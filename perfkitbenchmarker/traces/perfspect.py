@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,7 +35,6 @@ from perfkitbenchmarker import events
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import data
-from perfkitbenchmarker import os_types
 
 FLAGS = flags.FLAGS
 
@@ -46,18 +45,18 @@ flags.DEFINE_string('perfspect_tarball', None,
 flags.DEFINE_string('perfspect_url', None,
                     'URL for downloading perfspect tarball.')
 
-PERFSPECT_ARCHIVE_URL = "https://github.com/intel/PerfSpect/releases/download/v1.1.0/perfspect_1.1.0.tgz"
-PREREQ_UBUNTU = ["linux-tools-common",
-                 "linux-tools-generic",
-                 "linux-tools-`uname -r`"]
-PREREQ_CENTOS = ["perf"]
-PREREQ_PKGS = ["python3-pip"]
+PERFSPECT_ARCHIVE_URL = 'https://github.com/intel/PerfSpect/releases/download/v1.1.0/perfspect_1.1.0.tgz'
+PREREQ_UBUNTU = ['linux-tools-common',
+                 'linux-tools-generic',
+                 'linux-tools-`uname -r`']
+PREREQ_CENTOS = ['perf']
+PREREQ_PKGS = ['python3-pip']
 
 
 class PerfspectCollector(object):
   """ Manages running telemetry during a test, and fetching the results folder. """
 
-  telemetry_dir = "/opt/perf_telemetry"
+  telemetry_dir = '/opt/perf_telemetry'
 
   def __init__(self):
     self.pid = None
@@ -65,11 +64,10 @@ class PerfspectCollector(object):
 
   def _InstallOSReqs(self, vm):
     """ Installs prereqs depending on the OS """
-    if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
-      if vm.OS_TYPE.find('ubuntu') >= 0:
-        vm.InstallPackages(' '.join(PREREQ_UBUNTU))
-      elif vm.OS_TYPE.find('centos') >= 0:
-        vm.InstallPackages(' '.join(PREREQ_CENTOS))
+    if 'ubuntu' in vm.OS_TYPE:
+      vm.InstallPackages(' '.join(PREREQ_UBUNTU))
+    elif 'centos' in vm.OS_TYPE:
+      vm.InstallPackages(' '.join(PREREQ_CENTOS))
     else:
       raise errors.VirtualMachine.VirtualMachineError('OS not supported')
 
@@ -78,10 +76,10 @@ class PerfspectCollector(object):
     logging.info('Installing PerfSpect on VM')
     self._InstallOSReqs(vm)
     vm.InstallPackages(' '.join(PREREQ_PKGS))
-    vm.RemoteCommand(' '.join(["sudo", "rm", "-rf", self.telemetry_dir]))
-    vm.RemoteCommand(' '.join(["sudo", "mkdir", "-p", self.telemetry_dir]))
+    vm.RemoteCommand(f'sudo rm -rf {self.telemetry_dir}')
+    vm.RemoteCommand(f'sudo mkdir -p {self.telemetry_dir}')
     vm.PushFile(self.perf_dir)
-    vm.RemoteCommand(' '.join(["sudo", "cp", "-r", "./perfspect", self.telemetry_dir + "/"]))
+    vm.RemoteCommand(f'sudo cp -r ./perfspect {self.telemetry_dir}/')
 
   def _StartTelemetry(self, vm):
     """ Starts PerfSpect telemetry on the VM. """
@@ -91,52 +89,50 @@ class PerfspectCollector(object):
       logging.exception('Failed executing perf. Is it installed?')
       raise ex
     perf_collect_file = posixpath.join(self.telemetry_dir, 'perfspect', 'perf-collect.sh')
-    vm.RemoteCommand('sudo chmod +x {0}'.format(perf_collect_file))
-    collect_cmd = ['cd', posixpath.join(self.telemetry_dir, 'perfspect'), '&&', 'sudo', './perf-collect.sh']
-    stdout, _ = vm.RemoteCommand(' '.join(collect_cmd), should_log=True)
+    vm.RemoteCommand(f'sudo chmod +x {perf_collect_file}')
+    perf_dir = posixpath.join(self.telemetry_dir, 'perfspect')
+    stdout, _ = vm.RemoteCommand(f'cd {perf_dir} && sudo ./perf-collect.sh', should_log=True)
     self.pid = stdout.strip()
-    logging.debug("pid of PerfSpect collector process: {0}".format(self.pid))
+    logging.debug(f'pid of PerfSpect collector process: {self.pid}')
 
   def _StopTelemetry(self, vm):
     """ Stops PerfSpect telemetry on the VM. """
     logging.info('Stopping PerfSpect telemetry')
     vm.RemoteCommand('sudo pkill -9 -x perf')
-    wait_cmd = ['tail', '--pid=' + self.pid, '-f', '/dev/null']
-    vm.RemoteCommand(' '.join(wait_cmd))
+    vm.RemoteCommand(f'tail --pid={self.pid} -f /dev/null')
     logging.info('Post processing PerfSpect raw metrics')
-    postprocess_cmd = ['cd', posixpath.join(self.telemetry_dir, 'perfspect'), '&&', 'sudo', './perf-postprocess',
-                       '-r', 'results/perfstat.csv']
-    vm.RemoteCommand(' '.join(postprocess_cmd))
+    perf_dir = posixpath.join(self.telemetry_dir, 'perfspect')
+    stdout, _ = vm.RemoteCommand(f'cd {perf_dir} && sudo ./perf-postprocess -r results/perfstat.csv')
 
   def _FetchResults(self, vm):
     """ Fetches PerfSpect telemetry results. """
     logging.info('Fetching PerfSpect telemetry results')
     perfspect_dir = '~/' + vm.name + '-perfspect'
-    vm.RemoteCommand(('mkdir {0} ').format(perfspect_dir))
-    vm.RemoteCommand(' '.join(["sudo", "cp", "-r", posixpath.join(self.telemetry_dir, 'perfspect', 'results', '*'),
-                     perfspect_dir]))
+    vm.RemoteCommand(f'mkdir {perfspect_dir}')
+    results = posixpath.join(self.telemetry_dir, 'perfspect', 'results', '*')
+    vm.RemoteCommand(f'sudo cp -r {results} {perfspect_dir}')
     vm.RemoteCopy(vm_util.GetTempDir(), perfspect_dir, False)
     logging.info('PerfSpect results copied')
 
   def _CleanupTelemetry(self, vm):
     """ PerfSpect cleanup routines """
     logging.info('Removing PerfSpect leftover files')
-    vm_util.IssueCommand(["rm", "-rf", self.perf_dir, self.perfspect_archive])
-    vm.RemoteCommand(' '.join(["sudo", "rm", "-rf", "~/*perfspect"]))
+    vm_util.IssueCommand(['rm', '-rf', self.perf_dir, self.perfspect_archive])
+    vm.RemoteCommand('sudo rm -rf ~/*perfspect*')
     logging.info('Removing PerfSpect from VM')
-    vm.RemoteCommand(' '.join(["sudo", "rm", "-rf", self.telemetry_dir]))
+    vm.RemoteCommand(f'sudo rm -rf {self.telemetry_dir}')
 
   def _GetLocalArchive(self):
     """ Gets the local path of the PerfSpect archive. """
     if FLAGS.perfspect_tarball:
-      logging.info("perfspect_tarball specified: {}".format(FLAGS.perfspect_tarball))
+      logging.info(f'perfspect_tarball specified: {FLAGS.perfspect_tarball}')
       local_archive_path = FLAGS.perfspect_tarball
     else:
       url = FLAGS.perfspect_url or PERFSPECT_ARCHIVE_URL
-      logging.info("downloading PerfSpect from: {}".format(url))
+      logging.info(f'downloading PerfSpect from: {url}')
       filename = os.path.basename(urlparse(url).path)
       local_archive_path = posixpath.join(vm_util.GetTempDir(), filename)
-      vm_util.IssueCommand(["curl", "-k", "-L", "-o", local_archive_path, url], timeout=None)
+      vm_util.IssueCommand(['curl', '-k', '-L', '-o', local_archive_path, url], timeout=None)
     return local_archive_path
 
   def Before(self, unused_sender, benchmark_spec):
@@ -151,7 +147,7 @@ class PerfspectCollector(object):
 
     self.perf_dir = posixpath.join(vm_util.GetTempDir(), 'perfspect')
     self.perfspect_archive = self._GetLocalArchive()
-    vm_util.IssueCommand(["tar", "-C", vm_util.GetTempDir(), "-xf", self.perfspect_archive])
+    vm_util.IssueCommand(['tar', '-C', vm_util.GetTempDir(), '-xf', self.perfspect_archive])
     vm_util.IssueCommand(['cp', data.ResourcePath(posixpath.join('perfspect', 'perf-collect.sh')),
                           self.perf_dir + "/"])
     vm_util.RunThreaded(self._InstallTelemetry, vms)
