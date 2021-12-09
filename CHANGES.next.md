@@ -191,3 +191,5 @@
     than monitoring.googleapis.com. Used by `cloud_bigtable_ycsb`.
 -   Broadens Azure quota detection parsing
 -   AWS disk attaches now wait for attach, supporting io2 block express
+-   Update the performance results of Bigtable testing which used a more proper
+    client setup.
