@@ -1,4 +1,4 @@
-# Copyright 2016 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,17 +14,17 @@
 
 """Package for installing the AWS CLI."""
 
-AWSCLI_URL = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
-AWSCLI_ZIP = "awscliv2.zip"
+AWSCLI_URL = 'https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip'
+AWSCLI_ZIP = 'awscliv2.zip'
 
 
 def Install(vm):
   """Installs the awscli package on the VM."""
-  vm.InstallPackages("unzip")
-  vm.RemoteCommand(f"curl {AWSCLI_URL} -o {AWSCLI_ZIP} && unzip {AWSCLI_ZIP}")
-  vm.RemoteCommand("sudo ./aws/install")
+  vm.InstallPackages('unzip')
+  vm.RemoteCommand(f'curl {AWSCLI_URL} -o {AWSCLI_ZIP} && unzip {AWSCLI_ZIP}')
+  vm.RemoteCommand('sudo ./aws/install')
   # Clean up unused files
-  vm.RemoteCommand(f"rm -rf aws {AWSCLI_ZIP}")
+  vm.RemoteCommand(f'rm -rf aws {AWSCLI_ZIP}')
 
 
 def Uninstall(vm):
