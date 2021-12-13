@@ -320,7 +320,8 @@ def _Run(benchmark_spec, test):
     # use GCP zonal internal DNS, but maybe should add domain to vm's data attributes?
     endpoints = ''
     if FLAGS.cloud == 'GCP':
-      endpoints = ' '.join([f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal' for vm in vms])
+      # endpoints = ' '.join([f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal' for vm in vms])
+      endpoints = ' '.join('--test_endpoint=google.com')
     else:
       raise NotImplementedError('DNS not implemented for this cloud type')
     _AddComputeMetadata(client, vms[0], metadata)
@@ -335,11 +336,15 @@ def _Run(benchmark_spec, test):
     metadata['throughput_slowest_thread'] = True
   if FLAGS.ch_network_test == 'dns':
     metadata['dns_recursive'] = True
+  if FLAGS.ch_network_test in ['rtt', 'ssl', 'ttfb']:
+    metadata['throughput_time'] = True
 
   metadata = cloud_harmony_util.GetCommonMetadata(metadata)
   cmd_path = posixpath.join(cloud_harmony_network.INSTALL_PATH, 'run.sh')
   outdir = vm_util.VM_TMP_DIR
   cmd = f'sudo {cmd_path} {endpoints} {metadata} --output={outdir} --verbose'
+  print("CMD")
+  print(cmd)
   client.RobustRemoteCommand(cmd)
   save_command = posixpath.join(cloud_harmony_network.INSTALL_PATH, 'save.sh')
   client.RemoteCommand(f'{save_command} {outdir}')
