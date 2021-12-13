@@ -112,9 +112,9 @@ def CheckPrerequisites(_):
   if FLAGS.ch_network_test_service_type == STORAGE and FLAGS.cloud != 'GCP':
     raise NotImplementedError('Benchmark only supports GCS object storage.')
   elif FLAGS.ch_network_test_service_type == DNS and FLAGS.ch_network_test != 'dns':
-    raise InvalidConfigurationError('If ch_network_test_service_type flag is set to dns, ch_network_test flag must also be dns')
+    raise errors.Setup.InvalidConfigurationError('If ch_network_test_service_type flag is set to dns, ch_network_test flag must also be dns')
   elif FLAGS.ch_network_test_service_type != DNS and FLAGS.ch_network_test == 'dns':
-    raise InvalidConfigurationError('If ch_network_test flag is set to dns, ch_network_test_service_type flag must also be dns')
+    raise errors.Setup.InvalidConfigurationError('If ch_network_test flag is set to dns, ch_network_test_service_type flag must also be dns')
   elif FLAGS.ch_network_test_service_type == DNS and FLAGS.cloud != 'GCP':
     raise NotImplementedError('DNS Benchmark not implemented for this cloud type')
 
