@@ -51,6 +51,7 @@ ACT_DYNAMIC_LOAD_STEP = 0.9
 
 
 def GetConfig(user_config):
+  """Get benchmark config for act benchmark."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS.data_disk_type == disk.LOCAL:
     config['vm_groups']['default']['disk_count'] = (
@@ -58,6 +59,9 @@ def GetConfig(user_config):
   else:
     config['vm_groups']['default']['disk_count'] = (
         config['vm_groups']['default']['disk_count'] or 1)
+  disk_spec = config['vm_groups']['default']['disk_spec']
+  for cloud in disk_spec:
+    disk_spec[cloud]['mount_point'] = None
   return config
 
 
@@ -81,8 +85,6 @@ def Prepare(benchmark_spec):
   """Prepares act benchmark."""
   vm = benchmark_spec.vms[0]
   vm.Install('act')
-  for d in vm.scratch_disks:
-    vm.RemoteCommand('sudo umount %s' % d.mount_point)
 
 
 def PrepareActConfig(vm, load):
