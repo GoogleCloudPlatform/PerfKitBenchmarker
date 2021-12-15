@@ -822,48 +822,48 @@ class Debian9BasedAzureVirtualMachine(AzureVirtualMachine,
 class Debian10BasedAzureVirtualMachine(AzureVirtualMachine,
                                        linux_virtual_machine.Debian10Mixin):
   # From https://wiki.debian.org/Cloud/MicrosoftAzure
-  IMAGE_URN = 'Debian:debian-10:10:latest'
+  IMAGE_URN = 'Debian:debian-10:10-gen2:latest'
 
 
 class Debian11BasedAzureVirtualMachine(AzureVirtualMachine,
                                        linux_virtual_machine.Debian11Mixin):
   # From https://wiki.debian.org/Cloud/MicrosoftAzure
-  IMAGE_URN = 'Debian:debian-11:11:latest'
+  IMAGE_URN = 'Debian:debian-11:11-gen2:latest'
 
 
 class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1604Mixin):
-  IMAGE_URN = 'Canonical:UbuntuServer:16.04-LTS:latest'
+  IMAGE_URN = 'Canonical:UbuntuServer:16_04_0-lts-gen2:latest'
 
 
 class Ubuntu1804BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1804Mixin):
-  IMAGE_URN = 'Canonical:UbuntuServer:18.04-LTS:latest'
+  IMAGE_URN = 'Canonical:UbuntuServer:18_04-lts-gen2:latest'
 
 
 class Ubuntu2004BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu2004Mixin):
-  IMAGE_URN = 'Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest'
+  IMAGE_URN = 'Canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest'
 
 
 class Rhel7BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel7Mixin):
-  IMAGE_URN = 'RedHat:RHEL:7.6:latest'
+  IMAGE_URN = 'RedHat:RHEL:76-gen2:latest'
 
 
 class Rhel8BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel8Mixin):
-  IMAGE_URN = 'RedHat:RHEL:8:latest'
+  IMAGE_URN = 'RedHat:RHEL:8-gen2:latest'
 
 
 class CentOs7BasedAzureVirtualMachine(AzureVirtualMachine,
                                       linux_virtual_machine.CentOs7Mixin):
-  IMAGE_URN = 'OpenLogic:CentOS:7.6:latest'
+  IMAGE_URN = 'OpenLogic:CentOS:7_6-gen2:latest'
 
 
 class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
                                       linux_virtual_machine.CentOs8Mixin):
-  IMAGE_URN = 'OpenLogic:CentOS:8.0:latest'
+  IMAGE_URN = 'OpenLogic:CentOS:8_0-gen2:latest'
 
 
 # TODO(pclay): Add Fedora CoreOS when available:
