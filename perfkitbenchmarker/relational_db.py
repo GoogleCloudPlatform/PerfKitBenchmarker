@@ -624,7 +624,7 @@ class BaseRelationalDb(resource.BaseResource):
 
     # Set the size of the shared buffer
     vm.RemoteCommand(
-        'sudo sed -i.bak "s:#shared_buffers = 128MB:shared_buffers = {}GB:" '
+        'sudo sed -i.bak "s:shared_buffers = 128MB:shared_buffers = {}GB:" '
         '{}'.format(self.postgres_shared_buffer_size, postgres_conf_file))
     # Update data path to new location
     vm.RemoteCommand('sudo rsync -av /var/lib/postgresql /scratch')
