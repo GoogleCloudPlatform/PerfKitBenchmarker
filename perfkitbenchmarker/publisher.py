@@ -547,7 +547,7 @@ class BigQueryPublisher(SamplePublisher):
 
   def PublishSamples(self, samples):
     if not samples:
-      logging.warn('No samples: not publishing to BigQuery')
+      logging.warning('No samples: not publishing to BigQuery')
       return
 
     with vm_util.NamedTemporaryFile(prefix='perfkit-bq-pub',
@@ -623,8 +623,9 @@ class CloudStoragePublisher(SamplePublisher):
 
 
 class ElasticsearchPublisher(SamplePublisher):
-  """Publish samples to an Elasticsearch server. Index and document type
-  will be created if they do not exist.
+  """Publish samples to an Elasticsearch server.
+
+  Index and document type will be created if they do not exist.
 
   Attributes:
     es_uri: String. e.g. "http://localhost:9200"
@@ -638,27 +639,28 @@ class ElasticsearchPublisher(SamplePublisher):
     self.es_index = es_index.lower()
     self.es_type = es_type
     self.mapping_5_plus = {
-        "mappings": {
-            "result": {
-                "numeric_detection": True,
-                "properties": {
-                    "timestamp": {
-                        "type": "date",
-                        "format": "yyyy-MM-dd HH:mm:ss.SSSSSS"
+        'mappings': {
+            'result': {
+                'numeric_detection':
+                    True,
+                'properties': {
+                    'timestamp': {
+                        'type': 'date',
+                        'format': 'yyyy-MM-dd HH:mm:ss.SSSSSS'
                     },
-                    "value": {
-                        "type": "double"
+                    'value': {
+                        'type': 'double'
                     }
                 },
-                "dynamic_templates": [{
-                    "strings": {
-                        "match_mapping_type": "string",
-                        "mapping": {
-                            "type": "text",
-                            "fields": {
-                                "raw": {
-                                    "type": "keyword",
-                                    "ignore_above": 256
+                'dynamic_templates': [{
+                    'strings': {
+                        'match_mapping_type': 'string',
+                        'mapping': {
+                            'type': 'text',
+                            'fields': {
+                                'raw': {
+                                    'type': 'keyword',
+                                    'ignore_above': 256
                                 }
                             }
                         }
@@ -669,27 +671,28 @@ class ElasticsearchPublisher(SamplePublisher):
     }
 
     self.mapping_before_5 = {
-        "mappings": {
-            "result": {
-                "numeric_detection": True,
-                "properties": {
-                    "timestamp": {
-                        "type": "date",
-                        "format": "yyyy-MM-dd HH:mm:ss.SSSSSS"
+        'mappings': {
+            'result': {
+                'numeric_detection':
+                    True,
+                'properties': {
+                    'timestamp': {
+                        'type': 'date',
+                        'format': 'yyyy-MM-dd HH:mm:ss.SSSSSS'
                     },
-                    "value": {
-                        "type": "double"
+                    'value': {
+                        'type': 'double'
                     }
                 },
-                "dynamic_templates": [{
-                    "strings": {
-                        "match_mapping_type": "string",
-                        "mapping": {
-                            "type": "string",
-                            "fields": {
-                                "raw": {
-                                    "type": "string",
-                                    "index": "not_analyzed"
+                'dynamic_templates': [{
+                    'strings': {
+                        'match_mapping_type': 'string',
+                        'mapping': {
+                            'type': 'string',
+                            'fields': {
+                                'raw': {
+                                    'type': 'string',
+                                    'index': 'not_analyzed'
                                 }
                             }
                         }
@@ -740,7 +743,7 @@ class ElasticsearchPublisher(SamplePublisher):
     yyyy-MM-dd HH:mm:ss.SSSSSS in string
     """
     ts = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(epoch_us))
-    num_dec = ("%.6f" % (epoch_us - math.floor(epoch_us))).split('.')[1]
+    num_dec = ('%.6f' % (epoch_us - math.floor(epoch_us))).split('.')[1]
     new_ts = '%s.%s' % (ts, num_dec)
     return new_ts
 
@@ -820,7 +823,9 @@ class InfluxDBPublisher(SamplePublisher):
     return key_value_pairs
 
   def _CreateDB(self):
-    """This method is idempotent. If the DB already exists it will simply
+    """Creates a database.
+
+    This method is idempotent. If the DB already exists it will simply
     return a 200 code without re-creating it.
     """
     successful_http_request_codes = [200, 202, 204]
@@ -842,7 +847,7 @@ class InfluxDBPublisher(SamplePublisher):
   def _WriteData(self, data):
     successful_http_request_codes = [200, 202, 204]
     params = data
-    header = {"Content-type": "application/octet-stream"}
+    header = {'Content-type': 'application/octet-stream'}
     conn = httplib.HTTPConnection(self.influx_uri)
     conn.request('POST', '/write?' + 'db=' + self.influx_db_name, params,
                  headers=header)
@@ -892,7 +897,7 @@ class SampleCollector(object):
     if add_default_publishers:
       self.publishers.extend(SampleCollector._DefaultPublishers())
 
-    logging.debug('Using publishers: {0}'.format(self.publishers))
+    logging.debug('Using publishers: %s', str(self.publishers))
 
   @classmethod
   def _DefaultPublishers(cls):
@@ -977,7 +982,7 @@ class SampleCollector(object):
   def PublishSamples(self):
     """Publish samples via all registered publishers."""
     if not self.samples:
-      logging.warn('No samples to publish.')
+      logging.warning('No samples to publish.')
       return
     for publisher in self.publishers:
       publisher.PublishSamples(self.samples)
