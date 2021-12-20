@@ -1,12 +1,13 @@
-"""Module installing, mounting and unmounting gcsfuse."""
+"""Install gcsfuse package."""
 
 from absl import flags
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('gcsfuse_version', '0.35.1', 'The version of the gcsfuse.')
-flags.DEFINE_string('gcsfuse_options', '--implicit-dirs',
-                    'The options used to mount gcsfuse.')
+flags.DEFINE_string('gcsfuse_version', '0.37.0', 'The version of the gcsfuse.')
+flags.DEFINE_string(
+    'gcsfuse_bucket', '', 'The GCS bucket to be mounted. '
+    'If not set, all buckets are mounted as subdirectories.')
 
 PACKAGE_LOCAL = '/tmp/gcsfuse.deb'
 MNT = '/gcs'
