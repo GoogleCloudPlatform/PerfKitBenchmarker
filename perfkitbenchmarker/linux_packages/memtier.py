@@ -94,6 +94,11 @@ MEMTIER_KEY_PATTERN = flags.DEFINE_string(
     'memtier_key_pattern', 'R:R',
     'Set:Get key pattern. G for Gaussian distribution, R for '
     'uniform Random, S for Sequential. Defaults to R:R.')
+MEMTIER_LOAD_KEY_MAXIMUM = flags.DEFINE_integer(
+    'memtier_load_key_maximum', None, 'Key ID maximum value to load. '
+    'The range of keys will be from 1 (min) to this specified max key value. '
+    'If not set, defaults to memtier_key_maximum. Setting this different from '
+    'memtier_key_maximum allows triggering of eviction behavior.')
 MEMTIER_KEY_MAXIMUM = flags.DEFINE_integer(
     'memtier_key_maximum', 10000000, 'Key ID maximum value. The range of keys '
     'will be from 1 (min) to this specified max key value.')
@@ -224,7 +229,9 @@ def Load(client_vm,
          server_port: str,
          server_password: Optional[str] = None) -> None:
   """Preload the server with data."""
-
+  load_key_maximum = (
+      MEMTIER_LOAD_KEY_MAXIMUM.value
+      if MEMTIER_LOAD_KEY_MAXIMUM.value else MEMTIER_KEY_MAXIMUM.value)
   cmd = BuildMemtierCommand(
       server=server_ip,
       port=server_port,
@@ -235,7 +242,7 @@ def Load(client_vm,
       data_size=MEMTIER_DATA_SIZE.value,
       pipeline=_LOAD_NUM_PIPELINES,
       key_minimum=1,
-      key_maximum=MEMTIER_KEY_MAXIMUM.value,
+      key_maximum=load_key_maximum,
       requests='allkeys',
       password=server_password)
   client_vm.RemoteCommand(cmd)
@@ -252,7 +259,7 @@ def RunOverAllThreadsPipelinesAndClients(
     for client_thread in FLAGS.memtier_threads:
       for client in FLAGS.memtier_clients:
         logging.info(
-            'Start benchmarking memcached using memtier:\n'
+            'Start benchmarking redis/memcached using memtier:\n'
             '\tmemtier client: %s'
             '\tmemtier threads: %s'
             '\tmemtier pipeline, %s', client, client_thread, pipeline)
@@ -449,6 +456,8 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
   if MEMTIER_RUN_MODE.value == MemtierMode.MEASURE_CPU_LATENCY:
     meta['memtier_cpu_target'] = MEMTIER_CPU_TARGET.value
     meta['memtier_cpu_duration'] = MEMTIER_CPU_DURATION.value
+  if MEMTIER_LOAD_KEY_MAXIMUM.value:
+    meta['memtier_load_key_maximum'] = MEMTIER_LOAD_KEY_MAXIMUM.value
   return meta
 
 
