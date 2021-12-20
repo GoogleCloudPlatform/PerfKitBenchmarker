@@ -106,6 +106,10 @@ flags.DEFINE_string(
 flags.DEFINE_bool('dpb_sparksql_create_hive_tables', False,
                   'Whether to load dpb_sparksql_data into external hive tables '
                   'or not.')
+flags.DEFINE_bool('dpb_sparksql_simultaneous', False,
+                  'Run all queries simultaneously instead of one by one. '
+                  'Depending on the service type and cluster shape, it might '
+                  'fail if too many queries are to be run.')
 flags.DEFINE_string(
     'dpb_sparksql_database', None,
     'Name of preprovisioned Hive database to look for data in '
@@ -306,6 +310,8 @@ def Run(benchmark_spec):
     args += ['--enable-hive', 'True']
   if FLAGS.dpb_sparksql_table_cache:
     args += ['--table-cache', FLAGS.dpb_sparksql_table_cache]
+  if FLAGS.dpb_sparksql_simultaneous:
+    args += ['--simultaneous', 'True']
   jars = []
   if FLAGS.spark_bigquery_connector:
     jars.append(FLAGS.spark_bigquery_connector)
