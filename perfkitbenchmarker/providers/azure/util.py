@@ -173,7 +173,8 @@ def GetAllZones() -> Set[str]:
 def GetGeoFromRegion(region: str) -> str:
   """Gets valid geo from the region, i.e. region westus2 returns US."""
   stdout, _ = vm_util.IssueRetryableCommand([
-      AZURE_PATH, 'account', 'list-locations', '--output', 'json'
+      AZURE_PATH, 'account', 'list-locations',
+      '--output', 'json',
       '--query', f"[?name == '{region}'].metadata.geographyGroup"
   ])
   return stdout.splitlines()[1].strip('" ')
@@ -182,7 +183,8 @@ def GetGeoFromRegion(region: str) -> str:
 def GetRegionsInGeo(geo: str) -> Set[str]:
   """Gets valid regions in the geo."""
   stdout, _ = vm_util.IssueRetryableCommand([
-      AZURE_PATH, 'account', 'list-locations', '--output', 'json'
+      AZURE_PATH, 'account', 'list-locations',
+      '--output', 'json',
       '--query', f"[?metadata.geographyGroup == '{geo}']"
   ])
   return set([
