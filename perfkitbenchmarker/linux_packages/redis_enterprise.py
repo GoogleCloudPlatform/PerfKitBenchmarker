@@ -207,8 +207,15 @@ def PinWorkers(vm):
                          node_cpu_list=node_cpu_list))
 
 
-def SetUpCluster(vm, redis_port):
-  """Set up the details of the cluster."""
+def CreateDatabase(vm, redis_port):
+  """Create a new Redis Enterprise database.
+
+  Args:
+    vm: The VM where the cluster is set up.
+    redis_port: The port to serve the database.
+
+  See https://docs.redis.com/latest/rs/references/rest-api/objects/bdb/.
+  """
   content = {
       'name': 'redisdb',
       'memory_size': int(vm.total_memory_kb * _ONE_KILOBYTE / 2),
@@ -237,8 +244,8 @@ def SetUpCluster(vm, redis_port):
 
 
 @vm_util.Retry()
-def WaitForClusterUp(vm, redis_port):
-  """Waits for the Redis Enterprise cluster to respond to commands."""
+def WaitForDatabaseUp(vm, redis_port):
+  """Waits for the Redis Enterprise database to respond to commands."""
   stdout, _ = vm.RemoteCommand(
       'sudo /opt/redislabs/bin/redis-cli '
       '-h localhost '
@@ -251,8 +258,8 @@ def WaitForClusterUp(vm, redis_port):
     raise errors.Resource.RetryableCreationError()
 
 
-def LoadCluster(vm, redis_port):
-  """Load the cluster before performing tests."""
+def LoadDatabase(vm, redis_port):
+  """Load the database before performing tests."""
   command = (
       'sudo /opt/redislabs/bin/memtier_benchmark '
       '-s localhost '

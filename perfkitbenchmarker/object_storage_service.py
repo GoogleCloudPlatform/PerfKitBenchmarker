@@ -376,9 +376,8 @@ def FindBotoFile():
   for path in paths_to_check:
     if not path:
       continue
-    absolute_path = pathlib.Path(path).expanduser().absolute()
-    if absolute_path.exists():
-      return absolute_path.as_posix()
+    if pathlib.Path(path).exists():
+      return path
 
   raise errors.Benchmarks.MissingObjectCredentialException(
       'Boto file cannot be found in %s.' % paths_to_check)

@@ -193,4 +193,3 @@
 -   AWS disk attaches now wait for attach, supporting io2 block express
 -   Update the performance results of Bigtable testing which used a more proper
     client setup.
--   Boto file should be absolute path.

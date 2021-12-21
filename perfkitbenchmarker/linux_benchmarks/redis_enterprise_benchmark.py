@@ -93,10 +93,10 @@ def Prepare(benchmark_spec):
   redis_enterprise.OfflineCores(server_vm)
   redis_enterprise.CreateCluster(server_vm)
   redis_enterprise.TuneProxy(server_vm)
-  redis_enterprise.SetUpCluster(server_vm, REDIS_PORT)
+  redis_enterprise.CreateDatabase(server_vm, REDIS_PORT)
   redis_enterprise.PinWorkers(server_vm)
-  redis_enterprise.WaitForClusterUp(server_vm, REDIS_PORT)
-  redis_enterprise.LoadCluster(server_vm, REDIS_PORT)
+  redis_enterprise.WaitForDatabaseUp(server_vm, REDIS_PORT)
+  redis_enterprise.LoadDatabase(server_vm, REDIS_PORT)
 
 
 def Run(benchmark_spec):
