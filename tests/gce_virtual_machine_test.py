@@ -261,10 +261,10 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         "id": "5583038217590279140",
         "insertTime": "2021-03-12T10:38:00.048-08:00",
         "kind": "compute#operation",
-        "name": "systemevent-1615574280048-5bd5b33121158-c654ffc9-0ff0dc28",
+        "name": "systemevent-1815574280048-5bd5b33121158-c654ffc9-0ff0dc28",
         "operationType": "compute.instances.preempted",
         "progress": 100,
-        "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/asia-northeast2-a/operations/systemevent-1615574280048-5bd5b33121158-c654ffc9-0ff0dc28",
+        "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/asia-northeast2-a/operations/systemevent-1815574280048-5bd5b33121158-c654ffc9-0ff0dc28",
         "startTime": "2021-03-12T10:38:00.048-08:00",
         "status": "DONE",
         "statusMessage": "Instance was preempted.",
@@ -325,9 +325,9 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       fake_rets.append((json.dumps(_CreateFakeDiskMetadata(fake_image)), '', 0))
     return fake_rets
 
-  def testCreateUbuntu1604(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1604)
-    fake_image = 'fake-ubuntu1604'
+  def testCreateUbuntu1804(self):
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    fake_image = 'fake-ubuntu1804'
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(self.spec)
@@ -338,14 +338,14 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud compute instances create', command_string)
       self.assertIn(
-          '--image-family ubuntu-1604-lts --image-project ubuntu-os-cloud',
+          '--image-family ubuntu-1804-lts --image-project ubuntu-os-cloud',
           command_string)
       self.assertNotIn('--boot-disk-size', command_string)
       self.assertNotIn('--boot-disk-type', command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       self.assertDictContainsSubset({'image': fake_image,
-                                     'image_family': 'ubuntu-1604-lts',
+                                     'image_family': 'ubuntu-1804-lts',
                                      'image_project': 'ubuntu-os-cloud',
                                      'boot_disk_size': '10',
                                      'boot_disk_type': 'pd-standard'},
@@ -353,8 +353,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateUbuntuInCustomProject(self):
     """Test simulating passing --image and --image_project."""
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1604)
-    fake_image = 'fake-ubuntu1604'
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    fake_image = 'fake-ubuntu1804'
     fake_image_project = 'fake-project'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type',
@@ -370,7 +370,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud compute instances create', command_string)
       self.assertIn(
-          '--image fake-ubuntu1604 --image-project fake-project',
+          '--image fake-ubuntu1804 --image-project fake-project',
           command_string)
       self.assertNotIn('--image-family', command_string)
       vm._PostCreate()
@@ -383,8 +383,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateUbuntuInCustomDisk(self):
     """Test simulating passing --image and --image_project."""
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1604)
-    fake_image = 'fake-ubuntu1604'
+    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    fake_image = 'fake-ubuntu1804'
     fake_image_project = 'fake-project'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type',
@@ -412,28 +412,6 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
                                      'boot_disk_type': 'fake-disk-type'},
                                     vm_metadata)
       self.assertNotIn('image_family', vm_metadata)
-
-  def testCreateUbuntu1804(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
-    fake_image = 'fake-ubuntu1804'
-    with PatchCriticalObjects(
-        self._CreateFakeReturnValues(fake_image)) as issue_command:
-      vm = vm_class(self.spec)
-      vm._Create()
-      vm.created = True
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud compute instances create', command_string)
-      self.assertIn(
-          '--image-family ubuntu-1804-lts --image-project ubuntu-os-cloud',
-          command_string)
-      vm._PostCreate()
-      self.assertEqual(issue_command.call_count, 3)
-      self.assertDictContainsSubset({'image': fake_image,
-                                     'image_family': 'ubuntu-1804-lts',
-                                     'image_project': 'ubuntu-os-cloud'},
-                                    vm.GetResourceMetadata())
 
   def testCreateRhel7CustomImage(self):
     vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.RHEL7)

@@ -171,7 +171,7 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _CreateVm(self):
     vm_spec = gce_virtual_machine.GceVmSpec('test_vm_spec.GCP',
                                             machine_type='test_machine_type')
-    return gce_virtual_machine.Ubuntu1604BasedGceVirtualMachine(vm_spec)
+    return gce_virtual_machine.Ubuntu1804BasedGceVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
     return gce_disk.GceDisk

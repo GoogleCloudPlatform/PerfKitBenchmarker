@@ -228,7 +228,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
     return vm
 
   def testRecordLscpuOutputLinux(self):
-    vm = self.CreateVm(os_types.UBUNTU1604, self.LsCpuText(self.LSCPU_DATA))
+    vm = self.CreateVm(os_types.DEFAULT, self.LsCpuText(self.LSCPU_DATA))
     samples = pkb._CreateLscpuSamples([vm])
     vm.RemoteCommand.assert_called_with('lscpu')
     self.assertEqual(1, len(samples))
@@ -248,7 +248,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
       linux_virtual_machine.LsCpuResults('')
 
   def testLsCpuParsing(self):
-    vm = self.CreateVm(os_types.UBUNTU1604,
+    vm = self.CreateVm(os_types.DEFAULT,
                        self.LsCpuText(self.LSCPU_DATA) + '\nThis Line=Invalid')
     results = vm.CheckLsCpu()
     self.assertEqual(1, results.numa_node_count)
@@ -265,7 +265,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
         }, results.data)
 
   def testProcCpuParsing(self):
-    vm = self.CreateVm(os_types.UBUNTU1604, self.PROC_CPU_TEXT)
+    vm = self.CreateVm(os_types.DEFAULT, self.PROC_CPU_TEXT)
     results = vm.CheckProcCpu()
     expected_mappings = {}
     expected_mappings[29] = {'apicid': '27', 'core id': '13'}
@@ -280,7 +280,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
     self.assertEqual(expected_common, results.GetValues())
 
   def testProcCpuSamples(self):
-    vm = self.CreateVm(os_types.UBUNTU1604, self.PROC_CPU_TEXT)
+    vm = self.CreateVm(os_types.DEFAULT, self.PROC_CPU_TEXT)
     samples = pkb._CreateProcCpuSamples([vm])
     proccpu_metadata = {
         'cpu family': '6',

@@ -1184,12 +1184,6 @@ class CoreOsBasedGceVirtualMachine(
     self.user_name = 'core'
 
 
-class Ubuntu1604BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu1604Mixin):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-1604-lts'
-  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
-
-
 class Ubuntu1804BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu1804Mixin):
   DEFAULT_IMAGE_FAMILY = 'ubuntu-1804-lts'
