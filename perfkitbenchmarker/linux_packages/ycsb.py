@@ -333,6 +333,14 @@ def _Install(vm):
   install_cmd = ('mkdir -p {0} && curl -L {1} | '
                  'tar -C {0} --strip-components=1 -xzf -')
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
+  # Log4j 2 < 2.16 is vulnerable to
+  # https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-44228.
+  # YCSB currently ships with a number of vulnerable jars. None are used by PKB,
+  # so simply delete them.
+  # After https://github.com/brianfrankcooper/YCSB/pull/1583 is merged and
+  # released, this will not be necessary.
+  # TODO(user): Update minimum YCSB version and remove.
+  vm.RemoteCommand(f'rm $(find {YCSB_DIR} -name log4j-core-2*.jar)')
   if _GetVersion(FLAGS.ycsb_version) >= 11:
     vm.Install('maven')
     vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
@@ -345,12 +353,7 @@ def _Install(vm):
                          mvn_cmd=maven.GetRunCommand('install')))
 
 
-def YumInstall(vm):
-  """Installs the YCSB package on the VM."""
-  _Install(vm)
-
-
-def AptInstall(vm):
+def Install(vm):
   """Installs the YCSB package on the VM."""
   _Install(vm)
 
