@@ -53,8 +53,8 @@ PREREQ_CENTOS = ['perf']
 PREREQ_PKGS = ['python3-pip']
 
 
-class PerfspectCollector(object):
-  """ Manages running telemetry during a test, and fetching the results folder. """
+class PerfspectCollector():
+  """Manages running telemetry during a test, and fetching the results folder."""
 
   telemetry_dir = '/opt/perf_telemetry'
 
@@ -63,7 +63,7 @@ class PerfspectCollector(object):
     self.perf_dir = None
 
   def _InstallOSReqs(self, vm):
-    """ Installs prereqs depending on the OS """
+    """Installs prereqs depending on the OS"""
     if 'ubuntu' in vm.OS_TYPE:
       vm.InstallPackages(' '.join(PREREQ_UBUNTU))
     elif 'centos' in vm.OS_TYPE:
@@ -72,7 +72,7 @@ class PerfspectCollector(object):
       raise errors.VirtualMachine.VirtualMachineError('OS not supported')
 
   def _InstallTelemetry(self, vm):
-    """ Installs PerfSpect telemetry on the VM. """
+    """Installs PerfSpect telemetry on the VM."""
     logging.info('Installing PerfSpect on VM')
     self._InstallOSReqs(vm)
     vm.InstallPackages(' '.join(PREREQ_PKGS))
@@ -82,7 +82,7 @@ class PerfspectCollector(object):
     vm.RemoteCommand(f'sudo cp -r ./perfspect {self.telemetry_dir}/')
 
   def _StartTelemetry(self, vm):
-    """ Starts PerfSpect telemetry on the VM. """
+    """Starts PerfSpect telemetry on the VM."""
     try:
       vm.RemoteCommand('perf list')
     except errors.VirtualMachine.RemoteCommandError as ex:
@@ -96,7 +96,7 @@ class PerfspectCollector(object):
     logging.debug(f'pid of PerfSpect collector process: {self.pid}')
 
   def _StopTelemetry(self, vm):
-    """ Stops PerfSpect telemetry on the VM. """
+    """Stops PerfSpect telemetry on the VM."""
     logging.info('Stopping PerfSpect telemetry')
     vm.RemoteCommand('sudo pkill -9 -x perf')
     vm.RemoteCommand(f'tail --pid={self.pid} -f /dev/null')
@@ -105,7 +105,7 @@ class PerfspectCollector(object):
     stdout, _ = vm.RemoteCommand(f'cd {perf_dir} && sudo ./perf-postprocess -r results/perfstat.csv')
 
   def _FetchResults(self, vm):
-    """ Fetches PerfSpect telemetry results. """
+    """Fetches PerfSpect telemetry results."""
     logging.info('Fetching PerfSpect telemetry results')
     perfspect_dir = '~/' + vm.name + '-perfspect'
     vm.RemoteCommand(f'mkdir {perfspect_dir}')
@@ -115,7 +115,7 @@ class PerfspectCollector(object):
     logging.info('PerfSpect results copied')
 
   def _CleanupTelemetry(self, vm):
-    """ PerfSpect cleanup routines """
+    """PerfSpect cleanup routines"""
     logging.info('Removing PerfSpect leftover files')
     vm_util.IssueCommand(['rm', '-rf', self.perf_dir, self.perfspect_archive])
     vm.RemoteCommand('sudo rm -rf ~/*perfspect*')
@@ -123,7 +123,7 @@ class PerfspectCollector(object):
     vm.RemoteCommand(f'sudo rm -rf {self.telemetry_dir}')
 
   def _GetLocalArchive(self):
-    """ Gets the local path of the PerfSpect archive. """
+    """Gets the local path of the PerfSpect archive."""
     if FLAGS.perfspect_tarball:
       logging.info(f'perfspect_tarball specified: {FLAGS.perfspect_tarball}')
       local_archive_path = FLAGS.perfspect_tarball
@@ -136,9 +136,10 @@ class PerfspectCollector(object):
     return local_archive_path
 
   def Before(self, unused_sender, benchmark_spec):
-    """ Installs PerfSpect Telemetry.
+    """Installs PerfSpect Telemetry.
 
     Args:
+      unused_sender: Unused parameter that fits event connection interface
       benchmark_spec: benchmark_spec.BenchmarkSpec. The benchmark currently
           running.
     """
@@ -156,9 +157,10 @@ class PerfspectCollector(object):
     vm_util.RunThreaded(self._StartTelemetry, vms)
 
   def After(self, unused_sender, benchmark_spec):
-    """ Stops PerfSpect telemetry, fetch results from VM(s).
+    """Stops PerfSpect telemetry, fetch results from VM(s).
 
     Args:
+      unused_sender: Unused parameter that fits event connection interface
       benchmark_spec: benchmark_spec.BenchmarkSpec. The benchmark that stopped
           running.
     """
@@ -169,7 +171,7 @@ class PerfspectCollector(object):
 
 
 def Register(parsed_flags):
-  """ Registers the PerfSpect collector if FLAGS.perfspect is set. """
+  """Registers the PerfSpect collector if FLAGS.perfspect is set."""
   if not parsed_flags.perfspect:
     return
   logging.info('Registering PerfSpect telemetry collector')
