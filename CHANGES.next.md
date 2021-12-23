@@ -193,3 +193,4 @@
 -   AWS disk attaches now wait for attach, supporting io2 block express
 -   Update the performance results of Bigtable testing which used a more proper
     client setup.
+-   Update the runner's AWS CLI to 1.19.75.
