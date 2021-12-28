@@ -154,6 +154,27 @@ def _PrepareServer(vm):
   vm.RemoteCommand(
       'sudo sed -i "/server_name _;/a client_max_body_size 100M;" /etc/nginx/sites-enabled/default'
   )
+
+  # Required for SSL test. Have to make self signed certificate and setup SSL config for nginx
+  vm.RemoteCommand('sudo openssl rand -writerand .rnd')
+  vm.RemoteCommand(
+      f'sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj '
+      f'"/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" '
+      f'-keyout /etc/ssl/private/nginx-selfsigned.key -out /etc/ssl/certs/nginx-selfsigned.crt '
+  )
+  vm.RemoteCommand('sudo openssl dhparam -out /etc/nginx/dhparam.pem 1024')
+  vm.RemoteCommand(
+      'sudo sed -i "/server_name _;/a ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;" /etc/nginx/sites-enabled/default'
+  )
+  vm.RemoteCommand(
+      'sudo sed -i "/server_name _;/a ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;" /etc/nginx/sites-enabled/default'
+  )
+  vm.RemoteCommand(
+      'sudo sed -i "/server_name _;/a listen 443 ssl default_server;" /etc/nginx/sites-enabled/default'
+  )
+  vm.RemoteCommand(
+      'sudo sed -i "/server_name _;/a listen [::]:443 ssl default_server;" /etc/nginx/sites-enabled/default'
+  )
   vm.RemoteCommand('sudo systemctl restart nginx')
 
   web_probe_file = posixpath.join(vm.GetScratchDir(), 'probe.tgz')
@@ -232,6 +253,10 @@ def Prepare(benchmark_spec):
   vm_groups = benchmark_spec.vm_groups
   client = vm_groups['client'][0]
   client.Install('cloud_harmony_network')
+
+  if FLAGS.ch_network_test == 'ssl':
+    client.RemoteCommand('echo insecure >> $HOME/.curlrc')
+
   if FLAGS.ch_network_test_service_type == COMPUTE:
     vm_util.RunThreaded(_PrepareServer, vm_groups['server'])
   elif FLAGS.ch_network_test_service_type == STORAGE:
@@ -320,8 +345,7 @@ def _Run(benchmark_spec, test):
     # use GCP zonal internal DNS, but maybe should add domain to vm's data attributes?
     endpoints = ''
     if FLAGS.cloud == 'GCP':
-      # endpoints = ' '.join([f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal' for vm in vms])
-      endpoints = ' '.join('--test_endpoint=google.com')
+      endpoints = ' '.join([f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal' for vm in vms])
     else:
       raise NotImplementedError('DNS not implemented for this cloud type')
     _AddComputeMetadata(client, vms[0], metadata)
@@ -343,8 +367,6 @@ def _Run(benchmark_spec, test):
   cmd_path = posixpath.join(cloud_harmony_network.INSTALL_PATH, 'run.sh')
   outdir = vm_util.VM_TMP_DIR
   cmd = f'sudo {cmd_path} {endpoints} {metadata} --output={outdir} --verbose'
-  print("CMD")
-  print(cmd)
   client.RobustRemoteCommand(cmd)
   save_command = posixpath.join(cloud_harmony_network.INSTALL_PATH, 'save.sh')
   client.RemoteCommand(f'{save_command} {outdir}')
