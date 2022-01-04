@@ -58,6 +58,12 @@ NGINX = 'nginx'
 # tcp: rtt, ssl, ttfb
 NETWORK_TESTS = ['latency', 'downlink', 'uplink', 'dns', 'rtt', 'ssl', 'ttfb']
 
+# SSL encryption types
+RSA = 'rsa'
+ECC = 'ecc'
+UNENCRYPTED = 'unencrypted'
+
+
 flags.DEFINE_enum('ch_network_test_service_type', COMPUTE, [COMPUTE, STORAGE, DNS],
                   'The service type to host the website.')
 flags.DEFINE_enum('ch_network_test', 'latency', NETWORK_TESTS,
@@ -88,6 +94,8 @@ flags.DEFINE_boolean('ch_network_throughput_slowest_thread', False, 'If set, '
                      'threads.')
 flags.DEFINE_integer('ch_network_tcp_samples', 10, 'The number of test samples '
                      'for TCP tests (rtt, ssl or ttfb).')
+flags.DEFINE_enum('ch_ssl_encryption_type', ECC, [ECC, RSA, UNENCRYPTED],
+                  'Encryption type to use for SSL.')
 CLIENT_ZONE = flags.DEFINE_string(
     'ch_client_zone', None,
     'zone to launch the network or storage test client in. ')
@@ -155,27 +163,42 @@ def _PrepareServer(vm):
       'sudo sed -i "/server_name _;/a client_max_body_size 100M;" /etc/nginx/sites-enabled/default'
   )
 
-  # Required for SSL test. Have to make self signed certificate and setup SSL config for nginx
+  # Required for SSL test
+  # Generate random
   vm.RemoteCommand('sudo openssl rand -writerand .rnd')
-  vm.RemoteCommand(
-      f'sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -subj '
-      f'"/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" '
-      f'-keyout /etc/ssl/private/nginx-selfsigned.key -out /etc/ssl/certs/nginx-selfsigned.crt '
-  )
-  vm.RemoteCommand('sudo openssl dhparam -out /etc/nginx/dhparam.pem 1024')
-  vm.RemoteCommand(
-      'sudo sed -i "/server_name _;/a ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;" /etc/nginx/sites-enabled/default'
-  )
-  vm.RemoteCommand(
-      'sudo sed -i "/server_name _;/a ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;" /etc/nginx/sites-enabled/default'
-  )
-  vm.RemoteCommand(
-      'sudo sed -i "/server_name _;/a listen 443 ssl default_server;" /etc/nginx/sites-enabled/default'
-  )
-  vm.RemoteCommand(
-      'sudo sed -i "/server_name _;/a listen [::]:443 ssl default_server;" /etc/nginx/sites-enabled/default'
-  )
-  vm.RemoteCommand('sudo systemctl restart nginx')
+  
+  # Create self signed certificate (RSA)
+  if FLAGS.ch_ssl_encryption_type == RSA:
+    vm.RemoteCommand(
+        f'sudo openssl req -x509 -nodes -days 1 -newkey rsa:2048 -subj '
+        f'"/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" '
+        f'-keyout /etc/ssl/private/nginx-selfsigned.key -out /etc/ssl/certs/nginx-selfsigned.crt '
+    )
+  # Create self signed certificate (ECC)
+  elif FLAGS.ch_ssl_encryption_type == ECC:
+    vm.RemoteCommand('sudo openssl ecparam -genkey -name prime256v1 -out /etc/ssl/private/nginx-selfsigned.key')
+    vm.RemoteCommand(
+        f'sudo openssl req -new -x509 -days 365 -extensions v3_ca -key /etc/ssl/private/nginx-selfsigned.key -subj '
+        f'"/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" '
+        f'-out /etc/ssl/certs/nginx-selfsigned.crt '
+    )
+  if FLAGS.ch_ssl_encryption_type != UNENCRYPTED:
+    # Setup SSL config for nginx
+    vm.RemoteCommand('sudo openssl dhparam -out /etc/nginx/dhparam.pem 1024')
+    vm.RemoteCommand(
+        'sudo sed -i "/server_name _;/a ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;" /etc/nginx/sites-enabled/default'
+    )
+    vm.RemoteCommand(
+        'sudo sed -i "/server_name _;/a ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;" /etc/nginx/sites-enabled/default'
+    )
+    vm.RemoteCommand(
+        'sudo sed -i "/server_name _;/a listen 443 ssl default_server;" /etc/nginx/sites-enabled/default'
+    )
+    vm.RemoteCommand(
+        'sudo sed -i "/server_name _;/a listen [::]:443 ssl default_server;" /etc/nginx/sites-enabled/default'
+    )
+        
+    vm.RemoteCommand('sudo systemctl restart nginx')
 
   web_probe_file = posixpath.join(vm.GetScratchDir(), 'probe.tgz')
   vm.InstallPreprovisionedPackageData(cloud_harmony_network.PACKAGE_NAME,
