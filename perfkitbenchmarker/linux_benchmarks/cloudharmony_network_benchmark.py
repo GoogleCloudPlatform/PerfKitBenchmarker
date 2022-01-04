@@ -198,7 +198,7 @@ def _PrepareServer(vm):
         'sudo sed -i "/server_name _;/a listen [::]:443 ssl default_server;" /etc/nginx/sites-enabled/default'
     )
         
-    vm.RemoteCommand('sudo systemctl restart nginx')
+  vm.RemoteCommand('sudo systemctl restart nginx')
 
   web_probe_file = posixpath.join(vm.GetScratchDir(), 'probe.tgz')
   vm.InstallPreprovisionedPackageData(cloud_harmony_network.PACKAGE_NAME,
