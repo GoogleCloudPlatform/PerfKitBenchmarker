@@ -277,6 +277,7 @@ def Prepare(benchmark_spec):
   client = vm_groups['client'][0]
   client.Install('cloud_harmony_network')
 
+  # Ignore complaints from using self-signed certificate
   if FLAGS.ch_network_test == 'ssl':
     client.RemoteCommand('echo insecure >> $HOME/.curlrc')
 
