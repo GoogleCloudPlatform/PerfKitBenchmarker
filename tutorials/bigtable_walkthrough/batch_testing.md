@@ -255,7 +255,7 @@ curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/ma
 ```
 
 > **TIP**: You can learn how to build the sample configs by reading the
-[config template](./batch_configs/templates/benchmark_config.yaml) which has
+[config template](./batch_configs/templates/benchmark_config.yaml) which has the
 detailed instructions.
 
 ## Task 4: Generate a runner config
@@ -325,8 +325,8 @@ PROJECT_ID=<the project id>
 sed -i "s/test_project/${PROJECT_ID}/g" ~/pkb_configs/runner.yaml
 ```
 
-> **TIP**: You can learn how to build the sample config reading the
-[config template](./batch_configs/templates/runner_config.yaml) which has
+> **TIP**: You can learn how to build the sample config by reading the
+[config template](./batch_configs/templates/runner_config.yaml) which has the
 detailed instructions.
 
 ## Task 5: Run the benchmarks
@@ -346,6 +346,7 @@ detailed instructions.
 1.  Install docker on the runner VM via command (one-off operation):
 
     ```sh
+    sudo apt update
     sudo apt install docker.io
     ```
 
