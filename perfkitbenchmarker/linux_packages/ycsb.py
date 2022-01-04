@@ -340,7 +340,7 @@ def _Install(vm):
   # After https://github.com/brianfrankcooper/YCSB/pull/1583 is merged and
   # released, this will not be necessary.
   # TODO(user): Update minimum YCSB version and remove.
-  vm.RemoteCommand(f'rm $(find {YCSB_DIR} -name log4j-core-2*.jar)')
+  vm.RemoteCommand(f'rm -f -- $(find {YCSB_DIR} -name log4j-core-2*.jar)')
   if _GetVersion(FLAGS.ycsb_version) >= 11:
     vm.Install('maven')
     vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
