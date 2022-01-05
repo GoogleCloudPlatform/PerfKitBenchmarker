@@ -64,6 +64,10 @@ flags.DEFINE_string('google_bigtable_instance_name', None,
 flags.DEFINE_string('google_bigtable_static_table_name', None,
                     'Bigtable table name. If not specified, a temporary table '
                     'will be created and deleted on the fly.')
+_DELETE_STATIC_TABLE = flags.DEFINE_boolean(
+    'google_bigtable_delete_static_table', False,
+    'Whether or not to delete a static table during cleanup. Temporary tables '
+    'are always cleaned up.')
 flags.DEFINE_boolean('google_bigtable_enable_table_object_sharing', False,
                      'If true, will use a YCSB binary that shares the same '
                      'Bigtable table object across all the threads on a VM.')
@@ -471,7 +475,8 @@ def Cleanup(benchmark_spec):
   # Delete table
   if FLAGS.google_bigtable_instance_name is None:
     benchmark_spec.bigtable_instance.Delete()
-  elif FLAGS.google_bigtable_static_table_name is None:
+  elif (FLAGS.google_bigtable_static_table_name is None or
+        _DELETE_STATIC_TABLE.value):
     # Only need to drop the temporary tables if we're not deleting the instance.
     vm = benchmark_spec.vms[0]
     command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """

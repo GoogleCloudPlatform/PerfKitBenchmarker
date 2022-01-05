@@ -125,6 +125,8 @@
 -   Add support for 5th gen Azure VMs.
 -   Support multiple Redis instances on the same VM and multiple client VMs.
 -   Support creating autoscaled Bigtable instances.
+-   Added support to allow deleting a static table in Cloud Bigtable benchmarks
+    via --google_bigtable_delete_static_table.
 -   Support downloading data twice in object_storage_service_benchmark.
 
 ### Bug fixes and maintenance updates:
