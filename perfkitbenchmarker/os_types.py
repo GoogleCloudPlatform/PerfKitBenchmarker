@@ -47,13 +47,20 @@ DEBIAN = 'debian'
 RHEL = 'rhel'
 WINDOWS = 'windows'
 
-LINUX_OS_TYPES = [
+# These operating systems have SSH like other Linux OSes, but no package manager
+# to run Linux benchmarks without Docker.
+# Because they cannot install packages, they only support VM life cycle
+# benchmarks like cluster_boot.
+CONTAINER_OS_TYPES = [
+    CORE_OS,
+    COS,
+]
+
+LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     AMAZONLINUX2,
     CENTOS7,
     CENTOS8,
     CLEAR,
-    CORE_OS,
-    COS,
     DEBIAN9,
     DEBIAN10,
     DEBIAN11,

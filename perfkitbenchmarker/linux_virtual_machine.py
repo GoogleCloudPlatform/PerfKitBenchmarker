@@ -1606,24 +1606,36 @@ class ClearMixin(BaseLinuxMixin):
 
 
 class BaseContainerLinuxMixin(BaseLinuxMixin):
-  """Class holding VM methods for minimal container-based OSes like Core OS."""
+  """Class holding VM methods for minimal container-based OSes like Core OS.
 
-  def PrepareVMEnvironment(self):
-    # Add more when benchmarks besides clusterboot are supported
-    pass
+  These operating systems have SSH like other Linux OSes, but no package manager
+  to run Linux benchmarks without Docker.
 
-  def Install(self, package_name):
-    raise NotImplementedError('Only use for cluster boot for now')
+  Because they cannot install packages, they only support VM life cycle
+  benchmarks like cluster_boot.
+  """
 
   def InstallPackages(self, package_name):
-    raise NotImplementedError('Only use for cluster boot for now')
-
-  def Uninstall(self, package_name):
-    raise NotImplementedError('Only use for cluster boot for now')
+    raise NotImplementedError('Container OSes have no package managers.')
 
   def HasPackage(self, package: str) -> bool:
-    # Change this when implementing InstallPackages.
     return False
+
+  # Install could theoretically be supported. A hermetic architecture
+  # appropriate binary could be copied into the VM and run.
+  # However because curl, wget, and object store clients cannot be installed and
+  # may or may not be present, copying the binary is non-trivial so simply
+  # block trying.
+
+  def Install(self, package_name):
+    raise NotImplementedError('Container OSes have no package managers.')
+
+  def Uninstall(self, package_name):
+    raise NotImplementedError('Container OSes have no package managers.')
+
+  def PrepareVMEnvironment(self):
+    # Don't try to install packages as normal, because it will fail.
+    pass
 
 
 class BaseRhelMixin(BaseLinuxMixin):
