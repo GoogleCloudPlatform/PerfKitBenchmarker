@@ -30,6 +30,7 @@ from perfkitbenchmarker import capacity_reservation
 from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
+from perfkitbenchmarker import data_discovery_service
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
@@ -155,6 +156,7 @@ class BenchmarkSpec(object):
     self.nfs_service = None
     self.smb_service = None
     self.messaging_service = None
+    self.data_discovery_service = None
     self.app_groups = {}
     self._zone_index = 0
     self.capacity_reservations = []
@@ -626,6 +628,19 @@ class BenchmarkSpec(object):
         self.config.messaging_service)
     self.messaging_service.setVms(self.vm_groups)
 
+  def ConstructDataDiscoveryService(self):
+    """Create the data_discovery_service object."""
+    if not self.config.data_discovery_service:
+      return
+    cloud = self.config.data_discovery_service.cloud
+    service_type = self.config.data_discovery_service.service_type
+    providers.LoadProvider(cloud)
+    data_discovery_service_class = (
+        data_discovery_service.GetDataDiscoveryServiceClass(cloud, service_type)
+    )
+    self.data_discovery_service = data_discovery_service_class.FromSpec(
+        self.config.data_discovery_service)
+
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
     vm_util.RunParallelThreads(targets, len(targets))
@@ -735,6 +750,8 @@ class BenchmarkSpec(object):
       self.vpn_service.Create()
     if hasattr(self, 'messaging_service') and self.messaging_service:
       self.messaging_service.Create()
+    if self.data_discovery_service:
+      self.data_discovery_service.Create()
 
   def Delete(self):
     if self.deleted:
@@ -764,6 +781,8 @@ class BenchmarkSpec(object):
       self.smb_service.Delete()
     if hasattr(self, 'messaging_service') and self.messaging_service:
       self.messaging_service.Delete()
+    if hasattr(self, 'data_discovery_service') and self.data_discovery_service:
+      self.data_discovery_service.Delete()
 
     # Note: It is ok to delete capacity reservations before deleting the VMs,
     # and will actually save money (mere seconds of usage).

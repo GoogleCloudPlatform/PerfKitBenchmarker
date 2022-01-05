@@ -23,6 +23,7 @@ import os
 
 from perfkitbenchmarker import app_service
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import data_discovery_service
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
@@ -1840,6 +1841,83 @@ class _MessagingServiceDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _DataDiscoveryServiceSpec(spec.BaseSpec):
+  """Specs needed to configure data discovery service.
+  """
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments to
+      construct in order to decode the named option.
+    """
+    result = super()._GetOptionDecoderConstructions()
+    result.update({
+        'cloud': (option_decoders.EnumDecoder, {
+            'valid_values': providers.VALID_CLOUDS
+        }),
+        'service_type': (
+            option_decoders.EnumDecoder,
+            {
+                'default':
+                    data_discovery_service.GLUE,
+                'valid_values': [
+                    data_discovery_service.GLUE,
+                ]
+            }),
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super()._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
+
+
+class _DataDiscoveryServiceDecoder(option_decoders.TypeVerifier):
+  """Validate the data_discovery_service dict of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super().__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify data_discovery_service dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _DataDiscoveryServiceSpec object built from the config passed in value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    if value is None:
+      value = {}
+    data_discovery_service_config = super().Decode(value, component_full_name,
+                                                   flag_values)
+    result = _DataDiscoveryServiceSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **data_discovery_service_config)
+    return result
+
+
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
@@ -1957,6 +2035,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         }),
         'messaging_service': (_MessagingServiceDecoder, {
             'default': None,
+        }),
+        'data_discovery_service': (_DataDiscoveryServiceDecoder, {
+            'default': None,
+            'none_ok': True,
         })
     })
     return result

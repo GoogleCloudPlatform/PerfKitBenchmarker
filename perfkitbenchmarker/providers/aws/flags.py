@@ -113,4 +113,13 @@ flags.DEFINE_enum('aws_credit_specification', None,
 flags.DEFINE_boolean('aws_vm_hibernate', False,
                      'Whether to hibernate(suspend) an aws vm'
                      'instance.')
-
+flags.DEFINE_string(
+    'aws_glue_crawler_role', None,
+    "Role's ARN to be used by the crawler. Must have policies that grant "
+    'permission for using AWS Glue and read access to S3.')
+flags.DEFINE_integer(
+    'aws_glue_crawler_sample_size', None,
+    'Sets how many files will be crawled in each leaf directory. If left '
+    'unset, all the files will be crawled. May range from 1 to 249.',
+    1, 249
+)
