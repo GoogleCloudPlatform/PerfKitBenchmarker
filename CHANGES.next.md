@@ -197,3 +197,4 @@
     client setup.
 -   Update the runner's AWS CLI to 1.19.75.
 -   Minor fix of the Bigtable benchmarking user guide.
+-   Enable icelake and milan as --gcp_min_cpu_platform options.
