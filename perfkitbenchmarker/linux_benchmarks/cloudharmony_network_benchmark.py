@@ -15,6 +15,7 @@ See https://github.com/cloudharmony/network for more info.
 
 import logging
 import posixpath
+import enum
 
 from absl import flags
 from perfkitbenchmarker import cloud_harmony_util
@@ -56,12 +57,13 @@ NGINX = 'nginx'
 # tests as defined below
 # throughput: downlink, uplink
 # tcp: rtt, ssl, ttfb
-NETWORK_TESTS = ['latency', 'downlink', 'uplink', 'dns', 'rtt', 'ssl', 'ttfb']
+NETWORK_TESTS = ['latency', 'downlink', 'uplink', 'rtt', 'ssl', 'ttfb', DNS]
 
-# SSL encryption types
-RSA = 'rsa'
-ECC = 'ecc'
-UNENCRYPTED = 'unencrypted'
+# TLS encryption types
+class TlsEncryptionType(enum.Enum):
+  RSA = 'rsa'
+  ECC = 'ecc'
+  UNENCRYPTED = 'unencrypted'
 
 
 flags.DEFINE_enum('ch_network_test_service_type', COMPUTE, [COMPUTE, STORAGE, DNS],
@@ -94,7 +96,7 @@ flags.DEFINE_boolean('ch_network_throughput_slowest_thread', False, 'If set, '
                      'threads.')
 flags.DEFINE_integer('ch_network_tcp_samples', 10, 'The number of test samples '
                      'for TCP tests (rtt, ssl or ttfb).')
-flags.DEFINE_enum('ch_ssl_encryption_type', ECC, [ECC, RSA, UNENCRYPTED],
+flags.DEFINE_enum_class('ch_ssl_encryption_type', TlsEncryptionType.ECC, TlsEncryptionType,
                   'Encryption type to use for SSL.')
 CLIENT_ZONE = flags.DEFINE_string(
     'ch_client_zone', None,
@@ -119,10 +121,9 @@ def CheckPrerequisites(_):
   # TODO(user): add AWS & Azure support for object storage
   if FLAGS.ch_network_test_service_type == STORAGE and FLAGS.cloud != 'GCP':
     raise NotImplementedError('Benchmark only supports GCS object storage.')
-  elif FLAGS.ch_network_test_service_type == DNS and FLAGS.ch_network_test != 'dns':
-    raise errors.Setup.InvalidConfigurationError('If ch_network_test_service_type flag is set to dns, ch_network_test flag must also be dns')
-  elif FLAGS.ch_network_test_service_type != DNS and FLAGS.ch_network_test == 'dns':
-    raise errors.Setup.InvalidConfigurationError('If ch_network_test flag is set to dns, ch_network_test_service_type flag must also be dns')
+  elif [FLAGS.ch_network_test_service_type, FLAGS.ch_network_test].count(DNS) == 1:
+    raise errors.Setup.InvalidConfigurationError('To perform DNS test, both ch_network_test flag and '
+                                                 'ch_network_test_service_type flag must be set to dns')
   elif FLAGS.ch_network_test_service_type == DNS and FLAGS.cloud != 'GCP':
     raise NotImplementedError('DNS Benchmark not implemented for this cloud type')
 
@@ -168,21 +169,21 @@ def _PrepareServer(vm):
   vm.RemoteCommand('sudo openssl rand -writerand .rnd')
   
   # Create self signed certificate (RSA)
-  if FLAGS.ch_ssl_encryption_type == RSA:
+  if FLAGS.ch_ssl_encryption_type == TlsEncryptionType.RSA:
     vm.RemoteCommand(
         f'sudo openssl req -x509 -nodes -days 1 -newkey rsa:2048 -subj '
         f'"/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" '
         f'-keyout /etc/ssl/private/nginx-selfsigned.key -out /etc/ssl/certs/nginx-selfsigned.crt '
     )
   # Create self signed certificate (ECC)
-  elif FLAGS.ch_ssl_encryption_type == ECC:
+  elif FLAGS.ch_ssl_encryption_type == TlsEncryptionType.ECC:
     vm.RemoteCommand('sudo openssl ecparam -genkey -name prime256v1 -out /etc/ssl/private/nginx-selfsigned.key')
     vm.RemoteCommand(
         f'sudo openssl req -new -x509 -days 365 -extensions v3_ca -key /etc/ssl/private/nginx-selfsigned.key -subj '
         f'"/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" '
         f'-out /etc/ssl/certs/nginx-selfsigned.crt '
     )
-  if FLAGS.ch_ssl_encryption_type != UNENCRYPTED:
+  if FLAGS.ch_ssl_encryption_type != TlsEncryptionType.UNENCRYPTED:
     # Setup SSL config for nginx
     vm.RemoteCommand('sudo openssl dhparam -out /etc/nginx/dhparam.pem 1024')
     vm.RemoteCommand(
@@ -367,11 +368,7 @@ def _Run(benchmark_spec, test):
   elif FLAGS.ch_network_test_service_type == DNS:
     vms = vm_groups['server']
     # use GCP zonal internal DNS, but maybe should add domain to vm's data attributes?
-    endpoints = ''
-    if FLAGS.cloud == 'GCP':
-      endpoints = ' '.join([f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal' for vm in vms])
-    else:
-      raise NotImplementedError('DNS not implemented for this cloud type')
+    endpoints = ' '.join([f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal' for vm in vms])
     _AddComputeMetadata(client, vms[0], metadata)
 
   if FLAGS.ch_network_throughput_https:
