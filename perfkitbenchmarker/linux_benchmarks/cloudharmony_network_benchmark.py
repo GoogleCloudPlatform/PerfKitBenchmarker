@@ -379,7 +379,7 @@ def _Run(benchmark_spec, test):
     metadata['throughput_time'] = True
   if FLAGS.ch_network_throughput_slowest_thread:
     metadata['throughput_slowest_thread'] = True
-  if FLAGS.ch_network_test == 'dns':
+  if FLAGS.ch_network_test == DNS:
     metadata['dns_recursive'] = True
   if FLAGS.ch_network_test in ['rtt', 'ssl', 'ttfb']:
     metadata['throughput_time'] = True
