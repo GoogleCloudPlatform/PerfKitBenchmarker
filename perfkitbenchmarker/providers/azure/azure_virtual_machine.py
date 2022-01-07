@@ -848,22 +848,22 @@ class Ubuntu2004BasedAzureVirtualMachine(AzureVirtualMachine,
 
 class Rhel7BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel7Mixin):
-  IMAGE_URN = 'RedHat:RHEL:7.6:latest'
+  IMAGE_URN = 'RedHat:RHEL:7-LVM:latest'
 
 
 class Rhel8BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel8Mixin):
-  IMAGE_URN = 'RedHat:RHEL:8:latest'
+  IMAGE_URN = 'RedHat:RHEL:8-LVM:latest'
 
 
 class CentOs7BasedAzureVirtualMachine(AzureVirtualMachine,
                                       linux_virtual_machine.CentOs7Mixin):
-  IMAGE_URN = 'OpenLogic:CentOS:7.6:latest'
+  IMAGE_URN = 'OpenLogic:CentOS-LVM:7-lvm:latest'
 
 
 class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
                                       linux_virtual_machine.CentOs8Mixin):
-  IMAGE_URN = 'OpenLogic:CentOS:8.0:latest'
+  IMAGE_URN = 'OpenLogic:CentOS-LVM:8-lvm:latest'
 
 
 # TODO(pclay): Add Fedora CoreOS when available:
