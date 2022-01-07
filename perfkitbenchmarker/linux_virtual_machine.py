@@ -260,6 +260,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   # Serializing calls to ssh with the -t option fixes the problem.
   _pseudo_tty_lock = threading.Lock()
 
+  # TODO(user): Remove all uses of Python 2.
+  PYTHON_2_PACKAGE = 'python2'
+
   def __init__(self, *args, **kwargs):
     super(BaseLinuxMixin, self).__init__(*args, **kwargs)
     # N.B. If you override ssh_port you must override remote_access_ports and
@@ -457,7 +460,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
-      self.Install('python')
     self.SetFiles()
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
@@ -1483,6 +1485,7 @@ class ClearMixin(BaseLinuxMixin):
 
   OS_TYPE = os_types.CLEAR
   BASE_OS_TYPE = os_types.CLEAR
+  PYTHON_2_PACKAGE = 'python-basic'
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -1644,8 +1647,6 @@ class BaseRhelMixin(BaseLinuxMixin):
   # OS_TYPE = os_types.RHEL
   BASE_OS_TYPE = os_types.RHEL
 
-  PYTHON_PACKAGE = 'python'
-
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
     super(BaseRhelMixin, self).OnStartup()
@@ -1782,7 +1783,6 @@ class Rhel7Mixin(BaseRhelMixin):
 class Rhel8Mixin(BaseRhelMixin):
   """Class holding RHEL 8 specific VM methods and attributes."""
   OS_TYPE = os_types.RHEL8
-  PYTHON_PACKAGE = 'python2'
 
 
 class CentOs7Mixin(BaseRhelMixin):
@@ -1793,7 +1793,6 @@ class CentOs7Mixin(BaseRhelMixin):
 class CentOs8Mixin(BaseRhelMixin):
   """Class holding CentOS 8 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS8
-  PYTHON_PACKAGE = 'python2'
 
 
 class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
@@ -1821,6 +1820,7 @@ class BaseDebianMixin(BaseLinuxMixin):
 
   OS_TYPE = 'base-only'
   BASE_OS_TYPE = os_types.DEBIAN
+  PYTHON_2_PACKAGE = 'python2.7'
 
   def __init__(self, *args, **kwargs):
     super(BaseDebianMixin, self).__init__(*args, **kwargs)
@@ -1991,6 +1991,7 @@ class Debian10Mixin(BaseDebianMixin):
 class Debian11Mixin(BaseDebianMixin):
   """Class holding Debian 11 specific VM methods and attributes."""
   OS_TYPE = os_types.DEBIAN11
+  PYTHON_2_PACKAGE = 'python-is-python2'
 
   def PrepareVMEnvironment(self):
     # Missing in some images. Required by PrepareVMEnvironment to determine

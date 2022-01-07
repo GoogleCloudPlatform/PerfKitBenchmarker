@@ -48,7 +48,7 @@ class PythonTest(pkb_common_test_case.PkbCommonTestCase):
                     responses,
                     expected_last_call=None):
     vm = mock.Mock()
-    vm.PYTHON_PACKAGE = 'python2'
+    vm.PYTHON_2_PACKAGE = 'python2'
     vm.RemoteCommandWithReturnCode.side_effect = responses
     python._SetDefaultPythonIfNeeded(vm, '/usr/bin/python2')
     if expected_last_call:
@@ -60,14 +60,14 @@ class PythonTest(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch.object(python, '_SetDefaultPythonIfNeeded')
   def testYumCall(self, mock_set_default):
     vm = mock.Mock()
-    vm.PYTHON_PACKAGE = 'python3'
-    python.YumInstall(vm)
-    mock_set_default.assert_called_with(vm, '/usr/bin/python3')
+    vm.PYTHON_2_PACKAGE = 'python-foo'
+    python.Install(vm)
+    mock_set_default.assert_called_with(vm, '/usr/bin/python2')
 
   @mock.patch.object(python, '_SetDefaultPythonIfNeeded')
   def testAptCall(self, mock_set_default):
     vm = mock.Mock()
-    python.AptInstall(vm)
+    python.Install(vm)
     mock_set_default.assert_called_with(vm, '/usr/bin/python2')
 
   def testDefaultPythonAlreadySet(self):

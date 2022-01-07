@@ -12,17 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 """Module containing python 2.7 dev installation and cleanup functions."""
 
 
 def YumInstall(vm):
   """Installs the package on the VM."""
-  Install(vm, package=vm.PYTHON_PACKAGE + '-devel')
+  Install(vm, package=vm.PYTHON_2_PACKAGE + '-devel')
 
 
 def Install(vm, package='python-dev'):
   """Installs the package on the VM."""
-  # Install python first to get the python setup
-  vm.Install('python')
   vm.InstallPackages(package)
