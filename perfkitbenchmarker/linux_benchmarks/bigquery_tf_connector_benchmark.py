@@ -55,7 +55,7 @@ bigquery_tf_connector:
       https://www.googleapis.com/auth/bigquery
   vm_groups:
     default:
-      os_type: ubuntu1604
+      os_type: ubuntu1804
       vm_spec:
         GCP:
           machine_type: n1-standard-16
