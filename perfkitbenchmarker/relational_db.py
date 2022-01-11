@@ -99,8 +99,8 @@ flags.DEFINE_boolean(
     'service for the requested cloud provider. If false, uses '
     'MySql installed on a VM.')
 flags.DEFINE_list(
-    'db_flags', '', 'Flags to apply to the implementation of '
-    'MySQL on the cloud that\'s being used. Example: '
+    'db_flags', '', 'Flags to apply to the managed relational database '
+    'on the cloud that\'s being used. Example: '
     'binlog_cache_size=4096,innodb_log_buffer_size=4294967295')
 flags.DEFINE_integer(
     'innodb_buffer_pool_size', None,

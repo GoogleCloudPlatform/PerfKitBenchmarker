@@ -84,6 +84,7 @@ def RunPgBench(benchmark_spec,
                vm,
                test_db_name,
                client_counts,
+               job_counts,
                seconds_to_pause,
                seconds_per_test,
                metadata,
@@ -97,6 +98,7 @@ def RunPgBench(benchmark_spec,
     vm: Client VM
     test_db_name: The name of the database
     client_counts: Number of client
+    job_counts: Number of job
     seconds_to_pause: Seconds to pause between test
     seconds_per_test: Seconds per test
     metadata: Metadata of the benchmark
@@ -110,16 +112,20 @@ def RunPgBench(benchmark_spec,
     metadata['pgbench_file'] = file
 
   samples = []
-
-  for client in client_counts:
+  if job_counts and len(client_counts) != len(job_counts):
+    raise ValueError('Length of clients and jobs must be the same.')
+  for i in range(len(client_counts)):
     time.sleep(seconds_to_pause)
-    jobs = min(client, 16)
+    client = client_counts[i]
+    if job_counts:
+      jobs = job_counts[i]
+    else:
+      jobs = min(client, 16)
     command = (f'pgbench {connection_string} --client={client} '
                f'--jobs={jobs} --time={seconds_per_test} --progress=1 '
                '--report-latencies')
-
     if file and path:
-      command = f'cd {path} {command} --file={file}'
+      command = f'cd {path} && {command} --file={file}'
     _, stderr = vm.RobustRemoteCommand(command)
     samples = MakeSamplesFromOutput(stderr, client, jobs, metadata)
     publisher.PublishRunStageSamples(benchmark_spec, samples)

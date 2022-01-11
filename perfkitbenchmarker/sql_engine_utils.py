@@ -14,8 +14,14 @@
 
 """Utilities to support multiple engines."""
 import abc
-import typing
+import logging
+import timeit
+from typing import Dict, List, Any, Tuple, Union, Optional
+
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
+
+SECOND = 'seconds'
 
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
@@ -83,14 +89,74 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
     self.vm = vm
     self.connection_properties = connection_properties
 
+  def TimeQuery(self,
+                database_name: str,
+                query: str,
+                is_explain: bool = False,
+                suppress_stdout: bool = False) -> Tuple[Any, Any, str]:
+    """Time a query.."""
+    if is_explain:
+      query = self.GetExplainPrefix() + query
+
+    start = timeit.default_timer()
+    stdout_, error_ = self.IssueSqlCommand(
+        query,
+        database_name=database_name,
+        suppress_stdout=suppress_stdout,
+        timeout=60*30)
+    end = timeit.default_timer()
+    run_time = str(end - start)
+    if error_:
+      logging.info('Quries finished with error %s', error_)
+      run_time = '-1'
+
+    return stdout_, error_, run_time
+
+  def SamplesFromQueriesWithExplain(
+      self, database_name: str, queries: Dict[str, str],
+      metadata: Dict[str, Any]) -> List[sample.Sample]:
+    """Helper function to run quries."""
+    results = []
+    for query in queries:
+      execution_plan, _, run_time = self.TimeQuery(
+          database_name,
+          queries[query],
+          is_explain=True)
+
+      logging.info('Execution Plan for Query %s: %s', query, execution_plan)
+      result = sample.Sample('Query %s' % query, run_time, SECOND, metadata)
+      results.append(result)
+
+    return results
+
+  def SamplesFromQueriesAfterRunningExplain(
+      self, database_name: str, queries: Dict[str, str],
+      metadata: Dict[str, Any]) -> List[sample.Sample]:
+    """Run the query with explain and run the qeury once more for timing."""
+    results = []
+    for query in queries:
+      execution_plan, _, _ = self.TimeQuery(
+          database_name, queries[query], is_explain=True)
+
+      logging.info('Execution Plan for Query %s: %s', query, execution_plan)
+
+      _, _, run_time = self.TimeQuery(
+          database_name, queries[query], is_explain=False, suppress_stdout=True)
+
+      result = sample.Sample('Query %s' % query, run_time, SECOND, metadata)
+      results.append(result)
+
+    return results
+
   def IssueSqlCommand(self,
-                      command: typing.Union[str, typing.Dict[str, str]],
+                      command: Union[str, Dict[str, str]],
                       database_name: str = '',
                       superuser: bool = False,
                       session_variables: str = '',
-                      timeout: typing.Optional[int] = None,
+                      timeout: Optional[int] = None,
                       ignore_failure: bool = False,
-                      suppress_warning: bool = False):
+                      suppress_warning: bool = False,
+                      suppress_stdout: bool = False):
     """Issue Sql Command."""
     command_string = None
     # Get the command to issue base on type
@@ -109,6 +175,9 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
 
     if superuser:
       command_string = 'sudo ' + command_string
+
+    if suppress_stdout:
+      command_string = command_string + ' >/dev/null 2>&1'
 
     return self.vm.RemoteCommand(
         command_string, timeout=timeout, ignore_failure=ignore_failure,
@@ -131,6 +200,10 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
                      session_variables: str = ''):
     """Make a sql command."""
     pass
+
+  def GetExplainPrefix(self) -> str:
+    """Returns the prefix for explain query."""
+    return 'EXPLIAN '
 
 
 class PostgresCliQueryTools(ISQLQueryTools):
@@ -173,6 +246,10 @@ class PostgresCliQueryTools(ISQLQueryTools):
                 self.connection_properties.endpoint,
                 self.connection_properties.database_username,
                 self.connection_properties.database_password)
+
+  def GetExplainPrefix(self) -> str:
+    """Adding hints to increase the verboseness of the explain."""
+    return 'EXPLAIN (ANALYZE, BUFFERS, TIMING, SUMMARY, VERBOSE) '
 
 
 class MysqlCliQueryTools(ISQLQueryTools):
