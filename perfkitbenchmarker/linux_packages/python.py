@@ -13,6 +13,8 @@
 # limitations under the License.
 """Module containing python 2.7 installation and cleanup functions."""
 
+# TODO(user): Remove all uses of Python 2.
+
 import logging
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -22,21 +24,10 @@ GET_VERSION = ('import sys; '
                'print(".".join(str(v) for v in sys.version_info[:2]))')
 
 
-def YumInstall(vm):
+def Install(vm):
   """Installs the package on the VM."""
-  vm.InstallPackages(vm.PYTHON_PACKAGE)
-  _SetDefaultPythonIfNeeded(vm, '/usr/bin/{}'.format(vm.PYTHON_PACKAGE))
-
-
-def AptInstall(vm):
-  """Installs the package on the VM."""
-  vm.InstallPackages('python python2.7')
+  vm.InstallPackages(vm.PYTHON_2_PACKAGE)
   _SetDefaultPythonIfNeeded(vm, '/usr/bin/python2')
-
-
-def SwupdInstall(vm):
-  """Installs the package on the VM."""
-  vm.InstallPackages('python-basic')
 
 
 def _SetDefaultPythonIfNeeded(vm, python_path):
