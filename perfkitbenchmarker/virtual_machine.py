@@ -27,7 +27,7 @@ import socket
 import threading
 import time
 import typing
-from typing import List
+from typing import Any, Dict, List
 
 from absl import flags
 import jinja2
@@ -169,13 +169,28 @@ class BaseVmSpec(spec.BaseSpec):
         background network traffic during the benchmark.
     background_network_ip_type: The IP address type (INTERNAL or
         EXTERNAL) to use for generating background network workload.
+    disable_interrupt_moderation: If true, disables interrupt moderation.
+    disable_rss: = If true, disables rss.
+    vm_metadata: = Additional metadata for the VM.
   """
 
   SPEC_TYPE = 'BaseVmSpec'
   CLOUD = None
 
   def __init__(self, *args, **kwargs):
+    self.zone = None
+    self.cidr = None
     self.machine_type = None
+    self.gpu_count = None
+    self.gpu_type = None
+    self.image = None
+    self.install_packages = None
+    self.background_cpu_threads = None
+    self.background_network_mbits_per_sec = None
+    self.background_network_ip_type = None
+    self.disable_interrupt_moderation = None
+    self.disable_rss = None
+    self.vm_metadata: Dict[str, Any] = None
     super(BaseVmSpec, self).__init__(*args, **kwargs)
 
   @classmethod
@@ -305,6 +320,10 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   scratch_disks: List[disk.BaseDisk]  # mixed from BaseVirtualMachine
   ssh_private_key: str  # mixed from BaseVirtualMachine
   user_name: str  # mixed from BaseVirtualMachine
+  disable_interrupt_moderation: str  # mixed from BaseVirtualMachine
+  disable_rss: str  # mixed from BaseVirtualMachine
+  num_disable_cpus: str  # mixed from BaseVirtualMachine
+  ip_address: str  # mixed from BaseVirtualMachine
 
   @abc.abstractmethod
   def GetConnectionIp(self):

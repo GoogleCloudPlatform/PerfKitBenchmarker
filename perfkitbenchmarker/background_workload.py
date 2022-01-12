@@ -14,11 +14,12 @@
 
 """Module containing classes for background workloads."""
 
+from typing import List
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 import six
 
-BACKGROUND_WORKLOADS = []
+BACKGROUND_WORKLOADS: List['BaseBackgroundWorkload'] = []
 
 BACKGROUND_IPERF_PORT = 20001
 BACKGROUND_IPERF_SECONDS = 2147483647
@@ -29,7 +30,7 @@ class AutoRegisterBackgroundWorkloadMeta(type):
 
   def __init__(cls, name, bases, dct):
     super(AutoRegisterBackgroundWorkloadMeta, cls).__init__(name, bases, dct)
-    BACKGROUND_WORKLOADS.append(cls)
+    BACKGROUND_WORKLOADS.append(cls)  # pytype: disable=container-type-mismatch
 
 
 class BaseBackgroundWorkload(
