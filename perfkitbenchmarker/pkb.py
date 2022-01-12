@@ -527,6 +527,8 @@ def _PrintHelpMD(matches=None):
   Args:
     matches: regex string or None. Filters help to only those whose name matched
       the regex. If None then all flags are printed.
+  Raises:
+    RuntimeError: If unable to find module help.
   Eg:
   * all flags: `./pkb.py --helpmatchmd .*`  > testsuite_docs/all.md
   * linux benchmarks: `./pkb.py --helpmatchmd linux_benchmarks.*`  >
@@ -554,10 +556,14 @@ def _PrintHelpMD(matches=None):
       # Converts module name to github linkable string.
       # eg: perfkitbenchmarker.linux_benchmarks.iperf_vpn_benchmark ->
       # perfkitbenchmarker/linux_benchmarks/iperf_vpn_benchmark.py
-      module = re.search(
+      match = re.search(
           module_regex,
           helptext_raw,
-      ).group(1)
+      )
+      if not match:
+        raise RuntimeError(
+            f'Unable to find "{module_regex}" in "{helptext_raw}"')
+      module = match.group(1)
       module_link = module.replace('.', '/') + '.py'
       # Put flag name in a markdown code block for visibility.
       flags = re.findall(flags_regex, helptext_raw)
@@ -775,7 +781,7 @@ class InterruptChecker():
     Returns:
       None
     """
-    while not self.phase_status.isSet():
+    while not self.phase_status.is_set():
       vm.UpdateInterruptibleVmStatus(use_api=False)
       if vm.WasInterrupted():
         return
@@ -1188,7 +1194,7 @@ def _ShouldRetry(spec: bm_spec.BenchmarkSpec) -> bool:
 
 def RunBenchmarkTask(
     spec: bm_spec.BenchmarkSpec
-) -> Tuple[Sequence[bm_spec.BenchmarkSpec], List[sample.Sample]]:
+) -> Tuple[Sequence[bm_spec.BenchmarkSpec], List[sample.SampleDict]]:
   """Task that executes RunBenchmark.
 
   This is designed to be used with RunParallelProcesses. Note that

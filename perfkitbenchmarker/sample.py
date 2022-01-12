@@ -16,7 +16,7 @@
 import collections
 import math
 import time
-from typing import List
+from typing import Any, Dict, List, NewType
 
 import numpy as np
 
@@ -89,6 +89,10 @@ def GeoMean(iterable):
   return arr.prod()**(1 / len(arr))
 
 
+# The Sample is converted via collections.namedtuple._asdict for publishing
+SampleDict = NewType('SampleDict', Dict[str, Any])
+
+
 class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
   """A performance sample.
 
@@ -134,7 +138,7 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
         return False
     return True
 
-  def asdict(self):
+  def asdict(self)-> Dict[str, Any]:  # pylint:disable=invalid-name
     """Converts the Sample to a dictionary."""
     return self._asdict()
 

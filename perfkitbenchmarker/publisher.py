@@ -30,12 +30,14 @@ import operator
 import pprint
 import sys
 import time
+from typing import List
 import uuid
 
 from absl import flags
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import log_util
+from perfkitbenchmarker import sample as pkb_sample
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 import six
@@ -267,7 +269,7 @@ class SamplePublisher(six.with_metaclass(abc.ABCMeta, object)):
   """An object that can publish performance samples."""
 
   @abc.abstractmethod
-  def PublishSamples(self, samples):
+  def PublishSamples(self, samples: List[pkb_sample.SampleDict]):
     """Publishes 'samples'.
 
     PublishSamples will be called exactly once. Calling
@@ -705,7 +707,9 @@ class ElasticsearchPublisher(SamplePublisher):
   def PublishSamples(self, samples):
     """Publish samples to Elasticsearch service."""
     try:
-      from elasticsearch import Elasticsearch
+      # pylint:disable=g-import-not-at-top
+      from elasticsearch import Elasticsearch  # pytype: disable=import-error
+      # pylint:enable=g-import-not-at-top
     except ImportError:
       raise ImportError('The "elasticsearch" package is required to use '
                         'the Elasticsearch publisher. Please make sure it '
@@ -868,7 +872,7 @@ class SampleCollector(object):
   results via any number of SamplePublishers.
 
   Attributes:
-    samples: A list of Sample objects.
+    samples: A list of Sample objects as dicts.
     metadata_providers: A list of MetadataProvider objects. Metadata providers
       to use.  Defaults to DEFAULT_METADATA_PROVIDERS.
     publishers: A list of SamplePublisher objects to publish to.
@@ -882,14 +886,14 @@ class SampleCollector(object):
 
   def __init__(self, metadata_providers=None, publishers=None,
                publishers_from_flags=True, add_default_publishers=True):
-    self.samples = []
+    self.samples: List[pkb_sample.SampleDict] = []
 
     if metadata_providers is not None:
       self.metadata_providers = metadata_providers
     else:
       self.metadata_providers = DEFAULT_METADATA_PROVIDERS
 
-    self.publishers = publishers[:] if publishers else []
+    self.publishers: List[SamplePublisher] = publishers[:] if publishers else []
     for publisher_class in EXTERNAL_PUBLISHERS:
       self.publishers.append(publisher_class())
     if publishers_from_flags:
@@ -965,7 +969,7 @@ class SampleCollector(object):
     """
     for s in samples:
       # Annotate the sample.
-      sample = dict(s.asdict())
+      sample: pkb_sample.SampleDict = s.asdict()
       sample['test'] = benchmark
 
       for meta_provider in self.metadata_providers:
