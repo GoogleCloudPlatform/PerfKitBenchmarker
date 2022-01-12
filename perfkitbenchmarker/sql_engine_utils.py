@@ -205,6 +205,26 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
     """Returns the prefix for explain query."""
     return 'EXPLIAN '
 
+  def RunSqlScript(self,
+                   file_path: str,
+                   database_name: str = '') -> Tuple[str, str]:
+    """Run a sql command through a file.
+
+    The file could have multiple commands. RunSqlScript runs the sql file
+    from the file_path using the database_name. Failure in one command might
+    cause failure in subsequent commands.
+
+    Args:
+      file_path: The local path from the machine.
+      database_name: Name of the database. Uses the master database
+        or the default database if nothing is supplied.
+
+    Returns:
+      A tuple of standard output and standard error.
+
+    """
+    raise NotImplementedError('Running from a file is not currently supported.')
+
 
 class PostgresCliQueryTools(ISQLQueryTools):
   """SQL Query class to issue postgres related query."""
@@ -327,6 +347,32 @@ class SqlServerCliQueryTools(ISQLQueryTools):
 
   def GetConnectionString(self, database_name=''):
     raise NotImplementedError('Connection string currently not supported')
+
+  def RunSqlScript(self,
+                   file_path: str,
+                   database_name: str = '') -> Tuple[str, str]:
+    """Runs Sql script from sqlcmd.
+
+    This method execute command in a sql file using sqlcmd with the -i option
+    enabled.
+    Args:
+      file_path: The local path from the machine.
+      database_name: Name of the database.
+
+    Returns:
+       A tuple of stdout and stderr from running the command.
+    """
+    sqlserver_command = (
+        '/opt/mssql-tools/bin/sqlcmd -S '
+        '%s -U %s -P %s ' %
+        (self.connection_properties.endpoint,
+         self.connection_properties.database_username,
+         self.connection_properties.database_password))
+    if database_name:
+      sqlserver_command += '-d %s ' % database_name
+
+    sqlserver_command += ' -i ' +  file_path
+    return self.vm.RemoteCommand(sqlserver_command)
 
 
 # Helper functions for this module
