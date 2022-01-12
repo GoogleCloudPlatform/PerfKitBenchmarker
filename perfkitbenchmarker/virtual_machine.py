@@ -1435,8 +1435,8 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     """
     return None
 
-  def GetPreemptibleStatusPollSeconds(self):
-    """Get seconds between preemptible status polls.
+  def GetInterruptableStatusPollSeconds(self):
+    """Get seconds between interruptable status polls.
 
     Returns:
       Seconds between polls
