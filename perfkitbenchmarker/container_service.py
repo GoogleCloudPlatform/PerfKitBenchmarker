@@ -455,9 +455,10 @@ def _SetKubeConfig(unused_sender, benchmark_spec):
 
 def NodePoolName(name: str) -> str:
   """Clean node pool names to be usable by all providers."""
-  # GKE (or k8s?) requires nodepools use alphanumerics and hyphens, but PKB
-  # likes to use underscores isnstead of hyphens so we convert them.
-  return name.replace('_', '-')
+  # GKE (or k8s?) requires nodepools use alphanumerics and hyphens
+  # AKS requires full alphanumeric
+  # PKB likes to use underscores strip them out.
+  return name.replace('_', '')
 
 
 def GetContainerClusterClass(cloud, cluster_type):

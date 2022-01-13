@@ -167,16 +167,16 @@ class AksCluster(container_service.KubernetesCluster):
         # Half hour timeout on creating the cluster.
         timeout=1800)
 
-    for name, node_group in self.nodepools.items():
-      self._CreateNodeGroup(name, node_group)
+    for name, node_pool in self.nodepools.items():
+      self._CreateNodePool(name, node_pool)
 
   def _CreateNodePool(self, name: str, node_pool):
     """Creates a node pool."""
     cmd = [
-        azure.AZURE_PATH, 'aks', 'nodepools', 'add',
+        azure.AZURE_PATH, 'aks', 'nodepool', 'add',
         '--cluster-name', self.name,
         '--name', name,
-        '--labels', f'pkb_nodepool={node_pool}',
+        '--labels', f'pkb_nodepool={name}',
     ] + self._GetNodeFlags(node_pool.num_nodes, node_pool.vm_config)
     vm_util.IssueCommand(cmd, timeout=600)
 
