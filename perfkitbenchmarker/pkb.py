@@ -306,6 +306,8 @@ _RETRY_SUBSTATUSES = flags.DEFINE_multi_enum(
     'the same previous config.')
 _RETRY_DELAY_SECONDS = flags.DEFINE_integer(
     'retry_delay_seconds', 0, 'The time to wait in between retries.')
+# Retries could also allow for a dict of failed_substatus: 'zone'|'region'
+# retry method which would make the retry functionality more customizable.
 _SMART_QUOTA_RETRY = flags.DEFINE_bool(
     'smart_quota_retry', False,
     'If True, causes the benchmark to rerun in a zone in a different region '
@@ -317,11 +319,11 @@ _SMART_QUOTA_RETRY = flags.DEFINE_bool(
 _SMART_CAPACITY_RETRY = flags.DEFINE_bool(
     'smart_capacity_retry', False,
     'If True, causes the benchmark to rerun in a different zone in the same '
-    'region on a capacity exception. Currently only works for benchmarks '
-    'that specify a single zone (via --zone or --zones). The zone is selected '
-    'at random and overrides the --zones flag or the --zone flag, depending on '
-    'which is provided. INSUFFICIENT_CAPACITY must be in the list of retry '
-    'substatuses for this to work.')
+    'region on a capacity/config exception. Currently only works for '
+    'benchmarks that specify a single zone (via --zone or --zones). The zone '
+    'is selected at random and overrides the --zones flag or the --zone flag, '
+    'depending on which is provided. INSUFFICIENT_CAPACITY and UNSUPPORTED '
+    'must be in the list of retry substatuses for this to work.')
 flags.DEFINE_boolean(
     'boot_samples', False,
     'Whether to publish boot time samples for all tests.')
@@ -1305,8 +1307,10 @@ class ZoneRetryManager():
     if (_SMART_QUOTA_RETRY.value and spec.failed_substatus
         == benchmark_status.FailedSubstatus.QUOTA):
       self._AssignZoneToNewRegion()
-    elif (_SMART_CAPACITY_RETRY.value and spec.failed_substatus
-          == benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY):
+    elif (_SMART_CAPACITY_RETRY.value and spec.failed_substatus in {
+        benchmark_status.FailedSubstatus.UNSUPPORTED,
+        benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
+    }):
       self._AssignNewZoneSameRegion()
 
   def _AssignZoneToNewRegion(self) -> None:

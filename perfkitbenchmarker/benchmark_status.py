@@ -44,7 +44,8 @@ class FailedSubstatus(object):
   INTERRUPTED = 'INTERRUPTED'
 
   # Failure due to an unsupported configuration running. Ex. Machine type not
-  # supported in a zone.
+  # supported in a zone. For retries, this will pick a new region to maximize
+  # the chance of success.
   UNSUPPORTED = 'UNSUPPORTED'
 
   # General failure that don't fit in the above categories.
@@ -54,7 +55,7 @@ class FailedSubstatus(object):
   # UNCATEGORIZED failures are not retryable. To make a specific UNCATEGORIZED
   # failure retryable, please raise an errors.Benchmarks.KnownIntermittentError.
   RETRYABLE_SUBSTATUSES = [
-      QUOTA, INSUFFICIENT_CAPACITY, KNOWN_INTERMITTENT, INTERRUPTED,
+      QUOTA, INSUFFICIENT_CAPACITY, KNOWN_INTERMITTENT, INTERRUPTED, UNSUPPORTED
   ]
 
 
