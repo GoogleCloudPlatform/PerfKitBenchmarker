@@ -27,27 +27,20 @@ GET_VERSION = ('import sys; '
 def Install(vm):
   """Installs the package on the VM."""
   vm.InstallPackages(vm.PYTHON_2_PACKAGE)
-  _SetDefaultPythonIfNeeded(vm, '/usr/bin/python2')
+  _SetDefaultPythonIfNeeded(vm)
 
 
-def _SetDefaultPythonIfNeeded(vm, python_path):
-  """Sets the default version of python to the specified path if required.
+def _SetDefaultPythonIfNeeded(vm):
+  """Points /usr/bin/python -> /usr/bin/python2, if it isn't set.
 
-  Some linux distributions do not set a default version of python to use so that
-  running "python ..." will fail.  If the "alternatives" program is found on
-  the VM it is used to set the default version to the one specified.
-
-  Logs a warning if the default version is not set and the alternatives program
-  could not be run to set it.
+  This has been deprecated along with Python 2 by new OSes, but old scripts
+  require it.
 
   Args:
-    vm: The virtual machine to set the default version of python on.
-    python_path: Path to the python executable.
+    vm: The virtual machine to set the default version of Python on.
 
   Raises:
-    PythonPackageRequirementUnfulfilled: If the default version of python is
-    not set and it is possible to set via "alternatives" but the alternatives
-    program failed.
+    PythonPackageRequirementUnfulfilled: If we could not set the python alias.
   """
 
   @vm_util.Retry(
@@ -56,10 +49,6 @@ def _SetDefaultPythonIfNeeded(vm, python_path):
     return vm.RemoteCommandWithReturnCode(command, ignore_failure=True)
 
   python_version_cmd = 'python --version'
-  python_exists_cmd = 'ls {}'.format(python_path)
-  alternatives_exists_cmd = 'which update-alternatives'
-  alternatives_cmd = 'sudo update-alternatives --set python {}'.format(
-      python_path)
 
   stdout, stderr, return_code = _RunCommand(python_version_cmd)
   if not return_code:
@@ -67,28 +56,26 @@ def _SetDefaultPythonIfNeeded(vm, python_path):
         'Default version of python: %s', (stdout or stderr).strip().split()[-1])
     return
   logging.info('Trying to set the default python version')
-  _, _, return_code = _RunCommand(alternatives_exists_cmd)
-  if return_code:
-    # Some distros might not include update-alternatives
-    logging.warning('Can not set default version of python as '
-                    'update-alternatives program does not exist')
-    return
-  _, _, return_code = _RunCommand(python_exists_cmd)
-  if return_code:
-    # This is most likely an error but user could specify path to python
-    logging.warning('No default version of python set and %s does not exist',
-                    python_path)
-    return
-  _, error_text, return_code = _RunCommand(alternatives_cmd)
+  _, _, return_code = _RunCommand('ls /usr/bin/python2')
   if return_code:
     raise errors.Setup.PythonPackageRequirementUnfulfilled(
-        'Could not set via update-alternatives default python version: {}'
-        .format(error_text))
+        'No default version of python set and /usr/bin/python2 does not exist')
+  _, _, return_code = _RunCommand('which update-alternatives')
+  if return_code:
+    # Some distros might not include update-alternatives
+    vm.RemoteCommandWithReturnCode(
+        'sudo ln -s /usr/bin/python2 /usr/bin/python')
+  else:
+    _, error_text, return_code = _RunCommand(
+        'sudo update-alternatives --set python /usr/bin/python2')
+    if return_code:
+      raise errors.Setup.PythonPackageRequirementUnfulfilled(
+          'Could not set via update-alternatives default python version: {}'
+          .format(error_text))
   _, txt, return_code = _RunCommand(python_version_cmd)
   if return_code:
     raise errors.Setup.PythonPackageRequirementUnfulfilled(
-        'Set default python path to {} but could not use default version'
-        .format(python_path))
+        "'python' command not working after setting alias.")
   logging.info('Set default python version to %s', txt.strip().split()[-1])
 
 

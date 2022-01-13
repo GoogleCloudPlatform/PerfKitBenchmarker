@@ -1803,7 +1803,6 @@ class BaseDebianMixin(BaseLinuxMixin):
 
   OS_TYPE = 'base-only'
   BASE_OS_TYPE = os_types.DEBIAN
-  PYTHON_2_PACKAGE = 'python2.7'
 
   def __init__(self, *args, **kwargs):
     super(BaseDebianMixin, self).__init__(*args, **kwargs)
@@ -1964,6 +1963,8 @@ class BaseDebianMixin(BaseLinuxMixin):
 class Debian9Mixin(BaseDebianMixin):
   """Class holding Debian9 specific VM methods and attributes."""
   OS_TYPE = os_types.DEBIAN9
+  # https://packages.debian.org/stretch/python
+  PYTHON_2_PACKAGE = 'python'
 
 
 class Debian10Mixin(BaseDebianMixin):
@@ -2000,6 +2001,7 @@ class BaseUbuntuMixin(BaseDebianMixin):
 class Ubuntu1604Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
   """Class holding Ubuntu1604 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604
+  PYTHON_2_PACKAGE = 'python'
   END_OF_LIFE = '2021-05-01'
   ALTERNATIVE_OS = os_types.UBUNTU1804
 
@@ -2007,6 +2009,8 @@ class Ubuntu1604Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
 class Ubuntu1804Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu1804 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1804
+  # https://packages.ubuntu.com/bionic/python
+  PYTHON_2_PACKAGE = 'python'
 
   def UpdateEnvironmentPath(self):
     """Add /snap/bin to default search path for Ubuntu1804.
@@ -2025,9 +2029,11 @@ class Ubuntu1804Mixin(BaseUbuntuMixin):
 class Ubuntu2004Mixin(Ubuntu1804Mixin):
   """Class holding Ubuntu2004 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU2004
+  # https://packages.ubuntu.com/focal/python2
+  PYTHON_2_PACKAGE = 'python2'
 
 
-class Ubuntu1604Cuda9Mixin(BaseUbuntuMixin):
+class Ubuntu1604Cuda9Mixin(Ubuntu1604Mixin):
   """Class holding NVIDIA CUDA specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604_CUDA9
 
