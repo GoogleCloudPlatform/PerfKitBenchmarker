@@ -24,8 +24,8 @@ from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3.types import TimeInterval
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util
 
@@ -40,7 +40,7 @@ API_ENDPOINT = 'https://redis.googleapis.com/'
 class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
   """Object representing a GCP cloud redis instance."""
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
   MEMORY_STORE = managed_memory_store.REDIS
 
   def __init__(self, spec):

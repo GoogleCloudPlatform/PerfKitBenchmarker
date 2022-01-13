@@ -26,8 +26,8 @@ from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.linux_packages import aws_credentials
-from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
@@ -49,7 +49,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     project: ID of the project.
   """
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
   SERVICE_TYPE = 'dataproc'
 
   def __init__(self, dpb_service_spec):

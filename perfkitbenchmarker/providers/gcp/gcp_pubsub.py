@@ -12,7 +12,7 @@ from typing import Any, Dict
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import messaging_service as msgsvc
-from perfkitbenchmarker.providers import gcp
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -33,7 +33,7 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
   and subcription).
   """
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   def __init__(self):
     super().__init__()
