@@ -25,8 +25,8 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -98,7 +98,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     dpb_version: EMR version to use.
   """
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
   SERVICE_TYPE = 'emr'
 
   def __init__(self, dpb_service_spec):
