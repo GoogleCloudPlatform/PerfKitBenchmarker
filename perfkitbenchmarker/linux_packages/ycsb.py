@@ -324,10 +324,13 @@ def CheckPrerequisites():
 
 
 @vm_util.Retry(max_retries=5, poll_interval=1)
-def _Install(vm):
+def Install(vm):
   """Installs the YCSB and, if needed, hdrhistogram package on the VM."""
   vm.Install('openjdk')
-  vm.Install('curl')
+  # TODO(user): replace with Python 3 when supported.
+  # https://github.com/brianfrankcooper/YCSB/issues/1459
+  vm.Install('python')
+  vm.InstallPackages('curl')
   ycsb_url = (_ycsb_tar_url or FLAGS.ycsb_tar_url or
               YCSB_URL_TEMPLATE.format(FLAGS.ycsb_version))
   install_cmd = (
@@ -352,11 +355,6 @@ def _Install(vm):
                      '{mvn_cmd}'.format(
                          hist_dir=HDRHISTOGRAM_DIR,
                          mvn_cmd=maven.GetRunCommand('install')))
-
-
-def Install(vm):
-  """Installs the YCSB package on the VM."""
-  _Install(vm)
 
 
 def ParseResults(ycsb_result_string, data_type='histogram'):
