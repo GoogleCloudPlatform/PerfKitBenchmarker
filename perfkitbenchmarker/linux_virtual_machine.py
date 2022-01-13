@@ -1378,23 +1378,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     sha256sum, _ = stdout.split()
     return sha256sum
 
-  def _GetNfsService(self):
-    """Returns the NfsService created in the benchmark spec.
-
-    Before calling this method check that the disk.disk_type is equal to
-    disk.NFS or else an exception will be raised.
-
-    Returns:
-      The nfs_service.BaseNfsService service for this cloud.
-
-    Raises:
-      CreationError: If no NFS service was created.
-    """
-    nfs = getattr(context.GetThreadBenchmarkSpec(), 'nfs_service')
-    if nfs is None:
-      raise errors.Resource.CreationError('No NFS Service created')
-    return nfs
-
   def _GetSmbService(self):
     """Returns the SmbService created in the benchmark spec.
 

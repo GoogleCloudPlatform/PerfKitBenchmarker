@@ -33,6 +33,7 @@ from absl import flags
 import jinja2
 from perfkitbenchmarker import background_workload
 from perfkitbenchmarker import benchmark_lookup
+from perfkitbenchmarker import context as pkb_context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -948,6 +949,23 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   @abc.abstractmethod
   def _IsSmtEnabled(self):
     """Whether SMT is enabled on the vm."""
+
+  def _GetNfsService(self):
+    """Returns the NfsService created in the benchmark spec.
+
+    Before calling this method check that the disk.disk_type is equal to
+    disk.NFS or else an exception will be raised.
+
+    Returns:
+      The nfs_service.BaseNfsService service for this cloud.
+
+    Raises:
+      CreationError: If no NFS service was created.
+    """
+    nfs = getattr(pkb_context.GetThreadBenchmarkSpec(), 'nfs_service')
+    if nfs is None:
+      raise errors.Resource.CreationError('No NFS Service created')
+    return nfs
 
 
 class DeprecatedOsMixin(BaseOsMixin):
