@@ -656,7 +656,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             'be created and instance creation will be retried.')
         with self._host_lock:
           if num_hosts == len(self.host_list):
-            host = GceSoleTenantNodeGroup(self.node_template,
+            host = GceSoleTenantNodeGroup(self.node_type,
                                           self.zone, self.project)
             self.host_list.append(host)
             host.Create()
