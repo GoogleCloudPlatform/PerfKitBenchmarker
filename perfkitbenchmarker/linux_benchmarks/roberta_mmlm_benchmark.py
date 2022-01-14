@@ -32,7 +32,6 @@ robertammlm:
   description: Runs FairSeq Roberta Masked Multilingual LM benchmark'
   vm_groups:
     default:
-      os_type: ubuntu1604
       disk_spec: *default_500_gb
       vm_count: 2
       vm_spec:

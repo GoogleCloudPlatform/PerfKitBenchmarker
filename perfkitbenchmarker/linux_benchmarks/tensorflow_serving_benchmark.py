@@ -95,7 +95,6 @@ tensorflow_serving:
           boot_disk_size: 200
           machine_type: m5.2xlarge
           zone: us-east-1f
-      os_type: ubuntu1604
     servers:
       vm_spec:
         GCP:
@@ -109,7 +108,6 @@ tensorflow_serving:
           boot_disk_size: 200
           machine_type: m5.2xlarge
           zone: us-east-1f
-      os_type: ubuntu1804
 """
 
 flags.DEFINE_integer(

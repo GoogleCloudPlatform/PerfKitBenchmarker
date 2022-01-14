@@ -70,7 +70,6 @@ speccpu2017:
     default:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
-      os_type: ubuntu1604
 """
 
 KB_TO_GB_MULTIPLIER = 1000000

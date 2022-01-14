@@ -95,7 +95,6 @@ pgbench:
         disk_size: 128
     vm_groups:
       clients:
-        os_type: ubuntu1604
         vm_spec:
           GCP:
             machine_type: n1-standard-16
@@ -108,7 +107,6 @@ pgbench:
             zone: eastus
         disk_spec: *default_500_gb
       servers:
-        os_type: ubuntu1604
         vm_spec:
           GCP:
             machine_type: n1-standard-16

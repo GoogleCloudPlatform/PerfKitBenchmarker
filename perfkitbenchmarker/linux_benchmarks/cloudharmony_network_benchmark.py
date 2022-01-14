@@ -32,13 +32,11 @@ cloudharmony_network:
   description: Runs cloudharmony network tests.
   vm_groups:
     client:
-      os_type: ubuntu1804
       vm_spec:
         GCP:
           machine_type: n1-standard-2
           boot_disk_type: pd-ssd
     server:
-      os_type: ubuntu1804
       disk_spec: *default_50_gb
       vm_spec:
         GCP:

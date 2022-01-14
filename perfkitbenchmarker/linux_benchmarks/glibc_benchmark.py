@@ -44,7 +44,6 @@ glibc:
     default:
       vm_spec: *default_dual_core
       vm_count: null
-      os_type: ubuntu1804
 """
 
 glibc_default_benchset = ['bench-math',

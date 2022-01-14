@@ -166,7 +166,6 @@ sysbench:
             disk_size: 500
             disk_type: Premium_LRS
       servers:
-        os_type: ubuntu1604
         vm_spec:
           GCP:
             machine_type: n1-standard-16
@@ -179,7 +178,6 @@ sysbench:
             zone: westus
         disk_spec: *default_500_gb
       replications:
-        os_type: ubuntu1604
         vm_spec:
           GCP:
             machine_type: n1-standard-16

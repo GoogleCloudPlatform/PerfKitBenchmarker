@@ -41,7 +41,6 @@ mlperf_inference:
   description: Runs MLPerf Inference Benchmark.
   vm_groups:
     default:
-      os_type: ubuntu1804
       disk_spec: *default_500_gb
       vm_spec:
         GCP:
