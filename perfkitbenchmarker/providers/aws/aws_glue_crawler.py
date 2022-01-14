@@ -5,8 +5,8 @@ from typing import Any, Dict, Optional, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data_discovery_service
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
@@ -32,7 +32,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
       aws_glue_crawler_sample_size flag for more info.
   """
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
   SERVICE_TYPE = 'glue'
   READY = 'READY'
   FAILED = 'FAILED'

@@ -34,12 +34,12 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
@@ -325,7 +325,7 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
       use_dedicated_host: bool. Whether to create this VM on a dedicated host.
   """
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -449,7 +449,7 @@ class AwsKeyFileManager(object):
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AWS Virtual Machine."""
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
 
   # The IMAGE_NAME_FILTER is passed to the AWS CLI describe-images command to
   # filter images by name. This must be set by subclasses, but may be overridden

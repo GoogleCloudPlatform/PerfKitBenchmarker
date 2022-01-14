@@ -39,8 +39,8 @@ import logging
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import nfs_service
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 
@@ -55,7 +55,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
   See https://aws.amazon.com/efs/
   """
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
   NFS_TIERS = ('generalPurpose', 'maxIO')
   DEFAULT_NFS_VERSION = '4.1'
   DEFAULT_TIER = 'generalPurpose'

@@ -27,7 +27,7 @@ from perfkitbenchmarker.providers import ibmcloud
 
 GCP = 'GCP'
 AZURE = 'Azure'
-AWS = aws.CLOUD
+AWS = 'AWS'
 IBMCLOUD = ibmcloud.CLOUD
 ALICLOUD = 'AliCloud'
 KUBERNETES = 'Kubernetes'

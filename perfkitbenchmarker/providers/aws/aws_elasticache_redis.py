@@ -21,8 +21,8 @@ import logging
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 
@@ -36,7 +36,7 @@ REDIS_VERSION_MAPPING = {'redis_3_2': '3.2.10',
 class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
   """Object representing a AWS Elasticache redis instance."""
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
   MEMORY_STORE = managed_memory_store.REDIS
 
   def __init__(self, spec):
