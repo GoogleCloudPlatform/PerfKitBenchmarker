@@ -40,16 +40,15 @@ class ElastiCacheMemcacheService(MemcacheService):
     self.hosts = []  # [(ip, port)]
 
     self.vpc_id = network.subnet.vpc_id
-    self.security_group_id = \
-        network.regional_network.vpc.default_security_group_id
+    self.security_group_id = (
+        network.regional_network.vpc.default_security_group_id)
     self.subnet_id = network.subnet.id
     self.subnet_group_name = '%ssubnet' % cluster_id
 
   def Create(self):
     # Open the port memcached needs
-    aws_network.AwsFirewall.GetFirewall() \
-        .AllowPortInSecurityGroup(self.region, self.security_group_id,
-                                  ELASTICACHE_PORT)
+    aws_network.AwsFirewall.GetFirewall().AllowPortInSecurityGroup(
+        self.region, self.security_group_id, ELASTICACHE_PORT)
 
     # Create a cache subnet group
     cmd = ['aws', 'elasticache', 'create-cache-subnet-group',
@@ -74,9 +73,8 @@ class ElastiCacheMemcacheService(MemcacheService):
     cluster_info = self._WaitForClusterUp()
 
     # Parse out the hosts
-    self.hosts = \
-        [(node['Endpoint']['Address'], node['Endpoint']['Port'])
-         for node in cluster_info['CacheNodes']]
+    self.hosts = [(node['Endpoint']['Address'], node['Endpoint']['Port'])
+                  for node in cluster_info['CacheNodes']]
     assert len(self.hosts) == self.num_servers
 
   def Destroy(self):

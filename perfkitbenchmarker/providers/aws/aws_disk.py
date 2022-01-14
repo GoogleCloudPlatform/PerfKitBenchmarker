@@ -383,8 +383,8 @@ class AwsDisk(disk.BaseDisk):
       self.metadata['throughput'] = self.throughput
 
   def AssignDeviceLetter(self, letter_suggestion, nvme_boot_drive_index):
-    if LocalDriveIsNvme(self.machine_type) and \
-       EbsDriveIsNvme(self.machine_type):
+    if (LocalDriveIsNvme(self.machine_type) and
+        EbsDriveIsNvme(self.machine_type)):
       first_device_letter = 'b'
       local_drive_number = ord(letter_suggestion) - ord(first_device_letter)
       logging.info('local drive number is: %d', local_drive_number)

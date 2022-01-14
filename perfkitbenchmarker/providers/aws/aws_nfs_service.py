@@ -118,7 +118,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
   def _CreateFiler(self):
     """Creates the AWS EFS service."""
     if self.filer_id:
-      logging.warn('_CreateFiler() already called for %s', self.filer_id)
+      logging.warning('_CreateFiler() already called for %s', self.filer_id)
       return
     if FLAGS.aws_efs_token:
       filer = self.aws_commands.GetFiler(FLAGS.aws_efs_token)
@@ -138,7 +138,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
   def _CreateMount(self):
     """Creates an NFS mount point on an EFS service."""
     if self.mount_id:
-      logging.warn('_CreateMount() already called for %s', self.mount_id)
+      logging.warning('_CreateMount() already called for %s', self.mount_id)
       return
     if not self.filer_id:
       raise errors.Resource.CreationError('Did not create a filer first')

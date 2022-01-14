@@ -104,7 +104,7 @@ class AwsIamRole(resource.BaseResource):
 
       _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
       if retcode != 0:
-        logging.warn('Failed to create role! %s', stderror)
+        logging.warning('Failed to create role! %s', stderror)
 
     if not self._PolicyExists():
       with open(_ROLE_POLICY_FILE, 'w+') as policy_file:
@@ -120,7 +120,7 @@ class AwsIamRole(resource.BaseResource):
 
       _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
       if retcode != 0:
-        logging.warn('Failed to create policy! %s', stderror)
+        logging.warning('Failed to create policy! %s', stderror)
 
     cmd = util.AWS_PREFIX + [
         'iam', 'attach-role-policy', '--role-name', self.role_name,
@@ -129,7 +129,7 @@ class AwsIamRole(resource.BaseResource):
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
     if retcode != 0:
-      logging.warn('Failed to attach role policy! %s', stderror)
+      logging.warning('Failed to attach role policy! %s', stderror)
 
     # Make sure the role is available for the downstream users (e.g., DAX).
     # Without this, the step of creating DAX cluster may fail.
@@ -145,7 +145,7 @@ class AwsIamRole(resource.BaseResource):
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
-      logging.warn('Failed to delete role policy! %s', stderror)
+      logging.warning('Failed to delete role policy! %s', stderror)
 
     cmd = util.AWS_PREFIX + [
         'iam', 'delete-policy', '--policy-arn', self.policy_arn
@@ -153,7 +153,7 @@ class AwsIamRole(resource.BaseResource):
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
-      logging.warn('Failed to delete policy! %s', stderror)
+      logging.warning('Failed to delete policy! %s', stderror)
 
     cmd = util.AWS_PREFIX + [
         'iam', 'delete-role', '--role-name', self.role_name
@@ -161,7 +161,7 @@ class AwsIamRole(resource.BaseResource):
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
-      logging.warn('Failed to delete role! %s', stderror)
+      logging.warning('Failed to delete role! %s', stderror)
 
   def GetRoleArn(self):
     """Returns the role's Amazon Resource Name (ARN)."""
