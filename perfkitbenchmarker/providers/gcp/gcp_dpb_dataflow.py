@@ -55,7 +55,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   @staticmethod
   def _GetStats(stdout):
-    """
+    """Get Stats.
+
     TODO(saksena): Hook up the metrics API of dataflow to retrieve performance
     metrics when available
     """
@@ -92,17 +93,19 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if job_type == self.BEAM_JOB_TYPE:
       full_cmd, base_dir = beam_benchmark_helper.BuildBeamCommand(
           self.spec, classname, job_arguments)
-      stdout, _, retcode = vm_util.IssueCommand(full_cmd, cwd=base_dir,
-                                                timeout=FLAGS.beam_it_timeout,
-                                                raise_on_failure=False)
-      assert retcode == 0, "Integration Test Failed."
+      _, _, retcode = vm_util.IssueCommand(
+          full_cmd,
+          cwd=base_dir,
+          timeout=FLAGS.beam_it_timeout,
+          raise_on_failure=False)
+      assert retcode == 0, 'Integration Test Failed.'
       return
 
     worker_machine_type = self.spec.worker_group.vm_spec.machine_type
     num_workers = self.spec.worker_count
     max_num_workers = self.spec.worker_count
-    if self.spec.worker_group.disk_spec and \
-            self.spec.worker_group.disk_spec.disk_size:
+    if (self.spec.worker_group.disk_spec and
+        self.spec.worker_group.disk_spec.disk_size):
       disk_size_gb = self.spec.worker_group.disk_spec.disk_size
     elif self.spec.worker_group.vm_spec.boot_disk_size:
       disk_size_gb = self.spec.worker_group.vm_spec.boot_disk_size
@@ -131,7 +134,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if disk_size_gb:
       cmd.append('--diskSizeGb={}'.format(disk_size_gb))
     cmd.append('--defaultWorkerLogLevel={}'.format(FLAGS.dpb_log_level))
-    stdout, _, _ = vm_util.IssueCommand(cmd)
+    _, _, _ = vm_util.IssueCommand(cmd)
 
   def SetClusterProperty(self):
     pass
