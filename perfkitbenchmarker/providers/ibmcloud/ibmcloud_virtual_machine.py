@@ -25,10 +25,10 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
-from perfkitbenchmarker.providers import ibmcloud
 from perfkitbenchmarker.providers.ibmcloud import ibm_api as ibm
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud_disk
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud_network
@@ -45,7 +45,7 @@ _WAIT_TIME_UBUNTU = 600
 class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a IBM Cloud Virtual Machine."""
 
-  CLOUD = ibmcloud.CLOUD
+  CLOUD = providers.IBMCLOUD
   IMAGE_NAME_PREFIX = None
 
   _lock = threading.Lock()
@@ -92,7 +92,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info('Creating rias key')
     with open(vm_util.GetPublicKeyPath(), 'r') as keyfile:
       pubkey = keyfile.read()
-    logging.info('ssh private key file: %s, public key file: %s', \
+    logging.info('ssh private key file: %s, public key file: %s',
                  vm_util.GetPrivateKeyPath(), vm_util.GetPublicKeyPath())
     cmd = ibm.IbmAPICommand(self)
     cmd.flags['name'] = self.prefix + str(flags.FLAGS.run_uri) + 'key'
@@ -201,7 +201,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       for subnet_name in self.subnets.keys():
         cmd.flags['name'] = subnet_name
         cmd.flags['subnet'] = self.subnets[subnet_name]['id']  # subnet id
-        logging.info('Creating extra vnic for vmid: %s, subnet: %s', \
+        logging.info('Creating extra vnic for vmid: %s, subnet: %s',
                      self.vmid, cmd.flags['subnet'])
         vnicid, ip_addr = cmd.InstanceVnicCreate()
         logging.info('Extra vnic created for vmid: %s, vnicid: %s, ip_addr: %s',
@@ -346,7 +346,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     disks_names = ('%s-data-%d-%d'
                    % (self.name, len(self.scratch_disks), i)
                    for i in range(disk_spec.num_striped_disks))
-    disks = [ibmcloud_disk.IbmCloudDisk(disk_spec, name, self.zone, \
+    disks = [ibmcloud_disk.IbmCloudDisk(disk_spec, name, self.zone,
                                         encryption_key=self.data_encryption_key)
              for name in disks_names]
 

@@ -13,10 +13,10 @@
 # limitations under the License.
 """Utilities for working with IBM Cloud resources."""
 
+import dataclasses
 import os
 from typing import Any, Dict, Optional
 
-import dataclasses
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud_manager
