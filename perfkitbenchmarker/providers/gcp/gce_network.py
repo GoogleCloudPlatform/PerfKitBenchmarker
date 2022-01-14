@@ -31,10 +31,10 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import vpn_service
-from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_placement_group
 from perfkitbenchmarker.providers.gcp import util
 import six
@@ -46,7 +46,7 @@ ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
 class GceVpnGateway(network.BaseVpnGateway):
   """Object representing a GCE VPN Gateway."""
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   def __init__(self, name: str, network_name: str, region: str, cidr: str,
                project: str):
@@ -551,7 +551,7 @@ class GceFirewallRule(resource.BaseResource):
 class GceFirewall(network.BaseFirewall):
   """An object representing the GCE Firewall."""
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   def __init__(self):
     """Initialize GCE firewall class."""
@@ -745,7 +745,7 @@ class GceSubnetResource(resource.BaseResource):
 class GceNetwork(network.BaseNetwork):
   """Object representing a GCE Network."""
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   def __init__(self, network_spec: GceNetworkSpec):
     super(GceNetwork, self).__init__(network_spec)

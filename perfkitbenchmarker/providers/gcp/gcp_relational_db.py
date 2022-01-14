@@ -29,10 +29,10 @@ import time
 
 from absl import flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 from six.moves import range
@@ -102,7 +102,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   ideal; however, a password is still required to connect. Currently only
   MySQL 5.7 and Postgres 9.6 are supported.
   """
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   def __init__(self, relational_db_spec):
     super(GCPRelationalDb, self).__init__(relational_db_spec)

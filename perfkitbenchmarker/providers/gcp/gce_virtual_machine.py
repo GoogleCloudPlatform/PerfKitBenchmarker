@@ -33,8 +33,8 @@ import logging
 import posixpath
 import re
 import threading
-
 from typing import Dict, List, Optional, Tuple
+
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -42,12 +42,12 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
@@ -103,7 +103,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     boot_disk_type: string or None. The type of the boot disk.
   """
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   def __init__(self, *args, **kwargs):
     self.num_local_ssds: int = None
@@ -370,7 +370,7 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   # Subclasses should override the default image OR
   # both the image family and image_project.
