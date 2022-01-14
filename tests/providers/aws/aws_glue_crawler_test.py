@@ -57,16 +57,20 @@ class AwsGlueCrawlerTest(pkb_common_test_case.PkbCommonTestCase):
     result = self.service._GetCrawler()
     self.assertEqual(result, self.issue_command_mock.return_value)
     self.issue_command_mock.assert_called_once_with(
-        util.AWS_PREFIX +
-        ['glue', 'get-crawler', '--name', 'pkb-crawler-deadbeef'],
+        util.AWS_PREFIX + [
+            'glue', 'get-crawler', '--name', 'pkb-crawler-deadbeef', '--region',
+            'us-east-1'
+        ],
         raise_on_failure=True)
 
   def testGetCrawlerRaiseOnFailureFalse(self):
     result = self.service._GetCrawler(raise_on_failure=False)
     self.assertEqual(result, self.issue_command_mock.return_value)
     self.issue_command_mock.assert_called_once_with(
-        util.AWS_PREFIX +
-        ['glue', 'get-crawler', '--name', 'pkb-crawler-deadbeef'],
+        util.AWS_PREFIX + [
+            'glue', 'get-crawler', '--name', 'pkb-crawler-deadbeef', '--region',
+            'us-east-1'
+        ],
         raise_on_failure=False)
 
   @mock.patch.object(
@@ -92,6 +96,8 @@ class AwsGlueCrawlerTest(pkb_common_test_case.PkbCommonTestCase):
             'get-database',
             '--name',
             'pkb-db-deadbeef',
+            '--region',
+            'us-east-1',
         ],
         raise_on_failure=False)
 
@@ -104,6 +110,8 @@ class AwsGlueCrawlerTest(pkb_common_test_case.PkbCommonTestCase):
             'get-database',
             '--name',
             'pkb-db-deadbeef',
+            '--region',
+            'us-east-1',
         ],
         raise_on_failure=False)
 
@@ -121,7 +129,8 @@ class AwsGlueCrawlerTest(pkb_common_test_case.PkbCommonTestCase):
             'aws', '--output', 'json', 'glue', 'create-crawler', '--name',
             'pkb-crawler-deadbeef', '--role', CRAWLER_ROLE, '--database-name',
             'pkb-db-deadbeef', '--targets',
-            '{"S3Targets": [{"Path": "s3://foo/bar"}]}', '--tags', ''
+            '{"S3Targets": [{"Path": "s3://foo/bar"}]}', '--region',
+            'us-east-1', '--tags', ''
         ])
     ])
 

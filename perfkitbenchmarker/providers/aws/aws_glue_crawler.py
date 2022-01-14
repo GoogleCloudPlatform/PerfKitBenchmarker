@@ -73,6 +73,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         '--role', self.role,
         '--database-name', self.db_name,
         '--targets', json.dumps(targets),
+        '--region', self.region,
         '--tags', ','.join(
             f'{k}={v}' for k, v in util.MakeDefaultTags().items()),
     ]
@@ -123,13 +124,15 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         'glue',
         'start-crawler',
         '--name', self.crawler_name,
+        '--region', self.region,
     ]
     vm_util.IssueCommand(cmd)
     self._WaitUntilCrawlerReady()
     cmd = util.AWS_PREFIX + [
         'glue',
         'get-crawler-metrics',
-        '--crawler-name-list', self.crawler_name
+        '--crawler-name-list', self.crawler_name,
+        '--region', self.region,
     ]
     output, _, _ = vm_util.IssueCommand(cmd)
     data = json.loads(output)
@@ -169,6 +172,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         'glue',
         'get-database',
         '--name', self.db_name,
+        '--region', self.region,
     ]
     _, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if not retcode:
@@ -194,6 +198,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         'glue',
         'get-crawler',
         '--name', self.crawler_name,
+        '--region', self.region,
     ]
     return vm_util.IssueCommand(cmd, raise_on_failure=raise_on_failure)
 
