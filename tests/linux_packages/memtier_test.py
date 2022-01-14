@@ -40,7 +40,13 @@ GET               0         50.0
 GET               2       100.00
 """
 
-METADATA = {'test': 'foobar'}
+METADATA = {
+    'test': 'foobar',
+    'p90_latency': 2.295,
+    'p95_latency': 2.319,
+    'p99_latency': 2.399,
+    'avg_latency': 1.54,
+}
 
 TIME_SERIES_JSON = """
   {

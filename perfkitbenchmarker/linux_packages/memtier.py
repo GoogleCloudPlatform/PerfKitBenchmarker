@@ -467,6 +467,9 @@ class MemtierResult:
   ops_per_sec: float
   kb_per_sec: float
   latency_ms: float
+  p90_latency: float
+  p95_latency: float
+  p99_latency: float
   get_latency_histogram: MemtierHistogram
   set_latency_histogram: MemtierHistogram
   ops_time_series: List[Tuple[int, int]]
@@ -510,19 +513,32 @@ class MemtierResult:
     GET              40       100.00
     GET              41       100.00
     """
-    ops_per_sec, latency_ms, kb_per_sec = _ParseTotalThroughputAndLatency(
-        memtier_results)
+    aggregated_result = _ParseTotalThroughputAndLatency(memtier_results)
     set_histogram, get_histogram = _ParseHistogram(memtier_results)
     ops_time_series = []
     max_latency_time_series = []
     if time_series_json:
       ops_time_series, max_latency_time_series = _ParseTimeSeries(
           time_series_json)
-    return cls(ops_per_sec, kb_per_sec, latency_ms, get_histogram,
-               set_histogram, ops_time_series, max_latency_time_series)
+    return cls(
+        ops_per_sec=aggregated_result.ops_per_sec,
+        kb_per_sec=aggregated_result.kb_per_sec,
+        latency_ms=aggregated_result.latency_ms,
+        p90_latency=aggregated_result.p90_latency,
+        p95_latency=aggregated_result.p95_latency,
+        p99_latency=aggregated_result.p99_latency,
+        get_latency_histogram=get_histogram,
+        set_latency_histogram=set_histogram,
+        ops_time_series=ops_time_series,
+        max_latency_time_series=max_latency_time_series
+        )
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Return this result as a list of samples."""
+    metadata['avg_latency'] = self.latency_ms
+    metadata['p90_latency'] = self.p90_latency
+    metadata['p95_latency'] = self.p95_latency
+    metadata['p99_latency'] = self.p99_latency
     samples = [
         sample.Sample('Ops Throughput', self.ops_per_sec, 'ops/s', metadata),
         sample.Sample('KB Throughput', self.kb_per_sec, 'KB/s', metadata),
@@ -575,8 +591,19 @@ def _ParseHistogram(
   return set_histogram, get_histogram
 
 
+@dataclasses.dataclass(frozen=True)
+class MemtierAggregateResult:
+  """Parsed aggregated memtier results."""
+  ops_per_sec: float
+  kb_per_sec: float
+  latency_ms: float
+  p90_latency: float
+  p95_latency: float
+  p99_latency: float
+
+
 def _ParseTotalThroughputAndLatency(
-    memtier_results: Text) -> Tuple[float, float, float]:
+    memtier_results: Text) -> 'MemtierAggregateResult':
   """Parses the 'TOTALS' output line and return throughput and latency."""
   columns = None
   for raw_line in memtier_results.splitlines():
@@ -599,9 +626,14 @@ def _ParseTotalThroughputAndLatency(
           raise errors.Benchmarks.RunError(
               f'Stats table does not contain "{key}" column.')
         return float(totals[columns.index(key)])  # pylint: disable=cell-var-from-loop
-
-      return (_FetchStat('Ops/sec'), _FetchStat('Avg. Latency'),
-              _FetchStat('KB/sec'))
+      return MemtierAggregateResult(
+          ops_per_sec=_FetchStat('Ops/sec'),
+          kb_per_sec=_FetchStat('KB/sec'),
+          latency_ms=_FetchStat('Avg. Latency'),
+          p90_latency=_FetchStat('p90 Latency'),
+          p95_latency=_FetchStat('p95 Latency'),
+          p99_latency=_FetchStat('p99 Latency')
+          )
   raise errors.Benchmarks.RunError('No "Totals" line in memtier output.')
 
 

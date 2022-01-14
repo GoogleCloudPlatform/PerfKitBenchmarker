@@ -128,6 +128,7 @@
 -   Added support to allow deleting a static table in Cloud Bigtable benchmarks
     via --google_bigtable_delete_static_table.
 -   Support downloading data twice in object_storage_service_benchmark.
+-   Add memtier reported percentile latencies to Memtier samples metadata.
 
 ### Bug fixes and maintenance updates:
 
