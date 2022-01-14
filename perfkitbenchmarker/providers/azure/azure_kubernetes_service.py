@@ -20,6 +20,7 @@ from typing import List
 from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -32,7 +33,7 @@ FLAGS = flags.FLAGS
 class AzureContainerRegistry(container_service.BaseContainerRegistry):
   """Class for building and storing container images on Azure."""
 
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   def __init__(self, registry_spec):
     super(AzureContainerRegistry, self).__init__(registry_spec)
@@ -111,7 +112,7 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
 class AksCluster(container_service.KubernetesCluster):
   """Class representing an Azure Kubernetes Service cluster."""
 
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   def __init__(self, spec):
     """Initializes the cluster."""

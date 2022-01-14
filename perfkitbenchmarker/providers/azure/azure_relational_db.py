@@ -17,8 +17,10 @@ import datetime
 import json
 import logging
 import time
+
 from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
@@ -70,7 +72,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   must be the same.
 
   """
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   database_name: str
 

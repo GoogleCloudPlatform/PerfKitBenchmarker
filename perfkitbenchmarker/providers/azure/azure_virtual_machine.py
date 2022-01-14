@@ -33,12 +33,14 @@ import logging
 import posixpath
 import re
 import threading
+
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -48,7 +50,6 @@ from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
-
 from six.moves import range
 import yaml
 
@@ -83,7 +84,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     low_priority: boolean. True if the VM should be low-priority, else False.
   """
 
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   def __init__(self, *args, **kwargs):
     super(AzureVmSpec, self).__init__(*args, **kwargs)
@@ -458,7 +459,7 @@ class AzureDedicatedHost(resource.BaseResource):
 
 class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an Azure Virtual Machine."""
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   _lock = threading.Lock()
   # TODO(buggay): remove host groups & hosts as globals -> create new spec

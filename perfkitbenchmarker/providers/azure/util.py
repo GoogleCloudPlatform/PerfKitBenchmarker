@@ -18,6 +18,7 @@
 import json
 import re
 from typing import Any, Dict, Set
+
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import vm_util

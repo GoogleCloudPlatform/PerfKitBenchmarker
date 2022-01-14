@@ -14,4 +14,3 @@
 """Provider for Azure."""
 
 AZURE_PATH = 'az'
-CLOUD = 'Azure'

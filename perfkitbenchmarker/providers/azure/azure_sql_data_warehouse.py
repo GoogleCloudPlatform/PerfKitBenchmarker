@@ -20,9 +20,11 @@ import copy
 import json
 import os
 from typing import Dict, List, Text, Tuple
+
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 
@@ -274,7 +276,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
 class Azuresqldatawarehouse(edw_service.EdwService):
   """Object representing an Azure SQL data warehouse."""
 
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
   SERVICE_TYPE = 'azuresqldatawarehouse'
 
   def __init__(self, edw_service_spec):
