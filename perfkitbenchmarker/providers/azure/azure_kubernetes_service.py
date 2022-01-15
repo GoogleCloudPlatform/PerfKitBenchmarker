@@ -77,13 +77,16 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
 
   def _PostCreate(self):
     """Allow the service principle to read from the repository."""
-    create_role_assignment_cmd = [
-        azure.AZURE_PATH, 'role', 'assignment', 'create',
-        '--assignee', self.service_principal.app_id,
-        '--role', 'Reader',
-        '--scope', self.acr_id,
-    ]
-    vm_util.IssueRetryableCommand(create_role_assignment_cmd)
+    # If we bootstrapped our own credentials into the AKS cluster it already,
+    # has read permission, because it created the repo.
+    if not FLAGS.bootstrap_azure_service_principal:
+      create_role_assignment_cmd = [
+          azure.AZURE_PATH, 'role', 'assignment', 'create',
+          '--assignee', self.service_principal.app_id,
+          '--role', 'Reader',
+          '--scope', self.acr_id,
+      ]
+      vm_util.IssueRetryableCommand(create_role_assignment_cmd)
 
   def _CreateDependencies(self):
     """Creates the resource group."""
@@ -92,7 +95,6 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
 
   def _DeleteDependencies(self):
     """Deletes the resource group."""
-    self.resource_group.Delete()
     self.service_principal.Delete()
 
   def Login(self):
@@ -208,8 +210,20 @@ class AksCluster(container_service.KubernetesCluster):
 
   def _Delete(self):
     """Deletes the AKS cluster."""
-    # This will be deleted along with the resource group
-    super()._Delete()
+    # Do not call super._Delete() as it will try to delete containers and the
+    # cluster may have already been deleted by deleting a corresponding
+    # AzureContainerRegistry. The registry deletes the shared resource group.
+    #
+    # Normally only azure networks manage resource groups because,
+    # PKB assumes all benchmarks use VMs and VMs always depend on networks.
+    # However container benchmarks do not provision networks and
+    # directly manage their own resource groups. However ContainerClusters and
+    # ContainerRegistries can be used independently so they must both directly
+    # mangage the undlerlying resource group. This is indempotent, but can cause
+    # AKS clusters to have been deleted before calling _Delete().
+    #
+    # If it has not yet been deleted it will be deleted along with the resource
+    # group.
     self._deleted = True
 
   def _PostCreate(self):
@@ -251,5 +265,4 @@ class AksCluster(container_service.KubernetesCluster):
 
   def _DeleteDependencies(self):
     """Deletes the resource group."""
-    self.resource_group.Delete()
     self.service_principal.Delete()

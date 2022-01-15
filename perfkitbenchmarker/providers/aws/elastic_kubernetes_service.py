@@ -106,7 +106,14 @@ class EksCluster(container_service.KubernetesCluster):
 
     cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(
         '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v)
-    vm_util.IssueCommand(cmd, timeout=1800)
+    stdout, _, retcode = vm_util.IssueCommand(
+        cmd, timeout=1800, raise_on_failure=False)
+    if retcode:
+      # TODO(pclay): add other quota errors
+      if 'The maximum number of VPCs has been reached' in stdout:
+        raise errors.Benchmarks.QuotaFailure(stdout)
+      else:
+        raise errors.Resource.CreationError(stdout)
 
     for name, node_group in self.nodepools.items():
       self._CreateNodeGroup(name, node_group)
@@ -119,7 +126,7 @@ class EksCluster(container_service.KubernetesCluster):
     }
     eksctl_flags.update(
         self._GetNodeFlags(name, node_group.num_nodes, node_group.vm_config))
-    cmd = [FLAGS.eksctl, 'create', 'node-group'] + sorted(
+    cmd = [FLAGS.eksctl, 'create', 'nodegroup'] + sorted(
         '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v)
     vm_util.IssueCommand(cmd, timeout=600)
 
