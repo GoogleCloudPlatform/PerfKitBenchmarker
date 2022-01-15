@@ -113,6 +113,22 @@ def GetZonesInRegion(region) -> Set[str]:
   return set(stdout.splitlines())
 
 
+def GetZonesFromMachineType() -> Set[str]:
+  """Gets a list of zones for the given machine type."""
+  cmd = GcloudCommand(None, 'compute', 'machine-types', 'list')
+  cmd.flags = {
+      'filter': f"name~'{FLAGS.machine_type}'",
+      'format': 'value(zone)'
+  }
+  stdout, _, _ = cmd.Issue()
+  return set(stdout.splitlines())
+
+
+def GetRegionsFromMachineType() -> Set[str]:
+  """Gets a list of regions for the given machine type."""
+  return set(GetRegionFromZone(zone) for zone in GetZonesFromMachineType())
+
+
 def GetGeoFromRegion(region: str) -> str:
   """Gets valid geo from the region, i.e. region us-central1 returns us."""
   return region.split('-')[0]

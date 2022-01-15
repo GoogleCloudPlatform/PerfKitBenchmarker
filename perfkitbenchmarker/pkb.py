@@ -1291,6 +1291,7 @@ class ZoneRetryManager():
     if not _SMART_CAPACITY_RETRY.value and not _SMART_QUOTA_RETRY.value:
       return
     self._zones_tried: Set[str] = set()
+    self._regions_tried: Set[str] = set()
     self._utils: types.ModuleType = providers.LoadProviderUtils(FLAGS.cloud)
     self._SetOriginalZoneAndFlag()
 
@@ -1299,8 +1300,12 @@ class ZoneRetryManager():
     # This is guaranteed to set values due to flag validator.
     for zone_flag in ['zone', 'zones']:
       if FLAGS[zone_flag].value:
-        self._original_zone = FLAGS[zone_flag].value[0]
         self._zone_flag = zone_flag
+        if FLAGS[self._zone_flag].value[0].lower() == 'all':
+          self._AssignNewZone()
+        self._original_zone = FLAGS[self._zone_flag].value[0]
+        self._original_region = self._utils.GetRegionFromZone(
+            self._original_zone)
 
   def HandleSmartRetries(self, spec: bm_spec.BenchmarkSpec) -> None:
     """Handles smart zone retry flags if provided."""
@@ -1311,24 +1316,27 @@ class ZoneRetryManager():
         benchmark_status.FailedSubstatus.UNSUPPORTED,
         benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
     }):
-      self._AssignNewZoneSameRegion()
+      self._AssignNewZone()
 
   def _AssignZoneToNewRegion(self) -> None:
-    """Changes zone to be a new zone in the same geo but different region."""
-    region = self._utils.GetRegionFromZone(self._original_zone)
-    geo = self._utils.GetGeoFromRegion(region)
-    possible_zones = set()
-    for new_region in self._utils.GetRegionsInGeo(geo):
-      if new_region != region:
-        zones = self._utils.GetZonesInRegion(new_region)
-        possible_zones.update(zones)
-    self._ChooseAndSetNewZone(possible_zones)
+    """Changes zone to be a new zone in the different region."""
+    current_zone = FLAGS[self._zone_flag].value[0]
+    region = self._utils.GetRegionFromZone(current_zone)
+    self._regions_tried.add(region)
+    regions_to_try = self._utils.GetRegionsFromMachineType(
+    ) - self._regions_tried
+    # Restart from empty if we've exhausted all alternatives.
+    if not regions_to_try:
+      self._regions_tried.clear()
+      new_region = self._original_region
+    else:
+      new_region = random.choice(tuple(regions_to_try))
+    logging.info('Retry using new region %s', new_region)
+    self._ChooseAndSetNewZone(self._utils.GetZonesInRegion(new_region))
 
-  def _AssignNewZoneSameRegion(self) -> None:
-    """Changes zone to be a new zone in the same region."""
-    region = self._utils.GetRegionFromZone(self._original_zone)
-    possible_zones = self._utils.GetZonesInRegion(region)
-    self._ChooseAndSetNewZone(possible_zones)
+  def _AssignNewZone(self) -> None:
+    """Changes zone to be a new zone."""
+    self._ChooseAndSetNewZone(self._utils.GetZonesFromMachineType())
 
   def _ChooseAndSetNewZone(self, possible_zones: Set[str]) -> None:
     """Saves the current _zone_flag and sets it to a new zone.
@@ -1337,7 +1345,8 @@ class ZoneRetryManager():
       possible_zones: The set of zones to choose from.
     """
     current_zone = FLAGS[self._zone_flag].value[0]
-    self._zones_tried.add(current_zone)
+    if current_zone != 'all':
+      self._zones_tried.add(current_zone)
     zones_to_try = possible_zones - self._zones_tried
     # Restart from empty if we've exhausted all alternatives.
     if not zones_to_try:
