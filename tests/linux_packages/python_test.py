@@ -26,14 +26,12 @@ FLAGS = flags.FLAGS
 _RESPONSE_BAD = '', '', 1
 PYTHON_MISSING = _RESPONSE_BAD
 PYTHON2_PATH_MISSING = _RESPONSE_BAD
-ALTERNATIVES_MISSING = _RESPONSE_BAD
 ALTERNATIVES_CALL_BAD = _RESPONSE_BAD
 PYTHON_VERSION_CALL_BAD = _RESPONSE_BAD
 
 # Responses for non-error remote commands
 _RESPONSE_GOOD = '', '', 0
 PYTHON_VERSION_2 = '', 'Python 2.7', 0
-ALTERNATIVES_FOUND = _RESPONSE_GOOD
 PYTHON2_PATH_FOUND = _RESPONSE_GOOD
 ALTERNATIVES_CALL_GOOD = _RESPONSE_GOOD
 SYMLINK_SET = _RESPONSE_GOOD
@@ -76,9 +74,9 @@ class PythonTest(pkb_common_test_case.PkbCommonTestCase):
     expected = 'python --version'
     self.RunSetDefault(responses, expected)
 
-  def testNoAlternativesProgram(self):
+  def testBadAlternativesResponse(self):
     responses = [
-        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_MISSING, SYMLINK_SET,
+        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_CALL_BAD, SYMLINK_SET,
         PYTHON_VERSION_2
     ]
     expected = 'python --version'
@@ -89,26 +87,18 @@ class PythonTest(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
       self.RunSetDefault(responses)
 
-  def testBadAlternativesResponse(self):
-    responses = [
-        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_FOUND,
-        ALTERNATIVES_CALL_BAD
-    ]
-    with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
-      self.RunSetDefault(responses)
-
   def testNoPythonVersionAfterSet(self):
     responses = [
-        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_FOUND,
-        ALTERNATIVES_CALL_GOOD, PYTHON_VERSION_CALL_BAD
+        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_CALL_GOOD,
+        PYTHON_VERSION_CALL_BAD
     ]
     with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
       self.RunSetDefault(responses)
 
   def testPythonVersionAfterSet(self):
     responses = [
-        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_FOUND,
-        ALTERNATIVES_CALL_GOOD, PYTHON_VERSION_2
+        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_CALL_GOOD,
+        PYTHON_VERSION_2
     ]
     expected = 'python --version'
     self.RunSetDefault(responses, expected)

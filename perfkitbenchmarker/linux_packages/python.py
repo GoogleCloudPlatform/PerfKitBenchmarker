@@ -51,29 +51,26 @@ def _SetDefaultPythonIfNeeded(vm):
   python_version_cmd = 'python --version'
 
   stdout, stderr, return_code = _RunCommand(python_version_cmd)
-  if not return_code:
+  python_found = not return_code
+  if python_found:
     logging.info(
         'Default version of python: %s', (stdout or stderr).strip().split()[-1])
     return
   logging.info('Trying to set the default python version')
-  _, _, return_code = _RunCommand('ls /usr/bin/python2')
-  if return_code:
+  _, _, python2_not_found = _RunCommand('ls /usr/bin/python2')
+  if python2_not_found:
     raise errors.Setup.PythonPackageRequirementUnfulfilled(
         'No default version of python set and /usr/bin/python2 does not exist')
-  _, _, return_code = _RunCommand('which update-alternatives')
-  if return_code:
-    # Some distros might not include update-alternatives
+  _, _, update_alternatives_failed = _RunCommand(
+      'sudo update-alternatives --set python /usr/bin/python2')
+  if update_alternatives_failed:
+    # Ubuntu 20 lets you install python2, but not update-alternatives to point
+    # python to it. Also some distros might not include update-alternatives.
+    # In any case fall back to a symlink
     vm.RemoteCommandWithReturnCode(
         'sudo ln -s /usr/bin/python2 /usr/bin/python')
-  else:
-    _, error_text, return_code = _RunCommand(
-        'sudo update-alternatives --set python /usr/bin/python2')
-    if return_code:
-      raise errors.Setup.PythonPackageRequirementUnfulfilled(
-          'Could not set via update-alternatives default python version: {}'
-          .format(error_text))
-  _, txt, return_code = _RunCommand(python_version_cmd)
-  if return_code:
+  _, txt, python_not_found = _RunCommand(python_version_cmd)
+  if python_not_found:
     raise errors.Setup.PythonPackageRequirementUnfulfilled(
         "'python' command not working after setting alias.")
   logging.info('Set default python version to %s', txt.strip().split()[-1])
