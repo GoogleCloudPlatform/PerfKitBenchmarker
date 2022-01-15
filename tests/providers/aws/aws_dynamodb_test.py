@@ -81,17 +81,18 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
 
     test_instance = GetTestDynamoDBInstance()
 
-    self.assertEqual(test_instance.primary_key,
-                     '{"AttributeName": "test_primary_key","KeyType": "HASH"}')
-    self.assertEqual(test_instance.sort_key,
-                     '{"AttributeName": "test_sort_key","KeyType": "RANGE"}')
     self.assertEqual(
-        test_instance.part_attributes,
-        '{"AttributeName": "test_primary_key","AttributeType": "test_attribute_type"}'
+        test_instance._PrimaryKeyJson(),
+        '{"AttributeName": "test_primary_key", "KeyType": "HASH"}')
+    self.assertEqual(test_instance._SortKeyJson(),
+                     '{"AttributeName": "test_sort_key", "KeyType": "RANGE"}')
+    self.assertEqual(
+        test_instance._PrimaryAttrsJson(),
+        '{"AttributeName": "test_primary_key", "AttributeType": "test_attribute_type"}'
     )
     self.assertEqual(
-        test_instance.sort_attributes,
-        '{"AttributeName": "test_sort_key","AttributeType": "test_attribute_type"}'
+        test_instance._SortAttrsJson(),
+        '{"AttributeName": "test_sort_key", "AttributeType": "test_attribute_type"}'
     )
 
   @flagsaver.flagsaver
@@ -115,8 +116,6 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.aws_dynamodb_write_capacity = 2
     FLAGS.aws_dynamodb_lsi_count = 3
     FLAGS.aws_dynamodb_gsi_count = 4
-    FLAGS.aws_dynamodb_ycsb_consistentReads = 5
-    FLAGS.aws_dynamodb_connectMax = 6
     test_instance = aws_dynamodb.AwsDynamoDBInstance('test_table')
 
     actual_metadata = test_instance.GetResourceMetadata()
@@ -130,8 +129,6 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
         'aws_dynamodb_write_capacity': 2,
         'aws_dynamodb_lsi_count': 3,
         'aws_dynamodb_gsi_count': 4,
-        'aws_dynamodb_consistentReads': 5,
-        'aws_dynamodb_connectMax': 6,
     }
     self.assertEqual(actual_metadata, expected_metadata)
 
