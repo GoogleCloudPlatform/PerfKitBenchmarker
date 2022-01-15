@@ -102,14 +102,13 @@ class ElasticContainerRegistry(container_service.BaseContainerRegistry):
     for repository in self.repositories:
       repository.Delete()
 
-  def Push(self, image):
-    """Push a locally built image to the registry."""
+  def PrePush(self, image):
+    """Prepares registry to push a given image."""
     repository_name = '{namespace}/{name}'.format(
         namespace=self.name, name=image.name)
     repository = EcrRepository(repository_name, self.region)
     self.repositories.append(repository)
     repository.Create()
-    super(ElasticContainerRegistry, self).Push(image)
 
   def GetFullRegistryTag(self, image):
     """Gets the full tag of the image."""

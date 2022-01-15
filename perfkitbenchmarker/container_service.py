@@ -98,10 +98,10 @@ flags.DEFINE_string(
     'command. If not specified, the cloud-specific container '
     'implementation will chose an appropriate default.')
 
-# TODO(user): Consider supporting multiarch manifests.
-flags.DEFINE_string('container_cluster_architecture', 'linux/amd64',
-                    'The architecture that the container cluster uses. '
-                    'Defaults to linux/amd64')
+_CONTAINER_CLUSTER_ARCHITECTURE = flags.DEFINE_list(
+    'container_cluster_architecture', ['linux/amd64'],
+    'The architecture(s) that the container cluster uses. '
+    'Defaults to linux/amd64')
 
 _K8S_INGRESS = """
 apiVersion: extensions/v1beta1
@@ -357,17 +357,9 @@ class BaseContainerRegistry(resource.BaseResource):
     """
     raise NotImplementedError()
 
-  def Push(self, image):
-    """Push a locally built image to the repo.
-
-    Args:
-      image: Instance of _ContainerImage representing the image to push.
-    """
-    full_tag = self.GetFullRegistryTag(image.name)
-    tag_cmd = ['docker', 'tag', image.name, full_tag]
-    vm_util.IssueCommand(tag_cmd)
-    push_cmd = ['docker', 'push', full_tag]
-    vm_util.IssueCommand(push_cmd)
+  def PrePush(self, image):
+    """Prepares registry to push a given image."""
+    pass
 
   def RemoteBuild(self, image):
     """Build the image remotely.
@@ -381,19 +373,26 @@ class BaseContainerRegistry(resource.BaseResource):
     """Log in to the registry (in order to push to it)."""
     raise NotImplementedError()
 
-  def LocalBuild(self, image):
-    """Build the image locally.
+  def LocalBuildAndPush(self, image):
+    """Build the image locally and push to registry.
+
+    Assumes we are already authenticated with the registry from self.Login.
+    Building and pushing done in one command to support multiarch images
+    https://github.com/docker/buildx/issues/59
 
     Args:
       image: Instance of _ContainerImage representing the image to build.
     """
-    build_cmd = [
-        'docker', 'buildx', 'build',
-        '--platform', FLAGS.container_cluster_architecture,
-        '--no-cache', '--load',
-        '-t', image.name, image.directory
-    ]
-    vm_util.IssueCommand(build_cmd)
+    full_tag = self.GetFullRegistryTag(image.name)
+    # Multiarch images require buildx create
+    # https://github.com/docker/build-push-action/issues/302
+    vm_util.IssueCommand(['docker', 'buildx', 'create', '--use'])
+    cmd = ['docker', 'buildx', 'build']
+    if _CONTAINER_CLUSTER_ARCHITECTURE.value:
+      cmd += ['--platform', ','.join(_CONTAINER_CLUSTER_ARCHITECTURE.value)]
+    cmd += ['--no-cache', '--push', '-t', full_tag, image.directory]
+    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(['docker', 'buildx', 'stop'])
 
   def GetOrBuild(self, image):
     """Finds the image in the registry or builds it.
@@ -407,8 +406,11 @@ class BaseContainerRegistry(resource.BaseResource):
       The full image name (including the registry).
     """
     full_image = self.GetFullRegistryTag(image)
+    # Log in to the registry to see if image exists
+    self.Login()
     if not FLAGS.force_container_build:
-      inspect_cmd = ['docker', 'image', 'inspect', full_image]
+      # manifest inspect inpspects the registry's copy
+      inspect_cmd = ['docker', 'manifest', 'inspect', full_image]
       _, _, retcode = vm_util.IssueCommand(
           inspect_cmd, suppress_warning=True, raise_on_failure=False)
       if retcode == 0:
@@ -433,14 +435,11 @@ class BaseContainerRegistry(resource.BaseResource):
       except NotImplementedError:
         pass
 
+    self.PrePush(image)
     # Build the image locally using docker.
-    self.LocalBuild(image)
+    build_start = time.time()
+    self.LocalBuildAndPush(image)
     self.local_build_times[image.name] = time.time() - build_start
-
-    # Log in to the registry so we can push the image.
-    self.Login()
-    # Push the built image to the registry.
-    self.Push(image)
 
 
 @events.benchmark_start.connect

@@ -25,7 +25,6 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 import six
@@ -68,19 +67,11 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
     return full_tag
 
   def Login(self):
-    """No-op because Push() handles its own auth."""
-    pass
-
-  def Push(self, image):
-    """Push a locally built image to the registry."""
-    full_tag = self.GetFullRegistryTag(image.name)
-    tag_cmd = ['docker', 'tag', image.name, full_tag]
-    vm_util.IssueCommand(tag_cmd)
-    # vm_util.IssueCommand() is used here instead of util.GcloudCommand()
-    # because gcloud flags cannot be appended to the command since they
-    # are interpreted as docker args instead.
-    push_cmd = ['docker', '--', 'push', full_tag]
-    vm_util.IssueCommand(push_cmd)
+    """Configure docker to be able to push to remote repo."""
+    # TODO(pclay): Don't edit user's docker config. It is idempotent.
+    cmd = util.GcloudCommand(self, 'auth', 'configure-docker')
+    del cmd.flags['zone']
+    cmd.Issue()
 
   def RemoteBuild(self, image):
     """Build the image remotely."""

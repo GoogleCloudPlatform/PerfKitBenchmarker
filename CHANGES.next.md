@@ -129,6 +129,7 @@
     via --google_bigtable_delete_static_table.
 -   Support downloading data twice in object_storage_service_benchmark.
 -   Add memtier reported percentile latencies to Memtier samples metadata.
+-   Add support for building multiarch Docker images.
 
 ### Bug fixes and maintenance updates:
 
