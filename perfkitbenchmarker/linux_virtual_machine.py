@@ -54,7 +54,7 @@ import yaml
 FLAGS = flags.FLAGS
 
 
-LSB_DESCRIPTION_REGEXP = r'Description:\s*(.*)\s*'
+OS_PRETTY_NAME_REGEXP = r'PRETTY_NAME="(.*)"'
 CLEAR_BUILD_REGEXP = r'Installed version:\s*(.*)\s*'
 UPDATE_RETRIES = 5
 DEFAULT_SSH_PORT = 22
@@ -706,9 +706,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def GetOsInfo(self):
     """Returns information regarding OS type and version."""
-    self.Install('lsb_release')
-    stdout, _ = self.RemoteCommand('lsb_release -d')
-    return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
+    stdout, _ = self.RemoteCommand('grep PRETTY_NAME /etc/os-release')
+    return regex_util.ExtractGroup(OS_PRETTY_NAME_REGEXP, stdout)
 
   @property
   def os_info(self):

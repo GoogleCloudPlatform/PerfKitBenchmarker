@@ -381,7 +381,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'Socket(s): 1',
   ])
   normal_boot_responses = [
-      'cubic', 'Description: ' + os_info, kernel_release, partition_table
+      'cubic', f'PRETTY_NAME="{os_info}"', kernel_release, partition_table
   ]
 
   def CreateVm(self, array_of_stdout):
@@ -437,7 +437,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         '(myhostname)',
         '(last boot time)',
         '(create install dir)',
-        'Description: ' + os_info_new,
+        f'PRETTY_NAME="{os_info_new}"',
         kernel_release_new,
         '(create install dir)',
         '(create tmp dir)',
