@@ -64,6 +64,7 @@ dictionary.
 
 import copy
 import functools
+import json
 import logging
 import re
 
@@ -294,7 +295,13 @@ def LoadMinimalConfig(benchmark_config, benchmark_name):
         'Encountered a problem loading the default benchmark config. Please '
         'ensure that all references are defined. Error received:\n%s' % e)
 
-  return config[benchmark_name]
+  config = config[benchmark_name]
+  # yaml safe_parse parses anchor by reference and return the same
+  # object when the same anchor is used multiple times.
+  # Seralize and deserialize to make sure all objects in the dictionary are
+  # unique.
+  config = json.loads(json.dumps(config))
+  return config
 
 
 def LoadConfig(benchmark_config, user_config, benchmark_name):
