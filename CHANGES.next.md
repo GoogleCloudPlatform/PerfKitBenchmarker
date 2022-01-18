@@ -130,6 +130,7 @@
 -   Support downloading data twice in object_storage_service_benchmark.
 -   Add memtier reported percentile latencies to Memtier samples metadata.
 -   Add support for building multiarch Docker images.
+-   Add latency capped throughput measurement mode to memtier.
 
 ### Bug fixes and maintenance updates:
 

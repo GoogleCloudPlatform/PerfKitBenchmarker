@@ -104,6 +104,11 @@ def Run(benchmark_spec):
   if memtier.MEMTIER_RUN_MODE.value == memtier.MemtierMode.MEASURE_CPU_LATENCY:
     samples = memtier.RunGetLatencyAtCpu(benchmark_spec.cloud_redis_instance,
                                          memtier_vms)
+  elif memtier.MEMTIER_LATENCY_CAPPED_THROUGHPUT.value:
+    samples = memtier.MeasureLatencyCappedThroughput(
+        memtier_vms[0], benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
+        benchmark_spec.cloud_redis_instance.GetMemoryStorePort(),
+        benchmark_spec.cloud_redis_instance.GetMemoryStorePassword())
   else:
     samples = memtier.RunOverAllThreadsPipelinesAndClients(
         memtier_vms[0], benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
