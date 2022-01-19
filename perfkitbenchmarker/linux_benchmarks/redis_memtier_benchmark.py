@@ -138,7 +138,10 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   """Run memtier_benchmark against Redis."""
   client_vms = bm_spec.vm_groups['clients']
-  server_vm = bm_spec.vm_groups['servers'][0]
+  # Don't reference vm_groups['server'] directly, because this is reused by
+  # kubernetes_redis_memtier_benchmark, which doesn't have one.
+  measure_cpu_on_server_vm = (
+      REDIS_MEMTIER_MEASURE_CPU.value and 'servers' in bm_spec.vm_groups)
 
   ports = [str(port) for port in redis_server.GetRedisPorts()]
   def DistributeClientsToPorts(port):
@@ -159,7 +162,8 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
         'simulate_maintenance_time'] = str(simulate_maintenance_time)
     benchmark_metadata[
         'simulate_maintenance_delay'] = FLAGS.simulate_maintenance_delay
-  if REDIS_MEMTIER_MEASURE_CPU.value:
+  if measure_cpu_on_server_vm:
+    server_vm = bm_spec.vm_groups['servers'][0]
     top_cmd = f'top -b -d 1 -n {memtier.MEMTIER_RUN_DURATION.value} > {_TOP_OUTPUT} &'
     server_vm.RemoteCommand(
         f'echo "{top_cmd}" > {_TOP_SCRIPT}')
@@ -167,7 +171,10 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
 
   raw_results = vm_util.RunThreaded(DistributeClientsToPorts, ports)
   redis_metadata = redis_server.GetMetadata()
-  top_results = _GetTopResults(server_vm)
+
+  top_results = []
+  if measure_cpu_on_server_vm:
+    top_results = _GetTopResults(server_vm)
 
   results = []
 
