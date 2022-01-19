@@ -120,6 +120,8 @@ def Run(benchmark_spec):
   samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
   benchmark_metadata = {
       'ycsb_client_vms': len(vms),
+      'aws_dynamodb_consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
+      'aws_dynamodb_connectMax': FLAGS.aws_dynamodb_connectMax,
   }
   for sample in samples:
     sample.metadata.update(
