@@ -599,6 +599,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       if 'quota' in stderr.lower():
         raise errors.Benchmarks.QuotaFailure(
             virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
+      elif re.search(r'requested VM size \S+ is not available', stderr):
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       elif self.low_priority and 'OverconstrainedAllocationRequest' in stderr:
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     # TODO(buggay) refactor to share code with gcp_virtual_machine.py
