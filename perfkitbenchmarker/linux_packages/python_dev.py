@@ -20,6 +20,10 @@ def YumInstall(vm):
   Install(vm, package=vm.PYTHON_2_PACKAGE + '-devel')
 
 
-def Install(vm, package='python-dev'):
+def Install(vm, package=None):
   """Installs the package on the VM."""
+  if not package:
+    package = vm.PYTHON_2_PACKAGE + '-dev'
+  # Install python to get setup
+  vm.Install('python')
   vm.InstallPackages(package)

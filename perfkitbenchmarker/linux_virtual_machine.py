@@ -1974,7 +1974,6 @@ class Debian10Mixin(BaseDebianMixin):
 class Debian11Mixin(BaseDebianMixin):
   """Class holding Debian 11 specific VM methods and attributes."""
   OS_TYPE = os_types.DEBIAN11
-  PYTHON_2_PACKAGE = 'python-is-python2'
 
   def PrepareVMEnvironment(self):
     # Missing in some images. Required by PrepareVMEnvironment to determine
