@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Run YCSB benchmark against AWS DynamoDB.
 
 This benchmark does not provision VMs for the corresponding DynamboDB database.
@@ -30,9 +29,18 @@ from perfkitbenchmarker.providers.aws import aws_dynamodb
 _INITIAL_WRITES = flags.DEFINE_integer(
     'aws_dynamodb_ycsb_provision_wcu', 10000,
     'The provisioned WCU to use during the load phase.')
-flags.register_validator('aws_dynamodb_ycsb_provision_wcu',
-                         lambda wcu: wcu >= 1,
-                         message='WCU must be >=1 to load successfully.')
+flags.register_validator(
+    'aws_dynamodb_ycsb_provision_wcu',
+    lambda wcu: wcu >= 1,
+    message='WCU must be >=1 to load successfully.')
+_CONSISTENT_READS = flags.DEFINE_boolean(
+    'aws_dynamodb_ycsb_consistentReads', False,
+    'Consistent reads cost 2x eventual reads. '
+    "'false' is default which is eventual")
+_MAX_CONNECTIONS = flags.DEFINE_integer(
+    'aws_dynamodb_connectMax', 50,
+    'Maximum number of concurrent dynamodb connections. '
+    'Defaults to 50.')
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'aws_dynamodb_ycsb'
@@ -41,6 +49,10 @@ aws_dynamodb_ycsb:
   description: >
       Run YCSB against AWS DynamoDB.
       Configure the number of VMs via --ycsb_client_vms.
+  non_relational_db:
+    service_type: dynamodb
+    zone: us-east-1a
+    enable_freeze_restore: True
   vm_groups:
     default:
       vm_spec: *default_single_core
@@ -59,6 +71,7 @@ def CheckPrerequisites(benchmark_config):
 
   Args:
     benchmark_config: Unused.
+
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
@@ -71,13 +84,9 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   benchmark_spec.always_call_cleanup = True
-
-  benchmark_spec.dynamodb_instance = aws_dynamodb.AwsDynamoDBInstance(
-      table_name='pkb-{0}'.format(FLAGS.run_uri))
-  benchmark_spec.dynamodb_instance.Create()
 
   vms = benchmark_spec.vms
   # Install required packages.
@@ -90,42 +99,45 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
+
   Returns:
     A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
+  instance: aws_dynamodb.AwsDynamoDBInstance = benchmark_spec.non_relational_db
 
   run_kwargs = {
       'dynamodb.awsCredentialsFile': GetRemoteVMCredentialsFullPath(vms[0]),
-      'dynamodb.primaryKey': FLAGS.aws_dynamodb_primarykey,
-      'dynamodb.endpoint': benchmark_spec.dynamodb_instance.GetEndPoint(),
+      'dynamodb.primaryKey': instance.primary_key,
+      'dynamodb.endpoint': instance.GetEndPoint(),
       'table': 'pkb-{0}'.format(FLAGS.run_uri),
   }
   if FLAGS.aws_dynamodb_use_sort:
-    run_kwargs.update({'dynamodb.primaryKeyType': 'HASH_AND_RANGE',
-                       'aws_dynamodb_connectMax': FLAGS.aws_dynamodb_connectMax,
-                       'dynamodb.hashKeyName': FLAGS.aws_dynamodb_primarykey,
-                       'dynamodb.primaryKey': FLAGS.aws_dynamodb_sortkey})
-  if FLAGS.aws_dynamodb_ycsb_consistentReads:
+    run_kwargs.update({
+        'dynamodb.primaryKeyType': 'HASH_AND_RANGE',
+        'aws_dynamodb_connectMax': _MAX_CONNECTIONS.value,
+        'dynamodb.hashKeyName': instance.primary_key,
+        'dynamodb.primaryKey': instance.sort_key
+    })
+  if _CONSISTENT_READS.value:
     run_kwargs.update({'dynamodb.consistentReads': 'true'})
   load_kwargs = run_kwargs.copy()
   if FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = FLAGS.ycsb_preload_threads
   # More WCU results in a faster load stage.
-  benchmark_spec.dynamodb_instance.SetThroughput(wcu=_INITIAL_WRITES.value)
+  instance.SetThroughput(wcu=_INITIAL_WRITES.value)
   samples = list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
   # Reset the WCU to the initial level.
-  benchmark_spec.dynamodb_instance.SetThroughput()
+  instance.SetThroughput()
   samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
   benchmark_metadata = {
       'ycsb_client_vms': len(vms),
-      'aws_dynamodb_consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
-      'aws_dynamodb_connectMax': FLAGS.aws_dynamodb_connectMax,
+      'aws_dynamodb_consistentReads': _CONSISTENT_READS.value,
+      'aws_dynamodb_connectMax': _MAX_CONNECTIONS.value,
   }
   for sample in samples:
-    sample.metadata.update(
-        benchmark_spec.dynamodb_instance.GetResourceMetadata())
+    sample.metadata.update(instance.GetResourceMetadata())
     sample.metadata.update(benchmark_metadata)
   return samples
 
@@ -135,16 +147,16 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-    required to run the benchmark.
+      required to run the benchmark.
   """
-  benchmark_spec.dynamodb_instance.Delete()
+  del benchmark_spec
 
 
 def GetRemoteVMCredentialsFullPath(vm):
   """Returns the full path for first AWS credentials file found."""
   home_dir, _ = vm.RemoteCommand('echo ~')
-  search_path = os.path.join(home_dir.rstrip('\n'),
-                             FLAGS.aws_credentials_remote_path)
+  search_path = os.path.join(
+      home_dir.rstrip('\n'), FLAGS.aws_credentials_remote_path)
   result, _ = vm.RemoteCommand('grep -irl "key" {0}'.format(search_path))
   return result.strip('\n').split('\n')[0]
 
