@@ -183,7 +183,7 @@ class GcpSpannerInstance(resource.BaseResource):
         project or FLAGS.project or util.GetDefaultProject())
     self.zone = None
 
-  def _GetDefaultConfig(self):
+  def _GetDefaultConfig(self) -> str:
     """Gets the config that corresponds the region used for the test."""
     try:
       region = util.GetRegionFromZone(
@@ -207,7 +207,7 @@ class GcpSpannerInstance(resource.BaseResource):
         create_on_restore_error=spanner_spec.create_on_restore_error,
         delete_on_freeze_error=spanner_spec.delete_on_freeze_error)
 
-  def _Create(self):
+  def _Create(self) -> None:
     """Creates the instance, the database, and update the schema."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create', self.name)
     cmd.flags['description'] = self._description
@@ -236,7 +236,7 @@ class GcpSpannerInstance(resource.BaseResource):
     else:
       logging.info('Created GCP Spanner instance and database.')
 
-  def _Delete(self):
+  def _Delete(self) -> None:
     """Deletes the instance."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'delete',
                              self.name)
@@ -246,7 +246,7 @@ class GcpSpannerInstance(resource.BaseResource):
     else:
       logging.info('Deleted GCP Spanner instance.')
 
-  def _Exists(self, instance_only=False):
+  def _Exists(self, instance_only: bool = False) -> bool:
     """Returns true if the instance and the database exists."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'describe',
                              self.name)
@@ -272,7 +272,7 @@ class GcpSpannerInstance(resource.BaseResource):
 
     return True
 
-  def GetEndPoint(self):
+  def GetEndPoint(self) -> Optional[str]:
     """Returns the end point for Cloud Spanner."""
     if self._end_point:
       return self._end_point
