@@ -37,9 +37,9 @@ _HPC_SCRIPT = 'mpi-tuning.sh'
 flags.DEFINE_string('gce_hpc_tools_tag', None,
                     'Github tag of hpc-tools to use.  Default is latest.')
 flags.DEFINE_list('gce_hpc_tools_tuning', [
-    'tcpmem', 'networklatency', 'limits', 'nosmt', 'nofirewalld', 'noselinux',
+    'hpcprofile', 'tcpmem', 'limits', 'nosmt', 'nofirewalld', 'noselinux',
     'nomitigation', 'reboot'
-], 'List of HPC tunings.  `bash mpi-tools.sh` for description.')
+], 'List of HPC tunings.  `bash mpi-tuning.sh` for description.')
 
 FLAGS = flags.FLAGS
 
