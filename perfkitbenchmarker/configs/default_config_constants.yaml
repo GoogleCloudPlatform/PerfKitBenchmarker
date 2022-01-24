@@ -11,7 +11,7 @@ default_single_core: &default_single_core
     zone: eastus2
     image: null
   AWS:
-    machine_type: m3.medium
+    machine_type: t2.small
     zone: us-east-1
     image: null
   AliCloud:
