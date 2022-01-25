@@ -137,6 +137,7 @@ class _DpbServiceSpec(spec.BaseSpec):
                     dpb_service.DATAPROC,
                 'valid_values': [
                     dpb_service.DATAPROC,
+                    dpb_service.DATAPROC_GKE,
                     dpb_service.DATAFLOW,
                     dpb_service.EMR,
                     dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
@@ -151,6 +152,18 @@ class _DpbServiceSpec(spec.BaseSpec):
         }),
         'applications': (_DpbApplicationListDecoder, {}),
         'version': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'gke_cluster_name': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'gke_cluster_nodepools': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'gke_cluster_location': (option_decoders.StringDecoder, {
             'default': None,
             'none_ok': True
         })

@@ -328,3 +328,53 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
             'fs.s3a.access.key': s3_access_key,
             'fs.s3a.secret.key': s3_secret_key,
         })
+
+
+class GcpDpbDpgke(GcpDpbDataproc):
+  """Dataproc on GKE cluster."""
+
+  CLOUD = providers.GCP
+  SERVICE_TYPE = 'dataproc_gke'
+
+  def __init__(self, dpb_service_spec):
+    super(GcpDpbDpgke, self).__init__(dpb_service_spec)
+    required_spec_attrs = [
+        'gke_cluster_name', 'gke_cluster_nodepools',
+        'gke_cluster_location'
+    ]
+    missing_attrs = [
+        attr for attr in required_spec_attrs
+        if not getattr(self.spec, attr, None)
+    ]
+    if missing_attrs:
+      raise errors.Setup.InvalidSetupError(
+          f'{missing_attrs} must be provided for provisioning DPGKE.')
+
+  def _Create(self):
+    """Creates the dpgke virtual cluster."""
+    cmd = self.DataprocGcloudCommand('clusters', 'gke', 'create',
+                                     self.cluster_id)
+    cmd.use_alpha_gcloud = True
+    cmd.flags['setup-workload-identity'] = True
+    cmd.flags['gke-cluster'] = self.spec.gke_cluster_name
+    cmd.flags['namespace'] = self.cluster_id
+    # replace ':' field delimiter with '=' since create cluster command
+    # only accept '=' as field delimiter but pkb doesn't allow overriding
+    # spec parameters containing '='
+    cmd.flags['pools'] = self.spec.gke_cluster_nodepools.replace(':', '=')
+    cmd.flags['gke-cluster-location'] = self.spec.gke_cluster_location
+    if FLAGS.dpb_service_bucket:
+      cmd.flags['staging-bucket'] = FLAGS.dpb_service_bucket
+    if self.project is not None:
+      cmd.flags['project'] = self.project
+    cmd.flags['image-version'] = self.spec.version
+    if FLAGS.dpb_cluster_properties:
+      cmd.flags['properties'] = ','.join(FLAGS.dpb_cluster_properties)
+    timeout = 900  # 15 min
+    logging.info('Issuing command to create dpgke cluster. Flags %s, Args %s',
+                 cmd.flags, cmd.args)
+    stdout, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
+    self._cluster_create_time = self._ParseClusterCreateTime(stdout)
+    if retcode:
+      util.CheckGcloudResponseKnownFailures(stderr, retcode)
+      raise errors.Resource.CreationError(stderr)

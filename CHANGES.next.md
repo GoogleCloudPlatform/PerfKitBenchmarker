@@ -61,7 +61,7 @@
 -   Add cURL benchmark for object storage.
 -   Add vbench video encoding benchmark to PKB.
 -   Add Kubernetes based DPB Service for Spark
-
+-   Add support for creating Dataproc cluster on GKE
 
 ### Enhancements:
 

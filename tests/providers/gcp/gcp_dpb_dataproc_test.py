@@ -26,8 +26,10 @@ from tests import pkb_common_test_case
 
 TEST_RUN_URI = 'fakeru'
 GCP_ZONE_US_CENTRAL1_A = 'us-central1-a'
+GCP_REGION = 'us-central1'
 BUCKET_NAME = 'foo'
 PROJECT = 'fake-project'
+STAGING_BUCKET = 'fake-bucket'
 
 FLAGS = flags.FLAGS
 
@@ -39,6 +41,13 @@ CLUSTER_SPEC = mock.Mock(
     worker_group=mock.Mock(
         vm_spec=mock.Mock(machine_type='fake-machine-type', num_local_ssds=2),
         disk_spec=mock.Mock(disk_type='pd-ssd', disk_size=42)))
+
+DPGKE_CLUSTER_SPEC = mock.Mock(
+    static_dpb_service_instance=None,
+    gke_cluster_name='gke-cluster',
+    gke_cluster_location='gke-cluster-loc',
+    version='preview-0.3',
+    gke_cluster_nodepools='name:pool-name,role:driver,min:3')
 
 
 class LocalGcpDpbDataproc(gcp_dpb_dataproc.GcpDpbDataproc):
@@ -96,6 +105,55 @@ class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Benchmarks.InsufficientCapacityCloudFailure):
       cluster._Create()
     self.assertEqual(mock_issue.call_count, 1)
+
+
+class LocalGcpDpbDPGKE(gcp_dpb_dataproc.GcpDpbDpgke):
+
+  def __init__(self, spec=DPGKE_CLUSTER_SPEC):
+    # Bypass GCS initialization in Dataproc's constructor
+    gcp_dpb_dataproc.GcpDpbDpgke.__init__(self, spec)
+    self.project = PROJECT
+    self.region = GCP_REGION
+
+
+class GcpDpbDPGKETestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super(GcpDpbDPGKETestCase, self).setUp()
+    FLAGS.run_uri = TEST_RUN_URI
+    FLAGS.dpb_service_zone = GCP_ZONE_US_CENTRAL1_A
+    FLAGS.dpb_service_bucket = STAGING_BUCKET
+
+  @mock.patch.object(
+      vm_util, 'IssueCommand', return_value=('fake_stdout', 'fake_stderr', 0))
+  def testCreate(self, mock_issue):
+    cluster = LocalGcpDpbDPGKE()
+    cluster._Create()
+    self.assertEqual(mock_issue.call_count, 1)
+    command_string = ' '.join(mock_issue.call_args[0][0])
+    self.assertIn('gcloud alpha dataproc clusters gke create pkb-fakeru',
+                  command_string)
+    self.assertIn('--gke-cluster gke-cluster ', command_string)
+    self.assertIn('--namespace pkb-fakeru ', command_string)
+    self.assertIn('--gke-cluster-location gke-cluster-loc ', command_string)
+    self.assertIn('--pools name=pool-name,role=driver,min=3 ', command_string)
+    self.assertIn('--project fake-project ', command_string)
+    self.assertIn('--region us-central1 ', command_string)
+    self.assertIn('--image-version preview-0.3 ', command_string)
+    self.assertIn('--staging-bucket fake-bucket', command_string)
+
+  def testMissingAttrs(self):
+    cluster_spec = mock.Mock(
+        spec=[
+            'version',
+        ],
+        static_dpb_service_instance=None,
+        gke_cluster_nodepools='')
+    with self.assertRaises(errors.Setup.InvalidSetupError) as ex:
+      LocalGcpDpbDPGKE(spec=cluster_spec)
+    self.assertIn(
+        "['gke_cluster_name', 'gke_cluster_nodepools', 'gke_cluster_location'] must be provided for provisioning DPGKE.",
+        str(ex.exception))
 
 
 if __name__ == '__main__':
