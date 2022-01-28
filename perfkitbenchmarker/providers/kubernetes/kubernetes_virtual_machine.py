@@ -34,16 +34,12 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.kubernetes import flags as k8s_flags
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
-import six
 
 FLAGS = flags.FLAGS
 
 SELECTOR_PREFIX = 'pkb'
-
-_SETUP_SSH = flags.DEFINE_boolean(
-    'kubernetes_vm_setup_ssh', False,
-    'Set up SSH on Kubernetes VMs. Probably not needed any more?')
 
 
 def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
@@ -259,8 +255,12 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     }
 
     if self.vm_group:
+      if self.vm_group == 'default':
+        nodepool = k8s_flags.DEFAULT_VM_GROUP_NODEPOOL.value
+      else:
+        nodepool = self.vm_group
       template['spec']['nodeSelector'] = {
-          'pkb_nodepool': container_service.NodePoolName(self.vm_group)
+          'pkb_nodepool': container_service.NodePoolName(nodepool)
       }
 
     if FLAGS.kubernetes_anti_affinity:
@@ -357,7 +357,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       resources['requests'].update(gpu_dict)
 
     result_with_empty_values_removed = ({
-        k: v for k, v in six.iteritems(resources) if v
+        k: v for k, v in resources.items() if v
     })
     return result_with_empty_values_removed
 
@@ -469,7 +469,7 @@ class DebianBasedKubernetesVirtualMachine(
     # Install sudo as most PrepareVMEnvironment assume it exists.
     self.RemoteCommand(_InstallSudoCommand())
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
-    if _SETUP_SSH.value:
+    if k8s_flags.SETUP_SSH.value:
       # Don't rely on SSH being installed in Kubernetes containers,
       # so install it and restart the service so that it is ready to go.
       # Although ssh is not required to connect to the container, MPI

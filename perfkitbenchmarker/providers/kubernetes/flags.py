@@ -47,8 +47,19 @@ flags.DEFINE_multi_string('k8s_volume_parameters', None,
                           'A colon separated key-value pair that will be '
                           'added to Kubernetes storage class parameters.')
 _K8S_PROVISIONERS = [
-    'kubernetes.io/azure-disk', 'kubernetes.io/gce-pd', 'kubernetes.io/aws-ebs', 'kubernetes.io/glusterfs'
+    'kubernetes.io/azure-disk', 'kubernetes.io/gce-pd', 'kubernetes.io/aws-ebs',
+    'kubernetes.io/glusterfs'
 ]
 flags.DEFINE_enum('k8s_volume_provisioner', None, _K8S_PROVISIONERS,
                   'The name of the provisioner to use for K8s storage '
                   'classes.')
+
+SETUP_SSH = flags.DEFINE_boolean(
+    'kubernetes_vm_setup_ssh', False,
+    'Set up SSH on Kubernetes VMs. Probably not needed any more?')
+DEFAULT_VM_GROUP_NODEPOOL = flags.DEFINE_string(
+    # default is container_service.DEFAULT_NODEPOOL, but don't import because it
+    # causes a runtime circular dependency.
+    'kubernetes_vm_default_nodepool', 'default',
+    'The nodepool to place VMs in the default VM group into. Defaults to the '
+    'default nodepool, but can be changed for better isolation.')
