@@ -28,6 +28,10 @@ from packaging import version
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker.linux_packages import python
 
+import requests
+
+# NOTE: versionless (latest) URL is in root directory and versions have their
+# own subdirectories.
 GET_PIP_URL = 'https://bootstrap.pypa.io/pip/get-pip.py'
 GET_PIP_VERSIONED_URL = 'https://bootstrap.pypa.io/pip/{python_version}/get-pip.py'
 
@@ -53,10 +57,13 @@ def Install(vm, pip_cmd='pip', python_cmd='python'):
     logging.info('pip not bundled with Python. Installing with get-pip.py')
     python_version = python.GetPythonVersion(vm, python_cmd)
     python_version = version.Version(python_version)
-    # At the time of June 2021 pypi has special get-pips for versions up
-    # through 3.5.
-    if python_version <= version.Version('3.5'):
-      get_pip_url = GET_PIP_VERSIONED_URL.format(python_version=python_version)
+    # At the time of Feb 2022 pypi has special get-pips for versions up
+    # through 3.6. To be future proof check for the existence of a versioned
+    # URL using requests.
+    versioned_url = GET_PIP_VERSIONED_URL.format(python_version=python_version)
+    response = requests.get(versioned_url)
+    if response.ok:
+      get_pip_url = versioned_url
     else:
       get_pip_url = GET_PIP_URL
     vm.RemoteCommand(f'curl {get_pip_url} | sudo {python_cmd} -')
