@@ -103,7 +103,7 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
         query,
         database_name=database_name,
         suppress_stdout=suppress_stdout,
-        timeout=60*30)
+        timeout=60*200)
     end = timeit.default_timer()
     run_time = str(end - start)
     if error_:
