@@ -83,7 +83,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     created: True if the resource has been created.
     deleted: True if the resource has been deleted.
     user_managed: Whether Create() and Delete() should be skipped.
-    frozen: Whether the resource is currently in a frozen state.
+    restored: True if the resource has been restored.
     enable_freeze_restore: Whether the resource should use freeze/restore when
       the option is specified on the command line. Different benchmarks may want
       different resources to have freeze/restore enabled.
@@ -122,7 +122,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     self.created = user_managed
     self.deleted = user_managed
     self.user_managed = user_managed
-    self.frozen: bool = False
+    self.restored: bool = False
     self.enable_freeze_restore = enable_freeze_restore
     self.create_on_restore_error = create_on_restore_error
     self.delete_on_freeze_error = delete_on_freeze_error
@@ -313,7 +313,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
       raise errors.Resource.RestoreError('Error restoring resource '
                                          f'{repr(self)}') from e
 
-    self.frozen = False
+    self.restored = True
     self.UpdateTimeout(FLAGS.timeout_minutes)
 
   def Create(self, restore: bool = False) -> None:
@@ -375,7 +375,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
           f'Error freezing resource {repr(self)}') from e
 
     # If frozen successfully, attempt to update the timeout.
-    self.frozen = True
+    self.restored = False
     self.UpdateTimeout(FLAGS.persistent_timeout_minutes)
 
   def Delete(self, freeze: bool = False) -> None:

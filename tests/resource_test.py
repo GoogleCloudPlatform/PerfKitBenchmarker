@@ -161,7 +161,7 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
 
     mock_freeze.assert_called_once()
     mock_update_timeout.assert_called_once()
-    self.assertTrue(test_resource.frozen)
+    self.assertFalse(test_resource.restored)
 
   def testCreateWithSuccessfulRestore(self):
     test_resource = _CreateFreezeRestoreResource()
@@ -174,7 +174,7 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
 
     mock_restore.assert_called_once()
     mock_create_resource.assert_not_called()
-    self.assertFalse(test_resource.frozen)
+    self.assertTrue(test_resource.restored)
 
   def testCreateWithRestoreErrorRaisesInsteadOfCreating(self):
     test_resource = _CreateFreezeRestoreResource()
