@@ -758,6 +758,8 @@ class BenchmarkSpec(object):
       return
 
     should_freeze = hasattr(self, 'freeze_path') and self.freeze_path
+    if should_freeze:
+      self.Freeze()
 
     if self.container_registry:
       self.container_registry.Delete()

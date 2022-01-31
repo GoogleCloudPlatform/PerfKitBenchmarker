@@ -953,8 +953,6 @@ def DoTeardownPhase(spec, collector, timer):
     samples = cluster_boot_benchmark.MeasureDelete(spec.vms)
     collector.AddSamples(samples, spec.name, spec)
 
-  spec.Freeze()
-
   with timer.Measure('Resource Teardown'):
     spec.Delete()
 

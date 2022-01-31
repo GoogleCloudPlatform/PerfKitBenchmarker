@@ -510,5 +510,30 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     self.assertEmpty(test_retry_manager._zones_tried)
 
 
+class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
+
+  @flagsaver.flagsaver(freeze='mock_freeze_path')
+  def testSpecPickledEvenWithException(self):
+    # Make provision have an exception.
+    self.enter_context(
+        mock.patch.object(pkb, 'DoProvisionPhase', side_effect=Exception()))
+    # Make benchmark_spec avoid pickling for test.
+    test_benchmark_spec = (
+        pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+            pkb_common_test_case.SIMPLE_CONFIG, 'cluster_boot'))
+    self.enter_context(
+        mock.patch.object(test_benchmark_spec, 'Pickle'))
+    mock_freeze = self.enter_context(
+        mock.patch.object(test_benchmark_spec, 'Freeze'))
+    collector = pkb.SampleCollector()
+
+    # Run the benchmark loop.
+    with self.assertRaises(Exception):
+      pkb.RunBenchmark(test_benchmark_spec, collector)
+
+    # PKB should still attempt to freeze benchmark spec.
+    mock_freeze.assert_called_once()
+
+
 if __name__ == '__main__':
   unittest.main()
