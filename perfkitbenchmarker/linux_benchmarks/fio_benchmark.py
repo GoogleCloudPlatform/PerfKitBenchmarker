@@ -179,7 +179,7 @@ flags.DEFINE_integer('fio_log_hist_msec', 1000,
                      'logging is disabled.')
 flags.DEFINE_boolean(  # TODO(user): Add support for simultaneous read.
     'fio_write_against_multiple_clients', False,
-    'Whether to run fio against multiple nfs. Only applicable '
+    'Whether to run fio against multiple clients. Only applicable '
     'when running fio against network mounts and rw=write.')
 flags.DEFINE_integer('fio_command_timeout_sec', None,
                      'Timeout for fio commands in seconds.')
@@ -647,10 +647,8 @@ def Run(benchmark_spec):
       item.metadata['machine_instance'] = i
     samples.extend(samples_list[i])
 
-  if FLAGS.fio_write_against_multiple_clients:
+  if FLAGS.fio_write_against_multiple_clients and samples:
     metrics = collections.defaultdict(list)
-    if not metrics:
-      return samples
     for item in samples:
       # example metric: 'filestore-bandwidth:write:bandwidth'
       metrics[item.metric.split(':', 1)[-1]].append(item.value)

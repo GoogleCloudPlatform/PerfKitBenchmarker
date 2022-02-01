@@ -204,3 +204,4 @@
 -   Enable icelake and milan as --gcp_min_cpu_platform options.
 -   Update the bigtable tutorial readme with the content of batch_testing.md.
     Unneeded files are removed.
+-   Fix fio_write_against_multiple_clients additional samples and metadata.
