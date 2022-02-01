@@ -397,11 +397,11 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
   @AsyncTest
   async def testPinnedCpus(self, sched_setaffinity_mock, sched_getaffinity_mock,
                            *_):
+    runner_cls = latency_runner.EndToEndLatencyRunner
     try:
       self._SetupWorkerMocks(1_000_000_000, 1_500_000_000, 2_000_000_000)
       self.publisher_mock.CPUS_REQUIRED = 1
       self.receiver_mock.CPUS_REQUIRED = 1
-      runner_cls = latency_runner.EndToEndLatencyRunner
       runner_cls.on_startup()
       sched_getaffinity_mock.assert_called_once_with(0)
       main_pinned_cpus = runner_cls.MAIN_PINNED_CPUS
