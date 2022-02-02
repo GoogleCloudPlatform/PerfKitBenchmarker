@@ -45,8 +45,11 @@ flags.DEFINE_string(
 flags.DEFINE_string('kubernetes_mongodb_disk_size', '200Gi',
                     'Disk size used by mongodb')
 # TODO(user): Use GetStorageClass function, once available.
-flags.DEFINE_string('kubernetes_mongodb_storage_class', 'premium-rwo',
-                    'storageClassType of data disk')
+STORAGE_CLASS = flags.DEFINE_string(
+    'kubernetes_mongodb_storage_class',
+    None,
+    'storageClassType of data disk. Defaults to provider specific storage '
+    'class.')
 
 BENCHMARK_NAME = 'kubernetes_mongodb'
 BENCHMARK_CONFIG = """
@@ -108,18 +111,20 @@ def _PrepareClient(vm):
 
 def _PrepareDeployment(benchmark_spec):
   """Deploys MongoDB Operator and instance on the cluster."""
+  cluster = benchmark_spec.container_cluster
   admin_password = ''.join(
       random.choice(string.ascii_letters + string.digits) for _ in range(20))
-  benchmark_spec.container_cluster.ApplyManifest(
+  storage_class = STORAGE_CLASS.value or cluster.GetDefaultStorageClass()
+  cluster.ApplyManifest(
       'container/kubernetes_mongodb/kubernetes_mongodb_crd.yaml')
-  benchmark_spec.container_cluster.ApplyManifest(
+  cluster.ApplyManifest(
       'container/kubernetes_mongodb/kubernetes_mongodb_operator.yaml.j2',
       cpu_request=FLAGS.kubernetes_mongodb_cpu_request,
       cpu_limit=FLAGS.kubernetes_mongodb_cpu_limit,
       memory_request=FLAGS.kubernetes_mongodb_memory_request,
       memory_limit=FLAGS.kubernetes_mongodb_memory_limit,
       disk_size=FLAGS.kubernetes_mongodb_disk_size,
-      storage_class=FLAGS.kubernetes_mongodb_storage_class,
+      storage_class=storage_class,
       admin_password=admin_password)
   time.sleep(60)
 

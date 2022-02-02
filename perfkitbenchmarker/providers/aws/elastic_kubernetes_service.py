@@ -29,6 +29,7 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util
 
@@ -162,3 +163,8 @@ class EksCluster(container_service.KubernetesCluster):
     stdout, _, _ = vm_util.IssueCommand(get_cmd)
     ready_nodes = len(re.findall('Ready', stdout))
     return ready_nodes >= self.min_nodes
+
+  def GetDefaultStorageClass(self) -> str:
+    """Get the default storage class for the provider."""
+    # https://docs.aws.amazon.com/eks/latest/userguide/storage-classes.html
+    return aws_disk.GP2

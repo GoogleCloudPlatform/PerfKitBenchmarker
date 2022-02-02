@@ -266,3 +266,9 @@ class AksCluster(container_service.KubernetesCluster):
   def _DeleteDependencies(self):
     """Deletes the resource group."""
     self.service_principal.Delete()
+
+  def GetDefaultStorageClass(self) -> str:
+    """Get the default storage class for the provider."""
+    # https://docs.microsoft.com/en-us/azure/aks/csi-storage-drivers
+    # Premium_LRS
+    return 'managed-csi-premium'

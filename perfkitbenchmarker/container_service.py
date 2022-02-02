@@ -942,3 +942,8 @@ class KubernetesCluster(BaseContainerCluster):
         'exec', '-it', pod_name, '--'
     ] + cmd
     RunKubectlCommand(run_cmd)
+
+  # TODO(pclay): integrate with kubernetes_disk.
+  def GetDefaultStorageClass(self) -> str:
+    """Get the default storage class for the provider."""
+    raise NotImplementedError

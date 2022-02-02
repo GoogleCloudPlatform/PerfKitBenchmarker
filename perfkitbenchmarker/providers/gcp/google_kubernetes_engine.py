@@ -279,3 +279,9 @@ class GkeCluster(container_service.KubernetesCluster):
                              self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return retcode == 0
+
+  def GetDefaultStorageClass(self) -> str:
+    """Get the default storage class for the provider."""
+    # https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/gce-pd-csi-driver
+    # PD-SSD
+    return 'premium-rwo'
