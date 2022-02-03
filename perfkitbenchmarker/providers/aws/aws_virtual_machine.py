@@ -1522,6 +1522,11 @@ class Windows2019CoreAwsVirtualMachine(
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Core-Base-*'
 
 
+class Windows2022CoreAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2022CoreMixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2022-English-Core-Base-*'
+
+
 class Windows2012DesktopAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine,
     windows_virtual_machine.Windows2012DesktopMixin):
@@ -1538,6 +1543,12 @@ class Windows2019DesktopAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine,
     windows_virtual_machine.Windows2019DesktopMixin):
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-Base-*'
+
+
+class Windows2022DesktopAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2022DesktopMixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2022-English-Full-Base-*'
 
 
 class Windows2019DesktopSQLServer2019StandardAwsVirtualMachine(
