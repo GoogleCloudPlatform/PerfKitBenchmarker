@@ -52,9 +52,10 @@ flags.DEFINE_integer('tcp_stream_seconds', 3,
 flags.DEFINE_integer('tcp_number_of_streams', 10,
                      'The number of parrallel streams to run in the TCP test.')
 
-flags.DEFINE_integer('socket_buffer_size', None,
-                     'The socket buffer size in megabytes. If None is '
-                     'specified then the socket buffer size will not be set.')
+flags.DEFINE_float(
+    'socket_buffer_size', None,
+    'The socket buffer size in megabytes. If None is '
+    'specified then the socket buffer size will not be set.')
 
 flags.DEFINE_bool('run_tcp', True,
                   'setting to false will disable the run of the TCP test')
@@ -76,6 +77,8 @@ def Install(vm):
   zip_path = ntpath.join(vm.temp_dir, IPERF3_ZIP)
   vm.DownloadFile(IPERF3_URL, zip_path)
   vm.UnzipFile(zip_path, vm.temp_dir)
+
+  # Disable windows defender
 
 
 def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
