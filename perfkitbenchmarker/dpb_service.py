@@ -439,8 +439,14 @@ class UnmanagedDpbService(BaseDpbService):
       self.storage_service = s3.S3Service()
       self.persistent_fs_prefix = 's3://'
     else:
-      raise errors.Config.InvalidValue(
-          f'Unsupported Cloud provider {self.cloud}')
+      self.region = None
+      self.storage_service = None
+      self.persistent_fs_prefix = None
+      self.manage_bucket = False
+      logging.warning(
+          'Cloud provider %s does not support object storage. '
+          'Some benchmarks will not work.',
+          self.cloud)
 
     if self.storage_service:
       self.storage_service.PrepareService(location=self.region)
