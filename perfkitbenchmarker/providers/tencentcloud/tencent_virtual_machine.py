@@ -29,8 +29,8 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
 
-class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
-  """Object representing an AliCloud Virtual Machine."""
+class TencentVirtualMachine(virtual_machine.BaseVirtualMachine):
+  """Object representing an TencentCloud Virtual Machine."""
   CLOUD = providers.TENCENTCLOUD
 
   # Subclasses should override the default image OR
@@ -40,7 +40,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_IMAGE_PROJECT = None
 
   def __init__(self, vm_spec):
-    """Initialize a AliCloud virtual machine.
+    """Initialize a Tencent Cloud virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the VM.
@@ -114,8 +114,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     pass
 
 
-class AliCloudKeyFileManager(object):
-  """Object for managing AliCloud Keyfiles."""
+class TencentCloudKeyFileManager(object):
+  """Object for managing Tencent Cloud Keyfiles."""
   _lock = threading.Lock()
   imported_keyfile_set = set()
   deleted_keyfile_set = set()
@@ -123,7 +123,7 @@ class AliCloudKeyFileManager(object):
 
   @classmethod
   def ImportKeyfile(cls, region):
-    """Imports the public keyfile to AliCloud."""
+    """Imports the public keyfile to Tencent Cloud."""
     pass
 
   @classmethod

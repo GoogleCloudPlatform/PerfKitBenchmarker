@@ -16,3 +16,7 @@
 from absl import flags
 
 flags.DEFINE_string('tencent_path', 'tccli', 'The path for the Tencent Cloud utility.')
+
+FLAGS = flags.FLAGS
+
+FLAGS.tencent_path

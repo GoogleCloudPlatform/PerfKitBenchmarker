@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,14 +11,4 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Provider info for Tencent Cloud."""
-
-from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
-
-
-class GCPProviderInfo(provider_info.BaseProviderInfo):
-
-  UNSUPPORTED_BENCHMARKS = []
-  CLOUD = providers.TENCENTCLOUD
+"""Provider for Tencent Cloud."""

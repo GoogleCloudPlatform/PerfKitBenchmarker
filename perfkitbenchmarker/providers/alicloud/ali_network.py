@@ -48,6 +48,7 @@ class AliVpc(resource.BaseResource):
 
   def _Create(self):
     """Creates the VPC."""
+    'aliyun ecs CreateVpc --VpcName xxx --RegionId xxx'
     create_cmd = util.ALI_PREFIX + [
         'ecs',
         'CreateVpc',
