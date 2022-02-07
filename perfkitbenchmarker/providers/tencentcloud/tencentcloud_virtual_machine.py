@@ -58,9 +58,8 @@ class TencentCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
 
     super(TencentCloudVirtualMachine, self).__init__(vm_spec)
-    self.image = self.image or util.GetDefaultImage()
     self.user_name = FLAGS.user_name
-    self.region = util.GetReionFromZone(self.zone)
+    self.region = util.GetRegionFromZone(self.zone)
     self.network = tencentcloud_network.TencentNetwork.GetNetwork(self)
     self.firewall = tencentcloud_network.TencentFirewall.GetFirewall()
     pass
@@ -79,16 +78,6 @@ class TencentCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Allocate a public ip address and associate it to the instance."""
     pass
 
-
-  @classmethod
-  def _GetDefaultImage(cls, region):
-    """Returns the default image given the machine type and region.
-
-    If no default is configured, this will return None.
-    """
-    pass
-
-
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data and tag it."""
@@ -97,15 +86,69 @@ class TencentCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
+    # Calls tccli
+    self.image = self.image or util.GetDefaultImage(self.machine_type,
+                                                    self.region)
+
+    # Create user and add SSH key
+    with open(self.ssh_public_key) as f:
+      self.public_key = f.read().rstrip('\n')
+      self.key_pair_name, self.key_id = TencentKeyFileManager.ImportKeyfile(
+                                                    self.region, self.public_key)
+
+    self.AllowRemoteAccessPorts()
     pass
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
     pass
 
+  @classmethod
+  def _GetDefaultImage(cls, region):
+    """Returns the default image given the machine type and region.
+
+    If no default is configured, this will return None.
+    """
+
+    pass
+
+  def _GenerateLoginSettings() -> str:
+    """Returns:
+      LoginSettings. Use this parameter to set the login method,
+      password, and key of the instance or keep the login settings
+      of the original image.
+
+      In this case, this value should be the ssh public key.
+    """
+
+    return ''
+
+  def _GenerateCreateCommand(self):
+    """Generates a command to create the VM instance.
+
+    Returns:
+      TccliCommand. Command to issue in order to create the VM instance.
+    """
+    args = ['cvm', 'RunInstances']
+    cmd = util.TccliCommand(self, args)
+
+    cmd.flags['Placement.Zone'] = self.zone
+    cmd.flags['ImageId'] = self.image
+    cmd.flags['InstanceType'] = self.machine_type
+    cmd.flags['InstanceName'] = self.name
+    cmd.flags['SecurityGroupIds'] = self.network.security_group.group_id
+    cmd.flags['LoginSettings'] = self.key_id
+    cmd.flags['SystemDisk.DiskType'] = self.disk.disk_type
+    cmd.flags['SystemDisk.DiskSize'] = self.disk.disk_size
+
+    return cmd
+
+
   def _Create(self):
     """Create a VM instance."""
-    
+    create_cmd = self._GenerateCreateCommand(self)
+    _, stderr, retcode = create_cmd.Issue()
+
     pass
 
 
@@ -133,17 +176,36 @@ class TencentCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     pass
 
 
-class TencentCloudKeyFileManager(object):
+class TencentKeyFileManager(object):
   """Object for managing Tencent Cloud Keyfiles."""
   _lock = threading.Lock()
   imported_keyfile_set = set()
   deleted_keyfile_set = set()
-  run_uri_key_names = {}
+
 
   @classmethod
-  def ImportKeyfile(cls, region):
-    """Imports the public keyfile to Tencent Cloud."""
-    pass
+  def ImportKeyfile(cls, region, public_key):
+    """Imports the public keyfile to Tencent Cloud.
+
+       Returns:
+    """
+    with cls._lock:
+      if (region, FLAGS.run_uri) in cls.imported_keyfile_set:
+        return
+      key_name = cls.GetKeyNameForRun()
+
+      args = ['ecs', 'ImportKeyPair']
+      import_cmd = util.TccliCommand(cls, args)
+      import_cmd.flags['Reigon'] = region
+      import_cmd.flags['KeyName'] = key_name
+      import_cmd.flags['ProjectId'] = 0
+      import_cmd.flags['PublicKey'] = public_key
+
+      stdout, _, _ = import_cmd.Issue()
+      key_id = json.loads(stdout)
+
+      cls.run_uri_key_names[FLAGS.run_uri] = key_name
+      return key_name, key_id
 
   @classmethod
   def DeleteKeyfile(cls, region, key_name):
@@ -152,8 +214,4 @@ class TencentCloudKeyFileManager(object):
 
   @classmethod
   def GetKeyNameForRun(cls):
-      pass
-
-  @classmethod
-  def GetPublicKey(cls):
-    pass
+    return 'perfkit-key-{0}'.format(FLAGS.run_uri)

@@ -149,6 +149,12 @@ class TencentNetwork(network.BaseNetwork):
   CLOUD = providers.TENCENTCLOUD
 
   def __init__(self, spec):
+    self.name = None
+    self.region = util.GetRegionByZone(spec.zone)
+    self.use_vpc = FLAGS.ali_use_vpc
+    self.vpc = None
+    self.vswitch = None
+    self.security_group = None
     pass
 
   @vm_util.Retry()

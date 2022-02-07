@@ -24,7 +24,8 @@ import threading
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.alicloud import util
+from perfkitbenchmarker.providers.tencentcloud import tencentcloud_network
+from perfkitbenchmarker.providers.tencentcloud import util
 
 FLAGS = flags.FLAGS
 
