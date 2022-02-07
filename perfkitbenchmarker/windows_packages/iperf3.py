@@ -78,8 +78,6 @@ def Install(vm):
   vm.DownloadFile(IPERF3_URL, zip_path)
   vm.UnzipFile(zip_path, vm.temp_dir)
 
-  # Disable windows defender
-
 
 def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
   """Run a multi-stream TCP bandwidth between two VMs.
