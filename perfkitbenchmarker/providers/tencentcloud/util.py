@@ -93,4 +93,3 @@ class TccliCommand(object):
 
     Adds common tccli flags derived from the PKB flags and provided resource.
     """
-    self.flags['format'] = 'json'
