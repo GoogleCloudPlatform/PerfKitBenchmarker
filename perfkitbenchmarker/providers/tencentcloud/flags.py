@@ -16,7 +16,5 @@
 from absl import flags
 
 flags.DEFINE_string('tencent_path', 'tccli', 'The path for the Tencent Cloud utility.')
+flags.DEFINE_string('default_region', 'ap-guangzhou-3', 'The path for the Tencent Cloud utility.')
 
-FLAGS = flags.FLAGS
-
-FLAGS.tencent_path

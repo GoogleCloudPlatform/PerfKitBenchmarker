@@ -18,33 +18,51 @@ operate on the VM: boot, shutdown, etc.
 """
 
 import base64
+import collections
 import json
 import logging
 import threading
 from absl import flags
+from PerfKitBenchmarker.perfkitbenchmarker.providers import tencentcloud
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.tencentcloud import tencentcloud_disk
+from perfkitbenchmarker.providers.tencentcloud import tencentcloud_network
+from perfkitbenchmarker.providers.tencentcloud import util
 
+FLAGS = flags.FLAGS
 
-class TencentVirtualMachine(virtual_machine.BaseVirtualMachine):
-  """Object representing an TencentCloud Virtual Machine."""
+class TencentCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
+  """Object representing an Tencent Cloud Virtual Machine(CVM)."""
+
   CLOUD = providers.TENCENTCLOUD
 
-  # Subclasses should override the default image OR
-  # both the image family and image_project.
-  DEFAULT_IMAGE = None
-  DEFAULT_IMAGE_FAMILY = None
-  DEFAULT_IMAGE_PROJECT = None
+  _host_lock = threading.Lock()
+  deleted_hosts = set()
+  host_map = collections.defaultdict(list)
 
   def __init__(self, vm_spec):
     """Initialize a Tencent Cloud virtual machine.
 
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the VM.
+
+    Raises:
+      errors.Config.MissingOption: If the spec does not include a "machine_type"
+          or both "cpus" and "memory".
+      errors.Config.InvalidValue: If the spec contains both "machine_type" and
+          at least one of "cpus" or "memory".
     """
+
+    super(TencentCloudVirtualMachine, self).__init__(vm_spec)
+    self.image = self.image or util.GetDefaultImage()
+    self.user_name = FLAGS.user_name
+    self.region = util.GetReionFromZone(self.zone)
+    self.network = tencentcloud_network.TencentNetwork.GetNetwork(self)
+    self.firewall = tencentcloud_network.TencentFirewall.GetFirewall()
     pass
 
   @vm_util.Retry(poll_interval=1, log_errors=False)
@@ -87,6 +105,7 @@ class TencentVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a VM instance."""
+    
     pass
 
 
