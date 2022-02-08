@@ -33,8 +33,9 @@ FLAGS = flags.FLAGS
 
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
-DEFAULT_CONTAINER_VERSION = 'latest'
+DEFAULT_RELEASE_CHANNEL = 'regular'
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
+RELEASE_CHANNELS = ['rapid', DEFAULT_RELEASE_CHANNEL, 'stable']
 
 
 def _CalculateCidrSize(nodes: int) -> int:
@@ -91,7 +92,7 @@ class GkeCluster(container_service.KubernetesCluster):
     super(GkeCluster, self).__init__(spec)
     self.project = spec.vm_spec.project
     self.cluster_version = (
-        FLAGS.container_cluster_version or DEFAULT_CONTAINER_VERSION)
+        FLAGS.container_cluster_version or DEFAULT_RELEASE_CHANNEL)
     self.use_application_default_credentials = True
 
   def GetResourceMetadata(self):
@@ -102,7 +103,9 @@ class GkeCluster(container_service.KubernetesCluster):
     """
     result = super(GkeCluster, self).GetResourceMetadata()
     result['project'] = self.project
-    result['container_cluster_version'] = self.cluster_version
+    if self.cluster_version in RELEASE_CHANNELS:
+      result['gke_release_channel'] = self.cluster_version
+
     result['boot_disk_type'] = self.vm_config.boot_disk_type
     result['boot_disk_size'] = self.vm_config.boot_disk_size
     if self.vm_config.max_local_disks:
@@ -119,7 +122,10 @@ class GkeCluster(container_service.KubernetesCluster):
     self._AddNodeParamsToCmd(self.vm_config, self.num_nodes,
                              container_service.DEFAULT_NODEPOOL, cmd)
 
-    cmd.flags['cluster-version'] = self.cluster_version
+    if self.cluster_version in RELEASE_CHANNELS:
+      cmd.flags['release-channel'] = self.cluster_version
+    else:
+      cmd.flags['cluster-version'] = self.cluster_version
     if FLAGS.gke_enable_alpha:
       cmd.args.append('--enable-kubernetes-alpha')
       cmd.args.append('--no-enable-autorepair')

@@ -44,6 +44,9 @@ _INSTANCE_GROUPS_LIST_OUTPUT = (
     '../../../tests/data/gcloud_compute_instance_groups_list_instances.json')
 _NODE_POOLS_LIST_OUTPUT = (
     '../../../tests/data/gcloud_container_node_pools_list.json')
+_KUBECTL_VERSION = """\
+serverVersion:
+  gitVersion: v1.2.3"""
 
 
 @contextlib2.contextmanager
@@ -218,10 +221,10 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testGetResourceMetadata(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with patch_critical_objects(stdout=_KUBECTL_VERSION) as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       metadata = cluster.GetResourceMetadata()
-      self.assertEqual(issue_command.call_count, 0)
+      self.assertEqual(issue_command.call_count, 1)
       self.assertContainsSubset(
           {
               'project': 'fakeproject',
@@ -234,7 +237,8 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
               'cluster_type': 'Kubernetes',
               'zone': 'us-central1-a',
               'size': 2,
-              'container_cluster_version': 'latest'
+              'container_cluster_version': 'v1.2.3',
+              'gke_release_channel': 'regular',
           }, metadata)
 
   def testCidrCalculations(self):
@@ -283,10 +287,10 @@ class GoogleKubernetesEngineAutoscalingTestCase(
 
   def testGetResourceMetadata(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with patch_critical_objects(stdout=_KUBECTL_VERSION) as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       metadata = cluster.GetResourceMetadata()
-      self.assertEqual(issue_command.call_count, 0)
+      self.assertEqual(issue_command.call_count, 1)
       self.assertContainsSubset(
           {
               'project': 'fakeproject',
@@ -333,7 +337,18 @@ class GoogleKubernetesEngineVersionFlagTestCase(
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('--cluster-version latest', command_string)
+      self.assertIn('--release-channel regular', command_string)
+
+  def testCreateRapidChannel(self):
+    spec = self.create_kubernetes_engine_spec()
+    FLAGS.container_cluster_version = 'rapid'
+    with patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('--release-channel rapid', command_string)
 
 
 class GoogleKubernetesEngineWithGpusTestCase(

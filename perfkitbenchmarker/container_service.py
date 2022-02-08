@@ -771,6 +771,12 @@ class KubernetesCluster(BaseContainerCluster):
   def _Delete(self):
     self._DeleteAllFromDefaultNamespace()
 
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the cluster."""
+    result = super().GetResourceMetadata()
+    result['container_cluster_version'] = self.k8s_version
+    return result
+
   def DeployContainer(self, base_name, container_spec):
     """Deploys Containers according to the ContainerSpec."""
     name = base_name + str(len(self.containers[base_name]))
@@ -891,7 +897,7 @@ class KubernetesCluster(BaseContainerCluster):
           namespace,
       ])
 
-  # TODO(pclay): Move to cached property in
+  # TODO(pclay): Move to cached property in Python 3.9
   @property
   @functools.lru_cache(maxsize=1)
   def node_memory_allocatable(self) -> units.Quantity:
@@ -911,6 +917,13 @@ class KubernetesCluster(BaseContainerCluster):
     stdout, _, _ = RunKubectlCommand(
         ['get', 'nodes', '-o', 'jsonpath={.items[0].status.capacity.cpu}'])
     return int(stdout)
+
+  @property
+  @functools.lru_cache(maxsize=1)
+  def k8s_version(self) -> str:
+    """Actual Kubernetes version reported by server."""
+    stdout, _, _ = RunKubectlCommand(['version', '-o', 'yaml'])
+    return yaml.safe_load(stdout)['serverVersion']['gitVersion']
 
   def GetPodLabel(self, resource_name):
     run_cmd = [

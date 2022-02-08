@@ -71,7 +71,6 @@ class EksCluster(container_service.KubernetesCluster):
       dict mapping string property key to value.
     """
     result = super(EksCluster, self).GetResourceMetadata()
-    result['container_cluster_version'] = self.cluster_version
     result['boot_disk_type'] = self.boot_disk_type
     result['boot_disk_size'] = self.vm_config.boot_disk_size
     return result
