@@ -124,11 +124,6 @@ def GetZonesFromMachineType() -> Set[str]:
   return set(stdout.splitlines())
 
 
-def GetRegionsFromMachineType() -> Set[str]:
-  """Gets a list of regions for the given machine type."""
-  return set(GetRegionFromZone(zone) for zone in GetZonesFromMachineType())
-
-
 def GetGeoFromRegion(region: str) -> str:
   """Gets valid geo from the region, i.e. region us-central1 returns us."""
   return region.split('-')[0]

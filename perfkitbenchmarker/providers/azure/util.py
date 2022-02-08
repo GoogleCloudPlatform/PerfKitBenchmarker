@@ -165,17 +165,6 @@ def GetZonesFromMachineType() -> Set[str]:
   return zones
 
 
-def GetRegionsFromMachineType() -> Set[str]:
-  """Returns a set of regions for a machine type."""
-  stdout, _ = vm_util.IssueRetryableCommand(
-      [AZURE_PATH, 'vm', 'list-skus', '--size', FLAGS.machine_type])
-  regions = set()
-  for item in json.loads(stdout):
-    for location_info in item['locationInfo']:
-      regions.add(location_info['location'])
-  return regions
-
-
 def GetAllRegions() -> Set[str]:
   """Returns all valid regions."""
   stdout, _ = vm_util.IssueRetryableCommand([

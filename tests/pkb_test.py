@@ -406,6 +406,7 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(pkb.ZoneRetryManager, '_AssignZoneToNewRegion'))
     mock_capacity_retry = self.enter_context(
         mock.patch.object(pkb.ZoneRetryManager, '_AssignNewZone'))
+    self._MockGcpUtils('GetZonesFromMachineType', return_value=set())
 
     benchmark_specs, _ = pkb.RunBenchmarkTask(spec=test_spec)
 
@@ -452,8 +453,7 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     test_spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
     # Start with zone_1 in region_1.
     self._MockLoadProviderUtils(gcp_utils)
-    self._MockGcpUtils(
-        'GetRegionsFromMachineType', return_value={'region_1', 'region_2'})
+    self._MockGcpUtils('GetZonesFromMachineType', return_value=set())
     self._MockGcpUtils('GetRegionFromZone', return_value='region_1')
     self._MockGcpUtils('GetGeoFromRegion')
     self._MockGcpUtils('GetRegionsInGeo', return_value={'region_1', 'region_2'})
@@ -496,6 +496,7 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
   def testChooseAndSetNewZone(self, zone_flag):
     FLAGS[zone_flag].parse(['us-west1-a'])
     FLAGS.smart_quota_retry = True
+    self._MockGcpUtils('GetZonesFromMachineType', return_value=set())
     test_retry_manager = pkb.ZoneRetryManager()
     possible_zones = {'us-west1-a', 'us-west1-b'}
 

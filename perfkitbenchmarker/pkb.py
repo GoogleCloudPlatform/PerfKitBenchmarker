@@ -442,6 +442,7 @@ flags.DEFINE_bool('randomize_run_order', False,
                   'randomize order of the benchmarks.')
 
 _TEARDOWN_EVENT = multiprocessing.Event()
+_ANY_ZONE = 'any'
 
 events.initialization_complete.connect(traces.RegisterAll)
 
@@ -1215,6 +1216,7 @@ def RunBenchmarkTask(
     # Unset run_uri so the config value takes precedence.
     FLAGS['run_uri'].present = 0
 
+  zone_retry_manager = ZoneRetryManager()
   # Set the run count.
   max_run_count = 1 + _MAX_RETRIES.value
 
@@ -1224,7 +1226,6 @@ def RunBenchmarkTask(
       f'{spec.name} (UID: {spec.uid})'
   )
 
-  zone_retry_manager = ZoneRetryManager()
   result_specs = []
   for current_run_count in range(max_run_count):
     # Attempt to return the most recent results.
@@ -1286,6 +1287,7 @@ class ZoneRetryManager():
   """
 
   def __init__(self):
+    self._CheckFlag()
     if not _SMART_CAPACITY_RETRY.value and not _SMART_QUOTA_RETRY.value:
       return
     self._zones_tried: Set[str] = set()
@@ -1293,17 +1295,27 @@ class ZoneRetryManager():
     self._utils: types.ModuleType = providers.LoadProviderUtils(FLAGS.cloud)
     self._SetOriginalZoneAndFlag()
 
-  def _SetOriginalZoneAndFlag(self) -> None:
-    """Records the flag name and zone value that the benchmark started with."""
-    # This is guaranteed to set values due to flag validator.
+  def _GetCurrentZoneFlag(self):
+    return FLAGS[self._zone_flag].value[0]
+
+  def _CheckFlag(self) -> None:
     for zone_flag in ['zone', 'zones']:
       if FLAGS[zone_flag].value:
         self._zone_flag = zone_flag
-        if FLAGS[self._zone_flag].value[0].lower() == 'all':
-          self._AssignNewZone()
-        self._original_zone = FLAGS[self._zone_flag].value[0]
-        self._original_region = self._utils.GetRegionFromZone(
-            self._original_zone)
+        if self._GetCurrentZoneFlag() == _ANY_ZONE:
+          FLAGS['smart_capacity_retry'].parse(True)
+          FLAGS['smart_quota_retry'].parse(True)
+
+  def _SetOriginalZoneAndFlag(self) -> None:
+    """Records the flag name and zone value that the benchmark started with."""
+    # This is guaranteed to set values due to flag validator.
+    self._supported_zones = self._utils.GetZonesFromMachineType()
+    if self._GetCurrentZoneFlag() == _ANY_ZONE:
+      if _MAX_RETRIES.value < 1:
+        FLAGS['retries'].parse(len(self._supported_zones))
+      self._AssignNewZone()
+    self._original_zone = self._GetCurrentZoneFlag()
+    self._original_region = self._utils.GetRegionFromZone(self._original_zone)
 
   def HandleSmartRetries(self, spec: bm_spec.BenchmarkSpec) -> None:
     """Handles smart zone retry flags if provided."""
@@ -1318,11 +1330,11 @@ class ZoneRetryManager():
 
   def _AssignZoneToNewRegion(self) -> None:
     """Changes zone to be a new zone in the different region."""
-    current_zone = FLAGS[self._zone_flag].value[0]
-    region = self._utils.GetRegionFromZone(current_zone)
+    region = self._utils.GetRegionFromZone(self._GetCurrentZoneFlag())
     self._regions_tried.add(region)
-    regions_to_try = self._utils.GetRegionsFromMachineType(
-    ) - self._regions_tried
+    regions_to_try = set(
+        self._utils.GetRegionFromZone(zone)
+        for zone in self._supported_zones) - self._regions_tried
     # Restart from empty if we've exhausted all alternatives.
     if not regions_to_try:
       self._regions_tried.clear()
@@ -1334,7 +1346,7 @@ class ZoneRetryManager():
 
   def _AssignNewZone(self) -> None:
     """Changes zone to be a new zone."""
-    self._ChooseAndSetNewZone(self._utils.GetZonesFromMachineType())
+    self._ChooseAndSetNewZone(self._supported_zones)
 
   def _ChooseAndSetNewZone(self, possible_zones: Set[str]) -> None:
     """Saves the current _zone_flag and sets it to a new zone.
@@ -1342,8 +1354,8 @@ class ZoneRetryManager():
     Args:
       possible_zones: The set of zones to choose from.
     """
-    current_zone = FLAGS[self._zone_flag].value[0]
-    if current_zone != 'all':
+    current_zone = self._GetCurrentZoneFlag()
+    if current_zone != _ANY_ZONE:
       self._zones_tried.add(current_zone)
     zones_to_try = possible_zones - self._zones_tried
     # Restart from empty if we've exhausted all alternatives.
