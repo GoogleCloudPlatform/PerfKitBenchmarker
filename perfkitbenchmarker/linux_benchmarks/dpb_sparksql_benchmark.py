@@ -367,6 +367,8 @@ def Run(benchmark_spec):
     results.append(
         sample.Sample('dpb_cluster_create_time', cluster_create_time, 'seconds',
                       metadata))
+  results.append(sample.Sample('dpb_sparksql_job_pending',
+                               job_result.pending_time, 'seconds', metadata))
   return results
 
 

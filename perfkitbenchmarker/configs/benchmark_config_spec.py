@@ -138,6 +138,7 @@ class _DpbServiceSpec(spec.BaseSpec):
                 'valid_values': [
                     dpb_service.DATAPROC,
                     dpb_service.DATAPROC_GKE,
+                    dpb_service.DATAPROC_SERVERLESS,
                     dpb_service.DATAFLOW,
                     dpb_service.EMR,
                     dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,

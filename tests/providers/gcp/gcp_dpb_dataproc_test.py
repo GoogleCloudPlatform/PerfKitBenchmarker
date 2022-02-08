@@ -30,6 +30,22 @@ GCP_REGION = 'us-central1'
 BUCKET_NAME = 'foo'
 PROJECT = 'fake-project'
 STAGING_BUCKET = 'fake-bucket'
+SERVERLESS_MOCK_BATCH = """
+{
+    "state": "SUCCEEDED",
+    "stateHistory": [
+        {
+            "state": "PENDING",
+            "stateStartTime": "2022-02-03T02:24:38.810357Z"
+        },
+        {
+            "state": "RUNNING",
+            "stateStartTime": "2022-02-03T02:25:51.092538Z"
+        }
+    ],
+    "stateTime": "2022-02-03T02:27:04.152374Z"
+}
+"""
 
 FLAGS = flags.FLAGS
 
@@ -48,6 +64,11 @@ DPGKE_CLUSTER_SPEC = mock.Mock(
     gke_cluster_location='gke-cluster-loc',
     version='preview-0.3',
     gke_cluster_nodepools='name:pool-name,role:driver,min:3')
+
+SERVERLESS_SPEC = mock.Mock(
+    static_dpb_service_instance=None,
+    version='fake-4.2',
+)
 
 
 class LocalGcpDpbDataproc(gcp_dpb_dataproc.GcpDpbDataproc):
@@ -154,6 +175,53 @@ class GcpDpbDPGKETestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn(
         "['gke_cluster_name', 'gke_cluster_nodepools', 'gke_cluster_location'] must be provided for provisioning DPGKE.",
         str(ex.exception))
+
+
+class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    FLAGS.run_uri = TEST_RUN_URI
+    FLAGS.dpb_service_zone = GCP_ZONE_US_CENTRAL1_A
+
+  @mock.patch.object(
+      vm_util, 'IssueCommand', return_value=(SERVERLESS_MOCK_BATCH, '', 0))
+  def testSubmitJob(self, mock_issue):
+    service = gcp_dpb_dataproc.GcpDpbDataprocServerless(SERVERLESS_SPEC)
+    result = service.SubmitJob(
+        pyspark_file=(
+            'gs://pkb-fab5770b/spark_sql_test_scripts/spark_sql_runner.py'),
+        job_arguments=[
+            '--sql-scripts', 'gs://pkb-fab5770b/2.sql', '--report-dir',
+            'gs://pkb-fab5770b/report-1643853399069', '--table-metadata',
+            'gs://pkb-fab5770b/metadata.json'
+        ],
+        job_jars=[],
+        job_type='pyspark',
+    )
+    self.assertEqual(result.run_time, 73.059836)
+    self.assertEqual(result.pending_time, 72.282181)
+    self.assertEqual(mock_issue.call_count, 2)
+    mock_issue.assert_has_calls([
+        mock.call([
+            'gcloud', 'dataproc', 'batches', 'submit', 'pyspark',
+            'gs://pkb-fab5770b/spark_sql_test_scripts/spark_sql_runner.py',
+            '--batch', 'pkb-fakeru',
+            '--format', 'json',
+            '--labels', '',
+            '--quiet',
+            '--region', 'us-central1',
+            '--version', 'fake-4.2',
+            '--',
+            '--sql-scripts', 'gs://pkb-fab5770b/2.sql',
+            '--report-dir', 'gs://pkb-fab5770b/report-1643853399069',
+            '--table-metadata', 'gs://pkb-fab5770b/metadata.json'
+        ], raise_on_failure=False, timeout=None),
+        mock.call([
+            'gcloud', 'dataproc', 'batches', 'describe', 'pkb-fakeru',
+            '--format', 'json', '--quiet', '--region', 'us-central1'
+        ], raise_on_failure=False, timeout=None)
+    ])
 
 
 if __name__ == '__main__':

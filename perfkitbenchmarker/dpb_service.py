@@ -69,6 +69,7 @@ FLAGS = flags.FLAGS
 # List of supported data processing backend services
 DATAPROC = 'dataproc'
 DATAPROC_GKE = 'dataproc_gke'
+DATAPROC_SERVERLESS = 'dataproc_serverless'
 DATAFLOW = 'dataflow'
 EMR = 'emr'
 UNMANAGED_DPB_SVC_YARN_CLUSTER = 'unmanaged_dpb_svc_yarn_cluster'
