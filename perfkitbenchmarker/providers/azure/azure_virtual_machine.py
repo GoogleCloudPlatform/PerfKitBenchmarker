@@ -62,6 +62,17 @@ NUM_LOCAL_VOLUMES = {
     'Standard_L80s_v2': 10
 }
 
+_MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES = (
+    'Standard_ND96asr_v4', 'Standard_ND96asr_A100_v4',
+    'Standard_ND96amsr_A100_v4', 'Standard_M208ms_v2', 'Standard_M208s_v2',
+    'Standard_M416ms_v2', 'Standard_M416s_v2', 'Standard_ND40rs_v2',
+    'Standard_M32ms_v2', 'Standard_M64s_v2', 'Standard_M64ms_v2',
+    'Standard_M128s_v2', 'Standard_M128ms_v2', 'Standard_M192is_v2',
+    'Standard_M192ims_v2', 'Standard_M32dms_v2', 'Standard_M64ds_v2',
+    'Standard_M64ds_v2', 'Standard_M128ds_v2', 'Standard_M128dms_v2',
+    'Standard_M192ids_v2', 'Standard_M192idms_v2')
+
+
 # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/scheduled-events
 _SCHEDULED_EVENTS_CMD = ('curl -H Metadata:true http://169.254.169.254/metadata'
                          '/scheduledevents?api-version=2019-01-01')
@@ -495,7 +506,16 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
                         self.public_ip.name, vm_spec.accelerated_networking,
                         self.network.nsg)
     self.storage_account = self.network.storage_account
-    self.image = vm_spec.image or type(self).IMAGE_URN
+    if vm_spec.image:
+      self.image = vm_spec.image
+    elif self.machine_type in _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES:
+      if hasattr(type(self), 'GEN2_IMAGE_URN'):
+        self.image = type(self).GEN2_IMAGE_URN
+      else:
+        raise errors.Benchmarks.UnsupportedConfigError('No Azure gen2 image.')
+    else:
+      self.image = type(self).IMAGE_URN
+
     self.host = None
     if self.use_dedicated_host:
       self.host_series_sku = _GetSkuType(self.machine_type)
@@ -825,47 +845,56 @@ class Debian9BasedAzureVirtualMachine(AzureVirtualMachine,
 class Debian10BasedAzureVirtualMachine(AzureVirtualMachine,
                                        linux_virtual_machine.Debian10Mixin):
   # From https://wiki.debian.org/Cloud/MicrosoftAzure
+  GEN2_IMAGE_URN = 'Debian:debian-10:10-gen2:latest'
   IMAGE_URN = 'Debian:debian-10:10:latest'
 
 
 class Debian11BasedAzureVirtualMachine(AzureVirtualMachine,
                                        linux_virtual_machine.Debian11Mixin):
   # From https://wiki.debian.org/Cloud/MicrosoftAzure
+  GEN2_IMAGE_URN = 'Debian:debian-11:11-gen2:latest'
   IMAGE_URN = 'Debian:debian-11:11:latest'
 
 
 class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1604Mixin):
+  GEN2_IMAGE_URN = 'Canonical:UbuntuServer:16_04-lts-gen2:latest'
   IMAGE_URN = 'Canonical:UbuntuServer:16.04-LTS:latest'
 
 
 class Ubuntu1804BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1804Mixin):
+  GEN2_IMAGE_URN = 'Canonical:UbuntuServer:18_04-lts-gen2:latest'
   IMAGE_URN = 'Canonical:UbuntuServer:18.04-LTS:latest'
 
 
 class Ubuntu2004BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu2004Mixin):
+  GEN2_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest'
   IMAGE_URN = 'Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest'
 
 
 class Rhel7BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel7Mixin):
+  GEN2_IMAGE_URN = 'RedHat:RHEL:7lvm-gen2:latest'
   IMAGE_URN = 'RedHat:RHEL:7-LVM:latest'
 
 
 class Rhel8BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel8Mixin):
+  GEN2_IMAGE_URN = 'RedHat:RHEL:8-lvm-gen2:latest'
   IMAGE_URN = 'RedHat:RHEL:8-LVM:latest'
 
 
 class CentOs7BasedAzureVirtualMachine(AzureVirtualMachine,
                                       linux_virtual_machine.CentOs7Mixin):
+  GEN2_IMAGE_URN = 'OpenLogic:CentOS-LVM:7-lvm-gen2:latest'
   IMAGE_URN = 'OpenLogic:CentOS-LVM:7-lvm:latest'
 
 
 class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
                                       linux_virtual_machine.CentOs8Mixin):
+  GEN2_IMAGE_URN = 'OpenLogic:CentOS-LVM:8-lvm-gen2:latest'
   IMAGE_URN = 'OpenLogic:CentOS-LVM:8-lvm:latest'
 
 
@@ -916,18 +945,21 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
 class Windows2012CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2012CoreMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2012-r2-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
 class Windows2016CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2016CoreMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2016-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter-Server-Core:latest'
 
 
 class Windows2019CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2019CoreMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2019-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter-Core:latest'
 
 
@@ -940,18 +972,21 @@ class Windows2022CoreAzureVirtualMachine(
 class Windows2012DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2012DesktopMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2012-r2-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
 class Windows2016DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2016DesktopMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2016-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter:latest'
 
 
 class Windows2019DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2019DesktopMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2019-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest'
 
 
@@ -964,12 +999,14 @@ class Windows2022DesktopAzureVirtualMachine(
 class Windows2019DesktopSQLServer2019StandardAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2019SQLServer2019Standard):
+  GEN2_IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2019:standard-gen2:latest'
   IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2019:standard:latest'
 
 
 class Windows2019DesktopSQLServer2019EnterpriseAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2019SQLServer2019Enterprise):
+  GEN2_IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2019:enterprise-gen2:latest'
   IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2019:enterprise:latest'
 
 
