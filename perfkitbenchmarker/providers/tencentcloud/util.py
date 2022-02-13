@@ -38,7 +38,6 @@ def GetRegionFromZone():
 class TccliCommand(object):
   """A tccli command."""
 
-
   def __init__(self, *args):
     """Initializes a tccliCommand with the provided args and common flags.
 
@@ -50,6 +49,7 @@ class TccliCommand(object):
     self.flags = collections.OrderedDict()
     self.additional_flags = []
     self._AddCommonFlags()
+
 
   def GetCommand(self):
     """Generates the tccli command.
@@ -72,8 +72,10 @@ class TccliCommand(object):
 
     return cmd
 
+
   def __repr__(self):
     return '{0}({1})'.format(type(self).__name__, ' '.join(self.GetCommand()))
+
 
   @vm_util.Retry()
   def Issue(self, **kwargs):
@@ -85,22 +87,26 @@ class TccliCommand(object):
 
     return stdout, stderr, retcode
 
+
   def IssueRetryable(self, **kwargs):
     """Tries running the tccli command until it succeeds or times out."""
     return vm_util.IssueRetryableCommand(self.GetCommand(), **kwargs)
+
 
   def _AddCommonFlags(self):
     """Adds common flags to the command.
 
     Adds common tccli flags derived from the PKB flags and provided resource.
     """
+    pass
+
 
   def toListFlag(self, lst):
     """Tccli format of flags that require a list as input.
 
       Args: a list of strings
 
-      Returns: a string representing the list in tccli command
+      Returns: a string that can be straight insert into tccli command
     """
     res = ["'[\""]
     for _ in lst:
@@ -108,6 +114,6 @@ class TccliCommand(object):
       res.append(item)
       res.append(',')
     res[-1] = "\"]'"
-    
+
     return ''.join(res)
 
