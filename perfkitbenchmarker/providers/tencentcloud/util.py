@@ -36,7 +36,7 @@ def GetRegionFromZone():
 
 
 class TccliCommand(object):
-  """A tccli command."""
+  """Object to handle a tccli command."""
 
   def __init__(self, *args):
     """Initializes a tccliCommand with the provided args and common flags.
@@ -52,7 +52,7 @@ class TccliCommand(object):
 
 
   def GetCommand(self):
-    """Generates the tccli command.
+    """Generates a tccli command.
 
     Returns:
       list of strings. When joined by spaces, forms the tccli shell command.
@@ -79,7 +79,7 @@ class TccliCommand(object):
 
   @vm_util.Retry()
   def Issue(self, **kwargs):
-    """Tries to run the tccli command once, retrying if Rate Limited."""
+    """Tries to run the tccli command once."""
     try:
       stdout, stderr, retcode = vm_util.IssueCommand(self.GetCommand(), **kwargs)
     except errors.VmUtil.IssueCommandError as error:
@@ -102,11 +102,15 @@ class TccliCommand(object):
 
 
   def toListFlag(self, lst):
-    """Tccli format of flags that require a list as input.
+    """Some tccli flag values require a list as input. This function
+       transform the list to a formatted string to be a part of tccli
+       command.
 
-      Args: a list of strings
+      Args:
+        lst: a list of strings
 
-      Returns: a string that can be straight insert into tccli command
+      Returns:
+        a string that can be straight insert into tccli command
     """
     res = ["'[\""]
     for _ in lst:
