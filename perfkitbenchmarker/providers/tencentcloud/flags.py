@@ -16,7 +16,16 @@
 from absl import flags
 
 flags.DEFINE_string('tencent_path', 'tccli', 'The path for the Tencent Cloud utility.')
-flags.DEFINE_string('default_region', 'ap-guangzhou-3', 'The path for the Tencent Cloud utility.')
-flags.DEFINE_string('unfold', '--cli-unfold-argument', 'Unfold complicated arguments, using . to access\
-                     values of complicated arguments')
+flags.DEFINE_string('default_region', 'ap-guangzhou-3',
+                    'The path for the Tencent Cloud utility.')
+flags.DEFINE_string('unfold', '--cli-unfold-argument',
+                    'Unfold complicated arguments, using . to access values of '
+                    'complicated arguments')
+flags.DEFINE_integer('bandwith_out', 100,
+                    'The maximum outbound bandwidth of the public network, in Mbps. '
+                    'The default value is 100 Mbps. ')
+flags.DEFINE_boolean('assign_public_ip', True,
+                    'If the public network bandwidth is greater than 0 Mbps, you can '
+                    'choose whether to assign a public IP. If the public network '
+                    'bandwidth is 0 Mbps, you will not be able to assign a public IP.')
 

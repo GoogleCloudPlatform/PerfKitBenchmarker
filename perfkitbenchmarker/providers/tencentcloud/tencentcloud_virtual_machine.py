@@ -22,6 +22,8 @@ import collections
 import json
 import logging
 import threading
+from tracemalloc import start
+from urllib import response
 from absl import flags
 from PerfKitBenchmarker.perfkitbenchmarker.providers import tencentcloud
 from perfkitbenchmarker import disk
@@ -69,20 +71,6 @@ class TencentCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Waits until the instance's status is in status_list."""
     pass
 
-  @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
-  def _WaitForEipStatus(self, status_list):
-    """Waits until the instance's status is in status_list."""
-    pass
-
-  def _AllocatePubIp(self, region, instance_id):
-    """Allocate a public ip address and associate it to the instance."""
-    pass
-
-  @vm_util.Retry()
-  def _PostCreate(self):
-    """Get the instance's data and tag it."""
-    pass
-
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -99,29 +87,11 @@ class TencentCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.AllowRemoteAccessPorts()
     pass
 
+
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
     pass
 
-  @classmethod
-  def _GetDefaultImage(cls, region):
-    """Returns the default image given the machine type and region.
-
-    If no default is configured, this will return None.
-    """
-
-    pass
-
-  def _GenerateLoginSettings() -> str:
-    """Returns:
-      LoginSettings. Use this parameter to set the login method,
-      password, and key of the instance or keep the login settings
-      of the original image.
-
-      In this case, this value should be the ssh public key.
-    """
-
-    return ''
 
   def _GenerateCreateCommand(self):
     """Generates a command to create the VM instance.
@@ -129,15 +99,15 @@ class TencentCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       TccliCommand. Command to issue in order to create the VM instance.
     """
-    args = ['cvm', 'RunInstances']
-    cmd = util.TccliCommand(self, args)
-
+    cmd = util.TccliCommand(self, 'cvm', 'RunInstances')
     cmd.flags['Placement.Zone'] = self.zone
     cmd.flags['ImageId'] = self.image
     cmd.flags['InstanceType'] = self.machine_type
     cmd.flags['InstanceName'] = self.name
+    cmd.flags['InternetAccessible.InternetMaxBandwidthOut'] = FLAGS.bandwith_out
+    cmd.flags['InternetAccessible.PublicIpAssigned'] = FLAGS.assign_public_ip
     cmd.flags['SecurityGroupIds'] = self.network.security_group.group_id
-    cmd.flags['LoginSettings'] = self.key_id
+    cmd.flags['LoginSettings.KeyIds'] = self.key_id
     cmd.flags['SystemDisk.DiskType'] = self.disk.disk_type
     cmd.flags['SystemDisk.DiskSize'] = self.disk.disk_size
 
@@ -147,19 +117,64 @@ class TencentCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _Create(self):
     """Create a VM instance."""
     create_cmd = self._GenerateCreateCommand(self)
-    _, stderr, retcode = create_cmd.Issue()
+    stdout, stderr, retcode = create_cmd.Issue()
 
+    response = json.loads(stdout)
+    self.id = response['InstanceIdSet'][0]
     pass
+
+
+
+  @vm_util.Retry()
+  def _PostCreate(self):
+    """Get data of the created instance."""
+    describe_cmd = util.TccliCommand(self, 'cvm', 'DescribeInstances')
+    describe_cmd.flags['Region'] = self.region
+    describe_cmd.flags['InstanceIds'] = describe_cmd.toListFlag([self.id])
+
+    stdout, _, _ = describe_cmd.Issue()
+    response = json.loads(stdout)
+
+    instance = response['InstanceSet'][0]
+    self.ip_address = instance['PublicIpAddresses'][0]
+    self.internal_ip = instance['PrivateIpAddresses'][0]
+
+
+  def _Start(self):
+    """Starts the VM."""
+    start_cmd = util.TccliCommand(self, 'cvm', 'StartInstances')
+    start_cmd.flags['Region'] = self.region
+    start_cmd.flags['InstanceIds'] = start_cmd.toListFlag([self.id])
+    start_cmd.Issue()
+
+
+  def _Stop(self):
+    """Stops the VM."""
+    stop_cmd = util.TccliCommand(self, 'cvm', 'StopInstances')
+    stop_cmd.flags['Region'] = self.region
+    stop_cmd.flags['InstanceIds'] = stop_cmd.toListFlag([self.id])
+    stop_cmd.Issue()
 
 
   def _Delete(self):
     """Delete a VM instance."""
-    pass
+    delete_cmd = util.TccliCommand(self, 'cvm', 'TerminateInstances')
+    delete_cmd.flags['Region'] = self.region
+    delete_cmd.flags['InstanceIds'] = delete_cmd.toListFlag([self.id])
+    delete_cmd.Issue()
 
 
   def _Exists(self):
     """Returns true if the VM exists."""
-    pass
+    describe_cmd = util.TccliCommand(self, 'cvm', 'DescribeInstances')
+    describe_cmd.flags['Region'] = self.region
+    describe_cmd.flags['InstanceIds'] = describe_cmd.toListFlag([self.id])
+
+    stdout, _, _ = describe_cmd.Issue()
+    response = json.loads(stdout)
+    instance_cnt = response['TotalCount']
+
+    return instance_cnt == 1
 
 
   def CreateScratchDisk(self, disk_spec):
@@ -187,7 +202,7 @@ class TencentKeyFileManager(object):
   def ImportKeyfile(cls, region, public_key):
     """Imports the public keyfile to Tencent Cloud.
 
-       Returns:
+       Returns: key_name, key_id
     """
     with cls._lock:
       if (region, FLAGS.run_uri) in cls.imported_keyfile_set:

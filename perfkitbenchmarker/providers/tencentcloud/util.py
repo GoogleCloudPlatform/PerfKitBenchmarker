@@ -34,6 +34,7 @@ def GetDefaultImage():
 def GetRegionFromZone():
     pass
 
+
 class TccliCommand(object):
   """A tccli command."""
 
@@ -93,3 +94,20 @@ class TccliCommand(object):
 
     Adds common tccli flags derived from the PKB flags and provided resource.
     """
+
+  def toListFlag(self, lst):
+    """Tccli format of flags that require a list as input.
+
+      Args: a list of strings
+
+      Returns: a string representing the list in tccli command
+    """
+    res = ["'[\""]
+    for _ in lst:
+      item = '"{}"'.format(_)
+      res.append(item)
+      res.append(',')
+    res[-1] = "\"]'"
+    
+    return ''.join(res)
+
