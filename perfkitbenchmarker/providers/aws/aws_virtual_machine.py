@@ -1563,6 +1563,18 @@ class Windows2019DesktopSQLServer2019EnterpriseAwsVirtualMachine(
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-SQL_2019_Enterprise-*'
 
 
+class Windows2022DesktopSQLServer2019StandardAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2019Standard):
+  IMAGE_NAME_FILTER = 'Windows_Server-2022-English-Full-SQL_2019_Standard-*'
+
+
+class Windows2022DesktopSQLServer2019EnterpriseAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2019Enterprise):
+  IMAGE_NAME_FILTER = 'Windows_Server-2022-English-Full-SQL_2019_Enterprise-*'
+
+
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                               filename):
   """Returns a string used to download preprovisioned data."""
