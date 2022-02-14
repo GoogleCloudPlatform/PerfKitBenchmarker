@@ -22,6 +22,7 @@ import uuid
 
 from absl import flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sql_engine_utils
@@ -177,16 +178,24 @@ def GenerateRandomDbPassword():
   return ''.join(prefix) + str(uuid.uuid4())[:10]
 
 
-def GetRelationalDbClass(cloud):
+def GetRelationalDbClass(cloud, is_managed_db, engine):
   """Get the RelationalDb class corresponding to 'cloud'.
 
   Args:
     cloud: name of cloud to get the class for
+    is_managed_db: is the database self managed or database a a service
+    engine: database engine type
 
   Returns:
     BaseRelationalDb class with the cloud attribute of 'cloud'.
   """
-  return resource.GetResourceClass(BaseRelationalDb, CLOUD=cloud)
+  relational_db = None
+  try:
+    relational_db = resource.GetResourceClass(
+        BaseRelationalDb, CLOUD=cloud, IS_MANAGED=is_managed_db, ENGINE=engine)
+  except errors.Resource.SubclassNotFoundError:
+    relational_db = resource.GetResourceClass(BaseRelationalDb, CLOUD=cloud)
+  return relational_db
 
 
 def VmsToBoot(vm_groups):
@@ -807,7 +816,6 @@ class BaseRelationalDb(resource.BaseResource):
                       'as high available')
     self._FailoverHA()
 
-  @abstractmethod
   def _FailoverHA(self):
     """Fail over from master to replica."""
-    pass
+    raise NotImplementedError('Failover is not implemented.')

@@ -518,7 +518,9 @@ class _RelationalDbSpec(spec.BaseSpec):
     # Set defaults that were not able to be set in
     # GetOptionDecoderConstructions()
     if not self.engine_version:
-      db_class = relational_db.GetRelationalDbClass(self.cloud)
+      db_class = relational_db.GetRelationalDbClass(self.cloud,
+                                                    self.is_managed_db,
+                                                    self.engine)
       self.engine_version = db_class.GetDefaultEngineVersion(self.engine)
     if not self.database_name:
       self.database_name = 'pkb-db-%s' % flag_values.run_uri
@@ -569,6 +571,7 @@ class _RelationalDbSpec(spec.BaseSpec):
         'backup_start_time': (option_decoders.StringDecoder, {
             'default': '07:00'
         }),
+        'is_managed_db': (option_decoders.BooleanDecoder, {'default': True}),
         'db_spec': (option_decoders.PerCloudConfigDecoder, {}),
         'db_disk_spec': (option_decoders.PerCloudConfigDecoder, {}),
         'vm_groups': (_VmGroupsDecoder, {
@@ -631,6 +634,9 @@ class _RelationalDbSpec(spec.BaseSpec):
       raise errors.Config.MissingOption(
           'To specify a custom client VM, both client_vm_cpus '
           'and client_vm_memory must be specified.')
+
+    if flag_values['use_managed_db'].present:
+      config_values['is_managed_db'] = flag_values.use_managed_db
 
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud

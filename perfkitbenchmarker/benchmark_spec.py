@@ -292,8 +292,11 @@ class BenchmarkSpec(object):
     if self.config.relational_db is None:
       return
     cloud = self.config.relational_db.cloud
+    is_managed_db = self.config.relational_db.is_managed_db
+    engine = self.config.relational_db.engine
     providers.LoadProvider(cloud)
-    relational_db_class = (relational_db.GetRelationalDbClass(cloud))
+    relational_db_class = (
+        relational_db.GetRelationalDbClass(cloud, is_managed_db, engine))
     self.relational_db = relational_db_class(self.config.relational_db)
 
   def ConstructNonRelationalDb(self) -> None:
