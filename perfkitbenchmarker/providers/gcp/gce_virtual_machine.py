@@ -1322,6 +1322,12 @@ class Windows2019DesktopGceVirtualMachine(
   DEFAULT_IMAGE_FAMILY = 'windows-2019'
 
 
+class Windows2022DesktopGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2022DesktopMixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2022'
+
+
 class Windows2019DesktopSQLServer2017StandardGceVirtualMachine(
     BaseWindowsGceVirtualMachine,
     windows_virtual_machine.Windows2019SQLServer2017Standard):
@@ -1347,6 +1353,20 @@ class Windows2019DesktopSQLServer2019EnterpriseGceVirtualMachine(
     BaseWindowsGceVirtualMachine,
     windows_virtual_machine.Windows2019SQLServer2019Enterprise):
   DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
+class Windows2022DesktopSQLServer2019StandardGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2019Standard):
+  DEFAULT_IMAGE_FAMILY = 'sql-std-2019-win-2022'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
+class Windows2022DesktopSQLServer2019EnterpriseGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2019Enterprise):
+  DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2022'
   DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
 
 
