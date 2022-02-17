@@ -18,20 +18,27 @@
 TODO(user): Flags should be unified with memtier.py.
 """
 
+import dataclasses
 import json
 import logging
 import posixpath
+from typing import List, Optional
+
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
+_LICENSE = flags.DEFINE_string(
+    'enterprise_redis_license_file', 'enterprise_redis_license',
+    'Name of the redis enterprise license file to use.')
 _LICENSE_PATH = flags.DEFINE_string(
     'enterprise_redis_license_path', None,
-    'If none, defaults to the local data directory.')
+    'If none, defaults to local data directory joined with _LICENSE.')
 _TUNE_ON_STARTUP = flags.DEFINE_boolean(
     'enterprise_redis_tune_on_startup', True,
     'Whether to tune core config during startup.')
@@ -77,9 +84,10 @@ _DATA_SIZE = flags.DEFINE_integer(
     'enterprise_redis_data_size_bytes', 100,
     'The size of the data to write to redis enterprise.')
 
+_VM = virtual_machine.VirtualMachine
+
 _VERSION = '6.2.4-54'
 _PACKAGE_NAME = 'redis_enterprise'
-_LICENSE = 'enterprise_redis_license'
 _WORKING_DIR = '~/redislabs'
 _RHEL_TAR = f'redislabs-{_VERSION}-rhel7-x86_64.tar'
 _XENIAL_TAR = f'redislabs-{_VERSION}-xenial-amd64.tar'
@@ -99,7 +107,7 @@ PREPROVISIONED_DATA = {
 }
 
 
-def _GetTarName():
+def _GetTarName() -> Optional[str]:
   """Returns the Redis Enterprise package to use depending on the os.
 
   For information about available packages, see
@@ -113,7 +121,7 @@ def _GetTarName():
     return _BIONIC_TAR
 
 
-def Install(vm):
+def Install(vm: _VM) -> None:
   """Installs Redis Enterprise package on the VM."""
   vm.InstallPackages('wget')
   vm.RemoteCommand(f'mkdir -p {_WORKING_DIR}')
@@ -121,8 +129,8 @@ def Install(vm):
   # Check for the license in the data directory if a path isn't specified.
   license_path = _LICENSE_PATH.value
   if not license_path:
-    license_path = data.ResourcePath(_LICENSE)
-  vm.PushFile(license_path, posixpath.join(_WORKING_DIR, _LICENSE))
+    license_path = data.ResourcePath(_LICENSE.value)
+  vm.PushFile(license_path, posixpath.join(_WORKING_DIR, _LICENSE.value))
 
   # Check for the tarfile in the data directory first.
   vm.InstallPreprovisionedPackageData(_PACKAGE_NAME, [_GetTarName()],
@@ -145,85 +153,121 @@ def Install(vm):
       dir=_WORKING_DIR, install=install_cmd))
 
 
-def CreateCluster(vm):
-  """Create an Redis Enterprise cluster on the vm."""
-  vm.RemoteCommand(
-      'sudo /opt/redislabs/bin/rladmin cluster create '
-      'license_file {license_file} '
-      'name redis-cluster '
-      'username {username} '
-      'password {password} '.format(
-          license_file=posixpath.join(_WORKING_DIR, _LICENSE),
-          username=_USERNAME,
-          password=FLAGS.run_uri))
+def _JoinCluster(server_vm: _VM, vm: _VM) -> None:
+  """Joins a Redis Enterprise cluster."""
+  logging.info('Joining redis enterprise cluster.')
+  vm.RemoteCommand('sudo /opt/redislabs/bin/rladmin cluster join '
+                   'nodes {server_vm_ip} '
+                   'username {username} '
+                   'password {password} '.format(
+                       server_vm_ip=server_vm.internal_ip,
+                       username=_USERNAME,
+                       password=FLAGS.run_uri))
 
 
-def OfflineCores(vm):
-  """Offline specific cores."""
-  for cpu_id in _DISABLE_CPU_IDS.value or []:
-    vm.RemoteCommand('sudo bash -c '
-                     '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' % cpu_id)
+def CreateCluster(vms: List[_VM]) -> None:
+  """Creates a Redis Enterprise cluster on the VM."""
+  logging.info('Creating redis enterprise cluster.')
+  vms[0].RemoteCommand('sudo /opt/redislabs/bin/rladmin cluster create '
+                       'license_file {license_file} '
+                       'name redis-cluster '
+                       'username {username} '
+                       'password {password} '.format(
+                           license_file=posixpath.join(_WORKING_DIR,
+                                                       _LICENSE.value),
+                           username=_USERNAME,
+                           password=FLAGS.run_uri))
+  for vm in vms[1:]:
+    _JoinCluster(vms[0], vm)
 
 
-def TuneProxy(vm):
-  """Tune the number of Redis proxies on the server vm."""
-  vm.RemoteCommand(
-      'sudo /opt/redislabs/bin/rladmin tune '
-      'proxy all '
-      'max_threads {proxy_threads} '
-      'threads {proxy_threads} '.format(
-          proxy_threads=str(_PROXY_THREADS.value)))
-  vm.RemoteCommand('sudo /opt/redislabs/bin/dmc_ctl restart')
+def OfflineCores(vms: List[_VM]) -> None:
+  """Offlines specific cores."""
+
+  def _Offline(vm):
+    for cpu_id in _DISABLE_CPU_IDS.value or []:
+      vm.RemoteCommand('sudo bash -c '
+                       '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' %
+                       cpu_id)
+
+  vm_util.RunThreaded(_Offline, vms)
 
 
-def PinWorkers(vm):
+def TuneProxy(vms: List[_VM], proxy_threads: Optional[int] = None) -> None:
+  """Tunes the number of Redis proxies on the server vm."""
+  proxy_threads = proxy_threads or _PROXY_THREADS.value
+
+  def _Tune(vm):
+    vm.RemoteCommand('sudo /opt/redislabs/bin/rladmin tune '
+                     'proxy all '
+                     f'max_threads {proxy_threads} '
+                     f'threads {proxy_threads} ')
+    vm.RemoteCommand('sudo /opt/redislabs/bin/dmc_ctl restart')
+
+  vm_util.RunThreaded(_Tune, vms)
+
+
+def PinWorkers(vms: List[_VM]) -> None:
   """Splits the Redis worker threads across the NUMA nodes evenly.
 
   This function is no-op if --enterprise_redis_pin_workers is not set.
 
   Args:
-    vm: The VM with the Redis workers to pin.
+    vms: The VMs with the Redis workers to pin.
   """
   if not _PIN_WORKERS.value:
     return
 
-  numa_nodes = vm.CheckLsCpu().numa_node_count
-  proxies_per_node = _PROXY_THREADS.value // numa_nodes
-  for node in range(numa_nodes):
-    node_cpu_list = vm.RemoteCommand(
-        'cat /sys/devices/system/node/node%d/cpulist' % node)[0].strip()
-    # List the PIDs of the Redis worker processes and pin a sliding window of
-    # `proxies_per_node` workers to the NUMA nodes in increasing order.
-    vm.RemoteCommand(r'sudo /opt/redislabs/bin/dmc-cli -ts root list | '
-                     r'grep worker | '
-                     r'head -n -{proxies_already_partitioned} | '
-                     r'tail -n {proxies_per_node} | '
-                     r"awk '"
-                     r'{{printf "%i\n",$3}}'
-                     r"' | "
-                     r'xargs -i sudo taskset -pc {node_cpu_list} {{}} '.format(
-                         proxies_already_partitioned=proxies_per_node * node,
-                         proxies_per_node=proxies_per_node,
-                         node_cpu_list=node_cpu_list))
+  def _Pin(vm):
+    numa_nodes = vm.CheckLsCpu().numa_node_count
+    proxies_per_node = _PROXY_THREADS.value // numa_nodes
+    for node in range(numa_nodes):
+      node_cpu_list = vm.RemoteCommand(
+          'cat /sys/devices/system/node/node%d/cpulist' % node)[0].strip()
+      # List the PIDs of the Redis worker processes and pin a sliding window of
+      # `proxies_per_node` workers to the NUMA nodes in increasing order.
+      vm.RemoteCommand(
+          r'sudo /opt/redislabs/bin/dmc-cli -ts root list | '
+          r'grep worker | '
+          r'head -n -{proxies_already_partitioned} | '
+          r'tail -n {proxies_per_node} | '
+          r"awk '"
+          r'{{printf "%i\n",$3}}'
+          r"' | "
+          r'xargs -i sudo taskset -pc {node_cpu_list} {{}} '.format(
+              proxies_already_partitioned=proxies_per_node * node,
+              proxies_per_node=proxies_per_node,
+              node_cpu_list=node_cpu_list))
+
+  vm_util.RunThreaded(_Pin, vms)
 
 
-def CreateDatabase(vm, redis_port):
-  """Create a new Redis Enterprise database.
+def _GetRestCommand() -> str:
+  return (f'curl -v -k -u {_USERNAME}:{FLAGS.run_uri} '
+          'https://localhost:9443/v1/bdbs')
 
-  Args:
-    vm: The VM where the cluster is set up.
-    redis_port: The port to serve the database.
+
+def CreateDatabase(vms: List[_VM], redis_port: int) -> None:
+  """Creates a new Redis Enterprise database.
 
   See https://docs.redis.com/latest/rs/references/rest-api/objects/bdb/.
+
+  Args:
+    vms: The Redis Enterprise DB cluster nodes.
+    redis_port: The port to serve the database.
   """
+  if _SHARDS.value < len(vms):
+    raise errors.Config.InvalidValue(
+        'There should be at least 1 shard per server VM.')
   content = {
       'name': 'redisdb',
-      'memory_size': int(vm.total_memory_kb * _ONE_KILOBYTE / 2),
+      'memory_size': int(vms[0].total_memory_kb * _ONE_KILOBYTE / 2 * len(vms)),
       'type': 'redis',
       'proxy_policy': 'all-master-shards',
       'port': redis_port,
       'sharding': False,
       'authentication_redis_pass': FLAGS.run_uri,
+      'replication': False,
   }
   if _SHARDS.value > 1:
     content.update({
@@ -235,16 +279,14 @@ def CreateDatabase(vm, redis_port):
             [{'regex': '.*\\{(?<tag>.*)\\}.*'}, {'regex': '(?<tag>.*)'}]
     })
 
-  vm.RemoteCommand(
-      "curl -v -k -u {username}:{password} https://localhost:9443/v1/bdbs "
-      "-H 'Content-type: application/json' -d '{content}'".format(
-          username=_USERNAME,
-          password=FLAGS.run_uri,
-          content=json.dumps(content)))
+  logging.info('Creating Redis Enterprise database.')
+  vms[0].RemoteCommand(f'{_GetRestCommand()} '
+                       "-H 'Content-type: application/json' "
+                       f"-d '{json.dumps(content)}'")
 
 
 @vm_util.Retry()
-def WaitForDatabaseUp(vm, redis_port):
+def WaitForDatabaseUp(vm: _VM, redis_port: int) -> None:
   """Waits for the Redis Enterprise database to respond to commands."""
   stdout, _ = vm.RemoteCommand(
       'sudo /opt/redislabs/bin/redis-cli '
@@ -258,32 +300,69 @@ def WaitForDatabaseUp(vm, redis_port):
     raise errors.Resource.RetryableCreationError()
 
 
-def LoadDatabase(vm, redis_port):
-  """Load the database before performing tests."""
+@dataclasses.dataclass(frozen=True)
+class LoadRequest():
+  key_minimum: int
+  key_maximum: int
+  redis_port: int
+  cluster_mode: bool
+  server_ip: str
+
+
+def _BuildLoadCommand(request: LoadRequest) -> str:
+  """Returns the command used to load the database."""
   command = (
       'sudo /opt/redislabs/bin/memtier_benchmark '
-      '-s localhost '
+      f'-s {request.server_ip} '
       f'-a {FLAGS.run_uri} '
-      f'-p {str(redis_port)} '
+      f'-p {str(request.redis_port)} '
       '-t 1 '  # Set -t and -c to 1 to avoid duplicated work in writing the same
       '-c 1 '  # key/value pairs repeatedly.
       '--ratio 1:0 '
       '--pipeline 100 '
       f'-d {str(_DATA_SIZE.value)} '
       '--key-pattern S:S '
-      '--key-minimum 1 '
-      f'--key-maximum {str(_LOAD_RECORDS.value)} '
+      f'--key-minimum {request.key_minimum} '
+      f'--key-maximum {request.key_maximum} '
       '-n allkeys ')
-  if _SHARDS.value > 1:
+  if request.cluster_mode:
     command += '--cluster-mode'
-  vm.RemoteCommand(command)
+  return command
 
 
-def BuildRunCommand(redis_vm, threads, port):
-  """Spawn a memtir_benchmark on the load_vm against the redis_vm:port.
+def _LoadDatabaseSingleVM(load_vm: _VM, request: LoadRequest) -> None:
+  """Loads the DB from a single VM."""
+  command = _BuildLoadCommand(request)
+  logging.info('Loading database with %s', request)
+  load_vm.RemoteCommand(command)
+
+
+def LoadDatabase(redis_vms: List[_VM], load_vms: List[_VM],
+                 redis_port: int) -> None:
+  """Loads the database before performing tests."""
+  vms = load_vms + redis_vms
+  load_requests = []
+  load_records_per_vm = _LOAD_RECORDS.value // len(vms)
+  cluster_mode = len(redis_vms) > 1
+  for i, _ in enumerate(vms):
+    load_requests.append(
+        LoadRequest(
+            key_minimum=max(i * load_records_per_vm, 1),
+            key_maximum=(i + 1) * load_records_per_vm,
+            redis_port=redis_port,
+            cluster_mode=cluster_mode,
+            server_ip=redis_vms[0].internal_ip))
+
+  vm_util.RunThreaded(
+      _LoadDatabaseSingleVM,
+      [((vm, request), {}) for vm, request in zip(vms, load_requests)])
+
+
+def _BuildRunCommand(redis_vms: _VM, threads: int, port: int) -> str:
+  """Spawns a memtier_benchmark on the load_vm against the redis_vm:port.
 
   Args:
-    redis_vm: The target of the memtier_benchmark
+    redis_vms: The target of the memtier_benchmark
     threads: The number of threads to run in this memtier_benchmark process.
     port: the port to target on the redis_vm.
 
@@ -294,7 +373,7 @@ def BuildRunCommand(redis_vm, threads, port):
     return None
 
   result = ('sudo /opt/redislabs/bin/memtier_benchmark '
-            f'-s {redis_vm.internal_ip} '
+            f'-s {redis_vms[0].internal_ip} '
             f'-a {FLAGS.run_uri} '
             f'-p {str(port)} '
             f'-t {str(threads)} '
@@ -302,15 +381,16 @@ def BuildRunCommand(redis_vm, threads, port):
             f'--pipeline {str(_PIPELINES.value)} '
             f'-c {str(_LOADGEN_CLIENTS.value)} '
             f'-d {str(_DATA_SIZE.value)} '
+            '--test-time 15 '
             '--key-minimum 1 '
-            f'--key-maximum {str(_LOAD_RECORDS.value)} '
-            f'-n {_RUN_RECORDS.value} ')
-  if _SHARDS.value > 1:
-    result += '--cluster-mode'
+            f'--key-maximum {str(_LOAD_RECORDS.value)} ')
+  if len(redis_vms) > 1:
+    result += '--cluster-mode '
   return result
 
 
-def Run(redis_vm, load_vms, redis_port):
+def Run(redis_vms: List[_VM], load_vms: List[_VM],
+        redis_port: int) -> List[sample.Sample]:
   """Run memtier against enterprise redis and measure latency and throughput.
 
   This function runs memtier against the redis server vm with increasing memtier
@@ -319,7 +399,7 @@ def Run(redis_vm, load_vms, redis_port):
     - FLAGS.enterprise_redis_latency_threshold is reached
 
   Args:
-    redis_vm: Redis server vm.
+    redis_vms: Redis server vms.
     load_vms: Memtier load vms.
     redis_port: Port for the redis server.
 
@@ -332,15 +412,17 @@ def Run(redis_vm, load_vms, redis_port):
   threads = _MIN_THREADS.value
   max_threads = _MAX_THREADS.value
   max_throughput_for_completion_latency_under_1ms = 0.0
+  redis_vm = redis_vms[0]
 
   while (cur_max_latency < latency_threshold and threads <= max_threads):
-    load_command = BuildRunCommand(redis_vm, threads, redis_port)
+    load_command = _BuildRunCommand(redis_vms, threads, redis_port)
     # 1min for throughput to stabilize and 10sec of data.
     measurement_command = (
-        'sleep 60 && curl -v -k -u {user}:{password} '
+        'sleep 15 && curl -v -k -u {user}:{password} '
         'https://localhost:9443/v1/bdbs/stats?interval=1sec > ~/output'.format(
             user=_USERNAME,
-            password=FLAGS.run_uri,))
+            password=FLAGS.run_uri,
+        ))
     args = [((load_vm, load_command), {}) for load_vm in load_vms]
     args += [((redis_vm, measurement_command), {})]
     vm_util.RunThreaded(lambda vm, command: vm.RemoteCommand(command), args)
@@ -359,6 +441,7 @@ def Run(redis_vm, load_vms, redis_port):
           _PIPELINES.value)
       sample_metadata['threads'] = threads
       sample_metadata['shard_count'] = _SHARDS.value
+      sample_metadata['total_shard_count'] = _SHARDS.value * len(redis_vms)
       sample_metadata['redis_proxy_threads'] = (
           _PROXY_THREADS.value)
       sample_metadata['redis_loadgen_clients'] = (

@@ -134,6 +134,7 @@
 -   Add latency capped throughput measurement mode to memtier.
 -   Add Unsupported config failure substatus for Azure runs.
 -   Add support for Windows 2022 and Sql server 2019 on Windows 2022
+-   Add support for Redis Enterprise clustered database.
 
 ### Bug fixes and maintenance updates:
 

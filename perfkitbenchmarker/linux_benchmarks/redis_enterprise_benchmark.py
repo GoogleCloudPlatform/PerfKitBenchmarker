@@ -26,13 +26,18 @@ To run this benchmark:
    perfkitbenchmarker/linux_packages/redis_enterprise by running
    `sha256sum <redislabs_tarfile>`.
 """
-
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import redis_enterprise
 
 FLAGS = flags.FLAGS
+
+_OPTIMIZE_THROUGHPUT = flags.DEFINE_boolean(
+    'enterprise_redis_optimize_throughput', False,
+    'If True, the benchmark will find the optimal throughput under 1ms latency '
+    'for the machine type by optimizing the number of shards and proxy threads.'
+)
 
 BENCHMARK_NAME = 'redis_enterprise'
 REDIS_PORT = 12006
@@ -82,21 +87,20 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   client_vms = benchmark_spec.vm_groups['clients']
-  server_vm = benchmark_spec.vm_groups['servers']
-  args = [((vm,), {}) for vm in client_vms + server_vm]
-  vm_util.RunThreaded(_InstallRedisEnterprise, args)
+  server_vms = benchmark_spec.vm_groups['servers']
+  vm_util.RunThreaded(_InstallRedisEnterprise, client_vms + server_vms)
 
-  server_vm = server_vm[0]
+  server_vm = server_vms[0]
   server_vm.AllowPort(REDIS_PORT)
   server_vm.AllowPort(REDIS_UI_PORT)
 
-  redis_enterprise.OfflineCores(server_vm)
-  redis_enterprise.CreateCluster(server_vm)
-  redis_enterprise.TuneProxy(server_vm)
-  redis_enterprise.CreateDatabase(server_vm, REDIS_PORT)
-  redis_enterprise.PinWorkers(server_vm)
+  redis_enterprise.OfflineCores(server_vms)
+  redis_enterprise.CreateCluster(server_vms)
+  redis_enterprise.TuneProxy(server_vms)
+  redis_enterprise.CreateDatabase(server_vms, REDIS_PORT)
+  redis_enterprise.PinWorkers(server_vms)
   redis_enterprise.WaitForDatabaseUp(server_vm, REDIS_PORT)
-  redis_enterprise.LoadDatabase(server_vm, REDIS_PORT)
+  redis_enterprise.LoadDatabase(server_vms, client_vms, REDIS_PORT)
 
 
 def Run(benchmark_spec):
@@ -110,7 +114,8 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   load_vms = benchmark_spec.vm_groups['clients']
-  redis_vm = benchmark_spec.vm_groups['servers'][0]
+  redis_vms = benchmark_spec.vm_groups['servers']
+  redis_vm = redis_vms[0]
 
   numa_pages_migrated, _ = redis_vm.RemoteCommand(
       'cat /proc/vmstat | grep numa_pages_migrated')
@@ -122,7 +127,7 @@ def Run(benchmark_spec):
       'numa_balancing': numa_balancing.rstrip(),
   }
 
-  results = redis_enterprise.Run(redis_vm, load_vms, REDIS_PORT)
+  results = redis_enterprise.Run(redis_vms, load_vms, REDIS_PORT)
 
   for result in results:
     result.metadata.update(setup_metadata)
