@@ -2021,6 +2021,11 @@ class Ubuntu1804Mixin(BaseUbuntuMixin):
         r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" /etc/bash.bashrc')
 
 
+class Ubuntu1804EfaMixin(Ubuntu1804Mixin):
+  """Class holding EFA specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1804_EFA
+
+
 # Inherit Ubuntu 18's idiosyncracies.
 # Note https://bugs.launchpad.net/snappy/+bug/1659719 is also marked not fix in
 # focal.

@@ -67,6 +67,10 @@ CUDA_9_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/local_ins
 CUDA_9_0_PATCH = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/patches/1/cuda-repo-{os}-9-0-local-cublas-performance-update_1.0-1_amd64-deb'
 
 
+def _CudaOs(os_type):
+  return re.sub('_.*$', '', os_type)
+
+
 class UnsupportedCudaVersionError(Exception):
   pass
 
@@ -154,15 +158,16 @@ def _InstallCuda9Point0(vm):
   Args:
     vm: VM to install CUDA on
   """
-  basename = posixpath.basename(CUDA_9_0_TOOLKIT.format(os=vm.OS_TYPE)) + '.deb'
-  vm.RemoteCommand('wget -q %s -O %s' % (CUDA_9_0_TOOLKIT.format(os=vm.OS_TYPE),
-                                         basename))
+  basename = posixpath.basename(
+      CUDA_9_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE))) + '.deb'
+  vm.RemoteCommand('wget -q %s -O %s' %
+                   (CUDA_9_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)), basename))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   vm.RemoteCommand('sudo apt-key add /var/cuda-repo-9-0-local/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('cuda-toolkit-9-0 cuda-tools-9-0 cuda-libraries-9-0 '
                      'cuda-libraries-dev-9-0')
-  _InstallCudaPatch(vm, CUDA_9_0_PATCH.format(os=vm.OS_TYPE))
+  _InstallCudaPatch(vm, CUDA_9_0_PATCH.format(os=_CudaOs(vm.OS_TYPE)))
 
 
 def _InstallCuda10Point0(vm):
@@ -172,9 +177,11 @@ def _InstallCuda10Point0(vm):
     vm: VM to install CUDA on
   """
   basename = (
-      f'{posixpath.basename(CUDA_10_0_TOOLKIT.format(os=vm.OS_TYPE))}.deb')
-  vm.RemoteCommand(f'wget -q {CUDA_10_0_TOOLKIT.format(os=vm.OS_TYPE)} -O '
-                   f'{basename}')
+      f'{posixpath.basename(CUDA_10_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)))}.deb'
+  )
+  vm.RemoteCommand(
+      f'wget -q {CUDA_10_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE))} -O '
+      f'{basename}')
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   vm.RemoteCommand('sudo apt-key add '
                    '/var/cuda-repo-10-0-local-10.0.130-410.48/7fa2af80.pub')
@@ -189,11 +196,13 @@ def _InstallCuda10Point1(vm):
   Args:
     vm: VM to install CUDA on
   """
-  basename = posixpath.basename(CUDA_10_1_TOOLKIT.format(os=vm.OS_TYPE))
-  vm.RemoteCommand('wget -q %s' % CUDA_PIN.format(os=vm.OS_TYPE))
-  vm.RemoteCommand(f'sudo mv cuda-{vm.OS_TYPE}.pin '
+  basename = posixpath.basename(
+      CUDA_10_1_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)))
+  vm.RemoteCommand('wget -q %s' % CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE)))
+  vm.RemoteCommand(f'sudo mv cuda-{_CudaOs(vm.OS_TYPE)}.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
-  vm.RemoteCommand('wget -q %s' % CUDA_10_1_TOOLKIT.format(os=vm.OS_TYPE))
+  vm.RemoteCommand('wget -q %s' %
+                   CUDA_10_1_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   vm.RemoteCommand('sudo apt-key add '
                    '/var/cuda-repo-10-1-local-10.1.243-418.87.00/7fa2af80.pub')
@@ -208,11 +217,13 @@ def _InstallCuda10Point2(vm):
   Args:
     vm: VM to install CUDA on
   """
-  basename = posixpath.basename(CUDA_10_2_TOOLKIT.format(os=vm.OS_TYPE))
-  vm.RemoteCommand('wget -q %s' % CUDA_PIN.format(os=vm.OS_TYPE))
-  vm.RemoteCommand(f'sudo mv cuda-{vm.OS_TYPE}.pin '
+  basename = posixpath.basename(
+      CUDA_10_2_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)))
+  vm.RemoteCommand('wget -q %s' % CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE)))
+  vm.RemoteCommand(f'sudo mv cuda-{_CudaOs(vm.OS_TYPE)}.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
-  vm.RemoteCommand('wget -q %s' % CUDA_10_2_TOOLKIT.format(os=vm.OS_TYPE))
+  vm.RemoteCommand('wget -q %s' %
+                   CUDA_10_2_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   vm.RemoteCommand('sudo apt-key add '
                    '/var/cuda-repo-10-2-local-10.2.89-440.33.01/7fa2af80.pub')
@@ -229,16 +240,16 @@ def _InstallCuda11Generic(vm, toolkit_fmt, version_dash):
     toolkit_fmt: format string to use for the toolkit name
     version_dash: Version (ie 11-1) to install
   """
-  toolkit = toolkit_fmt.format(os=vm.OS_TYPE)
+  toolkit = toolkit_fmt.format(os=_CudaOs(vm.OS_TYPE))
   basename = posixpath.basename(toolkit)
-  vm.RemoteCommand(f'wget -q {CUDA_PIN.format(os=vm.OS_TYPE)}')
-  vm.RemoteCommand(f'sudo mv cuda-{vm.OS_TYPE}.pin '
+  vm.RemoteCommand(f'wget -q {CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE))}')
+  vm.RemoteCommand(f'sudo mv cuda-{_CudaOs(vm.OS_TYPE)}.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
   vm.RemoteCommand(f'wget -q {toolkit}')
   vm.RemoteCommand(f'sudo dpkg -i {basename}')
   vm.RemoteCommand(
       'sudo apt-key add '
-      f'/var/cuda-repo-{vm.OS_TYPE}-{version_dash}-local/7fa2af80.pub')
+      f'/var/cuda-repo-{_CudaOs(vm.OS_TYPE)}-{version_dash}-local/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages(f'cuda-toolkit-{version_dash} '
                      f'cuda-tools-{version_dash} '
@@ -349,5 +360,5 @@ def Uninstall(vm):
   Note that reinstallation does not work correctly, i.e. you cannot reinstall
   CUDA by calling _Install() again.
   """
-  vm.RemoteCommand(f'rm -f cuda-repo-{vm.OS_TYPE}*')
+  vm.RemoteCommand(f'rm -f cuda-repo-{_CudaOs(vm.OS_TYPE)}*')
   vm.RemoteCommand('sudo rm -rf {cuda_home}'.format(cuda_home=CUDA_HOME))

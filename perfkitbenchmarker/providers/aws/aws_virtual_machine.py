@@ -104,6 +104,7 @@ UBUNTU_IMAGE_PROJECT = ['099720109477']  # Owned by canonical
 # Some Windows images are also available in marketplace project, but this is the
 # one selected by the AWS console.
 WINDOWS_IMAGE_PROJECT = ['801119661308']  # alias amazon
+UBUNTU_EFA_IMAGE_PROJECT = ['898082745236']
 
 # Processor architectures
 ARM = 'arm64'
@@ -1336,6 +1337,12 @@ class Ubuntu1604BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
 class Ubuntu1804BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu1804Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-*64-server-20*'
+
+
+class Ubuntu1804EfaBasedAwsVirtualMachine(
+    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu1804EfaMixin):
+  IMAGE_OWNER = UBUNTU_EFA_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'Deep Learning AMI (Ubuntu 18.04) Version *'
 
 
 class Ubuntu2004BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,

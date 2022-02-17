@@ -28,6 +28,8 @@ MOFED_OS_MAPPING = {
     os_types.UBUNTU1604: 'ubuntu16.04',
     os_types.UBUNTU1604_CUDA9: 'ubuntu16.04',
     os_types.UBUNTU1804: 'ubuntu18.04',
+    os_types.UBUNTU1804_EFA: 'ubuntu18.04',
+    os_types.UBUNTU2004: 'ubuntu20.04'
 }
 
 # Mellanox OpenFabrics drivers
