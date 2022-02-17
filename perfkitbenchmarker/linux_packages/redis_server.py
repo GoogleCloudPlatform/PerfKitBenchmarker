@@ -59,6 +59,9 @@ _EVICTION_POLICY = flags.DEFINE_enum(
      RedisEvictionPolicy.VOLATILE_RANDOM, RedisEvictionPolicy.VOLATILE_TTL],
     'Redis eviction policy when maxmemory limit is reached. This requires '
     'running clients with larger amounts of data than Redis can hold.')
+REDIS_SIMULATE_AOF = flags.DEFINE_bool(
+    'redis_simulate_aof', False, 'If true, simulate usage of '
+    'disks on the server for aof backups. ')
 
 
 # Default port for Redis
@@ -66,6 +69,7 @@ _DEFAULT_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
 FLAGS = flags.FLAGS
 REDIS_GIT = 'https://github.com/antirez/redis.git'
+REDIS_BACKUP = 'redis_backup'
 
 
 def _GetRedisTarName() -> str:
@@ -125,6 +129,12 @@ def _BuildStartCommand(vm, port: int) -> str:
       f'--port {port}',
       '--protected-mode no',
   ]
+  if REDIS_SIMULATE_AOF.value:
+    cmd_args += [
+        '--appendonly yes',
+        '--appendfilename backup',
+        f'--dir /{REDIS_BACKUP}',
+    ]
   # Add check for the MADV_FREE/fork arm64 Linux kernel bug
   if _VERSION.value >= '6.2.1':
     cmd_args.append('--ignore-warnings ARM64-COW-BUG')

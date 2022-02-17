@@ -44,9 +44,6 @@ flags.DEFINE_string('redis_memtier_client_machine_type', None,
                     'If provided, overrides the memtier client machine type.')
 flags.DEFINE_string('redis_memtier_server_machine_type', None,
                     'If provided, overrides the redis server machine type.')
-REDIS_MEMTIER_SIMULATE_DISK = flags.DEFINE_bool(
-    'redis_memtier_simulate_disk', False, 'If true, simulate usage of '
-    'disks on the server by filling any scratch disks, if present. ')
 REDIS_MEMTIER_MEASURE_CPU = flags.DEFINE_bool(
     'redis_memtier_measure_cpu', False, 'If true, measure cpu usage on the '
     'server via top tool. Defaults to False.')
@@ -94,7 +91,12 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
     for cloud in vm_spec:
       vm_spec[cloud]['machine_type'] = (
           FLAGS.redis_memtier_server_machine_type)
-  if not REDIS_MEMTIER_SIMULATE_DISK.value:
+  if redis_server.REDIS_SIMULATE_AOF.value:
+    config['vm_groups']['servers']['disk_spec']['GCP']['disk_type'] = 'local'
+    config['vm_groups']['servers']['vm_spec']['GCP']['num_local_ssds'] = 8
+    FLAGS.num_striped_disks = 7
+    FLAGS.gce_ssd_interface = 'NVME'
+  else:
     config['vm_groups']['servers'].pop('disk_spec')
   return config
 
@@ -112,11 +114,17 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   vm_util.RunThreaded(lambda client: client.Install('memtier'),
                       client_vms + [server_vm])
 
-  # Install redis on the 1st machine.
-  server_vm.Install('redis_server')
-  redis_server.Start(server_vm)
+  if redis_server.REDIS_SIMULATE_AOF.value:
+    server_vm.RemoteCommand(
+        'yes | sudo mdadm --create /dev/md1 --level=stripe --force --raid-devices=1 /dev/nvme0n8'
+        )
+    server_vm.RemoteCommand('sudo mkfs.ext4 -F /dev/md1')
+    server_vm.RemoteCommand(
+        f'sudo mkdir -p /{redis_server.REDIS_BACKUP}; '
+        f'sudo mount -o discard /dev/md1 /{redis_server.REDIS_BACKUP} && '
+        f'sudo chown $USER:$USER /{redis_server.REDIS_BACKUP};'
+        )
 
-  if REDIS_MEMTIER_SIMULATE_DISK.value:
     server_vm.InstallPackages('fio')
     for disk in server_vm.scratch_disks:
       cmd = ('sudo fio --name=global --direct=1 --ioengine=libaio --numjobs=1 '
@@ -126,6 +134,10 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
       logging.info('Start filling %s. This may take up to 30min...',
                    disk.device_path)
       server_vm.RemoteCommand(cmd)
+
+  # Install redis on the 1st machine.
+  server_vm.Install('redis_server')
+  redis_server.Start(server_vm)
 
   # Load the redis server with preexisting data.
   for port in redis_server.GetRedisPorts():
