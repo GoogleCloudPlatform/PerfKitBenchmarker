@@ -77,6 +77,13 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
               "availability zone are",
           'expected_error': errors.Benchmarks.UnsupportedConfigError
       },
+      {
+          'testcase_name': 'UnsupportedSku',
+          'stderror':
+              "The requested resource is currently not available in location "
+              "'eastus' zones '1' for subscription",
+          'expected_error': errors.Benchmarks.UnsupportedConfigError
+      },
   )
   def testVmCreationError(self, stderror, expected_error):
     spec = azure_virtual_machine.AzureVmSpec(
