@@ -14,12 +14,16 @@
 """Tests for perfkitbenchmarker.providers.gcp.gcp_bigtable."""
 
 import unittest
+from absl import flags
+from absl.testing import flagsaver
 import mock
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 NAME = 'testcluster'
 PROJECT = 'testproject'
@@ -86,6 +90,36 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Benchmarks.QuotaFailure):
       self.bigtable._Create()
 
+  def testBuildClusterConfigsDefault(self):
+    # Act
+    actual_flag_values = gcp_bigtable._BuildClusterConfigs(
+        'test_name', 'test_zone')
+
+    # Assert
+    expected_flag_values = ['id=test_name-0,zone=test_zone,nodes=3']
+    self.assertEqual(actual_flag_values, expected_flag_values)
+
+  @flagsaver.flagsaver(
+      bigtable_node_count=10,
+      bigtable_autoscaling_min_nodes=1,
+      bigtable_autoscaling_max_nodes=5,
+      bigtable_autoscaling_cpu_target=50,
+      bigtable_replication_cluster_zone='test_replication_zone',
+      bigtable_replication_cluster=True,
+  )
+  def testBuildClusterConfigsWithFlags(self):
+    # Act
+    actual_flag_values = gcp_bigtable._BuildClusterConfigs(
+        'test_name', 'test_zone')
+
+    # Assert
+    expected_flag_values = [('id=test_name-0,zone=test_zone,'
+                             'autoscaling-min-nodes=1,autoscaling-max-nodes=5,'
+                             'autoscaling-cpu-target=50'),
+                            ('id=test_name-1,zone=test_replication_zone,'
+                             'autoscaling-min-nodes=1,autoscaling-max-nodes=5,'
+                             'autoscaling-cpu-target=50')]
+    self.assertEqual(actual_flag_values, expected_flag_values)
 
 if __name__ == '__main__':
   unittest.main()
