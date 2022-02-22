@@ -142,20 +142,6 @@ def GroupZonesIntoRegions(zones):
   return regions_to_zones_map
 
 
-def EksZonesValidator(value):
-  """Validates that the value is a single region or a list of zones."""
-  if not value:
-    return True
-  if len(value) == 1:
-    return IsRegion(value[0])
-  if any(IsRegion(zone) for zone in value):
-    return False
-  region = GetRegionFromZone(value[0])
-  if any(GetRegionFromZone(zone) != region for zone in value):
-    return False
-  return True
-
-
 def FormatTags(tags_dict):
   """Format a dict of tags into arguments for 'tag' parameter.
 

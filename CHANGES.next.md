@@ -4,7 +4,7 @@
     [the image was deleted](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/endorsed-distros#supported-distributions-and-versions),
     -   It will be replaced by
         [Fedora Core OS](https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/)
-        if a public image is made avaiable.
+        if a public image is made available.
 -   The `dpb_sparksql_benchmark` now requires passing the requested queries with
     `--dpb_sparksql_query_order`
 -   AwsVirtualMachine.IMAGE_OWNER has been changed from a string to a list of
@@ -18,6 +18,7 @@
 -   Deprecate Ubuntu 16 as it is EOL on 2021-05-01.
 -   Switch to Azure CLI to MSAL. This requires updating the CLI to >= 2.30.0.
     -   See https://docs.microsoft.com/en-us/cli/azure/msal-based-azure-cli
+-   Remove deprecated `--eks_zones` flags. Use `--zones` instead.
 
 ### New features:
 
@@ -135,6 +136,8 @@
 -   Add Unsupported config failure substatus for Azure runs.
 -   Add support for Windows 2022 and Sql server 2019 on Windows 2022
 -   Add support for Redis Enterprise clustered database.
+-   Support regional GKE clusters.
+-   Support zonal node placement in regional Kubernetes clusters.
 
 ### Bug fixes and maintenance updates:
 

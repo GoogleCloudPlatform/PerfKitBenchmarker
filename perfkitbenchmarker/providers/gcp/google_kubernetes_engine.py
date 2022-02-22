@@ -94,6 +94,16 @@ class GkeCluster(container_service.KubernetesCluster):
     self.cluster_version = (
         FLAGS.container_cluster_version or DEFAULT_RELEASE_CHANNEL)
     self.use_application_default_credentials = True
+    self.zones = self.zone and self.zone.split(',')
+    if not self.zones:
+      raise errors.Config.MissingOption(
+          'container_cluster.vm_spec.GCP.zone is required.')
+    elif len(self.zones) == 1 and util.IsRegion(self.zone):
+      self.region = self.zone
+      self.zones = []
+      logging.info("Interpreting zone '%s' as a region", self.zone)
+    else:
+      self.region = util.GetRegionFromZone(self.zones[0])
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -115,9 +125,17 @@ class GkeCluster(container_service.KubernetesCluster):
       result['gce_local_ssd_interface'] = gce_virtual_machine.SCSI
     return result
 
+  def _GcloudCommand(self, *args, **kwargs):
+    """Fix zone and region."""
+    cmd = util.GcloudCommand(self, *args, **kwargs)
+    if len(self.zones) != 1:
+      del cmd.flags['zone']
+      cmd.flags['region'] = self.region
+    return cmd
+
   def _Create(self):
     """Creates the cluster."""
-    cmd = util.GcloudCommand(self, 'container', 'clusters', 'create', self.name)
+    cmd = self._GcloudCommand('container', 'clusters', 'create', self.name)
 
     self._AddNodeParamsToCmd(self.vm_config, self.num_nodes,
                              container_service.DEFAULT_NODEPOOL, cmd)
@@ -165,9 +183,8 @@ class GkeCluster(container_service.KubernetesCluster):
   def _CreateNodePools(self):
     """Creates additional nodepools for the cluster, if applicable."""
     for name, nodepool in six.iteritems(self.nodepools):
-      cmd = util.GcloudCommand(self, 'container', 'node-pools', 'create', name,
-                               '--cluster', self.name)
-
+      cmd = self._GcloudCommand('container', 'node-pools', 'create', name,
+                                '--cluster', self.name)
       self._AddNodeParamsToCmd(nodepool.vm_config, nodepool.vm_count, name, cmd)
       self._IssueResourceCreationCommand(cmd)
 
@@ -214,6 +231,8 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.flags['local-ssd-count'] = vm_config.max_local_disks
 
     cmd.flags['num-nodes'] = num_nodes
+    # vm_config.zone may be split a comma separated list
+    cmd.flags['node-locations'] = vm_config.zone
 
     if vm_config.machine_type is None:
       cmd.flags['machine-type'] = 'custom-{0}-{1}'.format(
@@ -227,8 +246,8 @@ class GkeCluster(container_service.KubernetesCluster):
   def _PostCreate(self):
     """Acquire cluster authentication."""
     super(GkeCluster, self)._PostCreate()
-    cmd = util.GcloudCommand(
-        self, 'container', 'clusters', 'get-credentials', self.name)
+    cmd = self._GcloudCommand('container', 'clusters', 'get-credentials',
+                              self.name)
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
@@ -246,7 +265,7 @@ class GkeCluster(container_service.KubernetesCluster):
         namespace='kube-system')
 
   def _GetInstanceGroups(self):
-    cmd = util.GcloudCommand(self, 'container', 'node-pools', 'list')
+    cmd = self._GcloudCommand('container', 'node-pools', 'list')
     cmd.flags['cluster'] = self.name
     stdout, _, _ = cmd.Issue()
     json_output = json.loads(stdout)
@@ -256,33 +275,21 @@ class GkeCluster(container_service.KubernetesCluster):
         instance_groups.append(group_url.split('/')[-1])  # last url part
     return instance_groups
 
-  def _GetInstancesFromInstanceGroup(self, instance_group_name):
-    cmd = util.GcloudCommand(self, 'compute', 'instance-groups',
-                             'list-instances', instance_group_name)
-    stdout, _, _ = cmd.Issue()
-    json_output = json.loads(stdout)
-    instances = []
-    for instance in json_output:
-      instances.append(instance['instance'].split('/')[-1])
-    return instances
-
   def _IsDeleting(self):
-    cmd = util.GcloudCommand(self, 'container', 'clusters', 'describe',
-                             self.name)
+    cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
     stdout, _, _ = cmd.Issue(raise_on_failure=False)
     return True if stdout else False
 
   def _Delete(self):
     """Deletes the cluster."""
     super()._Delete()
-    cmd = util.GcloudCommand(self, 'container', 'clusters', 'delete', self.name)
+    cmd = self._GcloudCommand('container', 'clusters', 'delete', self.name)
     cmd.args.append('--async')
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns True if the cluster exits."""
-    cmd = util.GcloudCommand(self, 'container', 'clusters', 'describe',
-                             self.name)
+    cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return retcode == 0
 

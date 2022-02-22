@@ -19,7 +19,6 @@ from typing import List
 
 from absl import flags
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -119,9 +118,6 @@ class AksCluster(container_service.KubernetesCluster):
   def __init__(self, spec):
     """Initializes the cluster."""
     super(AksCluster, self).__init__(spec)
-    if util.IsZone(spec.vm_spec.zone):
-      raise errors.Config.InvalidValue(
-          'Availability zones are currently not supported by Aks Cluster')
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
     self.name = 'pkbcluster%s' % FLAGS.run_uri
@@ -188,6 +184,9 @@ class AksCluster(container_service.KubernetesCluster):
         '--node-vm-size', vm_config.machine_type,
         '--node-count', str(num_nodes),
     ] + self.resource_group.args
+    if self.vm_config.zone and self.vm_config.zone != self.region:
+      zones = ' '.join(zone[-1] for zone in self.vm_config.zone.split(','))
+      args += ['--zones', zones]
     if self.vm_config.os_disk and self.vm_config.os_disk.disk_size:
       args += ['--node-osdisk-size', str(self.vm_config.os_disk.disk_size)]
     if self.cluster_version:

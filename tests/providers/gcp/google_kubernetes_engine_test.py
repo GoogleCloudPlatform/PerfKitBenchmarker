@@ -95,6 +95,7 @@ class GoogleKubernetesEngineCustomMachineTypeTestCase(
                         'cpus': 4,
                         'memory': '1024MiB',
                     },
+                    'zone': 'us-west1-a',
                 },
             },
         })
@@ -313,6 +314,7 @@ class GoogleKubernetesEngineVersionFlagTestCase(
             'vm_spec': {
                 'GCP': {
                     'machine_type': 'fake-machine-type',
+                    'zone': 'us-west1-a',
                 },
             },
         })
@@ -364,6 +366,7 @@ class GoogleKubernetesEngineWithGpusTestCase(
                     'machine_type': 'fake-machine-type',
                     'gpu_type': 'k80',
                     'gpu_count': 2,
+                    'zone': 'us-west1-a',
                 },
             },
             'vm_count': 2,
@@ -418,27 +421,6 @@ class GoogleKubernetesEngineWithGpusTestCase(
 
 class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
 
-  def testGetInstancesFromInstanceGroups(self):
-    instance_group_name = 'gke-pkb-0c47e6fa-default-pool-167d73ee-grp'
-    path = os.path.join(os.path.dirname(__file__), _INSTANCE_GROUPS_LIST_OUTPUT)
-    output = open(path).read()
-    spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects(stdout=output) as issue_command:
-      cluster = google_kubernetes_engine.GkeCluster(spec)
-      instances = cluster._GetInstancesFromInstanceGroup(instance_group_name)
-
-      command_string = ' '.join(issue_command.call_args[0][0])
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn(
-          'gcloud compute instance-groups list-instances '
-          'gke-pkb-0c47e6fa-default-pool-167d73ee-grp', command_string)
-
-      expected = set([
-          'gke-pkb-0c47e6fa-default-pool-167d73ee-hmwk',
-          'gke-pkb-0c47e6fa-default-pool-167d73ee-t854'
-      ])
-      self.assertEqual(expected, set(instances))  # order doesn't matter
-
   def testGetInstanceGroups(self):
     path = os.path.join(os.path.dirname(__file__), _NODE_POOLS_LIST_OUTPUT)
     output = open(path).read()
@@ -458,6 +440,75 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
       ])
       self.assertEqual(expected, set(instance_groups))  # order doesn't matter
 
+
+class GoogleKubernetesEngineRegionalTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
+
+  @staticmethod
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-west1',
+                },
+            },
+            'nodepools': {
+                'nodepool1': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'machine-type-1',
+                            'zone': 'us-west1-a,us-west1-b',
+                        },
+                    }
+                },
+                'nodepool2': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'machine-type-2',
+                            'zone': 'us-west1-c',
+                        },
+                    }
+                },
+            }
+        })
+    return kubernetes_engine_spec
+
+  def testCreateCustomVersion(self):
+    spec = self.create_kubernetes_engine_spec()
+    FLAGS.container_cluster_version = 'fake-version'
+    with patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      create_cluster, create_nodepool1, create_nodepool2 = (
+          call[0][0] for call in issue_command.call_args_list)
+      self.assertNotIn('--zone', create_cluster)
+      self.assertContainsSubsequence(create_cluster, ['--region', 'us-west1'])
+      self.assertContainsSubsequence(create_cluster,
+                                     ['--machine-type', 'fake-machine-type'])
+
+      self.assertContainsSubsequence(
+          create_nodepool1,
+          ['gcloud', 'container', 'node-pools', 'create', 'nodepool1'])
+      self.assertContainsSubsequence(create_nodepool1,
+                                     ['--cluster', 'pkb-fake-urn-uri'])
+      self.assertContainsSubsequence(create_nodepool1,
+                                     ['--machine-type', 'machine-type-1'])
+      self.assertContainsSubsequence(
+          create_nodepool1, ['--node-labels', 'pkb_nodepool=nodepool1'])
+      self.assertContainsSubsequence(
+          create_nodepool1, ['--node-locations', 'us-west1-a,us-west1-b'])
+      self.assertContainsSubsequence(create_nodepool1, ['--region', 'us-west1'])
+
+      self.assertContainsSubsequence(
+          create_nodepool2,
+          ['gcloud', 'container', 'node-pools', 'create', 'nodepool2'])
+      self.assertContainsSubsequence(create_nodepool2,
+                                     ['--machine-type', 'machine-type-2'])
+      self.assertContainsSubsequence(create_nodepool2,
+                                     ['--node-locations', 'us-west1-c'])
 
 if __name__ == '__main__':
   unittest.main()

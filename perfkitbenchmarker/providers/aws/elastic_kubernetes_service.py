@@ -43,23 +43,28 @@ class EksCluster(container_service.KubernetesCluster):
 
   def __init__(self, spec):
     super(EksCluster, self).__init__(spec)
-    # EKS requires a region and optionally a list of zones.
+    # EKS requires a region and optionally a list of one or zones.
     # Interpret the zone as a comma separated list of zones or a region.
-    self.zones = sorted(FLAGS.eks_zones) or (self.zone and self.zone.split(','))
-    if not self.zones:
+    self.control_plane_zones = self.zone and self.zone.split(',')
+    if not self.control_plane_zones:
       raise errors.Config.MissingOption(
           'container_cluster.vm_spec.AWS.zone is required.')
-    elif len(self.zones) > 1:
-      self.region = util.GetRegionFromZone(self.zones[0])
-      self.zone = ','.join(self.zones)
-    elif util.IsRegion(self.zones[0]):
-      self.region = self.zone = self.zones[0]
-      self.zones = []
+    elif len(self.control_plane_zones) == 1 and util.IsRegion(self.zone):
+      self.region = self.zone
+      self.control_plane_zones = []
       logging.info("Interpreting zone '%s' as a region", self.zone)
     else:
-      raise errors.Config.InvalidValue(
-          'container_cluster.vm_spec.AWS.zone must either be a comma separated '
-          'list of zones or a region.')
+      self.region = util.GetRegionFromZones(self.control_plane_zones)
+    # control_plane_zones must be a superset of the node zones
+    for nodepool in self.nodepools.values():
+      if nodepool.vm_config.zone not in self.control_plane_zones:
+        self.control_plane_zones.append(nodepool.vm_config.zone)
+    if len(self.control_plane_zones) == 1:
+      # eksctl essentially requires you pass --zones if you pass --node-zones
+      # and --zones must have at least 2 zones
+      # https://github.com/weaveworks/eksctl/issues/4735
+      self.control_plane_zones.append(self.region +
+                                      ('b' if self.zone.endswith('a') else 'a'))
     self.cluster_version = FLAGS.container_cluster_version
     # TODO(user) support setting boot disk type if EKS does.
     self.boot_disk_type = self.vm_config.DEFAULT_ROOT_DISK_TYPE
@@ -93,8 +98,10 @@ class EksCluster(container_service.KubernetesCluster):
         'version': self.cluster_version,
         # NAT mode uses an EIP.
         'vpc-nat-mode': 'Disable',
-        'zones': ','.join(self.zones),
     }
+    # If multiple zones are passed use them for the control plane.
+    # Otherwise EKS will auto-select control plane zones in the region.
+    eksctl_flags['zones'] = ','.join(self.control_plane_zones)
     if self.min_nodes != self.max_nodes:
       eksctl_flags.update({
           'nodes-min': self.min_nodes,
@@ -135,12 +142,21 @@ class EksCluster(container_service.KubernetesCluster):
     """Get common flags for creating clusters and node_groups."""
     tags = util.MakeDefaultTags()
     return {
-        'nodes': num_nodes,
-        'node-labels': f'pkb_nodepool={node_group}',
-        'node-type': vm_config.machine_type,
-        'node-volume-size': vm_config.boot_disk_size,
-        'region': self.region,
-        'tags': ','.join(f'{k}={v}' for k, v in tags.items()),
+        'nodes':
+            num_nodes,
+        'node-labels':
+            f'pkb_nodepool={node_group}',
+        'node-type':
+            vm_config.machine_type,
+        'node-volume-size':
+            vm_config.boot_disk_size,
+        # vm_config.zone may be split a comma separated list
+        'node-zones':
+            vm_config.zone,
+        'region':
+            self.region,
+        'tags':
+            ','.join(f'{k}={v}' for k, v in tags.items()),
         'ssh-public-key':
             aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
     }

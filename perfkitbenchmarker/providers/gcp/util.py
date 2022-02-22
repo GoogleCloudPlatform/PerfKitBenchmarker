@@ -82,6 +82,11 @@ def GetRegionFromZone(zone):
   return '-'.join(parts[:2])
 
 
+def IsRegion(location: str) -> bool:
+  """Determine if a zone or region is a region."""
+  return bool(re.fullmatch(r'[a-z]+-[a-z]+[0-9]', location))
+
+
 def GetAllZones() -> Set[str]:
   """Gets a list of valid zones."""
   cmd = GcloudCommand(None, 'compute', 'zones', 'list')
