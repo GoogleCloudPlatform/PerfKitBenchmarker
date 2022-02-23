@@ -30,10 +30,13 @@ import os
 import pipes
 import posixpath
 import subprocess
+from typing import Any, Dict, List
 from absl import flags
+from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import hbase_ycsb_benchmark as hbase_ycsb
 from perfkitbenchmarker.linux_packages import hbase
@@ -52,42 +55,46 @@ BIGTABLE_CLIENT_VERSION = '1.4.0'
 YCSB_BIGTABLE_TABLE_SHARING_TAR_URL = (
     'https://storage.googleapis.com/cbt_ycsb_client_jar/ycsb-0.14.0.tar.gz')
 
-flags.DEFINE_string('google_bigtable_endpoint', 'bigtable.googleapis.com',
-                    'Google API endpoint for Cloud Bigtable.')
-flags.DEFINE_string('google_bigtable_admin_endpoint',
-                    'bigtableadmin.googleapis.com',
-                    'Google API endpoint for Cloud Bigtable table '
-                    'administration.')
-flags.DEFINE_string('google_bigtable_instance_name', None,
-                    'Bigtable instance name. If not specified, new instance '
-                    'will be created and deleted on the fly.')
-flags.DEFINE_string('google_bigtable_static_table_name', None,
-                    'Bigtable table name. If not specified, a temporary table '
-                    'will be created and deleted on the fly.')
+_ENDPOINT = flags.DEFINE_string('google_bigtable_endpoint',
+                                'bigtable.googleapis.com',
+                                'Google API endpoint for Cloud Bigtable.')
+_ADMIN_ENDPOINT = flags.DEFINE_string(
+    'google_bigtable_admin_endpoint', 'bigtableadmin.googleapis.com',
+    'Google API endpoint for Cloud Bigtable table '
+    'administration.')
+_INSTANCE_NAME = flags.DEFINE_string(
+    'google_bigtable_instance_name', None,
+    'Bigtable instance name. If not specified, new instance '
+    'will be created and deleted on the fly.')
+_STATIC_TABLE_NAME = flags.DEFINE_string(
+    'google_bigtable_static_table_name', None,
+    'Bigtable table name. If not specified, a temporary table '
+    'will be created and deleted on the fly.')
 _DELETE_STATIC_TABLE = flags.DEFINE_boolean(
     'google_bigtable_delete_static_table', False,
     'Whether or not to delete a static table during cleanup. Temporary tables '
     'are always cleaned up.')
-flags.DEFINE_boolean('google_bigtable_enable_table_object_sharing', False,
-                     'If true, will use a YCSB binary that shares the same '
-                     'Bigtable table object across all the threads on a VM.')
-flags.DEFINE_string(
+_TABLE_OBJECT_SHARING = flags.DEFINE_boolean(
+    'google_bigtable_enable_table_object_sharing', False,
+    'If true, will use a YCSB binary that shares the same '
+    'Bigtable table object across all the threads on a VM.')
+_HBASE_JAR_URL = flags.DEFINE_string(
     'google_bigtable_hbase_jar_url',
     'https://oss.sonatype.org/service/local/repositories/releases/content/'
     'com/google/cloud/bigtable/bigtable-hbase-{0}-hadoop/'
-    '{1}/bigtable-hbase-{0}-hadoop-{1}.jar'.format(
-        HBASE_CLIENT_VERSION,
-        BIGTABLE_CLIENT_VERSION),
+    '{1}/bigtable-hbase-{0}-hadoop-{1}.jar'.format(HBASE_CLIENT_VERSION,
+                                                   BIGTABLE_CLIENT_VERSION),
     'URL for the Bigtable-HBase client JAR.')
-flags.DEFINE_boolean('get_bigtable_cluster_cpu_utilization', False,
-                     'If true, will gather bigtable cluster cpu utilization '
-                     'for the duration of performance test run stage, and add '
-                     'samples to the result. Table loading phase is excluded '
-                     'the metric collection. To enable this functionality, '
-                     'need to set environment variable '
-                     'GOOGLE_APPLICATION_CREDENTIALS as described in '
-                     'https://cloud.google.com/docs/authentication/'
-                     'getting-started.')
+_GET_CPU_UTILIZATION = flags.DEFINE_boolean(
+    'get_bigtable_cluster_cpu_utilization', False,
+    'If true, will gather bigtable cluster cpu utilization '
+    'for the duration of performance test run stage, and add '
+    'samples to the result. Table loading phase is excluded '
+    'the metric collection. To enable this functionality, '
+    'need to set environment variable '
+    'GOOGLE_APPLICATION_CREDENTIALS as described in '
+    'https://cloud.google.com/docs/authentication/'
+    'getting-started.')
 _MONITORING_ADDRESS = flags.DEFINE_string(
     'google_monitoring_endpoint', 'monitoring.googleapis.com',
     'Google API endpoint for monitoring requests. Used when '
@@ -141,11 +148,11 @@ BENCHMARK_DATA_URL = {
 }
 
 
-def GetConfig(user_config):
+def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites(benchmark_config):
+def CheckPrerequisites(benchmark_config: Dict[str, Any]) -> None:
   """Verifies that the required resources are present.
 
   Args:
@@ -166,16 +173,16 @@ def CheckPrerequisites(benchmark_config):
       raise ValueError('Scope {0} required.'.format(scope))
 
   # TODO: extract from gcloud config if available.
-  if FLAGS.google_bigtable_instance_name:
+  if _INSTANCE_NAME.value:
     instance = _GetInstanceDescription(FLAGS.project or _GetDefaultProject(),
-                                       FLAGS.google_bigtable_instance_name)
+                                       _INSTANCE_NAME.value)
     if instance:
       logging.info('Found instance: %s', instance)
   else:
     logging.info('No instance; will create in Prepare.')
 
 
-def _GetInstanceDescription(project, instance_name):
+def _GetInstanceDescription(project: str, instance_name: str) -> Dict[str, Any]:
   """Gets the description for a Cloud Bigtable instance.
 
   Args:
@@ -198,17 +205,18 @@ def _GetInstanceDescription(project, instance_name):
          '--project', project]
   stdout, stderr, returncode = vm_util.IssueCommand(cmd, env=env)
   if returncode:
-    raise IOError('Command "{0}" failed:\nSTDOUT:\n{1}\nSTDERR:\n{2}'.format(
-        ' '.join(cmd), stdout, stderr))
+    cmd_str = ' '.join(cmd)
+    raise IOError(f'Command "{cmd_str}" failed:\n'
+                  f'STDOUT:\n{stdout}\nSTDERR:\n{stderr}')
   return json.loads(stdout)
 
 
-def _GetTableName():
-  return (FLAGS.google_bigtable_static_table_name or
-          'ycsb{0}'.format(FLAGS.run_uri))
+def _GetTableName() -> str:
+  return _STATIC_TABLE_NAME.value or 'ycsb{0}'.format(FLAGS.run_uri)
 
 
-def _GetDefaultProject():
+def _GetDefaultProject() -> str:
+  """Returns the default project used for this test."""
   cmd = [FLAGS.gcloud_path, 'config', 'list', '--format', 'json']
   stdout, _, return_code = vm_util.IssueCommand(cmd)
   if return_code:
@@ -218,22 +226,22 @@ def _GetDefaultProject():
 
   try:
     return config['core']['project']
-  except KeyError:
-    raise KeyError('No default project found in {0}'.format(config))
+  except KeyError as key_error:
+    raise KeyError(f'No default project found in {config}') from key_error
 
 
-def _Install(vm):
+def _Install(vm: virtual_machine.VirtualMachine) -> None:
   """Install YCSB and HBase on 'vm'."""
   vm.Install('hbase')
   vm.Install('ycsb')
   vm.Install('curl')
 
-  instance_name = (FLAGS.google_bigtable_instance_name or
+  instance_name = (_INSTANCE_NAME.value or
                    'pkb-bigtable-{0}'.format(FLAGS.run_uri))
   hbase_lib = posixpath.join(hbase.HBASE_DIR, 'lib')
 
   preprovisioned_pkgs = [TCNATIVE_BORINGSSL_JAR]
-  if 'hbase-1.x' in FLAGS.google_bigtable_hbase_jar_url:
+  if 'hbase-1.x' in _HBASE_JAR_URL.value:
     preprovisioned_pkgs.append(METRICS_CORE_JAR)
   ycsb_hbase_lib = posixpath.join(ycsb.YCSB_DIR,
                                   FLAGS.hbase_binding + '-binding', 'lib')
@@ -242,18 +250,18 @@ def _Install(vm):
   vm.InstallPreprovisionedBenchmarkData(
       BENCHMARK_NAME, preprovisioned_pkgs, hbase_lib)
 
-  url = FLAGS.google_bigtable_hbase_jar_url
+  url = _HBASE_JAR_URL.value
   jar_name = os.path.basename(url)
   jar_path = posixpath.join(ycsb_hbase_lib, jar_name)
-  vm.RemoteCommand('curl -Lo {0} {1}'.format(jar_path, url))
-  vm.RemoteCommand('cp {0} {1}'.format(jar_path, hbase_lib))
+  vm.RemoteCommand(f'curl -Lo {jar_path} {url}')
+  vm.RemoteCommand(f'cp {jar_path} {hbase_lib}')
 
-  vm.RemoteCommand('echo "export JAVA_HOME=/usr" >> {0}/hbase-env.sh'.format(
-      hbase.HBASE_CONF_DIR))
+  vm.RemoteCommand(
+      f'echo "export JAVA_HOME=/usr" >> {hbase.HBASE_CONF_DIR}/hbase-env.sh')
 
   context = {
-      'google_bigtable_endpoint': FLAGS.google_bigtable_endpoint,
-      'google_bigtable_admin_endpoint': FLAGS.google_bigtable_admin_endpoint,
+      'google_bigtable_endpoint': _ENDPOINT.value,
+      'google_bigtable_admin_endpoint': _ADMIN_ENDPOINT.value,
       'project': FLAGS.project or _GetDefaultProject(),
       'instance': instance_name,
       'hbase_version': HBASE_CLIENT_VERSION.replace('.', '_')
@@ -269,15 +277,8 @@ def _Install(vm):
       vm.RemoteCopy(file_path, remote_path)
 
 
-def MaxWithDefault(iterable, key, default):
-  """Equivalent to max on python 3.4 or later."""
-  try:
-    return max(iterable, key=key)
-  except ValueError:
-    return default
-
-
-def _GetCpuUtilizationSample(samples, instance_id):
+def _GetCpuUtilizationSample(samples: List[sample.Sample],
+                             instance_id: str) -> List[sample.Sample]:
   """Gets a list of cpu utilization samples - one per cluster per workload.
 
   Note that the utilization only covers the workload run stage.
@@ -325,7 +326,7 @@ def _GetCpuUtilizationSample(samples, instance_id):
     for metric in ['cpu_load', 'cpu_load_hottest_node']:
       cpu_query = query.Query(
           client, project=(FLAGS.project or _GetDefaultProject()),
-          metric_type='bigtable.googleapis.com/cluster/{}'.format(metric),
+          metric_type=f'bigtable.googleapis.com/cluster/{metric}',
           end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
           minutes=workload_duration_minutes)
       cpu_query = cpu_query.select_resources(instance=instance_id)
@@ -350,13 +351,13 @@ def _GetCpuUtilizationSample(samples, instance_id):
         }
 
         cpu_utilization_sample = sample.Sample(
-            '{}_array'.format(metric), -1, '', metadata)
+            f'{metric}_array', -1, '', metadata)
 
         cpu_samples.append(cpu_utilization_sample)
   return cpu_samples
 
 
-def Prepare(benchmark_spec):
+def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Prepare the virtual machines to run cloud bigtable.
 
   Args:
@@ -365,14 +366,14 @@ def Prepare(benchmark_spec):
   """
   benchmark_spec.always_call_cleanup = True
   vms = benchmark_spec.vms
-  if FLAGS.google_bigtable_enable_table_object_sharing:
+  if _TABLE_OBJECT_SHARING.value:
     ycsb.SetYcsbTarUrl(YCSB_BIGTABLE_TABLE_SHARING_TAR_URL)
 
   # TODO: in the future, it might be nice to change this so that
   # a gcp_bigtable.GcpBigtableInstance can be created with an
   # flag that says don't create/delete the instance.  That would
   # reduce the code paths here.
-  if FLAGS.google_bigtable_instance_name is None:
+  if _INSTANCE_NAME.value is None:
     instance_name = 'pkb-bigtable-{0}'.format(FLAGS.run_uri)
     project = FLAGS.project or _GetDefaultProject()
     logging.info('Creating bigtable instance %s', instance_name)
@@ -390,7 +391,7 @@ def Prepare(benchmark_spec):
 
   # Add hbase conf dir to the classpath.
   ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
-  jvm_args = pipes.quote(' -Xmx{0}m'.format(ycsb_memory))
+  jvm_args = pipes.quote(f' -Xmx{ycsb_memory}m')
 
   executor_flags = {
       'cp': hbase.HBASE_CONF_DIR,
@@ -401,7 +402,7 @@ def Prepare(benchmark_spec):
                                               **executor_flags)
 
 
-def Run(benchmark_spec):
+def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Spawn YCSB and gather the results.
 
   Args:
@@ -417,8 +418,8 @@ def Run(benchmark_spec):
       'ycsb_client_vms': len(vms),
   }
   instance_name = 'pkb-bigtable-{0}'.format(FLAGS.run_uri)
-  if FLAGS.google_bigtable_instance_name:
-    instance_name = FLAGS.google_bigtable_instance_name
+  if _INSTANCE_NAME.value:
+    instance_name = _INSTANCE_NAME.value
     clusters = gcp_bigtable.GetClustersDecription(
         instance_name, FLAGS.project or _GetDefaultProject())
     metadata['bigtable_zone'] = [
@@ -455,7 +456,7 @@ def Run(benchmark_spec):
       vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
 
   # Optionally add new samples for cluster cpu utilization.
-  if FLAGS.get_bigtable_cluster_cpu_utilization:
+  if _GET_CPU_UTILIZATION.value:
     cpu_utilization_samples = _GetCpuUtilizationSample(samples, instance_name)
     samples.extend(cpu_utilization_samples)
 
@@ -465,18 +466,19 @@ def Run(benchmark_spec):
   return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Cleanup.
+
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
   # Delete table
-  if FLAGS.google_bigtable_instance_name is None:
+  if _INSTANCE_NAME.value is None and hasattr(benchmark_spec,
+                                              'bigtable_instance'):
     benchmark_spec.bigtable_instance.Delete()
-  elif (FLAGS.google_bigtable_static_table_name is None or
-        _DELETE_STATIC_TABLE.value):
+  elif (_STATIC_TABLE_NAME.value is None or _DELETE_STATIC_TABLE.value):
     # Only need to drop the temporary tables if we're not deleting the instance.
     vm = benchmark_spec.vms[0]
     command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """
