@@ -68,6 +68,11 @@ DPGKE_CLUSTER_SPEC = mock.Mock(
 SERVERLESS_SPEC = mock.Mock(
     static_dpb_service_instance=None,
     version='fake-4.2',
+    dataproc_serverless_core_count=4,
+    dataproc_serverless_initial_executors=4,
+    dataproc_serverless_min_executors=2,
+    dataproc_serverless_max_executors=10,
+    worker_group=mock.Mock(disk_spec=mock.Mock(disk_size=42))
 )
 
 
@@ -209,6 +214,14 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
             '--batch', 'pkb-fakeru',
             '--format', 'json',
             '--labels', '',
+            '--properties',
+            ('^@^spark.executor.cores=4@'
+             'spark.driver.cores=4@'
+             'spark.executor.instances=4@'
+             'spark.dynamicAllocation.minExecutors=2@'
+             'spark.dynamicAllocation.maxExecutors=10@'
+             'spark.dataproc.driver.disk_size=42g@'
+             'spark.dataproc.executor.disk_size=42g'),
             '--quiet',
             '--region', 'us-central1',
             '--version', 'fake-4.2',

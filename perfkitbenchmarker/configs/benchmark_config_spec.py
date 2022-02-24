@@ -167,7 +167,23 @@ class _DpbServiceSpec(spec.BaseSpec):
         'gke_cluster_location': (option_decoders.StringDecoder, {
             'default': None,
             'none_ok': True
-        })
+        }),
+        'dataproc_serverless_core_count': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True,
+        }),
+        'dataproc_serverless_initial_executors': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'dataproc_serverless_min_executors': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'dataproc_serverless_max_executors': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
     })
     return result
 
@@ -1304,16 +1320,12 @@ class _ContainerClusterSpec(spec.BaseSpec):
     if flag_values['container_cluster_num_vms'].present:
       config_values['vm_count'] = flag_values.container_cluster_num_vms
 
-    # Despite both zone and zones flags being lists. VM groups require zone to
-    # be a string, so pass a comma separated list and make the provider parse
-    # it.
-    all_passed_zones = ','.join(
-        (flag_values['zones'].present and flag_values.zones or []) +
-        (flag_values['zone'].present and flag_values.zone or []))
-    if all_passed_zones:
-      for config in [config_values] + config_values.get('nodepools', []):
-        for cloud_spec in config['vm_spec'].values():
-          cloud_spec['zone'] = all_passed_zones
+    # Need to apply the first zone in the zones flag, if specified,
+    # to the spec. ContainerClusters do not currently support
+    # running in multiple zones in a single PKB invocation.
+    if flag_values['zones'].present:
+      for cloud in config_values['vm_spec']:
+        config_values['vm_spec'][cloud]['zone'] = (flag_values.zones[0])
 
 
 class _ContainerClusterSpecDecoder(option_decoders.TypeVerifier):

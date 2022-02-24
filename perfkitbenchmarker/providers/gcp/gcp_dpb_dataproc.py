@@ -499,13 +499,59 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
   def GetClusterCreateTime(self) -> Optional[float]:
     return None
 
+  def GetJobProperties(self) -> Dict[str, str]:
+    result = {}
+    if self.spec.dataproc_serverless_core_count:
+      result['spark.executor.cores'] = self.spec.dataproc_serverless_core_count
+      result['spark.driver.cores'] = self.spec.dataproc_serverless_core_count
+    if self.spec.dataproc_serverless_initial_executors:
+      result['spark.executor.instances'] = (
+          self.spec.dataproc_serverless_initial_executors)
+    if self.spec.dataproc_serverless_min_executors:
+      result['spark.dynamicAllocation.minExecutors'] = (
+          self.spec.dataproc_serverless_min_executors)
+    if self.spec.dataproc_serverless_max_executors:
+      result['spark.dynamicAllocation.maxExecutors'] = (
+          self.spec.dataproc_serverless_max_executors)
+    if self.spec.worker_group.disk_spec.disk_size:
+      result['spark.dataproc.driver.disk_size'] = (
+          f'{self.spec.worker_group.disk_spec.disk_size}g'
+      )
+      result['spark.dataproc.executor.disk_size'] = (
+          f'{self.spec.worker_group.disk_spec.disk_size}g'
+      )
+    result.update(super().GetJobProperties())
+    return result
+
   def GetMetadata(self):
     basic_data = super().GetMetadata()
+
+    if self.spec.dataproc_serverless_core_count:
+      cluster_shape = (
+          f'dataproc-serverless-{self.spec.dataproc_serverless_core_count}')
+    else:
+      cluster_shape = 'dataproc-serverless-default'
+
+    initial_executors = self.spec.dataproc_serverless_initial_executors
+    min_executors = self.spec.dataproc_serverless_min_executors
+    max_executors = self.spec.dataproc_serverless_max_executors
+
+    cluster_size = None
+    if initial_executors == min_executors == max_executors:
+      cluster_size = initial_executors
+
     return {
         'dpb_service': basic_data['dpb_service'],
         'dpb_version': basic_data['dpb_version'],
         'dpb_service_version': basic_data['dpb_service_version'],
         'dpb_batch_id': basic_data['dpb_cluster_id'],
+        'dpb_cluster_shape': cluster_shape,
+        'dpb_cluster_size': cluster_size,
+        'dpb_cluster_min_executors': min_executors,
+        'dpb_cluster_max_executors': max_executors,
+        'dpb_cluster_initial_executors': initial_executors,
+        'dpb_cores_per_node': self.spec.dataproc_serverless_core_count,
+        'dpb_hdfs_type': 'default-disk',
         'dpb_service_zone': basic_data['dpb_service_zone'],
         'dpb_job_properties': basic_data['dpb_job_properties'],
     }
