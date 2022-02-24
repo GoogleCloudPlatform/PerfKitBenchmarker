@@ -48,7 +48,6 @@ robertammlm:
           machine_type: p3dn.24xlarge
           boot_disk_size: 105
           zone: us-east-1a
-          image: ami-0a4a0d42e3b855a2c
         Azure:
           machine_type: Standard_ND40s_v2
           zone: eastus

@@ -45,7 +45,6 @@ horovod:
         AWS:
           machine_type: p3dn.24xlarge
           zone: us-east-1a
-          image: ami-02e86b825fe559330
           boot_disk_size: 300
         Azure:
           machine_type: Standard_NC24rs_v3

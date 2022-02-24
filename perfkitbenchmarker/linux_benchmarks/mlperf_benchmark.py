@@ -47,7 +47,6 @@ mlperf:
           machine_type: p4d.24xlarge
           zone: us-west-2a
           boot_disk_size: 200
-          image: ami-0ccc71d716eb5d6a4
         Azure:
           machine_type: Standard_ND96asr_v4
           zone: westus2

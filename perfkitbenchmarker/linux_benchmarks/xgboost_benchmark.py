@@ -65,7 +65,6 @@ xgboost:
         AWS:
           machine_type: g4dn.xlarge
           zone: us-east-1a
-          image: ami-0d50576797d8d1a43
         Azure:
           machine_type: Standard_NC4as_T4_v3
           zone: eastus
