@@ -62,10 +62,6 @@ _ADMIN_ENDPOINT = flags.DEFINE_string(
     'google_bigtable_admin_endpoint', 'bigtableadmin.googleapis.com',
     'Google API endpoint for Cloud Bigtable table '
     'administration.')
-_INSTANCE_NAME = flags.DEFINE_string(
-    'google_bigtable_instance_name', None,
-    'Bigtable instance name. If not specified, new instance '
-    'will be created and deleted on the fly.')
 _STATIC_TABLE_NAME = flags.DEFINE_string(
     'google_bigtable_static_table_name', None,
     'Bigtable table name. If not specified, a temporary table '
@@ -106,6 +102,8 @@ cloud_bigtable_ycsb:
   description: >
       Run YCSB against an existing Cloud Bigtable
       instance. Configure the number of client VMs via --num_vms.
+  non_relational_db:
+    service_type: bigtable
   vm_groups:
     default:
       vm_spec: *default_single_core
@@ -147,6 +145,8 @@ BENCHMARK_DATA_URL = {
     TCNATIVE_BORINGSSL_JAR: TCNATIVE_BORINGSSL_URL
 }
 
+_Bigtable = gcp_bigtable.GcpBigtableInstance
+
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -171,15 +171,6 @@ def CheckPrerequisites(benchmark_config: Dict[str, Any]) -> None:
   for scope in REQUIRED_SCOPES:
     if scope not in FLAGS.gcloud_scopes:
       raise ValueError('Scope {0} required.'.format(scope))
-
-  # TODO: extract from gcloud config if available.
-  if _INSTANCE_NAME.value:
-    instance = _GetInstanceDescription(FLAGS.project or _GetDefaultProject(),
-                                       _INSTANCE_NAME.value)
-    if instance:
-      logging.info('Found instance: %s', instance)
-  else:
-    logging.info('No instance; will create in Prepare.')
 
 
 def _GetInstanceDescription(project: str, instance_name: str) -> Dict[str, Any]:
@@ -230,14 +221,12 @@ def _GetDefaultProject() -> str:
     raise KeyError(f'No default project found in {config}') from key_error
 
 
-def _Install(vm: virtual_machine.VirtualMachine) -> None:
+def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
   """Install YCSB and HBase on 'vm'."""
   vm.Install('hbase')
   vm.Install('ycsb')
   vm.Install('curl')
 
-  instance_name = (_INSTANCE_NAME.value or
-                   'pkb-bigtable-{0}'.format(FLAGS.run_uri))
   hbase_lib = posixpath.join(hbase.HBASE_DIR, 'lib')
 
   preprovisioned_pkgs = [TCNATIVE_BORINGSSL_JAR]
@@ -263,7 +252,7 @@ def _Install(vm: virtual_machine.VirtualMachine) -> None:
       'google_bigtable_endpoint': _ENDPOINT.value,
       'google_bigtable_admin_endpoint': _ADMIN_ENDPOINT.value,
       'project': FLAGS.project or _GetDefaultProject(),
-      'instance': instance_name,
+      'instance': bigtable.name,
       'hbase_version': HBASE_CLIENT_VERSION.replace('.', '_')
   }
 
@@ -369,20 +358,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   if _TABLE_OBJECT_SHARING.value:
     ycsb.SetYcsbTarUrl(YCSB_BIGTABLE_TABLE_SHARING_TAR_URL)
 
-  # TODO: in the future, it might be nice to change this so that
-  # a gcp_bigtable.GcpBigtableInstance can be created with an
-  # flag that says don't create/delete the instance.  That would
-  # reduce the code paths here.
-  if _INSTANCE_NAME.value is None:
-    instance_name = 'pkb-bigtable-{0}'.format(FLAGS.run_uri)
-    project = FLAGS.project or _GetDefaultProject()
-    logging.info('Creating bigtable instance %s', instance_name)
-    zone = FLAGS.google_bigtable_zone
-    benchmark_spec.bigtable_instance = gcp_bigtable.GcpBigtableInstance(
-        instance_name, project, zone)
-    benchmark_spec.bigtable_instance.Create()
-
-  vm_util.RunThreaded(_Install, vms)
+  instance: _Bigtable = benchmark_spec.non_relational_db
+  args = [((vm, instance), {}) for vm in vms]
+  vm_util.RunThreaded(_Install, args)
 
   table_name = _GetTableName()
   # If the table already exists, it will be an no-op.
@@ -413,29 +391,12 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     A list of sample.Sample instances.
   """
   vms = benchmark_spec.vms
+  instance: _Bigtable = benchmark_spec.non_relational_db
 
   metadata = {
       'ycsb_client_vms': len(vms),
   }
-  instance_name = 'pkb-bigtable-{0}'.format(FLAGS.run_uri)
-  if _INSTANCE_NAME.value:
-    instance_name = _INSTANCE_NAME.value
-    clusters = gcp_bigtable.GetClustersDecription(
-        instance_name, FLAGS.project or _GetDefaultProject())
-    metadata['bigtable_zone'] = [
-        cluster['zone'] for cluster in clusters]
-    metadata['bigtable_storage_type'] = [
-        cluster['defaultStorageType'] for cluster in clusters]
-    metadata['bigtable_node_count'] = [
-        cluster['serveNodes'] for cluster in clusters]
-  else:
-    metadata['bigtable_zone'] = FLAGS.google_bigtable_zone
-    metadata[
-        'bigtable_replication_zone'] = FLAGS.bigtable_replication_cluster_zone
-    metadata['bigtable_storage_type'] = FLAGS.bigtable_storage_type
-    metadata['bigtable_node_count'] = FLAGS.bigtable_node_count
-    metadata['bigtable_multicluster_routing'] = (
-        FLAGS.bigtable_multicluster_routing)
+  metadata.update(instance.GetResourceMetadata())
 
   # By default YCSB uses a BufferedMutator for Puts / Deletes.
   # This leads to incorrect update latencies, since since the call returns
@@ -457,7 +418,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 
   # Optionally add new samples for cluster cpu utilization.
   if _GET_CPU_UTILIZATION.value:
-    cpu_utilization_samples = _GetCpuUtilizationSample(samples, instance_name)
+    cpu_utilization_samples = _GetCpuUtilizationSample(samples, instance.name)
     samples.extend(cpu_utilization_samples)
 
   for current_sample in samples:
@@ -469,16 +430,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Cleanup.
 
-
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  # Delete table
-  if _INSTANCE_NAME.value is None and hasattr(benchmark_spec,
-                                              'bigtable_instance'):
-    benchmark_spec.bigtable_instance.Delete()
-  elif (_STATIC_TABLE_NAME.value is None or _DELETE_STATIC_TABLE.value):
+  instance: _Bigtable = benchmark_spec.non_relational_db
+  if (instance.user_managed and
+      (_STATIC_TABLE_NAME.value is None or _DELETE_STATIC_TABLE.value)):
     # Only need to drop the temporary tables if we're not deleting the instance.
     vm = benchmark_spec.vms[0]
     command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """
