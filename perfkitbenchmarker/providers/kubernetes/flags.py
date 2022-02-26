@@ -63,3 +63,8 @@ DEFAULT_VM_GROUP_NODEPOOL = flags.DEFINE_string(
     'kubernetes_vm_default_nodepool', 'default',
     'The nodepool to place VMs in the default VM group into. Defaults to the '
     'default nodepool, but can be changed for better isolation.')
+USE_NODE_SELECTORS = flags.DEFINE_bool(
+    'use_k8s_vm_node_selectors', True,
+    'Whether to require node selectors to be present when creating K8s VMs. '
+    'Disable this if you are using a pre-existing k8s cluster without labels.')
+

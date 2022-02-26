@@ -254,7 +254,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         }
     }
 
-    if self.vm_group:
+    if k8s_flags.USE_NODE_SELECTORS.value and self.vm_group:
       if self.vm_group == 'default':
         nodepool = k8s_flags.DEFAULT_VM_GROUP_NODEPOOL.value
       else:
