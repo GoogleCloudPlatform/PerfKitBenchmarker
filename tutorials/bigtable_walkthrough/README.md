@@ -63,15 +63,20 @@ will be installed on the runner VM.
 files in which you can set parameters such as number of VMs, number of threads,
 YCSB workload settings, etc. In this tutorial, we organize the parameters in a
 more structured way tailored to Bigtable. You can easily build your configs from
-the samples in the [config folder](./batch_configs). All the sample configs use
-*workloada* as described below.
+the samples in the
+[config folder](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tutorials/bigtable_walkthrough/batch_configs).
+All the sample configs use *workloada* as described below.
 
 **Workloads**: The commonly used workloads are:
 
-*   [workloada](../../perfkitbenchmarker/data/ycsb/workloada): 50/50 Read/Write
-*   [workloadb](../../perfkitbenchmarker/data/ycsb/workloadb): 95/5 Read/Write
-*   [workloadc](../../perfkitbenchmarker/data/ycsb/workloadc): Read-only
-*   [workloadx](../../perfkitbenchmarker/data/ycsb/workloadx): Write-Only
+*   [workloada](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/data/ycsb/workloada):
+    50/50 Read/Write
+*   [workloadb](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/data/ycsb/workloadb):
+    95/5 Read/Write
+*   [workloadc](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/data/ycsb/workloadc):
+    Read-only
+*   [workloadx](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/data/ycsb/workloadx):
+    Write-Only
 
 Note that the workloads above only perform point read/write. We will add support
 for batch read/write in the future release.
@@ -226,7 +231,8 @@ benchmarks:
 For this lab, we want to run two benchmarks: one is to have a light workload to
 measure the latency of lightly-utilized Servers; the other is to have a heavy
 workload to measure the throughput of overloaded servers. They are already
-created in [the parallel_tests folder](./batch_configs/parallel_tests):
+created in
+[the parallel_tests folder](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tutorials/bigtable_walkthrough/batch_configs/parallel_tests):
 *latency.yaml* and *throughput.yaml*, and you can directly use them. Note that
 the throughput test does not fully exploit the server capacity because of the
 target throughput setting. For more realistic test, please refer to
@@ -251,7 +257,7 @@ curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/ma
 ```
 
 > **TIP**: You can learn how to build the sample configs by reading the
-[config template](./batch_configs/templates/benchmark_config.yaml).
+> [config template](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tutorials/bigtable_walkthrough/batch_configs/templates/benchmark_config.yaml).
 
 ## Task 4: Generate a runner config
 
@@ -303,8 +309,8 @@ The two formats correspond to two runner modes:
     Bigtable instance).
 
 We have created a runner config in
-[the parallel_tests folder](./batch_configs/parallel_tests): *runner.yaml*. You
-can download it with command:
+[the parallel_tests folder](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tutorials/bigtable_walkthrough/batch_configs/parallel_tests):
+*runner.yaml*. You can download it with command:
 
 ```sh
 curl https://raw.githubusercontent.com/GoogleCloudPlatform/PerfKitBenchmarker/master/tutorials/bigtable_walkthrough/batch_configs/parallel_tests/runner.yaml \
@@ -321,7 +327,7 @@ sed -i "s/test_project/${PROJECT_ID}/g" ~/pkb_configs/runner.yaml
 ```
 
 > **TIP**: You can learn how to build the sample config by reading the
-[config template](./batch_configs/templates/runner_config.yaml).
+> [config template](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tutorials/bigtable_walkthrough/batch_configs/templates/runner_config.yaml).
 
 ## Task 5: Run the benchmarks
 
@@ -602,8 +608,8 @@ the main thread will be cancelled, but other benchmarks may keep running.
 
 If you just want to run the benchmarks one after another in an arbitrary order,
 and each benchmark config sets all the PKB flags in the
-[runner config template](./batch_configs/templates/runner_config.yaml), then you
-don't need to prepare a dedicated *runner.yaml*.
+[runner config template](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tutorials/bigtable_walkthrough/batch_configs/templates/runner_config.yaml),
+then you don't need to prepare a dedicated *runner.yaml*.
 
 ### Resume the tests after early termination
 
@@ -643,8 +649,8 @@ The benchmarking tool can handle the steps easily. We will just redo
 [Task 5](#task-5-run-the-benchmarks).
 
 1.  For Task 3 and Task 4, download all the sample files under
-    [the sequential_tests folder](./batch_configs/sequential_tests), then update
-    *runner.yaml* with commands:
+    [the sequential_tests folder](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/tree/master/tutorials/bigtable_walkthrough/batch_configs/sequential_tests),
+    then update *runner.yaml* with commands:
 
     ```sh
     sudo rm ~/pkb_configs/*

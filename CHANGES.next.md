@@ -213,3 +213,4 @@
 -   Update the bigtable tutorial readme with the content of batch_testing.md.
     Unneeded files are removed.
 -   Fix fio_write_against_multiple_clients additional samples and metadata.
+-   Use real URLs as the links in Bigtable walkthrough doc.
