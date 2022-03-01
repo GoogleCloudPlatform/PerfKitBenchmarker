@@ -263,8 +263,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
 
   def _Create(self):
     """Creates the instance."""
-    cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'instances', 'create',
-                             self.name)
+    cmd = util.GcloudCommand(self, 'bigtable', 'instances', 'create', self.name)
     cmd.flags['display-name'] = self.name
     cmd.flags['cluster-storage-type'] = self.storage_type
     cmd.flags['project'] = self.project
@@ -281,8 +280,8 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
           f'and zone {self.zone}')
 
     if self.multicluster_routing:
-      cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'app-profiles',
-                               'update', 'default')
+      cmd = util.GcloudCommand(
+          self, 'bigtable', 'app-profiles', 'update', 'default')
       cmd.flags['instance'] = self.name
       cmd.flags['route-any'] = True
       cmd.flags['force'] = True
@@ -291,15 +290,14 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
 
   def _Delete(self):
     """Deletes the instance."""
-    cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'instances', 'delete',
-                             self.name)
+    cmd = util.GcloudCommand(self, 'bigtable', 'instances', 'delete', self.name)
     # The zone flag makes this command fail.
     cmd.flags['zone'] = []
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns true if the instance exists."""
-    cmd = util.GcloudCommand(self, 'beta', 'bigtable', 'instances', 'list')
+    cmd = util.GcloudCommand(self, 'bigtable', 'instances', 'list')
     cmd.flags['format'] = 'json'
     cmd.flags['project'] = self.project
     # The zone flag makes this command fail.
@@ -351,7 +349,7 @@ def GetClustersDescription(instance_name, project):
   Returns:
     A list of cluster descriptions dicts.
   """
-  cmd = util.GcloudCommand(None, 'beta', 'bigtable', 'clusters', 'list')
+  cmd = util.GcloudCommand(None, 'bigtable', 'clusters', 'list')
   cmd.flags['instances'] = instance_name
   cmd.flags['project'] = project
   stdout, stderr, retcode = cmd.Issue(

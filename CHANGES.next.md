@@ -139,6 +139,7 @@
 -   Add support for Redis Enterprise clustered database.
 -   Support regional GKE clusters.
 -   Support zonal node placement in regional Kubernetes clusters.
+-   Uses the regular version of gcloud for Bigtable commands instead of beta.
 
 ### Bug fixes and maintenance updates:
 
