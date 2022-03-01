@@ -449,6 +449,19 @@ def FormatTags(tags_dict):
       '{0}={1}'.format(k, v) for k, v in sorted(six.iteritems(tags_dict)))
 
 
+def SplitTags(tags):
+  """Formats a string of joined tags into a dictionary.
+
+  Args:
+    tags: A string containing tags formatted as key1=value1,key2=value2,...
+
+  Returns:
+    An OrderedDict mapping tag keys to values in the order the tags were given.
+  """
+  return collections.OrderedDict(
+      tag_pair.split('=') for tag_pair in tags.split(','))
+
+
 def GetDefaultTags(timeout_minutes=None):
   """Get the default tags in a dictionary.
 
@@ -474,3 +487,20 @@ def MakeFormattedDefaultTags(timeout_minutes=None):
     A string contains tags, contributed from the benchmark spec.
   """
   return FormatTags(GetDefaultTags(timeout_minutes))
+
+
+def GetAccessToken(application_default: bool = True) -> str:
+  """Gets the access token for the default project.
+
+  Args:
+    application_default: whether to use application-default in gcloud args.
+
+  Returns:
+    Text string of the access token.
+  """
+  cmd = [FLAGS.gcloud_path, 'auth']
+  if application_default:
+    cmd.append('application-default')
+  cmd.append('print-access-token')
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  return stdout.strip()
