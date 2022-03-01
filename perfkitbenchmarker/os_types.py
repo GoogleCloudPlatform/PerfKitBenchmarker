@@ -17,7 +17,9 @@ from absl import flags
 
 AMAZONLINUX2 = 'amazonlinux2'
 CENTOS7 = 'centos7'
-CENTOS8 = 'centos8'
+CENTOS8 = 'centos8'  # deprecated
+CENTOS_STREAM8 = 'centos_stream8'
+CENTOS_STREAM9 = 'centos_stream9'
 CLEAR = 'clear'
 COS = 'cos'
 CORE_OS = 'core_os'
@@ -27,8 +29,9 @@ DEBIAN11 = 'debian11'
 JUJU = 'juju'
 RHEL7 = 'rhel7'
 RHEL8 = 'rhel8'
+ROCKY_LINUX8 = 'rocky_linux8'
 UBUNTU_CONTAINER = 'ubuntu_container'
-UBUNTU1604 = 'ubuntu1604'
+UBUNTU1604 = 'ubuntu1604'  # deprecated
 UBUNTU1604_CUDA9 = 'ubuntu1604_cuda9'
 UBUNTU1804 = 'ubuntu1804'
 UBUNTU1804_EFA = 'ubuntu1804_efa'
@@ -65,6 +68,8 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     AMAZONLINUX2,
     CENTOS7,
     CENTOS8,
+    CENTOS_STREAM8,
+    CENTOS_STREAM9,
     CLEAR,
     DEBIAN9,
     DEBIAN10,
@@ -72,6 +77,7 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     JUJU,
     RHEL7,
     RHEL8,
+    ROCKY_LINUX8,
     UBUNTU_CONTAINER,
     UBUNTU1604,  # deprecated
     UBUNTU1604_CUDA9,

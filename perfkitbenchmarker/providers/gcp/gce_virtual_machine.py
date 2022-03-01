@@ -1161,10 +1161,16 @@ class CentOs7BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
-class CentOs8BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.CentOs8Mixin):
-  DEFAULT_IMAGE_FAMILY = 'centos-8'
+class CentOsStream8BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
+                                          linux_vm.CentOsStream8Mixin):
+  DEFAULT_IMAGE_FAMILY = 'centos-stream-8'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
+
+
+class RockyLinux8BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
+                                        linux_vm.RockyLinux8Mixin):
+  DEFAULT_IMAGE_FAMILY = 'rocky-linux-8'
+  DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
 
 
 class ContainerOptimizedOsBasedGceVirtualMachine(

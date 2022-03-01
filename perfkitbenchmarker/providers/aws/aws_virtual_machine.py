@@ -1411,6 +1411,34 @@ class CentOs8BasedAwsVirtualMachine(AwsVirtualMachine,
   DEFAULT_USER_NAME = 'centos'
 
 
+class CentOsStream8BasedAwsVirtualMachine(
+    AwsVirtualMachine, linux_virtual_machine.CentOsStream8Mixin):
+  """Class with configuration for AWS CentOS Stream 8 virtual machines."""
+  # This describes the official AMIs listed here:
+  # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
+  IMAGE_OWNER = CENTOS_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'CentOS Stream 8*'
+  DEFAULT_USER_NAME = 'centos'
+
+
+class RockyLinux8BasedAwsVirtualMachine(AwsVirtualMachine,
+                                        linux_virtual_machine.RockyLinux8Mixin):
+  """Class with configuration for AWS Rocky Linux 8 virtual machines."""
+  IMAGE_OWNER = MARKETPLACE_IMAGE_PROJECT
+  IMAGE_PRODUCT_CODE_FILTER = 'cotnnspjrsi38lfn8qo4ibnnm'
+  IMAGE_NAME_FILTER = 'Rocky-8-*'
+  DEFAULT_USER_NAME = 'rocky'
+
+
+class CentOsStream9BasedAwsVirtualMachine(
+    AwsVirtualMachine, linux_virtual_machine.CentOsStream9Mixin):
+  """Class with configuration for AWS CentOS Stream 9 virtual machines."""
+  # This describes the official AMIs listed here:
+  # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
+  IMAGE_OWNER = CENTOS_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'CentOS Stream 9*'
+
+
 class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
                                    windows_virtual_machine.BaseWindowsMixin):
   """Support for Windows machines on AWS."""

@@ -19,6 +19,7 @@
 -   Switch to Azure CLI to MSAL. This requires updating the CLI to >= 2.30.0.
     -   See https://docs.microsoft.com/en-us/cli/azure/msal-based-azure-cli
 -   Remove deprecated `--eks_zones` flags. Use `--zones` instead.
+-   Deprecate CentOS Linux 8 as it is EOL on 2021-12-31.
 
 ### New features:
 

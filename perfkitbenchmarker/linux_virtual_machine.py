@@ -1772,9 +1772,26 @@ class CentOs7Mixin(BaseRhelMixin):
   OS_TYPE = os_types.CENTOS7
 
 
-class CentOs8Mixin(BaseRhelMixin):
+class CentOs8Mixin(BaseRhelMixin, virtual_machine.DeprecatedOsMixin):
   """Class holding CentOS 8 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS8
+  END_OF_LIFE = '2021-12-31'
+  ALTERNATIVE_OS = f'{os_types.CENTOS_STREAM8} or {os_types.CENTOS_STREAM8}'
+
+
+class CentOsStream8Mixin(BaseRhelMixin):
+  """Class holding CentOS Stream 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.CENTOS_STREAM8
+
+
+class CentOsStream9Mixin(BaseRhelMixin):
+  """Class holding CentOS Stream 9 specific VM methods and attributes."""
+  OS_TYPE = os_types.CENTOS_STREAM9
+
+
+class RockyLinux8Mixin(BaseRhelMixin):
+  """Class holding Rocky Linux 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.ROCKY_LINUX8
 
 
 class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
