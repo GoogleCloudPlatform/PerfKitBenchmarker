@@ -19,14 +19,16 @@ Instances can be created and deleted.
 import dataclasses
 import json
 import logging
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import util
+import requests
 
 
 FLAGS = flags.FLAGS
@@ -218,6 +220,8 @@ class GcpSpannerInstance(resource.BaseResource):
       logging.error('Create GCP Spanner instance failed.')
       return
 
+    self._UpdateLabels(util.GetDefaultTags())
+
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'create',
                              self.database)
     cmd.flags['instance'] = self.name
@@ -309,9 +313,38 @@ class GcpSpannerInstance(resource.BaseResource):
     """
     self._SetNodes(_FROZEN_NODE_COUNT)
 
+  def _GetLabels(self) -> Dict[str, Any]:
+    """Gets labels from the current instance."""
+    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'describe',
+                             self.name)
+    stdout, _, _ = cmd.Issue(raise_on_failure=True)
+    return json.loads(stdout).get('labels', {})
+
+  def _UpdateLabels(self, labels: Dict[str, Any]) -> None:
+    """Updates the labels of the current instance."""
+    header = {'Authorization': f'Bearer {util.GetAccessToken()}'}
+    url = ('https://spanner.googleapis.com/v1/projects/'
+           f'{self.project}/instances/{self.name}')
+    # Keep any existing labels
+    tags = self._GetLabels()
+    tags.update(labels)
+    args = {
+        'instance': {
+            'labels': tags
+        },
+        'fieldMask': 'labels',
+    }
+    response = requests.patch(url, headers=header, json=args)
+    logging.info('Update labels: status code %s, %s',
+                 response.status_code, response.text)
+    if response.status_code != 200:
+      raise errors.Resource.UpdateError(
+          f'Unable to update Spanner instance: {response.text}')
+
   def _UpdateTimeout(self, timeout_minutes: int) -> None:
     """See base class."""
-    pass
+    labels = util.GetDefaultTags(timeout_minutes)
+    self._UpdateLabels(labels)
 
 
 def GetSpannerClass(

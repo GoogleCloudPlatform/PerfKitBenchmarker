@@ -1,5 +1,6 @@
 """Tests for google3.third_party.py.perfkitbenchmarker.providers.gcp.gcp_spanner."""
 
+import inspect
 import unittest
 
 from absl import flags
@@ -7,7 +8,10 @@ from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_spanner
+from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
+
+import requests
 
 FLAGS = flags.FLAGS
 
@@ -76,6 +80,54 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     instance._Restore()
 
     mock_set_nodes.assert_called_once_with(5)
+
+  @flagsaver.flagsaver(run_uri='test_uri')
+  def testUpdateLabels(self):
+    # Arrange
+    instance = GetTestSpannerInstance()
+    mock_json_response = inspect.cleandoc("""
+    {
+      "config": "test_config",
+      "displayName": "test_display_name",
+      "labels": {
+        "benchmark": "test_benchmark",
+        "timeout_minutes": "10"
+      },
+      "name": "test_name"
+    }
+    """)
+    self.enter_context(
+        mock.patch.object(
+            util.GcloudCommand,
+            'Issue',
+            return_value=(mock_json_response, '', 0)))
+    self.enter_context(
+        mock.patch.object(util, 'GetAccessToken', return_value='test_token'))
+    mock_request = self.enter_context(
+        mock.patch.object(
+            requests, 'patch', return_value=mock.Mock(status_code=200)))
+
+    # Act
+    new_labels = {
+        'benchmark': 'test_benchmark_2',
+        'metadata': 'test_metadata',
+    }
+    instance._UpdateLabels(new_labels)
+
+    # Assert
+    mock_request.assert_called_once_with(
+        'https://spanner.googleapis.com/v1/projects/test_project/instances/test_instance',
+        headers={'Authorization': 'Bearer test_token'},
+        json={
+            'instance': {
+                'labels': {
+                    'benchmark': 'test_benchmark_2',
+                    'timeout_minutes': '10',
+                    'metadata': 'test_metadata'
+                }
+            },
+            'fieldMask': 'labels'
+        })
 
 if __name__ == '__main__':
   unittest.main()
