@@ -29,18 +29,13 @@ NAME = 'test_name'
 PROJECT = 'test_project'
 ZONE = 'test_zone'
 
-VALID_JSON_BASE = """[
-    {{
-      "displayName": "not{name}",
-      "name": "projects/{project}/instances/not{name}",
-      "state": "READY"
-    }},
+VALID_JSON_BASE = """
     {{
       "displayName": "{name}",
       "name": "projects/{project}/instances/{name}",
       "state": "READY"
     }}
-]"""
+"""
 
 
 OUT_OF_QUOTA_STDERR = """
@@ -99,12 +94,7 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
     super(GcpBigtableTestCase, self).setUp()
     self.bigtable = GetTestBigtableInstance()
 
-  def testEmptyTableList(self):
-    with mock.patch.object(util.GcloudCommand, 'Issue',
-                           return_value=('{}', '', 0)):
-      self.assertFalse(self.bigtable._Exists())
-
-  def testGcloudError(self):
+  def testNotFoundTable(self):
     with mock.patch.object(util.GcloudCommand, 'Issue',
                            return_value=('', '', 1)):
       self.assertFalse(self.bigtable._Exists())
@@ -114,12 +104,6 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(util.GcloudCommand, 'Issue',
                            return_value=(stdout, '', 0)):
       self.assertTrue(self.bigtable._Exists())
-
-  def testNotFoundTable(self):
-    stdout = VALID_JSON_BASE.format(project=PROJECT, name=NAME + 'nope')
-    with mock.patch.object(util.GcloudCommand, 'Issue',
-                           return_value=(stdout, '', 0)):
-      self.assertFalse(self.bigtable._Exists())
 
   def testQuotaError(self):
     self.enter_context(

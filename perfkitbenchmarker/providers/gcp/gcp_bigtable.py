@@ -295,27 +295,24 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     cmd.flags['zone'] = []
     cmd.Issue(raise_on_failure=False)
 
-  def _Exists(self):
-    """Returns true if the instance exists."""
-    cmd = util.GcloudCommand(self, 'bigtable', 'instances', 'list')
-    cmd.flags['format'] = 'json'
-    cmd.flags['project'] = self.project
+  def _DescribeInstance(self) -> Dict[str, Any]:
+    cmd = util.GcloudCommand(
+        self, 'bigtable', 'instances', 'describe', self.name)
     # The zone flag makes this command fail.
     cmd.flags['zone'] = []
     stdout, stderr, retcode = cmd.Issue(
         suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
-      # This is not ideal, as we're returning false not because we know
-      # the table isn't there, but because we can't figure out whether
-      # it is there.  This behavior is consistent without other
-      # _Exists methods.
-      logging.error('Unable to list GCP Bigtable instances. Return code %s '
-                    'STDOUT: %s\nSTDERR: %s', retcode, stdout, stderr)
+      logging.error('Describing instance %s failed: %s', self.name, stderr)
+      return {}
+    return json.loads(stdout)
+
+  def _Exists(self):
+    """Returns true if the instance exists."""
+    instance = self._DescribeInstance()
+    if not instance:
       return False
-    result = json.loads(stdout)
-    for instance in result:
-      if instance['displayName'] == self.name:
-        return instance['state'] == 'READY'
+    return instance['state'] == 'READY'
 
   def GetResourceMetadata(self) -> Dict[str, Any]:
     metadata = {}
