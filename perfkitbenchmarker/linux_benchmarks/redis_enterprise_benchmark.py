@@ -14,6 +14,9 @@
 
 """Benchmark for Redis Enterprise database.
 
+This benchmark finds the maximum throughput (ops/sec) while keeping the avg
+latency of requests to less than a cap (1ms by default).
+
 To run this benchmark:
 1) Ensure your Redis Enterprise keyfile is at
    'perfkitbenchmarker/data/enterprise_redis_license', or specify its location
@@ -26,8 +29,11 @@ To run this benchmark:
    perfkitbenchmarker/linux_packages/redis_enterprise by running
    `sha256sum <redislabs_tarfile>`.
 """
+import logging
+
 from absl import flags
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import redis_enterprise
 
@@ -96,7 +102,13 @@ def Prepare(benchmark_spec):
 
   redis_enterprise.OfflineCores(server_vms)
   redis_enterprise.CreateCluster(server_vms)
-  redis_enterprise.TuneProxy(server_vms)
+
+  # Skip preparing the database if we're optimizing throughput. The database
+  # will be prepared on each individual run.
+  if _OPTIMIZE_THROUGHPUT.value:
+    return
+
+  redis_enterprise.TuneProxy(server_vm)
   redis_enterprise.CreateDatabase(server_vms, REDIS_PORT)
   redis_enterprise.PinWorkers(server_vms)
   redis_enterprise.WaitForDatabaseUp(server_vm, REDIS_PORT)
@@ -127,7 +139,17 @@ def Run(benchmark_spec):
       'numa_balancing': numa_balancing.rstrip(),
   }
 
-  results = redis_enterprise.Run(redis_vms, load_vms, REDIS_PORT)
+  if _OPTIMIZE_THROUGHPUT.value:
+    optimizer = redis_enterprise.ThroughputOptimizer(redis_vms, load_vms,
+                                                     REDIS_PORT)
+    optimal_throughput, results = optimizer.GetOptimalThroughput()
+    if not optimal_throughput:
+      raise errors.Benchmarks.RunError(
+          'Did not get a throughput under 1ms metric. Try decreasing the '
+          '--enterprise_redis_min_threads value.')
+    logging.info('Found optimal throughput %s', optimal_throughput)
+  else:
+    _, results = redis_enterprise.Run(redis_vms, load_vms, REDIS_PORT)
 
   for result in results:
     result.metadata.update(setup_metadata)

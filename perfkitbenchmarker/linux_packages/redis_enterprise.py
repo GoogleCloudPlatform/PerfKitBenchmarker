@@ -22,7 +22,8 @@ import dataclasses
 import json
 import logging
 import posixpath
-from typing import List, Optional
+import time
+from typing import List, Optional, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -47,7 +48,8 @@ _PROXY_THREADS = flags.DEFINE_integer(
     'Number of redis proxy threads to use.')
 _SHARDS = flags.DEFINE_integer(
     'enterprise_redis_shard_count', 6,
-    'Number of redis shard. Each shard is a redis thread.')
+    'Number of redis shard. Each shard is a redis thread. In a clustered '
+    'setup, this is the number of shards per server VM.')
 _LOAD_RECORDS = flags.DEFINE_integer(
     'enterprise_redis_load_records', 1000000,
     'Number of keys to pre-load into Redis.')
@@ -85,6 +87,8 @@ _DATA_SIZE = flags.DEFINE_integer(
     'The size of the data to write to redis enterprise.')
 
 _VM = virtual_machine.VirtualMachine
+_ThroughputSampleTuple = Tuple[float, List[sample.Sample]]
+_ThroughputSampleMatrix = List[List[_ThroughputSampleTuple]]
 
 _VERSION = '6.2.4-54'
 _PACKAGE_NAME = 'redis_enterprise'
@@ -193,34 +197,33 @@ def OfflineCores(vms: List[_VM]) -> None:
   vm_util.RunThreaded(_Offline, vms)
 
 
-def TuneProxy(vms: List[_VM], proxy_threads: Optional[int] = None) -> None:
-  """Tunes the number of Redis proxies on the server vm."""
+def TuneProxy(vm: _VM, proxy_threads: Optional[int] = None) -> None:
+  """Tunes the number of Redis proxies on the cluster."""
   proxy_threads = proxy_threads or _PROXY_THREADS.value
-
-  def _Tune(vm):
-    vm.RemoteCommand('sudo /opt/redislabs/bin/rladmin tune '
-                     'proxy all '
-                     f'max_threads {proxy_threads} '
-                     f'threads {proxy_threads} ')
-    vm.RemoteCommand('sudo /opt/redislabs/bin/dmc_ctl restart')
-
-  vm_util.RunThreaded(_Tune, vms)
+  vm.RemoteCommand('sudo /opt/redislabs/bin/rladmin tune '
+                   'proxy all '
+                   f'max_threads {proxy_threads} '
+                   f'threads {proxy_threads} ')
+  vm.RemoteCommand('sudo /opt/redislabs/bin/dmc_ctl restart')
 
 
-def PinWorkers(vms: List[_VM]) -> None:
+def PinWorkers(vms: List[_VM], proxy_threads: Optional[int] = None) -> None:
   """Splits the Redis worker threads across the NUMA nodes evenly.
 
   This function is no-op if --enterprise_redis_pin_workers is not set.
 
   Args:
     vms: The VMs with the Redis workers to pin.
+    proxy_threads: The number of proxy threads per VM.
   """
   if not _PIN_WORKERS.value:
     return
 
+  proxy_threads = proxy_threads or _PROXY_THREADS.value
+
   def _Pin(vm):
     numa_nodes = vm.CheckLsCpu().numa_node_count
-    proxies_per_node = _PROXY_THREADS.value // numa_nodes
+    proxies_per_node = proxy_threads // numa_nodes
     for node in range(numa_nodes):
       node_cpu_list = vm.RemoteCommand(
           'cat /sys/devices/system/node/node%d/cpulist' % node)[0].strip()
@@ -247,18 +250,19 @@ def _GetRestCommand() -> str:
           'https://localhost:9443/v1/bdbs')
 
 
-def CreateDatabase(vms: List[_VM], redis_port: int) -> None:
+def CreateDatabase(vms: List[_VM], redis_port: int,
+                   shards_per_vm: Optional[int] = None) -> None:
   """Creates a new Redis Enterprise database.
 
   See https://docs.redis.com/latest/rs/references/rest-api/objects/bdb/.
 
   Args:
-    vms: The Redis Enterprise DB cluster nodes.
+    vms: The server VMs.
     redis_port: The port to serve the database.
+    shards_per_vm: Number of shards to use per server VM.
   """
-  if _SHARDS.value < len(vms):
-    raise errors.Config.InvalidValue(
-        'There should be at least 1 shard per server VM.')
+  shards_per_vm = shards_per_vm or _SHARDS.value
+  total_shards = shards_per_vm * len(vms)
   content = {
       'name': 'redisdb',
       'memory_size': int(vms[0].total_memory_kb * _ONE_KILOBYTE / 2 * len(vms)),
@@ -269,15 +273,15 @@ def CreateDatabase(vms: List[_VM], redis_port: int) -> None:
       'authentication_redis_pass': FLAGS.run_uri,
       'replication': False,
   }
-  if _SHARDS.value > 1:
+  if total_shards > 1:
     content.update({
         'sharding': True,
-        'shards_count': _SHARDS.value,
+        'shards_count': total_shards,
         'shards_placement': 'sparse',
         'oss_cluster': True,
         'shard_key_regex':
             [{'regex': '.*\\{(?<tag>.*)\\}.*'}, {'regex': '(?<tag>.*)'}]
-    })
+    })  # pyformat: disable
 
   logging.info('Creating Redis Enterprise database.')
   vms[0].RemoteCommand(f'{_GetRestCommand()} '
@@ -358,7 +362,36 @@ def LoadDatabase(redis_vms: List[_VM], load_vms: List[_VM],
       [((vm, request), {}) for vm, request in zip(vms, load_requests)])
 
 
-def _BuildRunCommand(redis_vms: _VM, threads: int, port: int) -> str:
+def _GetDatabase(vm: _VM) -> Optional[str]:
+  """Gets the database object running in the cluster.
+
+  Args:
+    vm: The VM where the cluster is set up.
+
+  Returns:
+    The database object per
+    https://docs.redis.com/latest/rs/references/rest-api/objects/bdb/.
+
+  Raises:
+    errors.Benchmarks.RunError: If there is more than one database found.
+  """
+  stdout, _ = vm.RemoteCommand(f'{_GetRestCommand()}')
+  results = json.loads(stdout)
+  if len(results) != 1:
+    logging.info('Expected one database, found %s.', len(results))
+    return None
+  return results[0]
+
+
+def DeleteDatabase(vm: _VM) -> None:
+  logging.info('Deleting Redis Enterprise database.')
+  uid = _GetDatabase(vm)['uid']
+  vm.RemoteCommand(f'{_GetRestCommand()}/{uid} -X DELETE')
+  while _GetDatabase(vm) is not None:
+    time.sleep(5)
+
+
+def _BuildRunCommand(redis_vms: List[_VM], threads: int, port: int) -> str:
   """Spawns a memtier_benchmark on the load_vm against the redis_vm:port.
 
   Args:
@@ -381,7 +414,7 @@ def _BuildRunCommand(redis_vms: _VM, threads: int, port: int) -> str:
             f'--pipeline {str(_PIPELINES.value)} '
             f'-c {str(_LOADGEN_CLIENTS.value)} '
             f'-d {str(_DATA_SIZE.value)} '
-            '--test-time 15 '
+            '--test-time 20 '
             '--key-minimum 1 '
             f'--key-maximum {str(_LOAD_RECORDS.value)} ')
   if len(redis_vms) > 1:
@@ -389,8 +422,11 @@ def _BuildRunCommand(redis_vms: _VM, threads: int, port: int) -> str:
   return result
 
 
-def Run(redis_vms: List[_VM], load_vms: List[_VM],
-        redis_port: int) -> List[sample.Sample]:
+def Run(redis_vms: List[_VM],
+        load_vms: List[_VM],
+        redis_port: int,
+        shards: Optional[int] = None,
+        proxy_threads: Optional[int] = None) -> _ThroughputSampleTuple:
   """Run memtier against enterprise redis and measure latency and throughput.
 
   This function runs memtier against the redis server vm with increasing memtier
@@ -402,13 +438,16 @@ def Run(redis_vms: List[_VM], load_vms: List[_VM],
     redis_vms: Redis server vms.
     load_vms: Memtier load vms.
     redis_port: Port for the redis server.
+    shards: The per-VM shard count for this run.
+    proxy_threads: The per-VM proxy thread count for this run.
 
   Returns:
-    A list of sample.Sample objects.
+    A tuple of (max_throughput_under_1ms, list of sample.Sample objects).
   """
   results = []
   cur_max_latency = 0.0
   latency_threshold = _LATENCY_THRESHOLD.value
+  shards = shards or _SHARDS.value
   threads = _MIN_THREADS.value
   max_threads = _MAX_THREADS.value
   max_throughput_for_completion_latency_under_1ms = 0.0
@@ -440,10 +479,10 @@ def Run(redis_vms: List[_VM], load_vms: List[_VM],
       sample_metadata['redis_pipeline'] = (
           _PIPELINES.value)
       sample_metadata['threads'] = threads
-      sample_metadata['shard_count'] = _SHARDS.value
-      sample_metadata['total_shard_count'] = _SHARDS.value * len(redis_vms)
+      sample_metadata['shard_count'] = shards
+      sample_metadata['total_shard_count'] = shards * len(redis_vms)
       sample_metadata['redis_proxy_threads'] = (
-          _PROXY_THREADS.value)
+          proxy_threads or _PROXY_THREADS.value)
       sample_metadata['redis_loadgen_clients'] = (
           _LOADGEN_CLIENTS.value)
       sample_metadata['pin_workers'] = _PIN_WORKERS.value
@@ -457,8 +496,8 @@ def Run(redis_vms: List[_VM], load_vms: List[_VM],
         max_throughput_for_completion_latency_under_1ms = max(
             max_throughput_for_completion_latency_under_1ms, throughput)
 
-      logging.info('Threads : %d  (%f, %f) < %f', threads, throughput, latency,
-                   latency_threshold)
+      logging.info('Threads : %d  (%f ops/sec, %f ms latency) < %f ms latency',
+                   threads, throughput, latency, latency_threshold)
 
     threads += _THREAD_INCREMENT.value
 
@@ -468,4 +507,119 @@ def Run(redis_vms: List[_VM], load_vms: List[_VM],
         max_throughput_for_completion_latency_under_1ms, 'ops/s',
         sample_metadata))
 
-  return results
+  logging.info('Max throughput under 1ms: %s ops/sec.',
+               max_throughput_for_completion_latency_under_1ms)
+  return max_throughput_for_completion_latency_under_1ms, results
+
+
+class ThroughputOptimizer():
+  """Class that searches for the shard/proxy_thread count for best throughput.
+
+  Attributes:
+    server_vms: List of server VMs.
+    client_vms: List of client VMs.
+    redis_port: The port the Redis Enterprise database is served on.
+    results: Matrix that records the search space of shards and proxy threads.
+  """
+
+  def __init__(self, server_vms: List[_VM], client_vms: List[_VM],
+               redis_port: int):
+    self.server_vms: List[_VM] = server_vms
+    self.client_vms: List[_VM] = client_vms
+    self.redis_port: int = redis_port
+
+    num_cpus = server_vms[0].num_cpus
+    self.results: _ThroughputSampleMatrix = (
+        [[() for i in range(num_cpus)] for i in range(num_cpus)])
+
+  def _CreateAndLoadDatabase(self, shards_per_vm: int) -> None:
+    CreateDatabase(self.server_vms, self.redis_port, shards_per_vm)
+    WaitForDatabaseUp(self.server_vms[0], self.redis_port)
+    LoadDatabase(self.server_vms, self.client_vms, self.redis_port)
+
+  def _FullRun(self, shard_count: int,
+               proxy_thread_count: int) -> _ThroughputSampleTuple:
+    """Recreates DB if needed, then runs the test."""
+    logging.info('Starting new run with %s shards, %s proxy threads',
+                 shard_count, proxy_thread_count)
+    server_vm = self.server_vms[0]
+
+    # Recreate the DB if needed
+    db = _GetDatabase(server_vm)
+    if not db:
+      self._CreateAndLoadDatabase(shard_count)
+    elif shard_count != db['shards_count']:
+      DeleteDatabase(server_vm)
+      self._CreateAndLoadDatabase(shard_count)
+
+    # Tune
+    TuneProxy(server_vm, proxy_thread_count)
+    PinWorkers(self.server_vms, proxy_thread_count)
+
+    # Run the test
+    return Run(self.server_vms,
+               self.client_vms,
+               self.redis_port,
+               shard_count,
+               proxy_thread_count)
+
+  def _GetResult(self, shards: int,
+                 proxy_threads: int) -> _ThroughputSampleTuple:
+    if not self.results[shards - 1][proxy_threads - 1]:
+      self.results[shards - 1][proxy_threads - 1] = self._FullRun(
+          shards, proxy_threads)
+    return self.results[shards - 1][proxy_threads - 1]
+
+  def _GetOptimalNeighbor(self, shards: int,
+                          proxy_threads: int) -> Tuple[int, int]:
+    """Returns the shards/proxy_threads neighbor with the best throughput."""
+    optimal_shards = shards
+    optimal_proxy_threads = proxy_threads
+    optimal_throughput, _ = self._GetResult(shards, proxy_threads)
+
+    for shards_count, proxy_threads_count in [(shards, proxy_threads - 1),
+                                              (shards, proxy_threads + 1),
+                                              (shards + 1, proxy_threads),
+                                              (shards - 1, proxy_threads)]:
+      if (shards_count < 1 or shards_count > len(self.results) or
+          proxy_threads_count < 1 or proxy_threads_count > len(self.results)):
+        continue
+
+      throughput, _ = self._GetResult(shards_count, proxy_threads_count)
+
+      if throughput > optimal_throughput:
+        optimal_throughput = throughput
+        optimal_shards = shards_count
+        optimal_proxy_threads = proxy_threads_count
+
+    return optimal_shards, optimal_proxy_threads
+
+  def GetOptimalThroughput(self) -> _ThroughputSampleTuple:
+    """Gets the optimal throughput for the Redis Enterprise cluster.
+
+    Performs a linear search through shards and proxy threads. If the current
+    combination is a local maximum, finish and return the result.
+
+    The DB needs to be recreated since shards can only be resized in multiples
+    once created.
+
+    Returns:
+      Tuple of (optimal_throughput, samples).
+    """
+    # Use a heuristic for the number of shards and proxy threads per VM.
+    # Usually the optimal number is somewhere close to this.
+    num_cpus = self.server_vms[0].num_cpus
+    shard_count = max(num_cpus // 5, 1)
+    proxy_thread_count = num_cpus - shard_count
+
+    while True:
+      logging.info('Checking shards: %s, proxy_threads: %s', shard_count,
+                   proxy_thread_count)
+      optimal_shards, optimal_proxies = self._GetOptimalNeighbor(
+          shard_count, proxy_thread_count)
+      if (shard_count, proxy_thread_count) == (optimal_shards, optimal_proxies):
+        break
+      shard_count = optimal_shards
+      proxy_thread_count = optimal_proxies
+
+    return self._GetResult(shard_count, proxy_thread_count)
