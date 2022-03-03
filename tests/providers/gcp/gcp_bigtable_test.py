@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.gcp.gcp_bigtable."""
 
+import inspect
 import unittest
 from absl import flags
 from absl.testing import flagsaver
@@ -22,6 +23,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
+import requests
 
 FLAGS = flags.FLAGS
 
@@ -221,6 +223,54 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
                              'autoscaling-min-nodes=1,autoscaling-max-nodes=5,'
                              'autoscaling-cpu-target=50')]
     self.assertEqual(actual_flag_values, expected_flag_values)
+
+  @flagsaver.flagsaver(run_uri='test_uri')
+  def testUpdateLabels(self):
+    # Arrange
+    instance = GetTestBigtableInstance()
+    mock_json_response = inspect.cleandoc("""
+    {
+      "displayName": "test_display_name",
+      "labels": {
+        "benchmark": "test_benchmark",
+        "timeout_minutes": "10"
+      },
+      "name": "test_name"
+    }
+    """)
+    self.enter_context(
+        mock.patch.object(
+            util.GcloudCommand,
+            'Issue',
+            return_value=(mock_json_response, '', 0)))
+    self.enter_context(
+        mock.patch.object(util, 'GetAccessToken', return_value='test_token'))
+    mock_request = self.enter_context(
+        mock.patch.object(
+            requests, 'patch', return_value=mock.Mock(status_code=200)))
+
+    # Act
+    new_labels = {
+        'benchmark': 'test_benchmark_2',
+        'metadata': 'test_metadata',
+    }
+    instance._UpdateLabels(new_labels)
+
+    # Assert
+    mock_request.assert_called_once_with(
+        'https://bigtableadmin.googleapis.com/v2/projects/test_project'
+        '/instances/test_name',
+        headers={'Authorization': 'Bearer test_token'},
+        params={
+            'updateMask': 'labels',
+        },
+        json={
+            'labels': {
+                'benchmark': 'test_benchmark_2',
+                'timeout_minutes': '10',
+                'metadata': 'test_metadata'
+            }
+        })
 
 if __name__ == '__main__':
   unittest.main()

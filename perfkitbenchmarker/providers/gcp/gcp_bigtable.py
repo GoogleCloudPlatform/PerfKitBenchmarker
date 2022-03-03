@@ -25,6 +25,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import util
+import requests
 
 FLAGS = flags.FLAGS
 
@@ -279,6 +280,8 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
           f'Insufficient node quota in project {self.project} '
           f'and zone {self.zone}')
 
+    self._UpdateLabels(util.GetDefaultTags())
+
     if self.multicluster_routing:
       cmd = util.GcloudCommand(
           self, 'bigtable', 'app-profiles', 'update', 'default')
@@ -287,6 +290,33 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
       cmd.flags['force'] = True
       cmd.flags['zone'] = []
       cmd.Issue()
+
+  def _GetLabels(self) -> Dict[str, Any]:
+    """Gets labels from the current instance."""
+    return self._DescribeInstance().get('labels', {})
+
+  def _UpdateLabels(self, labels: Dict[str, Any]) -> None:
+    """Updates the labels of the current instance."""
+    header = {'Authorization': f'Bearer {util.GetAccessToken()}'}
+    url = ('https://bigtableadmin.googleapis.com/v2/'
+           f'projects/{self.project}/instances/{self.name}')
+    # Keep any existing labels
+    tags = self._GetLabels()
+    tags.update(labels)
+    response = requests.patch(
+        url,
+        headers=header,
+        params={'updateMask': 'labels'},
+        json={'labels': tags})
+    logging.info('Update labels: status code %s, %s', response.status_code,
+                 response.text)
+    if response.status_code != 200:
+      raise errors.Resource.UpdateError(
+          f'Unable to update Bigtable instance: {response.text}')
+
+  def _UpdateTimeout(self, timeout_minutes: int) -> None:
+    """See base class."""
+    self._UpdateLabels(util.GetDefaultTags(timeout_minutes))
 
   def _Delete(self):
     """Deletes the instance."""
