@@ -179,6 +179,7 @@ class AzurePublicIPAddress(resource.BaseResource):
 
     if self.availability_zone:
       # Availability Zones require Standard IPs.
+      # TODO(user): Consider setting this by default
       cmd += ['--zone', self.availability_zone, '--sku', 'Standard']
 
     if self.dns_name:
