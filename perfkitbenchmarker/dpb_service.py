@@ -331,6 +331,8 @@ class BaseDpbService(resource.BaseResource):
             self.spec.worker_count,
         'dpb_hdfs_type':
             self.dpb_hdfs_type,
+        'dpb_disk_size':
+            self.spec.worker_group.disk_spec.disk_size,
         'dpb_service_zone':
             self.dpb_service_zone,
         'dpb_job_properties':
