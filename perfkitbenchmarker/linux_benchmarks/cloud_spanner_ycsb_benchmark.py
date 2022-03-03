@@ -142,8 +142,10 @@ def Run(benchmark_spec):
     run_kwargs['cloudspanner.project'] = util.GetDefaultProject()
 
   load_kwargs = run_kwargs.copy()
-  samples = list(benchmark_spec.executor.LoadAndRun(
-      vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  samples = []
+  if not benchmark_spec.spanner.restored:
+    samples += list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
+  samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
 
   metadata = {'ycsb_client_type': FLAGS.cloud_spanner_ycsb_client_type}
   for sample in samples:
