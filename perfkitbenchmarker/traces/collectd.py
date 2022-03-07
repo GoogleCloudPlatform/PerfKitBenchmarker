@@ -21,6 +21,7 @@ import os
 import posixpath
 from absl import flags
 from perfkitbenchmarker import events
+from perfkitbenchmarker import stages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import collectd
 
@@ -79,5 +80,5 @@ def Register(parsed_flags):
     raise IOError('collectd output directory does not exist: {0}'.format(
         output_directory))
   collector = _CollectdCollector(output_directory)
-  events.before_phase.connect(collector.Before, events.RUN_PHASE, weak=False)
-  events.after_phase.connect(collector.After, events.RUN_PHASE, weak=False)
+  events.before_phase.connect(collector.Before, stages.RUN, weak=False)
+  events.after_phase.connect(collector.After, stages.RUN, weak=False)

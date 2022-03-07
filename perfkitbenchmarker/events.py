@@ -27,6 +27,7 @@ from absl import flags
 import blinker
 from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import stages
 
 
 FLAGS = flags.FLAGS
@@ -66,19 +67,17 @@ torn down (if run_stage includes teardown).
 Sender: None
 Payload: benchmark_spec.""")
 
-RUN_PHASE = 'run'
-
 before_phase = _events.signal('before-phase', doc="""
 Signal sent immediately before a phase runs.
 
-Sender: the phase. Currently only RUN_PHASE.
+Sender: the stage.
 Payload: benchmark_spec.""")
 
 after_phase = _events.signal('after-phase', doc="""
 Signal sent immediately after a phase runs, regardless of whether it was
 successful.
 
-Sender: the phase. Currently only RUN_PHASE.
+Sender: the stage.
 Payload: benchmark_spec.""")
 
 samples_created = _events.signal('samples-created', doc="""
@@ -87,7 +86,7 @@ Called with samples list and benchmark spec.
 Signal sent immediately after a sample is created.
 The samples' metadata is mutable, and may be updated by the subscriber.
 
-Sender: the phase. Currently only RUN_PHASE.
+Sender: the phase. Currently only stages.RUN.
 Payload: benchmark_spec (BenchmarkSpec), samples (list of sample.Sample).""")
 
 record_event = _events.signal('record-event', doc="""
@@ -156,7 +155,7 @@ def _AddScriptSamples(unused_sender, benchmark_spec, samples):
 
 @after_phase.connect
 def _RunPostRunScript(sender, benchmark_spec):
-  if sender != RUN_PHASE:
+  if sender != stages.RUN:
     logging.info(
         'Receive after_phase signal from :%s, not '
         'triggering _RunPostRunScript.', sender)

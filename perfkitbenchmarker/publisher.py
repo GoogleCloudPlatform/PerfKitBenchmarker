@@ -38,6 +38,7 @@ from perfkitbenchmarker import events
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import sample as pkb_sample
+from perfkitbenchmarker import stages
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 import six
@@ -164,7 +165,7 @@ def PublishRunStageSamples(benchmark_spec, samples):
     samples: A list of samples to publish.
   """
   events.samples_created.send(
-      events.RUN_PHASE, benchmark_spec=benchmark_spec, samples=samples)
+      stages.RUN, benchmark_spec=benchmark_spec, samples=samples)
   collector = SampleCollector()
   collector.AddSamples(samples, benchmark_spec.name, benchmark_spec)
   collector.PublishSamples()

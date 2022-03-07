@@ -857,7 +857,7 @@ def DoRunPhase(spec, collector, timer):
   while True:
     samples = []
     logging.info('Running benchmark %s', spec.name)
-    events.before_phase.send(events.RUN_PHASE, benchmark_spec=spec)
+    events.before_phase.send(stages.RUN, benchmark_spec=spec)
     try:
       with timer.Measure('Benchmark Run'):
         samples = spec.BenchmarkRun(spec)
@@ -870,7 +870,7 @@ def DoRunPhase(spec, collector, timer):
     else:
       consecutive_failures = 0
     finally:
-      events.after_phase.send(events.RUN_PHASE, benchmark_spec=spec)
+      events.after_phase.send(stages.RUN, benchmark_spec=spec)
     if FLAGS.run_stage_time or FLAGS.run_stage_iterations:
       for s in samples:
         s.metadata['run_number'] = run_number
@@ -899,7 +899,7 @@ def DoRunPhase(spec, collector, timer):
       samples.extend(_CreateGlibcSamples(spec.vms))
 
     events.samples_created.send(
-        events.RUN_PHASE, benchmark_spec=spec, samples=samples)
+        stages.RUN, benchmark_spec=spec, samples=samples)
     collector.AddSamples(samples, spec.name, spec)
     if (FLAGS.publish_after_run and FLAGS.publish_period is not None and
         FLAGS.publish_period < (time.time() - last_publish_time)):

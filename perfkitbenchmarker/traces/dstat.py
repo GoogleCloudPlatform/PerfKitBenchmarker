@@ -26,6 +26,7 @@ import numpy as np
 
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import stages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import dstat
 from perfkitbenchmarker.traces import base_collector
@@ -147,8 +148,7 @@ def Register(parsed_flags):
     os.makedirs(output_directory)
   collector = _DStatCollector(interval=parsed_flags.dstat_interval,
                               output_directory=output_directory)
-  events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
-  events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
+  events.before_phase.connect(collector.Start, stages.RUN, weak=False)
+  events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
   if parsed_flags.dstat_publish:
-    events.samples_created.connect(
-        collector.Analyze, events.RUN_PHASE, weak=False)
+    events.samples_created.connect(collector.Analyze, stages.RUN, weak=False)
