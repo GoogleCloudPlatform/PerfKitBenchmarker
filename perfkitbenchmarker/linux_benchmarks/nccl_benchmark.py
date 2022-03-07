@@ -65,18 +65,18 @@ nccl:
           zone: us-central1-a
           image_family: tf-latest-gpu-gvnic
           image_project: deeplearning-platform-release
-          boot_disk_size: 105
+          boot_disk_size: 130
           gpu_type: v100
           gpu_count: 8
         AWS:
           machine_type: p3dn.24xlarge
           zone: us-east-1a
-          boot_disk_size: 105
+          boot_disk_size: 130
         Azure:
           machine_type: Standard_ND40rs_v2
           zone: eastus
           image: microsoft-dsvm:ubuntu-hpc:1804:latest
-          boot_disk_size: 105
+          boot_disk_size: 130
 """
 
 HOSTFILE = 'HOSTFILE'
