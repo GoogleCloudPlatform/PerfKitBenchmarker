@@ -23,6 +23,7 @@ from perfkitbenchmarker import errors
 # way to pin this version to 3.7 which would probably involve changing the
 # python 3 linux package.
 _VERSION = '1.19.75'
+_SUSE_PKG_NAME = 'aws-cli'
 
 
 def Install(vm):
@@ -50,6 +51,12 @@ def YumInstall(vm):
   try:
     vm.RemoteCommand('yum list installed awscli')
   except errors.VirtualMachine.RemoteCommandError:
+    Install(vm)
+
+
+def ZypperInstall(vm):
+  stdout, _ = vm.RemoteCommand(f'zypper search -i {_SUSE_PKG_NAME}')
+  if _SUSE_PKG_NAME not in stdout:
     Install(vm)
 
 
