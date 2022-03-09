@@ -21,6 +21,7 @@ import abc
 import collections
 import copy
 import csv
+import datetime
 import fcntl
 import itertools
 import json
@@ -107,8 +108,14 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'cloud_storage_bucket',
     None,
-    'GCS bucket to upload records to. Bucket must exist.')
-
+    'GCS bucket to upload records to. Bucket must exist. '
+    'This flag differs from --hourly_partitioned_cloud_storage_bucket '
+    'by putting records directly in the bucket.')
+PARTITIONED_GCS_URL = flags.DEFINE_string(
+    'hourly_partitioned_cloud_storage_bucket', None,
+    'GCS bucket to upload records to. Bucket must exist. This flag differs '
+    'from --cloud_storage_bucket by putting records in subfolders based on '
+    'time of publish. i.e. gs://bucket/YYYY/mm/dd/HH/data.')
 flags.DEFINE_string(
     'es_uri', None,
     'The Elasticsearch address and port. e.g. http://localhost:9200')
@@ -597,15 +604,19 @@ class CloudStoragePublisher(SamplePublisher):
   Attributes:
     bucket: string. The GCS bucket name to publish to.
     gsutil_path: string. The path to the 'gsutil' tool.
+    sub_folder: Optional folder within the bucket to publish to.
   """
 
-  def __init__(self, bucket, gsutil_path='gsutil'):
+  def __init__(self, bucket, gsutil_path='gsutil', sub_folder=None):
     super().__init__()
-    self.bucket = bucket
     self.gsutil_path = gsutil_path
+    if sub_folder:
+      self.gcs_directory = f'gs://{bucket}/{sub_folder}'
+    else:
+      self.gcs_directory = f'gs://{bucket}'
 
   def __repr__(self):
-    return '<{0} bucket="{1}">'.format(type(self).__name__, self.bucket)
+    return f'<{type(self).__name__} gcs_directory="{self.gcs_directory}">'
 
   def _GenerateObjectName(self):
     object_name = str(int(time.time() * 100)) + '_' + str(uuid.uuid4())
@@ -619,7 +630,7 @@ class CloudStoragePublisher(SamplePublisher):
       json_publisher.PublishSamples(samples)
       tf.close()
       object_name = self._GenerateObjectName()
-      storage_uri = 'gs://{0}/{1}'.format(self.bucket, object_name)
+      storage_uri = f'{self.gcs_directory}/{object_name}'
       logging.info('Publishing %d samples to %s', len(samples), storage_uri)
       copy_cmd = [self.gsutil_path, 'cp', tf.name, storage_uri]
       vm_util.IssueRetryableCommand(copy_cmd)
@@ -947,6 +958,12 @@ class SampleCollector(object):
     if FLAGS.cloud_storage_bucket:
       publishers.append(CloudStoragePublisher(FLAGS.cloud_storage_bucket,
                                               gsutil_path=FLAGS.gsutil_path))
+    if PARTITIONED_GCS_URL.value:
+      now = datetime.datetime.now()
+      publishers.append(
+          CloudStoragePublisher(PARTITIONED_GCS_URL.value,
+                                sub_folder=now.strftime('%Y/%m/%d/%H'),
+                                gsutil_path=FLAGS.gsutil_path))
     if FLAGS.csv_path:
       publishers.append(CSVPublisher(FLAGS.csv_path))
 
