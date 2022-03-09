@@ -71,7 +71,7 @@ import sys
 import threading
 import time
 import types
-from typing import Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 import uuid
 
 from absl import flags
@@ -92,6 +92,7 @@ from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import publisher
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
@@ -106,7 +107,6 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
 from perfkitbenchmarker.linux_benchmarks import cuda_memcpy_benchmark
 from perfkitbenchmarker.linux_packages import build_tools
-from perfkitbenchmarker.publisher import SampleCollector
 import six
 from six.moves import zip
 
@@ -364,9 +364,13 @@ flags.DEFINE_boolean(
     'This sample will include metadata specifying the run stage that '
     'failed, the exception that occurred, as well as all the flags that '
     'were provided to PKB on the command line.')
-flags.DEFINE_boolean(
+_CREATE_STARTED_RUN_SAMPLE = flags.DEFINE_boolean(
     'create_started_run_sample', False,
     'Whether PKB will create a sample at the start of the provision phase of '
+    'the benchmark run.')
+_CREATE_STARTED_STAGE_SAMPLES = flags.DEFINE_boolean(
+    'create_started_stage_samples', False,
+    'Whether PKB will create a sample at the start of the each stage of '
     'the benchmark run.')
 flags.DEFINE_integer(
     'failed_run_samples_error_length', 10240,
@@ -720,9 +724,8 @@ def DoProvisionPhase(spec, timer):
     timer: An IntervalTimer that measures the start and stop times of resource
       provisioning.
   """
-  if FLAGS.create_started_run_sample:
-    PublishRunStartedSample(spec)
   logging.info('Provisioning resources for benchmark %s', spec.name)
+  events.before_phase.send(stages.PROVISION, benchmark_spec=spec)
   spec.ConstructContainerCluster()
   spec.ConstructContainerRegistry()
   # spark service needs to go first, because it adds some vms.
@@ -755,6 +758,7 @@ def DoProvisionPhase(spec, timer):
     # we have a record of things like AWS ids. Otherwise we won't
     # be able to clean them up on a subsequent run.
     spec.Pickle()
+  events.after_phase.send(stages.PROVISION, benchmark_spec=spec)
 
 
 class InterruptChecker():
@@ -821,6 +825,7 @@ def DoPreparePhase(spec, timer):
       benchmark module's Prepare function.
   """
   logging.info('Preparing benchmark %s', spec.name)
+  events.before_phase.send(stages.PREPARE, benchmark_spec=spec)
   with timer.Measure('BenchmarkSpec Prepare'):
     spec.Prepare()
   with timer.Measure('Benchmark Prepare'):
@@ -830,6 +835,7 @@ def DoPreparePhase(spec, timer):
     logging.info('Sleeping for %s seconds after the prepare phase.',
                  FLAGS.after_prepare_sleep_time)
     time.sleep(FLAGS.after_prepare_sleep_time)
+  events.after_phase.send(stages.PREPARE, benchmark_spec=spec)
 
 
 def DoRunPhase(spec, collector, timer):
@@ -928,11 +934,13 @@ def DoCleanupPhase(spec, timer):
   if FLAGS.before_cleanup_pause:
     six.moves.input('Hit enter to begin Cleanup.')
   logging.info('Cleaning up benchmark %s', spec.name)
+  events.before_phase.send(stages.CLEANUP, benchmark_spec=spec)
   if (spec.always_call_cleanup or any([vm.is_static for vm in spec.vms]) or
       spec.dpb_service is not None):
     spec.StopBackgroundWorkload()
     with timer.Measure('Benchmark Cleanup'):
       spec.BenchmarkCleanup(spec)
+  events.after_phase.send(stages.CLEANUP, benchmark_spec=spec)
 
 
 def DoTeardownPhase(spec, collector, timer):
@@ -949,6 +957,7 @@ def DoTeardownPhase(spec, collector, timer):
       resource teardown.
   """
   logging.info('Tearing down resources for benchmark %s', spec.name)
+  events.before_phase.send(stages.TEARDOWN, benchmark_spec=spec)
   # Add delete time metrics after metadeta collected
   if _MEASURE_DELETE.value:
     samples = cluster_boot_benchmark.MeasureDelete(spec.vms)
@@ -956,6 +965,7 @@ def DoTeardownPhase(spec, collector, timer):
 
   with timer.Measure('Resource Teardown'):
     spec.Delete()
+  events.after_phase.send(stages.TEARDOWN, benchmark_spec=spec)
 
 
 def _SkipPendingRunsFile():
@@ -978,7 +988,20 @@ def RegisterSkipPendingRunsCheck(func):
   _SKIP_PENDING_RUNS_CHECKS.append(func)
 
 
-def PublishRunStartedSample(spec):
+@events.before_phase.connect
+def _PublishStageStartedSamples(
+    sender: str,
+    benchmark_spec: bm_spec.BenchmarkSpec):
+  """Publish the start of each stage."""
+  if sender == stages.PROVISION and _CREATE_STARTED_RUN_SAMPLE.value:
+    _PublishRunStartedSample(benchmark_spec)
+  if _CREATE_STARTED_STAGE_SAMPLES.value:
+    _PublishEventSample(
+        benchmark_spec,
+        f'{sender.capitalize()} Stage Started')
+
+
+def _PublishRunStartedSample(spec):
   """Publishes a sample indicating that a run has started.
 
   This sample is published immediately so that there exists some metric for any
@@ -987,12 +1010,32 @@ def PublishRunStartedSample(spec):
   Args:
     spec: The BenchmarkSpec object with run information.
   """
-  collector = SampleCollector()
   metadata = {
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
+  _PublishEventSample(spec, 'Run Started', metadata)
+
+
+def _PublishEventSample(spec: bm_spec.BenchmarkSpec,
+                        event: str,
+                        metadata: Optional[Dict[str, Any]] = None,
+                        collector: Optional[publisher.SampleCollector] = None):
+  """Publishes a sample indicating the progress of the benchmark.
+
+  Value of sample is time of event in unix seconds
+
+  Args:
+    spec: The BenchmarkSpec object with run information.
+    event: The progress event to publish.
+    metadata: optional metadata to publish about the event.
+    collector: the SampleCollector to use.
+  """
+  # N.B. SampleCollector seems stateless so re-using vs creating a new one seems
+  # to have no effect.
+  if not collector:
+    collector = publisher.SampleCollector()
   collector.AddSamples(
-      [sample.Sample('Run Started', 1, 'Run Started', metadata)],
+      [sample.Sample(event, time.time(), 'seconds', metadata or {})],
       spec.name, spec)
   collector.PublishSamples()
 
@@ -1098,8 +1141,7 @@ def RunBenchmark(spec, collector):
         # immediate feedback, then re-throw.
         logging.exception('Error during benchmark %s', spec.name)
         if FLAGS.create_failed_run_samples:
-          collector.AddSamples(MakeFailedRunSample(
-              spec, str(e), current_run_stage), spec.name, spec)
+          PublishFailedRunSample(spec, str(e), current_run_stage, collector)
 
         # If the particular benchmark requests us to always call cleanup, do it
         # here.
@@ -1128,12 +1170,16 @@ def RunBenchmark(spec, collector):
   spec.status = benchmark_status.SUCCEEDED
 
 
-def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
-  """Create a sample.Sample representing a failed run stage.
+def PublishFailedRunSample(
+    spec: bm_spec.BenchmarkSpec,
+    error_message: str,
+    run_stage_that_failed: str,
+    collector: publisher.SampleCollector):
+  """Publish a sample.Sample representing a failed run stage.
 
   The sample metric will have the name 'Run Failed';
-  the value will be 1 (has to be convertible to a float),
-  and the unit will be 'Run Failed' (for lack of a better idea).
+  the value will be the timestamp in Unix Seconds, and the unit will be
+  'seconds'.
 
   The sample metadata will include the error message from the
   Exception, the run stage that failed, as well as all PKB
@@ -1144,9 +1190,7 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
     error_message: error message that was caught, resulting in the
       run stage failure.
     run_stage_that_failed: run stage that failed by raising an Exception
-
-  Returns:
-    a sample.Sample representing the run stage failure.
+    collector: the collector to publish to.
   """
   # Note: currently all provided PKB command line flags are included in the
   # metadata. We may want to only include flags specific to the benchmark that
@@ -1184,7 +1228,7 @@ def MakeFailedRunSample(spec, error_message, run_stage_that_failed):
     logging.error(
         '%d interruptible VMs were interrupted in this failed PKB run.',
         interrupted_vm_count)
-  return [sample.Sample('Run Failed', 1, 'Run Failed', metadata)]
+  _PublishEventSample(spec, 'Run Failed', metadata, collector)
 
 
 def _ShouldRetry(spec: bm_spec.BenchmarkSpec) -> bool:
@@ -1238,7 +1282,7 @@ def RunBenchmarkTask(
                      'Starting benchmark %s attempt %s of %s' + '\n' + '-' * 85)
     logging.info(run_start_msg, benchmark_info, current_run_count + 1,
                  max_run_count)
-    collector = SampleCollector()
+    collector = publisher.SampleCollector()
     # Make a new copy of the benchmark_spec for each run since currently a
     # benchmark spec isn't compatible with multiple runs. In particular, the
     # benchmark_spec doesn't correctly allow for a provision of resources
@@ -1476,7 +1520,7 @@ def RunBenchmarks():
     return 0
 
   benchmark_spec_lists = None
-  collector = SampleCollector()
+  collector = publisher.SampleCollector()
   try:
     tasks = [(RunBenchmarkTask, (spec,), {})
              for spec in benchmark_specs]
