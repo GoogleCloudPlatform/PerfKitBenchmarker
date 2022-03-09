@@ -36,7 +36,7 @@ flags.DEFINE_enum(
     'cuda_toolkit_version',
     '11.5', [
         '9.0', '10.0', '10.1', '10.2', '11.0', '11.1', '11.2', '11.3', '11.4',
-        '11.5', 'None', ''
+        '11.5', '11.6', 'None', ''
     ], 'Version of CUDA Toolkit to install. '
     'Input "None" or empty string to skip installation',
     module_name=__name__)
@@ -45,24 +45,16 @@ FLAGS = flags.FLAGS
 
 CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/x86_64/cuda-{os}.pin'
 
-CUDA_11_0_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.0.3/local_installers/cuda-repo-{os}-11-0-local_11.0.3-450.51.06-1_amd64.deb'
-
-CUDA_11_1_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.1.1/local_installers/cuda-repo-{os}-11-1-local_11.1.1-455.32.00-1_amd64.deb'
-
-CUDA_11_2_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.2.2/local_installers/cuda-repo-{os}-11-2-local_11.2.2-460.32.03-1_amd64.deb'
-
-CUDA_11_3_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.3.1/local_installers/cuda-repo-{os}-11-3-local_11.3.1-465.19.01-1_amd64.deb'
-
-CUDA_11_4_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.4.2/local_installers/cuda-repo-{os}-11-4-local_11.4.2-470.57.02-1_amd64.deb'
-
-CUDA_11_5_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/11.5.0/local_installers/cuda-repo-{os}-11-5-local_11.5.0-495.29.05-1_amd64.deb'
-
-CUDA_10_2_TOOLKIT = 'http://developer.download.nvidia.com/compute/cuda/10.2/Prod/local_installers/cuda-repo-{os}-10-2-local-10.2.89-440.33.01_1.0-1_amd64.deb'
-
+CUDA_11_6_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.6.1/local_installers/cuda-repo-{os}-11-6-local_11.6.1-510.47.03-1_amd64.deb'
+CUDA_11_5_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.5.2/local_installers/cuda-repo-{os}-11-5-local_11.5.2-495.29.05-1_amd64.deb'
+CUDA_11_4_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.4.4/local_installers/cuda-repo-{os}-11-4-local_11.4.4-470.82.01-1_amd64.deb'
+CUDA_11_3_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.3.1/local_installers/cuda-repo-{os}-11-3-local_11.3.1-465.19.01-1_amd64.deb'
+CUDA_11_2_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.2.2/local_installers/cuda-repo-{os}-11-2-local_11.2.2-460.32.03-1_amd64.deb'
+CUDA_11_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.1.1/local_installers/cuda-repo-{os}-11-1-local_11.1.1-455.32.00-1_amd64.deb'
+CUDA_11_0_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.0.3/local_installers/cuda-repo-{os}-11-0-local_11.0.3-450.51.06-1_amd64.deb'
+CUDA_10_2_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/10.2/Prod/local_installers/cuda-repo-{os}-10-2-local-10.2.89-440.33.01_1.0-1_amd64.deb'
 CUDA_10_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/10.1/Prod/local_installers/cuda-repo-{os}-10-1-local-10.1.243-418.87.00_1.0-1_amd64.deb'
-
 CUDA_10_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/10.0/Prod/local_installers/cuda-repo-{os}-10-0-local-10.0.130-410.48_1.0-1_amd64'
-
 CUDA_9_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-{os}-9-0-local_9.0.176-1_amd64-deb'
 CUDA_9_0_PATCH = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/patches/1/cuda-repo-{os}-9-0-local-cublas-performance-update_1.0-1_amd64-deb'
 
@@ -281,6 +273,10 @@ def _InstallCuda11Point5(vm):
   _InstallCuda11Generic(vm, CUDA_11_5_TOOLKIT, '11-5')
 
 
+def _InstallCuda11Point6(vm):
+  _InstallCuda11Generic(vm, CUDA_11_6_TOOLKIT, '11-6')
+
+
 def AptInstall(vm):
   """Installs CUDA toolkit on the VM if not already installed."""
   version_to_install = FLAGS.cuda_toolkit_version
@@ -320,6 +316,8 @@ def AptInstall(vm):
     _InstallCuda11Point4(vm)
   elif version_to_install == '11.5':
     _InstallCuda11Point5(vm)
+  elif version_to_install == '11.6':
+    _InstallCuda11Point6(vm)
   else:
     raise UnsupportedCudaVersionError()
   DoPostInstallActions(vm)
