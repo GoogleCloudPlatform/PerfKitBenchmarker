@@ -68,7 +68,7 @@ xgboost:
         Azure:
           machine_type: Standard_NC4as_T4_v3
           zone: eastus
-          image: microsoft-dsvm:ubuntu-hpc:1804:latest
+          image: microsoft-dsvm:ubuntu-1804:1804-gen2:latest
 """
 
 
