@@ -287,6 +287,12 @@ def Run(benchmark_spec):
   metadata = benchmark_spec.dpb_service.GetMetadata()
 
   metadata['benchmark'] = BENCHMARK_NAMES[FLAGS.dpb_sparksql_query]
+  if FLAGS.bigquery_record_format:
+    # This takes higher priority since for BQ dpb_sparksql_data_format actually
+    # holds a fully qualified Java class/package name.
+    metadata['data_format'] = FLAGS.bigquery_record_format
+  elif FLAGS.dpb_sparksql_data_format:
+    metadata['data_format'] = FLAGS.dpb_sparksql_data_format
 
   # Run PySpark Spark SQL Runner
   report_dir = '/'.join([cluster.base_dir, f'report-{int(time.time()*1000)}'])
