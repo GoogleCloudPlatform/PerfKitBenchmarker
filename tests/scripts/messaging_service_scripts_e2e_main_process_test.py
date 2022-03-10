@@ -6,6 +6,7 @@ import itertools
 import json
 import multiprocessing as mp
 import os
+import sys
 import typing
 from typing import Any
 import unittest
@@ -108,8 +109,13 @@ def AsyncTest(test_method):
   return Wrapped
 
 
+# TODO(user): Remove when only running on Python 3.8+ and use AsyncMock.
 def Just(value=None):
-  """Wrap a value (by default None) in a future that returns immediately."""
+  """Replacement for AsyncMock in Python 3.7."""
+  if sys.version_info[:2] >= (3, 8):
+    # This value gets wrapped by an AsyncMock so don't put it in a future.
+    # https://bugs.python.org/issue38857
+    return value
   future = asyncio.Future()
   future.set_result(value)
   return future
@@ -345,9 +351,9 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
   def setUp(self):
     super().setUp()
     self.publisher_mock = self.enter_context(
-        mock.patch.object(main_process, 'PublisherWorker'))
+        mock.patch.object(main_process, 'PublisherWorker', autospec=True))
     self.receiver_mock = self.enter_context(
-        mock.patch.object(main_process, 'ReceiverWorker'))
+        mock.patch.object(main_process, 'ReceiverWorker', autospec=True))
     self.set_start_method_mock = self.enter_context(
         mock.patch.object(mp, 'set_start_method'))
 
