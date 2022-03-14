@@ -676,12 +676,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         return
       if util.RATE_LIMITED_MESSAGE in stderr:
         raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(stderr)
-      if _UNSUPPORTED_RESOURCE in stderr:
-        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if self.preemptible and _FAILED_TO_START_DUE_TO_PREEMPTION in stderr:
         self.spot_early_termination = True
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(
             'Interrupted before VM started')
+      if _UNSUPPORTED_RESOURCE in stderr:
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (stderr, retcode))
 
