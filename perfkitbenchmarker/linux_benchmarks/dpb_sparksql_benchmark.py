@@ -118,6 +118,8 @@ flags.DEFINE_string(
     'dpb_sparksql_data_format', None,
     "Format of data to load. Assumed to be 'parquet' for HCFS "
     "and 'bigquery' for bigquery if unspecified.")
+flags.DEFINE_string('dpb_sparksql_csv_delimiter', ',',
+                    'CSV delimiter to load the CSV file.')
 flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', BENCHMARK_NAMES.keys(),
                   'A list of query to run on dpb_sparksql_data')
 flags.DEFINE_list(
@@ -381,12 +383,25 @@ def Run(benchmark_spec):
 def _GetTableMetadata(benchmark_spec):
   """Compute map of table metadata for spark_sql_runner --table_metadata."""
   metadata = {}
+  # TODO(user) : we support CSV format only when create_hive_tables
+  # is false.
   if not FLAGS.dpb_sparksql_create_hive_tables:
     for subdir in benchmark_spec.table_subdirs or []:
       # Subdir is table name
-      metadata[subdir] = (FLAGS.dpb_sparksql_data_format or 'parquet', {
-          'path': os.path.join(benchmark_spec.data_dir, subdir)
-      })
+      option_params = {
+          'path': os.path.join(benchmark_spec.data_dir, subdir),
+      }
+      # support csv data format which contains a header and has delimiter
+      # defined by dpb_sparksql_csv_delimiter flag
+      if FLAGS.dpb_sparksql_data_format == 'csv':
+        # TODO(user): currently we only support csv with a header.
+        # If the csv does not have a header it will not load properly.
+        option_params['header'] = 'true'
+        option_params['delimiter'] = FLAGS.dpb_sparksql_csv_delimiter
+
+      metadata[subdir] = (FLAGS.dpb_sparksql_data_format or
+                          'parquet', option_params)
+
   for table in FLAGS.bigquery_tables:
     name = table.split('.')[-1]
     bq_options = {'table': table}
