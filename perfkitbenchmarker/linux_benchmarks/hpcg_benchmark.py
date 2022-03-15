@@ -57,6 +57,7 @@ hpcg:
         Azure:
           machine_type: Standard_NC6
           zone: eastus
+          boot_disk_size: 200
       vm_count: null
 """
 
