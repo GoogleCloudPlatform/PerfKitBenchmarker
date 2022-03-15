@@ -1277,6 +1277,10 @@ class _ContainerClusterSpec(spec.BaseSpec):
     """
     result = super(_ContainerClusterSpec, cls)._GetOptionDecoderConstructions()
     result.update({
+        'static_cluster': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS
         }),

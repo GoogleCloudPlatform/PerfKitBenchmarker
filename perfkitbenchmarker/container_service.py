@@ -472,8 +472,8 @@ class BaseContainerCluster(resource.BaseResource):
   REQUIRED_ATTRS = ['CLOUD', 'CLUSTER_TYPE']
 
   def __init__(self, cluster_spec):
-    super(BaseContainerCluster, self).__init__()
-    self.name = 'pkb-%s' % FLAGS.run_uri
+    super().__init__(user_managed=bool(cluster_spec.static_cluster))
+    self.name = cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
     # Use Virtual Machine class to resolve VM Spec. This lets subclasses parse
     # Provider specific information like disks out of the spec.
     for name, nodepool in cluster_spec.nodepools.copy().items():
@@ -542,10 +542,11 @@ class BaseContainerCluster(resource.BaseResource):
   def GetSamples(self):
     """Return samples with information about deployment times."""
     samples = []
-    samples.append(
-        sample.Sample('Cluster Creation Time',
-                      self.resource_ready_time - self.create_start_time,
-                      'seconds'))
+    if self.resource_ready_time and self.create_start_time:
+      samples.append(
+          sample.Sample('Cluster Creation Time',
+                        self.resource_ready_time - self.create_start_time,
+                        'seconds'))
     for container in itertools.chain(*list(self.containers.values())):
       metadata = {'image': container.image.split('/')[-1]}
       if container.resource_ready_time and container.create_start_time:
