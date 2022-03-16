@@ -69,9 +69,16 @@ _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES = (
     'Standard_M32ms_v2', 'Standard_M64s_v2', 'Standard_M64ms_v2',
     'Standard_M128s_v2', 'Standard_M128ms_v2', 'Standard_M192is_v2',
     'Standard_M192ims_v2', 'Standard_M32dms_v2', 'Standard_M64ds_v2',
-    'Standard_M64ds_v2', 'Standard_M128ds_v2', 'Standard_M128dms_v2',
-    'Standard_M192ids_v2', 'Standard_M192idms_v2')
-
+    'Standard_M128ds_v2', 'Standard_M128dms_v2', 'Standard_M192ids_v2',
+    'Standard_M192idms_v2', 'Standard_DC2s_v2', 'Standard_DC2s_v3',
+    'Standard_DC32ds_v3', 'Standard_DC32s_v3', 'Standard_DC48ds_v3',
+    'Standard_DC48s_v3', 'Standard_DC4ds_v3', 'Standard_DC4s_v2',
+    'Standard_DC4s_v3', 'Standard_DC8_v2', 'Standard_DC8ds_v3',
+    'Standard_DC8s_v3', 'Standard_FX12mds', 'Standard_FX24mds',
+    'Standard_FX36mds', 'Standard_FX48mds', 'Standard_FX4mds',
+    'Standard_M64dms_v2', 'Standard_DC16ds_v3', 'Standard_DC16s_v3',
+    'Standard_DC1ds_v3', 'Standard_DC1s_v3', 'Standard_DC24ds_v3',
+    'Standard_DC24s_v3', 'Standard_DC2ds_v3', 'Standard_DC1s_v2')
 
 # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/scheduled-events
 _SCHEDULED_EVENTS_CMD = ('curl -H Metadata:true http://169.254.169.254/metadata'
