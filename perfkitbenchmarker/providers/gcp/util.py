@@ -247,6 +247,9 @@ class GcloudCommand(object):
 
     Returns:
       list of strings. When joined by spaces, forms the gcloud shell command.
+
+    Raises:
+      ValueError: if passed a None value
     """
     cmd = [FLAGS.gcloud_path]
     cmd.extend(self.args)
@@ -254,6 +257,8 @@ class GcloudCommand(object):
       flag_name_str = '--{0}'.format(flag_name)
       if values is True:
         cmd.append(flag_name_str)
+      elif values is None:
+        raise ValueError(f'Flag {flag_name} is None. Please filter out.')
       else:
         values_iterable = values if isinstance(values, list) else [values]
         for value in values_iterable:

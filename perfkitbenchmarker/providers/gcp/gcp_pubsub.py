@@ -37,7 +37,7 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
 
   def __init__(self):
     super().__init__()
-    self.project = FLAGS.project
+    self.project = FLAGS.project or util.GetDefaultProject()
     self.pubsub_topic = 'pkb-topic-{0}'.format(FLAGS.run_uri)
     self.pubsub_subscription = 'pkb-subscription-{0}'.format(FLAGS.run_uri)
 
