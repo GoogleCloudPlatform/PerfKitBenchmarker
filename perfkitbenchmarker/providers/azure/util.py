@@ -115,7 +115,7 @@ def GetTagsJson(timeout_minutes):
 
 def _IsRegion(zone_or_region):
   """Returns whether "zone_or_region" is a region."""
-  return re.match(r'[a-z]+[0-9]?$', zone_or_region)
+  return re.match(r'[a-z]+[0-9]?$', zone_or_region, re.IGNORECASE)
 
 
 def _IsRecommendedRegion(json_object: Dict[str, Any]) -> bool:
@@ -132,7 +132,7 @@ def IsZone(zone_or_region):
         Azure region eastus2 with availability zone 1.
   """
 
-  return re.match(r'[a-z]+[0-9]?-[0-9]$', zone_or_region)
+  return re.match(r'[a-z]+[0-9]?-[0-9]$', zone_or_region, re.IGNORECASE)
 
 
 def GetRegionFromZone(zone_or_region: str) -> str:
@@ -152,6 +152,13 @@ def GetZonesInRegion(region: str) -> Set[str]:
   return set([f'{region}-{i}' for i in range(1, 4)])
 
 
+def ShouldKeepZoneFromCLI(zone: str) -> bool:
+  """Filter out zones that we can't access."""
+  if 'EUAP' in zone:
+    return False
+  return True
+
+
 def GetZonesFromMachineType() -> Set[str]:
   """Returns a set of zones for a machine type."""
   stdout, _ = vm_util.IssueRetryableCommand(
@@ -161,7 +168,8 @@ def GetZonesFromMachineType() -> Set[str]:
     for location_info in item['locationInfo']:
       region = location_info['location']
       for zone in location_info['zones']:
-        zones.add(f'{region}-{zone}')
+        if ShouldKeepZoneFromCLI(f'{region}-{zone}'):
+          zones.add(f'{region}-{zone}')
   return zones
 
 
