@@ -1,3 +1,21 @@
+diff -u -r netperf-2.7.0/src/nettest_omni.c netperf-2.7.0-patch/src/nettest_omni.c
+--- netperf-2.7.0/src/nettest_omni.c      2022-03-15 22:50:10.047785864 +0000
++++ netperf-2.7.0-patch/src/nettest_omni.c        2022-03-15 23:10:09.067699443 +0000
+@@ -456,14 +456,6 @@
+ 
+  /* different options for the sockets                          */
+ 
+-int
+-  loc_nodelay,         /* don't/do use NODELAY locally         */
+-  rem_nodelay,         /* don't/do use NODELAY remotely        */
+-  loc_sndavoid,                /* avoid send copies locally            */
+-  loc_rcvavoid,                /* avoid recv copies locally            */
+-  rem_sndavoid,                /* avoid send copies remotely           */
+-  rem_rcvavoid;        /* avoid recv_copies remotely           */
+-
+ extern int
+   loc_tcpcork,
+   rem_tcpcork,
 diff -u -r netperf-2.7.0/src/netlib.c netperf-2.7.0-patch/src/netlib.c
 --- netperf-2.7.0/src/netlib.c	2015-07-20 12:39:35.000000000 -0500
 +++ netperf-2.7.0-patch/src/netlib.c	2020-01-13 14:40:59.727719673 -0600
