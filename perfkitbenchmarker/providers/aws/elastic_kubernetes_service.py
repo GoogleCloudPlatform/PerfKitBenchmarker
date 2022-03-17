@@ -57,7 +57,8 @@ class EksCluster(container_service.KubernetesCluster):
       self.region = util.GetRegionFromZones(self.control_plane_zones)
     # control_plane_zones must be a superset of the node zones
     for nodepool in self.nodepools.values():
-      if nodepool.vm_config.zone not in self.control_plane_zones:
+      if (nodepool.vm_config.zone and
+          nodepool.vm_config.zone not in self.control_plane_zones):
         self.control_plane_zones.append(nodepool.vm_config.zone)
     if len(self.control_plane_zones) == 1:
       # eksctl essentially requires you pass --zones if you pass --node-zones

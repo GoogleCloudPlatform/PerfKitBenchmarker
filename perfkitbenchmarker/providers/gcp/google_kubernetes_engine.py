@@ -232,7 +232,8 @@ class GkeCluster(container_service.KubernetesCluster):
 
     cmd.flags['num-nodes'] = num_nodes
     # vm_config.zone may be split a comma separated list
-    cmd.flags['node-locations'] = vm_config.zone
+    if vm_config.zone:
+      cmd.flags['node-locations'] = vm_config.zone
 
     if vm_config.machine_type is None:
       cmd.flags['machine-type'] = 'custom-{0}-{1}'.format(

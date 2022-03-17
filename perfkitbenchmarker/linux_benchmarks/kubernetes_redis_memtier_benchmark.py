@@ -51,13 +51,16 @@ kubernetes_redis_memtier:
     cloud: GCP
     type: Kubernetes
     vm_count: 4
-    vm_spec:
-      GCP:
-        machine_type: n2-standard-2
-        zone: us-central1-a
+    vm_spec: *default_dual_core
     nodepools:
       clients:
-        vm_spec: *default_single_core
+        vm_spec:
+          GCP:
+            machine_type: n2-standard-4
+          AWS:
+            machine_type: m6i.xlarge
+          Azure:
+            machine_type: Standard_D4s_v5
         vm_count: 1
   vm_groups:
     clients:

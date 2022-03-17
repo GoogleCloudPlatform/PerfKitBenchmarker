@@ -445,7 +445,7 @@ class GoogleKubernetesEngineRegionalTestCase(
     pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
-  def create_kubernetes_engine_spec():
+  def create_kubernetes_engine_spec(use_zonal_nodepools=False):
     kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
@@ -459,8 +459,11 @@ class GoogleKubernetesEngineRegionalTestCase(
                 'nodepool1': {
                     'vm_spec': {
                         'GCP': {
-                            'machine_type': 'machine-type-1',
-                            'zone': 'us-west1-a,us-west1-b',
+                            'machine_type':
+                                'machine-type-1',
+                            'zone':
+                                'us-west1-a,us-west1-b'
+                                if use_zonal_nodepools else None,
                         },
                     }
                 },
@@ -468,7 +471,8 @@ class GoogleKubernetesEngineRegionalTestCase(
                     'vm_spec': {
                         'GCP': {
                             'machine_type': 'machine-type-2',
-                            'zone': 'us-west1-c',
+                            'zone':
+                                'us-west1-c' if use_zonal_nodepools else None,
                         },
                     }
                 },
@@ -476,9 +480,8 @@ class GoogleKubernetesEngineRegionalTestCase(
         })
     return kubernetes_engine_spec
 
-  def testCreateCustomVersion(self):
-    spec = self.create_kubernetes_engine_spec()
-    FLAGS.container_cluster_version = 'fake-version'
+  def testCreateRegionalCluster(self):
+    spec = self.create_kubernetes_engine_spec(use_zonal_nodepools=False)
     with patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
@@ -498,8 +501,7 @@ class GoogleKubernetesEngineRegionalTestCase(
                                      ['--machine-type', 'machine-type-1'])
       self.assertContainsSubsequence(
           create_nodepool1, ['--node-labels', 'pkb_nodepool=nodepool1'])
-      self.assertContainsSubsequence(
-          create_nodepool1, ['--node-locations', 'us-west1-a,us-west1-b'])
+      self.assertNotIn('--node-locations', create_nodepool1)
       self.assertContainsSubsequence(create_nodepool1, ['--region', 'us-west1'])
 
       self.assertContainsSubsequence(
@@ -507,6 +509,34 @@ class GoogleKubernetesEngineRegionalTestCase(
           ['gcloud', 'container', 'node-pools', 'create', 'nodepool2'])
       self.assertContainsSubsequence(create_nodepool2,
                                      ['--machine-type', 'machine-type-2'])
+      self.assertNotIn('--node-locations', create_nodepool2)
+
+  def testCreateRegionalClusterZonalNodepool(self):
+    spec = self.create_kubernetes_engine_spec(use_zonal_nodepools=True)
+    with patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      create_cluster, create_nodepool1, create_nodepool2 = (
+          call[0][0] for call in issue_command.call_args_list)
+      self.assertNotIn('--zone', create_cluster)
+      self.assertContainsSubsequence(create_cluster, ['--region', 'us-west1'])
+      self.assertContainsSubsequence(create_cluster,
+                                     ['--machine-type', 'fake-machine-type'])
+
+      self.assertContainsSubsequence(
+          create_nodepool1,
+          ['gcloud', 'container', 'node-pools', 'create', 'nodepool1'])
+      self.assertContainsSubsequence(create_nodepool1,
+                                     ['--cluster', 'pkb-fake-urn-uri'])
+      self.assertContainsSubsequence(
+          create_nodepool1, ['--node-labels', 'pkb_nodepool=nodepool1'])
+      self.assertContainsSubsequence(
+          create_nodepool1, ['--node-locations', 'us-west1-a,us-west1-b'])
+      self.assertContainsSubsequence(create_nodepool1, ['--region', 'us-west1'])
+
+      self.assertContainsSubsequence(
+          create_nodepool2,
+          ['gcloud', 'container', 'node-pools', 'create', 'nodepool2'])
       self.assertContainsSubsequence(create_nodepool2,
                                      ['--node-locations', 'us-west1-c'])
 

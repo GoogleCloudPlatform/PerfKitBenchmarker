@@ -474,24 +474,29 @@ class BaseContainerCluster(resource.BaseResource):
   def __init__(self, cluster_spec):
     super().__init__(user_managed=bool(cluster_spec.static_cluster))
     self.name = cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
+    self.vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
+        cluster_spec.vm_spec)
+    self.zone = self.vm_config.zone
     # Use Virtual Machine class to resolve VM Spec. This lets subclasses parse
     # Provider specific information like disks out of the spec.
     for name, nodepool in cluster_spec.nodepools.copy().items():
+      nodepool_zone = nodepool.vm_spec.zone
+      # VM Classes can require zones. But nodepools have optional zones.
+      if not nodepool_zone:
+        nodepool.vm_spec.zone = self.zone
       nodepool.vm_config = virtual_machine.GetVmClass(
           self.CLOUD, os_types.DEFAULT)(nodepool.vm_spec)
+      nodepool.vm_config.zone = nodepool_zone
       nodepool.num_nodes = nodepool.vm_count
       # Fix name
       del cluster_spec.nodepools[name]
       cluster_spec.nodepools[NodePoolName(name)] = nodepool
     self.nodepools = cluster_spec.nodepools
-    self.vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
-        cluster_spec.vm_spec)
     self.num_nodes = cluster_spec.vm_count
     self.min_nodes = cluster_spec.min_vm_count or self.num_nodes
     self.max_nodes = cluster_spec.max_vm_count or self.num_nodes
     self.containers = collections.defaultdict(list)
     self.services = {}
-    self.zone = self.vm_config.zone
 
   def DeleteContainers(self):
     """Delete containers belonging to the cluster."""

@@ -120,6 +120,7 @@ class AksCluster(container_service.KubernetesCluster):
     super(AksCluster, self).__init__(spec)
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
+    self.node_resource_group = None
     self.name = 'pkbcluster%s' % FLAGS.run_uri
     # TODO(pclay): replace with built in service principal once I figure out how
     # to make it work with ACR
@@ -201,7 +202,8 @@ class AksCluster(container_service.KubernetesCluster):
         azure.AZURE_PATH, 'aks', 'show', '--name', self.name,
     ] + self.resource_group.args, raise_on_failure=False)
     try:
-      json.loads(stdout)
+      cluster = json.loads(stdout)
+      self.node_resource_group = cluster['nodeResourceGroup']
       return True
     except ValueError:
       return False
@@ -227,10 +229,8 @@ class AksCluster(container_service.KubernetesCluster):
   def _PostCreate(self):
     """Tags the cluster resource group."""
     super(AksCluster, self)._PostCreate()
-    cluster_resource_group_name = 'MC_%s_%s_%s' % (
-        self.resource_group.name, self.name, self.zone)
     set_tags_cmd = [
-        azure.AZURE_PATH, 'group', 'update', '-g', cluster_resource_group_name,
+        azure.AZURE_PATH, 'group', 'update', '-g', self.node_resource_group,
         '--set', util.GetTagsJson(self.resource_group.timeout_minutes)
     ]
     vm_util.IssueCommand(set_tags_cmd)
