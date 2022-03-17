@@ -660,8 +660,20 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
          'OverconstrainedZonalAllocationRequest' in stderr)):
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     if retcode:
-      raise errors.Resource.CreationError(
-          'Failed to create VM: %s return code: %s' % (stderr, retcode))
+      if "Virtual Machine Scale Set with '<NULL>' security type." in stderr:
+        raise errors.Resource.CreationError(
+            f'Failed to create VM: {self.machine_type} is likely a confidential'
+            ' machine, which PKB does not support at this time.\n\n'
+            f' Full error: {stderr} return code: {retcode}')
+      if "cannot boot Hypervisor Generation '1'" in stderr:
+        raise errors.Resource.CreationError(
+            f'Failed to create VM: {self.machine_type} is unable to support V1 '
+            'Hypervision. Please update _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES'
+            ' in azure_virtual_machine.py.\n\n'
+            f' Full error: {stderr} return code: {retcode}')
+      else:
+        raise errors.Resource.CreationError(
+            'Failed to create VM: %s return code: %s' % (stderr, retcode))
 
   def _Exists(self):
     """Returns True if the VM exists."""
