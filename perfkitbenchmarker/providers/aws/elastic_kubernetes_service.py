@@ -131,6 +131,8 @@ class EksCluster(container_service.KubernetesCluster):
     eksctl_flags = {
         'cluster': self.name,
         'name': name,
+        # Support ARM: https://github.com/weaveworks/eksctl/issues/3569
+        'skip-outdated-addons-check': True
     }
     eksctl_flags.update(
         self._GetNodeFlags(name, node_group.num_nodes, node_group.vm_config))

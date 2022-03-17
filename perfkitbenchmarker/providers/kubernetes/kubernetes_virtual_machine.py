@@ -481,42 +481,8 @@ class DebianBasedKubernetesVirtualMachine(
         key = f.read()
         self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
 
-    # TODO(pclay): figure out if this is all necessary.
-    # cpio is needed for the MKL math library.
     # software-properties-common is needed for add-apt-repository
-    self.InstallPackages('cpio software-properties-common')
-
-    # Don't assume the relevant CLI is installed in the Kubernetes environment.
-    if FLAGS.container_cluster_cloud == 'GCP':
-      self.InstallGcloudCli()
-    elif FLAGS.container_cluster_cloud == 'AWS':
-      self.InstallAwsCli()
-    elif FLAGS.container_cluster_cloud == 'Azure':
-      self.InstallAzureCli()
-
-  def InstallAwsCli(self):
-    """Installs the AWS CLI; used for downloading preprovisioned data."""
-    self.Install('aws_credentials')
-    self.Install('awscli')
-
-  def InstallAzureCli(self):
-    """Installs the Azure CLI; used for downloading preprovisioned data."""
-    self.Install('azure_cli')
-    self.Install('azure_credentials')
-
-  # TODO(ferneyhough): Consider making this a package.
-  def InstallGcloudCli(self):
-    """Installs the Gcloud CLI; used for downloading preprovisioned data."""
-    self.InstallPackages('curl')
-    # The driver /usr/lib/apt/methods/https is sometimes needed for apt-get.
-    self.InstallPackages('apt-transport-https')
-    self.RemoteCommand('echo "deb https://packages.cloud.google.com/apt '
-                       'cloud-sdk-$(lsb_release -c -s) main" | sudo tee -a '
-                       '/etc/apt/sources.list.d/google-cloud-sdk.list')
-    self.RemoteCommand('curl https://packages.cloud.google.com/apt/doc/'
-                       'apt-key.gpg | sudo apt-key add -')
-    self.RemoteCommand('sudo apt-get update && sudo apt-get install '
-                       '-y google-cloud-sdk')
+    self.InstallPackages('software-properties-common')
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a preprovisioned data file.
