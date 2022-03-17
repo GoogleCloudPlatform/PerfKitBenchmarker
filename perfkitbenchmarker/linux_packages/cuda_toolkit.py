@@ -43,34 +43,24 @@ flags.DEFINE_enum(
 
 FLAGS = flags.FLAGS
 
-CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/{cpu_arch}/cuda-{os}.pin'
+CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/x86_64/cuda-{os}.pin'
 
-CUDA_11_6_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.6.1/local_installers/cuda-repo-{os}-11-6-local_11.6.1-510.47.03-1_{cpu_arch}.deb'
-CUDA_11_5_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.5.2/local_installers/cuda-repo-{os}-11-5-local_11.5.2-495.29.05-1_{cpu_arch}.deb'
-CUDA_11_4_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.4.4/local_installers/cuda-repo-{os}-11-4-local_11.4.4-470.82.01-1_{cpu_arch}.deb'
-CUDA_11_3_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.3.1/local_installers/cuda-repo-{os}-11-3-local_11.3.1-465.19.01-1_{cpu_arch}.deb'
-CUDA_11_2_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.2.2/local_installers/cuda-repo-{os}-11-2-local_11.2.2-460.32.03-1_{cpu_arch}.deb'
-CUDA_11_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.1.1/local_installers/cuda-repo-{os}-11-1-local_11.1.1-455.32.00-1_{cpu_arch}.deb'
-CUDA_11_0_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.0.3/local_installers/cuda-repo-{os}-11-0-local_11.0.3-450.51.06-1_{cpu_arch}.deb'
-CUDA_10_2_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/10.2/Prod/local_installers/cuda-repo-{os}-10-2-local-10.2.89-440.33.01_1.0-1_{cpu_arch}.deb'
-CUDA_10_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/10.1/Prod/local_installers/cuda-repo-{os}-10-1-local-10.1.243-418.87.00_1.0-1_{cpu_arch}.deb'
-CUDA_10_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/10.0/Prod/local_installers/cuda-repo-{os}-10-0-local-10.0.130-410.48_1.0-1_{cpu_arch}'
-CUDA_9_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-{os}-9-0-local_9.0.176-1_{cpu_arch}-deb'
-CUDA_9_0_PATCH = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/patches/1/cuda-repo-{os}-9-0-local-cublas-performance-update_1.0-1_{cpu_arch}-deb'
+CUDA_11_6_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.6.1/local_installers/cuda-repo-{os}-11-6-local_11.6.1-510.47.03-1_amd64.deb'
+CUDA_11_5_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.5.2/local_installers/cuda-repo-{os}-11-5-local_11.5.2-495.29.05-1_amd64.deb'
+CUDA_11_4_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.4.4/local_installers/cuda-repo-{os}-11-4-local_11.4.4-470.82.01-1_amd64.deb'
+CUDA_11_3_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.3.1/local_installers/cuda-repo-{os}-11-3-local_11.3.1-465.19.01-1_amd64.deb'
+CUDA_11_2_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.2.2/local_installers/cuda-repo-{os}-11-2-local_11.2.2-460.32.03-1_amd64.deb'
+CUDA_11_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.1.1/local_installers/cuda-repo-{os}-11-1-local_11.1.1-455.32.00-1_amd64.deb'
+CUDA_11_0_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.0.3/local_installers/cuda-repo-{os}-11-0-local_11.0.3-450.51.06-1_amd64.deb'
+CUDA_10_2_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/10.2/Prod/local_installers/cuda-repo-{os}-10-2-local-10.2.89-440.33.01_1.0-1_amd64.deb'
+CUDA_10_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/10.1/Prod/local_installers/cuda-repo-{os}-10-1-local-10.1.243-418.87.00_1.0-1_amd64.deb'
+CUDA_10_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/10.0/Prod/local_installers/cuda-repo-{os}-10-0-local-10.0.130-410.48_1.0-1_amd64'
+CUDA_9_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-{os}-9-0-local_9.0.176-1_amd64-deb'
+CUDA_9_0_PATCH = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/patches/1/cuda-repo-{os}-9-0-local-cublas-performance-update_1.0-1_amd64-deb'
 
 
 def _CudaOs(os_type):
   return re.sub('_.*$', '', os_type)
-
-
-def _GetCpuArchPath(vm):
-  """Returns the CPU architecture of the VM."""
-  return 'arm64' if vm.host_arch else 'x86_64'
-
-
-def _GetCpuArch(vm):
-  """Returns the CPU architecture of the VM."""
-  return 'arm64' if vm.host_arch else 'amd64'
 
 
 class UnsupportedCudaVersionError(Exception):
@@ -161,18 +151,15 @@ def _InstallCuda9Point0(vm):
     vm: VM to install CUDA on
   """
   basename = posixpath.basename(
-      CUDA_9_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE),
-                              cpu_arch=_GetCpuArch(vm))) + '.deb'
-  vm.RemoteCommand('wget -q %s -O %s' % (CUDA_9_0_TOOLKIT.format(
-      os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)), basename))
+      CUDA_9_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE))) + '.deb'
+  vm.RemoteCommand('wget -q %s -O %s' %
+                   (CUDA_9_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)), basename))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   vm.RemoteCommand('sudo apt-key add /var/cuda-repo-9-0-local/7fa2af80.pub')
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('cuda-toolkit-9-0 cuda-tools-9-0 cuda-libraries-9-0 '
                      'cuda-libraries-dev-9-0')
-  _InstallCudaPatch(
-      vm,
-      CUDA_9_0_PATCH.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))
+  _InstallCudaPatch(vm, CUDA_9_0_PATCH.format(os=_CudaOs(vm.OS_TYPE)))
 
 
 def _InstallCuda10Point0(vm):
@@ -182,10 +169,10 @@ def _InstallCuda10Point0(vm):
     vm: VM to install CUDA on
   """
   basename = (
-      f'{posixpath.basename(CUDA_10_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))}.deb'
+      f'{posixpath.basename(CUDA_10_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)))}.deb'
   )
   vm.RemoteCommand(
-      f'wget -q {CUDA_10_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm))} -O '
+      f'wget -q {CUDA_10_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE))} -O '
       f'{basename}')
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   vm.RemoteCommand('sudo apt-key add '
@@ -202,15 +189,12 @@ def _InstallCuda10Point1(vm):
     vm: VM to install CUDA on
   """
   basename = posixpath.basename(
-      CUDA_10_1_TOOLKIT.format(
-          os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))
-  vm.RemoteCommand(
-      'wget -q %s' %
-      CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArchPath(vm)))
+      CUDA_10_1_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)))
+  vm.RemoteCommand('wget -q %s' % CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE)))
   vm.RemoteCommand(f'sudo mv cuda-{_CudaOs(vm.OS_TYPE)}.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
-  vm.RemoteCommand('wget -q %s' % CUDA_10_1_TOOLKIT.format(
-      os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))
+  vm.RemoteCommand('wget -q %s' %
+                   CUDA_10_1_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   vm.RemoteCommand('sudo apt-key add '
                    '/var/cuda-repo-10-1-local-10.1.243-418.87.00/7fa2af80.pub')
@@ -226,15 +210,12 @@ def _InstallCuda10Point2(vm):
     vm: VM to install CUDA on
   """
   basename = posixpath.basename(
-      CUDA_10_2_TOOLKIT.format(
-          os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))
-  vm.RemoteCommand(
-      'wget -q %s' %
-      CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArchPath(vm)))
+      CUDA_10_2_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)))
+  vm.RemoteCommand('wget -q %s' % CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE)))
   vm.RemoteCommand(f'sudo mv cuda-{_CudaOs(vm.OS_TYPE)}.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
-  vm.RemoteCommand('wget -q %s' % CUDA_10_2_TOOLKIT.format(
-      os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))
+  vm.RemoteCommand('wget -q %s' %
+                   CUDA_10_2_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE)))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   vm.RemoteCommand('sudo apt-key add '
                    '/var/cuda-repo-10-2-local-10.2.89-440.33.01/7fa2af80.pub')
@@ -251,11 +232,9 @@ def _InstallCuda11Generic(vm, toolkit_fmt, version_dash):
     toolkit_fmt: format string to use for the toolkit name
     version_dash: Version (ie 11-1) to install
   """
-  toolkit = toolkit_fmt.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm))
+  toolkit = toolkit_fmt.format(os=_CudaOs(vm.OS_TYPE))
   basename = posixpath.basename(toolkit)
-  vm.RemoteCommand(
-      f'wget -q {CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArchPath(vm))}'
-  )
+  vm.RemoteCommand(f'wget -q {CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE))}')
   vm.RemoteCommand(f'sudo mv cuda-{_CudaOs(vm.OS_TYPE)}.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
   vm.RemoteCommand(f'wget -q {toolkit}')
