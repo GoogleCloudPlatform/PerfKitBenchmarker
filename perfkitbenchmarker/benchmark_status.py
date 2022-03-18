@@ -51,9 +51,18 @@ class FailedSubstatus(object):
   # General failure that don't fit in the above categories.
   UNCATEGORIZED = 'UNCATEGORIZED'
 
+  # Failure when restoring resource.
+  RESTORE_FAILED = 'RESTORE_FAILED'
+
+  # Failure when freezing resource.
+  FREEZE_FAILED = 'FREEZE_FAILED'
+
   # List of valid substatuses for use with --retries.
   # UNCATEGORIZED failures are not retryable. To make a specific UNCATEGORIZED
   # failure retryable, please raise an errors.Benchmarks.KnownIntermittentError.
+  # RESTORE_FAILED/FREEZE_FAILED failures are not retryable since generally
+  # logic for freeze/restore is already retried in the BaseResource
+  # Create()/Delete().
   RETRYABLE_SUBSTATUSES = [
       QUOTA, INSUFFICIENT_CAPACITY, KNOWN_INTERMITTENT, INTERRUPTED, UNSUPPORTED
   ]

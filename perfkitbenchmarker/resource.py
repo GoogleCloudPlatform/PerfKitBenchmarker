@@ -301,6 +301,8 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     Raises:
       RestoreError: Generic error encompassing restore failures.
     """
+    # TODO(user): Add usage lock with labels to prevent multiple
+    # benchmarks from using the same resource concurrently.
     logging.info('Restoring resource %s.', repr(self))
 
     try:

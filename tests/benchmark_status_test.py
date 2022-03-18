@@ -107,6 +107,16 @@ class FailedSubstatusTestCase(pkb_common_test_case.PkbCommonTestCase):
               benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT,
       },
       {
+          'testcase_name': 'RestoreError',
+          'exception_class': errors.Resource.RestoreError,
+          'expected_substatus': benchmark_status.FailedSubstatus.RESTORE_FAILED,
+      },
+      {
+          'testcase_name': 'FreezeError',
+          'exception_class': errors.Resource.FreezeError,
+          'expected_substatus': benchmark_status.FailedSubstatus.FREEZE_FAILED,
+      },
+      {
           'testcase_name': 'Uncategorized',
           'exception_class': Exception,
           'expected_substatus': benchmark_status.FailedSubstatus.UNCATEGORIZED,

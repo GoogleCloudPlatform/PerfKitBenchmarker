@@ -1132,6 +1132,12 @@ def RunBenchmark(spec, collector):
         elif (isinstance(e, errors.Benchmarks.UnsupportedConfigError) or
               'UnsupportedConfigError' in str(e)):
           spec.failed_substatus = benchmark_status.FailedSubstatus.UNSUPPORTED
+        elif isinstance(e, errors.Resource.RestoreError):
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.RESTORE_FAILED)
+        elif isinstance(e, errors.Resource.FreezeError):
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.FREEZE_FAILED)
         else:
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.UNCATEGORIZED)
