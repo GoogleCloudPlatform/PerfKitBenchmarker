@@ -159,6 +159,10 @@ def _BuildStartCommand(vm, port: int) -> str:
 
 def Start(vm) -> None:
   """Start redis server process."""
+  # 10 is an arbituary multiplier that ensures this value is high enough.
+  mux_sessions = 10 * _NUM_PROCESSES.value
+  vm.RemoteCommand(f'echo "\nMaxSessions {mux_sessions}" | '
+                   'sudo tee -a /etc/ssh/sshd_config')
   # Redis tuning parameters, see
   # https://www.techandme.se/performance-tips-for-redis-cache-server/.
   # This command works on 2nd generation of VMs only.
