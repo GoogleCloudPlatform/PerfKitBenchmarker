@@ -118,6 +118,15 @@ flags.DEFINE_string(
     'dpb_sparksql_data_format', None,
     "Format of data to load. Assumed to be 'parquet' for HCFS "
     "and 'bigquery' for bigquery if unspecified.")
+flags.DEFINE_string(
+    'dpb_sparksql_data_compression', None,
+    'Compression format of the data to load. Since for most formats available '
+    'in Spark this may only be specified when writing data, for most cases '
+    'this option is a no-op and only serves the purpose of tagging the results '
+    'reported by PKB with the appropriate compression format. One notable '
+    'exception though is when the dpb_sparksql_copy_to_hdfs flag is passed. In '
+    'that case the compression data passed will be used to write data into '
+    'HDFS.')
 flags.DEFINE_string('dpb_sparksql_csv_delimiter', ',',
                     'CSV delimiter to load the CSV file.')
 flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', BENCHMARK_NAMES.keys(),
@@ -241,7 +250,11 @@ def Prepare(benchmark_spec):
       }
       for flag, data_dir in copy_dirs.items():
         staged_file = os.path.join(cluster.base_dir, flag + '-metadata.json')
-        metadata = _GetDistCpMetadata(data_dir, benchmark_spec.table_subdirs)
+        extra = {}
+        if flag == 'destination' and FLAGS.dpb_sparksql_data_compression:
+          extra['compression'] = FLAGS.dpb_sparksql_data_compression
+        metadata = _GetDistCpMetadata(
+            data_dir, benchmark_spec.table_subdirs, extra_metadata=extra)
         _StageMetadata(metadata, storage_service, staged_file)
         job_arguments += ['--{}-metadata'.format(flag), staged_file]
       try:
@@ -295,6 +308,8 @@ def Run(benchmark_spec):
     metadata['data_format'] = FLAGS.bigquery_record_format
   elif FLAGS.dpb_sparksql_data_format:
     metadata['data_format'] = FLAGS.dpb_sparksql_data_format
+  if FLAGS.dpb_sparksql_data_compression:
+    metadata['data_compression'] = FLAGS.dpb_sparksql_data_compression
 
   # Run PySpark Spark SQL Runner
   report_dir = '/'.join([cluster.base_dir, f'report-{int(time.time()*1000)}'])
@@ -411,12 +426,15 @@ def _GetTableMetadata(benchmark_spec):
   return metadata
 
 
-def _GetDistCpMetadata(base_dir: str, subdirs: List[str]):
+def _GetDistCpMetadata(base_dir: str, subdirs: List[str], extra_metadata=None):
   """Compute list of table metadata for spark_sql_distcp metadata flags."""
   metadata = []
+  if not extra_metadata:
+    extra_metadata = {}
   for subdir in subdirs or []:
     metadata += [(FLAGS.dpb_sparksql_data_format or 'parquet', {
-        'path': '/'.join([base_dir, subdir])
+        'path': '/'.join([base_dir, subdir]),
+        **extra_metadata
     })]
   return metadata
 
