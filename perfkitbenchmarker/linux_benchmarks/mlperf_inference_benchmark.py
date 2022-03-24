@@ -184,9 +184,12 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   makefile = f'{repository}/closed/NVIDIA/Makefile'
   vm_util.ReplaceText(vm, 'shell uname -p', 'shell uname -m', makefile)
 
-  requirements = f'{repository}/closed/NVIDIA/docker/requirements.1'
+  requirements1 = f'{repository}/closed/NVIDIA/docker/requirements.1'
   vm_util.ReplaceText(vm, 'opencv-python-headless==4.5.2.52',
-                      'opencv-python-headless==4.5.3.56', requirements)
+                      'opencv-python-headless==4.5.3.56', requirements1)
+  requirements2 = f'{repository}/closed/NVIDIA/docker/requirements.2'
+  for requirements in (requirements1, requirements2):
+    vm_util.ReplaceText(vm, 'git:', 'https:', requirements)
 
   if nvidia_driver.CheckNvidiaGpuExists(vm):
     vm.Install('cuda_toolkit')
