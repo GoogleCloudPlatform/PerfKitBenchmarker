@@ -1,4 +1,3 @@
-# Lint as: python2, python3
 """Runs a BigQuery TensorFlow connector benchmark."""
 
 import time
