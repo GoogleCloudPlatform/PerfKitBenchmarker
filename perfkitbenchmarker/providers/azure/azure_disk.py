@@ -193,7 +193,7 @@ class AzureDisk(disk.BaseDisk):
           str(self.lun), '--sku', self.disk_type, '--vm-name', self.vm_name,
           '--size-gb',
           str(self.disk_size)
-      ] + self.resource_group.args, raise_on_failure=False)
+      ] + self.resource_group.args, raise_on_failure=False, timeout=600)
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
