@@ -120,7 +120,10 @@ class MlperfInferenceBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
         'version': 'v1.1'
     }
     golden = Sample(
-        metric='throughput', value=3102.76, unit='samples/s', metadata=metadata)
+        metric='throughput',
+        value=3102.49,
+        unit='samples per second',
+        metadata=metadata)
     self.assertSamplesEqualUpToTimestamp(golden, samples[0])
 
     samples = mlperf_inference_benchmark.MakeAccuracySamplesFromOutput(
@@ -152,7 +155,6 @@ class MlperfInferenceBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
         'mlperf power_limit': 'None',
         'mlperf cpu_freq': 'None',
         'mlperf test_mode': 'AccuracyOnly',
-        'mlperf fast': 'True',
         'mlperf gpu_num_bundles': '2',
         'mlperf log_dir': '/work/build/logs/2021.11.09-05.18.28',
         'Threshold': 89.965,
@@ -232,8 +234,8 @@ class MlperfInferenceBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
     }
     golden = Sample(
         metric='throughput',
-        value=2102380.0,
-        unit='samples/s',
+        value=2102359.14,
+        unit='samples per second',
         metadata=metadata)
     self.assertSamplesEqualUpToTimestamp(golden, samples[0])
 
@@ -247,7 +249,6 @@ class MlperfInferenceBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
         'mlperf config_name': 'A100-SXM4-40GBx8_dlrm_Server',
         'mlperf config_ver': 'custom_k_99_MaxP',
         'mlperf cpu_freq': 'None',
-        'mlperf fast': 'True',
         'mlperf gpu_batch_size': '262100',
         'mlperf gpu_copy_streams': '1',
         'mlperf gpu_inference_streams': '1',

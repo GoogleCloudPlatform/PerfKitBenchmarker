@@ -45,7 +45,6 @@ use_cpu : False
 power_limit : None
 cpu_freq : None
 test_mode : AccuracyOnly
-fast : True
 log_dir : /work/build/logs/2021.11.13-06.24.26
 &&&& RUNNING DLRM_HARNESS # ./build/bin/harness_dlrm
 [I] [TRT] [MemUsageChange] Init CUDA: CPU +0, GPU +0, now: CPU 0, GPU 10924 (MiB)

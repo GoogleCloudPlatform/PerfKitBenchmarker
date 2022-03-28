@@ -148,7 +148,6 @@ _ACCURACY_METADATA = [
     'power_limit',
     'cpu_freq',
     'test_mode',
-    'fast',
     'gpu_num_bundles',
     'log_dir',
 ]
@@ -304,9 +303,13 @@ def MakePerformanceSamplesFromOutput(base_metadata: Dict[str, Any],
     metadata[f'mlperf {column_name}'] = regex_util.ExtractExactlyOneMatch(
         fr'{re.escape(column_name)} *: *(.*)', output)
   metadata.update(base_metadata)
-  throughput = regex_util.ExtractFloat(
-      r': result_scheduled_samples_per_sec: (\d+\.\d+)', output)
-  return [sample.Sample('throughput', float(throughput), 'samples/s', metadata)]
+  return [
+      sample.Sample(
+          'throughput',
+          regex_util.ExtractFloat(
+              r'Completed samples per second    : (\d+\.\d+)', output),
+          'samples per second', metadata)
+  ]
 
 
 def MakeAccuracySamplesFromOutput(base_metadata: Dict[str, Any],
@@ -351,14 +354,14 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} --fast --test_mode=PerformanceOnly\'"',
+      f'--scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly\'"',
       should_log=True)
   performance_samples = MakePerformanceSamplesFromOutput(metadata, stdout)
   stdout, _ = vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} --fast --test_mode=AccuracyOnly\'"',
+      f'--scenarios={_SCENARIOS.value} --test_mode=AccuracyOnly\'"',
       should_log=True)
   accuracy_samples = MakeAccuracySamplesFromOutput(metadata, stdout)
   return performance_samples + accuracy_samples
