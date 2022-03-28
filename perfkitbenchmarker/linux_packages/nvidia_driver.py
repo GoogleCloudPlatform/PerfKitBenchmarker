@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 """Module containing NVIDIA Driver installation.
 """
 
@@ -32,45 +31,6 @@ NVIDIA_TESLA_P100 = 'p100'
 NVIDIA_TESLA_V100 = 'v100'
 NVIDIA_TESLA_T4 = 't4'
 NVIDIA_TESLA_A100 = 'a100'
-
-"""Default GPU clocks and autoboost configurations.
-
-Base_clock is the default clock speeds when setting the GPU clocks. Max_clock
-is currently unused. The clock speeds are in the format of
-[memory_clock in MHz, graphics_clock in MHz].
-"""
-GPU_DEFAULTS = {
-    NVIDIA_TESLA_K80: {
-        'base_clock': [2505, 562],
-        'max_clock': [2505, 875],
-        'autoboost_enabled': True,
-    },
-    NVIDIA_TESLA_P4: {
-        'base_clock': [3003, 885],
-        'max_clock': [3003, 1531],
-        'autoboost_enabled': None,
-    },
-    NVIDIA_TESLA_P100: {
-        'base_clock': [715, 1189],
-        'max_clock': [715, 1328],
-        'autoboost_enabled': None,
-    },
-    NVIDIA_TESLA_V100: {
-        'base_clock': [877, 1312],
-        'max_clock': [877, 1530],
-        'autoboost_enabled': None,
-    },
-    NVIDIA_TESLA_T4: {
-        'base_clock': [5001, 585],
-        'max_clock': [5001, 1590],
-        'autoboost_enabled': None,
-    },
-    NVIDIA_TESLA_A100: {
-        'base_clock': [1215, 1410],
-        'max_clock': [1215, 1410],
-        'autoboost_enabled': None,
-    },
-}
 
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
@@ -304,14 +264,8 @@ def SetAndConfirmGpuClocks(vm):
     UnsupportedClockSpeedError: If a GPU did not accept the
     provided clock speeds.
   """
-  gpu_type = GetGpuType(vm)
-  gpu_clock_speeds = GPU_DEFAULTS[gpu_type]['base_clock']
-  autoboost_enabled = GPU_DEFAULTS[gpu_type]['autoboost_enabled']
-
-  if FLAGS.gpu_clock_speeds is not None:
-    gpu_clock_speeds = FLAGS.gpu_clock_speeds
-  if FLAGS.gpu_autoboost_enabled is not None:
-    autoboost_enabled = FLAGS.gpu_autoboost_enabled
+  gpu_clock_speeds = FLAGS.gpu_clock_speeds
+  autoboost_enabled = FLAGS.gpu_autoboost_enabled
 
   desired_memory_clock = gpu_clock_speeds[0]
   desired_graphics_clock = gpu_clock_speeds[1]
@@ -465,7 +419,8 @@ def DoPostInstallActions(vm):
   Args:
     vm: The virtual machine to operate on.
   """
-  SetAndConfirmGpuClocks(vm)
+  if FLAGS.gpu_clock_speeds:
+    SetAndConfirmGpuClocks(vm)
 
 
 def Install(vm):
