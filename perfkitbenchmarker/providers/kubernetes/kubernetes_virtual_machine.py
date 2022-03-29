@@ -31,6 +31,7 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
@@ -68,6 +69,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.image = self.image or self.DEFAULT_IMAGE
     self.resource_limits = vm_spec.resource_limits
     self.resource_requests = vm_spec.resource_requests
+    self.cloud = FLAGS.container_cluster_cloud
 
   def GetResourceMetadata(self):
     metadata = super(KubernetesVirtualMachine, self).GetResourceMetadata()
@@ -530,12 +532,18 @@ class DebianBasedKubernetesVirtualMachine(
     if cloud == 'GCP' and FLAGS.gcp_preprovisioned_data_bucket:
       stat_function = (gce_virtual_machine.
                        GenerateStatPreprovisionedDataCommand)
+      gce_virtual_machine.GceVirtualMachine.InstallCli(self)
+      # We assume that gsutil is installed to /usr/bin/gsutil on GCE VMs
+      self.RemoteCommand(
+          f'ln -s {google_cloud_sdk.GSUTIL_PATH} /usr/bin/gsutil')
     elif cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
       stat_function = (aws_virtual_machine.
                        GenerateStatPreprovisionedDataCommand)
+      aws_virtual_machine.AwsVirtualMachine.InstallCli(self)
     elif cloud == 'Azure' and FLAGS.azure_preprovisioned_data_bucket:
       stat_function = (azure_virtual_machine.
                        GenerateStatPreprovisionedDataCommand)
+      azure_virtual_machine.AzureVirtualMachine.InstallCli(self)
     else:
       return False
     return self.TryRemoteCommand(stat_function(module_name, filename))
