@@ -733,6 +733,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
             self.RemoteCommand('cat /proc/cmdline')[0].strip())
 
   @property
+  def cpu_arch(self):
+    """Returns the CPU architecture of the VM."""
+    return (self.os_metadata.get('cpu_arch') or
+            self.RemoteCommand('uname -m')[0].strip())
+
+  @property
   def partition_table(self):
     """Return partition table information."""
     if not self._partition_table:
@@ -780,6 +786,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.os_metadata['threads_per_core'] = lscpu_results.threads_per_core
     self.os_metadata['os_info'] = self.os_info
     self.os_metadata['kernel_release'] = self.kernel_release
+    self.os_metadata['cpu_arch'] = self.cpu_arch
     self.os_metadata.update(self.partition_table)
     if FLAGS.append_kernel_command_line:
       self.os_metadata['kernel_command_line'] = self.kernel_command_line

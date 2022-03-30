@@ -14,11 +14,20 @@
 """Module containing CUDA samples installation."""
 
 from absl import flags
+from perfkitbenchmarker.linux_packages import cuda_toolkit
 
-_VERSION = flags.DEFINE_enum(
-    'cuda_samples_version', None,
-    ['9.0', '10.0', '10.1', '10.2', '11.0', '11.1', '11.2', '11.4'],
-    'Version of CUDA samples to install.')
+_VERSION = flags.DEFINE_enum('cuda_samples_version', None, [
+    '9.0',
+    '10.0',
+    '10.1',
+    '10.2',
+    '11.0',
+    '11.1',
+    '11.2',
+    '11.4',
+    '11.5',
+    '11.6',
+], 'Version of CUDA samples to install.')
 
 FLAGS = flags.FLAGS
 
@@ -38,7 +47,8 @@ def GetBandwidthTestPath(vm):
   if vm.TryRemoteCommand(f'stat {BANDWIDTH_TEST_PATH}'):
     return BANDWIDTH_TEST_PATH
 
-  bandwidth_test_path = 'cuda-samples/bin/x86_64/linux/release/bandwidthTest'
+  cpu_arch = cuda_toolkit.GetCpuArchPath(vm)
+  bandwidth_test_path = f'cuda-samples/bin/{cpu_arch}/linux/release/bandwidthTest'
   if vm.TryRemoteCommand(f'stat {bandwidth_test_path}'):
     return bandwidth_test_path
 

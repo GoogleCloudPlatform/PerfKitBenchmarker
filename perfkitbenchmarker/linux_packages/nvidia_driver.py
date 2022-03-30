@@ -31,6 +31,7 @@ NVIDIA_TESLA_P100 = 'p100'
 NVIDIA_TESLA_V100 = 'v100'
 NVIDIA_TESLA_T4 = 't4'
 NVIDIA_TESLA_A100 = 'a100'
+NVIDIA_TESLA_A10G = 'a10g'
 
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
@@ -186,18 +187,21 @@ def GetGpuType(vm):
 
   if 'K80' in gpu_types[0]:
     return NVIDIA_TESLA_K80
-  if 'P4' in gpu_types[0]:
+  elif 'P4' in gpu_types[0]:
     return NVIDIA_TESLA_P4
-  if 'P100' in gpu_types[0]:
+  elif 'P100' in gpu_types[0]:
     return NVIDIA_TESLA_P100
-  if 'V100' in gpu_types[0]:
+  elif 'V100' in gpu_types[0]:
     return NVIDIA_TESLA_V100
-  if 'T4' in gpu_types[0]:
+  elif 'T4' in gpu_types[0]:
     return NVIDIA_TESLA_T4
-  if 'A100' in gpu_types[0]:
+  elif 'A100' in gpu_types[0]:
     return NVIDIA_TESLA_A100
-  raise UnsupportedClockSpeedError(
-      'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
+  elif 'A10G' in gpu_types[0]:
+    return NVIDIA_TESLA_A10G
+  else:
+    raise UnsupportedClockSpeedError(
+        'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
 
 
 def QueryNumberOfGpus(vm):
@@ -437,9 +441,10 @@ def Install(vm):
     logging.warn('NVIDIA drivers already detected. Not installing.')
     return
 
-  location = ('{base}/{version}/NVIDIA-Linux-x86_64-{version}.run'
-              .format(base=NVIDIA_DRIVER_LOCATION_BASE,
-                      version=version_to_install))
+  location = ('{base}/{version}/NVIDIA-Linux-{cpu_arch}-{version}.run'.format(
+      base=NVIDIA_DRIVER_LOCATION_BASE,
+      version=version_to_install,
+      cpu_arch=vm.cpu_arch))
 
   vm.Install('wget')
   tokens = re.split('/', location)
@@ -447,12 +452,12 @@ def Install(vm):
   vm.RemoteCommand('wget {location} && chmod 755 {filename} '
                    .format(location=location, filename=filename),
                    should_log=True)
-  vm.RemoteCommand('sudo ./{filename} -q -x-module-path={x_module_path} '
-                   '--ui=none -x-library-path={x_library_path} '
-                   '--no-install-compat32-libs'
-                   .format(filename=filename,
-                           x_module_path=FLAGS.nvidia_driver_x_module_path,
-                           x_library_path=FLAGS.nvidia_driver_x_library_path),
-                   should_log=True)
+  vm.RemoteCommand(
+      'sudo ./{filename} -q -x-module-path={x_module_path} '
+      '--ui=none -x-library-path={x_library_path}'.format(
+          filename=filename,
+          x_module_path=FLAGS.nvidia_driver_x_module_path,
+          x_library_path=FLAGS.nvidia_driver_x_library_path),
+      should_log=True)
   if FLAGS.nvidia_driver_persistence_mode:
     EnablePersistenceMode(vm)

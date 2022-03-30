@@ -373,6 +373,7 @@ I/O size (minimum/optimal): 524288 bytes / 1048576 bytes
 class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   os_info = 'Ubuntu 18.04.1 LTS'
   kernel_release = '5.3.0-1026'
+  cpu_arch = 'x86_64'
   partition_table = 'Disk /dev/sda: 1 GiB, 1073741824 bytes, 2097152 sectors'
   lscpu_output = '\n'.join([
       'NUMA node(s): 1',
@@ -381,7 +382,8 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'Socket(s): 1',
   ])
   normal_boot_responses = [
-      'cubic', f'PRETTY_NAME="{os_info}"', kernel_release, partition_table
+      'cubic', f'PRETTY_NAME="{os_info}"', kernel_release, cpu_arch,
+      partition_table
   ]
 
   def CreateVm(self, array_of_stdout):
@@ -425,6 +427,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         '/dev/sda': 1073741824,
         'kernel_release': self.kernel_release,
         'os_info': self.os_info,
+        'cpu_arch': self.cpu_arch,
         'threads_per_core': 1,
     }
     self.assertEqual(expected_os_metadata, vm.os_metadata)

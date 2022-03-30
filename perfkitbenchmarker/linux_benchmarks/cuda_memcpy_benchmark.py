@@ -60,14 +60,16 @@ cuda_memcpy:
           zone: us-central1-a
           image_family: tf-latest-gpu-gvnic
           image_project: deeplearning-platform-release
+          boot_disk_size: 200
         AWS:
           machine_type: p4d.24xlarge
           zone: us-east-1a
-          image: ami-084e787069ee27fb7
+          boot_disk_size: 200
         Azure:
           machine_type: Standard_NC6s_v3
           zone: eastus
           image: microsoft-dsvm:ubuntu-hpc:1804:latest
+          boot_disk_size: 200
 """
 
 
