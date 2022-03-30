@@ -176,7 +176,6 @@ def _PrepareHpcg(vm):
   logging.info('Installing HPCG on %s', vm)
   vm.Install('hpcg')
   vm.AuthenticateVm()
-  nvidia_driver.SetAndConfirmGpuClocks(vm)
 
 
 def Prepare(benchmark_spec):

@@ -89,7 +89,6 @@ def _InstallAndAuthenticateVm(vm):
     vm: vm to operate on.
   """
   vm.Install('shoc_benchmark_suite')
-  nvidia_driver.SetAndConfirmGpuClocks(vm)
   vm.AuthenticateVm()  # Configure ssh between vms for MPI
 
 
