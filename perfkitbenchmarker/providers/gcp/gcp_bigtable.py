@@ -197,8 +197,9 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     self.node_count: int = node_count or _DEFAULT_NODE_COUNT
     self.storage_type: str = storage_type or _DEFAULT_STORAGE_TYPE
     self.replication_cluster: bool = replication_cluster or False
-    self.replication_cluster_zone: str = (
-        replication_cluster_zone or _DEFAULT_REPLICATION_ZONE)
+    self.replication_cluster_zone: Optional[str] = (
+        replication_cluster_zone or
+        _DEFAULT_REPLICATION_ZONE) if self.replication_cluster else None
     self.multicluster_routing: bool = multicluster_routing or False
     self.autoscaling_min_nodes: Optional[int] = autoscaling_min_nodes or None
     self.autoscaling_max_nodes: Optional[int] = autoscaling_max_nodes or None
