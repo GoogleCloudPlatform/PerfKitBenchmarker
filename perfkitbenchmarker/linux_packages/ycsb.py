@@ -846,7 +846,7 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
   return result
 
 
-def _ParseWorkload(contents):
+def ParseWorkload(contents):
   """Parse a YCSB workload file.
 
   YCSB workloads are Java .properties format.
@@ -1059,7 +1059,7 @@ class YCSBExecutor(object):
       kwargs.setdefault('fieldlength', FLAGS.ycsb_field_length)
 
     with open(workload_file) as fp:
-      workload_meta = _ParseWorkload(fp.read())
+      workload_meta = ParseWorkload(fp.read())
       workload_meta.update(kwargs)
       workload_meta.update(stage='load',
                            clients=len(vms) * kwargs['threads'],
@@ -1258,7 +1258,7 @@ class YCSBExecutor(object):
                                    os.path.basename(workload_file))
 
       with open(workload_file) as fp:
-        workload_meta = _ParseWorkload(fp.read())
+        workload_meta = ParseWorkload(fp.read())
         workload_meta.update(kwargs)
         workload_meta.update(workload_name=os.path.basename(workload_file),
                              workload_index=workload_index,

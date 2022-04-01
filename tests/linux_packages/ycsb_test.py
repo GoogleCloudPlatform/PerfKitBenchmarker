@@ -158,19 +158,19 @@ class WeightedQuantileTestCase(unittest.TestCase):
 class ParseWorkloadTestCase(unittest.TestCase):
 
   def testParsesEmptyString(self):
-    self.assertDictEqual({}, ycsb._ParseWorkload(''))
+    self.assertDictEqual({}, ycsb.ParseWorkload(''))
 
   def testIgnoresComment(self):
-    self.assertDictEqual({}, ycsb._ParseWorkload('#\n'))
+    self.assertDictEqual({}, ycsb.ParseWorkload('#\n'))
     self.assertDictEqual({},
-                         ycsb._ParseWorkload('#recordcount = 10\n'
-                                             '# columnfamily=cf'))
+                         ycsb.ParseWorkload('#recordcount = 10\n'
+                                            '# columnfamily=cf'))
     self.assertDictEqual({'recordcount': '10'},
-                         ycsb._ParseWorkload('#Sample!\nrecordcount = 10'))
+                         ycsb.ParseWorkload('#Sample!\nrecordcount = 10'))
 
   def testParsesSampleWorkload(self):
     contents = open_data_file('ycsb_workloada')
-    actual = ycsb._ParseWorkload(contents)
+    actual = ycsb.ParseWorkload(contents)
 
     expected = {
         'recordcount': '1000',
