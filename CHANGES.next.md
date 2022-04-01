@@ -142,6 +142,7 @@
 -   Uses the regular version of gcloud for Bigtable commands instead of beta.
 -   Support logging the start timestamp of each stage.
 -   Support for building GCC on Debian
+-   Support for Postgres 13 on Debian
 
 ### Bug fixes and maintenance updates:
 
