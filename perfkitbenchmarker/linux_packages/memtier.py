@@ -668,23 +668,25 @@ class MemtierResult:
       hist_meta.update({'histogram': json.dumps(histogram)})
       samples.append(
           sample.Sample(f'{name} latency histogram', 0, '', hist_meta))
-    for interval, count in self.ops_time_series:
-      time_series_meta = copy.deepcopy(metadata)
-      time_series_meta.update({
-          'time_series_sec': interval,
-          'time_series_ops': count,
-      })
+
+    if self.ops_time_series:
+      ops_time_series_dict = {}
+      for interval, count in self.ops_time_series:
+        ops_time_series_dict[interval] = count
+      ops_series_metadata = copy.deepcopy(metadata)
+      ops_series_metadata.update({'time_series': ops_time_series_dict})
       samples.append(
-          sample.Sample('Ops Time Series', count, 'ops', time_series_meta))
-    for interval, latency in self.max_latency_time_series:
-      time_series_meta = copy.deepcopy(metadata)
-      time_series_meta.update({
-          'time_series_sec': interval,
-          'time_series_max_latency': latency,
-      })
+          sample.Sample('Ops Time Series', 0, 'ops', ops_series_metadata))
+
+    if self.max_latency_time_series:
+      latency_time_series_dict = {}
+      for interval, latency in self.max_latency_time_series:
+        latency_time_series_dict[interval] = latency
+      latency_series_metadata = copy.deepcopy(metadata)
+      latency_series_metadata.update({'time_series': latency_time_series_dict})
       samples.append(
-          sample.Sample('Max Latency Time Series', latency, 'ms',
-                        time_series_meta))
+          sample.Sample('Max Latency Time Series', 0, 'ms',
+                        latency_series_metadata))
     return samples
 
 

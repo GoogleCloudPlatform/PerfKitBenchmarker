@@ -14,6 +14,8 @@
 -   Remove Amazon Linux 1 from `--os_types`.
 -   Changed redis_memtier_benchmark to use redis version 6 and above. Redis
     versions less than 6 are no longer supported.
+-   Compressed redis_memtier samples from `--memtier_time_series` into a few
+    time-to-value dictionaries, greatly reducing the number of samples produced
 -   Make Ubuntu 18 the default os_type.
 -   Deprecate Ubuntu 16 as it is EOL on 2021-05-01.
 -   Switch to Azure CLI to MSAL. This requires updating the CLI to >= 2.30.0.
