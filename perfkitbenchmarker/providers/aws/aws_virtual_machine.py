@@ -51,7 +51,8 @@ FLAGS = flags.FLAGS
 HVM = 'hvm'
 PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
-NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3', 't3'])
+NON_PLACEMENT_GROUP_PREFIXES = frozenset(
+    ['t2', 'm3', 't3', 't3a', 't4g', 'vt1'])
 DRIVE_START_LETTER = 'b'
 TERMINATED = 'terminated'
 SHUTTING_DOWN = 'shutting-down'
@@ -114,12 +115,13 @@ X86 = 'x86_64'
 _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'a1': 'cortex-a72',
     'c6g': 'graviton2',
+    'g5g': 'graviton2',
     'm6g': 'graviton2',
     'r6g': 'graviton2',
     't4g': 'graviton2',
     'im4g': 'graviton2',
     'is4ge': 'graviton2',
-    'g5g': 'graviton2',
+    'x2g': 'graviton2',
 }
 
 # Parameters for use with Elastic Fiber Adapter
