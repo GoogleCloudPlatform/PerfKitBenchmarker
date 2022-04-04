@@ -47,7 +47,7 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(spanner._description, 'test_description')
     self.assertEqual(spanner.database, 'test_database')
     self.assertEqual(spanner._ddl, 'test_schema')
-    self.assertEqual(spanner._nodes, 2)
+    self.assertEqual(spanner.nodes, 2)
     self.assertEqual(spanner.project, 'test_project')
     self.assertEqual(spanner._config, 'regional-us-east1')
 
@@ -73,7 +73,7 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testRestoreUsesCorrectNodeCount(self):
     instance = GetTestSpannerInstance()
-    instance._nodes = 5
+    instance.nodes = 5
     mock_set_nodes = self.enter_context(
         mock.patch.object(instance, '_SetNodes', autospec=True))
 

@@ -177,7 +177,7 @@ class GcpSpannerInstance(resource.BaseResource):
     self._description = description or _DEFAULT_DESCRIPTION
     self._ddl = ddl or _DEFAULT_DDL
     self._config = config or self._GetDefaultConfig()
-    self._nodes = nodes or _DEFAULT_NODES
+    self.nodes = nodes or _DEFAULT_NODES
     self._end_point = None
 
     # Cloud Spanner may not explicitly set the following common flags.
@@ -213,7 +213,7 @@ class GcpSpannerInstance(resource.BaseResource):
     """Creates the instance, the database, and update the schema."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create', self.name)
     cmd.flags['description'] = self._description
-    cmd.flags['nodes'] = self._nodes
+    cmd.flags['nodes'] = self.nodes
     cmd.flags['config'] = self._config
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
@@ -302,7 +302,7 @@ class GcpSpannerInstance(resource.BaseResource):
     Increases the number of nodes on the instance to the specified number.  See
     https://cloud.google.com/spanner/pricing for Spanner pricing info.
     """
-    self._SetNodes(self._nodes)
+    self._SetNodes(self.nodes)
 
   def _Freeze(self) -> None:
     """See base class.
