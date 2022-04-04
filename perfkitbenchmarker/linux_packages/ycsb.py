@@ -49,6 +49,7 @@ import os
 import posixpath
 import re
 import time
+from typing import List
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -273,7 +274,7 @@ def _GetThreadsQpsPerLoaderList():
           for thread_qps in FLAGS.ycsb_threads_per_client]
 
 
-def _GetWorkloadFileList():
+def GetWorkloadFileList() -> List[str]:
   """Returns the list of workload files to run.
 
   Returns:
@@ -292,7 +293,7 @@ def CheckPrerequisites():
     IOError: On missing workload file.
     errors.Config.InvalidValue on unsupported YCSB version or configs.
   """
-  for workload_file in _GetWorkloadFileList():
+  for workload_file in GetWorkloadFileList():
     if not os.path.exists(workload_file):
       raise IOError('Missing workload file: {0}'.format(workload_file))
 
@@ -795,8 +796,8 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
   for indiv in result_list[1:]:
     for group_name, group in six.iteritems(indiv['groups']):
       if group_name not in result['groups']:
-        logging.warn('Found result group "%s" in individual YCSB result, '
-                     'but not in accumulator.', group_name)
+        logging.warning('Found result group "%s" in individual YCSB result, '
+                        'but not in accumulator.', group_name)
         result['groups'][group_name] = copy.deepcopy(group)
         continue
 
@@ -807,14 +808,14 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
       # * AGGREGATE_OPERATORS[statistic](result_value, indiv_value)
       for k, v in six.iteritems(group['statistics']):
         if k not in AGGREGATE_OPERATORS:
-          logging.warn('No operator for "%s". Skipping aggregation.', k)
+          logging.warning('No operator for "%s". Skipping aggregation.', k)
           continue
         elif AGGREGATE_OPERATORS[k] is None:  # Drop
           result['groups'][group_name]['statistics'].pop(k, None)
           continue
         elif k not in result['groups'][group_name]['statistics']:
-          logging.warn('Found statistic "%s.%s" in individual YCSB result, '
-                       'but not in accumulator.', group_name, k)
+          logging.warning('Found statistic "%s.%s" in individual YCSB result, '
+                          'but not in accumulator.', group_name, k)
           result['groups'][group_name]['statistics'][k] = copy.deepcopy(v)
           continue
 
@@ -1394,7 +1395,7 @@ class YCSBExecutor(object):
 
   def Load(self, vms, workloads=None, load_kwargs=None):
     """Load data using YCSB."""
-    workloads = workloads or _GetWorkloadFileList()
+    workloads = workloads or GetWorkloadFileList()
     load_samples = []
     assert workloads, 'no workloads'
 
@@ -1424,7 +1425,7 @@ class YCSBExecutor(object):
 
   def Run(self, vms, workloads=None, run_kwargs=None):
     """Runs each workload/client count combination."""
-    workloads = workloads or _GetWorkloadFileList()
+    workloads = workloads or GetWorkloadFileList()
     assert workloads, 'no workloads'
     samples = list(self.RunStaircaseLoads(vms, workloads,
                                           **(run_kwargs or {})))
@@ -1448,7 +1449,7 @@ class YCSBExecutor(object):
     Args:
       vms: List of virtual machines. VMs to use to generate load.
       workloads: List of strings. Workload files to use. If unspecified,
-        _GetWorkloadFileList() is used.
+        GetWorkloadFileList() is used.
       load_kwargs: dict. Additional arguments to pass to the load stage.
       run_kwargs: dict. Additional arguments to pass to the run stage.
     Returns:
