@@ -115,6 +115,7 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec) -> None:
   vm.RemoteCommand('cp -r ~/vbench /scratch')
   vm.Install('ffmpeg')
   vm.InstallPackages('parallel')
+  vm.InstallPackages('time')
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
