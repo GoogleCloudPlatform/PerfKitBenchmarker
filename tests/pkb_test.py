@@ -14,6 +14,7 @@
 
 """Tests for pkb.py."""
 
+import json
 import textwrap
 import unittest
 
@@ -571,6 +572,28 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
 
     # PKB should still attempt to freeze benchmark spec.
     mock_freeze.assert_called_once()
+
+  @flagsaver.flagsaver(freeze='mock_freeze_path', restore='mock_restore_path')
+  def testCompletionStatusesContainFreezeRestoreStatus(self):
+    # Arrange
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    test_bm_spec.status = benchmark_status.SUCCEEDED
+    mock_status_file = mock.Mock()
+    test_bm_spec.config.flags = {}
+
+    # Act
+    pkb._WriteCompletionStatusFile([test_bm_spec], mock_status_file)
+
+    # Assert
+    mock_status_file.write.assert_called_once_with(
+        json.dumps({
+            'name': 'cluster_boot',
+            'status': benchmark_status.SUCCEEDED,
+            'flags': {
+                'freeze': 'mock_freeze_path',
+                'restore': 'mock_restore_path'
+            }
+        }) + '\n')
 
 
 if __name__ == '__main__':

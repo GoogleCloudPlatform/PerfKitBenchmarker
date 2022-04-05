@@ -697,6 +697,11 @@ def _WriteCompletionStatusFile(benchmark_specs, status_file):
     if spec.status_detail:
       status_dict['status_detail'] = spec.status_detail
     status_dict['flags'] = spec.config.flags
+    # Record freeze and restore path values.
+    if _FREEZE_PATH.value:
+      status_dict['flags']['freeze'] = _FREEZE_PATH.value
+    if _RESTORE_PATH.value:
+      status_dict['flags']['restore'] = _RESTORE_PATH.value
     status_file.write(json.dumps(status_dict) + '\n')
 
 
