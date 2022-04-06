@@ -17,11 +17,17 @@ Instances can be created and deleted.
 """
 
 import dataclasses
+import datetime
 import json
 import logging
+import statistics
+import time
 from typing import Any, Dict, Optional
 
 from absl import flags
+from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3 import query
+import numpy as np
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import freeze_restore_spec
@@ -59,6 +65,16 @@ _FROZEN_NODE_COUNT = 1
 
 # Common decoder configuration option.
 _NONE_OK = {'default': None, 'none_ok': True}
+
+# Spanner CPU Monitoring API has a 3 minute delay. See
+# https://cloud.google.com/monitoring/api/metrics_gcp#gcp-spanner,
+CPU_API_DELAY_MINUTES = 3
+CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
+
+# For more information on QPS expectations, see
+# https://cloud.google.com/spanner/docs/instance-configurations#regional-performance
+_READ_OPS_PER_NODE = 10000
+_WRITE_OPS_PER_NODE = 2000
 
 
 @dataclasses.dataclass
@@ -345,6 +361,56 @@ class GcpSpannerInstance(resource.BaseResource):
     """See base class."""
     labels = util.GetDefaultTags(timeout_minutes)
     self._UpdateLabels(labels)
+
+  def GetAverageCpuUsage(self, duration_minutes: int) -> float:
+    """Gets the average high priority CPU usage through the time duration."""
+    client = monitoring_v3.MetricServiceClient()
+    # It takes up to 3 minutes for CPU metrics to appear.
+    end_timestamp = time.time() - CPU_API_DELAY_SECONDS
+    cpu_query = query.Query(
+        client, project=self.project,
+        metric_type='spanner.googleapis.com/instance/cpu/utilization_by_priority',
+        end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
+        minutes=duration_minutes)
+    # Filter by high priority
+    cpu_query = cpu_query.select_metrics(
+        database=self.database, priority='high')
+    # Filter by the Spanner instance
+    cpu_query = cpu_query.select_resources(
+        instance_id=self.name, project_id=self.project)
+    # Aggregate user and system high priority by the minute
+    time_series = list(cpu_query)
+    # Expect 2 metrics: user and system high-priority CPU
+    if len(time_series) != 2:
+      raise errors.Benchmarks.RunError(
+          'Expected 2 metrics (user and system) for Spanner high-priority CPU '
+          f'utilization query, got {len(time_series)}')
+    cpu_aggregated = [
+        user.value.double_value + system.value.double_value
+        for user, system in zip(time_series[0].points, time_series[1].points)
+    ]
+    average_cpu = statistics.mean(cpu_aggregated)
+    logging.info('CPU aggregated: %s', cpu_aggregated)
+    logging.info('Average CPU for the %s minutes ending at %s: %s',
+                 duration_minutes,
+                 datetime.datetime.fromtimestamp(end_timestamp), average_cpu)
+    return average_cpu
+
+  def CalculateRecommendedThroughput(self, read_proportion: float,
+                                     write_proportion: float) -> int:
+    """Returns the recommended throughput based on the workload and nodes."""
+    if read_proportion + write_proportion != 1:
+      raise errors.Benchmarks.RunError(
+          'Unrecognized workload, read + write proportion must be equal to 1, '
+          f'got {read_proportion} + {write_proportion}.')
+    # Calculates the starting throughput based off of each node being able to
+    # handle 10k QPS of reads or 2k QPS of writes. For example, for a 50/50
+    # workload, run at a QPS target of 1666 reads + 1666 writes = 3333 (round).
+    a = np.array([[1 / _READ_OPS_PER_NODE, 1 / _WRITE_OPS_PER_NODE],
+                  [write_proportion, -(1 - write_proportion)]])
+    b = np.array([1, 0])
+    result = np.linalg.solve(a, b)
+    return int(sum(result) * self.nodes)
 
 
 def GetSpannerClass(

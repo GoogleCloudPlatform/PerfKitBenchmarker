@@ -19,12 +19,19 @@ to test Spanner. Configure the number of VMs via --ycsb_client_vms.
 """
 
 import logging
+from typing import Any, Dict, List
+
 from absl import flags
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_spanner
 from perfkitbenchmarker.providers.gcp import util
+
+_VM = virtual_machine.VirtualMachine
 
 BENCHMARK_NAME = 'cloud_spanner_ycsb'
 
@@ -76,6 +83,26 @@ flags.DEFINE_enum('cloud_spanner_ycsb_readmode',
 flags.DEFINE_list('cloud_spanner_ycsb_custom_vm_install_commands', [],
                   'A list of strings. If specified, execute them on every '
                   'VM during the installation phase.')
+_CPU_OPTIMIZATION = flags.DEFINE_bool(
+    'cloud_spanner_ycsb_cpu_optimization', False,
+    'Whether to optimize CPU utilization to 65%.')
+_CPU_OPTIMIZATION_INCREMENT_MINUTES = flags.DEFINE_integer(
+    'cloud_spanner_ycsb_cpu_optimization_workload_mins', 30,
+    'Length of time to run YCSB until incrementing QPS.')
+_CPU_OPTIMIZATION_MEASUREMENT_MINUTES = flags.DEFINE_integer(
+    'cloud_spanner_ycsb_cpu_optimization_measurement_mins', 5,
+    'Length of time to measure average CPU at the end of a test. For example, '
+    'the default 5 means that only the last 5 minutes of the test will be '
+    'used for representative CPU utilization.')
+_STARTING_QPS = flags.DEFINE_integer(
+    'cloud_spanner_ycsb_min_target', None,
+    'Starting QPS to set as YCSB target. Defaults to a value which uses the '
+    'published throughput expectations for each node, see READ/WRITE caps per '
+    'node below.')
+
+
+_CPU_TARGET_HIGH_PRIORITY = 0.65
+_CPU_OPTIMIZATION_TARGET_QPS_INCREMENT = 1000
 
 
 def GetConfig(user_config):
@@ -86,10 +113,29 @@ def GetConfig(user_config):
   return config
 
 
-def CheckPrerequisites(benchmark_config):
+def CheckPrerequisites(_):
+  """Validates correct flag usages before running this benchmark."""
   for scope in REQUIRED_SCOPES:
     if scope not in FLAGS.gcloud_scopes:
       raise ValueError('Scope {0} required.'.format(scope))
+  if _CPU_OPTIMIZATION.value:
+    workloads = ycsb.GetWorkloadFileList()
+    if len(workloads) != 1:
+      raise errors.Setup.InvalidFlagConfigurationError(
+          'Running with --cloud_spanner_ycsb_cpu_optimization requires using '
+          '1 workload file in --ycsb_workload_files.')
+    if FLAGS.ycsb_dynamic_load:
+      raise errors.Setup.InvalidFlagConfigurationError(
+          '--ycsb_dynamic_load and --cloud_spanner_ycsb_cpu_optimization are '
+          'mutually exclusive.')
+    if _CPU_OPTIMIZATION_INCREMENT_MINUTES.value < (
+        _CPU_OPTIMIZATION_MEASUREMENT_MINUTES.value +
+        gcp_spanner.CPU_API_DELAY_MINUTES):
+      raise errors.Setup.InvalidFlagConfigurationError(
+          f'workload_mins {_CPU_OPTIMIZATION_INCREMENT_MINUTES.value} must be '
+          'greater than measurement_mins '
+          f'{_CPU_OPTIMIZATION_MEASUREMENT_MINUTES.value} '
+          f'+ CPU_API_DELAY_MINUTES {gcp_spanner.CPU_API_DELAY_MINUTES}')
 
 
 def Prepare(benchmark_spec):
@@ -112,6 +158,19 @@ def Prepare(benchmark_spec):
   benchmark_spec.executor = ycsb.YCSBExecutor('cloudspanner')
 
 
+def _GetCpuOptimizationMetadata() -> Dict[str, Any]:
+  return {
+      'cloud_spanner_cpu_optimization':
+          True,
+      'cloud_spanner_cpu_target':
+          _CPU_TARGET_HIGH_PRIORITY,
+      'cloud_spanner_cpu_increment_minutes':
+          _CPU_OPTIMIZATION_INCREMENT_MINUTES.value,
+      'cloud_spanner_cpu_measurement_minutes':
+          _CPU_OPTIMIZATION_MEASUREMENT_MINUTES.value,
+  }
+
+
 def Run(benchmark_spec):
   """Spawn YCSB and gather the results.
 
@@ -123,6 +182,8 @@ def Run(benchmark_spec):
     A list of sample.Sample instances.
   """
   vms = benchmark_spec.vms
+  spanner: gcp_spanner.GcpSpannerInstance = benchmark_spec.spanner
+
   run_kwargs = {
       'table': BENCHMARK_TABLE,
       'zeropadding': BENCHMARK_ZERO_PADDING,
@@ -143,15 +204,64 @@ def Run(benchmark_spec):
 
   load_kwargs = run_kwargs.copy()
   samples = []
+  metadata = {'ycsb_client_type': FLAGS.cloud_spanner_ycsb_client_type}
   if not benchmark_spec.spanner.restored:
     samples += list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
-  samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
+  if _CPU_OPTIMIZATION.value:
+    samples += CpuUtilizationRun(benchmark_spec.executor, spanner, vms,
+                                 run_kwargs)
+    metadata.update(_GetCpuOptimizationMetadata())
+  else:
+    samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
 
-  metadata = {'ycsb_client_type': FLAGS.cloud_spanner_ycsb_client_type}
-  for sample in samples:
-    sample.metadata.update(metadata)
+  for result in samples:
+    result.metadata.update(metadata)
 
   return samples
+
+
+def _ExtractThroughput(samples: List[sample.Sample]) -> float:
+  for result in samples:
+    if result.metric == 'overall Throughput':
+      return result.value
+  return 0.0
+
+
+def CpuUtilizationRun(executor: ycsb.YCSBExecutor,
+                      spanner: gcp_spanner.GcpSpannerInstance,
+                      vms: List[_VM],
+                      run_kwargs: Dict[str, Any]) -> List[sample.Sample]:
+  """Runs YCSB until the CPU utilization is over 65%."""
+  workload = ycsb.GetWorkloadFileList()[0]
+  with open(workload) as f:
+    workload_args = ycsb.ParseWorkload(f.read())
+  read_proportion = float(workload_args['readproportion'])
+  write_proportion = float(workload_args['updateproportion'])
+  qps = _STARTING_QPS.value or spanner.CalculateStartingThroughput(
+      read_proportion, write_proportion) * 0.75  # Leave space for increment.
+  first_run = True
+  while True:
+    run_kwargs['target'] = qps
+    run_kwargs['maxexecutiontime'] = (
+        _CPU_OPTIMIZATION_INCREMENT_MINUTES.value * 60)
+    run_samples = executor.Run(vms, run_kwargs=run_kwargs)
+    throughput = _ExtractThroughput(run_samples)
+    cpu_utilization = spanner.GetAverageCpuUsage(
+        _CPU_OPTIMIZATION_MEASUREMENT_MINUTES.value)
+    logging.info(
+        'Run had throughput target %s and measured throughput %s, '
+        'with average high-priority CPU utilization %s.',
+        qps, throughput, cpu_utilization)
+    if cpu_utilization > _CPU_TARGET_HIGH_PRIORITY:
+      logging.info('CPU utilization is higher than cap %s, stopping test',
+                   _CPU_TARGET_HIGH_PRIORITY)
+      if first_run:
+        raise errors.Benchmarks.RunError(
+            f'Initial QPS {qps} already above cpu utilization cap. '
+            'Please lower the starting QPS.')
+      return run_samples
+    qps += _CPU_OPTIMIZATION_TARGET_QPS_INCREMENT
+    first_run = False
 
 
 def Cleanup(benchmark_spec):

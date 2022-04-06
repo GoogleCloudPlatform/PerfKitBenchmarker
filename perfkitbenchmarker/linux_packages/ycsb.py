@@ -1273,6 +1273,8 @@ class YCSBExecutor(object):
 
       parameters['parameter_files'] = [remote_path]
 
+      # _GetThreadsQpsPerLoaderList() passes tuple of (client_count, target=0)
+      # if no target is passed via flags.
       for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList():
 
         def _DoRunStairCaseLoad(client_count,
@@ -1282,8 +1284,6 @@ class YCSBExecutor(object):
           parameters['threads'] = client_count
           if target_qps_per_vm:
             parameters['target'] = int(target_qps_per_vm * len(vms))
-          else:
-            parameters.pop('target', None)
           if is_sustained:
             parameters['maxexecutiontime'] = (
                 FLAGS.ycsb_dynamic_load_sustain_timelimit)
@@ -1395,6 +1395,9 @@ class YCSBExecutor(object):
 
   def Load(self, vms, workloads=None, load_kwargs=None):
     """Load data using YCSB."""
+    if FLAGS.ycsb_skip_load_stage:
+      return []
+
     workloads = workloads or GetWorkloadFileList()
     load_samples = []
     assert workloads, 'no workloads'
