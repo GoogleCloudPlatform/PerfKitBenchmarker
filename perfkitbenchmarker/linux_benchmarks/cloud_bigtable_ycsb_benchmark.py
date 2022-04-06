@@ -104,6 +104,7 @@ cloud_bigtable_ycsb:
       instance. Configure the number of client VMs via --num_vms.
   non_relational_db:
     service_type: bigtable
+    enable_freeze_restore: True
   vm_groups:
     default:
       vm_spec: *default_single_core
@@ -413,8 +414,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   if not FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = 1
 
-  samples = list(benchmark_spec.executor.LoadAndRun(
-      vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  samples = []
+  if not instance.restored:
+    samples += list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
+  samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
 
   # Optionally add new samples for cluster cpu utilization.
   if _GET_CPU_UTILIZATION.value:

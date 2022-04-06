@@ -65,6 +65,8 @@ _DEFAULT_STORAGE_TYPE = 'ssd'
 _DEFAULT_ZONE = 'us-central1-b'
 _DEFAULT_REPLICATION_ZONE = 'us-central1-c'
 
+_FROZEN_NODE_COUNT = 1
+
 
 class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
   """Configurable options of a Bigtable instance. See below for descriptions."""
@@ -187,8 +189,9 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
                multicluster_routing: Optional[bool],
                autoscaling_min_nodes: Optional[int],
                autoscaling_max_nodes: Optional[int],
-               autoscaling_cpu_target: Optional[int]):
-    super(GcpBigtableInstance, self).__init__()
+               autoscaling_cpu_target: Optional[int],
+               **kwargs):
+    super(GcpBigtableInstance, self).__init__(**kwargs)
     if name is not None:
       self.user_managed = True
     self.name: str = name or f'pkb-bigtable-{FLAGS.run_uri}'
@@ -218,7 +221,10 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
         multicluster_routing=spec.multicluster_routing,
         autoscaling_min_nodes=spec.autoscaling_min_nodes,
         autoscaling_max_nodes=spec.autoscaling_max_nodes,
-        autoscaling_cpu_target=spec.autoscaling_cpu_target)
+        autoscaling_cpu_target=spec.autoscaling_cpu_target,
+        delete_on_freeze_error=spec.delete_on_freeze_error,
+        create_on_restore_error=spec.create_on_restore_error,
+        enable_freeze_restore=spec.enable_freeze_restore)
 
   def _BuildClusterConfigs(self) -> List[str]:
     """Return flag values for --cluster_config when creating an instance.
@@ -265,13 +271,12 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
 
   def _Create(self):
     """Creates the instance."""
-    cmd = util.GcloudCommand(self, 'bigtable', 'instances', 'create', self.name)
+    cmd = _GetBigtableGcloudCommand(self, 'bigtable', 'instances', 'create',
+                                    self.name)
     cmd.flags['display-name'] = self.name
     cmd.flags['cluster-storage-type'] = self.storage_type
     cmd.flags['project'] = self.project
     cmd.flags['cluster-config'] = self._BuildClusterConfigs()
-    # The zone flag makes this command fail.
-    cmd.flags['zone'] = []
 
     logging.info('Creating instance %s.', self.name)
 
@@ -284,12 +289,11 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     self._UpdateLabels(util.GetDefaultTags())
 
     if self.multicluster_routing:
-      cmd = util.GcloudCommand(
+      cmd = _GetBigtableGcloudCommand(
           self, 'bigtable', 'app-profiles', 'update', 'default')
       cmd.flags['instance'] = self.name
       cmd.flags['route-any'] = True
       cmd.flags['force'] = True
-      cmd.flags['zone'] = []
       cmd.Issue()
 
   def _GetLabels(self) -> Dict[str, Any]:
@@ -321,16 +325,13 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
 
   def _Delete(self):
     """Deletes the instance."""
-    cmd = util.GcloudCommand(self, 'bigtable', 'instances', 'delete', self.name)
-    # The zone flag makes this command fail.
-    cmd.flags['zone'] = []
+    cmd = _GetBigtableGcloudCommand(self, 'bigtable', 'instances', 'delete',
+                                    self.name)
     cmd.Issue(raise_on_failure=False)
 
   def _DescribeInstance(self) -> Dict[str, Any]:
-    cmd = util.GcloudCommand(
+    cmd = _GetBigtableGcloudCommand(
         self, 'bigtable', 'instances', 'describe', self.name)
-    # The zone flag makes this command fail.
-    cmd.flags['zone'] = []
     stdout, stderr, retcode = cmd.Issue(
         suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
@@ -362,6 +363,39 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
       metadata['bigtable_node_count'] = self.node_count
       metadata['bigtable_multicluster_routing'] = self.multicluster_routing
     return metadata
+
+  def _GetClusters(self) -> List[Dict[str, Any]]:
+    cmd = _GetBigtableGcloudCommand(self, 'bigtable', 'clusters', 'list')
+    cmd.flags['instances'] = self.name
+    stdout, stderr, retcode = cmd.Issue(
+        suppress_warning=True, raise_on_failure=False)
+    if retcode != 0:
+      logging.error('Listing clusters %s failed: %s', self.name, stderr)
+      return []
+    return json.loads(stdout)
+
+  def _UpdateNodes(self, nodes: int) -> None:
+    clusters = self._GetClusters()
+    for i in range(len(clusters)):
+      cmd = _GetBigtableGcloudCommand(self, 'bigtable', 'clusters', 'update',
+                                      f'{self.name}-{i}')
+      cmd.flags['instance'] = self.name
+      cmd.flags['num-nodes'] = nodes or self.node_count
+      cmd.Issue()
+
+  def _Freeze(self) -> None:
+    self._UpdateNodes(_FROZEN_NODE_COUNT)
+
+  def _Restore(self) -> None:
+    self._UpdateNodes(self.node_count)
+
+
+def _GetBigtableGcloudCommand(instance, *args) -> util.GcloudCommand:
+  """Returns gcloud bigtable commmand without the zone argument."""
+  cmd = util.GcloudCommand(instance, *args)
+  # The zone flag makes this command fail.
+  cmd.flags['zone'] = []
+  return cmd
 
 
 def GetClustersDescription(instance_name, project):

@@ -272,5 +272,16 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
             }
         })
 
+  def testBigtableGcloudCommand(self):
+    bigtable = GetTestBigtableInstance()
+
+    cmd = gcp_bigtable._GetBigtableGcloudCommand(bigtable, 'instances', 'test')
+
+    # Command does not have the zone flag but has the project flag.
+    self.assertEqual(cmd.args, ['instances', 'test'])
+    self.assertEqual(cmd.flags['project'], PROJECT)
+    self.assertEmpty(cmd.flags['zone'])
+
+
 if __name__ == '__main__':
   unittest.main()
