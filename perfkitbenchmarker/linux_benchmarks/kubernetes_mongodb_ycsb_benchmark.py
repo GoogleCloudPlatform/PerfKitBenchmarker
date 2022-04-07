@@ -21,8 +21,6 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 """
 
 import functools
-import random
-import string
 
 import time
 from absl import flags
@@ -37,11 +35,6 @@ flags.DEFINE_string('kubernetes_mongodb_cpu_request', '7.1',
                     'CPU request of mongodb.')
 flags.DEFINE_string('kubernetes_mongodb_memory_request', '16Gi',
                     'Memory request of mongodb.')
-flags.DEFINE_string('kubernetes_mongodb_cpu_limit', '7.6',
-                    'CPU limit of mongodb, should be bigger than CPU request')
-flags.DEFINE_string(
-    'kubernetes_mongodb_memory_limit', '32Gi',
-    'Memory limit of mongodb, should be bigger than memory request')
 flags.DEFINE_string('kubernetes_mongodb_disk_size', '200Gi',
                     'Disk size used by mongodb')
 # TODO(user): Use GetStorageClass function, once available.
@@ -115,27 +108,20 @@ def _PrepareClient(vm):
 def _PrepareDeployment(benchmark_spec):
   """Deploys MongoDB Operator and instance on the cluster."""
   cluster = benchmark_spec.container_cluster
-  admin_password = ''.join(
-      random.choice(string.ascii_letters + string.digits) for _ in range(20))
   storage_class = STORAGE_CLASS.value or cluster.GetDefaultStorageClass()
   cluster.ApplyManifest(
-      'container/kubernetes_mongodb/kubernetes_mongodb_crd.yaml')
-  cluster.ApplyManifest(
-      'container/kubernetes_mongodb/kubernetes_mongodb_operator.yaml.j2',
+      'container/kubernetes_mongodb/kubernetes_mongodb.yaml.j2',
       cpu_request=FLAGS.kubernetes_mongodb_cpu_request,
-      cpu_limit=FLAGS.kubernetes_mongodb_cpu_limit,
       memory_request=FLAGS.kubernetes_mongodb_memory_request,
-      memory_limit=FLAGS.kubernetes_mongodb_memory_limit,
       disk_size=FLAGS.kubernetes_mongodb_disk_size,
-      storage_class=storage_class,
-      admin_password=admin_password)
+      storage_class=storage_class)
   time.sleep(60)
 
   benchmark_spec.container_cluster.WaitForResource('pod/mongodb-0', 'Ready')
   mongodb_cluster_ip = benchmark_spec.container_cluster.GetClusterIP(
       'mongodb-service')
-  benchmark_spec.mongodb_url = 'mongodb://ycsb:{password}@{ip_address}:27017/ycsb?authSource=ycsb'.format(
-      password=admin_password, ip_address=mongodb_cluster_ip)
+  benchmark_spec.mongodb_url = 'mongodb://{ip_address}:27017/ycsb'.format(
+      ip_address=mongodb_cluster_ip)
 
 
 def Prepare(benchmark_spec):
