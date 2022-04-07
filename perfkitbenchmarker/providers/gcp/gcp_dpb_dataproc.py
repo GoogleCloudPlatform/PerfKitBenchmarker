@@ -552,6 +552,7 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
         'dpb_cluster_initial_executors': initial_executors,
         'dpb_cores_per_node': self.spec.dataproc_serverless_core_count,
         'dpb_hdfs_type': 'default-disk',
+        'dpb_disk_size': basic_data['dpb_disk_size'],
         'dpb_service_zone': basic_data['dpb_service_zone'],
         'dpb_job_properties': basic_data['dpb_job_properties'],
     }
