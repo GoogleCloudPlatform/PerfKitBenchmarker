@@ -221,3 +221,5 @@
 -   Fix fio_write_against_multiple_clients additional samples and metadata.
 -   Use real URLs as the links in Bigtable walkthrough doc.
 -   Add option to publish to a subfolder in cloud storage publisher.
+-   Parse resulting output matrix by indexing from the bottom up instead of top
+    down.
