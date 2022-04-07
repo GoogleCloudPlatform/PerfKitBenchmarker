@@ -259,6 +259,8 @@ def CpuUtilizationRun(executor: ycsb.YCSBExecutor,
         raise errors.Benchmarks.RunError(
             f'Initial QPS {qps} already above cpu utilization cap. '
             'Please lower the starting QPS.')
+      for s in run_samples:
+        s.metadata['cloud_spanner_cpu_utilization'] = cpu_utilization
       return run_samples
     qps += _CPU_OPTIMIZATION_TARGET_QPS_INCREMENT
     first_run = False
