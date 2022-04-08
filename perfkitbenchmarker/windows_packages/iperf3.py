@@ -291,7 +291,7 @@ def ParseTCPMultiStreamOutput(results, sending_vm, receiving_vm, num_streams,
   samples = []
   for line in data_lines:
     line_data = [val for val in line.split(' ') if val]
-    if line_data[0] is '[':
+    if line_data[0] == '[':
       line_data = line_data[1:]
 
     thread_id = line_data[0].rstrip(']').lstrip('[')

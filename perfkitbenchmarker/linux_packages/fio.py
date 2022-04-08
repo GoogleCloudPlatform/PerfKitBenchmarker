@@ -213,7 +213,7 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
         clat_section = job[mode][clat_key]
 
         def _ConvertClat(value):
-          if clat_key is 'clat_ns':
+          if clat_key == 'clat_ns':  # pylint: disable=cell-var-from-loop
             # convert from nsec to usec
             return value / 1000
           else:
