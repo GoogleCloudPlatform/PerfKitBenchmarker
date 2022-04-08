@@ -237,7 +237,7 @@ def CpuUtilizationRun(executor: ycsb.YCSBExecutor,
     workload_args = ycsb.ParseWorkload(f.read())
   read_proportion = float(workload_args['readproportion'])
   write_proportion = float(workload_args['updateproportion'])
-  qps = _STARTING_QPS.value or spanner.CalculateStartingThroughput(
+  qps = _STARTING_QPS.value or spanner.CalculateRecommendedThroughput(
       read_proportion, write_proportion) * 0.75  # Leave space for increment.
   first_run = True
   while True:
