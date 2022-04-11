@@ -19,9 +19,14 @@ TODO: add DAX option.
 TODO: add global table option.
 """
 
+import logging
 import os
+from typing import Any, Dict, List
+
 from absl import flags
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
@@ -41,7 +46,17 @@ _MAX_CONNECTIONS = flags.DEFINE_integer(
     'aws_dynamodb_connectMax', 50,
     'Maximum number of concurrent dynamodb connections. '
     'Defaults to 50.')
+_RAMP_UP = flags.DEFINE_boolean(
+    'aws_dynamodb_ycsb_ramp_up', False,
+    'If true, runs YCSB with a target throughput equal to the provisioned qps '
+    'of the instance and increments until a max throughput is found.'
+)
 FLAGS = flags.FLAGS
+
+_VM = virtual_machine.VirtualMachine
+
+_TARGET_QPS_INCREMENT = 1000
+_QPS_THRESHOLD = 100
 
 BENCHMARK_NAME = 'aws_dynamodb_ycsb'
 BENCHMARK_CONFIG = """
@@ -130,16 +145,52 @@ def Run(benchmark_spec):
   samples = list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
   # Reset the WCU to the initial level.
   instance.SetThroughput()
-  samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
+  if _RAMP_UP.value:
+    samples += RampUpRun(benchmark_spec.executor, instance, vms, run_kwargs)
+  else:
+    samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
   benchmark_metadata = {
       'ycsb_client_vms': len(vms),
       'aws_dynamodb_consistentReads': _CONSISTENT_READS.value,
       'aws_dynamodb_connectMax': _MAX_CONNECTIONS.value,
   }
-  for sample in samples:
-    sample.metadata.update(instance.GetResourceMetadata())
-    sample.metadata.update(benchmark_metadata)
+  for s in samples:
+    s.metadata.update(instance.GetResourceMetadata())
+    s.metadata.update(benchmark_metadata)
   return samples
+
+
+def _ExtractThroughput(samples: List[sample.Sample]) -> float:
+  for result in samples:
+    if result.metric == 'overall Throughput':
+      return result.value
+  return 0.0
+
+
+def RampUpRun(executor: ycsb.YCSBExecutor,
+              db: aws_dynamodb.AwsDynamoDBInstance,
+              vms: List[_VM],
+              run_kwargs: Dict[str, Any]) -> List[sample.Sample]:
+  """Runs YCSB starting from provisioned QPS until max throughput is found."""
+  # Database is already provisioned with the correct QPS.
+  qps = db.rcu + db.wcu
+  max_throughput = 0
+  while True:
+    run_kwargs['target'] = qps
+    run_samples = executor.Run(vms, run_kwargs=run_kwargs)
+    throughput = _ExtractThroughput(run_samples)
+    logging.info('Run had throughput target %s and measured throughput %s.',
+                 qps, throughput)
+
+    if throughput < max_throughput + _QPS_THRESHOLD:
+      logging.info('Found maximum throughput %s.', throughput)
+      for s in run_samples:
+        s.metadata['qps_threshold'] = _QPS_THRESHOLD
+        s.metadata['ramp_up'] = True
+      return run_samples
+
+    max_throughput = throughput
+    qps += _TARGET_QPS_INCREMENT
 
 
 def Cleanup(benchmark_spec):
