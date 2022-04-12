@@ -101,7 +101,10 @@ _STARTING_QPS = flags.DEFINE_integer(
     'node below.')
 
 
+# Recommended Spanner high priority CPU utilization, see
+# https://cloud.google.com/spanner/docs/cpu-utilization#recommended-max.
 _CPU_TARGET_HIGH_PRIORITY = 0.65
+_CPU_TARGET_HIGH_PRIORITY_UPPER_BOUND = 0.75
 _CPU_OPTIMIZATION_TARGET_QPS_INCREMENT = 1000
 
 
@@ -238,7 +241,7 @@ def CpuUtilizationRun(executor: ycsb.YCSBExecutor,
   read_proportion = float(workload_args['readproportion'])
   write_proportion = float(workload_args['updateproportion'])
   qps = _STARTING_QPS.value or int(spanner.CalculateRecommendedThroughput(
-      read_proportion, write_proportion) * 0.75)  # Leave space for increment.
+      read_proportion, write_proportion) * 0.5)  # Leave space for increment.
   first_run = True
   while True:
     run_kwargs['target'] = qps
@@ -259,6 +262,11 @@ def CpuUtilizationRun(executor: ycsb.YCSBExecutor,
         raise errors.Benchmarks.RunError(
             f'Initial QPS {qps} already above cpu utilization cap. '
             'Please lower the starting QPS.')
+      if cpu_utilization > _CPU_TARGET_HIGH_PRIORITY_UPPER_BOUND:
+        raise errors.Benchmarks.RunError(
+            f'CPU utilization measured was {cpu_utilization}, over the '
+            f'{_CPU_TARGET_HIGH_PRIORITY_UPPER_BOUND} threshold. Decrease step '
+            'size to avoid overshooting.')
       for s in run_samples:
         s.metadata['cloud_spanner_cpu_utilization'] = cpu_utilization
       return run_samples
