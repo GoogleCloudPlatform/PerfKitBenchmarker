@@ -87,8 +87,8 @@ class AwsSqs(msgsvc.BaseMessagingService):
     # copy AWS creds
     self.client_vm.Install('aws_credentials')
 
-  def Run(self, benchmark_scenario: str, number_of_messages: str,
-          message_size: str):
+  def Run(self, benchmark_scenario: str, number_of_messages: int,
+          message_size: int):
     """Runs remote commands on client VM - benchmark's run phase."""
     command = (f'python3 -m aws_benchmark '
                f'--queue_name={self.queue_name} '
