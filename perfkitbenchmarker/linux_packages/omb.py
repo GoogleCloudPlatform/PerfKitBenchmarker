@@ -5,7 +5,7 @@ import itertools
 import logging
 import re
 import time
-from typing import Any, Dict, Iterator, List, Optional, Pattern, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Pattern, Sequence, Tuple, Union
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -214,7 +214,7 @@ class RunResult:
   data: List[Dict[str, float]]
   full_cmd: str
   units: str
-  params: Dict[str, str]
+  params: Dict[str, Union[str, int]]
   mpi_vendor: str
   mpi_version: str
   value_column: str
@@ -229,7 +229,8 @@ class RunResult:
 class RunRequest:
   test_name: str
   vms: List[Any]  # virtual machine
-  message_size: Optional[str] = None  # default: run all message sizes
+  message_size: Optional[
+      Union[str, int]] = None  # default: run all message sizes
 
 
 FLAGS = flags.FLAGS
