@@ -34,8 +34,9 @@ class IbmcloudNetworkTest(pkb_common_test_case.PkbCommonTestCase):
     super(IbmcloudNetworkTest, self).setUp()
     # Patch the __init__ method for simplicity.
     with mock.patch.object(ibmcloud_network.IbmCloudNetwork, '__init__',
-                           lambda self: None):
-      self.network = ibmcloud_network.IbmCloudNetwork()
+                           lambda self, prefix, zone: None):
+      self.network = ibmcloud_network.IbmCloudNetwork('fake_prefix',
+                                                      'fake_zone')
 
   def get_vpc(self):
     return VPC_ID

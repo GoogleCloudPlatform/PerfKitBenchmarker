@@ -76,8 +76,8 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
         MESSAGING_SERVICE_SCRIPTS_VM_GCP_DIR)
     self.client_vm.PushDataFile(MESSAGING_SERVICE_SCRIPTS_GCP_BIN)
 
-  def Run(self, benchmark_scenario: str, number_of_messages: str,
-          message_size: str) -> Dict[str, Any]:
+  def Run(self, benchmark_scenario: str, number_of_messages: int,
+          message_size: int) -> Dict[str, Any]:
     """Runs a benchmark on GCP PubSub from the client VM.
 
     Runs a benchmark based on the configuration specified through the arguments:

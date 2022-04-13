@@ -19,6 +19,9 @@ FLAGS = flags.FLAGS
 
 class AzureServiceBusTest(pkb_common_test_case.PkbCommonTestCase):
 
+  client: mock.Mock
+  servicebus: asb.AzureServiceBus
+
   @mock.patch.object(azure_network, 'GetResourceGroup')
   def setUp(self, resource_group_mock):
     super().setUp()
