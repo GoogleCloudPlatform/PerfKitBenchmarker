@@ -1,4 +1,3 @@
-# Lint as: python2, python3
 """Runs a Spark SQL query with preloaded temp views.
 
 Views can be BigQuery tables or HCFS directories containing Parquet.
