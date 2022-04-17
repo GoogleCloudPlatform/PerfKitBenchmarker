@@ -42,6 +42,7 @@ from perfkitbenchmarker import sample as pkb_sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+import pytz
 import six
 from six.moves import urllib
 import six.moves.http_client as httplib
@@ -154,6 +155,10 @@ GCS_OBJECT_NAME_LENGTH = 20
 # arguments to their __init__ methods. The SampleCollector will unconditionally
 # call PublishSamples using Publishers added via this method.
 EXTERNAL_PUBLISHERS = []
+
+
+# Used to publish samples in Pacific datetime
+_PACIFIC_TZ = pytz.timezone('US/Pacific')
 
 
 def PublishRunStageSamples(benchmark_spec, samples):
@@ -959,7 +964,7 @@ class SampleCollector(object):
       publishers.append(CloudStoragePublisher(FLAGS.cloud_storage_bucket,
                                               gsutil_path=FLAGS.gsutil_path))
     if PARTITIONED_GCS_URL.value:
-      now = datetime.datetime.now()
+      now = datetime.datetime.now(tz=_PACIFIC_TZ)
       publishers.append(
           CloudStoragePublisher(PARTITIONED_GCS_URL.value,
                                 sub_folder=now.strftime('%Y/%m/%d/%H'),
