@@ -126,6 +126,7 @@ def Run(benchmark_spec):
       'dynamodb.awsCredentialsFile': GetRemoteVMCredentialsFullPath(vms[0]),
       'dynamodb.primaryKey': instance.primary_key,
       'dynamodb.endpoint': instance.GetEndPoint(),
+      'dynamodb.region': instance.region,
       'table': 'pkb-{0}'.format(FLAGS.run_uri),
   }
   if FLAGS.aws_dynamodb_use_sort:
