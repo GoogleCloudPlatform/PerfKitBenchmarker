@@ -164,6 +164,8 @@ def _CollectGpuSamples(
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
+  vm_util.RunThreaded(lambda vm: vm.InstallPackages('freeglut3-dev'),
+                      bm_spec.vms)
   sample_lists = vm_util.RunThreaded(_CollectGpuSamples, bm_spec.vms)
   return (functools.reduce(lambda a, b: a + b, sample_lists) if sample_lists
           else [])
