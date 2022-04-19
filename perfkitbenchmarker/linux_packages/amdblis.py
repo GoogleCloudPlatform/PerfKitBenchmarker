@@ -28,6 +28,8 @@ def _Install(vm):
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(AMDBLIS_DIR, GIT_TAG))
   vm.RemoteCommand(
       'cd {0} && ./configure --enable-cblas zen'.format(AMDBLIS_DIR))
+  vm.RemoteCommand('sudo ln -s /usr/bin/python3 /usr/bin/python',
+                   ignore_failure=True)
   vm.RemoteCommand('cd {0} && make -j'.format(AMDBLIS_DIR))
 
 
