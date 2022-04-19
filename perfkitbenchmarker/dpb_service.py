@@ -72,6 +72,7 @@ DATAPROC_GKE = 'dataproc_gke'
 DATAPROC_SERVERLESS = 'dataproc_serverless'
 DATAFLOW = 'dataflow'
 EMR = 'emr'
+GLUE = 'glue'
 UNMANAGED_DPB_SVC_YARN_CLUSTER = 'unmanaged_dpb_svc_yarn_cluster'
 UNMANAGED_SPARK_CLUSTER = 'unmanaged_spark_cluster'
 KUBERNETES_SPARK_CLUSTER = 'kubernetes_spark_cluster'
@@ -420,6 +421,10 @@ class BaseDpbService(resource.BaseResource):
     if self.resource_ready_time is None or self.create_start_time is None:
       return None
     return self.resource_ready_time - self.create_start_time
+
+  def GetServiceWrapperScriptsToUpload(self) -> List[str]:
+    """Gets service wrapper scripts to upload alongside benchmark scripts."""
+    return []
 
 
 class UnmanagedDpbService(BaseDpbService):

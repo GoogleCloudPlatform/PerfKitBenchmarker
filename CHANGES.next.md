@@ -66,7 +66,9 @@
 -   Add vbench video encoding benchmark to PKB.
 -   Add Kubernetes based DPB Service for Spark
 -   Add support for creating Dataproc cluster on GKE
--   Add support for serverless Dataproc jobs.
+-   Add support for TPC-DS/H benchmarks on Dataproc Serverless.
+-   Add support for TPC-DS/H benchmarks on AWS Glue Job.
+-   Add messaging service latency benchmark (for GCP PubSub, AWS SQS & Azure Service Bus).
 
 ### Enhancements:
 

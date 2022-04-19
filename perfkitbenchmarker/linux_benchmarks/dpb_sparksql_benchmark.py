@@ -224,10 +224,12 @@ def Prepare(benchmark_spec):
   benchmark_spec.staged_queries = _LoadAndStageQueries(
       storage_service, cluster.base_dir)
 
-  for script in [
+  scripts_to_upload = [
       SPARK_SQL_DISTCP_SCRIPT,
       SPARK_TABLE_SCRIPT,
-      SPARK_SQL_RUNNER_SCRIPT]:
+      SPARK_SQL_RUNNER_SCRIPT,
+  ] + cluster.GetServiceWrapperScriptsToUpload()
+  for script in scripts_to_upload:
     src_url = data.ResourcePath(script)
     storage_service.CopyToBucket(src_url, cluster.bucket, script)
 

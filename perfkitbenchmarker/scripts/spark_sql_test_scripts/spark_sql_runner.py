@@ -18,7 +18,7 @@ import py4j
 from pyspark import sql
 
 
-def parse_args():
+def parse_args(args=None):
   """Parse argv."""
 
   parser = argparse.ArgumentParser(description=__doc__)
@@ -58,7 +58,9 @@ dataframe reader. e.g.:
       type=bool,
       default=False,
       help='Run all queries simultaneously instead of one by one.')
-  return parser.parse_args()
+  if args is None:
+    return parser.parse_args()
+  return parser.parse_args(args)
 
 
 def load_file(spark, object_path):

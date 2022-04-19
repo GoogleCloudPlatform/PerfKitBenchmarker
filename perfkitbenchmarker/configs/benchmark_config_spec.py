@@ -141,6 +141,7 @@ class _DpbServiceSpec(spec.BaseSpec):
                     dpb_service.DATAPROC_SERVERLESS,
                     dpb_service.DATAFLOW,
                     dpb_service.EMR,
+                    dpb_service.GLUE,
                     dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
                     dpb_service.UNMANAGED_SPARK_CLUSTER,
                     dpb_service.KUBERNETES_SPARK_CLUSTER,
