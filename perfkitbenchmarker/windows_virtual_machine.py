@@ -439,7 +439,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     if FLAGS.log_windows_password:
       logging.info('Password for %s: %s', self, self.password)
 
-  @vm_util.Retry(log_errors=False, poll_interval=1, timeout=4800)
+  @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
   def _WaitForSSH(self):
     """Waits for the VMs to be ready."""
     stdout, _ = self.RemoteCommand('hostname', suppress_warning=True)
