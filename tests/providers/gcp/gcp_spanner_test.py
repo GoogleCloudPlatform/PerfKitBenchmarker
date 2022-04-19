@@ -86,7 +86,8 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
   def testUpdateLabels(self):
     # Arrange
     instance = GetTestSpannerInstance()
-    mock_json_response = inspect.cleandoc("""
+    mock_endpoint_response = '"https://spanner.googleapis.com"'
+    mock_labels_response = inspect.cleandoc("""
     {
       "config": "test_config",
       "displayName": "test_display_name",
@@ -101,7 +102,8 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             util.GcloudCommand,
             'Issue',
-            return_value=(mock_json_response, '', 0)))
+            side_effect=[(mock_endpoint_response, '', 0),
+                         (mock_labels_response, '', 0)]))
     self.enter_context(
         mock.patch.object(util, 'GetAccessToken', return_value='test_token'))
     mock_request = self.enter_context(

@@ -60,6 +60,7 @@ _DEFAULT_DDL = """
     field0 STRING(MAX)
   ) PRIMARY KEY(id)
   """
+_DEFAULT_ENDPOINT = 'https://spanner.googleapis.com'
 _DEFAULT_NODES = 1
 _FROZEN_NODE_COUNT = 1
 
@@ -292,7 +293,7 @@ class GcpSpannerInstance(resource.BaseResource):
 
     return True
 
-  def GetEndPoint(self) -> Optional[str]:
+  def GetEndPoint(self) -> str:
     """Returns the end point for Cloud Spanner."""
     if self._end_point:
       return self._end_point
@@ -302,8 +303,7 @@ class GcpSpannerInstance(resource.BaseResource):
     stdout, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.warning('Fail to retrieve cloud spanner end point.')
-      return None
-    self._end_point = json.loads(stdout)
+    self._end_point = json.loads(stdout) or _DEFAULT_ENDPOINT
     return self._end_point
 
   def _SetNodes(self, nodes: int) -> None:
@@ -339,7 +339,7 @@ class GcpSpannerInstance(resource.BaseResource):
   def _UpdateLabels(self, labels: Dict[str, Any]) -> None:
     """Updates the labels of the current instance."""
     header = {'Authorization': f'Bearer {util.GetAccessToken()}'}
-    url = ('https://spanner.googleapis.com/v1/projects/'
+    url = (f'{self.GetEndPoint()}/v1/projects/'
            f'{self.project}/instances/{self.name}')
     # Keep any existing labels
     tags = self._GetLabels()
