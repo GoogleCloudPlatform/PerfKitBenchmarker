@@ -480,6 +480,10 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     """
     pass
 
+  def InstallPackages(self, packages: str) -> None:
+    """Installs packages using the OS's package manager."""
+    pass
+
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
     if not self.install_packages:
