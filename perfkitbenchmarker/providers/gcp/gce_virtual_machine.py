@@ -1310,6 +1310,11 @@ class Windows2019CoreGceVirtualMachine(
   DEFAULT_IMAGE_FAMILY = 'windows-2019-core'
 
 
+class Windows2022CoreGceVirtualMachine(
+    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2022CoreMixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2022-core'
+
+
 class Windows2012DesktopGceVirtualMachine(
     BaseWindowsGceVirtualMachine,
     windows_virtual_machine.Windows2012DesktopMixin):
