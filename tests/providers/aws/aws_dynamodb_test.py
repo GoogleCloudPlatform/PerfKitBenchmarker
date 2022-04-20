@@ -184,18 +184,37 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertEqual(actual, expected)
 
-  def testSetThroughput(self):
+  def testSetThroughputNotCalled(self):
+    # Arrange
     test_instance = GetTestDynamoDBInstance()
     cmd = self.enter_context(mock.patch.object(util, 'IssueRetryableCommand'))
     self.enter_context(mock.patch.object(test_instance, '_IsReady'))
+    self.enter_context(
+        mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5)))
 
+    # Act
     test_instance.SetThroughput(5, 5)
 
+    # Assert
+    cmd.assert_not_called()
+
+  def testSetThroughput(self):
+    # Arrange
+    test_instance = GetTestDynamoDBInstance()
+    cmd = self.enter_context(mock.patch.object(util, 'IssueRetryableCommand'))
+    self.enter_context(mock.patch.object(test_instance, '_IsReady'))
+    self.enter_context(
+        mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5)))
+
+    # Act
+    test_instance.SetThroughput(10, 10)
+
+    # Assert
     self.assertArgumentInCommand(cmd, '--table-name test_instance')
     self.assertArgumentInCommand(cmd, '--region us-east-1')
     self.assertArgumentInCommand(
         cmd,
-        '--provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5')
+        '--provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=10')
 
   def testGetThroughput(self):
     test_instance = GetTestDynamoDBInstance()

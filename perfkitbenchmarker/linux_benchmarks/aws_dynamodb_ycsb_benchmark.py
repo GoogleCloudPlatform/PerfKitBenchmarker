@@ -141,11 +141,14 @@ def Run(benchmark_spec):
   load_kwargs = run_kwargs.copy()
   if FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = FLAGS.ycsb_preload_threads
-  # More WCU results in a faster load stage.
-  instance.SetThroughput(wcu=_INITIAL_WRITES.value)
-  samples = list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
-  # Reset the WCU to the initial level.
-  instance.SetThroughput()
+  samples = []
+  if not instance.restored:
+    # More WCU results in a faster load stage.
+    if instance.wcu < _INITIAL_WRITES.value:
+      instance.SetThroughput(wcu=_INITIAL_WRITES.value)
+    samples += list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
+    # Reset the WCU to the initial level.
+    instance.SetThroughput()
   if _RAMP_UP.value:
     samples += RampUpRun(benchmark_spec.executor, instance, vms, run_kwargs)
   else:

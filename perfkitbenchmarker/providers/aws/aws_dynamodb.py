@@ -411,6 +411,10 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
       rcu = self.rcu
     if not wcu:
       wcu = self.wcu
+    current_rcu, current_wcu = self._GetThroughput()
+    if rcu == current_rcu and wcu == current_wcu:
+      logging.info('Table already has requested rcu %s and wcu %s', rcu, wcu)
+      return
     cmd = util.AWS_PREFIX + [
         'dynamodb', 'update-table',
         '--table-name', self.table_name,
@@ -487,6 +491,11 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
 
     Restores provisioned throughput back to benchmarking levels.
     """
+    # Providing flag overrides the capacity used in the previous run.
+    if FLAGS['aws_dynamodb_read_capacity'].present:
+      self.rcu = FLAGS.aws_dynamodb_read_capacity
+    if FLAGS['aws_dynamodb_write_capacity'].present:
+      self.wcu = FLAGS.aws_dynamodb_write_capacity
     self.SetThroughput(self.rcu, self.wcu)
 
 
