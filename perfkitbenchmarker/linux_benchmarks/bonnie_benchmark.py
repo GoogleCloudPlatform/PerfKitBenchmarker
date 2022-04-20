@@ -289,7 +289,7 @@ def ParseCSVResults(results):
     BONNIE_RESULTS_MAPPING = BONNIE_RESULTS_MAPPING_1_96
     logging.info("Detected bonnie++ CSV format version %s", results[0])
   else:
-    raise ValueError("Unsupported bonnie++ CSV Format: {0}".format(results[0]))
+    raise ValueError("Unsupported bonnie++ CSV Format version: {0} (expected version 1.98, 1.97, or 1.96)".format(results[0]))
 
   field_index_mapping = {}
   for field, value in six.iteritems(BONNIE_RESULTS_MAPPING):
