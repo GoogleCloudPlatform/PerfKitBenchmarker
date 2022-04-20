@@ -25,8 +25,8 @@ TF_SERVING_BASE_DIRECTORY = posixpath.join(linux_packages.INSTALL_DIR,
 
 FLAGS = flags.FLAGS
 
-# Versions supported including TF Serving 2.4.
-flags.DEFINE_string('tf_serving_branch', 'r2.4', 'GitHub branch to pull from')
+# Versions supported including TF Serving 2.8.
+flags.DEFINE_string('tf_serving_branch', 'master', 'GitHub branch to pull from')
 
 
 def InstallTensorFlowServingAPI(vm):
