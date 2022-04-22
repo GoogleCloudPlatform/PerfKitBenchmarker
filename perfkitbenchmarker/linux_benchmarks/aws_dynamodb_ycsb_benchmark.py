@@ -127,7 +127,7 @@ def Run(benchmark_spec):
       'dynamodb.primaryKey': instance.primary_key,
       'dynamodb.endpoint': instance.GetEndPoint(),
       'dynamodb.region': instance.region,
-      'table': 'pkb-{0}'.format(FLAGS.run_uri),
+      'table': instance.table_name,
   }
   if FLAGS.aws_dynamodb_use_sort:
     run_kwargs.update({
