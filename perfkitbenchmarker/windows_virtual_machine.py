@@ -163,12 +163,6 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       raise errors.VirtualMachine.RemoteCommandError(
           'RobustRemoteCommand did not start on VM.')
 
-    end_command_time = time.time()
-
-    @timeout_decorator.timeout(
-        timeout - (end_command_time - start_command_time),
-        use_signals=False,
-        timeout_exception=errors.VirtualMachine.RemoteCommandError)
     def wait_for_done_file():
       # Spin on the VM until the "done" file is created. It is better to spin
       # on the VM rather than creating a new session for each test.
@@ -177,7 +171,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
         done_out, _ = self.RemoteCommand(
             '$retries=0; while ((-not (Test-Path %s.done)) -and '
             '($retries -le 60)) { Start-Sleep -Seconds 1; $retries++ }; '
-            'Test-Path %s.done' % (command_id, command_id))
+            'Test-Path %s.done' % (command_id, command_id),
+            timeout=timeout - (time.time() - start_command_time))
 
     wait_for_done_file()
     stdout, _ = self.RemoteCommand('Get-Content %s.out' % (command_id,))
