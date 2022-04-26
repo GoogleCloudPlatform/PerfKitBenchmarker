@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Run MLPerf Inference benchmarks."""
+import json
 import posixpath
 import re
 from typing import Any, Dict, List
@@ -56,73 +57,14 @@ mlperf_inference:
           zone: westus2
           boot_disk_size: 200
 """
-
-_SCENARIOS = flags.DEFINE_enum('mlperf_inference_scenarios', 'server',
-                               ['server', 'singlestream', 'offline'],
+_SERVER = 'server'
+_SINGLESTREAM = 'singlestream'
+_OFFLINE = 'offline'
+_SCENARIOS = flags.DEFINE_enum('mlperf_inference_scenarios', _SERVER,
+                               [_SERVER, _SINGLESTREAM, _OFFLINE],
                                'MLPerf has defined three different scenarios')
-
-_PERFORMANCE_METADATA = [
-    'benchmark',
-    'coalesced_tensor',
-    'gpu_batch_size',
-    'gpu_copy_streams',
-    'gpu_inference_streams',
-    'input_dtype',
-    'input_format',
-    'precision',
-    'scenario',
-    'server_target_qps',
-    'system',
-    'tensor_path',
-    'use_graphs',
-    'config_name',
-    'config_ver',
-    'accuracy_level',
-    'optimization_level',
-    'inference_server',
-    'system_id',
-    'use_cpu',
-    'power_limit',
-    'cpu_freq',
-    'gpu_num_bundles',
-    'log_dir',
-    'SUT name',
-    'Scenario',
-    'Mode',
-    'Scheduled samples per second',
-    'Result is',
-    'Performance constraints satisfied',
-    'Min duration satisfied',
-    'Min queries satisfied',
-    'Completed samples per second',
-    'Min latency (ns)',
-    'Max latency (ns)',
-    'Mean latency (ns)',
-    '50.00 percentile latency (ns)',
-    '90.00 percentile latency (ns)',
-    '95.00 percentile latency (ns)',
-    '97.00 percentile latency (ns)',
-    '99.00 percentile latency (ns)',
-    '99.90 percentile latency (ns)',
-    'samples_per_query',
-    'target_latency (ns)',
-    'max_async_queries',
-    'min_duration (ms)',
-    'max_duration (ms)',
-    'min_query_count',
-    'max_query_count',
-    'qsl_rng_seed',
-    'sample_index_rng_seed',
-    'schedule_rng_seed',
-    'accuracy_log_rng_seed',
-    'accuracy_log_probability',
-    'accuracy_log_sampling_target',
-    'print_timestamps',
-    'performance_issue_unique',
-    'performance_issue_same',
-    'performance_issue_same_index',
-    'performance_sample_count',
-]
+_SERVER_TARGET_QPS = flags.DEFINE_float('mlperf_server_target_qps', None,
+                                        'server target qps')
 
 _ACCURACY_METADATA = [
     'benchmark',
@@ -151,6 +93,7 @@ _ACCURACY_METADATA = [
     'gpu_num_bundles',
     'log_dir',
 ]
+_PERFORMANCE_METRIC = 'result_completed_samples_per_sec'
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -187,6 +130,14 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   vm_util.ReplaceText(vm, 'opencv-python-headless==4.5.2.52',
                       'opencv-python-headless==4.5.3.56', requirements1)
   requirements2 = f'{repository}/closed/NVIDIA/docker/requirements.2'
+
+  benchmark = FLAGS.mlperf_benchmark
+  if _SERVER_TARGET_QPS.value:
+    config = f'{repository}/closed/NVIDIA/configs/{benchmark}/Server/__init__.py'
+    vm_util.ReplaceText(vm, 'server_target_qps = .*',
+                        f'server_target_qps = {_SERVER_TARGET_QPS.value}',
+                        config)
+
   for requirements in (requirements1, requirements2):
     vm_util.ReplaceText(vm, 'git:', 'https:', requirements)
 
@@ -195,7 +146,6 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     vm.Install('nvidia_driver')
     vm.Install('nvidia_docker')
 
-  benchmark = FLAGS.mlperf_benchmark
   bm_spec.env_cmd = (f'export MLPERF_SCRATCH_PATH={_MLPERF_SCRATCH_PATH} && '
                      f'cd {repository}/closed/NVIDIA')
   docker.AddUser(vm)
@@ -213,15 +163,12 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     vm.RemoteCommand(f'cd {data_dir} && gzip -d {_DLRM_DATA}')
 
     # Download model
-    model_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'models',
-                               FLAGS.mlperf_benchmark)
-    vm.DownloadPreprovisionedData(model_dir, FLAGS.mlperf_benchmark,
-                                  _DLRM_MODEL)
+    model_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'models', benchmark)
+    vm.DownloadPreprovisionedData(model_dir, benchmark, _DLRM_MODEL)
     vm.RemoteCommand(f'cd {model_dir} && '
                      f'tar -zxvf {_DLRM_MODEL} && '
                      f'rm -f {_DLRM_MODEL}')
-    vm.DownloadPreprovisionedData(model_dir, FLAGS.mlperf_benchmark,
-                                  _DLRM_ROW_FREQ)
+    vm.DownloadPreprovisionedData(model_dir, benchmark, _DLRM_ROW_FREQ)
 
     # Preprocess Data
     preprocessed_data_dir = posixpath.join(_MLPERF_SCRATCH_PATH,
@@ -232,6 +179,28 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     vm.RemoteCommand(f'cd {preprocessed_data_dir} && '
                      f'tar -zxvf {_DLRM_PREPROCESSED_DATA} && '
                      f'rm -f {_DLRM_PREPROCESSED_DATA}')
+  elif benchmark == mlperf_benchmark.BERT:
+    # Download data
+    data_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'data', 'squad')
+    vm.DownloadPreprovisionedData(data_dir, benchmark, 'dev-v1.1.json')
+
+    # Download model
+    model_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'models', benchmark)
+    vm.DownloadPreprovisionedData(model_dir, benchmark, 'bert_large_v1_1.onnx')
+    vm.DownloadPreprovisionedData(model_dir, benchmark,
+                                  'bert_large_v1_1_fake_quant.onnx')
+    vm.DownloadPreprovisionedData(model_dir, benchmark, 'vocab.txt')
+
+    # Preprocess Data
+    preprocessed_data_dir = posixpath.join(_MLPERF_SCRATCH_PATH,
+                                           'preprocessed_data',
+                                           'squad_tokenized')
+    vm.DownloadPreprovisionedData(preprocessed_data_dir, benchmark,
+                                  'input_ids.npy')
+    vm.DownloadPreprovisionedData(preprocessed_data_dir, benchmark,
+                                  'input_mask.npy')
+    vm.DownloadPreprovisionedData(preprocessed_data_dir, benchmark,
+                                  'segment_ids.npy')
   else:
     vm.RobustRemoteCommand(
         f'{bm_spec.env_cmd} && '
@@ -299,16 +268,13 @@ def MakePerformanceSamplesFromOutput(base_metadata: Dict[str, Any],
     Samples containing training metrics.
   """
   metadata = {}
-  for column_name in _PERFORMANCE_METADATA:
-    metadata[f'mlperf {column_name}'] = regex_util.ExtractExactlyOneMatch(
-        fr'{re.escape(column_name)} *: *(.*)', output)
+  for result in regex_util.ExtractAllMatches(r':::MLLOG (.*)', output):
+    metric = json.loads(result)
+    metadata[metric['key']] = metric['value']
   metadata.update(base_metadata)
   return [
-      sample.Sample(
-          'throughput',
-          regex_util.ExtractFloat(
-              r'Completed samples per second    : (\d+\.\d+)', output),
-          'samples per second', metadata)
+      sample.Sample('throughput', metadata[_PERFORMANCE_METRIC],
+                    'samples per second', metadata)
   ]
 
 
@@ -356,7 +322,17 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       f'--benchmarks={FLAGS.mlperf_benchmark} '
       f'--scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly\'"',
       should_log=True)
+
+  stdout, _ = vm.RobustRemoteCommand(
+      f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND="find build/logs -name mlperf_log_detail.txt"',
+      should_log=True)
+  mlperf_log_detail_txt = regex_util.ExtractExactlyOneMatch(
+      r'(build/logs/.*/mlperf_log_detail.txt)', stdout)
+  stdout, _ = vm.RobustRemoteCommand(
+      f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND="cat {mlperf_log_detail_txt}"',
+      should_log=True)
   performance_samples = MakePerformanceSamplesFromOutput(metadata, stdout)
+
   stdout, _ = vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
