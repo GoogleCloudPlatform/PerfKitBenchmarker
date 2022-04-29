@@ -302,7 +302,10 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     try:
       os.environ['USERPROFILE'] = self.home_dir
       remote_path = ntpath.expanduser(remote_path)
-      assert '~' not in remote_path, f'Failed to expand {remote_path}'
+      # Some Windows path's like C:\Users\ADMINI~1 contain ~,
+      # but they should not start with ~
+      for dir_part in remote_path.split(ntpath.sep):
+        assert not dir_part.startswith('~'), f'Failed to expand {remote_path}'
     finally:
       if home is None:
         del os.environ['USERPROFILE']
