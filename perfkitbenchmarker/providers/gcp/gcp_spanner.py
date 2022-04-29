@@ -362,6 +362,17 @@ class GcpSpannerInstance(resource.BaseResource):
     labels = util.GetDefaultTags(timeout_minutes)
     self._UpdateLabels(labels)
 
+  def GetResourceMetadata(self) -> Dict[Any, Any]:
+    """Returns useful metadata about the instance."""
+    return {
+        'gcp_spanner_name': self.name,
+        'gcp_spanner_database': self.database,
+        'gcp_spanner_node_count': self.nodes,
+        'gcp_spanner_ddl': self._ddl,
+        'gcp_spanner_config': self._config,
+        'gcp_spanner_endpoint': self.GetEndPoint()
+    }
+
   def GetAverageCpuUsage(self, duration_minutes: int) -> float:
     """Gets the average high priority CPU usage through the time duration."""
     client = monitoring_v3.MetricServiceClient()

@@ -219,6 +219,7 @@ def Run(benchmark_spec):
 
   for result in samples:
     result.metadata.update(metadata)
+    result.metadata.update(spanner.GetResourceMetadata())
 
   return samples
 
