@@ -176,6 +176,7 @@ class GkeCluster(container_service.KubernetesCluster):
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+    cmd.args.append('--no-enable-shielded-nodes')
     self._IssueResourceCreationCommand(cmd)
 
     self._CreateNodePools()
@@ -242,6 +243,11 @@ class GkeCluster(container_service.KubernetesCluster):
     else:
       cmd.flags['machine-type'] = vm_config.machine_type
 
+    if FLAGS.gke_enable_gvnic:
+      cmd.args.append('--enable-gvnic')
+    else:
+      cmd.args.append('--no-enable-gvnic')
+    cmd.args.append('--no-enable-autoupgrade')
     cmd.flags['node-labels'] = f'pkb_nodepool={name}'
 
   def _PostCreate(self):

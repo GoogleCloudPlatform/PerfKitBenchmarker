@@ -151,6 +151,8 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--disk-size 200', command_string)
       self.assertIn('--disk-type foo', command_string)
       self.assertIn('--local-ssd-count 2', command_string)
+      self.assertIn('--no-enable-shielded-nodes', command_string)
+      self.assertIn('--no-enable-autoupgrade', command_string)
 
   def testCreateQuotaExceeded(self):
     spec = self.create_kubernetes_engine_spec()
@@ -351,6 +353,46 @@ class GoogleKubernetesEngineVersionFlagTestCase(
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('--release-channel rapid', command_string)
+
+
+class GoogleKubernetesEngineGvnicFlagTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
+
+  @staticmethod
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+        'NAME', **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-west1-a',
+                },
+            },
+        })
+    return kubernetes_engine_spec
+
+  def testCreateEnableGvnic(self):
+    spec = self.create_kubernetes_engine_spec()
+    FLAGS.gke_enable_gvnic = True
+    with patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('--enable-gvnic', command_string)
+
+  def testCreateDisableGvnic(self):
+    spec = self.create_kubernetes_engine_spec()
+    FLAGS.gke_enable_gvnic = False
+    with patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('--no-enable-gvnic', command_string)
 
 
 class GoogleKubernetesEngineWithGpusTestCase(
