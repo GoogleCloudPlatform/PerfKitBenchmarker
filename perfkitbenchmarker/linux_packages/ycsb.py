@@ -1296,6 +1296,14 @@ class YCSBExecutor(object):
           client_meta.update(parameters)
           client_meta.update(clients=len(vms) * client_count,
                              threads_per_client_vm=client_count)
+          # Values passed in via this flag do not get recorded in metadata.
+          # The target passed in is applied to each client VM, so multiply by
+          # len(vms).
+          for pv in FLAGS.ycsb_run_parameters:
+            param, value = pv.split('=', 1)
+            if param == 'target':
+              value = int(value) * len(vms)
+            client_meta[param] = value
 
           if FLAGS.ycsb_include_individual_results and len(results) > 1:
             for i, result in enumerate(results):
