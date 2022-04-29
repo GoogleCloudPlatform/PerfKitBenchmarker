@@ -909,6 +909,11 @@ def DoRunPhase(spec, collector, timer):
     if FLAGS.record_glibc:
       samples.extend(_CreateGlibcSamples(spec.vms))
 
+    # Mark samples as restored to differentiate from non freeze/restore runs.
+    if FLAGS.restore:
+      for s in samples:
+        s.metadata['restore'] = True
+
     events.samples_created.send(
         stages.RUN, benchmark_spec=spec, samples=samples)
     collector.AddSamples(samples, spec.name, spec)
