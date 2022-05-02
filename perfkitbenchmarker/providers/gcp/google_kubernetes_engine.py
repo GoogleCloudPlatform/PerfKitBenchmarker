@@ -33,9 +33,8 @@ FLAGS = flags.FLAGS
 
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
-DEFAULT_RELEASE_CHANNEL = 'regular'
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
-RELEASE_CHANNELS = ['rapid', DEFAULT_RELEASE_CHANNEL, 'stable']
+RELEASE_CHANNELS = ['rapid', 'regular', 'stable']
 
 
 def _CalculateCidrSize(nodes: int) -> int:
@@ -91,8 +90,7 @@ class GkeCluster(container_service.KubernetesCluster):
   def __init__(self, spec):
     super(GkeCluster, self).__init__(spec)
     self.project = spec.vm_spec.project
-    self.cluster_version = (
-        FLAGS.container_cluster_version or DEFAULT_RELEASE_CHANNEL)
+    self.cluster_version = FLAGS.container_cluster_version
     self.use_application_default_credentials = True
     self.zones = self.zone and self.zone.split(',')
     if not self.zones:
@@ -140,14 +138,17 @@ class GkeCluster(container_service.KubernetesCluster):
     self._AddNodeParamsToCmd(self.vm_config, self.num_nodes,
                              container_service.DEFAULT_NODEPOOL, cmd)
 
-    if self.cluster_version in RELEASE_CHANNELS:
-      cmd.flags['release-channel'] = self.cluster_version
-    else:
-      cmd.flags['cluster-version'] = self.cluster_version
+    if self.cluster_version:
+      if self.cluster_version in RELEASE_CHANNELS:
+        if FLAGS.gke_enable_alpha:
+          raise errors.Config.InvalidValue(
+              'Kubernetes Alpha is not compatible with release channels')
+        cmd.flags['release-channel'] = self.cluster_version
+      else:
+        cmd.flags['cluster-version'] = self.cluster_version
     if FLAGS.gke_enable_alpha:
       cmd.args.append('--enable-kubernetes-alpha')
       cmd.args.append('--no-enable-autorepair')
-      cmd.args.append('--no-enable-autoupgrade')
 
     user = util.GetDefaultUser()
     if FLAGS.gcp_service_account:
@@ -247,7 +248,11 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.args.append('--enable-gvnic')
     else:
       cmd.args.append('--no-enable-gvnic')
-    cmd.args.append('--no-enable-autoupgrade')
+
+    # If using a fixed version (or the default) do not enable upgrades.
+    if self.cluster_version not in RELEASE_CHANNELS:
+      cmd.args.append('--no-enable-autoupgrade')
+
     cmd.flags['node-labels'] = f'pkb_nodepool={name}'
 
   def _PostCreate(self):

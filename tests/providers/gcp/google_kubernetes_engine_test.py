@@ -152,7 +152,6 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--disk-type foo', command_string)
       self.assertIn('--local-ssd-count 2', command_string)
       self.assertIn('--no-enable-shielded-nodes', command_string)
-      self.assertIn('--no-enable-autoupgrade', command_string)
 
   def testCreateQuotaExceeded(self):
     spec = self.create_kubernetes_engine_spec()
@@ -241,7 +240,6 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
               'zone': 'us-central1-a',
               'size': 2,
               'container_cluster_version': 'v1.2.3',
-              'gke_release_channel': 'regular',
           }, metadata)
 
   def testCidrCalculations(self):
@@ -331,7 +329,9 @@ class GoogleKubernetesEngineVersionFlagTestCase(
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
+      self.assertNotIn('--release-channel', command_string)
       self.assertIn('--cluster-version fake-version', command_string)
+      self.assertIn('--no-enable-autoupgrade', command_string)
 
   def testCreateDefaultVersion(self):
     spec = self.create_kubernetes_engine_spec()
@@ -341,7 +341,9 @@ class GoogleKubernetesEngineVersionFlagTestCase(
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('--release-channel regular', command_string)
+      self.assertNotIn('--release-channel', command_string)
+      self.assertNotIn('--cluster-version', command_string)
+      self.assertIn('--no-enable-autoupgrade', command_string)
 
   def testCreateRapidChannel(self):
     spec = self.create_kubernetes_engine_spec()
@@ -353,6 +355,8 @@ class GoogleKubernetesEngineVersionFlagTestCase(
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('--release-channel rapid', command_string)
+      self.assertNotIn('--cluster-version', command_string)
+      self.assertNotIn('--no-enable-autoupgrade', command_string)
 
 
 class GoogleKubernetesEngineGvnicFlagTestCase(
