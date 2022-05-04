@@ -371,6 +371,11 @@ _NOT_ENOUGH_RESOURCES_STDERR = ('does not have enough resources available to '
                                 'fulfill the request.')
 _NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 
+_INVALID_MACHINE_TYPE_REGEX = re.compile(
+    r"Invalid value for field 'resource.machineType': '.*?'. "
+    r"Machine type with name '.*?' does not exist in zone '.*?'.")
+_INVALID_MACHINE_TYPE_MESSAGE = 'Creation failed due to invalid machine type: '
+
 
 def CheckGcloudResponseKnownFailures(stderr, retcode):
   """Checks gcloud responses for quota exceeded errors.
@@ -388,6 +393,9 @@ def CheckGcloudResponseKnownFailures(stderr, retcode):
       message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
       logging.error(message)
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
+    if _INVALID_MACHINE_TYPE_REGEX.search(stderr):
+      message = _INVALID_MACHINE_TYPE_MESSAGE + stderr
+      raise errors.Benchmarks.UnsupportedConfigError(message)
 
 
 def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):
