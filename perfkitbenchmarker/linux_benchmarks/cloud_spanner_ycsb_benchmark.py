@@ -85,7 +85,33 @@ flags.DEFINE_list('cloud_spanner_ycsb_custom_vm_install_commands', [],
                   'VM during the installation phase.')
 _CPU_OPTIMIZATION = flags.DEFINE_bool(
     'cloud_spanner_ycsb_cpu_optimization', False,
-    'Whether to optimize CPU utilization to 65%.')
+    'Whether to run in CPU-optimized mode. The test will increase QPS until '
+    'CPU is between --cloud_spanner_ycsb_cpu_optimization_target and '
+    '--cloud_spanner_ycsb_cpu_optimization_target_max.')
+_CPU_TARGET_HIGH_PRIORITY = flags.DEFINE_float(
+    'cloud_spanner_ycsb_cpu_optimization_target', 0.65,
+    'Minimum target CPU utilization at which to stop the test. The default is '
+    'the recommended Spanner high priority CPU utilization, see: '
+    'https://cloud.google.com/spanner/docs/cpu-utilization#recommended-max.')
+_CPU_TARGET_HIGH_PRIORITY_UPPER_BOUND = flags.DEFINE_float(
+    'cloud_spanner_ycsb_cpu_optimization_target_max', 0.75,
+    'Maximum target CPU utilization after which the benchmark will throw an '
+    'exception. This is needed so that in CPU-optimized mode, the increase in '
+    'QPS does not overshoot the target CPU percentage by too much.')
+
+
+def _ValidateCpuTargetFlags(flags_dict):
+  return (flags_dict['cloud_spanner_ycsb_cpu_optimization_target_max'] >
+          flags_dict['cloud_spanner_ycsb_cpu_optimization_target'])
+
+
+flags.register_multi_flags_validator(
+    [
+        'cloud_spanner_ycsb_cpu_optimization_target',
+        'cloud_spanner_ycsb_cpu_optimization_target_max'
+    ], _ValidateCpuTargetFlags,
+    'CPU optimization max target must be greater than target.')
+
 _CPU_OPTIMIZATION_INCREMENT_MINUTES = flags.DEFINE_integer(
     'cloud_spanner_ycsb_cpu_optimization_workload_mins', 30,
     'Length of time to run YCSB until incrementing QPS.')
@@ -101,10 +127,6 @@ _STARTING_QPS = flags.DEFINE_integer(
     'node below.')
 
 
-# Recommended Spanner high priority CPU utilization, see
-# https://cloud.google.com/spanner/docs/cpu-utilization#recommended-max.
-_CPU_TARGET_HIGH_PRIORITY = 0.65
-_CPU_TARGET_HIGH_PRIORITY_UPPER_BOUND = 0.75
 _CPU_OPTIMIZATION_TARGET_QPS_INCREMENT = 1000
 
 
@@ -166,7 +188,7 @@ def _GetCpuOptimizationMetadata() -> Dict[str, Any]:
       'cloud_spanner_cpu_optimization':
           True,
       'cloud_spanner_cpu_target':
-          _CPU_TARGET_HIGH_PRIORITY,
+          _CPU_TARGET_HIGH_PRIORITY.value,
       'cloud_spanner_cpu_increment_minutes':
           _CPU_OPTIMIZATION_INCREMENT_MINUTES.value,
       'cloud_spanner_cpu_measurement_minutes':
@@ -256,18 +278,18 @@ def CpuUtilizationRun(executor: ycsb.YCSBExecutor,
         'Run had throughput target %s and measured throughput %s, '
         'with average high-priority CPU utilization %s.',
         qps, throughput, cpu_utilization)
-    if cpu_utilization > _CPU_TARGET_HIGH_PRIORITY:
+    if cpu_utilization > _CPU_TARGET_HIGH_PRIORITY.value:
       logging.info('CPU utilization is higher than cap %s, stopping test',
-                   _CPU_TARGET_HIGH_PRIORITY)
+                   _CPU_TARGET_HIGH_PRIORITY.value)
       if first_run:
         raise errors.Benchmarks.RunError(
             f'Initial QPS {qps} already above cpu utilization cap. '
             'Please lower the starting QPS.')
-      if cpu_utilization > _CPU_TARGET_HIGH_PRIORITY_UPPER_BOUND:
+      if cpu_utilization > _CPU_TARGET_HIGH_PRIORITY_UPPER_BOUND.value:
         raise errors.Benchmarks.RunError(
             f'CPU utilization measured was {cpu_utilization}, over the '
-            f'{_CPU_TARGET_HIGH_PRIORITY_UPPER_BOUND} threshold. Decrease step '
-            'size to avoid overshooting.')
+            f'{_CPU_TARGET_HIGH_PRIORITY_UPPER_BOUND.value} threshold. '
+            'Decrease step size to avoid overshooting.')
       for s in run_samples:
         s.metadata['cloud_spanner_cpu_utilization'] = cpu_utilization
       return run_samples
