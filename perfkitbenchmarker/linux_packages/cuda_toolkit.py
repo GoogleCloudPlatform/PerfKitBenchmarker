@@ -58,6 +58,8 @@ CUDA_10_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/10.1/Pro
 CUDA_10_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/10.0/Prod/local_installers/cuda-repo-{os}-10-0-local-10.0.130-410.48_1.0-1_{cpu_arch}'
 CUDA_9_0_TOOLKIT = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/local_installers/cuda-repo-{os}-9-0-local_9.0.176-1_{cpu_arch}-deb'
 CUDA_9_0_PATCH = 'https://developer.nvidia.com/compute/cuda/9.0/Prod/patches/1/cuda-repo-{os}-9-0-local-cublas-performance-update_1.0-1_{cpu_arch}-deb'
+# The new GPG keys for the CUDA repository. This is Debian-based distros.
+GPG_KEY = 'http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/3bf863cc.pub'
 
 
 def _CudaOs(os_type):
@@ -144,6 +146,10 @@ def GetCudaToolkitVersion(vm):
     return None
 
 
+def EnrollSigningKey(vm):
+  vm.RemoteCommand(f'sudo apt-key adv --fetch-keys {GPG_KEY}')
+
+
 def _InstallCudaPatch(vm, patch_url):
   """Installs CUDA Toolkit patch from NVIDIA.
 
@@ -177,7 +183,7 @@ def _InstallCuda9Point0(vm):
   vm.RemoteCommand('wget -q %s -O %s' % (CUDA_9_0_TOOLKIT.format(
       os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)), basename))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
-  vm.RemoteCommand('sudo apt-key add /var/cuda-repo-9-0-local/7fa2af80.pub')
+  EnrollSigningKey(vm)
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('cuda-toolkit-9-0 cuda-tools-9-0 cuda-libraries-9-0 '
                      'cuda-libraries-dev-9-0')
@@ -199,8 +205,7 @@ def _InstallCuda10Point0(vm):
       f'wget -q {CUDA_10_0_TOOLKIT.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm))} -O '
       f'{basename}')
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
-  vm.RemoteCommand('sudo apt-key add '
-                   '/var/cuda-repo-10-0-local-10.0.130-410.48/7fa2af80.pub')
+  EnrollSigningKey(vm)
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('cuda-toolkit-10-0 cuda-tools-10-0 cuda-libraries-10-0 '
                      'cuda-libraries-dev-10-0')
@@ -223,8 +228,7 @@ def _InstallCuda10Point1(vm):
   vm.RemoteCommand('wget -q %s' % CUDA_10_1_TOOLKIT.format(
       os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
-  vm.RemoteCommand('sudo apt-key add '
-                   '/var/cuda-repo-10-1-local-10.1.243-418.87.00/7fa2af80.pub')
+  EnrollSigningKey(vm)
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('cuda-toolkit-10-1 cuda-tools-10-1 cuda-libraries-10-1 '
                      'cuda-libraries-dev-10-1')
@@ -247,8 +251,7 @@ def _InstallCuda10Point2(vm):
   vm.RemoteCommand('wget -q %s' % CUDA_10_2_TOOLKIT.format(
       os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
-  vm.RemoteCommand('sudo apt-key add '
-                   '/var/cuda-repo-10-2-local-10.2.89-440.33.01/7fa2af80.pub')
+  EnrollSigningKey(vm)
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('cuda-toolkit-10-2 cuda-tools-10-2 cuda-libraries-10-2 '
                      'cuda-libraries-dev-10-2')
@@ -271,9 +274,7 @@ def _InstallCuda11Generic(vm, toolkit_fmt, version_dash):
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
   vm.RemoteCommand(f'wget -q {toolkit}')
   vm.RemoteCommand(f'sudo dpkg -i {basename}')
-  vm.RemoteCommand(
-      'sudo apt-key add '
-      f'/var/cuda-repo-{_CudaOs(vm.OS_TYPE)}-{version_dash}-local/7fa2af80.pub')
+  EnrollSigningKey(vm)
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages(f'cuda-toolkit-{version_dash} '
                      f'cuda-tools-{version_dash} '
