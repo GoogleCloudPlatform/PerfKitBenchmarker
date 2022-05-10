@@ -90,9 +90,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   Args:
     bm_spec: The benchmark specification
   """
-  vm = bm_spec.vms[0]
-  cuda_toolkit.EnrollSigningKey(vm)
-  vm.Install('xgboost')
+  vm_util.RunThreaded(lambda vm: vm.Install('xgboost'), bm_spec.vms)
 
 
 def _MetadataFromFlags(vm: virtual_machine.BaseVirtualMachine) -> [str, Any]:

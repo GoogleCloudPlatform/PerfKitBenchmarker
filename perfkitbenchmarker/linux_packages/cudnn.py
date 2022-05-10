@@ -41,7 +41,9 @@ def AptInstall(vm):
   vm.RemoteCommand(
       'sudo apt-get install -y --no-install-recommends dirmngr',
       should_log=True)
-  cuda_toolkit.EnrollSigningKey(vm)
+  vm.RemoteCommand(
+      'sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/'
+      'compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub', should_log=True)
   vm.RemoteCommand(
       'sudo bash -c \'echo "deb https://developer.download.nvidia.com/compute/'
       'machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/'
