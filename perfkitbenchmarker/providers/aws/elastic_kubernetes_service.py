@@ -126,6 +126,16 @@ class EksCluster(container_service.KubernetesCluster):
     for name, node_group in self.nodepools.items():
       self._CreateNodeGroup(name, node_group)
 
+    # Fix for kubectl 1.24 and https://github.com/weaveworks/eksctl/issues/5240
+    # This needs to run before we check Nodes with _IsReady so put it in Create
+    # TODO(user): Revert after fixed upstream.
+    vm_util.IssueCommand(util.AWS_PREFIX + [
+        'eks',
+        'update-kubeconfig',
+        '--region=' + self.region,
+        '--name=' + self.name,
+        '--kubeconfig=' + FLAGS.kubeconfig])
+
   def _CreateNodeGroup(self, name: str, node_group):
     """Creates a node group."""
     eksctl_flags = {
