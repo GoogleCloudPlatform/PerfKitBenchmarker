@@ -14,6 +14,8 @@
 
 """Runs HTTP load generators against an Nginx server."""
 
+import ipaddress
+
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -54,6 +56,10 @@ flags.DEFINE_boolean('nginx_use_ssl', False,
 flags.DEFINE_integer('nginx_worker_connections', 1024,
                      'The maximum number of simultaneous connections that can '
                      'be opened by a worker process.')
+_NGINX_SERVER_PORT = flags.DEFINE_integer(
+    'nginx_server_port', 0,
+    'The port that nginx server will listen to. 0 will use '
+    'default ports (80 or 443 depending on --nginx_use_ssl).')
 
 
 def _ValidateLoadConfigs(load_configs):
@@ -119,12 +125,18 @@ def _ConfigureNginxForSsl(server):
                        '-pkeyopt ec_paramgen_curve:secp384r1 '
                        '-keyout /etc/nginx/ssl/ecdsa.key '
                        '-out /etc/nginx/ssl/ecdsa.crt')
-  server.RemoteCommand(
-      r"sudo sed -i 's|# \(listen 443 ssl .*\)|\1|g' "
-      r"/etc/nginx/sites-enabled/default")
-  server.RemoteCommand(
-      r"sudo sed -i 's|# \(listen \[::\]:443 ssl .*\)|\1|g' "
-      r"/etc/nginx/sites-enabled/default")
+  isipv6 = isinstance(
+      ipaddress.ip_address(server.internal_ip), ipaddress.IPv6Address)
+  server.RemoteCommand(r"sudo sed -i 's|\(listen 80 .*\)|#\1|g' "
+                       r'/etc/nginx/sites-enabled/default')
+  server.RemoteCommand(r"sudo sed -i 's|\(listen \[::\]:80 .*;\)|#\1|g' "
+                       r"/etc/nginx/sites-enabled/default")
+  if not isipv6:
+    server.RemoteCommand(r"sudo sed -i 's|# \(listen 443 ssl .*\)|\1|g' "
+                         r'/etc/nginx/sites-enabled/default')
+  else:
+    server.RemoteCommand(r"sudo sed -i 's|# \(listen \[::\]:443 ssl .*\)|\1|g' "
+                         r'/etc/nginx/sites-enabled/default')
   server.RemoteCommand(
       r"sudo sed -i 's|\(\s*\)\(listen \[::\]:443 ssl .*;\)|"
       r"\1\2\n"
@@ -132,6 +144,11 @@ def _ConfigureNginxForSsl(server):
       r"\1ssl_certificate_key /etc/nginx/ssl/ecdsa.key;\n"
       r"\1ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384;|g' "
       r"/etc/nginx/sites-enabled/default")
+  if _NGINX_SERVER_PORT.value:
+    server_port = _NGINX_SERVER_PORT.value
+    replace_str = fr's|\(listen .*\)443 |\1{server_port} |g'
+    server.RemoteCommand(
+        f"sudo sed -i '{replace_str}' /etc/nginx/sites-enabled/default")
 
 
 def _ConfigureNginx(server):
@@ -170,6 +187,20 @@ def _ConfigureNginx(server):
 
   if FLAGS.nginx_use_ssl:
     _ConfigureNginxForSsl(server)
+  else:
+    isipv6 = isinstance(
+        ipaddress.ip_address(server.internal_ip), ipaddress.IPv6Address)
+    if not isipv6:
+      server.RemoteCommand(r"sudo sed -i 's|\(listen \[::\]:80 .*;\)|#\1|g' "
+                           r'/etc/nginx/sites-enabled/default')
+    else:
+      server.RemoteCommand(r"sudo sed -i 's|\(listen 80 .*\)|#\1|g' "
+                           r'/etc/nginx/sites-enabled/default')
+    if FLAGS.nginx_server_port:
+      server_port = FLAGS.nginx_server_port
+      replace_str = fr's|\(listen .*\)80 |\1{server_port} |g'
+      server.RemoteCommand(
+          f"sudo sed -i '{replace_str}' /etc/nginx/sites-enabled/default")
 
   server.RemoteCommand('sudo service nginx restart')
 
@@ -257,7 +288,11 @@ def Run(benchmark_spec):
   clients = benchmark_spec.vm_groups['clients']
   results = []
   scheme = 'https' if FLAGS.nginx_use_ssl else 'http'
-  target = f'{scheme}://{benchmark_spec.nginx_endpoint_ip}/random_content'
+  hostip = benchmark_spec.nginx_endpoint_ip
+  hoststr = f'[{hostip}]' if isinstance(
+      ipaddress.ip_address(hostip), ipaddress.IPv6Address) else f'{hostip}'
+  portstr = f':{FLAGS.nginx_server_port}' if FLAGS.nginx_server_port else ''
+  target = f'{scheme}://{hoststr}{portstr}/random_content'
 
   if FLAGS.nginx_throttle:
     return _RunMultiClient(
