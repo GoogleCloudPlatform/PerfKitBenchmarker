@@ -153,10 +153,14 @@ flags.DEFINE_integer(
     'gcp_provisioned_iops', 100000,
     'Iops to provision for pd-extreme. Defaults to the gcloud '
     'default of 100000.')
-API_OVERRIDE = flags.DEFINE_string(
+CLOUD_REDIS_API_OVERRIDE = flags.DEFINE_string(
     'gcp_cloud_redis_api_override',
     default='https://redis.googleapis.com/',
     help='Cloud redis API endpoint override. Defaults to prod.')
+GKE_API_OVERRIDE = flags.DEFINE_string(
+    'gke_api_override',
+    default=None,
+    help='GKE API endpoint override. Defaults to unset (prod).')
 
 
 def _ValidatePreemptFlags(flags_dict):
