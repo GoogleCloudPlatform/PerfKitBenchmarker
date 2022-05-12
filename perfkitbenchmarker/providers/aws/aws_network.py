@@ -330,7 +330,7 @@ class AwsVpc(resource.BaseResource):
       vm_util.IssueCommand(cmd)
     except errors.VmUtil.IssueCommandError as ex:
       # do not retry if this rule already exists
-      if ex.message.find('InvalidPermission.Duplicate') == -1:
+      if ex.message.find('InvalidPermission.Duplicate') == -1:  # pytype: disable=attribute-error  # enable-nested-classes
         raise ex
 
   def AllowVpcPeerInBound(self, peer_vpc):
