@@ -69,6 +69,7 @@
 -   Add support for TPC-DS/H benchmarks on Dataproc Serverless.
 -   Add support for TPC-DS/H benchmarks on AWS Glue Job.
 -   Add messaging service latency benchmark (for GCP PubSub, AWS SQS & Azure Service Bus).
+-   Add Intel perfspect as a new trace
 
 ### Enhancements:
 
