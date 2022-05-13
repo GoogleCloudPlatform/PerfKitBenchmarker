@@ -33,7 +33,6 @@ tensor2tensor:
   description: Runs a benchmark using the Tensor2Tensor framework.
   vm_groups:
     default:
-      os_type: ubuntu1604
       vm_spec:
         GCP:
           machine_type: n1-standard-8

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 """Module containing NVIDIA Driver installation.
 """
 
@@ -32,45 +31,7 @@ NVIDIA_TESLA_P100 = 'p100'
 NVIDIA_TESLA_V100 = 'v100'
 NVIDIA_TESLA_T4 = 't4'
 NVIDIA_TESLA_A100 = 'a100'
-
-"""Default GPU clocks and autoboost configurations.
-
-Base_clock is the default clock speeds when setting the GPU clocks. Max_clock
-is currently unused. The clock speeds are in the format of
-[memory_clock in MHz, graphics_clock in MHz].
-"""
-GPU_DEFAULTS = {
-    NVIDIA_TESLA_K80: {
-        'base_clock': [2505, 562],
-        'max_clock': [2505, 875],
-        'autoboost_enabled': True,
-    },
-    NVIDIA_TESLA_P4: {
-        'base_clock': [3003, 885],
-        'max_clock': [3003, 1531],
-        'autoboost_enabled': None,
-    },
-    NVIDIA_TESLA_P100: {
-        'base_clock': [715, 1189],
-        'max_clock': [715, 1328],
-        'autoboost_enabled': None,
-    },
-    NVIDIA_TESLA_V100: {
-        'base_clock': [877, 1312],
-        'max_clock': [877, 1530],
-        'autoboost_enabled': None,
-    },
-    NVIDIA_TESLA_T4: {
-        'base_clock': [5001, 585],
-        'max_clock': [5001, 1590],
-        'autoboost_enabled': None,
-    },
-    NVIDIA_TESLA_A100: {
-        'base_clock': [1215, 1410],
-        'max_clock': [1215, 1410],
-        'autoboost_enabled': None,
-    },
-}
+NVIDIA_TESLA_A10G = 'a10g'
 
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
@@ -83,7 +44,7 @@ flags.DEFINE_boolean('gpu_autoboost_enabled', None,
                      'whether gpu autoboost is enabled')
 
 flags.DEFINE_string(
-    'nvidia_driver_version', '495.29.05',
+    'nvidia_driver_version', '510.47.03',
     'The version of nvidia driver to install. '
     'For example, "418.67" or "418.87.01."')
 flags.DEFINE_boolean('nvidia_driver_force_install', False,
@@ -226,18 +187,21 @@ def GetGpuType(vm):
 
   if 'K80' in gpu_types[0]:
     return NVIDIA_TESLA_K80
-  if 'P4' in gpu_types[0]:
+  elif 'P4' in gpu_types[0]:
     return NVIDIA_TESLA_P4
-  if 'P100' in gpu_types[0]:
+  elif 'P100' in gpu_types[0]:
     return NVIDIA_TESLA_P100
-  if 'V100' in gpu_types[0]:
+  elif 'V100' in gpu_types[0]:
     return NVIDIA_TESLA_V100
-  if 'T4' in gpu_types[0]:
+  elif 'T4' in gpu_types[0]:
     return NVIDIA_TESLA_T4
-  if 'A100' in gpu_types[0]:
+  elif 'A100' in gpu_types[0]:
     return NVIDIA_TESLA_A100
-  raise UnsupportedClockSpeedError(
-      'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
+  elif 'A10G' in gpu_types[0]:
+    return NVIDIA_TESLA_A10G
+  else:
+    raise UnsupportedClockSpeedError(
+        'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
 
 
 def QueryNumberOfGpus(vm):
@@ -304,14 +268,8 @@ def SetAndConfirmGpuClocks(vm):
     UnsupportedClockSpeedError: If a GPU did not accept the
     provided clock speeds.
   """
-  gpu_type = GetGpuType(vm)
-  gpu_clock_speeds = GPU_DEFAULTS[gpu_type]['base_clock']
-  autoboost_enabled = GPU_DEFAULTS[gpu_type]['autoboost_enabled']
-
-  if FLAGS.gpu_clock_speeds is not None:
-    gpu_clock_speeds = FLAGS.gpu_clock_speeds
-  if FLAGS.gpu_autoboost_enabled is not None:
-    autoboost_enabled = FLAGS.gpu_autoboost_enabled
+  gpu_clock_speeds = FLAGS.gpu_clock_speeds
+  autoboost_enabled = FLAGS.gpu_autoboost_enabled
 
   desired_memory_clock = gpu_clock_speeds[0]
   desired_graphics_clock = gpu_clock_speeds[1]
@@ -465,7 +423,8 @@ def DoPostInstallActions(vm):
   Args:
     vm: The virtual machine to operate on.
   """
-  SetAndConfirmGpuClocks(vm)
+  if FLAGS.gpu_clock_speeds:
+    SetAndConfirmGpuClocks(vm)
 
 
 def Install(vm):
@@ -482,9 +441,10 @@ def Install(vm):
     logging.warn('NVIDIA drivers already detected. Not installing.')
     return
 
-  location = ('{base}/{version}/NVIDIA-Linux-x86_64-{version}.run'
-              .format(base=NVIDIA_DRIVER_LOCATION_BASE,
-                      version=version_to_install))
+  location = ('{base}/{version}/NVIDIA-Linux-{cpu_arch}-{version}.run'.format(
+      base=NVIDIA_DRIVER_LOCATION_BASE,
+      version=version_to_install,
+      cpu_arch=vm.cpu_arch))
 
   vm.Install('wget')
   tokens = re.split('/', location)
@@ -492,12 +452,12 @@ def Install(vm):
   vm.RemoteCommand('wget {location} && chmod 755 {filename} '
                    .format(location=location, filename=filename),
                    should_log=True)
-  vm.RemoteCommand('sudo ./{filename} -q -x-module-path={x_module_path} '
-                   '--ui=none -x-library-path={x_library_path} '
-                   '--no-install-compat32-libs'
-                   .format(filename=filename,
-                           x_module_path=FLAGS.nvidia_driver_x_module_path,
-                           x_library_path=FLAGS.nvidia_driver_x_library_path),
-                   should_log=True)
+  vm.RemoteCommand(
+      'sudo ./{filename} -q -x-module-path={x_module_path} '
+      '--ui=none -x-library-path={x_library_path}'.format(
+          filename=filename,
+          x_module_path=FLAGS.nvidia_driver_x_module_path,
+          x_library_path=FLAGS.nvidia_driver_x_library_path),
+      should_log=True)
   if FLAGS.nvidia_driver_persistence_mode:
     EnablePersistenceMode(vm)

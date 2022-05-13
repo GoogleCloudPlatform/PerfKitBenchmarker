@@ -21,13 +21,13 @@ class CmakeTests(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(cmake_kitware=True)
   def testAptInstallViaKitware(self):
-    vm = MockVm('ubuntu1604')
+    vm = MockVm('ubuntu1804')
     cmake.AptInstall(vm)
     expected_cmds = [
         'curl --silent https://apt.kitware.com/keys/kitware-archive-latest.asc '
         '| gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg '
         '>/dev/null', 'sudo apt-add-repository '
-        '"deb https://apt.kitware.com/ubuntu/ xenial main"'
+        '"deb https://apt.kitware.com/ubuntu/ bionic main"'
     ]
     vm.RemoteCommand.assert_has_calls([mock.call(cmd) for cmd in expected_cmds])
 

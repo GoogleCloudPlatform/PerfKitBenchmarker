@@ -85,6 +85,21 @@ def GetZonesInRegion(region: str) -> Set[str]:
   }
 
 
+def GetZonesFromMachineType() -> Set[str]:
+  """Returns all available zones for a given machine type."""
+  zones = set()
+  for region in GetAllRegions():
+    get_zones_cmd = AWS_PREFIX + [
+        'ec2', 'describe-instance-type-offerings',
+        '--location-type=availability-zone', f'--region={region}'
+    ] + AwsFilter({'instance-type': FLAGS.machine_type})
+    stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
+    response = json.loads(stdout)
+    for item in response['InstanceTypeOfferings']:
+      zones.add(item['Location'])
+  return zones
+
+
 def GetAllRegions() -> Set[str]:
   """Returns all enabled AWS regions."""
   get_regions_cmd = AWS_PREFIX + [
@@ -125,20 +140,6 @@ def GroupZonesIntoRegions(zones):
     region = GetRegionFromZone(zone)
     regions_to_zones_map[region].add(zone)
   return regions_to_zones_map
-
-
-def EksZonesValidator(value):
-  """Validates that the value is a single region or a list of zones."""
-  if not value:
-    return True
-  if len(value) == 1:
-    return IsRegion(value[0])
-  if any(IsRegion(zone) for zone in value):
-    return False
-  region = GetRegionFromZone(value[0])
-  if any(GetRegionFromZone(zone) != region for zone in value):
-    return False
-  return True
 
 
 def FormatTags(tags_dict):

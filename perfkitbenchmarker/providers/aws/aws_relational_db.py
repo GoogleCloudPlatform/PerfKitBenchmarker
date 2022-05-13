@@ -20,10 +20,10 @@ import logging
 import time
 
 from absl import flags
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
@@ -68,8 +68,8 @@ _RDS_ENGINES = (
     sql_engine_utils.SQLSERVER_STANDARD,
     sql_engine_utils.SQLSERVER_ENTERPRISE)
 
-MYSQL5_7_PARAM_GROUP_FAMILY = 'mysql5.7'
-MYSQL8_0_PARAM_GROUP_FAMILY = 'mysql8.0'
+MYSQL_SUPPORTED_MAJOR_VERSIONS = ['5.7', '8.0']
+POSTGRES_SUPPORTED_MAJOR_VERSIONS = ['9.6', '10', '11', '12', '13']
 
 
 class AwsRelationalDbCrossRegionError(Exception):
@@ -118,7 +118,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
   server will be launched in the zone requested, and
   relational_db_secondary_zone will not exist in the metadata.
   """
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
 
   def __init__(self, relational_db_spec):
     super(AwsRelationalDb, self).__init__(relational_db_spec)
@@ -706,7 +706,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
                       'reboot')
 
   def _ApplyManagedDbFlags(self):
-    """Apply managed mysql flags."""
+    """Apply managed flags on RDS."""
     if self.spec.db_flags:
       self.parameter_group = 'pkb-parameter-group-' + FLAGS.run_uri
       cmd = util.AWS_PREFIX + [
@@ -744,12 +744,21 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       self._Reboot()
 
   def _GetParameterGroupFamily(self):
-    """Get the parameter group family string."""
-    if self.spec.engine == sql_engine_utils.MYSQL:
-      if self.spec.engine_version.startswith('5.7'):
-        return MYSQL5_7_PARAM_GROUP_FAMILY
-      elif self.spec.engine_version.startswith('8.0'):
-        return MYSQL8_0_PARAM_GROUP_FAMILY
+    """Get the parameter group family string.
+
+    Parameter group family is formatted as engine type plus version.
+
+    Returns:
+      ParameterGroupFamiliy name of rds resources.
+
+    Raises:
+      NotImplementedError: If there is no supported ParameterGroupFamiliy.
+    """
+    all_supported_versions = (
+        MYSQL_SUPPORTED_MAJOR_VERSIONS + POSTGRES_SUPPORTED_MAJOR_VERSIONS)
+    for version in all_supported_versions:
+      if self.spec.engine_version.startswith(version):
+        return self.spec.engine + version
 
     raise NotImplementedError('The parameter group of engine %s,'
                               ' version %s is not supported' %

@@ -192,12 +192,12 @@ def _ParseStressngResult(metadata, output, cpu_method=None):
   """
   output_list = output.splitlines()
   output_matrix = [i.split() for i in output_list]
-  if len(output_matrix) != 5:
+  if len(output_matrix) < 5:
     logging.error('output is missing')
     return ''
-  assert output_matrix[2][-4] == 'bogo' and output_matrix[2][-3] == 'ops/s'
-  assert output_matrix[3][-4] == '(real' and output_matrix[3][-3] == 'time)'
-  line = output_matrix[4]
+  assert output_matrix[-3][-4] == 'bogo' and output_matrix[-3][-3] == 'ops/s'
+  assert output_matrix[-2][-4] == '(real' and output_matrix[-2][-3] == 'time)'
+  line = output_matrix[-1]
   name = line[3]
   value = float(line[-2])  # parse bogo ops/s (real time)
   if name == 'cpu' and cpu_method:

@@ -17,16 +17,24 @@ Instances can be created and deleted.
 """
 
 import dataclasses
+import datetime
 import json
 import logging
-from typing import Dict, Optional
+import statistics
+import time
+from typing import Any, Dict, Optional
 
 from absl import flags
+from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3 import query
+import numpy as np
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import util
+import requests
 
 
 FLAGS = flags.FLAGS
@@ -52,11 +60,22 @@ _DEFAULT_DDL = """
     field0 STRING(MAX)
   ) PRIMARY KEY(id)
   """
+_DEFAULT_ENDPOINT = 'https://spanner.googleapis.com'
 _DEFAULT_NODES = 1
 _FROZEN_NODE_COUNT = 1
 
 # Common decoder configuration option.
 _NONE_OK = {'default': None, 'none_ok': True}
+
+# Spanner CPU Monitoring API has a 3 minute delay. See
+# https://cloud.google.com/monitoring/api/metrics_gcp#gcp-spanner,
+CPU_API_DELAY_MINUTES = 3
+CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
+
+# For more information on QPS expectations, see
+# https://cloud.google.com/spanner/docs/instance-configurations#regional-performance
+_READ_OPS_PER_NODE = 10000
+_WRITE_OPS_PER_NODE = 2000
 
 
 @dataclasses.dataclass
@@ -175,7 +194,7 @@ class GcpSpannerInstance(resource.BaseResource):
     self._description = description or _DEFAULT_DESCRIPTION
     self._ddl = ddl or _DEFAULT_DDL
     self._config = config or self._GetDefaultConfig()
-    self._nodes = nodes or _DEFAULT_NODES
+    self.nodes = nodes or _DEFAULT_NODES
     self._end_point = None
 
     # Cloud Spanner may not explicitly set the following common flags.
@@ -183,7 +202,7 @@ class GcpSpannerInstance(resource.BaseResource):
         project or FLAGS.project or util.GetDefaultProject())
     self.zone = None
 
-  def _GetDefaultConfig(self):
+  def _GetDefaultConfig(self) -> str:
     """Gets the config that corresponds the region used for the test."""
     try:
       region = util.GetRegionFromZone(
@@ -207,16 +226,18 @@ class GcpSpannerInstance(resource.BaseResource):
         create_on_restore_error=spanner_spec.create_on_restore_error,
         delete_on_freeze_error=spanner_spec.delete_on_freeze_error)
 
-  def _Create(self):
+  def _Create(self) -> None:
     """Creates the instance, the database, and update the schema."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create', self.name)
     cmd.flags['description'] = self._description
-    cmd.flags['nodes'] = self._nodes
+    cmd.flags['nodes'] = self.nodes
     cmd.flags['config'] = self._config
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Create GCP Spanner instance failed.')
       return
+
+    self._UpdateLabels(util.GetDefaultTags())
 
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'create',
                              self.database)
@@ -236,7 +257,7 @@ class GcpSpannerInstance(resource.BaseResource):
     else:
       logging.info('Created GCP Spanner instance and database.')
 
-  def _Delete(self):
+  def _Delete(self) -> None:
     """Deletes the instance."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'delete',
                              self.name)
@@ -246,7 +267,7 @@ class GcpSpannerInstance(resource.BaseResource):
     else:
       logging.info('Deleted GCP Spanner instance.')
 
-  def _Exists(self, instance_only=False):
+  def _Exists(self, instance_only: bool = False) -> bool:
     """Returns true if the instance and the database exists."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'describe',
                              self.name)
@@ -272,7 +293,7 @@ class GcpSpannerInstance(resource.BaseResource):
 
     return True
 
-  def GetEndPoint(self):
+  def GetEndPoint(self) -> str:
     """Returns the end point for Cloud Spanner."""
     if self._end_point:
       return self._end_point
@@ -282,8 +303,7 @@ class GcpSpannerInstance(resource.BaseResource):
     stdout, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.warning('Fail to retrieve cloud spanner end point.')
-      return None
-    self._end_point = json.loads(stdout)
+    self._end_point = json.loads(stdout) or _DEFAULT_ENDPOINT
     return self._end_point
 
   def _SetNodes(self, nodes: int) -> None:
@@ -298,7 +318,7 @@ class GcpSpannerInstance(resource.BaseResource):
     Increases the number of nodes on the instance to the specified number.  See
     https://cloud.google.com/spanner/pricing for Spanner pricing info.
     """
-    self._SetNodes(self._nodes)
+    self._SetNodes(self.nodes)
 
   def _Freeze(self) -> None:
     """See base class.
@@ -309,9 +329,99 @@ class GcpSpannerInstance(resource.BaseResource):
     """
     self._SetNodes(_FROZEN_NODE_COUNT)
 
+  def _GetLabels(self) -> Dict[str, Any]:
+    """Gets labels from the current instance."""
+    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'describe',
+                             self.name)
+    stdout, _, _ = cmd.Issue(raise_on_failure=True)
+    return json.loads(stdout).get('labels', {})
+
+  def _UpdateLabels(self, labels: Dict[str, Any]) -> None:
+    """Updates the labels of the current instance."""
+    header = {'Authorization': f'Bearer {util.GetAccessToken()}'}
+    url = (f'{self.GetEndPoint()}/v1/projects/'
+           f'{self.project}/instances/{self.name}')
+    # Keep any existing labels
+    tags = self._GetLabels()
+    tags.update(labels)
+    args = {
+        'instance': {
+            'labels': tags
+        },
+        'fieldMask': 'labels',
+    }
+    response = requests.patch(url, headers=header, json=args)
+    logging.info('Update labels: status code %s, %s',
+                 response.status_code, response.text)
+    if response.status_code != 200:
+      raise errors.Resource.UpdateError(
+          f'Unable to update Spanner instance: {response.text}')
+
   def _UpdateTimeout(self, timeout_minutes: int) -> None:
     """See base class."""
-    pass
+    labels = util.GetDefaultTags(timeout_minutes)
+    self._UpdateLabels(labels)
+
+  def GetResourceMetadata(self) -> Dict[Any, Any]:
+    """Returns useful metadata about the instance."""
+    return {
+        'gcp_spanner_name': self.name,
+        'gcp_spanner_database': self.database,
+        'gcp_spanner_node_count': self.nodes,
+        'gcp_spanner_ddl': self._ddl,
+        'gcp_spanner_config': self._config,
+        'gcp_spanner_endpoint': self.GetEndPoint()
+    }
+
+  def GetAverageCpuUsage(self, duration_minutes: int) -> float:
+    """Gets the average high priority CPU usage through the time duration."""
+    client = monitoring_v3.MetricServiceClient()
+    # It takes up to 3 minutes for CPU metrics to appear.
+    end_timestamp = time.time() - CPU_API_DELAY_SECONDS
+    cpu_query = query.Query(
+        client, project=self.project,
+        metric_type='spanner.googleapis.com/instance/cpu/utilization_by_priority',
+        end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
+        minutes=duration_minutes)
+    # Filter by high priority
+    cpu_query = cpu_query.select_metrics(
+        database=self.database, priority='high')
+    # Filter by the Spanner instance
+    cpu_query = cpu_query.select_resources(
+        instance_id=self.name, project_id=self.project)
+    # Aggregate user and system high priority by the minute
+    time_series = list(cpu_query)
+    # Expect 2 metrics: user and system high-priority CPU
+    if len(time_series) != 2:
+      raise errors.Benchmarks.RunError(
+          'Expected 2 metrics (user and system) for Spanner high-priority CPU '
+          f'utilization query, got {len(time_series)}')
+    cpu_aggregated = [
+        user.value.double_value + system.value.double_value
+        for user, system in zip(time_series[0].points, time_series[1].points)
+    ]
+    average_cpu = statistics.mean(cpu_aggregated)
+    logging.info('CPU aggregated: %s', cpu_aggregated)
+    logging.info('Average CPU for the %s minutes ending at %s: %s',
+                 duration_minutes,
+                 datetime.datetime.fromtimestamp(end_timestamp), average_cpu)
+    return average_cpu
+
+  def CalculateRecommendedThroughput(self, read_proportion: float,
+                                     write_proportion: float) -> int:
+    """Returns the recommended throughput based on the workload and nodes."""
+    if read_proportion + write_proportion != 1:
+      raise errors.Benchmarks.RunError(
+          'Unrecognized workload, read + write proportion must be equal to 1, '
+          f'got {read_proportion} + {write_proportion}.')
+    # Calculates the starting throughput based off of each node being able to
+    # handle 10k QPS of reads or 2k QPS of writes. For example, for a 50/50
+    # workload, run at a QPS target of 1666 reads + 1666 writes = 3333 (round).
+    a = np.array([[1 / _READ_OPS_PER_NODE, 1 / _WRITE_OPS_PER_NODE],
+                  [write_proportion, -(1 - write_proportion)]])
+    b = np.array([1, 0])
+    result = np.linalg.solve(a, b)
+    return int(sum(result) * self.nodes)
 
 
 def GetSpannerClass(

@@ -26,8 +26,8 @@ from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import providers
 from perfkitbenchmarker.linux_packages import aws_credentials
-from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
@@ -42,19 +42,12 @@ disk_to_hdfs_map = {
 }
 
 
-class GcpDpbDataproc(dpb_service.BaseDpbService):
-  """Object representing a GCP Dataproc cluster.
-
-  Attributes:
-    project: ID of the project.
-  """
-
-  CLOUD = gcp.CLOUD
-  SERVICE_TYPE = 'dataproc'
+class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
+  """Base class for all Dataproc-based services (cluster or serverless)."""
 
   def __init__(self, dpb_service_spec):
-    super(GcpDpbDataproc, self).__init__(dpb_service_spec)
-    self.dpb_service_type = GcpDpbDataproc.SERVICE_TYPE
+    super().__init__(dpb_service_spec)
+    self.dpb_service_type = self.SERVICE_TYPE
     self.project = FLAGS.project
     if FLAGS.dpb_dataproc_image_version:
       self.dpb_version = FLAGS.dpb_dataproc_image_version
@@ -65,8 +58,7 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
     self.persistent_fs_prefix = 'gs://'
-    if self.user_managed and not FLAGS.dpb_service_bucket:
-      self.bucket = self._GetCluster()['config']['tempBucket']
+    self._cluster_create_time = None
 
   @staticmethod
   def _ParseTime(state_time: str) -> datetime.datetime:
@@ -88,10 +80,69 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     del benchmark_config  # Unused
 
   def DataprocGcloudCommand(self, *args):
-    all_args = ('dataproc',) + args
+    all_args = ('dataproc',) + tuple(args)
     cmd = util.GcloudCommand(self, *all_args)
     cmd.flags['region'] = self.region
     return cmd
+
+  def MigrateCrossCloud(self,
+                        source_location,
+                        destination_location,
+                        dest_cloud='AWS'):
+    """Method to copy data cross cloud using a distributed job on the cluster.
+
+    Currently the only supported destination cloud is AWS.
+    TODO(user): Add support for other destination clouds.
+
+    Args:
+      source_location: The source GCS path to migrate.
+      destination_location: The destination path.
+      dest_cloud: The cloud to copy data to.
+
+    Returns:
+      A dictionary with key 'success' and boolean value set to the status of
+      data migration command.
+    """
+    if dest_cloud == 'AWS':
+      dest_prefix = 's3a://'
+    else:
+      raise ValueError('Unsupported destination cloud.')
+    s3_access_key, s3_secret_key = aws_credentials.GetCredentials()
+    return self.DistributedCopy(
+        'gs://' + source_location,
+        dest_prefix + destination_location,
+        properties={
+            'fs.s3a.access.key': s3_access_key,
+            'fs.s3a.secret.key': s3_secret_key,
+        })
+
+
+class GcpDpbDataproc(GcpDpbBaseDataproc):
+  """Object representing a managed GCP Dataproc cluster.
+
+  Attributes:
+    project: ID of the project.
+  """
+
+  CLOUD = providers.GCP
+  SERVICE_TYPE = 'dataproc'
+
+  def __init__(self, dpb_service_spec):
+    super().__init__(dpb_service_spec)
+    if self.user_managed and not FLAGS.dpb_service_bucket:
+      self.bucket = self._GetCluster()['config']['tempBucket']
+
+  def GetClusterCreateTime(self) -> Optional[float]:
+    """Returns the cluster creation time.
+
+    On this implementation, the time returned is based on the timestamps
+    reported by the Dataproc API (which is stored in the _cluster_create_time
+    attribute).
+
+    Returns:
+      A float representing the creation time in seconds or None.
+    """
+    return self._cluster_create_time
 
   def _Create(self):
     """Creates the cluster."""
@@ -160,11 +211,29 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     cmd.flags['metadata'] = util.FormatTags(metadata)
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     timeout = 900  # 15 min
-    # TODO(saksena): Retrieve the cluster create time and hold in a var
-    _, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
+    stdout, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
+    self._cluster_create_time = self._ParseClusterCreateTime(stdout)
     if retcode:
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
+
+  @classmethod
+  def _ParseClusterCreateTime(cls, stdout: str) -> Optional[float]:
+    """Parses the cluster create time from a raw API response."""
+    try:
+      creation_data = json.loads(stdout)
+    except json.JSONDecodeError:
+      creation_data = {}
+    can_parse = creation_data.get('status', {}).get('state') == 'RUNNING'
+    status_history = creation_data.get('statusHistory', [])
+    can_parse = can_parse and len(
+        status_history) == 1 and status_history[0]['state'] == 'CREATING'
+    if not can_parse:
+      logging.warning('Unable to parse cluster creation duration.')
+      return None
+    creation_start = cls._ParseTime(status_history[0]['stateStartTime'])
+    creation_end = cls._ParseTime(creation_data['status']['stateStartTime'])
+    return (creation_end - creation_start).total_seconds()
 
   def _Delete(self):
     """Deletes the cluster."""
@@ -267,33 +336,223 @@ class GcpDpbDataproc(dpb_service.BaseDpbService):
     flag_name = cmd_property
     cmd.flags[flag_name] = cmd_value
 
-  def MigrateCrossCloud(self,
-                        source_location,
-                        destination_location,
-                        dest_cloud='AWS'):
-    """Method to copy data cross cloud using a distributed job on the cluster.
 
-    Currently the only supported destination cloud is AWS.
-    TODO(user): Add support for other destination clouds.
+class GcpDpbDpgke(GcpDpbDataproc):
+  """Dataproc on GKE cluster.
 
-    Args:
-      source_location: The source GCS path to migrate.
-      destination_location: The destination path.
-      dest_cloud: The cloud to copy data to.
+  Extends from GcpDpbDataproc and not GcpDpbBaseDataproc as this represents a
+  cluster with managed infrastructure.
+  """
 
-    Returns:
-      A dictionary with key 'success' and boolean value set to the status of
-      data migration command.
-    """
-    if dest_cloud == 'AWS':
-      dest_prefix = 's3a://'
+  CLOUD = providers.GCP
+  SERVICE_TYPE = 'dataproc_gke'
+
+  def __init__(self, dpb_service_spec):
+    super(GcpDpbDpgke, self).__init__(dpb_service_spec)
+    required_spec_attrs = [
+        'gke_cluster_name', 'gke_cluster_nodepools',
+        'gke_cluster_location'
+    ]
+    missing_attrs = [
+        attr for attr in required_spec_attrs
+        if not getattr(self.spec, attr, None)
+    ]
+    if missing_attrs:
+      raise errors.Setup.InvalidSetupError(
+          f'{missing_attrs} must be provided for provisioning DPGKE.')
+
+  def _Create(self):
+    """Creates the dpgke virtual cluster."""
+    cmd = self.DataprocGcloudCommand('clusters', 'gke', 'create',
+                                     self.cluster_id)
+    cmd.use_alpha_gcloud = True
+    cmd.flags['setup-workload-identity'] = True
+    cmd.flags['gke-cluster'] = self.spec.gke_cluster_name
+    cmd.flags['namespace'] = self.cluster_id
+    # replace ':' field delimiter with '=' since create cluster command
+    # only accept '=' as field delimiter but pkb doesn't allow overriding
+    # spec parameters containing '='
+    cmd.flags['pools'] = self.spec.gke_cluster_nodepools.replace(':', '=')
+    cmd.flags['gke-cluster-location'] = self.spec.gke_cluster_location
+    if FLAGS.dpb_service_bucket:
+      cmd.flags['staging-bucket'] = FLAGS.dpb_service_bucket
+    if self.project is not None:
+      cmd.flags['project'] = self.project
+    cmd.flags['image-version'] = self.spec.version
+    if FLAGS.dpb_cluster_properties:
+      cmd.flags['properties'] = ','.join(FLAGS.dpb_cluster_properties)
+    timeout = 900  # 15 min
+    logging.info('Issuing command to create dpgke cluster. Flags %s, Args %s',
+                 cmd.flags, cmd.args)
+    stdout, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
+    self._cluster_create_time = self._ParseClusterCreateTime(stdout)
+    if retcode:
+      util.CheckGcloudResponseKnownFailures(stderr, retcode)
+      raise errors.Resource.CreationError(stderr)
+
+
+class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
+  """Resource that allows spawning serverless Dataproc Jobs."""
+
+  CLOUD = providers.GCP
+  SERVICE_TYPE = 'dataproc_serverless'
+
+  def SubmitJob(self,
+                jarfile=None,
+                classname=None,
+                pyspark_file=None,
+                query_file=None,
+                job_poll_interval=None,
+                job_stdout_file=None,
+                job_arguments=None,
+                job_files=None,
+                job_jars=None,
+                job_type=None,
+                properties=None):
+    """See base class."""
+    assert job_type
+    args = ['batches', 'submit', job_type]
+    additional_args = []
+
+    if job_type == self.PYSPARK_JOB_TYPE:
+      args.append(pyspark_file)
+
+    cmd = self.DataprocGcloudCommand(*args)
+
+    cmd.flags['batch'] = self.cluster_id
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+
+    job_jars = job_jars or []
+    if classname:
+      if jarfile:
+        # Dataproc does not support both a main class and a main jar so just
+        # make the main jar an additional jar instead.
+        job_jars.append(jarfile)
+      cmd.flags['class'] = classname
+    elif jarfile:
+      cmd.flags['jar'] = jarfile
+
+    if query_file:
+      additional_args += query_file
+
+    if job_files:
+      cmd.flags['files'] = ','.join(job_files)
+    if job_jars:
+      cmd.flags['jars'] = ','.join(job_jars)
+
+    if FLAGS.gce_network_name:
+      cmd.flags['network'] = FLAGS.gce_network_name
+
+    if self.dpb_version:
+      cmd.flags['version'] = self.dpb_version
+    if FLAGS.gcp_dataproc_image:
+      cmd.flags['container-image'] = FLAGS.gcp_dataproc_image
+
+    all_properties = self.GetJobProperties()
+    all_properties.update(properties or {})
+    if all_properties:
+      # For commas: https://cloud.google.com/sdk/gcloud/reference/topic/escaping
+      cmd.flags['properties'] = '^@^' + '@'.join(
+          '{}={}'.format(k, v) for k, v in all_properties.items())
+
+    if job_arguments:
+      additional_args += ['--'] + job_arguments
+    cmd.additional_flags = additional_args
+
+    _, stderr, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
+    if retcode != 0:
+      raise dpb_service.JobSubmissionError(stderr)
+
+    fetch_batch_cmd = self.DataprocGcloudCommand(
+        'batches', 'describe', self.cluster_id)
+    stdout, stderr, retcode = fetch_batch_cmd.Issue(
+        timeout=None, raise_on_failure=False)
+    if retcode != 0:
+      raise dpb_service.JobSubmissionError(stderr)
+
+    results = json.loads(stdout)
+    # Otherwise retcode would not have been 0
+    assert results['state'] == 'SUCCEEDED'
+    done_time = self._ParseTime(results['stateTime'])
+    pending_time = None
+    start_time = None
+    for state in results['stateHistory']:
+      if state['state'] == 'PENDING':
+        pending_time = self._ParseTime(state['stateStartTime'])
+      elif state['state'] == 'RUNNING':
+        start_time = self._ParseTime(state['stateStartTime'])
+
+    assert pending_time and start_time and done_time
+
+    return dpb_service.JobResult(
+        run_time=(done_time - start_time).total_seconds(),
+        pending_time=(start_time - pending_time).total_seconds())
+
+  def _Create(self):
+    # Since there's no managed infrastructure, this is a no-op.
+    pass
+
+  def _Delete(self):
+    # Since there's no managed infrastructure, this is a no-op.
+    pass
+
+  def GetClusterCreateTime(self) -> Optional[float]:
+    return None
+
+  def GetJobProperties(self) -> Dict[str, str]:
+    result = {}
+    if self.spec.dataproc_serverless_core_count:
+      result['spark.executor.cores'] = self.spec.dataproc_serverless_core_count
+      result['spark.driver.cores'] = self.spec.dataproc_serverless_core_count
+    if self.spec.dataproc_serverless_initial_executors:
+      result['spark.executor.instances'] = (
+          self.spec.dataproc_serverless_initial_executors)
+    if self.spec.dataproc_serverless_min_executors:
+      result['spark.dynamicAllocation.minExecutors'] = (
+          self.spec.dataproc_serverless_min_executors)
+    if self.spec.dataproc_serverless_max_executors:
+      result['spark.dynamicAllocation.maxExecutors'] = (
+          self.spec.dataproc_serverless_max_executors)
+    if self.spec.worker_group.disk_spec.disk_size:
+      result['spark.dataproc.driver.disk_size'] = (
+          f'{self.spec.worker_group.disk_spec.disk_size}g'
+      )
+      result['spark.dataproc.executor.disk_size'] = (
+          f'{self.spec.worker_group.disk_spec.disk_size}g'
+      )
+    result.update(super().GetJobProperties())
+    return result
+
+  def GetMetadata(self):
+    basic_data = super().GetMetadata()
+
+    if self.spec.dataproc_serverless_core_count:
+      cluster_shape = (
+          f'dataproc-serverless-{self.spec.dataproc_serverless_core_count}')
     else:
-      raise ValueError('Unsupported destination cloud.')
-    s3_access_key, s3_secret_key = aws_credentials.GetCredentials()
-    return self.DistributedCopy(
-        'gs://' + source_location,
-        dest_prefix + destination_location,
-        properties={
-            'fs.s3a.access.key': s3_access_key,
-            'fs.s3a.secret.key': s3_secret_key,
-        })
+      cluster_shape = 'dataproc-serverless-default'
+
+    initial_executors = self.spec.dataproc_serverless_initial_executors
+    min_executors = self.spec.dataproc_serverless_min_executors
+    max_executors = self.spec.dataproc_serverless_max_executors
+
+    cluster_size = None
+    if initial_executors == min_executors == max_executors:
+      cluster_size = initial_executors
+
+    return {
+        'dpb_service': basic_data['dpb_service'],
+        'dpb_version': basic_data['dpb_version'],
+        'dpb_service_version': basic_data['dpb_service_version'],
+        'dpb_batch_id': basic_data['dpb_cluster_id'],
+        'dpb_cluster_shape': cluster_shape,
+        'dpb_cluster_size': cluster_size,
+        'dpb_cluster_min_executors': min_executors,
+        'dpb_cluster_max_executors': max_executors,
+        'dpb_cluster_initial_executors': initial_executors,
+        'dpb_cores_per_node': self.spec.dataproc_serverless_core_count,
+        'dpb_hdfs_type': 'default-disk',
+        'dpb_disk_size': basic_data['dpb_disk_size'],
+        'dpb_service_zone': basic_data['dpb_service_zone'],
+        'dpb_job_properties': basic_data['dpb_job_properties'],
+    }

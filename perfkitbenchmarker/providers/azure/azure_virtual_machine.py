@@ -33,12 +33,14 @@ import logging
 import posixpath
 import re
 import threading
+
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -48,7 +50,6 @@ from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
-
 from six.moves import range
 import yaml
 
@@ -60,6 +61,24 @@ NUM_LOCAL_VOLUMES = {
     'Standard_L64s_v2': 8,
     'Standard_L80s_v2': 10
 }
+
+_MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES = (
+    'Standard_ND96asr_v4', 'Standard_ND96asr_A100_v4',
+    'Standard_ND96amsr_A100_v4', 'Standard_M208ms_v2', 'Standard_M208s_v2',
+    'Standard_M416ms_v2', 'Standard_M416s_v2', 'Standard_ND40rs_v2',
+    'Standard_M32ms_v2', 'Standard_M64s_v2', 'Standard_M64ms_v2',
+    'Standard_M128s_v2', 'Standard_M128ms_v2', 'Standard_M192is_v2',
+    'Standard_M192ims_v2', 'Standard_M32dms_v2', 'Standard_M64ds_v2',
+    'Standard_M128ds_v2', 'Standard_M128dms_v2', 'Standard_M192ids_v2',
+    'Standard_M192idms_v2', 'Standard_DC2s_v2', 'Standard_DC2s_v3',
+    'Standard_DC32ds_v3', 'Standard_DC32s_v3', 'Standard_DC48ds_v3',
+    'Standard_DC48s_v3', 'Standard_DC4ds_v3', 'Standard_DC4s_v2',
+    'Standard_DC4s_v3', 'Standard_DC8_v2', 'Standard_DC8ds_v3',
+    'Standard_DC8s_v3', 'Standard_FX12mds', 'Standard_FX24mds',
+    'Standard_FX36mds', 'Standard_FX48mds', 'Standard_FX4mds',
+    'Standard_M64dms_v2', 'Standard_DC16ds_v3', 'Standard_DC16s_v3',
+    'Standard_DC1ds_v3', 'Standard_DC1s_v3', 'Standard_DC24ds_v3',
+    'Standard_DC24s_v3', 'Standard_DC2ds_v3', 'Standard_DC1s_v2')
 
 # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/scheduled-events
 _SCHEDULED_EVENTS_CMD = ('curl -H Metadata:true http://169.254.169.254/metadata'
@@ -83,7 +102,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     low_priority: boolean. True if the VM should be low-priority, else False.
   """
 
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   def __init__(self, *args, **kwargs):
     super(AzureVmSpec, self).__init__(*args, **kwargs)
@@ -167,6 +186,7 @@ class AzurePublicIPAddress(resource.BaseResource):
 
     if self.availability_zone:
       # Availability Zones require Standard IPs.
+      # TODO(user): Consider setting this by default
       cmd += ['--zone', self.availability_zone, '--sku', 'Standard']
 
     if self.dns_name:
@@ -458,7 +478,7 @@ class AzureDedicatedHost(resource.BaseResource):
 
 class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an Azure Virtual Machine."""
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   _lock = threading.Lock()
   # TODO(buggay): remove host groups & hosts as globals -> create new spec
@@ -494,7 +514,16 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
                         self.public_ip.name, vm_spec.accelerated_networking,
                         self.network.nsg)
     self.storage_account = self.network.storage_account
-    self.image = vm_spec.image or type(self).IMAGE_URN
+    if vm_spec.image:
+      self.image = vm_spec.image
+    elif self.machine_type in _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES:
+      if hasattr(type(self), 'GEN2_IMAGE_URN'):
+        self.image = type(self).GEN2_IMAGE_URN
+      else:
+        raise errors.Benchmarks.UnsupportedConfigError('No Azure gen2 image.')
+    else:
+      self.image = type(self).IMAGE_URN
+
     self.host = None
     if self.use_dedicated_host:
       self.host_series_sku = _GetSkuType(self.machine_type)
@@ -598,6 +627,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       if 'quota' in stderr.lower():
         raise errors.Benchmarks.QuotaFailure(
             virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr)
+      elif re.search(
+          r'requested VM size \S+ is not available', stderr) or re.search(
+              r'not available in location .+ for subscription', stderr):
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       elif self.low_priority and 'OverconstrainedAllocationRequest' in stderr:
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     # TODO(buggay) refactor to share code with gcp_virtual_machine.py
@@ -627,8 +660,20 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
          'OverconstrainedZonalAllocationRequest' in stderr)):
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     if retcode:
-      raise errors.Resource.CreationError(
-          'Failed to create VM: %s return code: %s' % (stderr, retcode))
+      if "Virtual Machine Scale Set with '<NULL>' security type." in stderr:
+        raise errors.Resource.CreationError(
+            f'Failed to create VM: {self.machine_type} is likely a confidential'
+            ' machine, which PKB does not support at this time.\n\n'
+            f' Full error: {stderr} return code: {retcode}')
+      if "cannot boot Hypervisor Generation '1'" in stderr:
+        raise errors.Resource.CreationError(
+            f'Failed to create VM: {self.machine_type} is unable to support V1 '
+            'Hypervision. Please update _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES'
+            ' in azure_virtual_machine.py.\n\n'
+            f' Full error: {stderr} return code: {retcode}')
+      else:
+        raise errors.Resource.CreationError(
+            'Failed to create VM: %s return code: %s' % (stderr, retcode))
 
   def _Exists(self):
     """Returns True if the VM exists."""
@@ -750,15 +795,17 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
     """
-    self.InstallCli()
+    # N.B. Should already be installed by ShouldDownloadPreprovisionedData
+    self.Install('azure_cli')
     self.RemoteCommand(
         GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
                                                   filename))
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""
+    # Do not install credentials. Data are fetched using locally generated
+    # connection strings and do not use credentials on the VM.
     self.Install('azure_cli')
-    self.Install('azure_credentials')
     return FLAGS.azure_preprovisioned_data_bucket and self.TryRemoteCommand(
         GenerateStatPreprovisionedDataCommand(module_name, filename))
 
@@ -820,48 +867,57 @@ class Debian9BasedAzureVirtualMachine(AzureVirtualMachine,
 class Debian10BasedAzureVirtualMachine(AzureVirtualMachine,
                                        linux_virtual_machine.Debian10Mixin):
   # From https://wiki.debian.org/Cloud/MicrosoftAzure
+  GEN2_IMAGE_URN = 'Debian:debian-10:10-gen2:latest'
   IMAGE_URN = 'Debian:debian-10:10:latest'
 
 
 class Debian11BasedAzureVirtualMachine(AzureVirtualMachine,
                                        linux_virtual_machine.Debian11Mixin):
   # From https://wiki.debian.org/Cloud/MicrosoftAzure
+  GEN2_IMAGE_URN = 'Debian:debian-11:11-gen2:latest'
   IMAGE_URN = 'Debian:debian-11:11:latest'
 
 
 class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1604Mixin):
+  GEN2_IMAGE_URN = 'Canonical:UbuntuServer:16_04-lts-gen2:latest'
   IMAGE_URN = 'Canonical:UbuntuServer:16.04-LTS:latest'
 
 
 class Ubuntu1804BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1804Mixin):
+  GEN2_IMAGE_URN = 'Canonical:UbuntuServer:18_04-lts-gen2:latest'
   IMAGE_URN = 'Canonical:UbuntuServer:18.04-LTS:latest'
 
 
 class Ubuntu2004BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu2004Mixin):
+  GEN2_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest'
   IMAGE_URN = 'Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest'
 
 
 class Rhel7BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel7Mixin):
-  IMAGE_URN = 'RedHat:RHEL:7.6:latest'
+  GEN2_IMAGE_URN = 'RedHat:RHEL:7lvm-gen2:latest'
+  IMAGE_URN = 'RedHat:RHEL:7-LVM:latest'
 
 
 class Rhel8BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel8Mixin):
-  IMAGE_URN = 'RedHat:RHEL:8:latest'
+  GEN2_IMAGE_URN = 'RedHat:RHEL:8-lvm-gen2:latest'
+  IMAGE_URN = 'RedHat:RHEL:8-LVM:latest'
 
 
 class CentOs7BasedAzureVirtualMachine(AzureVirtualMachine,
                                       linux_virtual_machine.CentOs7Mixin):
-  IMAGE_URN = 'OpenLogic:CentOS:7.6:latest'
+  GEN2_IMAGE_URN = 'OpenLogic:CentOS-LVM:7-lvm-gen2:latest'
+  IMAGE_URN = 'OpenLogic:CentOS-LVM:7-lvm:latest'
 
 
 class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
                                       linux_virtual_machine.CentOs8Mixin):
-  IMAGE_URN = 'OpenLogic:CentOS:8.0:latest'
+  GEN2_IMAGE_URN = 'OpenLogic:CentOS-LVM:8-lvm-gen2:latest'
+  IMAGE_URN = 'OpenLogic:CentOS-LVM:8-lvm:latest'
 
 
 # TODO(pclay): Add Fedora CoreOS when available:
@@ -911,49 +967,81 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
 class Windows2012CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2012CoreMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2012-r2-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
 class Windows2016CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2016CoreMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2016-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter-Server-Core:latest'
 
 
 class Windows2019CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2019CoreMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2019-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter-Core:latest'
+
+
+class Windows2022CoreAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2022CoreMixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2022-Datacenter-Core:latest'
 
 
 class Windows2012DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2012DesktopMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2012-r2-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
 class Windows2016DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2016DesktopMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2016-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter:latest'
 
 
 class Windows2019DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2019DesktopMixin):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2019-datacenter-gen2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest'
+
+
+class Windows2022DesktopAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2022DesktopMixin):
+  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest'
 
 
 class Windows2019DesktopSQLServer2019StandardAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2019SQLServer2019Standard):
+  GEN2_IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2019:standard-gen2:latest'
   IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2019:standard:latest'
 
 
 class Windows2019DesktopSQLServer2019EnterpriseAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2019SQLServer2019Enterprise):
+  GEN2_IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2019:enterprise-gen2:latest'
   IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2019:enterprise:latest'
+
+
+class Windows2022DesktopSQLServer2019StandardAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2019Standard):
+  IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2022:standard:latest'
+
+
+class Windows2022DesktopSQLServer2019EnterpriseAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2019Enterprise):
+  IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2022:enterprise:latest'
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,

@@ -18,192 +18,327 @@ Tables can be created and deleted.
 
 import json
 import logging
-from typing import Any, Dict, Optional, Tuple, Sequence
+from typing import Any, Collection, Dict, List, Optional, Tuple, Sequence
 
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('aws_dynamodb_primarykey',
-                    'primary_key',
-                    'The primaryKey of dynamodb table.'
-                    'This switches to sortkey if using sort.'
-                    'If testing GSI/LSI, use the range keyname'
-                    'of the index you want to test')
-flags.DEFINE_boolean('aws_dynamodb_use_sort',
-                     False,
-                     'determine whether to use sort key or not')
-flags.DEFINE_string('aws_dynamodb_sortkey',
-                    'sort_key',
-                    'The sortkey of dynamodb table.  '
-                    'This switches to primarykey if using sort.'
-                    'If testing GSI/LSI, use the primary keyname'
-                    'of the index you want to test')
-flags.DEFINE_enum('aws_dynamodb_attributetype',
-                  'S', ['S', 'N', 'B'],
-                  'The type of attribute, default to S (String).'
-                  'Alternates are N (Number) and B (Binary).')
-flags.DEFINE_integer('aws_dynamodb_read_capacity',
-                     '5',
-                     'Set RCU for dynamodb table')
-flags.DEFINE_integer('aws_dynamodb_write_capacity',
-                     '5',
-                     'Set WCU for dynamodb table')
-flags.DEFINE_integer('aws_dynamodb_lsi_count',
-                     0, 'Set amount of Local Secondary Indexes. Only set 0-5')
-flags.register_validator('aws_dynamodb_lsi_count',
-                         lambda value: -1 < value < 6,
-                         message='--count must be from 0-5')
-flags.register_validator('aws_dynamodb_use_sort',
-                         lambda sort: sort or not FLAGS.aws_dynamodb_lsi_count,
-                         message='--aws_dynamodb_lsi_count requires sort key.')
-flags.DEFINE_integer('aws_dynamodb_gsi_count',
-                     0, 'Set amount of Global Secondary Indexes. Only set 0-5')
-flags.register_validator('aws_dynamodb_gsi_count',
-                         lambda value: -1 < value < 6,
-                         message='--count must be from 0-5')
-flags.DEFINE_boolean('aws_dynamodb_ycsb_consistentReads',
-                     False,
-                     "Consistent reads cost 2x eventual reads. "
-                     "'false' is default which is eventual")
-flags.DEFINE_integer('aws_dynamodb_connectMax', 50,
-                     'Maximum number of concurrent dynamodb connections. '
-                     'Defaults to 50.')
+flags.DEFINE_string(
+    'aws_dynamodb_primarykey', None,
+    'The primaryKey of dynamodb table. This switches to sortkey if using sort.'
+    'If testing GSI/LSI, use the range keyname of the index you want to test.'
+    'Defaults to primary_key')
+flags.DEFINE_boolean(
+    'aws_dynamodb_use_sort', None,
+    'Determine whether to use sort key or not. Defaults to False.')
+flags.DEFINE_string(
+    'aws_dynamodb_sortkey', None,
+    'The sortkey of dynamodb table. This switches to primarykey if using sort.'
+    'If testing GSI/LSI, use the primary keyname of the index you want to test.'
+    'Defaults to sort_key.')
+flags.DEFINE_enum(
+    'aws_dynamodb_attributetype', None, ['S', 'N', 'B'],
+    'The type of attribute, default to S (String).'
+    'Alternates are N (Number) and B (Binary).'
+    'Defaults to S.')
+flags.DEFINE_integer('aws_dynamodb_read_capacity', None,
+                     'Set RCU for dynamodb table. Defaults to 25.')
+flags.DEFINE_integer('aws_dynamodb_write_capacity', None,
+                     'Set WCU for dynamodb table. Defaults to 25.')
+flags.DEFINE_integer('aws_dynamodb_lsi_count', None,
+                     'Set amount of Local Secondary Indexes. Only set 0-5.'
+                     'Defaults to 0.')
+flags.DEFINE_integer('aws_dynamodb_gsi_count', None,
+                     'Set amount of Global Secondary Indexes. Only set 0-5.'
+                     'Defaults to 0.')
 
 # Throughput constants
 _FREE_TIER_RCU = 25
 _FREE_TIER_WCU = 25
 
+_DEFAULT_ZONE = 'us-east-1b'
 
-class _GetIndexes():
-  """Used to create secondary indexes."""
 
-  def __init__(self):
-    self.lsi_count = FLAGS.aws_dynamodb_lsi_count
-    self.gsi_count = FLAGS.aws_dynamodb_gsi_count
+class DynamoDbSpec(non_relational_db.BaseNonRelationalDbSpec):
+  """Configurable options of a DynamoDB instance."""
 
-  def CreateLocalSecondaryIndex(self):
-    """Used to create local secondary indexes."""
-    lsi_items = []
-    lsi_entry = []
-    attr_list = []
-    for lsi in range(0, self.lsi_count):
-      lsi_item = ('{{"IndexName": "lsiidx{0}",'
-                  '"KeySchema": [{{'
-                  '"AttributeName": "{1}",'
-                  '"KeyType": "HASH"}},{{'
-                  '"AttributeName": "lattr{2}",'
-                  '"KeyType": "RANGE"}}],'
-                  '"Projection": {{'
-                  '"ProjectionType": "KEYS_ONLY"}}}}'.format(
-                      str(lsi),
-                      FLAGS.aws_dynamodb_primarykey,
-                      str(lsi)))
-      lsi_entry.append(lsi_item)
-      attr_list.append('{{"AttributeName": "lattr{0}","AttributeType": "{1}"}}'
-                       .format(str(lsi), FLAGS.aws_dynamodb_attributetype))
-    lsi_items.append('[' + ','.join(lsi_entry) + ']')
-    lsi_items.append(','.join(attr_list))
-    return lsi_items
+  SERVICE_TYPE = non_relational_db.DYNAMODB
 
-  def CreateGlobalSecondaryIndex(self):
-    """Used to create global secondary indexes."""
-    gsi_items = []
-    gsi_entry = []
-    attr_list = []
-    for gsi in range(0, self.gsi_count):
-      gsi_item = ('{{"IndexName": "gsiidx{0}",'
-                  '"KeySchema": [{{'
-                  '"AttributeName": "gsikey{1}",'
-                  '"KeyType": "HASH"}},{{'
-                  '"AttributeName": "gattr{2}",'
-                  '"KeyType": "RANGE"}}],'
-                  '"Projection": {{'
-                  '"ProjectionType": "KEYS_ONLY"}},'
-                  '"ProvisionedThroughput": {{'
-                  '"ReadCapacityUnits": {3},'
-                  '"WriteCapacityUnits": {4}}}}}'.format(str(gsi),
-                                                         str(gsi),
-                                                         str(gsi),
-                                                         5, 5))
-      gsi_entry.append(gsi_item)
-      attr_list.append('{{"AttributeName": "gattr{0}","AttributeType": "{1}"}}'
-                       .format(str(gsi), FLAGS.aws_dynamodb_attributetype))
-      attr_list.append('{{"AttributeName": "gsikey{0}","AttributeType": "{1}"}}'
-                       .format(str(gsi), FLAGS.aws_dynamodb_attributetype))
-    gsi_items.append('[' + ','.join(gsi_entry) + ']')
-    gsi_items.append(','.join(attr_list))
-    return gsi_items
+  table_name: str
+  zone: str
+  rcu: int
+  wcu: int
+  primary_key: str
+  sort_key: str
+  attribute_type: str
+  lsi_count: int
+  gsi_count: int
+  use_sort: bool
+
+  def __init__(self, component_full_name, flag_values, **kwargs):
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes / constructor args for each configurable option."""
+    result = super()._GetOptionDecoderConstructions()
+    none_ok = {'default': None, 'none_ok': False}
+    result.update({
+        'table_name': (option_decoders.StringDecoder, none_ok),
+        'zone': (option_decoders.StringDecoder, none_ok),
+        'rcu': (option_decoders.IntDecoder, none_ok),
+        'wcu': (option_decoders.IntDecoder, none_ok),
+        'primary_key': (option_decoders.StringDecoder, none_ok),
+        'sort_key': (option_decoders.StringDecoder, none_ok),
+        'attribute_type': (option_decoders.StringDecoder, none_ok),
+        'lsi_count': (option_decoders.IntDecoder, none_ok),
+        'gsi_count': (option_decoders.IntDecoder, none_ok),
+        'use_sort': (option_decoders.BooleanDecoder, none_ok),
+    })
+    return result
+
+  @classmethod
+  def _ValidateConfig(cls, config_values) -> None:
+    if 'lsi_count' in config_values:
+      if not -1 < config_values['lsi_count'] < 6:
+        raise errors.Config.InvalidValue('lsi_count must be from 0-5')
+      if (not config_values.get('use_sort', False) and
+          config_values['lsi_count'] != 0):
+        raise errors.Config.InvalidValue('lsi_count requires use_sort=True')
+    if not -1 < config_values.get('gsi_count', 0) < 6:
+      raise errors.Config.InvalidValue('gsi_count must be from 0-5')
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values) -> None:
+    """Modifies config options based on runtime flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+        provided config values.
+    """
+    super()._ApplyFlags(config_values, flag_values)
+    option_name_from_flag = {
+        'aws_dynamodb_read_capacity': 'rcu',
+        'aws_dynamodb_write_capacity': 'wcu',
+        'aws_dynamodb_primarykey': 'primary_key',
+        'aws_dynamodb_sortkey': 'sort_key',
+        'aws_dynamodb_attributetype': 'attribute_type',
+        'aws_dynamodb_lsi_count': 'lsi_count',
+        'aws_dynamodb_gsi_count': 'gsi_count',
+        'aws_dynamodb_use_sort': 'use_sort',
+    }
+    for flag_name, option_name in option_name_from_flag.items():
+      if flag_values[flag_name].present:
+        config_values[option_name] = flag_values[flag_name].value
+
+    # Handle the zone flag.
+    for zone_flag_name in ['zone', 'zones']:
+      if flag_values[zone_flag_name].present:
+        config_values['zone'] = flag_values[zone_flag_name].value[0]
+
+    cls._ValidateConfig(config_values)
+
+  def __repr__(self) -> str:
+    return str(self.__dict__)
 
 
 class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
   """Class for working with DynamoDB."""
   SERVICE_TYPE = non_relational_db.DYNAMODB
 
-  def __init__(self, table_name, **kwargs):
+  def __init__(self,
+               table_name: Optional[str] = None,
+               zone: Optional[str] = None,
+               rcu: Optional[int] = None,
+               wcu: Optional[int] = None,
+               primary_key: Optional[str] = None,
+               sort_key: Optional[str] = None,
+               attribute_type: Optional[str] = None,
+               lsi_count: Optional[int] = None,
+               gsi_count: Optional[int] = None,
+               use_sort: Optional[bool] = None,
+               **kwargs):
     super(AwsDynamoDBInstance, self).__init__(**kwargs)
-    self.zone = FLAGS.zones[0] if FLAGS.zones else FLAGS.zone[0]
+    self.table_name = table_name or f'pkb-{FLAGS.run_uri}'
+    self.zone = zone or _DEFAULT_ZONE
     self.region = util.GetRegionFromZone(self.zone)
-    self.primary_key = ('{{\"AttributeName\": \"{0}\",\"KeyType\": \"HASH\"}}'
-                        .format(FLAGS.aws_dynamodb_primarykey))
-    self.sort_key = ('{{\"AttributeName\": \"{0}\",\"KeyType\": \"RANGE\"}}'
-                     .format(FLAGS.aws_dynamodb_sortkey))
-    self.part_attributes = ('{{\"AttributeName\": \"{0}\",'
-                            '\"AttributeType\": \"{1}\"}}'
-                            .format(FLAGS.aws_dynamodb_primarykey,
-                                    FLAGS.aws_dynamodb_attributetype))
-    self.sort_attributes = ('{{\"AttributeName\": \"{0}\",'
-                            '\"AttributeType\": \"{1}\"}}'
-                            .format(FLAGS.aws_dynamodb_sortkey,
-                                    FLAGS.aws_dynamodb_attributetype))
-    self.table_name = table_name
-    self.rcu = FLAGS.aws_dynamodb_read_capacity
-    self.wcu = FLAGS.aws_dynamodb_write_capacity
-    self.throughput = 'ReadCapacityUnits={read},WriteCapacityUnits={write}'.format(
-        read=self.rcu, write=self.wcu)
-    self.lsi_indexes = _GetIndexes().CreateLocalSecondaryIndex()
-    self.gsi_indexes = _GetIndexes().CreateGlobalSecondaryIndex()
     self.resource_arn: str = None  # Set during the _Exists() call.
 
-  def _Create(self):
+    self.rcu = rcu or _FREE_TIER_RCU
+    self.wcu = wcu or _FREE_TIER_WCU
+    self.throughput = (
+        f'ReadCapacityUnits={self.rcu},WriteCapacityUnits={self.wcu}')
+
+    self.primary_key = primary_key or 'primary_key'
+    self.sort_key = sort_key or 'sort_key'
+    self.use_sort = use_sort or False
+    self.attribute_type = attribute_type or 'S'
+
+    self.lsi_count = lsi_count or 0
+    self.lsi_indexes = self._CreateLocalSecondaryIndex()
+    self.gsi_count = gsi_count or 0
+    self.gsi_indexes = self._CreateGlobalSecondaryIndex()
+
+  @classmethod
+  def FromSpec(cls, spec: DynamoDbSpec) -> 'AwsDynamoDBInstance':
+    return cls(
+        table_name=spec.table_name,
+        zone=spec.zone,
+        rcu=spec.rcu,
+        wcu=spec.wcu,
+        primary_key=spec.primary_key,
+        sort_key=spec.sort_key,
+        attribute_type=spec.attribute_type,
+        lsi_count=spec.lsi_count,
+        gsi_count=spec.gsi_count,
+        use_sort=spec.use_sort,
+        enable_freeze_restore=spec.enable_freeze_restore,
+        create_on_restore_error=spec.create_on_restore_error,
+        delete_on_freeze_error=spec.delete_on_freeze_error)
+
+  def _CreateLocalSecondaryIndex(self) -> List[str]:
+    """Used to create local secondary indexes."""
+    lsi_items = []
+    lsi_entry = []
+    attr_list = []
+    for lsi in range(0, self.lsi_count):
+      lsi_item = json.dumps({
+          'IndexName': f'lsiidx{str(lsi)}',
+          'KeySchema': [{
+              'AttributeName': self.primary_key,
+              'KeyType': 'HASH'
+          }, {
+              'AttributeName': f'lattr{str(lsi)}',
+              'KeyType': 'RANGE'
+          }],
+          'Projection': {
+              'ProjectionType': 'KEYS_ONLY'
+          }
+      })
+      lsi_entry.append(lsi_item)
+      attr_list.append(
+          json.dumps({
+              'AttributeName': f'lattr{str(lsi)}',
+              'AttributeType': self.attribute_type
+          }))
+    lsi_items.append('[' + ','.join(lsi_entry) + ']')
+    lsi_items.append(','.join(attr_list))
+    return lsi_items
+
+  def _CreateGlobalSecondaryIndex(self) -> List[str]:
+    """Used to create global secondary indexes."""
+    gsi_items = []
+    gsi_entry = []
+    attr_list = []
+    for gsi in range(0, self.gsi_count):
+      gsi_item = json.dumps({
+          'IndexName': f'gsiidx{str(gsi)}',
+          'KeySchema': [{
+              'AttributeName': f'gsikey{str(gsi)}',
+              'KeyType': 'HASH'
+          }, {
+              'AttributeName': f'gattr{str(gsi)}',
+              'KeyType': 'RANGE'
+          }],
+          'Projection': {
+              'ProjectionType': 'KEYS_ONLY'
+          },
+          'ProvisionedThroughput': {
+              'ReadCapacityUnits': 5,
+              'WriteCapacityUnits': 5
+          }
+      })
+      gsi_entry.append(gsi_item)
+      attr_list.append(
+          json.dumps({
+              'AttributeName': f'gattr{str(gsi)}',
+              'AttributeType': self.attribute_type
+          }))
+      attr_list.append(
+          json.dumps({
+              'AttributeName': f'gsikey{str(gsi)}',
+              'AttributeType': self.attribute_type
+          }))
+    gsi_items.append('[' + ','.join(gsi_entry) + ']')
+    gsi_items.append(','.join(attr_list))
+    return gsi_items
+
+  def _SetAttrDefnArgs(self, cmd: List[str], args: Sequence[str]) -> None:
+    attr_def_args = _MakeArgs(args)
+    cmd[10] = f'[{attr_def_args}]'
+    logging.info('adding to --attribute-definitions')
+
+  def _SetKeySchemaArgs(self, cmd: List[str], args: Sequence[str]) -> None:
+    key_schema_args = _MakeArgs(args)
+    cmd[12] = f'[{key_schema_args}]'
+    logging.info('adding to --key-schema')
+
+  def _PrimaryKeyJson(self) -> str:
+    return json.dumps({'AttributeName': self.primary_key, 'KeyType': 'HASH'})
+
+  def _PrimaryAttrsJson(self) -> str:
+    return json.dumps({
+        'AttributeName': self.primary_key,
+        'AttributeType': self.attribute_type
+    })
+
+  def _SortAttrsJson(self) -> str:
+    return json.dumps({
+        'AttributeName': self.sort_key,
+        'AttributeType': self.attribute_type
+    })
+
+  def _SortKeyJson(self) -> str:
+    return json.dumps({'AttributeName': self.sort_key, 'KeyType': 'RANGE'})
+
+  def _Create(self) -> None:
     """Creates the dynamodb table."""
     cmd = util.AWS_PREFIX + [
         'dynamodb',
         'create-table',
         '--region', self.region,
         '--table-name', self.table_name,
-        '--attribute-definitions', self.part_attributes,
-        '--key-schema', self.primary_key,
+        '--attribute-definitions', self._PrimaryAttrsJson(),
+        '--key-schema', self._PrimaryKeyJson(),
         '--provisioned-throughput', self.throughput,
-        '--tags'] + util.MakeFormattedDefaultTags()
-    if FLAGS.aws_dynamodb_lsi_count > 0 and FLAGS.aws_dynamodb_use_sort:
-      cmd[10] = (
-          '[' + self.part_attributes + ', ' + self.sort_attributes + ', ' +
-          self.lsi_indexes[1] + ']')
-      logging.info('adding to --attribute definitions')
+        '--tags'
+    ] + util.MakeFormattedDefaultTags()
+    if self.lsi_count > 0 and self.use_sort:
+      self._SetAttrDefnArgs(cmd, [
+          self._PrimaryAttrsJson(),
+          self._SortAttrsJson(), self.lsi_indexes[1]
+      ])
       cmd.append('--local-secondary-indexes')
       cmd.append(self.lsi_indexes[0])
-      cmd[12] = ('[' + self.primary_key + ', ' + self.sort_key + ']')
-      logging.info('adding to --key-schema')
-    elif FLAGS.aws_dynamodb_use_sort:
-      cmd[10] = ('[' + self.part_attributes + ', ' + self.sort_attributes + ']')
-      logging.info('adding to --attribute definitions')
-      cmd[12] = ('[' + self.primary_key + ', ' + self.sort_key + ']')
-      logging.info('adding to --key-schema')
-    if FLAGS.aws_dynamodb_gsi_count > 0:
-      cmd[10] = cmd[10][:-1]
-      cmd[10] += (', ' + self.gsi_indexes[1] + ']')
-      logging.info('adding to --attribute definitions')
+      self._SetKeySchemaArgs(
+          cmd, [self._PrimaryKeyJson(),
+                self._SortKeyJson()])
+    elif self.use_sort:
+      self._SetAttrDefnArgs(
+          cmd, [self._PrimaryAttrsJson(),
+                self._SortAttrsJson()])
+      self._SetKeySchemaArgs(
+          cmd, [self._PrimaryKeyJson(),
+                self._SortKeyJson()])
+    if self.gsi_count > 0:
+      self._SetAttrDefnArgs(
+          cmd, cmd[10].strip('[]').split(',') + [self.gsi_indexes[1]])
       cmd.append('--global-secondary-indexes')
       cmd.append(self.gsi_indexes[0])
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       logging.warning('Failed to create table! %s', stderror)
 
-  def _Delete(self):
+  def _Delete(self) -> None:
     """Deletes the dynamodb table."""
     cmd = util.AWS_PREFIX + [
         'dynamodb',
@@ -213,7 +348,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     logging.info('Attempting deletion: ')
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
-  def _IsReady(self):
+  def _IsReady(self) -> bool:
     """Check if dynamodb table is ready."""
     logging.info('Getting table ready status for %s', self.table_name)
     cmd = util.AWS_PREFIX + [
@@ -248,27 +383,24 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
       return {}
     return json.loads(stdout)['Table']
 
-  def GetEndPoint(self):
-    ddbep = 'http://dynamodb.{0}.amazonaws.com'.format(self.region)
-    return ddbep
+  def GetEndPoint(self) -> str:
+    return f'http://dynamodb.{self.region}.amazonaws.com'
 
-  def GetResourceMetadata(self):
+  def GetResourceMetadata(self) -> Dict[str, Any]:
     """Returns a dict containing metadata about the dynamodb instance.
 
     Returns:
       dict mapping string property key to value.
     """
     return {
-        'aws_dynamodb_primarykey': FLAGS.aws_dynamodb_primarykey,
-        'aws_dynamodb_use_sort': FLAGS.aws_dynamodb_use_sort,
-        'aws_dynamodb_sortkey': FLAGS.aws_dynamodb_sortkey,
-        'aws_dynamodb_attributetype': FLAGS.aws_dynamodb_attributetype,
-        'aws_dynamodb_read_capacity': FLAGS.aws_dynamodb_read_capacity,
-        'aws_dynamodb_write_capacity': FLAGS.aws_dynamodb_write_capacity,
-        'aws_dynamodb_lsi_count': FLAGS.aws_dynamodb_lsi_count,
-        'aws_dynamodb_gsi_count': FLAGS.aws_dynamodb_gsi_count,
-        'aws_dynamodb_consistentReads': FLAGS.aws_dynamodb_ycsb_consistentReads,
-        'aws_dynamodb_connectMax': FLAGS.aws_dynamodb_connectMax,
+        'aws_dynamodb_primarykey': self.primary_key,
+        'aws_dynamodb_use_sort': self.use_sort,
+        'aws_dynamodb_sortkey': self.sort_key,
+        'aws_dynamodb_attributetype': self.attribute_type,
+        'aws_dynamodb_read_capacity': self.rcu,
+        'aws_dynamodb_write_capacity': self.wcu,
+        'aws_dynamodb_lsi_count': self.lsi_count,
+        'aws_dynamodb_gsi_count': self.gsi_count,
     }
 
   def SetThroughput(self,
@@ -279,6 +411,10 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
       rcu = self.rcu
     if not wcu:
       wcu = self.wcu
+    current_rcu, current_wcu = self._GetThroughput()
+    if rcu == current_rcu and wcu == current_wcu:
+      logging.info('Table already has requested rcu %s and wcu %s', rcu, wcu)
+      return
     cmd = util.AWS_PREFIX + [
         'dynamodb', 'update-table',
         '--table-name', self.table_name,
@@ -355,4 +491,13 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
 
     Restores provisioned throughput back to benchmarking levels.
     """
+    # Providing flag overrides the capacity used in the previous run.
+    if FLAGS['aws_dynamodb_read_capacity'].present:
+      self.rcu = FLAGS.aws_dynamodb_read_capacity
+    if FLAGS['aws_dynamodb_write_capacity'].present:
+      self.wcu = FLAGS.aws_dynamodb_write_capacity
     self.SetThroughput(self.rcu, self.wcu)
+
+
+def _MakeArgs(args: Collection[str]) -> str:
+  return ','.join(args)

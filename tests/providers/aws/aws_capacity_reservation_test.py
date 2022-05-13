@@ -46,6 +46,7 @@ class FakeAwsVirtualMachine(object):
     self.machine_type = 'fake_machine_type'
     self.OS_TYPE = 'ubuntu1804'  # pylint: disable=invalid-name
     self.network = mock.MagicMock()
+    self.capacity_reservation_id = None
 
 
 class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):

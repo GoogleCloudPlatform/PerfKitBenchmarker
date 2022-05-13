@@ -39,7 +39,6 @@ inception3:
   description: Runs Inception V3 Benchmark.
   vm_groups:
     default:
-      os_type: ubuntu1604
       vm_spec:
         GCP:
           machine_type: n1-standard-4

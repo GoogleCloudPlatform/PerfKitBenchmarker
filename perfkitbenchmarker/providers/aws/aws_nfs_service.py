@@ -39,8 +39,8 @@ import logging
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import nfs_service
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 
@@ -55,7 +55,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
   See https://aws.amazon.com/efs/
   """
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
   NFS_TIERS = ('generalPurpose', 'maxIO')
   DEFAULT_NFS_VERSION = '4.1'
   DEFAULT_TIER = 'generalPurpose'
@@ -118,7 +118,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
   def _CreateFiler(self):
     """Creates the AWS EFS service."""
     if self.filer_id:
-      logging.warn('_CreateFiler() already called for %s', self.filer_id)
+      logging.warning('_CreateFiler() already called for %s', self.filer_id)
       return
     if FLAGS.aws_efs_token:
       filer = self.aws_commands.GetFiler(FLAGS.aws_efs_token)
@@ -138,7 +138,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
   def _CreateMount(self):
     """Creates an NFS mount point on an EFS service."""
     if self.mount_id:
-      logging.warn('_CreateMount() already called for %s', self.mount_id)
+      logging.warning('_CreateMount() already called for %s', self.mount_id)
       return
     if not self.filer_id:
       raise errors.Resource.CreationError('Did not create a filer first')

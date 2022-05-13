@@ -32,7 +32,7 @@ PORT = '4242'
 DGXSYSTEM = 'DGXA100_multinode'
 CONFIG = f'config_{DGXSYSTEM}.sh'
 AWS_EFA_NCCL_BASEAMI_PIPELINE_URL = 'https://github.com/aws-samples/aws-efa-nccl-baseami-pipeline.git'
-NVIDIA_EFA_DOCKERFILE = 'aws-efa-nccl-baseami-pipeline/nvidia-efa-docker_base/Dockerfile.base'
+NVIDIA_EFA_DOCKERFILE = 'aws-efa-nccl-baseami-pipeline/nvidia-efa-docker_base/Dockerfile*.base'
 
 
 BENCHMARK_NAME = 'mlperf_multiworkers'
@@ -41,7 +41,6 @@ mlperf_multiworkers:
   description: Runs MLPerf Benchmark on multiple workers.
   vm_groups:
     default:
-      os_type: ubuntu1804
       disk_spec: *default_500_gb
       vm_spec:
         GCP:
@@ -52,7 +51,6 @@ mlperf_multiworkers:
           machine_type: p4d.24xlarge
           zone: us-west-2a
           boot_disk_size: 200
-          image: ami-0ccc71d716eb5d6a4
         Azure:
           machine_type: Standard_ND96asr_v4
           zone: westus2

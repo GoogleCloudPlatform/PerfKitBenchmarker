@@ -9,6 +9,8 @@ from perfkitbenchmarker.linux_packages import pip
 from perfkitbenchmarker.linux_packages import python
 from tests import pkb_common_test_case
 
+import requests
+
 # executed remote commands
 NEED_PIP_27 = [
     'curl https://bootstrap.pypa.io/pip/2.7/get-pip.py | sudo python -',
@@ -35,6 +37,18 @@ EXISTING_PIP_38 = [
 PYTHON_38_KWARGS = {'pip_cmd': 'pip3', 'python_cmd': 'python3'}
 
 
+def _TestResponse(status_code: int) -> requests.Response:
+  response = requests.Response()
+  response.status_code = status_code
+  return response
+
+
+VERSIONED_PYPI_RESPONSES = {
+    'https://bootstrap.pypa.io/pip/2.7/get-pip.py': _TestResponse(200),
+    'https://bootstrap.pypa.io/pip/3.8/get-pip.py': _TestResponse(404),
+}
+
+
 class PipTest(pkb_common_test_case.PkbCommonTestCase):
 
   @parameterized.named_parameters(
@@ -43,18 +57,26 @@ class PipTest(pkb_common_test_case.PkbCommonTestCase):
       ('existing_pip_27', True, '2.7', EXISTING_PIP_27, {}),
       ('existing_pip_38', True, '3.8', EXISTING_PIP_38, PYTHON_38_KWARGS),
   )
-  def testInstall(self, need_pip: bool, python_version: str,
-                  expected_commands: List[str], install_kwargs: Dict[str, str]):
+  @mock.patch.object(requests, 'get', side_effect=VERSIONED_PYPI_RESPONSES.get)
+  def testInstall(self,
+                  already_has_pip: bool,
+                  python_version: str,
+                  expected_commands: List[str],
+                  install_kwargs: Dict[str, str],
+                  requests_get: mock.Mock):
     self.enter_context(
         mock.patch.object(
             python, 'GetPythonVersion', return_value=python_version))
     vm = mock.Mock()
-    vm.TryRemoteCommand.return_value = need_pip
+    vm.TryRemoteCommand.return_value = already_has_pip
 
     pip.Install(vm, **install_kwargs)
 
     vm.RemoteCommand.assert_has_calls(
         [mock.call(cmd) for cmd in expected_commands])
+
+    if not already_has_pip:
+      requests_get.assert_called_once()
 
 
 if __name__ == '__main__':

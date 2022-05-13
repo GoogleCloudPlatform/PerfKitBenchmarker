@@ -65,11 +65,10 @@ xgboost:
         AWS:
           machine_type: g4dn.xlarge
           zone: us-east-1a
-          image: ami-0d50576797d8d1a43
         Azure:
           machine_type: Standard_NC4as_T4_v3
           zone: eastus
-          image: microsoft-dsvm:ubuntu-hpc:1804:latest
+          image: microsoft-dsvm:ubuntu-1804:1804-gen2:latest
 """
 
 
@@ -91,7 +90,9 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   Args:
     bm_spec: The benchmark specification
   """
-  vm_util.RunThreaded(lambda vm: vm.Install('xgboost'), bm_spec.vms)
+  vm = bm_spec.vms[0]
+  cuda_toolkit.EnrollSigningKey(vm)
+  vm.Install('xgboost')
 
 
 def _MetadataFromFlags(vm: virtual_machine.BaseVirtualMachine) -> [str, Any]:

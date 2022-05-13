@@ -13,6 +13,7 @@ from the server.
 See https://github.com/cloudharmony/network for more info.
 """
 
+import enum
 import logging
 import posixpath
 
@@ -32,13 +33,11 @@ cloudharmony_network:
   description: Runs cloudharmony network tests.
   vm_groups:
     client:
-      os_type: ubuntu1804
       vm_spec:
         GCP:
           machine_type: n1-standard-2
           boot_disk_type: pd-ssd
     server:
-      os_type: ubuntu1804
       disk_spec: *default_50_gb
       vm_spec:
         GCP:
@@ -47,6 +46,7 @@ cloudharmony_network:
 # network test service types
 COMPUTE = 'compute'
 STORAGE = 'storage'
+DNS = 'dns'
 # network compute server type
 NGINX = 'nginx'
 # tests accepted by the --test flag of the gartner network benchmark
@@ -55,9 +55,18 @@ NGINX = 'nginx'
 # tests as defined below
 # throughput: downlink, uplink
 # tcp: rtt, ssl, ttfb
-NETWORK_TESTS = ['latency', 'downlink', 'uplink', 'dns', 'rtt', 'ssl', 'ttfb']
+NETWORK_TESTS = ['latency', 'downlink', 'uplink', 'rtt', 'ssl', 'ttfb', DNS]
 
-flags.DEFINE_enum('ch_network_test_service_type', COMPUTE, [COMPUTE, STORAGE],
+
+# TLS encryption types
+class TlsEncryptionType(enum.Enum):
+  RSA = 'rsa'
+  ECC = 'ecc'
+  UNENCRYPTED = 'unencrypted'
+
+
+flags.DEFINE_enum('ch_network_test_service_type', COMPUTE,
+                  [COMPUTE, STORAGE, DNS],
                   'The service type to host the website.')
 flags.DEFINE_enum('ch_network_test', 'latency', NETWORK_TESTS,
                   'Test supported by CloudHarmony network benchmark as defined'
@@ -87,6 +96,9 @@ flags.DEFINE_boolean('ch_network_throughput_slowest_thread', False, 'If set, '
                      'threads.')
 flags.DEFINE_integer('ch_network_tcp_samples', 10, 'The number of test samples '
                      'for TCP tests (rtt, ssl or ttfb).')
+flags.DEFINE_enum_class('ch_ssl_encryption_type',
+                        TlsEncryptionType.ECC, TlsEncryptionType,
+                        'Encryption type to use for SSL.')
 CLIENT_ZONE = flags.DEFINE_string(
     'ch_client_zone', None,
     'zone to launch the network or storage test client in. ')
@@ -110,6 +122,14 @@ def CheckPrerequisites(_):
   # TODO(user): add AWS & Azure support for object storage
   if FLAGS.ch_network_test_service_type == STORAGE and FLAGS.cloud != 'GCP':
     raise NotImplementedError('Benchmark only supports GCS object storage.')
+  elif [FLAGS.ch_network_test_service_type,
+        FLAGS.ch_network_test].count(DNS) == 1:
+    raise errors.Setup.InvalidConfigurationError(
+        'To perform DNS test, both ch_network_test flag and '
+        'ch_network_test_service_type flag must be set to dns')
+  elif FLAGS.ch_network_test_service_type == DNS and FLAGS.cloud != 'GCP':
+    raise NotImplementedError(
+        'DNS Benchmark not implemented for this cloud type')
 
 
 def GetConfig(user_config):
@@ -147,6 +167,44 @@ def _PrepareServer(vm):
   vm.RemoteCommand(
       'sudo sed -i "/server_name _;/a client_max_body_size 100M;" /etc/nginx/sites-enabled/default'
   )
+
+  # Required for SSL test
+  # Generate random
+  vm.RemoteCommand('sudo openssl rand -writerand .rnd')
+
+  # Create self signed certificate (RSA)
+  if FLAGS.ch_ssl_encryption_type == TlsEncryptionType.RSA:
+    vm.RemoteCommand(
+        f'sudo openssl req -x509 -nodes -days 1 -newkey rsa:2048 -subj '
+        f'"/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" '
+        f'-keyout /etc/ssl/private/nginx-selfsigned.key -out /etc/ssl/certs/nginx-selfsigned.crt '
+    )
+  # Create self signed certificate (ECC)
+  elif FLAGS.ch_ssl_encryption_type == TlsEncryptionType.ECC:
+    vm.RemoteCommand(
+        'sudo openssl ecparam -genkey -name prime256v1 -out /etc/ssl/private/nginx-selfsigned.key'
+        )
+    vm.RemoteCommand(
+        f'sudo openssl req -new -x509 -days 365 -extensions v3_ca -key /etc/ssl/private/nginx-selfsigned.key -subj '
+        f'"/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" '
+        f'-out /etc/ssl/certs/nginx-selfsigned.crt '
+    )
+  if FLAGS.ch_ssl_encryption_type != TlsEncryptionType.UNENCRYPTED:
+    # Setup SSL config for nginx
+    vm.RemoteCommand('sudo openssl dhparam -out /etc/nginx/dhparam.pem 1024')
+    vm.RemoteCommand(
+        'sudo sed -i "/server_name _;/a ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;" /etc/nginx/sites-enabled/default'
+    )
+    vm.RemoteCommand(
+        'sudo sed -i "/server_name _;/a ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;" /etc/nginx/sites-enabled/default'
+    )
+    vm.RemoteCommand(
+        'sudo sed -i "/server_name _;/a listen 443 ssl default_server;" /etc/nginx/sites-enabled/default'
+    )
+    vm.RemoteCommand(
+        'sudo sed -i "/server_name _;/a listen [::]:443 ssl default_server;" /etc/nginx/sites-enabled/default'
+    )
+
   vm.RemoteCommand('sudo systemctl restart nginx')
 
   web_probe_file = posixpath.join(vm.GetScratchDir(), 'probe.tgz')
@@ -225,10 +283,17 @@ def Prepare(benchmark_spec):
   vm_groups = benchmark_spec.vm_groups
   client = vm_groups['client'][0]
   client.Install('cloud_harmony_network')
+
+  # Ignore complaints from using self-signed certificate
+  if FLAGS.ch_network_test == 'ssl':
+    client.RemoteCommand('echo insecure >> $HOME/.curlrc')
+
   if FLAGS.ch_network_test_service_type == COMPUTE:
     vm_util.RunThreaded(_PrepareServer, vm_groups['server'])
   elif FLAGS.ch_network_test_service_type == STORAGE:
     _PrepareBucket(benchmark_spec)
+  elif FLAGS.ch_network_test_service_type == DNS:
+    pass
   else:
     raise NotImplementedError()
 
@@ -306,6 +371,15 @@ def _Run(benchmark_spec, test):
     http_url = f'http://{benchmark_spec.bucket}.storage.googleapis.com/probe'
     endpoints = f'--test_endpoint={http_url}'
     _AddStorageMetadata(client, metadata)
+  elif FLAGS.ch_network_test_service_type == DNS:
+    vms = vm_groups['server']
+    # use GCP zonal internal DNS,
+    # but maybe should add domain to vm's data attributes?
+    endpoints = ' '.join([
+        f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal'
+        for vm in vms
+    ])
+    _AddComputeMetadata(client, vms[0], metadata)
 
   if FLAGS.ch_network_throughput_https:
     metadata['throughput_https'] = True
@@ -315,6 +389,10 @@ def _Run(benchmark_spec, test):
     metadata['throughput_time'] = True
   if FLAGS.ch_network_throughput_slowest_thread:
     metadata['throughput_slowest_thread'] = True
+  if FLAGS.ch_network_test == DNS:
+    metadata['dns_recursive'] = True
+  if FLAGS.ch_network_test in ['rtt', 'ssl', 'ttfb']:
+    metadata['throughput_time'] = True
 
   metadata = cloud_harmony_util.GetCommonMetadata(metadata)
   cmd_path = posixpath.join(cloud_harmony_network.INSTALL_PATH, 'run.sh')

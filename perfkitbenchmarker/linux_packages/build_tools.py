@@ -11,21 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """Module containing build tools installation and cleanup functions."""
 import logging
 from absl import flags
-from perfkitbenchmarker import os_types
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('gcc_version', None, 'Version of gcc to use. Benchmarks '
-                    'that utilize gcc compilation should ensure reinstallation '
-                    'of GCC. Default is set by the OS package manager.')
+flags.DEFINE_string(
+    'gcc_version', None, 'Version of gcc to use. Benchmarks '
+    'that utilize gcc compilation should ensure reinstallation '
+    'of GCC. Default is set by the OS package manager.')
 flags.DEFINE_boolean('force_build_gcc_from_source', False, 'Whether to force '
                      'building GCC from source.')
-flags.DEFINE_boolean('build_fortran', False, 'Whether to build fortran '
-                     'alongside c and c++ when building GCC.')
+flags.DEFINE_boolean(
+    'build_fortran', False, 'Whether to build fortran '
+    'alongside c and c++ when building GCC.')
 
 GCC_TAR = 'gcc-{version}.tar.gz'
 GCC_URL = 'https://ftp.gnu.org/gnu/gcc/gcc-{version}/' + GCC_TAR
@@ -58,7 +57,6 @@ def BuildGccFromSource(vm, gcc_version):
   Args:
     vm: VirtualMachine object.
     gcc_version: string. GCC version.
-
   Taken from: https://gist.github.com/nchaigne/ad06bc867f911a3c0d32939f1e930a11
   """
   if gcc_version == '9' or gcc_version == '9.2':
@@ -66,11 +64,11 @@ def BuildGccFromSource(vm, gcc_version):
   logging.info('Compiling GCC %s', gcc_version)
 
   # build GCC on scratch disks for speed if possible
-  build_dir = vm.GetScratchDir() if vm.scratch_disks else 'build_tools'
+  build_dir = vm.GetScratchDir() if vm.scratch_disks else '~/'
   gcc_tar = GCC_TAR.format(version=gcc_version)
   if gcc_tar in PREPROVISIONED_DATA:
-    vm.InstallPreprovisionedPackageData(
-        'build_tools', PREPROVISIONED_DATA.keys(), build_dir)
+    vm.InstallPreprovisionedPackageData('build_tools',
+                                        PREPROVISIONED_DATA.keys(), build_dir)
   else:
     vm.RemoteCommand(f'cd {build_dir} && '
                      f'wget {GCC_URL.format(version=gcc_version)}')
@@ -128,7 +126,7 @@ def Reinstall(vm, version: str):
     vm: VirtualMachine object.
     version: string. GCC version.
   """
-  if vm.BASE_OS_TYPE != os_types.DEBIAN or FLAGS.force_build_gcc_from_source:
+  if 'ubuntu' not in vm.OS_TYPE or FLAGS.force_build_gcc_from_source:
     BuildGccFromSource(vm, version)
     logging.info('GCC info: %s', GetVersion(vm, 'gcc'))
     return

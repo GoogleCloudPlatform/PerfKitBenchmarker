@@ -38,34 +38,60 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
   @parameterized.named_parameters(
       {
           'testcase_name': 'QuotaExceeded',
-          'stderror': 'Error Code: QuotaExceeded'
+          'stderror': 'Error Code: QuotaExceeded',
+          'expected_error': errors.Benchmarks.QuotaFailure
       },
       {
           'testcase_name': 'CoreQuotaExceeded',
           'stderror':
               'Operation could not be completed as it results in exceeding '
-              'approved standardEv3Family Cores quota'
+              'approved standardEv3Family Cores quota',
+          'expected_error': errors.Benchmarks.QuotaFailure
       },
       {
           'testcase_name': 'CoreQuotaExceededDifferentWording',
           'stderror':
               'The operation could not be completed as it results in exceeding '
-              'quota limit of standardEv3Family Cores'
+              'quota limit of standardEv3Family Cores',
+          'expected_error': errors.Benchmarks.QuotaFailure,
       },
       {
           'testcase_name': 'FamilyQuotaExceededWording',
           'stderror':
               'Operation could not be completed as it results in exceeding '
-              'approved Standard NDASv4_A100 Family Cores quota'
+              'approved Standard NDASv4_A100 Family Cores quota',
+          'expected_error': errors.Benchmarks.QuotaFailure
+      },
+      {
+          'testcase_name': 'UnavailableInRegion',
+          'stderror':
+              'The requested VM size Standard_D2s_v5 is not available in the '
+              'current region. The sizes available in the current region are',
+          'expected_error': errors.Benchmarks.UnsupportedConfigError
+      },
+      {
+          'testcase_name': 'UnavailableInZone',
+          'stderror':
+              "The requested VM size 'Standard_D2s_v5' is not available in the "
+              "current availability zone. The sizes available in the current "
+              "availability zone are",
+          'expected_error': errors.Benchmarks.UnsupportedConfigError
+      },
+      {
+          'testcase_name': 'UnsupportedSku',
+          'stderror':
+              "The requested resource is currently not available in location "
+              "'eastus' zones '1' for subscription",
+          'expected_error': errors.Benchmarks.UnsupportedConfigError
       },
   )
-  def testQuotaExceeded(self, stderror):
+  def testVmCreationError(self, stderror, expected_error):
     spec = azure_virtual_machine.AzureVmSpec(
         _COMPONENT, machine_type='test_machine_type', zone='testing')
     vm = TestAzureVirtualMachine(spec)
 
     self.mock_cmd.side_effect = [('', stderror, 1)]
-    with self.assertRaises(errors.Benchmarks.QuotaFailure):
+    with self.assertRaises(expected_error):
       vm._Create()
 
   def testInsufficientSpotCapacity(self):

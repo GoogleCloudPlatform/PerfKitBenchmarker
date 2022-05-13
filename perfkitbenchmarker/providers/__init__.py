@@ -22,14 +22,13 @@ from perfkitbenchmarker import import_util
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers import azure
-from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers import ibmcloud
 
 
-GCP = gcp.CLOUD
-AZURE = azure.CLOUD
-AWS = aws.CLOUD
-IBMCLOUD = ibmcloud.CLOUD
+GCP = 'GCP'
+AZURE = 'Azure'
+AWS = 'AWS'
+IBMCLOUD = 'IBMCloud'
 ALICLOUD = 'AliCloud'
 KUBERNETES = 'Kubernetes'
 DIGITALOCEAN = 'DigitalOcean'

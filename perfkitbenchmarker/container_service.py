@@ -98,10 +98,10 @@ flags.DEFINE_string(
     'command. If not specified, the cloud-specific container '
     'implementation will chose an appropriate default.')
 
-# TODO(user): Consider supporting multiarch manifests.
-flags.DEFINE_string('container_cluster_architecture', 'linux/amd64',
-                    'The architecture that the container cluster uses. '
-                    'Defaults to linux/amd64')
+_CONTAINER_CLUSTER_ARCHITECTURE = flags.DEFINE_list(
+    'container_cluster_architecture', ['linux/amd64'],
+    'The architecture(s) that the container cluster uses. '
+    'Defaults to linux/amd64')
 
 _K8S_INGRESS = """
 apiVersion: extensions/v1beta1
@@ -357,17 +357,9 @@ class BaseContainerRegistry(resource.BaseResource):
     """
     raise NotImplementedError()
 
-  def Push(self, image):
-    """Push a locally built image to the repo.
-
-    Args:
-      image: Instance of _ContainerImage representing the image to push.
-    """
-    full_tag = self.GetFullRegistryTag(image.name)
-    tag_cmd = ['docker', 'tag', image.name, full_tag]
-    vm_util.IssueCommand(tag_cmd)
-    push_cmd = ['docker', 'push', full_tag]
-    vm_util.IssueCommand(push_cmd)
+  def PrePush(self, image):
+    """Prepares registry to push a given image."""
+    pass
 
   def RemoteBuild(self, image):
     """Build the image remotely.
@@ -381,19 +373,26 @@ class BaseContainerRegistry(resource.BaseResource):
     """Log in to the registry (in order to push to it)."""
     raise NotImplementedError()
 
-  def LocalBuild(self, image):
-    """Build the image locally.
+  def LocalBuildAndPush(self, image):
+    """Build the image locally and push to registry.
+
+    Assumes we are already authenticated with the registry from self.Login.
+    Building and pushing done in one command to support multiarch images
+    https://github.com/docker/buildx/issues/59
 
     Args:
       image: Instance of _ContainerImage representing the image to build.
     """
-    build_cmd = [
-        'docker', 'buildx', 'build',
-        '--platform', FLAGS.container_cluster_architecture,
-        '--no-cache', '--load',
-        '-t', image.name, image.directory
-    ]
-    vm_util.IssueCommand(build_cmd)
+    full_tag = self.GetFullRegistryTag(image.name)
+    # Multiarch images require buildx create
+    # https://github.com/docker/build-push-action/issues/302
+    vm_util.IssueCommand(['docker', 'buildx', 'create', '--use'])
+    cmd = ['docker', 'buildx', 'build']
+    if _CONTAINER_CLUSTER_ARCHITECTURE.value:
+      cmd += ['--platform', ','.join(_CONTAINER_CLUSTER_ARCHITECTURE.value)]
+    cmd += ['--no-cache', '--push', '-t', full_tag, image.directory]
+    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(['docker', 'buildx', 'stop'])
 
   def GetOrBuild(self, image):
     """Finds the image in the registry or builds it.
@@ -407,8 +406,11 @@ class BaseContainerRegistry(resource.BaseResource):
       The full image name (including the registry).
     """
     full_image = self.GetFullRegistryTag(image)
+    # Log in to the registry to see if image exists
+    self.Login()
     if not FLAGS.force_container_build:
-      inspect_cmd = ['docker', 'image', 'inspect', full_image]
+      # manifest inspect inpspects the registry's copy
+      inspect_cmd = ['docker', 'manifest', 'inspect', full_image]
       _, _, retcode = vm_util.IssueCommand(
           inspect_cmd, suppress_warning=True, raise_on_failure=False)
       if retcode == 0:
@@ -433,14 +435,11 @@ class BaseContainerRegistry(resource.BaseResource):
       except NotImplementedError:
         pass
 
+    self.PrePush(image)
     # Build the image locally using docker.
-    self.LocalBuild(image)
+    build_start = time.time()
+    self.LocalBuildAndPush(image)
     self.local_build_times[image.name] = time.time() - build_start
-
-    # Log in to the registry so we can push the image.
-    self.Login()
-    # Push the built image to the registry.
-    self.Push(image)
 
 
 @events.benchmark_start.connect
@@ -455,9 +454,10 @@ def _SetKubeConfig(unused_sender, benchmark_spec):
 
 def NodePoolName(name: str) -> str:
   """Clean node pool names to be usable by all providers."""
-  # GKE (or k8s?) requires nodepools use alphanumerics and hyphens, but PKB
-  # likes to use underscores isnstead of hyphens so we convert them.
-  return name.replace('_', '-')
+  # GKE (or k8s?) requires nodepools use alphanumerics and hyphens
+  # AKS requires full alphanumeric
+  # PKB likes to use underscores strip them out.
+  return name.replace('_', '')
 
 
 def GetContainerClusterClass(cloud, cluster_type):
@@ -472,26 +472,31 @@ class BaseContainerCluster(resource.BaseResource):
   REQUIRED_ATTRS = ['CLOUD', 'CLUSTER_TYPE']
 
   def __init__(self, cluster_spec):
-    super(BaseContainerCluster, self).__init__()
-    self.name = 'pkb-%s' % FLAGS.run_uri
+    super().__init__(user_managed=bool(cluster_spec.static_cluster))
+    self.name = cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
+    self.vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
+        cluster_spec.vm_spec)
+    self.zone = self.vm_config.zone
     # Use Virtual Machine class to resolve VM Spec. This lets subclasses parse
     # Provider specific information like disks out of the spec.
     for name, nodepool in cluster_spec.nodepools.copy().items():
+      nodepool_zone = nodepool.vm_spec.zone
+      # VM Classes can require zones. But nodepools have optional zones.
+      if not nodepool_zone:
+        nodepool.vm_spec.zone = self.zone
       nodepool.vm_config = virtual_machine.GetVmClass(
           self.CLOUD, os_types.DEFAULT)(nodepool.vm_spec)
+      nodepool.vm_config.zone = nodepool_zone
       nodepool.num_nodes = nodepool.vm_count
       # Fix name
       del cluster_spec.nodepools[name]
       cluster_spec.nodepools[NodePoolName(name)] = nodepool
     self.nodepools = cluster_spec.nodepools
-    self.vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
-        cluster_spec.vm_spec)
     self.num_nodes = cluster_spec.vm_count
     self.min_nodes = cluster_spec.min_vm_count or self.num_nodes
     self.max_nodes = cluster_spec.max_vm_count or self.num_nodes
     self.containers = collections.defaultdict(list)
     self.services = {}
-    self.zone = self.vm_config.zone
 
   def DeleteContainers(self):
     """Delete containers belonging to the cluster."""
@@ -542,10 +547,11 @@ class BaseContainerCluster(resource.BaseResource):
   def GetSamples(self):
     """Return samples with information about deployment times."""
     samples = []
-    samples.append(
-        sample.Sample('Cluster Creation Time',
-                      self.resource_ready_time - self.create_start_time,
-                      'seconds'))
+    if self.resource_ready_time and self.create_start_time:
+      samples.append(
+          sample.Sample('Cluster Creation Time',
+                        self.resource_ready_time - self.create_start_time,
+                        'seconds'))
     for container in itertools.chain(*list(self.containers.values())):
       metadata = {'image': container.image.split('/')[-1]}
       if container.resource_ready_time and container.create_start_time:
@@ -771,6 +777,12 @@ class KubernetesCluster(BaseContainerCluster):
   def _Delete(self):
     self._DeleteAllFromDefaultNamespace()
 
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the cluster."""
+    result = super().GetResourceMetadata()
+    result['container_cluster_version'] = self.k8s_version
+    return result
+
   def DeployContainer(self, base_name, container_spec):
     """Deploys Containers according to the ContainerSpec."""
     name = base_name + str(len(self.containers[base_name]))
@@ -891,7 +903,7 @@ class KubernetesCluster(BaseContainerCluster):
           namespace,
       ])
 
-  # TODO(pclay): Move to cached property in
+  # TODO(pclay): Move to cached property in Python 3.9
   @property
   @functools.lru_cache(maxsize=1)
   def node_memory_allocatable(self) -> units.Quantity:
@@ -911,6 +923,13 @@ class KubernetesCluster(BaseContainerCluster):
     stdout, _, _ = RunKubectlCommand(
         ['get', 'nodes', '-o', 'jsonpath={.items[0].status.capacity.cpu}'])
     return int(stdout)
+
+  @property
+  @functools.lru_cache(maxsize=1)
+  def k8s_version(self) -> str:
+    """Actual Kubernetes version reported by server."""
+    stdout, _, _ = RunKubectlCommand(['version', '-o', 'yaml'])
+    return yaml.safe_load(stdout)['serverVersion']['gitVersion']
 
   def GetPodLabel(self, resource_name):
     run_cmd = [
@@ -942,3 +961,8 @@ class KubernetesCluster(BaseContainerCluster):
         'exec', '-it', pod_name, '--'
     ] + cmd
     RunKubectlCommand(run_cmd)
+
+  # TODO(pclay): integrate with kubernetes_disk.
+  def GetDefaultStorageClass(self) -> str:
+    """Get the default storage class for the provider."""
+    raise NotImplementedError

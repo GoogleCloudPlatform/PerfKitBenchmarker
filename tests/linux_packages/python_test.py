@@ -25,17 +25,16 @@ FLAGS = flags.FLAGS
 # Responses for error returning remote commands
 _RESPONSE_BAD = '', '', 1
 PYTHON_MISSING = _RESPONSE_BAD
-PYTHON_PATH_MISSING = _RESPONSE_BAD
-ALTERNATIVES_MISSING = _RESPONSE_BAD
+PYTHON2_PATH_MISSING = _RESPONSE_BAD
 ALTERNATIVES_CALL_BAD = _RESPONSE_BAD
 PYTHON_VERSION_CALL_BAD = _RESPONSE_BAD
 
 # Responses for non-error remote commands
 _RESPONSE_GOOD = '', '', 0
 PYTHON_VERSION_2 = '', 'Python 2.7', 0
-ALTERNATIVES_FOUND = _RESPONSE_GOOD
-PYTHON_PATH_FOUND = _RESPONSE_GOOD
+PYTHON2_PATH_FOUND = _RESPONSE_GOOD
 ALTERNATIVES_CALL_GOOD = _RESPONSE_GOOD
+SYMLINK_SET = _RESPONSE_GOOD
 
 
 class PythonTest(pkb_common_test_case.PkbCommonTestCase):
@@ -48,9 +47,9 @@ class PythonTest(pkb_common_test_case.PkbCommonTestCase):
                     responses,
                     expected_last_call=None):
     vm = mock.Mock()
-    vm.PYTHON_PACKAGE = 'python2'
+    vm.PYTHON_2_PACKAGE = 'python2'
     vm.RemoteCommandWithReturnCode.side_effect = responses
-    python._SetDefaultPythonIfNeeded(vm, '/usr/bin/python2')
+    python._SetDefaultPythonIfNeeded(vm)
     if expected_last_call:
       vm.RemoteCommandWithReturnCode.assert_called_with(
           expected_last_call, ignore_failure=True)
@@ -60,51 +59,46 @@ class PythonTest(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch.object(python, '_SetDefaultPythonIfNeeded')
   def testYumCall(self, mock_set_default):
     vm = mock.Mock()
-    vm.PYTHON_PACKAGE = 'python3'
-    python.YumInstall(vm)
-    mock_set_default.assert_called_with(vm, '/usr/bin/python3')
+    vm.PYTHON_2_PACKAGE = 'python-foo'
+    python.Install(vm)
+    mock_set_default.assert_called_with(vm)
 
   @mock.patch.object(python, '_SetDefaultPythonIfNeeded')
   def testAptCall(self, mock_set_default):
     vm = mock.Mock()
-    python.AptInstall(vm)
-    mock_set_default.assert_called_with(vm, '/usr/bin/python2')
+    python.Install(vm)
+    mock_set_default.assert_called_with(vm)
 
   def testDefaultPythonAlreadySet(self):
     responses = [PYTHON_VERSION_2]
     expected = 'python --version'
     self.RunSetDefault(responses, expected)
 
-  def testNoAlternativesProgram(self):
-    responses = [PYTHON_MISSING, ALTERNATIVES_MISSING]
-    expected = 'which update-alternatives'
+  def testBadAlternativesResponse(self):
+    responses = [
+        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_CALL_BAD, SYMLINK_SET,
+        PYTHON_VERSION_2
+    ]
+    expected = 'python --version'
     self.RunSetDefault(responses, expected)
 
   def testMissingPythonPath(self):
-    responses = [PYTHON_MISSING, ALTERNATIVES_FOUND, PYTHON_PATH_MISSING]
-    expected = 'ls /usr/bin/python2'
-    self.RunSetDefault(responses, expected)
-
-  def testBadAlternativesResponse(self):
-    responses = [
-        PYTHON_MISSING, ALTERNATIVES_FOUND, PYTHON_PATH_FOUND,
-        ALTERNATIVES_CALL_BAD
-    ]
+    responses = [PYTHON_MISSING, PYTHON2_PATH_MISSING]
     with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
       self.RunSetDefault(responses)
 
   def testNoPythonVersionAfterSet(self):
     responses = [
-        PYTHON_MISSING, ALTERNATIVES_FOUND, PYTHON_PATH_FOUND,
-        ALTERNATIVES_CALL_GOOD, PYTHON_VERSION_CALL_BAD
+        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_CALL_GOOD,
+        PYTHON_VERSION_CALL_BAD
     ]
     with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
       self.RunSetDefault(responses)
 
   def testPythonVersionAfterSet(self):
     responses = [
-        PYTHON_MISSING, ALTERNATIVES_FOUND, PYTHON_PATH_FOUND,
-        ALTERNATIVES_CALL_GOOD, PYTHON_VERSION_2
+        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_CALL_GOOD,
+        PYTHON_VERSION_2
     ]
     expected = 'python --version'
     self.RunSetDefault(responses, expected)

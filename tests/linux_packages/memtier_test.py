@@ -40,7 +40,13 @@ GET               0         50.0
 GET               2       100.00
 """
 
-METADATA = {'test': 'foobar'}
+METADATA = {
+    'test': 'foobar',
+    'p90_latency': 2.295,
+    'p95_latency': 2.319,
+    'p99_latency': 2.399,
+    'avg_latency': 1.54,
+}
 
 TIME_SERIES_JSON = """
   {
@@ -82,30 +88,17 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             {'microsec': 9000.0, 'count': 10}])
     }
     set_metadata.update(METADATA)
-    time_series_0_metadata = {
-        'time_series_sec': '0',
-        'time_series_ops': 3,
-    }
-    time_series_0_metadata.update(METADATA)
-    time_series_1_metadata = {
-        'time_series_sec': '1',
-        'time_series_ops': 4,
-    }
-    time_series_1_metadata.update(METADATA)
-    latency_series_0_metadata = {
-        'time_series_sec': '0',
-        'time_series_max_latency': 1
-    }
-    latency_series_0_metadata.update(METADATA)
-    latency_series_1_metadata = {
-        'time_series_sec': '1',
-        'time_series_max_latency': 2.1
-    }
-    latency_series_1_metadata.update(METADATA)
+
+    time_series_metadata = {'time_series': {'0': 3, '1': 4}}
+    time_series_metadata.update(METADATA)
+    latency_series_metadata = {'time_series': {'0': 1, '1': 2.1}}
+    latency_series_metadata.update(METADATA)
+
     expected_result = [
         sample.Sample(
             metric='Ops Throughput',
-            value=44006.55, unit='ops/s',
+            value=44006.55,
+            unit='ops/s',
             metadata=METADATA),
         sample.Sample(
             metric='KB Throughput',
@@ -113,10 +106,7 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             unit='KB/s',
             metadata=METADATA),
         sample.Sample(
-            metric='Latency',
-            value=1.54,
-            unit='ms',
-            metadata=METADATA),
+            metric='Latency', value=1.54, unit='ms', metadata=METADATA),
         sample.Sample(
             metric='get latency histogram',
             value=0,
@@ -129,24 +119,14 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata=set_metadata),
         sample.Sample(
             metric='Ops Time Series',
-            value=3.0,
+            value=0,
             unit='ops',
-            metadata=time_series_0_metadata),
-        sample.Sample(
-            metric='Ops Time Series',
-            value=4.0,
-            unit='ops',
-            metadata=time_series_1_metadata),
+            metadata=time_series_metadata),
         sample.Sample(
             metric='Max Latency Time Series',
-            value=1.0,
+            value=0,
             unit='ms',
-            metadata=latency_series_0_metadata),
-        sample.Sample(
-            metric='Max Latency Time Series',
-            value=2.1,
-            unit='ms',
-            metadata=latency_series_1_metadata),
+            metadata=latency_series_metadata),
     ]
     samples = []
     results = memtier.MemtierResult.Parse(TEST_OUTPUT, TIME_SERIES_JSON)

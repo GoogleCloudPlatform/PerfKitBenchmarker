@@ -38,7 +38,6 @@ mxnet:
   description: Runs MXNet Benchmark.
   vm_groups:
     default:
-      os_type: ubuntu1604
       vm_spec:
         GCP:
           machine_type: n1-highmem-4

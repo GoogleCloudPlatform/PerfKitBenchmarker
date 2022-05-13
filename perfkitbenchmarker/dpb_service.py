@@ -68,8 +68,11 @@ FLAGS = flags.FLAGS
 
 # List of supported data processing backend services
 DATAPROC = 'dataproc'
+DATAPROC_GKE = 'dataproc_gke'
+DATAPROC_SERVERLESS = 'dataproc_serverless'
 DATAFLOW = 'dataflow'
 EMR = 'emr'
+GLUE = 'glue'
 UNMANAGED_DPB_SVC_YARN_CLUSTER = 'unmanaged_dpb_svc_yarn_cluster'
 UNMANAGED_SPARK_CLUSTER = 'unmanaged_spark_cluster'
 KUBERNETES_SPARK_CLUSTER = 'kubernetes_spark_cluster'
@@ -329,6 +332,8 @@ class BaseDpbService(resource.BaseResource):
             self.spec.worker_count,
         'dpb_hdfs_type':
             self.dpb_hdfs_type,
+        'dpb_disk_size':
+            self.spec.worker_group.disk_spec.disk_size,
         'dpb_service_zone':
             self.dpb_service_zone,
         'dpb_job_properties':
@@ -404,6 +409,23 @@ class BaseDpbService(resource.BaseResource):
     raise NotImplementedError(
         f'No jar found for category {job_category} and type {job_type}.')
 
+  def GetClusterCreateTime(self) -> Optional[float]:
+    """Returns the cluster creation time.
+
+    This default implementation computes it by substracting the
+    resource_ready_time and create_start_time attributes.
+
+    Returns:
+      A float representing the creation time in seconds or None.
+    """
+    if self.resource_ready_time is None or self.create_start_time is None:
+      return None
+    return self.resource_ready_time - self.create_start_time
+
+  def GetServiceWrapperScriptsToUpload(self) -> List[str]:
+    """Gets service wrapper scripts to upload alongside benchmark scripts."""
+    return []
+
 
 class UnmanagedDpbService(BaseDpbService):
   """Object representing an un-managed dpb service."""
@@ -425,14 +447,55 @@ class UnmanagedDpbService(BaseDpbService):
       self.storage_service = s3.S3Service()
       self.persistent_fs_prefix = 's3://'
     else:
-      raise errors.Config.InvalidValue(
-          f'Unsupported Cloud provider {self.cloud}')
+      self.region = None
+      self.storage_service = None
+      self.persistent_fs_prefix = None
+      self.manage_bucket = False
+      logging.warning(
+          'Cloud provider %s does not support object storage. '
+          'Some benchmarks will not work.',
+          self.cloud)
 
     if self.storage_service:
       self.storage_service.PrepareService(location=self.region)
 
     # set in _Create of derived classes
     self.leader = None
+
+  def GetClusterCreateTime(self) -> Optional[float]:
+    """Returns the cluster creation time.
+
+    UnmanagedDpbService Create phase doesn't consider actual VM creation, just
+    further provisioning. Thus, we need to add the VMs create time to the
+    default implementation.
+
+    Returns:
+      A float representing the creation time in seconds or None.
+    """
+
+    my_create_time = super().GetClusterCreateTime()
+    if my_create_time is None:
+      return None
+    vms = []
+    for vm_group in self.vms.values():
+      for vm in vm_group:
+        vms.append(vm)
+    first_vm_create_start_time = min(
+        (vm.create_start_time
+         for vm in vms
+         if vm.create_start_time is not None),
+        default=None,
+    )
+    last_vm_ready_start_time = max(
+        (vm.resource_ready_time
+         for vm in vms
+         if vm.resource_ready_time is not None),
+        default=None,
+    )
+    if first_vm_create_start_time is None or last_vm_ready_start_time is None:
+      return None
+    return (my_create_time + last_vm_ready_start_time -
+            first_vm_create_start_time)
 
 
 class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
@@ -614,6 +677,8 @@ class KubernetesSparkCluster(BaseDpbService):
   def _JobJars(self) -> Dict[str, Dict[str, str]]:
     """Known mappings of jars in the cluster used by GetExecutionJar."""
     return {self.SPARK_JOB_TYPE: {'examples': spark.SparkExamplesJarPath()}}
+
+  # TODO(odiego): Implement GetClusterCreateTime adding K8s cluster create time
 
   def __init__(self, dpb_service_spec):
     super().__init__(dpb_service_spec)

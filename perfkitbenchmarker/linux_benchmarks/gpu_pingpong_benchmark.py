@@ -49,7 +49,6 @@ gpu_pingpong:
         AWS:
           machine_type: p4d.24xlarge
           zone: us-east-1a
-          image: ami-0e956fe81fa11d0a9
         Azure:
           machine_type: Standard_ND40rs_v2
           zone: eastus

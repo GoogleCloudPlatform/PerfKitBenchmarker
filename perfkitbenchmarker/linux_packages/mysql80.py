@@ -15,6 +15,8 @@
 
 """Module containing mysql installation and cleanup functions."""
 
+import re
+
 MYSQL_PSWD = 'perfkitbenchmarker'
 PACKAGE_NAME = 'mysql'
 
@@ -34,7 +36,24 @@ def AptInstall(vm):
                    ' select Ok | sudo debconf-set-selections')
   vm.RemoteCommand('sudo -E DEBIAN_FRONTEND=noninteractive dpkg -i'
                    ' mysql-apt-config_0.8.17-1_all.deb')
-  vm.RemoteCommand('sudo apt-get update')
+
+  _, stderr = vm.RemoteCommand('sudo apt-get update', ignore_failure=True)
+
+  if stderr:
+    if 'public key is not available:' in stderr:
+      # This error is due to mysql updated the repository and the public
+      # key is not updated.
+      # Import the updated public key
+      match = re.match('.*NO_PUBKEY ([A-Z0-9]*)', stderr)
+      if match:
+        key = match.group(1)
+        vm.RemoteCommand('sudo apt-key adv '
+                         f'--keyserver keyserver.ubuntu.com --recv-keys {key}')
+      else:
+        raise RuntimeError('No public key found by regex.')
+    else:
+      raise RuntimeError(stderr)
+
   vm.RemoteCommand('echo "mysql-server-8.0 mysql-server/root_password password '
                    f'{MYSQL_PSWD}" | sudo debconf-set-selections')
   vm.RemoteCommand('echo "mysql-server-8.0 mysql-server/root_password_again '

@@ -106,6 +106,10 @@ flags.DEFINE_string(
 flags.DEFINE_bool('dpb_sparksql_create_hive_tables', False,
                   'Whether to load dpb_sparksql_data into external hive tables '
                   'or not.')
+flags.DEFINE_bool('dpb_sparksql_simultaneous', False,
+                  'Run all queries simultaneously instead of one by one. '
+                  'Depending on the service type and cluster shape, it might '
+                  'fail if too many queries are to be run.')
 flags.DEFINE_string(
     'dpb_sparksql_database', None,
     'Name of preprovisioned Hive database to look for data in '
@@ -114,6 +118,17 @@ flags.DEFINE_string(
     'dpb_sparksql_data_format', None,
     "Format of data to load. Assumed to be 'parquet' for HCFS "
     "and 'bigquery' for bigquery if unspecified.")
+flags.DEFINE_string(
+    'dpb_sparksql_data_compression', None,
+    'Compression format of the data to load. Since for most formats available '
+    'in Spark this may only be specified when writing data, for most cases '
+    'this option is a no-op and only serves the purpose of tagging the results '
+    'reported by PKB with the appropriate compression format. One notable '
+    'exception though is when the dpb_sparksql_copy_to_hdfs flag is passed. In '
+    'that case the compression data passed will be used to write data into '
+    'HDFS.')
+flags.DEFINE_string('dpb_sparksql_csv_delimiter', ',',
+                    'CSV delimiter to load the CSV file.')
 flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', BENCHMARK_NAMES.keys(),
                   'A list of query to run on dpb_sparksql_data')
 flags.DEFINE_list(
@@ -209,10 +224,12 @@ def Prepare(benchmark_spec):
   benchmark_spec.staged_queries = _LoadAndStageQueries(
       storage_service, cluster.base_dir)
 
-  for script in [
+  scripts_to_upload = [
       SPARK_SQL_DISTCP_SCRIPT,
       SPARK_TABLE_SCRIPT,
-      SPARK_SQL_RUNNER_SCRIPT]:
+      SPARK_SQL_RUNNER_SCRIPT,
+  ] + cluster.GetServiceWrapperScriptsToUpload()
+  for script in scripts_to_upload:
     src_url = data.ResourcePath(script)
     storage_service.CopyToBucket(src_url, cluster.bucket, script)
 
@@ -235,7 +252,11 @@ def Prepare(benchmark_spec):
       }
       for flag, data_dir in copy_dirs.items():
         staged_file = os.path.join(cluster.base_dir, flag + '-metadata.json')
-        metadata = _GetDistCpMetadata(data_dir, benchmark_spec.table_subdirs)
+        extra = {}
+        if flag == 'destination' and FLAGS.dpb_sparksql_data_compression:
+          extra['compression'] = FLAGS.dpb_sparksql_data_compression
+        metadata = _GetDistCpMetadata(
+            data_dir, benchmark_spec.table_subdirs, extra_metadata=extra)
         _StageMetadata(metadata, storage_service, staged_file)
         job_arguments += ['--{}-metadata'.format(flag), staged_file]
       try:
@@ -283,6 +304,14 @@ def Run(benchmark_spec):
   metadata = benchmark_spec.dpb_service.GetMetadata()
 
   metadata['benchmark'] = BENCHMARK_NAMES[FLAGS.dpb_sparksql_query]
+  if FLAGS.bigquery_record_format:
+    # This takes higher priority since for BQ dpb_sparksql_data_format actually
+    # holds a fully qualified Java class/package name.
+    metadata['data_format'] = FLAGS.bigquery_record_format
+  elif FLAGS.dpb_sparksql_data_format:
+    metadata['data_format'] = FLAGS.dpb_sparksql_data_format
+  if FLAGS.dpb_sparksql_data_compression:
+    metadata['data_compression'] = FLAGS.dpb_sparksql_data_compression
 
   # Run PySpark Spark SQL Runner
   report_dir = '/'.join([cluster.base_dir, f'report-{int(time.time()*1000)}'])
@@ -306,6 +335,8 @@ def Run(benchmark_spec):
     args += ['--enable-hive', 'True']
   if FLAGS.dpb_sparksql_table_cache:
     args += ['--table-cache', FLAGS.dpb_sparksql_table_cache]
+  if FLAGS.dpb_sparksql_simultaneous:
+    args += ['--simultaneous', 'True']
   jars = []
   if FLAGS.spark_bigquery_connector:
     jars.append(FLAGS.spark_bigquery_connector)
@@ -356,18 +387,38 @@ def Run(benchmark_spec):
   results.append(
       sample.Sample('sparksql_geomean_run_time',
                     sample.GeoMean(run_times.values()), 'seconds', metadata))
+  cluster_create_time = cluster.GetClusterCreateTime()
+  if cluster_create_time is not None:
+    results.append(
+        sample.Sample('dpb_cluster_create_time', cluster_create_time, 'seconds',
+                      metadata))
+  results.append(sample.Sample('dpb_sparksql_job_pending',
+                               job_result.pending_time, 'seconds', metadata))
   return results
 
 
 def _GetTableMetadata(benchmark_spec):
   """Compute map of table metadata for spark_sql_runner --table_metadata."""
   metadata = {}
+  # TODO(user) : we support CSV format only when create_hive_tables
+  # is false.
   if not FLAGS.dpb_sparksql_create_hive_tables:
     for subdir in benchmark_spec.table_subdirs or []:
       # Subdir is table name
-      metadata[subdir] = (FLAGS.dpb_sparksql_data_format or 'parquet', {
-          'path': os.path.join(benchmark_spec.data_dir, subdir)
-      })
+      option_params = {
+          'path': os.path.join(benchmark_spec.data_dir, subdir),
+      }
+      # support csv data format which contains a header and has delimiter
+      # defined by dpb_sparksql_csv_delimiter flag
+      if FLAGS.dpb_sparksql_data_format == 'csv':
+        # TODO(user): currently we only support csv with a header.
+        # If the csv does not have a header it will not load properly.
+        option_params['header'] = 'true'
+        option_params['delimiter'] = FLAGS.dpb_sparksql_csv_delimiter
+
+      metadata[subdir] = (FLAGS.dpb_sparksql_data_format or
+                          'parquet', option_params)
+
   for table in FLAGS.bigquery_tables:
     name = table.split('.')[-1]
     bq_options = {'table': table}
@@ -377,12 +428,15 @@ def _GetTableMetadata(benchmark_spec):
   return metadata
 
 
-def _GetDistCpMetadata(base_dir: str, subdirs: List[str]):
+def _GetDistCpMetadata(base_dir: str, subdirs: List[str], extra_metadata=None):
   """Compute list of table metadata for spark_sql_distcp metadata flags."""
   metadata = []
+  if not extra_metadata:
+    extra_metadata = {}
   for subdir in subdirs or []:
     metadata += [(FLAGS.dpb_sparksql_data_format or 'parquet', {
-        'path': '/'.join([base_dir, subdir])
+        'path': '/'.join([base_dir, subdir]),
+        **extra_metadata
     })]
   return metadata
 

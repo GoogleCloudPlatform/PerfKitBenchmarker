@@ -214,6 +214,10 @@ class Resource(object):
   class RetryableGetError(Error):
     pass
 
+  class UpdateError(Error):
+    """An error on update."""
+    pass
+
   class SubclassNotFoundError(Error):
     pass
 

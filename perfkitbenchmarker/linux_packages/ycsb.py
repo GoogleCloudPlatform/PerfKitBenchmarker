@@ -49,6 +49,7 @@ import os
 import posixpath
 import re
 import time
+from typing import List
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -273,7 +274,7 @@ def _GetThreadsQpsPerLoaderList():
           for thread_qps in FLAGS.ycsb_threads_per_client]
 
 
-def _GetWorkloadFileList():
+def GetWorkloadFileList() -> List[str]:
   """Returns the list of workload files to run.
 
   Returns:
@@ -292,7 +293,7 @@ def CheckPrerequisites():
     IOError: On missing workload file.
     errors.Config.InvalidValue on unsupported YCSB version or configs.
   """
-  for workload_file in _GetWorkloadFileList():
+  for workload_file in GetWorkloadFileList():
     if not os.path.exists(workload_file):
       raise IOError('Missing workload file: {0}'.format(workload_file))
 
@@ -324,14 +325,26 @@ def CheckPrerequisites():
 
 
 @vm_util.Retry(max_retries=5, poll_interval=1)
-def _Install(vm):
+def Install(vm):
   """Installs the YCSB and, if needed, hdrhistogram package on the VM."""
   vm.Install('openjdk')
-  vm.Install('curl')
+  # TODO(user): replace with Python 3 when supported.
+  # https://github.com/brianfrankcooper/YCSB/issues/1459
+  vm.Install('python')
+  vm.InstallPackages('curl')
   ycsb_url = (_ycsb_tar_url or FLAGS.ycsb_tar_url or
               YCSB_URL_TEMPLATE.format(FLAGS.ycsb_version))
-  install_cmd = ('mkdir -p {0} && curl -L {1} | '
-                 'tar -C {0} --strip-components=1 -xzf -')
+  install_cmd = (
+      'mkdir -p {0} && curl -L {1} | '
+      'tar -C {0} --strip-components=1 -xzf - '
+      # Log4j 2 < 2.16 is vulnerable to
+      # https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-44228.
+      # YCSB currently ships with a number of vulnerable jars. None are used by
+      # PKB, so simply exclude them.
+      # After https://github.com/brianfrankcooper/YCSB/pull/1583 is merged and
+      # released, this will not be necessary.
+      # TODO(user): Update minimum YCSB version and remove.
+      "--exclude='**/log4j-core-2*.jar' ")
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
   if _GetVersion(FLAGS.ycsb_version) >= 11:
     vm.Install('maven')
@@ -343,16 +356,6 @@ def _Install(vm):
                      '{mvn_cmd}'.format(
                          hist_dir=HDRHISTOGRAM_DIR,
                          mvn_cmd=maven.GetRunCommand('install')))
-
-
-def YumInstall(vm):
-  """Installs the YCSB package on the VM."""
-  _Install(vm)
-
-
-def AptInstall(vm):
-  """Installs the YCSB package on the VM."""
-  _Install(vm)
 
 
 def ParseResults(ycsb_result_string, data_type='histogram'):
@@ -793,8 +796,8 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
   for indiv in result_list[1:]:
     for group_name, group in six.iteritems(indiv['groups']):
       if group_name not in result['groups']:
-        logging.warn('Found result group "%s" in individual YCSB result, '
-                     'but not in accumulator.', group_name)
+        logging.warning('Found result group "%s" in individual YCSB result, '
+                        'but not in accumulator.', group_name)
         result['groups'][group_name] = copy.deepcopy(group)
         continue
 
@@ -805,14 +808,14 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
       # * AGGREGATE_OPERATORS[statistic](result_value, indiv_value)
       for k, v in six.iteritems(group['statistics']):
         if k not in AGGREGATE_OPERATORS:
-          logging.warn('No operator for "%s". Skipping aggregation.', k)
+          logging.warning('No operator for "%s". Skipping aggregation.', k)
           continue
         elif AGGREGATE_OPERATORS[k] is None:  # Drop
           result['groups'][group_name]['statistics'].pop(k, None)
           continue
         elif k not in result['groups'][group_name]['statistics']:
-          logging.warn('Found statistic "%s.%s" in individual YCSB result, '
-                       'but not in accumulator.', group_name, k)
+          logging.warning('Found statistic "%s.%s" in individual YCSB result, '
+                          'but not in accumulator.', group_name, k)
           result['groups'][group_name]['statistics'][k] = copy.deepcopy(v)
           continue
 
@@ -844,7 +847,7 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
   return result
 
 
-def _ParseWorkload(contents):
+def ParseWorkload(contents):
   """Parse a YCSB workload file.
 
   YCSB workloads are Java .properties format.
@@ -1057,7 +1060,7 @@ class YCSBExecutor(object):
       kwargs.setdefault('fieldlength', FLAGS.ycsb_field_length)
 
     with open(workload_file) as fp:
-      workload_meta = _ParseWorkload(fp.read())
+      workload_meta = ParseWorkload(fp.read())
       workload_meta.update(kwargs)
       workload_meta.update(stage='load',
                            clients=len(vms) * kwargs['threads'],
@@ -1256,7 +1259,7 @@ class YCSBExecutor(object):
                                    os.path.basename(workload_file))
 
       with open(workload_file) as fp:
-        workload_meta = _ParseWorkload(fp.read())
+        workload_meta = ParseWorkload(fp.read())
         workload_meta.update(kwargs)
         workload_meta.update(workload_name=os.path.basename(workload_file),
                              workload_index=workload_index,
@@ -1270,6 +1273,8 @@ class YCSBExecutor(object):
 
       parameters['parameter_files'] = [remote_path]
 
+      # _GetThreadsQpsPerLoaderList() passes tuple of (client_count, target=0)
+      # if no target is passed via flags.
       for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList():
 
         def _DoRunStairCaseLoad(client_count,
@@ -1279,8 +1284,6 @@ class YCSBExecutor(object):
           parameters['threads'] = client_count
           if target_qps_per_vm:
             parameters['target'] = int(target_qps_per_vm * len(vms))
-          else:
-            parameters.pop('target', None)
           if is_sustained:
             parameters['maxexecutiontime'] = (
                 FLAGS.ycsb_dynamic_load_sustain_timelimit)
@@ -1293,6 +1296,14 @@ class YCSBExecutor(object):
           client_meta.update(parameters)
           client_meta.update(clients=len(vms) * client_count,
                              threads_per_client_vm=client_count)
+          # Values passed in via this flag do not get recorded in metadata.
+          # The target passed in is applied to each client VM, so multiply by
+          # len(vms).
+          for pv in FLAGS.ycsb_run_parameters:
+            param, value = pv.split('=', 1)
+            if param == 'target':
+              value = int(value) * len(vms)
+            client_meta[param] = value
 
           if FLAGS.ycsb_include_individual_results and len(results) > 1:
             for i, result in enumerate(results):
@@ -1392,7 +1403,10 @@ class YCSBExecutor(object):
 
   def Load(self, vms, workloads=None, load_kwargs=None):
     """Load data using YCSB."""
-    workloads = workloads or _GetWorkloadFileList()
+    if FLAGS.ycsb_skip_load_stage:
+      return []
+
+    workloads = workloads or GetWorkloadFileList()
     load_samples = []
     assert workloads, 'no workloads'
 
@@ -1422,7 +1436,7 @@ class YCSBExecutor(object):
 
   def Run(self, vms, workloads=None, run_kwargs=None):
     """Runs each workload/client count combination."""
-    workloads = workloads or _GetWorkloadFileList()
+    workloads = workloads or GetWorkloadFileList()
     assert workloads, 'no workloads'
     samples = list(self.RunStaircaseLoads(vms, workloads,
                                           **(run_kwargs or {})))
@@ -1446,7 +1460,7 @@ class YCSBExecutor(object):
     Args:
       vms: List of virtual machines. VMs to use to generate load.
       workloads: List of strings. Workload files to use. If unspecified,
-        _GetWorkloadFileList() is used.
+        GetWorkloadFileList() is used.
       load_kwargs: dict. Additional arguments to pass to the load stage.
       run_kwargs: dict. Additional arguments to pass to the run stage.
     Returns:

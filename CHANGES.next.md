@@ -4,7 +4,7 @@
     [the image was deleted](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/endorsed-distros#supported-distributions-and-versions),
     -   It will be replaced by
         [Fedora Core OS](https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/)
-        if a public image is made avaiable.
+        if a public image is made available.
 -   The `dpb_sparksql_benchmark` now requires passing the requested queries with
     `--dpb_sparksql_query_order`
 -   AwsVirtualMachine.IMAGE_OWNER has been changed from a string to a list of
@@ -14,8 +14,14 @@
 -   Remove Amazon Linux 1 from `--os_types`.
 -   Changed redis_memtier_benchmark to use redis version 6 and above. Redis
     versions less than 6 are no longer supported.
+-   Compressed redis_memtier samples from `--memtier_time_series` into a few
+    time-to-value dictionaries, greatly reducing the number of samples produced
 -   Make Ubuntu 18 the default os_type.
 -   Deprecate Ubuntu 16 as it is EOL on 2021-05-01.
+-   Switch to Azure CLI to MSAL. This requires updating the CLI to >= 2.30.0.
+    -   See https://docs.microsoft.com/en-us/cli/azure/msal-based-azure-cli
+-   Remove deprecated `--eks_zones` flags. Use `--zones` instead.
+-   Deprecate CentOS Linux 8 as it is EOL on 2021-12-31.
 
 ### New features:
 
@@ -59,8 +65,11 @@
 -   Add cURL benchmark for object storage.
 -   Add vbench video encoding benchmark to PKB.
 -   Add Kubernetes based DPB Service for Spark
+-   Add support for creating Dataproc cluster on GKE
+-   Add support for TPC-DS/H benchmarks on Dataproc Serverless.
+-   Add support for TPC-DS/H benchmarks on AWS Glue Job.
+-   Add messaging service latency benchmark (for GCP PubSub, AWS SQS & Azure Service Bus).
 -   Add Intel perfspect as a new trace
-
 
 ### Enhancements:
 
@@ -123,6 +132,22 @@
 -   Expose GCS FUSE disk type to allow using GCS buckets as a data_disk.
 -   Add support for 5th gen Azure VMs.
 -   Support multiple Redis instances on the same VM and multiple client VMs.
+-   Support creating autoscaled Bigtable instances.
+-   Added support to allow deleting a static table in Cloud Bigtable benchmarks
+    via --google_bigtable_delete_static_table.
+-   Support downloading data twice in object_storage_service_benchmark.
+-   Add memtier reported percentile latencies to Memtier samples metadata.
+-   Add support for building multiarch Docker images.
+-   Add latency capped throughput measurement mode to memtier.
+-   Add Unsupported config failure substatus for Azure runs.
+-   Add support for Windows 2022 and Sql server 2019 on Windows 2022
+-   Add support for Redis Enterprise clustered database.
+-   Support regional GKE clusters.
+-   Support zonal node placement in regional Kubernetes clusters.
+-   Uses the regular version of gcloud for Bigtable commands instead of beta.
+-   Support logging the start timestamp of each stage.
+-   Support for building GCC on Debian
+-   Support for Postgres 13 on Debian
 
 ### Bug fixes and maintenance updates:
 
@@ -186,4 +211,19 @@
     and using variable expansion.
 -   Added `--google_monitoring_endpoint` flag for querying a different endpoint
     than monitoring.googleapis.com. Used by `cloud_bigtable_ycsb`.
+-   Update Go language binary to version 1.17.2
 -   Broadens Azure quota detection parsing
+-   AWS disk attaches now wait for attach, supporting io2 block express
+-   Update the performance results of Bigtable testing which used a more proper
+    client setup.
+-   Update the runner's AWS CLI to 1.19.75.
+-   Minor fix of the Bigtable benchmarking user guide.
+-   Enable icelake and milan as --gcp_min_cpu_platform options.
+-   Update the bigtable tutorial readme with the content of batch_testing.md.
+    Unneeded files are removed.
+-   Fix fio_write_against_multiple_clients additional samples and metadata.
+-   Use real URLs as the links in Bigtable walkthrough doc.
+-   Add option to publish to a subfolder in cloud storage publisher.
+-   Parse resulting output matrix by indexing from the bottom up instead of top
+    down.
+-   Double build time for docker images, for a more complex build script.

@@ -19,7 +19,7 @@ from typing import List
 
 from absl import flags
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker import errors
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -32,7 +32,7 @@ FLAGS = flags.FLAGS
 class AzureContainerRegistry(container_service.BaseContainerRegistry):
   """Class for building and storing container images on Azure."""
 
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   def __init__(self, registry_spec):
     super(AzureContainerRegistry, self).__init__(registry_spec)
@@ -76,13 +76,16 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
 
   def _PostCreate(self):
     """Allow the service principle to read from the repository."""
-    create_role_assignment_cmd = [
-        azure.AZURE_PATH, 'role', 'assignment', 'create',
-        '--assignee', self.service_principal.app_id,
-        '--role', 'Reader',
-        '--scope', self.acr_id,
-    ]
-    vm_util.IssueRetryableCommand(create_role_assignment_cmd)
+    # If we bootstrapped our own credentials into the AKS cluster it already,
+    # has read permission, because it created the repo.
+    if not FLAGS.bootstrap_azure_service_principal:
+      create_role_assignment_cmd = [
+          azure.AZURE_PATH, 'role', 'assignment', 'create',
+          '--assignee', self.service_principal.app_id,
+          '--role', 'Reader',
+          '--scope', self.acr_id,
+      ]
+      vm_util.IssueRetryableCommand(create_role_assignment_cmd)
 
   def _CreateDependencies(self):
     """Creates the resource group."""
@@ -91,7 +94,6 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
 
   def _DeleteDependencies(self):
     """Deletes the resource group."""
-    self.resource_group.Delete()
     self.service_principal.Delete()
 
   def Login(self):
@@ -111,16 +113,14 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
 class AksCluster(container_service.KubernetesCluster):
   """Class representing an Azure Kubernetes Service cluster."""
 
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   def __init__(self, spec):
     """Initializes the cluster."""
     super(AksCluster, self).__init__(spec)
-    if util.IsZone(spec.vm_spec.zone):
-      raise errors.Config.InvalidValue(
-          'Availability zones are currently not supported by Aks Cluster')
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
+    self.node_resource_group = None
     self.name = 'pkbcluster%s' % FLAGS.run_uri
     # TODO(pclay): replace with built in service principal once I figure out how
     # to make it work with ACR
@@ -135,7 +135,6 @@ class AksCluster(container_service.KubernetesCluster):
       dict mapping string property key to value.
     """
     result = super(AksCluster, self).GetResourceMetadata()
-    result['container_cluster_version'] = self.cluster_version
     result['boot_disk_type'] = self.vm_config.os_disk.disk_type
     result['boot_disk_size'] = self.vm_config.os_disk.disk_size
     return result
@@ -167,16 +166,16 @@ class AksCluster(container_service.KubernetesCluster):
         # Half hour timeout on creating the cluster.
         timeout=1800)
 
-    for name, node_group in self.nodepools.items():
-      self._CreateNodeGroup(name, node_group)
+    for name, node_pool in self.nodepools.items():
+      self._CreateNodePool(name, node_pool)
 
   def _CreateNodePool(self, name: str, node_pool):
     """Creates a node pool."""
     cmd = [
-        azure.AZURE_PATH, 'aks', 'nodepools', 'add',
+        azure.AZURE_PATH, 'aks', 'nodepool', 'add',
         '--cluster-name', self.name,
         '--name', name,
-        '--labels', f'pkb_nodepool={node_pool}',
+        '--labels', f'pkb_nodepool={name}',
     ] + self._GetNodeFlags(node_pool.num_nodes, node_pool.vm_config)
     vm_util.IssueCommand(cmd, timeout=600)
 
@@ -186,6 +185,9 @@ class AksCluster(container_service.KubernetesCluster):
         '--node-vm-size', vm_config.machine_type,
         '--node-count', str(num_nodes),
     ] + self.resource_group.args
+    if self.vm_config.zone and self.vm_config.zone != self.region:
+      zones = ' '.join(zone[-1] for zone in self.vm_config.zone.split(','))
+      args += ['--zones', zones]
     if self.vm_config.os_disk and self.vm_config.os_disk.disk_size:
       args += ['--node-osdisk-size', str(self.vm_config.os_disk.disk_size)]
     if self.cluster_version:
@@ -200,24 +202,35 @@ class AksCluster(container_service.KubernetesCluster):
         azure.AZURE_PATH, 'aks', 'show', '--name', self.name,
     ] + self.resource_group.args, raise_on_failure=False)
     try:
-      json.loads(stdout)
+      cluster = json.loads(stdout)
+      self.node_resource_group = cluster['nodeResourceGroup']
       return True
     except ValueError:
       return False
 
   def _Delete(self):
     """Deletes the AKS cluster."""
-    # This will be deleted along with the resource group
-    super()._Delete()
+    # Do not call super._Delete() as it will try to delete containers and the
+    # cluster may have already been deleted by deleting a corresponding
+    # AzureContainerRegistry. The registry deletes the shared resource group.
+    #
+    # Normally only azure networks manage resource groups because,
+    # PKB assumes all benchmarks use VMs and VMs always depend on networks.
+    # However container benchmarks do not provision networks and
+    # directly manage their own resource groups. However ContainerClusters and
+    # ContainerRegistries can be used independently so they must both directly
+    # mangage the undlerlying resource group. This is indempotent, but can cause
+    # AKS clusters to have been deleted before calling _Delete().
+    #
+    # If it has not yet been deleted it will be deleted along with the resource
+    # group.
     self._deleted = True
 
   def _PostCreate(self):
     """Tags the cluster resource group."""
     super(AksCluster, self)._PostCreate()
-    cluster_resource_group_name = 'MC_%s_%s_%s' % (
-        self.resource_group.name, self.name, self.zone)
     set_tags_cmd = [
-        azure.AZURE_PATH, 'group', 'update', '-g', cluster_resource_group_name,
+        azure.AZURE_PATH, 'group', 'update', '-g', self.node_resource_group,
         '--set', util.GetTagsJson(self.resource_group.timeout_minutes)
     ]
     vm_util.IssueCommand(set_tags_cmd)
@@ -250,5 +263,10 @@ class AksCluster(container_service.KubernetesCluster):
 
   def _DeleteDependencies(self):
     """Deletes the resource group."""
-    self.resource_group.Delete()
     self.service_principal.Delete()
+
+  def GetDefaultStorageClass(self) -> str:
+    """Get the default storage class for the provider."""
+    # https://docs.microsoft.com/en-us/azure/aks/csi-storage-drivers
+    # Premium_LRS
+    return 'managed-csi-premium'

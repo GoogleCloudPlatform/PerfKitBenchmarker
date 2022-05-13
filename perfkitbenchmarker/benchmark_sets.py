@@ -270,14 +270,18 @@ class FlagZipNotFoundException(Exception):
 
 def _GetValidBenchmarks():
   """Returns a dict mapping valid benchmark names to their modules."""
-  if FLAGS.os_type in os_types.WINDOWS_OS_TYPES:
+  if FLAGS.os_type in os_types.CONTAINER_OS_TYPES:
+    return {'cluster_boot': linux_benchmarks.VALID_BENCHMARKS['cluster_boot']}
+  elif FLAGS.os_type in os_types.WINDOWS_OS_TYPES:
     return windows_benchmarks.VALID_BENCHMARKS
   return linux_benchmarks.VALID_BENCHMARKS
 
 
 def _GetValidPackages():
   """Returns a dict mapping valid package names to their modules."""
-  if FLAGS.os_type in os_types.WINDOWS_OS_TYPES:
+  if FLAGS.os_type in os_types.CONTAINER_OS_TYPES:
+    return {}
+  elif FLAGS.os_type in os_types.WINDOWS_OS_TYPES:
     return windows_packages.PACKAGES
   return linux_packages.PACKAGES
 

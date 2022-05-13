@@ -24,8 +24,8 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
-from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import gcp
+from perfkitbenchmarker import providers
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 import six
@@ -34,8 +34,10 @@ FLAGS = flags.FLAGS
 
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
-DEFAULT_CONTAINER_VERSION = 'latest'
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
+RELEASE_CHANNELS = ['rapid', 'regular', 'stable']
+# Time for build to complete. 10 minutes as filesystem takes ~6 minutes
+BUILD_TIMEOUT = 600
 
 
 def _CalculateCidrSize(nodes: int) -> int:
@@ -53,7 +55,7 @@ def _CalculateCidrSize(nodes: int) -> int:
 class GoogleContainerRegistry(container_service.BaseContainerRegistry):
   """Class for building and storing container images on GCP."""
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   def __init__(self, registry_spec):
     super(GoogleContainerRegistry, self).__init__(registry_spec)
@@ -68,19 +70,11 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
     return full_tag
 
   def Login(self):
-    """No-op because Push() handles its own auth."""
-    pass
-
-  def Push(self, image):
-    """Push a locally built image to the registry."""
-    full_tag = self.GetFullRegistryTag(image.name)
-    tag_cmd = ['docker', 'tag', image.name, full_tag]
-    vm_util.IssueCommand(tag_cmd)
-    # vm_util.IssueCommand() is used here instead of util.GcloudCommand()
-    # because gcloud flags cannot be appended to the command since they
-    # are interpreted as docker args instead.
-    push_cmd = ['docker', '--', 'push', full_tag]
-    vm_util.IssueCommand(push_cmd)
+    """Configure docker to be able to push to remote repo."""
+    # TODO(pclay): Don't edit user's docker config. It is idempotent.
+    cmd = util.GcloudCommand(self, 'auth', 'configure-docker')
+    del cmd.flags['zone']
+    cmd.Issue()
 
   def RemoteBuild(self, image):
     """Build the image remotely."""
@@ -88,20 +82,33 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
     build_cmd = util.GcloudCommand(self, 'builds', 'submit', '--tag', full_tag,
                                    image.directory)
     del build_cmd.flags['zone']
-    build_cmd.Issue()
+    build_cmd.Issue(timeout=BUILD_TIMEOUT)
 
 
 class GkeCluster(container_service.KubernetesCluster):
   """Class representing a Google Kubernetes Engine cluster."""
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   def __init__(self, spec):
     super(GkeCluster, self).__init__(spec)
     self.project = spec.vm_spec.project
-    self.cluster_version = (
-        FLAGS.container_cluster_version or DEFAULT_CONTAINER_VERSION)
+    self.cluster_version = FLAGS.container_cluster_version
     self.use_application_default_credentials = True
+    self.zones = self.zone and self.zone.split(',')
+    if not self.zones:
+      raise errors.Config.MissingOption(
+          'container_cluster.vm_spec.GCP.zone is required.')
+    elif len(self.zones) == 1 and util.IsRegion(self.zone):
+      self.region = self.zone
+      self.zones = []
+      logging.info("Interpreting zone '%s' as a region", self.zone)
+    else:
+      self.region = util.GetRegionFromZone(self.zones[0])
+    # Update the environment for gcloud commands:
+    if gcp_flags.GKE_API_OVERRIDE.value:
+      os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER'] = (
+          gcp_flags.GKE_API_OVERRIDE.value)
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -111,7 +118,9 @@ class GkeCluster(container_service.KubernetesCluster):
     """
     result = super(GkeCluster, self).GetResourceMetadata()
     result['project'] = self.project
-    result['container_cluster_version'] = self.cluster_version
+    if self.cluster_version in RELEASE_CHANNELS:
+      result['gke_release_channel'] = self.cluster_version
+
     result['boot_disk_type'] = self.vm_config.boot_disk_type
     result['boot_disk_size'] = self.vm_config.boot_disk_size
     if self.vm_config.max_local_disks:
@@ -121,18 +130,32 @@ class GkeCluster(container_service.KubernetesCluster):
       result['gce_local_ssd_interface'] = gce_virtual_machine.SCSI
     return result
 
+  def _GcloudCommand(self, *args, **kwargs):
+    """Fix zone and region."""
+    cmd = util.GcloudCommand(self, *args, **kwargs)
+    if len(self.zones) != 1:
+      del cmd.flags['zone']
+      cmd.flags['region'] = self.region
+    return cmd
+
   def _Create(self):
     """Creates the cluster."""
-    cmd = util.GcloudCommand(self, 'container', 'clusters', 'create', self.name)
+    cmd = self._GcloudCommand('container', 'clusters', 'create', self.name)
 
     self._AddNodeParamsToCmd(self.vm_config, self.num_nodes,
                              container_service.DEFAULT_NODEPOOL, cmd)
 
-    cmd.flags['cluster-version'] = self.cluster_version
+    if self.cluster_version:
+      if self.cluster_version in RELEASE_CHANNELS:
+        if FLAGS.gke_enable_alpha:
+          raise errors.Config.InvalidValue(
+              'Kubernetes Alpha is not compatible with release channels')
+        cmd.flags['release-channel'] = self.cluster_version
+      else:
+        cmd.flags['cluster-version'] = self.cluster_version
     if FLAGS.gke_enable_alpha:
       cmd.args.append('--enable-kubernetes-alpha')
       cmd.args.append('--no-enable-autorepair')
-      cmd.args.append('--no-enable-autoupgrade')
 
     user = util.GetDefaultUser()
     if FLAGS.gcp_service_account:
@@ -161,6 +184,7 @@ class GkeCluster(container_service.KubernetesCluster):
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+    cmd.args.append('--no-enable-shielded-nodes')
     self._IssueResourceCreationCommand(cmd)
 
     self._CreateNodePools()
@@ -168,9 +192,8 @@ class GkeCluster(container_service.KubernetesCluster):
   def _CreateNodePools(self):
     """Creates additional nodepools for the cluster, if applicable."""
     for name, nodepool in six.iteritems(self.nodepools):
-      cmd = util.GcloudCommand(self, 'container', 'node-pools', 'create', name,
-                               '--cluster', self.name)
-
+      cmd = self._GcloudCommand('container', 'node-pools', 'create', name,
+                                '--cluster', self.name)
       self._AddNodeParamsToCmd(nodepool.vm_config, nodepool.vm_count, name, cmd)
       self._IssueResourceCreationCommand(cmd)
 
@@ -217,6 +240,9 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.flags['local-ssd-count'] = vm_config.max_local_disks
 
     cmd.flags['num-nodes'] = num_nodes
+    # vm_config.zone may be split a comma separated list
+    if vm_config.zone:
+      cmd.flags['node-locations'] = vm_config.zone
 
     if vm_config.machine_type is None:
       cmd.flags['machine-type'] = 'custom-{0}-{1}'.format(
@@ -225,13 +251,22 @@ class GkeCluster(container_service.KubernetesCluster):
     else:
       cmd.flags['machine-type'] = vm_config.machine_type
 
+    if FLAGS.gke_enable_gvnic:
+      cmd.args.append('--enable-gvnic')
+    else:
+      cmd.args.append('--no-enable-gvnic')
+
+    # If using a fixed version (or the default) do not enable upgrades.
+    if self.cluster_version not in RELEASE_CHANNELS:
+      cmd.args.append('--no-enable-autoupgrade')
+
     cmd.flags['node-labels'] = f'pkb_nodepool={name}'
 
   def _PostCreate(self):
     """Acquire cluster authentication."""
     super(GkeCluster, self)._PostCreate()
-    cmd = util.GcloudCommand(
-        self, 'container', 'clusters', 'get-credentials', self.name)
+    cmd = self._GcloudCommand('container', 'clusters', 'get-credentials',
+                              self.name)
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
@@ -249,7 +284,7 @@ class GkeCluster(container_service.KubernetesCluster):
         namespace='kube-system')
 
   def _GetInstanceGroups(self):
-    cmd = util.GcloudCommand(self, 'container', 'node-pools', 'list')
+    cmd = self._GcloudCommand('container', 'node-pools', 'list')
     cmd.flags['cluster'] = self.name
     stdout, _, _ = cmd.Issue()
     json_output = json.loads(stdout)
@@ -259,32 +294,26 @@ class GkeCluster(container_service.KubernetesCluster):
         instance_groups.append(group_url.split('/')[-1])  # last url part
     return instance_groups
 
-  def _GetInstancesFromInstanceGroup(self, instance_group_name):
-    cmd = util.GcloudCommand(self, 'compute', 'instance-groups',
-                             'list-instances', instance_group_name)
-    stdout, _, _ = cmd.Issue()
-    json_output = json.loads(stdout)
-    instances = []
-    for instance in json_output:
-      instances.append(instance['instance'].split('/')[-1])
-    return instances
-
   def _IsDeleting(self):
-    cmd = util.GcloudCommand(self, 'container', 'clusters', 'describe',
-                             self.name)
+    cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
     stdout, _, _ = cmd.Issue(raise_on_failure=False)
     return True if stdout else False
 
   def _Delete(self):
     """Deletes the cluster."""
     super()._Delete()
-    cmd = util.GcloudCommand(self, 'container', 'clusters', 'delete', self.name)
+    cmd = self._GcloudCommand('container', 'clusters', 'delete', self.name)
     cmd.args.append('--async')
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self):
     """Returns True if the cluster exits."""
-    cmd = util.GcloudCommand(self, 'container', 'clusters', 'describe',
-                             self.name)
+    cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return retcode == 0
+
+  def GetDefaultStorageClass(self) -> str:
+    """Get the default storage class for the provider."""
+    # https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/gce-pd-csi-driver
+    # PD-SSD
+    return 'premium-rwo'

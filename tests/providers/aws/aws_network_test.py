@@ -14,7 +14,9 @@
 """Tests for perfkitbenchmarker.providers.aws.aws_network."""
 
 import json
+from typing import List
 import unittest
+
 from absl import flags
 import mock
 from perfkitbenchmarker import errors
@@ -91,6 +93,8 @@ def AwsFilter(name, value):
 
 
 class BaseAwsTest(pkb_common_test_case.PkbCommonTestCase):
+
+  expected_commands: List[str]
 
   def setUp(self):
     super(BaseAwsTest, self).setUp()

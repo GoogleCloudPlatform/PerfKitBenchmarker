@@ -54,7 +54,7 @@ import yaml
 FLAGS = flags.FLAGS
 
 
-LSB_DESCRIPTION_REGEXP = r'Description:\s*(.*)\s*'
+OS_PRETTY_NAME_REGEXP = r'PRETTY_NAME="(.*)"'
 CLEAR_BUILD_REGEXP = r'Installed version:\s*(.*)\s*'
 UPDATE_RETRIES = 5
 DEFAULT_SSH_PORT = 22
@@ -260,6 +260,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   # Serializing calls to ssh with the -t option fixes the problem.
   _pseudo_tty_lock = threading.Lock()
 
+  # TODO(user): Remove all uses of Python 2.
+  PYTHON_2_PACKAGE = 'python2'
+
   def __init__(self, *args, **kwargs):
     super(BaseLinuxMixin, self).__init__(*args, **kwargs)
     # N.B. If you override ssh_port you must override remote_access_ports and
@@ -457,7 +460,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       if self.is_static:
         self.SnapshotPackages()
       self.SetupPackageManager()
-      self.Install('python')
     self.SetFiles()
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
@@ -704,9 +706,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def GetOsInfo(self):
     """Returns information regarding OS type and version."""
-    self.Install('lsb_release')
-    stdout, _ = self.RemoteCommand('lsb_release -d')
-    return regex_util.ExtractGroup(LSB_DESCRIPTION_REGEXP, stdout)
+    stdout, _ = self.RemoteCommand('grep PRETTY_NAME /etc/os-release')
+    return regex_util.ExtractGroup(OS_PRETTY_NAME_REGEXP, stdout)
 
   @property
   def os_info(self):
@@ -730,6 +731,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Return the kernel command line."""
     return (self.os_metadata.get('kernel_command_line') or
             self.RemoteCommand('cat /proc/cmdline')[0].strip())
+
+  @property
+  def cpu_arch(self):
+    """Returns the CPU architecture of the VM."""
+    return (self.os_metadata.get('cpu_arch') or
+            self.RemoteCommand('uname -m')[0].strip())
 
   @property
   def partition_table(self):
@@ -779,6 +786,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.os_metadata['threads_per_core'] = lscpu_results.threads_per_core
     self.os_metadata['os_info'] = self.os_info
     self.os_metadata['kernel_release'] = self.kernel_release
+    self.os_metadata['cpu_arch'] = self.cpu_arch
     self.os_metadata.update(self.partition_table)
     if FLAGS.append_kernel_command_line:
       self.os_metadata['kernel_command_line'] = self.kernel_command_line
@@ -1376,23 +1384,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     sha256sum, _ = stdout.split()
     return sha256sum
 
-  def _GetNfsService(self):
-    """Returns the NfsService created in the benchmark spec.
-
-    Before calling this method check that the disk.disk_type is equal to
-    disk.NFS or else an exception will be raised.
-
-    Returns:
-      The nfs_service.BaseNfsService service for this cloud.
-
-    Raises:
-      CreationError: If no NFS service was created.
-    """
-    nfs = getattr(context.GetThreadBenchmarkSpec(), 'nfs_service')
-    if nfs is None:
-      raise errors.Resource.CreationError('No NFS Service created')
-    return nfs
-
   def _GetSmbService(self):
     """Returns the SmbService created in the benchmark spec.
 
@@ -1483,6 +1474,7 @@ class ClearMixin(BaseLinuxMixin):
 
   OS_TYPE = os_types.CLEAR
   BASE_OS_TYPE = os_types.CLEAR
+  PYTHON_2_PACKAGE = 'python-basic'
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -1606,24 +1598,36 @@ class ClearMixin(BaseLinuxMixin):
 
 
 class BaseContainerLinuxMixin(BaseLinuxMixin):
-  """Class holding VM methods for minimal container-based OSes like Core OS."""
+  """Class holding VM methods for minimal container-based OSes like Core OS.
 
-  def PrepareVMEnvironment(self):
-    # Add more when benchmarks besides clusterboot are supported
-    pass
+  These operating systems have SSH like other Linux OSes, but no package manager
+  to run Linux benchmarks without Docker.
 
-  def Install(self, package_name):
-    raise NotImplementedError('Only use for cluster boot for now')
+  Because they cannot install packages, they only support VM life cycle
+  benchmarks like cluster_boot.
+  """
 
   def InstallPackages(self, package_name):
-    raise NotImplementedError('Only use for cluster boot for now')
-
-  def Uninstall(self, package_name):
-    raise NotImplementedError('Only use for cluster boot for now')
+    raise NotImplementedError('Container OSes have no package managers.')
 
   def HasPackage(self, package: str) -> bool:
-    # Change this when implementing InstallPackages.
     return False
+
+  # Install could theoretically be supported. A hermetic architecture
+  # appropriate binary could be copied into the VM and run.
+  # However because curl, wget, and object store clients cannot be installed and
+  # may or may not be present, copying the binary is non-trivial so simply
+  # block trying.
+
+  def Install(self, package_name):
+    raise NotImplementedError('Container OSes have no package managers.')
+
+  def Uninstall(self, package_name):
+    raise NotImplementedError('Container OSes have no package managers.')
+
+  def PrepareVMEnvironment(self):
+    # Don't try to install packages as normal, because it will fail.
+    pass
 
 
 class BaseRhelMixin(BaseLinuxMixin):
@@ -1631,8 +1635,6 @@ class BaseRhelMixin(BaseLinuxMixin):
 
   # OS_TYPE = os_types.RHEL
   BASE_OS_TYPE = os_types.RHEL
-
-  PYTHON_PACKAGE = 'python'
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -1770,7 +1772,6 @@ class Rhel7Mixin(BaseRhelMixin):
 class Rhel8Mixin(BaseRhelMixin):
   """Class holding RHEL 8 specific VM methods and attributes."""
   OS_TYPE = os_types.RHEL8
-  PYTHON_PACKAGE = 'python2'
 
 
 class CentOs7Mixin(BaseRhelMixin):
@@ -1778,10 +1779,26 @@ class CentOs7Mixin(BaseRhelMixin):
   OS_TYPE = os_types.CENTOS7
 
 
-class CentOs8Mixin(BaseRhelMixin):
+class CentOs8Mixin(BaseRhelMixin, virtual_machine.DeprecatedOsMixin):
   """Class holding CentOS 8 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS8
-  PYTHON_PACKAGE = 'python2'
+  END_OF_LIFE = '2021-12-31'
+  ALTERNATIVE_OS = f'{os_types.CENTOS_STREAM8} or {os_types.CENTOS_STREAM8}'
+
+
+class CentOsStream8Mixin(BaseRhelMixin):
+  """Class holding CentOS Stream 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.CENTOS_STREAM8
+
+
+class CentOsStream9Mixin(BaseRhelMixin):
+  """Class holding CentOS Stream 9 specific VM methods and attributes."""
+  OS_TYPE = os_types.CENTOS_STREAM9
+
+
+class RockyLinux8Mixin(BaseRhelMixin):
+  """Class holding Rocky Linux 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.ROCKY_LINUX8
 
 
 class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
@@ -1969,6 +1986,8 @@ class BaseDebianMixin(BaseLinuxMixin):
 class Debian9Mixin(BaseDebianMixin):
   """Class holding Debian9 specific VM methods and attributes."""
   OS_TYPE = os_types.DEBIAN9
+  # https://packages.debian.org/stretch/python
+  PYTHON_2_PACKAGE = 'python'
 
 
 class Debian10Mixin(BaseDebianMixin):
@@ -2004,6 +2023,7 @@ class BaseUbuntuMixin(BaseDebianMixin):
 class Ubuntu1604Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
   """Class holding Ubuntu1604 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604
+  PYTHON_2_PACKAGE = 'python'
   END_OF_LIFE = '2021-05-01'
   ALTERNATIVE_OS = os_types.UBUNTU1804
 
@@ -2011,6 +2031,8 @@ class Ubuntu1604Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
 class Ubuntu1804Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu1804 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1804
+  # https://packages.ubuntu.com/bionic/python
+  PYTHON_2_PACKAGE = 'python'
 
   def UpdateEnvironmentPath(self):
     """Add /snap/bin to default search path for Ubuntu1804.
@@ -2023,15 +2045,22 @@ class Ubuntu1804Mixin(BaseUbuntuMixin):
         r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" /etc/bash.bashrc')
 
 
+class Ubuntu1804EfaMixin(Ubuntu1804Mixin):
+  """Class holding EFA specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU1804_EFA
+
+
 # Inherit Ubuntu 18's idiosyncracies.
 # Note https://bugs.launchpad.net/snappy/+bug/1659719 is also marked not fix in
 # focal.
 class Ubuntu2004Mixin(Ubuntu1804Mixin):
   """Class holding Ubuntu2004 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU2004
+  # https://packages.ubuntu.com/focal/python2
+  PYTHON_2_PACKAGE = 'python2'
 
 
-class Ubuntu1604Cuda9Mixin(BaseUbuntuMixin):
+class Ubuntu1604Cuda9Mixin(Ubuntu1604Mixin):
   """Class holding NVIDIA CUDA specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1604_CUDA9
 

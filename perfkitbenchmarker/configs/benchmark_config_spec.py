@@ -23,6 +23,7 @@ import os
 
 from perfkitbenchmarker import app_service
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import data_discovery_service
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
@@ -136,8 +137,11 @@ class _DpbServiceSpec(spec.BaseSpec):
                     dpb_service.DATAPROC,
                 'valid_values': [
                     dpb_service.DATAPROC,
+                    dpb_service.DATAPROC_GKE,
+                    dpb_service.DATAPROC_SERVERLESS,
                     dpb_service.DATAFLOW,
                     dpb_service.EMR,
+                    dpb_service.GLUE,
                     dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
                     dpb_service.UNMANAGED_SPARK_CLUSTER,
                     dpb_service.KUBERNETES_SPARK_CLUSTER,
@@ -152,7 +156,35 @@ class _DpbServiceSpec(spec.BaseSpec):
         'version': (option_decoders.StringDecoder, {
             'default': None,
             'none_ok': True
-        })
+        }),
+        'gke_cluster_name': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'gke_cluster_nodepools': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'gke_cluster_location': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'dataproc_serverless_core_count': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True,
+        }),
+        'dataproc_serverless_initial_executors': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'dataproc_serverless_min_executors': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'dataproc_serverless_max_executors': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
     })
     return result
 
@@ -503,7 +535,9 @@ class _RelationalDbSpec(spec.BaseSpec):
     # Set defaults that were not able to be set in
     # GetOptionDecoderConstructions()
     if not self.engine_version:
-      db_class = relational_db.GetRelationalDbClass(self.cloud)
+      db_class = relational_db.GetRelationalDbClass(self.cloud,
+                                                    self.is_managed_db,
+                                                    self.engine)
       self.engine_version = db_class.GetDefaultEngineVersion(self.engine)
     if not self.database_name:
       self.database_name = 'pkb-db-%s' % flag_values.run_uri
@@ -554,6 +588,7 @@ class _RelationalDbSpec(spec.BaseSpec):
         'backup_start_time': (option_decoders.StringDecoder, {
             'default': '07:00'
         }),
+        'is_managed_db': (option_decoders.BooleanDecoder, {'default': True}),
         'db_spec': (option_decoders.PerCloudConfigDecoder, {}),
         'db_disk_spec': (option_decoders.PerCloudConfigDecoder, {}),
         'vm_groups': (_VmGroupsDecoder, {
@@ -616,6 +651,9 @@ class _RelationalDbSpec(spec.BaseSpec):
       raise errors.Config.MissingOption(
           'To specify a custom client VM, both client_vm_cpus '
           'and client_vm_memory must be specified.')
+
+    if flag_values['use_managed_db'].present:
+      config_values['is_managed_db'] = flag_values.use_managed_db
 
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
@@ -1240,6 +1278,10 @@ class _ContainerClusterSpec(spec.BaseSpec):
     """
     result = super(_ContainerClusterSpec, cls)._GetOptionDecoderConstructions()
     result.update({
+        'static_cluster': (option_decoders.StringDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS
         }),
@@ -1840,6 +1882,83 @@ class _MessagingServiceDecoder(option_decoders.TypeVerifier):
     return result
 
 
+class _DataDiscoveryServiceSpec(spec.BaseSpec):
+  """Specs needed to configure data discovery service.
+  """
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments to
+      construct in order to decode the named option.
+    """
+    result = super()._GetOptionDecoderConstructions()
+    result.update({
+        'cloud': (option_decoders.EnumDecoder, {
+            'valid_values': providers.VALID_CLOUDS
+        }),
+        'service_type': (
+            option_decoders.EnumDecoder,
+            {
+                'default':
+                    data_discovery_service.GLUE,
+                'valid_values': [
+                    data_discovery_service.GLUE,
+                ]
+            }),
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May
+          be modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+          provided config values.
+    """
+    super()._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
+
+
+class _DataDiscoveryServiceDecoder(option_decoders.TypeVerifier):
+  """Validate the data_discovery_service dict of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super().__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify data_discovery_service dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _DataDiscoveryServiceSpec object built from the config passed in value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    if value is None:
+      value = {}
+    data_discovery_service_config = super().Decode(value, component_full_name,
+                                                   flag_values)
+    result = _DataDiscoveryServiceSpec(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **data_discovery_service_config)
+    return result
+
+
 class BenchmarkConfigSpec(spec.BaseSpec):
   """Configurable options of a benchmark run.
 
@@ -1957,6 +2076,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         }),
         'messaging_service': (_MessagingServiceDecoder, {
             'default': None,
+        }),
+        'data_discovery_service': (_DataDiscoveryServiceDecoder, {
+            'default': None,
+            'none_ok': True,
         })
     })
     return result

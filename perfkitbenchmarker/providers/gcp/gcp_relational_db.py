@@ -29,10 +29,10 @@ import time
 
 from absl import flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 from six.moves import range
@@ -102,7 +102,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   ideal; however, a password is still required to connect. Currently only
   MySQL 5.7 and Postgres 9.6 are supported.
   """
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   def __init__(self, relational_db_spec):
     super(GCPRelationalDb, self).__init__(relational_db_spec)
@@ -378,28 +378,33 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
 
+  @vm_util.Retry(max_retries=4, poll_interval=2)
+  def SetManagedDatabasePassword(self):
+    # The hostname '%' means unrestricted access from any host.
+    cmd = util.GcloudCommand(
+        self, 'sql', 'users', 'create', self.spec.database_username,
+        '--host=%', '--instance={0}'.format(self.instance_id),
+        '--password={0}'.format(self.spec.database_password))
+    _, _, _ = cmd.Issue()
+
+    # By default the empty password is a security violation.
+    # Change the password to a non-default value.
+    default_user = DEFAULT_USERNAME[self.spec.engine]
+
+    cmd = util.GcloudCommand(
+        self, 'sql', 'users', 'set-password', default_user,
+        '--host=%', '--instance={0}'.format(self.instance_id),
+        '--password={0}'.format(self.spec.database_password))
+    _, _, _ = cmd.Issue()
+
   def _PostCreate(self):
     """Creates the PKB user and sets the password.
     """
     super()._PostCreate()
 
     if self.is_managed_db:
-      # The hostname '%' means unrestricted access from any host.
-      cmd = util.GcloudCommand(
-          self, 'sql', 'users', 'create', self.spec.database_username,
-          '--host=%', '--instance={0}'.format(self.instance_id),
-          '--password={0}'.format(self.spec.database_password))
-      _, _, _ = cmd.Issue()
+      self.SetManagedDatabasePassword()
 
-      # By default the empty password is a security violation.
-      # Change the password to a non-default value.
-      default_user = DEFAULT_USERNAME[self.spec.engine]
-
-      cmd = util.GcloudCommand(
-          self, 'sql', 'users', 'set-password', default_user,
-          '--host=%', '--instance={0}'.format(self.instance_id),
-          '--password={0}'.format(self.spec.database_password))
-      _, _, _ = cmd.Issue()
     self.client_vm_query_tools.InstallPackages()
 
   def _ApplyManagedDbFlags(self):

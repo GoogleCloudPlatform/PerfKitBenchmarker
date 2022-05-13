@@ -26,15 +26,15 @@ the original internet gateway.
 
 import json
 
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
 
 def GetAwsVpcEndpointClass(aws_service):
   """Returns the AwsVpcEndpoint class for the given service."""
   return resource.GetResourceClass(
-      AwsVpcEndpoint, CLOUD=aws.CLOUD, AWS_SERVICE=aws_service)
+      AwsVpcEndpoint, CLOUD=providers.AWS, AWS_SERVICE=aws_service)
 
 
 def CreateEndpointService(aws_service, vpc):
@@ -61,7 +61,7 @@ class AwsVpcEndpoint(resource.BaseResource):
   """
   REQUIRED_ATTRS = ['CLOUD', 'AWS_SERVICE']
   RESOURCE_TYPE = 'AwsVpcEndpoint'
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
   AWS_SERVICE: str  # must be set by derived classes
 
   def __init__(self, vpc):

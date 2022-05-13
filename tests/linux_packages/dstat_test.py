@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.packages.dstat"""
+"""Tests for perfkitbenchmarker.packages.dstat."""
 
 import os
 import unittest
@@ -26,7 +26,7 @@ class DstatTestCase(unittest.TestCase):
     path = os.path.join(os.path.dirname(__file__), '..', 'data',
                         'dstat-result.csv')
     with open(path) as f:
-      labels, out = dstat.ParseCsvFile(iter(f))
+      labels, out = dstat.ParseCsvFile(f)
 
     self.assertEqual(len(labels), len(out[0]))
     self.assertEqual(out.shape, (383, 62))

@@ -156,7 +156,7 @@ $ git clone https://github.com/GoogleCloudPlatform/PerfKitBenchmarker.git
 Install Python library dependencies:
 
 ```bash
-$ pip install -r $HOME/PerfKitBenchmarker/requirements.txt
+$ pip3 install -r $HOME/PerfKitBenchmarker/requirements.txt
 ```
 
 You may need to install additional dependencies depending on the cloud provider
@@ -165,7 +165,7 @@ you are using. For example, for
 
 ```bash
 $ cd $HOME/PerfKitBenchmarker/perfkitbenchmarker/providers/aws
-$ pip install -r requirements.txt
+$ pip3 install -r requirements.txt
 ```
 
 Note on MacOS: it may be helpful to override the default tmp directory to be a

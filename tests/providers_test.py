@@ -14,10 +14,11 @@
 
 """Tests for perfkitbenchmarker.providers."""
 
+import typing
 import unittest
+
 from absl import flags
 import mock
-
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -54,12 +55,15 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testLoadProviderChecksRequirements(self):
     with mock.patch(requirements.__name__ + '.CheckProviderRequirements'):
       providers.LoadProvider('GCP', ignore_package_requirements=False)
-      requirements.CheckProviderRequirements.assert_called_once_with('gcp')
+      typing.cast(
+          mock.MagicMock,
+          requirements.CheckProviderRequirements).assert_called_once_with('gcp')
 
   def testLoadProviderIgnoresRequirements(self):
     with mock.patch(requirements.__name__ + '.CheckProviderRequirements'):
       providers.LoadProvider('GCP')
-      requirements.CheckProviderRequirements.assert_not_called()
+      typing.cast(mock.MagicMock,
+                  requirements.CheckProviderRequirements).assert_not_called()
 
   def testBenchmarkConfigSpecLoadsProvider(self):
     p = mock.patch(providers.__name__ + '.LoadProvider')
@@ -77,7 +81,8 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
     benchmark_config_spec.BenchmarkConfigSpec(
         'name', flag_values=FLAGS, **config)
-    providers.LoadProvider.assert_called_with('AWS', True)
+    typing.cast(mock.MagicMock,
+                providers.LoadProvider).assert_called_with('AWS', True)
 
   def testLoadProviderUtils(self):
     test_cloud = providers.GCP

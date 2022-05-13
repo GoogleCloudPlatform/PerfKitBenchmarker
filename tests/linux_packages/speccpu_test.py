@@ -422,7 +422,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     self.addCleanup(mock.patch.stopall)
 
   def testParseResultsC(self):
-    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1604Mixin)
+    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1804Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2006'
     spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
@@ -464,7 +464,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
 
   def testParseSpeedResults(self):
     speccpu.FLAGS.spec_runmode = 'base'
-    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1604Mixin)
+    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1804Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2006'
     spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
@@ -477,7 +477,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
 
   def testParseAllResults(self):
     speccpu.FLAGS.spec_runmode = 'all'
-    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1604Mixin)
+    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1804Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2017'
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
@@ -490,7 +490,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
 
   def testParsePeakResults(self):
     speccpu.FLAGS.spec_runmode = 'peak'
-    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1604Mixin)
+    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1804Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2017'
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
@@ -503,7 +503,7 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
 
   def testParsePartialPeakResults(self):
     speccpu.FLAGS.spec_runmode = 'peak'
-    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1604Mixin)
+    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu1804Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2017'
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'

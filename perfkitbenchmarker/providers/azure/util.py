@@ -18,6 +18,7 @@
 import json
 import re
 from typing import Any, Dict, Set
+
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import vm_util
@@ -114,7 +115,7 @@ def GetTagsJson(timeout_minutes):
 
 def _IsRegion(zone_or_region):
   """Returns whether "zone_or_region" is a region."""
-  return re.match(r'[a-z]+[0-9]?$', zone_or_region)
+  return re.match(r'[a-z]+[0-9]?$', zone_or_region, re.IGNORECASE)
 
 
 def _IsRecommendedRegion(json_object: Dict[str, Any]) -> bool:
@@ -131,7 +132,7 @@ def IsZone(zone_or_region):
         Azure region eastus2 with availability zone 1.
   """
 
-  return re.match(r'[a-z]+[0-9]?-[0-9]$', zone_or_region)
+  return re.match(r'[a-z]+[0-9]?-[0-9]$', zone_or_region, re.IGNORECASE)
 
 
 def GetRegionFromZone(zone_or_region: str) -> str:
@@ -149,6 +150,27 @@ def GetZonesInRegion(region: str) -> Set[str]:
   """Returns a set of zones in the region."""
   # As of 2021 all Azure AZs are numbered 1-3 for eligible regions.
   return set([f'{region}-{i}' for i in range(1, 4)])
+
+
+def ShouldKeepZoneFromCLI(zone: str) -> bool:
+  """Filter out zones that we can't access."""
+  if 'EUAP' in zone:
+    return False
+  return True
+
+
+def GetZonesFromMachineType() -> Set[str]:
+  """Returns a set of zones for a machine type."""
+  stdout, _ = vm_util.IssueRetryableCommand(
+      [AZURE_PATH, 'vm', 'list-skus', '--size', FLAGS.machine_type])
+  zones = set()
+  for item in json.loads(stdout):
+    for location_info in item['locationInfo']:
+      region = location_info['location']
+      for zone in location_info['zones']:
+        if ShouldKeepZoneFromCLI(f'{region}-{zone}'):
+          zones.add(f'{region}-{zone}')
+  return zones
 
 
 def GetAllRegions() -> Set[str]:
@@ -173,7 +195,8 @@ def GetAllZones() -> Set[str]:
 def GetGeoFromRegion(region: str) -> str:
   """Gets valid geo from the region, i.e. region westus2 returns US."""
   stdout, _ = vm_util.IssueRetryableCommand([
-      AZURE_PATH, 'account', 'list-locations', '--output', 'json'
+      AZURE_PATH, 'account', 'list-locations',
+      '--output', 'json',
       '--query', f"[?name == '{region}'].metadata.geographyGroup"
   ])
   return stdout.splitlines()[1].strip('" ')
@@ -182,7 +205,8 @@ def GetGeoFromRegion(region: str) -> str:
 def GetRegionsInGeo(geo: str) -> Set[str]:
   """Gets valid regions in the geo."""
   stdout, _ = vm_util.IssueRetryableCommand([
-      AZURE_PATH, 'account', 'list-locations', '--output', 'json'
+      AZURE_PATH, 'account', 'list-locations',
+      '--output', 'json',
       '--query', f"[?metadata.geographyGroup == '{geo}']"
   ])
   return set([

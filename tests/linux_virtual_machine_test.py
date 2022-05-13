@@ -228,7 +228,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
     return vm
 
   def testRecordLscpuOutputLinux(self):
-    vm = self.CreateVm(os_types.UBUNTU1604, self.LsCpuText(self.LSCPU_DATA))
+    vm = self.CreateVm(os_types.DEFAULT, self.LsCpuText(self.LSCPU_DATA))
     samples = pkb._CreateLscpuSamples([vm])
     vm.RemoteCommand.assert_called_with('lscpu')
     self.assertEqual(1, len(samples))
@@ -248,7 +248,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
       linux_virtual_machine.LsCpuResults('')
 
   def testLsCpuParsing(self):
-    vm = self.CreateVm(os_types.UBUNTU1604,
+    vm = self.CreateVm(os_types.DEFAULT,
                        self.LsCpuText(self.LSCPU_DATA) + '\nThis Line=Invalid')
     results = vm.CheckLsCpu()
     self.assertEqual(1, results.numa_node_count)
@@ -265,7 +265,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
         }, results.data)
 
   def testProcCpuParsing(self):
-    vm = self.CreateVm(os_types.UBUNTU1604, self.PROC_CPU_TEXT)
+    vm = self.CreateVm(os_types.DEFAULT, self.PROC_CPU_TEXT)
     results = vm.CheckProcCpu()
     expected_mappings = {}
     expected_mappings[29] = {'apicid': '27', 'core id': '13'}
@@ -280,7 +280,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
     self.assertEqual(expected_common, results.GetValues())
 
   def testProcCpuSamples(self):
-    vm = self.CreateVm(os_types.UBUNTU1604, self.PROC_CPU_TEXT)
+    vm = self.CreateVm(os_types.DEFAULT, self.PROC_CPU_TEXT)
     samples = pkb._CreateProcCpuSamples([vm])
     proccpu_metadata = {
         'cpu family': '6',
@@ -373,6 +373,7 @@ I/O size (minimum/optimal): 524288 bytes / 1048576 bytes
 class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   os_info = 'Ubuntu 18.04.1 LTS'
   kernel_release = '5.3.0-1026'
+  cpu_arch = 'x86_64'
   partition_table = 'Disk /dev/sda: 1 GiB, 1073741824 bytes, 2097152 sectors'
   lscpu_output = '\n'.join([
       'NUMA node(s): 1',
@@ -381,7 +382,8 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'Socket(s): 1',
   ])
   normal_boot_responses = [
-      'cubic', 'Description: ' + os_info, kernel_release, partition_table
+      'cubic', f'PRETTY_NAME="{os_info}"', kernel_release, cpu_arch,
+      partition_table
   ]
 
   def CreateVm(self, array_of_stdout):
@@ -425,6 +427,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         '/dev/sda': 1073741824,
         'kernel_release': self.kernel_release,
         'os_info': self.os_info,
+        'cpu_arch': self.cpu_arch,
         'threads_per_core': 1,
     }
     self.assertEqual(expected_os_metadata, vm.os_metadata)
@@ -437,7 +440,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         '(myhostname)',
         '(last boot time)',
         '(create install dir)',
-        'Description: ' + os_info_new,
+        f'PRETTY_NAME="{os_info_new}"',
         kernel_release_new,
         '(create install dir)',
         '(create tmp dir)',

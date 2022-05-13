@@ -25,6 +25,11 @@ class KubernetesPodSpec(virtual_machine.BaseVmSpec):
 
   CLOUD = providers.KUBERNETES
 
+  def __init__(self, *args, **kwargs):
+    self.resource_limits = None
+    self.resource_requests = None
+    super(KubernetesPodSpec, self).__init__(*args, **kwargs)
+
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     """Gets decoder classes and constructor args for each configurable option.

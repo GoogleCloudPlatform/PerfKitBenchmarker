@@ -9,9 +9,9 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_pubsub as pubsub
 from tests import pkb_common_test_case
 
-PROJECT = None
-TOPIC = 'pkb-topic-uri'
-SUBSCRIPTION = 'pkb-subscription-uri'
+PROJECT = 'fake-project'
+TOPIC = 'pkb-topic-run_uri'
+SUBSCRIPTION = 'pkb-subscription-run_uri'
 BENCHMARK_SCENARIO = 'pull_latency'
 NUMBER_OF_MESSAGES = 10
 MESSAGE_SIZE = 10
@@ -24,7 +24,8 @@ class GcpPubsubTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
-    FLAGS.run_uri = 'uri'
+    FLAGS.run_uri = 'run_uri'
+    FLAGS.project = PROJECT
     self.client = mock.Mock()
     self.pubsub = pubsub.GCPCloudPubSub()
     self.pubsub.client_vm = self.client
@@ -41,6 +42,7 @@ class GcpPubsubTest(pkb_common_test_case.PkbCommonTestCase):
     self.pubsub._CreateTopic()
     cmd = ' '.join(cmd.call_args[0][0])
     self.assertIn('gcloud pubsub topics create ' + TOPIC, cmd)
+    self.assertIn('--project ' + PROJECT, cmd)
 
   def testCreateTopicError(self):
     # Don't actually issue a command.

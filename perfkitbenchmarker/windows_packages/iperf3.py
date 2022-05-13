@@ -52,9 +52,10 @@ flags.DEFINE_integer('tcp_stream_seconds', 3,
 flags.DEFINE_integer('tcp_number_of_streams', 10,
                      'The number of parrallel streams to run in the TCP test.')
 
-flags.DEFINE_integer('socket_buffer_size', None,
-                     'The socket buffer size in megabytes. If None is '
-                     'specified then the socket buffer size will not be set.')
+flags.DEFINE_float(
+    'socket_buffer_size', None,
+    'The socket buffer size in megabytes. If None is '
+    'specified then the socket buffer size will not be set.')
 
 flags.DEFINE_bool('run_tcp', True,
                   'setting to false will disable the run of the TCP test')
@@ -290,7 +291,7 @@ def ParseTCPMultiStreamOutput(results, sending_vm, receiving_vm, num_streams,
   samples = []
   for line in data_lines:
     line_data = [val for val in line.split(' ') if val]
-    if line_data[0] is '[':
+    if line_data[0] == '[':
       line_data = line_data[1:]
 
     thread_id = line_data[0].rstrip(']').lstrip('[')

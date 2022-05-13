@@ -17,11 +17,16 @@ from pyspark.sql import SparkSession
 from pyspark.sql.utils import AnalysisException
 
 
-def main():
+def parse_args(args=None):
   parser = argparse.ArgumentParser()
   parser.add_argument('root_dir')
   parser.add_argument('tables', type=lambda csv: csv.split(','))
-  args = parser.parse_args()
+  if args is None:
+    return parser.parse_args()
+  return parser.parse_args(args)
+
+
+def main(args):
   spark = (SparkSession.builder
            .appName('Setup Spark tables')
            .enableHiveSupport()
@@ -47,5 +52,7 @@ def main():
     spark.sql(
         'ANALYZE TABLE {} COMPUTE STATISTICS FOR COLUMNS {}'.format(
             table, columns))
+
+
 if __name__ == '__main__':
-  main()
+  main(parse_args())

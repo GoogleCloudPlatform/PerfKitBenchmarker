@@ -21,8 +21,6 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 """
 
 import functools
-import random
-import string
 
 import time
 from absl import flags
@@ -37,16 +35,14 @@ flags.DEFINE_string('kubernetes_mongodb_cpu_request', '7.1',
                     'CPU request of mongodb.')
 flags.DEFINE_string('kubernetes_mongodb_memory_request', '16Gi',
                     'Memory request of mongodb.')
-flags.DEFINE_string('kubernetes_mongodb_cpu_limit', '7.6',
-                    'CPU limit of mongodb, should be bigger than CPU request')
-flags.DEFINE_string(
-    'kubernetes_mongodb_memory_limit', '32Gi',
-    'Memory limit of mongodb, should be bigger than memory request')
 flags.DEFINE_string('kubernetes_mongodb_disk_size', '200Gi',
                     'Disk size used by mongodb')
 # TODO(user): Use GetStorageClass function, once available.
-flags.DEFINE_string('kubernetes_mongodb_storage_class', 'premium-rwo',
-                    'storageClassType of data disk')
+STORAGE_CLASS = flags.DEFINE_string(
+    'kubernetes_mongodb_storage_class',
+    None,
+    'storageClassType of data disk. Defaults to provider specific storage '
+    'class.')
 
 BENCHMARK_NAME = 'kubernetes_mongodb'
 BENCHMARK_CONFIG = """
@@ -56,23 +52,26 @@ kubernetes_mongodb:
     cloud: GCP
     type: Kubernetes
     vm_count: 1
-    vm_spec: *default_single_core
+    vm_spec: *default_dual_core
     nodepools:
       mongodb:
         vm_count: 1
         vm_spec:
           GCP:
-            machine_type: n2-standard-8
-            zone: us-central1-a
-          Azure:
-            zone: westus
-            machine_type: Standard_D3_v2
+            machine_type: n2-standard-4
           AWS:
-            zone: us-east-1a
-            machine_type: c5.xlarge
+            machine_type: m6i.xlarge
+          Azure:
+            machine_type: Standard_D4s_v5
       clients:
         vm_count: 1
-        vm_spec: *default_single_core
+        vm_spec:
+          GCP:
+            machine_type: n2-standard-4
+          AWS:
+            machine_type: m6i.xlarge
+          Azure:
+            machine_type: Standard_D4s_v5
   vm_groups:
     clients:
       vm_spec: *default_single_core
@@ -108,26 +107,21 @@ def _PrepareClient(vm):
 
 def _PrepareDeployment(benchmark_spec):
   """Deploys MongoDB Operator and instance on the cluster."""
-  admin_password = ''.join(
-      random.choice(string.ascii_letters + string.digits) for _ in range(20))
-  benchmark_spec.container_cluster.ApplyManifest(
-      'container/kubernetes_mongodb/kubernetes_mongodb_crd.yaml')
-  benchmark_spec.container_cluster.ApplyManifest(
-      'container/kubernetes_mongodb/kubernetes_mongodb_operator.yaml.j2',
+  cluster = benchmark_spec.container_cluster
+  storage_class = STORAGE_CLASS.value or cluster.GetDefaultStorageClass()
+  cluster.ApplyManifest(
+      'container/kubernetes_mongodb/kubernetes_mongodb.yaml.j2',
       cpu_request=FLAGS.kubernetes_mongodb_cpu_request,
-      cpu_limit=FLAGS.kubernetes_mongodb_cpu_limit,
       memory_request=FLAGS.kubernetes_mongodb_memory_request,
-      memory_limit=FLAGS.kubernetes_mongodb_memory_limit,
       disk_size=FLAGS.kubernetes_mongodb_disk_size,
-      storage_class=FLAGS.kubernetes_mongodb_storage_class,
-      admin_password=admin_password)
+      storage_class=storage_class)
   time.sleep(60)
 
   benchmark_spec.container_cluster.WaitForResource('pod/mongodb-0', 'Ready')
   mongodb_cluster_ip = benchmark_spec.container_cluster.GetClusterIP(
       'mongodb-service')
-  benchmark_spec.mongodb_url = 'mongodb://ycsb:{password}@{ip_address}:27017/ycsb?authSource=ycsb'.format(
-      password=admin_password, ip_address=mongodb_cluster_ip)
+  benchmark_spec.mongodb_url = 'mongodb://{ip_address}:27017/ycsb'.format(
+      ip_address=mongodb_cluster_ip)
 
 
 def Prepare(benchmark_spec):

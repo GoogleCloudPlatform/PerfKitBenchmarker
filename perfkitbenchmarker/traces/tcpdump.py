@@ -21,6 +21,7 @@ pkb-<machine_name>-<benchmark>-<UUID>-tcpdump.stdout that can be read in with
 
 from absl import flags
 from perfkitbenchmarker import events
+from perfkitbenchmarker import stages
 from perfkitbenchmarker.traces import base_collector
 
 flags.DEFINE_boolean(
@@ -126,5 +127,5 @@ def Register(parsed_flags):
   if not parsed_flags.tcpdump:
     return
   collector = _CreateCollector(parsed_flags)
-  events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
-  events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
+  events.before_phase.connect(collector.Start, stages.RUN, weak=False)
+  events.after_phase.connect(collector.Stop, stages.RUN, weak=False)

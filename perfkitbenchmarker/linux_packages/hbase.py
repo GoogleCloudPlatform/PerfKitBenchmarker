@@ -85,9 +85,9 @@ def _Install(vm):
   vm.Install('hadoop')
   vm.Install('curl')
   hbase_url = FLAGS.hbase_bin_url or _GetHBaseURL()
-  vm.RemoteCommand(('mkdir {0} && curl -L {1} | '
-                    'tar -C {0} --strip-components=1 -xzf -').format(
-                        HBASE_DIR, hbase_url))
+  vm.RemoteCommand(
+      ('mkdir -p {0} && curl -L {1} | '
+       'tar -C {0} --strip-components=1 -xzf -').format(HBASE_DIR, hbase_url))
 
 
 def YumInstall(vm):

@@ -30,9 +30,9 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_placement_group
 from perfkitbenchmarker.providers.aws import aws_vpc_endpoint
 from perfkitbenchmarker.providers.aws import util
@@ -61,7 +61,7 @@ ZONE = 'zone'
 class AwsFirewall(network.BaseFirewall):
   """An object representing the AWS Firewall."""
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
 
   def __init__(self):
     self.firewall_set = set()
@@ -330,7 +330,7 @@ class AwsVpc(resource.BaseResource):
       vm_util.IssueCommand(cmd)
     except errors.VmUtil.IssueCommandError as ex:
       # do not retry if this rule already exists
-      if ex.message.find('InvalidPermission.Duplicate') == -1:
+      if ex.message.find('InvalidPermission.Duplicate') == -1:  # pytype: disable=attribute-error  # enable-nested-classes
         raise ex
 
   def AllowVpcPeerInBound(self, peer_vpc):
@@ -613,7 +613,7 @@ class _AwsRegionalNetwork(network.BaseNetwork):
   _regional_network_count = 0
   _regional_network_lock = threading.Lock()
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
 
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)
@@ -809,7 +809,7 @@ class AwsNetwork(network.BaseNetwork):
     placement_group: An AwsPlacementGroup instance.
   """
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
 
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)

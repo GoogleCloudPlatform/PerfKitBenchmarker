@@ -163,12 +163,6 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       raise errors.VirtualMachine.RemoteCommandError(
           'RobustRemoteCommand did not start on VM.')
 
-    end_command_time = time.time()
-
-    @timeout_decorator.timeout(
-        timeout - (end_command_time - start_command_time),
-        use_signals=False,
-        timeout_exception=errors.VirtualMachine.RemoteCommandError)
     def wait_for_done_file():
       # Spin on the VM until the "done" file is created. It is better to spin
       # on the VM rather than creating a new session for each test.
@@ -177,7 +171,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
         done_out, _ = self.RemoteCommand(
             '$retries=0; while ((-not (Test-Path %s.done)) -and '
             '($retries -le 60)) { Start-Sleep -Seconds 1; $retries++ }; '
-            'Test-Path %s.done' % (command_id, command_id))
+            'Test-Path %s.done' % (command_id, command_id),
+            timeout=timeout - (time.time() - start_command_time))
 
     wait_for_done_file()
     stdout, _ = self.RemoteCommand('Get-Content %s.out' % (command_id,))
@@ -297,21 +292,25 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem copying the file.
     """
-    remote_path = remote_path or '~/'
+    # Join with '' to get a trailing \
+    remote_path = remote_path or ntpath.join(self.home_dir, '')
     # In order to expand "~" and "~user" we use ntpath.expanduser(),
     # but it relies on environment variables being set. This modifies
-    # the HOME environment variable in order to use that function, and then
-    # restores it to its previous value.
-    home = os.environ.get('HOME')
+    # the USERPROFILE environment variable in order to use that function, and
+    # then restores it to its previous value.
+    home = os.environ.get('USERPROFILE')
     try:
-      os.environ['HOME'] = self.home_dir
+      os.environ['USERPROFILE'] = self.home_dir
       remote_path = ntpath.expanduser(remote_path)
+      # Some Windows path's like C:\Users\ADMINI~1 contain ~,
+      # but they should not start with ~
+      for dir_part in remote_path.split(ntpath.sep):
+        assert not dir_part.startswith('~'), f'Failed to expand {remote_path}'
     finally:
       if home is None:
-        del os.environ['HOME']
+        del os.environ['USERPROFILE']
       else:
-        os.environ['HOME'] = home
-
+        os.environ['USERPROFILE'] = home
     drive, remote_path = ntpath.splitdrive(remote_path)
     remote_drive = (drive or self.system_drive).rstrip(':')
     network_drive = '\\\\%s\\%s$' % (self.GetConnectionIp(), remote_drive)
@@ -477,6 +476,10 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     This will be called after every call to Reboot().
     """
+    pass
+
+  def InstallPackages(self, packages: str) -> None:
+    """Installs packages using the OS's package manager."""
     pass
 
   def Install(self, package_name):
@@ -733,6 +736,11 @@ class Windows2019CoreMixin(BaseWindowsMixin):
   OS_TYPE = os_types.WINDOWS2019_CORE
 
 
+class Windows2022CoreMixin(BaseWindowsMixin):
+  """Class holding Windows Server 2022 Server Core VM specifics."""
+  OS_TYPE = os_types.WINDOWS2022_CORE
+
+
 class Windows2012DesktopMixin(BaseWindowsMixin):
   """Class holding Windows Server 2012 with Desktop Experience VM specifics."""
   OS_TYPE = os_types.WINDOWS2012_DESKTOP
@@ -746,6 +754,11 @@ class Windows2016DesktopMixin(BaseWindowsMixin):
 class Windows2019DesktopMixin(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
   OS_TYPE = os_types.WINDOWS2019_DESKTOP
+
+
+class Windows2022DesktopMixin(BaseWindowsMixin):
+  """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+  OS_TYPE = os_types.WINDOWS2022_DESKTOP
 
 
 class Windows2019SQLServer2017Standard(BaseWindowsMixin):
@@ -766,3 +779,13 @@ class Windows2019SQLServer2019Standard(BaseWindowsMixin):
 class Windows2019SQLServer2019Enterprise(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
   OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2019_ENTERPRISE
+
+
+class Windows2022SQLServer2019Standard(BaseWindowsMixin):
+  """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
+  OS_TYPE = os_types.WINDOWS2022_SQLSERVER_2019_STANDARD
+
+
+class Windows2022SQLServer2019Enterprise(BaseWindowsMixin):
+  """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
+  OS_TYPE = os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE

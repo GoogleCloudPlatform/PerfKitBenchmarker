@@ -103,6 +103,8 @@ class BidirectionalNetworkBenchmarkTestCase(
       del timeout  # unused by mock
       with stdout_lock:
         match = re.search('-t (.*?) ', remote_cmd)
+        if not match:
+          raise ValueError('match expected')
         netperf_test = match.group(1)
         i = last_returned[netperf_test]
         while True:

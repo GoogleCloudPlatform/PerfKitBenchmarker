@@ -15,16 +15,21 @@
 
 
 import copy
+import logging
 import os
 import unittest
 
+from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
+import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import ycsb
 from tests import pkb_common_test_case
 import six
 from six.moves import range
+
+FLAGS = flags.FLAGS
 
 
 def open_data_file(filename):
@@ -158,19 +163,19 @@ class WeightedQuantileTestCase(unittest.TestCase):
 class ParseWorkloadTestCase(unittest.TestCase):
 
   def testParsesEmptyString(self):
-    self.assertDictEqual({}, ycsb._ParseWorkload(''))
+    self.assertDictEqual({}, ycsb.ParseWorkload(''))
 
   def testIgnoresComment(self):
-    self.assertDictEqual({}, ycsb._ParseWorkload('#\n'))
+    self.assertDictEqual({}, ycsb.ParseWorkload('#\n'))
     self.assertDictEqual({},
-                         ycsb._ParseWorkload('#recordcount = 10\n'
-                                             '# columnfamily=cf'))
+                         ycsb.ParseWorkload('#recordcount = 10\n'
+                                            '# columnfamily=cf'))
     self.assertDictEqual({'recordcount': '10'},
-                         ycsb._ParseWorkload('#Sample!\nrecordcount = 10'))
+                         ycsb.ParseWorkload('#Sample!\nrecordcount = 10'))
 
   def testParsesSampleWorkload(self):
     contents = open_data_file('ycsb_workloada')
-    actual = ycsb._ParseWorkload(contents)
+    actual = ycsb.ParseWorkload(contents)
 
     expected = {
         'recordcount': '1000',
@@ -298,5 +303,23 @@ class PrerequisitesTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(actual_version, expected_version)
 
 
+class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  @flagsaver.flagsaver
+  def testRunCalledWithCorrectTarget(self):
+    # Arrange
+    FLAGS.ycsb_workload_files = ['workloadc']
+    test_executor = ycsb.YCSBExecutor('test_database')
+    test_vm = mock.Mock()
+    test_vm.RobustRemoteCommand.return_value = ['', '']
+    self.enter_context(mock.patch.object(ycsb, 'ParseResults'))
+
+    # Act
+    test_executor.Run([test_vm], run_kwargs={'target': 1000})
+
+    # Assert
+    self.assertIn('-target 1000', test_vm.RobustRemoteCommand.call_args[0][0])
+
 if __name__ == '__main__':
+  logging.basicConfig(level=logging.INFO)
   unittest.main()

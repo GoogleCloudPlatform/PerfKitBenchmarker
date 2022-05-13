@@ -1,4 +1,3 @@
-# Lint as: python2, python3
 """Runs a Spark SQL query with preloaded temp views.
 
 Views can be BigQuery tables or HCFS directories containing Parquet.
@@ -15,7 +14,7 @@ import json
 from pyspark import sql
 
 
-def parse_args():
+def parse_args(args=None):
   """Parse argv."""
 
   parser = argparse.ArgumentParser(description=__doc__)
@@ -43,7 +42,9 @@ dataframe writer. e.g.:
   ["bigquery", {"table": "bigquery_public_data:dataset.table"}],
   ["parquet", {"path": "gs://some/directory"}]
 ]""")
-  return parser.parse_args()
+  if args is None:
+    return parser.parse_args()
+  return parser.parse_args(args)
 
 
 def load_file(spark, object_path):

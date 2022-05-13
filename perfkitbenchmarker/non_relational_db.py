@@ -23,6 +23,7 @@ from perfkitbenchmarker.configs import spec
 
 # List of nonrelational database types
 DYNAMODB = 'dynamodb'
+BIGTABLE = 'bigtable'
 
 
 FLAGS = flags.FLAGS
@@ -59,6 +60,7 @@ class BaseNonRelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
                     None,
                 'valid_values': [
                     DYNAMODB,
+                    BIGTABLE,
                 ],
             }),
     })

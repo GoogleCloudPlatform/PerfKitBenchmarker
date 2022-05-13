@@ -34,12 +34,12 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
@@ -51,7 +51,8 @@ FLAGS = flags.FLAGS
 HVM = 'hvm'
 PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
-NON_PLACEMENT_GROUP_PREFIXES = frozenset(['t2', 'm3', 't3'])
+NON_PLACEMENT_GROUP_PREFIXES = frozenset(
+    ['t2', 'm3', 't3', 't3a', 't4g', 'vt1'])
 DRIVE_START_LETTER = 'b'
 TERMINATED = 'terminated'
 SHUTTING_DOWN = 'shutting-down'
@@ -104,6 +105,7 @@ UBUNTU_IMAGE_PROJECT = ['099720109477']  # Owned by canonical
 # Some Windows images are also available in marketplace project, but this is the
 # one selected by the AWS console.
 WINDOWS_IMAGE_PROJECT = ['801119661308']  # alias amazon
+UBUNTU_EFA_IMAGE_PROJECT = ['898082745236']
 
 # Processor architectures
 ARM = 'arm64'
@@ -113,8 +115,13 @@ X86 = 'x86_64'
 _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'a1': 'cortex-a72',
     'c6g': 'graviton2',
+    'g5g': 'graviton2',
     'm6g': 'graviton2',
     'r6g': 'graviton2',
+    't4g': 'graviton2',
+    'im4g': 'graviton2',
+    'is4ge': 'graviton2',
+    'x2g': 'graviton2',
 }
 
 # Parameters for use with Elastic Fiber Adapter
@@ -322,7 +329,7 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
       use_dedicated_host: bool. Whether to create this VM on a dedicated host.
   """
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -446,7 +453,7 @@ class AwsKeyFileManager(object):
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AWS Virtual Machine."""
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
 
   # The IMAGE_NAME_FILTER is passed to the AWS CLI describe-images command to
   # filter images by name. This must be set by subclasses, but may be overridden
@@ -1335,6 +1342,12 @@ class Ubuntu1804BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-bionic-18.04-*64-server-20*'
 
 
+class Ubuntu1804EfaBasedAwsVirtualMachine(
+    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu1804EfaMixin):
+  IMAGE_OWNER = UBUNTU_EFA_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'Deep Learning AMI (Ubuntu 18.04) Version *'
+
+
 class Ubuntu2004BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu2004Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-focal-20.04-*64-server-20*'
@@ -1399,6 +1412,34 @@ class CentOs8BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_OWNER = CENTOS_IMAGE_PROJECT
   IMAGE_NAME_FILTER = 'CentOS 8*'
   DEFAULT_USER_NAME = 'centos'
+
+
+class CentOsStream8BasedAwsVirtualMachine(
+    AwsVirtualMachine, linux_virtual_machine.CentOsStream8Mixin):
+  """Class with configuration for AWS CentOS Stream 8 virtual machines."""
+  # This describes the official AMIs listed here:
+  # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
+  IMAGE_OWNER = CENTOS_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'CentOS Stream 8*'
+  DEFAULT_USER_NAME = 'centos'
+
+
+class RockyLinux8BasedAwsVirtualMachine(AwsVirtualMachine,
+                                        linux_virtual_machine.RockyLinux8Mixin):
+  """Class with configuration for AWS Rocky Linux 8 virtual machines."""
+  IMAGE_OWNER = MARKETPLACE_IMAGE_PROJECT
+  IMAGE_PRODUCT_CODE_FILTER = 'cotnnspjrsi38lfn8qo4ibnnm'
+  IMAGE_NAME_FILTER = 'Rocky-8-*'
+  DEFAULT_USER_NAME = 'rocky'
+
+
+class CentOsStream9BasedAwsVirtualMachine(
+    AwsVirtualMachine, linux_virtual_machine.CentOsStream9Mixin):
+  """Class with configuration for AWS CentOS Stream 9 virtual machines."""
+  # This describes the official AMIs listed here:
+  # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
+  IMAGE_OWNER = CENTOS_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'CentOS Stream 9*'
 
 
 class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
@@ -1519,6 +1560,11 @@ class Windows2019CoreAwsVirtualMachine(
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Core-Base-*'
 
 
+class Windows2022CoreAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2022CoreMixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2022-English-Core-Base-*'
+
+
 class Windows2012DesktopAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine,
     windows_virtual_machine.Windows2012DesktopMixin):
@@ -1537,6 +1583,12 @@ class Windows2019DesktopAwsVirtualMachine(
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-Base-*'
 
 
+class Windows2022DesktopAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2022DesktopMixin):
+  IMAGE_NAME_FILTER = 'Windows_Server-2022-English-Full-Base-*'
+
+
 class Windows2019DesktopSQLServer2019StandardAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine,
     windows_virtual_machine.Windows2019SQLServer2019Standard):
@@ -1547,6 +1599,18 @@ class Windows2019DesktopSQLServer2019EnterpriseAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine,
     windows_virtual_machine.Windows2019SQLServer2019Enterprise):
   IMAGE_NAME_FILTER = 'Windows_Server-2019-English-Full-SQL_2019_Enterprise-*'
+
+
+class Windows2022DesktopSQLServer2019StandardAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2019Standard):
+  IMAGE_NAME_FILTER = 'Windows_Server-2022-English-Full-SQL_2019_Standard-*'
+
+
+class Windows2022DesktopSQLServer2019EnterpriseAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2019Enterprise):
+  IMAGE_NAME_FILTER = 'Windows_Server-2022-English-Full-SQL_2019_Enterprise-*'
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,

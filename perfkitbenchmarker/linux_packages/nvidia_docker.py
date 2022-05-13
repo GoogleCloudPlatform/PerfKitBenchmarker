@@ -17,6 +17,9 @@
 
 Installation: https://github.com/NVIDIA/nvidia-docker
 """
+from absl import flags
+_VERSION = flags.DEFINE_string('nvidia_docker_version', '2.8.0-1',
+                               'The version of nvidia docker to install.')
 
 
 def AptInstall(vm):
@@ -29,7 +32,7 @@ def AptInstall(vm):
                    '/nvidia-docker.list | sudo tee '
                    '/etc/apt/sources.list.d/nvidia-docker.list')
   vm.RemoteCommand('sudo apt-get update')
-  vm.InstallPackages('nvidia-docker2')
+  vm.InstallPackages(f'nvidia-docker2={_VERSION.value}')
   # Reload the Docker daemon configuration
   vm.RemoteCommand('sudo pkill -SIGHUP dockerd')
 

@@ -455,15 +455,16 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         '--tag-specifications=foobar',
         '--associate-public-ip-address',
         '--subnet-id=subnet-id',
-        '--block-device-mappings=[{"VirtualName": "ephemeral0", '
-        '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
-        '"DeviceName": "/dev/xvdc"}]',
-        '--placement=AvailabilityZone=us-east-1a,'
-        'GroupName=placement_group_name',
-        '--instance-market-options={"MarketType": "spot", '
-        '"SpotOptions": {"SpotInstanceType": "one-time", '
-        '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}'
-    ], raise_on_failure=False)
+        ('--block-device-mappings=[{"VirtualName": "ephemeral0", '
+         '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
+         '"DeviceName": "/dev/xvdc"}]'),
+        ('--placement=AvailabilityZone=us-east-1a,'
+         'GroupName=placement_group_name'),
+        ('--instance-market-options={"MarketType": "spot", '
+         '"SpotOptions": {"SpotInstanceType": "one-time", '
+         '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}')
+    ],
+                                            raise_on_failure=False)
     self.vm.use_spot_instance = False
 
   def testCreateSpotFailure(self):
@@ -630,7 +631,7 @@ class AwsGetBlockDeviceMapTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.describe_image_output = fp.read()
 
   def testInvalidMachineType(self):
-    self.assertEqual(aws_virtual_machine.GetBlockDeviceMap('invalid'), None)
+    self.assertIsNone(aws_virtual_machine.GetBlockDeviceMap('invalid'))
 
   def testValidMachineTypeWithNoRootVolumeSize(self):
     expected = [{'DeviceName': '/dev/xvdb',
@@ -697,10 +698,10 @@ class AwsKeyFileManagerTestCase(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch.object(vm_util, 'IssueCommand')
   def testKeyPairLimitExceeded(self, import_cmd, cat_cmd):
     cat_cmd.side_effect = [('key_content', None)]
-    import_cmd.side_effect = [
-        ('', 'An error occurred (KeyPairLimitExceeded) when calling the '
-         'ImportKeyPair operation: Maximum of 5000 keypairs reached.', 255)
-    ]
+    import_cmd.side_effect = [('', (
+        'An error occurred (KeyPairLimitExceeded) when calling the '
+        'ImportKeyPair operation: Maximum of 5000 keypairs reached.'
+    ), 255)]
     with self.assertRaises(errors.Benchmarks.QuotaFailure):
       aws_virtual_machine.AwsKeyFileManager.ImportKeyfile('region')
 

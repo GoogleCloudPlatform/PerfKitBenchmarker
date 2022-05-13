@@ -25,4 +25,4 @@ LD_LIBRARY_PATH_FLAGS="-x LD_LIBRARY_PATH=/usr/local/cuda/lib64:/opt/amazon/efa/
 HPCG_BIN="hpcg"
 
 echo " ****** running HPCG 9-3-20 binary=$HPCG_BIN on $NUM_GPUS GPUs ***************************** "
-mpirun {{ ALLOW_RUN_AS_ROOT }} -np $NUM_GPUS $MPIFLAGS -hostfile HOSTFILE $LD_LIBRARY_PATH_FLAGS $HPCG_DIR/$HPCG_BIN | tee ./results/xhpcg-$DATETIME-output.txt
+PATH=/opt/amazon/openmpi/bin:$PATH mpirun {{ ALLOW_RUN_AS_ROOT }} -np $NUM_GPUS $MPIFLAGS -hostfile HOSTFILE $LD_LIBRARY_PATH_FLAGS $HPCG_DIR/$HPCG_BIN | tee ./results/xhpcg-$DATETIME-output.txt

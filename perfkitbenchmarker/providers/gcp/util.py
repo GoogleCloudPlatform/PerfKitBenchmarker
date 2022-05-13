@@ -82,6 +82,11 @@ def GetRegionFromZone(zone):
   return '-'.join(parts[:2])
 
 
+def IsRegion(location: str) -> bool:
+  """Determine if a zone or region is a region."""
+  return bool(re.fullmatch(r'[a-z]+-[a-z]+[0-9]', location))
+
+
 def GetAllZones() -> Set[str]:
   """Gets a list of valid zones."""
   cmd = GcloudCommand(None, 'compute', 'zones', 'list')
@@ -108,6 +113,17 @@ def GetZonesInRegion(region) -> Set[str]:
   cmd.flags = {
       'filter': f"name~'{region}'",
       'format': 'value(name)',
+  }
+  stdout, _, _ = cmd.Issue()
+  return set(stdout.splitlines())
+
+
+def GetZonesFromMachineType() -> Set[str]:
+  """Gets a list of zones for the given machine type."""
+  cmd = GcloudCommand(None, 'compute', 'machine-types', 'list')
+  cmd.flags = {
+      'filter': f"name~'{FLAGS.machine_type}'",
+      'format': 'value(zone)'
   }
   stdout, _, _ = cmd.Issue()
   return set(stdout.splitlines())
@@ -231,6 +247,9 @@ class GcloudCommand(object):
 
     Returns:
       list of strings. When joined by spaces, forms the gcloud shell command.
+
+    Raises:
+      ValueError: if passed a None value
     """
     cmd = [FLAGS.gcloud_path]
     cmd.extend(self.args)
@@ -238,6 +257,8 @@ class GcloudCommand(object):
       flag_name_str = '--{0}'.format(flag_name)
       if values is True:
         cmd.append(flag_name_str)
+      elif values is None:
+        raise ValueError(f'Flag {flag_name} is None. Please filter out.')
       else:
         values_iterable = values if isinstance(values, list) else [values]
         for value in values_iterable:
@@ -350,6 +371,11 @@ _NOT_ENOUGH_RESOURCES_STDERR = ('does not have enough resources available to '
                                 'fulfill the request.')
 _NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 
+_INVALID_MACHINE_TYPE_REGEX = re.compile(
+    r"Invalid value for field 'resource.machineType': '.*?'. "
+    r"Machine type with name '.*?' does not exist in zone '.*?'.")
+_INVALID_MACHINE_TYPE_MESSAGE = 'Creation failed due to invalid machine type: '
+
 
 def CheckGcloudResponseKnownFailures(stderr, retcode):
   """Checks gcloud responses for quota exceeded errors.
@@ -367,6 +393,9 @@ def CheckGcloudResponseKnownFailures(stderr, retcode):
       message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
       logging.error(message)
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
+    if _INVALID_MACHINE_TYPE_REGEX.search(stderr):
+      message = _INVALID_MACHINE_TYPE_MESSAGE + stderr
+      raise errors.Benchmarks.UnsupportedConfigError(message)
 
 
 def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):
@@ -433,6 +462,19 @@ def FormatTags(tags_dict):
       '{0}={1}'.format(k, v) for k, v in sorted(six.iteritems(tags_dict)))
 
 
+def SplitTags(tags):
+  """Formats a string of joined tags into a dictionary.
+
+  Args:
+    tags: A string containing tags formatted as key1=value1,key2=value2,...
+
+  Returns:
+    An OrderedDict mapping tag keys to values in the order the tags were given.
+  """
+  return collections.OrderedDict(
+      tag_pair.split('=') for tag_pair in tags.split(','))
+
+
 def GetDefaultTags(timeout_minutes=None):
   """Get the default tags in a dictionary.
 
@@ -458,3 +500,20 @@ def MakeFormattedDefaultTags(timeout_minutes=None):
     A string contains tags, contributed from the benchmark spec.
   """
   return FormatTags(GetDefaultTags(timeout_minutes))
+
+
+def GetAccessToken(application_default: bool = True) -> str:
+  """Gets the access token for the default project.
+
+  Args:
+    application_default: whether to use application-default in gcloud args.
+
+  Returns:
+    Text string of the access token.
+  """
+  cmd = [FLAGS.gcloud_path, 'auth']
+  if application_default:
+    cmd.append('application-default')
+  cmd.append('print-access-token')
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  return stdout.strip()

@@ -200,12 +200,12 @@ def ParsePspingResults(results, client_vm, server_vm, internal_ip_used):
     line_data = [val for val in line.split(' ') if val]
 
     # the line should look like ['entry\tvalue']
-    if len(line_data) is not 1:
+    if len(line_data) != 1:
       continue
 
     entry_data = line_data[0].split('\t')
 
-    if len(entry_data) is not 2:
+    if len(entry_data) != 2:
       continue
 
     if 'Latency' in entry_data:

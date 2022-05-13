@@ -17,6 +17,7 @@ import copy
 import dataclasses
 import json
 import logging
+import math
 import os
 import pathlib
 import re
@@ -44,6 +45,12 @@ _WRITE_ONLY = '1:0'
 CPU_TOLERANCE = 0.05
 WARM_UP_SECONDS = 360
 JSON_OUT_FILE = '/tmp/json_data'
+# upper limit to pipelines when binary searching for latency-capped throughput.
+# arbitrarily chosen for large latency.
+MAX_PIPELINES_COUNT = 5000
+# upper limit to clients when binary searching for latency-capped throughput
+# arbitrarily chosen for large latency.
+MAX_CLIENTS_COUNT = 1000
 
 MemtierHistogram = List[Dict[str, Union[float, int]]]
 
@@ -94,9 +101,21 @@ MEMTIER_KEY_PATTERN = flags.DEFINE_string(
     'memtier_key_pattern', 'R:R',
     'Set:Get key pattern. G for Gaussian distribution, R for '
     'uniform Random, S for Sequential. Defaults to R:R.')
+MEMTIER_LOAD_KEY_MAXIMUM = flags.DEFINE_integer(
+    'memtier_load_key_maximum', None, 'Key ID maximum value to load. '
+    'The range of keys will be from 1 (min) to this specified max key value. '
+    'If not set, defaults to memtier_key_maximum. Setting this different from '
+    'memtier_key_maximum allows triggering of eviction behavior.')
 MEMTIER_KEY_MAXIMUM = flags.DEFINE_integer(
     'memtier_key_maximum', 10000000, 'Key ID maximum value. The range of keys '
     'will be from 1 (min) to this specified max key value.')
+MEMTIER_LATENCY_CAPPED_THROUGHPUT = flags.DEFINE_bool(
+    'latency_capped_throughput', False,
+    'Measure latency capped throughput. Use in conjunction with '
+    'memtier_latency_cap. Defaults to False. ')
+MEMTIER_LATENCY_CAP = flags.DEFINE_float(
+    'memtier_latency_cap', 1.0, 'Latency cap in ms. Use in conjunction with '
+    'latency_capped_throughput. Defaults to 1ms.')
 MEMTIER_RUN_MODE = flags.DEFINE_enum(
     'memtier_run_mode', MemtierMode.NORMAL_RUN, MemtierMode.ALL,
     'Mode that the benchmark is set to. NORMAL_RUN measures latency and '
@@ -224,7 +243,9 @@ def Load(client_vm,
          server_port: str,
          server_password: Optional[str] = None) -> None:
   """Preload the server with data."""
-
+  load_key_maximum = (
+      MEMTIER_LOAD_KEY_MAXIMUM.value
+      if MEMTIER_LOAD_KEY_MAXIMUM.value else MEMTIER_KEY_MAXIMUM.value)
   cmd = BuildMemtierCommand(
       server=server_ip,
       port=server_port,
@@ -235,7 +256,7 @@ def Load(client_vm,
       data_size=MEMTIER_DATA_SIZE.value,
       pipeline=_LOAD_NUM_PIPELINES,
       key_minimum=1,
-      key_maximum=MEMTIER_KEY_MAXIMUM.value,
+      key_maximum=load_key_maximum,
       requests='allkeys',
       password=server_password)
   client_vm.RemoteCommand(cmd)
@@ -252,7 +273,7 @@ def RunOverAllThreadsPipelinesAndClients(
     for client_thread in FLAGS.memtier_threads:
       for client in FLAGS.memtier_clients:
         logging.info(
-            'Start benchmarking memcached using memtier:\n'
+            'Start benchmarking redis/memcached using memtier:\n'
             '\tmemtier client: %s'
             '\tmemtier threads: %s'
             '\tmemtier pipeline, %s', client, client_thread, pipeline)
@@ -268,6 +289,110 @@ def RunOverAllThreadsPipelinesAndClients(
             clients=client, threads=client_thread, pipeline=pipeline)
         samples.extend(results.GetSamples(metadata))
   return samples
+
+
+@dataclasses.dataclass(frozen=True)
+class MemtierBinarySearchParameters:
+  """Parameters to aid binary search of memtier."""
+  lower_bound: float
+  upper_bound: float
+  pipelines: int
+  threads: int
+  clients: int
+
+
+def MeasureLatencyCappedThroughput(
+    client_vm,
+    server_ip: str,
+    server_port: str,
+    password: Optional[str] = None) -> List[sample.Sample]:
+  """Runs memtier to find the maximum throughput under a latency cap."""
+  samples = []
+
+  for modify_load_func in [_ModifyPipelines, _ModifyClients]:
+    parameters = MemtierBinarySearchParameters(
+        lower_bound=0,
+        upper_bound=math.inf,
+        pipelines=1,
+        threads=1,
+        clients=1)
+    current_max_result = MemtierResult(0, 0, 0, 0, 0, 0, [], [], [], [])
+    current_metadata = None
+    while parameters.lower_bound < (parameters.upper_bound - 1):
+      result = _Run(
+          vm=client_vm,
+          server_ip=server_ip,
+          server_port=server_port,
+          threads=parameters.threads,
+          pipeline=parameters.pipelines,
+          clients=parameters.clients,
+          password=password)
+      logging.info('Binary search for latency capped throughput.\n'
+                   '\tMemtier ops throughput: %s'
+                   '\tmemtier 95th percentile latency: %s'
+                   '\tupper bound: %s'
+                   '\tlower bound: %s',
+                   result.ops_per_sec, result.p95_latency,
+                   parameters.lower_bound, parameters.upper_bound)
+      if result.ops_per_sec > current_max_result.ops_per_sec:
+        current_max_result = result
+        current_metadata = GetMetadata(
+            clients=parameters.clients,
+            threads=parameters.threads,
+            pipeline=parameters.pipelines)
+      # 95 percentile used to decide latency cap
+      parameters = modify_load_func(parameters, result.p95_latency)
+    samples.extend(current_max_result.GetSamples(current_metadata))
+  return samples
+
+
+def _ModifyPipelines(current_parameters: 'MemtierBinarySearchParameters',
+                     latency: float) -> 'MemtierBinarySearchParameters':
+  """Modify pipelines count for next iteration of binary search."""
+  if latency <= MEMTIER_LATENCY_CAP.value:
+    lower_bound = current_parameters.pipelines
+    upper_bound = min(current_parameters.upper_bound, MAX_PIPELINES_COUNT)
+  else:
+    lower_bound = current_parameters.lower_bound
+    upper_bound = current_parameters.pipelines
+
+  pipelines = lower_bound + math.ceil((upper_bound - lower_bound) / 2)
+  return MemtierBinarySearchParameters(
+      lower_bound=lower_bound,
+      upper_bound=upper_bound,
+      pipelines=pipelines,
+      threads=1,
+      clients=1)
+
+
+def _ModifyClients(current_parameters: 'MemtierBinarySearchParameters',
+                   latency: float) -> 'MemtierBinarySearchParameters':
+  """Modify clients count for next iteration of binary search."""
+  if latency <= MEMTIER_LATENCY_CAP.value:
+    lower_bound = current_parameters.clients * current_parameters.threads
+    upper_bound = min(current_parameters.upper_bound, MAX_CLIENTS_COUNT)
+  else:
+    lower_bound = current_parameters.lower_bound
+    upper_bound = current_parameters.clients * current_parameters.threads
+
+  total_clients = lower_bound + math.ceil((upper_bound - lower_bound) / 2)
+  threads = _FindFactor(total_clients)
+  clients = total_clients // threads
+  return MemtierBinarySearchParameters(
+      lower_bound=lower_bound,
+      upper_bound=upper_bound,
+      pipelines=1,
+      threads=threads,
+      clients=clients)
+
+
+def _FindFactor(number):
+  """Find any factor of the given number. Returns 1 for primes."""
+  i = round(math.sqrt(number))
+  while i > 0:
+    if number % i == 0:
+      return i
+    i -= 1
 
 
 def RunGetLatencyAtCpu(cloud_instance, client_vms):
@@ -449,6 +574,8 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
   if MEMTIER_RUN_MODE.value == MemtierMode.MEASURE_CPU_LATENCY:
     meta['memtier_cpu_target'] = MEMTIER_CPU_TARGET.value
     meta['memtier_cpu_duration'] = MEMTIER_CPU_DURATION.value
+  if MEMTIER_LOAD_KEY_MAXIMUM.value:
+    meta['memtier_load_key_maximum'] = MEMTIER_LOAD_KEY_MAXIMUM.value
   return meta
 
 
@@ -458,6 +585,9 @@ class MemtierResult:
   ops_per_sec: float
   kb_per_sec: float
   latency_ms: float
+  p90_latency: float
+  p95_latency: float
+  p99_latency: float
   get_latency_histogram: MemtierHistogram
   set_latency_histogram: MemtierHistogram
   ops_time_series: List[Tuple[int, int]]
@@ -501,19 +631,32 @@ class MemtierResult:
     GET              40       100.00
     GET              41       100.00
     """
-    ops_per_sec, latency_ms, kb_per_sec = _ParseTotalThroughputAndLatency(
-        memtier_results)
+    aggregated_result = _ParseTotalThroughputAndLatency(memtier_results)
     set_histogram, get_histogram = _ParseHistogram(memtier_results)
     ops_time_series = []
     max_latency_time_series = []
     if time_series_json:
       ops_time_series, max_latency_time_series = _ParseTimeSeries(
           time_series_json)
-    return cls(ops_per_sec, kb_per_sec, latency_ms, get_histogram,
-               set_histogram, ops_time_series, max_latency_time_series)
+    return cls(
+        ops_per_sec=aggregated_result.ops_per_sec,
+        kb_per_sec=aggregated_result.kb_per_sec,
+        latency_ms=aggregated_result.latency_ms,
+        p90_latency=aggregated_result.p90_latency,
+        p95_latency=aggregated_result.p95_latency,
+        p99_latency=aggregated_result.p99_latency,
+        get_latency_histogram=get_histogram,
+        set_latency_histogram=set_histogram,
+        ops_time_series=ops_time_series,
+        max_latency_time_series=max_latency_time_series
+        )
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Return this result as a list of samples."""
+    metadata['avg_latency'] = self.latency_ms
+    metadata['p90_latency'] = self.p90_latency
+    metadata['p95_latency'] = self.p95_latency
+    metadata['p99_latency'] = self.p99_latency
     samples = [
         sample.Sample('Ops Throughput', self.ops_per_sec, 'ops/s', metadata),
         sample.Sample('KB Throughput', self.kb_per_sec, 'KB/s', metadata),
@@ -525,23 +668,25 @@ class MemtierResult:
       hist_meta.update({'histogram': json.dumps(histogram)})
       samples.append(
           sample.Sample(f'{name} latency histogram', 0, '', hist_meta))
-    for interval, count in self.ops_time_series:
-      time_series_meta = copy.deepcopy(metadata)
-      time_series_meta.update({
-          'time_series_sec': interval,
-          'time_series_ops': count,
-      })
+
+    if self.ops_time_series:
+      ops_time_series_dict = {}
+      for interval, count in self.ops_time_series:
+        ops_time_series_dict[interval] = count
+      ops_series_metadata = copy.deepcopy(metadata)
+      ops_series_metadata.update({'time_series': ops_time_series_dict})
       samples.append(
-          sample.Sample('Ops Time Series', count, 'ops', time_series_meta))
-    for interval, latency in self.max_latency_time_series:
-      time_series_meta = copy.deepcopy(metadata)
-      time_series_meta.update({
-          'time_series_sec': interval,
-          'time_series_max_latency': latency,
-      })
+          sample.Sample('Ops Time Series', 0, 'ops', ops_series_metadata))
+
+    if self.max_latency_time_series:
+      latency_time_series_dict = {}
+      for interval, latency in self.max_latency_time_series:
+        latency_time_series_dict[interval] = latency
+      latency_series_metadata = copy.deepcopy(metadata)
+      latency_series_metadata.update({'time_series': latency_time_series_dict})
       samples.append(
-          sample.Sample('Max Latency Time Series', latency, 'ms',
-                        time_series_meta))
+          sample.Sample('Max Latency Time Series', 0, 'ms',
+                        latency_series_metadata))
     return samples
 
 
@@ -566,8 +711,19 @@ def _ParseHistogram(
   return set_histogram, get_histogram
 
 
+@dataclasses.dataclass(frozen=True)
+class MemtierAggregateResult:
+  """Parsed aggregated memtier results."""
+  ops_per_sec: float
+  kb_per_sec: float
+  latency_ms: float
+  p90_latency: float
+  p95_latency: float
+  p99_latency: float
+
+
 def _ParseTotalThroughputAndLatency(
-    memtier_results: Text) -> Tuple[float, float, float]:
+    memtier_results: Text) -> 'MemtierAggregateResult':
   """Parses the 'TOTALS' output line and return throughput and latency."""
   columns = None
   for raw_line in memtier_results.splitlines():
@@ -590,9 +746,14 @@ def _ParseTotalThroughputAndLatency(
           raise errors.Benchmarks.RunError(
               f'Stats table does not contain "{key}" column.')
         return float(totals[columns.index(key)])  # pylint: disable=cell-var-from-loop
-
-      return (_FetchStat('Ops/sec'), _FetchStat('Avg. Latency'),
-              _FetchStat('KB/sec'))
+      return MemtierAggregateResult(
+          ops_per_sec=_FetchStat('Ops/sec'),
+          kb_per_sec=_FetchStat('KB/sec'),
+          latency_ms=_FetchStat('Avg. Latency'),
+          p90_latency=_FetchStat('p90 Latency'),
+          p95_latency=_FetchStat('p95 Latency'),
+          p99_latency=_FetchStat('p99 Latency')
+          )
   raise errors.Benchmarks.RunError('No "Totals" line in memtier output.')
 
 

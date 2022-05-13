@@ -21,9 +21,9 @@ from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_load_balancer
 from perfkitbenchmarker.providers.aws import aws_logs
 from perfkitbenchmarker.providers.aws import aws_network
@@ -89,7 +89,7 @@ class EcrRepository(resource.BaseResource):
 class ElasticContainerRegistry(container_service.BaseContainerRegistry):
   """Class for building and storing container images on AWS."""
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
 
   def __init__(self, registry_spec):
     super(ElasticContainerRegistry, self).__init__(registry_spec)
@@ -102,14 +102,13 @@ class ElasticContainerRegistry(container_service.BaseContainerRegistry):
     for repository in self.repositories:
       repository.Delete()
 
-  def Push(self, image):
-    """Push a locally built image to the registry."""
+  def PrePush(self, image):
+    """Prepares registry to push a given image."""
     repository_name = '{namespace}/{name}'.format(
         namespace=self.name, name=image.name)
     repository = EcrRepository(repository_name, self.region)
     self.repositories.append(repository)
     repository.Create()
-    super(ElasticContainerRegistry, self).Push(image)
 
   def GetFullRegistryTag(self, image):
     """Gets the full tag of the image."""
@@ -421,7 +420,7 @@ class EcsService(container_service.BaseContainerService):
 class FargateCluster(container_service.BaseContainerCluster):
   """Class representing an AWS Fargate cluster."""
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
   CLUSTER_TYPE = 'Fargate'
 
   def __init__(self, cluster_spec):
@@ -492,7 +491,7 @@ class FargateCluster(container_service.BaseContainerCluster):
 class AwsKopsCluster(container_service.KubernetesCluster):
   """Class representing a kops based Kubernetes cluster."""
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
   CLUSTER_TYPE = 'kops'
 
   def __init__(self, spec):

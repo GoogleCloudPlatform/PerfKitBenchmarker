@@ -43,7 +43,6 @@ hpcg:
   description: Runs HPCG. Specify the number of VMs with --num_vms
   vm_groups:
     default:
-      os_type: ubuntu1604
       vm_spec:
         GCP:
           machine_type: n1-standard-4
@@ -58,6 +57,7 @@ hpcg:
         Azure:
           machine_type: Standard_NC6
           zone: eastus
+          boot_disk_size: 200
       vm_count: null
 """
 
@@ -176,7 +176,6 @@ def _PrepareHpcg(vm):
   logging.info('Installing HPCG on %s', vm)
   vm.Install('hpcg')
   vm.AuthenticateVm()
-  nvidia_driver.SetAndConfirmGpuClocks(vm)
 
 
 def Prepare(benchmark_spec):

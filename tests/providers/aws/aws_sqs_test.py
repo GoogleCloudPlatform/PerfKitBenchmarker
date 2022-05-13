@@ -20,6 +20,9 @@ FLAGS = flags.FLAGS
 
 class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
 
+  sqs: aws_sqs.AwsSqs
+  client: mock.Mock
+
   @mock.patch.object(util, 'GetAccount')
   def setUp(self, _):
     super().setUp()

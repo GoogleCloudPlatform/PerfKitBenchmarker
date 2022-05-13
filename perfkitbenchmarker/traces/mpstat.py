@@ -54,6 +54,7 @@ from typing import Any, Dict, List, Optional
 from absl import flags
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import stages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.traces import base_collector
 import six
@@ -437,8 +438,7 @@ def Register(parsed_flags):
   collector = MpstatCollector(
       interval=parsed_flags.mpstat_interval,
       per_interval_samples=parsed_flags.mpstat_publish_per_interval_samples)
-  events.before_phase.connect(collector.Start, events.RUN_PHASE, weak=False)
-  events.after_phase.connect(collector.Stop, events.RUN_PHASE, weak=False)
+  events.before_phase.connect(collector.Start, stages.RUN, weak=False)
+  events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
   if parsed_flags.mpstat_publish:
-    events.samples_created.connect(
-        collector.Analyze, events.RUN_PHASE, weak=False)
+    events.samples_created.connect(collector.Analyze, stages.RUN, weak=False)

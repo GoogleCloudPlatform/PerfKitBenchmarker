@@ -26,6 +26,9 @@
   Additionally, the runtime per step, as well as the number of clients
   at each step can be specified.
 
+  Documentations of pgbench
+  https://www.postgresql.org/docs/10/pgbench.html
+
   This benchmark is written for pgbench 9.5, which is the default
   (as of 10/2017) version installed on Ubuntu 16.04.
 """
@@ -49,6 +52,14 @@ flag_util.DEFINE_integerlist(
     'pgbench_client_counts',
     flag_util.IntegerList([1]),
     'array of client counts passed to pgbench', module_name=__name__)
+flag_util.DEFINE_integerlist(
+    'pgbench_job_counts',
+    flag_util.IntegerList([]),
+    'array of job counts passed to pgbench. Jobs count '
+    'is the number of worker threads within pgbench. '
+    'When this is empty, Pgbench is run with job counts equals to '
+    'client counts. If this is specified, it must have the same length as '
+    'pgbench_client_counts.', module_name=__name__)
 FLAGS = flags.FLAGS
 
 
@@ -84,7 +95,6 @@ pgbench:
         disk_size: 128
     vm_groups:
       clients:
-        os_type: ubuntu1604
         vm_spec:
           GCP:
             machine_type: n1-standard-16
@@ -97,7 +107,6 @@ pgbench:
             zone: eastus
         disk_spec: *default_500_gb
       servers:
-        os_type: ubuntu1604
         vm_spec:
           GCP:
             machine_type: n1-standard-16
@@ -145,6 +154,7 @@ def UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec):
   benchmark_spec.seconds_per_test = FLAGS.pgbench_seconds_per_test
   benchmark_spec.seconds_to_pause = FLAGS.pgbench_seconds_to_pause_before_steps
   benchmark_spec.client_counts = FLAGS.pgbench_client_counts
+  benchmark_spec.job_counts = FLAGS.pgbench_job_counts
 
 
 def GetDbSize(relational_db, db_name):
@@ -279,6 +289,7 @@ def Run(benchmark_spec):
   pgbench.RunPgBench(benchmark_spec, relational_db, benchmark_spec.vms[0],
                      TEST_DB_NAME,
                      benchmark_spec.client_counts,
+                     benchmark_spec.job_counts,
                      benchmark_spec.seconds_to_pause,
                      benchmark_spec.seconds_per_test, common_metadata)
   return []

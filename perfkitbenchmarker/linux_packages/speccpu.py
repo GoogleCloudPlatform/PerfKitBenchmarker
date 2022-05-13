@@ -24,7 +24,6 @@ import re
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker.linux_packages import build_tools
@@ -323,8 +322,9 @@ def Install(vm):
   # user is smart
   if FLAGS.runspec_build_tool_version:
     build_tool_version = FLAGS.runspec_build_tool_version or '4.7'
-    if not (vm.OS_TYPE == os_types.DEBIAN9 and build_tool_version == '6'):
-      # debian9 already comes with version 6
+    if 'debian' not in vm.OS_TYPE:
+      # do not reinstall gcc/g++/gfortran on Debian OS's;
+      # reinstallation may be done by setting FLAGS.gcc_version
       build_tools.Reinstall(vm, version=build_tool_version)
   if FLAGS.runspec_enable_32bit:
     vm.Install('multilib')

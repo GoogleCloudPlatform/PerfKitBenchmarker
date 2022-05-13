@@ -51,13 +51,16 @@ kubernetes_redis_memtier:
     cloud: GCP
     type: Kubernetes
     vm_count: 4
-    vm_spec:
-      GCP:
-        machine_type: n2-standard-2
-        zone: us-central1-a
+    vm_spec: *default_dual_core
     nodepools:
       clients:
-        vm_spec: *default_single_core
+        vm_spec:
+          GCP:
+            machine_type: n2-standard-4
+          AWS:
+            machine_type: m6i.xlarge
+          Azure:
+            machine_type: Standard_D4s_v5
         vm_count: 1
   vm_groups:
     clients:
@@ -86,18 +89,18 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
 
 def _PrepareCluster(bm_spec: _BenchmarkSpec):
   """Prepares a cluster to run the Redis benchmark."""
+  redis_port = redis_server.GetRedisPorts()[0]
   with kubernetes_helper.CreateRenderedManifestFile(
       'container/kubernetes_redis_memtier/kubernetes_redis_memtier.yaml.j2', {
           'redis_replicas': FLAGS.kubernetes_redis_cluster_size,
-          'redis_port': redis_server.DEFAULT_PORT,
+          'redis_port': redis_port,
           # Redis expects cluster bus port as 'the client port + 10000'
-          'redis_cluster_port': redis_server.DEFAULT_PORT + 10000
+          'redis_cluster_port': redis_port + 10000
       }) as rendered_manifest:
     bm_spec.container_cluster.ApplyManifest(rendered_manifest.name)
 
   bm_spec.container_cluster.WaitForRollout('statefulset/redis')
 
-  redis_port = redis_server.DEFAULT_PORT
   pod_ips = bm_spec.container_cluster.GetPodIps('statefulset/redis')
   ip_and_port_list = list(map(lambda ip: '%s:%s' % (ip, redis_port), pod_ips))
   cmd = [
@@ -141,7 +144,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
 
   # Load Redis database
   memtier.Load(client_vms[0], bm_spec.redis_endpoint_ip,
-               str(redis_server.DEFAULT_PORT))
+               str(redis_server.GetRedisPorts()[0]))
 
 
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:

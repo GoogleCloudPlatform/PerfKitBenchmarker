@@ -59,7 +59,7 @@ class ConfigOptionDecoderTestCase(unittest.TestCase):
     class IncompleteDerivedClass(option_decoders.ConfigOptionDecoder):
       pass
     with self.assertRaises(TypeError):
-      IncompleteDerivedClass(option=_OPTION)
+      IncompleteDerivedClass(option=_OPTION)  # pytype: disable=not-instantiable
 
 
 class TypeVerifierTestCase(unittest.TestCase):

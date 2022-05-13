@@ -76,7 +76,7 @@ class AwsDax(resource.BaseResource):
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
     if retcode != 0:
-      logging.warn('Failed to create subnet group! %s', stderror)
+      logging.warning('Failed to create subnet group! %s', stderror)
 
   def _Create(self):
     """See base class."""
@@ -90,7 +90,7 @@ class AwsDax(resource.BaseResource):
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
     if retcode != 0:
-      logging.warn('Failed to create dax cluster! %s', stderror)
+      logging.warning('Failed to create dax cluster! %s', stderror)
 
   def _DeleteDependencies(self):
     """See base class."""
@@ -101,7 +101,7 @@ class AwsDax(resource.BaseResource):
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
-      logging.warn('Failed to delete subnet group! %s', stderror)
+      logging.warning('Failed to delete subnet group! %s', stderror)
 
     self.iam_role.Delete()
 
@@ -112,7 +112,7 @@ class AwsDax(resource.BaseResource):
     ]
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
-      logging.warn('Failed to delete dax cluster! %s', stderror)
+      logging.warning('Failed to delete dax cluster! %s', stderror)
 
   def _Exists(self):
     """See base class."""
@@ -163,7 +163,7 @@ class AwsDax(resource.BaseResource):
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
     if retcode != 0:
-      logging.warn('Failed to config Dax port! %s', stderror)
+      logging.warning('Failed to config Dax port! %s', stderror)
 
   def GetClusterEndpoint(self):
     """Returns the DAX cluster's endpoint."""

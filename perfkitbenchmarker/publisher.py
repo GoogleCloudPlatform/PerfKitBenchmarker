@@ -21,6 +21,7 @@ import abc
 import collections
 import copy
 import csv
+import datetime
 import fcntl
 import itertools
 import json
@@ -30,14 +31,18 @@ import operator
 import pprint
 import sys
 import time
+from typing import List
 import uuid
 
 from absl import flags
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import log_util
+from perfkitbenchmarker import sample as pkb_sample
+from perfkitbenchmarker import stages
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+import pytz
 import six
 from six.moves import urllib
 import six.moves.http_client as httplib
@@ -104,8 +109,14 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'cloud_storage_bucket',
     None,
-    'GCS bucket to upload records to. Bucket must exist.')
-
+    'GCS bucket to upload records to. Bucket must exist. '
+    'This flag differs from --hourly_partitioned_cloud_storage_bucket '
+    'by putting records directly in the bucket.')
+PARTITIONED_GCS_URL = flags.DEFINE_string(
+    'hourly_partitioned_cloud_storage_bucket', None,
+    'GCS bucket to upload records to. Bucket must exist. This flag differs '
+    'from --cloud_storage_bucket by putting records in subfolders based on '
+    'time of publish. i.e. gs://bucket/YYYY/mm/dd/HH/data.')
 flags.DEFINE_string(
     'es_uri', None,
     'The Elasticsearch address and port. e.g. http://localhost:9200')
@@ -146,6 +157,10 @@ GCS_OBJECT_NAME_LENGTH = 20
 EXTERNAL_PUBLISHERS = []
 
 
+# Used to publish samples in Pacific datetime
+_PACIFIC_TZ = pytz.timezone('US/Pacific')
+
+
 def PublishRunStageSamples(benchmark_spec, samples):
   """Publishes benchmark run-stage samples immediately.
 
@@ -162,7 +177,7 @@ def PublishRunStageSamples(benchmark_spec, samples):
     samples: A list of samples to publish.
   """
   events.samples_created.send(
-      events.RUN_PHASE, benchmark_spec=benchmark_spec, samples=samples)
+      stages.RUN, benchmark_spec=benchmark_spec, samples=samples)
   collector = SampleCollector()
   collector.AddSamples(samples, benchmark_spec.name, benchmark_spec)
   collector.PublishSamples()
@@ -267,7 +282,7 @@ class SamplePublisher(six.with_metaclass(abc.ABCMeta, object)):
   """An object that can publish performance samples."""
 
   @abc.abstractmethod
-  def PublishSamples(self, samples):
+  def PublishSamples(self, samples: List[pkb_sample.SampleDict]):
     """Publishes 'samples'.
 
     PublishSamples will be called exactly once. Calling
@@ -547,7 +562,7 @@ class BigQueryPublisher(SamplePublisher):
 
   def PublishSamples(self, samples):
     if not samples:
-      logging.warn('No samples: not publishing to BigQuery')
+      logging.warning('No samples: not publishing to BigQuery')
       return
 
     with vm_util.NamedTemporaryFile(prefix='perfkit-bq-pub',
@@ -594,15 +609,19 @@ class CloudStoragePublisher(SamplePublisher):
   Attributes:
     bucket: string. The GCS bucket name to publish to.
     gsutil_path: string. The path to the 'gsutil' tool.
+    sub_folder: Optional folder within the bucket to publish to.
   """
 
-  def __init__(self, bucket, gsutil_path='gsutil'):
+  def __init__(self, bucket, gsutil_path='gsutil', sub_folder=None):
     super().__init__()
-    self.bucket = bucket
     self.gsutil_path = gsutil_path
+    if sub_folder:
+      self.gcs_directory = f'gs://{bucket}/{sub_folder}'
+    else:
+      self.gcs_directory = f'gs://{bucket}'
 
   def __repr__(self):
-    return '<{0} bucket="{1}">'.format(type(self).__name__, self.bucket)
+    return f'<{type(self).__name__} gcs_directory="{self.gcs_directory}">'
 
   def _GenerateObjectName(self):
     object_name = str(int(time.time() * 100)) + '_' + str(uuid.uuid4())
@@ -616,15 +635,16 @@ class CloudStoragePublisher(SamplePublisher):
       json_publisher.PublishSamples(samples)
       tf.close()
       object_name = self._GenerateObjectName()
-      storage_uri = 'gs://{0}/{1}'.format(self.bucket, object_name)
+      storage_uri = f'{self.gcs_directory}/{object_name}'
       logging.info('Publishing %d samples to %s', len(samples), storage_uri)
       copy_cmd = [self.gsutil_path, 'cp', tf.name, storage_uri]
       vm_util.IssueRetryableCommand(copy_cmd)
 
 
 class ElasticsearchPublisher(SamplePublisher):
-  """Publish samples to an Elasticsearch server. Index and document type
-  will be created if they do not exist.
+  """Publish samples to an Elasticsearch server.
+
+  Index and document type will be created if they do not exist.
 
   Attributes:
     es_uri: String. e.g. "http://localhost:9200"
@@ -638,27 +658,28 @@ class ElasticsearchPublisher(SamplePublisher):
     self.es_index = es_index.lower()
     self.es_type = es_type
     self.mapping_5_plus = {
-        "mappings": {
-            "result": {
-                "numeric_detection": True,
-                "properties": {
-                    "timestamp": {
-                        "type": "date",
-                        "format": "yyyy-MM-dd HH:mm:ss.SSSSSS"
+        'mappings': {
+            'result': {
+                'numeric_detection':
+                    True,
+                'properties': {
+                    'timestamp': {
+                        'type': 'date',
+                        'format': 'yyyy-MM-dd HH:mm:ss.SSSSSS'
                     },
-                    "value": {
-                        "type": "double"
+                    'value': {
+                        'type': 'double'
                     }
                 },
-                "dynamic_templates": [{
-                    "strings": {
-                        "match_mapping_type": "string",
-                        "mapping": {
-                            "type": "text",
-                            "fields": {
-                                "raw": {
-                                    "type": "keyword",
-                                    "ignore_above": 256
+                'dynamic_templates': [{
+                    'strings': {
+                        'match_mapping_type': 'string',
+                        'mapping': {
+                            'type': 'text',
+                            'fields': {
+                                'raw': {
+                                    'type': 'keyword',
+                                    'ignore_above': 256
                                 }
                             }
                         }
@@ -669,27 +690,28 @@ class ElasticsearchPublisher(SamplePublisher):
     }
 
     self.mapping_before_5 = {
-        "mappings": {
-            "result": {
-                "numeric_detection": True,
-                "properties": {
-                    "timestamp": {
-                        "type": "date",
-                        "format": "yyyy-MM-dd HH:mm:ss.SSSSSS"
+        'mappings': {
+            'result': {
+                'numeric_detection':
+                    True,
+                'properties': {
+                    'timestamp': {
+                        'type': 'date',
+                        'format': 'yyyy-MM-dd HH:mm:ss.SSSSSS'
                     },
-                    "value": {
-                        "type": "double"
+                    'value': {
+                        'type': 'double'
                     }
                 },
-                "dynamic_templates": [{
-                    "strings": {
-                        "match_mapping_type": "string",
-                        "mapping": {
-                            "type": "string",
-                            "fields": {
-                                "raw": {
-                                    "type": "string",
-                                    "index": "not_analyzed"
+                'dynamic_templates': [{
+                    'strings': {
+                        'match_mapping_type': 'string',
+                        'mapping': {
+                            'type': 'string',
+                            'fields': {
+                                'raw': {
+                                    'type': 'string',
+                                    'index': 'not_analyzed'
                                 }
                             }
                         }
@@ -702,7 +724,9 @@ class ElasticsearchPublisher(SamplePublisher):
   def PublishSamples(self, samples):
     """Publish samples to Elasticsearch service."""
     try:
-      from elasticsearch import Elasticsearch
+      # pylint:disable=g-import-not-at-top
+      from elasticsearch import Elasticsearch  # pytype: disable=import-error
+      # pylint:enable=g-import-not-at-top
     except ImportError:
       raise ImportError('The "elasticsearch" package is required to use '
                         'the Elasticsearch publisher. Please make sure it '
@@ -740,7 +764,7 @@ class ElasticsearchPublisher(SamplePublisher):
     yyyy-MM-dd HH:mm:ss.SSSSSS in string
     """
     ts = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(epoch_us))
-    num_dec = ("%.6f" % (epoch_us - math.floor(epoch_us))).split('.')[1]
+    num_dec = ('%.6f' % (epoch_us - math.floor(epoch_us))).split('.')[1]
     new_ts = '%s.%s' % (ts, num_dec)
     return new_ts
 
@@ -820,7 +844,9 @@ class InfluxDBPublisher(SamplePublisher):
     return key_value_pairs
 
   def _CreateDB(self):
-    """This method is idempotent. If the DB already exists it will simply
+    """Creates a database.
+
+    This method is idempotent. If the DB already exists it will simply
     return a 200 code without re-creating it.
     """
     successful_http_request_codes = [200, 202, 204]
@@ -842,7 +868,7 @@ class InfluxDBPublisher(SamplePublisher):
   def _WriteData(self, data):
     successful_http_request_codes = [200, 202, 204]
     params = data
-    header = {"Content-type": "application/octet-stream"}
+    header = {'Content-type': 'application/octet-stream'}
     conn = httplib.HTTPConnection(self.influx_uri)
     conn.request('POST', '/write?' + 'db=' + self.influx_db_name, params,
                  headers=header)
@@ -863,7 +889,7 @@ class SampleCollector(object):
   results via any number of SamplePublishers.
 
   Attributes:
-    samples: A list of Sample objects.
+    samples: A list of Sample objects as dicts.
     metadata_providers: A list of MetadataProvider objects. Metadata providers
       to use.  Defaults to DEFAULT_METADATA_PROVIDERS.
     publishers: A list of SamplePublisher objects to publish to.
@@ -877,14 +903,14 @@ class SampleCollector(object):
 
   def __init__(self, metadata_providers=None, publishers=None,
                publishers_from_flags=True, add_default_publishers=True):
-    self.samples = []
+    self.samples: List[pkb_sample.SampleDict] = []
 
     if metadata_providers is not None:
       self.metadata_providers = metadata_providers
     else:
       self.metadata_providers = DEFAULT_METADATA_PROVIDERS
 
-    self.publishers = publishers[:] if publishers else []
+    self.publishers: List[SamplePublisher] = publishers[:] if publishers else []
     for publisher_class in EXTERNAL_PUBLISHERS:
       self.publishers.append(publisher_class())
     if publishers_from_flags:
@@ -892,7 +918,7 @@ class SampleCollector(object):
     if add_default_publishers:
       self.publishers.extend(SampleCollector._DefaultPublishers())
 
-    logging.debug('Using publishers: {0}'.format(self.publishers))
+    logging.debug('Using publishers: %s', str(self.publishers))
 
   @classmethod
   def _DefaultPublishers(cls):
@@ -937,6 +963,12 @@ class SampleCollector(object):
     if FLAGS.cloud_storage_bucket:
       publishers.append(CloudStoragePublisher(FLAGS.cloud_storage_bucket,
                                               gsutil_path=FLAGS.gsutil_path))
+    if PARTITIONED_GCS_URL.value:
+      now = datetime.datetime.now(tz=_PACIFIC_TZ)
+      publishers.append(
+          CloudStoragePublisher(PARTITIONED_GCS_URL.value,
+                                sub_folder=now.strftime('%Y/%m/%d/%H'),
+                                gsutil_path=FLAGS.gsutil_path))
     if FLAGS.csv_path:
       publishers.append(CSVPublisher(FLAGS.csv_path))
 
@@ -960,7 +992,7 @@ class SampleCollector(object):
     """
     for s in samples:
       # Annotate the sample.
-      sample = dict(s.asdict())
+      sample: pkb_sample.SampleDict = s.asdict()
       sample['test'] = benchmark
 
       for meta_provider in self.metadata_providers:
@@ -977,7 +1009,7 @@ class SampleCollector(object):
   def PublishSamples(self):
     """Publish samples via all registered publishers."""
     if not self.samples:
-      logging.warn('No samples to publish.')
+      logging.warning('No samples to publish.')
       return
     for publisher in self.publishers:
       publisher.PublishSamples(self.samples)

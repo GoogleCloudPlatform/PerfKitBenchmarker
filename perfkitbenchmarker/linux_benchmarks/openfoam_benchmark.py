@@ -85,7 +85,6 @@ openfoam:
           machine_type: c5.2xlarge
           zone: us-east-1f
           boot_disk_size: 100
-      os_type: ubuntu1604
       vm_count: 2
       disk_spec:
         GCP:

@@ -22,6 +22,7 @@ import uuid
 
 from absl import flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sql_engine_utils
@@ -99,8 +100,8 @@ flags.DEFINE_boolean(
     'service for the requested cloud provider. If false, uses '
     'MySql installed on a VM.')
 flags.DEFINE_list(
-    'db_flags', '', 'Flags to apply to the implementation of '
-    'MySQL on the cloud that\'s being used. Example: '
+    'db_flags', '', 'Flags to apply to the managed relational database '
+    'on the cloud that\'s being used. Example: '
     'binlog_cache_size=4096,innodb_log_buffer_size=4294967295')
 flags.DEFINE_integer(
     'innodb_buffer_pool_size', None,
@@ -177,16 +178,24 @@ def GenerateRandomDbPassword():
   return ''.join(prefix) + str(uuid.uuid4())[:10]
 
 
-def GetRelationalDbClass(cloud):
+def GetRelationalDbClass(cloud, is_managed_db, engine):
   """Get the RelationalDb class corresponding to 'cloud'.
 
   Args:
     cloud: name of cloud to get the class for
+    is_managed_db: is the database self managed or database a a service
+    engine: database engine type
 
   Returns:
     BaseRelationalDb class with the cloud attribute of 'cloud'.
   """
-  return resource.GetResourceClass(BaseRelationalDb, CLOUD=cloud)
+  relational_db = None
+  try:
+    relational_db = resource.GetResourceClass(
+        BaseRelationalDb, CLOUD=cloud, IS_MANAGED=is_managed_db, ENGINE=engine)
+  except errors.Resource.SubclassNotFoundError:
+    relational_db = resource.GetResourceClass(BaseRelationalDb, CLOUD=cloud)
+  return relational_db
 
 
 def VmsToBoot(vm_groups):
@@ -624,9 +633,10 @@ class BaseRelationalDb(resource.BaseResource):
 
     # Set the size of the shared buffer
     vm.RemoteCommand(
-        'sudo sed -i.bak "s:#shared_buffers = 128MB:shared_buffers = {}GB:" '
+        'sudo sed -i.bak "s:shared_buffers = 128MB:shared_buffers = {}GB:" '
         '{}'.format(self.postgres_shared_buffer_size, postgres_conf_file))
     # Update data path to new location
+    vm.InstallPackages('rsync')
     vm.RemoteCommand('sudo rsync -av /var/lib/postgresql /scratch')
 
     # # Use cat to move files because mv will override file permissions
@@ -673,7 +683,6 @@ class BaseRelationalDb(resource.BaseResource):
     # Minimal MySQL tuning; see AWS whitepaper in docstring.
     innodb_buffer_pool_gb = self.innodb_buffer_pool_size
     innodb_log_file_mb = self.innodb_log_file_size
-
     self.server_vm.RemoteCommand(
         'echo "\n'
         f'innodb_buffer_pool_size = {innodb_buffer_pool_gb}G\n'
@@ -698,9 +707,12 @@ class BaseRelationalDb(resource.BaseResource):
         'wait_timeout        = 86400\n'
         'interactive_timeout        = 86400" | sudo tee -a %s' %
         self.server_vm.GetPathToConfig(mysql_name))
-    self.server_vm.RemoteCommand('sudo sed -i "s/bind-address/#bind-address/g" '
-                                 '%s' %
-                                 self.server_vm.GetPathToConfig(mysql_name))
+    self.server_vm.RemoteCommand(
+        'sudo sed -i "s/^bind-address/#bind-address/g" '
+        '%s' % self.server_vm.GetPathToConfig(mysql_name))
+    self.server_vm.RemoteCommand(
+        'sudo sed -i "s/^mysqlx-bind-address/#mysqlx-bind-address/g" '
+        '%s' % self.server_vm.GetPathToConfig(mysql_name))
     self.server_vm.RemoteCommand(
         'sudo sed -i '
         '"s/max_allowed_packet\t= 16M/max_allowed_packet\t= 1024M/g" %s' %
@@ -710,10 +722,6 @@ class BaseRelationalDb(resource.BaseResource):
     self.server_vm.RemoteCommand(
         'echo "\nlog_error_verbosity        = 3" | sudo tee -a %s' %
         self.server_vm.GetPathToConfig(mysql_name))
-    self.server_vm.RemoteCommand(
-        'sudo cat /etc/mysql/mysql.conf.d/mysql.sock',
-        should_log=True,
-        ignore_failure=True)
     # Restart.
     self.server_vm.RemoteCommand('sudo service %s restart' %
                                  self.server_vm.GetServiceName(mysql_name))
@@ -724,6 +732,9 @@ class BaseRelationalDb(resource.BaseResource):
     self.server_vm_query_tools.IssueSqlCommand(
         'SET GLOBAL max_connections=8000;', superuser=True)
 
+    self.SetMYSQLClientPrivileges()
+
+  def SetMYSQLClientPrivileges(self):
     if FLAGS.ip_addresses == vm_util.IpAddressSubset.INTERNAL:
       client_ip = self.client_vm.internal_ip
     else:
@@ -732,13 +743,14 @@ class BaseRelationalDb(resource.BaseResource):
     self.server_vm_query_tools.IssueSqlCommand(
         'CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';' %
         (self.spec.database_username, client_ip, self.spec.database_password),
-        superuser=True)
+        superuser=True, ignore_failure=True)
 
     self.server_vm_query_tools.IssueSqlCommand(
         'GRANT ALL PRIVILEGES ON *.* TO \'%s\'@\'%s\';' %
-        (self.spec.database_username, client_ip), superuser=True)
-    self.server_vm_query_tools.IssueSqlCommand('FLUSH PRIVILEGES;',
-                                               superuser=True)
+        (self.spec.database_username, client_ip), superuser=True,
+        ignore_failure=True)
+    self.server_vm_query_tools.IssueSqlCommand(
+        'FLUSH PRIVILEGES;', superuser=True, ignore_failure=True)
 
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""
@@ -805,7 +817,6 @@ class BaseRelationalDb(resource.BaseResource):
                       'as high available')
     self._FailoverHA()
 
-  @abstractmethod
   def _FailoverHA(self):
     """Fail over from master to replica."""
-    pass
+    raise NotImplementedError('Failover is not implemented.')

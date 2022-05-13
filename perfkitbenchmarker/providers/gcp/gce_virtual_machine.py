@@ -33,8 +33,8 @@ import logging
 import posixpath
 import re
 import threading
-
 from typing import Dict, List, Optional, Tuple
+
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -42,12 +42,12 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.providers import gcp
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_network
@@ -103,7 +103,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     boot_disk_type: string or None. The type of the boot disk.
   """
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   def __init__(self, *args, **kwargs):
     self.num_local_ssds: int = None
@@ -370,7 +370,7 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
-  CLOUD = gcp.CLOUD
+  CLOUD = providers.GCP
 
   # Subclasses should override the default image OR
   # both the image family and image_project.
@@ -446,6 +446,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if (not FLAGS.gce_migrate_on_maintenance or
         self.gpu_count or self.network.placement_group):
       self.on_host_maintenance = 'TERMINATE'
+    self.automatic_restart = FLAGS.gce_automatic_restart
     if self.preemptible:
       self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
 
@@ -528,7 +529,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(self.gpu_type,
                                                                self.gpu_count)
     cmd.flags['tags'] = ','.join(['perfkitbenchmarker'] + (self.gce_tags or []))
-    cmd.flags['no-restart-on-failure'] = True
+    if not self.automatic_restart:
+      cmd.flags['no-restart-on-failure'] = True
+    self.metadata['automatic_restart'] = self.automatic_restart
     if self.node_group:
       cmd.flags['node-group'] = self.node_group.name
     if self.gce_shielded_secure_boot:
@@ -653,7 +656,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             'be created and instance creation will be retried.')
         with self._host_lock:
           if num_hosts == len(self.host_list):
-            host = GceSoleTenantNodeGroup(self.node_template,
+            host = GceSoleTenantNodeGroup(self.node_type,
                                           self.zone, self.project)
             self.host_list.append(host)
             host.Create()
@@ -673,12 +676,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         return
       if util.RATE_LIMITED_MESSAGE in stderr:
         raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(stderr)
-      if _UNSUPPORTED_RESOURCE in stderr:
-        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if self.preemptible and _FAILED_TO_START_DUE_TO_PREEMPTION in stderr:
         self.spot_early_termination = True
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(
             'Interrupted before VM started')
+      if _UNSUPPORTED_RESOURCE in stderr:
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (stderr, retcode))
 
@@ -1158,10 +1161,16 @@ class CentOs7BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
-class CentOs8BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.CentOs8Mixin):
-  DEFAULT_IMAGE_FAMILY = 'centos-8'
+class CentOsStream8BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
+                                          linux_vm.CentOsStream8Mixin):
+  DEFAULT_IMAGE_FAMILY = 'centos-stream-8'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
+
+
+class RockyLinux8BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
+                                        linux_vm.RockyLinux8Mixin):
+  DEFAULT_IMAGE_FAMILY = 'rocky-linux-8'
+  DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
 
 
 class ContainerOptimizedOsBasedGceVirtualMachine(
@@ -1179,12 +1188,6 @@ class CoreOsBasedGceVirtualMachine(
     super(CoreOsBasedGceVirtualMachine, self).__init__(vm_spec)
     # Fedora CoreOS only creates the core user
     self.user_name = 'core'
-
-
-class Ubuntu1604BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu1604Mixin):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-1604-lts'
-  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
 class Ubuntu1804BasedGceVirtualMachine(
@@ -1307,6 +1310,11 @@ class Windows2019CoreGceVirtualMachine(
   DEFAULT_IMAGE_FAMILY = 'windows-2019-core'
 
 
+class Windows2022CoreGceVirtualMachine(
+    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2022CoreMixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2022-core'
+
+
 class Windows2012DesktopGceVirtualMachine(
     BaseWindowsGceVirtualMachine,
     windows_virtual_machine.Windows2012DesktopMixin):
@@ -1323,6 +1331,12 @@ class Windows2019DesktopGceVirtualMachine(
     BaseWindowsGceVirtualMachine,
     windows_virtual_machine.Windows2019DesktopMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2019'
+
+
+class Windows2022DesktopGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2022DesktopMixin):
+  DEFAULT_IMAGE_FAMILY = 'windows-2022'
 
 
 class Windows2019DesktopSQLServer2017StandardGceVirtualMachine(
@@ -1350,6 +1364,20 @@ class Windows2019DesktopSQLServer2019EnterpriseGceVirtualMachine(
     BaseWindowsGceVirtualMachine,
     windows_virtual_machine.Windows2019SQLServer2019Enterprise):
   DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2019'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
+class Windows2022DesktopSQLServer2019StandardGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2019Standard):
+  DEFAULT_IMAGE_FAMILY = 'sql-std-2019-win-2022'
+  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+
+
+class Windows2022DesktopSQLServer2019EnterpriseGceVirtualMachine(
+    BaseWindowsGceVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2019Enterprise):
+  DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2022'
   DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
 
 

@@ -31,19 +31,22 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.kubernetes import flags as k8s_flags
 from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
-import six
 
 FLAGS = flags.FLAGS
 
 SELECTOR_PREFIX = 'pkb'
 
-_SETUP_SSH = flags.DEFINE_boolean(
-    'kubernetes_vm_setup_ssh', False,
-    'Set up SSH on Kubernetes VMs. Probably not needed any more?')
+
+def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
+  """Determine if kubectl error is retriable."""
+  return (retcode == 1 and ('error dialing backend:' in stderr or
+                            'connect: connection timed out' in stderr))
 
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -66,6 +69,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.image = self.image or self.DEFAULT_IMAGE
     self.resource_limits = vm_spec.resource_limits
     self.resource_requests = vm_spec.resource_requests
+    self.cloud = FLAGS.container_cluster_cloud
 
   def GetResourceMetadata(self):
     metadata = super(KubernetesVirtualMachine, self).GetResourceMetadata()
@@ -252,9 +256,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         }
     }
 
-    if self.vm_group:
+    if k8s_flags.USE_NODE_SELECTORS.value and self.vm_group:
+      if self.vm_group == 'default':
+        nodepool = k8s_flags.DEFAULT_VM_GROUP_NODEPOOL.value
+      else:
+        nodepool = self.vm_group
       template['spec']['nodeSelector'] = {
-          'pkb_nodepool': container_service.NodePoolName(self.vm_group)
+          'pkb_nodepool': container_service.NodePoolName(nodepool)
       }
 
     if FLAGS.kubernetes_anti_affinity:
@@ -351,7 +359,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       resources['requests'].update(gpu_dict)
 
     result_with_empty_values_removed = ({
-        k: v for k, v in six.iteritems(resources) if v
+        k: v for k, v in resources.items() if v
     })
     return result_with_empty_values_removed
 
@@ -375,8 +383,7 @@ class DebianBasedKubernetesVirtualMachine(
           suppress_warning=suppress_warning, timeout=timeout,
           raise_on_failure=False)
       # Check for ephemeral connection issues.
-      if not (retcode == 1 and ('error dialing backend: ssh' in stderr or
-                                'connect: connection timed out' in stderr)):
+      if not _IsKubectlErrorEphemeral(retcode, stderr):
         break
       logging.info('Retrying ephemeral connection issue\n:%s', stderr)
     if not ignore_failure and retcode:
@@ -436,8 +443,7 @@ class DebianBasedKubernetesVirtualMachine(
              'cp', src_spec, dest_spec]
       stdout, stderr, retcode = vm_util.IssueCommand(
           cmd, raise_on_failure=False)
-      if not (retcode == 1 and ('error dialing backend: ssh' in stderr or
-                                'connect: connection timed out' in stderr)):
+      if not _IsKubectlErrorEphemeral(retcode, stderr):
         break
       logging.info('Retrying ephemeral connection issue\n:%s', stderr)
     if retcode:
@@ -463,9 +469,9 @@ class DebianBasedKubernetesVirtualMachine(
 
   def PrepareVMEnvironment(self):
     # Install sudo as most PrepareVMEnvironment assume it exists.
-    self.RemoteCommand(_install_sudo_command())
+    self.RemoteCommand(_InstallSudoCommand())
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
-    if _SETUP_SSH.value:
+    if k8s_flags.SETUP_SSH.value:
       # Don't rely on SSH being installed in Kubernetes containers,
       # so install it and restart the service so that it is ready to go.
       # Although ssh is not required to connect to the container, MPI
@@ -477,42 +483,8 @@ class DebianBasedKubernetesVirtualMachine(
         key = f.read()
         self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
 
-    # TODO(pclay): figure out if this is all necessary.
-    # cpio is needed for the MKL math library.
     # software-properties-common is needed for add-apt-repository
-    self.InstallPackages('cpio software-properties-common')
-
-    # Don't assume the relevant CLI is installed in the Kubernetes environment.
-    if FLAGS.container_cluster_cloud == 'GCP':
-      self.InstallGcloudCli()
-    elif FLAGS.container_cluster_cloud == 'AWS':
-      self.InstallAwsCli()
-    elif FLAGS.container_cluster_cloud == 'Azure':
-      self.InstallAzureCli()
-
-  def InstallAwsCli(self):
-    """Installs the AWS CLI; used for downloading preprovisioned data."""
-    self.Install('aws_credentials')
-    self.Install('awscli')
-
-  def InstallAzureCli(self):
-    """Installs the Azure CLI; used for downloading preprovisioned data."""
-    self.Install('azure_cli')
-    self.Install('azure_credentials')
-
-  # TODO(ferneyhough): Consider making this a package.
-  def InstallGcloudCli(self):
-    """Installs the Gcloud CLI; used for downloading preprovisioned data."""
-    self.InstallPackages('curl')
-    # The driver /usr/lib/apt/methods/https is sometimes needed for apt-get.
-    self.InstallPackages('apt-transport-https')
-    self.RemoteCommand('echo "deb https://packages.cloud.google.com/apt '
-                       'cloud-sdk-$(lsb_release -c -s) main" | sudo tee -a '
-                       '/etc/apt/sources.list.d/google-cloud-sdk.list')
-    self.RemoteCommand('curl https://packages.cloud.google.com/apt/doc/'
-                       'apt-key.gpg | sudo apt-key add -')
-    self.RemoteCommand('sudo apt-get update && sudo apt-get install '
-                       '-y google-cloud-sdk')
+    self.InstallPackages('software-properties-common')
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a preprovisioned data file.
@@ -560,18 +532,24 @@ class DebianBasedKubernetesVirtualMachine(
     if cloud == 'GCP' and FLAGS.gcp_preprovisioned_data_bucket:
       stat_function = (gce_virtual_machine.
                        GenerateStatPreprovisionedDataCommand)
+      gce_virtual_machine.GceVirtualMachine.InstallCli(self)
+      # We assume that gsutil is installed to /usr/bin/gsutil on GCE VMs
+      self.RemoteCommand(
+          f'ln -s {google_cloud_sdk.GSUTIL_PATH} /usr/bin/gsutil')
     elif cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
       stat_function = (aws_virtual_machine.
                        GenerateStatPreprovisionedDataCommand)
+      aws_virtual_machine.AwsVirtualMachine.InstallCli(self)
     elif cloud == 'Azure' and FLAGS.azure_preprovisioned_data_bucket:
       stat_function = (azure_virtual_machine.
                        GenerateStatPreprovisionedDataCommand)
+      azure_virtual_machine.AzureVirtualMachine.InstallCli(self)
     else:
       return False
     return self.TryRemoteCommand(stat_function(module_name, filename))
 
 
-def _install_sudo_command() -> str:
+def _InstallSudoCommand() -> str:
   """Return a bash command that installs sudo.
 
   This is useful for some docker images that don't have sudo installed.

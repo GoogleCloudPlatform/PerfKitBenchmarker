@@ -20,10 +20,10 @@ import json
 import logging
 
 from absl import flags
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 
@@ -78,7 +78,7 @@ class AwsSecurityGroup(resource.BaseResource):
 
   def _Create(self):
     if not self.created:
-      raise NotImplemented()
+      raise NotImplementedError()
 
 
 class AwsEMR(spark_service.BaseSparkService):
@@ -93,7 +93,7 @@ class AwsEMR(spark_service.BaseSparkService):
     terminated.
   """
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
   SPARK_SAMPLE_LOCATION = '/usr/lib/spark/lib/spark-examples.jar'
   SERVICE_NAME = 'emr'
 
@@ -244,7 +244,7 @@ class AwsEMR(spark_service.BaseSparkService):
     """Check to see if the cluster is ready."""
     cmd = self.cmd_prefix + ['emr', 'describe-cluster', '--cluster-id',
                              self.cluster_id]
-    stdout, _, rc = vm_util.IssueCommand(cmd)
+    stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     if result['Cluster']['Status']['State'] == 'TERMINATED_WITH_ERRORS':
       reason = result['Cluster']['Status']['StateChangeReason']['Message']
@@ -294,13 +294,13 @@ class AwsEMR(spark_service.BaseSparkService):
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     state = result['Step']['Status']['State']
-    if state == "COMPLETED" or state == "FAILED":
+    if state == 'COMPLETED' or state == 'FAILED':
       return result
     else:
       return None
 
   def _MakeHadoopStep(self, jarfile, classname, job_arguments):
-    """Construct an EMR step with a type CUSTOM_JAR"""
+    """Construct an EMR step with a type CUSTOM_JAR."""
     step_list = ['Type=CUSTOM_JAR', 'Jar=' + jarfile]
     if classname:
       step_list.append('MainClass=' + classname)
@@ -371,15 +371,15 @@ class AwsEMR(spark_service.BaseSparkService):
     metrics[spark_service.WAITING] = start_time - pending_time
     metrics[spark_service.RUNTIME] = end_time - start_time
     step_state = result['Step']['Status']['State']
-    metrics[spark_service.SUCCESS] = step_state == "COMPLETED"
+    metrics[spark_service.SUCCESS] = step_state == 'COMPLETED'
 
     # Now we need to take the standard out and put it in the designated path,
     # if appropriate.
     if job_stdout_file:
       log_base = self._GetLogBase()
       if log_base is None:
-        logging.warn('SubmitJob requested output, but EMR cluster was not '
-                     'created with logging')
+        logging.warning('SubmitJob requested output, but EMR cluster was not '
+                        'created with logging')
         return metrics
 
       # log_base ends in a slash.

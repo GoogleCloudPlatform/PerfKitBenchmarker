@@ -25,6 +25,7 @@ import itertools
 import json
 import re
 import threading
+
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -192,7 +193,7 @@ class AzureDisk(disk.BaseDisk):
           str(self.lun), '--sku', self.disk_type, '--vm-name', self.vm_name,
           '--size-gb',
           str(self.disk_size)
-      ] + self.resource_group.args, raise_on_failure=False)
+      ] + self.resource_group.args, raise_on_failure=False, timeout=600)
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
@@ -264,7 +265,7 @@ class AzureDisk(disk.BaseDisk):
         return '/dev/nvme%sn1' % str(self.lun)
       # Temp disk naming isn't always /dev/sdb:
       # https://github.com/MicrosoftDocs/azure-docs/issues/54055
-      return '/dev/disk/azure/resource'
+      return '/dev/disk/cloud/azure_resource'
     else:
       try:
         start_index = 1  # the os drive is always at index 0; skip the OS drive.

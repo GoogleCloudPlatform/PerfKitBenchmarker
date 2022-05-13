@@ -23,11 +23,13 @@ for more information about Azure Virtual Networks.
 import json
 import logging
 import threading
+
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -235,7 +237,7 @@ class AzureVirtualNetwork(network.BaseNetwork):
   _regional_network_count = 0
   vnet_lock = threading.Lock()
 
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   def __init__(self, spec, region, name, number_subnets):
     super(AzureVirtualNetwork, self).__init__(spec)
@@ -482,7 +484,7 @@ class AzureFirewall(network.BaseFirewall):
   proxy methods through to the right NSG instance.
   """
 
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Opens a port on the firewall.
@@ -518,7 +520,7 @@ class AzureNetwork(network.BaseNetwork):
   we need for an Azure zone (aka region).
   """
 
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE
 
   def __init__(self, spec):
     super(AzureNetwork, self).__init__(spec)

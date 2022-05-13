@@ -8,8 +8,8 @@ import os
 
 from absl import flags
 from perfkitbenchmarker import messaging_service as msgsvc
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
@@ -23,7 +23,7 @@ MESSAGING_SERVICE_SCRIPTS_AWS_BIN = 'messaging_service_scripts/aws_benchmark.py'
 class AwsSqs(msgsvc.BaseMessagingService):
   """AWS SQS Interface Class."""
 
-  CLOUD = aws.CLOUD
+  CLOUD = providers.AWS
 
   def __init__(self):
     super().__init__()
@@ -87,8 +87,8 @@ class AwsSqs(msgsvc.BaseMessagingService):
     # copy AWS creds
     self.client_vm.Install('aws_credentials')
 
-  def Run(self, benchmark_scenario: str, number_of_messages: str,
-          message_size: str):
+  def Run(self, benchmark_scenario: str, number_of_messages: int,
+          message_size: int):
     """Runs remote commands on client VM - benchmark's run phase."""
     command = (f'python3 -m aws_benchmark '
                f'--queue_name={self.queue_name} '

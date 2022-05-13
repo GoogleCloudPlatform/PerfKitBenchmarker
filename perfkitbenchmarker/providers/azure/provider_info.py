@@ -15,10 +15,10 @@
 """Provider info for Azure."""
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker.providers import azure
+from perfkitbenchmarker import providers
 
 
 class AzureProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
-  CLOUD = azure.CLOUD
+  CLOUD = providers.AZURE

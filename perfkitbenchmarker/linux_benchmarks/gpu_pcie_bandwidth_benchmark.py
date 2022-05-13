@@ -23,7 +23,6 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit
-from perfkitbenchmarker.linux_packages import nvidia_driver
 from six.moves import range
 
 DEFAULT_RANGE_START = 1 << 26  # 64 MB
@@ -265,10 +264,6 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   vm = benchmark_spec.vms[0]
-  # Note:  The clock speed is set in this function rather than Prepare()
-  # so that the user can perform multiple runs with a specified
-  # clock speed without having to re-prepare the VM.
-  nvidia_driver.SetAndConfirmGpuClocks(vm)
   num_iterations = FLAGS.gpu_pcie_bandwidth_iterations
   mode = FLAGS.gpu_pcie_bandwidth_mode
   transfer_size_range = FLAGS.gpu_pcie_bandwidth_transfer_sizes

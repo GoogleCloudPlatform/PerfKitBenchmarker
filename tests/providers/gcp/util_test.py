@@ -14,6 +14,7 @@
 """Tests for perfkitbenchmarker.providers.gcp.util."""
 
 
+import collections
 import inspect
 import unittest
 
@@ -212,6 +213,19 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         util.GcloudCommand._IsIssueRateLimitMessage(error_text),
         is_rate_limit_message)
+
+
+class GcpUtilTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def testSplitTags(self):
+    tags = 'a=b,c=d'
+    self.assertEqual(
+        collections.OrderedDict([('a', 'b'), ('c', 'd')]),
+        util.SplitTags(tags))
+
+  def testFormatAndSplitAreInverses(self):
+    tags = {'a': 'b', 'c': 'd'}
+    self.assertEqual(tags, util.SplitTags(util.FormatTags(tags)))
 
 
 if __name__ == '__main__':

@@ -31,6 +31,8 @@ flags.DEFINE_string(
     'scopes to apply to every created machine')
 flags.DEFINE_boolean('gce_migrate_on_maintenance', True, 'If true, allow VM '
                      'migration on GCE host maintenance.')
+flags.DEFINE_boolean('gce_automatic_restart', False, 'If true, allow VM '
+                     'to restart when crashes.')
 flags.DEFINE_boolean('gce_preemptible_vms', False, 'If true, use preemptible '
                      'VMs on GCE.')
 flags.DEFINE_string(
@@ -91,7 +93,7 @@ flags.DEFINE_string('gcp_node_type', None,
 flags.DEFINE_enum(
     'gcp_min_cpu_platform', None, [
         GCP_MIN_CPU_PLATFORM_NONE, 'sandybridge', 'ivybridge', 'haswell',
-        'broadwell', 'skylake', 'cascadelake',
+        'broadwell', 'skylake', 'cascadelake', 'milan', 'icelake'
     ], 'When specified, the VM will have either the specified '
     'architecture or a newer one. Architecture availability is zone dependent.')
 flags.DEFINE_string(
@@ -110,6 +112,8 @@ flags.DEFINE_string(
 flags.DEFINE_list('gce_tags', None, 'List of --tags when creating a VM')
 flags.DEFINE_boolean('gke_enable_alpha', False,
                      'Whether to enable alpha kubernetes clusters.')
+flags.DEFINE_boolean('gke_enable_gvnic', False,
+                     'Whether to use google vitrual interface on GKE nodes.')
 flags.DEFINE_string('gcp_dataproc_subnet', None,
                     'Specifies the subnet that the cluster will be part of.')
 flags.DEFINE_multi_string('gcp_dataproc_property', [],
@@ -149,10 +153,14 @@ flags.DEFINE_integer(
     'gcp_provisioned_iops', 100000,
     'Iops to provision for pd-extreme. Defaults to the gcloud '
     'default of 100000.')
-API_OVERRIDE = flags.DEFINE_string(
+CLOUD_REDIS_API_OVERRIDE = flags.DEFINE_string(
     'gcp_cloud_redis_api_override',
     default='https://redis.googleapis.com/',
     help='Cloud redis API endpoint override. Defaults to prod.')
+GKE_API_OVERRIDE = flags.DEFINE_string(
+    'gke_api_override',
+    default=None,
+    help='GKE API endpoint override. Defaults to unset (prod).')
 
 
 def _ValidatePreemptFlags(flags_dict):
