@@ -39,6 +39,8 @@ bonnieplusplus:
 """
 
 LATENCY_REGEX = r'([0-9]*\.?[0-9]+)(\w+)'
+
+
 # Bonnie++ result fields mapping, see man bon_csv2txt for details.
 BONNIE_RESULTS_MAPPING_1_96 = {
     'format_version': 0,
@@ -144,6 +146,11 @@ BONNIE_RESULTS_MAPPING_1_98 = {
     'ran_create_latency': 47,
     'ran_stat_latency': 48,
     'ran_del_latency': 49}
+
+BONNIE_SUPPORTED_VERSIONS = {
+    '1.96': BONNIE_RESULTS_MAPPING_1_96,
+    '1.97': BONNIE_RESULTS_MAPPING_1_97,
+    '1.98': BONNIE_RESULTS_MAPPING_1_98}
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -279,17 +286,13 @@ def ParseCSVResults(results):
   """
   results = results.split(',')
 
-  if results[0] == "1.98":
-    BONNIE_RESULTS_MAPPING = BONNIE_RESULTS_MAPPING_1_98
-    logging.info("Detected bonnie++ CSV format version %s", results[0])
-  elif results[0] == "1.97":
-    BONNIE_RESULTS_MAPPING = BONNIE_RESULTS_MAPPING_1_97
-    logging.info("Detected bonnie++ CSV format version %s", results[0])
-  elif results[0] == "1.96":
-    BONNIE_RESULTS_MAPPING = BONNIE_RESULTS_MAPPING_1_96
-    logging.info("Detected bonnie++ CSV format version %s", results[0])
+  format_version = results[0]
+
+  if format_version in BONNIE_SUPPORTED_VERSIONS:
+    BONNIE_RESULTS_MAPPING = BONNIE_SUPPORTED_VERSIONS[format_version]
+    logging.info("Detected bonnie++ CSV format version %s", format_version)
   else:
-    raise ValueError("Unsupported bonnie++ CSV Format version: {0} (expected version 1.98, 1.97, or 1.96)".format(results[0]))
+    raise ValueError("Unsupported bonnie++ CSV Format version: {0} (expected version 1.98, 1.97, or 1.96)".format(format_version))
 
   field_index_mapping = {}
   for field, value in six.iteritems(BONNIE_RESULTS_MAPPING):
