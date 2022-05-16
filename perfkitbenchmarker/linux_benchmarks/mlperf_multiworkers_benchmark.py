@@ -33,6 +33,7 @@ DGXSYSTEM = 'DGXA100_multinode'
 CONFIG = f'config_{DGXSYSTEM}.sh'
 AWS_EFA_NCCL_BASEAMI_PIPELINE_URL = 'https://github.com/aws-samples/aws-efa-nccl-baseami-pipeline.git'
 NVIDIA_EFA_DOCKERFILE = 'aws-efa-nccl-baseami-pipeline/nvidia-efa-docker_base/Dockerfile*.base'
+NVIDIA_EFA_DOCKERFILE_COMMIT = 'ac83c764b3f802d24bd78adab260d803ed497f4b'
 
 
 BENCHMARK_NAME = 'mlperf_multiworkers'
@@ -687,6 +688,9 @@ def _UpdateScripts(benchmark_spec, node_rank):
 
   if FLAGS.aws_efa:
     vm.RemoteCommand(f'git clone {AWS_EFA_NCCL_BASEAMI_PIPELINE_URL}')
+    vm.RemoteCommand(
+        f'cd aws-efa-nccl-baseami-pipeline && git checkout {NVIDIA_EFA_DOCKERFILE_COMMIT}'
+    )
     vm.RemoteCommand(f'cat {NVIDIA_EFA_DOCKERFILE} >> {docker_file}')
     vm_util.ReplaceText(vm, 'FROM nvcr.*', '', docker_file)
     vm_util.ReplaceText(vm, 'yum-utils.*', '', docker_file)
