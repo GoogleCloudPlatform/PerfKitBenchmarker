@@ -516,18 +516,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       return None
     return int(describe_instance_json['DBInstances'][0]['Endpoint']['Port'])
 
-  def _ParseEndpointFromCluster(self, describe_cluster_json):
-    """Parses the json output from the CLI and returns the endpoint.
-
-    Args:
-      describe_cluster_json: output in json format from calling
-        'aws rds describe-db-clusters'
-
-    Returns:
-      endpoint of the server as a string
-    """
-    return describe_cluster_json['DBClusters'][0]['Endpoint']
-
   def _SavePrimaryAndSecondaryZones(self, describe_instance_json):
     """Saves the primary, and secondary (only if HA) zone of the server.
 
@@ -778,7 +766,9 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     These will be used to communicate with the data base.
     """
     json_output = self._DescribeCluster(cluster_id)
-    self.endpoint = self._ParseEndpointFromCluster(json_output)
+    self.endpoint = json_output['DBClusters'][0]['Endpoint']
+    if 'ReaderEndpoint' in json_output['DBClusters'][0]:
+      self.replica_endpoint = json_output['DBClusters'][0]['ReaderEndpoint']
 
   def _AssertClientAndDbInSameRegion(self):
     """Asserts that the client vm is in the same region requested by the server.

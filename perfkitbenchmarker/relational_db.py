@@ -231,6 +231,7 @@ class BaseRelationalDb(resource.BaseResource):
         raise UnsupportedError('High availability is unsupported for unmanaged '
                                'databases.')
       self.endpoint = ''
+      self.replica_endpoint = ''
       self.spec.database_username = 'root'
       self.spec.database_password = 'perfkitbenchmarker'
       self.innodb_buffer_pool_size = FLAGS.innodb_buffer_pool_size
@@ -290,6 +291,19 @@ class BaseRelationalDb(resource.BaseResource):
       self._client_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
           self.client_vm, connection_properties)
     return self._client_vm_query_tools
+
+  @property
+  def client_vm_query_tools_for_replica(self):
+    """Query tools to make custom queries on replica."""
+    if not hasattr(self, '_client_vm_query_tools_for_replica'):
+      if not self.replica_endpoint:
+        raise ValueError('Database does not have replica.')
+      connection_properties = sql_engine_utils.DbConnectionProperties(
+          self.spec.engine, self.spec.engine_version, self.replica_endpoint,
+          self.port, self.spec.database_username, self.spec.database_password)
+      self._client_vm_query_tools_for_replica = sql_engine_utils.GetQueryToolsByEngine(
+          self.client_vm, connection_properties)
+    return self._client_vm_query_tools_for_replica
 
   @property
   def server_vm_query_tools(self):
