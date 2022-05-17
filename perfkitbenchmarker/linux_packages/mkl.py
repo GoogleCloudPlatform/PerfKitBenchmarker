@@ -71,6 +71,7 @@ def UseMklRepo():
 
 def Install(vm):
   """Installs the MKL package on the VM."""
+  vm.InstallPackages('cpio')
   if UseMklRepo():
     vm.Install('intel_repo')
     if intel_repo.UseOneApi():

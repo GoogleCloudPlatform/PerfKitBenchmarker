@@ -469,7 +469,7 @@ class DebianBasedKubernetesVirtualMachine(
 
   def PrepareVMEnvironment(self):
     # Install sudo as most PrepareVMEnvironment assume it exists.
-    self.RemoteCommand(_InstallSudoCommand())
+    self._InstallSudo()
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
     if k8s_flags.SETUP_SSH.value:
       # Don't rely on SSH being installed in Kubernetes containers,
@@ -534,8 +534,9 @@ class DebianBasedKubernetesVirtualMachine(
                        GenerateStatPreprovisionedDataCommand)
       gce_virtual_machine.GceVirtualMachine.InstallCli(self)
       # We assume that gsutil is installed to /usr/bin/gsutil on GCE VMs
+      # ln -f is idempotent and can be called multiple times
       self.RemoteCommand(
-          f'ln -s {google_cloud_sdk.GSUTIL_PATH} /usr/bin/gsutil')
+          f'ln -sf {google_cloud_sdk.GSUTIL_PATH} /usr/bin/gsutil')
     elif cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
       stat_function = (aws_virtual_machine.
                        GenerateStatPreprovisionedDataCommand)
@@ -548,26 +549,24 @@ class DebianBasedKubernetesVirtualMachine(
       return False
     return self.TryRemoteCommand(stat_function(module_name, filename))
 
+  # Retry installing sudo for ephemeral APT errors
+  @vm_util.Retry(max_retries=linux_virtual_machine.UPDATE_RETRIES)
+  def _InstallSudo(self):
+    """Installs sudo."""
+    # The canonical ubuntu images as well as the nvidia/cuda
+    # image do not have sudo installed so install it and configure
+    # the sudoers file such that the root user's environment is
+    # preserved when running as sudo.
+    self.RemoteCommand(' && '.join([
+        # Clear existing lists to work around hash mismatches
+        'rm -rf /var/lib/apt/lists/*',
+        'apt-get update',
+        'apt-get install -y sudo',
+        'sed -i \'/env_reset/d\' /etc/sudoers',
+        'sed -i \'/secure_path/d\' /etc/sudoers',
+        'sudo ldconfig',
+    ]))
 
-def _InstallSudoCommand() -> str:
-  """Return a bash command that installs sudo.
-
-  This is useful for some docker images that don't have sudo installed.
-
-  Returns:
-    a sequence of arguments that use bash to install sudo
-  """
-  # The canonical ubuntu images as well as the nvidia/cuda
-  # image do not have sudo installed so install it and configure
-  # the sudoers file such that the root user's environment is
-  # preserved when running as sudo.
-  return ' && '.join([
-      'apt-get update',
-      'apt-get install -y sudo',
-      'sed -i \'/env_reset/d\' /etc/sudoers',
-      'sed -i \'/secure_path/d\' /etc/sudoers',
-      'sudo ldconfig',
-  ])
 
 # All Ubuntu images below are from https://hub.docker.com/_/ubuntu/
 # Note that they do not include all packages that are typically
