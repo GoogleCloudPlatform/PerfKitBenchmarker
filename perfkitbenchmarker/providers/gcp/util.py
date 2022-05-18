@@ -29,6 +29,13 @@ import six
 FLAGS = flags.FLAGS
 
 RATE_LIMITED_MESSAGE = 'Rate Limit Exceeded'
+
+# When too many read reqeusts are issued, receive a message like:
+# PERMISSION_DENIED: Quota exceeded for quota metric 'Read requests' and limit
+# 'Read requests per minute' of service 'compute.googleapis.com'
+READ_LIMITED_MESSAGE = "limit 'Read requests per minute'"
+
+
 # regex to check API limits when tagging resources
 # matches a string like:
 # ERROR: (gcloud.compute.disks.add-labels) PERMISSION_DENIED: Quota exceeded
@@ -275,6 +282,8 @@ class GcloudCommand(object):
   @staticmethod
   def _IsIssueRateLimitMessage(text) -> bool:
     if RATE_LIMITED_MESSAGE in text:
+      return True
+    if READ_LIMITED_MESSAGE in text:
       return True
     match = TAGGING_RATE_LIMITED_REGEX.search(text)
     if match:
