@@ -26,8 +26,9 @@ TEARDOWN = 'teardown'
 
 STAGES = [PROVISION, PREPARE, RUN, CLEANUP, TEARDOWN]
 
-_NEXT_STAGE = {PROVISION: PREPARE, PREPARE: RUN, RUN: CLEANUP,
-               CLEANUP: TEARDOWN}
+_NEXT_STAGE = {PROVISION: [PREPARE, TEARDOWN],
+               PREPARE: [RUN, CLEANUP], RUN: [CLEANUP],
+               CLEANUP: [TEARDOWN]}
 _ALL = 'all'
 _VALID_FLAG_VALUES = PROVISION, PREPARE, RUN, CLEANUP, TEARDOWN, _ALL
 
@@ -83,15 +84,15 @@ class RunStageParser(flags.ListParser):
 
     previous_stage = stage_list[0]
     for stage in itertools.islice(stage_list, 1, None):
-      expected_stage = _NEXT_STAGE.get(previous_stage)
-      if not expected_stage:
+      expected_stages = _NEXT_STAGE.get(previous_stage)
+      if not expected_stages:
         raise ValueError("Unable to parse {0}. '{1}' should be the last "
                          "stage.".format(repr(argument), previous_stage))
-      if stage != expected_stage:
+      if stage not in expected_stages:
         raise ValueError(
-            "Unable to parse {0}. The stage after '{1}' should be '{2}', not "
-            "'{3}'.".format(repr(argument), previous_stage, expected_stage,
-                            stage))
+            "Unable to parse {0}. The stage after '{1}' should be one of '{2}',"
+            " not '{3}'.".format(
+                repr(argument), previous_stage, expected_stages, stage))
       previous_stage = stage
 
     return stage_list
@@ -99,5 +100,5 @@ class RunStageParser(flags.ListParser):
 
 flags.DEFINE(
     RunStageParser(), 'run_stage', STAGES,
-    "The stage or stages of perfkitbenchmarker to run.",
+    'The stage or stages of perfkitbenchmarker to run.',
     flags.FLAGS, flags.ListSerializer(','))
