@@ -365,7 +365,7 @@ class GcloudCommand(object):
 
 
 _QUOTA_EXCEEDED_REGEX = re.compile(
-    r"(Quota '.*' exceeded|Insufficient \w+ quota)")
+    r"(Quota '.*' exceeded|Insufficient .*\w+.* quota)")
 
 _NOT_ENOUGH_RESOURCES_STDERR = ('does not have enough resources available to '
                                 'fulfill the request.')
