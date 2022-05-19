@@ -227,9 +227,9 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       'make launch_docker DOCKER_COMMAND='
       '"make build" && '
       'make launch_docker DOCKER_COMMAND='
-      '"make generate_engines RUN_ARGS=\''
+      '"make run RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value}\'"',
+      f'--scenarios={_SCENARIOS.value} --fast\'"',
       should_log=True)
 
 
@@ -307,17 +307,13 @@ def MakeAccuracySamplesFromOutput(base_metadata: Dict[str, Any],
   return [sample.Sample('accuracy', float(accuracy), '%', metadata)]
 
 
-def _Run(bm_spec: benchmark_spec.BenchmarkSpec,
-         target_qps: float,
-         use_quick_run: bool = True) -> bool:
+def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
   """Runs MLPerf inference test under a server target QPS.
 
   Args:
     bm_spec: The benchmark specification. Contains all data that is required to
       run the benchmark.
     target_qps: The load to generate.
-    use_quick_run: Reduce the minimum runtime of the workload from 10 minutes to
-      1 minute.
 
   Returns:
     Whether the system under test passes under the serer target QPS.
@@ -328,16 +324,14 @@ def _Run(bm_spec: benchmark_spec.BenchmarkSpec,
       f'{bm_spec.env_cmd} && '
       f'make launch_docker DOCKER_COMMAND="sed -i \'s/server_target_qps = .*/server_target_qps = {target_qps}/g\' {config}"',
       should_log=True)
-  fast_flag = '--fast' if use_quick_run else ''
   # For valid log, result_validity is VALID
   # For invalid log, result_validity is INVALID
   stdout, _ = vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} {fast_flag} --test_mode=PerformanceOnly\'"',
-      should_log=True,
-      ignore_failure=use_quick_run)
+      f'--scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly --fast\'"',
+      should_log=True)
   return _VALID in stdout
 
 
@@ -353,12 +347,9 @@ def _LastRunResults(bm_spec: benchmark_spec.BenchmarkSpec) -> str:
   """
   vm = bm_spec.vms[0]
   stdout, _ = vm.RobustRemoteCommand(
-      f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND="find build/logs -name mlperf_log_detail.txt | xargs ls -t | head -n 1"',
-      should_log=True)
-  mlperf_log_detail_txt = regex_util.ExtractExactlyOneMatch(
-      r'(build/logs/.*/mlperf_log_detail.txt)', stdout)
-  stdout, _ = vm.RobustRemoteCommand(
-      f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND="cat {mlperf_log_detail_txt}"',
+      f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND='
+      '"grep -l \'\\"VALID\\"\' build/logs/*/*/*/*/mlperf_log_detail.txt | '
+      'xargs ls -t | head -n 1 | xargs cat"',
       should_log=True)
   return stdout
 
@@ -385,23 +376,20 @@ def _FindStartingQps(
       return passing_qps, falling_qps
 
 
-def _BinarySearch(bm_spec: benchmark_spec.BenchmarkSpec) -> float:
+def _BinarySearch(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   """Finds the system under test QPS.
 
   Uses binary search between to find the max GPU QPS while meet the latency
-  constraint. Stops searching when the absolute difference is less 0.1 samples
+  constraint. Stops searching when the absolute difference is less 1 samples
   per second.
 
   Args:
     bm_spec: The benchmark specification. Contains all data that is required to
       run the benchmark.
-
-  Returns:
-    The passing QPS.
   """
   passing_qps, falling_qps = _FindStartingQps(bm_spec)
-  # Set absolute tolerance to 0.1
-  while not math.isclose(passing_qps, falling_qps, abs_tol=0.1):
+  # Set absolute tolerance to 1
+  while not math.isclose(passing_qps, falling_qps, abs_tol=1):
     target_qps = (passing_qps + falling_qps) / 2
     if _Run(bm_spec, target_qps):
       passing_qps = target_qps
@@ -409,7 +397,6 @@ def _BinarySearch(bm_spec: benchmark_spec.BenchmarkSpec) -> float:
       falling_qps = target_qps
   else:
     logging.info('Target QPS is %s.', passing_qps)
-    return passing_qps
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -422,9 +409,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
-  passing_qps = _BinarySearch(bm_spec)
-  # Validate this still passes.
-  _Run(bm_spec, passing_qps, False)
+  _BinarySearch(bm_spec)
 
   metadata = _CreateMetadataDict(bm_spec)
   performance_samples = MakePerformanceSamplesFromOutput(
@@ -435,7 +420,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} --test_mode=AccuracyOnly\'"',
+      f'--scenarios={_SCENARIOS.value} --test_mode=AccuracyOnly --fast\'"',
       should_log=True)
   accuracy_samples = MakeAccuracySamplesFromOutput(metadata, stdout)
   return performance_samples + accuracy_samples
