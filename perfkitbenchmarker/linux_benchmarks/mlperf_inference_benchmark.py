@@ -98,6 +98,7 @@ _ACCURACY_METADATA = [
 _PERFORMANCE_METRIC = 'result_completed_samples_per_sec'
 _VALID = 'Result is : VALID'
 _INVALID = 'Result is : INVALID'
+_PATCH = 'mlperf_inference.patch'
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -126,6 +127,8 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
 
   repository = f'inference_results_{MLPERF_INFERENCE_VERSION}'
   vm.RemoteCommand(f'git clone https://github.com/mlcommons/{repository}.git')
+  vm.PushDataFile(_PATCH)
+  vm.RemoteCommand(f'patch -p0 < {_PATCH}')
 
   makefile = f'{repository}/closed/NVIDIA/Makefile'
   vm_util.ReplaceText(vm, 'shell uname -p', 'shell uname -m', makefile)
