@@ -125,9 +125,9 @@ _STARTING_QPS = flags.DEFINE_integer(
     'Starting QPS to set as YCSB target. Defaults to a value which uses the '
     'published throughput expectations for each node, see READ/WRITE caps per '
     'node below.')
-
-
-_CPU_OPTIMIZATION_TARGET_QPS_INCREMENT = 1000
+_CPU_OPTIMIZATION_TARGET_QPS_INCREMENT = flags.DEFINE_integer(
+    'cloud_spanner_ycsb_cpu_optimization_target_qps_increment', 1000,
+    'The amount to increase target QPS by when running in CPU-optimized mode.')
 
 
 def GetConfig(user_config):
@@ -193,6 +193,8 @@ def _GetCpuOptimizationMetadata() -> Dict[str, Any]:
           _CPU_OPTIMIZATION_INCREMENT_MINUTES.value,
       'cloud_spanner_cpu_measurement_minutes':
           _CPU_OPTIMIZATION_MEASUREMENT_MINUTES.value,
+      'cloud_spanner_cpu_qps_increment':
+          _CPU_OPTIMIZATION_TARGET_QPS_INCREMENT.value,
   }
 
 
@@ -293,7 +295,7 @@ def CpuUtilizationRun(executor: ycsb.YCSBExecutor,
       for s in run_samples:
         s.metadata['cloud_spanner_cpu_utilization'] = cpu_utilization
       return run_samples
-    qps += _CPU_OPTIMIZATION_TARGET_QPS_INCREMENT
+    qps += _CPU_OPTIMIZATION_TARGET_QPS_INCREMENT.value
     first_run = False
 
 
