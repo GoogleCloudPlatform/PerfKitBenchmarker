@@ -1345,7 +1345,7 @@ class Ubuntu1804BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
 class Ubuntu1804EfaBasedAwsVirtualMachine(
     UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu1804EfaMixin):
   IMAGE_OWNER = UBUNTU_EFA_IMAGE_PROJECT
-  IMAGE_NAME_FILTER = 'Deep Learning AMI (Ubuntu 18.04) Version *'
+  IMAGE_NAME_FILTER = 'Deep Learning AMI GPU CUDA * (Ubuntu 18.04) *'
 
 
 class Ubuntu2004BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
