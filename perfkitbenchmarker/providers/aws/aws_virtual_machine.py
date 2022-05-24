@@ -115,6 +115,7 @@ X86 = 'x86_64'
 _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'a1': 'cortex-a72',
     'c6g': 'graviton2',
+    'c7g': 'graviton2',
     'g5g': 'graviton2',
     'm6g': 'graviton2',
     'r6g': 'graviton2',
