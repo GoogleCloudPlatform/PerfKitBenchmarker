@@ -896,6 +896,12 @@ class Ubuntu2004BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest'
 
 
+class Ubuntu2204BasedAzureVirtualMachine(AzureVirtualMachine,
+                                         linux_virtual_machine.Ubuntu2204Mixin):
+  GEN2_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest'
+  IMAGE_URN = 'Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest'
+
+
 class Rhel7BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel7Mixin):
   GEN2_IMAGE_URN = 'RedHat:RHEL:7lvm-gen2:latest'

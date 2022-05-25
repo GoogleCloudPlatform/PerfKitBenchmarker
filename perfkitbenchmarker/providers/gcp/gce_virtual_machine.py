@@ -1173,6 +1173,12 @@ class RockyLinux8BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
   DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
 
 
+class CentOsStream9BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
+                                          linux_vm.CentOsStream9Mixin):
+  DEFAULT_IMAGE_FAMILY = 'centos-stream-9'
+  DEFAULT_IMAGE_PROJECT = 'centos-cloud'
+
+
 class ContainerOptimizedOsBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.ContainerOptimizedOsMixin):
   DEFAULT_IMAGE_FAMILY = 'cos-stable'
@@ -1199,6 +1205,12 @@ class Ubuntu1804BasedGceVirtualMachine(
 class Ubuntu2004BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2004Mixin):
   DEFAULT_IMAGE_FAMILY = 'ubuntu-2004-lts'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
+
+class Ubuntu2204BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2204Mixin):
+  DEFAULT_IMAGE_FAMILY = 'ubuntu-2204-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 

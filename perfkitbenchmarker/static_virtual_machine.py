@@ -331,6 +331,11 @@ class Ubuntu2004BasedStaticVirtualMachine(
   pass
 
 
+class Ubuntu2204BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Ubuntu2204Mixin):
+  pass
+
+
 class ClearBasedStaticVirtualMachine(StaticVirtualMachine,
                                      linux_virtual_machine.ClearMixin):
   pass

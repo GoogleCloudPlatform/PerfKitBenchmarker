@@ -70,6 +70,9 @@
 -   Add support for TPC-DS/H benchmarks on AWS Glue Job.
 -   Add messaging service latency benchmark (for GCP PubSub, AWS SQS & Azure Service Bus).
 -   Add Intel perfspect as a new trace
+-   Add Ubuntu 22.04 support for GCP, AWS and Azure Providers.
+-   Add support for Rocky Linux 8, CentOS Stream 8 and CentOS Stream 9 on
+    GCP and AWS Providers.
 
 ### Enhancements:
 
