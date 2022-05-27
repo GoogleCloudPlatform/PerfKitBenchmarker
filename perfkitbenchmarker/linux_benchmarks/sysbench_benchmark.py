@@ -308,12 +308,15 @@ def _GetCommonSysbenchOptions(benchmark_spec):
   engine = sql_engine_utils.GetDbEngineType(FLAGS.managed_db_engine)
   result = []
 
+  # Ignore possible mysql errors
+  # https://github.com/actiontech/dble/issues/458
+  # https://callisto.digital/posts/tools/using-sysbench-to-benchmark-mysql-5-7/
   if engine == sql_engine_utils.MYSQL:
     result += [
         '--db-ps-mode=%s' % DISABLE,
         # Error 1205: Lock wait timeout exceeded
         # Could happen when we overload the database
-        '--mysql-ignore-errors=1205,2013',
+        '--mysql-ignore-errors=1213,1205,1020,2013',
         '--db-driver=mysql'
     ]
   elif engine == sql_engine_utils.POSTGRES:
