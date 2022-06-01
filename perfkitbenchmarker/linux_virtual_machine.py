@@ -1774,6 +1774,12 @@ class Rhel8Mixin(BaseRhelMixin):
   OS_TYPE = os_types.RHEL8
 
 
+class Rhel9Mixin(BaseRhelMixin):
+  """Class holding RHEL 9 specific VM methods and attributes."""
+  OS_TYPE = os_types.RHEL9
+  PYTHON_2_PACKAGE = None
+
+
 class CentOs7Mixin(BaseRhelMixin):
   """Class holding CentOS 7 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS7
@@ -1794,6 +1800,7 @@ class CentOsStream8Mixin(BaseRhelMixin):
 class CentOsStream9Mixin(BaseRhelMixin):
   """Class holding CentOS Stream 9 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS_STREAM9
+  PYTHON_2_PACKAGE = None
 
 
 class RockyLinux8Mixin(BaseRhelMixin):

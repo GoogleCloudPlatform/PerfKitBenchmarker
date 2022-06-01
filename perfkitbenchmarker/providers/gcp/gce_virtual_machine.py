@@ -1155,6 +1155,12 @@ class Rhel8BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
+class Rhel9BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Rhel9Mixin):
+  DEFAULT_IMAGE_FAMILY = 'rhel-9'
+  DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
+
+
 class CentOs7BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CentOs7Mixin):
   DEFAULT_IMAGE_FAMILY = 'centos-7'

@@ -913,6 +913,9 @@ class Rhel8BasedAzureVirtualMachine(AzureVirtualMachine,
   GEN2_IMAGE_URN = 'RedHat:RHEL:8-lvm-gen2:latest'
   IMAGE_URN = 'RedHat:RHEL:8-LVM:latest'
 
+# TODO(user): Add RHEL 9 after it is available
+# https://docs.microsoft.com/en-us/azure/virtual-machines/workloads/redhat/redhat-imagelist
+
 
 class CentOs7BasedAzureVirtualMachine(AzureVirtualMachine,
                                       linux_virtual_machine.CentOs7Mixin):

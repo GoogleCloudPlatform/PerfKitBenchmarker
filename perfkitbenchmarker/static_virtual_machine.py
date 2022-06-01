@@ -351,6 +351,11 @@ class Rhel8BasedStaticVirtualMachine(StaticVirtualMachine,
   pass
 
 
+class Rhel9BasedStaticVirtualMachine(StaticVirtualMachine,
+                                     linux_virtual_machine.Rhel9Mixin):
+  pass
+
+
 class CentOs7BasedStaticVirtualMachine(StaticVirtualMachine,
                                        linux_virtual_machine.CentOs7Mixin):
   pass

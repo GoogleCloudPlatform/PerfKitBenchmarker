@@ -1382,7 +1382,7 @@ class Rhel7BasedAwsVirtualMachine(AwsVirtualMachine,
                                   linux_virtual_machine.Rhel7Mixin):
   """Class with configuration for AWS RHEL 7 virtual machines."""
   # Documentation on finding RHEL images:
-  # https://access.redhat.com/articles/2962171
+  # https://access.redhat.com/articles/3692431
   IMAGE_NAME_FILTER = 'RHEL-7*_GA*'
   IMAGE_OWNER = RHEL_IMAGE_PROJECT
 
@@ -1391,9 +1391,19 @@ class Rhel8BasedAwsVirtualMachine(AwsVirtualMachine,
                                   linux_virtual_machine.Rhel8Mixin):
   """Class with configuration for AWS RHEL 8 virtual machines."""
   # Documentation on finding RHEL images:
-  # https://access.redhat.com/articles/2962181
+  # https://access.redhat.com/articles/3692431
   # All RHEL AMIs are HVM. HVM- blocks HVM_BETA.
   IMAGE_NAME_FILTER = 'RHEL-8*_HVM-*'
+  IMAGE_OWNER = RHEL_IMAGE_PROJECT
+
+
+class Rhel9BasedAwsVirtualMachine(AwsVirtualMachine,
+                                  linux_virtual_machine.Rhel9Mixin):
+  """Class with configuration for AWS RHEL 9 virtual machines."""
+  # Documentation on finding RHEL images:
+  # https://access.redhat.com/articles/3692431
+  # All RHEL AMIs are HVM. HVM- blocks HVM_BETA.
+  IMAGE_NAME_FILTER = 'RHEL-9*_HVM-*'
   IMAGE_OWNER = RHEL_IMAGE_PROJECT
 
 

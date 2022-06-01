@@ -29,6 +29,7 @@ DEBIAN11 = 'debian11'
 JUJU = 'juju'
 RHEL7 = 'rhel7'
 RHEL8 = 'rhel8'
+RHEL9 = 'rhel9'
 ROCKY_LINUX8 = 'rocky_linux8'
 UBUNTU_CONTAINER = 'ubuntu_container'
 UBUNTU1604 = 'ubuntu1604'  # deprecated
@@ -79,6 +80,7 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     JUJU,
     RHEL7,
     RHEL8,
+    RHEL9,
     ROCKY_LINUX8,
     UBUNTU_CONTAINER,
     UBUNTU1604,  # deprecated
