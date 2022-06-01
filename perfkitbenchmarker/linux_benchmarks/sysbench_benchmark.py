@@ -111,6 +111,7 @@ BENCHMARK_DATA = {
 _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
     'tpcc': set(['scale']),
     'oltp_write_only': set(['table_size']),
+    'oltp_read_only': set(['table_size']),
     'oltp_read_write': set(['table_size'])
 }
 
