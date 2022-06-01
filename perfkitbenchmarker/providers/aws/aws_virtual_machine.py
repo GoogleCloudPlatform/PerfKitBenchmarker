@@ -1354,6 +1354,12 @@ class Ubuntu2004BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-focal-20.04-*64-server-20*'
 
 
+class Ubuntu2004EfaBasedAwsVirtualMachine(
+    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2004EfaMixin):
+  IMAGE_OWNER = UBUNTU_EFA_IMAGE_PROJECT
+  IMAGE_NAME_FILTER = 'Deep Learning AMI GPU CUDA * (Ubuntu 20.04) *'
+
+
 class Ubuntu2204BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu2204Mixin):
   IMAGE_NAME_FILTER = 'ubuntu/images/*/ubuntu-jammy-22.04-*64-server-20*'

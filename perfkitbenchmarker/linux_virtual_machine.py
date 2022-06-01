@@ -2060,6 +2060,11 @@ class Ubuntu2004Mixin(Ubuntu1804Mixin):
   PYTHON_2_PACKAGE = 'python2'
 
 
+class Ubuntu2004EfaMixin(Ubuntu2004Mixin):
+  """Class holding EFA specific VM methods and attributes."""
+  OS_TYPE = os_types.UBUNTU2004_EFA
+
+
 class Ubuntu2204Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu2204 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU2204
