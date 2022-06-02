@@ -32,7 +32,7 @@ import json
 import logging
 import os
 import time
-from typing import List
+from typing import List, Dict
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -85,7 +85,9 @@ _QUERY_SUBSTITUTION_JSON_STRING = flags.DEFINE_string(
     'Values of the names variable used in query provided via '
     " `dpb_spark_query_uri_path`. It's a comma separated json string where"
     "each value looks like 'key' : 'value'"
-    "Imp: 'key' are stripped for spaces and then used, 'value' is used as is.")
+    "Imp: 'key' are stripped for spaces and then used, 'value' is used as is."
+    'Cluster parameters like $BASE_DIR, $REGION, $CLUSTER_ID can also be used'
+    'as variables in sql query.')
 FLAGS = flags.FLAGS
 
 SCRIPT_DIR = 'spark_sql_test_scripts'
@@ -104,8 +106,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   """
   cluster = benchmark_spec.dpb_service
   storage_service = cluster.storage_service
-  benchmark_spec.staged_queries = _LoadAndStageQueries(storage_service,
-                                                       cluster.base_dir)
+  benchmark_spec.staged_queries = _LoadAndStageQueries(cluster)
 
   scripts_to_upload = [
       SPARK_SQL_RUNNER_SCRIPT,
@@ -196,30 +197,52 @@ def _DownloadTemplatedQuery(
   return template_query_path
 
 
-def _GetSubstitutedSqlQuery(
-    storage_service: object_storage_service.ObjectStorageService):
+def _GetQuerySubstitutions(
+    cluster: dpb_service.BaseDpbService) -> Dict[str, str]:
+  """Creates a sql query substitution dictionary.
+
+  Substitutions is composed of two set of variables
+  1. list of custom query variables paased in via
+  'dpb_spark_query_param_json_string'
+  2. list of cluster specific parameters i.e. cluster_id, region etc.
+
+  Args:
+    cluster: BaseDpbService object.
+
+  Returns:
+    Dictionary of substituion of variables.
+  """
+  substitute_dict = json.loads(_QUERY_SUBSTITUTION_JSON_STRING.value)
+  substitute_dict.update({
+      '$BASE_DIR': cluster.base_dir,
+      '$REGION': cluster.region,
+      '$CLUSTER_ID': cluster.cluster_id
+  })
+  return substitute_dict
+
+
+def _GetSubstitutedSqlQuery(cluster: dpb_service.BaseDpbService):
   """Downloads the query and convert it to string.
 
   Args:
-    storage_service: object_storage_service to stage queries into.
+    cluster: BaseDpbService object.
 
   Returns:
     Sql query with all substitutions in place.
   """
+  storage_service = cluster.storage_service
   query_string = ''
   template_query_path = _DownloadTemplatedQuery(storage_service)
-  substitute_map = json.loads(_QUERY_SUBSTITUTION_JSON_STRING.value)
+  substitute_dict = _GetQuerySubstitutions(cluster)
   with open(template_query_path, 'r') as query_read:
     for line in query_read:
-      for subs in substitute_map:
-        line = line.replace(subs, substitute_map[subs])
+      for subs in substitute_dict:
+        line = line.replace(subs, substitute_dict[subs])
       query_string += line
   return query_string
 
 
-def _LoadAndStageQueries(
-    storage_service: object_storage_service.ObjectStorageService,
-    base_dir: str) -> List[str]:
+def _LoadAndStageQueries(cluster: dpb_service.BaseDpbService) -> List[str]:
   """Loads query from gcs and stages them in object storage.
 
   Query is picked from location `--dpb_spark_query_uri_path`.
@@ -227,8 +250,7 @@ def _LoadAndStageQueries(
   `--dpb_spark_query_param_json_string`.
 
   Args:
-    storage_service: object_storage_service to stage queries into.
-    base_dir: object storage directory to stage queries into.
+    cluster: BaseDpbService object.
 
   Returns:
     The paths to the stage queries.
@@ -236,11 +258,13 @@ def _LoadAndStageQueries(
   Raises:
     PrepareException if a requested query is not found.
   """
+  storage_service = cluster.storage_service
+  base_dir = cluster.base_dir
   temp_run_dir = temp_dir.GetRunDirPath()
   local_script_file_name = 'query.sql'
   local_script_file = os.path.join(temp_run_dir, local_script_file_name)
   with open(local_script_file, 'w') as f:
-    query_string = _GetSubstitutedSqlQuery(storage_service)
+    query_string = _GetSubstitutedSqlQuery(cluster)
     f.write(query_string)
   query_file = local_script_file_name
   staged_file = '/'.join([base_dir, query_file])
