@@ -52,6 +52,7 @@ def CreateMockServerVM(db_class):
   m = mock.MagicMock()
   m.HasIpAddress = True
   m.ip_address = '192.168.2.1'
+  m.internal_ip = '192.168.2.3'
   db_class.server_vm = m
 
 
@@ -265,8 +266,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       CreateMockServerVM(db)
       db._Create()
       self.assertTrue(db._Exists())
-      self.assertTrue(hasattr(db, 'firewall'))
-      self.assertEqual(db.endpoint, db.server_vm.ip_address)
+      self.assertEqual(db.endpoint, db.server_vm.internal_ip)
       self.assertEqual(db.spec.database_username, 'root')
       self.assertEqual(db.spec.database_password, 'perfkitbenchmarker')
       self.assertIsNone(issue_command.call_args)

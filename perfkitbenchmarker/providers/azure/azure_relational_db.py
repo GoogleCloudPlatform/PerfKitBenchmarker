@@ -374,13 +374,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
   def _CreateAzureUnmanagedSqlInstance(self):
     """Creates an Azure Sql Instance hosted inside of a VM."""
-    self.endpoint = self.server_vm.ip_address
+    self.endpoint = self.server_vm.internal_ip
     self._SetupUnmanagedDatabase()
-    self.firewall = azure_network.AzureFirewall()
-    self.firewall.AllowPort(
-        self.server_vm,
-        self.port,
-        source_range=['%s/32' % self.client_vm.ip_address])
 
   def _Create(self):
     """Creates the Azure RDS instance.

@@ -33,7 +33,6 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 from six.moves import range
 
@@ -195,14 +194,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       self._CreateGcloudSqlInstance()
     else:
       self._SetupUnmanagedDatabase()
-
-      if FLAGS.ip_addresses == vm_util.IpAddressSubset.INTERNAL:
-        self.endpoint = self.server_vm.internal_ip
-      else:
-        self.endpoint = self.server_vm.ip_address
-        self.firewall = gce_network.GceFirewall()
-        self.firewall.AllowPort(
-            self.server_vm, self.port, source_range=[self.client_vm.ip_address])
+      self.endpoint = self.server_vm.internal_ip
       self.unmanaged_db_exists = True
 
   def _GetHighAvailabilityFlag(self):

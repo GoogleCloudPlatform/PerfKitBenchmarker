@@ -26,7 +26,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sql_engine_utils
-from perfkitbenchmarker import vm_util
 import six
 
 # TODO(ferneyhough): change to enum
@@ -749,10 +748,7 @@ class BaseRelationalDb(resource.BaseResource):
     self.SetMYSQLClientPrivileges()
 
   def SetMYSQLClientPrivileges(self):
-    if FLAGS.ip_addresses == vm_util.IpAddressSubset.INTERNAL:
-      client_ip = self.client_vm.internal_ip
-    else:
-      client_ip = self.client_vm.ip_address
+    client_ip = self.client_vm.internal_ip
 
     self.server_vm_query_tools.IssueSqlCommand(
         'CREATE USER \'%s\'@\'%s\' IDENTIFIED BY \'%s\';' %

@@ -417,15 +417,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     if self.is_managed_db:
       self._CreateAwsSqlInstance()
     else:
-      self.endpoint = self.server_vm.ip_address
+      self.endpoint = self.server_vm.internal_ip
       self._SetupUnmanagedDatabase()
-      self.firewall = aws_network.AwsFirewall()
-      self.firewall.AllowPortInSecurityGroup(
-          self.server_vm.region,
-          self.server_vm.network.regional_network.vpc.default_security_group_id,
-          self.port,
-          self.port,
-          ['%s/32' % self.client_vm.ip_address])
       self.unmanaged_db_exists = True
 
   def _IsDeleting(self):

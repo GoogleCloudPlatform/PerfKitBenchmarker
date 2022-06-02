@@ -25,7 +25,6 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
-from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.sql_engine_utils import AURORA_POSTGRES
 from perfkitbenchmarker.sql_engine_utils import MYSQL
@@ -146,6 +145,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     m = mock.MagicMock()
     m.HasIpAddress = True
     m.ip_address = '192.168.2.1'
+    m.internal_ip = '192.168.2.3'
     db_class.server_vm = m
 
   def CreateDbFromMockSpec(self, mock_spec):
@@ -329,9 +329,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
                     command_string)
       self.assertIn('--skip-final-snapshot', command_string)
 
-  @mock.patch.object(aws_network.AwsFirewall, '_RuleExists', return_value=True,
-                     autospec=True)
-  def testCreateUnmanagedDb(self, rule_check_mock):  # pylint: disable=unused-argument
+  def testCreateUnmanagedDb(self):
     FLAGS['use_managed_db'].parse(False)
     FLAGS['innodb_buffer_pool_size'].parse(100)
     FLAGS['innodb_log_file_size'].parse(1000)
@@ -344,8 +342,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.CreateMockServerVM(db)
       db._Create()
       self.assertTrue(db._Exists())
-      self.assertTrue(hasattr(db, 'firewall'))
-      self.assertEqual(db.endpoint, db.server_vm.ip_address)
+      self.assertEqual(db.endpoint, db.server_vm.internal_ip)
       self.assertEqual(db.spec.database_username, 'root')
       self.assertEqual(db.spec.database_password, 'perfkitbenchmarker')
       self.assertIsNone(issue_command.call_args)
