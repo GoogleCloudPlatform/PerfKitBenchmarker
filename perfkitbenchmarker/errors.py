@@ -187,7 +187,10 @@ class Benchmarks(object):
     """
 
   class UnsupportedConfigError(Error):
-    """Errors due to an unsupported configuration running."""
+    """Errors due to an unsupported configuration running.
+
+    This is a retryable error when --zone=any.
+    """
     pass
 
 

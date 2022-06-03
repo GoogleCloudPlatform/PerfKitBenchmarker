@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runs SPEC CPU2017.
 
 From the SPEC CPU2017 documentation:
@@ -35,32 +34,36 @@ from perfkitbenchmarker.linux_packages import build_tools
 from perfkitbenchmarker.linux_packages import speccpu
 from perfkitbenchmarker.linux_packages import speccpu2017
 
-
-INT_SUITE = ['perlbench', 'gcc', 'mcf', 'omnetpp',
-             'xalancbmk', 'x264', 'deepsjeng', 'leela',
-             'exchange2', 'xz']
+INT_SUITE = [
+    'perlbench', 'gcc', 'mcf', 'omnetpp', 'xalancbmk', 'x264', 'deepsjeng',
+    'leela', 'exchange2', 'xz'
+]
 INTSPEED_SUITE = [benchmark + '_s' for benchmark in INT_SUITE]
 INTRATE_SUITE = [benchmark + '_r' for benchmark in INT_SUITE]
 
-COMMON_FP_SUITE = ['bwaves', 'cactuBSSN', 'lbm', 'wrf', 'cam4', 'imagick',
-                   'nab', 'fotonik3d', 'roms']
+COMMON_FP_SUITE = [
+    'bwaves', 'cactuBSSN', 'lbm', 'wrf', 'cam4', 'imagick', 'nab', 'fotonik3d',
+    'roms'
+]
 FPSPEED_SUITE = [benchmark + '_s' for benchmark in COMMON_FP_SUITE] + ['pop2_s']
-FPRATE_SUITE = [benchmark + '_r' for benchmark in COMMON_FP_SUITE] + [
-    'namd_r', 'parest_r', 'povray_r', 'blender_r']
+FPRATE_SUITE = [benchmark + '_r' for benchmark in COMMON_FP_SUITE
+               ] + ['namd_r', 'parest_r', 'povray_r', 'blender_r']
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_boolean('spec17_build_only', False,
-                     'Compile benchmarks only, but don\'t run benchmarks. '
-                     'Defaults to False. The benchmark fails if the build '
-                     'fails.')
-flags.DEFINE_boolean('spec17_rebuild', True,
-                     'Rebuild spec binaries, defaults to True. Set to False '
-                     'when using run_stage_iterations > 1 to avoid recompiling')
-flags.DEFINE_string('spec17_gcc_flags', '-O3',
-                    'Flags to be used to override the default GCC -O3 used '
-                    'to compile SPEC.')
-
+flags.DEFINE_boolean(
+    'spec17_build_only', False,
+    'Compile benchmarks only, but don\'t run benchmarks. '
+    'Defaults to False. The benchmark fails if the build '
+    'fails.')
+flags.DEFINE_boolean(
+    'spec17_rebuild', True,
+    'Rebuild spec binaries, defaults to True. Set to False '
+    'when using run_stage_iterations > 1 to avoid recompiling')
+flags.DEFINE_string(
+    'spec17_gcc_flags', '-O3',
+    'Flags to be used to override the default GCC -O3 used '
+    'to compile SPEC.')
 
 BENCHMARK_NAME = 'speccpu2017'
 BENCHMARK_CONFIG = """
@@ -91,6 +94,7 @@ def CheckPrerequisites(benchmark_config):
 
   Args:
     benchmark_config: benchmark_config
+
   Raises:
     errors.Config.InvalidValue: On invalid flag setting.
   """
@@ -109,6 +113,7 @@ def CheckVmPrerequisites(vm):
 
   Args:
     vm: virtual machine to run spec on.
+
   Raises:
     errors.Config.InvalidValue: On insufficient vm memory.
   """
@@ -117,13 +122,13 @@ def CheckVmPrerequisites(vm):
     # AWS machines that advertise 16 GB have slightly less than that
     if available_memory < 15.6 * KB_TO_GB_MULTIPLIER:
       raise errors.Config.InvalidValue(
-          'Available memory of %s GB is insufficient for spec17 speed runs.'
-          % (available_memory / KB_TO_GB_MULTIPLIER))
+          'Available memory of %s GB is insufficient for spec17 speed runs.' %
+          (available_memory / KB_TO_GB_MULTIPLIER))
   if 'intrate' in FLAGS.spec17_subset or 'fprate' in FLAGS.spec17_subset:
     if available_memory < 2 * KB_TO_GB_MULTIPLIER:
       raise errors.Config.InvalidValue(
-          'Available memory of %s GB is insufficient for spec17 rate runs.'
-          % (available_memory / KB_TO_GB_MULTIPLIER))
+          'Available memory of %s GB is insufficient for spec17 rate runs.' %
+          (available_memory / KB_TO_GB_MULTIPLIER))
 
 
 def Prepare(benchmark_spec):
@@ -131,7 +136,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm_util.RunThreaded(_Prepare, vms)
@@ -157,7 +162,13 @@ def _GenIncFile(vm):
     config = FLAGS.runspec_config.split('.')[0]
     cmd = (f'cd /scratch/cpu2017 && sudo ./run_{config}.py '
            '--tuning=base --exit_after_inc_gen < ~/yes.txt')
-    vm.RemoteCommand(cmd)
+    stdout, _ = vm.RemoteCommand(cmd)
+    if 'ERROR' in stdout:
+      raise errors.Benchmarks.PrepareException(
+          'Error during creation of .inc file.'
+          ' This is likely due to a missing entry in cpu_info.json for the'
+          ' given machine type and speccpu17 tar file. This will cause the'
+          ' run to fail.')
 
 
 def Run(benchmark_spec):
@@ -165,7 +176,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of lists of sample.Sample objects.
@@ -285,7 +296,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm_util.RunThreaded(speccpu.Uninstall, vms)
