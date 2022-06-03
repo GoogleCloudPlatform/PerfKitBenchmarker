@@ -33,7 +33,7 @@ DGXSYSTEM = 'DGXA100_multinode'
 CONFIG = f'config_{DGXSYSTEM}.sh'
 AWS_EFA_NCCL_BASEAMI_PIPELINE_URL = 'https://github.com/aws-samples/aws-efa-nccl-baseami-pipeline.git'
 NVIDIA_EFA_DOCKERFILE = 'aws-efa-nccl-baseami-pipeline/nvidia-efa-docker_base/Dockerfile*.base'
-NVIDIA_EFA_DOCKERFILE_COMMIT = 'ac83c764b3f802d24bd78adab260d803ed497f4b'
+NVIDIA_EFA_DOCKERFILE_COMMIT = '3934b3477993661ae0d29e9f23fbd46b64342301'
 
 
 BENCHMARK_NAME = 'mlperf_multiworkers'
