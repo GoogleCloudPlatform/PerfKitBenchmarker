@@ -15,18 +15,47 @@
 
 """Module containing sysbench installation and cleanup functions."""
 
+GIT_REPO = 'https://github.com/akopytov/sysbench'
+GIT_TAG = 'df89d34c410a2277e19f77e47e535d0890b2029b'
+SYSBENCH_DIR = '~/sysbench'
+
 
 def _Install(vm):
   """Installs the sysbench package on the VM."""
-  vm.InstallPackages('sysbench')
+  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, SYSBENCH_DIR))
+  vm.RemoteCommand('cd {0} && git checkout {1}'.format(SYSBENCH_DIR, GIT_TAG))
+  vm.RemoteCommand('cd {0} && make && sudo make install'.format(SYSBENCH_DIR))
+
+
+def _Uninstall(vm):
+  """Uninstalls the sysbench package on the VM."""
+  vm.RemoteCommand('cd {0} && sudo make uninstall'.format(SYSBENCH_DIR))
 
 
 def YumInstall(vm):
   """Installs the sysbench package on the VM."""
   vm.InstallEpelRepo()
+  vm.InstallPackages(
+      'make automake libtool pkgconfig libaio-devel mariadb-devel '
+      'openssl-devel postgresql-devel'
+  )
   _Install(vm)
+
+
+def YumUninstall(vm):
+  """Uninstalls sysbench."""
+  _Uninstall(vm)
 
 
 def AptInstall(vm):
   """Installs the sysbench package on the VM."""
+  vm.InstallPackages(
+      'make automake libtool pkg-config libaio-dev libmysqlclient-dev '
+      'libssl-dev libpq-dev'
+  )
   _Install(vm)
+
+
+def AptUninstall(vm):
+  """Uninstalls sysbench."""
+  _Uninstall(vm)
