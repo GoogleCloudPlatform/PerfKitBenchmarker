@@ -151,6 +151,7 @@
 -   Support logging the start timestamp of each stage.
 -   Support for building GCC on Debian
 -   Support for Postgres 13 on Debian
+-   Add OSProvisioningTimedOut as a recognized failure mode in Azure.
 
 ### Bug fixes and maintenance updates:
 

@@ -84,6 +84,17 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
               "'eastus' zones '1' for subscription",
           'expected_error': errors.Benchmarks.UnsupportedConfigError
       },
+      {
+          'testcase_name':
+              'ProvisioningTimedOut',
+          'stderror':
+              '\"code\": \"OSProvisioningTimedOut\",\r\n        \"message\": '
+              '\"OS Provisioning for VM \'pkb-f1e4bae672b8-0\' did not finish '
+              'in the allotted time. The VM may still finish provisioning '
+              'successfully. Please check provisioning state later.',
+          'expected_error':
+              errors.Resource.ProvisionTimeoutError
+      },
   )
   def testVmCreationError(self, stderror, expected_error):
     spec = azure_virtual_machine.AzureVmSpec(

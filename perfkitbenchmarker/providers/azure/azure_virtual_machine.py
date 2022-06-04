@@ -89,6 +89,9 @@ _SCHEDULED_EVENTS_CMD_WIN = ('Invoke-RestMethod -Headers @{"Metadata"="true"} '
                              'scheduledevents?api-version=2019-01-01 | '
                              'ConvertTo-Json')
 
+# Recognized Errors
+_OS_PROVISIONING_TIMED_OUT = 'OSProvisioningTimedOut'
+
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
@@ -633,44 +636,44 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       elif self.low_priority and 'OverconstrainedAllocationRequest' in stderr:
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
-    # TODO(buggay) refactor to share code with gcp_virtual_machine.py
-    if (self.use_dedicated_host and retcode and
-        'AllocationFailed' in stderr):
-      if self.num_vms_per_host:
-        raise errors.Resource.CreationError(
-            'Failed to create host: %d vms of type %s per host exceeds '
-            'memory capacity limits of the host' %
-            (self.num_vms_per_host, self.machine_type))
-      else:
-        logging.warning(
-            'Creation failed due to insufficient host capacity. A new host will '
-            'be created and instance creation will be retried.')
-        with self._lock:
-          if num_hosts == len(self.host_list):
-            new_host = AzureDedicatedHost(self.name, self.region,
-                                          self.resource_group,
-                                          self.host_series_sku,
-                                          self.availability_zone)
-            self.host_list.append(new_host)
-            new_host.Create()
-          self.host = self.host_list[-1]
-        raise errors.Resource.RetryableCreationError()
-    if (not self.use_dedicated_host and retcode and
-        ('AllocationFailed' in stderr or
-         'OverconstrainedZonalAllocationRequest' in stderr)):
-      raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
-    if retcode:
-      if "Virtual Machine Scale Set with '<NULL>' security type." in stderr:
+      elif _OS_PROVISIONING_TIMED_OUT in stderr:
+        raise errors.Resource.ProvisionTimeoutError(_OS_PROVISIONING_TIMED_OUT +
+                                                    stderr)
+      elif "Virtual Machine Scale Set with '<NULL>' security type." in stderr:
         raise errors.Resource.CreationError(
             f'Failed to create VM: {self.machine_type} is likely a confidential'
             ' machine, which PKB does not support at this time.\n\n'
             f' Full error: {stderr} return code: {retcode}')
-      if "cannot boot Hypervisor Generation '1'" in stderr:
+      elif "cannot boot Hypervisor Generation '1'" in stderr:
         raise errors.Resource.CreationError(
             f'Failed to create VM: {self.machine_type} is unable to support V1 '
             'Hypervision. Please update _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES'
             ' in azure_virtual_machine.py.\n\n'
             f' Full error: {stderr} return code: {retcode}')
+      elif (self.use_dedicated_host and 'AllocationFailed' in stderr):
+        if self.num_vms_per_host:
+          raise errors.Resource.CreationError(
+              'Failed to create host: %d vms of type %s per host exceeds '
+              'memory capacity limits of the host' %
+              (self.num_vms_per_host, self.machine_type))
+        else:
+          logging.warning(
+              'Creation failed due to insufficient host capacity. A new host '
+              'will be created and instance creation will be retried.')
+          with self._lock:
+            if num_hosts == len(self.host_list):
+              new_host = AzureDedicatedHost(self.name, self.region,
+                                            self.resource_group,
+                                            self.host_series_sku,
+                                            self.availability_zone)
+              self.host_list.append(new_host)
+              new_host.Create()
+            self.host = self.host_list[-1]
+          raise errors.Resource.RetryableCreationError()
+      elif (not self.use_dedicated_host and
+            ('AllocationFailed' in stderr or
+             'OverconstrainedZonalAllocationRequest' in stderr)):
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
       else:
         raise errors.Resource.CreationError(
             'Failed to create VM: %s return code: %s' % (stderr, retcode))

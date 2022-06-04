@@ -232,6 +232,10 @@ class Resource(object):
     """Errors while freezing a resource."""
     pass
 
+  class ProvisionTimeoutError(Error):
+    """Timeout errors while provisioning a resource."""
+    pass
+
 
 class Config(object):
   """Errors related to configs."""
