@@ -447,6 +447,11 @@ class StripedDisk(BaseDisk):
     self.metadata = disks[0].metadata.copy()
     if self.disk_size:
       self.metadata['size'] = self.disk_size * self.num_striped_disks
+    if self.metadata.get('iops'):
+      self.metadata['iops'] = self.metadata['iops'] * self.num_striped_disks
+    if self.metadata.get('throughput'):
+      total_throughput = self.metadata['throughput'] * self.num_striped_disks
+      self.metadata['throughput'] = total_throughput
 
   def _Create(self):
     for disk in self.disks:
