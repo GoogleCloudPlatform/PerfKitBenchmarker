@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Module containing wrk2 installation, cleanup, and parsing functions.
 
 wrk2 is a fork of wrk, supporting improved latency stats and fixed throughput.
@@ -29,15 +28,14 @@ WRK2_URL = ('https://github.com/giltene/wrk2/archive/'
 WRK2_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'wrk2')
 WRK2_PATH = posixpath.join(WRK2_DIR, 'wrk')
 
-FLAGS = flags.FLAGS
-
-flags.DEFINE_bool('wrk2_corrected_latency', True,
-                  'Whether or not response latency is corrected.\n'
-                  'If True, wrk2 measure response latency from the time the '
-                  'transmission should have occurred according to the constant '
-                  'throughput configured for the run.\n'
-                  'If False, response latency is the time that actual '
-                  'transmission of a request occured.')
+_CORRECTED = flags.DEFINE_bool(
+    'wrk2_corrected_latency', False,
+    'Whether or not response latency is corrected.\n'
+    'If True, wrk2 measure response latency from the time the '
+    'transmission should have occurred according to the constant '
+    'throughput configured for the run.\n'
+    'If False, response latency is the time that actual '
+    'transmission of a request occured.')
 
 
 def _Install(vm):
@@ -118,7 +116,12 @@ def _ParseOutput(output_text):
     raise ValueError('More than 10% of requests failed.')
 
 
-def Run(vm, target, rate, connections=1, duration=60, script_path=None,
+def Run(vm,
+        target,
+        rate,
+        connections=1,
+        duration=60,
+        script_path=None,
         threads=None):
   """Runs wrk against a given target.
 
@@ -130,6 +133,7 @@ def Run(vm, target, rate, connections=1, duration=60, script_path=None,
     duration: Duration of the test, in seconds.
     script_path: If specified, a lua script to execute.
     threads: Number of threads. Defaults to min(connections, num_cores).
+
   Yields:
     sample.Sample objects with results.
   """
@@ -141,18 +145,25 @@ def Run(vm, target, rate, connections=1, duration=60, script_path=None,
          '--threads={threads} '
          '--duration={duration} '
          '--{corrected}').format(
-             wrk=WRK2_PATH, connections=connections, threads=threads,
-             rate=rate, duration=duration,
-             corrected=(
-                 'latency' if FLAGS.wrk2_corrected_latency else 'u_latency'))
+             wrk=WRK2_PATH,
+             connections=connections,
+             threads=threads,
+             rate=rate,
+             duration=duration,
+             corrected=('latency' if _CORRECTED.value else 'u_latency'))
   if script_path:
     cmd += ' --script ' + script_path
   cmd += ' ' + target
   stdout, _ = vm.RemoteCommand(cmd)
   for variable, value, unit in _ParseOutput(stdout):
-    yield sample.Sample(variable, value, unit,
-                        metadata={'connections': connections,
-                                  'threads': threads,
-                                  'duration': duration,
-                                  'target_rate': rate,
-                                  'corrected': False})
+    yield sample.Sample(
+        variable,
+        value,
+        unit,
+        metadata={
+            'connections': connections,
+            'threads': threads,
+            'duration': duration,
+            'target_rate': rate,
+            'corrected': _CORRECTED.value
+        })
