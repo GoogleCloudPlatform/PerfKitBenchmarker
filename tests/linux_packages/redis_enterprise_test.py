@@ -15,7 +15,9 @@
 
 
 import unittest
+
 import mock
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import redis_enterprise
 from tests import pkb_common_test_case
 
@@ -32,17 +34,24 @@ class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(mock.patch.object(optimizer, '_CreateAndLoadDatabase'))
     self.enter_context(
         mock.patch.object(redis_enterprise, '_GetDatabase', return_value={}))
+    wrong_result = [
+        sample.Sample('fake_metric', 0, 'fake_unit', {'threads': 10})
+    ]
     throughput_responses = [
-        (60, None),
-        (40, None),
-        (70, None),
-        (90, None),
-        (80, None),
-        (30, None),
-        (100, None),
-        (20, None),
-        (50, None),
-        (40, None),
+        (60, wrong_result),
+        (40, wrong_result),
+        (70, wrong_result),
+        (90, wrong_result),
+        (80, wrong_result),
+        (30, wrong_result),
+        # This should be chosen as optimal throughput
+        (100, [
+            sample.Sample('max_throughput_under_1ms', 100, 'ops/sec',
+                          {'threads': 100})
+        ]),
+        (20, wrong_result),
+        (50, wrong_result),
+        (40, wrong_result),
     ]
     self.enter_context(
         mock.patch.object(
@@ -54,6 +63,7 @@ class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
     # Assert
     self.assertEqual(throughput, 100)
     self.assertLen(optimizer.results, 5)
+    self.assertEqual(optimizer.min_threads, 75)
 
 
 if __name__ == '__main__':

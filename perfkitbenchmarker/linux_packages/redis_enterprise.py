@@ -110,6 +110,8 @@ PREPROVISIONED_DATA = {
         'dfe568958b243368c1f1c08c9cce9f660fa06e1bce38fa88f90503e344466927',
 }
 
+_THREAD_OPTIMIZATION_RATIO = 0.75
+
 
 def _GetTarName() -> Optional[str]:
   """Returns the Redis Enterprise package to use depending on the os.
@@ -426,7 +428,8 @@ def Run(redis_vms: List[_VM],
         load_vms: List[_VM],
         redis_port: int,
         shards: Optional[int] = None,
-        proxy_threads: Optional[int] = None) -> _ThroughputSampleTuple:
+        proxy_threads: Optional[int] = None,
+        memtier_threads: Optional[int] = None) -> _ThroughputSampleTuple:
   """Run memtier against enterprise redis and measure latency and throughput.
 
   This function runs memtier against the redis server vm with increasing memtier
@@ -440,6 +443,7 @@ def Run(redis_vms: List[_VM],
     redis_port: Port for the redis server.
     shards: The per-VM shard count for this run.
     proxy_threads: The per-VM proxy thread count for this run.
+    memtier_threads: If provided, overrides --enterprise_redis_min_threads.
 
   Returns:
     A tuple of (max_throughput_under_1ms, list of sample.Sample objects).
@@ -448,10 +452,15 @@ def Run(redis_vms: List[_VM],
   cur_max_latency = 0.0
   latency_threshold = _LATENCY_THRESHOLD.value
   shards = shards or _SHARDS.value
-  threads = _MIN_THREADS.value
+  threads = memtier_threads or _MIN_THREADS.value
   max_threads = _MAX_THREADS.value
   max_throughput_for_completion_latency_under_1ms = 0.0
   redis_vm = redis_vms[0]
+
+  if threads > max_threads:
+    raise errors.Benchmarks.RunError(
+        'min threads %s higher than max threads %s, '
+        'raise --enterprise_redis_max_threads')
 
   while (cur_max_latency < latency_threshold and threads <= max_threads):
     load_command = _BuildRunCommand(redis_vms, threads, redis_port)
@@ -520,6 +529,7 @@ class ThroughputOptimizer():
     client_vms: List of client VMs.
     redis_port: The port the Redis Enterprise database is served on.
     results: Matrix that records the search space of shards and proxy threads.
+    min_threads: Keeps track of the optimal thread count used in previous run.
   """
 
   def __init__(self, server_vms: List[_VM], client_vms: List[_VM],
@@ -527,6 +537,7 @@ class ThroughputOptimizer():
     self.server_vms: List[_VM] = server_vms
     self.client_vms: List[_VM] = client_vms
     self.redis_port: int = redis_port
+    self.min_threads: int = _MIN_THREADS.value
 
     num_cpus = server_vms[0].num_cpus
     self.results: _ThroughputSampleMatrix = (
@@ -556,12 +567,17 @@ class ThroughputOptimizer():
     TuneProxy(server_vm, proxy_thread_count)
     PinWorkers(self.server_vms, proxy_thread_count)
 
-    # Run the test
-    return Run(self.server_vms,
-               self.client_vms,
-               self.redis_port,
-               shard_count,
-               proxy_thread_count)
+    # Optimize the number of threads and run the test
+    results = Run(self.server_vms,
+                  self.client_vms,
+                  self.redis_port,
+                  shard_count,
+                  proxy_thread_count,
+                  self.min_threads)  # pyformat: disable
+    self.min_threads = max(
+        self.min_threads,
+        int(results[1][-1].metadata['threads'] * _THREAD_OPTIMIZATION_RATIO))
+    return results
 
   def _GetResult(self, shards: int,
                  proxy_threads: int) -> _ThroughputSampleTuple:
