@@ -175,10 +175,6 @@ def PrepareHorovod(vm):
       'git+https://github.com/NVIDIA/dllogger.git '
       f'nvidia-dali-cuda{cuda_version}')
 
-  vm.RemoteCommand(
-      f'sudo {pip} install '
-      '--extra-index-url https://developer.download.nvidia.com/compute/redist/ '
-      f'nvidia-dali-tf-plugin-cuda{cuda_version}')
   vm.RemoteCommand(f'sudo {pip} uninstall -y horovod')
   vm.RemoteCommand(
       f'sudo HOROVOD_GPU_OPERATIONS=NCCL HOROVOD_WITH_TENSORFLOW=1 HOROVOD_WITH_MPI=1 {pip} install -U --no-cache horovod'
