@@ -15,50 +15,47 @@
 
 """Module containing OpenJDK installation and cleanup functions."""
 
-from absl import flags
-from perfkitbenchmarker import vm_util
+from typing import Callable
 
-FLAGS = flags.FLAGS
+from absl import flags
+from perfkitbenchmarker import errors
 
 JAVA_HOME = '/usr'
 
-flags.DEFINE_string('openjdk_version', None, 'Version of openjdk to use. '
-                    'By default, the version of openjdk is automatically '
-                    'detected.')
+_JAVA_VERSION = flags.DEFINE_integer(
+    'openjdk_version', None,
+    'Version of openjdk to use. By default, the oldest non-end-of-life LTS '
+    'version of openjdk is automatically detected.')
 
 
-def _OpenJdkPackage(vm, format_string):
-  version = FLAGS.openjdk_version
-  if version is None:
-    # Only install Java 7 if Java 8 is not available.
-    if (vm.HasPackage(format_string.format('7'))
-        and not vm.HasPackage(format_string.format('8'))):
-      version = '7'
-    else:
-      version = '8'
-  return format_string.format(version)
+# Earlier elements of list are preferred.
+# These are the 3 LTS versions of Java.
+# The default 11 is a compromise between the older most popular, but maintenance
+# mode Java 8 and the newest Java 17.
+KNOWN_JAVA_VERSIONS = [11, 17, 8]
+
+
+def _Install(vm, get_package_name_for_version: Callable[[int], str]):
+  """Installs the OpenJDK package on the VM."""
+  def DetectJava():
+    for version in KNOWN_JAVA_VERSIONS:
+      if vm.HasPackage(get_package_name_for_version(version)):
+        return version
+
+  version = _JAVA_VERSION.value or DetectJava()
+  if not version:
+    raise errors.VirtualMachineError(
+        f'No OpenJDK candidate found for {vm.name}.')
+  vm.InstallPackages(get_package_name_for_version(version))
 
 
 def YumInstall(vm):
   """Installs the OpenJDK package on the VM."""
-  vm.InstallPackages(_OpenJdkPackage(vm, 'java-1.{0}.0-openjdk-devel'))
-
-
-@vm_util.Retry()
-def _AddRepository(vm):
-  """Install could fail when Ubuntu keyservers are overloaded."""
-  vm.RemoteCommand(
-      'sudo add-apt-repository -y ppa:openjdk-r/ppa && sudo apt-get update')
+  def OpenJdkPackage(version: int) -> str:
+    return f"java-{version > 8 and version or f'1.{version}.0'}-openjdk-devel"
+  _Install(vm, OpenJdkPackage)
 
 
 def AptInstall(vm):
   """Installs the OpenJDK package on the VM."""
-  package_name = _OpenJdkPackage(vm, 'openjdk-{0}-jdk')
-
-  if not vm.HasPackage(package_name):
-    _AddRepository(vm)
-  vm.InstallPackages(package_name)
-
-  # Populate the ca-certificates-java's trustAnchors parameter.
-  vm.RemoteCommand(
-      'sudo /var/lib/dpkg/info/ca-certificates-java.postinst configure')
+  _Install(vm, lambda version: f'openjdk-{version}-jdk')
