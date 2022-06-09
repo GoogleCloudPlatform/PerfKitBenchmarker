@@ -106,7 +106,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('Bonnie++ prepare on %s', vm)
-  vm.Install('bonnieplusplus')
+  vm.InstallPackages('bonnie++')
 
 
 def IsValueValid(value):

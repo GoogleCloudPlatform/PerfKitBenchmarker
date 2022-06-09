@@ -38,7 +38,6 @@ def YumInstall(vm):
     raise NotImplementedError(
         'PKB currently only supports installation of gluster on centos7 or '
         'Debian-based VMs.')
-  vm.InstallEpelRepo()
   vm.InstallPackages('centos-release-gluster')
   vm.InstallPackages('glusterfs-server')
   vm.RemoteCommand('sudo glusterd')

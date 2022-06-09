@@ -55,6 +55,7 @@ FLAGS = flags.FLAGS
 
 
 OS_PRETTY_NAME_REGEXP = r'PRETTY_NAME="(.*)"'
+_EPEL_URL = 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-{}.noarch.rpm'
 CLEAR_BUILD_REGEXP = r'Installed version:\s*(.*)\s*'
 UPDATE_RETRIES = 5
 DEFAULT_SSH_PORT = 22
@@ -463,6 +464,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self._CreateInstallDir()
       if self.is_static:
         self.SnapshotPackages()
+      # TODO(user): Only setup if necessary.
+      # Call SetupPackageManager lazily from HasPackage/InstallPackages like
+      # ShouldDownloadPreprovisionedData sets up object storage CLIs.
       self.SetupPackageManager()
     self.SetFiles()
     self.DoSysctls()
@@ -1347,7 +1351,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     burn_cpu_threads = burn_cpu_threads or FLAGS.burn_cpu_threads
     burn_cpu_seconds = burn_cpu_seconds or FLAGS.burn_cpu_seconds
     if burn_cpu_seconds:
-      self.Install('sysbench')
+      self.InstallPackages('sysbench')
       end_time = time.time() + burn_cpu_seconds
       self.RemoteCommand(
           'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
@@ -1659,10 +1663,6 @@ class BaseRhelMixin(BaseLinuxMixin):
     """Installs the GCP HPC tools."""
     self.Install('gce_hpc_tools')
 
-  def InstallEpelRepo(self):
-    """Installs the Extra Packages for Enterprise Linux repository."""
-    self.Install('epel_release')
-
   def PackageCleanup(self):
     """Cleans up all installed packages.
 
@@ -1769,15 +1769,32 @@ class AmazonLinux2Mixin(BaseRhelMixin):
   """Class holding Amazon Linux 2 VM methods and attributes."""
   OS_TYPE = os_types.AMAZONLINUX2
 
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://aws.amazon.com/premiumsupport/knowledge-center/ec2-enable-epel/
+    self.RemoteCommand('sudo amazon-linux-extras install epel -y')
+
 
 class Rhel7Mixin(BaseRhelMixin):
   """Class holding RHEL 7 specific VM methods and attributes."""
   OS_TYPE = os_types.RHEL7
 
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_rhel_7
+    # yum exits 1 if the program is installed so check first
+    self.RemoteCommand(
+        f'rpm -q epel-release || sudo yum install -y {_EPEL_URL.format(7)}')
+
 
 class Rhel8Mixin(BaseRhelMixin):
   """Class holding RHEL 8 specific VM methods and attributes."""
   OS_TYPE = os_types.RHEL8
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_rhel_8
+    self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(8)}')
 
 
 class Rhel9Mixin(BaseRhelMixin):
@@ -1785,22 +1802,48 @@ class Rhel9Mixin(BaseRhelMixin):
   OS_TYPE = os_types.RHEL9
   PYTHON_2_PACKAGE = None
 
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_rhel_9
+    self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(9)}')
+
 
 class CentOs7Mixin(BaseRhelMixin):
   """Class holding CentOS 7 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS7
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_centos_7
+    # yum exits 1 if the program is installed so check first
+    self.RemoteCommand(
+        'rpm -q epel-release || sudo yum install -y epel-release')
 
 
 class CentOs8Mixin(BaseRhelMixin, virtual_machine.DeprecatedOsMixin):
   """Class holding CentOS 8 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS8
   END_OF_LIFE = '2021-12-31'
-  ALTERNATIVE_OS = f'{os_types.CENTOS_STREAM8} or {os_types.CENTOS_STREAM8}'
+  ALTERNATIVE_OS = f'{os_types.ROCKY_LINUX8} or {os_types.CENTOS_STREAM8}'
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#almalinux_8_rocky_linux_8
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled powertools && '
+        'sudo dnf install -y epel-release')
 
 
 class CentOsStream8Mixin(BaseRhelMixin):
   """Class holding CentOS Stream 8 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS_STREAM8
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_centos_stream_8
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled powertools && '
+        'sudo dnf install -y epel-release epel-next-release')
 
 
 class CentOsStream9Mixin(BaseRhelMixin):
@@ -1808,10 +1851,24 @@ class CentOsStream9Mixin(BaseRhelMixin):
   OS_TYPE = os_types.CENTOS_STREAM9
   PYTHON_2_PACKAGE = None
 
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_centos_stream_9
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled crb && '
+        'sudo dnf install -y epel-release epel-next-release')
+
 
 class RockyLinux8Mixin(BaseRhelMixin):
   """Class holding Rocky Linux 8 specific VM methods and attributes."""
   OS_TYPE = os_types.ROCKY_LINUX8
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_almalinux_8_rocky_linux_8
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled powertools && '
+        'sudo dnf install -y epel-release')
 
 
 class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):

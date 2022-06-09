@@ -38,7 +38,6 @@ def _Install(vm, packages):
 
 def YumInstall(vm):
   """Installs oldisim dependencies on the VM."""
-  vm.InstallEpelRepo()
   _Install(vm, YUM_PACKAGES)
 
 

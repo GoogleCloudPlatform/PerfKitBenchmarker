@@ -48,7 +48,6 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs the Silo package on the VM."""
-  vm.InstallEpelRepo()
   vm.InstallPackages(YUM_PACKAGES)
   _Install(vm)
 
