@@ -263,6 +263,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   # TODO(user): Remove all uses of Python 2.
   PYTHON_2_PACKAGE = 'python2'
 
+  # this command might change depending on the OS, but most linux distributions
+  # can use the following command
+  INIT_RAM_FS_CMD = 'sudo update-initramfs -u'
+
   def __init__(self, *args, **kwargs):
     super(BaseLinuxMixin, self).__init__(*args, **kwargs)
     # N.B. If you override ssh_port you must override remote_access_ports and
@@ -1318,13 +1322,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.RemoteHostCommand(stripe_cmd)
 
     # Save the RAID layout on the disk
+    self.RemoteHostCommand('sudo mkdir -p /etc/mdadm')
+    self.RemoteHostCommand('sudo touch /etc/mdadm/mdadm.conf')
     cmd = ('sudo mdadm --detail --scan | ' +
            'sudo tee -a /etc/mdadm/mdadm.conf')
     self.RemoteHostCommand(cmd)
 
     # Make the disk available during reboot
-    cmd = 'sudo update-initramfs -u'
-    self.RemoteHostCommand(cmd)
+    init_ram_fs_cmd = self.INIT_RAM_FS_CMD
+    self.RemoteHostCommand(init_ram_fs_cmd)
 
     # Automatically mount the disk after reboot
     cmd = ('echo \'/dev/md0  /mnt/md0  ext4 defaults,nofail'
