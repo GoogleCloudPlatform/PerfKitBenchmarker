@@ -7,9 +7,13 @@ import random
 from absl import flags
 from google.api_core import retry
 from google.cloud import pubsub_v1
-from google.cloud.pubsub_v1.types import PullResponse
+from google.cloud.pubsub_v1 import types
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
+
+BATCH_SETTINGS_MAX_MESSAGES = 1
+BATCH_SETTINGS_MAX_BYTES = 1
+BATCH_SETTINGS_MAX_LATENCY = 0
 
 FLAGS = flags.FLAGS
 
@@ -36,7 +40,12 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     self.project = project
     self.topic = topic
     self.subscription = subscription
-    self.publisher = pubsub_v1.PublisherClient()
+    batch_settings = types.BatchSettings(
+        max_messages=BATCH_SETTINGS_MAX_MESSAGES,
+        max_bytes=BATCH_SETTINGS_MAX_BYTES,
+        max_latency=BATCH_SETTINGS_MAX_LATENCY,
+    )
+    self.publisher = pubsub_v1.PublisherClient(batch_settings)
     self.subscriber = pubsub_v1.SubscriberClient()
 
     self.topic_path = self.publisher.topic_path(self.project, self.topic)
@@ -54,7 +63,7 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     message_id = published_message.result(timeout=client.TIMEOUT)
     return message_id
 
-  def pull_message(self) -> PullResponse:
+  def pull_message(self) -> types.PullResponse:
     """Pulls a single message from a PubSub Subscription."""
     # Cloud Pub/Sub has support for 2 different ways of retrieving messages:
     # Pull, and StreamingPull. We're using Pull, and doing 1 message / request.
@@ -66,7 +75,7 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
         retry=retry.Retry(deadline=client.TIMEOUT))
     return pulled_message
 
-  def acknowledge_received_message(self, response: PullResponse) -> None:
+  def acknowledge_received_message(self, response: types.PullResponse) -> None:
     if response.received_messages[0].message.data:
       ack_ids = []
 
