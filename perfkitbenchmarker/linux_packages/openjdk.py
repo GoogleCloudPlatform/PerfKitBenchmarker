@@ -22,7 +22,7 @@ from perfkitbenchmarker import errors
 
 JAVA_HOME = '/usr'
 
-_JAVA_VERSION = flags.DEFINE_integer(
+OPENJDK_VERSION = flags.DEFINE_integer(
     'openjdk_version', None,
     'Version of openjdk to use. By default, the oldest non-end-of-life LTS '
     'version of openjdk is automatically detected.')
@@ -42,9 +42,9 @@ def _Install(vm, get_package_name_for_version: Callable[[int], str]):
       if vm.HasPackage(get_package_name_for_version(version)):
         return version
 
-  version = _JAVA_VERSION.value or DetectJava()
+  version = OPENJDK_VERSION.value or DetectJava()
   if not version:
-    raise errors.VirtualMachineError(
+    raise errors.VirtualMachine.VirtualMachineError(
         f'No OpenJDK candidate found for {vm.name}.')
   vm.InstallPackages(get_package_name_for_version(version))
 

@@ -1937,7 +1937,10 @@ class BaseDebianMixin(BaseLinuxMixin):
 
   def HasPackage(self, package):
     """Returns True iff the package is available for installation."""
-    return self.TryRemoteCommand('apt-get install --just-print %s' % package,
+    if not self._apt_updated:
+      self.AptUpdate()
+      self._apt_updated = True
+    return self.TryRemoteCommand('apt-cache show ' + package,
                                  suppress_warning=True)
 
   @vm_util.Retry()

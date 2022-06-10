@@ -22,6 +22,7 @@ from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.linux_packages import openjdk
 from perfkitbenchmarker.linux_packages import openjdk_neoverse
 
 
@@ -36,7 +37,7 @@ specjbb2015:
 """
 
 FLAGS = flags.FLAGS
-_DEFAULT_OPEN_JDK_VERSION = '11'
+_DEFAULT_OPEN_JDK_VERSION = 11
 _FOUR_HOURS = 60 * 60 * 4
 # Customer's JVM args.
 _DEFAULT_JVM_ARGS = ('-XX:+AlwaysPreTouch -XX:-UseAdaptiveSizePolicy '
@@ -105,14 +106,15 @@ def Prepare(benchmark_spec):
 
   _PrepareSpec(vm)
 
-  if not FLAGS.openjdk_version:
+  if not openjdk.OPENJDK_VERSION.value:
     FLAGS.openjdk_version = _DEFAULT_OPEN_JDK_VERSION
 
   vm.Install('openjdk')
 
   # Used on m6g (AWS Graviton 2) machines for optimal performance
   if FLAGS.build_openjdk_neoverse:
-    openjdk_neoverse.InstallNeoverseCompiledOpenJDK(vm, FLAGS.openjdk_version)
+    openjdk_neoverse.InstallNeoverseCompiledOpenJDK(
+        vm, openjdk.OPENJDK_VERSION.value)
   vm.InstallPackages('numactl')
 
   # swap only if necessary; free local node memory and avoid remote memory;

@@ -11,7 +11,7 @@ NEOVERSE_CFLAGS = ('-mcpu=neoverse-n1 -march=armv8.2-a -mtune=neoverse-n1 '
 NEOVERSE_LDFLAGS = '-Wl,--allow-multiple-definition -Wl,-lgcc_s -lgcc_s'
 
 
-def InstallNeoverseCompiledOpenJDK(vm, jdk_version):
+def InstallNeoverseCompiledOpenJDK(vm, jdk_version: int):
   """Compiles and installs OpenJDK for Neoverse ARM on the VM.
 
   Installation instructions inpired by
@@ -26,8 +26,8 @@ def InstallNeoverseCompiledOpenJDK(vm, jdk_version):
   if os_type != os_types.UBUNTU1804:
     raise errors.Config.InvalidValue(f'OS Type must be {os_types.UBUNTU1804},'
                                      f'current os type is {FLAGS.os_type}.')
-  if int(jdk_version) != 11:
-    raise errors.Config.InvalidValue('OpenJDK Version must begin with 11, '
+  if jdk_version != 11:
+    raise errors.Config.InvalidValue('OpenJDK Version must equal 11, '
                                      f'current version is {jdk_version}.')
   vm.Install('ubuntu_toolchain')
   # This command fails without Ubuntu 1804 - gcc-10 isn't available.
@@ -58,4 +58,4 @@ def InstallNeoverseCompiledOpenJDK(vm, jdk_version):
     vm.RemoteCommand(f'sudo update-alternatives --set {binary} '
                      f'{build_dir}/jdk/bin/{binary}')
 
-    stdout, _ = vm.RemoteCommand(f'{binary} --version', should_log=True)
+    vm.RemoteCommand(f'{binary} --version', should_log=True)
