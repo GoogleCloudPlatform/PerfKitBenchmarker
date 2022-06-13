@@ -53,6 +53,8 @@ tailbench:
           disk_size: 2000
           disk_type: StandardSSD_LRS
           mount_point: /scratch_ts
+  flags:
+    openjdk_version: 8
 """
 
 _TESTS = flags.DEFINE_multi_enum(

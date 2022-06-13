@@ -27,7 +27,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import openjdk
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_spanner
 from perfkitbenchmarker.providers.gcp import util
@@ -59,10 +58,9 @@ cloud_spanner_ycsb:
     description: {BENCHMARK_DESCRIPTION}
     enable_freeze_restore: True
   flags:
+    openjdk_version: 8
     gcloud_scopes: >
       {' '.join(REQUIRED_SCOPES)}"""
-
-_DEFAULT_JDK_VERSION = 8
 
 CLIENT_TAR_URL = {
     'go': 'https://storage.googleapis.com/cloud-spanner-client-packages/'
@@ -177,9 +175,6 @@ def Prepare(benchmark_spec):
 
   if FLAGS.cloud_spanner_ycsb_client_type != 'java':
     ycsb.SetYcsbTarUrl(CLIENT_TAR_URL[FLAGS.cloud_spanner_ycsb_client_type])
-
-  if not openjdk.OPENJDK_VERSION.value:
-    FLAGS.openjdk_version = _DEFAULT_JDK_VERSION
 
   vms = benchmark_spec.vms
 

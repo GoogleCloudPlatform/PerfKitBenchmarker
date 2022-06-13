@@ -40,7 +40,6 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import hbase_ycsb_benchmark as hbase_ycsb
 from perfkitbenchmarker.linux_packages import hbase
-from perfkitbenchmarker.linux_packages import openjdk
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
 
@@ -48,7 +47,6 @@ FLAGS = flags.FLAGS
 
 HBASE_CLIENT_VERSION = '1.x'
 BIGTABLE_CLIENT_VERSION = '1.4.0'
-_DEFAULT_JDK_VERSION = 8
 
 # TODO(user): remove the custom ycsb build once the head version of YCSB
 # is updated to share Bigtable table object. The source code of the patched YCSB
@@ -112,6 +110,7 @@ cloud_bigtable_ycsb:
       vm_spec: *default_single_core
       vm_count: null
   flags:
+    openjdk_version: 8
     gcloud_scopes: >
       https://www.googleapis.com/auth/bigtable.admin
       https://www.googleapis.com/auth/bigtable.data"""
@@ -226,9 +225,6 @@ def _GetDefaultProject() -> str:
 
 def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
   """Install YCSB and HBase on 'vm'."""
-  if not openjdk.OPENJDK_VERSION.value:
-    FLAGS.openjdk_version = _DEFAULT_JDK_VERSION
-
   vm.Install('hbase')
   vm.Install('ycsb')
   vm.Install('curl')

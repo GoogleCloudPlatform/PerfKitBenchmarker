@@ -34,10 +34,11 @@ specjbb2015:
     default:
       vm_spec: *default_single_core
       disk_spec: *default_50_gb
+  flags:
+    openjdk_version: 11
 """
 
 FLAGS = flags.FLAGS
-_DEFAULT_OPEN_JDK_VERSION = 11
 _FOUR_HOURS = 60 * 60 * 4
 # Customer's JVM args.
 _DEFAULT_JVM_ARGS = ('-XX:+AlwaysPreTouch -XX:-UseAdaptiveSizePolicy '
@@ -105,9 +106,6 @@ def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
 
   _PrepareSpec(vm)
-
-  if not openjdk.OPENJDK_VERSION.value:
-    FLAGS.openjdk_version = _DEFAULT_OPEN_JDK_VERSION
 
   vm.Install('openjdk')
 
@@ -300,7 +298,7 @@ def Run(benchmark_spec):
     stdout, _ = vm.RemoteCommand(cmd, timeout=_FOUR_HOURS)
     max_heap_size_gb = _MaxHeapMB(vm, COMPOSITE_MODE) / 1000.0  # for metadata
 
-  jdk_metadata = FLAGS.openjdk_version or _DEFAULT_OPEN_JDK_VERSION
+  jdk_metadata = FLAGS.openjdk_version
   if FLAGS.build_openjdk_neoverse:
     jdk_metadata += '_neoverse_optimized'
 
