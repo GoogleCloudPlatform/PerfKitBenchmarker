@@ -1940,8 +1940,12 @@ class BaseDebianMixin(BaseLinuxMixin):
     if not self._apt_updated:
       self.AptUpdate()
       self._apt_updated = True
-    return self.TryRemoteCommand('apt-cache show ' + package,
-                                 suppress_warning=True)
+    # apt-cache show will exit 0 for purely virtual packages.
+    # It does always log `N: No packages found` to STDOUT in that case though
+    stdout, stderr, retcode = self.RemoteCommandWithReturnCode(
+        'apt-cache --quiet=0 show ' + package,
+        ignore_failure=True, should_log=True)
+    return not retcode and 'No packages found' not in (stdout + stderr)
 
   @vm_util.Retry()
   def InstallPackages(self, packages):
