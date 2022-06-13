@@ -132,7 +132,7 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
   def SamplesFromQueriesAfterRunningExplain(
       self, database_name: str, queries: Dict[str, str],
       metadata: Dict[str, Any]) -> List[sample.Sample]:
-    """Run the query with explain and run the qeury once more for timing."""
+    """Run queryset once to prewarm, then run the queryset again for timing."""
     results = []
     for query in queries:
       execution_plan, _, _ = self.TimeQuery(
@@ -140,6 +140,7 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
 
       logging.info('Execution Plan for Query %s: %s', query, execution_plan)
 
+    for query in queries:
       _, _, run_time = self.TimeQuery(
           database_name, queries[query], is_explain=False, suppress_stdout=True)
 
