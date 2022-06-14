@@ -164,9 +164,9 @@ class PullLatencyRunner(BaseRunner):
     for _ in range(number_of_messages):
       start_time = GET_TIME_IN_MILLISECONDS()
       try:
-        response = self.client.pull_message()
+        message = self.client.pull_message()
         pull_end_time = GET_TIME_IN_MILLISECONDS()
-        self.client.acknowledge_received_message(response)
+        self.client.acknowledge_received_message(message)
         acknowledge_end_time = GET_TIME_IN_MILLISECONDS()
         pull_latencies.append(pull_end_time - start_time)
         acknowledge_latencies.append(acknowledge_end_time - start_time)
@@ -224,8 +224,8 @@ class PublishLatencyRunner(BaseRunner):
     failure_counter = 0
 
     # publishing 'number_of_messages' messages
-    for _ in range(number_of_messages):
-      message_payload = self.client.generate_random_message(message_size)
+    for i in range(number_of_messages):
+      message_payload = self.client.generate_message(i, message_size)
       start_time = GET_TIME_IN_MILLISECONDS()
       # Publishing a message and waiting for completion
       try:

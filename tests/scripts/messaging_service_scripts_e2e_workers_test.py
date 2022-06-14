@@ -5,6 +5,7 @@ import unittest
 from unittest import mock
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import app
+from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import errors
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import protocol
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import publisher
@@ -70,6 +71,7 @@ class BaseSubprocessTest(pkb_common_test_case.PkbCommonTestCase):
     self.get_client_class_mock = self.enter_context(
         mock.patch.object(app.App, 'get_client_class'))
     self.time_ns_mock = self.enter_context(mock.patch('time.time_ns'))
+    self.time_mock = self.enter_context(mock.patch('time.time'))
     self.sched_setaffinity_mock = self.enter_context(
         mock.patch.object(os, 'sched_setaffinity'))
     self.communicator_instance_mock = self.communicator_mock.return_value
@@ -88,7 +90,12 @@ class BaseSubprocessTest(pkb_common_test_case.PkbCommonTestCase):
         yield self._curr_timens
         self._curr_timens += 1_000_000_000
 
+    def GetTime():
+      while True:
+        yield self._curr_timens
+
     self.time_ns_mock.side_effect = GetTimeNs()
+    self.time_mock.side_effect = GetTime()
 
   def testInitialization(self):
     self.Main(
@@ -123,6 +130,9 @@ class MessagingServiceScriptsE2EReceiverTest(BaseSubprocessTest):
   subprocess_module = receiver
 
   def testMainLoop(self):
+    self.communicator_instance_mock.await_from_main.return_value = (
+        protocol.Consume(seq=1))
+    self.client_instance_mock.decode_seq_from_message.return_value = 1
     self.Main(
         input_conn=self.input_conn_mock,
         output_conn=self.output_conn_mock,
@@ -138,11 +148,14 @@ class MessagingServiceScriptsE2EReceiverTest(BaseSubprocessTest):
         mock.call.communicator.greet(),
         mock.call.communicator.await_from_main(protocol.Consume,
                                                protocol.AckConsume()),
-        mock.call.client.pull_message(),
+        mock.call.client.pull_message(client.TIMEOUT),
         mock.call.client.acknowledge_received_message(mock.ANY),
+        mock.call.client.decode_seq_from_message(mock.ANY),
         mock.call.communicator.send(
             protocol.ReceptionReport(
-                receive_timestamp=pull_timestamp, ack_timestamp=ack_timestamp)),
+                seq=1,
+                receive_timestamp=pull_timestamp,
+                ack_timestamp=ack_timestamp)),
     ])
 
   def testMainLoopError(self):
@@ -159,7 +172,7 @@ class MessagingServiceScriptsE2EReceiverTest(BaseSubprocessTest):
         mock.call.communicator.greet(),
         mock.call.communicator.await_from_main(protocol.Consume,
                                                protocol.AckConsume()),
-        mock.call.client.pull_message(),
+        mock.call.client.pull_message(client.TIMEOUT),
         mock.call.communicator.send(
             protocol.ReceptionReport(receive_error=repr(error))),
     ])
@@ -170,6 +183,8 @@ class MessagingServiceScriptsE2EPublisherTest(BaseSubprocessTest):
   subprocess_module = publisher
 
   def testMainLoop(self):
+    self.communicator_instance_mock.await_from_main.return_value = (
+        protocol.Consume(seq=42))
     self.Main(
         input_conn=self.input_conn_mock,
         output_conn=self.output_conn_mock,
@@ -180,13 +195,15 @@ class MessagingServiceScriptsE2EPublisherTest(BaseSubprocessTest):
     self.parent_mock.assert_has_calls([
         mock.call.communicator.greet(),
         mock.call.communicator.await_from_main(protocol.Publish),
-        mock.call.client.generate_random_message(self.flags_mock.message_size),
+        mock.call.client.generate_message(42, self.flags_mock.message_size),
         mock.call.client.publish_message(mock.ANY),
         mock.call.communicator.send(
             protocol.AckPublish(publish_timestamp=self._curr_timens)),
     ])
 
   def testMainLoopError(self):
+    self.communicator_instance_mock.await_from_main.return_value = (
+        protocol.Consume(seq=33))
     error = Exception('Too bad')
     self.client_instance_mock.publish_message.side_effect = error
     self.Main(
@@ -199,7 +216,7 @@ class MessagingServiceScriptsE2EPublisherTest(BaseSubprocessTest):
     self.parent_mock.assert_has_calls([
         mock.call.communicator.greet(),
         mock.call.communicator.await_from_main(protocol.Publish),
-        mock.call.client.generate_random_message(self.flags_mock.message_size),
+        mock.call.client.generate_message(33, self.flags_mock.message_size),
         mock.call.client.publish_message(mock.ANY),
         mock.call.communicator.send(
             protocol.AckPublish(publish_error=repr(error))),

@@ -4,8 +4,6 @@ This Azure ServiceBus client interface is implemented using Azure SDK for
 Python:
 https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/servicebus/azure-servicebus
 """
-import random
-
 from absl import flags
 # pytype: disable=import-error
 from azure import servicebus
@@ -45,27 +43,27 @@ class AzureServiceBusClient(client.BaseMessagingServiceClient):
     self.subscription_receiver = (
         self.servicebus_client.get_subscription_receiver(
             topic_name=self.topic_name,
-            subscription_name=self.subscription_name,
-            max_wait_time=client.TIMEOUT))
+            subscription_name=self.subscription_name))
 
-  def generate_random_message(
-      self, message_size: int) -> servicebus.ServiceBusMessage:
-    message = ''.join(
-        random.choice(client.MESSAGE_CHARACTERS)
-        for _ in range(message_size))
-    return servicebus.ServiceBusMessage(message)
+  def generate_message(
+      self, seq, message_size: int) -> servicebus.ServiceBusMessage:
+    return servicebus.ServiceBusMessage(
+        super().generate_message(seq, message_size))
 
   def publish_message(self, message):
     self.topic_sender.send_messages(message)
 
-  def pull_message(self):
-    pulled_message = self.subscription_receiver.receive_messages(
-        max_message_count=1)
-    return pulled_message
+  def pull_message(self, timeout: float = client.TIMEOUT):
+    pulled_messages = self.subscription_receiver.receive_messages(
+        max_message_count=1, max_wait_time=timeout)
+    return pulled_messages[0] if pulled_messages else None
 
-  def acknowledge_received_message(self, response):
-    message = response[0]
+  def acknowledge_received_message(self, message):
     self.subscription_receiver.complete_message(message)
+
+  def _get_first_six_bytes_from_payload(self, message) -> bytes:
+    """Gets the first 6 bytes of a message (as returned by pull_message)."""
+    return str(message)[:6].encode('utf-8')
 
   def close(self):
     self.topic_sender.close()

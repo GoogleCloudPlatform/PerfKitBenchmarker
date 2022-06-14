@@ -291,9 +291,9 @@ class MessagingServiceScriptsE2EMainProcessTest(
   async def testPublish(self, read_subprocess_output_mock, *_):
     worker = main_process.PublisherWorker()
     await worker.start()
-    self.assertEqual(await worker.publish(), 1000)
+    self.assertEqual(await worker.publish(1), 1000)
     self._GetSubprocessInWriter(worker).send.assert_called_once_with(
-        protocol.Publish())
+        protocol.Publish(seq=1))
     read_subprocess_output_mock.assert_called_once_with(protocol.AckPublish,
                                                         None)
     await worker.stop()
@@ -309,7 +309,7 @@ class MessagingServiceScriptsE2EMainProcessTest(
     worker = main_process.PublisherWorker()
     await worker.start()
     with self.assertRaises(errors.EndToEnd.SubprocessFailedOperationError):
-      await worker.publish()
+      await worker.publish(1)
     await worker.stop()
 
   @mock.patch.object(main_process.BaseWorker, 'start', return_value=Just())
@@ -320,9 +320,9 @@ class MessagingServiceScriptsE2EMainProcessTest(
   async def testStartConsumption(self, read_subprocess_output_mock, *_):
     worker = main_process.ReceiverWorker()
     await worker.start()
-    await worker.start_consumption()
+    await worker.start_consumption(1)
     self._GetSubprocessInWriter(worker).send.assert_called_once_with(
-        protocol.Consume())
+        protocol.Consume(1))
     read_subprocess_output_mock.assert_called_once_with(protocol.AckConsume,
                                                         None)
     await worker.stop()

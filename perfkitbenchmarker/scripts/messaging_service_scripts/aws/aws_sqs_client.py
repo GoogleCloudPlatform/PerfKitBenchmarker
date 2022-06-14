@@ -4,7 +4,7 @@ This AWS SQS client interface is implemented using Boto3 - AWS SDK for Python.
 Boto3 SQS Documentation:
 https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/sqs.html
 """
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from absl import flags
 import boto3
@@ -37,15 +37,20 @@ class AwsSqsClient(client.BaseMessagingServiceClient):
     published_message = self.queue.send_message(MessageBody=message)
     return published_message
 
-  def pull_message(self) -> Dict[str, Any]:
-    pulled_message = self.sqs_client.receive_message(
+  def pull_message(
+      self, timeout: float = client.TIMEOUT) -> Optional[Dict[str, Any]]:
+    response = self.sqs_client.receive_message(
         QueueUrl=self.queue.url,
         MaxNumberOfMessages=1,
-        WaitTimeSeconds=client.TIMEOUT)
-    return pulled_message
+        WaitTimeSeconds=max(1, int(timeout)))  # WaitTimeSeconds must be an int
+    messages = response.get('Messages', [])
+    return messages[0] if messages else None
 
-  def acknowledge_received_message(self, response: Dict[str, Any]):
-    message = response['Messages'][0]
+  def acknowledge_received_message(self, message: Dict[str, Any]):
     receipt_handle = message['ReceiptHandle']
     self.sqs_client.delete_message(
         QueueUrl=self.queue.url, ReceiptHandle=receipt_handle)
+
+  def _get_first_six_bytes_from_payload(self, message: Dict[str, Any]) -> bytes:
+    """Gets the first 6 bytes of a message (as returned by pull_message)."""
+    return message['Body'][:6].encode('utf-8')

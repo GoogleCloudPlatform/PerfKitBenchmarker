@@ -87,15 +87,15 @@ class EndToEndLatencyRunner(runners.BaseRunner):
 
     try:
       await asyncio.wait([publisher.start(), receiver.start()])
-      for _ in range(number_of_messages):
+      for i in range(number_of_messages):
         try:
-          await receiver.start_consumption()
+          await receiver.start_consumption(i)
           # Give time for the receiver to actually start pulling.
           # RECEIVER_PULL_TIME_MARGIN should be big enough for the receiver to
           # have started pulling after being commanded to do so, while small
           # enough to make this test run on a reasonable time.
           await asyncio.sleep(RECEIVER_PULL_TIME_MARGIN)
-          publish_timestamp = await publisher.publish()
+          publish_timestamp = await publisher.publish(i)
           receive_timestamp, ack_timestamp = await receiver.receive()
           e2e_pull_latencies.append(
               nanoseconds_to_milliseconds(receive_timestamp -

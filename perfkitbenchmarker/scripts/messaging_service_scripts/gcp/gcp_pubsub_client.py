@@ -2,9 +2,10 @@
 
 This PubSub client is implemented using Google Cloud SDK.
 """
-import random
+from typing import Optional
 
 from absl import flags
+from google.api_core import exceptions
 from google.api_core import retry
 from google.cloud import pubsub_v1
 from google.cloud.pubsub_v1 import types
@@ -52,10 +53,8 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     self.subscription_path = self.subscriber.subscription_path(
         self.project, self.subscription)
 
-  def generate_random_message(self, message_size: int) -> bytes:
-    message = ''.join(
-        random.choice(client.MESSAGE_CHARACTERS) for _ in range(message_size))
-    return message.encode('utf-8')
+  def generate_message(self, seq: int, message_size: int) -> bytes:
+    return super().generate_message(seq, message_size).encode('utf-8')
 
   def publish_message(self, message: bytes) -> str:
     """Publishes a single message to a PubSub topic."""
@@ -63,26 +62,33 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     message_id = published_message.result(timeout=client.TIMEOUT)
     return message_id
 
-  def pull_message(self) -> types.PullResponse:
-    """Pulls a single message from a PubSub Subscription."""
+  def pull_message(
+      self, timeout: float = client.TIMEOUT) -> Optional[types.ReceivedMessage]:
+    """See base class."""
     # Cloud Pub/Sub has support for 2 different ways of retrieving messages:
     # Pull, and StreamingPull. We're using Pull, and doing 1 message / request.
-    pulled_message = self.subscriber.pull(
-        request={
-            'subscription': self.subscription_path,
-            'max_messages': 1
-        },
-        retry=retry.Retry(deadline=client.TIMEOUT))
-    return pulled_message
+    try:
+      pulled_messages = self.subscriber.pull(
+          request={
+              'subscription': self.subscription_path,
+              'max_messages': 1
+          },
+          retry=retry.Retry(deadline=timeout),
+          timeout=timeout)
+      return (pulled_messages.received_messages[0]
+              if pulled_messages.received_messages else None)
+    except exceptions.DeadlineExceeded:
+      return None
 
-  def acknowledge_received_message(self, response: types.PullResponse) -> None:
-    if response.received_messages[0].message.data:
-      ack_ids = []
+  def acknowledge_received_message(
+      self, message: types.ReceivedMessage) -> None:
+    # Acknowledges the received message so it will not be sent again.
+    self.subscriber.acknowledge(request={
+        'subscription': self.subscription_path,
+        'ack_ids': [message.ack_id]
+    })
 
-      for received_message in response.received_messages:
-        ack_ids.append(received_message.ack_id)
-      # Acknowledges the received messages so they will not be sent again.
-      self.subscriber.acknowledge(request={
-          'subscription': self.subscription_path,
-          'ack_ids': ack_ids
-      })
+  def _get_first_six_bytes_from_payload(
+      self, message: types.ReceivedMessage) -> bytes:
+    """Gets the first 6 bytes of a message (as returned by pull_message)."""
+    return message.message.data[:6]

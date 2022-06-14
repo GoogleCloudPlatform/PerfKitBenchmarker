@@ -21,7 +21,7 @@ class BaseWorker:
   """Base Worker class which represents a worker in the main process."""
 
   SLEEP_TIME = 0.1
-  DEFAULT_TIMEOUT = 10
+  DEFAULT_TIMEOUT = 20
   CPUS_REQUIRED = 1
 
   def __init__(self,
@@ -107,17 +107,18 @@ class PublisherWorker(BaseWorker):
   def __init__(self, pinned_cpus: Optional[Set[int]] = None):
     super().__init__(publisher.main, pinned_cpus)
 
-  async def publish(self, timeout: Optional[float] = None):
+  async def publish(self, seq: int, timeout: Optional[float] = None):
     """Commands the worker to send a message.
 
     Args:
+      seq: Sequence number. Must be an unsigned 32-bit integer.
       timeout: Timeout in seconds. Defaults to BaseWorker.DEFAULT_TIMEOUT.
 
     Returns:
       An int representing the timestamp registered just after the worker sent
       the message.
     """
-    self.subprocess_in_writer.send(protocol.Publish())
+    self.subprocess_in_writer.send(protocol.Publish(seq=seq))
     response = await self._read_subprocess_output(protocol.AckPublish, timeout)
     if response.publish_error is not None:
       raise errors.EndToEnd.SubprocessFailedOperationError(
@@ -133,7 +134,7 @@ class ReceiverWorker(BaseWorker):
 
   The lifecycle of this object is:
     - start() to spawn the subprocess
-    - start_consumption() to send messages, many times as desired (usually
+    - start_consumption() to receive messages, many times as desired (usually
       before another Publisher.publish() call)
     - receive() up to once per start_consumption() call
     - stop() to shutdown the subprocess
@@ -145,7 +146,7 @@ class ReceiverWorker(BaseWorker):
   def __init__(self, pinned_cpus: Optional[Set[int]] = None):
     super().__init__(receiver.main, pinned_cpus)
 
-  async def start_consumption(self, timeout: Optional[float] = None):
+  async def start_consumption(self, seq: int, timeout: Optional[float] = None):
     """Commands the worker to start polling.
 
     Then waits for the worker's ACK.
@@ -155,9 +156,10 @@ class ReceiverWorker(BaseWorker):
     To be safe you should wait an extra time.
 
     Args:
+      seq: int. The expected sequence number to receive.
       timeout: Timeout in seconds. Defaults to BaseWorker.DEFAULT_TIMEOUT.
     """
-    self.subprocess_in_writer.send(protocol.Consume())
+    self.subprocess_in_writer.send(protocol.Consume(seq=seq))
     await self._read_subprocess_output(protocol.AckConsume, timeout)
 
   async def receive(self, timeout: Optional[float] = None) -> Tuple[int, int]:

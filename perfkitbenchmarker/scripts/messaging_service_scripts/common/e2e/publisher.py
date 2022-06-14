@@ -45,8 +45,9 @@ def main(input_conn: connection.Connection,
   times_iterable = itertools.repeat(0) if iterations is None else range(
       iterations)
   for _ in times_iterable:
-    communicator.await_from_main(protocol.Publish)
-    message_payload = client.generate_random_message(FLAGS.message_size)
+    publish_obj = communicator.await_from_main(protocol.Publish)
+    message_payload = client.generate_message(
+        publish_obj.seq, FLAGS.message_size)
     publish_timestamp = time.time_ns()
     try:
       client.publish_message(message_payload)

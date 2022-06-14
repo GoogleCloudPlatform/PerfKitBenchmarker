@@ -13,7 +13,7 @@ class Ready:
 @dataclasses.dataclass
 class Publish:
   """Message to signal Publish command to subprocess."""
-  pass
+  seq: int
 
 
 @dataclasses.dataclass
@@ -23,12 +23,14 @@ class AckPublish:
   publish_error: Optional[str] = None
 
 
+# TODO(odiego): Rename to Receive
 @dataclasses.dataclass
 class Consume:
-  """Message to signal Publish command to subprocess."""
-  pass
+  """Message to signal Consume command to subprocess."""
+  seq: int
 
 
+# TODO(odiego): Rename to AckReceive
 @dataclasses.dataclass
 class AckConsume:
   """Message acknowledging Consume command to main process."""
@@ -38,6 +40,7 @@ class AckConsume:
 @dataclasses.dataclass
 class ReceptionReport:
   """Message reporting Consume command results to main process."""
+  seq: Optional[int] = None
   receive_timestamp: Optional[int] = None
   ack_timestamp: Optional[int] = None
   receive_error: Optional[str] = None

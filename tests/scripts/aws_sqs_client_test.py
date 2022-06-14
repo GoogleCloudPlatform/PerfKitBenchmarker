@@ -44,11 +44,7 @@ class AWSSQSClientTest(pkb_common_test_case.PkbCommonTestCase):
         WaitTimeSeconds=TIMEOUT)
 
   def testAcknowledgeReceivedMessage(self, client_mock, resource_mock):
-    response = {
-        'Messages': [{
-            'ReceiptHandle': 'MockedReceipt'
-        }]
-    }
+    response = {'ReceiptHandle': 'MockedReceipt'}
 
     aws_client = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
     aws_client.acknowledge_received_message(response)
