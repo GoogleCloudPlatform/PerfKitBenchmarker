@@ -129,8 +129,8 @@ class GceDisk(disk.BaseDisk):
       del cmd.flags['zone']
     cmd.Issue(raise_on_failure=False)
 
-  def _Exists(self):
-    """Returns true if the disk exists."""
+  def _Describe(self):
+    """Returns json describing the disk or None on failure."""
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'describe', self.name)
 
     if self.replica_zones:
@@ -139,10 +139,20 @@ class GceDisk(disk.BaseDisk):
 
     stdout, _, _ = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     try:
-      json.loads(stdout)
+      result = json.loads(stdout)
     except ValueError:
-      return False
-    return True
+      return None
+    return result
+
+  def _Ready(self):
+    """Returns true if the disk is ready."""
+    result = self._Describe()
+    return result['status'] == 'READY'
+
+  def _Exists(self):
+    """Returns true if the disk exists."""
+    result = self._Describe()
+    return bool(result)
 
   @vm_util.Retry()
   def Attach(self, vm):
