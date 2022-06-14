@@ -142,7 +142,7 @@ class GkeCluster(container_service.KubernetesCluster):
     """Creates the cluster."""
     cmd = self._GcloudCommand('container', 'clusters', 'create', self.name)
 
-    self._AddNodeParamsToCmd(self.vm_config, self.num_nodes,
+    self._AddNodeParamsToCmd(self.vm_config, self.num_nodes, None,
                              container_service.DEFAULT_NODEPOOL, cmd)
 
     if self.cluster_version:
@@ -194,7 +194,9 @@ class GkeCluster(container_service.KubernetesCluster):
     for name, nodepool in six.iteritems(self.nodepools):
       cmd = self._GcloudCommand('container', 'node-pools', 'create', name,
                                 '--cluster', self.name)
-      self._AddNodeParamsToCmd(nodepool.vm_config, nodepool.vm_count, name, cmd)
+      self._AddNodeParamsToCmd(
+          nodepool.vm_config, nodepool.vm_count, nodepool.sandbox_config,
+          name, cmd)
       self._IssueResourceCreationCommand(cmd)
 
   def _IssueResourceCreationCommand(self, cmd):
@@ -213,7 +215,8 @@ class GkeCluster(container_service.KubernetesCluster):
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
 
-  def _AddNodeParamsToCmd(self, vm_config, num_nodes, name, cmd):
+  def _AddNodeParamsToCmd(
+      self, vm_config, num_nodes, sandbox_config, name, cmd):
     """Modifies cmd to include node specific command arguments."""
 
     if vm_config.gpu_count:
@@ -255,6 +258,9 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.args.append('--enable-gvnic')
     else:
       cmd.args.append('--no-enable-gvnic')
+
+    if sandbox_config is not None:
+      cmd.flags['sandbox'] = sandbox_config.ToSandboxFlag()
 
     # If using a fixed version (or the default) do not enable upgrades.
     if self.cluster_version not in RELEASE_CHANNELS:

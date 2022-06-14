@@ -154,6 +154,7 @@
 -   Add OSProvisioningTimedOut as a recognized failure mode in Azure.
 -   Add support for providing initialization actions into DPB clusters with
     `--dpb_initialization_actions`
+-   Add sandbox configuration fields for GKE nodepools.
 
 ### Bug fixes and maintenance updates:
 

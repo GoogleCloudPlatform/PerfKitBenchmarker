@@ -516,11 +516,15 @@ class GoogleKubernetesEngineRegionalTestCase(
                 'nodepool2': {
                     'vm_spec': {
                         'GCP': {
-                            'machine_type': 'machine-type-2',
+                            'machine_type':
+                                'machine-type-2',
                             'zone':
                                 'us-west1-c' if use_zonal_nodepools else None,
                         },
-                    }
+                    },
+                    'sandbox_config': {
+                        'type': 'gvisor',
+                    },
                 },
             }
         })
@@ -548,6 +552,7 @@ class GoogleKubernetesEngineRegionalTestCase(
       self.assertContainsSubsequence(
           create_nodepool1, ['--node-labels', 'pkb_nodepool=nodepool1'])
       self.assertNotIn('--node-locations', create_nodepool1)
+      self.assertNotIn('--sandbox', create_nodepool1)
       self.assertContainsSubsequence(create_nodepool1, ['--region', 'us-west1'])
 
       self.assertContainsSubsequence(
@@ -555,6 +560,8 @@ class GoogleKubernetesEngineRegionalTestCase(
           ['gcloud', 'container', 'node-pools', 'create', 'nodepool2'])
       self.assertContainsSubsequence(create_nodepool2,
                                      ['--machine-type', 'machine-type-2'])
+      self.assertContainsSubsequence(create_nodepool2,
+                                     ['--sandbox', 'type=gvisor'])
       self.assertNotIn('--node-locations', create_nodepool2)
 
   def testCreateRegionalClusterZonalNodepool(self):

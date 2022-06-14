@@ -1167,7 +1167,8 @@ class _NodepoolSpec(spec.BaseSpec):
             'default': _DEFAULT_VM_COUNT,
             'min': 0
         }),
-        'vm_spec': (option_decoders.PerCloudConfigDecoder, {})
+        'vm_spec': (option_decoders.PerCloudConfigDecoder, {}),
+        'sandbox_config': (_SandboxDecoder, {'default': None}),
     })
     return result
 
@@ -1225,6 +1226,67 @@ class _NodepoolsDecoder(option_decoders.TypeVerifier):
           self._GetOptionFullName(component_full_name), nodepool_name,
           flag_values, **nodepool_config)
     return result
+
+
+class _SandboxSpec(spec.BaseSpec):
+  """Configurable options for sandboxed node pools."""
+
+  def __init__(self, *args, **kwargs):
+    self.type: str = None
+    super(_SandboxSpec, self).__init__(*args, **kwargs)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Can be overridden by derived classes to add options or impose additional
+    requirements on existing options.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(_SandboxSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'type': (option_decoders.StringDecoder, {'none_ok': True,
+                                                 'default': None}),
+    })
+    return result
+
+  def ToSandboxFlag(self):
+    """Returns the string value to pass to gcloud's --sandbox flag."""
+    return 'type=%s' % (self.type,)
+
+
+class _SandboxDecoder(option_decoders.TypeVerifier):
+  """Decodes the sandbox configuration option of a nodepool."""
+
+  def __init__(self, **kwargs):
+    super(_SandboxDecoder, self).__init__((dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Decodes the sandbox configuration option of a nodepool.
+
+    Args:
+      value: Dictionary with the sandbox config.
+      component_full_name: string. Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      Returns the decoded _SandboxSpec.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    super(_SandboxDecoder, self).Decode(value, component_full_name,
+                                        flag_values)
+    return _SandboxSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **value)
 
 
 class _ContainerClusterSpec(spec.BaseSpec):

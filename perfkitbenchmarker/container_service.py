@@ -515,8 +515,12 @@ class BaseContainerCluster(resource.BaseResource):
       nodepool_metadata = {
           'size': nodepool.num_nodes,
           'machine_type': nodepool.vm_config.machine_type,
-          'name': name
+          'name': name,
       }
+      if nodepool.sandbox_config is not None:
+        nodepool_metadata['sandbox_config'] = {
+            'type': nodepool.sandbox_config.type,
+        }
       nodepools[name] = nodepool_metadata
 
     metadata = {
@@ -525,7 +529,7 @@ class BaseContainerCluster(resource.BaseResource):
         'zone': self.zone,
         'size': self.num_nodes,
         'machine_type': self.vm_config.machine_type,
-        'nodepools': nodepools
+        'nodepools': nodepools,
     }
 
     if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
