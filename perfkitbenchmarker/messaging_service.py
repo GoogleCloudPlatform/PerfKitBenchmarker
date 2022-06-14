@@ -26,6 +26,7 @@ MESSAGING_SERVICE_SCRIPTS_COMMON_FILES = [
     'app.py',
     'client.py',
     'errors.py',
+    'log_utils.py',
     'runners.py',
     'e2e/__init__.py',
     'e2e/latency_runner.py',

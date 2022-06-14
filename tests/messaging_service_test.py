@@ -88,6 +88,13 @@ class MessagingServiceTest(pkb_common_test_case.PkbCommonTestCase):
             'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
         ),
         mock.call.PushDataFile(
+            'messaging_service_scripts/common/log_utils.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/log_utils.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common'
+        ),
+        mock.call.PushDataFile(
             'messaging_service_scripts/common/runners.py',
             '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/runners.py'
         ),
