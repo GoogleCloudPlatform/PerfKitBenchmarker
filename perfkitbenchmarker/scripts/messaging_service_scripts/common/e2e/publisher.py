@@ -1,6 +1,5 @@
 """Module for the publisher subprocess for end-to-end latency measurement."""
 import itertools
-import logging
 from multiprocessing import connection
 import os
 import time
@@ -8,15 +7,10 @@ from typing import Any, Iterable, Optional
 
 from absl import flags
 
-from perfkitbenchmarker.scripts.messaging_service_scripts.common import log_utils
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import protocol
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import worker_utils
 
 FLAGS = flags.FLAGS
-
-
-# setting dummy root logger, before serialized_flags are parsed
-logger = logging.getLogger('')
 
 
 def main(input_conn: connection.Connection,
@@ -42,12 +36,9 @@ def main(input_conn: connection.Connection,
     pinned_cpus: Optional. An iterable of CPU IDs to be passed to
       os.sched_setaffinity if set.
   """
-  global logger
   if pinned_cpus is not None:
     os.sched_setaffinity(0, pinned_cpus)
   FLAGS(serialized_flags.splitlines(), known_only=True)
-  # setting actual logger, after actual log level in FLAGS is parsed
-  logger = log_utils.get_logger(__name__, 'publisher.log')
   client = app.get_client_class().from_flags()
   communicator = worker_utils.Communicator(input_conn, output_conn)
   communicator.greet()
