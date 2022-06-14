@@ -152,6 +152,8 @@
 -   Support for building GCC on Debian
 -   Support for Postgres 13 on Debian
 -   Add OSProvisioningTimedOut as a recognized failure mode in Azure.
+-   Add support for providing initialization actions into DPB clusters with
+    `--dpb_initialization_actions`
 
 ### Bug fixes and maintenance updates:
 

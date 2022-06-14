@@ -57,11 +57,15 @@ flags.DEFINE_string('dpb_service_zone', None, 'The zone for provisioning the '
                     'dpb_service instance.')
 flags.DEFINE_list(
     'dpb_job_properties', [], 'A list of strings of the form '
-    '"key=value" to be passed into DBP jobs.')
+    '"key=value" to be passed into DPB jobs.')
 flags.DEFINE_list(
     'dpb_cluster_properties', [], 'A list of strings of the form '
-    '"type:key=value" to be passed into DBP clusters. See '
+    '"type:key=value" to be passed into DPB clusters. See '
     'https://cloud.google.com/dataproc/docs/concepts/configuring-clusters/cluster-properties.'
+)
+flags.DEFINE_string(
+    'dpb_initialization_actions', None,
+    'A comma separated list of Google Cloud Storage URIs of executables to run on each node in the DPB cluster. See https://cloud.google.com/sdk/gcloud/reference/dataproc/clusters/create#--initialization-actions.'
 )
 
 FLAGS = flags.FLAGS
