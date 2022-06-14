@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import multiprocessing as mp
 import os
 import random
@@ -9,10 +10,15 @@ import sys
 from typing import Optional, Set
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import errors
+from perfkitbenchmarker.scripts.messaging_service_scripts.common import log_utils
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import runners
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import main_process
 
 RECEIVER_PULL_TIME_MARGIN = 0.5  # seconds
+
+
+# setting dummy root logger, before flags are parsed
+logger = logging.getLogger('')
 
 
 def nanoseconds_to_milliseconds(ns: int) -> int:
@@ -28,6 +34,7 @@ class EndToEndLatencyRunner(runners.BaseRunner):
 
   @classmethod
   def on_startup(cls):
+    global logger
     mp.set_start_method('spawn')
     available_cpus = os.sched_getaffinity(0)
     publisher_cpus_required = main_process.PublisherWorker.CPUS_REQUIRED
@@ -49,6 +56,7 @@ class EndToEndLatencyRunner(runners.BaseRunner):
     cls.MAIN_PINNED_CPUS = main_process_cpus
     cls.PUBLISHER_PINNED_CPUS = publisher_cpus
     cls.RECEIVER_PINNED_CPUS = receiver_cpus
+    logger = log_utils.get_logger(__name__, 'main.log')
 
   def run_phase(self, number_of_messages: int, message_size: int):
     """Runs an end-to-end latency benchmark.

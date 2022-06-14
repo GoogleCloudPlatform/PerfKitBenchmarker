@@ -5,6 +5,7 @@ from typing import Type
 from absl import flags
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
+from perfkitbenchmarker.scripts.messaging_service_scripts.common import log_utils
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import runners
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import latency_runner
 
@@ -25,6 +26,9 @@ _MESSAGE_SIZE = flags.DEFINE_integer(
     10,
     help='Number of characters to have in a message. '
     "Ex: 1: 'A', 2: 'AA', ...")
+
+
+log_utils.silence_log_messages_by_default()
 
 
 class App:
