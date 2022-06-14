@@ -19,6 +19,7 @@ to test Spanner. Configure the number of VMs via --ycsb_client_vms.
 """
 
 import logging
+import time
 from typing import Any, Dict, List
 
 from absl import flags
@@ -99,6 +100,12 @@ _CPU_TARGET_HIGH_PRIORITY_UPPER_BOUND = flags.DEFINE_float(
     'Maximum target CPU utilization after which the benchmark will throw an '
     'exception. This is needed so that in CPU-optimized mode, the increase in '
     'QPS does not overshoot the target CPU percentage by too much.')
+_CPU_OPTIMIZATION_SLEEP_MINUTES = flags.DEFINE_integer(
+    'cloud_spanner_ycsb_cpu_optimization_sleep_mins', 0,
+    'Time in minutes to sleep in between run steps that increase the target '
+    'QPS. This allows for Spanner to run compactions and other background '
+    'tasks after a write-heavy workload. See '
+    'https://cloud.google.com/spanner/docs/pre-warm-database.')
 
 
 def _ValidateCpuTargetFlags(flags_dict):
@@ -296,6 +303,14 @@ def CpuUtilizationRun(executor: ycsb.YCSBExecutor,
       for s in run_samples:
         s.metadata['cloud_spanner_cpu_utilization'] = cpu_utilization
       return run_samples
+
+    # Sleep between steps for some workloads.
+    if _CPU_OPTIMIZATION_SLEEP_MINUTES.value:
+      logging.info(
+          'Run phase finished, sleeping for %s minutes before starting the '
+          'next run.', _CPU_OPTIMIZATION_SLEEP_MINUTES.value)
+      time.sleep(_CPU_OPTIMIZATION_SLEEP_MINUTES.value * 60)
+
     qps += _CPU_OPTIMIZATION_TARGET_QPS_INCREMENT.value
     first_run = False
 
