@@ -4,6 +4,8 @@ This Azure ServiceBus client interface is implemented using Azure SDK for
 Python:
 https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/servicebus/azure-servicebus
 """
+import time
+
 from absl import flags
 # pytype: disable=import-error
 from azure import servicebus
@@ -25,6 +27,10 @@ flags.DEFINE_string(
 
 class AzureServiceBusClient(client.BaseMessagingServiceClient):
   """Azure ServiceBus Client Class."""
+
+  PURGE_DURATION = 60  # in seconds
+  PURGE_MAX_MESSAGE_COUNT = 10
+  PURGE_MAX_WAIT_TIME = 5  # in seconds
 
   @classmethod
   def from_flags(cls):
@@ -64,6 +70,22 @@ class AzureServiceBusClient(client.BaseMessagingServiceClient):
   def _get_first_six_bytes_from_payload(self, message) -> bytes:
     """Gets the first 6 bytes of a message (as returned by pull_message)."""
     return str(message)[:6].encode('utf-8')
+
+  def purge_messages(self) -> None:
+    """Purges all the messages for the underlying service."""
+    purge_receiver = self.servicebus_client.get_subscription_receiver(
+        topic_name=self.topic_name,
+        susbcription_name=self.subscription_name,
+        receive_mode=servicebus.ServiceBusReceiveMode.RECEIVE_AND_DELETE)
+    start_time = time.time()
+    with purge_receiver:
+      while True:
+        purge_receiver.receive_messages(
+            max_message_count=self.PURGE_MAX_MESSAGE_COUNT,
+            max_wait_time=self.PURGE_MAX_WAIT_TIME)
+        now = time.time()
+        if now - start_time > self.PURGE_DURATION:
+          return
 
   def close(self):
     self.topic_sender.close()

@@ -51,17 +51,32 @@ def main(input_conn: connection.Connection,
   client = app.get_client_class().from_flags()
   communicator = worker_utils.Communicator(input_conn, output_conn)
   communicator.greet()
+  logger.debug('Publisher ready!')
   times_iterable = itertools.repeat(0) if iterations is None else range(
       iterations)
   for _ in times_iterable:
+    logger.debug('Awaiting for Publish request from main...')
     publish_obj = communicator.await_from_main(protocol.Publish)
     message_payload = client.generate_message(
         publish_obj.seq, FLAGS.message_size)
     publish_timestamp = time.time_ns()
     try:
+      logger.debug(
+          'Publishing message (seq=%d)...',
+          publish_obj.seq,
+          exc_info=True)
       client.publish_message(message_payload)
     except Exception as e:  # pylint: disable=broad-except
+      logger.debug(
+          'Got an error while publishing message (seq=%d).',
+          publish_obj.seq,
+          exc_info=True)
       communicator.send(protocol.AckPublish(publish_error=repr(e)))
     else:
+      logger.debug(
+          'Message (seq=%d) published successfully.',
+          publish_obj.seq,
+          exc_info=True)
       communicator.send(
-          protocol.AckPublish(publish_timestamp=publish_timestamp))
+          protocol.AckPublish(
+              seq=publish_obj.seq, publish_timestamp=publish_timestamp))

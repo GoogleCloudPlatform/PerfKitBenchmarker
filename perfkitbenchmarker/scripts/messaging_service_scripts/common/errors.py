@@ -13,5 +13,11 @@ class EndToEnd:
   class SubprocessFailedOperationError(Exception):
     """Subprocess reported a failure while performing an operation."""
 
+  class PublisherFailedOperationError(SubprocessFailedOperationError):
+    """Publisher subprocess reported a failure while performing an operation."""
+
+  class ReceiverFailedOperationError(SubprocessFailedOperationError):
+    """Receiver subprocess reported a failure while performing an operation."""
+
   class PullTimeoutOnReceiverError(Exception):
     """Signals a pull timeout in the receiver process."""

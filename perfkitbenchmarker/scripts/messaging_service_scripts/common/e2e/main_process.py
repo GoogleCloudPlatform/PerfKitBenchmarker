@@ -6,7 +6,7 @@ to measure end-to-end latency accurately.
 import asyncio
 import multiprocessing as mp
 import time
-from typing import Any, Callable, Optional, Set, Tuple, Type
+from typing import Any, Callable, Optional, Set, Type
 
 from absl import flags
 
@@ -22,6 +22,7 @@ class BaseWorker:
 
   SLEEP_TIME = 0.1
   DEFAULT_TIMEOUT = 20
+  PURGE_TIMEOUT = 90
   CPUS_REQUIRED = 1
 
   def __init__(self,
@@ -107,7 +108,8 @@ class PublisherWorker(BaseWorker):
   def __init__(self, pinned_cpus: Optional[Set[int]] = None):
     super().__init__(publisher.main, pinned_cpus)
 
-  async def publish(self, seq: int, timeout: Optional[float] = None):
+  async def publish(
+      self, seq: int, timeout: Optional[float] = None) -> protocol.AckPublish:
     """Commands the worker to send a message.
 
     Args:
@@ -121,9 +123,9 @@ class PublisherWorker(BaseWorker):
     self.subprocess_in_writer.send(protocol.Publish(seq=seq))
     response = await self._read_subprocess_output(protocol.AckPublish, timeout)
     if response.publish_error is not None:
-      raise errors.EndToEnd.SubprocessFailedOperationError(
+      raise errors.EndToEnd.PublisherFailedOperationError(
           response.publish_error)
-    return response.publish_timestamp
+    return response
 
 
 class ReceiverWorker(BaseWorker):
@@ -162,7 +164,8 @@ class ReceiverWorker(BaseWorker):
     self.subprocess_in_writer.send(protocol.Consume(seq=seq))
     await self._read_subprocess_output(protocol.AckConsume, timeout)
 
-  async def receive(self, timeout: Optional[float] = None) -> Tuple[int, int]:
+  async def receive(
+      self, timeout: Optional[float] = None) -> protocol.ReceptionReport:
     """Awaits the worker to receive a message and returns reported timestamps.
 
     Args:
@@ -175,5 +178,11 @@ class ReceiverWorker(BaseWorker):
     report = await self._read_subprocess_output(protocol.ReceptionReport,
                                                 timeout)
     if report.receive_error is not None:
-      raise errors.EndToEnd.SubprocessFailedOperationError(report.receive_error)
-    return report.receive_timestamp, report.ack_timestamp
+      raise errors.EndToEnd.ReceiverFailedOperationError(report.receive_error)
+    return report
+
+  async def purge_messages(self, timeout: Optional[float] = None):
+    if timeout is None:
+      timeout = self.PURGE_TIMEOUT
+    self.subprocess_in_writer.send(protocol.Purge())
+    await self._read_subprocess_output(protocol.PurgeAck, timeout)

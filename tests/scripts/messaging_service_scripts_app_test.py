@@ -5,6 +5,8 @@ from unittest import mock
 
 AZURE_MOCK = mock.Mock()
 sys.modules['azure'] = AZURE_MOCK
+THIRD_PARTY_GOOGLE_PROTOBUF_MOCK = mock.Mock()
+sys.modules['google.protobuf'] = THIRD_PARTY_GOOGLE_PROTOBUF_MOCK
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.aws import aws_sqs_client
 from perfkitbenchmarker.scripts.messaging_service_scripts.azure import azure_service_bus_client

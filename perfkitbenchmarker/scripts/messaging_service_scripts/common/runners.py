@@ -165,6 +165,8 @@ class PullLatencyRunner(BaseRunner):
       start_time = GET_TIME_IN_MILLISECONDS()
       try:
         message = self.client.pull_message()
+        if message is None:
+          raise Exception('Could not pull the message.')
         pull_end_time = GET_TIME_IN_MILLISECONDS()
         self.client.acknowledge_received_message(message)
         acknowledge_end_time = GET_TIME_IN_MILLISECONDS()

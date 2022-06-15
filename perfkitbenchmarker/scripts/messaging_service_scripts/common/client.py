@@ -106,6 +106,10 @@ class BaseMessagingServiceClient(metaclass=abc.ABCMeta):
       response: Response from _pull_message.
     """
 
+  @abc.abstractmethod
+  def purge_messages(self) -> None:
+    """Purges all the messages for the underlying service."""
+
   def close(self):
     """Closes the underlying client objects.
 

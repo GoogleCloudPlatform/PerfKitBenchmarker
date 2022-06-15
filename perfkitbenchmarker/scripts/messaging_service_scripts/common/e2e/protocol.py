@@ -19,6 +19,7 @@ class Publish:
 @dataclasses.dataclass
 class AckPublish:
   """Message acknowledging Publish and reporting results to main process."""
+  seq: Optional[int] = None
   publish_timestamp: Optional[int] = None
   publish_error: Optional[str] = None
 
@@ -44,3 +45,15 @@ class ReceptionReport:
   receive_timestamp: Optional[int] = None
   ack_timestamp: Optional[int] = None
   receive_error: Optional[str] = None
+
+
+@dataclasses.dataclass
+class Purge:
+  """Message to signal a Purge command from the main process."""
+  pass
+
+
+@dataclasses.dataclass
+class PurgeAck:
+  """Message acknowledging a Purge command to main process."""
+  pass

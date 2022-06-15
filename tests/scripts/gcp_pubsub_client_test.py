@@ -1,6 +1,10 @@
 """Tests for data/messaging_service/gcp_pubsub_client.py."""
+import sys
 import unittest
 from unittest import mock
+
+THIRD_PARTY_GOOGLE_PROTOBUF_MOCK = mock.Mock()
+sys.modules['google.protobuf'] = THIRD_PARTY_GOOGLE_PROTOBUF_MOCK
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.gcp import gcp_pubsub_client
 

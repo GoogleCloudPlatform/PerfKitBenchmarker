@@ -4,6 +4,7 @@ This AWS SQS client interface is implemented using Boto3 - AWS SDK for Python.
 Boto3 SQS Documentation:
 https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/sqs.html
 """
+import time
 from typing import Any, Dict, Optional
 
 from absl import flags
@@ -19,6 +20,8 @@ flags.DEFINE_string('queue_name', 'perfkit_queue', help='AWS SQS queue name.')
 
 class AwsSqsClient(client.BaseMessagingServiceClient):
   """AWS SQS PubSub Client Class."""
+
+  PURGE_WAIT_TIME = 60
 
   @classmethod
   def from_flags(cls):
@@ -50,6 +53,13 @@ class AwsSqsClient(client.BaseMessagingServiceClient):
     receipt_handle = message['ReceiptHandle']
     self.sqs_client.delete_message(
         QueueUrl=self.queue.url, ReceiptHandle=receipt_handle)
+
+  def purge_messages(self) -> None:
+    """Purges all the messages for the underlying service."""
+    self.queue.purge()
+    # Waiting 1 minute, as per
+    # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/sqs.html#SQS.Queue.purge
+    time.sleep(self.PURGE_WAIT_TIME)
 
   def _get_first_six_bytes_from_payload(self, message: Dict[str, Any]) -> bytes:
     """Gets the first 6 bytes of a message (as returned by pull_message)."""

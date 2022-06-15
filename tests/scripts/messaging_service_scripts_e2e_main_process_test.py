@@ -286,12 +286,13 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_read_subprocess_output',
-      return_value=Just(protocol.AckPublish(publish_timestamp=1000)))
+      return_value=Just(protocol.AckPublish(seq=1, publish_timestamp=1000)))
   @AsyncTest
   async def testPublish(self, read_subprocess_output_mock, *_):
     worker = main_process.PublisherWorker()
     await worker.start()
-    self.assertEqual(await worker.publish(1), 1000)
+    self.assertEqual(await worker.publish(1), protocol.AckPublish(
+        seq=1, publish_timestamp=1000))
     self._GetSubprocessInWriter(worker).send.assert_called_once_with(
         protocol.Publish(seq=1))
     read_subprocess_output_mock.assert_called_once_with(protocol.AckPublish,
@@ -369,13 +370,16 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
                         ack_timestamp):
     self.publisher_instance_mock.start.return_value = Just()
     self.publisher_instance_mock.stop.return_value = Just()
-    self.publisher_instance_mock.publish.return_value = Just(publish_timestamp)
+    self.publisher_instance_mock.publish.return_value = Just(
+        protocol.AckPublish(seq=0, publish_timestamp=publish_timestamp))
 
     self.receiver_instance_mock.start.return_value = Just()
     self.receiver_instance_mock.stop.return_value = Just()
     self.receiver_instance_mock.start_consumption.return_value = Just()
     self.receiver_instance_mock.receive.return_value = Just(
-        (receive_timestamp, ack_timestamp))
+        protocol.ReceptionReport(
+            seq=0, receive_timestamp=receive_timestamp,
+            ack_timestamp=ack_timestamp))
 
   @mock.patch.object(asyncio, 'run')
   @mock.patch.object(
@@ -384,7 +388,7 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
     runner = latency_runner.EndToEndLatencyRunner(mock.Mock())
     runner.run_phase(13, 14)
     asyncio_run_mock.assert_called_once()
-    self.mock_coro.assert_called_once_with(13, 14)
+    self.mock_coro.assert_called_once_with(13)
 
   @mock.patch.object(asyncio, 'sleep', new=mock_sleep_coro)
   @mock.patch.object(latency_runner, 'print')
@@ -392,7 +396,7 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
   async def testAsyncRunPhase(self, print_mock):
     self._SetupWorkerMocks(1_000_000_000, 1_500_000_000, 2_000_000_000)
     runner = latency_runner.EndToEndLatencyRunner(mock.Mock())
-    metrics = await runner._async_run_phase(1, 42)
+    metrics = await runner._async_run_phase(1)
     print_mock.assert_called_once_with(json.dumps(metrics))
     self.assertEqual(metrics, AGGREGATE_E2E_METRICS)
 
@@ -425,7 +429,7 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
           len(receiver_pinned_cpus), 'test for disjointness')
       sched_setaffinity_mock.assert_called_once_with(0, main_pinned_cpus)
       runner = latency_runner.EndToEndLatencyRunner(mock.Mock())
-      await runner._async_run_phase(1, 42)
+      await runner._async_run_phase(1)
       self.publisher_mock.assert_called_once_with(publisher_pinned_cpus)
       self.receiver_mock.assert_called_once_with(receiver_pinned_cpus)
     finally:
@@ -451,7 +455,7 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
     self.assertIsNone(runner_cls.RECEIVER_PINNED_CPUS)
     sched_setaffinity_mock.assert_not_called()
     runner = latency_runner.EndToEndLatencyRunner(mock.Mock())
-    await runner._async_run_phase(1, 42)
+    await runner._async_run_phase(1)
     self.publisher_mock.assert_called_once_with(None)
     self.receiver_mock.assert_called_once_with(None)
 

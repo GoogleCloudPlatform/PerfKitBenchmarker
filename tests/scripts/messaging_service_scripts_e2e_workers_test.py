@@ -151,6 +151,7 @@ class MessagingServiceScriptsE2EReceiverTest(BaseSubprocessTest):
         mock.call.client.pull_message(client.TIMEOUT),
         mock.call.client.acknowledge_received_message(mock.ANY),
         mock.call.client.decode_seq_from_message(mock.ANY),
+        mock.call.communicator.peek(),
         mock.call.communicator.send(
             protocol.ReceptionReport(
                 seq=1,
@@ -198,7 +199,7 @@ class MessagingServiceScriptsE2EPublisherTest(BaseSubprocessTest):
         mock.call.client.generate_message(42, self.flags_mock.message_size),
         mock.call.client.publish_message(mock.ANY),
         mock.call.communicator.send(
-            protocol.AckPublish(publish_timestamp=self._curr_timens)),
+            protocol.AckPublish(seq=42, publish_timestamp=self._curr_timens)),
     ])
 
   def testMainLoopError(self):

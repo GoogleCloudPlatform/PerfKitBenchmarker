@@ -7,12 +7,15 @@ import multiprocessing as mp
 import os
 import random
 import sys
-from typing import Optional, Set
+import traceback
+from typing import Any, Dict, Optional, Set
 
+from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import errors
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import log_utils
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import runners
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import main_process
+from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import protocol
 
 RECEIVER_PULL_TIME_MARGIN = 0.5  # seconds
 
@@ -58,6 +61,51 @@ class EndToEndLatencyRunner(runners.BaseRunner):
     cls.RECEIVER_PINNED_CPUS = receiver_cpus
     logger = log_utils.get_logger(__name__, 'main.log')
 
+  def __init__(self, client_: client.BaseMessagingServiceClient):
+    super().__init__(client_)
+    self._published_timestamps = []
+    self._receive_timestamps = []
+    self._ack_timestamps = []
+    self._publisher = None
+    self._receiver = None
+
+  def _record_message_published(self, ack_publish: protocol.AckPublish) -> None:
+    self._published_timestamps[ack_publish.seq] = ack_publish.publish_timestamp
+
+  def _record_message_reception(
+      self, reception_report: protocol.ReceptionReport) -> None:
+    self._receive_timestamps[
+        reception_report.seq] = reception_report.receive_timestamp
+    self._ack_timestamps[reception_report.seq] = reception_report.ack_timestamp
+
+  def _compute_metrics(self, number_of_messages: int) -> Dict[str, Any]:
+    e2e_pull_latencies = [None] * number_of_messages
+    e2e_ack_latencies = [None] * number_of_messages
+    failure_counter = 0
+    i = 0
+    for published_timestamp, receive_timestamp, ack_timestamp in zip(
+        self._published_timestamps, self._receive_timestamps,
+        self._ack_timestamps):
+      if None in (published_timestamp, receive_timestamp, ack_timestamp):
+        failure_counter += 1
+        continue
+      e2e_pull_latencies[i] = nanoseconds_to_milliseconds(
+          receive_timestamp - published_timestamp)
+      e2e_ack_latencies[i] = nanoseconds_to_milliseconds(
+          ack_timestamp - published_timestamp)
+      i += 1
+    e2e_pull_latencies = e2e_pull_latencies[:i]
+    e2e_ack_latencies = e2e_ack_latencies[:i]
+    pull_metrics = self._get_summary_statistics('e2e_latency',
+                                                e2e_pull_latencies,
+                                                number_of_messages,
+                                                failure_counter)
+    acknowledge_metrics = self._get_summary_statistics(
+        'e2e_acknowledge_latency', e2e_ack_latencies, number_of_messages,
+        failure_counter)
+    metrics = {**pull_metrics, **acknowledge_metrics}
+    return metrics
+
   def run_phase(self, number_of_messages: int, message_size: int):
     """Runs an end-to-end latency benchmark.
 
@@ -82,52 +130,52 @@ class EndToEndLatencyRunner(runners.BaseRunner):
           ...
         }
     """
-    return asyncio.run(self._async_run_phase(number_of_messages, message_size))
+    return asyncio.run(self._async_run_phase(number_of_messages))
 
-  async def _async_run_phase(self, number_of_messages: int, _: int):
-    """Actual coroutine implementing run phase logic."""
+  async def _wait_until_received(self, seq: int) -> protocol.ReceptionReport:
+    while True:
+      report = await self._receiver.receive()
+      self._record_message_reception(report)
+      if report.seq == seq:
+        return report
 
-    publisher = main_process.PublisherWorker(self.PUBLISHER_PINNED_CPUS)
-    receiver = main_process.ReceiverWorker(self.RECEIVER_PINNED_CPUS)
-    e2e_pull_latencies = []
-    e2e_ack_latencies = []
-    failure_counter = 0
+  async def _async_run_phase(self, number_of_messages: int) -> Dict[str, Any]:
+    """Actual coroutine implementing run phase logic.
 
+    Not re-entrant!
+
+    Args:
+      number_of_messages: Number of messages.
+
+    Returns:
+      A dict of metrics.
+    """
+    self._publisher = main_process.PublisherWorker(self.PUBLISHER_PINNED_CPUS)
+    self._receiver = main_process.ReceiverWorker(self.RECEIVER_PINNED_CPUS)
+    self._published_timestamps = [None] * number_of_messages
+    self._receive_timestamps = [None] * number_of_messages
+    self._ack_timestamps = [None] * number_of_messages
     try:
-      await asyncio.wait([publisher.start(), receiver.start()])
+      await asyncio.wait([self._publisher.start(), self._receiver.start()])
       for i in range(number_of_messages):
         try:
-          await receiver.start_consumption(i)
+          await self._receiver.start_consumption(seq=i)
           # Give time for the receiver to actually start pulling.
           # RECEIVER_PULL_TIME_MARGIN should be big enough for the receiver to
           # have started pulling after being commanded to do so, while small
           # enough to make this test run on a reasonable time.
           await asyncio.sleep(RECEIVER_PULL_TIME_MARGIN)
-          publish_timestamp = await publisher.publish(i)
-          receive_timestamp, ack_timestamp = await receiver.receive()
-          e2e_pull_latencies.append(
-              nanoseconds_to_milliseconds(receive_timestamp -
-                                          publish_timestamp))
-          e2e_ack_latencies.append(
-              nanoseconds_to_milliseconds(ack_timestamp - publish_timestamp))
-        except errors.EndToEnd.SubprocessFailedOperationError:
-          failure_counter += 1
+          self._record_message_published(await self._publisher.publish(i))
+          await self._wait_until_received(i)
+        except errors.EndToEnd.PublisherFailedOperationError:
+          await self._receiver.purge_messages()
+        except errors.EndToEnd.ReceiverFailedOperationError:
+          await asyncio.sleep(main_process.ReceiverWorker.PURGE_TIMEOUT)
     except Exception:  # pylint: disable=broad-except
-      failure_counter += number_of_messages - len(e2e_pull_latencies)
+      traceback.print_exc()
     finally:
-      await asyncio.wait([publisher.stop(), receiver.stop()])
+      await asyncio.wait([self._publisher.stop(), self._receiver.stop()])
 
-    # getting summary statistics
-    pull_metrics = self._get_summary_statistics('e2e_latency',
-                                                e2e_pull_latencies,
-                                                number_of_messages,
-                                                failure_counter)
-    acknowledge_metrics = self._get_summary_statistics(
-        'e2e_acknowledge_latency', e2e_ack_latencies, number_of_messages,
-        failure_counter)
-
-    # merging metrics dictionaries
-    metrics = {**pull_metrics, **acknowledge_metrics}
-
+    metrics = self._compute_metrics(number_of_messages)
     print(json.dumps(metrics))
     return metrics

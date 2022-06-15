@@ -2,6 +2,7 @@
 
 This PubSub client is implemented using Google Cloud SDK.
 """
+import datetime
 from typing import Optional
 
 from absl import flags
@@ -9,6 +10,9 @@ from google.api_core import exceptions
 from google.api_core import retry
 from google.cloud import pubsub_v1
 from google.cloud.pubsub_v1 import types
+# pytype: disable=import-error
+from google.protobuf import timestamp_pb2
+# pytype: enable=import-error
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 
@@ -92,3 +96,13 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
       self, message: types.ReceivedMessage) -> bytes:
     """Gets the first 6 bytes of a message (as returned by pull_message)."""
     return message.message.data[:6]
+
+  def purge_messages(self) -> None:
+    """Purges all the messages for the underlying service."""
+    timestamp = timestamp_pb2.Timestamp()
+    timestamp.FromDatetime(
+        datetime.datetime.now() + datetime.timedelta(days=30))
+    request = types.SeekRequest(
+        subscription=self.subscription,
+        time=timestamp,)
+    self.subscriber.seek(request=request)
