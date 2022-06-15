@@ -13,6 +13,7 @@ spec:
         app: nginx
         appCluster: nginx-cluster
     spec:
+      {% if runtime_class_name %}runtimeClassName: {{ runtime_class_name }}{% endif %}
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

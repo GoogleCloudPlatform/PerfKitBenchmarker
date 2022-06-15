@@ -26,6 +26,9 @@ from perfkitbenchmarker.linux_benchmarks import nginx_benchmark
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_string('kubernetes_nginx_runtime_class_name', None,
+                    'A custom runtimeClassName to apply to the nginx pods.')
+
 BENCHMARK_NAME = 'kubernetes_nginx'
 BENCHMARK_CONFIG = """
 kubernetes_nginx:
@@ -122,7 +125,8 @@ def _PrepareCluster(benchmark_spec):
       nginx_replicas=replicas,
       nginx_content_size=FLAGS.nginx_content_size,
       nginx_port=nginx_port,
-      nginx_worker_connections=FLAGS.nginx_worker_connections)
+      nginx_worker_connections=FLAGS.nginx_worker_connections,
+      runtime_class_name=FLAGS.kubernetes_nginx_runtime_class_name)
 
   benchmark_spec.container_cluster.WaitForResource(
       'deploy/nginx-deployment', 'available')
