@@ -25,15 +25,20 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import util
 
-flags.DEFINE_string('dpb_dataflow_staging_location', None,
-                    'Google Cloud Storage bucket for Dataflow to stage the '
-                    'binary and any temporary files. You must create this '
-                    'bucket ahead of time, before running your pipeline.')
+flags.DEFINE_string(
+    'dpb_dataflow_temp_location', None,
+    'Cloud Storage path for Dataflow to stage most temporary files.')
+flags.DEFINE_string(
+    'dpb_dataflow_staging_location', None,
+    'Google Cloud Storage bucket for Dataflow to stage the binary files. '
+    'You must create this bucket ahead of time, before running your pipeline.')
 flags.DEFINE_string('dpb_dataflow_runner', 'DataflowRunner',
                     'Flag to specify the pipeline runner at runtime.')
 flags.DEFINE_string('dpb_dataflow_sdk', None,
-                    'SDK used to build the Dataflow executable.')
+                    'SDK used to build the Dataflow executable. The latest sdk '
+                    'will be used by default.')
 
 
 FLAGS = flags.FLAGS
@@ -67,8 +72,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     del benchmark_config  # Unused
     if not FLAGS.dpb_job_jarfile or not os.path.exists(FLAGS.dpb_job_jarfile):
       raise errors.Config.InvalidValue('Job jar missing.')
-    if not FLAGS.dpb_dataflow_sdk:
-      raise errors.Config.InvalidValue('Dataflow SDK version missing.')
 
   def Create(self):
     """See base class."""
@@ -127,6 +130,11 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     cmd.append(classname)
     cmd += job_arguments
 
+    if FLAGS.dpb_dataflow_temp_location:
+      cmd.append('--gcpTempLocation={}'.format(
+          FLAGS.dpb_dataflow_temp_location))
+    region = util.GetRegionFromZone(FLAGS.dpb_service_zone)
+    cmd.append('--region={}'.format(region))
     cmd.append('--workerMachineType={}'.format(worker_machine_type))
     cmd.append('--numWorkers={}'.format(num_workers))
     cmd.append('--maxNumWorkers={}'.format(max_num_workers))

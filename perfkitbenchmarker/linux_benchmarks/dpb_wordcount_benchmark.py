@@ -98,6 +98,7 @@ def CheckPrerequisites(benchmark_config):
     raise errors.Config.InvalidValue('Invalid default input directory.')
   # Get handle to the dpb service
   dpb_service_class = dpb_service.GetDpbServiceClass(
+      benchmark_config.dpb_service.worker_group.cloud,
       benchmark_config.dpb_service.service_type)
   dpb_service_class.CheckPrerequisites(benchmark_config)
 
