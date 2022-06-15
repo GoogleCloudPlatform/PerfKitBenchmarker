@@ -71,7 +71,9 @@ aws_dynamodb_ycsb:
   vm_groups:
     default:
       vm_spec: *default_single_core
-      vm_count: 1"""
+      vm_count: 1
+  flags:
+    openjdk_version: 8"""
 
 
 def GetConfig(user_config):
