@@ -16,6 +16,7 @@
 import logging
 import posixpath
 import re
+from typing import Optional
 from absl import flags
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import vm_util
@@ -163,7 +164,7 @@ def NfsExportIntelDirectory(vms) -> None:
   TestInstall(vms)
 
 
-def MpirunMpiVersion(vm, source_cmd: str = None) -> str:
+def MpirunMpiVersion(vm, source_cmd: Optional[str] = None) -> str:
   """Returns the Intel MPI version in use.
 
   Example output of "mpirun -V" (all on one line):

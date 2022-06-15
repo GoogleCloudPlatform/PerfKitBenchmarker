@@ -53,6 +53,9 @@ def GetMpiVersion(vm):
   Returns:
     A string containing the active MPI version,
     None if mpirun could not be found
+
+  Raises:
+    MpirunParseOutputError: if parsing fails.
   """
   stdout, _ = vm.RemoteCommand('mpirun --version',
                                ignore_failure=True,
@@ -60,10 +63,9 @@ def GetMpiVersion(vm):
   if bool(stdout.rstrip()):
     regex = r'MPI\) (\S+)'
     match = re.search(regex, stdout)
-    try:
-      return str(match.group(1))
-    except:
+    if not match:
       raise MpirunParseOutputError('Unable to parse mpirun version output')
+    return str(match.group(1))
   else:
     return None
 

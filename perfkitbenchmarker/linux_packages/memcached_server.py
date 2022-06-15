@@ -143,7 +143,7 @@ def StopMemcached(vm):
 
 def FlushMemcachedServer(ip, port):
   vm_util.IssueCommand(
-      '(echo -e "flush_all\n" ; sleep 1)| netcat %s %s' % (ip, port))
+      ['(echo -e "flush_all\n" ; sleep 1)| netcat %s %s' % (ip, port)])
 
 
 def AptUninstall(vm):

@@ -19,6 +19,7 @@ import posixpath
 import re
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 
@@ -67,6 +68,8 @@ def ParseIORResults(test_output):
                     re.findall('ordering in a file = (.*)', test_output))
   match = re.search(
       'Summary of all tests:\n(.*?)Finished', test_output, re.DOTALL)
+  if not match:
+    raise errors.Benchmarks.RunError('Error parsing: "{test_output}"')
   fp = io.StringIO(re.sub(' +', ' ', match.group(1)))
   result_dicts = csv.DictReader(fp, delimiter=' ')
   results = []
@@ -101,6 +104,8 @@ def ParseMdtestResults(test_output):
   """Parses the test output and returns samples."""
   results = []
   match = re.search('Command line used: (.*)', test_output)
+  if not match:
+    raise errors.Benchmarks.RunError(f'Error parsing "{test_output}"')
   command_line = match.group(1).strip()
   dir_per_task = '-u' in command_line
   summaries = re.findall(_MDTEST_SUMMARY_REGEX, test_output, re.DOTALL)
