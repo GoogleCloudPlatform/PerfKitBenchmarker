@@ -12,6 +12,7 @@ from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import late
 PUBLISH_LATENCY = 'publish_latency'
 PULL_LATENCY = 'pull_latency'
 END_TO_END_LATENCY = 'end_to_end_latency'
+STREAMING_PULL_END_TO_END_LATENCY = 'streaming_pull_end_to_end_latency'
 BENCHMARK_SCENARIO_CHOICES = [PUBLISH_LATENCY, PULL_LATENCY, END_TO_END_LATENCY]
 
 _BENCHMARK_SCENARIO = flags.DEFINE_enum(
@@ -26,6 +27,23 @@ _MESSAGE_SIZE = flags.DEFINE_integer(
     10,
     help='Number of characters to have in a message. '
     "Ex: 1: 'A', 2: 'AA', ...")
+_STREAMING_PULL = flags.DEFINE_boolean(
+    'streaming_pull', False,
+    help=('Use StreamingPull to fetch messages. Supported only in GCP Pubsub '
+          'end-to-end benchmarking.')
+)
+
+
+@flags.multi_flags_validator(
+    ['streaming_pull', 'benchmark_scenario'],
+    message=(
+        'streaming_pull is only supported for end-to-end latency benchmarking '
+        'with GCP PubSub.'))
+def validate_streaming_pull(flags_dict):
+  client_class_name = App.get_instance().get_client_class().__name__
+  return (not flags_dict['streaming_pull'] or
+          client_class_name == 'GCPPubSubClient' and
+          flags_dict['benchmark_scenario'] == END_TO_END_LATENCY)
 
 
 log_utils.silence_log_messages_by_default()
@@ -124,6 +142,9 @@ class App:
       A BaseRunner class.
     """
     try:
+      if (_STREAMING_PULL.value and
+          _BENCHMARK_SCENARIO.value == END_TO_END_LATENCY):
+        return self.runner_registry[STREAMING_PULL_END_TO_END_LATENCY]
       return self.runner_registry[_BENCHMARK_SCENARIO.value]
     except KeyError:
       raise Exception('Unknown benchmark_scenario flag value.')
@@ -143,7 +164,14 @@ class App:
     self._register_runner(PULL_LATENCY, runners.PullLatencyRunner)
     self._register_runner(
         END_TO_END_LATENCY, latency_runner.EndToEndLatencyRunner)
+    self._register_runner(
+        STREAMING_PULL_END_TO_END_LATENCY,
+        latency_runner.StreamingPullEndToEndLatencyRunner)
 
   def _register_runner(self, benchmark_scenario: str,
                        runner_cls: Type[runners.BaseRunner]):
     self.runner_registry[benchmark_scenario] = runner_cls
+
+  def promote_to_singleton_instance(self):
+    """Set this instance as the App.instance singleton."""
+    App.instance = self

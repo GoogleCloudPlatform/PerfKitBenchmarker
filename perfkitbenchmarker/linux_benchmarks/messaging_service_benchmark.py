@@ -78,6 +78,24 @@ _MESSAGE_SIZE = flags.DEFINE_integer(
     10,
     help='Number of characters to have in a message. '
     "Ex: 1: 'A', 2: 'AA', ...")
+_STREAMING_PULL = flags.DEFINE_boolean(
+    'messaging_service_streaming_pull',
+    False,
+    help=('Use StreamingPull to fetch messages. Supported only in GCP Pubsub '
+          'end-to-end benchmarking.')
+)
+
+
+@flags.multi_flags_validator(
+    ['messaging_service_streaming_pull', 'messaging_service_measurement',
+     'cloud'],
+    message=(
+        'streaming_pull is only supported for end-to-end latency benchmarking '
+        'with GCP PubSub.'))
+def ValidateStreamingPull(flags_dict):
+  return (not flags_dict['messaging_service_streaming_pull'] or
+          flags_dict['cloud'] == 'GCP' and
+          flags_dict['messaging_service_measurement'] == END_TO_END)
 
 
 def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -85,13 +103,15 @@ def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
 
 
 def _CreateSamples(results: Dict[str, Any], number_of_messages: int,
-                   message_size: int, cloud: str) -> List[sample.Sample]:
+                   message_size: int, cloud: str,
+                   streaming_pull: bool) -> List[sample.Sample]:
   """Handles sample creation from benchmark_scenario results."""
   samples = []
   common_metadata = {
       'number_of_messages': number_of_messages,
       'message_size': message_size,
-      'cloud': cloud
+      'cloud': cloud,
+      'streaming_pull': streaming_pull,
   }
 
   for metric_name in results:
@@ -147,10 +167,12 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   elif _MEASUREMENT.value == END_TO_END:
     results = service.Run(service.END_TO_END_LATENCY,
                           int(_NUMBER_OF_MESSAGES.value),
-                          int(_MESSAGE_SIZE.value))
+                          int(_MESSAGE_SIZE.value),
+                          _STREAMING_PULL.value,)
   # Creating samples from results
   samples = _CreateSamples(results, int(_NUMBER_OF_MESSAGES.value),
-                           int(_MESSAGE_SIZE.value), FLAGS.cloud)
+                           int(_MESSAGE_SIZE.value), FLAGS.cloud,
+                           _STREAMING_PULL.value)
   return samples
 
 

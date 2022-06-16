@@ -15,6 +15,7 @@ from perfkitbenchmarker.scripts.messaging_service_scripts.common import errors
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import protocol
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import publisher
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import receiver
+from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import streaming_pull_receiver
 
 
 class BaseWorker:
@@ -145,8 +146,10 @@ class ReceiverWorker(BaseWorker):
   Not thread safe.
   """
 
+  WORKER_MAIN = receiver.ReceiverRunner.main
+
   def __init__(self, pinned_cpus: Optional[Set[int]] = None):
-    super().__init__(receiver.main, pinned_cpus)
+    super().__init__(self.WORKER_MAIN, pinned_cpus)
 
   async def start_consumption(self, seq: int, timeout: Optional[float] = None):
     """Commands the worker to start polling.
@@ -186,3 +189,9 @@ class ReceiverWorker(BaseWorker):
       timeout = self.PURGE_TIMEOUT
     self.subprocess_in_writer.send(protocol.Purge())
     await self._read_subprocess_output(protocol.PurgeAck, timeout)
+
+
+class StreamingPullReceiverWorker(ReceiverWorker):
+  """Just like ReceiverWorker, but uses StreamingPull."""
+
+  WORKER_MAIN = streaming_pull_receiver.StreamingPullReceiverRunner.main

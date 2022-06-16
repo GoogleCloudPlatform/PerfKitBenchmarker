@@ -199,7 +199,7 @@ class MessagingServiceScriptsE2EMainProcessTest(
     worker = main_process.ReceiverWorker({3, 1, 4})
     await worker.start()
     self.process_mock.assert_called_once_with(
-        target=receiver.main,
+        target=receiver.ReceiverRunner.main,
         kwargs={
             'input_conn': worker.subprocess_in_reader,
             'output_conn': worker.subprocess_out_writer,
@@ -354,7 +354,10 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
     self.publisher_mock = self.enter_context(
         mock.patch.object(main_process, 'PublisherWorker', autospec=True))
     self.receiver_mock = self.enter_context(
-        mock.patch.object(main_process, 'ReceiverWorker', autospec=True))
+        mock.patch.object(
+            latency_runner.EndToEndLatencyRunner,
+            'RECEIVER_WORKER',
+            autospec=True))
     self.set_start_method_mock = self.enter_context(
         mock.patch.object(mp, 'set_start_method'))
 

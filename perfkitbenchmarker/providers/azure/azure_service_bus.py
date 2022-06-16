@@ -67,7 +67,9 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
             self._SubscriptionExists())
 
   def Run(self, benchmark_scenario: str, number_of_messages: str,
-          message_size: str) -> Dict[str, Any]:
+          message_size: str, streaming_pull: bool = False) -> Dict[str, Any]:
+    if streaming_pull:
+      raise ValueError('Unsupported StreamingPull in AWS SQS.')
     connection_str = self._GetPrimaryConnectionString()
     command = (f'python3 -m azure_benchmark '
                f'--topic_name={self.topic_name} '

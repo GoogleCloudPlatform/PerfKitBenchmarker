@@ -88,8 +88,10 @@ class AwsSqs(msgsvc.BaseMessagingService):
     self.client_vm.Install('aws_credentials')
 
   def Run(self, benchmark_scenario: str, number_of_messages: int,
-          message_size: int):
+          message_size: int, streaming_pull: bool = False):
     """Runs remote commands on client VM - benchmark's run phase."""
+    if streaming_pull:
+      raise ValueError('Unsupported StreamingPull in AWS SQS.')
     command = (f'python3 -m aws_benchmark '
                f'--queue_name={self.queue_name} '
                f'--region={self.region} '

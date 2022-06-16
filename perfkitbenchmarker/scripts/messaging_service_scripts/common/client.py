@@ -1,7 +1,7 @@
 """This module contains the base cloud client class."""
 import abc
 import base64
-from typing import Any, Type, TypeVar
+from typing import Any, Callable, Type, TypeVar
 
 TIMEOUT = 10
 
@@ -109,6 +109,19 @@ class BaseMessagingServiceClient(metaclass=abc.ABCMeta):
   @abc.abstractmethod
   def purge_messages(self) -> None:
     """Purges all the messages for the underlying service."""
+
+  def start_streaming_pull(self, callback: Callable[[Any], None]) -> None:
+    """Opens a streaming connection to pull messages asynchronously.
+
+    Implementation is optional. Just make sure that you don't try to run it with
+    services that don't support it, because it will fail.
+
+    Args:
+      callback: A callable that receives a message argument. It will be called
+        each time a message is received and might run in a different thread than
+        the main one!
+    """
+    raise NotImplementedError
 
   def close(self):
     """Closes the underlying client objects.

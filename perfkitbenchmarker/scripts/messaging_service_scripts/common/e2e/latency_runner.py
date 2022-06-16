@@ -34,6 +34,7 @@ class EndToEndLatencyRunner(runners.BaseRunner):
   MAIN_PINNED_CPUS: Optional[Set[int]] = None
   PUBLISHER_PINNED_CPUS: Optional[Set[int]] = None
   RECEIVER_PINNED_CPUS: Optional[Set[int]] = None
+  RECEIVER_WORKER = main_process.ReceiverWorker
 
   @classmethod
   def on_startup(cls):
@@ -41,7 +42,7 @@ class EndToEndLatencyRunner(runners.BaseRunner):
     mp.set_start_method('spawn')
     available_cpus = os.sched_getaffinity(0)
     publisher_cpus_required = main_process.PublisherWorker.CPUS_REQUIRED
-    receiver_cpus_required = main_process.ReceiverWorker.CPUS_REQUIRED
+    receiver_cpus_required = cls.RECEIVER_WORKER.CPUS_REQUIRED
     total_cpus_required = 1 + publisher_cpus_required + receiver_cpus_required
     if len(available_cpus) < total_cpus_required:
       print(
@@ -151,12 +152,12 @@ class EndToEndLatencyRunner(runners.BaseRunner):
       A dict of metrics.
     """
     self._publisher = main_process.PublisherWorker(self.PUBLISHER_PINNED_CPUS)
-    self._receiver = main_process.ReceiverWorker(self.RECEIVER_PINNED_CPUS)
+    self._receiver = self.RECEIVER_WORKER(self.RECEIVER_PINNED_CPUS)
     self._published_timestamps = [None] * number_of_messages
     self._receive_timestamps = [None] * number_of_messages
     self._ack_timestamps = [None] * number_of_messages
     try:
-      await asyncio.wait([self._publisher.start(), self._receiver.start()])
+      await asyncio.gather(self._publisher.start(), self._receiver.start())
       for i in range(number_of_messages):
         try:
           await self._receiver.start_consumption(seq=i)
@@ -170,12 +171,17 @@ class EndToEndLatencyRunner(runners.BaseRunner):
         except errors.EndToEnd.PublisherFailedOperationError:
           await self._receiver.purge_messages()
         except errors.EndToEnd.ReceiverFailedOperationError:
-          await asyncio.sleep(main_process.ReceiverWorker.PURGE_TIMEOUT)
+          await asyncio.sleep(self.RECEIVER_WORKER.PURGE_TIMEOUT)
     except Exception:  # pylint: disable=broad-except
       traceback.print_exc()
     finally:
-      await asyncio.wait([self._publisher.stop(), self._receiver.stop()])
+      await asyncio.gather(self._publisher.stop(), self._receiver.stop())
 
     metrics = self._compute_metrics(number_of_messages)
     print(json.dumps(metrics))
     return metrics
+
+
+class StreamingPullEndToEndLatencyRunner(EndToEndLatencyRunner):
+  """Runner for end-to-end latency measurement using StreamingPull."""
+  RECEIVER_WORKER = main_process.StreamingPullReceiverWorker

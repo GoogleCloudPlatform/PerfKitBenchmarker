@@ -57,10 +57,11 @@ class MessagingServiceScriptsE2ECommunicatorTest(
 class BaseSubprocessTest(pkb_common_test_case.PkbCommonTestCase):
 
   subprocess_module = None
+  main_function = None
 
   @classmethod
   def Main(cls, *args, **kwargs):
-    cls.subprocess_module.main(*args, **kwargs)
+    cls.main_function(*args, **kwargs)  # pylint: disable=not-callable
 
   def setUp(self):
     super().setUp()
@@ -128,6 +129,7 @@ class BaseSubprocessTest(pkb_common_test_case.PkbCommonTestCase):
 class MessagingServiceScriptsE2EReceiverTest(BaseSubprocessTest):
 
   subprocess_module = receiver
+  main_function = receiver.ReceiverRunner.main
 
   def testMainLoop(self):
     self.communicator_instance_mock.await_from_main.return_value = (
@@ -182,6 +184,7 @@ class MessagingServiceScriptsE2EReceiverTest(BaseSubprocessTest):
 class MessagingServiceScriptsE2EPublisherTest(BaseSubprocessTest):
 
   subprocess_module = publisher
+  main_function = publisher.main
 
   def testMainLoop(self):
     self.communicator_instance_mock.await_from_main.return_value = (

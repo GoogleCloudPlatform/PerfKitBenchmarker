@@ -22,47 +22,50 @@ FLAGS = flags.FLAGS
 logger = logging.getLogger('')
 
 
-def main(input_conn: connection.Connection,
-         output_conn: connection.Connection,
-         serialized_flags: str,
-         app: Any,
-         iterations: Optional[int] = None,
-         pinned_cpus: Optional[Iterable[Any]] = None):
-  """Runs the code for the receiver worker subprocess.
-
-  Intended to be called with the multiprocessing.Process stdlib function.
-
-  Args:
-    input_conn: A connection object created with multiprocessing.Pipe to read
-      data from the main process.
-    output_conn: A connection object created with multiprocessing.Pipe to write
-      data to the main process.
-    serialized_flags: Flags from the main process serialized with
-      flags.FLAGS.flags_into_string.
-    app: Main process' app instance.
-    iterations: Optional. The number of times the main loop will be run. If left
-      unset, it will run forever (or until terminated by the main process).
-    pinned_cpus: Optional. An iterable of CPU IDs to be passed to
-      os.sched_setaffinity if set.
-  """
-  global logger
-  if pinned_cpus is not None:
-    os.sched_setaffinity(0, pinned_cpus)
-  FLAGS(serialized_flags.splitlines(), known_only=True)
-  # setting actual logger, after actual log level in FLAGS is parsed
-  logger = log_utils.get_logger(__name__, 'receiver.log')
-  client = app.get_client_class().from_flags()
-  communicator = worker_utils.Communicator(input_conn, output_conn)
-  runner = ReceiverRunner(client, communicator)
-  runner.process_state()  # this ensures greeting the main process always
-  runner.run(iterations)
-
-
 class ReceiverRunner:
   """Controls the flow of the receiver process.
 
   The whole flow is modeled with a state machine. Each state has its own class.
   """
+
+  @classmethod
+  def main(cls,
+           input_conn: connection.Connection,
+           output_conn: connection.Connection,
+           serialized_flags: str,
+           app: Any,
+           iterations: Optional[int] = None,
+           pinned_cpus: Optional[Iterable[Any]] = None):
+    """Runs the code for the receiver worker subprocess.
+
+    Intended to be called with the multiprocessing.Process stdlib function.
+
+    Args:
+      input_conn: A connection object created with multiprocessing.Pipe to read
+        data from the main process.
+      output_conn: A connection object created with multiprocessing.Pipe to
+        write data to the main process.
+      serialized_flags: Flags from the main process serialized with
+        flags.FLAGS.flags_into_string.
+      app: Main process' app instance.
+      iterations: Optional. The number of times the main loop will be run. If
+        left unset, it will run forever (or until terminated by the main
+        process).
+      pinned_cpus: Optional. An iterable of CPU IDs to be passed to
+        os.sched_setaffinity if set.
+    """
+    global logger
+    if pinned_cpus is not None:
+      os.sched_setaffinity(0, pinned_cpus)
+    app.promote_to_singleton_instance()
+    FLAGS(serialized_flags.splitlines(), known_only=True)
+    # setting actual logger, after actual log level in FLAGS is parsed
+    logger = log_utils.get_logger(__name__, 'receiver.log')
+    client = app.get_client_class().from_flags()
+    communicator = worker_utils.Communicator(input_conn, output_conn)
+    runner = cls(client, communicator)
+    runner.process_state()  # this ensures greeting the main process always
+    runner.run(iterations)
 
   def __init__(
       self,
@@ -85,8 +88,33 @@ class ReceiverRunner:
   def process_state(self) -> None:
     self.state = self.state.process_state()
 
-  def receive_message(self) -> protocol.ReceptionReport:
+  def await_message_received(self) -> Optional[protocol.ReceptionReport]:
+    """Awaits a message from the messaging service and gets a reception report.
+
+    The default implementation calls self.client.pull_message, and then
+    self.process_message to get the reception report, but this may be
+    overriden.
+
+    Returns:
+      A ReceptionReport object.
+    """
     message = self.client.pull_message(common_client.TIMEOUT)
+    return self.process_message(message) if message is not None else None
+
+  def process_message(self, message: Any) -> protocol.ReceptionReport:
+    """Record the reception time for a message, ACK it (recording its time).
+
+    This code should be thread-safe, as it might get run concurrently
+    in a secondary thread (in subclasses).
+
+    Args:
+      message: A message object, as gotten by the client.
+
+    Returns:
+      A ReceptionReport object with the decoded seq, reception time and
+      acknowledge time.
+    """
+
     pull_timestamp = time.time_ns()
     self.client.acknowledge_received_message(message)
     ack_timestamp = time.time_ns()
@@ -122,6 +150,14 @@ class ReceiverRunner:
   def close(self) -> None:
     self.client.close()
 
+  def before_boot(self) -> None:
+    """Runs a start-up action in the BootingState, before greeting main process.
+
+    By default this is a no-op. Intended to be overriden in subclasses if
+    needed.
+    """
+    pass
+
 
 class ReceiverState(abc.ABC):
   """Base class for all receiver runner states."""
@@ -147,6 +183,7 @@ class BootingState(ReceiverState):
   """
 
   def process_state(self) -> ReceiverState:
+    self.receiver_runner.before_boot()
     self.receiver_runner.communicator.greet()
     logger.debug('Receiver ready!')
     return self.get_next_state(ReadyState)
@@ -173,6 +210,8 @@ class PullingState(ReceiverState):
   """The state where we pull messages from the messaging service.
 
   Possible next states:
+  - PullingState if pull operation itself got no message (and deadline is
+    not exceeded).
   - PullSuccessState if the messaging service pull call was successful.
   - PullErrorState if an error was encountered (or deadline was reached).
   """
@@ -189,14 +228,23 @@ class PullingState(ReceiverState):
 
   # TODO(odiego): Rename consume to receive
   def process_state(self) -> ReceiverState:
-    logger.debug('Receiving message (expected_seq=%d)', self.consume_cmd.seq)
+    logger.debug('Getting message (expected_seq=%d)', self.consume_cmd.seq)
     try:
       if time.time() > self.deadline:
+        logger.debug(
+            'Deadline exceeded for message (expected_seq=%d)',
+            self.consume_cmd.seq)
         raise errors.EndToEnd.PullTimeoutOnReceiverError
-      reception_report = self.receiver_runner.receive_message()
+      reception_report = self.receiver_runner.await_message_received()
     except Exception as e:  # pylint: disable=broad-except
       return self.get_next_state(PullErrorState, error=e)
     else:
+      if reception_report is None:
+        logger.debug('No message received. Retrying...')
+        return self.get_next_state(
+            PullingState,
+            consume_cmd=self.consume_cmd,
+            deadline=self.deadline)
       return self.get_next_state(
           PullSuccessState,
           consume_cmd=self.consume_cmd,

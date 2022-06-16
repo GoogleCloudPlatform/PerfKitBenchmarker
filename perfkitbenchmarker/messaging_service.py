@@ -34,6 +34,7 @@ MESSAGING_SERVICE_SCRIPTS_COMMON_FILES = [
     'e2e/protocol.py',
     'e2e/publisher.py',
     'e2e/receiver.py',
+    'e2e/streaming_pull_receiver.py',
     'e2e/worker_utils.py',
 ]
 
@@ -111,7 +112,7 @@ class BaseMessagingService(resource.BaseResource):
 
   @abc.abstractmethod
   def Run(self, benchmark_scenario: str, number_of_messages: str,
-          message_size: str) -> Dict[str, Any]:
+          message_size: str, streaming_pull: bool = False) -> Dict[str, Any]:
     """Runs remote commands on client VM - benchmark's run phase.
 
     Runs a benchmark that consists of first publishing messages and then
@@ -127,6 +128,8 @@ class BaseMessagingService(resource.BaseResource):
       number_of_messages: Number of messages to use on the benchmark.
       message_size: Size of the messages that will be used on the benchmark. It
         specifies the number of characters in those messages.
+      streaming_pull: Set to True if you want to use streaming_pull. False by
+        default. Only implemented properly in GCP PubSub.
 
     Returns:
       Dictionary with metric_name (mean_latency, p50_latency...) as key and the

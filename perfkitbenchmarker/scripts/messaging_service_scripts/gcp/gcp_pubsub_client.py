@@ -3,13 +3,15 @@
 This PubSub client is implemented using Google Cloud SDK.
 """
 import datetime
-from typing import Optional
+import typing
+from typing import Any, Callable, Optional, Union
 
 from absl import flags
 from google.api_core import exceptions
 from google.api_core import retry
 from google.cloud import pubsub_v1
 from google.cloud.pubsub_v1 import types
+from google.cloud.pubsub_v1.subscriber import message as pubsub_message
 # pytype: disable=import-error
 from google.protobuf import timestamp_pb2
 # pytype: enable=import-error
@@ -85,7 +87,8 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
       return None
 
   def acknowledge_received_message(
-      self, message: types.ReceivedMessage) -> None:
+      self,
+      message: Union[types.ReceivedMessage, pubsub_message.Message]) -> None:
     # Acknowledges the received message so it will not be sent again.
     self.subscriber.acknowledge(request={
         'subscription': self.subscription_path,
@@ -93,9 +96,15 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     })
 
   def _get_first_six_bytes_from_payload(
-      self, message: types.ReceivedMessage) -> bytes:
-    """Gets the first 6 bytes of a message (as returned by pull_message)."""
-    return message.message.data[:6]
+      self,
+      message: Union[types.ReceivedMessage, pubsub_message.Message]) -> bytes:
+    """Gets the first 6 bytes of a message (as returned by pull_message or PullingStream)."""
+    if isinstance(message, types.ReceivedMessage):
+      return typing.cast(types.ReceivedMessage, message).message.data[:6]
+    elif isinstance(message, pubsub_message.Message):
+      return typing.cast(pubsub_message.Message, message).data[:6]
+    else:
+      raise ValueError(f'Got unexpected message type: {type(message)}.')
 
   def purge_messages(self) -> None:
     """Purges all the messages for the underlying service."""
@@ -106,3 +115,10 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
         subscription=self.subscription,
         time=timestamp,)
     self.subscriber.seek(request=request)
+
+  def start_streaming_pull(self, callback: Callable[[Any], None]) -> None:
+    """See base class."""
+    self.subscriber.subscribe(self.subscription_path, callback=callback)
+
+  def close(self):
+    self.subscriber.close()

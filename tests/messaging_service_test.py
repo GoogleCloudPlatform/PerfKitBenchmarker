@@ -144,6 +144,13 @@ class MessagingServiceTest(pkb_common_test_case.PkbCommonTestCase):
             'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
         ),
         mock.call.PushDataFile(
+            'messaging_service_scripts/common/e2e/streaming_pull_receiver.py',
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/streaming_pull_receiver.py'
+        ),
+        mock.call.RemoteCommand(
+            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e'
+        ),
+        mock.call.PushDataFile(
             'messaging_service_scripts/common/e2e/worker_utils.py',
             '~/perfkitbenchmarker/scripts/messaging_service_scripts/common/e2e/worker_utils.py'
         ),

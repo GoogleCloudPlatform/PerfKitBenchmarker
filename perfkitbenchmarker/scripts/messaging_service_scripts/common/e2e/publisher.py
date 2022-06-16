@@ -45,6 +45,7 @@ def main(input_conn: connection.Connection,
   global logger
   if pinned_cpus is not None:
     os.sched_setaffinity(0, pinned_cpus)
+  app.promote_to_singleton_instance()
   FLAGS(serialized_flags.splitlines(), known_only=True)
   # setting actual logger, after actual log level in FLAGS is parsed
   logger = log_utils.get_logger(__name__, 'publisher.log')

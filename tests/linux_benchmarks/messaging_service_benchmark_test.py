@@ -31,7 +31,8 @@ _AGGREGATE_SAMPLES = [
             ],
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='publish_latency_mean_without_cold_start',
@@ -41,7 +42,8 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='publish_latency_p50',
@@ -51,7 +53,8 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='publish_latency_p99',
@@ -61,7 +64,8 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='publish_latency_p999',
@@ -71,7 +75,8 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='publish_latency_percentage_received',
@@ -81,7 +86,8 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='pull_latency_mean',
@@ -103,7 +109,8 @@ _AGGREGATE_SAMPLES = [
             ],
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='pull_latency_mean_without_cold_start',
@@ -113,7 +120,8 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='pull_latency_p50',
@@ -123,7 +131,8 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='pull_latency_p99',
@@ -133,7 +142,8 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='pull_latency_p999',
@@ -143,7 +153,8 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
     sample.Sample(
         metric='pull_latency_percentage_received',
@@ -153,7 +164,8 @@ _AGGREGATE_SAMPLES = [
         metadata={
             'number_of_messages': NUMBER_OF_MESSAGES,
             'message_size': MESSAGE_SIZE,
-            'cloud': CLOUD
+            'cloud': CLOUD,
+            'streaming_pull': False,
         }),
 ]
 
@@ -171,7 +183,7 @@ class MessagingServiceBenchmarkTest(parameterized.TestCase):
   @parameterized.named_parameters(('aggregate_samples', _AGGREGATE_SAMPLES))
   def testCreateSamples(self, expected_samples):
     actual_samples = messaging_service_benchmark._CreateSamples(
-        self.contents, NUMBER_OF_MESSAGES, MESSAGE_SIZE, CLOUD)
+        self.contents, NUMBER_OF_MESSAGES, MESSAGE_SIZE, CLOUD, False)
 
     for expected_sample in expected_samples:
       if expected_sample not in actual_samples:
