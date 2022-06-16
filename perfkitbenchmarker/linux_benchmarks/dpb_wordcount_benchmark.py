@@ -48,13 +48,15 @@ dpb_wordcount_benchmark:
     worker_group:
       vm_spec:
         GCP:
-          machine_type: n1-standard-1
+          machine_type: n1-standard-4
           boot_disk_size: 500
         AWS:
           machine_type: m3.medium
       disk_spec:
         GCP:
-          disk_type: nodisk
+          disk_size: 500
+          disk_type: pd-standard
+          mount_point: /scratch_ts
         AWS:
           disk_size: 500
           disk_type: gp2
@@ -79,6 +81,8 @@ flags.DEFINE_enum('dpb_wordcount_fs', dpb_service.BaseDpbService.GCS_FS,
                   'File System to use for the job output')
 flags.DEFINE_string('dpb_wordcount_out_base', None,
                     'Base directory for word count output')
+flags.DEFINE_list('dpb_wordcount_additional_args', [], 'Additional arguments '
+                  'which should be passed to job.')
 
 FLAGS = flags.FLAGS
 
@@ -144,8 +148,14 @@ def Run(benchmark_spec):
       base_out = 'gs://{}'.format(FLAGS.dpb_wordcount_out_base)
     job_arguments.append('--output={}/output/'.format(base_out))
   else:
-    jarfile = dpb_service_instance.GetExecutionJarfile('spark', 'examples')
+    # Use user-provided jar file if present; otherwise use the default example
+    if not FLAGS.dpb_job_jarfile:
+      jarfile = dpb_service_instance.GetExecutionJarfile('spark', 'examples')
+    else:
+      jarfile = FLAGS.dpb_job_jarfile
+
     job_arguments = [input_location]
+  job_arguments.extend(FLAGS.dpb_wordcount_additional_args)
 
   # TODO (saksena): Finalize more stats to gather
   results = []
