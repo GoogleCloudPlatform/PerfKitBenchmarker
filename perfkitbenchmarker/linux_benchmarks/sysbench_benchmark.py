@@ -822,7 +822,7 @@ def Prepare(benchmark_spec):
   UpdateBenchmarkSpecWithFlags(benchmark_spec)
 
   # Setup common test tools required on the client VM
-  client_vm.Install('sysbench1')
+  client_vm.Install('sysbench')
 
   prepare_results = _PrepareSysbench(client_vm, benchmark_spec)
   print(prepare_results)
