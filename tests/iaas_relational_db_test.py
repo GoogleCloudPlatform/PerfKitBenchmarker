@@ -17,7 +17,7 @@ import unittest
 from unittest import mock
 
 from absl import flags
-from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import iaas_relational_db
 from perfkitbenchmarker.configs import benchmark_config_spec
 from tests import pkb_common_test_case
 
@@ -31,7 +31,7 @@ def CreateTestLinuxVm():
   return pkb_common_test_case.TestLinuxVirtualMachine(vm_spec=vm_spec)
 
 
-class FakeRelationalDb(relational_db.BaseRelationalDb):
+class FakeRelationalDb(iaas_relational_db.IAASRelationalDb):
 
   def GetEndpoint(self):
     pass

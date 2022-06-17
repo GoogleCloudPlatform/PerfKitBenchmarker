@@ -64,6 +64,15 @@ def CreateDbFromSpec(spec_dict):
   return db_class
 
 
+def CreateIAASDbFromSpec(spec_dict):
+  mock_db_spec = mock.Mock(spec=benchmark_config_spec._RelationalDbSpec)
+  mock_db_spec.configure_mock(**spec_dict)
+  db_class = gcp_relational_db.GCPIAASRelationalDb(mock_db_spec)
+  CreateMockClientVM(db_class)
+  CreateMockServerVM(db_class)
+  return db_class
+
+
 @contextlib.contextmanager
 def PatchCriticalObjects(stdout='', stderr='', return_code=0):
   """A context manager that patches a few critical objects with mocks."""
@@ -177,8 +186,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCorrectVmGroupsPresent(self):
     with PatchCriticalObjects():
-      db = CreateDbFromSpec(self.createMySQLSpecDict())
-      CreateMockServerVM(db)
+      db = CreateIAASDbFromSpec(self.createMySQLSpecDict())
       db._Create()
       vms = relational_db.VmsToBoot(db.spec.vm_groups)
       self.assertNotIn('servers', vms)
@@ -262,8 +270,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['use_managed_db'].parse(False)
     FLAGS['project'].parse('test')
     with PatchCriticalObjects() as issue_command:
-      db = CreateDbFromSpec(self.createMySQLSpecDict())
-      CreateMockServerVM(db)
+      db = CreateIAASDbFromSpec(self.createMySQLSpecDict())
       db._Create()
       self.assertTrue(db._Exists())
       self.assertEqual(db.endpoint, db.server_vm.internal_ip)

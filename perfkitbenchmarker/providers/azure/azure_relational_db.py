@@ -20,6 +20,7 @@ import time
 
 from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import iaas_relational_db
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
@@ -53,6 +54,11 @@ IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (might take some time to prepare)
 CREATE_AZURE_DB_TIMEOUT = 60 * 30
 
 
+class AzureIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
+  """An Azure IAAS database resource."""
+  CLOUD = providers.AZURE
+
+
 class AzureRelationalDb(relational_db.BaseRelationalDb):
   """An object representing an Azure RDS relational database.
 
@@ -83,8 +89,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
           'Availability zones are currently not supported by Azure DBs')
     self.region = util.GetRegionFromZone(self.spec.db_spec.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
-
-    self.unmanaged_db_exists = None if self.is_managed_db else False
 
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
@@ -217,7 +221,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       raise relational_db.RelationalDbEngineNotFoundError(
           'Unsupported engine {0}'.format(engine))
 
-  def _ApplyManagedDbFlags(self):
+  def _ApplyDbFlags(self):
     """Applies the MySqlFlags to a managed instance."""
     for flag in FLAGS.db_flags:
       name_and_value = flag.split('=')
@@ -372,11 +376,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       raise NotImplementedError('Unknown how to create Azure data base '
                                 'engine {0}'.format(self.spec.engine))
 
-  def _CreateAzureUnmanagedSqlInstance(self):
-    """Creates an Azure Sql Instance hosted inside of a VM."""
-    self.endpoint = self.server_vm.internal_ip
-    self._SetupUnmanagedDatabase()
-
   def _Create(self):
     """Creates the Azure RDS instance.
 
@@ -385,11 +384,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       Exception: if attempting to create a non high availability database.
 
     """
-    if self.is_managed_db:
-      self._CreateAzureManagedSqlInstance()
-    else:
-      self.unmanaged_db_exists = True
-      self._CreateAzureUnmanagedSqlInstance()
+    self._CreateAzureManagedSqlInstance()
 
   def _Delete(self):
     """Deletes the underlying resource.
@@ -398,13 +393,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
-    if not self.is_managed_db:
-      if hasattr(self, 'firewall'):
-        self.firewall.DisallowAllPorts()
-      self.unmanaged_db_exists = False
-      self.PrintUnmanagedDbStats()
-      return
-
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
@@ -423,9 +411,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     default is to assume success when _Create and _Delete do not raise
     exceptions.
     """
-    if not self.is_managed_db:
-      return self.unmanaged_db_exists
-
     json_server_show = self._AzServerShow()
     if json_server_show is None:
       return False
@@ -453,26 +438,20 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     """
     super()._PostCreate()
 
-    if self.is_managed_db:
-      cmd = [
-          azure.AZURE_PATH,
-          self.GetAzCommandForEngine(),
-          'server',
-          'firewall-rule',
-          'create',
-          '--resource-group', self.resource_group.name,
-          '--server', self.instance_id,
-          '--name', 'AllowAllIps',
-          '--start-ip-address', '0.0.0.0',
-          '--end-ip-address', '255.255.255.255'
-      ]
-      vm_util.IssueCommand(cmd)
-      self._AssignEndpointForWriterInstance()
+    cmd = [
+        azure.AZURE_PATH,
+        self.GetAzCommandForEngine(), 'server', 'firewall-rule', 'create',
+        '--resource-group', self.resource_group.name, '--server',
+        self.instance_id, '--name', 'AllowAllIps', '--start-ip-address',
+        '0.0.0.0', '--end-ip-address', '255.255.255.255'
+    ]
+    vm_util.IssueCommand(cmd)
+    self._AssignEndpointForWriterInstance()
 
-      if self.spec.engine == 'mysql' or self.spec.engine == 'postgres':
-        # Azure will add @domainname after the database username
-        self.spec.database_username = (self.spec.database_username + '@' +
-                                       self.endpoint.split('.')[0])
+    if self.spec.engine == 'mysql' or self.spec.engine == 'postgres':
+      # Azure will add @domainname after the database username
+      self.spec.database_username = (self.spec.database_username + '@' +
+                                     self.endpoint.split('.')[0])
 
     self.client_vm_query_tools.InstallPackages()
 
@@ -505,9 +484,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       True if the resource was ready in time, False if the wait timed out
         or an Exception occurred.
     """
-    if not self.is_managed_db:
-      return self._IsReadyUnmanaged()
-
     start_time = datetime.datetime.now()
 
     while True:

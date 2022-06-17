@@ -29,6 +29,7 @@ import time
 
 from absl import flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import iaas_relational_db
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
@@ -93,6 +94,11 @@ class UnsupportedDatabaseEngineError(Exception):
   pass
 
 
+class GCPIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
+  """A GCP IAAS database resource."""
+  CLOUD = providers.GCP
+
+
 class GCPRelationalDb(relational_db.BaseRelationalDb):
   """A GCP CloudSQL database resource.
 
@@ -102,12 +108,11 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   MySQL 5.7 and Postgres 9.6 are supported.
   """
   CLOUD = providers.GCP
+  IS_MANAGED = True
 
   def __init__(self, relational_db_spec):
     super(GCPRelationalDb, self).__init__(relational_db_spec)
     self.project = FLAGS.project or util.GetDefaultProject()
-
-    self.unmanaged_db_exists = None if self.is_managed_db else False
 
   def _GetAuthorizedNetworks(self, vms):
     """Get CIDR connections for list of VM specs that need to access the db."""
@@ -190,12 +195,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         if the database is unmanaged and the engine isn't MYSQL.
       Exception: if an invalid MySQL flag was used.
     """
-    if self.is_managed_db:
-      self._CreateGcloudSqlInstance()
-    else:
-      self._SetupUnmanagedDatabase()
-      self.endpoint = self.server_vm.internal_ip
-      self.unmanaged_db_exists = True
+    self._CreateGcloudSqlInstance()
 
   def _GetHighAvailabilityFlag(self):
     """Returns a flag that enables high-availability.
@@ -267,12 +267,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
-    if not self.is_managed_db:
-      if hasattr(self, 'firewall'):
-        self.firewall.DisallowAllPorts()
-      self.unmanaged_db_exists = False
-      self.PrintUnmanagedDbStats()
-      return
     if hasattr(self, 'replica_instance_id'):
       cmd = util.GcloudCommand(self, 'sql', 'instances', 'delete',
                                self.replica_instance_id, '--quiet')
@@ -289,8 +283,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     default is to assume success when _Create and _Delete do not raise
     exceptions.
     """
-    if not self.is_managed_db:
-      return self.unmanaged_db_exists
     cmd = util.GcloudCommand(self, 'sql', 'instances', 'describe',
                              self.instance_id)
     stdout, _, _ = cmd.Issue(raise_on_failure=False)
@@ -337,9 +329,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       True if the resource was ready in time, False if the wait timed out.
     """
-    if not self.is_managed_db:
-      return self._IsReadyUnmanaged()
-
     if not self._IsDBInstanceReady(self.instance_id, timeout):
       return False
     if self.spec.high_availability and hasattr(self, 'replica_instance_id'):
@@ -393,13 +382,11 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     """Creates the PKB user and sets the password.
     """
     super()._PostCreate()
-
-    if self.is_managed_db:
-      self.SetManagedDatabasePassword()
+    self.SetManagedDatabasePassword()
 
     self.client_vm_query_tools.InstallPackages()
 
-  def _ApplyManagedDbFlags(self):
+  def _ApplyDbFlags(self):
     cmd_string = [
         self, 'sql', 'instances', 'patch', self.instance_id,
         '--database-flags=%s' % ','.join(FLAGS.db_flags)

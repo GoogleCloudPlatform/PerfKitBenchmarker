@@ -148,6 +148,13 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     m.internal_ip = '192.168.2.3'
     db_class.server_vm = m
 
+  def CreateIAASDbFromSpec(self):
+    mock_spec = self.CreateMockSpec()
+    aws_db = aws_relational_db.AwsIAASRelationalDb(mock_spec)
+    self.CreateMockClientVM(aws_db)
+    self.CreateMockServerVM(aws_db)
+    return aws_db
+
   def CreateDbFromMockSpec(self, mock_spec):
     aws_db = aws_relational_db.AwsRelationalDb(mock_spec)
 
@@ -181,8 +188,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCorrectVmGroupsPresent(self):
     with self._PatchCriticalObjects():
-      db = self.CreateDbFromSpec()
-      self.CreateMockServerVM(db)
+      db = self.CreateIAASDbFromSpec()
       db._Create()
       vms = relational_db.VmsToBoot(db.spec.vm_groups)
       self.assertNotIn('servers', vms)
@@ -338,7 +344,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['ip_addresses'].parse('REACHABLE')
     FLAGS['postgres_shared_buffer_size'].parse(100)
     with self._PatchCriticalObjects() as issue_command:
-      db = self.CreateDbFromSpec()
+      db = self.CreateIAASDbFromSpec()
       self.CreateMockServerVM(db)
       db._Create()
       self.assertTrue(db._Exists())

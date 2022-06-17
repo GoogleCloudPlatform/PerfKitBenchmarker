@@ -20,6 +20,7 @@ import logging
 import time
 
 from absl import flags
+from perfkitbenchmarker import iaas_relational_db
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
@@ -81,6 +82,11 @@ class AwsRelationalDbParameterError(Exception):
   pass
 
 
+class AwsIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
+  """A AWS IAAS database resource."""
+  CLOUD = providers.AWS
+
+
 class AwsRelationalDb(relational_db.BaseRelationalDb):
   """An object representing an AWS RDS managed relational database.
 
@@ -136,8 +142,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     self.region = util.GetRegionFromZones(self.zones)
     self.subnets_owned_by_db = []
     self.subnets_used_by_db = []
-
-    self.unmanaged_db_exists = None if self.is_managed_db else False
 
     # dependencies which will be created
     self.db_subnet_group_name: str = None
@@ -414,12 +418,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       Exception: if unknown how to create self.spec.engine.
 
     """
-    if self.is_managed_db:
-      self._CreateAwsSqlInstance()
-    else:
-      self.endpoint = self.server_vm.internal_ip
-      self._SetupUnmanagedDatabase()
-      self.unmanaged_db_exists = True
+    self._CreateAwsSqlInstance()
 
   def _IsDeleting(self):
     """See Base class BaseResource in perfkitbenchmarker.resource.py."""
@@ -440,13 +439,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
-    if not self.is_managed_db:
-      if hasattr(self, 'firewall'):
-        self.firewall.DisallowAllPorts()
-      self.unmanaged_db_exists = False
-      self.PrintUnmanagedDbStats()
-      return
-
     for current_instance_id in self.all_instance_ids:
       cmd = util.AWS_PREFIX + [
           'rds',
@@ -474,8 +466,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     default is to assume success when _Create and _Delete do not raise
     exceptions.
     """
-    if not self.is_managed_db:
-      return self.unmanaged_db_exists
     for current_instance_id in self.all_instance_ids:
       json_output = self._DescribeInstance(current_instance_id)
       if not json_output:
@@ -545,9 +535,6 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       True if the resource was ready in time, False if the wait timed out
         or an Exception occurred.
     """
-    if not self.is_managed_db:
-      return self._IsReadyUnmanaged()
-
     if not self.all_instance_ids:
       return False
 
@@ -565,36 +552,32 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
                    multi-az.
     """
     super()._PostCreate()
+    need_ha_modification = self.spec.engine in _RDS_ENGINES
 
-    if not self.is_managed_db:
-      self.client_vm_query_tools.InstallPackages()
+    if self.spec.high_availability and need_ha_modification:
+      # When extending the database to be multi-az, the second region
+      # is picked by where the second subnet has been created.
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'modify-db-instance',
+          '--db-instance-identifier=%s' % self.instance_id,
+          '--multi-az',
+          '--apply-immediately',
+          '--region=%s' % self.region
+      ]
+      vm_util.IssueCommand(cmd)
+
+      if not self._IsInstanceReady(
+          self.instance_id, timeout=IS_READY_TIMEOUT):
+        raise Exception('Instance could not be set to ready after '
+                        'modification for high availability')
+
+    json_output = self._DescribeInstance(self.instance_id)
+    self._SavePrimaryAndSecondaryZones(json_output)
+    if self.cluster_id:
+      self._GetPortsForClusterInstance(self.cluster_id)
     else:
-      need_ha_modification = self.spec.engine in _RDS_ENGINES
-
-      if self.spec.high_availability and need_ha_modification:
-        # When extending the database to be multi-az, the second region
-        # is picked by where the second subnet has been created.
-        cmd = util.AWS_PREFIX + [
-            'rds',
-            'modify-db-instance',
-            '--db-instance-identifier=%s' % self.instance_id,
-            '--multi-az',
-            '--apply-immediately',
-            '--region=%s' % self.region
-        ]
-        vm_util.IssueCommand(cmd)
-
-        if not self._IsInstanceReady(
-            self.instance_id, timeout=IS_READY_TIMEOUT):
-          raise Exception('Instance could not be set to ready after '
-                          'modification for high availability')
-
-      json_output = self._DescribeInstance(self.instance_id)
-      self._SavePrimaryAndSecondaryZones(json_output)
-      if self.cluster_id:
-        self._GetPortsForClusterInstance(self.cluster_id)
-      else:
-        self._GetPortsForWriterInstance(self.all_instance_ids[0])
+      self._GetPortsForWriterInstance(self.all_instance_ids[0])
 
     self.client_vm_query_tools.InstallPackages()
 
@@ -686,7 +669,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
       raise Exception('Instance could not be set to ready after '
                       'reboot')
 
-  def _ApplyManagedDbFlags(self):
+  def _ApplyDbFlags(self):
     """Apply managed flags on RDS."""
     if self.spec.db_flags:
       self.parameter_group = 'pkb-parameter-group-' + FLAGS.run_uri
@@ -781,9 +764,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     Supplying this method is optional. It is intended to allow additional
     flexibility in creating resource dependencies separately from _Create().
     """
-    if self.is_managed_db:
-      self._AssertClientAndDbInSameRegion()
-      self._SetupNetworking()
+    self._AssertClientAndDbInSameRegion()
+    self._SetupNetworking()
 
   def _DeleteDependencies(self):
     """Method that will be called once after _DeleteResource() is called.
@@ -791,9 +773,8 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
     Supplying this method is optional. It is intended to allow additional
     flexibility in deleting resource dependencies separately from _Delete().
     """
-    if self.is_managed_db:
-      self._TeardownNetworking()
-      self._TeardownParameterGroup()
+    self._TeardownNetworking()
+    self._TeardownParameterGroup()
 
   def _FailoverHA(self):
     """Fail over from master to replica."""
