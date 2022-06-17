@@ -22,6 +22,11 @@ from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import rece
 from tests import pkb_common_test_case
 
 AGGREGATE_E2E_METRICS = {
+    'e2e_acknowledge_latency_cold': {
+        'value': 1000,
+        'unit': 'milliseconds',
+        'metadata': {}
+    },
     'e2e_latency_failure_counter': {
         'value': 0,
         'unit': '',
@@ -33,11 +38,6 @@ AGGREGATE_E2E_METRICS = {
         'metadata': {
             'samples': [500]
         }
-    },
-    'e2e_latency_mean_without_cold_start': {
-        'value': 500.0,
-        'unit': 'milliseconds',
-        'metadata': {}
     },
     'e2e_latency_p50': {
         'value': 500.0,
@@ -59,6 +59,11 @@ AGGREGATE_E2E_METRICS = {
         'unit': '%',
         'metadata': {}
     },
+    'e2e_latency_cold': {
+        'value': 500,
+        'unit': 'milliseconds',
+        'metadata': {}
+    },
     'e2e_acknowledge_latency_failure_counter': {
         'value': 0,
         'unit': '',
@@ -70,11 +75,6 @@ AGGREGATE_E2E_METRICS = {
         'metadata': {
             'samples': [1000]
         }
-    },
-    'e2e_acknowledge_latency_mean_without_cold_start': {
-        'value': 1000.0,
-        'unit': 'milliseconds',
-        'metadata': {}
     },
     'e2e_acknowledge_latency_p50': {
         'value': 1000.0,

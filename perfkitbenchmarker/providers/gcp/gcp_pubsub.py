@@ -77,7 +77,8 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
     self.client_vm.PushDataFile(MESSAGING_SERVICE_SCRIPTS_GCP_BIN)
 
   def Run(self, benchmark_scenario: str, number_of_messages: int,
-          message_size: int, streaming_pull: bool = False) -> Dict[str, Any]:
+          message_size: int, warmup_messages: int,
+          streaming_pull: bool = False) -> Dict[str, Any]:
     """Runs a benchmark on GCP PubSub from the client VM.
 
     Runs a benchmark based on the configuration specified through the arguments:
@@ -90,6 +91,9 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
       number_of_messages: Number of messages to use on the benchmark.
       message_size: Size of the messages that will be used on the benchmark. It
         specifies the number of characters in those messages.
+      warmup_messages: Number of messages that will be considered warm-up and
+        won't be included into the steady_state metrics. Must be greater or
+        equal to 0 and less than number_of_messages.
       streaming_pull: Set to True if you want to use streaming_pull. False by
         default. Requires benchmark scenario to be
         GCPCloudPubSub.END_TO_END_LATENCY.
@@ -109,7 +113,8 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
                f'--pubsub_subscription={self.pubsub_subscription} '
                f'--benchmark_scenario={benchmark_scenario} '
                f'--number_of_messages={number_of_messages} '
-               f'--message_size={message_size} ')
+               f'--message_size={message_size} '
+               f'--warmup_messages={warmup_messages}')
     if streaming_pull:
       command += '--streaming_pull '
     stdout, _ = self.client_vm.RemoteCommand(command)

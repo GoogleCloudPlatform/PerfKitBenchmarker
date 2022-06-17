@@ -30,11 +30,6 @@ AGGREGATE_PUBLISH_METRICS = {
             'samples': METRICS
         }
     },
-    'publish_latency_mean_without_cold_start': {
-        'value': 0.06490101814270019,
-        'unit': UNIT_OF_TIME,
-        'metadata': {}
-    },
     'publish_latency_p50': {
         'value': 0.0983436107635498,
         'unit': UNIT_OF_TIME,
@@ -70,11 +65,6 @@ AGGREGATE_PULL_METRICS = {
             'samples': METRICS
         }
     },
-    'pull_latency_mean_without_cold_start': {
-        'value': 0.06490101814270019,
-        'unit': UNIT_OF_TIME,
-        'metadata': {}
-    },
     'pull_latency_p50': {
         'value': 0.0983436107635498,
         'unit': UNIT_OF_TIME,
@@ -105,6 +95,10 @@ AGGREGATE_PULL_METRICS = {
 
 @freezegun.freeze_time(FAKE_DATETIME)
 class MessagingServiceScriptsRunnersTest(parameterized.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.enter_context(mock.patch.object(runners, '_WARMUP_MESSAGES', value=0))
 
   @parameterized.named_parameters(
       ('Publish', 'publish_latency', AGGREGATE_PUBLISH_METRICS),

@@ -5,12 +5,20 @@ import json
 import time
 from typing import Any, Dict, List
 
+from absl import flags
 import numpy as np
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 
 GET_TIME_IN_MILLISECONDS = lambda: time.time() * 1000
 UNIT_OF_TIME = 'milliseconds'
+
+_WARMUP_MESSAGES = flags.DEFINE_integer(
+    'warmup_messages', 0, lower_bound=0,
+    help=('Number of messages that will be considered warm-up and will not be '
+          'included into the steady_state resulting metrics. Must be greater '
+          'or equal to 0 and less than number_of_messages. If set to 0, no '
+          'steady_state metrics will be reported (this is the default).'))
 
 
 class BaseRunner(metaclass=abc.ABCMeta):
@@ -55,7 +63,6 @@ class BaseRunner(metaclass=abc.ABCMeta):
     common_metadata = {}
 
     latency_mean = np.mean(results)
-    latency_mean_without_cold_start = np.mean(results[len(results) // 2:])
     latency_percentage_received = 100 * (len(results) / number_of_messages)
 
     metrics_data[scenario + '_failure_counter'] = {
@@ -70,8 +77,8 @@ class BaseRunner(metaclass=abc.ABCMeta):
             'samples': results
         }
     }
-    metrics_data[scenario + '_mean_without_cold_start'] = {
-        'value': latency_mean_without_cold_start,
+    metrics_data[scenario + '_cold'] = {
+        'value': results[0],
         'unit': UNIT_OF_TIME,
         'metadata': common_metadata
     }
@@ -90,6 +97,22 @@ class BaseRunner(metaclass=abc.ABCMeta):
         'unit': UNIT_OF_TIME,
         'metadata': common_metadata
     }
+    if _WARMUP_MESSAGES.value:
+      metrics_data[scenario + '_steady_state_p50'] = {
+          'value': np.percentile(results[_WARMUP_MESSAGES.value:], 50),
+          'unit': UNIT_OF_TIME,
+          'metadata': common_metadata
+      }
+      metrics_data[scenario + '_steady_state_p99'] = {
+          'value': np.percentile(results[_WARMUP_MESSAGES.value:], 99),
+          'unit': UNIT_OF_TIME,
+          'metadata': common_metadata
+      }
+      metrics_data[scenario + '_steady_state_p99_9'] = {
+          'value': np.percentile(results[_WARMUP_MESSAGES.value:], 99.9),
+          'unit': UNIT_OF_TIME,
+          'metadata': common_metadata
+      }
     metrics_data[scenario + '_percentage_received'] = {
         'value': latency_percentage_received,
         'unit': '%',

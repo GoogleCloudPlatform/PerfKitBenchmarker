@@ -66,8 +66,9 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
     return (self._NamespaceExists() or self._TopicExists() or
             self._SubscriptionExists())
 
-  def Run(self, benchmark_scenario: str, number_of_messages: str,
-          message_size: str, streaming_pull: bool = False) -> Dict[str, Any]:
+  def Run(self, benchmark_scenario: str, number_of_messages: int,
+          message_size: int, warmup_messages: int,
+          streaming_pull: bool = False) -> Dict[str, Any]:
     if streaming_pull:
       raise ValueError('Unsupported StreamingPull in AWS SQS.')
     connection_str = self._GetPrimaryConnectionString()
@@ -77,7 +78,8 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
                f'--benchmark_scenario={benchmark_scenario} '
                f'--number_of_messages={number_of_messages} '
                f'--message_size={message_size} '
-               f'--connection_str="{connection_str}" ')
+               f'--warmup_messages={warmup_messages} '
+               f'--connection_str="{connection_str}"')
     results = self.client_vm.RemoteCommand(command)
     results = json.loads(results[0])
     return results

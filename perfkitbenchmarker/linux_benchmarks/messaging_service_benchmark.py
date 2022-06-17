@@ -84,6 +84,12 @@ _STREAMING_PULL = flags.DEFINE_boolean(
     help=('Use StreamingPull to fetch messages. Supported only in GCP Pubsub '
           'end-to-end benchmarking.')
 )
+_WARMUP_MESSAGES = flags.DEFINE_integer(
+    'messaging_service_warmup_messages', 0, lower_bound=0,
+    help=('Number of messages that will be considered warm-up and will not be '
+          'included into the steady_state resulting metrics. Must be greater '
+          'or equal to 0 and less than number_of_messages. If set to 0, no '
+          'steady_state metrics will be reported (this is the default).'))
 
 
 @flags.multi_flags_validator(
@@ -96,6 +102,15 @@ def ValidateStreamingPull(flags_dict):
   return (not flags_dict['messaging_service_streaming_pull'] or
           flags_dict['cloud'] == 'GCP' and
           flags_dict['messaging_service_measurement'] == END_TO_END)
+
+
+@flags.multi_flags_validator(
+    ['messaging_service_warmup_messages',
+     'messaging_service_number_of_messages'],
+    message='warmup_message must be less than number_of_messages.')
+def ValidateWarmupMessages(flags_dict):
+  return (flags_dict['messaging_service_warmup_messages'] <
+          flags_dict['messaging_service_number_of_messages'])
 
 
 def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -158,16 +173,19 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   if _MEASUREMENT.value == SINGLE_OP:
     publish_results = service.Run(service.PUBLISH_LATENCY,
                                   int(_NUMBER_OF_MESSAGES.value),
-                                  int(_MESSAGE_SIZE.value))
+                                  int(_MESSAGE_SIZE.value),
+                                  int(_WARMUP_MESSAGES.value))
     pull_results = service.Run(service.PULL_LATENCY,
                                int(_NUMBER_OF_MESSAGES.value),
-                               int(_MESSAGE_SIZE.value))
+                               int(_MESSAGE_SIZE.value),
+                               int(_WARMUP_MESSAGES.value))
     publish_results.update(pull_results)
     results = publish_results
   elif _MEASUREMENT.value == END_TO_END:
     results = service.Run(service.END_TO_END_LATENCY,
                           int(_NUMBER_OF_MESSAGES.value),
                           int(_MESSAGE_SIZE.value),
+                          int(_WARMUP_MESSAGES.value),
                           _STREAMING_PULL.value,)
   # Creating samples from results
   samples = _CreateSamples(results, int(_NUMBER_OF_MESSAGES.value),

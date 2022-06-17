@@ -111,8 +111,9 @@ class BaseMessagingService(resource.BaseResource):
     raise NotImplementedError
 
   @abc.abstractmethod
-  def Run(self, benchmark_scenario: str, number_of_messages: str,
-          message_size: str, streaming_pull: bool = False) -> Dict[str, Any]:
+  def Run(self, benchmark_scenario: str, number_of_messages: int,
+          message_size: int, warmup_messages: int,
+          streaming_pull: bool = False) -> Dict[str, Any]:
     """Runs remote commands on client VM - benchmark's run phase.
 
     Runs a benchmark that consists of first publishing messages and then
@@ -128,6 +129,9 @@ class BaseMessagingService(resource.BaseResource):
       number_of_messages: Number of messages to use on the benchmark.
       message_size: Size of the messages that will be used on the benchmark. It
         specifies the number of characters in those messages.
+      warmup_messages: Number of messages that will be considered warm-up and
+        won't be included into the steady_state metrics. Must be greater or
+        equal to 0 and less than number_of_messages.
       streaming_pull: Set to True if you want to use streaming_pull. False by
         default. Only implemented properly in GCP PubSub.
 

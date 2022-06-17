@@ -5,6 +5,7 @@ This class handles resource creation/cleanup for SQS benchmark on AWS.
 
 import json
 import os
+from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import messaging_service as msgsvc
@@ -88,7 +89,8 @@ class AwsSqs(msgsvc.BaseMessagingService):
     self.client_vm.Install('aws_credentials')
 
   def Run(self, benchmark_scenario: str, number_of_messages: int,
-          message_size: int, streaming_pull: bool = False):
+          message_size: int, warmup_messages: int,
+          streaming_pull: bool = False) -> Dict[str, Any]:
     """Runs remote commands on client VM - benchmark's run phase."""
     if streaming_pull:
       raise ValueError('Unsupported StreamingPull in AWS SQS.')
@@ -97,7 +99,8 @@ class AwsSqs(msgsvc.BaseMessagingService):
                f'--region={self.region} '
                f'--benchmark_scenario={benchmark_scenario} '
                f'--number_of_messages={number_of_messages} '
-               f'--message_size={message_size}')
+               f'--message_size={message_size} '
+               f'--warmup_messages={warmup_messages}')
     stdout, _ = self.client_vm.RemoteCommand(command)
     results = json.loads(stdout)
     return results

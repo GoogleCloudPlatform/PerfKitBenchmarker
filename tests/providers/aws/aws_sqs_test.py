@@ -13,6 +13,7 @@ _REGION = 'us-east-1b'
 _BENCHMARK_SCENARIO = 'pull_latency'
 _NUMBER_OF_MESSAGES = 10
 _MESSAGE_SIZE = 100
+_WARMUP_MESSAGES = 0
 _MESSAGING_SERVICE_DATA_DIR = 'messaging_service_scripts'
 
 FLAGS = flags.FLAGS
@@ -131,9 +132,11 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
                       f'--region={self.sqs.region} '
                       f'--benchmark_scenario={_BENCHMARK_SCENARIO} '
                       f'--number_of_messages={_NUMBER_OF_MESSAGES} '
-                      f'--message_size={_MESSAGE_SIZE}')
+                      f'--message_size={_MESSAGE_SIZE} '
+                      f'--warmup_messages={_WARMUP_MESSAGES}')
 
-    self.sqs.Run(_BENCHMARK_SCENARIO, _NUMBER_OF_MESSAGES, _MESSAGE_SIZE)
+    self.sqs.Run(_BENCHMARK_SCENARIO, _NUMBER_OF_MESSAGES, _MESSAGE_SIZE,
+                 _WARMUP_MESSAGES)
     self.client.RemoteCommand.assert_called_with(remote_run_cmd)
 
 

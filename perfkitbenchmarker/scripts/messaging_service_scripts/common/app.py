@@ -46,6 +46,13 @@ def validate_streaming_pull(flags_dict):
           flags_dict['benchmark_scenario'] == END_TO_END_LATENCY)
 
 
+@flags.multi_flags_validator(
+    ['warmup_messages', 'number_of_messages'],
+    message='warmup_message must be less than number_of_messages.')
+def validate_warmup_messages(flags_dict):
+  return flags_dict['warmup_messages'] < flags_dict['number_of_messages']
+
+
 log_utils.silence_log_messages_by_default()
 
 
@@ -147,7 +154,7 @@ class App:
         return self.runner_registry[STREAMING_PULL_END_TO_END_LATENCY]
       return self.runner_registry[_BENCHMARK_SCENARIO.value]
     except KeyError:
-      raise Exception('Unknown benchmark_scenario flag value.')
+      raise Exception('Unknown benchmark_scenario flag value.') from None
 
   def register_client(self,
                       client_cls: Type[client.BaseMessagingServiceClient]):

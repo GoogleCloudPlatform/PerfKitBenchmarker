@@ -12,6 +12,7 @@ _REGION = 'eastus'
 BENCHMARK_SCENARIO = 'pull_latency'
 NUMBER_OF_MESSAGES = 10
 MESSAGE_SIZE = 10
+WARMUP_MESSAGES = 0
 MESSAGING_SERVICE_DATA_DIR = 'messaging_service_scripts'
 
 FLAGS = flags.FLAGS
@@ -217,9 +218,11 @@ class AzureServiceBusTest(pkb_common_test_case.PkbCommonTestCase):
         f'--benchmark_scenario={BENCHMARK_SCENARIO} '
         f'--number_of_messages={NUMBER_OF_MESSAGES} '
         f'--message_size={MESSAGE_SIZE} '
-        f'--connection_str="mocked_string" ')
+        f'--warmup_messages={WARMUP_MESSAGES} '
+        f'--connection_str="mocked_string"')
 
-    self.servicebus.Run(BENCHMARK_SCENARIO, NUMBER_OF_MESSAGES, MESSAGE_SIZE)
+    self.servicebus.Run(BENCHMARK_SCENARIO, NUMBER_OF_MESSAGES, MESSAGE_SIZE,
+                        WARMUP_MESSAGES)
     self.client.RemoteCommand.assert_called_with(remote_run_cmd)
 
   @mock.patch.object(asb.AzureServiceBus, '_DeleteNamespace')
