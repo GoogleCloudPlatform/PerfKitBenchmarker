@@ -261,6 +261,13 @@ class PostgresCliQueryTools(ISQLQueryTools):
         self.connection_properties.database_username,
         self.connection_properties.database_password, database_name)
 
+  def GetDSNConnectionString(self, database_name=''):
+    if not database_name:
+      database_name = self.DEFAULT_DATABASE
+    return (f'postgresql://{self.connection_properties.database_username}:' +
+            f'{self.connection_properties.database_password}@' +
+            f'{self.connection_properties.endpoint}:5432/{database_name}')
+
   def GetSysbenchConnectionString(self):
     return ('--pgsql-host={0} --pgsql-user={1} --pgsql-password="{2}" '
             '--pgsql-port=5432').format(
