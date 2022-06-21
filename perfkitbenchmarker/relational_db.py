@@ -373,7 +373,8 @@ class BaseRelationalDb(resource.BaseResource):
     """
 
   def _PostCreate(self):
-    self._ApplyDbFlags()
+    if self.spec.db_flags:
+      self._ApplyDbFlags()
 
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""

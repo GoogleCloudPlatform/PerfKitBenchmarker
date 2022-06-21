@@ -169,15 +169,14 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
 
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""
-    if FLAGS.db_flags:
-      # TODO(chunla): Refactor this into a separate engine module.
-      if self.spec.engine == sql_engine_utils.MYSQL:
-        self._ApplyMySqlFlags()
-      elif self.spec.engine == sql_engine_utils.POSTGRES:
-        self._ApplyPostgresFlags()
-      else:
-        raise NotImplementedError('Flags is not supported on %s' %
-                                  self.spec.engine)
+    # TODO(chunla): Refactor this into a separate engine module.
+    if self.spec.engine == sql_engine_utils.MYSQL:
+      self._ApplyMySqlFlags()
+    elif self.spec.engine == sql_engine_utils.POSTGRES:
+      self._ApplyPostgresFlags()
+    else:
+      raise NotImplementedError('Flags is not supported on %s' %
+                                self.spec.engine)
 
   def _ApplyMySqlFlags(self):
     if FLAGS.db_flags:
