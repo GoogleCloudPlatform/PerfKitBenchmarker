@@ -116,7 +116,7 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
                f'--message_size={message_size} '
                f'--warmup_messages={warmup_messages}')
     if streaming_pull:
-      command += '--streaming_pull '
+      command += ' --streaming_pull'
     stdout, _ = self.client_vm.RemoteCommand(command)
     metrics = json.loads(stdout)
     return metrics
