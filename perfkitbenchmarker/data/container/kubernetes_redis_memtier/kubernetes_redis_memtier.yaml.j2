@@ -28,6 +28,7 @@ spec:
         app: redis
         appCluster: redis-cluster
     spec:
+      {% if runtime_class_name %}runtimeClassName: {{ runtime_class_name }}{% endif %}
       terminationGracePeriodSeconds: 20
       topologySpreadConstraints:
       # Enforce max 2 Redis pods per node (leader and follower)

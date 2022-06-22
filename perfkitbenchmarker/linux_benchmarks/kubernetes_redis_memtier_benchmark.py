@@ -37,6 +37,8 @@ from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
 
 FLAGS = flags.FLAGS
+flags.DEFINE_string('kubernetes_redis_memtier_runtime_class_name', None,
+                    'A custom runtimeClassName to apply to the redis pods.')
 
 BENCHMARK_NAME = 'kubernetes_redis_memtier'
 BENCHMARK_CONFIG = """
@@ -96,7 +98,9 @@ def _PrepareCluster(bm_spec: _BenchmarkSpec):
           'redis_replicas': replicas,
           'redis_port': redis_port,
           # Redis expects cluster bus port as 'the client port + 10000'
-          'redis_cluster_port': redis_port + 10000
+          'redis_cluster_port': redis_port + 10000,
+          'runtime_class_name':
+              FLAGS.kubernetes_redis_memtier_runtime_class_name,
       }) as rendered_manifest:
     bm_spec.container_cluster.ApplyManifest(rendered_manifest.name)
 
