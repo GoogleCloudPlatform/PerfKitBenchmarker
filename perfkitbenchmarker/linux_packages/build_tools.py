@@ -14,6 +14,7 @@
 """Module containing build tools installation and cleanup functions."""
 import logging
 from absl import flags
+from perfkitbenchmarker import errors
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -74,8 +75,16 @@ def BuildGccFromSource(vm, gcc_version):
     vm.InstallPreprovisionedPackageData('build_tools',
                                         PREPROVISIONED_DATA.keys(), build_dir)
   else:
-    vm.RemoteCommand(f'cd {build_dir} && '
-                     f'wget {GCC_URL.format(version=gcc_version)}')
+    vm.InstallPackages('wget')
+    try:
+      vm.RemoteCommand(f'cd {build_dir} && '
+                       f'wget {GCC_URL.format(version=gcc_version)}')
+    # Some older OS images have outdated certificates; use curl instead
+    except errors.VirtualMachine.RemoteCommandError as e:
+      logging.info('Failed to wget, trying curl instead. Error: %s', str(e))
+      vm.RemoteCommand(f'cd {build_dir} && '
+                       f'curl {GCC_URL.format(version=gcc_version)} '
+                       f'-L -o {gcc_tar}')
   vm.RemoteCommand(f'cd {build_dir} && tar xzvf {gcc_tar}')
   vm.RemoteCommand(f'cd {build_dir} && mkdir -p obj.gcc-{gcc_version}')
   vm.RemoteCommand(f'cd {build_dir}/gcc-{gcc_version} && '
