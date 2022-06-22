@@ -144,10 +144,12 @@ class GceDisk(disk.BaseDisk):
       return None
     return result
 
-  def _Ready(self):
+  def _IsReady(self):
     """Returns true if the disk is ready."""
     result = self._Describe()
-    return result['status'] == 'READY'
+    if not result:
+      return False
+    return result.get('status') == 'READY'
 
   def _Exists(self):
     """Returns true if the disk exists."""
