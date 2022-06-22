@@ -50,6 +50,14 @@ spec:
                   values:
                   - redis
               topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: pkb_nodepool
+                operator: In
+                values:
+                - redis
         podAntiAffinity:
           # Prevent Redis pods from being scheduled with PKB VMs (VMs)
           requiredDuringSchedulingIgnoredDuringExecution:

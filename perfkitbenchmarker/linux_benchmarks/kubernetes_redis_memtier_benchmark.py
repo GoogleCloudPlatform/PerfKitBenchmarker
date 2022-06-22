@@ -29,7 +29,6 @@ from absl import flags
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -38,8 +37,6 @@ from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('kubernetes_redis_cluster_size', 6,
-                     'The number of nodes in the Redis cluster. Must be even')
 
 BENCHMARK_NAME = 'kubernetes_redis_memtier'
 BENCHMARK_CONFIG = """
@@ -50,9 +47,12 @@ kubernetes_redis_memtier:
   container_cluster:
     cloud: GCP
     type: Kubernetes
-    vm_count: 4
+    vm_count: 1
     vm_spec: *default_dual_core
     nodepools:
+      redis:
+        vm_spec: *default_dual_core
+        vm_count: 3
       clients:
         vm_spec:
           GCP:
@@ -80,7 +80,7 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
       vm_spec[cloud]['machine_type'] = (
           FLAGS.redis_memtier_client_machine_type)
   if FLAGS.redis_memtier_server_machine_type:
-    vm_spec = config['container_cluster']['vm_spec']
+    vm_spec = config['container_cluster']['nodepools']['redis']['vm_spec']
     for cloud in vm_spec:
       vm_spec[cloud]['machine_type'] = (
           FLAGS.redis_memtier_server_machine_type)
@@ -90,9 +90,10 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
 def _PrepareCluster(bm_spec: _BenchmarkSpec):
   """Prepares a cluster to run the Redis benchmark."""
   redis_port = redis_server.GetRedisPorts()[0]
+  replicas = bm_spec.container_cluster.nodepools['redis'].num_nodes * 2
   with kubernetes_helper.CreateRenderedManifestFile(
       'container/kubernetes_redis_memtier/kubernetes_redis_memtier.yaml.j2', {
-          'redis_replicas': FLAGS.kubernetes_redis_cluster_size,
+          'redis_replicas': replicas,
           'redis_port': redis_port,
           # Redis expects cluster bus port as 'the client port + 10000'
           'redis_cluster_port': redis_port + 10000
@@ -116,25 +117,7 @@ def _PrepareCluster(bm_spec: _BenchmarkSpec):
 
 def Prepare(bm_spec: _BenchmarkSpec) -> None:
   """Install Redis on K8s cluster and memtier_benchmark on client VMs."""
-  redis_cluster_size = FLAGS.kubernetes_redis_cluster_size
-  # We configure the Redis cluster with one replica per master. Ensure that the
-  # redis cluster size is even to account for this topology.
-  if redis_cluster_size % 2 != 0:
-    raise errors.Benchmarks.PrepareException(
-        f'Expected redis cluster size to be even, got {redis_cluster_size}')
-
-  # TODO(user): Add support for multiple Nodepools, to separate out the nodes
-  # used for Redis from the Nodes used for Memtier. This will eliminate the
-  # need for these checks and allow Memtier machine types to be different than
-  # Redis machine types.
   client_vms = bm_spec.vm_groups['clients']
-  min_num_nodes = (redis_cluster_size / 2) + len(client_vms)
-  k8s_cluster_size = bm_spec.container_cluster.num_nodes
-  if k8s_cluster_size < min_num_nodes:
-    raise errors.Benchmarks.PrepareException(
-        f'Container cluster size must be at least {min_num_nodes}, got '
-        f'{k8s_cluster_size}')
-
   # Install Memtier and Redis on the cluster
   prepare_fns = (
       [functools.partial(_PrepareCluster, bm_spec)] +
