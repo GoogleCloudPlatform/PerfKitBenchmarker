@@ -872,6 +872,13 @@ def ParseWorkload(contents):
   return result
 
 
+def PushWorkload(vm, workload_file, remote_path):
+  """Pushes the workload file to the VM."""
+  if os.path.basename(remote_path):
+    vm.RemoteCommand('sudo rm -f ' + remote_path)
+  vm.PushFile(workload_file, remote_path)
+
+
 def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
   """Create PKB samples from a YCSB result.
 
@@ -1077,11 +1084,8 @@ class YCSBExecutor(object):
     remote_path = posixpath.join(linux_packages.INSTALL_DIR,
                                  os.path.basename(workload_file))
 
-    def PushWorkload(vm):
-      if os.path.basename(remote_path):
-        vm.RemoteCommand('sudo rm -f ' + remote_path)
-      vm.PushFile(workload_file, remote_path)
-    vm_util.RunThreaded(PushWorkload, list(set(vms)))
+    args = [((vm, workload_file, remote_path), {}) for vm in dict.fromkeys(vms)]
+    vm_util.RunThreaded(PushWorkload, args)
 
     kwargs['parameter_files'] = [remote_path]
 
@@ -1261,15 +1265,15 @@ class YCSBExecutor(object):
       with open(workload_file) as fp:
         workload_meta = ParseWorkload(fp.read())
         workload_meta.update(kwargs)
-        workload_meta.update(workload_name=os.path.basename(workload_file),
-                             workload_index=workload_index,
-                             stage='run')
+        workload_meta.update(
+            workload_name=os.path.basename(workload_file),
+            workload_index=workload_index,
+            stage='run')
 
-      def PushWorkload(vm, workload_file, remote_path):
-        vm.RemoteCommand('sudo rm -f ' + remote_path)
-        vm.PushFile(workload_file, remote_path)
-      vm_util.RunThreaded(PushWorkload, [((vm, workload_file, remote_path), {})
-                                         for vm in dict.fromkeys(vms)])
+      args = [
+          ((vm, workload_file, remote_path), {}) for vm in dict.fromkeys(vms)
+      ]
+      vm_util.RunThreaded(PushWorkload, args)
 
       parameters['parameter_files'] = [remote_path]
 
