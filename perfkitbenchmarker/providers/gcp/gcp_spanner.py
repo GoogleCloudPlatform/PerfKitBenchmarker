@@ -205,8 +205,7 @@ class GcpSpannerInstance(resource.BaseResource):
   def _GetDefaultConfig(self) -> str:
     """Gets the config that corresponds the region used for the test."""
     try:
-      region = util.GetRegionFromZone(
-          FLAGS.zones[0] if FLAGS.zones else FLAGS.zone[0])
+      region = util.GetRegionFromZone(FLAGS.zone[0])
     except IndexError:
       region = _DEFAULT_REGION
     return f'regional-{region}'

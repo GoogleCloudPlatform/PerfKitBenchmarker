@@ -270,8 +270,8 @@ class ContainerRegistrySpec(spec.BaseSpec):
     updated_spec = {}
     if flag_values['project'].present:
       updated_spec['project'] = flag_values.project
-    if flag_values['zones'].present:
-      updated_spec['zone'] = flag_values.zones[0]
+    if flag_values['zone'].present:
+      updated_spec['zone'] = flag_values.zone[0]
     cloud = config_values['cloud']
     cloud_spec = config_values.get('spec', {}).get(cloud, {})
     cloud_spec.update(updated_spec)

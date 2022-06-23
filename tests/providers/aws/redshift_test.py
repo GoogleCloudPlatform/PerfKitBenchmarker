@@ -64,7 +64,7 @@ class RedshiftTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(RedshiftTestCase, self).setUp()
     FLAGS.run_uri = TEST_RUN_URI
-    FLAGS.zones = [AWS_ZONE_US_EAST_1A]
+    FLAGS.zone = [AWS_ZONE_US_EAST_1A]
 
   def testInvalidClusterCreationError(self):
     kwargs = copy.copy(BASE_REDSHIFT_SPEC)

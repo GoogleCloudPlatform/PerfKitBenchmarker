@@ -239,14 +239,14 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Checks prerequisites are met otherwise aborts execution."""
     with self._lock:
       logging.info('Validating prerequisites.')
-      logging.info('zones: %s', FLAGS.zones)
+      logging.info('zones: %s', FLAGS.zone)
       if len(FLAGS.zones) > 1:
-        for zone in FLAGS.zones:
+        for zone in FLAGS.zone:
           if zone not in IbmCloudVirtualMachine.validated_resources_set:
             self.zone = zone
             break
       else:
-        self.zone = FLAGS.zones[0]
+        self.zone = FLAGS.zone[0]
       logging.info('zone to use %s', self.zone)
       self._CheckImage()
       self.network = ibmcloud_network.IbmCloudNetwork(self.prefix, self.zone)

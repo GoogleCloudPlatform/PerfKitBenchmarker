@@ -224,7 +224,7 @@ class Athena(edw_service.EdwService):
 
   def __init__(self, edw_service_spec):
     super(Athena, self).__init__(edw_service_spec)
-    self.region = util.GetRegionFromZone(FLAGS.zones[0])
+    self.region = util.GetRegionFromZone(FLAGS.zone[0])
     self.output_bucket = '-'.join(
         [FLAGS.athena_output_location_prefix, self.region, FLAGS.run_uri])
     self.client_interface = GetAthenaClientInterface(self.cluster_identifier,

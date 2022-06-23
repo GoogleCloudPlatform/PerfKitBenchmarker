@@ -81,7 +81,7 @@ class AzureResourceGroup(resource.BaseResource):
     # actual resources, but we need to choose *some* region for every
     # benchmark, even if the user doesn't specify one.
     self.region = util.GetRegionFromZone(
-        FLAGS.zones[0] if FLAGS.zones else zone or DEFAULT_REGION)
+        FLAGS.zone[0] if FLAGS.zone else zone or DEFAULT_REGION)
     # Whenever an Azure CLI command needs a resource group, it's
     # always specified the same way.
     self.args = ['--resource-group', self.name]
@@ -90,7 +90,7 @@ class AzureResourceGroup(resource.BaseResource):
     if not self.use_existing:
       # A resource group can own resources in multiple zones, but the
       # group itself needs to have a region. Therefore,
-      # FLAGS.zones[0].
+      # FLAGS.zone[0].
       _, _, retcode = vm_util.IssueCommand(
           [
               azure.AZURE_PATH, 'group', 'create', '--name', self.name,
@@ -277,7 +277,7 @@ class AzureVirtualNetwork(network.BaseNetwork):
     # Because this method is only called from the AzureNetwork constructor,
     # which is only called from AzureNetwork.GetNetwork, we already hold the
     # benchmark_spec.networks_lock.
-    number_subnets = max(number_subnets, len(FLAGS.zones))
+    number_subnets = max(number_subnets, len(FLAGS.zone))
     if key not in benchmark_spec.regional_networks:
       benchmark_spec.regional_networks[key] = cls(spec, region, name,
                                                   number_subnets)

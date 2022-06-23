@@ -127,8 +127,8 @@ def Run(benchmark_spec):
       metadata.update({'dfsio_fs': FLAGS.dfsio_fs})
       metadata.update({'dfsio_num_files': num_files})
       metadata.update({'dfsio_file_size_mbs': file_size})
-      if FLAGS.zones:
-        zone = FLAGS.zones[0]
+      if FLAGS.zone:
+        zone = FLAGS.zone[0]
         region = zone.rsplit('-', 1)[0]
         metadata.update({'regional': True})
         metadata.update({'region': region})

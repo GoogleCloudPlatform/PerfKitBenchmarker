@@ -164,7 +164,7 @@ class IbmCloudNetwork(resource.BaseResource):
     logging.info('Creating vpc: %s', cmd.flags)
     self.vpcid = cmd.CreateVpc()
     if self.vpcid:
-      for zone in FLAGS.zones:
+      for zone in FLAGS.zone:
         cmd.flags.update({'vpcid': self.vpcid, 'zone': zone})
         index = int(zone[len(zone) - 1])  # get the ending -1
         cmd.flags['cidr'] = VPC_PREFIX_RANGES[index - 1]

@@ -1430,6 +1430,21 @@ class ZoneRetryManager():
     FLAGS[self._zone_flag].parse([new_zone])
 
 
+def _WarnAndTranslateZoneFlags():
+  """Translate old zone flags to --zone."""
+  for flag in ['zones', 'extra_zones']:
+    if FLAGS[flag].present:
+      logging.warning(
+          'Flag --%s is deprecated and will be removed after July 2022. Please '
+          'switch to --zone.', flag)
+    # Parse zones from old flags.
+    for zone in FLAGS[flag].value:
+      if zone not in FLAGS.zone:
+        FLAGS['zone'].parse(zone)
+    # Unset the deprecated flag
+    FLAGS[flag].unparse()
+
+
 def _LogCommandLineFlags():
   result = []
   for name in FLAGS:
@@ -1466,6 +1481,7 @@ def SetUpPKB():
 
   # Translate deprecated flags and log all provided flag values.
   disk.WarnAndTranslateDiskFlags()
+  _WarnAndTranslateZoneFlags()
   _LogCommandLineFlags()
 
   # Register skip pending runs functionality.

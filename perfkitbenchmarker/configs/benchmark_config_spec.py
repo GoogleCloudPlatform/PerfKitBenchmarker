@@ -205,12 +205,12 @@ class _DpbServiceSpec(spec.BaseSpec):
       config_values['static_dpb_service_instance'] = (
           flag_values.static_dpb_service_instance)
     # TODO(saksena): Update the documentation for zones assignment
-    if flag_values['zones'].present:
+    if flag_values['zone'].present:
       group = 'worker_group'
       if group in config_values:
         for cloud in config_values[group]['vm_spec']:
           config_values[group]['vm_spec'][cloud]['zone'] = (
-              flag_values.zones[0])
+              flag_values.zone[0])
 
 
 class _TpuGroupSpec(spec.BaseSpec):
@@ -842,12 +842,12 @@ class _SparkServiceSpec(spec.BaseSpec):
     super(_SparkServiceSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['spark_static_cluster_id'].present:
       config_values['static_cluster_id'] = (flag_values.spark_static_cluster_id)
-    if flag_values['zones'].present:
+    if flag_values['zone'].present:
       for group in ('master_group', 'worker_group'):
         if group in config_values:
           for cloud in config_values[group]['vm_spec']:
             config_values[group]['vm_spec'][cloud]['zone'] = (
-                flag_values.zones[0])
+                flag_values.zone[0])
 
 
 class _VmGroupSpec(spec.BaseSpec):
@@ -1191,9 +1191,9 @@ class _NodepoolSpec(spec.BaseSpec):
     # Need to apply the first zone in the zones flag, if specified,
     # to the spec. _NodepoolSpec does not currently support
     # running in multiple zones in a single PKB invocation.
-    if flag_values['zones'].present:
+    if flag_values['zone'].present:
       for cloud in config_values['vm_spec']:
-        config_values['vm_spec'][cloud]['zone'] = (flag_values.zones[0])
+        config_values['vm_spec'][cloud]['zone'] = (flag_values.zone[0])
 
 
 class _NodepoolsDecoder(option_decoders.TypeVerifier):
@@ -1390,9 +1390,9 @@ class _ContainerClusterSpec(spec.BaseSpec):
     # Need to apply the first zone in the zones flag, if specified,
     # to the spec. ContainerClusters do not currently support
     # running in multiple zones in a single PKB invocation.
-    if flag_values['zones'].present:
+    if flag_values['zone'].present:
       for cloud in config_values['vm_spec']:
-        config_values['vm_spec'][cloud]['zone'] = (flag_values.zones[0])
+        config_values['vm_spec'][cloud]['zone'] = (flag_values.zone[0])
 
 
 class _ContainerClusterSpecDecoder(option_decoders.TypeVerifier):

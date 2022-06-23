@@ -114,7 +114,7 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.gpus_per_vm = gpus_per_vm
   benchmark_spec.num_vms = num_vms
   benchmark_spec.total_num_gpus = total_num_gpus
-  benchmark_spec.zones = FLAGS.zones
+  benchmark_spec.zones = FLAGS.zone
 
   # pylint: disable=protected-access
   mlperf_benchmark._UpdateBenchmarkSpecWithFlags(benchmark_spec)

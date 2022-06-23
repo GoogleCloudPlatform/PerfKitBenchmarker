@@ -227,19 +227,20 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
       self.assertTrue(all(disk_spec.disk_size == 75
                           for disk_spec in vm.disk_specs))
 
+  @flagsaver.flagsaver
   def testZonesFlag(self):
-    FLAGS.zones = ['us-east-1b', 'zone2']
-    FLAGS.extra_zones = []
+    FLAGS.zone = ['us-east-1b', 'zone2']
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
     self.assertEqual(len(spec.vms), 2)
     self.assertEqual(spec.vm_groups['group1'][0].zone, 'us-east-1b')
     self.assertEqual(spec.vm_groups['group2'][0].zone, 'zone2')
 
+  @flagsaver.flagsaver
   def testZonesFlagWithZoneFlag(self):
-    FLAGS.zones = ['us-east-1b']
-    FLAGS.extra_zones = []
-    FLAGS.zone = ['us-west-2b']
+    FLAGS['zone'].parse(['us-east-1b'])
+    FLAGS['zones'].parse(['us-west-2b'])
+    pkb._WarnAndTranslateZoneFlags()
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
     self.assertEqual(len(spec.vms), 2)

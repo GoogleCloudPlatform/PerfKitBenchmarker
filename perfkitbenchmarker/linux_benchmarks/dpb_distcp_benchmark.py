@@ -153,8 +153,8 @@ def Run(benchmark_spec):
   metadata.update({'destination_fs': FLAGS.distcp_dest_fs})
   metadata.update({'distcp_num_files': FLAGS.distcp_num_files})
   metadata.update({'distcp_file_size_mbs': FLAGS.distcp_file_size_mbs})
-  if FLAGS.zones:
-    zone = FLAGS.zones[0]
+  if FLAGS.zone:
+    zone = FLAGS.zone[0]
     region = zone.rsplit('-', 1)[0]
     metadata.update({'regional': True})
     metadata.update({'region': region})
