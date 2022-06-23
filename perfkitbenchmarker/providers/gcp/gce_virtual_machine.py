@@ -475,9 +475,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Compute all flags requiring alpha first. Then if any flags are different
     # between alpha and GA, we can set the appropriate ones.
     if self.gce_egress_bandwidth_tier:
-      # gce_egress_bandwidth_tier is available in alpha and beta as of June 2021
-      # TODO(pclay): remove when available in GA
-      cmd.use_alpha_gcloud = True
       network_performance_configs = f'total-egress-bandwidth-tier={self.gce_egress_bandwidth_tier}'
       cmd.flags['network-performance-configs'] = network_performance_configs
 

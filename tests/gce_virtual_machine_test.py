@@ -582,15 +582,18 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     """Tests that egress bandwidth can be set as tier 1."""
     cmd, call_count = self._CreateVmCommand(gce_egress_bandwidth_tier='TIER_1')
     self.assertEqual(call_count, 1)
-    self.assertIn(' alpha ', cmd)
     self.assertIn('total-egress-bandwidth-tier=TIER_1', cmd)
 
   def testAlphaMaintenanceFlag(self):
     """Tests that egress bandwidth can be set as tier 1."""
-    cmd, call_count = self._CreateVmCommand(
-        gce_egress_bandwidth_tier='TIER_1', gpu_count=1, gpu_type='k80')
+    gcloud_init = util.GcloudCommand.__init__
+    def InitAndSetAlpha(self, resource, *args):
+      gcloud_init(self, resource, *args)
+      self.use_alpha_gcloud = True
+    with mock.patch.object(util.GcloudCommand, '__init__', InitAndSetAlpha):
+      cmd, call_count = self._CreateVmCommand(
+          gce_egress_bandwidth_tier='TIER_1', gpu_count=1, gpu_type='k80')
     self.assertEqual(call_count, 1)
-    self.assertIn(' alpha ', cmd)
     self.assertIn('--on-host-maintenance', cmd)
 
   def testGcpInstanceMetadataFlag(self):
