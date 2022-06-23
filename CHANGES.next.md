@@ -76,6 +76,7 @@
 -   Add support for Rocky Linux 8, CentOS Stream 8, CentOS Stream 9, and RHEL 9
     on GCP and AWS Providers.
 -   Add support for chbench using s64da.
+-   Add sysbench_memory benchmark.
 
 ### Enhancements:
 
