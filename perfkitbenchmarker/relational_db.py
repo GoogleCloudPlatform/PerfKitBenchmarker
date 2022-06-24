@@ -25,7 +25,7 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import sql_engine_utils
 import six
 
-# TODO(ferneyhough): change to enum
+# TODO(chunla): Move IAAS flag to file
 flags.DEFINE_string('managed_db_engine', None,
                     'Managed database flavor to use (mysql, postgres)')
 flags.DEFINE_string('managed_db_engine_version', None,

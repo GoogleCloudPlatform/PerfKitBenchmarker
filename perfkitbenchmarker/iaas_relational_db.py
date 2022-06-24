@@ -25,6 +25,14 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 
+SERVER_GCE_NUM_LOCAL_SSDS = flags.DEFINE_integer(
+    'server_gce_num_local_ssds', 0,
+    'The number of ssds that should be added to the Server.')
+
+SERVER_GCE_SSD_INTERFACE = flags.DEFINE_enum(
+    'server_gce_ssd_interface', 'SCSI', ['SCSI', 'NVME'],
+    'The ssd interface for GCE local SSD.')
+
 FLAGS = flags.FLAGS
 
 IS_READY_TIMEOUT = 600  # 10 minutes

@@ -203,8 +203,11 @@ class GceDeviceIdTest(unittest.TestCase):
   def testDeviceId(self):
     with mock.patch(disk.__name__ + '.FLAGS') as disk_flags:
       disk_flags.os_type = 'windows'
-      disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_number=1, disk_size=2,
-                                    disk_type=gce_disk.PD_STANDARD)
+      disk_spec = gce_disk.GceDiskSpec(
+          _COMPONENT,
+          disk_number=1,
+          disk_size=2,
+          disk_type=gce_disk.PD_STANDARD)
       disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
       self.assertEqual(disk_obj.GetDeviceId(), r'\\.\PHYSICALDRIVE1')
 

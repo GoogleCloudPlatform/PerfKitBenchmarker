@@ -24,6 +24,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -66,6 +67,52 @@ NVME = 'NVME'
 disk.RegisterDiskTypeMap(providers.GCP, DISK_TYPE)
 
 
+class GceDiskSpec(disk.BaseDiskSpec):
+  """Object holding the information needed to create an GCPDisk."""
+
+  CLOUD = providers.GCP
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Overrides config values with flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. Is
+        modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+        provided config values.
+
+    Returns:
+      dict mapping config option names to values derived from the config
+      values or flag values.
+    """
+    super(GceDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    if flag_values['gce_ssd_interface'].present:
+      config_values['interface'] = flag_values.gce_ssd_interface
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Can be overridden by derived classes to add options or impose additional
+    requirements on existing options.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(GceDiskSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'interface': (option_decoders.StringDecoder, {
+            'default': 'SCSI'
+        }),
+    })
+    return result
+
+
 class GceDisk(disk.BaseDisk):
   """Object representing an GCE Disk."""
 
@@ -78,6 +125,7 @@ class GceDisk(disk.BaseDisk):
                image_project=None,
                replica_zones=None):
     super(GceDisk, self).__init__(disk_spec)
+    self.interface = disk_spec.interface
     self.attached_vm_name = None
     self.image = image
     self.image_project = image_project
@@ -96,7 +144,7 @@ class GceDisk(disk.BaseDisk):
       self.metadata['replica_zones'] = replica_zones
     self.metadata.update(DISK_METADATA[disk_spec.disk_type])
     if self.disk_type == disk.LOCAL:
-      self.metadata['interface'] = FLAGS.gce_ssd_interface
+      self.metadata['interface'] = self.interface
     if self.provisioned_iops and self.disk_type == PD_EXTREME:
       self.metadata['provisioned_iops'] = self.provisioned_iops
 
@@ -197,8 +245,8 @@ class GceDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    if self.disk_type == disk.LOCAL and FLAGS.gce_ssd_interface == NVME:
+    if self.disk_type == disk.LOCAL and self.interface == NVME:
       return '/dev/%s' % self.name
     else:
-      # by default, gce_ssd_interface == SCSI and returns this name id
+      # by default, interface == SCSI and returns this name id
       return '/dev/disk/by-id/google-%s' % self.name

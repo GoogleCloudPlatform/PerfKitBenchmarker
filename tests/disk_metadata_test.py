@@ -57,11 +57,22 @@ class _DiskMetadataTestCase(pkb_common_test_case.PkbCommonTestCase):
 class GcpDiskMetadataTest(_DiskMetadataTestCase):
 
   def testPDStandard(self):
-    disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_size=2,
-                                  disk_type=gce_disk.PD_STANDARD)
+    disk_spec = gce_disk.GceDiskSpec(
+        _COMPONENT, disk_size=2, disk_type=gce_disk.PD_STANDARD)
     disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
     self.assertDictContainsSubset(
         {disk.MEDIA: disk.HDD, disk.REPLICATION: disk.ZONE},
+        disk_obj.metadata
+    )
+
+  def testLocalSSD(self):
+    disk_spec = gce_disk.GceDiskSpec(
+        _COMPONENT, disk_size=2, disk_type=disk.LOCAL,
+        interface=gce_disk.NVME)
+    disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
+    self.assertDictContainsSubset(
+        {disk.MEDIA: disk.SSD, disk.REPLICATION: 'none',
+         'interface': gce_disk.NVME},
         disk_obj.metadata
     )
 

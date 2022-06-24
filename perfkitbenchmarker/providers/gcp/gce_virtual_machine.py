@@ -164,6 +164,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     super(GceVmSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['gce_num_local_ssds'].present:
       config_values['num_local_ssds'] = flag_values.gce_num_local_ssds
+    if flag_values['gce_ssd_interface'].present:
+      config_values['ssd_interface'] = flag_values.gce_ssd_interface
     if flag_values['gce_preemptible_vms'].present:
       config_values['preemptible'] = flag_values.gce_preemptible_vms
     if flag_values['gce_boot_disk_size'].present:
@@ -205,6 +207,9 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     result.update({
         'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder, {
             'default': None
+        }),
+        'ssd_interface': (option_decoders.StringDecoder, {
+            'default': 'SCSI'
         }),
         'num_local_ssds': (option_decoders.IntDecoder, {
             'default': 0,
@@ -402,6 +407,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     super(GceVirtualMachine, self).__init__(vm_spec)
     self.boot_metadata = {}
+    self.ssd_interface = vm_spec.ssd_interface
     self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
     self.max_local_disks = vm_spec.num_local_ssds
@@ -577,7 +583,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.flags['metadata'] = util.FormatTags(metadata)
 
     cmd.flags['local-ssd'] = (['interface={0}'.format(
-        FLAGS.gce_ssd_interface)] * self.max_local_disks)
+        self.ssd_interface)] * self.max_local_disks)
     if FLAGS.gcloud_scopes:
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
@@ -811,10 +817,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     for i in range(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.LOCAL:
         name = ''
-        if FLAGS.gce_ssd_interface == SCSI:
+        if self.ssd_interface == SCSI:
           name = 'local-ssd-%d' % self.local_disk_counter
           disk_number = self.local_disk_counter + 1
-        elif FLAGS.gce_ssd_interface == NVME:
+        elif self.ssd_interface == NVME:
           # Device can either be /dev/nvme0n1 or /dev/nvme1n1. Find out which.
           name, _ = self.RemoteCommand('find /dev/nvme*n%d' %
                                        (self.local_disk_counter + 1))
@@ -894,7 +900,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['gce_tags'] = ','.join(self.gce_tags)
     if self.max_local_disks:
       result['gce_local_ssd_count'] = self.max_local_disks
-      result['gce_local_ssd_interface'] = FLAGS.gce_ssd_interface
+      result['gce_local_ssd_interface'] = self.ssd_interface
     result['gce_network_tier'] = self.gce_network_tier
     result['gce_nic_type'] = self.gce_nic_type
     if self.gce_egress_bandwidth_tier:
