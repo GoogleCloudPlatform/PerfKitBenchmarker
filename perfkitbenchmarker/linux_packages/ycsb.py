@@ -872,6 +872,7 @@ def ParseWorkload(contents):
   return result
 
 
+@vm_util.Retry(poll_interval=10, max_retries=10)
 def PushWorkload(vm, workload_file, remote_path):
   """Pushes the workload file to the VM."""
   if os.path.basename(remote_path):
