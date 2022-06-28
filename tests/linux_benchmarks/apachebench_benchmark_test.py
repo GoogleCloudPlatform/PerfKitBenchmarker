@@ -13,11 +13,12 @@
 # limitations under the License.
 """Tests for apachebench_benchmark."""
 
+import collections
 import os
 import unittest
+
 from absl import flags
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker.linux_benchmarks import apachebench_benchmark
 from perfkitbenchmarker.linux_packages import apache2_server
@@ -44,6 +45,14 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     self.apachebench_percentiles = self.populateTestString(
         'apachebench_percentiles.txt')
     self.apachebench_output = self.populateTestString('apachebench_output.txt')
+    self.apachebench_raw_request_times = self.populateTestString(
+        'apachebench_raw_request_times.tsv')
+    self.sample_config = apachebench_benchmark.ApacheBenchConfig(
+        'internal-ip',
+        'internal_ip',
+        'internal_results.txt',
+        'internal_ip_percentiles.csv',
+        'internal_ip_raw_request_times.tsv')
     self.vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     client = mock.MagicMock(
         hostname='pkb-mock-0',
@@ -71,13 +80,8 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
   def testApacheBench_Run(self):
     client = self.vm_spec.vm_groups['client'][0]
     client.RemoteCommand.return_value = (self.apachebench_output, '')
-    config = apachebench_benchmark.ApacheBenchConfig(
-        'internal-ip',
-        'internal_ip',
-        'internal_results.txt',
-        'internal_ip_percentiles.csv')
 
-    results = apachebench_benchmark._Run(self.vm_spec, config)
+    results = apachebench_benchmark._Run(self.vm_spec, self.sample_config)
     result = results[0]
 
     expected_attrs = {
@@ -105,11 +109,6 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
   def testApacheBenchGetMetadata(self):
     client = self.vm_spec.vm_groups['client'][0]
     client.RemoteCommand.return_value = (self.apachebench_output, '')
-    config = apachebench_benchmark.ApacheBenchConfig(
-        'internal-ip',
-        'internal_ip',
-        'internal_results.txt',
-        'internal_ip_percentiles.csv')
 
     FLAGS.apachebench_num_requests = 1
     FLAGS.apachebench_concurrency = 1
@@ -119,8 +118,8 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.apachebench_timelimit = None
     FLAGS.apachebench_client_vms = 1
 
-    results = apachebench_benchmark._Run(self.vm_spec, config)
-    metadata = apachebench_benchmark.GetMetadata(results[0], config)
+    results = apachebench_benchmark._Run(self.vm_spec, self.sample_config)
+    metadata = apachebench_benchmark.GetMetadata(results[0], self.sample_config)
 
     expected_metadata = {
         'apachebench_requests': 1,
@@ -137,7 +136,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertDictEqual(metadata, expected_metadata)
 
-  def testParsePercentilesFromString(self):
+  def testParsePercentilesFromFile(self):
     client = self.vm_spec.vm_groups['client'][0]
     client.RemoteCommand.return_value = (self.apachebench_percentiles, '')
     result = apachebench_benchmark._ParsePercentilesFromFile(client, 'path')
@@ -156,6 +155,19 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     }
 
     self.assertDictEqual(result, expected_percentiles)
+
+  def testParseHistogramFromFile(self):
+    client = self.vm_spec.vm_groups['client'][0]
+    client.RemoteCommand.return_value = (self.apachebench_raw_request_times, '')
+    result = apachebench_benchmark._ParseHistogramFromFile(client, 'path')
+
+    expected_histogram = collections.OrderedDict()
+    expected_histogram[4] = 1
+    expected_histogram[5] = 3
+    expected_histogram[6] = 1
+    expected_histogram[7] = 3
+
+    self.assertDictEqual(result, expected_histogram)
 
 
 if __name__ == '__main__':

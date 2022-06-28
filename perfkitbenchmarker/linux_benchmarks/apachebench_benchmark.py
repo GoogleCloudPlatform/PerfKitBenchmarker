@@ -18,9 +18,11 @@ See https://httpd.apache.org/docs/2.4/programs/ab.html#synopsis for more info.
 """
 
 import dataclasses
+import io
 from typing import Any, Dict, List
 
 from absl import flags
+import pandas as pd
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import regex_util
@@ -37,6 +39,7 @@ class ApacheBenchConfig:
   server_attr: str
   output_path: str
   percentile_output_path: str
+  raw_request_data_path: str
 
 
 @dataclasses.dataclass
@@ -100,12 +103,14 @@ _INTERNAL_IP_CONFIG = ApacheBenchConfig(
         'internal-ip',
         'internal_ip',
         'internal_results.txt',
-        'internal_ip_percentiles.csv')
+        'internal_ip_percentiles.csv',
+        'internal_ip_request_times.tsv')
 _EXTERNAL_IP_CONFIG = ApacheBenchConfig(
         'external-ip',
         'ip_address',
         'external_results.txt',
-        'external_ip_percentiles.csv')
+        'external_ip_percentiles.csv',
+        'external_ip_request_times.tsv')
 
 _NUM_REQUESTS = flags.DEFINE_integer(
     'apachebench_num_requests', default=10000,
@@ -154,6 +159,41 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   apache2_server.SetupServer(server, _APACHE_SERVER_CONTENT_SIZE.value)
   apache2_server.StartServer(server)
+
+
+def _ParseHistogramFromFile(vm: virtual_machine.VirtualMachine, path: str,
+                            column: str = 'ttime') -> sample._Histogram:
+  """Loads tsv file created by ApacheBench at path in the VM into a histogram.
+
+  The tsv located by path inside of the virtual machine vm will be loaded and
+  used to create a sample._Histogram.
+
+  Args:
+    vm: The Virtual Machine that has run an ApacheBench (AB) benchmark.
+    path: The path to the tsv file output inside of the VM which ran AB.
+    column: The column with numeric data to create the Histogram from.
+  Returns:
+    sample._Histogram created from the data in the column of the tsv file
+    specified.
+
+  Column meanings:
+    ctime: Time to establish a connection with the server.
+    dtime: Time from connection established to response recieved.
+    ttime: ctime + dtime
+    wait: Time from request written to response from server.
+
+  Example ApacheBench percentile output.
+
+  starttime                       seconds     ctime   dtime   ttime   wait
+  Fri Jun 24 14:16:49 2022        1656105409      2       2       4       2
+  Fri Jun 24 14:16:54 2022        1656105414      2       2       5       2
+  Fri Jun 24 14:16:54 2022        1656105414      2       2       5       2
+  Fri Jun 24 14:16:54 2022        1656105414      3       2       5       2
+  """
+  tsv, _ = vm.RemoteCommand(f'cat {path}')
+  data_frame = pd.read_csv(io.StringIO(tsv), sep='\t')
+
+  return sample.MakeHistogram(data_frame[column].tolist())
 
 
 def _ParsePercentilesFromFile(vm: virtual_machine.VirtualMachine,
@@ -320,6 +360,7 @@ def _Run(benchmark_spec: bm_spec.BenchmarkSpec,
       f'-m {_HTTP_METHOD.value} '
       f'-s {_SOCKET_TIMEOUT.value} '
       f'-e {config.percentile_output_path} '
+      f'-g {config.raw_request_data_path} '
       f'http://{getattr(server, config.server_attr)}:{_PORT}/ '
       f'1> {config.output_path}')
 
@@ -344,10 +385,16 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 
       samples += result.GetSamples(metadata)
 
-      # Add percentile data to a 'histogram' sample
+      # Add percentile data to a sample
       percentiles = _ParsePercentilesFromFile(vm, config.percentile_output_path)
       percentiles.update(metadata)
-      samples.append(sample.Sample('ApacheBench Histogram', 0, '', percentiles))
+      samples.append(
+          sample.Sample('ApacheBench Percentiles', 0, '', percentiles))
+
+      # Add a total request time histogram sample
+      histogram = _ParseHistogramFromFile(vm, config.raw_request_data_path)
+      samples.append(sample.CreateHistogramSample(
+          histogram, '', '', 'ms', metadata, 'ApacheBench Histrogram'))
 
   return samples
 
