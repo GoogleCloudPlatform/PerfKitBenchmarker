@@ -94,6 +94,8 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   if redis_server.REDIS_SIMULATE_AOF.value:
     config['vm_groups']['servers']['disk_spec']['GCP']['disk_type'] = 'local'
     config['vm_groups']['servers']['vm_spec']['GCP']['num_local_ssds'] = 8
+    # To auto mount scratch disks (/scratch0, /scratch1, ...etc)
+    config['vm_groups']['servers']['disk_count'] = 7
     FLAGS.num_striped_disks = 7
     FLAGS.gce_ssd_interface = 'NVME'
   else:
@@ -115,6 +117,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
                       client_vms + [server_vm])
 
   if redis_server.REDIS_SIMULATE_AOF.value:
+    server_vm.Install('mdadm')
     server_vm.RemoteCommand(
         'yes | sudo mdadm --create /dev/md1 --level=stripe --force --raid-devices=1 /dev/nvme0n8'
         )
@@ -129,10 +132,11 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
     for disk in server_vm.scratch_disks:
       cmd = ('sudo fio --name=global --direct=1 --ioengine=libaio --numjobs=1 '
              '--refill_buffers --scramble_buffers=1 --allow_mounted_write=1 '
-             '--blocksize=128k --rw=write --iodepth=64 --size=100% '
-             f'--name=wipc --filename={disk.device_path}')
+             '--blocksize=128k --rw=write --iodepth=64 '
+             f'--size={disk.disk_size}G --name=wipc '
+             f'--filename={disk.mount_point}/fio_data &> /dev/null &')
       logging.info('Start filling %s. This may take up to 30min...',
-                   disk.device_path)
+                   disk.mount_point)
       server_vm.RemoteCommand(cmd)
 
   # Install redis on the 1st machine.
@@ -140,8 +144,9 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   redis_server.Start(server_vm)
 
   # Load the redis server with preexisting data.
-  for port in redis_server.GetRedisPorts():
-    memtier.Load(server_vm, 'localhost', str(port))
+  vm_util.RunThreaded(
+      lambda port: memtier.Load(server_vm, 'localhost', str(port)),
+      redis_server.GetRedisPorts(), 10)
 
   bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
   vm_util.SetupSimulatedMaintenance(server_vm)

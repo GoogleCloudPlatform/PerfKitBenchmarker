@@ -132,7 +132,7 @@ def _BuildStartCommand(vm, port: int) -> str:
   if REDIS_SIMULATE_AOF.value:
     cmd_args += [
         '--appendonly yes',
-        '--appendfilename backup',
+        f'--appendfilename backup_{port}',
         f'--dir /{REDIS_BACKUP}',
     ]
   # Add check for the MADV_FREE/fork arm64 Linux kernel bug
