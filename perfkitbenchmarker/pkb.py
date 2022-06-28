@@ -1137,7 +1137,8 @@ def RunBenchmark(spec, collector):
               or 'QuotaFailure' in str(e)):
           spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
         elif (isinstance(e, errors.Benchmarks.KnownIntermittentError) or
-              isinstance(e, errors.Resource.ProvisionTimeoutError)):
+              isinstance(e, errors.Resource.ProvisionTimeoutError) or
+              'ProvisionTimeoutError' in str(e)):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT)
         elif (isinstance(e, errors.Benchmarks.UnsupportedConfigError) or

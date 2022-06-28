@@ -650,8 +650,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       elif self.low_priority and 'OverconstrainedAllocationRequest' in stderr:
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
       elif _OS_PROVISIONING_TIMED_OUT in stderr:
-        raise errors.Resource.ProvisionTimeoutError(_OS_PROVISIONING_TIMED_OUT +
-                                                    stderr)
+        raise errors.Resource.ProvisionTimeoutError(stderr)
       elif "Virtual Machine Scale Set with '<NULL>' security type." in stderr:
         raise errors.Resource.CreationError(
             f'Failed to create VM: {self.machine_type} is likely a confidential'
