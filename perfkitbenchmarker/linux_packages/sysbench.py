@@ -25,7 +25,8 @@ def _Install(vm):
   """Installs the sysbench package on the VM."""
   vm.RemoteCommand(
       f'git clone {GIT_REPO} {SYSBENCH_DIR} --branch {RELEASE_TAG}')
-  vm.RemoteCommand(f'cd {SYSBENCH_DIR} && ./autogen.sh && ./configure')
+  vm.RemoteCommand(f'cd {SYSBENCH_DIR} && ./autogen.sh '
+                   '&& ./configure --with-pgsql')
   vm.RemoteCommand(f'cd {SYSBENCH_DIR} && make -j && sudo make install')
 
 
