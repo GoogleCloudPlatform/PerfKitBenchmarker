@@ -58,8 +58,21 @@ NUM_LOCAL_VOLUMES = {
     'Standard_L8s_v2': 1,
     'Standard_L16s_v2': 2,
     'Standard_L32s_v2': 4,
+    'Standard_L48s_v2': 6,
     'Standard_L64s_v2': 8,
-    'Standard_L80s_v2': 10
+    'Standard_L80s_v2': 10,
+    'Standard_L8s_v3': 1,
+    'Standard_L16s_v3': 2,
+    'Standard_L32s_v3': 4,
+    'Standard_L48s_v3': 6,
+    'Standard_L64s_v3': 8,
+    'Standard_L80s_v3': 10,
+    'Standard_L8as_v3': 1,
+    'Standard_L16as_v3': 2,
+    'Standard_L32as_v3': 4,
+    'Standard_L48as_v3': 6,
+    'Standard_L64as_v3': 8,
+    'Standard_L80as_v3': 10
 }
 
 _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES = (
