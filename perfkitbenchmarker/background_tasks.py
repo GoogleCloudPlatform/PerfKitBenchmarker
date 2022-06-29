@@ -53,7 +53,8 @@ keeping the risk of deadlock low.
 
 
 import abc
-from collections import deque
+import collections
+from concurrent import futures
 import ctypes
 import functools
 import logging
@@ -62,11 +63,10 @@ import signal
 import threading
 import time
 import traceback
-from concurrent import futures
 
+from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from absl import flags
 from perfkitbenchmarker import log_util
 import six
 from six.moves import queue
@@ -157,7 +157,7 @@ class _SingleReaderQueue(object):
   """
 
   def __init__(self):
-    self._deque = deque()
+    self._deque = collections.deque()
 
   def Get(self, timeout=None):
     if not _WaitForCondition(lambda: self._deque, timeout):
@@ -177,7 +177,7 @@ class _NonPollingSingleReaderQueue(object):
   """
 
   def __init__(self):
-    self._deque = deque()
+    self._deque = collections.deque()
     self._lock = threading.Lock()
     self._lock.acquire()
 
