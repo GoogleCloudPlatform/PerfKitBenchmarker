@@ -48,8 +48,7 @@ _PROXY_THREADS = flags.DEFINE_integer(
     'Number of redis proxy threads to use.')
 _SHARDS = flags.DEFINE_integer(
     'enterprise_redis_shard_count', 6,
-    'Number of redis shard. Each shard is a redis thread. In a clustered '
-    'setup, this is the number of shards per server VM.')
+    'Number of redis shards per database. Each shard is a redis thread.')
 _LOAD_RECORDS = flags.DEFINE_integer(
     'enterprise_redis_load_records', 1000000,
     'Number of keys to pre-load into Redis.')
@@ -253,7 +252,7 @@ def _GetRestCommand() -> str:
 
 
 def CreateDatabase(vms: List[_VM], redis_port: int,
-                   shards_per_vm: Optional[int] = None) -> None:
+                   shards: Optional[int] = None) -> None:
   """Creates a new Redis Enterprise database.
 
   See https://docs.redis.com/latest/rs/references/rest-api/objects/bdb/.
@@ -261,10 +260,10 @@ def CreateDatabase(vms: List[_VM], redis_port: int,
   Args:
     vms: The server VMs.
     redis_port: The port to serve the database.
-    shards_per_vm: Number of shards to use per server VM.
+    shards: Number of shards for the database. In a clustered setup, shards will
+      be distributed evenly across nodes.
   """
-  shards_per_vm = shards_per_vm or _SHARDS.value
-  total_shards = shards_per_vm * len(vms)
+  db_shards = shards or _SHARDS.value
   content = {
       'name': 'redisdb',
       'memory_size': int(vms[0].total_memory_kb * _ONE_KILOBYTE / 2 * len(vms)),
@@ -275,10 +274,10 @@ def CreateDatabase(vms: List[_VM], redis_port: int,
       'authentication_redis_pass': FLAGS.run_uri,
       'replication': False,
   }
-  if total_shards > 1:
+  if db_shards > 1:
     content.update({
         'sharding': True,
-        'shards_count': total_shards,
+        'shards_count': db_shards,
         'shards_placement': 'sparse',
         'oss_cluster': True,
         'shard_key_regex':
@@ -441,7 +440,7 @@ def Run(redis_vms: List[_VM],
     redis_vms: Redis server vms.
     load_vms: Memtier load vms.
     redis_port: Port for the redis server.
-    shards: The per-VM shard count for this run.
+    shards: The per-DB shard count for this run.
     proxy_threads: The per-VM proxy thread count for this run.
     memtier_threads: If provided, overrides --enterprise_redis_min_threads.
 
@@ -488,8 +487,11 @@ def Run(redis_vms: List[_VM],
       sample_metadata['redis_pipeline'] = (
           _PIPELINES.value)
       sample_metadata['threads'] = threads
-      sample_metadata['shard_count'] = shards
-      sample_metadata['total_shard_count'] = shards * len(redis_vms)
+      sample_metadata['db_shard_count'] = shards
+      # TODO(user): Update total_shard_count and db_count once
+      # multi-DB support is added.
+      sample_metadata['total_shard_count'] = shards
+      sample_metadata['db_count'] = 1
       sample_metadata['redis_proxy_threads'] = (
           proxy_threads or _PROXY_THREADS.value)
       sample_metadata['redis_loadgen_clients'] = (
@@ -543,8 +545,8 @@ class ThroughputOptimizer():
     self.results: _ThroughputSampleMatrix = (
         [[() for i in range(num_cpus)] for i in range(num_cpus)])
 
-  def _CreateAndLoadDatabase(self, shards_per_vm: int) -> None:
-    CreateDatabase(self.server_vms, self.redis_port, shards_per_vm)
+  def _CreateAndLoadDatabase(self, shards: int) -> None:
+    CreateDatabase(self.server_vms, self.redis_port, shards)
     WaitForDatabaseUp(self.server_vms[0], self.redis_port)
     LoadDatabase(self.server_vms, self.client_vms, self.redis_port)
 
@@ -583,7 +585,7 @@ class ThroughputOptimizer():
                  proxy_threads: int) -> _ThroughputSampleTuple:
     if not self.results[shards - 1][proxy_threads - 1]:
       self.results[shards - 1][proxy_threads - 1] = self._FullRun(
-          shards, proxy_threads)
+          shards * len(self.server_vms), proxy_threads)
     return self.results[shards - 1][proxy_threads - 1]
 
   def _GetOptimalNeighbor(self, shards: int,
@@ -625,7 +627,7 @@ class ThroughputOptimizer():
     # Use a heuristic for the number of shards and proxy threads per VM.
     # Usually the optimal number is somewhere close to this.
     num_cpus = self.server_vms[0].num_cpus
-    shard_count = max(num_cpus // 5, 1)
+    shard_count = max(num_cpus // 5, 1)  # Per VM on 1 database
     proxy_thread_count = num_cpus - shard_count
 
     while True:
