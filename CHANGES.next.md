@@ -242,3 +242,4 @@
     gcp_dpb_dataflow provider.
 -   Support taking FLAGS.dpb_jar_file and FLAGS.dpb_wordcount_additional_args
     when running wordcount benchmark.
+-   Add some required types to BaseAppServiceSpec
