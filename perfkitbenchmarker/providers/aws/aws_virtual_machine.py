@@ -810,7 +810,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--hibernation-options=Configured=true',
       ])
 
-    if FLAGS.disable_smt:
+    # query fails on hpc6a.48xlarge which already disables smt.
+    if FLAGS.disable_smt and self.machine_type != 'hpc6a.48xlarge':
       query_cmd = util.AWS_PREFIX + [
           'ec2',
           'describe-instance-types',
