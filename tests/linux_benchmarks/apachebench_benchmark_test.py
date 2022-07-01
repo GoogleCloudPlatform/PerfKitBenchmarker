@@ -74,6 +74,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
 
     client.Install.assert_called_once_with('apache2_utils')
     server.Install.assert_called_once_with('apache2_server')
+    server.AllowPort.assert_called_once_with(apachebench_benchmark._PORT)
     SetupServer.assert_called_once_with(server, 1)
     StartServer.assert_called_once_with(server)
 

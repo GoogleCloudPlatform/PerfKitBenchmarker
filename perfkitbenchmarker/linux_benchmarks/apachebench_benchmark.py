@@ -157,6 +157,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   vm_util.RunThreaded(lambda vm: vm.Install('apache2_utils'), client_vms)
   server.Install('apache2_server')
 
+  server.AllowPort(_PORT)
   apache2_server.SetupServer(server, _APACHE_SERVER_CONTENT_SIZE.value)
   apache2_server.StartServer(server)
 
