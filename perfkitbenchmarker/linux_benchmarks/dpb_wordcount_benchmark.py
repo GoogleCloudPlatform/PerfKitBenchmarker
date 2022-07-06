@@ -146,7 +146,7 @@ def Run(benchmark_spec):
       base_out = FLAGS.dpb_dataflow_staging_location
     else:
       base_out = 'gs://{}'.format(FLAGS.dpb_wordcount_out_base)
-    job_arguments.append('--output={}/output/'.format(base_out))
+    job_arguments.append('--output={}/output'.format(base_out))
   else:
     # Use user-provided jar file if present; otherwise use the default example
     if not FLAGS.dpb_job_jarfile:
