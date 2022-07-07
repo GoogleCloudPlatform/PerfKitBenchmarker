@@ -73,10 +73,11 @@
     Service Bus).
 -   Add Intel perfspect as a new trace
 -   Add Ubuntu 22.04 support for GCP, AWS and Azure Providers.
--   Add support for Rocky Linux 8, CentOS Stream 8, CentOS Stream 9, and RHEL 9
-    on GCP and AWS Providers.
+-   Add support for Rocky Linux 8, CentOS Stream 8, and CentOS Stream 9 on GCP
+    and AWS Providers.
 -   Add support for chbench using s64da.
 -   Add sysbench_memory benchmark.
+-   Add support for RHEL 9 on AWS, Azure, and GCP.
 
 ### Enhancements:
 

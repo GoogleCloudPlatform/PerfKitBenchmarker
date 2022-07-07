@@ -928,8 +928,11 @@ class Rhel8BasedAzureVirtualMachine(AzureVirtualMachine,
   GEN2_IMAGE_URN = 'RedHat:RHEL:8-lvm-gen2:latest'
   IMAGE_URN = 'RedHat:RHEL:8-LVM:latest'
 
-# TODO(user): Add RHEL 9 after it is available
-# https://docs.microsoft.com/en-us/azure/virtual-machines/workloads/redhat/redhat-imagelist
+
+class Rhel9BasedAzureVirtualMachine(AzureVirtualMachine,
+                                    linux_virtual_machine.Rhel9Mixin):
+  GEN2_IMAGE_URN = 'RedHat:RHEL:9-lvm-gen2:latest'
+  IMAGE_URN = 'RedHat:RHEL:9-lvm:latest'
 
 
 class CentOs7BasedAzureVirtualMachine(AzureVirtualMachine,
@@ -944,7 +947,7 @@ class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'OpenLogic:CentOS-LVM:8-lvm:latest'
 
 
-# TODO(pclay): Add Fedora CoreOS when available:
+# TODO(user): Add Fedora CoreOS when available:
 #   https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/
 
 
