@@ -24,9 +24,8 @@ class GcsFuseDisk(disk.MountableDisk):
     vm.Install('gcsfuse')
 
   def Mount(self, vm):
-    vm.RemoteCommand(
-        f'sudo mkdir -p {self.mount_point} && '
-        f'sudo chmod a+w {self.mount_point}')
+    vm.RemoteCommand(f'sudo mkdir -p {self.mount_point} && '
+                     f'sudo chmod a+w {self.mount_point}')
 
     opts = ','.join(DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
     bucket = FLAGS.gcsfuse_bucket
