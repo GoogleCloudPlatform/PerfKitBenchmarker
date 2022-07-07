@@ -23,7 +23,7 @@ import json
 import logging
 import posixpath
 import time
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -482,25 +482,7 @@ def Run(redis_vms: List[_VM],
       latency = interval.get('avg_latency')
       cur_max_latency = max(cur_max_latency, latency)
       sample_metadata = interval
-      sample_metadata['redis_tune_on_startup'] = (
-          _TUNE_ON_STARTUP.value)
-      sample_metadata['redis_pipeline'] = (
-          _PIPELINES.value)
-      sample_metadata['threads'] = threads
-      sample_metadata['db_shard_count'] = shards
-      # TODO(user): Update total_shard_count and db_count once
-      # multi-DB support is added.
-      sample_metadata['total_shard_count'] = shards
-      sample_metadata['db_count'] = 1
-      sample_metadata['redis_proxy_threads'] = (
-          proxy_threads or _PROXY_THREADS.value)
-      sample_metadata['redis_loadgen_clients'] = (
-          _LOADGEN_CLIENTS.value)
-      sample_metadata['pin_workers'] = _PIN_WORKERS.value
-      sample_metadata['disable_cpus'] = _DISABLE_CPU_IDS.value
-      sample_metadata['redis_enterprise_version'] = _VERSION
-      sample_metadata['memtier_data_size'] = _DATA_SIZE.value
-      sample_metadata['memtier_key_maximum'] = _LOAD_RECORDS.value
+      sample_metadata.update(GetMetadata(shards, threads, proxy_threads))
       results.append(sample.Sample('throughput', throughput, 'ops/s',
                                    sample_metadata))
       if latency < 1000:
@@ -521,6 +503,38 @@ def Run(redis_vms: List[_VM],
   logging.info('Max throughput under 1ms: %s ops/sec.',
                max_throughput_for_completion_latency_under_1ms)
   return max_throughput_for_completion_latency_under_1ms, results
+
+
+def GetMetadata(shards: int, threads: int,
+                proxy_threads: int) -> Dict[str, Any]:
+  """Returns metadata associated with the run.
+
+  Args:
+    shards: The shard count per database.
+    threads: The thread count used by the memtier client.
+    proxy_threads: The proxy thread count used on the redis cluster.
+
+  Returns:
+    A dictionary of metadata that can be attached to the run sample.
+  """
+  return {
+      'redis_tune_on_startup': _TUNE_ON_STARTUP.value,
+      'redis_pipeline': _PIPELINES.value,
+      'threads': threads,
+      'db_shard_count': shards,
+      # TODO(user): Update total_shard_count and db_count once
+      # multi-DB support is added.
+      'total_shard_count': shards,
+      'db_count': 1,
+      'redis_proxy_threads': proxy_threads or _PROXY_THREADS.value,
+      'redis_loadgen_clients': _LOADGEN_CLIENTS.value,
+      'pin_workers': _PIN_WORKERS.value,
+      'disable_cpus': _DISABLE_CPU_IDS.value,
+      'redis_enterprise_version': _VERSION,
+      'memtier_data_size': _DATA_SIZE.value,
+      'memtier_key_maximum': _LOAD_RECORDS.value,
+      'replication': False
+  }
 
 
 class ThroughputOptimizer():
