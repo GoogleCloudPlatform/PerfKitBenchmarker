@@ -118,7 +118,7 @@ def Prepare(benchmark_spec):
   path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
   logging.info('Uploading %s to %s', path, vms[0])
   vms[0].PushFile(path)
-  vms[0].RemoteCommand('sudo chmod 777 %s' % REMOTE_SCRIPT)
+  vms[0].RemoteCommand('sudo chmod 755 %s' % REMOTE_SCRIPT)
 
 
 def _ParseNetperfOutput(stdout, metadata, benchmark_name, iteration_id):

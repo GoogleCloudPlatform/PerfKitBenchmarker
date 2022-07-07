@@ -1421,7 +1421,7 @@ class YCSBExecutor(object):
             'touch {0}{1}.hdr && tail -1 {0}{1}.hdr'.format(
                 hdr_files_dir, grouptype))
         worker_vm.RemoteCommand(
-            'sudo chmod 777 {1}{2}.hdr && echo "{0}" >> {1}{2}.hdr'.format(
+            'sudo chmod 755 {1}{2}.hdr && echo "{0}" >> {1}{2}.hdr'.format(
                 hdr[:-1], hdr_files_dir, grouptype))
       hdrhistogram, _ = worker_vm.RemoteCommand(
           'cd {0}; ./HistogramLogProcessor -i {1}{2}.hdr -outputValueUnitRatio '

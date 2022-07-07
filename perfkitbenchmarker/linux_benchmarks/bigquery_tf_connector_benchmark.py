@@ -87,7 +87,7 @@ def Prepare(benchmark_spec):
   path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
   logging.info('Uploading %s to %s', path, vm)
   vm.PushFile(path, REMOTE_SCRIPT)
-  vm.RemoteCommand(f'sudo chmod 777 {REMOTE_SCRIPT}')
+  vm.RemoteCommand(f'sudo chmod 755 {REMOTE_SCRIPT}')
 
 
 def _RunBenchmark(vm, streams=1, batch_size=2048, data_format='AVRO'):

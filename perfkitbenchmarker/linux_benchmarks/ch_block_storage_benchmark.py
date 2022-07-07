@@ -66,7 +66,7 @@ def _PrepareDevicePath(vm, link):
     String represents the actual path to the device.
   """
   path = vm.RemoteCommand('readlink -f %s' % link)[0][:-1]
-  vm.RemoteCommand('sudo chmod 777 %s' % path)
+  vm.RemoteCommand('sudo chmod 755 %s' % path)
   return path
 
 

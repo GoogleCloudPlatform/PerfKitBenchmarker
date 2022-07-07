@@ -171,7 +171,7 @@ def Prepare(benchmark_spec):
   path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
   logging.info('Uploading %s to %s', path, vms[0])
   vms[0].PushFile(path, REMOTE_SCRIPT)
-  vms[0].RemoteCommand(f'sudo chmod 777 {REMOTE_SCRIPT}')
+  vms[0].RemoteCommand(f'sudo chmod 755 {REMOTE_SCRIPT}')
 
 
 def _SetupHostFirewall(benchmark_spec):

@@ -1409,13 +1409,16 @@ def PrepareVM(vm, service):
   # permission.
 
   vm.RemoteCommand('sudo mkdir -p ' + SCRIPT_DIR)
-  vm.RemoteCommand('sudo chmod 777 ' + SCRIPT_DIR)
+  vm.RemoteCommand('sudo chmod 755 ' + SCRIPT_DIR)
+  vm.RemoteCommand('sudo chown ' + vm.user_name + ': ' + SCRIPT_DIR)
 
   vm.RemoteCommand('sudo mkdir -p ' + DOWNLOAD_DIRECTORY)
-  vm.RemoteCommand('sudo chmod 777 ' + DOWNLOAD_DIRECTORY)
+  vm.RemoteCommand('sudo chmod 755 ' + DOWNLOAD_DIRECTORY)
+  vm.RemoteCommand('sudo chown ' + vm.user_name + ': ' + DOWNLOAD_DIRECTORY)
 
   vm.RemoteCommand('sudo mkdir -p ' + REMOTE_PACKAGE_DIR)
-  vm.RemoteCommand('sudo chmod 777  ' + REMOTE_PACKAGE_DIR)
+  vm.RemoteCommand('sudo chmod 755  ' + REMOTE_PACKAGE_DIR)
+  vm.RemoteCommand('sudo chown ' + vm.user_name + ': ' + REMOTE_PACKAGE_DIR)
 
   file_path = data.ResourcePath(DATA_FILE)
   vm.PushFile(file_path, SCRIPT_DIR)

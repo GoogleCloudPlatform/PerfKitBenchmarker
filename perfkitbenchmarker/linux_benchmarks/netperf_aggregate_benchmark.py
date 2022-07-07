@@ -110,7 +110,7 @@ def Prepare(benchmark_spec):
 
   vm_util.RunThreaded(PrepareNetperfAggregate, vms)
   client_vm.RemoteCommand(
-      f'sudo chmod 777 {os.path.join(netperf.NETPERF_EXAMPLE_DIR, REMOTE_SCRIPT)}'
+      f'sudo chmod 755 {os.path.join(netperf.NETPERF_EXAMPLE_DIR, REMOTE_SCRIPT)}'
   )
 
 
