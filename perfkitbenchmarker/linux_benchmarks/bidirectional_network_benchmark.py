@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Generates bidirectional network load using netperf.
 
 docs:
@@ -41,12 +40,16 @@ flags.register_validator(
     'bidirectional_network_tests',
     lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_TESTS))
 
-flags.DEFINE_integer('bidirectional_network_test_length', 60,
-                     'bidirectional_network test length, in seconds',
-                     lower_bound=1)
-flags.DEFINE_integer('bidirectional_stream_num_streams', 8,
-                     'Number of netperf processes to run.',
-                     lower_bound=1)
+flags.DEFINE_integer(
+    'bidirectional_network_test_length',
+    60,
+    'bidirectional_network test length, in seconds',
+    lower_bound=1)
+flags.DEFINE_integer(
+    'bidirectional_stream_num_streams',
+    8,
+    'Number of netperf processes to run.',
+    lower_bound=1)
 
 ALL_TESTS = ['TCP_STREAM', 'TCP_MAERTS']
 
@@ -64,7 +67,6 @@ bidirectional_network:
     secondary:
       vm_spec: *default_single_core
 """
-
 
 MBPS = 'Mbits/sec'
 SEC = 'seconds'
@@ -96,7 +98,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm_util.RunThreaded(PrepareNetperf, vms)
@@ -127,7 +129,7 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name, iteration_id):
     metadata: metadata for any sample.Sample objects we create
     benchmark_name: name of the netperf benchmark
     iteration_id: the unique id of the benchmark within the bidirectional
-        network benchmark
+      network benchmark
 
   Returns:
     A tuple containing throughput_sample
@@ -172,8 +174,8 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name, iteration_id):
   # Update the metadata with some additional infos
   meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
                ('Throughput Confidence Width (%)', 'confidence_width_percent')]
-  metadata.update({meta_key: results[netperf_key]
-                   for netperf_key, meta_key in meta_keys})
+  metadata.update(
+      {meta_key: results[netperf_key] for netperf_key, meta_key in meta_keys})
 
   # Create the throughput sample
   throughput = float(results['Throughput'])
@@ -183,15 +185,16 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name, iteration_id):
     unit = MBPS
     metric = '%s_%s_Throughput' % (iteration_id, benchmark_name)
   else:
-    raise ValueError('Netperf output specifies unrecognized throughput units %s'
-                     % throughput_units)
+    raise ValueError(
+        'Netperf output specifies unrecognized throughput units %s' %
+        throughput_units)
   throughput_sample = sample.Sample(metric, throughput, unit, metadata)
 
   return throughput_sample
 
 
-def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams,
-               iteration, results):
+def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams, iteration,
+               results):
   """Spawns netperf on a remote VM, parses results.
 
   Args:
@@ -202,8 +205,8 @@ def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams,
     iteration: The iteration to prefix the metrics with, as well as the index
       into the array where the results will be stored.
     results: The results variable shared by all threads.  The iteration-th
-      element holds a tuple of
-      (Samples[], begin_starting_processes, end_starting_processes)
+      element holds a tuple of (Samples[], begin_starting_processes,
+      end_starting_processes)
   """
   # Flags:
   # -o specifies keys to include in CSV output.
@@ -227,8 +230,8 @@ def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams,
   remote_cmd_timeout = FLAGS.bidirectional_network_test_length + 300
   remote_cmd = ('./%s --netperf_cmd="%s" --num_streams=%s --port_start=%s' %
                 (REMOTE_SCRIPT, netperf_cmd, num_streams, PORT_START))
-  remote_stdout, _ = primary_vm.RemoteCommand(remote_cmd,
-                                              timeout=remote_cmd_timeout)
+  remote_stdout, _ = primary_vm.RemoteCommand(
+      remote_cmd, timeout=remote_cmd_timeout)
 
   # Decode the remote command's stdout which the stdouts, stderrs and return
   # code from each sub invocation of netperf (per stream)
@@ -245,23 +248,29 @@ def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams,
   metadata = {
       'bidirectional_network_test_length':
           FLAGS.bidirectional_network_test_length,
-      'bidirectional_stream_num_streams': num_streams,
-      'ip_type': 'internal',
-      'primary_machine_type': primary_vm.machine_type,
-      'primary_zone': primary_vm.zone,
-      'secondary_machine_type': secondary_vm.machine_type,
-      'secondary_zone': secondary_vm.zone,
+      'bidirectional_stream_num_streams':
+          num_streams,
+      'ip_type':
+          'internal',
+      'primary_machine_type':
+          primary_vm.machine_type,
+      'primary_zone':
+          primary_vm.zone,
+      'secondary_machine_type':
+          secondary_vm.machine_type,
+      'secondary_zone':
+          secondary_vm.zone,
   }
 
   stream_start_delta = end_starting_processes - begin_starting_processes
-  local_results.append(sample.Sample('%s_%s_start_delta' %
-                                     (iteration, benchmark_name),
-                                     float(stream_start_delta),
-                                     SEC, metadata))
+  local_results.append(
+      sample.Sample('%s_%s_start_delta' % (iteration, benchmark_name),
+                    float(stream_start_delta), SEC, metadata))
 
-  throughput_samples = [_ParseNetperfOutput(stdout, metadata, benchmark_name,
-                                            iteration)
-                        for stdout in stdouts]
+  throughput_samples = [
+      _ParseNetperfOutput(stdout, metadata, benchmark_name, iteration)
+      for stdout in stdouts
+  ]
 
   # They should all have the same units
   throughput_unit = throughput_samples[0].unit
@@ -276,11 +285,10 @@ def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams,
   # Create samples for throughput stats
   for stat, value in throughput_stats.items():
     local_results.append(
-        sample.Sample('%s_%s_Throughput_%s' %
-                      (iteration, benchmark_name, stat),
+        sample.Sample('%s_%s_Throughput_%s' % (iteration, benchmark_name, stat),
                       float(value), throughput_unit, metadata))
-  results[iteration] = (local_results,
-                        begin_starting_processes, end_starting_processes)
+  results[iteration] = (local_results, begin_starting_processes,
+                        end_starting_processes)
 
 
 def Run(benchmark_spec):
@@ -288,7 +296,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -318,28 +326,32 @@ def Run(benchmark_spec):
 
   primary_vm = vms[0]  # client in netperf terms
   metadata = {
-      'primary_machine_type': primary_vm.machine_type,
-      'primary_zone': primary_vm.zone,
-      'ip_type': 'internal',
+      'primary_machine_type':
+          primary_vm.machine_type,
+      'primary_zone':
+          primary_vm.zone,
+      'ip_type':
+          'internal',
       'bidirectional_network_tests':
-      ','.join(FLAGS.bidirectional_network_tests),
+          ','.join(FLAGS.bidirectional_network_tests),
       'bidirectional_network_test_length':
-      FLAGS.bidirectional_network_test_length,
-      'bidirectional_stream_num_streams': num_streams,
+          FLAGS.bidirectional_network_test_length,
+      'bidirectional_stream_num_streams':
+          num_streams,
   }
 
   if total_outbound > 0:
-    results.append(sample.Sample('outbound_network_total', total_outbound,
-                                 MBPS, metadata))
+    results.append(
+        sample.Sample('outbound_network_total', total_outbound, MBPS, metadata))
   if total_inbound > 0:
-    results.append(sample.Sample('inbound_network_total', total_inbound,
-                                 MBPS, metadata))
+    results.append(
+        sample.Sample('inbound_network_total', total_inbound, MBPS, metadata))
 
   start_times = [r[1] for r in test_results]
   end_times = [r[2] for r in test_results]
-  results.append(sample.Sample('all_streams_start_delta',
-                               max(end_times) - min(start_times),
-                               SEC, metadata))
+  results.append(
+      sample.Sample('all_streams_start_delta',
+                    max(end_times) - min(start_times), SEC, metadata))
   return results
 
 
@@ -348,7 +360,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   for vm in vms[1:]:

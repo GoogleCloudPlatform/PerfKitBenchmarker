@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runs plain netperf in a few modes.
 
 docs:
@@ -39,32 +38,39 @@ from perfkitbenchmarker.linux_packages import netperf
 import six
 from six.moves import zip
 
-flags.DEFINE_integer('netperf_max_iter', None,
-                     'Maximum number of iterations to run during '
-                     'confidence interval estimation. If unset, '
-                     'a single iteration will be run.',
-                     lower_bound=3, upper_bound=30)
+flags.DEFINE_integer(
+    'netperf_max_iter',
+    None, 'Maximum number of iterations to run during '
+    'confidence interval estimation. If unset, '
+    'a single iteration will be run.',
+    lower_bound=3,
+    upper_bound=30)
 
-flags.DEFINE_integer('netperf_test_length', 60,
-                     'netperf test length, in seconds',
-                     lower_bound=1)
-flags.DEFINE_bool('netperf_enable_histograms', True,
-                  'Determines whether latency histograms are '
-                  'collected/reported. Only for *RR benchmarks')
-flag_util.DEFINE_integerlist('netperf_num_streams', flag_util.IntegerList([1]),
-                             'Number of netperf processes to run. Netperf '
-                             'will run once for each value in the list.',
-                             module_name=__name__)
+flags.DEFINE_integer(
+    'netperf_test_length', 60, 'netperf test length, in seconds', lower_bound=1)
+flags.DEFINE_bool(
+    'netperf_enable_histograms', True,
+    'Determines whether latency histograms are '
+    'collected/reported. Only for *RR benchmarks')
+flag_util.DEFINE_integerlist(
+    'netperf_num_streams',
+    flag_util.IntegerList([1]), 'Number of netperf processes to run. Netperf '
+    'will run once for each value in the list.',
+    module_name=__name__)
 flags.DEFINE_integer('netperf_thinktime', 0,
                      'Time in nanoseconds to do work for each request.')
 flags.DEFINE_integer('netperf_thinktime_array_size', 0,
                      'The size of the array to traverse for thinktime.')
-flags.DEFINE_integer('netperf_thinktime_run_length', 0,
-                     'The number of contiguous numbers to sum at a time in the '
-                     'thinktime array.')
-flags.DEFINE_integer('netperf_udp_stream_send_size_in_bytes', 1024,
-                     'Send size to use for UDP_STREAM tests (netperf -m flag)',
-                     lower_bound=1, upper_bound=65507)
+flags.DEFINE_integer(
+    'netperf_thinktime_run_length', 0,
+    'The number of contiguous numbers to sum at a time in the '
+    'thinktime array.')
+flags.DEFINE_integer(
+    'netperf_udp_stream_send_size_in_bytes',
+    1024,
+    'Send size to use for UDP_STREAM tests (netperf -m flag)',
+    lower_bound=1,
+    upper_bound=65507)
 # We set the default to 128KB (131072 bytes) to override the Linux default
 # of 16K so that we can achieve the "link rate".
 flags.DEFINE_integer('netperf_tcp_stream_send_size_in_bytes', 131072,
@@ -104,12 +110,11 @@ TRANSACTIONS_PER_SECOND = 'transactions_per_second'
 # Specifies the keys and to include in the results for OMNI tests.
 # Any user of ParseNetperfOutput() (e.g. container_netperf_benchmark), must
 # specify these selectors to ensure the parsing doesn't break.
-OUTPUT_SELECTOR = (
-    'THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
-    'P99_LATENCY,STDDEV_LATENCY,MIN_LATENCY,MAX_LATENCY,'
-    'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
-    'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS,'
-    'TRANSPORT_MSS')
+OUTPUT_SELECTOR = ('THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
+                   'P99_LATENCY,STDDEV_LATENCY,MIN_LATENCY,MAX_LATENCY,'
+                   'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
+                   'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS,'
+                   'TRANSPORT_MSS')
 
 # Command ports are even (id*2), data ports are odd (id*2 + 1)
 PORT_START = 20000
@@ -140,7 +145,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vms = vms[:2]
@@ -174,7 +179,7 @@ def _SetupHostFirewall(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
 
   client_vm = benchmark_spec.vms[0]
@@ -226,9 +231,10 @@ def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
   value_sum = float(sum([value * count for value, count in histogram.items()]))
   average = value_sum / float(total_count)
   if total_count > 1:
-    total_of_squares = sum([(value - average) ** 2 * count
-                            for value, count in histogram.items()])
-    stats['stddev'] = (total_of_squares / (total_count - 1)) ** 0.5
+    total_of_squares = sum([
+        (value - average)**2 * count for value, count in histogram.items()
+    ])
+    stats['stddev'] = (total_of_squares / (total_count - 1))**0.5
   else:
     stats['stddev'] = 0
   return stats
@@ -243,7 +249,7 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     metadata: metadata for any sample.Sample objects we create
     benchmark_name: the name of the netperf benchmark
     enable_latency_histograms: bool indicating if latency histograms are
-        included in stdout
+      included in stdout
 
   Returns:
     A tuple containing (throughput_sample, latency_samples, latency_histogram)
@@ -292,8 +298,8 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
         ('Transport MSS bytes', 'netperf_mss')
     ])
 
-  metadata.update({meta_key: results[netperf_key]
-                   for netperf_key, meta_key in meta_keys})
+  metadata.update(
+      {meta_key: results[netperf_key] for netperf_key, meta_key in meta_keys})
 
   # Create the throughput sample
   throughput = float(results['Throughput'])
@@ -307,8 +313,9 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     unit = TRANSACTIONS_PER_SECOND
     metric = '%s_Transaction_Rate' % benchmark_name
   else:
-    raise ValueError('Netperf output specifies unrecognized throughput units %s'
-                     % throughput_units)
+    raise ValueError(
+        'Netperf output specifies unrecognized throughput units %s' %
+        throughput_units)
   throughput_sample = sample.Sample(metric, throughput, unit, metadata)
 
   latency_hist = None
@@ -320,8 +327,9 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     latency_hist = netperf.ParseHistogram(stdout)
     hist_metadata = {'histogram': json.dumps(latency_hist)}
     hist_metadata.update(metadata)
-    latency_samples.append(sample.Sample(
-        '%s_Latency_Histogram' % benchmark_name, 0, 'us', hist_metadata))
+    latency_samples.append(
+        sample.Sample('%s_Latency_Histogram' % benchmark_name, 0, 'us',
+                      hist_metadata))
   if unit != MBPS:
     for metric_key, metric_name in [
         ('50th Percentile Latency Microseconds', 'p50'),
@@ -329,7 +337,8 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
         ('99th Percentile Latency Microseconds', 'p99'),
         ('Minimum Latency Microseconds', 'min'),
         ('Maximum Latency Microseconds', 'max'),
-        ('Stddev Latency Microseconds', 'stddev')]:
+        ('Stddev Latency Microseconds', 'stddev')
+    ]:
       if metric_key in results:
         latency_samples.append(
             sample.Sample('%s_Latency_%s' % (benchmark_name, metric_name),
@@ -369,9 +378,11 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   remote_cmd_timeout = (
       FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300)
 
-  metadata = {'netperf_test_length': FLAGS.netperf_test_length,
-              'sending_thread_count': num_streams,
-              'max_iter': FLAGS.netperf_max_iter or 1}
+  metadata = {
+      'netperf_test_length': FLAGS.netperf_test_length,
+      'sending_thread_count': num_streams,
+      'max_iter': FLAGS.netperf_max_iter or 1
+  }
 
   netperf_cmd = (f'{netperf.NETPERF_PATH} '
                  f'-p {{command_port}} '
@@ -415,16 +426,17 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
       FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300
   remote_cmd = (f'./{REMOTE_SCRIPT} --netperf_cmd="{netperf_cmd}" '
                 f'--num_streams={num_streams} --port_start={PORT_START}')
-  remote_stdout, _ = vm.RobustRemoteCommand(remote_cmd, should_log=True,
-                                            timeout=remote_cmd_timeout)
+  remote_stdout, _ = vm.RobustRemoteCommand(
+      remote_cmd, should_log=True, timeout=remote_cmd_timeout)
 
   # Decode stdouts, stderrs, and return codes from remote command's stdout
   json_out = json.loads(remote_stdout)
   stdouts = json_out[0]
 
-  parsed_output = [ParseNetperfOutput(stdout, metadata, benchmark_name,
-                                      enable_latency_histograms)
-                   for stdout in stdouts]
+  parsed_output = [
+      ParseNetperfOutput(stdout, metadata, benchmark_name,
+                         enable_latency_histograms) for stdout in stdouts
+  ]
 
   if len(parsed_output) == 1:
     # Only 1 netperf thread
@@ -438,8 +450,9 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     # Unzip parsed output
     # Note that latency_samples are invalid with multiple threads because stats
     # are computed per-thread by netperf, so we don't use them here.
-    throughput_samples, _, latency_histograms = [list(t)
-                                                 for t in zip(*parsed_output)]
+    throughput_samples, _, latency_histograms = [
+        list(t) for t in zip(*parsed_output)
+    ]
     # They should all have the same units
     throughput_unit = throughput_samples[0].unit
     # Extract the throughput values from the samples
@@ -453,8 +466,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     # Create samples for throughput stats
     for stat, value in throughput_stats.items():
       samples.append(
-          sample.Sample(f'{benchmark_name}_Throughput_{stat}',
-                        float(value),
+          sample.Sample(f'{benchmark_name}_Throughput_{stat}', float(value),
                         throughput_unit, metadata))
     if enable_latency_histograms:
       # Combine all of the latency histogram dictionaries
@@ -464,15 +476,15 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
       # Create a sample for the aggregate latency histogram
       hist_metadata = {'histogram': json.dumps(latency_histogram)}
       hist_metadata.update(metadata)
-      samples.append(sample.Sample(
-          f'{benchmark_name}_Latency_Histogram', 0, 'us', hist_metadata))
+      samples.append(
+          sample.Sample(f'{benchmark_name}_Latency_Histogram', 0, 'us',
+                        hist_metadata))
       # Calculate stats on aggregate latency histogram
       latency_stats = _HistogramStatsCalculator(latency_histogram, [50, 90, 99])
       # Create samples for the latency stats
       for stat, value in latency_stats.items():
         samples.append(
-            sample.Sample(f'{benchmark_name}_Latency_{stat}',
-                          float(value),
+            sample.Sample(f'{benchmark_name}_Latency_{stat}', float(value),
                           'us', metadata))
     return samples
 
@@ -482,7 +494,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -529,7 +541,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vms[1].RemoteCommand('sudo killall netserver')
