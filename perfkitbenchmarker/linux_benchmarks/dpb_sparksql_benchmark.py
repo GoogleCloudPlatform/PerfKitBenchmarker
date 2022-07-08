@@ -159,6 +159,11 @@ flags.DEFINE_string(
     'The record format to use when connecting to BigQuery storage. See: '
     'https://github.com/GoogleCloudDataproc/spark-bigquery-connector#properties'
 )
+flags.DEFINE_bool(
+    'dpb_sparksql_one_job_per_query', False,
+    'Instead of running all queries in one submission to the Spark cluster '
+    '(which is the default), PKB will run each query in a separate submission.'
+)
 
 FLAGS = flags.FLAGS
 
@@ -312,71 +317,82 @@ def Run(benchmark_spec):
     metadata['data_format'] = FLAGS.dpb_sparksql_data_format
   if FLAGS.dpb_sparksql_data_compression:
     metadata['data_compression'] = FLAGS.dpb_sparksql_data_compression
+  metadata['one_job_per_query'] = FLAGS.dpb_sparksql_one_job_per_query
+
+  # Partition queries into chunks that will be run each in their own job
+  # submission.
+  if FLAGS.dpb_sparksql_one_job_per_query:
+    query_chunks = [[query] for query in benchmark_spec.staged_queries]
+  else:
+    query_chunks = [benchmark_spec.staged_queries]
 
   # Run PySpark Spark SQL Runner
   report_dir = '/'.join([cluster.base_dir, f'report-{int(time.time()*1000)}'])
-  args = [
-      '--sql-scripts',
-      ','.join(benchmark_spec.staged_queries),
-      '--report-dir',
-      report_dir,
-  ]
-  if FLAGS.dpb_sparksql_database:
-    args += ['--database', FLAGS.dpb_sparksql_database]
-  table_metadata = _GetTableMetadata(benchmark_spec)
-  if table_metadata:
-    table_metadata_file = '/'.join([cluster.base_dir, 'metadata.json'])
-    _StageMetadata(table_metadata, storage_service, table_metadata_file)
-    args += ['--table-metadata', table_metadata_file]
-  else:
-    # If we don't pass in tables, we must be reading from hive.
-    # Note you can even read from Hive without --create_hive_tables if they
-    # were precreated.
-    args += ['--enable-hive', 'True']
-  if FLAGS.dpb_sparksql_table_cache:
-    args += ['--table-cache', FLAGS.dpb_sparksql_table_cache]
-  if FLAGS.dpb_sparksql_simultaneous:
-    args += ['--simultaneous', 'True']
-  jars = []
-  if FLAGS.spark_bigquery_connector:
-    jars.append(FLAGS.spark_bigquery_connector)
-  job_result = cluster.SubmitJob(
-      pyspark_file='/'.join([cluster.base_dir, SPARK_SQL_RUNNER_SCRIPT]),
-      job_arguments=args,
-      job_jars=jars,
-      job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE)
+  for query_chunk in query_chunks:
+    args = [
+        '--sql-scripts',
+        ','.join(query_chunk),
+        '--report-dir',
+        report_dir,
+    ]
+    if FLAGS.dpb_sparksql_database:
+      args += ['--database', FLAGS.dpb_sparksql_database]
+    table_metadata = _GetTableMetadata(benchmark_spec)
+    if table_metadata:
+      table_metadata_file = '/'.join([cluster.base_dir, 'metadata.json'])
+      _StageMetadata(table_metadata, storage_service, table_metadata_file)
+      args += ['--table-metadata', table_metadata_file]
+    else:
+      # If we don't pass in tables, we must be reading from hive.
+      # Note you can even read from Hive without --create_hive_tables if they
+      # were precreated.
+      args += ['--enable-hive', 'True']
+    if FLAGS.dpb_sparksql_table_cache:
+      args += ['--table-cache', FLAGS.dpb_sparksql_table_cache]
+    if FLAGS.dpb_sparksql_simultaneous:
+      args += ['--simultaneous', 'True']
+    jars = []
+    if FLAGS.spark_bigquery_connector:
+      jars.append(FLAGS.spark_bigquery_connector)
+    job_result = cluster.SubmitJob(
+        pyspark_file='/'.join([cluster.base_dir, SPARK_SQL_RUNNER_SCRIPT]),
+        job_arguments=args,
+        job_jars=jars,
+        job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE)
 
   # Spark can only write data to directories not files. So do a recursive copy
-  # of that directory and then search it for the single JSON file with the
-  # results.
+  # of that directory and then search it for the collection of JSON files with
+  # the results.
   temp_run_dir = temp_dir.GetRunDirPath()
   storage_service.Copy(report_dir, temp_run_dir, recursive=True)
-  report_file = None
+  report_files = []
   for dir_name, _, files in os.walk(
       os.path.join(temp_run_dir, os.path.basename(report_dir))):
     for filename in files:
       if filename.endswith('.json'):
         report_file = os.path.join(dir_name, filename)
-        logging.info(report_file)
-  if not report_file:
+        report_files.append(report_file)
+        logging.info("Found report file '%s'.", report_file)
+  if not report_files:
     raise errors.Benchmarks.RunError('Job report not found.')
 
   results = []
   run_times = {}
   passing_queries = set()
-  with open(report_file, 'r') as file:
-    for line in file:
-      result = json.loads(line)
-      logging.info('Timing: %s', result)
-      query_id = _GetQueryId(result['script'])
-      assert query_id
-      passing_queries.add(query_id)
-      metadata_copy = metadata.copy()
-      metadata_copy['query'] = query_id
-      results.append(
-          sample.Sample('sparksql_run_time', result['duration'], 'seconds',
-                        metadata_copy))
-      run_times[query_id] = result['duration']
+  for report_file in report_files:
+    with open(report_file, 'r') as file:
+      for line in file:
+        result = json.loads(line)
+        logging.info('Timing: %s', result)
+        query_id = _GetQueryId(result['script'])
+        assert query_id
+        passing_queries.add(query_id)
+        metadata_copy = metadata.copy()
+        metadata_copy['query'] = query_id
+        results.append(
+            sample.Sample('sparksql_run_time', result['duration'], 'seconds',
+                          metadata_copy))
+        run_times[query_id] = result['duration']
 
   metadata['failing_queries'] = ','.join(
       sorted(set(FLAGS.dpb_sparksql_order) - passing_queries))
