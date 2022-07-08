@@ -20,6 +20,7 @@ See details at: https://cloud.google.com/dataflow/
 import os
 import re
 import time
+import logging
 
 from absl import flags
 from google.cloud import monitoring_v3
@@ -158,7 +159,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if not match:
       raise Exception('Dataflow output in unexpected format.')
     self.job_id = match.group(1)
-    # print('job_id: ', self.job_id)
+    logging.info('Dataflow job ID: %s', self.job_id)
 
   def SetClusterProperty(self):
     pass
@@ -170,6 +171,41 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
     basic_data['dpb_job_id'] = self.job_id
     return basic_data
+
+  def GetMetricValue(self, metric_name):
+    """Get value of a job's default metric.
+    Examples include: TotalVcpuTime, TotalMemoryUsage, TotalPdUsage
+    """
+    cmd = util.GcloudCommand(self, 'beta', 'dataflow',
+                            'metrics', 'list', self.job_id)
+    cmd.flags = {
+        'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
+        'filter': f"\"name={metric_name}\"",
+        'format': '"get(scalar)"',
+    }
+    stdout, _, _ = cmd.Issue()
+    return stdout
+
+  @vm_util.Retry(max_retries=5)
+  def GetCustomMetricValue(self, metric_name):
+    """Get value of a job's custom metric.
+    
+      Raises:
+        errors.Resource.RetryableGetError:
+    """
+    cmd = util.GcloudCommand(self, 'beta', 'dataflow',
+                            'metrics', 'list', self.job_id)
+    cmd.flags = {
+        'source': 'user',
+        'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
+        'filter': f"\"name={metric_name}\"",
+        'format': '"get(scalar)"',
+    }
+    stdout, stderr, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    if retcode != 0:
+      raise errors.Resource.RetryableGetError(
+          'Failed to retrieve metric {} for job {}: {}'.format(metric_name, self.job_id, stderr))
+    return stdout
 
   def GetAvgCpuUtilization(self, start_time, end_time):
     """Get average cpu utilization across all pipeline workers.
@@ -189,7 +225,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     end_time_seconds = int(end_time.timestamp())
     # Cpu metrics data can take up to 240 seconds to appear
     if (now_seconds - end_time_seconds) < CPU_API_DELAY_SECONDS:
-      print('Waiting for CPU metrics to be available (up to 4 minutes)...')
+      logging.info('Waiting for CPU metrics to be available (up to 4 minutes)...')
       time.sleep(CPU_API_DELAY_SECONDS - (now_seconds - end_time_seconds))
 
     interval = TimeInterval(
@@ -198,14 +234,12 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
             "end_time": {"seconds": end_time_seconds},
         }
     )
-    # print("interval:\n", interval)
 
     api_filter = (
       'metric.type = "compute.googleapis.com/instance/cpu/utilization" '
       'AND resource.labels.project_id = "' + self.project + '" '
       'AND metadata.user_labels.dataflow_job_id = "' + self.job_id + '" '
     )
-    # print('api_filter: ', api_filter)
 
     aggregation = Aggregation(
         {

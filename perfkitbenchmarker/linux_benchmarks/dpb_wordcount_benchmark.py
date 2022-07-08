@@ -178,6 +178,15 @@ def Run(benchmark_spec):
 
   avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(start_time, end_time)
   results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))
+
+  # num_lines = dpb_service_instance.GetCustomMetricValue('lineLenDistro_COUNT')
+  # results.append(sample.Sample('num_lines', num_lines, 'count', metadata))
+  # print(num_lines)
+
+  # empty_lines = dpb_service_instance.GetCustomMetricValue('emptyLines')
+  # print(empty_lines)
+  # results.append(sample.Sample('empty_lines', empty_lines, 'count', metadata))
+
   return results
 
 
