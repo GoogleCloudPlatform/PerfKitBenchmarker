@@ -159,10 +159,8 @@ def Run(benchmark_spec):
 
   # TODO (saksena): Finalize more stats to gather
   results = []
-  metadata = copy.copy(dpb_service_instance.GetMetadata())
-  metadata.update({'input_location': input_location})
 
-  start = datetime.datetime.now()
+  start_time = datetime.datetime.now()
   dpb_service_instance.SubmitJob(
       jarfile=jarfile,
       classname=classname,
@@ -170,8 +168,16 @@ def Run(benchmark_spec):
       job_stdout_file=stdout_file,
       job_type=job_type)
   end_time = datetime.datetime.now()
-  run_time = (end_time - start).total_seconds()
+
+  # Update metadata after job run to get job id
+  metadata = copy.copy(dpb_service_instance.GetMetadata())
+  metadata.update({'input_location': input_location})
+
+  run_time = (end_time - start_time).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
+
+  avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(start_time, end_time)
+  results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))
   return results
 
 

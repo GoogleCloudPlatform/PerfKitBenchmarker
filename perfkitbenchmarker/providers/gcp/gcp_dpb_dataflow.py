@@ -18,8 +18,13 @@ See details at: https://cloud.google.com/dataflow/
 """
 
 import os
+import re
+import time
 
 from absl import flags
+from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3.types import TimeInterval
+from google.cloud.monitoring_v3.types import Aggregation
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -47,6 +52,10 @@ GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
 
+# Compute Engine CPU Monitoring API has up to 4 minute delay. See
+# https://cloud.google.com/monitoring/api/metrics_gcp#gcp-compute
+CPU_API_DELAY_MINUTES = 4
+CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
 
 class GcpDpbDataflow(dpb_service.BaseDpbService):
   """Object representing GCP Dataflow Service."""
@@ -56,7 +65,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataflow, self).__init__(dpb_service_spec)
-    self.project = None
+    self.project = util.GetDefaultProject()
+    self.job_id = None
 
   @staticmethod
   def _GetStats(stdout):
@@ -116,7 +126,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       disk_size_gb = None
 
     cmd = []
-
     # Needed to verify java executable is on the path
     dataflow_executable = 'java'
     if not vm_util.ExecutableOnPath(dataflow_executable):
@@ -142,7 +151,14 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if disk_size_gb:
       cmd.append('--diskSizeGb={}'.format(disk_size_gb))
     cmd.append('--defaultWorkerLogLevel={}'.format(FLAGS.dpb_log_level))
-    _, _, _ = vm_util.IssueCommand(cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+
+    # Parse output to retrieve submitted job ID
+    match = re.search('Submitted job: (.\S*)', stderr)
+    if not match:
+      raise Exception('Dataflow output in unexpected format.')
+    self.job_id = match.group(1)
+    # print('job_id: ', self.job_id)
 
   def SetClusterProperty(self):
     pass
@@ -152,4 +168,89 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data = super(GcpDpbDataflow, self).GetMetadata()
     basic_data['dpb_dataflow_runner'] = FLAGS.dpb_dataflow_runner
     basic_data['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
+    basic_data['dpb_job_id'] = self.job_id
     return basic_data
+
+  def GetAvgCpuUtilization(self, start_time, end_time):
+    """Get average cpu utilization across all pipeline workers.
+
+    Args:
+      start_time: datetime specifying the beginning of the time interval.
+      end_time: datetime specifying the end of the time interval.
+
+    Returns:
+      Average value across time interval
+    """
+    client = monitoring_v3.MetricServiceClient()
+    project_name = f"projects/{self.project}"
+    
+    now_seconds = int(time.time())
+    start_time_seconds = int(start_time.timestamp())
+    end_time_seconds = int(end_time.timestamp())
+    # Cpu metrics data can take up to 240 seconds to appear
+    if (now_seconds - end_time_seconds) < CPU_API_DELAY_SECONDS:
+      print('Waiting for CPU metrics to be available (up to 4 minutes)...')
+      time.sleep(CPU_API_DELAY_SECONDS - (now_seconds - end_time_seconds))
+
+    interval = TimeInterval(
+        {
+            "start_time": {"seconds": start_time_seconds},
+            "end_time": {"seconds": end_time_seconds},
+        }
+    )
+    # print("interval:\n", interval)
+
+    api_filter = (
+      'metric.type = "compute.googleapis.com/instance/cpu/utilization" '
+      'AND resource.labels.project_id = "' + self.project + '" '
+      'AND metadata.user_labels.dataflow_job_id = "' + self.job_id + '" '
+    )
+    # print('api_filter: ', api_filter)
+
+    aggregation = Aggregation(
+        {
+            "alignment_period": {"seconds": 60},  # 1 minute
+            "per_series_aligner": Aggregation.Aligner.ALIGN_MEAN,
+            "cross_series_reducer": Aggregation.Reducer.REDUCE_MEAN,
+            "group_by_fields": ["resource.instance_id"],
+        }
+    )
+
+    results = client.list_time_series(
+      request={
+        "name": project_name,
+        "filter": api_filter,
+        "interval": interval,
+        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        "aggregation": aggregation,
+      }
+    )
+
+    # print(results)
+    # if not results:
+    #   raise Exception('No monitoring data found. Unable to calculate avg CPU utilization')
+    return self._ParseTimeSeriesData(results)
+
+  def _ParseTimeSeriesData(self, time_series):
+    """Parses time series data and returns average across intervals.
+
+    Args:
+      time_series: time series of cpu fractional utilization returned by monitoring.
+
+    Returns:
+      Average value across intervals
+    """
+    points = []
+    for i, time_interval in enumerate(time_series):
+      for j, snapshot in enumerate(time_interval.points):
+        points.append(snapshot.value.double_value)
+
+    if points:
+      # Average over all minute intervals captured
+      averaged = sum(points) / len(points)
+      # If metric unit is a fractional number between 0 and 1 (e.g. CPU utilization metric)
+      # multiply by 100 to display a percentage usage.
+      if time_series.unit == "10^2.%":
+        averaged = round(averaged * 100, 2)
+      return averaged
+    return None 
