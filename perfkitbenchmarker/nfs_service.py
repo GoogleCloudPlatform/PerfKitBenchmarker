@@ -150,10 +150,12 @@ class UnmanagedNfsService(BaseNfsService):
 
   # Allows anybody to write to the NFS mount.
   _EXPORT_FS_COMMAND = ' && '.join([
-      'sudo mkdir -p {export_dir}', 'sudo chown $USER:$USER {export_dir}',
+      'sudo mkdir -p {export_dir}',
+      'sudo chown $USER:$USER {export_dir}',
       'sudo chmod 777 {export_dir}',
       ('echo "{export_dir} *(rw,sync,no_subtree_check,no_root_squash)" | '
-       'sudo tee -a /etc/exports'), 'sudo exportfs -a'
+       'sudo tee -a /etc/exports'),
+      'sudo exportfs -a',
   ])
 
   _NFS_NAME = {

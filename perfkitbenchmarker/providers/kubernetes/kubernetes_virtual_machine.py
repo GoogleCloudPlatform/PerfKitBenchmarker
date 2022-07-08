@@ -147,8 +147,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       containers = pod_info['spec']['containers']
       if len(containers) == 1:
         pod_status = pod_info['status']['phase']
-        if (containers[0]['name'].startswith(self.name) and
-            pod_status == 'Running'):
+        if (containers[0]['name'].startswith(self.name)
+            and pod_status == 'Running'):
           logging.info('POD is up and running.')
           return
     raise Exception('POD %s is not running. Retrying to check status.' %
