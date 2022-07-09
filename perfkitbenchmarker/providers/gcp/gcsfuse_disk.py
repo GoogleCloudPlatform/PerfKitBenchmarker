@@ -7,8 +7,8 @@ FLAGS = flags.FLAGS
 
 DEFAULT_MOUNT_OPTIONS = [
     'allow_other',
-    'dir_mode=777',
-    'file_mode=777',
+    'dir_mode=755',
+    'file_mode=755',
     'implicit_dirs',
 ]
 

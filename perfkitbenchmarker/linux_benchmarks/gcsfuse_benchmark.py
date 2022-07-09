@@ -69,7 +69,7 @@ def _Prepare(vm):
   path = data.ResourcePath(os.path.join(_REMOTE_SCRIPTS_DIR, _REMOTE_SCRIPT))
   logging.info('Uploading %s to %s', path, vm)
   vm.PushFile(path, _REMOTE_SCRIPT)
-  vm.RemoteCommand(f'sudo chmod 777 {_REMOTE_SCRIPT}')
+  vm.RemoteCommand(f'sudo chmod 755 {_REMOTE_SCRIPT}')
 
 
 def Run(benchmark_spec):

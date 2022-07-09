@@ -289,7 +289,7 @@ def InstallSPECCPU(vm, speccpu_vm_state):
     speccpu_vm_state: SpecInstallConfigurations. Install configuration for spec.
   """
   scratch_dir = vm.GetScratchDir()
-  vm.RemoteCommand('chmod 777 {0}'.format(scratch_dir))
+  vm.RemoteCommand('chmod 755 {0}'.format(scratch_dir))
   try:
     # Since this will override 'build_tools' installation, install this
     # before we install 'build_tools' package
@@ -374,7 +374,7 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
         data.ResourcePath(speccpu_vm_state.base_clang_flag_file_path),
         speccpu_vm_state.clang_flag_file_path)
 
-  vm.RemoteCommand('chmod -R 777 {0}'.format(speccpu_vm_state.spec_dir))
+  vm.RemoteCommand('chmod -R 755 {0}'.format(speccpu_vm_state.spec_dir))
 
   # Copy the cfg to the VM.
   local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)

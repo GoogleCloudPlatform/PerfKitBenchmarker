@@ -465,7 +465,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
       raise errors.VirtualMachine.RemoteCommandError(error_text)
     if copy_to:
       remote_path = remote_path or file_name
-      self.RemoteCommand('mv %s %s; chmod 777 %s' %
+      self.RemoteCommand('mv %s %s; chmod 755 %s' %
                          (file_name, remote_path, remote_path))
     # TODO(pclay): Validate directories
     if not stat.S_ISDIR(os.stat(file_path).st_mode):

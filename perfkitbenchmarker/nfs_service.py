@@ -152,7 +152,7 @@ class UnmanagedNfsService(BaseNfsService):
   _EXPORT_FS_COMMAND = ' && '.join([
       'sudo mkdir -p {export_dir}',
       'sudo chown $USER:$USER {export_dir}',
-      'sudo chmod 777 {export_dir}',
+      'sudo chmod 755 {export_dir}',
       ('echo "{export_dir} *(rw,sync,no_subtree_check,no_root_squash)" | '
        'sudo tee -a /etc/exports'),
       'sudo exportfs -a',
