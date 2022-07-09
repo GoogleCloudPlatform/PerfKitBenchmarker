@@ -105,7 +105,7 @@ def main(args):
     results = [run_sql_script(spark, script) for script in args.sql_scripts]
   results = [r for r in results if r is not None]
   logging.info('Writing results to %s', args.report_dir)
-  spark.createDataFrame(results).coalesce(1).write.mode('overwrite').json(
+  spark.createDataFrame(results).coalesce(1).write.mode('append').json(
       args.report_dir)
 
 

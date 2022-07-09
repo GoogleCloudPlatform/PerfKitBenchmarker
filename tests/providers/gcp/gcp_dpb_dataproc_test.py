@@ -211,7 +211,7 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
         mock.call([
             'gcloud', 'dataproc', 'batches', 'submit', 'pyspark',
             'gs://pkb-fab5770b/spark_sql_test_scripts/spark_sql_runner.py',
-            '--batch', 'pkb-fakeru',
+            '--batch', 'pkb-fakeru-0',
             '--format', 'json',
             '--labels', '',
             '--properties',
@@ -231,7 +231,7 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
             '--table-metadata', 'gs://pkb-fab5770b/metadata.json'
         ], raise_on_failure=False, timeout=None),
         mock.call([
-            'gcloud', 'dataproc', 'batches', 'describe', 'pkb-fakeru',
+            'gcloud', 'dataproc', 'batches', 'describe', 'pkb-fakeru-0',
             '--format', 'json', '--quiet', '--region', 'us-central1'
         ], raise_on_failure=False, timeout=None)
     ])
