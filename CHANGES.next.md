@@ -160,6 +160,7 @@
 -   Add support for providing initialization actions into DPB clusters with
     `--dpb_initialization_actions`
 -   Add sandbox configuration fields for GKE nodepools.
+-   Fetch Redis benchmark live migration times from GCP metadata server.
 
 ### Bug fixes and maintenance updates:
 

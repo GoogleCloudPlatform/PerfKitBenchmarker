@@ -1207,6 +1207,26 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     """Simulates a maintenance event on the VM."""
     raise NotImplementedError()
 
+  def SetupLMNotification(self):
+    """Prepare environment for /scripts/gce_maintenance_notify.py script."""
+    raise NotImplementedError()
+
+  def _GetLMNotifificationCommand(self):
+    """Return Remote python execution command for LM notify script."""
+    raise NotImplementedError()
+
+  def StartLMNotification(self):
+    """Start meta-data server notification subscription."""
+    raise NotImplementedError()
+
+  def WaitLMNotificationRelease(self):
+    """Block main thread until LM ended."""
+    raise NotImplementedError()
+
+  def CollectLMNotificationsTime(self):
+    """Extract LM notifications from log file."""
+    raise NotImplementedError()
+
   def _InstallData(self, preprovisioned_data, module_name, filenames,
                    install_path, fallback_url):
     """Installs preprovisioned_data on this VM.
