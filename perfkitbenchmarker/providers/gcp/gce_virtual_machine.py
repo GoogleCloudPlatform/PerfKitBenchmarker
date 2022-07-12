@@ -564,7 +564,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         '%s=%s' % (k, v) for k, v in six.iteritems(metadata_from_file)
     ])
 
-    metadata = {}
+    # passing sshKeys does not work with OS Login
+    metadata = {'enable-oslogin': 'FALSE'}
     metadata.update(self.boot_metadata)
     metadata.update(util.GetDefaultTags())
 
