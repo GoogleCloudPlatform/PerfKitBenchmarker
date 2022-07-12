@@ -182,7 +182,7 @@ def Run(benchmark_spec):
 
     stats = dpb_service_instance.GetStats()
     for name, value in stats.items():
-      results.append(sample.Sample(name, value, 'counter', metadata))
+      results.append(sample.Sample(name, value, 'number', metadata))
 
   return results
 

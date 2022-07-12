@@ -59,8 +59,20 @@ DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
 CPU_API_DELAY_MINUTES = 4
 CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
 
+DATAFLOW_TYPE_BATCH = 'batch'
+DATAFLOW_TYPE_STREAMING = 'streaming'
+
 METRIC_TYPE_COUNTER = 'counter'
 METRIC_TYPE_DISTRIBUTION = 'distribution'
+
+# Dataflow resources cost factors (showing us-central-1 pricing).
+# See https://cloud.google.com/dataflow/pricing#pricing-details
+VCPU_PER_HR_BATCH = 0.056
+VCPU_PER_HR_STREAMING = 0.069
+MEM_PER_GB_HR_BATCH = 0.003557
+MEM_PER_GB_HR_STREAMING = 0.0035557
+PD_PER_GB_HR = 0.000054
+PD_SSD_PER_GB_HR = 0.000298
 
 class GcpDpbDataflow(dpb_service.BaseDpbService):
   """Object representing GCP Dataflow Service."""
@@ -180,12 +192,31 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
   def GetStats(self):
     """Collect series of relevant performance and cost stats"""
     stats = {}
-    stats['total_vcpu_time'] = self.GetMetricValue('TotalVcpuTime')    # cpu_num_seconds
-    stats['total_mem_usage'] = self.GetMetricValue('TotalMemoryUsage') # mem_mb_seconds
-    stats['total_pd_usage'] = self.GetMetricValue('TotalPdUsage')      # pd_gb_seconds
+    stats['total_vcpu_time'] = self.GetMetricValue('TotalVcpuTime')/3600         # vCPU-hr
+    stats['total_mem_usage'] = self.GetMetricValue('TotalMemoryUsage')/1024/3600 # GB-hr
+    stats['total_pd_usage'] = self.GetMetricValue('TotalPdUsage')/3600           # GB-hr
     # BillableShuffleDataProcessed
     # BillableStreamingDataProcessed
+    stats['total_cost'] = self._CalculateCost(stats['total_vcpu_time'], stats['total_mem_usage'], stats['total_pd_usage'])
     return stats
+
+  def _CalculateCost(self, total_vcpu_time, total_mem_usage, total_pd_usage,
+                    type=DATAFLOW_TYPE_BATCH):
+    if type not in (DATAFLOW_TYPE_BATCH, DATAFLOW_TYPE_STREAMING):
+      raise Exception('Invalid type provided to _CalculateCost()')
+
+    cost = 0
+    if type == DATAFLOW_TYPE_BATCH:
+      cost +=  total_vcpu_time * VCPU_PER_HR_BATCH
+      cost +=  total_mem_usage * MEM_PER_GB_HR_BATCH
+    else:
+      cost += total_vcpu_time * VCPU_PER_HR_STREAMING
+      cost += total_mem_usage * MEM_PER_GB_HR_STREAMING
+    
+    cost += total_pd_usage * PD_PER_GB_HR
+    # TODO(rarsan): Add cost related to per-GB data processed by Dataflow Shuffle
+    # (for batch) or Streaming Appliance (for streaming) when applicable
+    return cost
 
   def _PullJobMetrics(self, force_refresh=False):
     """Retrieve and cache all job metrics from Dataflow API"""
@@ -228,12 +259,12 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       contains keys such as count/max/mean/min/sum
     """
     if type not in (METRIC_TYPE_COUNTER, METRIC_TYPE_DISTRIBUTION):
-      raise Exception('Invalid type provided to GetMetricValue')
+      raise Exception('Invalid type provided to GetMetricValue()')
     
     if self.job_metrics is None:
       self._PullJobMetrics()
     
-    return self.job_metrics[type][name]
+    return int(self.job_metrics[type][name])
 
   def GetAvgCpuUtilization(self, start_time, end_time):
     """Get average cpu utilization across all pipeline workers.
