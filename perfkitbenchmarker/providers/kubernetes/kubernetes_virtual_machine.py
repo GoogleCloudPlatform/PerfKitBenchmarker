@@ -481,7 +481,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
 
   def PrepareVMEnvironment(self):
     # Install sudo as most PrepareVMEnvironment assume it exists.
-    self._InstallSudo()
+    self._InstallPrepareVmEnvironmentDependencies()
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
     if k8s_flags.SETUP_SSH.value:
       # Don't rely on SSH being installed in Kubernetes containers,
@@ -562,8 +562,8 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
 
   # Retry installing sudo for ephemeral APT errors
   @vm_util.Retry(max_retries=linux_virtual_machine.UPDATE_RETRIES)
-  def _InstallSudo(self):
-    """Installs sudo."""
+  def _InstallPrepareVmEnvironmentDependencies(self):
+    """Installs sudo and other packages assumed by SetupVmEnvironment."""
     # The canonical ubuntu images as well as the nvidia/cuda
     # image do not have sudo installed so install it and configure
     # the sudoers file such that the root user's environment is
@@ -584,6 +584,26 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
 # included with Ubuntu. For example, sudo is not installed.
 # KubernetesVirtualMachine takes care of this by installing
 # sudo in the container startup script.
+
+
+class Ubuntu2204BasedKubernetesVirtualMachine(
+    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu2204Mixin):
+  """Ubuntu 22 based Kubernetes VM."""
+  DEFAULT_IMAGE = 'ubuntu:22.04'
+
+  def _InstallPrepareVmEnvironmentDependencies(self):
+    # fdisk is not installed. It needs to be installed after sudo, but before
+    # RecordAdditionalMetatada.
+    super()._InstallPrepareVmEnvironmentDependencies()
+    # util-linux budled in the image no longer depends on fdisk.
+    # Ubuntu 22 VMs get fdisk from ubuntu-server (which maybe we should
+    # install here?).
+    self.InstallPackages('fdisk')
+
+
+class Ubuntu2004BasedKubernetesVirtualMachine(
+    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin):
+  DEFAULT_IMAGE = 'ubuntu:20.04'
 
 
 class Ubuntu1804BasedKubernetesVirtualMachine(

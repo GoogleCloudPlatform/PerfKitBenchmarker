@@ -27,7 +27,7 @@ import socket
 import threading
 import time
 import typing
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 from absl import flags
 import jinja2
@@ -991,6 +991,12 @@ class DeprecatedOsMixin(BaseOsMixin):
     if self.ALTERNATIVE_OS:
       warning += " Use '%s' instead." % self.ALTERNATIVE_OS
     logging.warning(warning)
+
+  # TODO(pclay): Implement on Windows, make abstract and non Optional
+  @property
+  def cpu_arch(self) -> Optional[str]:
+    """The basic CPU architecture of the VM."""
+    return None
 
 
 class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):

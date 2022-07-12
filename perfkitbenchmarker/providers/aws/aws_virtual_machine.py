@@ -538,6 +538,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking-os.html
     self._smp_affinity_script = 'smp_affinity.sh'
 
+    arm_arch = GetArmArchitecture(self.machine_type)
+    if arm_arch:
+      self.host_arch = arm_arch
+
     if self.use_dedicated_host and util.IsRegion(self.zone):
       raise ValueError(
           'In order to use dedicated hosts, you must specify an availability '
@@ -869,10 +873,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--instance-market-options=%s' % json.dumps(instance_market_options))
     _, stderr, retcode = vm_util.IssueCommand(create_cmd,
                                               raise_on_failure=False)
-
-    arm_arch = GetArmArchitecture(self.machine_type)
-    if arm_arch:
-      self.host_arch = arm_arch
 
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       if self.num_vms_per_host:
