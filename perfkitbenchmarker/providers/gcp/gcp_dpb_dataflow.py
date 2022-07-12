@@ -20,6 +20,7 @@ See details at: https://cloud.google.com/dataflow/
 import os
 import re
 import time
+import json
 import logging
 
 from absl import flags
@@ -58,6 +59,9 @@ DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
 CPU_API_DELAY_MINUTES = 4
 CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
 
+METRIC_TYPE_COUNTER = 'counter'
+METRIC_TYPE_DISTRIBUTION = 'distribution'
+
 class GcpDpbDataflow(dpb_service.BaseDpbService):
   """Object representing GCP Dataflow Service."""
 
@@ -68,6 +72,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     super(GcpDpbDataflow, self).__init__(dpb_service_spec)
     self.project = util.GetDefaultProject()
     self.job_id = None
+    self.job_metrics = None
 
   @staticmethod
   def _GetStats(stdout):
@@ -172,40 +177,53 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data['dpb_job_id'] = self.job_id
     return basic_data
 
-  def GetMetricValue(self, metric_name):
-    """Get value of a job's default metric.
-    Examples include: TotalVcpuTime, TotalMemoryUsage, TotalPdUsage
-    """
-    cmd = util.GcloudCommand(self, 'beta', 'dataflow',
-                            'metrics', 'list', self.job_id)
+  def _PullJobMetrics(self, force_refresh=False):
+    """Retrieve and cache all job metrics from Dataflow API"""
+    # Skip if job metrics is already populated unless force_refresh is True
+    if self.job_metrics is not None and not force_refresh:
+      return
+    
+    cmd = util.GcloudCommand(self, 'dataflow', 'metrics',
+                            'list', self.job_id)
+    cmd.use_alpha_gcloud = True
     cmd.flags = {
+        'project': self.project,
         'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
-        'filter': f"\"name={metric_name}\"",
-        'format': '"get(scalar)"',
+        'format': 'json',
     }
     stdout, _, _ = cmd.Issue()
-    return stdout
+    results = json.loads(stdout)
 
-  @vm_util.Retry(max_retries=5)
-  def GetCustomMetricValue(self, metric_name):
-    """Get value of a job's custom metric.
-    
-      Raises:
-        errors.Resource.RetryableGetError:
-    """
-    cmd = util.GcloudCommand(self, 'beta', 'dataflow',
-                            'metrics', 'list', self.job_id)
-    cmd.flags = {
-        'source': 'user',
-        'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
-        'filter': f"\"name={metric_name}\"",
-        'format': '"get(scalar)"',
+    counters = {}
+    distributions = {}
+    for metric in results:
+      if 'scalar' in metric:
+        counters[metric['name']['name']] = metric['scalar']
+      elif 'distribution' in metric:
+        distributions[metric['name']['name']] = metric['distribution']
+      else:
+        raise Exception('Unfamiliar metric type found: {}'.format(metric))
+
+    self.job_metrics = {
+      METRIC_TYPE_COUNTER: counters,
+      METRIC_TYPE_DISTRIBUTION: distributions
     }
-    stdout, stderr, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
-    if retcode != 0:
-      raise errors.Resource.RetryableGetError(
-          'Failed to retrieve metric {} for job {}: {}'.format(metric_name, self.job_id, stderr))
-    return stdout
+
+  def GetMetricValue(self, name, type=METRIC_TYPE_COUNTER):
+    """Get value of a job's metric.
+    
+    Returns:
+      Integer if metric is of type counter
+      Dictionary if metric is of type distribution. Dictionary 
+      contains keys such as count/max/mean/min/sum
+    """
+    if type not in (METRIC_TYPE_COUNTER, METRIC_TYPE_DISTRIBUTION):
+      raise Exception('Invalid type provided to GetMetricValue')
+    
+    if self.job_metrics is None:
+      self._PullJobMetrics()
+    
+    return self.job_metrics[type][name]
 
   def GetAvgCpuUtilization(self, start_time, end_time):
     """Get average cpu utilization across all pipeline workers.
