@@ -54,8 +54,8 @@ GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
 
-# Compute Engine CPU Monitoring API has up to 4 minute delay. See
-# https://cloud.google.com/monitoring/api/metrics_gcp#gcp-compute
+# Compute Engine CPU Monitoring API has up to 4 minute delay.
+# See https://cloud.google.com/monitoring/api/metrics_gcp#gcp-compute
 CPU_API_DELAY_MINUTES = 4
 CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
 
@@ -74,14 +74,14 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     self.job_id = None
     self.job_metrics = None
 
-  @staticmethod
-  def _GetStats(stdout):
-    """Get Stats.
+  # @staticmethod
+  # def _GetStats(stdout):
+  #   """Get Stats.
 
-    TODO(saksena): Hook up the metrics API of dataflow to retrieve performance
-    metrics when available
-    """
-    pass
+  #   TODO(saksena): Hook up the metrics API of dataflow to retrieve performance
+  #   metrics when available
+  #   """
+  #   pass
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
@@ -176,6 +176,16 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
     basic_data['dpb_job_id'] = self.job_id
     return basic_data
+
+  def GetStats(self):
+    """Collect series of relevant performance and cost stats"""
+    stats = {}
+    stats['total_vcpu_time'] = self.GetMetricValue('TotalVcpuTime')    # cpu_num_seconds
+    stats['total_mem_usage'] = self.GetMetricValue('TotalMemoryUsage') # mem_mb_seconds
+    stats['total_pd_usage'] = self.GetMetricValue('TotalPdUsage')      # pd_gb_seconds
+    # BillableShuffleDataProcessed
+    # BillableStreamingDataProcessed
+    return stats
 
   def _PullJobMetrics(self, force_refresh=False):
     """Retrieve and cache all job metrics from Dataflow API"""
