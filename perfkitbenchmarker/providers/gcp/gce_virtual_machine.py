@@ -843,10 +843,21 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         data_disk = self._GetNfsService().CreateNfsDisk()
       elif disk_spec.disk_type == disk.OBJECT_STORAGE:
         data_disk = gcsfuse_disk.GcsFuseDisk(disk_spec)
-      else:
+      else:  # remote disk
         name = '%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
         data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project,
                                      replica_zones=replica_zones)
+        # m3 machines uses nvme interface for
+        # pd-extreme, pd-ssd, pd-balanced and pd-standard.
+        if self.machine_type.startswith('m3-'):
+          self.interface = NVME
+          nvme_disk_number = (
+              self.NVME_START_INDEX
+              + 1  # 1 boot/system disk
+              + self.max_local_disks  # any local disks, if present
+              + self.remote_disk_counter  # finally any remote disk
+              )
+          data_disk.device_path = f'/dev/nvme0n{nvme_disk_number}'
         # Remote disk numbers start at 1+max_local_disks (0 is the system disk
         # and local disks occupy 1-max_local_disks).
         data_disk.disk_number = (self.remote_disk_counter +
