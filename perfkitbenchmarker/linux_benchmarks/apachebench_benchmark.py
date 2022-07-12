@@ -95,6 +95,7 @@ apachebench:
       os_type: ubuntu1804
       vm_spec: *default_single_core
 """
+FLAGS = flags.FLAGS
 
 # Default port for Apache
 _PORT = 80
@@ -111,6 +112,15 @@ _EXTERNAL_IP_CONFIG = ApacheBenchConfig(
         'external_results.txt',
         'external_ip_percentiles.csv',
         'external_ip_request_times.tsv')
+# Map from ip_addresses flag enum to list of ip configs to use
+_IP_ADDRESSES_TO_IP_CONFIGS = {
+    vm_util.IpAddressSubset.INTERNAL: [_INTERNAL_IP_CONFIG],
+    vm_util.IpAddressSubset.EXTERNAL: [_EXTERNAL_IP_CONFIG],
+    vm_util.IpAddressSubset.BOTH: [_INTERNAL_IP_CONFIG, _EXTERNAL_IP_CONFIG],
+    vm_util.IpAddressSubset.REACHABLE: [
+        _INTERNAL_IP_CONFIG, _EXTERNAL_IP_CONFIG
+    ]
+}
 
 _NUM_REQUESTS = flags.DEFINE_integer(
     'apachebench_num_requests', default=10000,
@@ -131,7 +141,7 @@ _SOCKET_TIMEOUT = flags.DEFINE_integer(
 _TIMELIMIT = flags.DEFINE_integer(
     'apachebench_timelimit',
     default=None,
-    help='Maximum number of seconds to spend for benchmarking. '
+    help='Maximum number of seconds to spend for benchmarking.'
     'After the timelimit is reached, additional requests will not be sent.')
 _APACHE_SERVER_CONTENT_SIZE = flags.DEFINE_integer(
     'apachebench_server_content_size',
@@ -376,7 +386,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   client_vms = benchmark_spec.vm_groups['client']
   samples = []
 
-  for config in [_INTERNAL_IP_CONFIG, _EXTERNAL_IP_CONFIG]:
+  for config in _IP_ADDRESSES_TO_IP_CONFIGS[FLAGS.ip_addresses]:
     results = _Run(benchmark_spec, config)
 
     # Format pkb-style samples
