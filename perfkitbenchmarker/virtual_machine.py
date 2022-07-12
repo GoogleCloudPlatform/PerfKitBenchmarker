@@ -27,7 +27,7 @@ import socket
 import threading
 import time
 import typing
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from absl import flags
 import jinja2
@@ -352,7 +352,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self._total_memory_kb = None
     self._num_cpus = None
     self._is_smt_enabled = None
-    self.os_metadata = {}
+    # Update to Json type if ever available:
+    # https://github.com/python/typing/issues/182
+    self.os_metadata: Dict[str, Union[str, int]] = {}
     assert type(
         self).BASE_OS_TYPE in os_types.BASE_OS_TYPES, '%s is not in %s' % (
             type(self).BASE_OS_TYPE, os_types.BASE_OS_TYPES)
@@ -369,7 +371,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   def BASE_OS_TYPE(cls):
     raise NotImplementedError()
 
-  def GetOSResourceMetadata(self):
+  def GetOSResourceMetadata(self) -> Dict[str, Union[str, int]]:
     """Returns a dict containing VM OS metadata.
 
     Returns:

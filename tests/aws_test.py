@@ -555,9 +555,10 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertRegex(
         aws_cmd, '.*'.join([
             'curl -O https://s3-us-west-2', 'yum upgrade -y kernel',
-            'yum install -y kernel-devel', 'reboot', 'efa_installer.sh -y',
+            'yum install -y kernel-devel', 'efa_installer.sh -y',
             './efa_test.sh'
         ]))
+    vm.Reboot.assert_called_once()
 
 
 def CreateVm():
@@ -587,7 +588,13 @@ def InitCentosVm():
   }
   util.IssueRetryableCommand.return_value = json.dumps(aws_response), ''
   vm = aws_virtual_machine.CentOs7BasedAwsVirtualMachine(TestVmSpec())
+  # This assumes that STDOUT is never parsed, which is incredibly brittle.
+  # If this test starts infinitely looping it's probably retrying an error
+  # based on this mock.
   vm.RemoteHostCommandWithReturnCode = mock.Mock(return_value=('', '', 0))  # pylint: disable=invalid-name
+  # Reboot can never be called without mocking out VMLastBootTime to change or
+  # it infinitely loops.
+  vm.Reboot = mock.Mock()
   return vm
 
 

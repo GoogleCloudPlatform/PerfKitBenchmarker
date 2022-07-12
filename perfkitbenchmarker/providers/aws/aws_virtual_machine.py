@@ -1336,7 +1336,6 @@ class Ubuntu1604BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
   def _InstallEfa(self):
     super(Ubuntu1604BasedAwsVirtualMachine, self)._InstallEfa()
     self.Reboot()
-    self.WaitForBootCompletion()
 
 
 class Ubuntu1804BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
@@ -1423,8 +1422,7 @@ class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
     self.RemoteCommand('sudo yum upgrade -y kernel')
     self.InstallPackages('kernel-devel')
     self.Reboot()
-    self.WaitForBootCompletion()
-    super(CentOs7BasedAwsVirtualMachine, self)._InstallEfa()
+    super()._InstallEfa()
 
 
 class CentOs8BasedAwsVirtualMachine(AwsVirtualMachine,

@@ -14,6 +14,7 @@
 
 """Tests for linux_virtual_machine.py."""
 
+from typing import Dict, Union
 import unittest
 
 from absl import flags
@@ -381,15 +382,26 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'Thread(s) per core: 1',
       'Socket(s): 1',
   ])
-  normal_boot_responses = [
-      'cubic', f'PRETTY_NAME="{os_info}"', kernel_release, cpu_arch,
-      partition_table
-  ]
+  normal_boot_responses = {
+      'cat /proc/sys/net/ipv4/tcp_congestion_control': 'cubic',
+      'grep PRETTY_NAME /etc/os-release': f'PRETTY_NAME="{os_info}"',
+      'uname -r': kernel_release,
+      'uname -m': cpu_arch,
+      'sudo fdisk -l': partition_table
+  }
 
-  def CreateVm(self, array_of_stdout):
+  def CreateVm(self, run_cmd_reponse: Union[str, Dict[str, str]]):
     vm = CreateTestLinuxVm()
+    def FakeRemoteHostCommandWithReturnCode(cmd, **_):
+      if isinstance(run_cmd_reponse, str):
+        stdout = run_cmd_reponse
+      elif isinstance(run_cmd_reponse, dict):
+        # NOTE: unfortunately @vm_util.Retry will infinitely retry a key error
+        # on this map, which can be tricky to diagnose.
+        stdout = run_cmd_reponse[cmd]
+      return stdout, ''
     vm.RemoteHostCommandWithReturnCode = mock.Mock(
-        side_effect=[(str(text), '') for text in array_of_stdout])
+        side_effect=FakeRemoteHostCommandWithReturnCode)
     vm.CheckLsCpu = mock.Mock(
         return_value=linux_virtual_machine.LsCpuResults(self.lscpu_output))
     return vm
@@ -399,7 +411,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       ('no_smt_centos7', _CENTOS7_KERNEL_COMMAND_LINE + ' noht nosmt nr_cpus=1',
        False))
   def testIsSmtEnabled(self, proc_cmdline, is_enabled):
-    vm = self.CreateVm([proc_cmdline])
+    vm = self.CreateVm(proc_cmdline)
     self.assertEqual(is_enabled, vm.IsSmtEnabled())
 
   @parameterized.named_parameters(
@@ -408,12 +420,16 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   )
   def testNumCpusForBenchmarkNoSmt(self, vcpus, kernel_command_line,
                                    expected_num_cpus):
-    vm = self.CreateVm([kernel_command_line, vcpus])
+    responses = {
+        'cat /proc/cpuinfo | grep processor | wc -l': str(vcpus),
+        'cat /proc/cmdline': kernel_command_line,
+    }
+    vm = self.CreateVm(responses)
     self.assertEqual(expected_num_cpus, vm.NumCpusForBenchmark(True))
 
   def testNumCpusForBenchmarkDefaultCall(self):
     # shows that IsSmtEnabled is not called unless new optional parameter used
-    vm = self.CreateVm([32])
+    vm = self.CreateVm('32')
     vm.IsSmtEnabled = mock.Mock()
     self.assertEqual(32, vm.NumCpusForBenchmark())
     vm.IsSmtEnabled.assert_not_called()
@@ -433,26 +449,26 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(expected_os_metadata, vm.os_metadata)
 
   def testReboot(self):
+    responses = self.normal_boot_responses.copy()
+    vm = self.CreateVm(responses)
+    vm.RecordAdditionalMetadata()
     os_info_new = 'Ubuntu 18.04.1b LTS'
     kernel_release_new = '5.3.0-1027'
-    additional_commands = [
-        '(reboot command)',
-        '(myhostname)',
-        '(last boot time)',
-        '(create install dir)',
-        f'PRETTY_NAME="{os_info_new}"',
-        kernel_release_new,
-        '(create install dir)',
-        '(create tmp dir)',
-    ]
-    vm = self.CreateVm(self.normal_boot_responses + additional_commands)
-    vm.RecordAdditionalMetadata()
+    responses.update({
+        'sudo reboot': 'bye bye',
+        'hostname': 'hello there',
+        'grep PRETTY_NAME /etc/os-release': f'PRETTY_NAME="{os_info_new}"',
+        'uname -r': kernel_release_new,
+        'stat -c %z /proc/': '',
+        'sudo mkdir -p /opt/pkb; sudo chmod a+rwxt /opt/pkb': '',
+        'mkdir -p /tmp/pkb': '',
+    })
     vm.Reboot()
     self.assertEqual(os_info_new, vm.os_metadata['os_info'])
     self.assertEqual(kernel_release_new, vm.os_metadata['kernel_release'])
 
   def testCpuVulnerabilitiesEmpty(self):
-    self.assertEqual({}, self.CreateVm(['']).cpu_vulnerabilities.asdict)
+    self.assertEqual({}, self.CreateVm('').cpu_vulnerabilities.asdict)
 
   def testCpuVulnerabilities(self):
     # lines returned from running "grep . .../cpu/vulnerabilities/*"
@@ -469,7 +485,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         # Not actually seen, shows that falls into "unknowns"
         '.../made_up:Unknown Entry',
     ]
-    cpu_vuln = self.CreateVm(['\n'.join(cpu_vuln_lines)]).cpu_vulnerabilities
+    cpu_vuln = self.CreateVm('\n'.join(cpu_vuln_lines)).cpu_vulnerabilities
     expected_mitigation = {
         'l1tf': 'PTE Inversion',
         'meltdown': 'PTI',
