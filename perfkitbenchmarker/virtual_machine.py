@@ -972,6 +972,12 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       raise errors.Resource.CreationError('No NFS Service created')
     return nfs
 
+  # TODO(pclay): Implement on Windows, make abstract and non Optional
+  @property
+  def cpu_arch(self) -> Optional[str]:
+    """The basic CPU architecture of the VM."""
+    return None
+
 
 class DeprecatedOsMixin(BaseOsMixin):
   """Class that adds a deprecation log message to OsBasedVms."""
@@ -991,12 +997,6 @@ class DeprecatedOsMixin(BaseOsMixin):
     if self.ALTERNATIVE_OS:
       warning += " Use '%s' instead." % self.ALTERNATIVE_OS
     logging.warning(warning)
-
-  # TODO(pclay): Implement on Windows, make abstract and non Optional
-  @property
-  def cpu_arch(self) -> Optional[str]:
-    """The basic CPU architecture of the VM."""
-    return None
 
 
 class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
