@@ -75,6 +75,7 @@ AZURE_NO_TMP_DISK_TYPES = [
     r'(Standard_E[0-9]+i?s?_v5)',
     r'(Standard_D[0-9]+as?_v5)',
     r'(Standard_E[0-9]+as?_v5)',
+    r'(Standard_E[0-9]+bs?_v5)',
 ]
 
 
