@@ -74,15 +74,16 @@ flags.DEFINE_integer('burn_cpu_seconds', 0,
 flags.DEFINE_integer('burn_cpu_threads', 1, 'Number of threads to use to '
                      'burn cpu before starting benchmark.')
 flags.DEFINE_integer('background_cpu_threads', None,
-                     'Number of threads of background cpu usage while '
+                     'Number of threads of background vm_util.cpu usage while '
                      'running a benchmark')
 flags.DEFINE_integer('background_network_mbits_per_sec', None,
                      'Number of megabits per second of background '
                      'network traffic to generate during the run phase '
                      'of the benchmark')
-flags.DEFINE_boolean('simulate_maintenance', False,
-                     'Whether to simulate VM maintenance during the benchmark. '
-                     'This requires both benchmark and provider support.')
+SIMULATE_MAINTENANCE = flags.DEFINE_boolean(
+    'simulate_maintenance', False,
+    'Whether to simulate VM maintenance during the benchmark. This requires '
+    'both benchmark and provider support.')
 flags.DEFINE_integer('simulate_maintenance_delay', 0,
                      'The number of seconds to wait to start simulating '
                      'maintenance.')
@@ -663,13 +664,13 @@ def GenerateRandomWindowsPassword(password_length=PASSWORD_LENGTH):
 
 def StartSimulatedMaintenance():
   """Initiates the simulated maintenance event."""
-  if FLAGS.simulate_maintenance:
+  if SIMULATE_MAINTENANCE.value:
     _SIMULATE_MAINTENANCE_SEMAPHORE.release()
 
 
 def SetupSimulatedMaintenance(vm):
   """Called ready VM for simulated maintenance."""
-  if FLAGS.simulate_maintenance:
+  if SIMULATE_MAINTENANCE.value:
     def _SimulateMaintenance():
       _SIMULATE_MAINTENANCE_SEMAPHORE.acquire()
       time.sleep(FLAGS.simulate_maintenance_delay)

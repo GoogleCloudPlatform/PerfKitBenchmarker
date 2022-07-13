@@ -23,13 +23,14 @@ memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 
 import datetime
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
@@ -161,11 +162,13 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   """Run memtier_benchmark against Redis."""
   client_vms = bm_spec.vm_groups['clients']
-  server_vm = bm_spec.vm_groups['servers'][0]
-  # Don't reference vm_groups['server'] directly, because this is reused by
-  # kubernetes_redis_memtier_benchmark, which doesn't have one.
-  measure_cpu_on_server_vm = (
-      REDIS_MEMTIER_MEASURE_CPU.value and 'servers' in bm_spec.vm_groups)
+  # IMPORTANT: Don't reference vm_groups['servers'] directly, because this is
+  # reused by kubernetes_redis_memtier_benchmark, which doesn't define it.
+  server_vm: Optional[virtual_machine.BaseVirtualMachine] = None
+  if 'servers' in bm_spec.vm_groups:
+    server_vm = bm_spec.vm_groups['servers'][0]
+  measure_cpu_on_server_vm = server_vm and REDIS_MEMTIER_MEASURE_CPU.value
+  simulate_maintenance = server_vm and vm_util.SIMULATE_MAINTENANCE.value
 
   ports = [str(port) for port in redis_server.GetRedisPorts()]
   def DistributeClientsToPorts(port):
@@ -177,7 +180,7 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   benchmark_metadata = {}
 
   # if testing performance due to a live migration, simulate live migration.
-  if FLAGS.simulate_maintenance:
+  if simulate_maintenance:
     if FLAGS.redis_memtier_capture_live_migration_timestamps:
       server_vm.StartLMNotification()
     vm_util.StartSimulatedMaintenance()
