@@ -33,6 +33,13 @@ from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
 
+_IP_LINK_TEXT = """
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state ...
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: ens4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1460 qdisc mq ...
+    link/ether 42:01:c0:a8:15:66 brd ff:ff:ff:ff:ff:ff
+"""
+
 
 def CreateTestLinuxVm():
   vm_spec = pkb_common_test_case.CreateTestVmSpec()
@@ -387,18 +394,19 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'grep PRETTY_NAME /etc/os-release': f'PRETTY_NAME="{os_info}"',
       'uname -r': kernel_release,
       'uname -m': cpu_arch,
-      'sudo fdisk -l': partition_table
+      'sudo fdisk -l': partition_table,
+      'PATH="${PATH}":/usr/sbin ip link show up': _IP_LINK_TEXT
   }
 
-  def CreateVm(self, run_cmd_reponse: Union[str, Dict[str, str]]):
+  def CreateVm(self, run_cmd_response: Union[str, Dict[str, str]]):
     vm = CreateTestLinuxVm()
     def FakeRemoteHostCommandWithReturnCode(cmd, **_):
-      if isinstance(run_cmd_reponse, str):
-        stdout = run_cmd_reponse
-      elif isinstance(run_cmd_reponse, dict):
+      if isinstance(run_cmd_response, str):
+        stdout = run_cmd_response
+      elif isinstance(run_cmd_response, dict):
         # NOTE: unfortunately @vm_util.Retry will infinitely retry a key error
         # on this map, which can be tricky to diagnose.
-        stdout = run_cmd_reponse[cmd]
+        stdout = run_cmd_response[cmd]
       return stdout, ''
     vm.RemoteHostCommandWithReturnCode = mock.Mock(
         side_effect=FakeRemoteHostCommandWithReturnCode)
@@ -442,6 +450,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     expected_os_metadata = {
         '/dev/sda': 1073741824,
         'kernel_release': self.kernel_release,
+        'mtu': 1460,
         'os_info': self.os_info,
         'cpu_arch': self.cpu_arch,
         'threads_per_core': 1,
@@ -466,6 +475,14 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm.Reboot()
     self.assertEqual(os_info_new, vm.os_metadata['os_info'])
     self.assertEqual(kernel_release_new, vm.os_metadata['kernel_release'])
+
+  def testGetNetworkDeviceNames(self):
+    responses = self.normal_boot_responses.copy()
+    vm = self.CreateVm(responses)
+    names = vm._get_network_device_mtus()
+    self.assertEqual({'ens4': 1460}, names)
+    mock_cmd = vm.RemoteHostCommandWithReturnCode
+    mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ip link show up')
 
   def testCpuVulnerabilitiesEmpty(self):
     self.assertEqual({}, self.CreateVm('').cpu_vulnerabilities.asdict)

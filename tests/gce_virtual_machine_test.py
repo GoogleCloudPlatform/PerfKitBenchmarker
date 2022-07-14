@@ -856,7 +856,7 @@ class GvnicTest(GceVirtualMachineTestCase):
 
   def testGetNetworkDeviceNames(self):
     self.mock_cmd.return_value = (_IP_LINK_TEXT, '')
-    names = self.vm._GetNetworkDevices()
+    names = self.vm._get_network_device_mtus()
     self.assertEqual({'ens4': 1460}, names)
     self.mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ip link show up')
 
@@ -885,7 +885,7 @@ class GvnicTest(GceVirtualMachineTestCase):
     self.vm.OnStartup()
     self.assertEqual('1.0.0', self.vm._gvnic_version)
     self.assertEqual('1.0.0', self.vm.GetResourceMetadata()['gvnic_version'])
-    self.assertEqual(1460, self.vm._discovered_mtu)
+    self.assertEqual(1460, list(self.vm._get_network_device_mtus().values())[0])
 
   def testMissingVersionInProperties(self):
     self.mock_cmd.side_effect = [(_IP_LINK_TEXT, ''), ('driver: gve', '')]

@@ -29,6 +29,7 @@ for you.
 import abc
 import collections
 import copy
+# import functools
 import logging
 import os
 import pipes
@@ -311,6 +312,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   # can use the following command
   INIT_RAM_FS_CMD = 'sudo update-initramfs -u'
 
+  # regex to get the network devices from "ip link show"
+  _IP_LINK_RE_DEVICE_MTU = re.compile(
+      r'^\d+: (?P<device_name>\S+):.*mtu (?P<mtu>\d+)')
+  # devices to ignore from "ip link show"
+  _IGNORE_NETWORK_DEVICES = ('lo', 'docker0')
+
   def __init__(self, *args, **kwargs):
     super(BaseLinuxMixin, self).__init__(*args, **kwargs)
     # N.B. If you override ssh_port you must override remote_access_ports and
@@ -331,6 +338,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._kernel_release: Optional[KernelRelease] = None
     self._cpu_arch: Optional[str] = None
     self._kernel_command_line: Optional[str] = None
+    self._network_device_mtus = None
 
   def _Suspend(self):
     """Suspends a VM."""
@@ -848,6 +856,28 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.os_metadata['kernel_command_line'] = self.kernel_command_line
       self.os_metadata[
           'append_kernel_command_line'] = FLAGS.append_kernel_command_line
+
+    devices = self._get_network_device_mtus()
+    all_mtus = set(devices.values())
+    if len(all_mtus) != 1:
+      raise ValueError(
+          'To record, MTU must only have 1 unique MTU value not: ', devices)
+    else:
+      self.os_metadata['mtu'] = list(all_mtus)[0]
+
+  # @functools.cached_property
+  def _get_network_device_mtus(self) -> Dict[str, int]:
+    """Returns network device names and their MTUs."""
+    if not self._network_device_mtus:
+      stdout, _ = self.RemoteCommand('PATH="${PATH}":/usr/sbin ip link show up')
+      self._network_device_mtus = {}
+      for line in stdout.splitlines():
+        m = self._IP_LINK_RE_DEVICE_MTU.match(line)
+        if m:
+          device_name = m['device_name']
+          if device_name not in self._IGNORE_NETWORK_DEVICES:
+            self._network_device_mtus[device_name] = int(m['mtu'])
+    return self._network_device_mtus
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
