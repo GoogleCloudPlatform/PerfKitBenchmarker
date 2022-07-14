@@ -431,6 +431,20 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   return samples
 
 
+@vm_util.Retry()
+def _CleanupTable(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Deletes a table under a user managed instance.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+      required to run the benchmark.
+  """
+  vm = benchmark_spec.vms[0]
+  command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """
+             """{1}/hbase shell""").format(_GetTableName(), hbase.HBASE_BIN)
+  vm.RemoteCommand(command, should_log=True)
+
+
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Cleanup.
 
@@ -442,7 +456,4 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   if (instance.user_managed and
       (_STATIC_TABLE_NAME.value is None or _DELETE_STATIC_TABLE.value)):
     # Only need to drop the temporary tables if we're not deleting the instance.
-    vm = benchmark_spec.vms[0]
-    command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """
-               """{1}/hbase shell""").format(_GetTableName(), hbase.HBASE_BIN)
-    vm.RemoteCommand(command, should_log=True, ignore_failure=True)
+    _CleanupTable(benchmark_spec)

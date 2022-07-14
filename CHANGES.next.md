@@ -162,6 +162,8 @@
     `--dpb_initialization_actions`
 -   Add sandbox configuration fields for GKE nodepools.
 -   Fetch Redis benchmark live migration times from GCP metadata server.
+-   Retry table deletions in Cloud Bigtable benchmarks against a user managed
+    instance and fail if the benchmark eventually fails to delete a table.
 
 ### Bug fixes and maintenance updates:
 
