@@ -41,6 +41,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
@@ -1260,6 +1261,13 @@ class RockyLinux8BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
                                         linux_vm.RockyLinux8Mixin):
   DEFAULT_IMAGE_FAMILY = 'rocky-linux-8'
   DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
+
+
+# https://cloud.google.com/blog/products/application-modernization/introducing-rocky-linux-optimized-for-google-cloud
+class RockyLinux8OptimizedBasedGceVirtualMachine(
+    RockyLinux8BasedGceVirtualMachine):
+  OS_TYPE = os_types.ROCKY_LINUX8_OPTIMIZED
+  DEFAULT_IMAGE_FAMILY = 'rocky-linux-8-optimized-gcp'
 
 
 class CentOsStream9BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,

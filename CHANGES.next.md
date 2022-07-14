@@ -78,6 +78,7 @@
 -   Add support for chbench using s64da.
 -   Add sysbench_memory benchmark.
 -   Add support for RHEL 9 on AWS, Azure, and GCP.
+-   Add GCP Optimized Rocky Linux 8 OS.
 
 ### Enhancements:
 
