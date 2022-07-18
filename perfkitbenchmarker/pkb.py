@@ -1278,7 +1278,7 @@ def RunBenchmarkTask(
     # Unset run_uri so the config value takes precedence.
     FLAGS['run_uri'].present = 0
 
-  zone_retry_manager = ZoneRetryManager()
+  zone_retry_manager = ZoneRetryManager(FLAGS.machine_type)
   # Set the run count.
   max_run_count = 1 + _MAX_RETRIES.value
 
@@ -1348,30 +1348,39 @@ class ZoneRetryManager():
     zones_tried: Zones that have already been tried in previous runs.
   """
 
-  def __init__(self):
-    self._CheckFlag()
+  def __init__(self, machine_type: str):
+    self._CheckFlag(machine_type)
     if not _SMART_CAPACITY_RETRY.value and not _SMART_QUOTA_RETRY.value:
       return
+    self._machine_type = machine_type
     self._zones_tried: Set[str] = set()
     self._regions_tried: Set[str] = set()
     self._utils: types.ModuleType = providers.LoadProviderUtils(FLAGS.cloud)
     self._SetOriginalZoneAndFlag()
 
+  def _CheckMachineTypeIsSupported(self, machine_type: str) -> None:
+    if not machine_type:
+      raise errors.Config.MissingOption(
+          'machine_type flag must be specified on the command line '
+          'if zone=any feature is used.')
+
   def _GetCurrentZoneFlag(self):
     return FLAGS[self._zone_flag].value[0]
 
-  def _CheckFlag(self) -> None:
+  def _CheckFlag(self, machine_type: str) -> None:
     for zone_flag in ['zone', 'zones']:
       if FLAGS[zone_flag].value:
         self._zone_flag = zone_flag
         if self._GetCurrentZoneFlag() == _ANY_ZONE:
+          self._CheckMachineTypeIsSupported(machine_type)
           FLAGS['smart_capacity_retry'].parse(True)
           FLAGS['smart_quota_retry'].parse(True)
 
   def _SetOriginalZoneAndFlag(self) -> None:
     """Records the flag name and zone value that the benchmark started with."""
     # This is guaranteed to set values due to flag validator.
-    self._supported_zones = self._utils.GetZonesFromMachineType()
+    self._supported_zones = self._utils.GetZonesFromMachineType(
+        self._machine_type)
     if self._GetCurrentZoneFlag() == _ANY_ZONE:
       if _MAX_RETRIES.value < 1:
         FLAGS['retries'].parse(len(self._supported_zones))
