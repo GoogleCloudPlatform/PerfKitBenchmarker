@@ -84,8 +84,16 @@ flags.DEFINE_integer(
     'If you try to set the MSS lower than 88 bytes, the default MSS will be '
     'used.')
 
-ALL_BENCHMARKS = ['TCP_RR', 'TCP_CRR', 'TCP_STREAM', 'UDP_RR', 'UDP_STREAM']
-flags.DEFINE_list('netperf_benchmarks', ALL_BENCHMARKS,
+TCP_RR = 'TCP_RR'
+TCP_CRR = 'TCP_CRR'
+TCP_STREAM = 'TCP_STREAM'
+UDP_RR = 'UDP_RR'
+UDP_STREAM = 'UDP_STREAM'
+
+TCP_BENCHMARKS = [TCP_RR, TCP_CRR, TCP_STREAM]
+ALL_BENCHMARKS = TCP_BENCHMARKS + [UDP_RR, UDP_STREAM]
+
+flags.DEFINE_list('netperf_benchmarks', TCP_BENCHMARKS,
                   'The netperf benchmark(s) to run.')
 flags.register_validator(
     'netperf_benchmarks',
@@ -96,7 +104,8 @@ FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'netperf'
 BENCHMARK_CONFIG = """
 netperf:
-  description: Run TCP_RR, TCP_CRR, UDP_RR, TCP_STREAM and UDP_STREAM
+  description: Run one or more of TCP_RR, TCP_CRR, UDP_RR, TCP_STREAM and
+               UDP_STREAM
   vpc_peering: True
   vm_groups:
     vm_1:
