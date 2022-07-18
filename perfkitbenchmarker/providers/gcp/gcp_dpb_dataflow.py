@@ -22,6 +22,7 @@ import re
 import time
 import json
 import logging
+import datetime
 
 from absl import flags
 from google.cloud import monitoring_v3
@@ -53,11 +54,16 @@ FLAGS = flags.FLAGS
 GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
+DATAFLOW_JOB_TIMEOUT = 1200   # 20 minutes
 
 # Compute Engine CPU Monitoring API has up to 4 minute delay.
 # See https://cloud.google.com/monitoring/api/metrics_gcp#gcp-compute
 CPU_API_DELAY_MINUTES = 4
 CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
+# Dataflow Monitoring API has up to 3 minute delay.
+# See https://cloud.google.com/monitoring/api/metrics_gcp#gcp-dataflow
+DATAFLOW_METRICS_DELAY_MINUTES = 3
+DATAFLOW_METRICS_DELAY_SECONDS = DATAFLOW_METRICS_DELAY_MINUTES * 60
 
 DATAFLOW_TYPE_BATCH = 'batch'
 DATAFLOW_TYPE_STREAMING = 'streaming'
@@ -85,6 +91,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     self.project = util.GetDefaultProject()
     self.job_id = None
     self.job_metrics = None
+    self.input_sub_empty = False
+    self.job_drained = False
+    self.job_stats = None
 
   # @staticmethod
   # def _GetStats(stdout):
@@ -178,6 +187,97 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     self.job_id = match.group(1)
     logging.info('Dataflow job ID: %s', self.job_id)
 
+  def SubmitJobAsync(
+      self,
+      template_gcs_location=None,
+      job_poll_interval=None,
+      job_arguments=None,
+      job_input_sub = None,
+      job_stdout_file=None,
+      job_type=None):
+
+    worker_machine_type = self.spec.worker_group.vm_spec.machine_type
+    num_workers = self.spec.worker_count
+    max_workers = self.spec.worker_count
+
+    now = datetime.datetime.now()
+    job_name = template_gcs_location.split('/')[-1] + '_' + now.strftime("%Y%m%d_%H%M%S")
+    region = util.GetRegionFromZone(FLAGS.dpb_service_zone)
+
+    cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'run', job_name)
+    cmd.flags = {
+        'project': self.project,
+        'gcs-location': template_gcs_location,
+        'staging-location': FLAGS.dpb_dataflow_temp_location,
+        'region': region,
+        'worker-region': region,
+        'worker-machine-type': worker_machine_type,
+        'num-workers': num_workers,
+        'max-workers': max_workers,
+        'parameters': ','.join(job_arguments),
+        'format': 'json',
+    }
+
+    stdout, stderr, retcode = cmd.Issue()
+
+    # Parse output to retrieve submitted job ID
+    try:
+      result = json.loads(stdout)
+      self.job_id = result['id']
+    except Exception as err:
+      logging.error("Failed to parse Dataflow job ID: {}".format(err))
+      raise
+
+    logging.info('Dataflow job ID: %s', self.job_id)
+    # TODO: return JobResult() with pre-computed time stats
+    return self._WaitForJob(job_input_sub, DATAFLOW_JOB_TIMEOUT, job_poll_interval)
+
+  def _GetCompletedJob(self, job_id):
+    """See base class."""
+    job_input_sub = job_id
+
+    # Job completed if input subscription is empty *and* job is drained;
+    # otherwise keep waiting
+    if not self.input_sub_empty:
+      backlog_size = self.GetSubscriptionBacklogSize(job_input_sub)
+      logging.info("Polling: Backlog size of subscription {} is {}".format(job_input_sub, backlog_size))
+      if backlog_size == 0:
+        self.input_sub_empty = True
+        # Start draining job once input subscription is empty
+        cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'drain', self.job_id)
+        cmd.flags = {
+            'project': self.project,
+            'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
+            'format': 'json',
+        }
+        logging.info("Polling: Draining job {} ...".format(self.job_id))
+        stdout, stderr, retcode = cmd.Issue()
+      else:
+        return None
+
+    if not self.job_drained:
+      # Confirm job is drained
+      cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'show', self.job_id)
+      cmd.flags = {
+          'project': self.project,
+          'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
+          'format': 'json',
+      }
+      stdout, stderr, retcode = cmd.Issue()
+      job_state = json.loads(stdout)['state']
+      logging.info("Polling: Job state is {} ".format(job_state))
+      if job_state == "Drained":
+          self.job_drained = True
+      else:
+          return None
+
+    # TODO: calculate run_time, pending_time as args for JobResult()
+    # started_on = result['JobRun']['StartedOn']
+    # completed_on = result['JobRun']['CompletedOn']
+    # execution_time = result['JobRun']['ExecutionTime']
+    # return dpb_service.JobResult()
+    return True
+
   def SetClusterProperty(self):
     pass
 
@@ -189,6 +289,13 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data['dpb_job_id'] = self.job_id
     return basic_data
 
+  def GetJobStatus(self):
+    cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'show', self.job_id)
+    cmd.flags = {
+        'project': self.project,
+        'format': 'json',
+    }
+
   def GetStats(self):
     """Collect series of relevant performance and cost stats"""
     stats = {}
@@ -197,13 +304,19 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     stats['total_pd_usage'] = self.GetMetricValue('TotalPdUsage')/3600           # GB-hr
     # BillableShuffleDataProcessed
     # BillableStreamingDataProcessed
-    stats['total_cost'] = self._CalculateCost(stats['total_vcpu_time'], stats['total_mem_usage'], stats['total_pd_usage'])
+    self.job_stats = stats
     return stats
 
-  def _CalculateCost(self, total_vcpu_time, total_mem_usage, total_pd_usage,
-                    type=DATAFLOW_TYPE_BATCH):
+  def CalculateCost(self, type=DATAFLOW_TYPE_BATCH):
     if type not in (DATAFLOW_TYPE_BATCH, DATAFLOW_TYPE_STREAMING):
-      raise Exception('Invalid type provided to _CalculateCost()')
+      raise Exception('Invalid type provided to CalculateCost()')
+
+    if not self.job_stats:
+      self.GetStats()
+
+    total_vcpu_time = self.job_stats['total_vcpu_time']
+    total_mem_usage = self.job_stats['total_mem_usage']
+    total_pd_usage = self.job_stats['total_pd_usage']
 
     cost = 0
     if type == DATAFLOW_TYPE_BATCH:
@@ -215,7 +328,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     
     cost += total_pd_usage * PD_PER_GB_HR
     # TODO(rarsan): Add cost related to per-GB data processed by Dataflow Shuffle
-    # (for batch) or Streaming Appliance (for streaming) when applicable
+    # (for batch) or Streaming Engine (for streaming) when applicable
     return cost
 
   def _PullJobMetrics(self, force_refresh=False):
@@ -319,12 +432,109 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       }
     )
 
-    # print(results)
     # if not results:
     #   raise Exception('No monitoring data found. Unable to calculate avg CPU utilization')
-    return self._ParseTimeSeriesData(results)
+    return self._GetAvgValueFromTimeSeries(results)
 
-  def _ParseTimeSeriesData(self, time_series):
+  def GetMaxOutputThroughput(self, ptransform, start_time, end_time):
+    """Get max throughput from a particular pTransform during job run interval.
+
+    Args:
+      start_time: datetime specifying the beginning of the time interval.
+      end_time: datetime specifying the end of the time interval.
+
+    Returns:
+      Max value across time interval
+    """
+    client = monitoring_v3.MetricServiceClient()
+    project_name = f"projects/{self.project}"
+    
+    now_seconds = int(time.time())
+    start_time_seconds = int(start_time.timestamp())
+    end_time_seconds = int(end_time.timestamp())
+    # Cpu metrics data can take up to 240 seconds to appear
+    if (now_seconds - end_time_seconds) < DATAFLOW_METRICS_DELAY_SECONDS:
+      logging.info('Waiting for Dataflow metrics to be available (up to 3 minutes)...')
+      time.sleep(DATAFLOW_METRICS_DELAY_SECONDS - (now_seconds - end_time_seconds))
+
+    interval = TimeInterval(
+        {
+            "start_time": {"seconds": start_time_seconds},
+            "end_time": {"seconds": end_time_seconds},
+        }
+    )
+
+    api_filter = (
+      'metric.type = "dataflow.googleapis.com/job/elements_produced_count" '
+      'AND resource.labels.project_id = "' + self.project + '" '
+      'AND metric.labels.job_id = "' + self.job_id + '" '
+      'AND metric.labels.ptransform = "' + ptransform + '" '
+    )
+
+    aggregation = Aggregation(
+        {
+            "alignment_period": {"seconds": 60},  # 1 minute
+            "per_series_aligner": Aggregation.Aligner.ALIGN_RATE,
+            # "group_by_fields": ["metric.job_id", "metric.ptransform"],
+        }
+    )
+
+    results = client.list_time_series(
+      request={
+        "name": project_name,
+        "filter": api_filter,
+        "interval": interval,
+        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        "aggregation": aggregation
+      }
+    )
+
+    # print(results)
+    # if not results:
+    #   raise Exception('No monitoring data found. Unable to calculate max throughput')
+    return self._GetMaxValueFromTimeSeries(results)
+
+  def GetSubscriptionBacklogSize(self, subscription_name, interval_length=4):
+    client = monitoring_v3.MetricServiceClient()
+    project_name = f"projects/{self.project}"
+
+    now = time.time()
+    seconds = int(now)
+
+    interval = TimeInterval(
+        {
+            "end_time": {"seconds": seconds},
+            "start_time": {"seconds": seconds - interval_length * 60},
+        }
+    )
+
+    api_filter = (
+      'metric.type = "pubsub.googleapis.com/subscription/num_undelivered_messages" '
+      'AND resource.labels.subscription_id = "' + subscription_name + '" '
+    )
+    
+    results = client.list_time_series(
+      request={
+        "name": project_name,
+        "filter": api_filter,
+        "interval": interval,
+        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+      }
+    )
+
+    return self._GetLastValueFromTimeSeries(results)
+
+  def _GetLastValueFromTimeSeries(self, time_series):
+    value = None
+    for i, time_interval in enumerate(time_series):
+      if i != 0: break
+      for j, snapshot in enumerate(time_interval.points):
+        if j != 0: break
+        value = snapshot.value.int64_value
+
+    return value
+
+  def _GetAvgValueFromTimeSeries(self, time_series):
     """Parses time series data and returns average across intervals.
 
     Args:
@@ -346,4 +556,28 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       if time_series.unit == "10^2.%":
         averaged = round(averaged * 100, 2)
       return averaged
+    return None 
+
+  def _GetMaxValueFromTimeSeries(self, time_series):
+    """Parses time series data and returns maximum across intervals.
+
+    Args:
+      time_series: time series of throughput rates returned by monitoring.
+
+    Returns:
+      Maximum value across intervals
+    """
+    points = []
+    for i, time_interval in enumerate(time_series):
+      for j, snapshot in enumerate(time_interval.points):
+        points.append(snapshot.value.double_value)
+
+    if points:
+      # Max over all minute intervals captured
+      max_rate = round(max(points), 2)
+      # If metric unit is a fractional number between 0 and 1 (e.g. CPU utilization metric)
+      # multiply by 100 to display a percentage usage.
+      # if time_series.unit == "10^2.%":
+      #   averaged = round(max * 100, 2)
+      return max_rate
     return None 
