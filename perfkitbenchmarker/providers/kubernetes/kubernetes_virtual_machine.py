@@ -577,6 +577,8 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
         'sed -i \'/secure_path/d\' /etc/sudoers',
         'sudo ldconfig',
     ]))
+    # iproute2 propvides ip
+    self.InstallPackages('iproute2')
 
 
 # All Ubuntu images below are from https://hub.docker.com/_/ubuntu/
