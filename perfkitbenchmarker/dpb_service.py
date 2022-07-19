@@ -600,7 +600,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
     self.vms = {}
     self.dpb_service_type = UNMANAGED_SPARK_CLUSTER
     # Set DPB version as Spark version for metadata
-    self.dpb_version = 'spark_' + FLAGS.spark_version
+    self.dpb_version = f'spark_{spark.SparkVersion()}'
     self.cloud = dpb_service_spec.worker_group.cloud
 
   def _Create(self):

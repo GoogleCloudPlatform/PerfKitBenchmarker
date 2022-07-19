@@ -20,25 +20,34 @@ import functools
 import logging
 import os
 import posixpath
+import re
 import time
 from typing import Dict
 
 from absl import flags
+import bs4
 from packaging import version
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aws_credentials
 from perfkitbenchmarker.linux_packages import hadoop
+import requests
+
 
 FLAGS = flags.FLAGS
 
-SPARK_VERSION_FLAG = flags.DEFINE_string('spark_version', '3.1.2',
-                                         'Version of spark.')
+_SPARK_VERSION_FLAG = flags.DEFINE_string(
+    'spark_version', None,
+    'Version of spark. Defaults to latest.')
 
 DATA_FILES = [
     'spark/spark-defaults.conf.j2', 'spark/spark-env.sh.j2', 'spark/workers.j2'
 ]
+
+SPARK_DOWNLOADS = 'https://downloads.apache.org/spark'
+SPARK_VERSION_DIR_PATTERN = r'spark-([0-9.]+)/'
 
 SPARK_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'spark')
 SPARK_BIN = posixpath.join(SPARK_DIR, 'bin')
@@ -49,12 +58,31 @@ SPARK_PRIVATE_KEY = posixpath.join(SPARK_CONF_DIR, 'spark_keyfile')
 SPARK_SUBMIT = posixpath.join(SPARK_BIN, 'spark-submit')
 
 
-def _SparkVersion() -> version.Version:
-  return version.Version(SPARK_VERSION_FLAG.value)
+@functools.lru_cache()
+def SparkVersion() -> version.Version:
+  """Get passed Spark version or latest available."""
+  if _SPARK_VERSION_FLAG.value:
+    return version.Version(_SPARK_VERSION_FLAG.value)
+  # Find latest version
+  # N.B. requests handles a redirect from spark to spark/.
+  response = requests.get(SPARK_DOWNLOADS)
+  if not response.ok:
+    raise errors.Setup.MissingExecutableError(
+        'Could not load ' + SPARK_DOWNLOADS)
+  soup = bs4.BeautifulSoup(response.content, 'html.parser')
+  found_versions = []
+  for link in soup.find_all('a'):
+    match = re.match(SPARK_VERSION_DIR_PATTERN, link.get('href') or '')
+    if match:
+      found_versions.append(version.Version(match.group(1)))
+  if not found_versions:
+    raise errors.Setup.MissingExecutableError(
+        'Could not find valid spark versions at ' + SPARK_DOWNLOADS)
+  return max(found_versions)
 
 
 def _ScalaVersion() -> version.Version:
-  if _SparkVersion().major >= 3:
+  if SparkVersion().major >= 3:
     # https://spark.apache.org/docs/3.0.0/#downloading
     return version.Version('2.12')
   else:
@@ -65,7 +93,7 @@ def _ScalaVersion() -> version.Version:
 def SparkExamplesJarPath() -> str:
   return posixpath.join(
       SPARK_DIR, 'examples/jars/',
-      f'spark-examples_{_ScalaVersion()}-{_SparkVersion()}.jar')
+      f'spark-examples_{_ScalaVersion()}-{SparkVersion()}.jar')
 
 
 def CheckPrerequisites():
@@ -79,14 +107,16 @@ def CheckPrerequisites():
 
 
 def Install(vm):
+  """Install spark on a vm."""
   vm.Install('openjdk')
   vm.Install('python3')
   vm.Install('curl')
   # Needed for HDFS not as a dependency.
   # Also used on Spark's classpath to support s3a client.
   vm.Install('hadoop')
-  spark_url = ('https://downloads.apache.org/spark/spark-{0}/'
-               'spark-{0}-bin-without-hadoop.tgz').format(FLAGS.spark_version)
+  spark_version = SparkVersion()
+  spark_url = (f'{SPARK_DOWNLOADS}/spark-{spark_version}/'
+               f'spark-{spark_version}-bin-without-hadoop.tgz')
   vm.RemoteCommand(
       ('mkdir {0} && curl -L {1} | '
        'tar -C {0} --strip-components=1 -xzf -').format(SPARK_DIR, spark_url))

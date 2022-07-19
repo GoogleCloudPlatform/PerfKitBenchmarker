@@ -28,3 +28,5 @@ pywinrm
 timeout-decorator
 google-cloud-datastore
 google-cloud-monitoring
+beautifulsoup4
+requests
