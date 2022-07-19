@@ -315,8 +315,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   # regex to get the network devices from "ip link show"
   _IP_LINK_RE_DEVICE_MTU = re.compile(
       r'^\d+: (?P<device_name>\S+):.*mtu (?P<mtu>\d+)')
-  # devices to ignore from "ip link show"
-  _IGNORE_NETWORK_DEVICES = ('lo', 'docker0')
+  # device prefixes to ignore from "ip link show"
+  # TODO(spencerkim): Record ib device metadata.
+  _IGNORE_NETWORK_DEVICE_PREFIXES = ('lo', 'docker', 'ib')
 
   def __init__(self, *args, **kwargs):
     super(BaseLinuxMixin, self).__init__(*args, **kwargs)
@@ -875,7 +876,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         m = self._IP_LINK_RE_DEVICE_MTU.match(line)
         if m:
           device_name = m['device_name']
-          if device_name not in self._IGNORE_NETWORK_DEVICES:
+          if not any(device_name.startswith(prefix)
+                     for prefix in self._IGNORE_NETWORK_DEVICE_PREFIXES):
             self._network_device_mtus[device_name] = int(m['mtu'])
     return self._network_device_mtus
 
