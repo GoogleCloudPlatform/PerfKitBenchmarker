@@ -22,6 +22,7 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
+from perfkitbenchmarker.linux_packages import docker
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
@@ -29,7 +30,6 @@ from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
-MLPERF_VERSION = 'v1.0'
 
 BENCHMARK_NAME = 'mlperf'
 BENCHMARK_CONFIG = """
@@ -86,12 +86,11 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'mlperf_transformer_decode_dir', '', 'Transformer decode directory')
 flags.DEFINE_string('wmt_data_dir',
-                    f'gs://p3rf-mlperf/mlperf_{MLPERF_VERSION}_nv_transformer',
+                    'gs://p3rf-mlperf/mlperf_v1.0_nv_transformer',
                     'Directory where the wmt dataset is stored')
 flags.DEFINE_string('coco_data_dir', 'gs://p3rf-mlperf/coco2017',
                     'Directory where the coco dataset is stored')
-flags.DEFINE_string('gnmt_data_dir',
-                    f'gs://p3rf-mlperf/mlperf_{MLPERF_VERSION}_nv_gnmt',
+flags.DEFINE_string('gnmt_data_dir', 'gs://p3rf-mlperf/mlperf_v1.0_nv_gnmt',
                     'Directory where the nv 1.0 WMT dataset is stored')
 flags.DEFINE_string('bert_data_dir', 'gs://p3rf-mlperf/bert_data',
                     'Directory where the nv bert dataset is stored.')
@@ -102,9 +101,6 @@ flags.DEFINE_string('minigo_model_dir', '',
 RESNET_EPOCHS = flags.DEFINE_integer(
     'mlperf_resnet_epochs', 48,
     'The Number of epochs to use for training ResNet.', lower_bound=4)
-MASK_ITERATION = flags.DEFINE_integer(
-    'mlperf_mask_iteration', 20000,
-    'The Number of iteration to use for training Mask R-CNN.', lower_bound=1)
 BERT_STEPS = flags.DEFINE_integer(
     'mlperf_bert_steps', 1271,
     'The Number of steps to use for training BERT.', lower_bound=1)
@@ -114,6 +110,10 @@ BERT_BATCH_SIZE = flags.DEFINE_integer(
 
 HYPERTHREADS = flags.DEFINE_bool('mlperf_hyperthreads', True,
                                  'enable or disable binding to hyperthreads')
+
+VERSION = flags.DEFINE_enum('mlperf_training_version', 'v1.0',
+                            ['v1.0', 'v1.1', 'v2.0'],
+                            'MLPerf training version to run.')
 
 RE_FLOAT = r'\d+\.\d+'
 
@@ -186,8 +186,8 @@ def PrepareBenchmark(benchmark_spec, vm=None):
     )
 
   vm.RemoteCommand(
-      f'if [ ! -d "$HOME/training_results_{MLPERF_VERSION}" ]; then '
-      f'  git clone https://github.com/mlcommons/training_results_{MLPERF_VERSION}.git ; '
+      f'if [ ! -d "$HOME/training_results_{VERSION.value}" ]; then '
+      f'  git clone https://github.com/mlcommons/training_results_{VERSION.value}.git ; '
       'fi',
       should_log=True)
   vm.Install('pip3')
@@ -195,17 +195,17 @@ def PrepareBenchmark(benchmark_spec, vm=None):
     if BERT in benchmark_spec.benchmark:
       vm_util.ReplaceText(
           vm, "'bind_pyt'", "'bind_pyt' '--no_hyperthreads'",
-          f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/bert/'
+          f'training_results_{VERSION.value}/NVIDIA/benchmarks/bert/'
           'implementations/pytorch/run_with_docker.sh')
     elif MASK in benchmark_spec.benchmark:
       vm_util.ReplaceText(
           vm, "'bind_launch'", "'bind_launch' '--no_hyperthreads'",
-          f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/maskrcnn/'
+          f'training_results_{VERSION.value}/NVIDIA/benchmarks/maskrcnn/'
           'implementations/pytorch/run_and_time.sh')
     elif RESNET in benchmark_spec.benchmark:
       vm_util.ReplaceText(
           vm, '--cpu=exclusive', '--cpu=exclusive,nosmt',
-          f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/resnet/'
+          f'training_results_{VERSION.value}/NVIDIA/benchmarks/resnet/'
           'implementations/mxnet/run_and_time.sh')
 
 
@@ -248,7 +248,7 @@ def PrepareRunner(benchmark_spec, vm=None):
       run_path = (
           '$HOME/training_results_{version}/Google/benchmarks/{model}/tpu-{tpus}'
           .format(
-              version=MLPERF_VERSION,
+              version=VERSION.value,
               model=benchmark_spec.benchmark,
               tpus=benchmark_spec.tpu_groups['train'].GetAcceleratorType()))
     else:
@@ -266,7 +266,7 @@ def PrepareRunner(benchmark_spec, vm=None):
     code_path = (
         '$HOME/training_results_{version}/Google/benchmarks/{model}/implementations/tpu-{tpus}-{model}'
         .format(
-            version=MLPERF_VERSION,
+            version=VERSION.value,
             model=benchmark_spec.benchmark,
             tpus=benchmark_spec.tpu_groups['train'].GetAcceleratorType()))
 
@@ -278,8 +278,9 @@ def PrepareRunner(benchmark_spec, vm=None):
       # and SSD benchmarks.
       # TODO(user): coco whl package for python 3.5
       vm.RemoteCommand(
-          'cd /tmp && '
-          f'wget https://storage.cloud.google.com/mlperf_artifcats/{MLPERF_VERSION}_training/coco-1.1-cp36-cp36m-linux_x86_64.whl'
+          'cd /tmp && wget https://storage.cloud.google.com/'
+          'mlperf_artifcats/v0.6_training/'  # NOTYPO
+          'coco-1.1-cp36-cp36m-linux_x86_64.whl'
       )
 
     setup_script = posixpath.join(run_path, 'setup.sh')
@@ -364,62 +365,65 @@ def PrepareRunner(benchmark_spec, vm=None):
       vm.Install('cuda_toolkit')
 
     vm.Install('nvidia_docker')
+    docker.AddUser(vm)
+    vm.RemoteCommand('sudo usermod -aG docker $USER')
     vm.RemoteCommand('if [ ! -d "/data" ]; then sudo ln -s /scratch /data; fi')
 
     if RESNET in benchmark_spec.benchmark:
-      run_script = f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/resnet/implementations/mxnet/run_and_time.sh'
+      run_script = f'training_results_{VERSION.value}/NVIDIA/benchmarks/resnet/implementations/mxnet/run_and_time.sh'
       vm.RemoteCommand(
-          f'cd training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/resnet/implementations/mxnet &&'
-          ' sudo docker build --network=host . -t mlperf-nvidia:image_classification',
+          f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/resnet/implementations/mxnet &&'
+          ' docker build --network=host . -t mlperf-nvidia:image_classification',
           should_log=True)
       _DownloadData(benchmark_spec.imagenet_data_dir,
                     posixpath.join('/data', 'imagenet'), vm)
 
     if TRANSFORMER in benchmark_spec.benchmark:
       vm.RemoteCommand(
-          f'cd training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/transformer/implementations/pytorch &&'
-          ' sudo docker build --network=host . -t mlperf-nvidia:translation',
+          f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/transformer/implementations/pytorch &&'
+          ' docker build --network=host . -t mlperf-nvidia:translation',
           should_log=True)
       _DownloadData(benchmark_spec.wmt_data_dir, posixpath.join('/data', 'wmt'),
                     vm)
 
     if MINIGO in benchmark_spec.benchmark:
-      build_path = f'training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/minigo/implementations/tensorflow'
+      build_path = f'training_results_{VERSION.value}/NVIDIA/benchmarks/minigo/implementations/tensorflow'
       run_script = posixpath.join(build_path, 'run_and_time.sh')
       vm_util.ReplaceText(vm, 'get_data.py', 'get_data.py --src_dir={}'.format(
           FLAGS.minigo_model_dir.replace('/', r'\/')), run_script)
-      vm.RemoteCommand('cd {} && sudo docker build --network=host -t '
-                       'mlperf-nvidia:minigo .'.format(build_path),
-                       should_log=True)
+      vm.RemoteCommand(
+          'cd {} && docker build --network=host -t '
+          'mlperf-nvidia:minigo .'.format(build_path),
+          should_log=True)
 
     if MASK in benchmark_spec.benchmark:
       vm.RemoteCommand(
-          f'cd training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/maskrcnn/implementations/pytorch && '
-          'sudo docker build --network=host -t mlperf-nvidia:object_detection . ',
+          f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/maskrcnn/implementations/pytorch && '
+          'docker build --network=host -t mlperf-nvidia:object_detection . ',
           should_log=True)
       _DownloadData(benchmark_spec.coco_data_dir,
                     posixpath.join('/data', 'coco2017'), vm)
 
     if GNMT in benchmark_spec.benchmark:
       vm.RemoteCommand(
-          f'cd training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/gnmt/implementations/pytorch && '
-          'sudo docker build --network=host -t mlperf-nvidia:rnn_translator . ',
+          f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/gnmt/implementations/pytorch && '
+          'docker build --network=host -t mlperf-nvidia:rnn_translator . ',
           should_log=True)
       _DownloadData(benchmark_spec.gnmt_data_dir,
                     posixpath.join('/data', 'gnmt'), vm)
 
     if SSD in benchmark_spec.benchmark:
       vm.RemoteCommand(
-          f'cd training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/ssd/implementations/pytorch && '
-          'sudo docker build --network=host -t mlperf-nvidia:single_stage_detector . ',
+          f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/ssd/implementations/pytorch && '
+          'docker build --network=host -t mlperf-nvidia:single_stage_detector . ',
           should_log=True)
       _DownloadData(benchmark_spec.coco_data_dir,
                     posixpath.join('/data', 'coco2017'), vm)
 
     if BERT in benchmark_spec.benchmark:
       vm.RemoteCommand(
-          f'cd training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/bert/implementations/pytorch && '
-          'sudo docker build --network=host -t mlperf-nvidia:language_model . ',
+          f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/bert/implementations/pytorch && '
+          'docker build --network=host -t mlperf-nvidia:language_model . ',
           should_log=True)
       _DownloadData(benchmark_spec.bert_data_dir,
                     posixpath.join('/data', 'bert_data'), vm)
@@ -437,14 +441,12 @@ def _GetChangesForMask(config_sed_input):
     config_sed_output: Output list of sed pairs for config_DGXA100.sh.
   """
   config_sed = config_sed_input
-  config_sed += [('SOLVER_MAX_ITER=.*',
-                  f'SOLVER_MAX_ITER={MASK_ITERATION.value}')]
   config_sed += [(r'WALLTIME_MINUTES=100',
-                  r'WALLTIME_MINUTES=100\n'
-                  r'export CONT=mlperf-nvidia:object_detection\n'
-                  r'export DATADIR=\/data\n'
-                  r'export PKLDIR=\/data\/coco2017\/pkl_coco\n'
-                  r'export NEXP=1')]
+                  (r'WALLTIME_MINUTES=100\n'
+                   r'export CONT=mlperf-nvidia:object_detection\n'
+                   r'export DATADIR=\/data\n'
+                   r'export PKLDIR=\/data\/coco2017\/pkl_coco\n'
+                   r'export NEXP=1'))]
   return config_sed
 
 
@@ -459,9 +461,11 @@ def _GetChangesForResnet(config_sed_input):
   """
   config_sed = config_sed_input
   config_sed += [(r'NUMEPOCHS=.*',
-                  fr'NUMEPOCHS={RESNET_EPOCHS.value}\n'
-                  r'export CONT=mlperf-nvidia:image_classification\n'
-                  r'export DATADIR=\/data\/imagenet')]
+                  (fr'NUMEPOCHS={RESNET_EPOCHS.value}\n'
+                   r'export CONT=mlperf-nvidia:image_classification\n'
+                   r'export DATADIR=\/data\/imagenet\n'
+                   r'export LOCAL_RANK=0'))]
+  config_sed += [('source .*config_DGXA100_common.sh', '')]
 
   return config_sed
 
@@ -477,15 +481,13 @@ def _GetChangesForBert(config_sed_input):
   """
   config_sed = config_sed_input
 
-  config_sed += [(r'source .*',
-                  r'export CONT=mlperf-nvidia:language_model\n'
-                  r'export NEXP=1')]
+  config_sed += [(r'source .*', (r'export CONT=mlperf-nvidia:language_model\n'
+                                 r'export NEXP=1'))]
   config_sed += [(r'DATADIR=.*',
                   r'DATADIR=\/data\/bert_data\/2048_shards_uncompressed')]
   config_sed += [(r'MAX_STEPS=.*', f'MAX_STEPS={BERT_STEPS.value}')]
-  config_sed += [(r'DATADIR_PHASE2=.*',
-                  r'DATADIR_PHASE2=\/data\/bert_data\/'
-                  r'2048_shards_uncompressed')]
+  config_sed += [(r'DATADIR_PHASE2=.*', (r'DATADIR_PHASE2=\/data\/bert_data\/'
+                                         r'2048_shards_uncompressed'))]
   config_sed += [(r'EVALDIR=.*',
                   r'EVALDIR=\/data\/bert_data\/eval_set_uncompressed')]
   config_sed += [(r'CHECKPOINTDIR=.*',
@@ -534,7 +536,7 @@ def _UpdateScripts(benchmark_spec, vm):
   model = 'maskrcnn' if MASK in benchmark else benchmark
   framework = 'mxnet' if RESNET in benchmark else 'pytorch'
   script_path = (
-      fr'$HOME/training_results_{MLPERF_VERSION}/NVIDIA/benchmarks/{model}/'
+      fr'$HOME/training_results_{VERSION.value}/NVIDIA/benchmarks/{model}/'
       fr'implementations/{framework}')
 
   config_files = [CONFIG]
@@ -589,7 +591,7 @@ def _CreateMetadataDict(benchmark_spec):
       'use_tpu': bool(benchmark_spec.tpus),
       'model_dir': benchmark_spec.model_dir,
       'model': benchmark_spec.benchmark,
-      'version': MLPERF_VERSION,
+      'version': VERSION.value,
   }
   vms = benchmark_spec.vms
   num_vms = len(vms)
@@ -683,13 +685,13 @@ def Run(benchmark_spec):
       run_path = (
           '$HOME/training_results_{version}/Google/benchmarks/{model}/tpu-{tpus}'
           .format(
-              version=MLPERF_VERSION,
+              version=VERSION.value,
               model=benchmark_spec.benchmark,
               tpus=benchmark_spec.tpu_groups['train'].GetAcceleratorType()))
       code_path = (
           '$HOME/training_results_{version}/Google/benchmarks/{model}/implementations/tpu-{tpus}-{model}'
           .format(
-              version=MLPERF_VERSION,
+              version=VERSION.value,
               model=benchmark_spec.benchmark,
               tpus=benchmark_spec.tpu_groups['train'].GetAcceleratorType()))
 
@@ -729,14 +731,23 @@ def Run(benchmark_spec):
                      GNMT: 'gnmt/implementations/pytorch',
                      SSD: 'ssd/implementations/pytorch',
                      BERT: 'bert/implementations/pytorch',}
-    benchmark_path = f'$HOME/training_results_{MLPERF_VERSION}/NVIDIA/benchmarks'
+    benchmark_path = f'$HOME/training_results_{VERSION.value}/NVIDIA/benchmarks'
     run_path = posixpath.join(benchmark_path,
                               run_sub_paths[benchmark_spec.benchmark])
     env = {
-        'DGXSYSTEM': DGXSYSTEM,
-        'NEXP': 1,
-        'PULL': 0,
-        'LOGDIR': f'/tmp/{benchmark_spec.benchmark}',
+        'DGXSYSTEM':
+            DGXSYSTEM,
+        'NEXP':
+            1,
+        'PULL':
+            0,
+        'LOGDIR':
+            f'/tmp/{benchmark_spec.benchmark}',
+        'CUDA_VISIBLE_DEVICES':
+            ','.join([
+                str(gpu_number)
+                for gpu_number in range(nvidia_driver.QueryNumberOfGpus(vm))
+            ]),
     }
     envs = {
         RESNET: {},
@@ -752,14 +763,12 @@ def Run(benchmark_spec):
     run_script = posixpath.join(run_path, 'run_with_docker.sh')
     vm_util.ReplaceText(vm, 'SYSLOGGING=1', 'SYSLOGGING=0', run_script)
     vm_util.ReplaceText(vm, 'docker exec -it', 'docker exec -t', run_script)
-    vm_util.ReplaceText(vm, 'nvidia-docker', 'sudo nvidia-docker', run_script)
-    vm_util.ReplaceText(vm, 'docker exec', 'sudo docker exec', run_script)
-    vm_util.ReplaceText(vm, 'docker container', 'sudo docker container',
-                        run_script)
     if benchmark_spec.benchmark == MASK:
       vm_util.ReplaceText(vm, r'_cont_mounts=\(',
                           r'_cont_mounts=\(\"--volume=\${PKLDIR}:\/pkl_coco\" ',
                           run_script)
+    elif benchmark_spec.benchmark == RESNET:
+      vm_util.ReplaceText(vm, r'mpirun.*sh', r'.\/run_and_time.sh', run_script)
 
     env = ' '.join(f'{key}={value}' for key, value in env.items())
     if nvidia_driver.CheckNvidiaGpuExists(vm):

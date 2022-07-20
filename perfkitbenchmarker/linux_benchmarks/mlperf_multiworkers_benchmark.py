@@ -84,11 +84,11 @@ def GetConfig(user_config):
   return config
 
 
-def CheckPrerequisites(benchmark_config):
+def CheckPrerequisites(_):
   """Verify that the required prerequisites are met.
 
   Args:
-    benchmark_config: Unused.
+    _: Unused.
 
   Raises:
     perfkitbenchmarker.errors.Setup.InvalidFlagConfigurationError:
@@ -367,14 +367,12 @@ def _GetChangesForMask(benchmark_spec, node_rank, script_path, nvprof_flags,
   run_sed = run_sed_input
   run_and_time_sed = run_and_time_sed_input
 
-  config_sed += [('SOLVER_MAX_ITER=.*',
-                  f'SOLVER_MAX_ITER={mlperf_benchmark.MASK_ITERATION.value}')]
   config_sed += [(r'WALLTIME_MINUTES=30',
-                  r'WALLTIME_MINUTES=30\n'
-                  r'export CONT=mlperf-nvidia:object_detection\n'
-                  r'export DATADIR=\/data\n'
-                  r'export PKLDIR=\/data\/coco2017\/pkl_coco\n'
-                  r'export NEXP=1')]
+                  (r'WALLTIME_MINUTES=30\n'
+                   r'export CONT=mlperf-nvidia:object_detection\n'
+                   r'export DATADIR=\/data\n'
+                   r'export PKLDIR=\/data\/coco2017\/pkl_coco\n'
+                   r'export NEXP=1'))]
 
   run_and_time_sed += [(r"'bind_launch'",
                         r"'bind_launch' "
@@ -500,9 +498,8 @@ def _GetChangesForBert(benchmark_spec, node_rank, nvprof_flags,
                   r'DATADIR=\/data\/bert_data\/2048_shards_uncompressed')]
   config_sed += [(r'MAX_STEPS=.*',
                   f'MAX_STEPS={mlperf_benchmark.BERT_STEPS.value}')]
-  config_sed += [(r'DATADIR_PHASE2=.*',
-                  r'DATADIR_PHASE2=\/data\/bert_data\/'
-                  r'2048_shards_uncompressed')]
+  config_sed += [(r'DATADIR_PHASE2=.*', (r'DATADIR_PHASE2=\/data\/bert_data\/'
+                                         r'2048_shards_uncompressed'))]
   config_sed += [(r'EVALDIR=.*',
                   r'EVALDIR=\/data\/bert_data\/eval_set_uncompressed')]
   config_sed += [(r'CHECKPOINTDIR=.*',
@@ -556,10 +553,10 @@ def _UpdateScripts(benchmark_spec, node_rank):
 
   if FLAGS.mlperf_keep_nccl_log:
     run_and_time_sed += [(r'#\!\/bin\/bash',
-                          r'#\!\/bin\/bash\n'
-                          r'export NCCL_DEBUG=INFO\n'
-                          r'export NCCL_DEBUG_SUBSYS=ALL\n'
-                          r'export NCCL_DEBUG_FILE=\/results\/%h.%p.nccl')]
+                          (r'#\!\/bin\/bash\n'
+                           r'export NCCL_DEBUG=INFO\n'
+                           r'export NCCL_DEBUG_SUBSYS=ALL\n'
+                           r'export NCCL_DEBUG_FILE=\/results\/%h.%p.nccl'))]
 
   nccl_exports = _GetNcclParams() if FLAGS.nccl_extra_params else r''
   run_and_time_sed += [(r'#!\/bin\/bash',
@@ -600,14 +597,13 @@ def _UpdateScripts(benchmark_spec, node_rank):
 
   nvprof_flags = r'-f -o \/results\/%h.%p.nvprof --profile-child-processes'
 
-  script_path = (
-      r'$HOME/training_results_{version}/NVIDIA/benchmarks/{model}'
-      r'/implementations/{framework}'
-      .format(version=mlperf_benchmark.MLPERF_VERSION,
-              model='maskrcnn' if mlperf_benchmark.MASK in benchmark
-              else benchmark,
-              framework='mxnet' if mlperf_benchmark.RESNET in benchmark
-              else 'pytorch'))
+  script_path = (r'$HOME/training_results_{version}/NVIDIA/benchmarks/{model}'
+                 r'/implementations/{framework}'.format(
+                     version=FLAGS.mlperf_training_version,
+                     model='maskrcnn'
+                     if mlperf_benchmark.MASK in benchmark else benchmark,
+                     framework='mxnet'
+                     if mlperf_benchmark.RESNET in benchmark else 'pytorch'))
 
   config_files = [CONFIG]
   if mlperf_benchmark.TRANSFORMER in benchmark:
@@ -769,7 +765,7 @@ def _CreateMetadataDict(benchmark_spec):
       'use_tpu': bool(benchmark_spec.tpus),
       'model_dir': benchmark_spec.model_dir,
       'model': benchmark_spec.benchmark,
-      'version': mlperf_benchmark.MLPERF_VERSION,
+      'version': FLAGS.mlperf_training_version,
   }
   return metadata
 
@@ -813,14 +809,13 @@ def Run(benchmark_spec):
   env_params['NEXP'] = 1
   env_params['LOGDIR'] = posixpath.join(vm_util.VM_TMP_DIR, benchmark)
 
-  script_path = (
-      '$HOME/training_results_{version}/NVIDIA/benchmarks/{model}'
-      r'/implementations/{framework}'
-      .format(version=mlperf_benchmark.MLPERF_VERSION,
-              model='maskrcnn' if mlperf_benchmark.MASK in benchmark
-              else benchmark,
-              framework='mxnet' if mlperf_benchmark.RESNET in benchmark
-              else 'pytorch'))
+  script_path = ('$HOME/training_results_{version}/NVIDIA/benchmarks/{model}'
+                 r'/implementations/{framework}'.format(
+                     version=FLAGS.mlperf_training_version,
+                     model='maskrcnn'
+                     if mlperf_benchmark.MASK in benchmark else benchmark,
+                     framework='mxnet'
+                     if mlperf_benchmark.RESNET in benchmark else 'pytorch'))
 
   benchmark_env_params = {
       mlperf_benchmark.TRANSFORMER: {
