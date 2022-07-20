@@ -13,12 +13,14 @@ import requests
 
 # executed remote commands
 NEED_PIP_27 = [
-    'curl https://bootstrap.pypa.io/pip/2.7/get-pip.py | sudo python -',
+    ('curl https://bootstrap.pypa.io/pip/2.7/get-pip.py -o get_pip.py && '
+     'sudo python get_pip.py'),
     'pip --version',
     'mkdir -p /opt/pkb && pip freeze | tee /opt/pkb/requirements.txt'
 ]
 NEED_PIP_38 = [
-    'curl https://bootstrap.pypa.io/pip/get-pip.py | sudo python3 -',
+    ('curl https://bootstrap.pypa.io/pip/get-pip.py -o get_pip.py && '
+     'sudo python3 get_pip.py'),
     'pip3 --version',
     'mkdir -p /opt/pkb && pip3 freeze | tee /opt/pkb/requirements.txt'
 ]
