@@ -31,6 +31,11 @@ import six
 
 FLAGS = flags.FLAGS
 
+_TRACE_VM_GROUPS = flags.DEFINE_list(
+    'trace_vm_groups', None, 'Run traces on all vms in the vm groups.'
+    'By default traces runs on all VMs, for client and server achitecture,'
+    'specify trace vm groups to servers to only collect metrics on server vms.')
+
 
 def Register(parsed_flags):
   """Registers the collector if FLAGS.<collector> is set.
@@ -120,9 +125,19 @@ class BaseCollector(object):
       raise ex
 
   def Start(self, sender, benchmark_spec):
-    """Install and start collector on all VMs in 'benchmark_spec'."""
+    """Install and start collector on VMs specified in trace vm groups'."""
     suffix = '-{0}-{1}'.format(benchmark_spec.uid, str(uuid.uuid4())[:8])
-    self.StartOnVms(sender, benchmark_spec.vms, suffix)
+    vms = []
+    if _TRACE_VM_GROUPS.value:
+      for vm_group in _TRACE_VM_GROUPS.value:
+        if vm_group in benchmark_spec.vm_groups:
+          vms += benchmark_spec.vm_groups[vm_group]
+        else:
+          logging.exception('TRACE_VM_GROUPS % does not exists.', vm_group)
+    else:
+      vms = benchmark_spec.vms
+
+    self.StartOnVms(sender, vms, suffix)
 
   def StartOnVms(self, sender, vms, id_suffix):
     """Install and start collector on given subset of vms.
