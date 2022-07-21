@@ -200,7 +200,7 @@ def MeasureDelete(
 
 
 def _GetVmOperationDataSamples(
-    operation_times: List[int], cluster_time: int, operation: str,
+    operation_times: List[int], cluster_time: float, operation: str,
     vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
   """Append samples from given data.
 
