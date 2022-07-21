@@ -166,6 +166,7 @@
 -   Retry table deletions in Cloud Bigtable benchmarks against a user managed
     instance and fail if the benchmark eventually fails to delete a table.
 -   Add support for Snowflake on Azure External Tables
+-   Fetch memtier benchmark runtime information
 
 ### Bug fixes and maintenance updates:
 
