@@ -80,6 +80,7 @@
 -   Add support for RHEL 9 on AWS, Azure, and GCP.
 -   Add GCP Optimized Rocky Linux 8 OS.
 -   Add mtu to os_metadata in linux_virtual_machine.
+-   Add support for TPC-DS/H benchmarks on AWS EMR Serverless.
 
 ### Enhancements:
 
