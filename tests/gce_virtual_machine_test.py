@@ -696,6 +696,21 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
       with self.assertRaises(errors.Resource.CreationError):
         vm._Create()
 
+  def testCreateVMSubnetworkNotReady(self):
+    fake_rets = [('stdout', """\
+(gcloud.compute.instances.create) Could not fetch resource:
+- The resource 'projects/myproject/regions/us-central1/subnetworks/mysubnet' is not ready""",
+                  1)]
+    with PatchCriticalObjects(fake_rets):
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT, machine_type={
+              'cpus': 1,
+              'memory': '1.0GiB',
+          })
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+      with self.assertRaises(errors.Resource.RetryableCreationError):
+        vm._Create()
+
   @parameterized.named_parameters(
       {
           'testcase_name':

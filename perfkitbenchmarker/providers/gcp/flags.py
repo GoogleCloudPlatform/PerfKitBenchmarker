@@ -161,6 +161,10 @@ GKE_API_OVERRIDE = flags.DEFINE_string(
     'gke_api_override',
     default=None,
     help='GKE API endpoint override. Defaults to unset (prod).')
+RETRY_GCE_SUBNETWORK_NOT_READY = flags.DEFINE_boolean(
+    'retry_gce_subnetwork_not_ready', True,
+    'Retry Subnetwork not ready when provisioning resources.'
+)
 
 
 def _ValidatePreemptFlags(flags_dict):

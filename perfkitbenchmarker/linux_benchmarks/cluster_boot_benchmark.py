@@ -53,8 +53,9 @@ cluster_boot:
       vm_count: null
   flags:
     # We don't want boot time samples to be affected from retrying, so don't
-    # retry cluster_boot when rate limited.
+    # retry VM creation failures.
     retry_on_rate_limited: False
+    retry_gce_subnetwork_not_ready: False
 """
 
 flags.DEFINE_boolean(

@@ -690,6 +690,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(
             'Interrupted before VM started')
       if _UNSUPPORTED_RESOURCE in stderr:
+        if (re.search(r"subnetworks/\S+' is not ready", stderr) and
+            gcp_flags.RETRY_GCE_SUBNETWORK_NOT_READY.value):
+          # Commonly occurs when simultaneously creating GKE clusters
+          raise errors.Resource.RetryableCreationError(
+              f'subnet is currently being updated:\n{stderr}')
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (stderr, retcode))
