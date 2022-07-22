@@ -59,13 +59,6 @@ TIME_SERIES_JSON = """
           "0": {"Count": 3, "Max Latency": 1},
           "1": {"Count": 4, "Max Latency": 2.1}
         }
-      },
-      "Runtime":
-      {
-        "Start time": 1657947420452,
-        "Finish time": 1657947420454,
-        "Total duration": 2,
-        "Time unit": "MILLISECONDS"
       }
     }
   }
@@ -100,12 +93,6 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     time_series_metadata.update(METADATA)
     latency_series_metadata = {'time_series': {'0': 1, '1': 2.1}}
     latency_series_metadata.update(METADATA)
-    runtime_info_metadata = {
-        'Start_time': 1657947420452,
-        'Finish_time': 1657947420454,
-        'Total_duration': 2,
-        'Time_unit': 'MILLISECONDS'
-    }
 
     expected_result = [
         sample.Sample(
@@ -140,11 +127,6 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             value=0,
             unit='ms',
             metadata=latency_series_metadata),
-        sample.Sample(
-            metric='Memtier Duration',
-            value=2,
-            unit='ms',
-            metadata=runtime_info_metadata),
     ]
     samples = []
     results = memtier.MemtierResult.Parse(TEST_OUTPUT, TIME_SERIES_JSON)
