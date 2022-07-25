@@ -251,3 +251,4 @@
 -   Support taking FLAGS.dpb_jar_file and FLAGS.dpb_wordcount_additional_args
     when running wordcount benchmark.
 -   Add some required types to BaseAppServiceSpec.
+-   Uses nic type of GVNIC by default (instead of VIRTIO_NET) on GCE

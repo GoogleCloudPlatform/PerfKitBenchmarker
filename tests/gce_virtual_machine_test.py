@@ -567,16 +567,16 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('network-tier=STANDARD', cmd)
 
   def testNetworkInterfaceDefault(self):
-    """Tests that VirtIONet is selected as the default virtual NIC."""
+    """Tests that gVNIC is selected as the default virtual NIC."""
     cmd, call_count = self._CreateVmCommand()
     self.assertEqual(call_count, 1)
-    self.assertIn('nic-type=VIRTIO_NET', cmd)
-
-  def testNetworkInterfaceGVNIC(self):
-    """Tests that gVNIC can be set as the virtual NIC."""
-    cmd, call_count = self._CreateVmCommand(gce_nic_type='GVNIC')
-    self.assertEqual(call_count, 1)
     self.assertIn('nic-type=GVNIC', cmd)
+
+  def testNetworkInterfaceVIRTIO(self):
+    """Tests that VirtIO can be set as the virtual NIC."""
+    cmd, call_count = self._CreateVmCommand(gce_nic_type='VIRTIO_NET')
+    self.assertEqual(call_count, 1)
+    self.assertIn('nic-type=VIRTIO_NET', cmd)
 
   def testEgressBandwidthTier(self):
     """Tests that egress bandwidth can be set as tier 1."""

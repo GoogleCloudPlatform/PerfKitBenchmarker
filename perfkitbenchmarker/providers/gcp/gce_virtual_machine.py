@@ -398,6 +398,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   _LM_NOTICE_SCRIPT = 'gce_maintenance_notice.py'
   _LM_NOTICE_LOG = 'gce_maintenance_notice.log'
 
+  SUPPORTS_GVNIC = True
+
   def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
 
@@ -441,6 +443,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_nic_type = FLAGS.gce_nic_type
+    if not self.SUPPORTS_GVNIC:
+      logging.warning('Changing gce_nic_type to VIRTIO_NET')
+      self.gce_nic_type = 'VIRTIO_NET'
     self.gce_egress_bandwidth_tier = gcp_flags.EGRESS_BANDWIDTH_TIER.value
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
     # Default to GCE default (Live Migration)
@@ -1188,6 +1193,7 @@ class Debian9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian9Mixin):
   DEFAULT_IMAGE_FAMILY = 'debian-9'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+  SUPPORTS_GVNIC = False
 
   def _BeforeSuspend(self):
     self.InstallPackages('dbus')
@@ -1198,6 +1204,7 @@ class Debian10BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian10Mixin):
   DEFAULT_IMAGE_FAMILY = 'debian-10'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+  SUPPORTS_GVNIC = False
 
 
 class Debian11BasedGceVirtualMachine(
@@ -1265,6 +1272,7 @@ class CoreOsBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CoreOsMixin):
   DEFAULT_IMAGE_FAMILY = 'fedora-coreos-stable'
   DEFAULT_IMAGE_PROJECT = 'fedora-coreos-cloud'
+  SUPPORTS_GVNIC = False
 
   def __init__(self, vm_spec):
     super(CoreOsBasedGceVirtualMachine, self).__init__(vm_spec)
@@ -1386,6 +1394,7 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
 class Windows2012CoreGceVirtualMachine(
     BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2012-r2-core'
+  SUPPORTS_GVNIC = False
 
 
 class Windows2016CoreGceVirtualMachine(
@@ -1407,6 +1416,7 @@ class Windows2012DesktopGceVirtualMachine(
     BaseWindowsGceVirtualMachine,
     windows_virtual_machine.Windows2012DesktopMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
+  SUPPORTS_GVNIC = False
 
 
 class Windows2016DesktopGceVirtualMachine(
@@ -1439,6 +1449,7 @@ class Windows2019DesktopSQLServer2017EnterpriseGceVirtualMachine(
     windows_virtual_machine.Windows2019SQLServer2017Enterprise):
   DEFAULT_IMAGE_FAMILY = 'sql-ent-2017-win-2019'
   DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+  SUPPORTS_GVNIC = False
 
 
 class Windows2019DesktopSQLServer2019StandardGceVirtualMachine(
@@ -1453,6 +1464,7 @@ class Windows2019DesktopSQLServer2019EnterpriseGceVirtualMachine(
     windows_virtual_machine.Windows2019SQLServer2019Enterprise):
   DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2019'
   DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+  SUPPORTS_GVNIC = False
 
 
 class Windows2022DesktopSQLServer2019StandardGceVirtualMachine(
@@ -1467,6 +1479,7 @@ class Windows2022DesktopSQLServer2019EnterpriseGceVirtualMachine(
     windows_virtual_machine.Windows2022SQLServer2019Enterprise):
   DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2022'
   DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+  SUPPORTS_GVNIC = False
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
