@@ -245,7 +245,8 @@
 -   Add option to publish to a subfolder in cloud storage publisher.
 -   Parse resulting output matrix by indexing from the bottom up instead of top
     down.
--   Double build time for docker images, for a more complex build script.
+-   Double build time for all cloud's docker images, for a more complex build
+    script.
 -   Add required dataflow option --gcpTempLocation and --region to
     gcp_dpb_dataflow provider.
 -   Support taking FLAGS.dpb_jar_file and FLAGS.dpb_wordcount_additional_args
