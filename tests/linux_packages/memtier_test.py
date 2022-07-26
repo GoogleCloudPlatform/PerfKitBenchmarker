@@ -59,6 +59,13 @@ TIME_SERIES_JSON = """
           "0": {"Count": 3, "Max Latency": 1},
           "1": {"Count": 4, "Max Latency": 2.1}
         }
+      },
+      "Runtime":
+      {
+        "Start time": 1657947420452,
+        "Finish time": 1657947420454,
+        "Total duration": 2,
+        "Time unit": "MILLISECONDS"
       }
     }
   }
@@ -68,6 +75,83 @@ TIME_SERIES_JSON = """
 class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def testParseResults(self):
+    get_metadata = {
+        'histogram': json.dumps([
+            {'microsec': 0.0, 'count': 4500},
+            {'microsec': 2000.0, 'count': 4500}])
+    }
+    get_metadata.update(METADATA)
+    set_metadata = {
+        'histogram': json.dumps([
+            {'microsec': 0.0, 'count': 50},
+            {'microsec': 1000.0, 'count': 50},
+            {'microsec': 2000.0, 'count': 50},
+            {'microsec': 3000.0, 'count': 150},
+            {'microsec': 4000.0, 'count': 200},
+            {'microsec': 5000.0, 'count': 200},
+            {'microsec': 6000.0, 'count': 200},
+            {'microsec': 7000.0, 'count': 50},
+            {'microsec': 8000.0, 'count': 40},
+            {'microsec': 9000.0, 'count': 10}])
+    }
+    set_metadata.update(METADATA)
+
+    time_series_metadata = {'time_series': {'0': 3, '1': 4}}
+    time_series_metadata.update(METADATA)
+    latency_series_metadata = {'time_series': {'0': 1, '1': 2.1}}
+    latency_series_metadata.update(METADATA)
+    runtime_info_metadata = {
+        'Start_time': 1657947420452,
+        'Finish_time': 1657947420454,
+        'Total_duration': 2,
+        'Time_unit': 'MILLISECONDS'
+    }
+
+    expected_result = [
+        sample.Sample(
+            metric='Ops Throughput',
+            value=44006.55,
+            unit='ops/s',
+            metadata=METADATA),
+        sample.Sample(
+            metric='KB Throughput',
+            value=1828.0,
+            unit='KB/s',
+            metadata=METADATA),
+        sample.Sample(
+            metric='Latency', value=1.54, unit='ms', metadata=METADATA),
+        sample.Sample(
+            metric='get latency histogram',
+            value=0,
+            unit='',
+            metadata=get_metadata),
+        sample.Sample(
+            metric='set latency histogram',
+            value=0,
+            unit='',
+            metadata=set_metadata),
+        sample.Sample(
+            metric='Ops Time Series',
+            value=0,
+            unit='ops',
+            metadata=time_series_metadata),
+        sample.Sample(
+            metric='Max Latency Time Series',
+            value=0,
+            unit='ms',
+            metadata=latency_series_metadata),
+        sample.Sample(
+            metric='Memtier Duration',
+            value=2,
+            unit='ms',
+            metadata=runtime_info_metadata),
+    ]
+    samples = []
+    results = memtier.MemtierResult.Parse(TEST_OUTPUT, TIME_SERIES_JSON)
+    samples.extend(results.GetSamples(METADATA))
+    self.assertSampleListsEqualUpToTimestamp(samples, expected_result)
+
+  def testParseResults_no_time_series(self):
     get_metadata = {
         'histogram': json.dumps([
             {'microsec': 0.0, 'count': 4500},
@@ -117,19 +201,9 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             value=0,
             unit='',
             metadata=set_metadata),
-        sample.Sample(
-            metric='Ops Time Series',
-            value=0,
-            unit='ops',
-            metadata=time_series_metadata),
-        sample.Sample(
-            metric='Max Latency Time Series',
-            value=0,
-            unit='ms',
-            metadata=latency_series_metadata),
     ]
     samples = []
-    results = memtier.MemtierResult.Parse(TEST_OUTPUT, TIME_SERIES_JSON)
+    results = memtier.MemtierResult.Parse(TEST_OUTPUT, None)
     samples.extend(results.GetSamples(METADATA))
     self.assertSampleListsEqualUpToTimestamp(samples, expected_result)
 
