@@ -90,7 +90,7 @@ class GceNfsService(nfs_service.BaseNfsService):
     return self.zone
 
   def _NfsCommand(self, verb, *args):
-    cmd = [FLAGS.gcloud_path, 'alpha', '--quiet', '--format', 'json']
+    cmd = [FLAGS.gcloud_path, '--quiet', '--format', 'json']
     if FLAGS.project:
       cmd += ['--project', FLAGS.project]
     cmd += ['filestore', 'instances', verb, self.name]
