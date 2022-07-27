@@ -15,6 +15,7 @@
 """Module containing apache2 installation and setup functions."""
 
 import tempfile
+
 from perfkitbenchmarker import virtual_machine
 
 
@@ -45,22 +46,47 @@ def SetupServer(vm: virtual_machine.VirtualMachine, content_bytes: int) -> None:
         <title>My test page</title>
       </head>
       <body>
-        <img src="cat.png" alt="My test image">
+        <img src="image.png" alt="My test image">
         <p> {'a' * content_bytes} </p>
       </body>
     </html>
     '''.encode())
-    vm.RemoteCopy(tmp.name, '/var/www/html/index.html', True)
+    vm.PushFile(tmp.name, '/var/www/html/index.html')
 
   # Set up read access to index.html
   vm.RemoteCommand('sudo chmod 644 /var/www/html/index.html')
 
   # Download sample image to serve
   vm.RemoteCommand(
-      'wget --output-document=/var/www/html/cat.png https://http.cat/100'
-  )
+      'wget --output-document=/var/www/html/image.png https://http.cat/100')
+
+  # Enable status module if not already enabled for Apache server monitoring
+  output, _ = vm.RemoteCommand('ls /etc/apache2/mods-enabled | grep status*')
+  if not output:
+    vm.RemoteCommand('sudo a2enmod status')
 
 
 def StartServer(vm: virtual_machine.VirtualMachine) -> None:
-  """Starts the apache server on the VM."""
-  vm.RemoteCommand('sudo systemctl reload apache2')
+  """Starts the apache server on the VM.
+
+  Uses default multi-processing module mpm_event. To verify the module in use,
+  run the command 'apache2ctl -M'.
+
+  Args:
+    vm: The server virtual machine that will run Apache.
+  """
+  vm.RemoteCommand('sudo service apache2 restart')
+
+
+def GetApacheCPUSeconds(vm: virtual_machine.VirtualMachine) -> float:
+  """Returns the total number of CPU seconds Apache has used."""
+  output, _ = vm.RemoteCommand(
+      'curl -s http://localhost/server-status?auto | '
+      'grep \'CPUSystem\\|CPUUser\''
+  )
+
+  cpu_use = 0.0
+  for line in output.splitlines():
+    cpu_use += float(line.split(':')[1].strip())
+
+  return cpu_use

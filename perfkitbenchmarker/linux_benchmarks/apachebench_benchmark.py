@@ -17,9 +17,12 @@
 See https://httpd.apache.org/docs/2.4/programs/ab.html#synopsis for more info.
 """
 
+from __future__ import annotations
+
 import dataclasses
 import io
-from typing import Any, Dict, List
+import logging
+from typing import Any, Dict, List, Optional
 
 from absl import flags
 import pandas as pd
@@ -33,13 +36,53 @@ from perfkitbenchmarker.linux_packages import apache2_server
 
 
 @dataclasses.dataclass
-class ApacheBenchConfig:
-  """Config settings used for a run."""
+class ApacheBenchIpConfig:
+  """Ip Config settings used for a run."""
   ip_type: str
   server_attr: str
   output_path: str
-  percentile_output_path: str
   raw_request_data_path: str
+
+
+@dataclasses.dataclass
+class ApacheBenchRunConfig:
+  """Run config settings used for a run."""
+  num_requests: int
+  concurrency: int
+  keep_alive: bool
+  http_method: str
+  socket_timeout: int
+  timelimit: Optional[int]
+  server_content_size: int
+  client_vms: int
+
+  def GetCommand(self, ip_config: ApacheBenchIpConfig,
+                 server: virtual_machine.VirtualMachine) -> str:
+    """Builds Apache Bench command with class fields.
+
+    Args:
+      ip_config: Ip config object containing info for this run.
+      server: The Virtual Machine that is running Apache.
+
+    Returns:
+      String representing the command to run Apache Bench.
+    """
+    cmd = 'ab -r '
+
+    if self.keep_alive:
+      cmd += '-k '
+    if self.timelimit:
+      cmd += f'-t {self.timelimit} '
+
+    cmd += (f'-n {self.num_requests} '
+            f'-c {self.concurrency} '
+            f'-m {self.http_method} '
+            f'-s {self.socket_timeout} '
+            f'-g {ip_config.raw_request_data_path} '
+            f'http://{getattr(server, ip_config.server_attr)}:{_PORT}/ '
+            f'1> {ip_config.output_path}')
+
+    return cmd
 
 
 @dataclasses.dataclass
@@ -61,6 +104,9 @@ class ApacheBenchResults:
   total_transferred_unit: str
   html_transferred: int
   html_transferred_unit: str
+  histogram: sample._Histogram
+  raw_results: List[str]
+  cpu_seconds: Optional[float] = None
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Generate a list of samples based on the data stored in this object."""
@@ -78,8 +124,21 @@ class ApacheBenchResults:
         sample.Sample('Total transferred', self.total_transferred,
                       self.total_transferred_unit, metadata),
         sample.Sample('HTML transferred', self.html_transferred,
-                      self.html_transferred_unit, metadata)
+                      self.html_transferred_unit, metadata),
+        sample.Sample('CPU Seconds', self.cpu_seconds, 'seconds', metadata),
+        sample.CreateHistogramSample(self.histogram, '', '', 'ms', metadata,
+                                     'ApacheBench Histogram'),
+        sample.Sample('Raw Request Times', 0, '',
+                      {**metadata, **{'raw_requests': self.raw_results}}),
     ]
+
+
+class ApacheBenchRunMode(object):
+  """Enum of options for --apachebench_run_mode."""
+  MAX_THROUGHPUT = 'MAX_THROUGHPUT'
+  STANDARD = 'STANDARD'
+
+  ALL = (MAX_THROUGHPUT, STANDARD)
 
 
 BENCHMARK_NAME = 'apachebench'
@@ -99,19 +158,15 @@ FLAGS = flags.FLAGS
 
 # Default port for Apache
 _PORT = 80
+# Max number of concurrent requests each VM can make (limited by sockets)
+_MAX_CONCURRENCY_PER_VM = 1024
 # Constants used to differentiate between runs using internal or external ip
-_INTERNAL_IP_CONFIG = ApacheBenchConfig(
-        'internal-ip',
-        'internal_ip',
-        'internal_results.txt',
-        'internal_ip_percentiles.csv',
-        'internal_ip_request_times.tsv')
-_EXTERNAL_IP_CONFIG = ApacheBenchConfig(
-        'external-ip',
-        'ip_address',
-        'external_results.txt',
-        'external_ip_percentiles.csv',
-        'external_ip_request_times.tsv')
+_INTERNAL_IP_CONFIG = ApacheBenchIpConfig('internal-ip', 'internal_ip',
+                                          'internal_results.txt',
+                                          'internal_ip_request_times.tsv')
+_EXTERNAL_IP_CONFIG = ApacheBenchIpConfig('external-ip', 'ip_address',
+                                          'external_results.txt',
+                                          'external_ip_request_times.tsv')
 # Map from ip_addresses flag enum to list of ip configs to use
 _IP_ADDRESSES_TO_IP_CONFIGS = {
     vm_util.IpAddressSubset.INTERNAL: [_INTERNAL_IP_CONFIG],
@@ -141,7 +196,7 @@ _SOCKET_TIMEOUT = flags.DEFINE_integer(
 _TIMELIMIT = flags.DEFINE_integer(
     'apachebench_timelimit',
     default=None,
-    help='Maximum number of seconds to spend for benchmarking.'
+    help='Maximum number of seconds to spend for benchmarking. '
     'After the timelimit is reached, additional requests will not be sent.')
 _APACHE_SERVER_CONTENT_SIZE = flags.DEFINE_integer(
     'apachebench_server_content_size',
@@ -151,11 +206,31 @@ _CLIENT_VMS = flags.DEFINE_integer(
     'apachebench_client_vms',
     default=1,
     help='The number of client VMs to use.')
+flags.register_validator('apachebench_client_vms',
+                         lambda value: value == 1,
+                         message='The number of client VMs should be 1 as '
+                         'metric combination logic is not yet implemented.')
+_RUN_MODE = flags.DEFINE_enum(
+    'apachebench_run_mode',
+    default=ApacheBenchRunMode.STANDARD,
+    enum_values=ApacheBenchRunMode.ALL,
+    help='Specify which run mode to use.'
+    'MAX_THROUGHPUT: Searches for max concurrency level such that proportion '
+    'of requests that fail < apachebench_max_fail_prop. '
+    'STANDARD: Runs Apache Bench with specified flags.')
+_MAX_CONCURRENCY = flags.DEFINE_integer(
+    'apachebench_max_concurrency',
+    default=1000,
+    upper_bound=_MAX_CONCURRENCY_PER_VM,
+    help='The maximum number of concurrent requests to use when searching for '
+    'max throughput (when --apachebench_run_mode=MAX_THROUGHPUT).')
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
+  """Returns config for ApacheBench benchmark."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   config['vm_groups']['client']['vm_count'] = _CLIENT_VMS.value
+
   return config
 
 
@@ -172,20 +247,16 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   apache2_server.StartServer(server)
 
 
-def _ParseHistogramFromFile(vm: virtual_machine.VirtualMachine, path: str,
-                            column: str = 'ttime') -> sample._Histogram:
-  """Loads tsv file created by ApacheBench at path in the VM into a histogram.
-
-  The tsv located by path inside of the virtual machine vm will be loaded and
-  used to create a sample._Histogram.
+def _ParseRawRequestData(vm: virtual_machine.VirtualMachine, path: str,
+                         column: str = 'ttime') -> List[str]:
+  """Loads column of tsv file created by ApacheBench into a list.
 
   Args:
     vm: The Virtual Machine that has run an ApacheBench (AB) benchmark.
     path: The path to the tsv file output inside of the VM which ran AB.
-    column: The column with numeric data to create the Histogram from.
+    column: The column with numeric data to create the list from.
   Returns:
-    sample._Histogram created from the data in the column of the tsv file
-    specified.
+    List created from the data in the column of the tsv file specified.
 
   Column meanings:
     ctime: Time to establish a connection with the server.
@@ -203,56 +274,26 @@ def _ParseHistogramFromFile(vm: virtual_machine.VirtualMachine, path: str,
   """
   tsv, _ = vm.RemoteCommand(f'cat {path}')
   data_frame = pd.read_csv(io.StringIO(tsv), sep='\t')
+  data_frame = data_frame.sort_values('seconds')
 
-  return sample.MakeHistogram(data_frame[column].tolist())
-
-
-def _ParsePercentilesFromFile(vm: virtual_machine.VirtualMachine,
-                              path: str) -> Dict[str, str]:
-  """Loads the csv file created by ApacheBench at path in the VM into a dict.
-
-  The csv located by path inside of the virtual machine vm will be loaded. For
-  each percentage served, a set of key/value pairs is created.
-
-  Args:
-    vm: The Virtual Machine that has run an ApacheBench (AB) benchmark.
-    path: The path to the csv file output inside of the VM which ran AB.
-  Returns:
-    Dictonary where each key represents a request percentile
-    and the value for 'x' represents the time in ms it took for a request in the
-    xth percentile to run.
-
-  Example ApacheBench percentile output.
-
-  percent, response time
-  0,10
-  1,12
-  2,15
-  """
-  csv, _ = vm.RemoteCommand(f'cat {path}')
-  csv = csv.strip()
-  result = {}
-
-  # Skip header line
-  for row in csv.split('\n')[1:]:
-    percent, response_time = row.split(',')
-    result[percent] = response_time
-
-  return result
+  return data_frame[column].tolist()
 
 
-def _ParseResultsFromFile(
-    vm: virtual_machine.VirtualMachine,
-    path: str,) -> ApacheBenchResults:
-  """Loads the txt file created by ApacheBench at path in the VM into a dict.
+def _ParseHistogramFromFile(vm: virtual_machine.VirtualMachine, path: str,
+                            column: str = 'ttime') -> sample._Histogram:
+  """Loads tsv file created by ApacheBench at path in the VM into a histogram."""
+  data = _ParseRawRequestData(vm, path, column)
+  return sample.MakeHistogram(list(map(float, data)))
 
-  The txt located by path inside of the virtual machine vm will be loaded. For
-  each row of relevant results, a set of key/value pairs is created. The keys
-  will all be prepended with `apachebench` or similar.
+
+def _ParseResults(vm: virtual_machine.VirtualMachine,
+                  ip_config: ApacheBenchIpConfig) -> ApacheBenchResults:
+  """Parse results of ApacheBench into an ApacheBenchResults object.
 
   Args:
     vm: The Virtual Machine that has run an ApacheBench (AB) benchmark.
-    path: The path to the output file inside of the VM which ran AB.
+    ip_config: The ApacheBenchIpConfig used.
+
   Returns:
     ApacheBenchResults object populated with the results read from path.
 
@@ -274,7 +315,7 @@ def _ParseResultsFromFile(
   Time per request: 10.044 [ms] (mean, across all concurrent requests)
   Transfer rate: 5747.06 [Kbytes/sec] received
   """
-  output, _ = vm.RemoteCommand(f'cat {path}')
+  output, _ = vm.RemoteCommand(f'cat {ip_config.output_path}')
 
   complete_requests = regex_util.ExtractExactlyOneMatch(
       r'Complete requests:\s+(\d+)', output)
@@ -319,93 +360,133 @@ def _ParseResultsFromFile(
       total_transferred=int(total_transferred),
       total_transferred_unit=total_transferred_unit,
       html_transferred=int(html_transferred),
-      html_transferred_unit=html_transferred_unit)
+      html_transferred_unit=html_transferred_unit,
+      histogram=_ParseHistogramFromFile(vm, ip_config.raw_request_data_path),
+      raw_results=_ParseRawRequestData(vm, ip_config.raw_request_data_path))
 
 
 def GetMetadata(results: ApacheBenchResults,
-                config: ApacheBenchConfig) -> Dict[str, Any]:
+                run_config: ApacheBenchRunConfig,
+                ip_config: ApacheBenchIpConfig) -> Dict[str, Any]:
   """Returns the apachebench metadata as a dictonary.
 
   Args:
     results: The dictionary returned by _Run.
-    config: The ApacheBenchConfig passed to _Run.
+    run_config: The ApacheBenchRunConfig passed to _Run.
+    ip_config: The ApacheBenchIpConfig passed to _Run.
   Returns:
     A dictonary of metadata to be included in all ApacheBench samples.
   """
 
-  metadata = {
-      'apachebench_requests': _NUM_REQUESTS.value,
-      'apachebench_concurrency_level': _CONCURRENCY.value,
-      'apachebench_keep_alive': _KEEP_ALIVE.value,
-      'apachebench_http_method': _HTTP_METHOD.value,
-      'apachebench_socket_timeout': _SOCKET_TIMEOUT.value,
-      'apachebench_timelimit': _TIMELIMIT.value,
-      'apachebench_ip_type': config.ip_type,
-      'apachebench_client_vms': _CLIENT_VMS.value,
+  return {
+      'apachebench_requests': run_config.num_requests,
+      'apachebench_concurrency_level': run_config.concurrency,
+      'apachebench_keep_alive': run_config.keep_alive,
+      'apachebench_http_method': run_config.http_method,
+      'apachebench_socket_timeout': run_config.socket_timeout,
+      'apachebench_timelimit': run_config.timelimit,
+      'apachebench_server_content_size': run_config.server_content_size,
+      'apachebench_ip_type': ip_config.ip_type,
+      'apachebench_client_vms': run_config.client_vms,
       'apachebench_complete_requests': results.complete_requests,
-      'apachebench_time_taken_for_tests':
-          f'{results.time_taken_for_tests} {results.time_taken_for_tests_unit}'
+      'apachebench_time_taken_for_tests': results.time_taken_for_tests,
+      'apachebench_run_mode': _RUN_MODE.value
   }
 
-  return metadata
 
-
-def _Run(benchmark_spec: bm_spec.BenchmarkSpec,
-         config: ApacheBenchConfig) -> List[ApacheBenchResults]:
+def _Run(client_vms: List[virtual_machine.VirtualMachine],
+         server_vm: virtual_machine.VirtualMachine,
+         run_config: ApacheBenchRunConfig,
+         ip_config: ApacheBenchIpConfig) -> ApacheBenchResults:
   """Runs apachebench benchmark."""
-  vm_groups = benchmark_spec.vm_groups
-  client_vms = vm_groups['client']
-  server = vm_groups['server'][0]
-
-  # Building the ApacheBench command with appropriate flags
-  cmd = 'ab -r '
-
-  if _KEEP_ALIVE.value:
-    cmd += '-k '
-  if _TIMELIMIT.value:
-    cmd += f'-t {_TIMELIMIT.value} '
-
-  cmd += (
-      f'-n {_NUM_REQUESTS.value} '
-      f'-c {_CONCURRENCY.value} '
-      f'-m {_HTTP_METHOD.value} '
-      f'-s {_SOCKET_TIMEOUT.value} '
-      f'-e {config.percentile_output_path} '
-      f'-g {config.raw_request_data_path} '
-      f'http://{getattr(server, config.server_attr)}:{_PORT}/ '
-      f'1> {config.output_path}')
-
+  apache2_server.StartServer(server_vm)
+  cmd = run_config.GetCommand(ip_config, server_vm)
   vm_util.RunThreaded(lambda vm: vm.RemoteCommand(cmd), client_vms)
 
-  return vm_util.RunThreaded(
-      lambda vm: _ParseResultsFromFile(vm, config.output_path), client_vms)
+  result = vm_util.RunThreaded(lambda vm: _ParseResults(vm, ip_config),
+                               client_vms)[0]
+
+  result.cpu_seconds = apache2_server.GetApacheCPUSeconds(server_vm)
+  return result
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs apachebench and reports the results."""
+  server_vm = benchmark_spec.vm_groups['server'][0]
   client_vms = benchmark_spec.vm_groups['client']
   samples = []
 
-  for config in _IP_ADDRESSES_TO_IP_CONFIGS[FLAGS.ip_addresses]:
-    results = _Run(benchmark_spec, config)
+  run_config = ApacheBenchRunConfig(
+      num_requests=_NUM_REQUESTS.value,
+      concurrency=_CONCURRENCY.value,
+      keep_alive=_KEEP_ALIVE.value,
+      http_method=_HTTP_METHOD.value,
+      socket_timeout=_SOCKET_TIMEOUT.value,
+      timelimit=_TIMELIMIT.value,
+      server_content_size=_APACHE_SERVER_CONTENT_SIZE.value,
+      client_vms=_CLIENT_VMS.value)
 
-    # Format pkb-style samples
-    for vm, result in zip(client_vms, results):
-      metadata = GetMetadata(result, config)
-      metadata['client_vm'] = vm.hostname
+  if _RUN_MODE.value == ApacheBenchRunMode.STANDARD:
+    for ip_config in _IP_ADDRESSES_TO_IP_CONFIGS[FLAGS.ip_addresses]:
+      clients = client_vms
+      result = _Run(clients, server_vm, run_config, ip_config)
+      metadata = GetMetadata(result, run_config, ip_config)
 
       samples += result.GetSamples(metadata)
 
-      # Add percentile data to a sample
-      percentiles = _ParsePercentilesFromFile(vm, config.percentile_output_path)
-      percentiles.update(metadata)
-      samples.append(
-          sample.Sample('ApacheBench Percentiles', 0, '', percentiles))
+  if _RUN_MODE.value == ApacheBenchRunMode.MAX_THROUGHPUT:
+    for ip_config in _IP_ADDRESSES_TO_IP_CONFIGS[FLAGS.ip_addresses]:
+      results = {}
+      min_val, max_val = 1, _MAX_CONCURRENCY.value
+      # Ternary search for max number of concurrent requests
+      while min_val < max_val:
+        logging.info(
+            'Searching for max throughput in concurrency range [%d, %d]',
+            min_val, max_val)
+        mid1 = min_val + (max_val - min_val) // 3
+        mid2 = max_val - (max_val - min_val) // 3
 
-      # Add a total request time histogram sample
-      histogram = _ParseHistogramFromFile(vm, config.raw_request_data_path)
-      samples.append(sample.CreateHistogramSample(
-          histogram, '', '', 'ms', metadata, 'ApacheBench Histrogram'))
+        mid1_result = results.get(mid1)
+        if not mid1_result:
+          run_config = dataclasses.replace(run_config, concurrency=mid1)
+          mid1_result = _Run(client_vms, server_vm, run_config, ip_config)
+
+        logging.info(
+            'mid1 concurrency: %d, failed requests: %d, requests/second: %f',
+            mid1, mid1_result.failed_requests, mid1_result.requests_per_second)
+        if mid1_result.failed_requests > 0:
+          max_val = mid1 - 1
+          continue
+
+        mid2_result = results.get(mid2)
+        if not mid2_result:
+          run_config = dataclasses.replace(run_config, concurrency=mid2)
+          mid2_result = _Run(client_vms, server_vm, run_config, ip_config)
+
+        logging.info(
+            'mid2 concurrency: %d, failed requests: %d, requests/second: %f',
+            mid2, mid2_result.failed_requests, mid2_result.requests_per_second)
+        if mid2_result.failed_requests > 0:
+          max_val = mid2 - 1
+          continue
+
+        if mid1_result.requests_per_second > mid2_result.requests_per_second:
+          max_val = mid2 - 1
+        else:
+          min_val = mid1 + 1
+
+        results[mid1] = mid1_result
+        results[mid2] = mid2_result
+
+      run_config = dataclasses.replace(run_config, concurrency=max_val)
+      best_result = results.get(max_val)
+      if not best_result:
+        best_result = _Run(client_vms, server_vm, run_config, ip_config)
+
+      metadata = GetMetadata(best_result, run_config, ip_config)
+      samples += best_result.GetSamples(metadata)
+      samples.append(
+          sample.Sample('Max Concurrent Requests', max_val, '', metadata))
 
   return samples
 
