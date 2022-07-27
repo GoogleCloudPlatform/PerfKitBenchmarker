@@ -1289,7 +1289,7 @@ class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
 
 class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.CoreOsMixin):
-  IMAGE_NAME_FILTER = 'fedora-coreos-*-hvm'
+  IMAGE_NAME_FILTER = 'fedora-coreos-*'
   # CoreOS only distinguishes between stable and testing in the description
   IMAGE_DESCRIPTION_FILTER = 'Fedora CoreOS stable *'
   IMAGE_OWNER = CENTOS_IMAGE_PROJECT
