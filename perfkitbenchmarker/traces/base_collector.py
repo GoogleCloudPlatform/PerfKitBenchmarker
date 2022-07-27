@@ -73,6 +73,7 @@ class BaseCollector(object):
     self._pid_files = {}
     self._role_mapping = {}  # mapping vm role to output file
     self._start_time = 0
+    self.vm_groups = {}
 
     if not os.path.isdir(self.output_directory):
       raise IOError('collector output directory does not exist: {0}'.format(
@@ -110,7 +111,7 @@ class BaseCollector(object):
   def _StopOnVm(self, vm, vm_role):
     """Stop collector on 'vm' and copy the files back."""
     if vm.name not in self._pid_files:
-      logging.warn('No collector PID for %s', vm.name)
+      logging.warning('No collector PID for %s', vm.name)
       return
     else:
       with self._lock:
@@ -127,16 +128,15 @@ class BaseCollector(object):
   def Start(self, sender, benchmark_spec):
     """Install and start collector on VMs specified in trace vm groups'."""
     suffix = '-{0}-{1}'.format(benchmark_spec.uid, str(uuid.uuid4())[:8])
-    vms = []
     if _TRACE_VM_GROUPS.value:
       for vm_group in _TRACE_VM_GROUPS.value:
         if vm_group in benchmark_spec.vm_groups:
-          vms += benchmark_spec.vm_groups[vm_group]
+          self.vm_groups[vm_group] = benchmark_spec.vm_groups[vm_group]
         else:
-          logging.exception('TRACE_VM_GROUPS % does not exists.', vm_group)
+          logging.warning('TRACE_VM_GROUPS % does not exists.', vm_group)
     else:
-      vms = benchmark_spec.vms
-
+      self.vm_groups = benchmark_spec.vm_groups
+    vms = sum(self.vm_groups.values(), [])
     self.StartOnVms(sender, vms, suffix)
 
   def StartOnVms(self, sender, vms, id_suffix):
@@ -153,16 +153,15 @@ class BaseCollector(object):
     self._start_time = time.time()
     return
 
-  def Stop(self, sender, benchmark_spec, name=''):
-    """Stop collector on all VMs in 'benchmark_spec', fetch results."""
-    self.StopOnVms(sender, benchmark_spec.vm_groups, name)
+  def Stop(self, sender, benchmark_spec, name=''):  # pylint: disable=unused-argument
+    """Stop collector on VMs."""
+    self.StopOnVms(sender, name)
 
-  def StopOnVms(self, sender, vm_groups, name):
+  def StopOnVms(self, sender, name):
     """Stop collector on given subset of vms, fetch results.
 
     Args:
       sender: sender of the event to stop the collector.
-      vm_groups: vm_groups to stop the collector on.
       name: name of event to be stopped.
     """
     events.record_event.send(sender, event=name,
@@ -170,7 +169,7 @@ class BaseCollector(object):
                              end_timestamp=time.time(),
                              metadata={})
     args = []
-    for role, vms in six.iteritems(vm_groups):
+    for role, vms in six.iteritems(self.vm_groups):
       args.extend([((
           vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)])
     vm_util.RunThreaded(self._StopOnVm, args)
