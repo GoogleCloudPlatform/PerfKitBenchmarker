@@ -168,6 +168,8 @@
     instance and fail if the benchmark eventually fails to delete a table.
 -   Add support for Snowflake on Azure External Tables
 -   Fetch memtier benchmark runtime information
+-   Support installing the Google Cloud Bigtable client by a given version via
+    --google_bigtable_client_version and simplify dependency management.
 
 ### Bug fixes and maintenance updates:
 
