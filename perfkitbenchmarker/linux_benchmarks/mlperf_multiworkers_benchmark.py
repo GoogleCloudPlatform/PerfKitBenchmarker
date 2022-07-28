@@ -163,7 +163,6 @@ def _PrepareMLPerfRunner(benchmark_spec, node_rank):
   """
   vm = benchmark_spec.vms[node_rank]
   mlperf_benchmark.PrepareRunner(benchmark_spec, vm)
-  vm.RemoteCommand('sudo usermod -aG docker $USER')
 
 
 def _SedPairsToString(pairs):
@@ -363,23 +362,46 @@ def _GetChangesForMask(benchmark_spec, node_rank, script_path, nvprof_flags,
     run_and_time_sed_output: Output list of sed pairs for run_and_time.sh.
   """
   vm = benchmark_spec.vms[node_rank]
+  master_vm = benchmark_spec.vms[0]
   config_sed = config_sed_input
   run_sed = run_sed_input
   run_and_time_sed = run_and_time_sed_input
 
+  nsockets_per_node = vm.CheckLsCpu().socket_count
+  ncores_per_socket = vm.CheckLsCpu().cores_per_socket
+  nproc_per_node = nvidia_driver.QueryNumberOfGpus(vm)
+  nnodes = benchmark_spec.num_vms
+  dist_world_size = nproc_per_node * nnodes
+
+  vm.RemoteCommand(
+      'git clone https://github.com/mlcommons/training_results_v1.1.git')
+  vm.RemoteCommand(
+      f'cp training_results_v1.1/NVIDIA/benchmarks/maskrcnn/implementations/pytorch/bind_launch.py training_results_{FLAGS.mlperf_training_version}/NVIDIA/benchmarks/maskrcnn/implementations/pytorch/'
+  )
   config_sed += [(r'WALLTIME_MINUTES=30',
                   (r'WALLTIME_MINUTES=30\n'
                    r'export CONT=mlperf-nvidia:object_detection\n'
                    r'export DATADIR=\/data\n'
                    r'export PKLDIR=\/data\/coco2017\/pkl_coco\n'
+                   fr'export MASTER_ADDR={master_vm.internal_ip}\n'
+                   fr'export MASTER_PORT={PORT}\n'
+                   fr'export WORLD_SIZE={dist_world_size}\n'
+                   fr'export RANK={node_rank}\n'
                    r'export NEXP=1'))]
 
-  run_and_time_sed += [(r"'bind_launch'",
+  run_and_time_sed += [(r' CMD=.*', r' CMD=( '
+                        r"'python' "
+                        r"'-u' "
+                        r"'-m' "
                         r"'bind_launch' "
-                        f"'--nnodes={benchmark_spec.num_vms}' "
+                        f"'--nnodes={nnodes}' "
                         f"'--node_rank={node_rank}' "
-                        f"'--master_addr={benchmark_spec.vms[0].internal_ip}' "
-                        f"'--master_port={PORT}'")]
+                        f"'--master_addr={master_vm.internal_ip}' "
+                        f"'--master_port={PORT}' "
+                        f"'--nsockets_per_node={nsockets_per_node}' "
+                        f"'--ncores_per_socket={ncores_per_socket}' "
+                        f"'--nproc_per_node={nproc_per_node}' "
+                        ')')]
   if mlperf_benchmark.NVPROF in FLAGS.mlperf_profiler:
     run_and_time_sed += [(r'python', r'nvprof {nvprof_flags} python'
                           .format(nvprof_flags=nvprof_flags))]
@@ -392,8 +414,7 @@ def _GetChangesForMask(benchmark_spec, node_rank, script_path, nvprof_flags,
         .format(script_path=script_path))
 
   run_sed += [(r'SYSLOGGING=1', r'SYSLOGGING=0')]
-  run_sed += [(r'_cont_mounts=(',
-               r'_cont_mounts=(\"--volume=\${PKLDIR}:\/pkl_coco\" ')]
+  run_sed += [(r'.*run_and_time', r'.\/run_and_time')]
 
   return config_sed, run_sed, run_and_time_sed
 
@@ -422,10 +443,9 @@ def _GetChangesForResnet(benchmark_spec, node_rank, nvprof_flags,
   run_sed = run_sed_input
   run_and_time_sed = run_and_time_sed_input
 
-  config_sed += [(r'NUMEPOCHS=.*',
-                  fr'NUMEPOCHS={mlperf_benchmark.RESNET_EPOCHS.value}\n'
-                  r'export CONT=mlperf-nvidia:image_classification\n'
-                  r'export DATADIR=\/data\/imagenet')]
+  config_sed += [(r'.*config_DGXA100_common\.sh',
+                  (r'export CONT=mlperf-nvidia:image_classification\n'
+                   r'export DATADIR=\/data\/imagenet'))]
 
   if mlperf_benchmark.NVPROF in FLAGS.mlperf_profiler:
     run_and_time_sed += [(r'python', r'nvprof {nvprof_flags} python'
@@ -435,19 +455,18 @@ def _GetChangesForResnet(benchmark_spec, node_rank, nvprof_flags,
                           r'  --epoch-size  \"{profile_steps}\"'
                           .format(profile_steps=FLAGS.mlperf_profile_steps))]
 
-  run_and_time_sed += [(r'BIND=.*', r'BIND=\"\"')]
-  run_and_time_sed += [('NUMEPOCHS=.*',
-                        f'NUMEPOCHS={mlperf_benchmark.RESNET_EPOCHS.value}')]
-
   hosts = ','.join(f'{vm.internal_ip}:{benchmark_spec.gpus_per_vm}'
                    for vm in benchmark_spec.vms)
   np = benchmark_spec.gpus_per_vm * benchmark_spec.num_vms
-  run_and_time_sed += [(r'mpirun.*',
-                        fr'horovodrun -H {hosts} -p {PORT} -np {np}\"')]
+  run_and_time_sed += [
+      (r'BIND=.*', r'BIND=\"\"\n'
+       fr'DISTRIBUTED=\"horovodrun -H {hosts} -p {PORT} -np {np}\"')
+  ]
 
   run_sed += [(r'_cont_mounts=(',
                r'_cont_mounts=(\"--volume=\$HOME\/.ssh:\/tmp\/.ssh\" ')]
 
+  run_sed += [(r'.*run_and_time', r'.\/run_and_time')]
   if node_rank == 0:
     run_sed += [(r'sleep infinity',
                  r'bash -c \"cp -r \/tmp\/.ssh \/root\/.ssh;sleep infinity\"')]
@@ -460,7 +479,7 @@ def _GetChangesForResnet(benchmark_spec, node_rank, nvprof_flags,
                  r'mkdir -p \/run\/sshd;'
                  fr'\/usr\/sbin\/sshd -p {PORT};'
                  r'sleep infinity\"')]
-    run_sed += [(r'.*run_and_time.*', r'')]
+    run_sed += [(r'.*run_and_time.*', r'hostname')]
     run_sed += [(r'trap.*', r'')]
 
   return config_sed, run_sed, run_and_time_sed
@@ -485,19 +504,27 @@ def _GetChangesForBert(benchmark_spec, node_rank, nvprof_flags,
     run_sed_output: Output list of sed pairs for run.sub.
     run_and_time_sed_output: Output list of sed pairs for run_and_time.sh.
   """
+  vm = benchmark_spec.vms[node_rank]
+  master_vm = benchmark_spec.vms[0]
   config_sed = config_sed_input
   run_sed = run_sed_input
   run_and_time_sed = run_and_time_sed_input
 
-  config_sed += [(r'source .*',
+  nsockets_per_node = vm.CheckLsCpu().socket_count
+  ncores_per_socket = vm.CheckLsCpu().cores_per_socket
+  nproc_per_node = nvidia_driver.QueryNumberOfGpus(vm)
+  nnodes = benchmark_spec.num_vms
+  dist_world_size = nproc_per_node * nnodes
+
+  config_sed += [(r'.*config_DGXA100_common\.sh',
                   r'export CONT=mlperf-nvidia:language_model\n'
                   r'export NEXP=1\n'
-                  fr'export MASTER_ADDR={benchmark_spec.vms[0].internal_ip}\n'
-                  fr'export MASTER_PORT={PORT}')]
+                  fr'export MASTER_ADDR={master_vm.internal_ip}\n'
+                  fr'export MASTER_PORT={PORT}\n'
+                  fr'export WORLD_SIZE={dist_world_size}\n'
+                  fr'export RANK={node_rank}\n')]
   config_sed += [(r'DATADIR=.*',
                   r'DATADIR=\/data\/bert_data\/2048_shards_uncompressed')]
-  config_sed += [(r'MAX_STEPS=.*',
-                  f'MAX_STEPS={mlperf_benchmark.BERT_STEPS.value}')]
   config_sed += [(r'DATADIR_PHASE2=.*', (r'DATADIR_PHASE2=\/data\/bert_data\/'
                                          r'2048_shards_uncompressed'))]
   config_sed += [(r'EVALDIR=.*',
@@ -512,12 +539,27 @@ def _GetChangesForBert(benchmark_spec, node_rank, nvprof_flags,
   if mlperf_benchmark.NVPROF in FLAGS.mlperf_profiler:
     run_and_time_sed += [(r'python', fr'nvprof {nvprof_flags} python')]
 
-  run_sed += [(r"'bind_pyt'",
-               r"'bind_pyt' "
-               fr"'--nnodes={benchmark_spec.num_vms}' "
-               fr"'--node_rank={node_rank}' "
-               fr"'--master_addr={benchmark_spec.vms[0].internal_ip}' "
-               fr"'--master_port={PORT}'")]
+  vm.RemoteCommand(
+      'git clone https://github.com/mlcommons/training_results_v1.1.git')
+  vm.RemoteCommand(
+      f'cp training_results_v1.1/NVIDIA/benchmarks/bert/implementations/pytorch/bind_pyt.py training_results_{FLAGS.mlperf_training_version}/NVIDIA/benchmarks/bert/implementations/pytorch/'
+  )
+
+  run_and_time_sed += [(r' CMD=.*', r' CMD=( '
+                        r"'python' "
+                        r"'-u' "
+                        r"'-m' "
+                        r"'bind_pyt' "
+                        f"'--nnodes={nnodes}' "
+                        f"'--node_rank={node_rank}' "
+                        f"'--master_addr={master_vm.internal_ip}' "
+                        f"'--master_port={PORT}' "
+                        f"'--nsockets_per_node={nsockets_per_node}' "
+                        f"'--ncores_per_socket={ncores_per_socket}' "
+                        f"'--nproc_per_node={nproc_per_node}' "
+                        ')')]
+
+  run_sed += [(r'.*run_and_time', r'.\/run_and_time')]
 
   return config_sed, run_sed, run_and_time_sed
 
@@ -540,8 +582,11 @@ def _UpdateScripts(benchmark_spec, node_rank):
   config_sed += [(r'DGXSYSTEM=.*', fr'DGXSYSTEM=\"{DGXSYSTEM}\"')]
   config_sed += [(r'DGXNNODES=.*', r'DGXNNODES={num_vms}'
                   .format(num_vms=benchmark_spec.num_vms))]
-  config_sed += [(r'DGXNGPU=.*', r'DGXNGPU={gpus_per_vm}'
-                  .format(gpus_per_vm=benchmark_spec.gpus_per_vm))]
+  config_sed += [(
+      r'DGXNGPU=.*',
+      fr'DGXNGPU={benchmark_spec.gpus_per_vm}\nexport CUDA_VISIBLE_DEVICES={",".join([str(i) for i in range(benchmark_spec.gpus_per_vm)])}'
+  )]
+
   config_sed += [(r'DGXNSOCKET=.*', r'DGXNSOCKET={nsockets}'
                   .format(nsockets=vm.CheckLsCpu().socket_count))]
   config_sed += [(r'DGXSOCKETCORES=.*', r'DGXSOCKETCORES={ncores}'
@@ -579,10 +624,6 @@ def _UpdateScripts(benchmark_spec, node_rank):
   run_sed += [(r'sleep 30', r'sleep 60')]
   run_sed += [(r'docker exec -it', r'docker exec -t')]
   run_sed += [(r'run_and_time.sh', r'run_and_time1.sh')]
-
-  run_sed += [(r'nvidia-docker', r'sudo nvidia-docker')]
-  run_sed += [(r'docker exec', r'sudo docker exec')]
-  run_sed += [(r'docker container', r'sudo docker container')]
 
   if FLAGS.aws_efa or FLAGS.azure_infiniband:
     stdout, _ = vm.RemoteCommand('ls -d /dev/infiniband/*')
@@ -624,15 +665,16 @@ def _UpdateScripts(benchmark_spec, node_rank):
         benchmark_spec, node_rank, script_path, nvprof_flags, config_sed,
         run_sed, run_and_time_sed)
 
-    config_files = ['config_DGXA100_multi_4x8x4.sh']
+    config_files = ['config_DGXA100_multi_8x8x2.sh']
 
   elif mlperf_benchmark.RESNET in benchmark:
     config_sed, run_sed, run_and_time_sed = _GetChangesForResnet(
         benchmark_spec, node_rank, nvprof_flags, config_sed, run_sed,
         run_and_time_sed)
 
-    config_files = ['config_DGXA100_common.sh',
-                    'config_DGXA100_multi_8x8x204.sh']
+    config_files = [
+        'config_DGXA100_common.sh', 'config_DGXA100_multi_8x8x51.sh'
+    ]
 
   elif mlperf_benchmark.BERT in benchmark:
     config_sed, run_sed, run_and_time_sed = _GetChangesForBert(

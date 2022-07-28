@@ -98,12 +98,6 @@ flags.DEFINE_string('minigo_model_dir', '',
                     'Directory on GCS to copy minigo source data from. Files '
                     'will be copied from subdirectories of src_dir '
                     'corresponding to the board size.')
-RESNET_EPOCHS = flags.DEFINE_integer(
-    'mlperf_resnet_epochs', 48,
-    'The Number of epochs to use for training ResNet.', lower_bound=4)
-BERT_STEPS = flags.DEFINE_integer(
-    'mlperf_bert_steps', 1271,
-    'The Number of steps to use for training BERT.', lower_bound=1)
 
 BERT_BATCH_SIZE = flags.DEFINE_integer(
     'mlperf_bert_batch_size', 46, 'The batch size to use for training BERT.')
@@ -111,7 +105,7 @@ BERT_BATCH_SIZE = flags.DEFINE_integer(
 HYPERTHREADS = flags.DEFINE_bool('mlperf_hyperthreads', True,
                                  'enable or disable binding to hyperthreads')
 
-VERSION = flags.DEFINE_enum('mlperf_training_version', 'v1.0',
+VERSION = flags.DEFINE_enum('mlperf_training_version', 'v2.0',
                             ['v1.0', 'v1.1', 'v2.0'],
                             'MLPerf training version to run.')
 
@@ -460,12 +454,10 @@ def _GetChangesForResnet(config_sed_input):
     config_sed_output: Output list of sed pairs for config_DGXA100.sh.
   """
   config_sed = config_sed_input
-  config_sed += [(r'NUMEPOCHS=.*',
-                  (fr'NUMEPOCHS={RESNET_EPOCHS.value}\n'
-                   r'export CONT=mlperf-nvidia:image_classification\n'
+  config_sed += [(r'.*config_DGXA100_common\.sh',
+                  (r'export CONT=mlperf-nvidia:image_classification\n'
                    r'export DATADIR=\/data\/imagenet\n'
                    r'export LOCAL_RANK=0'))]
-  config_sed += [('source .*config_DGXA100_common.sh', '')]
 
   return config_sed
 
@@ -485,7 +477,6 @@ def _GetChangesForBert(config_sed_input):
                                  r'export NEXP=1'))]
   config_sed += [(r'DATADIR=.*',
                   r'DATADIR=\/data\/bert_data\/2048_shards_uncompressed')]
-  config_sed += [(r'MAX_STEPS=.*', f'MAX_STEPS={BERT_STEPS.value}')]
   config_sed += [(r'DATADIR_PHASE2=.*', (r'DATADIR_PHASE2=\/data\/bert_data\/'
                                          r'2048_shards_uncompressed'))]
   config_sed += [(r'EVALDIR=.*',
