@@ -428,7 +428,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         # NOTE: unfortunately @vm_util.Retry will infinitely retry a key error
         # on this map, which can be tricky to diagnose.
         stdout = run_cmd_response[cmd]
-      return stdout, ''
+      return stdout, ''  # pytype: disable=name-error  # py310-upgrade
     vm.RemoteHostCommandWithReturnCode = mock.Mock(
         side_effect=FakeRemoteHostCommandWithReturnCode)
     vm.CheckLsCpu = mock.Mock(
