@@ -47,7 +47,7 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the sysbench package on the VM."""
   vm.InstallPackages(
-      'make automake libtool pkg-config libaio-dev libmysqlclient-dev '
+      'make automake libtool pkg-config libaio-dev default-libmysqlclient-dev '
       'libssl-dev libpq-dev'
   )
   _Install(vm)
