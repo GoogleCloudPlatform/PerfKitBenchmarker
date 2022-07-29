@@ -19,6 +19,7 @@ See https://httpd.apache.org/docs/2.4/programs/ab.html#synopsis for more info.
 
 from __future__ import annotations
 
+import collections
 import dataclasses
 import io
 import logging
@@ -41,6 +42,7 @@ class ApacheBenchIpConfig:
   ip_type: str
   server_attr: str
   output_path: str
+  percentile_data_path: str
   raw_request_data_path: str
 
 
@@ -78,6 +80,7 @@ class ApacheBenchRunConfig:
             f'-c {self.concurrency} '
             f'-m {self.http_method} '
             f'-s {self.socket_timeout} '
+            f'-e {ip_config.percentile_data_path} '
             f'-g {ip_config.raw_request_data_path} '
             f'http://{getattr(server, ip_config.server_attr)}:{_PORT}/ '
             f'1> {ip_config.output_path}')
@@ -105,7 +108,7 @@ class ApacheBenchResults:
   html_transferred: int
   html_transferred_unit: str
   histogram: sample._Histogram
-  raw_results: List[str]
+  raw_results: Dict[int, List[float]]
   cpu_seconds: Optional[float] = None
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
@@ -163,9 +166,11 @@ _MAX_CONCURRENCY_PER_VM = 1024
 # Constants used to differentiate between runs using internal or external ip
 _INTERNAL_IP_CONFIG = ApacheBenchIpConfig('internal-ip', 'internal_ip',
                                           'internal_results.txt',
+                                          'internal_ip_percentiles.csv',
                                           'internal_ip_request_times.tsv')
 _EXTERNAL_IP_CONFIG = ApacheBenchIpConfig('external-ip', 'ip_address',
                                           'external_results.txt',
+                                          'external_ip_percentiles.csv',
                                           'external_ip_request_times.tsv')
 # Map from ip_addresses flag enum to list of ip configs to use
 _IP_ADDRESSES_TO_IP_CONFIGS = {
@@ -215,8 +220,8 @@ _RUN_MODE = flags.DEFINE_enum(
     default=ApacheBenchRunMode.STANDARD,
     enum_values=ApacheBenchRunMode.ALL,
     help='Specify which run mode to use.'
-    'MAX_THROUGHPUT: Searches for max concurrency level such that proportion '
-    'of requests that fail < apachebench_max_fail_prop. '
+    'MAX_THROUGHPUT: Searches for concurrency level with max requests per '
+    'second while keeping number of failed requests at 0. '
     'STANDARD: Runs Apache Bench with specified flags.')
 _MAX_CONCURRENCY = flags.DEFINE_integer(
     'apachebench_max_concurrency',
@@ -248,7 +253,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
 
 def _ParseRawRequestData(vm: virtual_machine.VirtualMachine, path: str,
-                         column: str = 'ttime') -> List[str]:
+                         column: str = 'ttime') -> Dict[int, List[float]]:
   """Loads column of tsv file created by ApacheBench into a list.
 
   Args:
@@ -256,7 +261,9 @@ def _ParseRawRequestData(vm: virtual_machine.VirtualMachine, path: str,
     path: The path to the tsv file output inside of the VM which ran AB.
     column: The column with numeric data to create the list from.
   Returns:
-    List created from the data in the column of the tsv file specified.
+    Dict where the keys represents the second a request was started (starting
+    at 0) and the values are lists of data (specified by the column argument)
+    from requests started at the time specified by the corresponding key.
 
   Column meanings:
     ctime: Time to establish a connection with the server.
@@ -274,16 +281,72 @@ def _ParseRawRequestData(vm: virtual_machine.VirtualMachine, path: str,
   """
   tsv, _ = vm.RemoteCommand(f'cat {path}')
   data_frame = pd.read_csv(io.StringIO(tsv), sep='\t')
-  data_frame = data_frame.sort_values('seconds')
 
-  return data_frame[column].tolist()
+  data_frame['seconds'] = pd.to_numeric(data_frame['seconds'])
+  data_frame[column] = pd.to_numeric(data_frame[column])
+
+  result = {}
+  min_seconds = data_frame['seconds'].min()
+
+  for _, row in data_frame.iterrows():
+    second = int(row['seconds'] - min_seconds)
+    if second not in result.keys():
+      result[second] = []
+
+    result[second].append(float(row[column]))
+
+  return result
 
 
 def _ParseHistogramFromFile(vm: virtual_machine.VirtualMachine, path: str,
-                            column: str = 'ttime') -> sample._Histogram:
-  """Loads tsv file created by ApacheBench at path in the VM into a histogram."""
-  data = _ParseRawRequestData(vm, path, column)
-  return sample.MakeHistogram(list(map(float, data)))
+                            successful_requests: int) -> sample._Histogram:
+  """Creates a histogram from csv file created by ApacheBench.
+
+  Args:
+    vm: The Virtual Machine that has run an ApacheBench (AB) benchmark.
+    path: The path to the csv file output inside of the VM which ran AB.
+    successful_requests: The number of successful requests.
+  Returns:
+    sample._Histogram where each bucket represents a unique request time and
+    the count for a bucket represents the number of requests that match the
+    bucket's request time.
+
+  Example ApacheBench percentile output.
+
+  percent, response time
+  0,10.21
+  1,12.12
+  2,15.10
+  """
+  csv, _ = vm.RemoteCommand(f'cat {path}')
+  csv = csv.strip()
+
+  # Skip header line
+  rows = csv.split('\n')[1:]
+  result = collections.OrderedDict()
+
+  # 0th percentile represents 1 request (the quickest request)
+  percentile, response_time = list(map(float, rows[0].split(',')))
+  result[response_time] = 1
+
+  last_unique_percentile = percentile
+  prev_percentile, prev_response_time = percentile, response_time
+
+  # Skip 0th percentile
+  for row in rows[1:]:
+    percentile, response_time = list(map(float, row.split(',')))
+
+    if response_time != prev_response_time:
+      last_unique_percentile = prev_percentile
+
+    # Calculate number of requests in this bucket
+    result[response_time] = int(successful_requests *
+                                (percentile - last_unique_percentile) / 100)
+
+    prev_percentile = percentile
+    prev_response_time = response_time
+
+  return result
 
 
 def _ParseResults(vm: virtual_machine.VirtualMachine,
@@ -361,7 +424,9 @@ def _ParseResults(vm: virtual_machine.VirtualMachine,
       total_transferred_unit=total_transferred_unit,
       html_transferred=int(html_transferred),
       html_transferred_unit=html_transferred_unit,
-      histogram=_ParseHistogramFromFile(vm, ip_config.raw_request_data_path),
+      histogram=_ParseHistogramFromFile(
+          vm, ip_config.percentile_data_path,
+          int(complete_requests) - int(failed_requests)),
       raw_results=_ParseRawRequestData(vm, ip_config.raw_request_data_path))
 
 

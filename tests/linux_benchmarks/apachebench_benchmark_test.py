@@ -45,6 +45,8 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     self.apachebench_output = self.populateTestString('apachebench_output.txt')
     self.apachebench_raw_request_times = self.populateTestString(
         'apachebench_raw_request_times.tsv')
+    self.apachebench_percentile_data = self.populateTestString(
+        'apachebench_percentile_data.csv')
 
     self.run_config = apachebench_benchmark.ApacheBenchRunConfig(
         num_requests=1,
@@ -60,6 +62,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         'internal-ip',
         'internal_ip',
         'internal_results.txt',
+        'internal_ip_percentile_output.csv',
         'internal_ip_raw_request_times.tsv')
 
     client = mock.MagicMock(
@@ -73,10 +76,17 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     setattr(self.vm_spec, 'vm_groups', {'client': [client], 'server': [server]})
 
     self.expected_histogram = collections.OrderedDict()
-    self.expected_histogram[4] = 1
-    self.expected_histogram[5] = 3
-    self.expected_histogram[6] = 1
-    self.expected_histogram[7] = 3
+    self.expected_histogram[4] = 2
+    self.expected_histogram[5] = 4
+    self.expected_histogram[6] = 2
+    self.expected_histogram[7] = 2
+
+    self.expected_raw_request_data = {
+        0: [4.0, 5.0, 5.0],
+        1: [4.0, 5.0],
+        2: [5.0, 6.0],
+        3: [6.0, 7.0, 7.0]
+    }
 
   def testApacheBenchRunConfigGetCommand(self):
     server = self.vm_spec.vm_groups['server'][0]
@@ -110,18 +120,18 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch.object(apache2_server, 'GetApacheCPUSeconds', autospec=True)
   @mock.patch.object(
       apachebench_benchmark, '_ParseHistogramFromFile', autospec=True)
-  def testApacheBench_Run(self, _ParseHistogramFromFile, GetApacheCPUSeconds):  # pylint: disable=invalid-name
+  @mock.patch.object(
+      apachebench_benchmark, '_ParseRawRequestData', autospec=True)
+  def testApacheBench_Run(self, _ParseRawRequestData, _ParseHistogramFromFile,  # pylint: disable=invalid-name
+                          GetApacheCPUSeconds):  # pylint: disable=invalid-name
     server = self.vm_spec.vm_groups['server'][0]
     clients = self.vm_spec.vm_groups['client']
     for client in clients:
-      client.RemoteCommand.side_effect = [
-          None,
-          (self.apachebench_output, ''),
-          (self.apachebench_raw_request_times, '')
-      ]
+      client.RemoteCommand.return_value = (self.apachebench_output, '')
 
     GetApacheCPUSeconds.return_value = 1.0
     _ParseHistogramFromFile.return_value = self.expected_histogram
+    _ParseRawRequestData.return_value = self.expected_raw_request_data
 
     result = apachebench_benchmark._Run(clients, server, self.run_config,
                                         self.ip_config)
@@ -144,6 +154,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         'html_transferred': 1,
         'html_transferred_unit': 'bytes',
         'histogram': self.expected_histogram,
+        'raw_results': self.expected_raw_request_data,
         'cpu_seconds': 1.0
     }
 
@@ -175,9 +186,8 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         html_transferred=1,
         html_transferred_unit='bytes',
         histogram=self.expected_histogram,
-        raw_results=['1'],
-        cpu_seconds=1.0
-    )
+        raw_results={0: [1.0]},
+        cpu_seconds=1.0)
     metadata = apachebench_benchmark.GetMetadata(result, self.run_config,
                                                  self.ip_config)
 
@@ -199,10 +209,17 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertDictEqual(metadata, expected_metadata)
 
-  def testParseHistogramFromFile(self):
+  def testParseRawRequestData(self):
     client = self.vm_spec.vm_groups['client'][0]
     client.RemoteCommand.return_value = (self.apachebench_raw_request_times, '')
-    result = apachebench_benchmark._ParseHistogramFromFile(client, 'path')
+    result = apachebench_benchmark._ParseRawRequestData(client, 'path')
+
+    self.assertDictEqual(result, self.expected_raw_request_data)
+
+  def testParseHistogramFromFile(self):
+    client = self.vm_spec.vm_groups['client'][0]
+    client.RemoteCommand.return_value = (self.apachebench_percentile_data, '')
+    result = apachebench_benchmark._ParseHistogramFromFile(client, 'path', 10)
 
     self.assertDictEqual(result, self.expected_histogram)
 
