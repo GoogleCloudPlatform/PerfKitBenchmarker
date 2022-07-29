@@ -969,7 +969,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Start meta-data server notification subscription."""
     if FLAGS.redis_memtier_capture_live_migration_timestamps:
       def _Subscribe():
-        self.RemoteCommand(self._GetLMNotificationCommand())
+        self.RobustRemoteCommand(self._GetLMNotificationCommand())
         self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
         logging.info('[LM Notify] Release live migration lock.')
         self._LM_TIMES_SEMAPHORE.release()
