@@ -270,7 +270,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
         total_stats = interval_sums[len(interval_sums)-1]
         total_stats['rtt'] = sum(rtt_avg_list)/len(rtt_avg_list)
         total_stats['cwnd'] = sum(cwnd_avg_list)/len(cwnd_avg_list)
-        total_stats['netpwr'] = sum(netpwr_sum_list)
+        total_stats['netpwr'] = sum(netpwr_sum_list)/len(netpwr_sum_list)
         total_stats['rtt_unit'] = thread_results_for_interval[0]['rtt_unit']
         print("TOTAL STATS")
         print(total_stats)

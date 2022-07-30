@@ -219,6 +219,91 @@ class IperfBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(expected_results, results.metadata)
     self.assertEqual(results.value, 1970.0)
 
+  def testIperfParseResultsTCPWithIntervalReports(self):
+
+    iperf_output = """
+        Client connecting to 10.128.0.2, TCP port 20000 with pid 10054
+        Write buffer size: 0.12 MByte
+        TCP window size: 0.08 MByte (default)
+        ------------------------------------------------------------
+        [  3] local 10.160.0.98 port 59524 connected with 10.128.0.68 port 20000 (ct=261.36 ms)
+        [  4] local 10.160.0.98 port 59526 connected with 10.128.0.68 port 20000 (ct=260.81 ms)
+        [  5] local 10.160.0.98 port 59528 connected with 10.128.0.68 port 20000 (ct=268.94 ms)
+        [ ID] Interval        Transfer    Bandwidth       Write/Err  Rtry     Cwnd/RTT        NetPwr
+        [  3] 0.00-1.00 sec  0.62 MBytes  5.21 Mbits/sec  5/0          0       28K/261265 us  2.49
+        [  4] 0.00-1.00 sec  0.75 MBytes  6.29 Mbits/sec  6/0          0       28K/260765 us  3.02
+        [  5] 0.00-1.00 sec  0.75 MBytes  6.29 Mbits/sec  6/0          0       28K/268926 us  2.92
+        [SUM] 0.00-1.00 sec  2.12 MBytes  17.8 Mbits/sec  17/0         0
+        [  3] 1.00-2.00 sec  7.88 MBytes  66.1 Mbits/sec  63/0          0      226K/261302 us  31.60
+        [  4] 1.00-2.00 sec  11.2 MBytes  94.4 Mbits/sec  90/0          0      226K/260657 us  45.26
+        [  5] 1.00-2.00 sec  10.0 MBytes  83.9 Mbits/sec  80/0          0      226K/268935 us  38.99
+        [SUM] 1.00-2.00 sec  29.1 MBytes   244 Mbits/sec  233/0         0
+        [  5] 2.00-3.00 sec  45.2 MBytes   379 Mbits/sec  362/0          0     3011K/268952 us  176.18
+        [  3] 2.00-3.00 sec   106 MBytes   892 Mbits/sec  851/0          0     3620K/261276 us  426.91
+        [  4] 2.00-3.00 sec   125 MBytes  1045 Mbits/sec  997/0          0     3597K/261199 us  499.98
+        [SUM] 2.00-3.00 sec   276 MBytes  2316 Mbits/sec  2210/0         0
+        [  5] 3.00-4.00 sec  71.0 MBytes   596 Mbits/sec  568/0          0    22316K/269496 us  276.25
+        [  3] 3.00-4.00 sec  66.5 MBytes   558 Mbits/sec  532/0          0    49005K/264374 us  263.76
+        [  4] 3.00-4.00 sec  77.8 MBytes   652 Mbits/sec  622/0          0    51703K/264568 us  308.15
+        [SUM] 3.00-4.00 sec   215 MBytes  1806 Mbits/sec  1722/0         0
+        [  5] 4.00-5.00 sec  71.2 MBytes   598 Mbits/sec  570/0          0    22316K/270509 us  276.19
+        [  5] 0.00-5.04 sec   198 MBytes   330 Mbits/sec  1586/0          0       -1K/158775 us  259.61
+        [  3] 4.00-5.00 sec  66.5 MBytes   558 Mbits/sec  532/0          0    49005K/264387 us  263.74
+        [  3] 0.00-5.07 sec   248 MBytes   410 Mbits/sec  1983/0          0       -1K/261758 us  195.93
+        [  4] 4.00-5.00 sec  78.8 MBytes   661 Mbits/sec  630/0          0    51703K/263757 us  313.07
+        [SUM] 4.00-5.00 sec   216 MBytes  1816 Mbits/sec  1732/0         0
+        [  4] 0.00-5.24 sec   293 MBytes   469 Mbits/sec  2345/0          0       -1K/183205 us  320.04
+        [SUM] 0.00-5.24 sec   739 MBytes  1183 Mbits/sec  5914/0         0
+      """
+
+    self.vm_spec.vms[0].RemoteCommand.side_effect = [(iperf_output, '')]
+    results = iperf_benchmark._RunIperf(self.vm_spec.vms[0],
+                                        self.vm_spec.vms[1], '10.128.0.2', 2,
+                                        'INTERNAL', 'TCP')
+
+    expected_results = {'buffer_size': 0.12,
+        'congestion_window': 17135.86666666667,
+        'congestion_window_scale': 'K',
+        'err_packet_count': '0',
+        'interval_congestion_window_list': [28.0,
+                                            226.0,
+                                            3409.3333333333335,
+                                            41008.0,
+                                            41008.0],
+        'interval_length_seconds': 1.0,
+        'interval_netpwr_list': [8.43,
+                                 115.85,
+                                 1103.0700000000002,
+                                 848.16,
+                                 853.0],
+        'interval_retry_list': [0, 0, 0, 0, 0],
+        'interval_rtt_list': [263652.0,
+                              263631.3333333333,
+                              263809.0,
+                              266146.0,
+                              266217.6666666667],
+        'interval_start_time_list': [0.0, 1.0, 2.0, 3.0, 4.0],
+        'interval_throughput_list': [17.8, 244.0, 2316.0, 1806.0, 1816.0],
+        'ip_type': 'internal',
+        'netpwr': 585.702,
+        'receiving_machine_type': 'mock_machine_1',
+        'receiving_zone': 'antarctica-1a',
+        'retry_packet_count': '0',
+        'rtt': 264691.2,
+        'rtt_unit': 'us',
+        'run_number': 0,
+        'runtime_in_seconds': 5,
+        'sending_machine_type': 'mock_machine_1',
+        'sending_thread_count': 3,
+        'sending_zone': 'antarctica-1a',
+        'tcp_window_size': 0.08,
+        'transfer_mbytes': '739',
+        'write_packet_count': '5914'},
+
+
+    self.assertEqual(expected_results, results.metadata)
+    self.assertEqual(results.value, 1183.0)
+
   def testIperfParseResultsTCPMultiThreadWithIntervalReports(self):
 
     iperf_output = """
