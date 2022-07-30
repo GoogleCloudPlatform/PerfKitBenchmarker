@@ -530,7 +530,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             if self.placement_group else placement_group.PLACEMENT_GROUP_NONE,
         'aws_credit_specification':
             FLAGS.aws_credit_specification
-            if FLAGS.aws_credit_specification else 'none'
+            if FLAGS.aws_credit_specification else 'none',
+        'aws_global_accelerator': 
+            FLAGS.aws_global_accelerator
     })
     self.spot_early_termination = False
     self.spot_status_code = None
@@ -676,6 +678,20 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       raise errors.Resource.RetryableCreationError('Public IP not ready.')
 
+    if FLAGS.aws_global_accelerator:
+      #TODO associate elastic IP here
+      logging.warn("adding global acclerator stuff here")
+      self.network.elastic_ip.AssociateAddress(self.id)
+      self.ip_address = self.network.elastic_ip.public_ip
+      logging.warning(self.network.global_accelerator.Status())
+      status = self.network.global_accelerator.Status()
+      while(status == 'In Progress'):
+        status = self.network.global_accelerator.Status()
+        logging.warning(status)
+
+      self.ip_address = self.network.global_accelerator.ip_addresses[0]
+
+  
   def _ConfigureEfa(self, instance):
     """Configuare EFA and associate Elastic IP.
 

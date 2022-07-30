@@ -78,6 +78,8 @@ flags.DEFINE_boolean('provision_athena', False,
                      'Whether to provision the Athena database.')
 flags.DEFINE_boolean('teardown_athena', True,
                      'Whether to teardown the Athena database.')
+flags.DEFINE_boolean('aws_global_accelerator', False,
+                     'Whether to use AWS Global Accelerator for networking')
 flags.DEFINE_string(
     'athena_output_location_prefix', 'athena-cli-results',
     'Prefix of the S3 bucket name for Athena Query Output. Suffix will be the '
