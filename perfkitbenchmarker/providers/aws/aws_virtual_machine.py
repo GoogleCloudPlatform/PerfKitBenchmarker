@@ -679,7 +679,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Resource.RetryableCreationError('Public IP not ready.')
 
     if FLAGS.aws_global_accelerator:
+<<<<<<< HEAD
       # Associate elastic IPs
+=======
+      #TODO associate elastic IP here
+>>>>>>> aws global accelerator initial commit
       logging.warn("adding global acclerator stuff here")
       self.network.elastic_ip.AssociateAddress(self.id)
       self.ip_address = self.network.elastic_ip.public_ip
