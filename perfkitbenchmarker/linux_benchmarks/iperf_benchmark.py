@@ -22,6 +22,7 @@ Runs Iperf to collect network throughput.
 import logging
 import re
 from absl import flags
+import time
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
@@ -53,6 +54,13 @@ flags.DEFINE_float(
     'In Mbits. Iperf will attempt to send at this bandwidth for TCP tests. '
     'If using multiple streams, each stream will '
     'attempt to send at this bandwidth')
+flags.DEFINE_float(
+    'iperf_interval', None,
+    'The number of seconds between periodic bandwidth reports. '
+    'Currently only for TCP tests')
+flags.DEFINE_integer(
+    'iperf_sleep_time', 5,
+    'number of seconds to sleep after each iperf test')
 
 TCP = 'TCP'
 UDP = 'UDP'
@@ -106,11 +114,13 @@ def Prepare(benchmark_spec):
 
   for vm in vms:
     vm.Install('iperf')
+    # TODO maybe indent this block one
     if vm_util.ShouldRunOnExternalIpAddress():
       if TCP in FLAGS.iperf_benchmarks:
         vm.AllowPort(IPERF_PORT)
       if UDP in FLAGS.iperf_benchmarks:
         vm.AllowPort(IPERF_UDP_PORT)
+
     if TCP in FLAGS.iperf_benchmarks:
       stdout, _ = vm.RemoteCommand(f'nohup iperf --server --port {IPERF_PORT}'
                                    ' &> /dev/null & echo $!')
@@ -164,6 +174,9 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
         f'{IPERF_PORT} --format m --time {FLAGS.iperf_runtime_in_seconds} '
         f'--parallel {thread_count}')
 
+    if FLAGS.iperf_interval:
+      iperf_cmd += f' --interval {FLAGS.iperf_interval}'
+
     if FLAGS.iperf_tcp_per_stream_bandwidth:
       iperf_cmd += f' --bandwidth {FLAGS.iperf_tcp_per_stream_bandwidth}M'
 
@@ -182,74 +195,204 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     window_size = float(window_size_match.group('size'))
 
     buffer_size = float(
-        re.search(r'Write buffer size: (?P<buffer_size>\d+\.\d+) \S+',
+        re.search(r'Write buffer size: (?P<buffer_size>\d+\.?\d+) \S+',
                   stdout).group('buffer_size'))
 
-    multi_thread = re.search((
-        r'\[SUM\]\s+\d+\.\d+-\d+\.\d+\s\w+\s+(?P<transfer>\d+)\s\w+\s+(?P<throughput>\d+)'
-        r'\s\w+/\w+\s+(?P<write>\d+)/(?P<err>\d+)\s+(?P<retry>\d+)\s*'), stdout)
-    # Iperf output is formatted differently when running with multiple threads
-    # vs a single thread
-    if multi_thread:
-      # Write, error, retry
-      write = int(multi_thread.group('write'))
-      err = int(multi_thread.group('err'))
-      retry = int(multi_thread.group('retry'))
 
-    # if single thread
+    if FLAGS.iperf_interval:
+      interval_throughput_list = []
+      interval_start_time_list = []
+      rtt_avg_list = []
+      cwnd_avg_list = []
+      netpwr_sum_list = []
+      retry_sum_list = []
+      cwnd_scale = None
+      total_stats = {}
+
+      if thread_count > 1:
+        # Parse aggregates of multiple sending threads for each report interval
+        r = re.compile((
+            r'\[SUM\]\s+(?P<interval>\d+\.\d+-\d+\.\d+)\s\w+\s+(?P<transfer>\d+\.?\d*)'
+            r'\s\w+\s+(?P<throughput>\d+\.?\d*)\sMbits\/sec\s+(?P<write>\d+)'
+            r'\/(?P<err>\d+)\s+(?P<retry>\d+)'))
+        interval_sums = [m.groupdict() for m in r.finditer(stdout)]
+
+
+        print("INTERVAL SUMS")
+        print(interval_sums)
+
+        # Parse output for each individual thread for each report interval
+        r = re.compile((
+            r'\[\s*(?P<thread_num>\d+)\]\s+(?P<interval>\d+\.\d+-\d+\.\d+)\s+sec\s+'
+            r'(?P<transfer>\d+\.?\d*)\s\w+\s+(?P<throughput>\d+\.?\d*)\sMbits\/sec\s+(?P<write>\d+)\/'
+            r'(?P<err>\d+)\s+(?P<retry>\d+)\s+(?P<cwnd>-?\d+)(?P<cwnd_scale>\w*)\/(?P<rtt>\d+)\s+'
+            r'(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.?\d*)'))
+        interval_threads = [m.groupdict() for m in r.finditer(stdout)]
+
+        # sum and average across threads for each interval report
+        for interval in interval_sums[:-1]:
+          interval_time = interval['interval'].split('-')
+          interval_start = float(interval_time[0])
+          interval_start_time_list.append(interval_start)
+          interval_throughput_list.append(float(interval['throughput']))
+
+          thread_results_for_interval = list(filter(lambda x: x['interval'] == interval['interval'], interval_threads))
+          print("SUM INTERVAL")
+          print(interval)
+          print("THREAD RESULTS")
+          print(thread_results_for_interval)
+          if len(thread_results_for_interval) != thread_count:
+            logging.warning("iperf thread results don't match sending_thread argument")
+
+          rtt_sum = 0.0
+          cwnd_sum = 0.0
+          netpwr_sum = 0.0
+          retry_sum = 0
+
+          for thread_result in thread_results_for_interval:
+            rtt_sum += float(thread_result['rtt'])
+            cwnd_sum += float(thread_result['cwnd'])
+            netpwr_sum += float(thread_result['netpwr'])
+            retry_sum += int(thread_result['retry'])
+            cwnd_scale = thread_result['cwnd_scale']
+
+          rtt_average = rtt_sum/len(thread_results_for_interval)
+          cwnd_average = cwnd_sum/len(thread_results_for_interval)
+
+          rtt_avg_list.append(rtt_average)
+          cwnd_avg_list.append(cwnd_average)
+          netpwr_sum_list.append(netpwr_sum)
+          retry_sum_list.append(retry_sum)
+
+        # END for count in range(0,len(interval_sums)):
+
+        
+        total_stats = interval_sums[len(interval_sums)-1]
+        total_stats['rtt'] = sum(rtt_avg_list)/len(rtt_avg_list)
+        total_stats['cwnd'] = sum(cwnd_avg_list)/len(cwnd_avg_list)
+        total_stats['netpwr'] = sum(netpwr_sum_list)
+        total_stats['rtt_unit'] = thread_results_for_interval[0]['rtt_unit']
+        print("TOTAL STATS")
+        print(total_stats)
+
+        total_throughput = total_stats['throughput']
+        # thread_results_for_interval = list(filter(lambda x: x['interval']==total_sum['interval'], interval_threads))
+
+      elif thread_count == 1:
+        
+        r = re.compile((
+            r'\[\s*(?P<thread_num>\d+)\]\s+(?P<interval>\d+\.\d+-\d+\.\d+)\s+sec\s+'
+            r'(?P<transfer>\d+\.?\d*)\s\w+\s+(?P<throughput>\d+\.?\d*)\sMbits\/sec\s+'
+            r'(?P<write>\d+)\/(?P<err>\d+)\s+(?P<retry>\d+)\s+(?P<cwnd>-?\d+)(?P<cwnd_scale>\w*)\/'
+            r'(?P<rtt>\d+)\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.?\d*)'))
+        interval_stats = [m.groupdict() for m in r.finditer(stdout)]
+
+        for count in range(0,len(interval_stats)-1):
+          i = interval_stats[count]
+          interval_time = i['interval'].split('-')
+          interval_start = float(interval_time[0])
+          interval_start_time_list.append(interval_start)
+          interval_throughput_list.append(float(i['throughput']))
+          rtt_avg_list.append(float(i['rtt']))
+          cwnd_avg_list.append(int(i['cwnd']))
+          cwnd_scale = i['cwnd_scale']
+          netpwr_sum_list.append(float(i['netpwr']))
+          retry_sum_list.append(int(i['retry']))
+
+        total_stats = interval_stats[len(interval_stats)-1]
+
+      tcp_metadata = {
+          'buffer_size': buffer_size,
+          'tcp_window_size': window_size,
+          'write_packet_count': total_stats['write'],
+          'err_packet_count': total_stats['err'],
+          'retry_packet_count': total_stats['retry'],
+          'congestion_window': total_stats['cwnd'],
+          'congestion_window_scale': cwnd_scale,
+          'interval_length_seconds': FLAGS.iperf_interval,
+          'rtt': total_stats['rtt'],
+          'rtt_unit': total_stats['rtt_unit'],
+          'netpwr': total_stats['netpwr'],
+          'transfer_mbytes': total_stats['transfer'],
+          'interval_throughput_list': interval_throughput_list,
+          'interval_start_time_list': interval_start_time_list,
+          'interval_rtt_list': rtt_avg_list, 
+          'interval_congestion_window_list': cwnd_avg_list,
+          'interval_retry_list': retry_sum_list,
+          'interval_netpwr_list': netpwr_sum_list,
+      }
+      
+      metadata_tmp = metadata.copy()
+      metadata_tmp.update(tcp_metadata)
+      return sample.Sample('Throughput', total_stats['throughput'], 'Mbits/sec', metadata_tmp)
+
+    # if FLAGS.iperf_interval == None
     else:
-      # Write, error, retry
-      match = re.search(
-          r'\d+ Mbits/sec\s+(?P<write>\d+)/(?P<err>\d+)\s+(?P<retry>\d+)',
-          stdout)
-      write = int(match.group('write'))
-      err = int(match.group('err'))
-      retry = int(match.group('retry'))
 
-    r = re.compile((
-        r'\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(?P<cwnd>-*\d+)(?P<cwnd_unit>\w+)\/(?P<rtt>\d+)'
-        r'\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.\d+)'))
-    match = [m.groupdict() for m in r.finditer(stdout)]
+      multi_thread = re.search((
+          r'\[SUM\]\s+\d+\.\d+-\d+\.\d+\s\w+\s+(?P<transfer>\d+)\s\w+\s+(?P<throughput>\d+)'
+          r'\s\w+/\w+\s+(?P<write>\d+)/(?P<err>\d+)\s+(?P<retry>\d+)\s*'), stdout)
+      # Iperf output is formatted differently when running with multiple threads
+      # vs a single thread
+      if multi_thread:
+        # Write, error, retry
+        write = int(multi_thread.group('write'))
+        err = int(multi_thread.group('err'))
+        retry = int(multi_thread.group('retry'))
 
-    cwnd = sum(float(i['cwnd']) for i in match) / len(match)
-    rtt = round(sum(float(i['rtt']) for i in match) / len(match), 2)
-    netpwr = round(sum(float(i['netpwr']) for i in match) / len(match), 2)
+      # if single thread
+      else:
+        # Write, error, retry
+        match = re.search(
+            r'\d+ Mbits/sec\s+(?P<write>\d+)/(?P<err>\d+)\s+(?P<retry>\d+)',
+            stdout)
+        write = int(match.group('write'))
+        err = int(match.group('err'))
+        retry = int(match.group('retry'))
 
-    rtt_unit = match[0]['rtt_unit']
+      r = re.compile((
+          r'\d+ Mbits\/sec\s+ \d+\/\d+\s+\d+\s+(?P<cwnd>-*\d+)(?P<cwnd_unit>\w+)\/(?P<rtt>\d+)'
+          r'\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.\d+)'))
+      match = [m.groupdict() for m in r.finditer(stdout)]
 
-    thread_values = re.findall(r'\[SUM].*\s+(\d+\.?\d*).Mbits/sec', stdout)
-    if not thread_values:
-      # If there is no sum you have try and figure out an estimate
-      # which happens when threads start at different times.  The code
-      # below will tend to overestimate a bit.
-      thread_values = re.findall(r'\[.*\d+\].*\s+(\d+\.?\d*).Mbits/sec', stdout)
+      cwnd = sum(float(i['cwnd']) for i in match) / len(match)
+      rtt = round(sum(float(i['rtt']) for i in match) / len(match), 2)
+      netpwr = round(sum(float(i['netpwr']) for i in match) / len(match), 2)
+      rtt_unit = match[0]['rtt_unit']
 
-      if len(thread_values) != thread_count:
-        raise ValueError(f'Only {len(thread_values)} out of {thread_count}'
-                         ' iperf threads reported a throughput value.')
+      thread_values = re.findall(r'\[SUM].*\s+(\d+\.?\d*).Mbits/sec', stdout)
+      if not thread_values:
+        # If there is no sum you have try and figure out an estimate
+        # which happens when threads start at different times.  The code
+        # below will tend to overestimate a bit.
+        thread_values = re.findall(r'\[.*\d+\].*\s+(\d+\.?\d*).Mbits/sec', stdout)
 
-    total_throughput = sum(float(value) for value in thread_values)
+        if len(thread_values) != thread_count:
+          raise ValueError(f'Only {len(thread_values)} out of {thread_count}'
+                           ' iperf threads reported a throughput value.')
 
-    tcp_metadata = {
-        'buffer_size': buffer_size,
-        'tcp_window_size': window_size,
-        'write_packet_count': write,
-        'err_packet_count': err,
-        'retry_packet_count': retry,
-        'congestion_window': cwnd,
-        'rtt': rtt,
-        'rtt_unit': rtt_unit,
-        'netpwr': netpwr
-    }
-    metadata.update(tcp_metadata)
-    return sample.Sample('Throughput', total_throughput, 'Mbits/sec', metadata)
+      total_throughput = sum(float(value) for value in thread_values)
+
+      tcp_metadata = {
+          'buffer_size': buffer_size,
+          'tcp_window_size': window_size,
+          'write_packet_count': write,
+          'err_packet_count': err,
+          'retry_packet_count': retry,
+          'congestion_window': cwnd,
+          'rtt': rtt,
+          'rtt_unit': rtt_unit,
+          'netpwr': netpwr
+      }
+      metadata.update(tcp_metadata)
+      return sample.Sample('Throughput', total_throughput, 'Mbits/sec', metadata)
 
   elif protocol == UDP:
 
     iperf_cmd = (
         f'iperf --enhancedreports --udp --client {receiving_ip_address} --port'
         f' {IPERF_UDP_PORT} --format m --time {FLAGS.iperf_runtime_in_seconds}'
-        f' --parallel {thread_count}')
+        f' --parallel {thread_count} ')
 
     if FLAGS.iperf_udp_per_stream_bandwidth:
       iperf_cmd += f' --bandwidth {FLAGS.iperf_udp_per_stream_bandwidth}M'
@@ -265,7 +408,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
         timeout=FLAGS.iperf_runtime_in_seconds + timeout_buffer)
 
     match = re.search(
-        r'UDP buffer size: (?P<buffer_size>\d+\.\d+)\s+(?P<buffer_unit>\w+)',
+        r'UDP buffer size: (?P<buffer_size>\d+\.?\d+)\s+(?P<buffer_unit>\w+)',
         stdout)
     buffer_size = float(match.group('buffer_size'))
     datagram_size = int(
@@ -340,7 +483,9 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
         'jitter_unit': jitter_unit,
         'lost_datagrams': lost_datagrams_sum,
         'total_datagrams': total_datagrams_sum,
-        'out_of_order_datagrams': out_of_order_sum
+        'out_of_order_datagrams': out_of_order_sum,
+        'udp_per_stream_bandwidth_mbit': FLAGS.iperf_udp_per_stream_bandwidth
+
     }
     metadata.update(udp_metadata)
     return sample.Sample('UDP Throughput', total_throughput, 'Mbits/sec',
@@ -376,6 +521,8 @@ def Run(benchmark_spec):
                         vm_util.IpAddressMetadata.EXTERNAL,
                         protocol))
 
+          time.sleep(FLAGS.iperf_sleep_time)
+
         # Send using internal IP addresses
         if vm_util.ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
           results.append(
@@ -385,6 +532,8 @@ def Run(benchmark_spec):
                         thread_count,
                         vm_util.IpAddressMetadata.INTERNAL,
                         protocol))
+
+          time.sleep(FLAGS.iperf_sleep_time)
 
   return results
 
