@@ -217,10 +217,6 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
             r'\/(?P<err>\d+)\s+(?P<retry>\d+)'))
         interval_sums = [m.groupdict() for m in r.finditer(stdout)]
 
-
-        print("INTERVAL SUMS")
-        print(interval_sums)
-
         # Parse output for each individual thread for each report interval
         r = re.compile((
             r'\[\s*(?P<thread_num>\d+)\]\s+(?P<interval>\d+\.\d+-\d+\.\d+)\s+sec\s+'
@@ -237,10 +233,6 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
           interval_throughput_list.append(float(interval['throughput']))
 
           thread_results_for_interval = list(filter(lambda x: x['interval'] == interval['interval'], interval_threads))
-          print("SUM INTERVAL")
-          print(interval)
-          print("THREAD RESULTS")
-          print(thread_results_for_interval)
           if len(thread_results_for_interval) != thread_count:
             logging.warning("iperf thread results don't match sending_thread argument")
 
@@ -263,20 +255,14 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
           cwnd_avg_list.append(cwnd_average)
           netpwr_sum_list.append(netpwr_sum)
           retry_sum_list.append(retry_sum)
-
-        # END for count in range(0,len(interval_sums)):
-
         
         total_stats = interval_sums[len(interval_sums)-1]
         total_stats['rtt'] = sum(rtt_avg_list)/len(rtt_avg_list)
         total_stats['cwnd'] = sum(cwnd_avg_list)/len(cwnd_avg_list)
         total_stats['netpwr'] = sum(netpwr_sum_list)/len(netpwr_sum_list)
         total_stats['rtt_unit'] = thread_results_for_interval[0]['rtt_unit']
-        print("TOTAL STATS")
-        print(total_stats)
 
         total_throughput = total_stats['throughput']
-        # thread_results_for_interval = list(filter(lambda x: x['interval']==total_sum['interval'], interval_threads))
 
       elif thread_count == 1:
         
