@@ -42,6 +42,8 @@ class IperfBenchmarkTestCase(unittest.TestCase):
 
   def testIperfParseResultsUDPSingleThread(self):
 
+    FLAGS.iperf_interval = None
+
     iperf_output = """
       Client connecting to 10.128.0.2, UDP port 25000 with pid 10159
       Sending 1470 byte datagrams, IPG target: 11215.21 us (kalman adjust)
@@ -82,10 +84,12 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'out_of_order_datagrams': 0
     }
 
-    self.assertEqual(results.value, 1.05)
+    self.assertDictEqual(results.value, 1.05)
     self.assertEqual(expected_results, results.metadata)
 
   def testIperfParseResultsUDPMultiThread(self):
+
+    FLAGS.iperf_interval = None
 
     iperf_output = """
       Client connecting to 10.128.0.2, UDP port 25000 with pid 10188
@@ -135,10 +139,12 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'out_of_order_datagrams': 1
     }
 
-    self.assertEqual(expected_results, results.metadata)
+    self.assertDictEqual(expected_results, results.metadata)
     self.assertEqual(results.value, 2.10)
 
   def testIperfParseResultsTCPSingleThread(self):
+
+    FLAGS.iperf_interval = None
 
     iperf_output = """
       Client connecting to 10.128.0.2, TCP port 20000 with pid 10208
@@ -174,10 +180,12 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'netpwr': 182579.69
     }
 
-    self.assertEqual(expected_results, results.metadata)
+    self.assertDictEqual(expected_results, results.metadata)
     self.assertEqual(results.value, 1966.0)
 
   def testIperfParseResultsTCPMultiThread(self):
+
+    FLAGS.iperf_interval = None
 
     iperf_output = """
       Client connecting to 10.128.0.2, TCP port 20000 with pid 10561
@@ -216,10 +224,12 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'netpwr': 736102.93
     }
 
-    self.assertEqual(expected_results, results.metadata)
+    self.assertDictEqual(expected_results, results.metadata)
     self.assertEqual(results.value, 1970.0)
 
   def testIperfParseResultsTCPWithIntervalReports(self):
+
+    FLAGS.iperf_interval = 1
 
     iperf_output = """
         Client connecting to 10.128.0.2, TCP port 20000 with pid 10020
@@ -272,11 +282,12 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'transfer_mbytes': 601,
         'write_packet_count': 4811}
 
-
-    self.assertEqual(expected_results, results.metadata)
+    self.assertDictEqual(expected_results, results.metadata)
     self.assertEqual(results.value, 1183.0)
 
   def testIperfParseResultsTCPMultiThreadWithIntervalReports(self):
+
+    FLAGS.iperf_interval = 1
 
     iperf_output = """
         Client connecting to 10.128.0.2, TCP port 20000 with pid 10054
@@ -357,8 +368,7 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'transfer_mbytes': 739,
         'write_packet_count': 5914}
 
-
-    self.assertEqual(expected_results, results.metadata)
+    self.assertDictEqual(expected_results, results.metadata)
     self.assertEqual(results.value, 1183.0)
 
 
