@@ -64,7 +64,6 @@ class AwsGlobalAccelerator(resource.BaseResource):
     response = json.loads(stdout)
     self.accelerator_arn = response['Accelerator']['AcceleratorArn']
     self.ip_addresses = response['Accelerator']['IpSets'][0]['IpAddresses']
-    #util.AddDefaultTags(self.id, self.region)
 
   def _Delete(self):
     """Deletes the Accelerator"""
@@ -164,6 +163,7 @@ class AwsGlobalAccelerator(resource.BaseResource):
     status = response['Accelerator']['Status']
     return status
 
+
 class AwsGlobalAcceleratorListener(resource.BaseResource):
   """Class representing an AWS Global Accelerator listener."""
 
@@ -250,6 +250,7 @@ class AwsEndpointGroup(resource.BaseResource):
 
   def _Create(self):
     """Creates the endpoint group"""
+
     if not self.idempotency_token:
       self.idempotency_token = str(uuid.uuid4())[-50:]
 
