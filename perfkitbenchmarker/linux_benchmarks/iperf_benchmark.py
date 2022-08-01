@@ -141,7 +141,7 @@ def Prepare(benchmark_spec):
 
 @vm_util.Retry(max_retries=IPERF_RETRIES)
 def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
-              ip_type, protocol):
+              ip_type, protocol, interval_size=None):
   """Run iperf using sending 'vm' to connect to 'ip_address'.
 
   Args:
@@ -199,7 +199,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
                   stdout).group('buffer_size'))
 
 
-    if FLAGS.iperf_interval:
+    if interval_size:
       interval_throughput_list = []
       interval_start_time_list = []
       rtt_avg_list = []
@@ -295,7 +295,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
           'retry_packet_count': int(total_stats['retry']),
           'congestion_window': float(total_stats['cwnd']),
           'congestion_window_scale': cwnd_scale,
-          'interval_length_seconds': FLAGS.iperf_interval,
+          'interval_length_seconds': float(interval_size),
           'rtt': float(total_stats['rtt']),
           'rtt_unit': total_stats['rtt_unit'],
           'netpwr': float(total_stats['netpwr']),
@@ -312,7 +312,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
       metadata_tmp.update(tcp_metadata)
       return sample.Sample('Throughput', total_stats['throughput'], 'Mbits/sec', metadata_tmp)
 
-    # if FLAGS.iperf_interval == None
+    # if interval_size == None
     else:
 
       multi_thread = re.search((
@@ -434,8 +434,8 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     # total and lost datagrams
     match = re.findall(
         r'(?P<lost_datagrams>\d+)/\s*(?P<total_datagrams>\d+)\s+\(', stdout)
-    lost_datagrams_sum = sum(float(i[0]) for i in match)
-    total_datagrams_sum = sum(float(i[1]) for i in match)
+    lost_datagrams_sum = sum(int(i[0]) for i in match)
+    total_datagrams_sum = sum(int(i[1]) for i in match)
 
     # out of order datagrams
     out_of_order_array = re.findall(
@@ -505,7 +505,8 @@ def Run(benchmark_spec):
                         receiving_vm.ip_address,
                         thread_count,
                         vm_util.IpAddressMetadata.EXTERNAL,
-                        protocol))
+                        protocol,
+                        interval_size=FLAGS.iperf_interval))
 
           time.sleep(FLAGS.iperf_sleep_time)
 
@@ -517,7 +518,8 @@ def Run(benchmark_spec):
                         receiving_vm.internal_ip,
                         thread_count,
                         vm_util.IpAddressMetadata.INTERNAL,
-                        protocol))
+                        protocol,
+                        interval_size=FLAGS.iperf_interval))
 
           time.sleep(FLAGS.iperf_sleep_time)
 

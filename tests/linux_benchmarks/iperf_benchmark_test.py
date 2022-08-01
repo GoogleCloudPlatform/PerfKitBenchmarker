@@ -42,8 +42,6 @@ class IperfBenchmarkTestCase(unittest.TestCase):
 
   def testIperfParseResultsUDPSingleThread(self):
 
-    FLAGS.iperf_interval = None
-
     iperf_output = """
       Client connecting to 10.128.0.2, UDP port 25000 with pid 10159
       Sending 1470 byte datagrams, IPG target: 11215.21 us (kalman adjust)
@@ -80,16 +78,15 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'jitter': 0.017,
         'jitter_unit': 'ms',
         'lost_datagrams': 0,
+        'udp_per_stream_bandwidth_mbit': None,
         'total_datagrams': 5350,
         'out_of_order_datagrams': 0
     }
 
-    self.assertDictEqual(results.value, 1.05)
-    self.assertEqual(expected_results, results.metadata)
+    self.assertEqual(results.value, 1.05)
+    self.assertDictEqual(expected_results, results.metadata)
 
   def testIperfParseResultsUDPMultiThread(self):
-
-    FLAGS.iperf_interval = None
 
     iperf_output = """
       Client connecting to 10.128.0.2, UDP port 25000 with pid 10188
@@ -135,6 +132,7 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'jitter': 0.0325,
         'jitter_unit': 'ms',
         'lost_datagrams': 1,
+        'udp_per_stream_bandwidth_mbit': None,
         'total_datagrams': 10700,
         'out_of_order_datagrams': 1
     }
@@ -143,8 +141,6 @@ class IperfBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(results.value, 2.10)
 
   def testIperfParseResultsTCPSingleThread(self):
-
-    FLAGS.iperf_interval = None
 
     iperf_output = """
       Client connecting to 10.128.0.2, TCP port 20000 with pid 10208
@@ -184,8 +180,6 @@ class IperfBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(results.value, 1966.0)
 
   def testIperfParseResultsTCPMultiThread(self):
-
-    FLAGS.iperf_interval = None
 
     iperf_output = """
       Client connecting to 10.128.0.2, TCP port 20000 with pid 10561
@@ -229,8 +223,6 @@ class IperfBenchmarkTestCase(unittest.TestCase):
 
   def testIperfParseResultsTCPWithIntervalReports(self):
 
-    FLAGS.iperf_interval = 1
-
     iperf_output = """
         Client connecting to 10.128.0.2, TCP port 20000 with pid 10020
         Write buffer size: 0.12 MByte
@@ -248,8 +240,8 @@ class IperfBenchmarkTestCase(unittest.TestCase):
 
     self.vm_spec.vms[0].RemoteCommand.side_effect = [(iperf_output, '')]
     results = iperf_benchmark._RunIperf(self.vm_spec.vms[0],
-                                        self.vm_spec.vms[1], '10.128.0.2', 2,
-                                        'INTERNAL', 'TCP')
+                                        self.vm_spec.vms[1], '10.128.0.2', 1,
+                                        'INTERNAL', 'TCP', interval_size=1)
 
     expected_results = {'buffer_size': 0.12,
         'congestion_window': -1,
@@ -266,15 +258,14 @@ class IperfBenchmarkTestCase(unittest.TestCase):
                               269102.0],
         'interval_start_time_list': [0.0, 1.0, 2.0, 3.0, 4.0],
         'interval_throughput_list': [5.24, 94.4, 811.0, 2109.0, 2026.0],
-        'ip_type': 'internal',
+        'ip_type': 'INTERNAL',
         'netpwr': 435.59,
         'receiving_machine_type': 'mock_machine_1',
         'receiving_zone': 'antarctica-1a',
         'retry_packet_count': 0,
         'rtt': 269333,
         'rtt_unit': 'us',
-        'run_number': 0,
-        'runtime_in_seconds': 5,
+        'runtime_in_seconds': 60,
         'sending_machine_type': 'mock_machine_1',
         'sending_thread_count': 1,
         'sending_zone': 'antarctica-1a',
@@ -283,11 +274,9 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'write_packet_count': 4811}
 
     self.assertDictEqual(expected_results, results.metadata)
-    self.assertEqual(results.value, 1183.0)
+    self.assertEqual(results.value, 939.0)
 
   def testIperfParseResultsTCPMultiThreadWithIntervalReports(self):
-
-    FLAGS.iperf_interval = 1
 
     iperf_output = """
         Client connecting to 10.128.0.2, TCP port 20000 with pid 10054
@@ -326,8 +315,8 @@ class IperfBenchmarkTestCase(unittest.TestCase):
 
     self.vm_spec.vms[0].RemoteCommand.side_effect = [(iperf_output, '')]
     results = iperf_benchmark._RunIperf(self.vm_spec.vms[0],
-                                        self.vm_spec.vms[1], '10.128.0.2', 2,
-                                        'INTERNAL', 'TCP')
+                                        self.vm_spec.vms[1], '10.128.0.2', 3,
+                                        'INTERNAL', 'TCP', interval_size=1)
 
     expected_results = {'buffer_size': 0.12,
         'congestion_window': 17135.86666666667,
@@ -352,15 +341,14 @@ class IperfBenchmarkTestCase(unittest.TestCase):
                               266217.6666666667],
         'interval_start_time_list': [0.0, 1.0, 2.0, 3.0, 4.0],
         'interval_throughput_list': [17.8, 244.0, 2316.0, 1806.0, 1816.0],
-        'ip_type': 'internal',
-        'netpwr': 2928.51,
+        'ip_type': 'INTERNAL',
+        'netpwr': 585.702,
         'receiving_machine_type': 'mock_machine_1',
         'receiving_zone': 'antarctica-1a',
         'retry_packet_count': 0,
         'rtt': 264691.2,
         'rtt_unit': 'us',
-        'run_number': 0,
-        'runtime_in_seconds': 5,
+        'runtime_in_seconds': 60,
         'sending_machine_type': 'mock_machine_1',
         'sending_thread_count': 3,
         'sending_zone': 'antarctica-1a',
