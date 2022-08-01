@@ -43,6 +43,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker.providers.aws import aws_elastic_ip
 from six.moves import range
 
 
@@ -552,8 +553,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_dedicated_host and self.use_spot_instance:
       raise ValueError(
           'Tenancy=host is not supported for Spot Instances')
-    self.allocation_id = None
-    self.association_id = None
+    self.elastic_ip = None
     self.aws_tags = {}
 
   @property
@@ -727,23 +727,44 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         break
     assert network_interface_id is not None
 
-    stdout, _, _ = vm_util.IssueCommand(util.AWS_PREFIX +
-                                        ['ec2', 'allocate-address',
-                                         f'--region={self.region}',
-                                         '--domain=vpc'])
-    response = json.loads(stdout)
-    self.ip_address = response['PublicIp']
-    self.allocation_id = response['AllocationId']
-
+    self.elastic_ip = aws_elastic_ip.AwsElasticIP(self.region, domain='vpc')
+    self.elastic_ip.Create()
+    self.ip_address = self.elastic_ip.public_ip
     util.AddDefaultTags(self.allocation_id, self.region)
+    self.elastic_ip.AssociateAddress(network_interface_id, 
+                                     is_network_interface=True)
 
-    stdout, _, _ = vm_util.IssueCommand(
-        util.AWS_PREFIX + ['ec2', 'associate-address',
-                           f'--region={self.region}',
-                           f'--allocation-id={self.allocation_id}',
-                           f'--network-interface-id={network_interface_id}'])
-    response = json.loads(stdout)
-    self.association_id = response['AssociationId']
+  # def _ConfigureElasticIpOld(self, instance):
+  #   """Create and associate Elastic IP.
+
+  #   Args:
+  #     instance: dict which contains instance info.
+  #   """
+  #   network_interface_id = None
+  #   for network_interface in instance['NetworkInterfaces']:
+  #     # The primary network interface (eth0) for the instance.
+  #     if network_interface['Attachment']['DeviceIndex'] == 0:
+  #       network_interface_id = network_interface['NetworkInterfaceId']
+  #       break
+  #   assert network_interface_id is not None
+
+  #   stdout, _, _ = vm_util.IssueCommand(util.AWS_PREFIX +
+  #                                       ['ec2', 'allocate-address',
+  #                                        f'--region={self.region}',
+  #                                        '--domain=vpc'])
+  #   response = json.loads(stdout)
+  #   self.ip_address = response['PublicIp']
+  #   self.allocation_id = response['AllocationId']
+
+  #   util.AddDefaultTags(self.allocation_id, self.region)
+
+  #   stdout, _, _ = vm_util.IssueCommand(
+  #       util.AWS_PREFIX + ['ec2', 'associate-address',
+  #                          f'--region={self.region}',
+  #                          f'--allocation-id={self.allocation_id}',
+  #                          f'--network-interface-id={network_interface_id}'])
+  #   response = json.loads(stdout)
+  #   self.association_id = response['AssociationId']
 
   def _InstallEfa(self):
     """Installs AWS EFA packages.
@@ -1051,17 +1072,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
     if FLAGS.aws_efa:
-      if self.association_id:
-        vm_util.IssueCommand(util.AWS_PREFIX +
-                             ['ec2', 'disassociate-address',
-                              f'--region={self.region}',
-                              f'--association-id={self.association_id}'])
-
-      if self.allocation_id:
-        vm_util.IssueCommand(util.AWS_PREFIX +
-                             ['ec2', 'release-address',
-                              f'--region={self.region}',
-                              f'--allocation-id={self.allocation_id}'])
+      if self.elastic_ip:
+        self.elastic_ip.DisassociateAddress()
+        self.elastic_ip.Delete()
 
   #  _Start or _Stop not yet implemented for AWS
   def _Start(self):
