@@ -80,10 +80,10 @@ successful.
 Sender: the stage.
 Payload: benchmark_spec.""")
 
-samples_created = _events.signal('samples-created', doc="""
+benchmark_samples_created = _events.signal('benchmark-samples-created', doc="""
 Called with samples list and benchmark spec.
 
-Signal sent immediately after a sample is created.
+Signal sent immediately after samples from benchmark is created.
 The samples' metadata is mutable, and may be updated by the subscriber.
 
 Sender: the phase. Currently only stages.RUN.
@@ -140,7 +140,7 @@ def _RunStartupScript(unused_sender, vm):
         './%s' % os.path.basename(FLAGS.startup_script))
 
 
-@samples_created.connect
+@benchmark_samples_created.connect
 def _AddScriptSamples(unused_sender, benchmark_spec, samples):
   def _ScriptResultToMetadata(out):
     return {'stdout': out[0], 'stderr': out[1]}

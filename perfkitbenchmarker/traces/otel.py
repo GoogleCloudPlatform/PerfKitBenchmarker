@@ -83,11 +83,10 @@ class _OTELCollector(base_collector.BaseCollector):
     return (f'sudo ./{otel_binary.strip()} --config=./{OTEL_DIR}/config.yaml'
             f'> ./{OTEL_DIR}/otel.log 2>&1 & echo $!')
 
-  def Analyze(self, sender, benchmark_spec, samples):
+  def Analyze(self, unused_sender, benchmark_spec, samples):
     """Parse otel metric file and record samples.
 
     Args:
-      sender: event sender for collecting stats.
       benchmark_spec: benchmark_spec of this run.
       samples: samples to add stats to.
     """
@@ -146,4 +145,4 @@ def Register(parsed_flags):
       output_directory=output_directory)
   events.before_phase.connect(collector.Start, stages.RUN, weak=False)
   events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
-  events.samples_created.connect(collector.Analyze, stages.RUN, weak=False)
+  events.benchmark_samples_created.connect(collector.Analyze, weak=False)

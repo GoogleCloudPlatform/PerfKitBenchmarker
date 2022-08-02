@@ -86,7 +86,7 @@ class _DStatCollector(base_collector.BaseCollector):
                dstat_interval=self.interval or '')
     return cmd
 
-  def Analyze(self, sender, benchmark_spec, samples):
+  def Analyze(self, unused_sender, benchmark_spec, samples):
     """Analyze dstat file and record samples."""
 
     def _AnalyzeEvent(role, labels, out, event):
@@ -100,7 +100,6 @@ class _DStatCollector(base_collector.BaseCollector):
       avg = np.average(out[:, 1:], weights=cond, axis=0)
       metadata = copy.deepcopy(event.metadata)
       metadata['event'] = event.event
-      metadata['sender'] = event.sender
       metadata['vm_role'] = role
 
       samples.extend([
@@ -151,4 +150,4 @@ def Register(parsed_flags):
   events.before_phase.connect(collector.Start, stages.RUN, weak=False)
   events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
   if parsed_flags.dstat_publish:
-    events.samples_created.connect(collector.Analyze, stages.RUN, weak=False)
+    events.benchmark_samples_created.connect(collector.Analyze, weak=False)

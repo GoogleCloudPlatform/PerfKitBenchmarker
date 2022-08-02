@@ -66,7 +66,7 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
     """See base class."""
     return f'nvidia-smi --query-gpu=index,power.draw --format=csv -l {self.interval} > {collector_file} & echo $!'
 
-  def Analyze(self, sender: str, benchmark_spec: BenchmarkSpec,
+  def Analyze(self, unused_sender, benchmark_spec: BenchmarkSpec,
               samples: List[sample.Sample]) -> None:
     """Analyze Nvidia power and record samples."""
 
@@ -76,7 +76,6 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
           'r') as fp:
         metadata = {
             'event': 'nvidia_power',
-            'sender': 'run',
             'nvidia_interval': self.interval,
             'role': role
         }
@@ -96,4 +95,4 @@ def Register(parsed_flags: flags) -> None:
   events.before_phase.connect(collector.Start, stages.RUN, weak=False)
   events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
   if _PUBLISH.value:
-    events.samples_created.connect(collector.Analyze, stages.RUN, weak=False)
+    events.benchmark_samples_created.connect(collector.Analyze, weak=False)

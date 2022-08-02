@@ -914,8 +914,7 @@ def DoRunPhase(spec, collector, timer):
       for s in samples:
         s.metadata['restore'] = True
 
-    events.samples_created.send(
-        stages.RUN, benchmark_spec=spec, samples=samples)
+    events.benchmark_samples_created.send(benchmark_spec=spec, samples=samples)
     collector.AddSamples(samples, spec.name, spec)
     if (FLAGS.publish_after_run and FLAGS.publish_period is not None and
         FLAGS.publish_period < (time.time() - last_publish_time)):
@@ -1754,8 +1753,8 @@ def _ParseMeminfo(meminfo_txt: str) -> Tuple[Dict[str, int], List[str]]:
   return data, malformed
 
 
-@events.samples_created.connect
-def _CollectMeminfoHandler(sender: str, benchmark_spec: bm_spec.BenchmarkSpec,
+@events.benchmark_samples_created.connect
+def _CollectMeminfoHandler(unused_sender, benchmark_spec: bm_spec.BenchmarkSpec,
                            samples: List[sample.Sample]) -> None:
   """Optionally creates /proc/meminfo samples.
 
@@ -1766,11 +1765,9 @@ def _CollectMeminfoHandler(sender: str, benchmark_spec: bm_spec.BenchmarkSpec,
   keyword arguments.
 
   Args:
-    sender: Unused sender.
     benchmark_spec: The benchmark spec.
     samples: Generated samples that can be appended to.
   """
-  del sender  # Unused as appending to samples with VMs from benchmark_spec
   if not _COLLECT_MEMINFO.value:
     return
 
