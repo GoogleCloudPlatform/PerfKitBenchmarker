@@ -81,6 +81,9 @@
 -   Add GCP Optimized Rocky Linux 8 OS.
 -   Add mtu to os_metadata in linux_virtual_machine.
 -   Add support for TPC-DS/H benchmarks on AWS EMR Serverless.
+-   Add dpb_sparksql_serverless_benchmark, which submits one job for each
+    TPC-DS/H query and measures the whole job execution time, instead of only
+    the query run time.
 
 ### Enhancements:
 
