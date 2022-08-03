@@ -145,7 +145,11 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
           'a2-highgpu-2g': 2,
           'a2-highgpu-4g': 4,
           'a2-highgpu-8g': 8,
-          'a2-megagpu-16g': 16
+          'a2-megagpu-16g': 16,
+          'a2-ultragpu-1g': 1,
+          'a2-ultragpu-2g': 2,
+          'a2-ultragpu-4g': 4,
+          'a2-ultragpu-8g': 8,
       }
       self.gpu_count = a2_lookup[self.machine_type]
       self.gpu_type = virtual_machine.GPU_A100

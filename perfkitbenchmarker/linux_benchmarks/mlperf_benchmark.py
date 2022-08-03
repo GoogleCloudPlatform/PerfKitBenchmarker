@@ -100,7 +100,7 @@ flags.DEFINE_string('minigo_model_dir', '',
                     'corresponding to the board size.')
 
 BERT_BATCH_SIZE = flags.DEFINE_integer(
-    'mlperf_bert_batch_size', 46, 'The batch size to use for training BERT.')
+    'mlperf_bert_batch_size', None, 'The batch size to use for training BERT.')
 
 HYPERTHREADS = flags.DEFINE_bool('mlperf_hyperthreads', True,
                                  'enable or disable binding to hyperthreads')
@@ -485,7 +485,8 @@ def _GetChangesForBert(config_sed_input):
                   r'CHECKPOINTDIR=\/data\/bert_data\/tf1_ckpt')]
   config_sed += [(r'CHECKPOINTDIR_PHASE1=.*',
                   r'CHECKPOINTDIR_PHASE1=\/data\/bert_data\/tf1_ckpt')]
-  config_sed += [(r'BATCHSIZE=.*', fr'BATCHSIZE={BERT_BATCH_SIZE.value}')]
+  if BERT_BATCH_SIZE.value:
+    config_sed += [(r'BATCHSIZE=.*', fr'BATCHSIZE={BERT_BATCH_SIZE.value}')]
 
   return config_sed
 

@@ -533,8 +533,9 @@ def _GetChangesForBert(benchmark_spec, node_rank, nvprof_flags,
                   r'CHECKPOINTDIR=\/data\/bert_data\/tf1_ckpt')]
   config_sed += [(r'CHECKPOINTDIR_PHASE1=.*',
                   r'CHECKPOINTDIR_PHASE1=\/data\/bert_data\/tf1_ckpt')]
-  config_sed += [(r'BATCHSIZE=.*',
-                  fr'BATCHSIZE={mlperf_benchmark.BERT_BATCH_SIZE.value}')]
+  if FLAGS.mlperf_bert_batch_size:
+    config_sed += [(r'BATCHSIZE=.*',
+                    fr'BATCHSIZE={FLAGS.mlperf_bert_batch_size}')]
 
   if mlperf_benchmark.NVPROF in FLAGS.mlperf_profiler:
     run_and_time_sed += [(r'python', fr'nvprof {nvprof_flags} python')]
