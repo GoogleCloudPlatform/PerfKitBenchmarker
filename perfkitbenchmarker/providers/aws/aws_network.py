@@ -24,7 +24,6 @@ for more information about AWS Virtual Private Clouds.
 import json
 import logging
 import threading
-import string
 
 from absl import flags
 from perfkitbenchmarker import context
