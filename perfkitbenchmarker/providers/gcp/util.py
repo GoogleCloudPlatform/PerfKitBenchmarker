@@ -133,7 +133,7 @@ def GetZonesFromMachineType(machine_type: str) -> Set[str]:
       'format': 'value(zone)'
   }
   stdout, _, _ = cmd.Issue()
-  return set(stdout.splitlines())
+  return set(stdout.splitlines()) or GetAllZones()
 
 
 def GetGeoFromRegion(region: str) -> str:
