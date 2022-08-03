@@ -679,7 +679,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Resource.RetryableCreationError('Public IP not ready.')
 
     if FLAGS.aws_global_accelerator:
-      #TODO associate elastic IP here
+      # Associate elastic IPs
       logging.warn("adding global acclerator stuff here")
       self.network.elastic_ip.AssociateAddress(self.id)
       self.ip_address = self.network.elastic_ip.public_ip
@@ -733,38 +733,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     util.AddDefaultTags(self.allocation_id, self.region)
     self.elastic_ip.AssociateAddress(network_interface_id, 
                                      is_network_interface=True)
-
-  # def _ConfigureElasticIpOld(self, instance):
-  #   """Create and associate Elastic IP.
-
-  #   Args:
-  #     instance: dict which contains instance info.
-  #   """
-  #   network_interface_id = None
-  #   for network_interface in instance['NetworkInterfaces']:
-  #     # The primary network interface (eth0) for the instance.
-  #     if network_interface['Attachment']['DeviceIndex'] == 0:
-  #       network_interface_id = network_interface['NetworkInterfaceId']
-  #       break
-  #   assert network_interface_id is not None
-
-  #   stdout, _, _ = vm_util.IssueCommand(util.AWS_PREFIX +
-  #                                       ['ec2', 'allocate-address',
-  #                                        f'--region={self.region}',
-  #                                        '--domain=vpc'])
-  #   response = json.loads(stdout)
-  #   self.ip_address = response['PublicIp']
-  #   self.allocation_id = response['AllocationId']
-
-  #   util.AddDefaultTags(self.allocation_id, self.region)
-
-  #   stdout, _, _ = vm_util.IssueCommand(
-  #       util.AWS_PREFIX + ['ec2', 'associate-address',
-  #                          f'--region={self.region}',
-  #                          f'--allocation-id={self.allocation_id}',
-  #                          f'--network-interface-id={network_interface_id}'])
-  #   response = json.loads(stdout)
-  #   self.association_id = response['AssociationId']
 
   def _InstallEfa(self):
     """Installs AWS EFA packages.

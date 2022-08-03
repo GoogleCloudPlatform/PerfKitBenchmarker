@@ -24,8 +24,6 @@ for more information about AWS Virtual Private Clouds.
 import json
 import logging
 import threading
-import uuid
-import random
 import string
 
 from absl import flags
@@ -884,6 +882,7 @@ class AwsNetwork(network.BaseNetwork):
       self.global_accelerator.listeners[-1].AddEndpointGroup(
                                             self.region,
                                             self.elastic_ip.allocation_id, 128)
+    print("back in aws_network create")
 
   def Delete(self):
     """Deletes the network."""

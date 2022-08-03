@@ -1,14 +1,7 @@
 import json
 import logging
-import threading
-import uuid
-import random
-import string
 
-from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import network
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
@@ -44,6 +37,7 @@ class AwsElasticIP(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the elastic IP."""
+
     delete_cmd = util.AWS_PREFIX + [
         'ec2',
         'release-address',
@@ -53,6 +47,7 @@ class AwsElasticIP(resource.BaseResource):
 
   def _Exists(self):
     """Returns true if the elastic IP exists."""
+
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-addresses',
