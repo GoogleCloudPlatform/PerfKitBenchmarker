@@ -13,13 +13,40 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.packages.ycsb."""
 
-
+import os
 import unittest
 
 import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import redis_enterprise
 from tests import pkb_common_test_case
+
+
+class ResultParserTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def GetRedisEnterpriseOutput(self, file: str) -> str:
+    path = os.path.join(os.path.dirname(__file__), '..', 'data', file)
+    with open(path) as f:
+      return f.read()
+
+  def testParseResults(self):
+    output = self.GetRedisEnterpriseOutput('redis_enterprise_output.txt')
+    actual = redis_enterprise.ParseResult(output)
+    # DB 4 has 5 elements in the time series so final length is 5 instead of 10.
+    self.assertCountEqual(actual.latencies, [
+        895.4008497116798,
+        889.6032863841133,
+        898.4151736901495,
+        857.8283013278468,
+        825.5712436699047,
+    ])
+    self.assertCountEqual(actual.throughputs, [
+        423465.0,
+        423435.0,
+        426084.0,
+        435096.0,
+        441108.0,
+    ])
 
 
 class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
