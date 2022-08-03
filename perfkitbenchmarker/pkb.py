@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs all benchmarks in PerfKitBenchmarker.
+"""Runs benchmarks in PerfKitBenchmarker.
 
 All benchmarks in PerfKitBenchmarker export the following interface:
 
@@ -1792,6 +1792,8 @@ def _CollectMeminfoHandler(unused_sender, benchmark_spec: bm_spec.BenchmarkSpec,
 
 
 def Main():
+  """Entrypoint for PerfKitBenchmarker."""
+  assert sys.version_info >= (3, 9), 'PerfKitBenchmarker requires Python 3.9+'
   log_util.ConfigureBasicLogging()
   _InjectBenchmarkInfoIntoDocumentation()
   _ParseFlags()

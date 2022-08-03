@@ -20,7 +20,8 @@ blinker>=1.3
 packaging
 pandas>=1.1.5
 PyYAML==5.4.1
-pint>=0.7
+# TODO(pclay): fix % parsing in 0.19+
+pint<0.19
 numpy>=1.16.5
 contextlib2>=0.5.1
 six>=1.13.0
@@ -30,3 +31,7 @@ google-cloud-datastore
 google-cloud-monitoring
 beautifulsoup4
 requests
+
+# unlike setup.py requirements.txt cannot require a Python version AFAICT
+# this hack requires a non-existent package when Python is less than 3.9
+PerfkitBenchmarker_requires_Python_39;python_version<"3.9"
