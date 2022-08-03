@@ -231,6 +231,9 @@ class AwsGlobalAcceleratorListener(resource.BaseResource):
     self.endpoint_groups.append(AwsEndpointGroup(self, region))
     self.endpoint_groups[-1].Create()
     self.endpoint_groups[-1].Update(endpoint, weight)
+    print("update done")
+    return
+
 
 
 class AwsEndpointGroup(resource.BaseResource):
