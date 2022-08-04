@@ -957,10 +957,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def SetupLMNotification(self):
     """Prepare environment for /scripts/gce_maintenance_notify.py script."""
-    if FLAGS.redis_memtier_capture_live_migration_timestamps:
-      self.Install('pip3')
-      self.RemoteCommand('sudo pip3 install requests')
-      self.PushDataFile(self._LM_NOTICE_SCRIPT, vm_util.VM_TMP_DIR)
+    self.Install('pip3')
+    self.RemoteCommand('sudo pip3 install requests')
+    self.PushDataFile(self._LM_NOTICE_SCRIPT, vm_util.VM_TMP_DIR)
 
   def _GetLMNotificationCommand(self):
     """Return Remote python execution command for LM notify script."""
@@ -971,22 +970,20 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def StartLMNotification(self):
     """Start meta-data server notification subscription."""
-    if FLAGS.redis_memtier_capture_live_migration_timestamps:
-      def _Subscribe():
-        self.RobustRemoteCommand(self._GetLMNotificationCommand())
-        self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
-        logging.info('[LM Notify] Release live migration lock.')
-        self._LM_TIMES_SEMAPHORE.release()
-      t = threading.Thread(target=_Subscribe)
-      t.daemon = True
-      t.start()
+    def _Subscribe():
+      self.RobustRemoteCommand(self._GetLMNotificationCommand())
+      self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
+      logging.info('[LM Notify] Release live migration lock.')
+      self._LM_TIMES_SEMAPHORE.release()
+    t = threading.Thread(target=_Subscribe)
+    t.daemon = True
+    t.start()
 
   def WaitLMNotificationRelease(self):
     """Block main thread until LM ended."""
-    if FLAGS.redis_memtier_capture_live_migration_timestamps:
-      logging.info('[LM Notify] Wait for live migration to finish.')
-      self._LM_TIMES_SEMAPHORE.acquire()
-      logging.info('[LM Notify] Live nigration is done.')
+    logging.info('[LM Notify] Wait for live migration to finish.')
+    self._LM_TIMES_SEMAPHORE.acquire()
+    logging.info('[LM Notify] Live nigration is done.')
 
   def CollectLMNotificationsTime(self):
     """Extract LM notifications from log file.
@@ -1001,23 +998,22 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     lm_total_time_key = 'LM_total_time'
     lm_start_time_key = 'Host_maintenance_start'
     lm_end_time_key = 'Host_maintenance_end'
-    events_dict = {}
-    if FLAGS.redis_memtier_capture_live_migration_timestamps:
-      lm_times, _ = self.RemoteCommand(f'cat {self._LM_NOTICE_LOG}')
-      if not lm_times: return events_dict
+    events_dict = {'machine_instance': self.instance_number}
+    lm_times, _ = self.RemoteCommand(f'cat {self._LM_NOTICE_LOG}')
+    if not lm_times: return events_dict
 
-      # Result may contain errors captured, so we need to skip them
-      for event_info in lm_times.splitlines():
-        event_info_parts = event_info.split(' _at_ ')
-        if len(event_info_parts) == 2:
-          events_dict[event_info_parts[0]] = event_info_parts[1]
+    # Result may contain errors captured, so we need to skip them
+    for event_info in lm_times.splitlines():
+      event_info_parts = event_info.split(' _at_ ')
+      if len(event_info_parts) == 2:
+        events_dict[event_info_parts[0]] = event_info_parts[1]
 
-      lm_total_time = 0
-      if lm_start_time_key in events_dict and lm_end_time_key in events_dict:
-        lm_total_time = float(events_dict[lm_end_time_key]) - float(
-            events_dict[lm_start_time_key])
-      events_dict[lm_total_time_key] = lm_total_time
-      return events_dict
+    lm_total_time = 0
+    if lm_start_time_key in events_dict and lm_end_time_key in events_dict:
+      lm_total_time = float(events_dict[lm_end_time_key]) - float(
+          events_dict[lm_start_time_key])
+    events_dict[lm_total_time_key] = lm_total_time
+    return events_dict
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a data file from a GCS bucket with pre-provisioned data.

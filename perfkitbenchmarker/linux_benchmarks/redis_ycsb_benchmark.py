@@ -95,7 +95,6 @@ def Prepare(benchmark_spec):
           'shardkeyspace': True,
           'redis.host': redis_vm.internal_ip,
           'perclientparam': server_metadata})
-  vm_util.SetupSimulatedMaintenance(redis_vm)
 
 
 def Run(benchmark_spec):
@@ -143,7 +142,6 @@ def Run(benchmark_spec):
 
   samples = list(benchmark_spec.executor.Load(client_vms,
                                               load_kwargs={'threads': 4}))
-  vm_util.StartSimulatedMaintenance()
   samples += list(benchmark_spec.executor.Run(client_vms))
 
   for sample in samples:

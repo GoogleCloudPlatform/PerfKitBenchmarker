@@ -98,6 +98,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine
+from perfkitbenchmarker import time_triggers
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import traces
 from perfkitbenchmarker import version
@@ -449,6 +450,7 @@ _TEARDOWN_EVENT = multiprocessing.Event()
 _ANY_ZONE = 'any'
 
 events.initialization_complete.connect(traces.RegisterAll)
+events.initialization_complete.connect(time_triggers.RegisterAll)
 
 
 @flags.multi_flags_validator(
@@ -869,6 +871,7 @@ def DoRunPhase(spec, collector, timer):
     samples = []
     logging.info('Running benchmark %s', spec.name)
     events.before_phase.send(stages.RUN, benchmark_spec=spec)
+    events.trigger_phase.send()
     try:
       with timer.Measure('Benchmark Run'):
         samples = spec.BenchmarkRun(spec)
@@ -915,6 +918,7 @@ def DoRunPhase(spec, collector, timer):
         s.metadata['restore'] = True
 
     events.benchmark_samples_created.send(benchmark_spec=spec, samples=samples)
+    events.all_samples_created.send(benchmark_spec=spec, samples=samples)
     collector.AddSamples(samples, spec.name, spec)
     if (FLAGS.publish_after_run and FLAGS.publish_period is not None and
         FLAGS.publish_period < (time.time() - last_publish_time)):

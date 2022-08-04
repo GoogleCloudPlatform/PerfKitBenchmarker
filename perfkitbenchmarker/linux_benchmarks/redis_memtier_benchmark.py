@@ -21,7 +21,6 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
-import datetime
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -48,9 +47,6 @@ flags.DEFINE_string('redis_memtier_server_machine_type', None,
 REDIS_MEMTIER_MEASURE_CPU = flags.DEFINE_bool(
     'redis_memtier_measure_cpu', False, 'If true, measure cpu usage on the '
     'server via top tool. Defaults to False.')
-flags.DEFINE_boolean('redis_memtier_capture_live_migration_timestamps', False,
-                     'Whether to capture maintenance times during migration. '
-                     'This requires external python script for notification.')
 BENCHMARK_NAME = 'redis_memtier'
 BENCHMARK_CONFIG = """
 redis_memtier:
@@ -153,10 +149,6 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
       redis_server.GetRedisPorts(), 10)
 
   bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
-  vm_util.SetupSimulatedMaintenance(server_vm)
-
-  if FLAGS.redis_memtier_capture_live_migration_timestamps:
-    server_vm.SetupLMNotification()
 
 
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
@@ -168,7 +160,6 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   if 'servers' in bm_spec.vm_groups:
     server_vm = bm_spec.vm_groups['servers'][0]
   measure_cpu_on_server_vm = server_vm and REDIS_MEMTIER_MEASURE_CPU.value
-  simulate_maintenance = server_vm and vm_util.SIMULATE_MAINTENANCE.value
 
   ports = [str(port) for port in redis_server.GetRedisPorts()]
   def DistributeClientsToPorts(port):
@@ -179,17 +170,6 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
 
   benchmark_metadata = {}
 
-  # if testing performance due to a live migration, simulate live migration.
-  if simulate_maintenance:
-    if FLAGS.redis_memtier_capture_live_migration_timestamps:
-      server_vm.StartLMNotification()
-    vm_util.StartSimulatedMaintenance()
-    simulate_maintenance_time = datetime.datetime.now() + datetime.timedelta(
-        seconds=FLAGS.simulate_maintenance_delay)
-    benchmark_metadata[
-        'simulate_maintenance_time'] = str(simulate_maintenance_time)
-    benchmark_metadata[
-        'simulate_maintenance_delay'] = FLAGS.simulate_maintenance_delay
   if measure_cpu_on_server_vm:
     top_cmd = f'top -b -d 1 -n {memtier.MEMTIER_RUN_DURATION.value} > {_TOP_OUTPUT} &'
     server_vm.RemoteCommand(
@@ -211,17 +191,7 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
       result_sample.metadata.update(benchmark_metadata)
       results.append(result_sample)
 
-  lm_results = []
-  if FLAGS.redis_memtier_capture_live_migration_timestamps:
-    # Block test exit until LM ended. This can happen if memtier test time
-    # is less than LM time
-    server_vm.WaitLMNotificationRelease()
-    lm_events_dict = server_vm.CollectLMNotificationsTime()
-    lm_results.append(
-        sample.Sample('LM Total Time', lm_events_dict['LM_total_time'],
-                      'seconds', lm_events_dict))
-
-  return results + top_results + lm_results
+  return results + top_results
 
 
 def Cleanup(bm_spec: _BenchmarkSpec) -> None:
