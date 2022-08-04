@@ -45,10 +45,10 @@ _TUNE_ON_STARTUP = flags.DEFINE_boolean(
     'enterprise_redis_tune_on_startup', True,
     'Whether to tune core config during startup.')
 _PROXY_THREADS = flags.DEFINE_integer(
-    'enterprise_redis_proxy_threads', 24,
+    'enterprise_redis_proxy_threads', None,
     'Number of redis proxy threads to use.')
 _SHARDS = flags.DEFINE_integer(
-    'enterprise_redis_shard_count', 6,
+    'enterprise_redis_shard_count', None,
     'Number of redis shards per database. Each shard is a redis thread.')
 _LOAD_RECORDS = flags.DEFINE_integer(
     'enterprise_redis_load_records', 1000000,
@@ -631,9 +631,13 @@ class ThroughputOptimizer():
     self.redis_port: int = redis_port
     self.min_threads: int = _MIN_THREADS.value
 
-    num_cpus = server_vms[0].num_cpus
+    # Determines the search space for the optimization algorithm. We multiply
+    # the size by 2 which should be a large enough search space.
+    matrix_size = max(server_vms[0].num_cpus,
+                      FLAGS.enterprise_redis_proxy_threads or 0,
+                      FLAGS.enterprise_redis_shard_count or 0) * 2
     self.results: _ThroughputSampleMatrix = (
-        [[() for i in range(num_cpus)] for i in range(num_cpus)])
+        [[() for i in range(matrix_size)] for i in range(matrix_size)])
 
   def _CreateAndLoadDatabase(self, shards: int) -> None:
     CreateDatabase(self.server_vms, self.redis_port, shards)
@@ -678,6 +682,20 @@ class ThroughputOptimizer():
           shards * len(self.server_vms), proxy_threads)
     return self.results[shards - 1][proxy_threads - 1]
 
+  def _GetNeighborsToCheck(self, shards: int,
+                           proxy_threads: int) -> List[Tuple[int, int]]:
+    """Returns the shards/proxy_threads neighbor to check."""
+    vary_proxy_threads = [(shards, proxy_threads - 1),
+                          (shards, proxy_threads + 1)]
+    vary_shards = [(shards - 1, proxy_threads), (shards + 1, proxy_threads)]
+    # Vary proxy threads only.
+    if _SHARDS.value:
+      return vary_proxy_threads
+    # Vary shards only.
+    if _PROXY_THREADS.value:
+      return vary_shards
+    return vary_proxy_threads + vary_shards
+
   def _GetOptimalNeighbor(self, shards: int,
                           proxy_threads: int) -> Tuple[int, int]:
     """Returns the shards/proxy_threads neighbor with the best throughput."""
@@ -685,10 +703,8 @@ class ThroughputOptimizer():
     optimal_proxy_threads = proxy_threads
     optimal_throughput, _ = self._GetResult(shards, proxy_threads)
 
-    for shards_count, proxy_threads_count in [(shards, proxy_threads - 1),
-                                              (shards, proxy_threads + 1),
-                                              (shards + 1, proxy_threads),
-                                              (shards - 1, proxy_threads)]:
+    for shards_count, proxy_threads_count in self._GetNeighborsToCheck(
+        shards, proxy_threads):
       if (shards_count < 1 or shards_count > len(self.results) or
           proxy_threads_count < 1 or proxy_threads_count > len(self.results)):
         continue
@@ -715,10 +731,12 @@ class ThroughputOptimizer():
       Tuple of (optimal_throughput, samples).
     """
     # Use a heuristic for the number of shards and proxy threads per VM.
-    # Usually the optimal number is somewhere close to this.
+    # Usually the optimal number is somewhere close to this. _SHARDS and
+    # _PROXY threads are mutually exclusive flags and use that number if they
+    # are provided.
     num_cpus = self.server_vms[0].num_cpus
-    shard_count = max(num_cpus // 5, 1)  # Per VM on 1 database
-    proxy_thread_count = num_cpus - shard_count
+    shard_count = _SHARDS.value or max(num_cpus // 5, 1)  # Per VM on 1 database
+    proxy_thread_count = _PROXY_THREADS.value or (num_cpus - shard_count)
 
     while True:
       logging.info('Checking shards: %s, proxy_threads: %s', shard_count,
