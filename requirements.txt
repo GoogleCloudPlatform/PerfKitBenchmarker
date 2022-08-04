@@ -20,8 +20,7 @@ blinker>=1.3
 packaging
 pandas>=1.1.5
 PyYAML==5.4.1
-# TODO(pclay): fix % parsing in 0.19+
-pint<0.19
+pint
 numpy>=1.16.5
 contextlib2>=0.5.1
 six>=1.13.0
