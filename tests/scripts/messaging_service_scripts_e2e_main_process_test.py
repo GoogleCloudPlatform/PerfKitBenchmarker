@@ -6,7 +6,6 @@ import itertools
 import json
 import multiprocessing as mp
 import os
-import sys
 import typing
 from typing import Any
 import unittest
@@ -109,18 +108,6 @@ def AsyncTest(test_method):
   return Wrapped
 
 
-# TODO(user): Remove when only running on Python 3.8+ and use AsyncMock.
-def Just(value=None):
-  """Replacement for AsyncMock in Python 3.7."""
-  if sys.version_info[:2] >= (3, 8):
-    # This value gets wrapped by an AsyncMock so don't put it in a future.
-    # https://bugs.python.org/issue38857
-    return value
-  future = asyncio.Future()
-  future.set_result(value)
-  return future
-
-
 def GetMockCoro(return_value=None):
   """Gets a Mock Coroutine."""
 
@@ -157,23 +144,23 @@ class MessagingServiceScriptsE2EMainProcessTest(
   def _GetSubprocessOutReader(self, worker):
     return typing.cast(Any, getattr(worker, 'subprocess_out_reader'))
 
-  @mock.patch.object(
-      main_process.BaseWorker, '_join_subprocess', return_value=Just())
-  @mock.patch.object(
-      main_process.BaseWorker, '_read_subprocess_output', return_value=Just())
+  @mock.patch.object(main_process.BaseWorker, '_join_subprocess')
+  @mock.patch.object(main_process.BaseWorker, '_read_subprocess_output')
   @AsyncTest
   async def testStartStop(self, read_subprocess_output_mock,
                           join_subprocess_mock):
     worker = main_process.PublisherWorker()
     self.assertEqual(self.pipe_mock.call_count, 2)
-    self.assertEqual(self._GetSubprocessInWriter(worker)._extract_mock_name(),
-                     'pipe_writer')
-    self.assertEqual(self._GetSubprocessInReader(worker)._extract_mock_name(),
-                     'pipe_reader')
-    self.assertEqual(self._GetSubprocessOutWriter(worker)._extract_mock_name(),
-                     'pipe_writer')
-    self.assertEqual(self._GetSubprocessOutReader(worker)._extract_mock_name(),
-                     'pipe_reader')
+    self.assertEqual(
+        self._GetSubprocessInWriter(worker)._extract_mock_name(), 'pipe_writer')
+    self.assertEqual(
+        self._GetSubprocessInReader(worker)._extract_mock_name(), 'pipe_reader')
+    self.assertEqual(
+        self._GetSubprocessOutWriter(worker)._extract_mock_name(),
+        'pipe_writer')
+    self.assertEqual(
+        self._GetSubprocessOutReader(worker)._extract_mock_name(),
+        'pipe_reader')
     self.assertEqual(worker.subprocess_func, publisher.main)
     await worker.start()
     self.process_mock.assert_called_once_with(
@@ -190,10 +177,8 @@ class MessagingServiceScriptsE2EMainProcessTest(
     self.subprocess_mock.terminate.assert_called_once_with()
     join_subprocess_mock.assert_called_once_with(None)
 
-  @mock.patch.object(
-      main_process.BaseWorker, '_join_subprocess', return_value=Just())
-  @mock.patch.object(
-      main_process.BaseWorker, '_read_subprocess_output', return_value=Just())
+  @mock.patch.object(main_process.BaseWorker, '_join_subprocess')
+  @mock.patch.object(main_process.BaseWorker, '_read_subprocess_output')
   @AsyncTest
   async def testStartWithPinnedCpus(self, *_):
     worker = main_process.ReceiverWorker({3, 1, 4})
@@ -212,9 +197,8 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_join_subprocess',
-      side_effect=(errors.EndToEnd.SubprocessTimeoutError, Just()))
-  @mock.patch.object(
-      main_process.BaseWorker, '_read_subprocess_output', return_value=Just())
+      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None))
+  @mock.patch.object(main_process.BaseWorker, '_read_subprocess_output')
   @AsyncTest
   async def testStopKill(self, read_subprocess_output_mock,
                          join_subprocess_mock):
@@ -230,13 +214,11 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_join_subprocess',
-      side_effect=(errors.EndToEnd.SubprocessTimeoutError, Just()))
+      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None))
   @AsyncTest
   async def testReadSubprocessOutput(self, _, sleep_mock):
     worker = main_process.PublisherWorker()
-    with mock.patch.object(
-        main_process.BaseWorker, '_read_subprocess_output',
-        return_value=Just()):
+    with mock.patch.object(main_process.BaseWorker, '_read_subprocess_output'):
       await worker.start()
     worker.subprocess_out_reader.poll.side_effect = [False, True]
     worker.subprocess_out_reader.recv.return_value = 'hola'
@@ -249,13 +231,11 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_join_subprocess',
-      side_effect=(errors.EndToEnd.SubprocessTimeoutError, Just()))
+      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None))
   @AsyncTest
   async def testReadSubprocessOutputTimeout(self, _):
     worker = main_process.PublisherWorker()
-    with mock.patch.object(
-        main_process.BaseWorker, '_read_subprocess_output',
-        return_value=Just()):
+    with mock.patch.object(main_process.BaseWorker, '_read_subprocess_output'):
       await worker.start()
     worker.subprocess_out_reader.poll.side_effect = itertools.repeat(False)
     self._GetSubprocessOutReader(worker).recv.assert_not_called()
@@ -266,13 +246,11 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_join_subprocess',
-      side_effect=(errors.EndToEnd.SubprocessTimeoutError, Just()))
+      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None))
   @AsyncTest
   async def testReadSubprocessUnexpectedObject(self, _):
     worker = main_process.PublisherWorker()
-    with mock.patch.object(
-        main_process.BaseWorker, '_read_subprocess_output',
-        return_value=Just()):
+    with mock.patch.object(main_process.BaseWorker, '_read_subprocess_output'):
       await worker.start()
     worker.subprocess_out_reader.poll.return_value = True
     worker.subprocess_out_reader.recv.return_value = 42
@@ -281,30 +259,30 @@ class MessagingServiceScriptsE2EMainProcessTest(
     self._GetSubprocessOutReader(worker).recv.assert_called_once_with()
     await worker.stop()
 
-  @mock.patch.object(main_process.BaseWorker, 'start', return_value=Just())
-  @mock.patch.object(main_process.BaseWorker, 'stop', return_value=Just())
+  @mock.patch.object(main_process.BaseWorker, 'start')
+  @mock.patch.object(main_process.BaseWorker, 'stop')
   @mock.patch.object(
       main_process.BaseWorker,
       '_read_subprocess_output',
-      return_value=Just(protocol.AckPublish(seq=1, publish_timestamp=1000)))
+      return_value=protocol.AckPublish(seq=1, publish_timestamp=1000))
   @AsyncTest
   async def testPublish(self, read_subprocess_output_mock, *_):
     worker = main_process.PublisherWorker()
     await worker.start()
-    self.assertEqual(await worker.publish(1), protocol.AckPublish(
-        seq=1, publish_timestamp=1000))
+    self.assertEqual(await worker.publish(1),
+                     protocol.AckPublish(seq=1, publish_timestamp=1000))
     self._GetSubprocessInWriter(worker).send.assert_called_once_with(
         protocol.Publish(seq=1))
     read_subprocess_output_mock.assert_called_once_with(protocol.AckPublish,
                                                         None)
     await worker.stop()
 
-  @mock.patch.object(main_process.BaseWorker, 'start', return_value=Just())
-  @mock.patch.object(main_process.BaseWorker, 'stop', return_value=Just())
+  @mock.patch.object(main_process.BaseWorker, 'start')
+  @mock.patch.object(main_process.BaseWorker, 'stop')
   @mock.patch.object(
       main_process.BaseWorker,
       '_read_subprocess_output',
-      return_value=Just(protocol.AckPublish(publish_error='blahblah')))
+      return_value=protocol.AckPublish(publish_error='blahblah'))
   @AsyncTest
   async def testPublishError(self, *_):
     worker = main_process.PublisherWorker()
@@ -313,10 +291,9 @@ class MessagingServiceScriptsE2EMainProcessTest(
       await worker.publish(1)
     await worker.stop()
 
-  @mock.patch.object(main_process.BaseWorker, 'start', return_value=Just())
-  @mock.patch.object(main_process.BaseWorker, 'stop', return_value=Just())
-  @mock.patch.object(
-      main_process.BaseWorker, '_read_subprocess_output', return_value=Just())
+  @mock.patch.object(main_process.BaseWorker, 'start')
+  @mock.patch.object(main_process.BaseWorker, 'stop')
+  @mock.patch.object(main_process.BaseWorker, '_read_subprocess_output')
   @AsyncTest
   async def testStartConsumption(self, read_subprocess_output_mock, *_):
     worker = main_process.ReceiverWorker()
@@ -328,12 +305,12 @@ class MessagingServiceScriptsE2EMainProcessTest(
                                                         None)
     await worker.stop()
 
-  @mock.patch.object(main_process.BaseWorker, 'start', return_value=Just())
-  @mock.patch.object(main_process.BaseWorker, 'stop', return_value=Just())
+  @mock.patch.object(main_process.BaseWorker, 'start')
+  @mock.patch.object(main_process.BaseWorker, 'stop')
   @mock.patch.object(
       main_process.BaseWorker,
       '_read_subprocess_output',
-      return_value=Just(protocol.ReceptionReport(receive_error='blahblah')))
+      return_value=protocol.ReceptionReport(receive_error='blahblah'))
   @AsyncTest
   async def testReceive(self, *_):
     worker = main_process.ReceiverWorker()
@@ -371,18 +348,11 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
 
   def _SetupWorkerMocks(self, publish_timestamp, receive_timestamp,
                         ack_timestamp):
-    self.publisher_instance_mock.start.return_value = Just()
-    self.publisher_instance_mock.stop.return_value = Just()
-    self.publisher_instance_mock.publish.return_value = Just(
-        protocol.AckPublish(seq=0, publish_timestamp=publish_timestamp))
+    self.publisher_instance_mock.publish.return_value = protocol.AckPublish(
+        seq=0, publish_timestamp=publish_timestamp)
 
-    self.receiver_instance_mock.start.return_value = Just()
-    self.receiver_instance_mock.stop.return_value = Just()
-    self.receiver_instance_mock.start_consumption.return_value = Just()
-    self.receiver_instance_mock.receive.return_value = Just(
-        protocol.ReceptionReport(
-            seq=0, receive_timestamp=receive_timestamp,
-            ack_timestamp=ack_timestamp))
+    self.receiver_instance_mock.receive.return_value = protocol.ReceptionReport(
+        seq=0, receive_timestamp=receive_timestamp, ack_timestamp=ack_timestamp)
 
   @mock.patch.object(asyncio, 'run')
   @mock.patch.object(
