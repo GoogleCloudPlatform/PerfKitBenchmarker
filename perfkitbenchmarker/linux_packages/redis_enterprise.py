@@ -688,12 +688,6 @@ class ThroughputOptimizer():
     vary_proxy_threads = [(shards, proxy_threads - 1),
                           (shards, proxy_threads + 1)]
     vary_shards = [(shards - 1, proxy_threads), (shards + 1, proxy_threads)]
-    # Vary proxy threads only.
-    if _SHARDS.value:
-      return vary_proxy_threads
-    # Vary shards only.
-    if _PROXY_THREADS.value:
-      return vary_shards
     return vary_proxy_threads + vary_shards
 
   def _GetOptimalNeighbor(self, shards: int,
@@ -718,10 +712,10 @@ class ThroughputOptimizer():
 
     return optimal_shards, optimal_proxy_threads
 
-  def GetOptimalThroughput(self) -> _ThroughputSampleTuple:
-    """Gets the optimal throughput for the Redis Enterprise cluster.
+  def DoGraphSearch(self) -> _ThroughputSampleTuple:
+    """Performs a graph search with the optimal shards AND proxy thread count.
 
-    Performs a linear search through shards and proxy threads. If the current
+    Performs a graph search through shards and proxy threads. If the current
     combination is a local maximum, finish and return the result.
 
     The DB needs to be recreated since shards can only be resized in multiples
@@ -730,13 +724,11 @@ class ThroughputOptimizer():
     Returns:
       Tuple of (optimal_throughput, samples).
     """
-    # Use a heuristic for the number of shards and proxy threads per VM.
-    # Usually the optimal number is somewhere close to this. _SHARDS and
-    # _PROXY threads are mutually exclusive flags and use that number if they
-    # are provided.
+    # Uses a heuristic for the number of shards and proxy threads per VM
+    # Usually the optimal number is somewhere close to this.
     num_cpus = self.server_vms[0].num_cpus
-    shard_count = _SHARDS.value or max(num_cpus // 5, 1)  # Per VM on 1 database
-    proxy_thread_count = _PROXY_THREADS.value or (num_cpus - shard_count)
+    shard_count = max(num_cpus // 5, 1)  # Per VM on 1 database
+    proxy_thread_count = num_cpus - shard_count
 
     while True:
       logging.info('Checking shards: %s, proxy_threads: %s', shard_count,
@@ -749,3 +741,31 @@ class ThroughputOptimizer():
       proxy_thread_count = optimal_proxies
 
     return self._GetResult(shard_count, proxy_thread_count)
+
+  def DoLinearSearch(self) -> _ThroughputSampleTuple:
+    """Performs a linear search using either shards or proxy threads."""
+    logging.info('Performing linear search through proxy threads OR shards.')
+    max_throughput_tuple = (0, None)
+    num_cpus = self.server_vms[0].num_cpus
+    for i in range(1, num_cpus):
+      if _SHARDS.value:
+        result = self._FullRun(_SHARDS.value, i)
+      else:
+        result = self._FullRun(i, _PROXY_THREADS.value)
+      if result[0] > max_throughput_tuple[0]:
+        max_throughput_tuple = result
+    return max_throughput_tuple
+
+  def GetOptimalThroughput(self) -> _ThroughputSampleTuple:
+    """Gets the optimal throughput for the Redis Enterprise cluster.
+
+    Returns:
+      Tuple of (optimal_throughput, samples).
+    """
+    # If only optimizing proxy threads, do a linear search.
+    if (_SHARDS.value and not _PROXY_THREADS.value) or (
+        _PROXY_THREADS.value and not _SHARDS.value):
+      return self.DoLinearSearch()
+    return self.DoGraphSearch()
+
+

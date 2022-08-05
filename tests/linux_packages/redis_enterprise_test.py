@@ -54,22 +54,21 @@ class ResultParserTest(pkb_common_test_case.PkbCommonTestCase):
 
 class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
 
-  def setUp(self):
-    super(ThroughputOptimizerTest, self).setUp()
-    mock_server = mock.Mock(num_cpus=16)
+  def _GetOptimizer(self, num_cpus):
+    mock_server = mock.Mock(num_cpus=num_cpus)
     mock_client = mock.Mock()
     mock_port = 1
-    self.optimizer = redis_enterprise.ThroughputOptimizer([mock_server],
-                                                          [mock_client],
-                                                          mock_port)
+    return redis_enterprise.ThroughputOptimizer([mock_server], [mock_client],
+                                                mock_port)
 
   def _CallList(self, calls):
     return [mock.call(*call) for call in calls]
 
   def testRun(self):
     # Arrange
+    optimizer = self._GetOptimizer(16)
     self.enter_context(
-        mock.patch.object(self.optimizer, '_CreateAndLoadDatabase'))
+        mock.patch.object(optimizer, '_CreateAndLoadDatabase'))
     self.enter_context(
         mock.patch.object(redis_enterprise, '_GetDatabase', return_value={}))
     throughput_responses = [
@@ -93,15 +92,16 @@ class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
             redis_enterprise, 'Run', side_effect=throughput_responses))
 
     # Act
-    throughput, _ = self.optimizer.GetOptimalThroughput()
+    throughput, _ = optimizer.GetOptimalThroughput()
 
     # Assert
     self.assertEqual(throughput, 100)
-    self.assertLen(self.optimizer.results, 32)
-    self.assertEqual(self.optimizer.min_threads, 75)
+    self.assertLen(optimizer.results, 32)
+    self.assertEqual(optimizer.min_threads, 75)
 
   def testRunChecksCorrectNeighbors(self):
     # Arrange
+    optimizer = self._GetOptimizer(16)
     throughput_responses = [
         (60, WRONG_RESULT),
         (40, WRONG_RESULT),
@@ -118,10 +118,10 @@ class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
     ]
     mock_run = self.enter_context(
         mock.patch.object(
-            self.optimizer, '_FullRun', side_effect=throughput_responses))
+            optimizer, '_FullRun', side_effect=throughput_responses))
 
     # Act
-    throughput, _ = self.optimizer.GetOptimalThroughput()
+    throughput, _ = optimizer.GetOptimalThroughput()
 
     # Assert
     self.assertEqual(throughput, 100)
@@ -139,6 +139,7 @@ class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
   @flagsaver.flagsaver(enterprise_redis_proxy_threads=3)
   def testRunChecksCorrectNeighborsVaryingShards(self):
     # Arrange
+    optimizer = self._GetOptimizer(5)
     throughput_responses = [
         (70, WRONG_RESULT),
         (80, WRONG_RESULT),
@@ -151,23 +152,24 @@ class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
     ]
     mock_run = self.enter_context(
         mock.patch.object(
-            self.optimizer, '_FullRun', side_effect=throughput_responses))
+            optimizer, '_FullRun', side_effect=throughput_responses))
 
     # Act
-    throughput, _ = self.optimizer.GetOptimalThroughput()
+    throughput, _ = optimizer.GetOptimalThroughput()
 
     # Assert
     self.assertEqual(throughput, 100)
     mock_run.assert_has_calls(self._CallList([
-        (3, 3),
+        (1, 3),
         (2, 3),
+        (3, 3),
         (4, 3),
-        (5, 3),
     ]))
 
   @flagsaver.flagsaver(enterprise_redis_shard_count=5)
   def testRunChecksCorrectNeighborsVaryingProxyThreads(self):
     # Arrange
+    optimizer = self._GetOptimizer(5)
     throughput_responses = [
         (70, WRONG_RESULT),
         (80, WRONG_RESULT),
@@ -180,18 +182,18 @@ class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
     ]
     mock_run = self.enter_context(
         mock.patch.object(
-            self.optimizer, '_FullRun', side_effect=throughput_responses))
+            optimizer, '_FullRun', side_effect=throughput_responses))
 
     # Act
-    throughput, _ = self.optimizer.GetOptimalThroughput()
+    throughput, _ = optimizer.GetOptimalThroughput()
 
     # Assert
     self.assertEqual(throughput, 100)
     mock_run.assert_has_calls(self._CallList([
-        (5, 11),
-        (5, 10),
-        (5, 12),
-        (5, 13),
+        (5, 1),
+        (5, 2),
+        (5, 3),
+        (5, 4),
     ]))
 
 if __name__ == '__main__':
