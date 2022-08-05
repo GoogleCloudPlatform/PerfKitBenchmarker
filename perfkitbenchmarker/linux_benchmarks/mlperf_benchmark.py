@@ -364,7 +364,6 @@ def PrepareRunner(benchmark_spec, vm=None):
     vm.RemoteCommand('if [ ! -d "/data" ]; then sudo ln -s /scratch /data; fi')
 
     if RESNET in benchmark_spec.benchmark:
-      run_script = f'training_results_{VERSION.value}/NVIDIA/benchmarks/resnet/implementations/mxnet/run_and_time.sh'
       vm.RemoteCommand(
           f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/resnet/implementations/mxnet &&'
           ' docker build --network=host . -t mlperf-nvidia:image_classification',
@@ -454,10 +453,11 @@ def _GetChangesForResnet(config_sed_input):
     config_sed_output: Output list of sed pairs for config_DGXA100.sh.
   """
   config_sed = config_sed_input
-  config_sed += [(r'.*config_DGXA100_common\.sh',
-                  (r'export CONT=mlperf-nvidia:image_classification\n'
-                   r'export DATADIR=\/data\/imagenet\n'
-                   r'export LOCAL_RANK=0'))]
+  config_sed.append((r'.*config_DGXA100_common\.sh', (
+      r'export CONT=mlperf-nvidia:image_classification\n'
+      r'export DATADIR=\/data\/imagenet\n'
+      r'export DISTRIBUTED=\\\"mpirun --allow-run-as-root --bind-to none --np \$DGXNGPU\\\"'
+  )))
 
   return config_sed
 
@@ -477,8 +477,9 @@ def _GetChangesForBert(config_sed_input):
                                  r'export NEXP=1'))]
   config_sed += [(r'DATADIR=.*',
                   r'DATADIR=\/data\/bert_data\/2048_shards_uncompressed')]
-  config_sed += [(r'DATADIR_PHASE2=.*', (r'DATADIR_PHASE2=\/data\/bert_data\/'
-                                         r'2048_shards_uncompressed'))]
+  config_sed += [(r'DATADIR_PHASE2=.*',
+                  r'DATADIR_PHASE2=\/data\/bert_data\/2048_shards_uncompressed')
+                ]
   config_sed += [(r'EVALDIR=.*',
                   r'EVALDIR=\/data\/bert_data\/eval_set_uncompressed')]
   config_sed += [(r'CHECKPOINTDIR=.*',
@@ -518,8 +519,11 @@ def _UpdateScripts(benchmark_spec, vm):
 
   config_sed = []
   config_sed += [(r'DGXSYSTEM=.*', fr'DGXSYSTEM=\"{DGXSYSTEM}\"')]
-  config_sed += [(r'DGXNGPU=.*',
-                  fr'DGXNGPU={nvidia_driver.QueryNumberOfGpus(vm)}')]
+  gpus_per_node = nvidia_driver.QueryNumberOfGpus(vm)
+  config_sed.append((
+      r'DGXNGPU=.*', fr'DGXNGPU={gpus_per_node}\n'
+      fr'export CUDA_VISIBLE_DEVICES={",".join([str(gpu_number) for gpu_number in range(gpus_per_node)])}'
+  ))
   config_sed += [(r'DGXNSOCKET=.*',
                   fr'DGXNSOCKET={vm.CheckLsCpu().socket_count}')]
   config_sed += [(r'DGXSOCKETCORES=.*',
@@ -727,19 +731,10 @@ def Run(benchmark_spec):
     run_path = posixpath.join(benchmark_path,
                               run_sub_paths[benchmark_spec.benchmark])
     env = {
-        'DGXSYSTEM':
-            DGXSYSTEM,
-        'NEXP':
-            1,
-        'PULL':
-            0,
-        'LOGDIR':
-            f'/tmp/{benchmark_spec.benchmark}',
-        'CUDA_VISIBLE_DEVICES':
-            ','.join([
-                str(gpu_number)
-                for gpu_number in range(nvidia_driver.QueryNumberOfGpus(vm))
-            ]),
+        'DGXSYSTEM': DGXSYSTEM,
+        'NEXP': 1,
+        'PULL': 0,
+        'LOGDIR': f'/tmp/{benchmark_spec.benchmark}',
     }
     envs = {
         RESNET: {},
