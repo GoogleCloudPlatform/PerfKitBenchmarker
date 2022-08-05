@@ -54,7 +54,7 @@ FLAGS = flags.FLAGS
 GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
-DATAFLOW_JOB_TIMEOUT = 1200   # 20 minutes
+DATAFLOW_JOB_TIMEOUT = 3600   # 60 minutes
 
 # Compute Engine CPU Monitoring API has up to 4 minute delay.
 # See https://cloud.google.com/monitoring/api/metrics_gcp#gcp-compute
