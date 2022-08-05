@@ -514,6 +514,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     #  Dictionary to hold the cluster vms.
     self.dpb_service_type = UNMANAGED_DPB_SVC_YARN_CLUSTER
     # Set DPB version as Hadoop version for metadata
+    self.dpb_version = hadoop.HadoopVersion()
     self.cloud = dpb_service_spec.worker_group.cloud
 
   def _Create(self):

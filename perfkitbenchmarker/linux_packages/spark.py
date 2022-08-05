@@ -47,7 +47,7 @@ DATA_FILES = [
 ]
 
 SPARK_DOWNLOADS = 'https://downloads.apache.org/spark'
-SPARK_VERSION_DIR_PATTERN = r'spark-([0-9.]+)/'
+SPARK_VERSION_DIR_PATTERN = re.compile(r'spark-([0-9.]+)/')
 
 SPARK_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'spark')
 SPARK_BIN = posixpath.join(SPARK_DIR, 'bin')
@@ -71,8 +71,8 @@ def SparkVersion() -> version.Version:
         'Could not load ' + SPARK_DOWNLOADS)
   soup = bs4.BeautifulSoup(response.content, 'html.parser')
   found_versions = []
-  for link in soup.find_all('a'):
-    match = re.match(SPARK_VERSION_DIR_PATTERN, link.get('href') or '')
+  for link in soup.find_all('a', href=SPARK_VERSION_DIR_PATTERN):
+    match = re.match(SPARK_VERSION_DIR_PATTERN, link.get('href'))
     if match:
       found_versions.append(version.Version(match.group(1)))
   if not found_versions:
