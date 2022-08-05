@@ -58,6 +58,9 @@ class _OTELCollector(base_collector.BaseCollector):
 
     vm.Install('build_tools')
     vm.Install('go_lang')
+    # Install collector runs before run phase
+    # Remove OTEL folder to support running run phase multiple times.
+    vm.RemoteCommand(f'sudo rm -rf {OTEL_DIR}')
     vm.RemoteCommand(f'git clone {GIT_REPO} {OTEL_DIR}')
     vm.RobustRemoteCommand(f'cd {OTEL_DIR} && git checkout {GIT_TAG} && '
                            'export PATH=$PATH:/usr/local/go/bin && make build')
