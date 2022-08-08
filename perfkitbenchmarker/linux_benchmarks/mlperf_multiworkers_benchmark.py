@@ -388,6 +388,9 @@ def _GetChangesForMask(benchmark_spec, node_rank, script_path, nvprof_flags,
                    fr'export WORLD_SIZE={dist_world_size}\n'
                    fr'export RANK={node_rank}\n'
                    r'export NEXP=1'))]
+  if FLAGS.mlperf_maskrcnn_batch_size:
+    config_sed.append(
+        (r'BATCHSIZE=.*', fr'BATCHSIZE={FLAGS.mlperf_maskrcnn_batch_size}'))
 
   run_and_time_sed += [(r' CMD=.*', r' CMD=( '
                         r"'python' "
@@ -442,11 +445,18 @@ def _GetChangesForResnet(benchmark_spec, node_rank, nvprof_flags,
   config_sed = config_sed_input
   run_sed = run_sed_input
   run_and_time_sed = run_and_time_sed_input
+  hosts = ','.join(f'{vm.internal_ip}:{benchmark_spec.gpus_per_vm}'
+                   for vm in benchmark_spec.vms)
+  np = benchmark_spec.gpus_per_vm * benchmark_spec.num_vms
 
-  config_sed += [(r'.*config_DGXA100_common\.sh',
-                  (r'export CONT=mlperf-nvidia:image_classification\n'
-                   r'export DATADIR=\/data\/imagenet'))]
-
+  config_sed.append(
+      (r'.*config_DGXA100_common\.sh',
+       (r'export CONT=mlperf-nvidia:image_classification\n'
+        r'export DATADIR=\/data\/imagenet\n'
+        fr'export DISTRIBUTED=\'horovodrun -H {hosts} -p {PORT} -np {np}\'')))
+  if FLAGS.mlperf_resnet_batch_size:
+    config_sed.append(
+        (r'BATCHSIZE=.*', fr'BATCHSIZE={FLAGS.mlperf_resnet_batch_size}'))
   if mlperf_benchmark.NVPROF in FLAGS.mlperf_profiler:
     run_and_time_sed += [(r'python', r'nvprof {nvprof_flags} python'
                           .format(nvprof_flags=nvprof_flags))]
@@ -454,14 +464,7 @@ def _GetChangesForResnet(benchmark_spec, node_rank, nvprof_flags,
                           r'num-epochs  \"1\"\n'
                           r'  --epoch-size  \"{profile_steps}\"'
                           .format(profile_steps=FLAGS.mlperf_profile_steps))]
-
-  hosts = ','.join(f'{vm.internal_ip}:{benchmark_spec.gpus_per_vm}'
-                   for vm in benchmark_spec.vms)
-  np = benchmark_spec.gpus_per_vm * benchmark_spec.num_vms
-  run_and_time_sed += [
-      (r'BIND=.*', r'BIND=\"\"\n'
-       fr'DISTRIBUTED=\"horovodrun -H {hosts} -p {PORT} -np {np}\"')
-  ]
+  run_and_time_sed.append((r'BIND=.*', r'BIND='))
 
   run_sed += [(r'_cont_mounts=(',
                r'_cont_mounts=(\"--volume=\$HOME\/.ssh:\/tmp\/.ssh\" ')]
@@ -538,8 +541,8 @@ def _GetChangesForBert(benchmark_spec, node_rank, nvprof_flags,
   config_sed.append((r'CHECKPOINTDIR_PHASE1=.*',
                      r'CHECKPOINTDIR_PHASE1=\/data\/bert_data\/phase1'))
   if FLAGS.mlperf_bert_batch_size:
-    config_sed += [(r'BATCHSIZE=.*',
-                    fr'BATCHSIZE={FLAGS.mlperf_bert_batch_size}')]
+    config_sed.append(
+        (r'BATCHSIZE=.*', fr'BATCHSIZE={FLAGS.mlperf_bert_batch_size}'))
 
   if mlperf_benchmark.NVPROF in FLAGS.mlperf_profiler:
     run_and_time_sed += [(r'python', fr'nvprof {nvprof_flags} python')]

@@ -102,6 +102,12 @@ flags.DEFINE_string('minigo_model_dir', '',
 
 BERT_BATCH_SIZE = flags.DEFINE_integer(
     'mlperf_bert_batch_size', None, 'The batch size to use for training BERT.')
+RESNET_BATCH_SIZE = flags.DEFINE_integer(
+    'mlperf_resnet_batch_size', None,
+    'The batch size to use for training ResNet.')
+MASKRCNN_BATCH_SIZE = flags.DEFINE_integer(
+    'mlperf_maskrcnn_batch_size', None,
+    'The batch size to use for training Mask RCNN .')
 
 HYPERTHREADS = flags.DEFINE_bool('mlperf_hyperthreads', True,
                                  'enable or disable binding to hyperthreads')
@@ -441,6 +447,9 @@ def _GetChangesForMask(config_sed_input):
                    r'export DATADIR=\/data\n'
                    r'export PKLDIR=\/data\/coco2017\/pkl_coco\n'
                    r'export NEXP=1'))]
+  if MASKRCNN_BATCH_SIZE.value:
+    config_sed.append(
+        (r'BATCHSIZE=.*', fr'BATCHSIZE={MASKRCNN_BATCH_SIZE.value}'))
   return config_sed
 
 
@@ -459,6 +468,9 @@ def _GetChangesForResnet(config_sed_input):
       r'export DATADIR=\/data\/imagenet\n'
       r'export DISTRIBUTED=\\\"mpirun --allow-run-as-root --bind-to none --np \$DGXNGPU\\\"'
   )))
+  if RESNET_BATCH_SIZE.value:
+    config_sed.append(
+        (r'BATCHSIZE=.*', fr'BATCHSIZE={RESNET_BATCH_SIZE.value}'))
 
   return config_sed
 
@@ -474,8 +486,9 @@ def _GetChangesForBert(config_sed_input):
   """
   config_sed = config_sed_input
 
-  config_sed += [(r'source .*', (r'export CONT=mlperf-nvidia:language_model\n'
-                                 r'export NEXP=1'))]
+  config_sed.append((r'.*config_DGXA100_common\.sh',
+                     (r'export CONT=mlperf-nvidia:language_model\n'
+                      r'export NEXP=1')))
   config_sed.append((
       r'DATADIR=.*',
       r'DATADIR=\/data\/bert_data\/hdf5\/training-4320\/hdf5_4320_shards_varlength'
@@ -491,7 +504,7 @@ def _GetChangesForBert(config_sed_input):
   config_sed.append((r'CHECKPOINTDIR_PHASE1=.*',
                      r'CHECKPOINTDIR_PHASE1=\/data\/bert_data\/phase1'))
   if BERT_BATCH_SIZE.value:
-    config_sed += [(r'BATCHSIZE=.*', fr'BATCHSIZE={BERT_BATCH_SIZE.value}')]
+    config_sed.append((r'BATCHSIZE=.*', fr'BATCHSIZE={BERT_BATCH_SIZE.value}'))
 
   return config_sed
 
@@ -754,12 +767,9 @@ def Run(benchmark_spec):
     run_script = posixpath.join(run_path, 'run_with_docker.sh')
     vm_util.ReplaceText(vm, 'SYSLOGGING=1', 'SYSLOGGING=0', run_script)
     vm_util.ReplaceText(vm, 'docker exec -it', 'docker exec -t', run_script)
-    if benchmark_spec.benchmark == MASK:
-      vm_util.ReplaceText(vm, r'_cont_mounts=\(',
-                          r'_cont_mounts=\(\"--volume=\${PKLDIR}:\/pkl_coco\" ',
-                          run_script)
-    elif benchmark_spec.benchmark == RESNET:
-      vm_util.ReplaceText(vm, r'mpirun.*sh', r'.\/run_and_time.sh', run_script)
+    if benchmark_spec.benchmark == RESNET:
+      vm_util.ReplaceText(vm, r'mpirun.*run_and_time\.sh',
+                          r'.\/run_and_time.sh', run_script)
 
     env = ' '.join(f'{key}={value}' for key, value in env.items())
     if nvidia_driver.CheckNvidiaGpuExists(vm):
