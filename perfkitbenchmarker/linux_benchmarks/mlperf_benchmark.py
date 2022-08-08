@@ -86,13 +86,14 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'mlperf_transformer_decode_dir', '', 'Transformer decode directory')
 flags.DEFINE_string('wmt_data_dir',
-                    'gs://p3rf-mlperf/mlperf_v1.0_nv_transformer',
+                    'gs://p3rf-mlperf/mlperf_v0.6_nv_transformer',
                     'Directory where the wmt dataset is stored')
 flags.DEFINE_string('coco_data_dir', 'gs://p3rf-mlperf/coco2017',
                     'Directory where the coco dataset is stored')
-flags.DEFINE_string('gnmt_data_dir', 'gs://p3rf-mlperf/mlperf_v1.0_nv_gnmt',
-                    'Directory where the nv 1.0 WMT dataset is stored')
-flags.DEFINE_string('bert_data_dir', 'gs://p3rf-mlperf/bert_data',
+flags.DEFINE_string('gnmt_data_dir', 'gs://p3rf-mlperf/mlperf_v0.6_nv_gnmt',
+                    'Directory where the nv 0.6 WMT dataset is stored')
+flags.DEFINE_string('bert_data_dir',
+                    'gs://p3rf-mlperf/mlperf_training_v2.0_nv_bert',
                     'Directory where the nv bert dataset is stored.')
 flags.DEFINE_string('minigo_model_dir', '',
                     'Directory on GCS to copy minigo source data from. Files '
@@ -475,17 +476,20 @@ def _GetChangesForBert(config_sed_input):
 
   config_sed += [(r'source .*', (r'export CONT=mlperf-nvidia:language_model\n'
                                  r'export NEXP=1'))]
-  config_sed += [(r'DATADIR=.*',
-                  r'DATADIR=\/data\/bert_data\/2048_shards_uncompressed')]
-  config_sed += [(r'DATADIR_PHASE2=.*',
-                  r'DATADIR_PHASE2=\/data\/bert_data\/2048_shards_uncompressed')
-                ]
-  config_sed += [(r'EVALDIR=.*',
-                  r'EVALDIR=\/data\/bert_data\/eval_set_uncompressed')]
-  config_sed += [(r'CHECKPOINTDIR=.*',
-                  r'CHECKPOINTDIR=\/data\/bert_data\/tf1_ckpt')]
-  config_sed += [(r'CHECKPOINTDIR_PHASE1=.*',
-                  r'CHECKPOINTDIR_PHASE1=\/data\/bert_data\/tf1_ckpt')]
+  config_sed.append((
+      r'DATADIR=.*',
+      r'DATADIR=\/data\/bert_data\/hdf5\/training-4320\/hdf5_4320_shards_varlength'
+  ))
+  config_sed.append((
+      r'DATADIR_PHASE2=.*',
+      r'DATADIR_PHASE2=\/data\/bert_data\/hdf5\/training-4320\/hdf5_4320_shards_varlength'
+  ))
+  config_sed.append(
+      (r'EVALDIR=.*', r'EVALDIR=\/data\/bert_data\/hdf5\/eval_varlength'))
+  config_sed.append(
+      (r'CHECKPOINTDIR=.*', r'CHECKPOINTDIR=\/data\/bert_data\/phase1'))
+  config_sed.append((r'CHECKPOINTDIR_PHASE1=.*',
+                     r'CHECKPOINTDIR_PHASE1=\/data\/bert_data\/phase1'))
   if BERT_BATCH_SIZE.value:
     config_sed += [(r'BATCHSIZE=.*', fr'BATCHSIZE={BERT_BATCH_SIZE.value}')]
 

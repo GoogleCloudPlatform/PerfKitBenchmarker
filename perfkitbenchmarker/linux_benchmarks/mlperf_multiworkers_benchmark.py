@@ -523,16 +523,20 @@ def _GetChangesForBert(benchmark_spec, node_rank, nvprof_flags,
                   fr'export MASTER_PORT={PORT}\n'
                   fr'export WORLD_SIZE={dist_world_size}\n'
                   fr'export RANK={node_rank}\n')]
-  config_sed += [(r'DATADIR=.*',
-                  r'DATADIR=\/data\/bert_data\/2048_shards_uncompressed')]
-  config_sed += [(r'DATADIR_PHASE2=.*', (r'DATADIR_PHASE2=\/data\/bert_data\/'
-                                         r'2048_shards_uncompressed'))]
-  config_sed += [(r'EVALDIR=.*',
-                  r'EVALDIR=\/data\/bert_data\/eval_set_uncompressed')]
-  config_sed += [(r'CHECKPOINTDIR=.*',
-                  r'CHECKPOINTDIR=\/data\/bert_data\/tf1_ckpt')]
-  config_sed += [(r'CHECKPOINTDIR_PHASE1=.*',
-                  r'CHECKPOINTDIR_PHASE1=\/data\/bert_data\/tf1_ckpt')]
+  config_sed.append((
+      r'DATADIR=.*',
+      r'DATADIR=\/data\/bert_data\/hdf5\/training-4320\/hdf5_4320_shards_varlength'
+  ))
+  config_sed.append((
+      r'DATADIR_PHASE2=.*',
+      r'DATADIR_PHASE2=\/data\/bert_data\/hdf5\/training-4320\/hdf5_4320_shards_varlength'
+  ))
+  config_sed.append(
+      (r'EVALDIR=.*', r'EVALDIR=\/data\/bert_data\/hdf5\/eval_varlength'))
+  config_sed.append(
+      (r'CHECKPOINTDIR=.*', r'CHECKPOINTDIR=\/data\/bert_data\/phase1'))
+  config_sed.append((r'CHECKPOINTDIR_PHASE1=.*',
+                     r'CHECKPOINTDIR_PHASE1=\/data\/bert_data\/phase1'))
   if FLAGS.mlperf_bert_batch_size:
     config_sed += [(r'BATCHSIZE=.*',
                     fr'BATCHSIZE={FLAGS.mlperf_bert_batch_size}')]
