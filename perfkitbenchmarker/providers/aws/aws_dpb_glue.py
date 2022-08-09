@@ -46,6 +46,7 @@ class AwsDpbGlue(dpb_service.BaseDpbService):
       raise errors.Setup.InvalidSetupError(
           'dpb_service_zone must be provided, for provisioning.')
     self.region = util.GetRegionFromZone(self.dpb_service_zone)
+    self.cmd_prefix += ['--region', self.region]
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(location=self.region)
     self.persistent_fs_prefix = 's3://'
