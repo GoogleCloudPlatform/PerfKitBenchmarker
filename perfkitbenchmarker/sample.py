@@ -148,7 +148,7 @@ _Histogram = collections.OrderedDict
 
 def MakeHistogram(values: List[float],
                   round_bottom: float = 0.0,
-                  round_to_sig_fig: int = 3) -> _Histogram:
+                  round_to_sig_fig: int = 3) -> _Histogram[float, int]:
   """Take a list of float values and returns a ordered dict of values and frequency.
 
   Args:
@@ -182,14 +182,14 @@ def MakeHistogram(values: List[float],
   return histogram
 
 
-def _ConvertHistogramToString(histogram: _Histogram) -> str:
+def _ConvertHistogramToString(histogram: _Histogram[float, int]) -> str:
   histogram_label_values = ','.join(
       f'"{key}": {value}' for (key, value) in histogram.items())
   histogram_labels = '{%s}' % histogram_label_values
   return histogram_labels
 
 
-def CreateHistogramSample(histogram: _Histogram,
+def CreateHistogramSample(histogram: _Histogram[float, int],
                           name: str,
                           subname: str,
                           units: str,
