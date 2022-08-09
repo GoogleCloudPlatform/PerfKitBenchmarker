@@ -61,6 +61,9 @@ import yaml
 
 FLAGS = flags.FLAGS
 
+# 2h timeout for LM notificaiton
+LM_NOTIFICATION_TIMEOUT_SECONDS = 60 * 60 * 2
+
 NVME = 'NVME'
 SCSI = 'SCSI'
 _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
@@ -950,8 +953,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Simulates a maintenance event on the VM."""
     cmd = util.GcloudCommand(self, 'compute', 'instances',
                              'simulate-maintenance-event', self.name, '--async')
-    _, _, retcode = cmd.Issue(raise_on_failure=False)
-    if retcode:
+    stdout, _, retcode = cmd.Issue(raise_on_failure=False)
+    if retcode or 'error' in stdout:
       raise errors.VirtualMachine.VirtualMachineError(
           'Unable to simulate maintenance event.')
 
@@ -971,7 +974,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def StartLMNotification(self):
     """Start meta-data server notification subscription."""
     def _Subscribe():
-      self.RobustRemoteCommand(self._GetLMNotificationCommand())
+      self.RobustRemoteCommand(self._GetLMNotificationCommand(),
+                               timeout=LM_NOTIFICATION_TIMEOUT_SECONDS)
       self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
       logging.info('[LM Notify] Release live migration lock.')
       self._LM_TIMES_SEMAPHORE.release()
