@@ -42,7 +42,7 @@ BENCHMARK_CONFIG = """
 dpb_df_template_benchmark:
   description: Run an Apache Beam template on Dataflow service
   dpb_service:
-    service_type: dataflow
+    service_type: dataflow_template
     worker_group:
       vm_spec:
         GCP:
@@ -97,7 +97,7 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
-  # Snapshot Pub/Sub input subscription to restore at end of test
+  # Snapshot Pub/Sub input subscription to later restore at end of test
   suffix = ''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(6))
   benchmark_spec.input_subscription_name = FLAGS.dpb_df_template_input_subscription.split('/')[-1]
   benchmark_spec.input_subscription_snapshot_name = benchmark_spec.input_subscription_name + '-' + suffix
@@ -114,7 +114,6 @@ def Prepare(benchmark_spec):
   pass
 
 def Run(benchmark_spec):
-
   template_gcs_location = FLAGS.dpb_df_template_gcs_location
   output_ptransform = FLAGS.dpb_df_template_output_ptransform
   input_pubsub_id = FLAGS.dpb_df_template_input_subscription
@@ -141,13 +140,11 @@ def Run(benchmark_spec):
   results = []
 
   start_time = datetime.datetime.now()
-  dpb_service_instance.SubmitJobAsync(
+  dpb_service_instance.SubmitJob(
       template_gcs_location=template_gcs_location,
       job_poll_interval=30,
       job_arguments=template_params,
-      job_input_sub = input_pubsub_name,
-      job_stdout_file=stdout_file,
-      job_type=dpb_service.BaseDpbService.DATAFLOW_JOB_TYPE)
+      job_input_sub = input_pubsub_name)
   end_time = datetime.datetime.now()
 
   # Update metadata after job run to get job id
@@ -191,14 +188,14 @@ def Cleanup(benchmark_spec):
   time.sleep(PUBSUB_SEEK_DELAY_SECONDS)
 
   # Delete snapshot itself
-  # cmd = util.GcloudCommand(None, 'pubsub', 'snapshots',
-  #                         'delete', benchmark_spec.input_subscription_snapshot_name)
-  # cmd.flags = {
-  #     'project':  util.GetDefaultProject(),
-  #     'format': 'json',
-  # }
-  # stdout, _, _ = cmd.Issue()
-  # snapshot_id = json.loads(stdout)[0]['snapshotId']
-  # logging.info("Cleanup: Deleted snapshot {}".format(snapshot_id))
+  cmd = util.GcloudCommand(None, 'pubsub', 'snapshots',
+                          'delete', benchmark_spec.input_subscription_snapshot_name)
+  cmd.flags = {
+      'project':  util.GetDefaultProject(),
+      'format': 'json',
+  }
+  stdout, _, _ = cmd.Issue()
+  snapshot_id = json.loads(stdout)[0]['snapshotId']
+  logging.info("Cleanup: Deleted snapshot {}".format(snapshot_id))
   pass
 

@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing class for GCP's dataflow service.
+"""Module containing class for GCP's Dataflow service.
+Use this module for running Dataflow jobs from compiled jar files.
 
 No Clusters can be created or destroyed, since it is a managed solution
 See details at: https://cloud.google.com/dataflow/
@@ -51,10 +52,7 @@ flags.DEFINE_string('dpb_dataflow_sdk', None,
 
 FLAGS = flags.FLAGS
 
-GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
-
 DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
-DATAFLOW_JOB_TIMEOUT = 3600   # 60 minutes
 
 # Compute Engine CPU Monitoring API has up to 4 minute delay.
 # See https://cloud.google.com/monitoring/api/metrics_gcp#gcp-compute
@@ -88,11 +86,10 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataflow, self).__init__(dpb_service_spec)
+    self.dpb_service_type = self.SERVICE_TYPE
     self.project = util.GetDefaultProject()
     self.job_id = None
     self.job_metrics = None
-    self.input_sub_empty = False
-    self.job_drained = False
     self.job_stats = None
 
   # @staticmethod
@@ -186,97 +183,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       raise Exception('Dataflow output in unexpected format.')
     self.job_id = match.group(1)
     logging.info('Dataflow job ID: %s', self.job_id)
-
-  def SubmitJobAsync(
-      self,
-      template_gcs_location=None,
-      job_poll_interval=None,
-      job_arguments=None,
-      job_input_sub = None,
-      job_stdout_file=None,
-      job_type=None):
-
-    worker_machine_type = self.spec.worker_group.vm_spec.machine_type
-    num_workers = self.spec.worker_count
-    max_workers = self.spec.worker_count
-
-    now = datetime.datetime.now()
-    job_name = template_gcs_location.split('/')[-1] + '_' + now.strftime("%Y%m%d_%H%M%S")
-    region = util.GetRegionFromZone(FLAGS.dpb_service_zone)
-
-    cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'run', job_name)
-    cmd.flags = {
-        'project': self.project,
-        'gcs-location': template_gcs_location,
-        'staging-location': FLAGS.dpb_dataflow_temp_location,
-        'region': region,
-        'worker-region': region,
-        'worker-machine-type': worker_machine_type,
-        'num-workers': num_workers,
-        'max-workers': max_workers,
-        'parameters': ','.join(job_arguments),
-        'format': 'json',
-    }
-
-    stdout, stderr, retcode = cmd.Issue()
-
-    # Parse output to retrieve submitted job ID
-    try:
-      result = json.loads(stdout)
-      self.job_id = result['id']
-    except Exception as err:
-      logging.error("Failed to parse Dataflow job ID: {}".format(err))
-      raise
-
-    logging.info('Dataflow job ID: %s', self.job_id)
-    # TODO: return JobResult() with pre-computed time stats
-    return self._WaitForJob(job_input_sub, DATAFLOW_JOB_TIMEOUT, job_poll_interval)
-
-  def _GetCompletedJob(self, job_id):
-    """See base class."""
-    job_input_sub = job_id
-
-    # Job completed if input subscription is empty *and* job is drained;
-    # otherwise keep waiting
-    if not self.input_sub_empty:
-      backlog_size = self.GetSubscriptionBacklogSize(job_input_sub)
-      logging.info("Polling: Backlog size of subscription {} is {}".format(job_input_sub, backlog_size))
-      if backlog_size == 0:
-        self.input_sub_empty = True
-        # Start draining job once input subscription is empty
-        cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'drain', self.job_id)
-        cmd.flags = {
-            'project': self.project,
-            'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
-            'format': 'json',
-        }
-        logging.info("Polling: Draining job {} ...".format(self.job_id))
-        stdout, stderr, retcode = cmd.Issue()
-      else:
-        return None
-
-    if not self.job_drained:
-      # Confirm job is drained
-      cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'show', self.job_id)
-      cmd.flags = {
-          'project': self.project,
-          'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
-          'format': 'json',
-      }
-      stdout, stderr, retcode = cmd.Issue()
-      job_state = json.loads(stdout)['state']
-      logging.info("Polling: Job state is {} ".format(job_state))
-      if job_state == "Drained":
-          self.job_drained = True
-      else:
-          return None
-
-    # TODO: calculate run_time, pending_time as args for JobResult()
-    # started_on = result['JobRun']['StartedOn']
-    # completed_on = result['JobRun']['CompletedOn']
-    # execution_time = result['JobRun']['ExecutionTime']
-    # return dpb_service.JobResult()
-    return True
 
   def SetClusterProperty(self):
     pass
