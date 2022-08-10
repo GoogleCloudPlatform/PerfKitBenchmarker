@@ -174,6 +174,8 @@
 -   Fetch memtier benchmark runtime information
 -   Support installing the Google Cloud Bigtable client by a given version via
     --google_bigtable_client_version and simplify dependency management.
+-   Support setting --dpb_dataflow_additional_args and --dpb_dataflow_timeout
+    for dpb_dataflow_provider.
 
 ### Bug fixes and maintenance updates:
 
