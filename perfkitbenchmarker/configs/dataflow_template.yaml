@@ -39,10 +39,6 @@ two_core: &two_core
 flags: &myflags
   dpb_service_zone: us-central1-a
   dpb_dataflow_temp_location: gs://<MY_BUCKET>/temp 
-  dpb_dataflow_staging_location: gs://<MY_BUCKET>/temp
-  # TODO: remove jar and class params - not needed here since we're passing a template
-  dpb_job_jarfile: ./word-count-beam/target/word-count-beam-bundled-0.1.jar
-  dpb_job_classname: org.apache.beam.examples.WordCount
   dpb_df_template_gcs_location: gs://dataflow-templates/latest/PubSub_Subscription_to_BigQuery
   dpb_df_template_input_subscription: projects/<MY_PROJECT>/subscriptions/perftest-pubsub-input-sub-1M
   dpb_df_template_output_ptransform: WriteSuccessfulRecords/StreamingInserts/StreamingWriteTables/StreamingWrite/BatchedStreamingWrite.ViaBundleFinalization/ParMultiDo(BatchAndInsertElements)
