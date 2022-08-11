@@ -176,6 +176,7 @@ def Run(benchmark_spec):
   run_time = (end_time - start_time).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
 
+  # TODO(odiego): Refactor to avoid explicit service type checks.
   if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
     avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(start_time, end_time)
     results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))
@@ -184,7 +185,7 @@ def Run(benchmark_spec):
     for name, value in stats.items():
       results.append(sample.Sample(name, value, 'number', metadata))
 
-    total_cost = dpb_service_instance.CalculateCost(gcp_dpb_dataflow.DATAFLOW_TYPE_STREAMING)
+    total_cost = dpb_service_instance.CalculateCost()
     results.append(sample.Sample('total_cost', total_cost, '$', metadata))
 
   return results

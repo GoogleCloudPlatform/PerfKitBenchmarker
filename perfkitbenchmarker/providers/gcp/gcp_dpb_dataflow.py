@@ -92,15 +92,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     self.job_metrics = None
     self.job_stats = None
 
-  # @staticmethod
-  # def _GetStats(stdout):
-  #   """Get Stats.
-
-  #   TODO(saksena): Hook up the metrics API of dataflow to retrieve performance
-  #   metrics when available
-  #   """
-  #   pass
-
   @staticmethod
   def CheckPrerequisites(benchmark_config):
     del benchmark_config  # Unused
@@ -175,12 +166,14 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if disk_size_gb:
       cmd.append('--diskSizeGb={}'.format(disk_size_gb))
     cmd.append('--defaultWorkerLogLevel={}'.format(FLAGS.dpb_log_level))
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    _, stderr, _ = vm_util.IssueCommand(cmd)
 
     # Parse output to retrieve submitted job ID
     match = re.search('Submitted job: (.\S*)', stderr)
     if not match:
-      raise Exception('Dataflow output in unexpected format.')
+      logging.warn('Dataflow output in unexpected format. Failed to parse Dataflow job ID.')
+      return
+    
     self.job_id = match.group(1)
     logging.info('Dataflow job ID: %s', self.job_id)
 
@@ -203,19 +196,19 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     }
 
   def GetStats(self):
-    """Collect series of relevant performance and cost stats"""
+    """Collect series of relevant performance and cost stats."""
     stats = {}
     stats['total_vcpu_time'] = self.GetMetricValue('TotalVcpuTime')/3600         # vCPU-hr
     stats['total_mem_usage'] = self.GetMetricValue('TotalMemoryUsage')/1024/3600 # GB-hr
     stats['total_pd_usage'] = self.GetMetricValue('TotalPdUsage')/3600           # GB-hr
-    # BillableShuffleDataProcessed
-    # BillableStreamingDataProcessed
+    # TODO(rarsan): retrieve BillableShuffleDataProcessed
+    # and/or BillableStreamingDataProcessed when applicable
     self.job_stats = stats
     return stats
 
   def CalculateCost(self, type=DATAFLOW_TYPE_BATCH):
     if type not in (DATAFLOW_TYPE_BATCH, DATAFLOW_TYPE_STREAMING):
-      raise Exception('Invalid type provided to CalculateCost()')
+      raise ValueError(f'Invalid type provided to CalculateCost(): {type}')
 
     if not self.job_stats:
       self.GetStats()
@@ -258,7 +251,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     distributions = {}
     for metric in results:
       if 'scalar' in metric:
-        counters[metric['name']['name']] = metric['scalar']
+        counters[metric['name']['name']] = int(metric['scalar'])
       elif 'distribution' in metric:
         distributions[metric['name']['name']] = metric['distribution']
       else:
@@ -278,12 +271,12 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       contains keys such as count/max/mean/min/sum
     """
     if type not in (METRIC_TYPE_COUNTER, METRIC_TYPE_DISTRIBUTION):
-      raise Exception('Invalid type provided to GetMetricValue()')
+      raise ValueError(f'Invalid type provided to GetMetricValue(): {type}')
     
     if self.job_metrics is None:
       self._PullJobMetrics()
     
-    return int(self.job_metrics[type][name])
+    return self.job_metrics[type][name]
 
   def GetAvgCpuUtilization(self, start_time, end_time):
     """Get average cpu utilization across all pipeline workers.
@@ -395,9 +388,10 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       }
     )
 
-    # print(results)
-    # if not results:
-    #   raise Exception('No monitoring data found. Unable to calculate max throughput')
+    if not results:
+      logging.warn('No monitoring data found. Unable to calculate max throughput.')
+      return None
+
     return self._GetMaxValueFromTimeSeries(results)
 
   def GetSubscriptionBacklogSize(self, subscription_name, interval_length=4):
@@ -462,6 +456,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       if time_series.unit == "10^2.%":
         averaged = round(averaged * 100, 2)
       return averaged
+    
     return None 
 
   def _GetMaxValueFromTimeSeries(self, time_series):
@@ -480,10 +475,13 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     if points:
       # Max over all minute intervals captured
-      max_rate = round(max(points), 2)
+      max_rate = max(points)
       # If metric unit is a fractional number between 0 and 1 (e.g. CPU utilization metric)
       # multiply by 100 to display a percentage usage.
-      # if time_series.unit == "10^2.%":
-      #   averaged = round(max * 100, 2)
+      if time_series.unit == "10^2.%":
+        max_rate = round(max_rate * 100, 2)
+      else:
+        max_rate = round(max_rate, 2)
       return max_rate
+    
     return None 
