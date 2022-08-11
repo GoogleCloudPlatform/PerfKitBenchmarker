@@ -87,7 +87,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataflow, self).__init__(dpb_service_spec)
     self.dpb_service_type = self.SERVICE_TYPE
-    self.project = util.GetDefaultProject()
+    self.project = FLAGS.project
     self.job_id = None
     self.job_metrics = None
     self.job_stats = None
@@ -166,6 +166,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if disk_size_gb:
       cmd.append('--diskSizeGb={}'.format(disk_size_gb))
     cmd.append('--defaultWorkerLogLevel={}'.format(FLAGS.dpb_log_level))
+    cmd.append('--project={}'.format(self.project))
     _, stderr, _ = vm_util.IssueCommand(cmd)
 
     # Parse output to retrieve submitted job ID
@@ -255,7 +256,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       elif 'distribution' in metric:
         distributions[metric['name']['name']] = metric['distribution']
       else:
-        raise Exception('Unfamiliar metric type found: {}'.format(metric))
+        logging.warn(f'Unfamiliar metric type found: {metric}')
 
     self.job_metrics = {
       METRIC_TYPE_COUNTER: counters,
@@ -278,7 +279,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     
     return self.job_metrics[type][name]
 
-  def GetAvgCpuUtilization(self, start_time, end_time):
+  def GetAvgCpuUtilization(self, start_time: datetime, end_time: datetime):
     """Get average cpu utilization across all pipeline workers.
 
     Args:
@@ -308,8 +309,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     api_filter = (
       'metric.type = "compute.googleapis.com/instance/cpu/utilization" '
-      'AND resource.labels.project_id = "' + self.project + '" '
-      'AND metadata.user_labels.dataflow_job_id = "' + self.job_id + '" '
+      f'AND resource.labels.project_id = "{self.project}" '
+      f'AND metadata.user_labels.dataflow_job_id = "{self.job_id}" '
     )
 
     aggregation = Aggregation(
@@ -335,7 +336,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     #   raise Exception('No monitoring data found. Unable to calculate avg CPU utilization')
     return self._GetAvgValueFromTimeSeries(results)
 
-  def GetMaxOutputThroughput(self, ptransform, start_time, end_time):
+  def GetMaxOutputThroughput(self, ptransform: str, start_time: datetime, end_time: datetime):
     """Get max throughput from a particular pTransform during job run interval.
 
     Args:
@@ -365,9 +366,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     api_filter = (
       'metric.type = "dataflow.googleapis.com/job/elements_produced_count" '
-      'AND resource.labels.project_id = "' + self.project + '" '
-      'AND metric.labels.job_id = "' + self.job_id + '" '
-      'AND metric.labels.ptransform = "' + ptransform + '" '
+      f'AND resource.labels.project_id = "{self.project}" '
+      f'AND metric.labels.job_id = "{self.job_id}" '
+      f'AND metric.labels.ptransform = "{ptransform}" '
     )
 
     aggregation = Aggregation(
@@ -444,8 +445,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       Average value across intervals
     """
     points = []
-    for i, time_interval in enumerate(time_series):
-      for j, snapshot in enumerate(time_interval.points):
+    for time_interval in time_series:
+      for snapshot in time_interval.points:
         points.append(snapshot.value.double_value)
 
     if points:
@@ -469,8 +470,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       Maximum value across intervals
     """
     points = []
-    for i, time_interval in enumerate(time_series):
-      for j, snapshot in enumerate(time_interval.points):
+    for time_interval in time_series:
+      for snapshot in time_interval.points:
         points.append(snapshot.value.double_value)
 
     if points:
