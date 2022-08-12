@@ -237,7 +237,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       return
     # Raise exception if job id not available
     if self.job_id is None:
-      raise ValueError('Unable to pull job metrics. Job ID not available')
+      raise Exception('Unable to pull job metrics. Job ID not available')
     
     cmd = util.GcloudCommand(self, 'dataflow', 'metrics',
                             'list', self.job_id)
