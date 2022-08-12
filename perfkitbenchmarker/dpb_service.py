@@ -77,6 +77,7 @@ DATAPROC_SERVERLESS = 'dataproc_serverless'
 DATAFLOW = 'dataflow'
 DATAFLOW_TEMPLATE = 'dataflow_template'
 EMR = 'emr'
+EMR_SERVERLESS = 'emr_serverless'
 GLUE = 'glue'
 UNMANAGED_DPB_SVC_YARN_CLUSTER = 'unmanaged_dpb_svc_yarn_cluster'
 UNMANAGED_SPARK_CLUSTER = 'unmanaged_spark_cluster'
@@ -514,6 +515,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     #  Dictionary to hold the cluster vms.
     self.dpb_service_type = UNMANAGED_DPB_SVC_YARN_CLUSTER
     # Set DPB version as Hadoop version for metadata
+    self.dpb_version = hadoop.HadoopVersion()
     self.cloud = dpb_service_spec.worker_group.cloud
 
   def _Create(self):
@@ -601,7 +603,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
     self.vms = {}
     self.dpb_service_type = UNMANAGED_SPARK_CLUSTER
     # Set DPB version as Spark version for metadata
-    self.dpb_version = 'spark_' + FLAGS.spark_version
+    self.dpb_version = f'spark_{spark.SparkVersion()}'
     self.cloud = dpb_service_spec.worker_group.cloud
 
   def _Create(self):

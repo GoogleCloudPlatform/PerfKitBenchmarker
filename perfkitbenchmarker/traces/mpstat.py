@@ -396,11 +396,10 @@ class MpstatCollector(base_collector.BaseCollector):
                 count=FLAGS.mpstat_count,
                 output=collector_file))
 
-  def Analyze(self, sender, benchmark_spec, samples):
+  def Analyze(self, unused_sender, benchmark_spec, samples):
     """Analyze mpstat file and record samples.
 
     Args:
-      sender: event sender for collecting stats.
       benchmark_spec: benchmark_spec of this run.
       samples: samples to add stats to.
     """
@@ -413,7 +412,6 @@ class MpstatCollector(base_collector.BaseCollector):
         output = json.loads(fp.read())
         metadata = {
             'event': 'mpstat',
-            'sender': 'run',
             'role': role,
         }
         samples.extend(
@@ -441,4 +439,4 @@ def Register(parsed_flags):
   events.before_phase.connect(collector.Start, stages.RUN, weak=False)
   events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
   if parsed_flags.mpstat_publish:
-    events.samples_created.connect(collector.Analyze, stages.RUN, weak=False)
+    events.benchmark_samples_created.connect(collector.Analyze, weak=False)

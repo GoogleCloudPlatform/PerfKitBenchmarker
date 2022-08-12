@@ -130,8 +130,8 @@ running with PKB.
 ## Python 3
 
 The recommended way to install and run PKB is in a virtualenv with the latest
-version of Python 3. Most Linux distributions and recent Mac OS X versions
-already have Python 3 installed at `/usr/bin/python3`.
+version of Python 3 (at least Python 3.9). Most Linux distributions and recent
+Mac OS X versions already have Python 3 installed at `/usr/bin/python3`.
 
 If Python is not installed, you can likely install it using your distribution's
 package manager, or see the

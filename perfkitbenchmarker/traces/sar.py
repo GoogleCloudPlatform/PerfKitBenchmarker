@@ -107,7 +107,7 @@ class _SarCollector(base_collector.BaseCollector):
                sar_samples=FLAGS.sar_samples if FLAGS.sar_samples else '')
     return cmd
 
-  def Analyze(self, sender, benchmark_spec, samples):
+  def Analyze(self, unused_sender, benchmark_spec, samples):
     """Analyze sar file and record samples."""
 
     def _Analyze(role, f):
@@ -117,7 +117,6 @@ class _SarCollector(base_collector.BaseCollector):
         output = fp.read()
         metadata = {
             'event': 'sar',
-            'sender': 'run',
             'sar_interval': self.interval,
             'role': role,
         }
@@ -146,4 +145,4 @@ def Register(parsed_flags):
   events.before_phase.connect(collector.Start, stages.RUN, weak=False)
   events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
   if parsed_flags.sar_publish:
-    events.samples_created.connect(collector.Analyze, stages.RUN, weak=False)
+    events.benchmark_samples_created.connect(collector.Analyze, weak=False)

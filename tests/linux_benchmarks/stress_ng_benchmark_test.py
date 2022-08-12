@@ -40,8 +40,10 @@ class StressngTestCase(unittest.TestCase):
     }
 
     samples = []
-    samples.append(stress_ng_benchmark._ParseStressngResult(
-        metadata, self.contents))
+    result = stress_ng_benchmark._ParseStressngResult(
+        metadata, self.contents)
+    self.assertIsNotNone(result)
+    samples.append(result)
 
     # Test metadata
     metadata = samples[0].metadata

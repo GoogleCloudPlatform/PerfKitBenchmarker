@@ -316,7 +316,7 @@ def MeasureLatencyCappedThroughput(
         pipelines=1,
         threads=1,
         clients=1)
-    current_max_result = MemtierResult(0, 0, 0, 0, 0, 0, [], [], [], [])
+    current_max_result = MemtierResult(0, 0, 0, 0, 0, 0, [], [], [], [], {})
     current_metadata = None
     while parameters.lower_bound < (parameters.upper_bound - 1):
       result = _Run(
@@ -592,6 +592,7 @@ class MemtierResult:
   set_latency_histogram: MemtierHistogram
   ops_time_series: List[Tuple[int, int]]
   max_latency_time_series: List[Tuple[int, int]]
+  runtime_info: Dict[Text, Text]
 
   @classmethod
   def Parse(cls, memtier_results: Text,
@@ -633,9 +634,11 @@ class MemtierResult:
     """
     aggregated_result = _ParseTotalThroughputAndLatency(memtier_results)
     set_histogram, get_histogram = _ParseHistogram(memtier_results)
+    runtime_info = {}
     ops_time_series = []
     max_latency_time_series = []
     if time_series_json:
+      runtime_info = _GetRuntimeInfo(time_series_json)
       ops_time_series, max_latency_time_series = _ParseTimeSeries(
           time_series_json)
     return cls(
@@ -648,7 +651,8 @@ class MemtierResult:
         get_latency_histogram=get_histogram,
         set_latency_histogram=set_histogram,
         ops_time_series=ops_time_series,
-        max_latency_time_series=max_latency_time_series
+        max_latency_time_series=max_latency_time_series,
+        runtime_info=runtime_info,
         )
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
@@ -687,6 +691,10 @@ class MemtierResult:
       samples.append(
           sample.Sample('Max Latency Time Series', 0, 'ms',
                         latency_series_metadata))
+    if self.runtime_info:
+      samples.append(
+          sample.Sample('Memtier Duration', self.runtime_info['Total_duration'],
+                        'ms', self.runtime_info))
     return samples
 
 
@@ -776,14 +784,27 @@ def _ConvertPercentToAbsolute(total_value: int, percent: float) -> float:
   return percent / 100 * total_value
 
 
-def _ParseTimeSeries(time_series_json: Text
+def _ParseTimeSeries(time_series_json: Optional[Text]
                      ) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
   """Parse time series ops throughput from json output."""
   ops_series = []
   max_latency_series = []
-  raw = json.loads(time_series_json)
-  time_series = raw['ALL STATS']['Totals']['Time-Serie']
-  for interval, data_dict in time_series.items():
-    ops_series.append((interval, data_dict['Count']))
-    max_latency_series.append((interval, data_dict['Max Latency']))
+  if time_series_json:
+    raw = json.loads(time_series_json)
+    time_series = raw['ALL STATS']['Totals']['Time-Serie']
+    for interval, data_dict in time_series.items():
+      ops_series.append((interval, data_dict['Count']))
+      max_latency_series.append((interval, data_dict['Max Latency']))
   return ops_series, max_latency_series
+
+
+def _GetRuntimeInfo(time_series_json: Optional[Text]):
+  """Fetch runtime info (i.e start, end times and duration) from json output."""
+  runtime_info = {}
+  if time_series_json:
+    raw = json.loads(time_series_json)
+    runtime_info = raw['ALL STATS']['Runtime']
+    runtime_info = {
+        key.replace(' ', '_'): val for key, val in runtime_info.items()
+    }
+  return runtime_info

@@ -32,8 +32,6 @@ from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_spanner
 from perfkitbenchmarker.providers.gcp import util
 
-_VM = virtual_machine.VirtualMachine
-
 BENCHMARK_NAME = 'cloud_spanner_ycsb'
 
 BENCHMARK_DESCRIPTION = 'YCSB'
@@ -265,7 +263,7 @@ def _ExtractThroughput(samples: List[sample.Sample]) -> float:
 
 def CpuUtilizationRun(executor: ycsb.YCSBExecutor,
                       spanner: gcp_spanner.GcpSpannerInstance,
-                      vms: List[_VM],
+                      vms: List[virtual_machine.VirtualMachine],
                       run_kwargs: Dict[str, Any]) -> List[sample.Sample]:
   """Runs YCSB until the CPU utilization is over 65%."""
   workload = ycsb.GetWorkloadFileList()[0]

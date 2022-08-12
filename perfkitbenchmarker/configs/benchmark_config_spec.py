@@ -143,6 +143,7 @@ class _DpbServiceSpec(spec.BaseSpec):
                     dpb_service.DATAFLOW,
                     dpb_service.DATAFLOW_TEMPLATE,
                     dpb_service.EMR,
+                    dpb_service.EMR_SERVERLESS,
                     dpb_service.GLUE,
                     dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
                     dpb_service.UNMANAGED_SPARK_CLUSTER,
@@ -184,6 +185,18 @@ class _DpbServiceSpec(spec.BaseSpec):
             'none_ok': True
         }),
         'dataproc_serverless_max_executors': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'emr_serverless_executor_count': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'emr_serverless_core_count': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'emr_serverless_memory': (option_decoders.IntDecoder, {
             'default': None,
             'none_ok': True
         }),

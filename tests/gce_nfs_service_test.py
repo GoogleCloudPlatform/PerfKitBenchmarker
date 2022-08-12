@@ -61,7 +61,7 @@ def _DescribeResult(tier='STANDARD'):
 
 def _FullGcloud(args, location):
   prefix = [
-      'gcloud', 'alpha', '--quiet', '--format', 'json', '--project', _PROJECT,
+      'gcloud', '--quiet', '--format', 'json', '--project', _PROJECT,
       'filestore', 'instances'
   ]
   postfix = ['--location', location]

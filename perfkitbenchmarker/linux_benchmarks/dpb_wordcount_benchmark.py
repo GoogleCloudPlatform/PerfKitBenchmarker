@@ -146,7 +146,7 @@ def Run(benchmark_spec):
       base_out = FLAGS.dpb_dataflow_staging_location
     else:
       base_out = 'gs://{}'.format(FLAGS.dpb_wordcount_out_base)
-    job_arguments.append('--output={}/output/'.format(base_out))
+    job_arguments.append('--output={}/output'.format(base_out))
   else:
     # Use user-provided jar file if present; otherwise use the default example
     if not FLAGS.dpb_job_jarfile:
@@ -159,10 +159,8 @@ def Run(benchmark_spec):
 
   # TODO (saksena): Finalize more stats to gather
   results = []
-  metadata = copy.copy(dpb_service_instance.GetMetadata())
-  metadata.update({'input_location': input_location})
 
-  start = datetime.datetime.now()
+  start_time = datetime.datetime.now()
   dpb_service_instance.SubmitJob(
       jarfile=jarfile,
       classname=classname,
@@ -170,8 +168,26 @@ def Run(benchmark_spec):
       job_stdout_file=stdout_file,
       job_type=job_type)
   end_time = datetime.datetime.now()
-  run_time = (end_time - start).total_seconds()
+
+  # Update metadata after job run to get job id
+  metadata = copy.copy(dpb_service_instance.GetMetadata())
+  metadata.update({'input_location': input_location})
+
+  run_time = (end_time - start_time).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
+
+  # TODO(odiego): Refactor to avoid explicit service type checks.
+  if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
+    avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(start_time, end_time)
+    results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))
+
+    stats = dpb_service_instance.GetStats()
+    for name, value in stats.items():
+      results.append(sample.Sample(name, value, 'number', metadata))
+
+    total_cost = dpb_service_instance.CalculateCost()
+    results.append(sample.Sample('total_cost', total_cost, '$', metadata))
+
   return results
 
 

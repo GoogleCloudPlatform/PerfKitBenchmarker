@@ -53,11 +53,20 @@ dataframe reader. e.g.:
       '--report-dir',
       required=True,
       help='Directory to write out query timings to.')
-  parser.add_argument(
+  group = parser.add_mutually_exclusive_group()
+  group.add_argument(
       '--simultaneous',
       type=bool,
       default=False,
       help='Run all queries simultaneously instead of one by one.')
+  group.add_argument(
+      '--fail-on-query-execution-errors',
+      type=bool,
+      default=False,
+      help='Fail the whole script on an error while executing the queries, '
+           'instead of continuing and not reporting that query run time (the '
+           'default). Mutually exclusive with --simultaneous.'
+  )
   if args is None:
     return parser.parse_args()
   return parser.parse_args(args)
@@ -102,14 +111,16 @@ def main(args):
     futures.wait(result_futures)
     results = [f.result() for f in result_futures]
   else:
-    results = [run_sql_script(spark, script) for script in args.sql_scripts]
+    results = [
+        run_sql_script(spark, script, args.fail_on_query_execution_errors)
+        for script in args.sql_scripts]
   results = [r for r in results if r is not None]
   logging.info('Writing results to %s', args.report_dir)
-  spark.createDataFrame(results).coalesce(1).write.mode('overwrite').json(
+  spark.createDataFrame(results).coalesce(1).write.mode('append').json(
       args.report_dir)
 
 
-def run_sql_script(spark_session, script):
+def run_sql_script(spark_session, script, raise_query_execution_errors=False):
   """Runs a SQL script, returns a pyspark.sql.Row with its duration."""
 
   # Read script from object storage using rdd API
@@ -133,6 +144,8 @@ def run_sql_script(spark_session, script):
   except (sql.utils.QueryExecutionException,
           py4j.protocol.Py4JJavaError) as e:
     logging.error('Script %s failed', script, exc_info=e)
+    if raise_query_execution_errors:
+      raise
 
 
 if __name__ == '__main__':

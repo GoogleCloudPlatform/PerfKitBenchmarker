@@ -58,8 +58,21 @@ NUM_LOCAL_VOLUMES = {
     'Standard_L8s_v2': 1,
     'Standard_L16s_v2': 2,
     'Standard_L32s_v2': 4,
+    'Standard_L48s_v2': 6,
     'Standard_L64s_v2': 8,
-    'Standard_L80s_v2': 10
+    'Standard_L80s_v2': 10,
+    'Standard_L8s_v3': 1,
+    'Standard_L16s_v3': 2,
+    'Standard_L32s_v3': 4,
+    'Standard_L48s_v3': 6,
+    'Standard_L64s_v3': 8,
+    'Standard_L80s_v3': 10,
+    'Standard_L8as_v3': 1,
+    'Standard_L16as_v3': 2,
+    'Standard_L32as_v3': 4,
+    'Standard_L48as_v3': 6,
+    'Standard_L64as_v3': 8,
+    'Standard_L80as_v3': 10
 }
 
 _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES = (
@@ -637,8 +650,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       elif self.low_priority and 'OverconstrainedAllocationRequest' in stderr:
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
       elif _OS_PROVISIONING_TIMED_OUT in stderr:
-        raise errors.Resource.ProvisionTimeoutError(_OS_PROVISIONING_TIMED_OUT +
-                                                    stderr)
+        raise errors.Resource.ProvisionTimeoutError(stderr)
       elif "Virtual Machine Scale Set with '<NULL>' security type." in stderr:
         raise errors.Resource.CreationError(
             f'Failed to create VM: {self.machine_type} is likely a confidential'
@@ -916,8 +928,11 @@ class Rhel8BasedAzureVirtualMachine(AzureVirtualMachine,
   GEN2_IMAGE_URN = 'RedHat:RHEL:8-lvm-gen2:latest'
   IMAGE_URN = 'RedHat:RHEL:8-LVM:latest'
 
-# TODO(user): Add RHEL 9 after it is available
-# https://docs.microsoft.com/en-us/azure/virtual-machines/workloads/redhat/redhat-imagelist
+
+class Rhel9BasedAzureVirtualMachine(AzureVirtualMachine,
+                                    linux_virtual_machine.Rhel9Mixin):
+  GEN2_IMAGE_URN = 'RedHat:RHEL:9-lvm-gen2:latest'
+  IMAGE_URN = 'RedHat:RHEL:9-lvm:latest'
 
 
 class CentOs7BasedAzureVirtualMachine(AzureVirtualMachine,
@@ -932,7 +947,7 @@ class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'OpenLogic:CentOS-LVM:8-lvm:latest'
 
 
-# TODO(pclay): Add Fedora CoreOS when available:
+# TODO(user): Add Fedora CoreOS when available:
 #   https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/
 
 

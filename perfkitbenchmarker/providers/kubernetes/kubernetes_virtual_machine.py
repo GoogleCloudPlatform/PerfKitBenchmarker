@@ -11,9 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Contains code related to lifecycle management of Kubernetes Pods."""
-
 
 import json
 import logging
@@ -136,13 +134,14 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
   def _WaitForPodBootCompletion(self):
-    """Need to wait for the PODs to get up, they're created with a little delay.
-    """
-    exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
-                  'pod', '-o=json', self.name]
+    """Need to wait for the PODs to get up, they're created with a little delay."""
+    exists_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig=%s' % FLAGS.kubeconfig, 'get', 'pod', '-o=json', self.name
+    ]
     logging.info('Waiting for POD %s', self.name)
-    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True,
-                                          raise_on_failure=False)
+    pod_info, _, _ = vm_util.IssueCommand(
+        exists_cmd, suppress_warning=True, raise_on_failure=False)
     if pod_info:
       pod_info = json.loads(pod_info)
       containers = pod_info['spec']['containers']
@@ -157,16 +156,20 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _DeletePod(self):
     """Deletes a POD."""
-    delete_pod = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                  'delete', 'pod', self.name]
+    delete_pod = [
+        FLAGS.kubectl,
+        '--kubeconfig=%s' % FLAGS.kubeconfig, 'delete', 'pod', self.name
+    ]
     stdout, _, _ = vm_util.IssueCommand(delete_pod, raise_on_failure=False)
     logging.info(stdout.rstrip())
 
   @vm_util.Retry(poll_interval=10, max_retries=20)
   def _Exists(self):
     """POD should have been already created but this is a double check."""
-    exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
-                  'pod', '-o=json', self.name]
+    exists_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig=%s' % FLAGS.kubeconfig, 'get', 'pod', '-o=json', self.name
+    ]
     pod_info, _, _ = vm_util.IssueCommand(
         exists_cmd, suppress_warning=True, raise_on_failure=False)
     if pod_info:
@@ -193,8 +196,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _GetInternalIp(self):
     """Gets the POD's internal ip address."""
-    pod_ip = kubernetes_helper.Get(
-        'pods', self.name, '', '.status.podIP')
+    pod_ip = kubernetes_helper.Get('pods', self.name, '', '.status.podIP')
 
     if not pod_ip:
       raise Exception('Internal POD IP address not found. Retrying.')
@@ -296,8 +298,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _BuildContainerBody(self):
     """Constructs containers-related part of POST request to create POD."""
     registry = getattr(context.GetThreadBenchmarkSpec(), 'registry', None)
-    if (not FLAGS.static_container_image and
-        registry is not None):
+    if (not FLAGS.static_container_image and registry is not None):
       image = registry.GetFullRegistryTag(self.image)
     else:
       image = self.image
@@ -308,8 +309,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         'securityContext': {
             'privileged': FLAGS.docker_in_privileged_mode
         },
-        'volumeMounts': [
-        ]
+        'volumeMounts': []
     }
 
     for scratch_disk in self.scratch_disks:
@@ -352,9 +352,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       })
 
     if self.gpu_count:
-      gpu_dict = {
-          'nvidia.com/gpu': str(self.gpu_count)
-      }
+      gpu_dict = {'nvidia.com/gpu': str(self.gpu_count)}
       resources['limits'].update(gpu_dict)
       resources['requests'].update(gpu_dict)
 
@@ -364,23 +362,33 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     return result_with_empty_values_removed
 
 
-class DebianBasedKubernetesVirtualMachine(
-    KubernetesVirtualMachine, linux_virtual_machine.BaseDebianMixin):
+class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
+                                          linux_virtual_machine.BaseDebianMixin
+                                         ):
   """Base class for Debian based containers running inside k8s."""
 
-  def RemoteHostCommandWithReturnCode(self, command,
-                                      should_log=False, retries=None,
-                                      ignore_failure=False, login_shell=False,
-                                      suppress_warning=False, timeout=None):
+  def RemoteHostCommandWithReturnCode(self,
+                                      command,
+                                      should_log=False,
+                                      retries=None,
+                                      ignore_failure=False,
+                                      login_shell=False,
+                                      suppress_warning=False,
+                                      timeout=None):
     """Runs a command in the Kubernetes container."""
     if retries is None:
       retries = FLAGS.ssh_retries
-    cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'exec', '-i',
-           self.name, '--', '/bin/bash', '-c', command]
+    cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig=%s' % FLAGS.kubeconfig, 'exec', '-i', self.name, '--',
+        '/bin/bash', '-c', command
+    ]
     for _ in range(retries):
       stdout, stderr, retcode = vm_util.IssueCommand(
-          cmd, force_info_log=should_log,
-          suppress_warning=suppress_warning, timeout=timeout,
+          cmd,
+          force_info_log=should_log,
+          suppress_warning=suppress_warning,
+          timeout=timeout,
           raise_on_failure=False)
       # Check for ephemeral connection issues.
       if not _IsKubectlErrorEphemeral(retcode, stderr):
@@ -389,8 +397,7 @@ class DebianBasedKubernetesVirtualMachine(
     if not ignore_failure and retcode:
       error_text = ('Got non-zero return code (%s) executing %s\n'
                     'Full command: %s\nSTDOUT: %sSTDERR: %s' %
-                    (retcode, command, ' '.join(cmd),
-                     stdout, stderr))
+                    (retcode, command, ' '.join(cmd), stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
     return stdout, stderr, retcode
 
@@ -400,14 +407,17 @@ class DebianBasedKubernetesVirtualMachine(
     Args:
       target: The target BaseVirtualMachine object.
       source_path: The location of the file on the REMOTE machine.
-      remote_path: The destination of the file on the TARGET machine, default
-          is the home directory.
+      remote_path: The destination of the file on the TARGET machine, default is
+        the home directory.
     """
     file_name = vm_util.PrependTempDir(posixpath.basename(source_path))
     self.RemoteHostCopy(file_name, source_path, copy_to=False)
     target.RemoteHostCopy(file_name, remote_path)
 
-  def RemoteHostCopy(self, file_path, remote_path='', copy_to=True,
+  def RemoteHostCopy(self,
+                     file_path,
+                     remote_path='',
+                     copy_to=True,
                      retries=None):
     """Copies a file to or from the VM.
 
@@ -439,8 +449,10 @@ class DebianBasedKubernetesVirtualMachine(
     if retries is None:
       retries = FLAGS.ssh_retries
     for _ in range(retries):
-      cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-             'cp', src_spec, dest_spec]
+      cmd = [
+          FLAGS.kubectl,
+          '--kubeconfig=%s' % FLAGS.kubeconfig, 'cp', src_spec, dest_spec
+      ]
       stdout, stderr, retcode = vm_util.IssueCommand(
           cmd, raise_on_failure=False)
       if not _IsKubectlErrorEphemeral(retcode, stderr):
@@ -453,7 +465,7 @@ class DebianBasedKubernetesVirtualMachine(
       raise errors.VirtualMachine.RemoteCommandError(error_text)
     if copy_to:
       remote_path = remote_path or file_name
-      self.RemoteCommand('mv %s %s; chmod 777 %s' %
+      self.RemoteCommand('mv %s %s; chmod 755 %s' %
                          (file_name, remote_path, remote_path))
     # TODO(pclay): Validate directories
     if not stat.S_ISDIR(os.stat(file_path).st_mode):
@@ -469,7 +481,7 @@ class DebianBasedKubernetesVirtualMachine(
 
   def PrepareVMEnvironment(self):
     # Install sudo as most PrepareVMEnvironment assume it exists.
-    self._InstallSudo()
+    self._InstallPrepareVmEnvironmentDependencies()
     super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
     if k8s_flags.SETUP_SSH.value:
       # Don't rely on SSH being installed in Kubernetes containers,
@@ -510,40 +522,39 @@ class DebianBasedKubernetesVirtualMachine(
     """
     cloud = FLAGS.container_cluster_cloud
     if cloud == 'GCP':
-      download_function = (gce_virtual_machine.
-                           GenerateDownloadPreprovisionedDataCommand)
+      download_function = (
+          gce_virtual_machine.GenerateDownloadPreprovisionedDataCommand)
     elif cloud == 'AWS':
-      download_function = (aws_virtual_machine.
-                           GenerateDownloadPreprovisionedDataCommand)
+      download_function = (
+          aws_virtual_machine.GenerateDownloadPreprovisionedDataCommand)
     elif cloud == 'Azure':
-      download_function = (azure_virtual_machine.
-                           GenerateDownloadPreprovisionedDataCommand)
+      download_function = (
+          azure_virtual_machine.GenerateDownloadPreprovisionedDataCommand)
     else:
       raise NotImplementedError(
           'Cloud {0} does not support downloading preprovisioned '
           'data on Kubernetes VMs.'.format(cloud))
 
-    self.RemoteCommand(
-        download_function(install_path, module_name, filename))
+    self.RemoteCommand(download_function(install_path, module_name, filename))
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""
     cloud = FLAGS.container_cluster_cloud
     if cloud == 'GCP' and FLAGS.gcp_preprovisioned_data_bucket:
-      stat_function = (gce_virtual_machine.
-                       GenerateStatPreprovisionedDataCommand)
+      stat_function = (
+          gce_virtual_machine.GenerateStatPreprovisionedDataCommand)
       gce_virtual_machine.GceVirtualMachine.InstallCli(self)
       # We assume that gsutil is installed to /usr/bin/gsutil on GCE VMs
       # ln -f is idempotent and can be called multiple times
       self.RemoteCommand(
           f'ln -sf {google_cloud_sdk.GSUTIL_PATH} /usr/bin/gsutil')
     elif cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
-      stat_function = (aws_virtual_machine.
-                       GenerateStatPreprovisionedDataCommand)
+      stat_function = (
+          aws_virtual_machine.GenerateStatPreprovisionedDataCommand)
       aws_virtual_machine.AwsVirtualMachine.InstallCli(self)
     elif cloud == 'Azure' and FLAGS.azure_preprovisioned_data_bucket:
-      stat_function = (azure_virtual_machine.
-                       GenerateStatPreprovisionedDataCommand)
+      stat_function = (
+          azure_virtual_machine.GenerateStatPreprovisionedDataCommand)
       azure_virtual_machine.AzureVirtualMachine.InstallCli(self)
     else:
       return False
@@ -551,8 +562,8 @@ class DebianBasedKubernetesVirtualMachine(
 
   # Retry installing sudo for ephemeral APT errors
   @vm_util.Retry(max_retries=linux_virtual_machine.UPDATE_RETRIES)
-  def _InstallSudo(self):
-    """Installs sudo."""
+  def _InstallPrepareVmEnvironmentDependencies(self):
+    """Installs sudo and other packages assumed by SetupVmEnvironment."""
     # The canonical ubuntu images as well as the nvidia/cuda
     # image do not have sudo installed so install it and configure
     # the sudoers file such that the root user's environment is
@@ -566,6 +577,8 @@ class DebianBasedKubernetesVirtualMachine(
         'sed -i \'/secure_path/d\' /etc/sudoers',
         'sudo ldconfig',
     ]))
+    # iproute2 propvides ip
+    self.InstallPackages('iproute2')
 
 
 # All Ubuntu images below are from https://hub.docker.com/_/ubuntu/
@@ -573,6 +586,26 @@ class DebianBasedKubernetesVirtualMachine(
 # included with Ubuntu. For example, sudo is not installed.
 # KubernetesVirtualMachine takes care of this by installing
 # sudo in the container startup script.
+
+
+class Ubuntu2204BasedKubernetesVirtualMachine(
+    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu2204Mixin):
+  """Ubuntu 22 based Kubernetes VM."""
+  DEFAULT_IMAGE = 'ubuntu:22.04'
+
+  def _InstallPrepareVmEnvironmentDependencies(self):
+    # fdisk is not installed. It needs to be installed after sudo, but before
+    # RecordAdditionalMetatada.
+    super()._InstallPrepareVmEnvironmentDependencies()
+    # util-linux budled in the image no longer depends on fdisk.
+    # Ubuntu 22 VMs get fdisk from ubuntu-server (which maybe we should
+    # install here?).
+    self.InstallPackages('fdisk')
+
+
+class Ubuntu2004BasedKubernetesVirtualMachine(
+    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin):
+  DEFAULT_IMAGE = 'ubuntu:20.04'
 
 
 class Ubuntu1804BasedKubernetesVirtualMachine(

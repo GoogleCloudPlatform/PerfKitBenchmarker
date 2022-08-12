@@ -105,7 +105,7 @@ def BuildGccFromSource(vm, gcc_version):
     vm.RemoteCommand('sudo rm -rf /usr/bin/gfortran && '
                      'sudo ln -s /usr/local/bin/gfortran /usr/bin/gfortran')
 
-  if '11' in gcc_version:
+  if gcc_version.startswith('11'):
     # https://stackoverflow.com/a/65384705
     vm.RemoteCommand(
         f'sudo cp {build_dir}/obj.gcc-{gcc_version}/x86_64-pc-linux-gnu/'
@@ -120,7 +120,7 @@ def BuildGccFromSource(vm, gcc_version):
 def GetVersion(vm, pkg):
   """Get version of package using -dumpversion."""
   out, _ = vm.RemoteCommand(
-      '{pkg} -dumpversion'.format(pkg=pkg), ignore_failure=True)
+      '{pkg} -dumpfullversion'.format(pkg=pkg), ignore_failure=True)
   return out.rstrip()
 
 
@@ -146,10 +146,13 @@ def Reinstall(vm, version: str):
   vm.Install('ubuntu_toolchain')
   for pkg in ('gcc', 'gfortran', 'g++'):
     version_string = GetVersion(vm, pkg)
-    if version in version_string:
+    if version_string.startswith(version):
       logging.info('Have expected version of %s: %s', pkg, version_string)
       continue
     else:
+      logging.info(
+          'Built-in version of %s is incorrect: expected %s, but found %s', pkg,
+          version_string, version)
       new_pkg = pkg + '-' + version
       vm.InstallPackages(new_pkg)
       vm.RemoteCommand('sudo rm -f /usr/bin/{pkg}'.format(pkg=pkg))

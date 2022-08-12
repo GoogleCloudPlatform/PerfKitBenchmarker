@@ -43,6 +43,9 @@ _OPTIMIZE_THROUGHPUT = flags.DEFINE_boolean(
     'enterprise_redis_optimize_throughput', False,
     'If True, the benchmark will find the optimal throughput under 1ms latency '
     'for the machine type by optimizing the number of shards and proxy threads.'
+    'Requires one or none of --enterprise_redis_proxy_threads and '
+    '--enterprise_redis_shard_count to be set. If only one is set, keeps that '
+    'value constant for the run and optimizes the other.'
 )
 
 BENCHMARK_NAME = 'redis_enterprise'
@@ -78,6 +81,23 @@ redis_enterprise:
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   return config
+
+
+def CheckPrerequisites(_):
+  """Validates flag configuration."""
+  if _OPTIMIZE_THROUGHPUT.value:
+    if (FLAGS.enterprise_redis_proxy_threads and
+        FLAGS.enterprise_redis_shard_count):
+      raise errors.Setup.InvalidFlagConfigurationError(
+          'Running with --enterprise_redis_optimize_throughput, expected one '
+          'of --enterprise_redis_proxy_threads or '
+          '--enterprise_redis_shard_count to be set, not both.')
+  else:
+    if not (FLAGS.enterprise_redis_proxy_threads and
+            FLAGS.enterprise_redis_shard_count):
+      raise errors.Setup.InvalidFlagConfigurationError(
+          'Expected both --enterprise_redis_proxy_threads and '
+          '--enterprise_redis_shard_count must be set, but they were not.')
 
 
 def _InstallRedisEnterprise(vm):

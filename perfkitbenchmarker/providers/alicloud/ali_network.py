@@ -59,6 +59,10 @@ class AliVpc(resource.BaseResource):
     response = json.loads(stdout)
     self.id = response['VpcId']
 
+  def _PostCreate(self):
+    """Tag VPC with default tags."""
+    util.VPCAddDefaultTags(self.id, util.ResourceTypes.VPC, self.region)
+
   def _Exists(self):
     """Returns true if the VPC exists."""
     describe_cmd = util.ALI_PREFIX + [
@@ -129,6 +133,10 @@ class AliVSwitch(resource.BaseResource):
     response = json.loads(stdout)
     self.id = response['VSwitchId']
 
+  def _PostCreate(self):
+    """Tag VSwitch with default tags."""
+    util.VPCAddDefaultTags(self.id, util.ResourceTypes.VSWITCH, self.region)
+
   def _Delete(self):
     """Deletes the VSwitch."""
     delete_cmd = util.ALI_PREFIX + [
@@ -177,6 +185,11 @@ class AliSecurityGroup(resource.BaseResource):
     create_cmd = util.GetEncodedCmd(create_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     self.group_id = json.loads(stdout)['SecurityGroupId']
+
+  def _PostCreate(self):
+    """Tag security group with default tags."""
+    util.AddDefaultTags(self.group_id, util.ResourceTypes.SECURITYGROUP,
+                        self.region)
 
   def _Delete(self):
     """Deletes the security group."""

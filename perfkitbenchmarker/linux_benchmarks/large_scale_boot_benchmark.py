@@ -69,7 +69,7 @@ large_scale_boot:
           zone: eastus
           boot_disk_type: StandardSSD_LRS
       vm_count: 1
-      os_type: debian9
+      os_type: debian11
     clients:
       vm_spec:
         GCP:
@@ -80,7 +80,7 @@ large_scale_boot:
         Azure:
           machine_type: Standard_D2_v3
           boot_disk_type: StandardSSD_LRS
-      os_type: debian9
+      os_type: debian11
       vm_count: 1
 """
 
@@ -91,8 +91,8 @@ flags.register_validator('boots_per_launcher',
                          lambda value: 1 <= value <= 1000,
                          message='The number of VMs booted by each launcher '
                          'should be between 1 and 1000.')
-flags.DEFINE_string('boot_os_type', 'debian9', 'OS to boot on the VMs. '
-                    'Defaults to debian9. OS on launcher server VM is set '
+flags.DEFINE_string('boot_os_type', 'debian11', 'OS to boot on the VMs. '
+                    'Defaults to debian11. OS on launcher server VM is set '
                     'using os_type flag.')
 flags.DEFINE_string('boot_machine_type', 'n1-standard-2', 'Machine type to boot'
                     'on the VMs. Defaults to n1-standard-2. Set machine type '

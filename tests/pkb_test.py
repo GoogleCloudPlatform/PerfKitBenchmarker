@@ -37,6 +37,8 @@ from tests import pkb_common_test_case
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
 
+test_machine_type = 'n1-standard-2'
+
 
 class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
@@ -499,7 +501,7 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     mock_get_zones = self._MockGcpUtils(
         'GetZonesInRegion', return_value={'zone_2'})
 
-    test_retry_manager = pkb.ZoneRetryManager()
+    test_retry_manager = pkb.ZoneRetryManager(test_machine_type)
     test_retry_manager.HandleSmartRetries(test_spec)
 
     # Function should not get zones from region_1, resulting in only 1 call.
@@ -521,7 +523,7 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     self._MockGcpUtils(
         'GetZonesFromMachineType', return_value={'zone_1', 'zone_2'})
 
-    test_retry_manager = pkb.ZoneRetryManager()
+    test_retry_manager = pkb.ZoneRetryManager(test_machine_type)
     test_retry_manager.HandleSmartRetries(test_spec)
 
     # zone_1 is recorded.
@@ -535,7 +537,7 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     FLAGS[zone_flag].parse(['us-west1-a'])
     FLAGS.smart_quota_retry = True
     self._MockGcpUtils('GetZonesFromMachineType', return_value=set())
-    test_retry_manager = pkb.ZoneRetryManager()
+    test_retry_manager = pkb.ZoneRetryManager(test_machine_type)
     possible_zones = {'us-west1-a', 'us-west1-b'}
 
     # us-west1-b is chosen.

@@ -567,16 +567,16 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('network-tier=STANDARD', cmd)
 
   def testNetworkInterfaceDefault(self):
-    """Tests that VirtIONet is selected as the default virtual NIC."""
+    """Tests that gVNIC is selected as the default virtual NIC."""
     cmd, call_count = self._CreateVmCommand()
     self.assertEqual(call_count, 1)
-    self.assertIn('nic-type=VIRTIO_NET', cmd)
-
-  def testNetworkInterfaceGVNIC(self):
-    """Tests that gVNIC can be set as the virtual NIC."""
-    cmd, call_count = self._CreateVmCommand(gce_nic_type='GVNIC')
-    self.assertEqual(call_count, 1)
     self.assertIn('nic-type=GVNIC', cmd)
+
+  def testNetworkInterfaceVIRTIO(self):
+    """Tests that VirtIO can be set as the virtual NIC."""
+    cmd, call_count = self._CreateVmCommand(gce_nic_type='VIRTIO_NET')
+    self.assertEqual(call_count, 1)
+    self.assertIn('nic-type=VIRTIO_NET', cmd)
 
   def testEgressBandwidthTier(self):
     """Tests that egress bandwidth can be set as tier 1."""
@@ -694,6 +694,21 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           })
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(errors.Resource.CreationError):
+        vm._Create()
+
+  def testCreateVMSubnetworkNotReady(self):
+    fake_rets = [('stdout', """\
+(gcloud.compute.instances.create) Could not fetch resource:
+- The resource 'projects/myproject/regions/us-central1/subnetworks/mysubnet' is not ready""",
+                  1)]
+    with PatchCriticalObjects(fake_rets):
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT, machine_type={
+              'cpus': 1,
+              'memory': '1.0GiB',
+          })
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+      with self.assertRaises(errors.Resource.RetryableCreationError):
         vm._Create()
 
   @parameterized.named_parameters(
@@ -856,7 +871,7 @@ class GvnicTest(GceVirtualMachineTestCase):
 
   def testGetNetworkDeviceNames(self):
     self.mock_cmd.return_value = (_IP_LINK_TEXT, '')
-    names = self.vm._GetNetworkDevices()
+    names = self.vm._get_network_device_mtus()
     self.assertEqual({'ens4': 1460}, names)
     self.mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ip link show up')
 
@@ -885,7 +900,7 @@ class GvnicTest(GceVirtualMachineTestCase):
     self.vm.OnStartup()
     self.assertEqual('1.0.0', self.vm._gvnic_version)
     self.assertEqual('1.0.0', self.vm.GetResourceMetadata()['gvnic_version'])
-    self.assertEqual(1460, self.vm._discovered_mtu)
+    self.assertEqual(1460, list(self.vm._get_network_device_mtus().values())[0])
 
   def testMissingVersionInProperties(self):
     self.mock_cmd.side_effect = [(_IP_LINK_TEXT, ''), ('driver: gve', '')]

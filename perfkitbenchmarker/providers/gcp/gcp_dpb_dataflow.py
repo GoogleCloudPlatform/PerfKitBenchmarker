@@ -11,15 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing class for GCP's dataflow service.
+"""Module containing class for GCP's Dataflow service.
+Use this module for running Dataflow jobs from compiled jar files.
 
 No Clusters can be created or destroyed, since it is a managed solution
 See details at: https://cloud.google.com/dataflow/
 """
 
 import os
+import re
+import time
+import json
+import logging
+import datetime
 
 from absl import flags
+from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3.types import TimeInterval
+from google.cloud.monitoring_v3.types import Aggregation
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -39,14 +48,39 @@ flags.DEFINE_string('dpb_dataflow_runner', 'DataflowRunner',
 flags.DEFINE_string('dpb_dataflow_sdk', None,
                     'SDK used to build the Dataflow executable. The latest sdk '
                     'will be used by default.')
+flags.DEFINE_multi_string('dpb_dataflow_additional_args', [], 'Additional '
+                          'arguments which should be passed to Dataflow job.')
+flags.DEFINE_integer('dpb_dataflow_timeout', 300,
+                     'The default timeout for Dataflow job.')
 
 
 FLAGS = flags.FLAGS
 
-GCP_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
-
 DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
 
+# Compute Engine CPU Monitoring API has up to 4 minute delay.
+# See https://cloud.google.com/monitoring/api/metrics_gcp#gcp-compute
+CPU_API_DELAY_MINUTES = 4
+CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
+# Dataflow Monitoring API has up to 3 minute delay.
+# See https://cloud.google.com/monitoring/api/metrics_gcp#gcp-dataflow
+DATAFLOW_METRICS_DELAY_MINUTES = 3
+DATAFLOW_METRICS_DELAY_SECONDS = DATAFLOW_METRICS_DELAY_MINUTES * 60
+
+DATAFLOW_TYPE_BATCH = 'batch'
+DATAFLOW_TYPE_STREAMING = 'streaming'
+
+METRIC_TYPE_COUNTER = 'counter'
+METRIC_TYPE_DISTRIBUTION = 'distribution'
+
+# Dataflow resources cost factors (showing us-central-1 pricing).
+# See https://cloud.google.com/dataflow/pricing#pricing-details
+VCPU_PER_HR_BATCH = 0.056
+VCPU_PER_HR_STREAMING = 0.069
+MEM_PER_GB_HR_BATCH = 0.003557
+MEM_PER_GB_HR_STREAMING = 0.0035557
+PD_PER_GB_HR = 0.000054
+PD_SSD_PER_GB_HR = 0.000298
 
 class GcpDpbDataflow(dpb_service.BaseDpbService):
   """Object representing GCP Dataflow Service."""
@@ -56,16 +90,11 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataflow, self).__init__(dpb_service_spec)
-    self.project = None
-
-  @staticmethod
-  def _GetStats(stdout):
-    """Get Stats.
-
-    TODO(saksena): Hook up the metrics API of dataflow to retrieve performance
-    metrics when available
-    """
-    pass
+    self.dpb_service_type = self.SERVICE_TYPE
+    self.project = FLAGS.project
+    self.job_id = None
+    self.job_metrics = None
+    self.job_stats = None
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
@@ -108,15 +137,14 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     num_workers = self.spec.worker_count
     max_num_workers = self.spec.worker_count
     if (self.spec.worker_group.disk_spec and
-        self.spec.worker_group.disk_spec.disk_size):
+        self.spec.worker_group.disk_spec.disk_size is not None):
       disk_size_gb = self.spec.worker_group.disk_spec.disk_size
-    elif self.spec.worker_group.vm_spec.boot_disk_size:
+    elif self.spec.worker_group.vm_spec.boot_disk_size is not None:
       disk_size_gb = self.spec.worker_group.vm_spec.boot_disk_size
     else:
       disk_size_gb = None
 
     cmd = []
-
     # Needed to verify java executable is on the path
     dataflow_executable = 'java'
     if not vm_util.ExecutableOnPath(dataflow_executable):
@@ -142,7 +170,20 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if disk_size_gb:
       cmd.append('--diskSizeGb={}'.format(disk_size_gb))
     cmd.append('--defaultWorkerLogLevel={}'.format(FLAGS.dpb_log_level))
-    _, _, _ = vm_util.IssueCommand(cmd)
+    cmd.append('--project={}'.format(self.project))
+
+    if FLAGS.dpb_dataflow_additional_args:
+      cmd.extend(FLAGS.dpb_dataflow_additional_args)
+    _, stderr, _ = vm_util.IssueCommand(cmd, timeout=FLAGS.dpb_dataflow_timeout)
+
+    # Parse output to retrieve submitted job ID
+    match = re.search('Submitted job: (.\S*)', stderr)
+    if not match:
+      logging.warn('Dataflow output in unexpected format. Failed to parse Dataflow job ID.')
+      return
+    
+    self.job_id = match.group(1)
+    logging.info('Dataflow job ID: %s', self.job_id)
 
   def SetClusterProperty(self):
     pass
@@ -152,4 +193,303 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data = super(GcpDpbDataflow, self).GetMetadata()
     basic_data['dpb_dataflow_runner'] = FLAGS.dpb_dataflow_runner
     basic_data['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
+    basic_data['dpb_job_id'] = self.job_id
     return basic_data
+
+  def GetJobStatus(self):
+    cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'show', self.job_id)
+    cmd.flags = {
+        'project': self.project,
+        'format': 'json',
+    }
+
+  def GetStats(self):
+    """Collect series of relevant performance and cost stats."""
+    stats = {}
+    stats['total_vcpu_time'] = self.GetMetricValue('TotalVcpuTime')/3600         # vCPU-hr
+    stats['total_mem_usage'] = self.GetMetricValue('TotalMemoryUsage')/1024/3600 # GB-hr
+    stats['total_pd_usage'] = self.GetMetricValue('TotalPdUsage')/3600           # GB-hr
+    # TODO(rarsan): retrieve BillableShuffleDataProcessed
+    # and/or BillableStreamingDataProcessed when applicable
+    self.job_stats = stats
+    return stats
+
+  def CalculateCost(self, type=DATAFLOW_TYPE_BATCH):
+    if type not in (DATAFLOW_TYPE_BATCH, DATAFLOW_TYPE_STREAMING):
+      raise ValueError(f'Invalid type provided to CalculateCost(): {type}')
+
+    if not self.job_stats:
+      self.GetStats()
+
+    total_vcpu_time = self.job_stats['total_vcpu_time']
+    total_mem_usage = self.job_stats['total_mem_usage']
+    total_pd_usage = self.job_stats['total_pd_usage']
+
+    cost = 0
+    if type == DATAFLOW_TYPE_BATCH:
+      cost +=  total_vcpu_time * VCPU_PER_HR_BATCH
+      cost +=  total_mem_usage * MEM_PER_GB_HR_BATCH
+    else:
+      cost += total_vcpu_time * VCPU_PER_HR_STREAMING
+      cost += total_mem_usage * MEM_PER_GB_HR_STREAMING
+    
+    cost += total_pd_usage * PD_PER_GB_HR
+    # TODO(rarsan): Add cost related to per-GB data processed by Dataflow Shuffle
+    # (for batch) or Streaming Engine (for streaming) when applicable
+    return cost
+
+  def _PullJobMetrics(self, force_refresh=False):
+    """Retrieve and cache all job metrics from Dataflow API"""
+    # Skip if job metrics is already populated unless force_refresh is True
+    if self.job_metrics is not None and not force_refresh:
+      return
+    
+    cmd = util.GcloudCommand(self, 'dataflow', 'metrics',
+                            'list', self.job_id)
+    cmd.use_alpha_gcloud = True
+    cmd.flags = {
+        'project': self.project,
+        'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
+        'format': 'json',
+    }
+    stdout, _, _ = cmd.Issue()
+    results = json.loads(stdout)
+
+    counters = {}
+    distributions = {}
+    for metric in results:
+      if 'scalar' in metric:
+        counters[metric['name']['name']] = int(metric['scalar'])
+      elif 'distribution' in metric:
+        distributions[metric['name']['name']] = metric['distribution']
+      else:
+        logging.warn(f'Unfamiliar metric type found: {metric}')
+
+    self.job_metrics = {
+      METRIC_TYPE_COUNTER: counters,
+      METRIC_TYPE_DISTRIBUTION: distributions
+    }
+
+  def GetMetricValue(self, name, type=METRIC_TYPE_COUNTER):
+    """Get value of a job's metric.
+    
+    Returns:
+      Integer if metric is of type counter
+      Dictionary if metric is of type distribution. Dictionary 
+      contains keys such as count/max/mean/min/sum
+    """
+    if type not in (METRIC_TYPE_COUNTER, METRIC_TYPE_DISTRIBUTION):
+      raise ValueError(f'Invalid type provided to GetMetricValue(): {type}')
+    
+    if self.job_metrics is None:
+      self._PullJobMetrics()
+    
+    return self.job_metrics[type][name]
+
+  def GetAvgCpuUtilization(self, start_time: datetime, end_time: datetime):
+    """Get average cpu utilization across all pipeline workers.
+
+    Args:
+      start_time: datetime specifying the beginning of the time interval.
+      end_time: datetime specifying the end of the time interval.
+
+    Returns:
+      Average value across time interval
+    """
+    client = monitoring_v3.MetricServiceClient()
+    project_name = f"projects/{self.project}"
+    
+    now_seconds = int(time.time())
+    start_time_seconds = int(start_time.timestamp())
+    end_time_seconds = int(end_time.timestamp())
+    # Cpu metrics data can take up to 240 seconds to appear
+    if (now_seconds - end_time_seconds) < CPU_API_DELAY_SECONDS:
+      logging.info('Waiting for CPU metrics to be available (up to 4 minutes)...')
+      time.sleep(CPU_API_DELAY_SECONDS - (now_seconds - end_time_seconds))
+
+    interval = TimeInterval(
+        {
+            "start_time": {"seconds": start_time_seconds},
+            "end_time": {"seconds": end_time_seconds},
+        }
+    )
+
+    api_filter = (
+      'metric.type = "compute.googleapis.com/instance/cpu/utilization" '
+      f'AND resource.labels.project_id = "{self.project}" '
+      f'AND metadata.user_labels.dataflow_job_id = "{self.job_id}" '
+    )
+
+    aggregation = Aggregation(
+        {
+            "alignment_period": {"seconds": 60},  # 1 minute
+            "per_series_aligner": Aggregation.Aligner.ALIGN_MEAN,
+            "cross_series_reducer": Aggregation.Reducer.REDUCE_MEAN,
+            "group_by_fields": ["resource.instance_id"],
+        }
+    )
+
+    results = client.list_time_series(
+      request={
+        "name": project_name,
+        "filter": api_filter,
+        "interval": interval,
+        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        "aggregation": aggregation,
+      }
+    )
+
+    # if not results:
+    #   raise Exception('No monitoring data found. Unable to calculate avg CPU utilization')
+    return self._GetAvgValueFromTimeSeries(results)
+
+  def GetMaxOutputThroughput(self, ptransform: str, start_time: datetime, end_time: datetime):
+    """Get max throughput from a particular pTransform during job run interval.
+
+    Args:
+      start_time: datetime specifying the beginning of the time interval.
+      end_time: datetime specifying the end of the time interval.
+
+    Returns:
+      Max value across time interval
+    """
+    client = monitoring_v3.MetricServiceClient()
+    project_name = f"projects/{self.project}"
+    
+    now_seconds = int(time.time())
+    start_time_seconds = int(start_time.timestamp())
+    end_time_seconds = int(end_time.timestamp())
+    # Cpu metrics data can take up to 240 seconds to appear
+    if (now_seconds - end_time_seconds) < DATAFLOW_METRICS_DELAY_SECONDS:
+      logging.info('Waiting for Dataflow metrics to be available (up to 3 minutes)...')
+      time.sleep(DATAFLOW_METRICS_DELAY_SECONDS - (now_seconds - end_time_seconds))
+
+    interval = TimeInterval(
+        {
+            "start_time": {"seconds": start_time_seconds},
+            "end_time": {"seconds": end_time_seconds},
+        }
+    )
+
+    api_filter = (
+      'metric.type = "dataflow.googleapis.com/job/elements_produced_count" '
+      f'AND resource.labels.project_id = "{self.project}" '
+      f'AND metric.labels.job_id = "{self.job_id}" '
+      f'AND metric.labels.ptransform = "{ptransform}" '
+    )
+
+    aggregation = Aggregation(
+        {
+            "alignment_period": {"seconds": 60},  # 1 minute
+            "per_series_aligner": Aggregation.Aligner.ALIGN_RATE,
+            # "group_by_fields": ["metric.job_id", "metric.ptransform"],
+        }
+    )
+
+    results = client.list_time_series(
+      request={
+        "name": project_name,
+        "filter": api_filter,
+        "interval": interval,
+        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        "aggregation": aggregation
+      }
+    )
+
+    if not results:
+      logging.warn('No monitoring data found. Unable to calculate max throughput.')
+      return None
+
+    return self._GetMaxValueFromTimeSeries(results)
+
+  def GetSubscriptionBacklogSize(self, subscription_name, interval_length=4):
+    client = monitoring_v3.MetricServiceClient()
+    project_name = f"projects/{self.project}"
+
+    now = time.time()
+    seconds = int(now)
+
+    interval = TimeInterval(
+        {
+            "end_time": {"seconds": seconds},
+            "start_time": {"seconds": seconds - interval_length * 60},
+        }
+    )
+
+    api_filter = (
+      'metric.type = "pubsub.googleapis.com/subscription/num_undelivered_messages" '
+      'AND resource.labels.subscription_id = "' + subscription_name + '" '
+    )
+    
+    results = client.list_time_series(
+      request={
+        "name": project_name,
+        "filter": api_filter,
+        "interval": interval,
+        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+      }
+    )
+
+    return self._GetLastValueFromTimeSeries(results)
+
+  def _GetLastValueFromTimeSeries(self, time_series):
+    value = None
+    for i, time_interval in enumerate(time_series):
+      if i != 0: break
+      for j, snapshot in enumerate(time_interval.points):
+        if j != 0: break
+        value = snapshot.value.int64_value
+
+    return value
+
+  def _GetAvgValueFromTimeSeries(self, time_series):
+    """Parses time series data and returns average across intervals.
+
+    Args:
+      time_series: time series of cpu fractional utilization returned by monitoring.
+
+    Returns:
+      Average value across intervals
+    """
+    points = []
+    for time_interval in time_series:
+      for snapshot in time_interval.points:
+        points.append(snapshot.value.double_value)
+
+    if points:
+      # Average over all minute intervals captured
+      averaged = sum(points) / len(points)
+      # If metric unit is a fractional number between 0 and 1 (e.g. CPU utilization metric)
+      # multiply by 100 to display a percentage usage.
+      if time_series.unit == "10^2.%":
+        averaged = round(averaged * 100, 2)
+      return averaged
+    
+    return None 
+
+  def _GetMaxValueFromTimeSeries(self, time_series):
+    """Parses time series data and returns maximum across intervals.
+
+    Args:
+      time_series: time series of throughput rates returned by monitoring.
+
+    Returns:
+      Maximum value across intervals
+    """
+    points = []
+    for time_interval in time_series:
+      for snapshot in time_interval.points:
+        points.append(snapshot.value.double_value)
+
+    if points:
+      # Max over all minute intervals captured
+      max_rate = max(points)
+      # If metric unit is a fractional number between 0 and 1 (e.g. CPU utilization metric)
+      # multiply by 100 to display a percentage usage.
+      if time_series.unit == "10^2.%":
+        max_rate = round(max_rate * 100, 2)
+      else:
+        max_rate = round(max_rate, 2)
+      return max_rate
+    
+    return None 

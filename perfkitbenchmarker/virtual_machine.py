@@ -27,7 +27,7 @@ import socket
 import threading
 import time
 import typing
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 
 from absl import flags
 import jinja2
@@ -352,7 +352,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self._total_memory_kb = None
     self._num_cpus = None
     self._is_smt_enabled = None
-    self.os_metadata = {}
+    # Update to Json type if ever available:
+    # https://github.com/python/typing/issues/182
+    self.os_metadata: Dict[str, Union[str, int]] = {}
     assert type(
         self).BASE_OS_TYPE in os_types.BASE_OS_TYPES, '%s is not in %s' % (
             type(self).BASE_OS_TYPE, os_types.BASE_OS_TYPES)
@@ -369,7 +371,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   def BASE_OS_TYPE(cls):
     raise NotImplementedError()
 
-  def GetOSResourceMetadata(self):
+  def GetOSResourceMetadata(self) -> Dict[str, Union[str, int]]:
     """Returns a dict containing VM OS metadata.
 
     Returns:
@@ -970,6 +972,12 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       raise errors.Resource.CreationError('No NFS Service created')
     return nfs
 
+  # TODO(pclay): Implement on Windows, make abstract and non Optional
+  @property
+  def cpu_arch(self) -> Optional[str]:
+    """The basic CPU architecture of the VM."""
+    return None
+
 
 class DeprecatedOsMixin(BaseOsMixin):
   """Class that adds a deprecation log message to OsBasedVms."""
@@ -1205,6 +1213,26 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
 
   def SimulateMaintenanceEvent(self):
     """Simulates a maintenance event on the VM."""
+    raise NotImplementedError()
+
+  def SetupLMNotification(self):
+    """Prepare environment for /scripts/gce_maintenance_notify.py script."""
+    raise NotImplementedError()
+
+  def _GetLMNotifificationCommand(self):
+    """Return Remote python execution command for LM notify script."""
+    raise NotImplementedError()
+
+  def StartLMNotification(self):
+    """Start meta-data server notification subscription."""
+    raise NotImplementedError()
+
+  def WaitLMNotificationRelease(self):
+    """Block main thread until LM ended."""
+    raise NotImplementedError()
+
+  def CollectLMNotificationsTime(self):
+    """Extract LM notifications from log file."""
     raise NotImplementedError()
 
   def _InstallData(self, preprovisioned_data, module_name, filenames,

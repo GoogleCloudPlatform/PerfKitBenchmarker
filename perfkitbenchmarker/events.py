@@ -68,9 +68,17 @@ Sender: None
 Payload: benchmark_spec.""")
 
 before_phase = _events.signal('before-phase', doc="""
-Signal sent immediately before a phase runs.
+Signal sent before run phase and trigger phase.
 
 Sender: the stage.
+Payload: benchmark_spec.""")
+
+trigger_phase = _events.signal('trigger-phase', doc="""
+Signal sent immediately before run phase.
+This is used for short running command right before the run phase.
+Before run phase can be slow, time sensitive function should use
+this event insteand.
+
 Payload: benchmark_spec.""")
 
 after_phase = _events.signal('after-phase', doc="""
@@ -80,11 +88,23 @@ successful.
 Sender: the stage.
 Payload: benchmark_spec.""")
 
-samples_created = _events.signal('samples-created', doc="""
+benchmark_samples_created = _events.signal('benchmark-samples-created', doc="""
 Called with samples list and benchmark spec.
 
 Signal sent immediately after a sample is created.
+Sample's should be added into this phase. Any global metadata should be
+added in the samples finalized.
+
+Payload: benchmark_spec (BenchmarkSpec), samples (list of sample.Sample).""")
+
+all_samples_created = _events.signal('all_samples_created', doc="""
+Called with samples list and benchmark spec.
+
+Signal sent immediately after a benchmark_samples_created is called.
 The samples' metadata is mutable, and may be updated by the subscriber.
+This stage is used for adding global metadata. No new samples should
+be added during this phase.
+
 
 Sender: the phase. Currently only stages.RUN.
 Payload: benchmark_spec (BenchmarkSpec), samples (list of sample.Sample).""")
@@ -140,7 +160,7 @@ def _RunStartupScript(unused_sender, vm):
         './%s' % os.path.basename(FLAGS.startup_script))
 
 
-@samples_created.connect
+@benchmark_samples_created.connect
 def _AddScriptSamples(unused_sender, benchmark_spec, samples):
   def _ScriptResultToMetadata(out):
     return {'stdout': out[0], 'stderr': out[1]}

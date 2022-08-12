@@ -14,6 +14,7 @@
 
 """Tests for linux_virtual_machine.py."""
 
+from typing import Dict, Union
 import unittest
 
 from absl import flags
@@ -31,6 +32,34 @@ from perfkitbenchmarker import test_util
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
+
+# Tests Docker and IB filtered out and having multile eth with same MTU
+_IP_LINK_TEXT = """\
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+    link/ether 00:0d:3a:ed:2d:65 brd ff:ff:ff:ff:ff:ff
+3: ib0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 256
+    link/infiniband 00:00:01:49:fe:80:00:00:00:00:00:00:00:15:5d:ff:fd:34:02:db brd 00:ff:ff:ff:ff:12:40:1b:80:3a:00:00:00:00:00:00:ff:ff:ff:ff
+4: ib1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 256
+    link/infiniband 00:00:01:49:fe:80:00:00:00:00:00:00:00:15:5d:ff:fd:34:02:dc brd 00:ff:ff:ff:ff:12:40:1b:80:3a:00:00:00:00:00:00:ff:ff:ff:ff
+5: ib2: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 256
+    link/infiniband 00:00:01:49:fe:80:00:00:00:00:00:00:00:15:5d:ff:fd:34:02:dd brd 00:ff:ff:ff:ff:12:40:1b:80:3a:00:00:00:00:00:00:ff:ff:ff:ff
+6: ib3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 256
+    link/infiniband 00:00:01:49:fe:80:00:00:00:00:00:00:00:15:5d:ff:fd:34:02:de brd 00:ff:ff:ff:ff:12:40:1b:80:3a:00:00:00:00:00:00:ff:ff:ff:ff
+7: ib4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 256
+    link/infiniband 00:00:01:49:fe:80:00:00:00:00:00:00:00:15:5d:ff:fd:34:02:df brd 00:ff:ff:ff:ff:12:40:1b:80:3a:00:00:00:00:00:00:ff:ff:ff:ff
+8: ib5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 256
+    link/infiniband 00:00:01:49:fe:80:00:00:00:00:00:00:00:15:5d:ff:fd:34:02:e0 brd 00:ff:ff:ff:ff:12:40:1b:80:3a:00:00:00:00:00:00:ff:ff:ff:ff
+9: ib6: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 256
+    link/infiniband 00:00:01:49:fe:80:00:00:00:00:00:00:00:15:5d:ff:fd:34:02:e1 brd 00:ff:ff:ff:ff:12:40:1b:80:3a:00:00:00:00:00:00:ff:ff:ff:ff
+10: ib7: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 2044 qdisc mq state UP mode DEFAULT group default qlen 256
+    link/infiniband 00:00:01:49:fe:80:00:00:00:00:00:00:00:15:5d:ff:fd:34:02:e2 brd 00:ff:ff:ff:ff:12:40:1b:80:3a:00:00:00:00:00:00:ff:ff:ff:ff
+11: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN mode DEFAULT group default
+    link/ether 02:42:8a:7d:93:c8 brd ff:ff:ff:ff:ff:ff
+12: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+    link/ether 00:0d:3a:ed:2d:67 brd ff:ff:ff:ff:ff:ff
+"""
 
 
 def CreateTestLinuxVm():
@@ -381,15 +410,27 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'Thread(s) per core: 1',
       'Socket(s): 1',
   ])
-  normal_boot_responses = [
-      'cubic', f'PRETTY_NAME="{os_info}"', kernel_release, cpu_arch,
-      partition_table
-  ]
+  normal_boot_responses = {
+      'cat /proc/sys/net/ipv4/tcp_congestion_control': 'cubic',
+      'grep PRETTY_NAME /etc/os-release': f'PRETTY_NAME="{os_info}"',
+      'uname -r': kernel_release,
+      'uname -m': cpu_arch,
+      'sudo fdisk -l': partition_table,
+      'PATH="${PATH}":/usr/sbin ip link show up': _IP_LINK_TEXT
+  }
 
-  def CreateVm(self, array_of_stdout):
+  def CreateVm(self, run_cmd_response: Union[str, Dict[str, str]]):
     vm = CreateTestLinuxVm()
+    def FakeRemoteHostCommandWithReturnCode(cmd, **_):
+      if isinstance(run_cmd_response, str):
+        stdout = run_cmd_response
+      elif isinstance(run_cmd_response, dict):
+        # NOTE: unfortunately @vm_util.Retry will infinitely retry a key error
+        # on this map, which can be tricky to diagnose.
+        stdout = run_cmd_response[cmd]
+      return stdout, ''  # pytype: disable=name-error  # py310-upgrade
     vm.RemoteHostCommandWithReturnCode = mock.Mock(
-        side_effect=[(str(text), '') for text in array_of_stdout])
+        side_effect=FakeRemoteHostCommandWithReturnCode)
     vm.CheckLsCpu = mock.Mock(
         return_value=linux_virtual_machine.LsCpuResults(self.lscpu_output))
     return vm
@@ -399,7 +440,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       ('no_smt_centos7', _CENTOS7_KERNEL_COMMAND_LINE + ' noht nosmt nr_cpus=1',
        False))
   def testIsSmtEnabled(self, proc_cmdline, is_enabled):
-    vm = self.CreateVm([proc_cmdline])
+    vm = self.CreateVm(proc_cmdline)
     self.assertEqual(is_enabled, vm.IsSmtEnabled())
 
   @parameterized.named_parameters(
@@ -408,12 +449,16 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   )
   def testNumCpusForBenchmarkNoSmt(self, vcpus, kernel_command_line,
                                    expected_num_cpus):
-    vm = self.CreateVm([kernel_command_line, vcpus])
+    responses = {
+        'cat /proc/cpuinfo | grep processor | wc -l': str(vcpus),
+        'cat /proc/cmdline': kernel_command_line,
+    }
+    vm = self.CreateVm(responses)
     self.assertEqual(expected_num_cpus, vm.NumCpusForBenchmark(True))
 
   def testNumCpusForBenchmarkDefaultCall(self):
     # shows that IsSmtEnabled is not called unless new optional parameter used
-    vm = self.CreateVm([32])
+    vm = self.CreateVm('32')
     vm.IsSmtEnabled = mock.Mock()
     self.assertEqual(32, vm.NumCpusForBenchmark())
     vm.IsSmtEnabled.assert_not_called()
@@ -426,6 +471,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     expected_os_metadata = {
         '/dev/sda': 1073741824,
         'kernel_release': self.kernel_release,
+        'mtu': 1500,
         'os_info': self.os_info,
         'cpu_arch': self.cpu_arch,
         'threads_per_core': 1,
@@ -433,26 +479,34 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(expected_os_metadata, vm.os_metadata)
 
   def testReboot(self):
+    responses = self.normal_boot_responses.copy()
+    vm = self.CreateVm(responses)
+    vm.RecordAdditionalMetadata()
     os_info_new = 'Ubuntu 18.04.1b LTS'
     kernel_release_new = '5.3.0-1027'
-    additional_commands = [
-        '(reboot command)',
-        '(myhostname)',
-        '(last boot time)',
-        '(create install dir)',
-        f'PRETTY_NAME="{os_info_new}"',
-        kernel_release_new,
-        '(create install dir)',
-        '(create tmp dir)',
-    ]
-    vm = self.CreateVm(self.normal_boot_responses + additional_commands)
-    vm.RecordAdditionalMetadata()
+    responses.update({
+        'sudo reboot': 'bye bye',
+        'hostname': 'hello there',
+        'grep PRETTY_NAME /etc/os-release': f'PRETTY_NAME="{os_info_new}"',
+        'uname -r': kernel_release_new,
+        'stat -c %z /proc/': '',
+        'sudo mkdir -p /opt/pkb; sudo chmod a+rwxt /opt/pkb': '',
+        'mkdir -p /tmp/pkb': '',
+    })
     vm.Reboot()
     self.assertEqual(os_info_new, vm.os_metadata['os_info'])
     self.assertEqual(kernel_release_new, vm.os_metadata['kernel_release'])
 
+  def testGetNetworkDeviceNames(self):
+    responses = self.normal_boot_responses.copy()
+    vm = self.CreateVm(responses)
+    names = vm._get_network_device_mtus()
+    self.assertEqual({'eth0': 1500, 'eth1': 1500}, names)
+    mock_cmd = vm.RemoteHostCommandWithReturnCode
+    mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ip link show up')
+
   def testCpuVulnerabilitiesEmpty(self):
-    self.assertEqual({}, self.CreateVm(['']).cpu_vulnerabilities.asdict)
+    self.assertEqual({}, self.CreateVm('').cpu_vulnerabilities.asdict)
 
   def testCpuVulnerabilities(self):
     # lines returned from running "grep . .../cpu/vulnerabilities/*"
@@ -469,7 +523,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         # Not actually seen, shows that falls into "unknowns"
         '.../made_up:Unknown Entry',
     ]
-    cpu_vuln = self.CreateVm(['\n'.join(cpu_vuln_lines)]).cpu_vulnerabilities
+    cpu_vuln = self.CreateVm('\n'.join(cpu_vuln_lines)).cpu_vulnerabilities
     expected_mitigation = {
         'l1tf': 'PTE Inversion',
         'meltdown': 'PTI',
