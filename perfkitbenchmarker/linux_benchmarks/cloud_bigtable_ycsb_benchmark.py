@@ -20,7 +20,6 @@ with an HBase-compatible API.
 Compared to hbase_ycsb, this benchmark:
   * Modifies hbase-site.xml to work with Cloud Bigtable.
   * Adds the Bigtable client JAR.
-  * Adds netty-tcnative-boringssl, used for communication with Bigtable.
 """
 
 import datetime
@@ -39,6 +38,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import hbase_ycsb_benchmark as hbase_ycsb
+from perfkitbenchmarker.linux_packages import google_cloud_bigtable_client
 from perfkitbenchmarker.linux_packages import hbase
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
@@ -80,7 +80,8 @@ _HBASE_JAR_URL = flags.DEFINE_string(
     'com/google/cloud/bigtable/bigtable-hbase-{0}-hadoop/'
     '{1}/bigtable-hbase-{0}-hadoop-{1}.jar'.format(HBASE_CLIENT_VERSION,
                                                    BIGTABLE_CLIENT_VERSION),
-    'URL for the Bigtable-HBase client JAR.')
+    'URL for the Bigtable-HBase client JAR. Deprecated: Prefer to use '
+    '--google_bigtable_client_version instead.')
 _GET_CPU_UTILIZATION = flags.DEFINE_boolean(
     'get_bigtable_cluster_cpu_utilization', False,
     'If true, will gather bigtable cluster cpu utilization '
@@ -115,14 +116,6 @@ cloud_bigtable_ycsb:
       https://www.googleapis.com/auth/bigtable.admin
       https://www.googleapis.com/auth/bigtable.data"""
 
-# Starting from version 1.4.0, there is no need to install a separate boring ssl
-# via TCNATIVE_BORINGSSL_URL.
-TCNATIVE_BORINGSSL_JAR = (
-    'netty-tcnative-boringssl-static-1.1.33.Fork13-linux-x86_64.jar')
-TCNATIVE_BORINGSSL_URL = posixpath.join(
-    'https://search.maven.org/remotecontent?filepath='
-    'io/netty/netty-tcnative-boringssl-static/'
-    '1.1.33.Fork13/', TCNATIVE_BORINGSSL_JAR)
 METRICS_CORE_JAR = 'metrics-core-3.1.2.jar'
 DROPWIZARD_METRICS_CORE_URL = posixpath.join(
     'https://search.maven.org/remotecontent?filepath='
@@ -139,12 +132,9 @@ COLUMN_FAMILY = 'cf'
 BENCHMARK_DATA = {
     METRICS_CORE_JAR:
         '245ba2a66a9bc710ce4db14711126e77bcb4e6d96ef7e622659280f3c90cbb5c',
-    TCNATIVE_BORINGSSL_JAR:
-        '027d87e77a08dedf2005d9333db49aa37e08d599aff64ea18da9893912bdf314'
 }
 BENCHMARK_DATA_URL = {
     METRICS_CORE_JAR: DROPWIZARD_METRICS_CORE_URL,
-    TCNATIVE_BORINGSSL_JAR: TCNATIVE_BORINGSSL_URL
 }
 
 _Bigtable = gcp_bigtable.GcpBigtableInstance
@@ -223,29 +213,37 @@ def _GetDefaultProject() -> str:
     raise KeyError(f'No default project found in {config}') from key_error
 
 
-def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
-  """Install YCSB and HBase on 'vm'."""
-  vm.Install('hbase')
-  vm.Install('ycsb')
+def _InstallClientLegacy(vm: virtual_machine.VirtualMachine):
+  """Legacy function for installing the bigtable client from a given URL."""
   vm.Install('curl')
 
   hbase_lib = posixpath.join(hbase.HBASE_DIR, 'lib')
 
-  preprovisioned_pkgs = [TCNATIVE_BORINGSSL_JAR]
   if 'hbase-1.x' in _HBASE_JAR_URL.value:
-    preprovisioned_pkgs.append(METRICS_CORE_JAR)
-  ycsb_hbase_lib = posixpath.join(ycsb.YCSB_DIR,
-                                  FLAGS.hbase_binding + '-binding', 'lib')
-  vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, preprovisioned_pkgs,
-                                        ycsb_hbase_lib)
-  vm.InstallPreprovisionedBenchmarkData(
-      BENCHMARK_NAME, preprovisioned_pkgs, hbase_lib)
+    preprovisioned_pkgs = [METRICS_CORE_JAR]
+    ycsb_hbase_lib = posixpath.join(ycsb.YCSB_DIR,
+                                    FLAGS.hbase_binding + '-binding', 'lib')
+    vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, preprovisioned_pkgs,
+                                          ycsb_hbase_lib)
+    vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, preprovisioned_pkgs,
+                                          hbase_lib)
 
   url = _HBASE_JAR_URL.value
   jar_name = os.path.basename(url)
   jar_path = posixpath.join(ycsb_hbase_lib, jar_name)
   vm.RemoteCommand(f'curl -Lo {jar_path} {url}')
   vm.RemoteCommand(f'cp {jar_path} {hbase_lib}')
+
+
+def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
+  """Install YCSB and HBase on 'vm'."""
+  vm.Install('hbase')
+  vm.Install('ycsb')
+
+  if google_cloud_bigtable_client.CLIENT_VERSION.value:
+    vm.Install('google_cloud_bigtable_client')
+  else:
+    _InstallClientLegacy(vm)
 
   vm.RemoteCommand(
       f'echo "export JAVA_HOME=/usr" >> {hbase.HBASE_CONF_DIR}/hbase-env.sh')
@@ -431,6 +429,20 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   return samples
 
 
+@vm_util.Retry()
+def _CleanupTable(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Deletes a table under a user managed instance.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+      required to run the benchmark.
+  """
+  vm = benchmark_spec.vms[0]
+  command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """
+             """{1}/hbase shell""").format(_GetTableName(), hbase.HBASE_BIN)
+  vm.RemoteCommand(command, should_log=True)
+
+
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Cleanup.
 
@@ -442,7 +454,4 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   if (instance.user_managed and
       (_STATIC_TABLE_NAME.value is None or _DELETE_STATIC_TABLE.value)):
     # Only need to drop the temporary tables if we're not deleting the instance.
-    vm = benchmark_spec.vms[0]
-    command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """
-               """{1}/hbase shell""").format(_GetTableName(), hbase.HBASE_BIN)
-    vm.RemoteCommand(command, should_log=True, ignore_failure=True)
+    _CleanupTable(benchmark_spec)

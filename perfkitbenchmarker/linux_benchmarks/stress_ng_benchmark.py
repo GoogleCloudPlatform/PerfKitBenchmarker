@@ -25,9 +25,10 @@ http://manpages.ubuntu.com/manpages/xenial/man1/stress-ng.1.html
 """
 
 import logging
+from typing import Optional
+
 from absl import flags
 import numpy
-
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 
@@ -173,7 +174,9 @@ def Prepare(benchmark_spec):
   vm.Install('stress_ng')
 
 
-def _ParseStressngResult(metadata, output, cpu_method=None):
+def _ParseStressngResult(metadata,
+                         output,
+                         cpu_method=None) -> Optional[sample.Sample]:
   """Returns stress-ng data as a sample.
 
   Sample output eg:
@@ -194,7 +197,7 @@ def _ParseStressngResult(metadata, output, cpu_method=None):
   output_matrix = [i.split() for i in output_list]
   if len(output_matrix) < 5:
     logging.error('output is missing')
-    return ''
+    return None
   assert output_matrix[-3][-4] == 'bogo' and output_matrix[-3][-3] == 'ops/s'
   assert output_matrix[-2][-4] == '(real' and output_matrix[-2][-3] == 'time)'
   line = output_matrix[-1]

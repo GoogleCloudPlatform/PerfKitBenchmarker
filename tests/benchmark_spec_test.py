@@ -132,7 +132,8 @@ class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
         yaml_string=_SIMPLE_EDW_CONFIG, benchmark_name='edw_benchmark')
     spec.ConstructEdwService()
     self.assertEqual('snowflake_aws', spec.edw_service.SERVICE_TYPE)
-    self.assertIsInstance(spec.edw_service, providers.aws.snowflake.Snowflake)
+    self.assertIsInstance(spec.edw_service,
+                          providers.aws.snowflake_aws.Snowflake)
 
 
 class ConstructSpannerTestCase(_BenchmarkSpecTestCase):

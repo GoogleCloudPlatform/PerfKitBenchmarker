@@ -7,13 +7,13 @@ FROM $base_image
 ARG java_version=8
 ENV JAVA_HOME=/usr/lib/jvm/java-$java_version-openjdk-amd64
 
-ARG hadoop_version=3.3.1
+ARG hadoop_version=3.3.3
 # Spark picks this up for executor classpath:
 # https://github.com/apache/spark/blob/master/resource-managers/kubernetes/docker/src/main/dockerfiles/spark/entrypoint.sh#L56
 ENV HADOOP_HOME=/opt/pkb/hadoop
 ENV HADOOP_OPTIONAL_TOOLS=hadoop-aws
 
-ARG spark_version=3.1.2
+ARG spark_version=3.3.0
 ENV SPARK_HOME=/opt/pkb/spark
 
 RUN apt-get update && \

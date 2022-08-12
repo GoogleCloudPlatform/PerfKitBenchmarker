@@ -128,12 +128,18 @@ def _CreateSamples(results: Dict[str, Any], number_of_messages: int,
       'cloud': cloud,
       'streaming_pull': streaming_pull,
   }
+  failure_counter = None
+  for metric_name in results:
+    if metric_name.endswith('_failure_counter'):
+      failure_counter = results[metric_name]['value']
 
   for metric_name in results:
     metric_value = results[metric_name]['value']
     metric_unit = results[metric_name]['unit']
     metric_metadata = results[metric_name]['metadata']
     metric_metadata.update(common_metadata)
+    if failure_counter is not None:
+      metric_metadata['failure_count'] = failure_counter
 
     # aggregated metrics, such as: mean, p50, p99...
     samples.append(

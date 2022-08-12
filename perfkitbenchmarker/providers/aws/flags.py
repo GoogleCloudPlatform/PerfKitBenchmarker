@@ -113,6 +113,10 @@ flags.DEFINE_string(
     'aws_glue_job_role', None,
     "Role's ARN to be used by Glue Jobs. Must have policies that grant "
     'permission for using AWS Glue and read access to S3.')
+flags.DEFINE_string(
+    'aws_emr_serverless_role', None,
+    "Role's ARN to be used by AWS EMR Serverless Jobs. Must have policies that "
+    'grant AWS Serverless read & write S3 access.')
 flags.DEFINE_integer(
     'aws_glue_crawler_sample_size', None,
     'Sets how many files will be crawled in each leaf directory. If left '

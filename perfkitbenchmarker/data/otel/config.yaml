@@ -1,0 +1,148 @@
+# An Open-Telemetry collector configuration file that specifies the exporter, processors, and receiver.
+# This configuration file collects default host metrics of cpu, disk, memory and network, processes the metrics to rename and filter, and then exports to a file.
+# See https://github.com/GoogleCloudPlatform/opentelemetry-operations-collector#configuration for more details of OTEL configuration.
+
+exporters:
+  file:
+    path: {{OUTPUT_FILE}}
+processors:
+  agentmetrics/default__pipeline_hostmetrics_0:
+    blank_label_metrics:
+    - system.cpu.utilization
+  filter/default__pipeline_hostmetrics_1:
+    metrics:
+      exclude:
+        match_type: strict
+        metric_names:
+        - system.cpu.time
+        - system.disk.operation_time
+        - system.disk.io_time
+        - system.disk.merged
+        - system.disk.weighted_io_time
+        - system.network.errors
+        - system.network.connections
+        - system.network.dropped
+  metricstransform/default__pipeline_hostmetrics_2:
+    transforms:
+    - action: update
+      include: system.cpu.utilization
+      new_name: cpu_utilization
+      operations:
+      - action: aggregate_labels
+        aggregation_type: mean
+        label_set:
+        - state
+        - blank
+      - action: update_label
+        label: blank
+        new_label: cpu_number
+      - action: update_label
+        label: state
+        new_label: cpu_state
+      - action: delete_label_value
+        label: cpu_state
+        label_value: interrupt
+      - action: delete_label_value
+        label: cpu_state
+        label_value: softirq
+      - action: delete_label_value
+        label: cpu_state
+        label_value: steal
+      - action: delete_label_value
+        label: cpu_state
+        label_value: wait
+      - action: delete_label_value
+        label: cpu_state
+        label_value: nice
+    - action: update
+      include: system.disk.read_io
+      new_name: disk_read_bytes_count
+    - action: update
+      include: system.disk.write_io
+      new_name: disk_write_bytes_count
+    - action: update
+      include: system.disk.operations
+      new_name: disk_operation_count
+    - action: update
+      include: system.disk.average_operation_time
+      new_name: disk_operation_time
+      operations:
+      - action: experimental_scale_value
+        experimental_scale: 1000.0
+      - action: toggle_scalar_data_type
+    - action: update
+      include: system.disk.pending_operations
+      new_name: disk_pending_operations
+      operations:
+      - action: toggle_scalar_data_type
+    - action: update
+      include: system.memory.usage
+      new_name: memory_bytes_used
+      operations:
+      - action: delete_label_value
+        label: state
+        label_value: slab_reclaimable
+      - action: delete_label_value
+        label: state
+        label_value: slab_unreclaimable
+      - action: delete_label_value
+        label: state
+        label_value: free
+      - action: delete_label_value
+        label: state
+        label_value: buffered
+      - action: delete_label_value
+        label: state
+        label_value: cached
+    - action: update
+      include: system.memory.utilization
+      new_name: memory_percent_used
+      operations:
+      - action: delete_label_value
+        label: state
+        label_value: slab_reclaimable
+      - action: delete_label_value
+        label: state
+        label_value: slab_unreclaimable
+      - action: delete_label_value
+        label: state
+        label_value: free
+      - action: delete_label_value
+        label: state
+        label_value: buffered
+      - action: delete_label_value
+        label: state
+        label_value: cached
+    - action: update
+      include: system.network.io
+      new_name: network_traffic
+      operations:
+      - action: update_label
+        label: interface
+        new_label: device
+    - action: update
+      include: system.network.packets
+      new_name: network_packets_count
+      operations:
+      - action: update_label
+        label: interface
+        new_label: device
+receivers:
+  hostmetrics/default__pipeline_hostmetrics:
+    collection_interval: {{INTERVAL}}s
+    scrapers:
+      cpu: {}
+      disk: {}
+      memory: {}
+      network: {}
+service:
+  pipelines:
+    metrics/default__pipeline_hostmetrics:
+      exporters:
+      - file
+      processors:
+      - agentmetrics/default__pipeline_hostmetrics_0
+      - filter/default__pipeline_hostmetrics_1
+      - metricstransform/default__pipeline_hostmetrics_2
+      receivers:
+      - hostmetrics/default__pipeline_hostmetrics

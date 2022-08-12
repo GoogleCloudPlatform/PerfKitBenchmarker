@@ -232,10 +232,16 @@ def _ParseSysbenchOutput(sysbench_output):
     # lat (ms,99%): 40.37 err/s: 0.00 reconn/s: 0.00
     if re.match(r'^\[', line):
       match = re.search('tps: (.*?) ', line)
+      if not match:
+        raise ValueError(f'no tps in: {line}')
       tps_numbers.append(float(match.group(1)))
       match = re.search(r'lat \(.*?\): (.*?) ', line)
+      if not match:
+        raise ValueError(f'no lat in: {line}')
       latency_numbers.append(float(match.group(1)))
       match = re.search(r'qps: (.*?) \(.*?\) ', line)
+      if not match:
+        raise ValueError(f'no qps in: {line}')
       qps_numbers.append(float(match.group(1)))
       if line.startswith('SQL statistics:'):
         break

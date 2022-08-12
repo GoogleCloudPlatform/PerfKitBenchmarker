@@ -50,7 +50,7 @@ FLAGS = flags.FLAGS
 
 CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/{cpu_arch}/cuda-{os}.pin'
 
-CUDA_11_6_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.6.1/local_installers/cuda-repo-{os}-11-6-local_11.6.1-510.47.03-1_{cpu_arch}.deb'
+CUDA_11_6_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.6.2/local_installers/cuda-repo-{os}-11-6-local_11.6.2-510.47.03-1_{cpu_arch}.deb'
 CUDA_11_5_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.5.2/local_installers/cuda-repo-{os}-11-5-local_11.5.2-495.29.05-1_{cpu_arch}.deb'
 CUDA_11_4_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.4.4/local_installers/cuda-repo-{os}-11-4-local_11.4.4-470.82.01-1_{cpu_arch}.deb'
 CUDA_11_3_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.3.1/local_installers/cuda-repo-{os}-11-3-local_11.3.1-465.19.01-1_{cpu_arch}.deb'

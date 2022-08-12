@@ -1,4 +1,4 @@
-# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2022 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,19 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.providers.aws.snowflake."""
+"""Tests for perfkitbenchmarker.providers.azure.snowflake_azure."""
 
 import copy
 import unittest
 
 from absl import flags
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.providers.aws import snowflake
+from perfkitbenchmarker.providers.azure import snowflake_azure
 from tests import pkb_common_test_case
 
 _TEST_RUN_URI = 'fakeru'
-_AWS_ZONE_US_EAST_1A = 'us-east-1a'
-_BASE_SNOWFLAKE_SPEC = {'type': 'snowflake_aws'}
+_AZURE_ZONE_EAST_US_2 = 'eastus2'
+_BASE_SNOWFLAKE_SPEC = {'type': 'snowflake_azure'}
 
 FLAGS = flags.FLAGS
 
@@ -44,29 +44,29 @@ class SnowflakeTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(SnowflakeTestCase, self).setUp()
-    FLAGS.cloud = 'AWS'
+    FLAGS.cloud = 'AZURE'
     FLAGS.run_uri = _TEST_RUN_URI
-    FLAGS.zones = [_AWS_ZONE_US_EAST_1A]
+    FLAGS.zones = [_AZURE_ZONE_EAST_US_2]
     FLAGS.snowflake_snowsql_config_override_file = 'snowflake_snowsql_config_override_file'
     FLAGS.snowflake_connection = 'fake_connection'
 
   def testCreateRequestError(self):
     kwargs = copy.copy(_BASE_SNOWFLAKE_SPEC)
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
-    snowflake_local = snowflake.Snowflake(spec)
+    snowflake_local = snowflake_azure.Snowflake(spec)
     with self.assertRaises(NotImplementedError):
       snowflake_local._Create()
 
   def testIsAlwaysUserManaged(self):
     kwargs = copy.copy(_BASE_SNOWFLAKE_SPEC)
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
-    snowflake_local = snowflake.Snowflake(spec)
+    snowflake_local = snowflake_azure.Snowflake(spec)
     self.assertTrue(snowflake_local.IsUserManaged(spec))
 
   def testAlwaysExists(self):
     kwargs = copy.copy(_BASE_SNOWFLAKE_SPEC)
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
-    snowflake_local = snowflake.Snowflake(spec)
+    snowflake_local = snowflake_azure.Snowflake(spec)
     self.assertTrue(snowflake_local._Exists())
 
 

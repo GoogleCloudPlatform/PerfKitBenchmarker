@@ -38,18 +38,6 @@ NON_HVM_PREFIXES = ['t1', 's1', 's2', 's3', 'm1']
 
 DRIVE_START_LETTER = 'b'
 DEFAULT_DISK_SIZE = 500
-INSTANCE = 'instance'
-IMAGE = 'image'
-SNAPSHOT = 'snapshot'
-DISK = 'disk'
-NONE = 'none'
-IO_OPTIMIZED = 'io_optimized'
-RESOURCE_TYPE = {
-    INSTANCE: 'instance',
-    IMAGE: 'image',
-    SNAPSHOT: 'snapshot',
-    DISK: 'disk',
-}
 SSH_PORT = 22
 
 
@@ -74,7 +62,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AliCloud Virtual Machine."""
 
   CLOUD = providers.ALICLOUD
-  DEFAULT_ZONE = 'cn-hangzhou-d'
+  DEFAULT_ZONE = 'us-west-1a'
   DEFAULT_MACHINE_TYPE = 'ecs.s3.large'
 
   _lock = threading.Lock()
@@ -164,6 +152,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       associate_cmd = util.GetEncodedCmd(associate_cmd)
       vm_util.IssueRetryableCommand(associate_cmd)
 
+      util.VPCAddDefaultTags(self.eip_id, util.ResourceTypes.EIP, self.region)
+
     else:
       allocatip_cmd = util.ALI_PREFIX + [
           'ecs',
@@ -230,8 +220,32 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.firewall.AllowPort(self, SSH_PORT)
     tags = {}
     tags.update(self.vm_metadata)
-    util.AddTags(self.id, RESOURCE_TYPE[INSTANCE], self.region, **tags)
-    util.AddDefaultTags(self.id, RESOURCE_TYPE[INSTANCE], self.region)
+    util.AddTags(self.id, util.ResourceTypes.INSTANCE, self.region, **tags)
+    util.AddDefaultTags(self.id, util.ResourceTypes.INSTANCE, self.region)
+
+    # Find and tag attached disks
+    describe_cmd = util.ALI_PREFIX + [
+        'ecs',
+        'DescribeDisks',
+        '--InstanceId %s' % self.id]
+
+    describe_cmd_encoded = util.GetEncodedCmd(describe_cmd)
+    stdout, _ = vm_util.IssueRetryableCommand(describe_cmd_encoded)
+    response = json.loads(stdout)
+    disks = list(response['Disks']['Disk'])
+
+    while response['NextToken']:
+      describe_cmd_encoded = util.GetEncodedCmd(
+          describe_cmd + ['--NextToken', response['NextToken']])
+
+      stdout, _ = vm_util.IssueRetryableCommand(describe_cmd_encoded)
+      response = json.loads(stdout)
+      disks.extend(list(response['Disks']['Disk']))
+
+    for attached_disk in disks:
+      disk_id = attached_disk['DiskId']
+      util.AddTags(disk_id, util.ResourceTypes.DISK, self.region, **tags)
+      util.AddDefaultTags(disk_id, util.ResourceTypes.DISK, self.region)
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -374,7 +388,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
-    util.AddTags(self.id, RESOURCE_TYPE[INSTANCE], self.region, **kwargs)
+    util.AddTags(self.id, util.ResourceTypes.INSTANCE, self.region, **kwargs)
 
 
 class AliCloudKeyFileManager(object):
@@ -428,16 +442,21 @@ class AliCloudKeyFileManager(object):
     return keyfile.strip()
 
 
+class Debian113BasedAliVirtualMachine(AliVirtualMachine,
+                                      linux_virtual_machine.Debian11Mixin):
+  IMAGE_NAME_FILTER = 'debian_11_3_x64_20G*alibase*.vhd'
+
+
 class Ubuntu1604BasedAliVirtualMachine(AliVirtualMachine,
                                        linux_virtual_machine.Ubuntu1604Mixin):
-  IMAGE_NAME_FILTER = 'ubuntu_16_04_64*alibase*.vhd'
+  IMAGE_NAME_FILTER = 'ubuntu_16_04_x64*alibase*.vhd'
 
 
 class Ubuntu1804BasedAliVirtualMachine(AliVirtualMachine,
                                        linux_virtual_machine.Ubuntu1804Mixin):
-  IMAGE_NAME_FILTER = 'ubuntu_18_04_64*alibase*.vhd'
+  IMAGE_NAME_FILTER = 'ubuntu_18_04_x64*alibase*.vhd'
 
 
 class CentOs7BasedAliVirtualMachine(AliVirtualMachine,
                                     linux_virtual_machine.CentOs7Mixin):
-  IMAGE_NAME_FILTER = 'centos_7_05_64*alibase*.vhd'
+  IMAGE_NAME_FILTER = 'centos_7_05_x64*alibase*.vhd'

@@ -53,8 +53,6 @@ _RAMP_UP = flags.DEFINE_boolean(
 )
 FLAGS = flags.FLAGS
 
-_VM = virtual_machine.VirtualMachine
-
 _TARGET_QPS_INCREMENT = 1000
 _QPS_THRESHOLD = 100
 
@@ -175,7 +173,7 @@ def _ExtractThroughput(samples: List[sample.Sample]) -> float:
 
 def RampUpRun(executor: ycsb.YCSBExecutor,
               db: aws_dynamodb.AwsDynamoDBInstance,
-              vms: List[_VM],
+              vms: List[virtual_machine.VirtualMachine],
               run_kwargs: Dict[str, Any]) -> List[sample.Sample]:
   """Runs YCSB starting from provisioned QPS until max throughput is found."""
   # Database is already provisioned with the correct QPS.

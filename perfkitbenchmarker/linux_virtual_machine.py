@@ -29,6 +29,7 @@ for you.
 import abc
 import collections
 import copy
+# import functools
 import logging
 import os
 import pipes
@@ -36,7 +37,7 @@ import posixpath
 import re
 import threading
 import time
-from typing import Dict, Set
+from typing import Optional, Dict, Set
 import uuid
 
 from absl import flags
@@ -253,6 +254,49 @@ class CpuVulnerabilities:
     return ret
 
 
+class KernelRelease(object):
+  """Holds the contents of the linux kernel version returned from uname -r."""
+
+  def __init__(self, uname: str):
+    """KernelVersion Constructor.
+
+    Args:
+      uname: A string in the format of "uname -r" command
+    """
+
+    # example format would be: "4.5.0-96-generic"
+    # or "3.10.0-514.26.2.el7.x86_64" for centos
+    # major.minor.Rest
+    # in this example, major = 4, minor = 5
+    self.name = uname
+    major_string, minor_string, _ = uname.split('.', 2)
+    self.major = int(major_string)
+    self.minor = int(minor_string)
+
+  def AtLeast(self, major, minor):
+    """Check If the kernel version meets a minimum bar.
+
+    The kernel version needs to be at least as high as the major.minor
+    specified in args.
+
+    Args:
+      major: The major number to test, as an integer
+      minor: The minor number to test, as an integer
+
+    Returns:
+      True if the kernel version is at least as high as major.minor,
+      False otherwise
+    """
+    if self.major < major:
+      return False
+    if self.major > major:
+      return True
+    return self.minor >= minor
+
+  def __repr__(self) -> str:
+    return self.name
+
+
 class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
 
@@ -267,6 +311,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   # this command might change depending on the OS, but most linux distributions
   # can use the following command
   INIT_RAM_FS_CMD = 'sudo update-initramfs -u'
+
+  # regex to get the network devices from "ip link show"
+  _IP_LINK_RE_DEVICE_MTU = re.compile(
+      r'^\d+: (?P<device_name>\S+):.*mtu (?P<mtu>\d+)')
+  # device prefixes to ignore from "ip link show"
+  # TODO(spencerkim): Record ib device metadata.
+  _IGNORE_NETWORK_DEVICE_PREFIXES = ('lo', 'docker', 'ib')
 
   def __init__(self, *args, **kwargs):
     super(BaseLinuxMixin, self).__init__(*args, **kwargs)
@@ -284,6 +335,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._partition_table = {}
     self._proccpu_cache = None
     self._smp_affinity_script = None
+    self._os_info: Optional[str] = None
+    self._kernel_release: Optional[KernelRelease] = None
+    self._cpu_arch: Optional[str] = None
+    self._kernel_command_line: Optional[str] = None
+    self._network_device_mtus = None
 
   def _Suspend(self):
     """Suspends a VM."""
@@ -615,7 +671,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if not FLAGS.network_enable_BBR:
       return
 
-    if not KernelRelease(self.kernel_release).AtLeast(4, 9):
+    if not self.kernel_release.AtLeast(4, 9):
       raise flags.ValidationError(
           'BBR requires a linux image with kernel 4.9 or newer')
 
@@ -712,42 +768,43 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self._proccpu_cache = ProcCpuResults(proccpu)
     return self._proccpu_cache
 
-  def GetOsInfo(self):
+  def GetOsInfo(self) -> str:
     """Returns information regarding OS type and version."""
     stdout, _ = self.RemoteCommand('grep PRETTY_NAME /etc/os-release')
     return regex_util.ExtractGroup(OS_PRETTY_NAME_REGEXP, stdout)
 
   @property
-  def os_info(self):
+  def os_info(self) -> str:
     """Get distribution-specific information."""
-    if self.os_metadata.get('os_info'):
-      return self.os_metadata['os_info']
-    else:
-      return self.GetOsInfo()
+    if not self._os_info:
+      self._os_info = self.GetOsInfo()
+    return self._os_info
 
   @property
-  def kernel_release(self):
+  def kernel_release(self) -> KernelRelease:
     """Return kernel release number."""
-    if self.os_metadata.get('kernel_release'):
-      return self.os_metadata.get('kernel_release')
-    else:
-      stdout, _ = self.RemoteCommand('uname -r')
-      return stdout.strip()
+    if not self._kernel_release:
+      self._kernel_release = KernelRelease(
+          self.RemoteCommand('uname -r')[0].strip())
+    return self._kernel_release
 
   @property
-  def kernel_command_line(self):
+  def kernel_command_line(self) -> str:
     """Return the kernel command line."""
-    return (self.os_metadata.get('kernel_command_line') or
-            self.RemoteCommand('cat /proc/cmdline')[0].strip())
+    if not self._kernel_command_line:
+      self._kernel_command_line = self.RemoteCommand(
+          'cat /proc/cmdline')[0].strip()
+    return self._kernel_command_line
 
   @property
-  def cpu_arch(self):
+  def cpu_arch(self) -> str:
     """Returns the CPU architecture of the VM."""
-    return (self.os_metadata.get('cpu_arch') or
-            self.RemoteCommand('uname -m')[0].strip())
+    if not self._cpu_arch:
+      self._cpu_arch = self.RemoteCommand('uname -m')[0].strip()
+    return self._cpu_arch
 
   @property
-  def partition_table(self):
+  def partition_table(self) -> Dict[str, int]:
     """Return partition table information."""
     if not self._partition_table:
       cmd = 'sudo fdisk -l'
@@ -793,13 +850,36 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.numa_node_count = lscpu_results.numa_node_count
     self.os_metadata['threads_per_core'] = lscpu_results.threads_per_core
     self.os_metadata['os_info'] = self.os_info
-    self.os_metadata['kernel_release'] = self.kernel_release
+    self.os_metadata['kernel_release'] = str(self.kernel_release)
     self.os_metadata['cpu_arch'] = self.cpu_arch
     self.os_metadata.update(self.partition_table)
     if FLAGS.append_kernel_command_line:
       self.os_metadata['kernel_command_line'] = self.kernel_command_line
       self.os_metadata[
           'append_kernel_command_line'] = FLAGS.append_kernel_command_line
+
+    devices = self._get_network_device_mtus()
+    all_mtus = set(devices.values())
+    if len(all_mtus) != 1:
+      raise ValueError(
+          'To record, MTU must only have 1 unique MTU value not: ', devices)
+    else:
+      self.os_metadata['mtu'] = list(all_mtus)[0]
+
+  # @functools.cached_property
+  def _get_network_device_mtus(self) -> Dict[str, int]:
+    """Returns network device names and their MTUs."""
+    if not self._network_device_mtus:
+      stdout, _ = self.RemoteCommand('PATH="${PATH}":/usr/sbin ip link show up')
+      self._network_device_mtus = {}
+      for line in stdout.splitlines():
+        m = self._IP_LINK_RE_DEVICE_MTU.match(line)
+        if m:
+          device_name = m['device_name']
+          if not any(device_name.startswith(prefix)
+                     for prefix in self._IGNORE_NETWORK_DEVICE_PREFIXES):
+            self._network_device_mtus[device_name] = int(m['mtu'])
+    return self._network_device_mtus
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
@@ -1103,15 +1183,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     This will be called after every call to Reboot().
     """
-    # clear out os_info and kernel_release as might have changed
-    previous_os_info = self.os_metadata.pop('os_info', None)
-    previous_kernel_release = self.os_metadata.pop('kernel_release', None)
-    previous_kernel_command = self.os_metadata.pop('kernel_command_line', None)
-    if previous_os_info or previous_kernel_release or previous_kernel_command:
-      self.RecordAdditionalMetadata()
-    if self._lscpu_cache:
-      self._lscpu_cache = None
-      self.CheckLsCpu()
+    # redetect os metadata as it might have changed
+    self._os_info = None
+    self._kernel_release = None
+    self._kernel_command_line = None
+    self._lscpu_cache = None
+    self.RecordAdditionalMetadata()
     if self.install_packages:
       self._CreateInstallDir()
     self._CreateVmTmpDir()
@@ -2312,45 +2389,6 @@ class ContainerizedDebianMixin(BaseDebianMixin):
     """
     if self.docker_id:
       self.RemoteHostCommand('docker stop %s' % self.docker_id)
-
-
-class KernelRelease(object):
-  """Holds the contents of the linux kernel version returned from uname -r."""
-
-  def __init__(self, uname):
-    """KernelVersion Constructor.
-
-    Args:
-      uname: A string in the format of "uname -r" command
-    """
-
-    # example format would be: "4.5.0-96-generic"
-    # or "3.10.0-514.26.2.el7.x86_64" for centos
-    # major.minor.Rest
-    # in this example, major = 4, minor = 5
-    major_string, minor_string, _ = uname.split('.', 2)
-    self.major = int(major_string)
-    self.minor = int(minor_string)
-
-  def AtLeast(self, major, minor):
-    """Check If the kernel version meets a minimum bar.
-
-    The kernel version needs to be at least as high as the major.minor
-    specified in args.
-
-    Args:
-      major: The major number to test, as an integer
-      minor: The minor number to test, as an integer
-
-    Returns:
-      True if the kernel version is at least as high as major.minor,
-      False otherwise
-    """
-    if self.major < major:
-      return False
-    if self.major > major:
-      return True
-    return self.minor >= minor
 
 
 def _ParseTextProperties(text):

@@ -1,4 +1,4 @@
-  # Copyright 20121 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 20121 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -249,7 +249,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(db.server_vm, 'RemoteCommand') as remote_command:
       db._InstallMySQLServer()
     command = [
-        mock.call('chmod 777 scratch'),
+        mock.call('chmod 755 scratch'),
         mock.call('sudo service None stop'),
         mock.call('sudo mkdir -p /scratch/mysql'),
         mock.call('sudo mkdir -p /scratch/tmp'),

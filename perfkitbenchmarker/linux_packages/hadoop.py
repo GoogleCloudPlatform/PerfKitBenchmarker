@@ -22,18 +22,23 @@ import os
 import posixpath
 import re
 import time
+
 from absl import flags
+import bs4
+from packaging import version
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aws_credentials
+import requests
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('hadoop_version', '3.3.1', 'Version of Hadoop.')
-flags.DEFINE_string('hadoop_bin_url', None,
-                    'Specify to override url from HADOOP_URL_BASE.')
+_VERSION = flags.DEFINE_string('hadoop_version', None, 'Version of Hadoop.')
+_URL_OVERRIDE = flags.DEFINE_string(
+    'hadoop_bin_url', None, 'Specify to override url from HADOOP_URL_BASE.')
 
 DATA_FILES = [
     'hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
@@ -43,6 +48,8 @@ DATA_FILES = [
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
 HADOOP_URL_BASE = 'https://downloads.apache.org/hadoop/common'
+HADOOP_STABLE_URL = HADOOP_URL_BASE + '/stable'
+HADOOP_TAR_PATTERN = re.compile(r'hadoop-([0-9.]+)\.t(ar\.)?gz')
 
 HADOOP_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'hadoop')
 HADOOP_BIN = posixpath.join(HADOOP_DIR, 'bin')
@@ -57,6 +64,34 @@ HDFS_CMD = posixpath.join(HADOOP_BIN, 'hdfs')
 YARN_CMD = posixpath.join(HADOOP_BIN, 'yarn')
 
 
+@functools.lru_cache()
+def HadoopVersion() -> version.Version:
+  """Get provided or latest stable HadoopVersion."""
+  if _VERSION.value:
+    return version.Version(_VERSION.value)
+  if _URL_OVERRIDE.value:
+    extracted_version = re.search(
+        r'[0-9]+\.[0-9]+\.[0-9]+', _URL_OVERRIDE.value)
+    if extracted_version:
+      return version.Version(extracted_version.group(0))
+    else:
+      raise errors.Config.InvalidValue(
+          'Cannot parse version out of --hadoop_bin_url please pass '
+          '--hadoop_version as well.')
+  response = requests.get(HADOOP_STABLE_URL)
+  if not response.ok:
+    raise errors.Setup.MissingExecutableError(
+        'Could not load ' + HADOOP_STABLE_URL)
+  soup = bs4.BeautifulSoup(response.content, 'html.parser')
+  link = soup.find('a', href=HADOOP_TAR_PATTERN)
+  if link:
+    match = re.match(HADOOP_TAR_PATTERN, link['href'])
+    if match:
+      return version.Version(match.group(1))
+  raise errors.Setup.MissingExecutableError(
+      'Could not find valid hadoop version at ' + HADOOP_STABLE_URL)
+
+
 def _GetHadoopURL():
   """Gets the Hadoop download url based on flags.
 
@@ -67,7 +102,7 @@ def _GetHadoopURL():
   """
 
   return '{0}/hadoop-{1}/hadoop-{1}.tar.gz'.format(HADOOP_URL_BASE,
-                                                   FLAGS.hadoop_version)
+                                                   HadoopVersion())
 
 
 def CheckPrerequisites():
@@ -81,6 +116,8 @@ def CheckPrerequisites():
 
 
 def _Install(vm):
+  # Not all benhmarks know they are installing Hadooop so re-validate here.
+  CheckPrerequisites()
   vm.Install('openjdk')
   vm.Install('curl')
   hadoop_url = FLAGS.hadoop_bin_url or _GetHadoopURL()
@@ -110,7 +147,7 @@ def InstallGcsConnector(vm, install_dir=HADOOP_LIB_DIR):
   """Install the GCS connector for Hadoop, which allows I/O to GCS."""
   connector_url = ('https://storage.googleapis.com/hadoop-lib/gcs/'
                    'gcs-connector-hadoop{}-latest.jar'.format(
-                       FLAGS.hadoop_version[0]))
+                       HadoopVersion().major))
   vm.RemoteCommand('cd {0} && curl -O {1}'.format(install_dir, connector_url))
 
 
@@ -200,7 +237,7 @@ def _RenderConfig(vm,
   for file_name in DATA_FILES:
     file_path = data.ResourcePath(file_name)
     if (file_name == 'hadoop/workers.j2' and
-        FLAGS.hadoop_version.split('.')[0] < '3'):
+        HadoopVersion() < version.Version('3')):
       file_name = 'hadoop/slaves.j2'
     remote_path = posixpath.join(HADOOP_CONF_DIR, os.path.basename(file_name))
     if file_name.endswith('.j2'):

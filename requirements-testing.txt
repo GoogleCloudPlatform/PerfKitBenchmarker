@@ -35,3 +35,4 @@ azure-storage<=0.20.3
 freezegun
 boto3
 google-cloud-pubsub
+requests-mock

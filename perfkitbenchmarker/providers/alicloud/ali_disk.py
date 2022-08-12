@@ -62,6 +62,10 @@ class AliDisk(disk.BaseDisk):
     response = json.loads(stdout)
     self.id = response['DiskId']
 
+  def _PostCreate(self):
+    """Tag disk with default tags."""
+    util.AddDefaultTags(self.id, util.ResourceTypes.DISK, self.region)
+
   def _Delete(self):
     """Deletes the disk."""
     delete_cmd = util.ALI_PREFIX + [
@@ -122,7 +126,7 @@ class AliDisk(disk.BaseDisk):
 
   @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
   def WaitForDiskStatus(self, status_list):
-    """Waits until disk is attach to the instance"""
+    """Waits until disk is attach to the instance."""
     logging.info('Waits until the disk\'s status is one of statuses: %s',
                  status_list)
     describe_cmd = util.ALI_PREFIX + [
@@ -134,7 +138,7 @@ class AliDisk(disk.BaseDisk):
     attach_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(attach_cmd)
     response = json.loads(stdout)
-    disk = response['Disks']['Disk']
-    assert len(disk) == 1
-    status = disk[0]['Status']
+    disks = response['Disks']['Disk']
+    assert len(disks) == 1
+    status = disks[0]['Status']
     assert status in status_list

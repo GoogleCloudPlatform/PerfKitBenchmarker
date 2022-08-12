@@ -48,6 +48,10 @@ flags.DEFINE_string('dpb_dataflow_runner', 'DataflowRunner',
 flags.DEFINE_string('dpb_dataflow_sdk', None,
                     'SDK used to build the Dataflow executable. The latest sdk '
                     'will be used by default.')
+flags.DEFINE_multi_string('dpb_dataflow_additional_args', [], 'Additional '
+                          'arguments which should be passed to Dataflow job.')
+flags.DEFINE_integer('dpb_dataflow_timeout', 300,
+                     'The default timeout for Dataflow job.')
 
 
 FLAGS = flags.FLAGS
@@ -133,9 +137,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     num_workers = self.spec.worker_count
     max_num_workers = self.spec.worker_count
     if (self.spec.worker_group.disk_spec and
-        self.spec.worker_group.disk_spec.disk_size):
+        self.spec.worker_group.disk_spec.disk_size is not None):
       disk_size_gb = self.spec.worker_group.disk_spec.disk_size
-    elif self.spec.worker_group.vm_spec.boot_disk_size:
+    elif self.spec.worker_group.vm_spec.boot_disk_size is not None:
       disk_size_gb = self.spec.worker_group.vm_spec.boot_disk_size
     else:
       disk_size_gb = None
@@ -167,7 +171,10 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       cmd.append('--diskSizeGb={}'.format(disk_size_gb))
     cmd.append('--defaultWorkerLogLevel={}'.format(FLAGS.dpb_log_level))
     cmd.append('--project={}'.format(self.project))
-    _, stderr, _ = vm_util.IssueCommand(cmd)
+
+    if FLAGS.dpb_dataflow_additional_args:
+      cmd.extend(FLAGS.dpb_dataflow_additional_args)
+    _, stderr, _ = vm_util.IssueCommand(cmd, timeout=FLAGS.dpb_dataflow_timeout)
 
     # Parse output to retrieve submitted job ID
     match = re.search('Submitted job: (.\S*)', stderr)

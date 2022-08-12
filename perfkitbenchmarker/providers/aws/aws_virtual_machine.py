@@ -538,6 +538,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking-os.html
     self._smp_affinity_script = 'smp_affinity.sh'
 
+    arm_arch = GetArmArchitecture(self.machine_type)
+    if arm_arch:
+      self.host_arch = arm_arch
+
     if self.use_dedicated_host and util.IsRegion(self.zone):
       raise ValueError(
           'In order to use dedicated hosts, you must specify an availability '
@@ -810,7 +814,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--hibernation-options=Configured=true',
       ])
 
-    if FLAGS.disable_smt:
+    # query fails on hpc6a.48xlarge which already disables smt.
+    if FLAGS.disable_smt and self.machine_type != 'hpc6a.48xlarge':
       query_cmd = util.AWS_PREFIX + [
           'ec2',
           'describe-instance-types',
@@ -868,10 +873,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--instance-market-options=%s' % json.dumps(instance_market_options))
     _, stderr, retcode = vm_util.IssueCommand(create_cmd,
                                               raise_on_failure=False)
-
-    arm_arch = GetArmArchitecture(self.machine_type)
-    if arm_arch:
-      self.host_arch = arm_arch
 
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
       if self.num_vms_per_host:
@@ -1288,7 +1289,7 @@ class ClearBasedAwsVirtualMachine(AwsVirtualMachine,
 
 class CoreOsBasedAwsVirtualMachine(AwsVirtualMachine,
                                    linux_virtual_machine.CoreOsMixin):
-  IMAGE_NAME_FILTER = 'fedora-coreos-*-hvm'
+  IMAGE_NAME_FILTER = 'fedora-coreos-*'
   # CoreOS only distinguishes between stable and testing in the description
   IMAGE_DESCRIPTION_FILTER = 'Fedora CoreOS stable *'
   IMAGE_OWNER = CENTOS_IMAGE_PROJECT
@@ -1335,7 +1336,6 @@ class Ubuntu1604BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
   def _InstallEfa(self):
     super(Ubuntu1604BasedAwsVirtualMachine, self)._InstallEfa()
     self.Reboot()
-    self.WaitForBootCompletion()
 
 
 class Ubuntu1804BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
@@ -1422,8 +1422,7 @@ class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
     self.RemoteCommand('sudo yum upgrade -y kernel')
     self.InstallPackages('kernel-devel')
     self.Reboot()
-    self.WaitForBootCompletion()
-    super(CentOs7BasedAwsVirtualMachine, self)._InstallEfa()
+    super()._InstallEfa()
 
 
 class CentOs8BasedAwsVirtualMachine(AwsVirtualMachine,
@@ -1462,6 +1461,7 @@ class CentOsStream9BasedAwsVirtualMachine(
   # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
   IMAGE_OWNER = CENTOS_IMAGE_PROJECT
   IMAGE_NAME_FILTER = 'CentOS Stream 9*'
+  DEFAULT_USER_NAME = 'centos'
 
 
 class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
