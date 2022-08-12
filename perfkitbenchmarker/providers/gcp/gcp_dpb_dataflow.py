@@ -18,6 +18,7 @@ No Clusters can be created or destroyed, since it is a managed solution
 See details at: https://cloud.google.com/dataflow/
 """
 
+from functools import cached_property
 import os
 import re
 import time
@@ -29,6 +30,7 @@ from absl import flags
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3.types import TimeInterval
 from google.cloud.monitoring_v3.types import Aggregation
+from google.cloud.monitoring_v3.types import ListTimeSeriesResponse
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -90,7 +92,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     self.project = FLAGS.project
     self.job_id = None
     self.job_metrics = None
-    self.job_stats = None
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
@@ -189,14 +190,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data['dpb_job_id'] = self.job_id
     return basic_data
 
-  def GetJobStatus(self):
-    cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'show', self.job_id)
-    cmd.flags = {
-        'project': self.project,
-        'format': 'json',
-    }
-
-  def GetStats(self):
+  @cached_property
+  def job_stats(self):
     """Collect series of relevant performance and cost stats."""
     stats = {}
     stats['total_vcpu_time'] = self.GetMetricValue('TotalVcpuTime')/3600         # vCPU-hr
@@ -204,15 +199,11 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     stats['total_pd_usage'] = self.GetMetricValue('TotalPdUsage')/3600           # GB-hr
     # TODO(rarsan): retrieve BillableShuffleDataProcessed
     # and/or BillableStreamingDataProcessed when applicable
-    self.job_stats = stats
     return stats
 
   def CalculateCost(self, type=DATAFLOW_TYPE_BATCH):
     if type not in (DATAFLOW_TYPE_BATCH, DATAFLOW_TYPE_STREAMING):
       raise ValueError(f'Invalid type provided to CalculateCost(): {type}')
-
-    if not self.job_stats:
-      self.GetStats()
 
     total_vcpu_time = self.job_stats['total_vcpu_time']
     total_mem_usage = self.job_stats['total_mem_usage']
@@ -235,6 +226,10 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     """Retrieve and cache all job metrics from Dataflow API"""
     # Skip if job metrics is already populated unless force_refresh is True
     if self.job_metrics is not None and not force_refresh:
+      return
+    # Skip if job id not available
+    if self.job_id is None:
+      logging.warn('Unable to pull job metrics. Job ID not available')
       return
     
     cmd = util.GcloudCommand(self, 'dataflow', 'metrics',
@@ -290,7 +285,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       Average value across time interval
     """
     client = monitoring_v3.MetricServiceClient()
-    project_name = f"projects/{self.project}"
+    project_name = f'projects/{self.project}'
     
     now_seconds = int(time.time())
     start_time_seconds = int(start_time.timestamp())
@@ -302,8 +297,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     interval = TimeInterval(
         {
-            "start_time": {"seconds": start_time_seconds},
-            "end_time": {"seconds": end_time_seconds},
+            'start_time': {'seconds': start_time_seconds},
+            'end_time': {'seconds': end_time_seconds},
         }
     )
 
@@ -315,127 +310,30 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     aggregation = Aggregation(
         {
-            "alignment_period": {"seconds": 60},  # 1 minute
-            "per_series_aligner": Aggregation.Aligner.ALIGN_MEAN,
-            "cross_series_reducer": Aggregation.Reducer.REDUCE_MEAN,
-            "group_by_fields": ["resource.instance_id"],
+            'alignment_period': {'seconds': 60},  # 1 minute
+            'per_series_aligner': Aggregation.Aligner.ALIGN_MEAN,
+            'cross_series_reducer': Aggregation.Reducer.REDUCE_MEAN,
+            'group_by_fields': ['resource.instance_id'],
         }
     )
 
     results = client.list_time_series(
       request={
-        "name": project_name,
-        "filter": api_filter,
-        "interval": interval,
-        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
-        "aggregation": aggregation,
-      }
-    )
-
-    # if not results:
-    #   raise Exception('No monitoring data found. Unable to calculate avg CPU utilization')
-    return self._GetAvgValueFromTimeSeries(results)
-
-  def GetMaxOutputThroughput(self, ptransform: str, start_time: datetime, end_time: datetime):
-    """Get max throughput from a particular pTransform during job run interval.
-
-    Args:
-      start_time: datetime specifying the beginning of the time interval.
-      end_time: datetime specifying the end of the time interval.
-
-    Returns:
-      Max value across time interval
-    """
-    client = monitoring_v3.MetricServiceClient()
-    project_name = f"projects/{self.project}"
-    
-    now_seconds = int(time.time())
-    start_time_seconds = int(start_time.timestamp())
-    end_time_seconds = int(end_time.timestamp())
-    # Cpu metrics data can take up to 240 seconds to appear
-    if (now_seconds - end_time_seconds) < DATAFLOW_METRICS_DELAY_SECONDS:
-      logging.info('Waiting for Dataflow metrics to be available (up to 3 minutes)...')
-      time.sleep(DATAFLOW_METRICS_DELAY_SECONDS - (now_seconds - end_time_seconds))
-
-    interval = TimeInterval(
-        {
-            "start_time": {"seconds": start_time_seconds},
-            "end_time": {"seconds": end_time_seconds},
-        }
-    )
-
-    api_filter = (
-      'metric.type = "dataflow.googleapis.com/job/elements_produced_count" '
-      f'AND resource.labels.project_id = "{self.project}" '
-      f'AND metric.labels.job_id = "{self.job_id}" '
-      f'AND metric.labels.ptransform = "{ptransform}" '
-    )
-
-    aggregation = Aggregation(
-        {
-            "alignment_period": {"seconds": 60},  # 1 minute
-            "per_series_aligner": Aggregation.Aligner.ALIGN_RATE,
-            # "group_by_fields": ["metric.job_id", "metric.ptransform"],
-        }
-    )
-
-    results = client.list_time_series(
-      request={
-        "name": project_name,
-        "filter": api_filter,
-        "interval": interval,
-        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
-        "aggregation": aggregation
+        'name': project_name,
+        'filter': api_filter,
+        'interval': interval,
+        'view': monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        'aggregation': aggregation,
       }
     )
 
     if not results:
-      logging.warn('No monitoring data found. Unable to calculate max throughput.')
+      logging.warn('No monitoring data found. Unable to calculate avg CPU utilization.')
       return None
 
-    return self._GetMaxValueFromTimeSeries(results)
+    return self._GetAvgValueFromTimeSeries(results)
 
-  def GetSubscriptionBacklogSize(self, subscription_name, interval_length=4):
-    client = monitoring_v3.MetricServiceClient()
-    project_name = f"projects/{self.project}"
-
-    now = time.time()
-    seconds = int(now)
-
-    interval = TimeInterval(
-        {
-            "end_time": {"seconds": seconds},
-            "start_time": {"seconds": seconds - interval_length * 60},
-        }
-    )
-
-    api_filter = (
-      'metric.type = "pubsub.googleapis.com/subscription/num_undelivered_messages" '
-      'AND resource.labels.subscription_id = "' + subscription_name + '" '
-    )
-    
-    results = client.list_time_series(
-      request={
-        "name": project_name,
-        "filter": api_filter,
-        "interval": interval,
-        "view": monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
-      }
-    )
-
-    return self._GetLastValueFromTimeSeries(results)
-
-  def _GetLastValueFromTimeSeries(self, time_series):
-    value = None
-    for i, time_interval in enumerate(time_series):
-      if i != 0: break
-      for j, snapshot in enumerate(time_interval.points):
-        if j != 0: break
-        value = snapshot.value.int64_value
-
-    return value
-
-  def _GetAvgValueFromTimeSeries(self, time_series):
+  def _GetAvgValueFromTimeSeries(self, time_series: ListTimeSeriesResponse):
     """Parses time series data and returns average across intervals.
 
     Args:
@@ -458,31 +356,4 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
         averaged = round(averaged * 100, 2)
       return averaged
     
-    return None 
-
-  def _GetMaxValueFromTimeSeries(self, time_series):
-    """Parses time series data and returns maximum across intervals.
-
-    Args:
-      time_series: time series of throughput rates returned by monitoring.
-
-    Returns:
-      Maximum value across intervals
-    """
-    points = []
-    for time_interval in time_series:
-      for snapshot in time_interval.points:
-        points.append(snapshot.value.double_value)
-
-    if points:
-      # Max over all minute intervals captured
-      max_rate = max(points)
-      # If metric unit is a fractional number between 0 and 1 (e.g. CPU utilization metric)
-      # multiply by 100 to display a percentage usage.
-      if time_series.unit == "10^2.%":
-        max_rate = round(max_rate * 100, 2)
-      else:
-        max_rate = round(max_rate, 2)
-      return max_rate
-    
-    return None 
+    return None

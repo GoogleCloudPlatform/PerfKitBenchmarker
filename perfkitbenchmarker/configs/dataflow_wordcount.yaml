@@ -54,6 +54,9 @@ benchmarks:
   }
 
 
+#################################
+# Alternative benchmark config examples
+#################################
 # dpb_wordcount_benchmark:
 #   description: Run word count on dataflow
 #   dpb_service:

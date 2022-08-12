@@ -181,7 +181,7 @@ def Run(benchmark_spec):
     avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(start_time, end_time)
     results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))
 
-    stats = dpb_service_instance.GetStats()
+    stats = dpb_service_instance.job_stats
     for name, value in stats.items():
       results.append(sample.Sample(name, value, 'number', metadata))
 
