@@ -245,8 +245,6 @@ class GceDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    if self.device_path:
-      return self.device_path
     if self.disk_type == disk.LOCAL and self.interface == NVME:
       return '/dev/%s' % self.name
     else:
