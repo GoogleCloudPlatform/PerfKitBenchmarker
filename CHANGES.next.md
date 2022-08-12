@@ -1,5 +1,6 @@
 ### Breaking changes:
 
+-   Require Python 3.9+
 -   The core_os os_type was removed from the Azure provider as
     [the image was deleted](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/endorsed-distros#supported-distributions-and-versions),
     -   It will be replaced by
@@ -73,10 +74,17 @@
     Service Bus).
 -   Add Intel perfspect as a new trace
 -   Add Ubuntu 22.04 support for GCP, AWS and Azure Providers.
--   Add support for Rocky Linux 8, CentOS Stream 8, CentOS Stream 9, and RHEL 9
-    on GCP and AWS Providers.
+-   Add support for Rocky Linux 8, CentOS Stream 8, and CentOS Stream 9 on GCP
+    and AWS Providers.
 -   Add support for chbench using s64da.
 -   Add sysbench_memory benchmark.
+-   Add support for RHEL 9 on AWS, Azure, and GCP.
+-   Add GCP Optimized Rocky Linux 8 OS.
+-   Add mtu to os_metadata in linux_virtual_machine.
+-   Add support for TPC-DS/H benchmarks on AWS EMR Serverless.
+-   Add dpb_sparksql_serverless_benchmark, which submits one job for each
+    TPC-DS/H query and measures the whole job execution time, instead of only
+    the query run time.
 
 ### Enhancements:
 
@@ -159,6 +167,15 @@
 -   Add support for providing initialization actions into DPB clusters with
     `--dpb_initialization_actions`
 -   Add sandbox configuration fields for GKE nodepools.
+-   Fetch Redis benchmark live migration times from GCP metadata server.
+-   Retry table deletions in Cloud Bigtable benchmarks against a user managed
+    instance and fail if the benchmark eventually fails to delete a table.
+-   Add support for Snowflake on Azure External Tables
+-   Fetch memtier benchmark runtime information
+-   Support installing the Google Cloud Bigtable client by a given version via
+    --google_bigtable_client_version and simplify dependency management.
+-   Support setting --dpb_dataflow_additional_args and --dpb_dataflow_timeout
+    for dpb_dataflow_provider.
 
 ### Bug fixes and maintenance updates:
 
@@ -237,8 +254,11 @@
 -   Add option to publish to a subfolder in cloud storage publisher.
 -   Parse resulting output matrix by indexing from the bottom up instead of top
     down.
--   Double build time for docker images, for a more complex build script.
+-   Double build time for all cloud's docker images, for a more complex build
+    script.
 -   Add required dataflow option --gcpTempLocation and --region to
     gcp_dpb_dataflow provider.
 -   Support taking FLAGS.dpb_jar_file and FLAGS.dpb_wordcount_additional_args
     when running wordcount benchmark.
+-   Add some required types to BaseAppServiceSpec.
+-   Uses nic type of GVNIC by default (instead of VIRTIO_NET) on GCE

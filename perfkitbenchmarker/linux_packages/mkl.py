@@ -110,8 +110,8 @@ def _InstallFromPreprovisionedData(vm):
       ('cd {0}/{1} && '
        'sed -i "s/decline/accept/g" silent.cfg && '
        'sudo ./install.sh --silent ./silent.cfg').format(MKL_DIR, MKL_TAG))
-  vm.RemoteCommand('sudo chmod +w /etc/bash.bashrc && '
-                   'sudo chmod 777 /etc/bash.bashrc && '
+  vm.RemoteCommand('sudo chmod 755 /etc/bash.bashrc && '
+                   'sudo chown ' + vm.user_name + ' /etc/bash.bashrc && '
                    'echo "source /opt/intel/mkl/bin/mklvars.sh intel64" '
                    '>>/etc/bash.bashrc && '
                    'echo "export PATH=/opt/intel/bin:$PATH" '

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runs a cloudharmony benchmark.
 
 See https://github.com/cloudharmony/block-storage for more info.
@@ -67,7 +66,7 @@ def _PrepareDevicePath(vm, link):
     String represents the actual path to the device.
   """
   path = vm.RemoteCommand('readlink -f %s' % link)[0][:-1]
-  vm.RemoteCommand('sudo chmod 777 %s' % path)
+  vm.RemoteCommand('sudo chmod 755 %s' % path)
   return path
 
 
@@ -89,8 +88,10 @@ def _LocateFioJson(vm, outdir, test):
 def Run(benchmark_spec):
   """Runs cloudharmony block storage and reports the results."""
   vm = benchmark_spec.vms[0]
-  target = ' '.join(['--target=%s' % _PrepareDevicePath(vm, dev.GetDevicePath())
-                     for dev in vm.scratch_disks])
+  target = ' '.join([
+      '--target=%s' % _PrepareDevicePath(vm, dev.GetDevicePath())
+      for dev in vm.scratch_disks
+  ])
   tests = ' '.join(['--test=%s' % test for test in FLAGS.ch_block_tests])
   args = ' '.join(['--%s' % param for param in FLAGS.ch_params])
   outdir = vm_util.VM_TMP_DIR
@@ -98,16 +99,17 @@ def Run(benchmark_spec):
          '{target} {tests} '
          '--output={outdir} --noreport {args} --verbose').format(
              benchmark_dir=ch_block_storage.INSTALL_PATH,
-             target=target, outdir=outdir,
-             tests=tests, args=args)
+             target=target,
+             outdir=outdir,
+             tests=tests,
+             args=args)
   vm.RobustRemoteCommand('sudo %s' % cmd)
   results = []
   for test in FLAGS.ch_block_tests:
     metadata = {'ch_test': test}
     result_json, _ = vm.RemoteCommand('cat %s/%s.json' % (outdir, test))
     fns = _LocateFioJson(vm, outdir, test)
-    fio_json_list = [
-        vm.RemoteCommand('cat %s' % fn)[0] for fn in fns]
+    fio_json_list = [vm.RemoteCommand('cat %s' % fn)[0] for fn in fns]
     tmp_results = ch_block_storage.ParseOutput(result_json, fio_json_list)
     for r in tmp_results:
       r.metadata.update(metadata)

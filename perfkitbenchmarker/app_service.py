@@ -32,10 +32,24 @@ def GetAppServiceSpecClass(service):
 
 
 class BaseAppServiceSpec(spec.BaseSpec):
-  """Storing various data about app service."""
+  """Spec storing various data about app service.
+
+  That data is parsed from command lines or yaml benchmark_spec configs, using
+  bunchmark_config_spec._AppServiceDecoder.
+
+  Attributes:
+    SPEC_TYPE: The class / spec name.
+    SPEC_ATTRS: Required field(s) for subclasses.
+    appservice_region: The region to run in.
+    appservice_backend: Amount of memory to use.
+    appservice: Name of the service (e.g. googlecloudfunction).
+  """
 
   SPEC_TYPE = 'BaseAppServiceSpec'
   SPEC_ATTRS = ['SERVICE']
+  appservice_region: str
+  appservice_backend: str
+  appservice: str
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):

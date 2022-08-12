@@ -57,7 +57,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm_util.RunThreaded(_Prepare, vms)
@@ -69,7 +69,7 @@ def _Prepare(vm):
   path = data.ResourcePath(os.path.join(_REMOTE_SCRIPTS_DIR, _REMOTE_SCRIPT))
   logging.info('Uploading %s to %s', path, vm)
   vm.PushFile(path, _REMOTE_SCRIPT)
-  vm.RemoteCommand(f'sudo chmod 777 {_REMOTE_SCRIPT}')
+  vm.RemoteCommand(f'sudo chmod 755 {_REMOTE_SCRIPT}')
 
 
 def Run(benchmark_spec):
@@ -77,7 +77,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample instances.

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Resource encapsulating provisioned Data Warehouse in the cloud Services.
 
 Classes to wrap specific backend services are in the corresponding provider
@@ -23,7 +22,6 @@ from typing import Dict, List, Text, Tuple
 from absl import flags
 from perfkitbenchmarker import resource
 
-
 flags.DEFINE_integer('edw_service_cluster_concurrency', 5,
                      'Number of queries to run concurrently on the cluster.')
 flags.DEFINE_string('edw_service_cluster_snapshot', None,
@@ -32,25 +30,29 @@ flags.DEFINE_string('edw_service_cluster_identifier', None,
                     'If set, the preprovisioned edw cluster.')
 flags.DEFINE_string('edw_service_endpoint', None,
                     'If set, the preprovisioned edw cluster endpoint.')
-flags.DEFINE_string('edw_service_cluster_db', None,
-                    'If set, the db on cluster to use during the benchmark ('
-                    'only applicable when using snapshots).')
-flags.DEFINE_string('edw_service_cluster_user', None,
-                    'If set, the user authorized on cluster (only applicable '
-                    'when using snapshots).')
-flags.DEFINE_string('edw_service_cluster_password', None,
-                    'If set, the password authorized on cluster (only '
-                    'applicable when using snapshots).')
+flags.DEFINE_string(
+    'edw_service_cluster_db', None,
+    'If set, the db on cluster to use during the benchmark ('
+    'only applicable when using snapshots).')
+flags.DEFINE_string(
+    'edw_service_cluster_user', None,
+    'If set, the user authorized on cluster (only applicable '
+    'when using snapshots).')
+flags.DEFINE_string(
+    'edw_service_cluster_password', None,
+    'If set, the password authorized on cluster (only '
+    'applicable when using snapshots).')
 flags.DEFINE_string('snowflake_snowsql_config_override_file', None,
                     'The SnowSQL configuration to use.'
                     'https://docs.snowflake.net/manuals/user-guide/snowsql-config.html#snowsql-config-file')  # pylint: disable=line-too-long
 flags.DEFINE_string('snowflake_connection', None,
                     'Named Snowflake connection defined in SnowSQL config file.'
                     'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections')  # pylint: disable=line-too-long
-flags.DEFINE_integer('edw_suite_iterations', 1, 'Number of suite iterations to perform.')
+flags.DEFINE_integer('edw_suite_iterations', 1,
+                     'Number of suite iterations to perform.')
 # TODO(user): Revisit flags for accepting query lists.
-flags.DEFINE_string('edw_simultaneous_queries',
-                    None, 'CSV list of simultaneous queries to benchmark.')
+flags.DEFINE_string('edw_simultaneous_queries', None,
+                    'CSV list of simultaneous queries to benchmark.')
 flags.DEFINE_integer('edw_simultaneous_query_submission_interval', '0',
                      'Simultaneous query submission interval in milliseconds.')
 flags.DEFINE_string('edw_power_queries', None,
@@ -73,28 +75,31 @@ flags.DEFINE_enum(
     'snowflake_client_interface', 'JDBC', ['JDBC'],
     'The Runtime Interface used when interacting with Snowflake.')
 
-
 FLAGS = flags.FLAGS
-
 
 TYPE_2_PROVIDER = dict([('athena', 'aws'), ('redshift', 'aws'),
                         ('spectrum', 'aws'), ('snowflake_aws', 'aws'),
-                        ('snowflakeexternal_aws', 'aws'), ('bigquery', 'gcp'),
-                        ('endor', 'gcp'), ('endorazure', 'gcp'),
-                        ('bqfederated', 'gcp'),
+                        ('snowflake_azure', 'azure'),
+                        ('snowflakeexternal_aws', 'aws'),
+                        ('snowflakeexternal_azure', 'azure'),
+                        ('bigquery', 'gcp'), ('endor', 'gcp'),
+                        ('endorazure', 'gcp'), ('bqfederated', 'gcp'),
                         ('azuresqldatawarehouse', 'azure')])
 TYPE_2_MODULE = dict([
     ('athena', 'perfkitbenchmarker.providers.aws.athena'),
     ('redshift', 'perfkitbenchmarker.providers.aws.redshift'),
     ('spectrum', 'perfkitbenchmarker.providers.aws.spectrum'),
-    ('snowflake_aws', 'perfkitbenchmarker.providers.aws.snowflake'),
-    ('snowflakeexternal_aws', 'perfkitbenchmarker.providers.aws.snowflake'),
+    ('snowflake_aws', 'perfkitbenchmarker.providers.aws.snowflake_aws'),
+    ('snowflake_azure', 'perfkitbenchmarker.providers.azure.snowflake_azure'),
+    ('snowflakeexternal_aws', 'perfkitbenchmarker.providers.aws.snowflake_aws'),
+    ('snowflakeexternal_azure',
+     'perfkitbenchmarker.providers.azure.snowflake_azure'),
     ('bigquery', 'perfkitbenchmarker.providers.gcp.bigquery'),
     ('endor', 'perfkitbenchmarker.providers.gcp.bigquery'),
     ('endorazure', 'perfkitbenchmarker.providers.gcp.bigquery'),
     ('bqfederated', 'perfkitbenchmarker.providers.gcp.bigquery'),
-    ('azuresqldatawarehouse', 'perfkitbenchmarker.providers.azure.'
-     'azure_sql_data_warehouse')
+    ('azuresqldatawarehouse',
+     'perfkitbenchmarker.providers.azure.azure_sql_data_warehouse')
 ])
 DEFAULT_NUMBER_OF_NODES = 1
 # The order of stages is important to the successful lifecycle completion.
@@ -170,7 +175,8 @@ class EdwClientInterface(object):
       "simultaneous_wall_time_in_secs":3.084}
 
     Args:
-      submission_interval: Simultaneous query submission interval in milliseconds.
+      submission_interval: Simultaneous query submission interval in
+        milliseconds.
       queries: List of string names of the queries to execute simultaneously.
 
     Returns:
@@ -306,10 +312,12 @@ class EdwService(resource.BaseResource):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this edw service."""
-    basic_data = {'edw_service_type': self.spec.type,
-                  'edw_cluster_identifier': self.cluster_identifier,
-                  'edw_cluster_node_type': self.node_type,
-                  'edw_cluster_node_count': self.node_count}
+    basic_data = {
+        'edw_service_type': self.spec.type,
+        'edw_cluster_identifier': self.cluster_identifier,
+        'edw_cluster_node_type': self.node_type,
+        'edw_cluster_node_count': self.node_count
+    }
     return basic_data
 
   def GenerateLifecycleStageScriptName(self, lifecycle_stage):

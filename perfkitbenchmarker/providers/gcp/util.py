@@ -125,15 +125,15 @@ def GetZonesInRegion(region) -> Set[str]:
   return set(stdout.splitlines())
 
 
-def GetZonesFromMachineType() -> Set[str]:
+def GetZonesFromMachineType(machine_type: str) -> Set[str]:
   """Gets a list of zones for the given machine type."""
   cmd = GcloudCommand(None, 'compute', 'machine-types', 'list')
   cmd.flags = {
-      'filter': f"name~'{FLAGS.machine_type}'",
+      'filter': f"name~'{machine_type}'",
       'format': 'value(zone)'
   }
   stdout, _, _ = cmd.Issue()
-  return set(stdout.splitlines())
+  return set(stdout.splitlines()) or GetAllZones()
 
 
 def GetGeoFromRegion(region: str) -> str:

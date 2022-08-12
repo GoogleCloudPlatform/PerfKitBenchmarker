@@ -18,6 +18,7 @@
 import shlex
 
 from absl import flags
+from perfkitbenchmarker import context
 from perfkitbenchmarker import vm_util
 import six
 
@@ -41,6 +42,21 @@ chmod 600 /home/{user_name}/.ssh/authorized_keys
 """
 
 
+class ResourceTypes:
+  """AliCloud resource types."""
+  INSTANCE = 'instance'
+  IMAGE = 'image'
+  SNAPSHOT = 'snapshot'
+  DISK = 'disk'
+  SECURITYGROUP = 'securitygroup'
+  VPC = 'VPC'
+  VSWITCH = 'VSWITCH'
+  ROUTETABLE = 'ROUTETABLE'
+  EIP = 'EIP'
+  VPNGATEWAY = 'VpnGateway'
+  NATGATEWAY = 'NATGATEWAY'
+
+
 def GetEncodedCmd(cmd):
   cmd_line = ' '.join(cmd)
   cmd_args = shlex.split(cmd_line)
@@ -56,6 +72,17 @@ def GetRegionByZone(zone):
     return '-'.join(s)
   else:
     return zone[:-1]
+
+
+def _BuildTagsList(**kwargs):
+  tags_list = []
+  for index, (key, value) in enumerate(six.iteritems(kwargs)):
+    tags_list.extend([
+        '--Tag.{0}.Key'.format(index + 1), str(key),
+        '--Tag.{0}.Value'.format(index + 1), str(value)
+    ])
+
+  return tags_list
 
 
 def AddTags(resource_id, resource_type, region, **kwargs):
@@ -76,28 +103,62 @@ def AddTags(resource_id, resource_type, region, **kwargs):
       '--ResourceId', resource_id,
       '--ResourceType', resource_type
   ]
-  for index, (key, value) in enumerate(six.iteritems(kwargs)):
-    tag_cmd.extend([
-        '--Tag.{0}.Key'.format(index + 1), str(key),
-        '--Tag.{0}.Value'.format(index + 1), str(value)
-    ])
+  tag_cmd.extend(_BuildTagsList(**kwargs))
   vm_util.IssueRetryableCommand(tag_cmd)
 
 
-def AddDefaultTags(resource_id, resource_type, region):
-  """Adds tags to an AliCloud resource created by PerfKitBenchmarker.
+def GetDefaultTags(timeout_minutes=None):
+  """Returns the default tags for an AliCloud resource created by PKB.
 
-  By default, resources are tagged with "owner" and "perfkitbenchmarker-run"
-  key-value
-  pairs.
+  Tags include "owner", "perfkitbenchmarker-run", "timeout_utc",
+  "create_time_utc", "benchmark", "perfkit_uuid", "benchmark_uid"
+
+  Args:
+    timeout_minutes: Timeout used for setting the timeout_utc tag.
+  """
+  tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
+
+  benchmark_spec = context.GetThreadBenchmarkSpec()
+  if benchmark_spec:
+    tags.update(benchmark_spec.GetResourceTags(timeout_minutes))
+
+  return tags
+
+
+def AddDefaultTags(resource_id, resource_type, region, timeout_minutes=None):
+  """Adds tags to an AliCloud resource created by PerfKitBenchmarker.
 
   Args:
     resource_id: An extant AliCloud resource to operate on.
     resource_type: The type of the 'resource_id'
     region: The AliCloud region 'resource_id' was created in.
+    timeout_minutes: Timeout used for setting the timeout_utc tag.
   """
-  tags = {'owner': FLAGS.owner, 'perfkitbenchmarker-run': FLAGS.run_uri}
-  AddTags(resource_id, resource_type, region, **tags)
+  AddTags(resource_id, resource_type, region, **GetDefaultTags(timeout_minutes))
+
+
+def VPCAddDefaultTags(resource_id, resource_type, region, timeout_minutes=None):
+  """Adds tags to an AliCloud VPC resource created by PerfKitBenchmarker.
+
+  Args:
+    resource_id: An extant AliCloud resource to operate on.
+    resource_type: The type of the 'resource_id'
+    region: The AliCloud region 'resource_id' was created in.
+    timeout_minutes: Timeout used for setting the timeout_utc tag.
+  """
+  tags = GetDefaultTags(timeout_minutes)
+
+  if not tags:
+    return
+
+  tag_cmd = ALI_PREFIX + [
+      'vpc', 'TagResources',
+      '--RegionId', region,
+      '--ResourceId.1', resource_id,
+      '--ResourceType', resource_type
+  ]
+  tag_cmd.extend(_BuildTagsList(**tags))
+  vm_util.IssueRetryableCommand(tag_cmd)
 
 
 def GetDrivePathPrefix():

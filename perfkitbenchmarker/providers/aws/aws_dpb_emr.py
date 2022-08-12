@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2022 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing class for AWS's EMR service.
+"""Module containing class for AWS's EMR services.
 
 Clusters can be created and deleted.
 """
@@ -19,7 +19,7 @@ Clusters can be created and deleted.
 import collections
 import json
 import logging
-from typing import Optional
+from typing import Dict, Optional
 
 from absl import flags
 from perfkitbenchmarker import disk
@@ -407,3 +407,172 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         'command-runner.jar',
         job_arguments=job_arguments,
         job_type=dpb_service.BaseDpbService.HADOOP_JOB_TYPE)
+
+
+class AwsDpbEmrServerless(dpb_service.BaseDpbService):
+  """Resource that allows spawning EMR Serverless Jobs.
+
+  Pre-initialization capacity is not supported yet.
+
+  Docs:
+  https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/emr-serverless.html
+  """
+
+  CLOUD = providers.AWS
+  SERVICE_TYPE = 'emr_serverless'
+
+  def __init__(self, dpb_service_spec):
+    # TODO(odiego): Refactor the AwsDpbEmr and AwsDpbEmrServerless into a
+    # hierarchy or move common code to a parent class.
+    super().__init__(dpb_service_spec)
+    self.dpb_service_type = self.SERVICE_TYPE
+    self.project = None
+    self.cmd_prefix = list(util.AWS_PREFIX)
+    if self.dpb_service_zone:
+      self.region = util.GetRegionFromZone(self.dpb_service_zone)
+    else:
+      raise errors.Setup.InvalidSetupError(
+          'dpb_service_zone must be provided, for provisioning.')
+    self.cmd_prefix += ['--region', self.region]
+    self.storage_service = s3.S3Service()
+    self.storage_service.PrepareService(self.region)
+    self.persistent_fs_prefix = 's3://'
+    self._cluster_create_time = None
+    if not self.dpb_version:
+      raise errors.Setup.InvalidSetupError(
+          'dpb_service.version must be provided. Versions follow the format: '
+          '"emr-x.y.z" and are listed at '
+          'https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/'
+          'release-versions.html')
+    self.role = FLAGS.aws_emr_serverless_role
+
+  def _Create(self):
+    # Since there's no managed infrastructure, this is a no-op.
+    pass
+
+  def _Delete(self):
+    # Since there's no managed infrastructure, this is a no-op.
+    pass
+
+  def SubmitJob(self,
+                jarfile=None,
+                classname=None,
+                pyspark_file=None,
+                query_file=None,
+                job_poll_interval=5,
+                job_arguments=None,
+                job_files=None,
+                job_jars=None,
+                job_stdout_file=None,
+                job_type=None,
+                properties=None):
+    """See base class."""
+
+    assert job_type
+
+    # Set vars according to job type.
+    if job_type == self.PYSPARK_JOB_TYPE:
+      application_type = 'SPARK'
+      job_driver_dict = {
+          'sparkSubmit': {
+              'entryPoint': pyspark_file,
+              'entryPointArguments': job_arguments,
+              'sparkSubmitParameters': ' '.join(
+                  f'--conf {prop}={val}'
+                  for prop, val in self.GetJobProperties().items())
+          }
+      }
+    else:
+      raise NotImplementedError(
+          f'Unsupported job type {job_type} for AWS EMR Serverless.')
+
+    # Create the application.
+    stdout, _, _ = vm_util.IssueCommand(self.cmd_prefix + [
+        'emr-serverless', 'create-application',
+        '--release-label', self.dpb_version,
+        '--name', self.cluster_id,
+        '--type', application_type,
+        '--tags', json.dumps(util.MakeDefaultTags()),
+    ])
+    result = json.loads(stdout)
+    application_id = result['applicationId']
+
+    @vm_util.Retry(
+        poll_interval=job_poll_interval,
+        fuzz=0,
+        retryable_exceptions=(EMRRetryableException,))
+    def WaitTilApplicationReady():
+      result = self._GetApplication(application_id)
+      if result['application']['state'] not in ('CREATED', 'STARTED'):
+        raise EMRRetryableException(
+            f'Application {application_id} not ready yet.')
+      return result
+
+    WaitTilApplicationReady()
+
+    # Run the job.
+    stdout, _, _ = vm_util.IssueCommand(self.cmd_prefix + [
+        'emr-serverless', 'start-job-run',
+        '--application-id', application_id,
+        '--execution-role-arn', self.role,
+        '--job-driver', json.dumps(job_driver_dict),
+    ])
+    result = json.loads(stdout)
+    application_id = result['applicationId']
+    job_run_id = result['jobRunId']
+    return self._WaitForJob(
+        (application_id, job_run_id), EMR_TIMEOUT, job_poll_interval)
+
+  def GetJobProperties(self) -> Dict[str, str]:
+    result = {'spark.dynamicAllocation.enabled': 'FALSE'}
+    if self.spec.emr_serverless_core_count:
+      result['spark.executor.cores'] = self.spec.emr_serverless_core_count
+      result['spark.driver.cores'] = self.spec.emr_serverless_core_count
+    if self.spec.emr_serverless_core_count:
+      result['spark.executor.memory'] = f'{self.spec.emr_serverless_memory}G'
+    if self.spec.emr_serverless_executor_count:
+      result['spark.executor.instances'] = (
+          self.spec.emr_serverless_executor_count)
+    if self.spec.worker_group.disk_spec.disk_size:
+      result['spark.emr-serverless.driver.disk'] = (
+          f'{self.spec.worker_group.disk_spec.disk_size}G'
+      )
+      result['spark.emr-serverless.executor.disk'] = (
+          f'{self.spec.worker_group.disk_spec.disk_size}G'
+      )
+    result.update(super().GetJobProperties())
+    return result
+
+  def _GetApplication(self, application_id):
+    stdout, _, _ = vm_util.IssueCommand(
+        self.cmd_prefix +
+        ['emr-serverless', 'get-application',
+         '--application-id', application_id])
+    result = json.loads(stdout)
+    return result
+
+  def _GetCompletedJob(self, job_id):
+    """See base class."""
+    application_id, job_run_id = job_id
+    cmd = self.cmd_prefix + [
+        'emr-serverless',
+        'get-job-run',
+        '--application-id', application_id,
+        '--job-run-id', job_run_id
+    ]
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retcode:
+      if 'ThrottlingException' in stderr:
+        logging.warning('Rate limited while polling EMR JobRun:\n%s\nRetrying.',
+                        stderr)
+        return None
+      raise errors.VmUtil.IssueCommandError(
+          f'Getting JobRun status failed:\n{stderr}')
+    result = json.loads(stdout)
+    state = result['jobRun']['state']
+    if state in ('FAILED', 'CANCELLED'):
+      raise dpb_service.JobSubmissionError(result['jobRun'].get('stateDetails'))
+    if state == 'SUCCESS':
+      start_time = result['jobRun']['createdAt']
+      end_time = result['jobRun']['updatedAt']
+      return dpb_service.JobResult(run_time=end_time - start_time)

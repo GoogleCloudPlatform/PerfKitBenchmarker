@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runs plain netperf aggregate script runemomniaggdemo.sh to test packets/sec.
 
 docs:
@@ -34,12 +33,13 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
 
 ALL_BENCHMARKS = ['STREAM', 'MAERTS', 'BIDIR', 'RRAGG']
-flags.DEFINE_list('netperf_aggregate_benchmarks', ALL_BENCHMARKS,
-                  'The netperf aggregate benchmark(s) to run. '
-                  'STREAM measures outbound throughput. '
-                  'MAERTS measures inbound throughput. '
-                  'RRAGG measures packets per second.'
-                  'BIDIR measure bidirectional bulk throughput')
+flags.DEFINE_list(
+    'netperf_aggregate_benchmarks', ALL_BENCHMARKS,
+    'The netperf aggregate benchmark(s) to run. '
+    'STREAM measures outbound throughput. '
+    'MAERTS measures inbound throughput. '
+    'RRAGG measures packets per second.'
+    'BIDIR measure bidirectional bulk throughput')
 flags.register_validator(
     'netperf_aggregate_benchmarks',
     lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_BENCHMARKS))
@@ -93,8 +93,7 @@ def PrepareNetperfAggregate(vm):
     vm.AllowPort(PORT_START, port_end)
 
   netserver_cmd = ('{netserver_path} -p {port_start}').format(
-      port_start=PORT_START,
-      netserver_path=netperf.NETSERVER_PATH)
+      port_start=PORT_START, netserver_path=netperf.NETSERVER_PATH)
   vm.RemoteCommand(netserver_cmd)
 
 
@@ -103,7 +102,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
 
   vms = benchmark_spec.vms
@@ -111,7 +110,7 @@ def Prepare(benchmark_spec):
 
   vm_util.RunThreaded(PrepareNetperfAggregate, vms)
   client_vm.RemoteCommand(
-      f'sudo chmod 777 {os.path.join(netperf.NETPERF_EXAMPLE_DIR, REMOTE_SCRIPT)}'
+      f'sudo chmod 755 {os.path.join(netperf.NETPERF_EXAMPLE_DIR, REMOTE_SCRIPT)}'
   )
 
 
@@ -138,8 +137,7 @@ def ParseNetperfAggregateOutput(stdout, test_type):
       metric = f'{test_type} {line_split[0]} {line_split[6]}'
       value = float(line_split[5])
       unit = line_split[6]
-      aggregate_samples.append(sample.Sample(
-          metric, value, unit, metadata))
+      aggregate_samples.append(sample.Sample(metric, value, unit, metadata))
 
       # Each Transaction consists of a send and a receive packet
       # So Packets per second is Trans/s * 2
@@ -168,11 +166,11 @@ def RunNetperfAggregate(vm, server_ips):
   ip_num = 0
   for ip in server_ips:
     vm.RemoteCommand(f"echo 'REMOTE_HOSTS[{ip_num}]={ip}' >> "
-                     f"{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts")
+                     f'{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts')
     ip_num += 1
 
   vm.RemoteCommand(f"echo 'NUM_REMOTE_HOSTS={len(server_ips)}' >> "
-                   f"{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts")
+                   f'{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts')
 
   vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && '
@@ -184,8 +182,8 @@ def RunNetperfAggregate(vm, server_ips):
       login_shell=False,
       timeout=1200)
 
-  interval_naming = collections.namedtuple(
-      'IntervalNaming', 'output_file parse_name')
+  interval_naming = collections.namedtuple('IntervalNaming',
+                                           'output_file parse_name')
   benchmark_interval_mapping = {
       'STREAM': interval_naming('netperf_outbound', 'Outbound'),
       'MAERTS': interval_naming('netperf_inbound', 'Inbound'),
@@ -212,7 +210,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -256,7 +254,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   for vm in vms:

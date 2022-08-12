@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs all benchmarks in PerfKitBenchmarker.
+"""Runs benchmarks in PerfKitBenchmarker.
 
 All benchmarks in PerfKitBenchmarker export the following interface:
 
@@ -98,6 +98,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine
+from perfkitbenchmarker import time_triggers
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import traces
 from perfkitbenchmarker import version
@@ -449,6 +450,7 @@ _TEARDOWN_EVENT = multiprocessing.Event()
 _ANY_ZONE = 'any'
 
 events.initialization_complete.connect(traces.RegisterAll)
+events.initialization_complete.connect(time_triggers.RegisterAll)
 
 
 @flags.multi_flags_validator(
@@ -869,6 +871,7 @@ def DoRunPhase(spec, collector, timer):
     samples = []
     logging.info('Running benchmark %s', spec.name)
     events.before_phase.send(stages.RUN, benchmark_spec=spec)
+    events.trigger_phase.send()
     try:
       with timer.Measure('Benchmark Run'):
         samples = spec.BenchmarkRun(spec)
@@ -914,8 +917,8 @@ def DoRunPhase(spec, collector, timer):
       for s in samples:
         s.metadata['restore'] = True
 
-    events.samples_created.send(
-        stages.RUN, benchmark_spec=spec, samples=samples)
+    events.benchmark_samples_created.send(benchmark_spec=spec, samples=samples)
+    events.all_samples_created.send(benchmark_spec=spec, samples=samples)
     collector.AddSamples(samples, spec.name, spec)
     if (FLAGS.publish_after_run and FLAGS.publish_period is not None and
         FLAGS.publish_period < (time.time() - last_publish_time)):
@@ -1137,7 +1140,8 @@ def RunBenchmark(spec, collector):
               or 'QuotaFailure' in str(e)):
           spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
         elif (isinstance(e, errors.Benchmarks.KnownIntermittentError) or
-              isinstance(e, errors.Resource.ProvisionTimeoutError)):
+              isinstance(e, errors.Resource.ProvisionTimeoutError) or
+              'ProvisionTimeoutError' in str(e)):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT)
         elif (isinstance(e, errors.Benchmarks.UnsupportedConfigError) or
@@ -1277,7 +1281,7 @@ def RunBenchmarkTask(
     # Unset run_uri so the config value takes precedence.
     FLAGS['run_uri'].present = 0
 
-  zone_retry_manager = ZoneRetryManager()
+  zone_retry_manager = ZoneRetryManager(FLAGS.machine_type)
   # Set the run count.
   max_run_count = 1 + _MAX_RETRIES.value
 
@@ -1347,30 +1351,39 @@ class ZoneRetryManager():
     zones_tried: Zones that have already been tried in previous runs.
   """
 
-  def __init__(self):
-    self._CheckFlag()
+  def __init__(self, machine_type: str):
+    self._CheckFlag(machine_type)
     if not _SMART_CAPACITY_RETRY.value and not _SMART_QUOTA_RETRY.value:
       return
+    self._machine_type = machine_type
     self._zones_tried: Set[str] = set()
     self._regions_tried: Set[str] = set()
     self._utils: types.ModuleType = providers.LoadProviderUtils(FLAGS.cloud)
     self._SetOriginalZoneAndFlag()
 
+  def _CheckMachineTypeIsSupported(self, machine_type: str) -> None:
+    if not machine_type:
+      raise errors.Config.MissingOption(
+          'machine_type flag must be specified on the command line '
+          'if zone=any feature is used.')
+
   def _GetCurrentZoneFlag(self):
     return FLAGS[self._zone_flag].value[0]
 
-  def _CheckFlag(self) -> None:
+  def _CheckFlag(self, machine_type: str) -> None:
     for zone_flag in ['zone', 'zones']:
       if FLAGS[zone_flag].value:
         self._zone_flag = zone_flag
         if self._GetCurrentZoneFlag() == _ANY_ZONE:
+          self._CheckMachineTypeIsSupported(machine_type)
           FLAGS['smart_capacity_retry'].parse(True)
           FLAGS['smart_quota_retry'].parse(True)
 
   def _SetOriginalZoneAndFlag(self) -> None:
     """Records the flag name and zone value that the benchmark started with."""
     # This is guaranteed to set values due to flag validator.
-    self._supported_zones = self._utils.GetZonesFromMachineType()
+    self._supported_zones = self._utils.GetZonesFromMachineType(
+        self._machine_type)
     if self._GetCurrentZoneFlag() == _ANY_ZONE:
       if _MAX_RETRIES.value < 1:
         FLAGS['retries'].parse(len(self._supported_zones))
@@ -1744,8 +1757,8 @@ def _ParseMeminfo(meminfo_txt: str) -> Tuple[Dict[str, int], List[str]]:
   return data, malformed
 
 
-@events.samples_created.connect
-def _CollectMeminfoHandler(sender: str, benchmark_spec: bm_spec.BenchmarkSpec,
+@events.benchmark_samples_created.connect
+def _CollectMeminfoHandler(unused_sender, benchmark_spec: bm_spec.BenchmarkSpec,
                            samples: List[sample.Sample]) -> None:
   """Optionally creates /proc/meminfo samples.
 
@@ -1756,11 +1769,9 @@ def _CollectMeminfoHandler(sender: str, benchmark_spec: bm_spec.BenchmarkSpec,
   keyword arguments.
 
   Args:
-    sender: Unused sender.
     benchmark_spec: The benchmark spec.
     samples: Generated samples that can be appended to.
   """
-  del sender  # Unused as appending to samples with VMs from benchmark_spec
   if not _COLLECT_MEMINFO.value:
     return
 
@@ -1785,6 +1796,8 @@ def _CollectMeminfoHandler(sender: str, benchmark_spec: bm_spec.BenchmarkSpec,
 
 
 def Main():
+  """Entrypoint for PerfKitBenchmarker."""
+  assert sys.version_info >= (3, 9), 'PerfKitBenchmarker requires Python 3.9+'
   log_util.ConfigureBasicLogging()
   _InjectBenchmarkInfoIntoDocumentation()
   _ParseFlags()

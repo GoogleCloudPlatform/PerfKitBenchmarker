@@ -16,7 +16,6 @@ import os
 import unittest
 
 from perfkitbenchmarker import test_util
-from perfkitbenchmarker.linux_benchmarks import mlperf_benchmark
 from perfkitbenchmarker.linux_benchmarks import mlperf_multiworkers_benchmark
 from perfkitbenchmarker.sample import Sample
 from tests import pkb_common_test_case
@@ -34,8 +33,7 @@ class MlperfMultiworkersBenchmarkTestCase(
 
   def testTrainResults(self):
     samples = mlperf_multiworkers_benchmark.MakeSamplesFromOutput(
-        {'version': mlperf_benchmark.MLPERF_VERSION},
-        self.contents, model='transformer')
+        {'version': 'v1.0'}, self.contents, model='transformer')
     golden = [
         Sample('speed', 196673.0, 'samples/sec', {'version': 'v1.0'}),
         Sample('speed', 203225.0, 'samples/sec', {'version': 'v1.0'}),

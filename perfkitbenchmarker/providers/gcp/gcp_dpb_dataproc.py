@@ -400,6 +400,10 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
   CLOUD = providers.GCP
   SERVICE_TYPE = 'dataproc_serverless'
 
+  def __init__(self, dpb_service_spec):
+    super().__init__(dpb_service_spec)
+    self._job_counter = 0
+
   def SubmitJob(self,
                 jarfile=None,
                 classname=None,
@@ -422,7 +426,9 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
 
     cmd = self.DataprocGcloudCommand(*args)
 
-    cmd.flags['batch'] = self.cluster_id
+    batch_name = f'{self.cluster_id}-{self._job_counter}'
+    self._job_counter += 1
+    cmd.flags['batch'] = batch_name
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     job_jars = job_jars or []
@@ -467,7 +473,7 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
       raise dpb_service.JobSubmissionError(stderr)
 
     fetch_batch_cmd = self.DataprocGcloudCommand(
-        'batches', 'describe', self.cluster_id)
+        'batches', 'describe', batch_name)
     stdout, stderr, retcode = fetch_batch_cmd.Issue(
         timeout=None, raise_on_failure=False)
     if retcode != 0:

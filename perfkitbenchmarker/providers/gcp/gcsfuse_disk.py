@@ -7,8 +7,8 @@ FLAGS = flags.FLAGS
 
 DEFAULT_MOUNT_OPTIONS = [
     'allow_other',
-    'dir_mode=777',
-    'file_mode=777',
+    'dir_mode=755',
+    'file_mode=755',
     'implicit_dirs',
 ]
 
@@ -24,9 +24,8 @@ class GcsFuseDisk(disk.MountableDisk):
     vm.Install('gcsfuse')
 
   def Mount(self, vm):
-    vm.RemoteCommand(
-        f'sudo mkdir -p {self.mount_point} && '
-        f'sudo chmod a+w {self.mount_point}')
+    vm.RemoteCommand(f'sudo mkdir -p {self.mount_point} && '
+                     f'sudo chmod a+w {self.mount_point}')
 
     opts = ','.join(DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
     bucket = FLAGS.gcsfuse_bucket

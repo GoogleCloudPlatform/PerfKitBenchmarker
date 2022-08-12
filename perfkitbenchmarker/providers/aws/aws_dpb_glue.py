@@ -46,6 +46,7 @@ class AwsDpbGlue(dpb_service.BaseDpbService):
       raise errors.Setup.InvalidSetupError(
           'dpb_service_zone must be provided, for provisioning.')
     self.region = util.GetRegionFromZone(self.dpb_service_zone)
+    self.cmd_prefix += ['--region', self.region]
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(location=self.region)
     self.persistent_fs_prefix = 's3://'
@@ -144,8 +145,17 @@ class AwsDpbGlue(dpb_service.BaseDpbService):
     pass
 
   def _Delete(self):
-    # Since there's no managed infrastructure, this is a no-op.
-    pass
+    """Deletes Glue Jobs created to avoid quota issues."""
+    for i in range(self._job_counter):
+      job_name = f'{self.cluster_id}-{i}'
+      self._DeleteGlueJob(job_name)
+
+  def _DeleteGlueJob(self, job_name: str):
+    vm_util.IssueCommand(self.cmd_prefix + [
+        'glue',
+        'delete-job',
+        f'--job-name={job_name}'
+    ], raise_on_failure=False)
 
   def GetClusterCreateTime(self) -> Optional[float]:
     return None

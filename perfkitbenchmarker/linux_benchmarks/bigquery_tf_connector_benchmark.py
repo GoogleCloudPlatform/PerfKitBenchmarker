@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License
-
-
 r"""Runs a TensorFlow BigQuery Connector benchmark.
 
 Benchmark measures the numbers of tensors/rows we can read per second from a
@@ -76,6 +74,7 @@ def GetConfig(user_config):
 
   Args:
     user_config: user supplied configuration (flags and config file)
+
   Returns:
     loaded benchmark configuration
   """
@@ -88,7 +87,7 @@ def Prepare(benchmark_spec):
   path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
   logging.info('Uploading %s to %s', path, vm)
   vm.PushFile(path, REMOTE_SCRIPT)
-  vm.RemoteCommand(f'sudo chmod 777 {REMOTE_SCRIPT}')
+  vm.RemoteCommand(f'sudo chmod 755 {REMOTE_SCRIPT}')
 
 
 def _RunBenchmark(vm, streams=1, batch_size=2048, data_format='AVRO'):
@@ -99,6 +98,7 @@ def _RunBenchmark(vm, streams=1, batch_size=2048, data_format='AVRO'):
     streams: Number of BigQuery streams to use.
     batch_size: batch size to use.
     data_format: serialization data format to use (AVRO or ARROW).
+
   Returns:
     Benchmark result.
   """
@@ -135,21 +135,19 @@ def _RunBenchmark(vm, streams=1, batch_size=2048, data_format='AVRO'):
       'table_id': FLAGS.table_id,
   }
   return [
-      sample.Sample(
-          'BigQuery TensorFlow connector read throughput',
-          result,
-          UNIT,
-          metadata)
+      sample.Sample('BigQuery TensorFlow connector read throughput', result,
+                    UNIT, metadata)
   ]
 
 
 def Run(benchmark_spec):
   """Run a benchmark python script on a VM and returns results."""
   vm = benchmark_spec.vms[0]
-  results = _RunBenchmark(vm,
-                          streams=FLAGS.requested_streams,
-                          batch_size=FLAGS.batch_size,
-                          data_format=FLAGS.format)
+  results = _RunBenchmark(
+      vm,
+      streams=FLAGS.requested_streams,
+      batch_size=FLAGS.batch_size,
+      data_format=FLAGS.format)
   return results
 
 

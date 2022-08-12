@@ -17,6 +17,7 @@ import json
 import os
 import unittest
 from absl import flags
+from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 
@@ -24,10 +25,6 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
-
-FLAGS = flags.FLAGS
-FLAGS.mark_as_parsed()
-
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
@@ -74,6 +71,7 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     self.assertEqual(stats['p100'], 5)
     self.assertLessEqual(abs(stats['stddev'] - 1.538), 0.001)
 
+  @flagsaver.flagsaver(netperf_benchmarks=netperf_benchmark.ALL_BENCHMARKS)
   def testExternalAndInternal(self):
     self._ConfigureIpTypes()
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
@@ -86,53 +84,54 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     tps = 'transactions_per_second'
     mbps = 'Mbits/sec'
     self.assertListEqual(
-        [('TCP_RR_Transaction_Rate', 1405.5, tps),
-         ('TCP_RR_Latency_p50', 683.0, 'us'),
-         ('TCP_RR_Latency_p90', 735.0, 'us'),
-         ('TCP_RR_Latency_p99', 841.0, 'us'),
-         ('TCP_RR_Latency_min', 600.0, 'us'),
-         ('TCP_RR_Latency_max', 900.0, 'us'),
-         ('TCP_RR_Latency_stddev', 783.80, 'us'),
-         ('TCP_RR_Transaction_Rate', 3545.77, tps),
-         ('TCP_RR_Latency_p50', 274.0, 'us'),
-         ('TCP_RR_Latency_p90', 309.0, 'us'),
-         ('TCP_RR_Latency_p99', 371.0, 'us'),
-         ('TCP_RR_Latency_min', 200.0, 'us'),
-         ('TCP_RR_Latency_max', 400.0, 'us'),
-         ('TCP_RR_Latency_stddev', 189.82, 'us'),
-         ('TCP_CRR_Transaction_Rate', 343.35, tps),
-         ('TCP_CRR_Latency_p50', 2048.0, 'us'),
-         ('TCP_CRR_Latency_p90', 2372.0, 'us'),
-         ('TCP_CRR_Latency_p99', 30029.0, 'us'),
-         ('TCP_CRR_Latency_min', 2000.0, 'us'),
-         ('TCP_CRR_Latency_max', 35000.0, 'us'),
-         ('TCP_CRR_Latency_stddev', 8147.88, 'us'),
-         ('TCP_CRR_Transaction_Rate', 1078.07, tps),
-         ('TCP_CRR_Latency_p50', 871.0, 'us'),
-         ('TCP_CRR_Latency_p90', 996.0, 'us'),
-         ('TCP_CRR_Latency_p99', 2224.0, 'us'),
-         ('TCP_CRR_Latency_min', 800.0, 'us'),
-         ('TCP_CRR_Latency_max', 2500.0, 'us'),
-         ('TCP_CRR_Latency_stddev', 551.07, 'us'),
-         ('TCP_STREAM_Throughput', 1187.94, mbps),
-         ('TCP_STREAM_Throughput', 1973.37, 'Mbits/sec'),
-         ('UDP_RR_Transaction_Rate', 1359.71, tps),
-         ('UDP_RR_Latency_p50', 700.0, 'us'),
-         ('UDP_RR_Latency_p90', 757.0, 'us'),
-         ('UDP_RR_Latency_p99', 891.0, 'us'),
-         ('UDP_RR_Latency_min', 600.0, 'us'),
-         ('UDP_RR_Latency_max', 1000.0, 'us'),
-         ('UDP_RR_Latency_stddev', 808.44, 'us'),
-         ('UDP_RR_Transaction_Rate', 3313.49, tps),
-         ('UDP_RR_Latency_p50', 295.0, 'us'),
-         ('UDP_RR_Latency_p90', 330.0, 'us'),
-         ('UDP_RR_Latency_p99', 406.0, 'us'),
-         ('UDP_RR_Latency_min', 200.0, 'us'),
-         ('UDP_RR_Latency_max', 500.0, 'us'),
-         ('UDP_RR_Latency_stddev', 214.64, 'us'),
-         ('UDP_STREAM_Throughput', 1102.42, mbps),
-         ('UDP_STREAM_Throughput', 1802.72, 'Mbits/sec'),
-         ],
+        [
+            ('TCP_RR_Transaction_Rate', 1405.5, tps),
+            ('TCP_RR_Latency_p50', 683.0, 'us'),
+            ('TCP_RR_Latency_p90', 735.0, 'us'),
+            ('TCP_RR_Latency_p99', 841.0, 'us'),
+            ('TCP_RR_Latency_min', 600.0, 'us'),
+            ('TCP_RR_Latency_max', 900.0, 'us'),
+            ('TCP_RR_Latency_stddev', 783.80, 'us'),
+            ('TCP_RR_Transaction_Rate', 3545.77, tps),
+            ('TCP_RR_Latency_p50', 274.0, 'us'),
+            ('TCP_RR_Latency_p90', 309.0, 'us'),
+            ('TCP_RR_Latency_p99', 371.0, 'us'),
+            ('TCP_RR_Latency_min', 200.0, 'us'),
+            ('TCP_RR_Latency_max', 400.0, 'us'),
+            ('TCP_RR_Latency_stddev', 189.82, 'us'),
+            ('TCP_CRR_Transaction_Rate', 343.35, tps),
+            ('TCP_CRR_Latency_p50', 2048.0, 'us'),
+            ('TCP_CRR_Latency_p90', 2372.0, 'us'),
+            ('TCP_CRR_Latency_p99', 30029.0, 'us'),
+            ('TCP_CRR_Latency_min', 2000.0, 'us'),
+            ('TCP_CRR_Latency_max', 35000.0, 'us'),
+            ('TCP_CRR_Latency_stddev', 8147.88, 'us'),
+            ('TCP_CRR_Transaction_Rate', 1078.07, tps),
+            ('TCP_CRR_Latency_p50', 871.0, 'us'),
+            ('TCP_CRR_Latency_p90', 996.0, 'us'),
+            ('TCP_CRR_Latency_p99', 2224.0, 'us'),
+            ('TCP_CRR_Latency_min', 800.0, 'us'),
+            ('TCP_CRR_Latency_max', 2500.0, 'us'),
+            ('TCP_CRR_Latency_stddev', 551.07, 'us'),
+            ('TCP_STREAM_Throughput', 1187.94, mbps),
+            ('TCP_STREAM_Throughput', 1973.37, 'Mbits/sec'),
+            ('UDP_RR_Transaction_Rate', 1359.71, tps),
+            ('UDP_RR_Latency_p50', 700.0, 'us'),
+            ('UDP_RR_Latency_p90', 757.0, 'us'),
+            ('UDP_RR_Latency_p99', 891.0, 'us'),
+            ('UDP_RR_Latency_min', 600.0, 'us'),
+            ('UDP_RR_Latency_max', 1000.0, 'us'),
+            ('UDP_RR_Latency_stddev', 808.44, 'us'),
+            ('UDP_RR_Transaction_Rate', 3313.49, tps),
+            ('UDP_RR_Latency_p50', 295.0, 'us'),
+            ('UDP_RR_Latency_p90', 330.0, 'us'),
+            ('UDP_RR_Latency_p99', 406.0, 'us'),
+            ('UDP_RR_Latency_min', 200.0, 'us'),
+            ('UDP_RR_Latency_max', 500.0, 'us'),
+            ('UDP_RR_Latency_stddev', 214.64, 'us'),
+            ('UDP_STREAM_Throughput', 1102.42, mbps),
+            ('UDP_STREAM_Throughput', 1802.72, 'Mbits/sec'),
+        ],
         [i[:3] for i in result])
 
     external_meta = {'ip_type': 'external'}

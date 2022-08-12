@@ -17,8 +17,6 @@ Forwards access to pint Quantity and Unit classes built around a customized
 unit registry.
 """
 
-import copy
-import numbers
 import pint
 import six.moves.copyreg
 
@@ -36,15 +34,15 @@ class _UnitRegistry(pint.UnitRegistry):
     # Kubernetes
     self.define('Ki = kibibyte')
     self.define('Mi = mebibyte')
-    self.define('% = [percent] = percent')
+    self.define('percent = [percent]')
 
   def parse_expression(self, input_string, *args, **kwargs):
-    result = super(_UnitRegistry, self).parse_expression(input_string, *args,
-                                                         **kwargs)
-    if (isinstance(result, numbers.Number) and
-        input_string.strip().endswith('%')):
-      return self.Quantity(result, self.Unit('percent'))
-    return result
+    # pint cannot parse percent, because it wants to be able to do python math.
+    # '3 % 2' is a Python math expression for 3 mod 2.
+    # Replace all instances of the percent symbol.
+    # https://github.com/hgrecco/pint/issues/429#issuecomment-265287161
+    fixed_input_string = input_string.replace('%', '[percent]')
+    return super().parse_expression(fixed_input_string, *args, **kwargs)
 
 
 # Pint recommends one global UnitRegistry for the entire program, so
@@ -64,20 +62,6 @@ def _UnPickleQuantity(inp):
 
 
 six.moves.copyreg.pickle(_UNIT_REGISTRY.Quantity, _PickleQuantity)
-
-
-# The following monkey-patch has been submitted to upstream Pint as
-# pull request 357.
-# TODO: once that PR is merged, get rid of this workaround.
-def _unit_deepcopy(self, memo):
-  ret = self.__class__(copy.deepcopy(self._units))
-  return ret
-
-_UNIT_REGISTRY.Unit.__deepcopy__ = _unit_deepcopy
-
-
-# Fix for https://github.com/hgrecco/pint/issues/372
-_UNIT_REGISTRY.Unit.__ne__ = lambda self, other: not self.__eq__(other)
 
 
 # Forward access to pint's classes and functions.

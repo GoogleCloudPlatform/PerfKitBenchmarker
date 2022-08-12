@@ -53,8 +53,9 @@ cluster_boot:
       vm_count: null
   flags:
     # We don't want boot time samples to be affected from retrying, so don't
-    # retry cluster_boot when rate limited.
+    # retry VM creation failures.
     retry_on_rate_limited: False
+    retry_gce_subnetwork_not_ready: False
 """
 
 flags.DEFINE_boolean(
@@ -200,7 +201,7 @@ def MeasureDelete(
 
 
 def _GetVmOperationDataSamples(
-    operation_times: List[int], cluster_time: int, operation: str,
+    operation_times: List[int], cluster_time: float, operation: str,
     vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
   """Append samples from given data.
 

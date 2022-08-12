@@ -25,7 +25,9 @@ added after installation.
 
 from absl import logging
 from packaging import version
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import python
 
 import requests
@@ -57,7 +59,7 @@ def Install(vm, pip_cmd='pip', python_cmd='python'):
     logging.info('pip not bundled with Python. Installing with get-pip.py')
     python_version = python.GetPythonVersion(vm, python_cmd)
     python_version = version.Version(python_version)
-    # At the time of Feb 2022 pypi has special get-pips for versions up
+    # At the time of Jul 2022 pypi has special get-pips for versions up
     # through 3.6. To be future proof check for the existence of a versioned
     # URL using requests.
     versioned_url = GET_PIP_VERSIONED_URL.format(python_version=python_version)
@@ -66,7 +68,15 @@ def Install(vm, pip_cmd='pip', python_cmd='python'):
       get_pip_url = versioned_url
     else:
       get_pip_url = GET_PIP_URL
-    vm.RemoteCommand(f'curl {get_pip_url} | sudo {python_cmd} -')
+    # get_pip can suffer from various network issues.
+    @vm_util.Retry(
+        max_retries=5,
+        retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,))
+    def GetPipWithRetries():
+      vm.RemoteCommand(
+          f'curl {get_pip_url} -o get_pip.py && sudo {python_cmd} get_pip.py')
+
+    GetPipWithRetries()
 
   # Verify installation
   vm.RemoteCommand(pip_cmd + ' --version')

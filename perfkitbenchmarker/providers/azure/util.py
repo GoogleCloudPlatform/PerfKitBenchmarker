@@ -159,10 +159,10 @@ def ShouldKeepZoneFromCLI(zone: str) -> bool:
   return True
 
 
-def GetZonesFromMachineType() -> Set[str]:
+def GetZonesFromMachineType(machine_type: str) -> Set[str]:
   """Returns a set of zones for a machine type."""
   stdout, _ = vm_util.IssueRetryableCommand(
-      [AZURE_PATH, 'vm', 'list-skus', '--size', FLAGS.machine_type])
+      [AZURE_PATH, 'vm', 'list-skus', '--size', machine_type])
   zones = set()
   for item in json.loads(stdout):
     for location_info in item['locationInfo']:

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Runs the Spec JBB 2015 benchmark https://www.spec.org/jbb2015/.
 
 User guide: https://www.spec.org/jbb2015/docs/userguide.pdf.
@@ -24,7 +23,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import openjdk
 from perfkitbenchmarker.linux_packages import openjdk_neoverse
-
+from perfkitbenchmarker.linux_packages import specjbb
 
 BENCHMARK_NAME = 'specjbb2015'
 BENCHMARK_CONFIG = """
@@ -53,8 +52,8 @@ _DEFAULT_COMPOSITE_MEMORY_RATIO = 0.8
 _DEFAULT_WORKERS_RATIO = 1
 _DEFAULT_NUM_GROUPS = 4
 _RAM_MB_PER_CORE = 1500
-_SPEC_JBB_2015_ISO = 'SPECjbb2015-1_03.iso'
-_SPEC_DIR = 'spec'
+_SPEC_JBB_2015_ISO = specjbb.SPEC_JBB_2015_ISO
+_SPEC_DIR = specjbb.SPEC_DIR
 _LOG_FILE = '~/specjbb2015.log'
 _JAR_FILE = 'specjbb2015.jar'
 _PROPS_FILE = 'config/specjbb2015.props'
@@ -76,25 +75,14 @@ flags.DEFINE_enum('specjbb_run_mode', MULTIJVM_MODE,
                   'String representing run mode. COMPOSITE or MultiJVM.')
 flags.DEFINE_integer('specjbb_num_groups', _DEFAULT_NUM_GROUPS,
                      'Used in MultiJVM, number of groups.')
-flags.DEFINE_bool('build_openjdk_neoverse', False,
-                  'Whether to build OpenJDK optimized for ARM Neoverse.'
-                  'Requires Ubuntu 1804 and OpenJDK 11.')
+flags.DEFINE_bool(
+    'build_openjdk_neoverse', False,
+    'Whether to build OpenJDK optimized for ARM Neoverse.'
+    'Requires Ubuntu 1804 and OpenJDK 11.')
 
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-
-
-def _PrepareSpec(vm):
-  """Prepares a SPEC client by copying SPEC to the VM."""
-  mount_dir = 'spec_mnt'
-  vm.RemoteCommand(f'mkdir -p {mount_dir} {_SPEC_DIR}')
-  vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, [_SPEC_JBB_2015_ISO],
-                                        '~/')
-  vm.RemoteCommand(
-      f'sudo mount -t iso9660 -o loop {_SPEC_JBB_2015_ISO} {mount_dir}')
-  vm.RemoteCommand(f'cp -r {mount_dir}/* {_SPEC_DIR}')
-  vm.RemoteCommand(f'sudo umount {mount_dir} && sudo rm -rf {mount_dir}')
 
 
 def Prepare(benchmark_spec):
@@ -105,7 +93,7 @@ def Prepare(benchmark_spec):
   """
   vm = benchmark_spec.vms[0]
 
-  _PrepareSpec(vm)
+  vm.Install('specjbb')
 
   vm.Install('openjdk')
 
@@ -322,6 +310,4 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification.
   """
   vm = benchmark_spec.vms[0]
-  vm.RemoteCommand(f'sudo umount {_SPEC_DIR}', ignore_failure=True)
-  vm.RemoteCommand(
-      f'rm -rf {_SPEC_DIR} {_SPEC_JBB_2015_ISO}', ignore_failure=True)
+  specjbb.Uninstall(vm)

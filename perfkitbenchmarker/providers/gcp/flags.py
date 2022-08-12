@@ -82,8 +82,10 @@ flags.DEFINE_enum('gce_boot_disk_type', None, ['pd-standard', 'pd-ssd'],
                   'The boot disk type for GCP VMs.')
 flags.DEFINE_enum('gce_ssd_interface', 'SCSI', ['SCSI', 'NVME'],
                   'The ssd interface for GCE local SSD.')
-flags.DEFINE_enum('gce_nic_type', 'VIRTIO_NET', ['VIRTIO_NET', 'GVNIC'],
-                  'The virtual NIC type of GCE VMs.')
+flags.DEFINE_enum('gce_nic_type', 'GVNIC', ['VIRTIO_NET', 'GVNIC'],
+                  'The virtual NIC type of GCE VMs. All machine types '
+                  'currently support GVNIC, but certain OS types will be '
+                  'excluded in gce_virtual_machine.')
 EGRESS_BANDWIDTH_TIER = flags.DEFINE_enum(
     'gce_egress_bandwidth_tier', None, ['TIER_1'],
     'Egress bandwidth tier of the GCE VMs.')
@@ -112,7 +114,7 @@ flags.DEFINE_string(
 flags.DEFINE_list('gce_tags', None, 'List of --tags when creating a VM')
 flags.DEFINE_boolean('gke_enable_alpha', False,
                      'Whether to enable alpha kubernetes clusters.')
-flags.DEFINE_boolean('gke_enable_gvnic', False,
+flags.DEFINE_boolean('gke_enable_gvnic', True,
                      'Whether to use google vitrual interface on GKE nodes.')
 flags.DEFINE_string('gcp_dataproc_subnet', None,
                     'Specifies the subnet that the cluster will be part of.')
@@ -161,6 +163,10 @@ GKE_API_OVERRIDE = flags.DEFINE_string(
     'gke_api_override',
     default=None,
     help='GKE API endpoint override. Defaults to unset (prod).')
+RETRY_GCE_SUBNETWORK_NOT_READY = flags.DEFINE_boolean(
+    'retry_gce_subnetwork_not_ready', True,
+    'Retry Subnetwork not ready when provisioning resources.'
+)
 
 
 def _ValidatePreemptFlags(flags_dict):

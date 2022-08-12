@@ -85,14 +85,14 @@ def GetZonesInRegion(region: str) -> Set[str]:
   }
 
 
-def GetZonesFromMachineType() -> Set[str]:
+def GetZonesFromMachineType(machine_type: str) -> Set[str]:
   """Returns all available zones for a given machine type."""
   zones = set()
   for region in GetAllRegions():
     get_zones_cmd = AWS_PREFIX + [
         'ec2', 'describe-instance-type-offerings',
         '--location-type=availability-zone', f'--region={region}'
-    ] + AwsFilter({'instance-type': FLAGS.machine_type})
+    ] + AwsFilter({'instance-type': machine_type})
     stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
     response = json.loads(stdout)
     for item in response['InstanceTypeOfferings']:

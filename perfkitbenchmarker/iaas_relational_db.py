@@ -394,7 +394,7 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
       raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
                       'and 8.0 are supported.' % self.spec.engine_version)
     self.server_vm.Install(mysql_name)
-    self.server_vm.RemoteCommand('chmod 777 %s' %
+    self.server_vm.RemoteCommand('chmod 755 %s' %
                                  self.server_vm.GetScratchDir())
     self.server_vm.RemoteCommand('sudo service %s stop' %
                                  self.server_vm.GetServiceName(mysql_name))

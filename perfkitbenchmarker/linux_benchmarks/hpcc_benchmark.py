@@ -468,7 +468,8 @@ def RunHpccSource(
     mpi_cmd += f'-np {num_processes} {mpi_flags} {hpcc_exec}'
 
   headnode_vm.RobustRemoteCommand(
-      mpi_cmd, timeout=int(FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR))
+      f'ulimit -n 32768; {mpi_cmd}',
+      timeout=int(FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR))
   logging.info('HPCC Results:')
   stdout, _ = headnode_vm.RemoteCommand('cat hpccoutf.txt', should_log=True)
   if stdout.startswith('HPL ERROR'):

@@ -41,6 +41,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
@@ -59,6 +60,9 @@ from six.moves import range
 import yaml
 
 FLAGS = flags.FLAGS
+
+# 2h timeout for LM notificaiton
+LM_NOTIFICATION_TIMEOUT_SECONDS = 60 * 60 * 2
 
 NVME = 'NVME'
 SCSI = 'SCSI'
@@ -144,7 +148,11 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
           'a2-highgpu-2g': 2,
           'a2-highgpu-4g': 4,
           'a2-highgpu-8g': 8,
-          'a2-megagpu-16g': 16
+          'a2-megagpu-16g': 16,
+          'a2-ultragpu-1g': 1,
+          'a2-ultragpu-2g': 2,
+          'a2-ultragpu-4g': 4,
+          'a2-ultragpu-8g': 8,
       }
       self.gpu_count = a2_lookup[self.machine_type]
       self.gpu_type = virtual_machine.GPU_A100
@@ -393,6 +401,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   deleted_hosts = set()
   host_map = collections.defaultdict(list)
 
+  _LM_TIMES_SEMAPHORE = threading.Semaphore(0)
+  _LM_NOTICE_SCRIPT = 'gce_maintenance_notice.py'
+  _LM_NOTICE_LOG = 'gce_maintenance_notice.log'
+
+  SUPPORTS_GVNIC = True
+
   def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
 
@@ -436,6 +450,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_nic_type = FLAGS.gce_nic_type
+    if not self.SUPPORTS_GVNIC:
+      logging.warning('Changing gce_nic_type to VIRTIO_NET')
+      self.gce_nic_type = 'VIRTIO_NET'
     self.gce_egress_bandwidth_tier = gcp_flags.EGRESS_BANDWIDTH_TIER.value
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
     # Default to GCE default (Live Migration)
@@ -560,7 +577,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         '%s=%s' % (k, v) for k, v in six.iteritems(metadata_from_file)
     ])
 
-    metadata = {}
+    # passing sshKeys does not work with OS Login
+    metadata = {'enable-oslogin': 'FALSE'}
     metadata.update(self.boot_metadata)
     metadata.update(util.GetDefaultTags())
 
@@ -684,6 +702,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(
             'Interrupted before VM started')
       if _UNSUPPORTED_RESOURCE in stderr:
+        if (re.search(r"subnetworks/\S+' is not ready", stderr) and
+            gcp_flags.RETRY_GCE_SUBNETWORK_NOT_READY.value):
+          # Commonly occurs when simultaneously creating GKE clusters
+          raise errors.Resource.RetryableCreationError(
+              f'subnet is currently being updated:\n{stderr}')
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (stderr, retcode))
@@ -838,10 +861,21 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         data_disk = self._GetNfsService().CreateNfsDisk()
       elif disk_spec.disk_type == disk.OBJECT_STORAGE:
         data_disk = gcsfuse_disk.GcsFuseDisk(disk_spec)
-      else:
+      else:  # remote disk
         name = '%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
         data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project,
                                      replica_zones=replica_zones)
+        # m3 machines uses nvme interface for
+        # pd-extreme, pd-ssd, pd-balanced and pd-standard.
+        if self.machine_type.startswith('m3-'):
+          self.interface = NVME
+          nvme_disk_number = (
+              self.NVME_START_INDEX
+              + 1  # 1 boot/system disk
+              + self.max_local_disks  # any local disks, if present
+              + self.remote_disk_counter  # finally any remote disk
+              )
+          data_disk.device_path = f'/dev/nvme0n{nvme_disk_number}'
         # Remote disk numbers start at 1+max_local_disks (0 is the system disk
         # and local disks occupy 1-max_local_disks).
         data_disk.disk_number = (self.remote_disk_counter +
@@ -919,10 +953,71 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Simulates a maintenance event on the VM."""
     cmd = util.GcloudCommand(self, 'compute', 'instances',
                              'simulate-maintenance-event', self.name, '--async')
-    _, _, retcode = cmd.Issue(raise_on_failure=False)
-    if retcode:
+    stdout, _, retcode = cmd.Issue(raise_on_failure=False)
+    if retcode or 'error' in stdout:
       raise errors.VirtualMachine.VirtualMachineError(
           'Unable to simulate maintenance event.')
+
+  def SetupLMNotification(self):
+    """Prepare environment for /scripts/gce_maintenance_notify.py script."""
+    self.Install('pip3')
+    self.RemoteCommand('sudo pip3 install requests')
+    self.PushDataFile(self._LM_NOTICE_SCRIPT, vm_util.VM_TMP_DIR)
+
+  def _GetLMNotificationCommand(self):
+    """Return Remote python execution command for LM notify script."""
+    vm_name = self.name
+    vm_path = posixpath.join(vm_util.VM_TMP_DIR, self._LM_NOTICE_SCRIPT)
+    server_log = self._LM_NOTICE_LOG
+    return f'python3 {vm_path} {vm_name} > {server_log} 2>&1'
+
+  def StartLMNotification(self):
+    """Start meta-data server notification subscription."""
+    def _Subscribe():
+      self.RobustRemoteCommand(self._GetLMNotificationCommand(),
+                               timeout=LM_NOTIFICATION_TIMEOUT_SECONDS)
+      self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
+      logging.info('[LM Notify] Release live migration lock.')
+      self._LM_TIMES_SEMAPHORE.release()
+    t = threading.Thread(target=_Subscribe)
+    t.daemon = True
+    t.start()
+
+  def WaitLMNotificationRelease(self):
+    """Block main thread until LM ended."""
+    logging.info('[LM Notify] Wait for live migration to finish.')
+    self._LM_TIMES_SEMAPHORE.acquire()
+    logging.info('[LM Notify] Live nigration is done.')
+
+  def CollectLMNotificationsTime(self):
+    """Extract LM notifications from log file.
+
+    Sample Log file to parse:
+      Host_maintenance_start _at_ 1656555520.78123
+      Host_maintenance_end _at_ 1656557227.63631
+
+    Returns:
+      Live migration events timing info dictionary
+    """
+    lm_total_time_key = 'LM_total_time'
+    lm_start_time_key = 'Host_maintenance_start'
+    lm_end_time_key = 'Host_maintenance_end'
+    events_dict = {'machine_instance': self.instance_number}
+    lm_times, _ = self.RemoteCommand(f'cat {self._LM_NOTICE_LOG}')
+    if not lm_times: return events_dict
+
+    # Result may contain errors captured, so we need to skip them
+    for event_info in lm_times.splitlines():
+      event_info_parts = event_info.split(' _at_ ')
+      if len(event_info_parts) == 2:
+        events_dict[event_info_parts[0]] = event_info_parts[1]
+
+    lm_total_time = 0
+    if lm_start_time_key in events_dict and lm_end_time_key in events_dict:
+      lm_total_time = float(events_dict[lm_end_time_key]) - float(
+          events_dict[lm_start_time_key])
+    events_dict[lm_total_time_key] = lm_total_time
+    return events_dict
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a data file from a GCS bucket with pre-provisioned data.
@@ -1039,11 +1134,6 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
   Currently looks for gVNIC capabilities.
   TODO(pclay): Make more generic and move to BaseLinuxMixin.
   """
-
-  # regex to get the network devices from "ip link show"
-  _IP_LINK_RE = re.compile(r'^\d+: (?P<device_name>\S+):.*mtu (?P<mtu>\d+)')
-  # devices to ignore from "ip link show"
-  _IGNORE_NETWORK_DEVICES = ('lo',)
   # ethtool properties output should match this regex
   _ETHTOOL_RE = re.compile(r'^(?P<key>.*?):\s*(?P<value>.*)\s*')
   # the "device" value in ethtool properties for gvnic
@@ -1052,7 +1142,6 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
   def __init__(self, vm_spec):
     super(BaseLinuxGceVirtualMachine, self).__init__(vm_spec)
     self._gvnic_version = None
-    self._discovered_mtu: Optional[int] = None
 
   def GetResourceMetadata(self):
     """See base class."""
@@ -1060,26 +1149,18 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
                      self).GetResourceMetadata().copy()
     if self._gvnic_version:
       metadata['gvnic_version'] = self._gvnic_version
-    if self._discovered_mtu:
-      metadata['mtu'] = self._discovered_mtu
+
     return metadata
 
   def OnStartup(self):
     """See base class.  Sets the _gvnic_version."""
     super(BaseLinuxGceVirtualMachine, self).OnStartup()
     self._gvnic_version = self.GetGvnicVersion()
-    devices = self._GetNetworkDevices()
-    all_mtus = set(devices.values())
-    if len(all_mtus) == 1:
-      self._discovered_mtu = list(all_mtus)[0]
-    else:
-      logging.warning('To record MTU must only have 1 unique MTU value not: %s',
-                      devices)
 
   def GetGvnicVersion(self) -> Optional[str]:
     """Returns the gvnic network driver version."""
     all_device_properties = {}
-    for device_name in self._GetNetworkDevices():
+    for device_name in self._get_network_device_mtus():
       device = self._GetNetworkDeviceProperties(device_name)
       all_device_properties[device_name] = device
       driver = device.get('driver')
@@ -1111,23 +1192,12 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
         properties[m['key']] = m['value']
     return properties
 
-  def _GetNetworkDevices(self) -> Dict[str, int]:
-    """Returns network device names and their MTUs."""
-    stdout, _ = self.RemoteCommand('PATH="${PATH}":/usr/sbin ip link show up')
-    devices = {}
-    for line in stdout.splitlines():
-      m = self._IP_LINK_RE.match(line)
-      if m:
-        device_name = m['device_name']
-        if device_name not in self._IGNORE_NETWORK_DEVICES:
-          devices[device_name] = int(m['mtu'])
-    return devices
-
 
 class Debian9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian9Mixin):
   DEFAULT_IMAGE_FAMILY = 'debian-9'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+  SUPPORTS_GVNIC = False
 
   def _BeforeSuspend(self):
     self.InstallPackages('dbus')
@@ -1138,6 +1208,7 @@ class Debian10BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian10Mixin):
   DEFAULT_IMAGE_FAMILY = 'debian-10'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+  SUPPORTS_GVNIC = False
 
 
 class Debian11BasedGceVirtualMachine(
@@ -1182,6 +1253,13 @@ class RockyLinux8BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
   DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
 
 
+# https://cloud.google.com/blog/products/application-modernization/introducing-rocky-linux-optimized-for-google-cloud
+class RockyLinux8OptimizedBasedGceVirtualMachine(
+    RockyLinux8BasedGceVirtualMachine):
+  OS_TYPE = os_types.ROCKY_LINUX8_OPTIMIZED
+  DEFAULT_IMAGE_FAMILY = 'rocky-linux-8-optimized-gcp'
+
+
 class CentOsStream9BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
                                           linux_vm.CentOsStream9Mixin):
   DEFAULT_IMAGE_FAMILY = 'centos-stream-9'
@@ -1198,6 +1276,7 @@ class CoreOsBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CoreOsMixin):
   DEFAULT_IMAGE_FAMILY = 'fedora-coreos-stable'
   DEFAULT_IMAGE_PROJECT = 'fedora-coreos-cloud'
+  SUPPORTS_GVNIC = False
 
   def __init__(self, vm_spec):
     super(CoreOsBasedGceVirtualMachine, self).__init__(vm_spec)
@@ -1319,6 +1398,7 @@ class BaseWindowsGceVirtualMachine(GceVirtualMachine,
 class Windows2012CoreGceVirtualMachine(
     BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2012-r2-core'
+  SUPPORTS_GVNIC = False
 
 
 class Windows2016CoreGceVirtualMachine(
@@ -1340,6 +1420,7 @@ class Windows2012DesktopGceVirtualMachine(
     BaseWindowsGceVirtualMachine,
     windows_virtual_machine.Windows2012DesktopMixin):
   DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
+  SUPPORTS_GVNIC = False
 
 
 class Windows2016DesktopGceVirtualMachine(
@@ -1372,6 +1453,7 @@ class Windows2019DesktopSQLServer2017EnterpriseGceVirtualMachine(
     windows_virtual_machine.Windows2019SQLServer2017Enterprise):
   DEFAULT_IMAGE_FAMILY = 'sql-ent-2017-win-2019'
   DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+  SUPPORTS_GVNIC = False
 
 
 class Windows2019DesktopSQLServer2019StandardGceVirtualMachine(
@@ -1386,6 +1468,7 @@ class Windows2019DesktopSQLServer2019EnterpriseGceVirtualMachine(
     windows_virtual_machine.Windows2019SQLServer2019Enterprise):
   DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2019'
   DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+  SUPPORTS_GVNIC = False
 
 
 class Windows2022DesktopSQLServer2019StandardGceVirtualMachine(
@@ -1400,6 +1483,7 @@ class Windows2022DesktopSQLServer2019EnterpriseGceVirtualMachine(
     windows_virtual_machine.Windows2022SQLServer2019Enterprise):
   DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2022'
   DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
+  SUPPORTS_GVNIC = False
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,

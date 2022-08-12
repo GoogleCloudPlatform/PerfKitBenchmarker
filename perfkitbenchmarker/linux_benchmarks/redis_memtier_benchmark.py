@@ -21,15 +21,15 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
-import datetime
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
@@ -94,6 +94,8 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   if redis_server.REDIS_SIMULATE_AOF.value:
     config['vm_groups']['servers']['disk_spec']['GCP']['disk_type'] = 'local'
     config['vm_groups']['servers']['vm_spec']['GCP']['num_local_ssds'] = 8
+    # To auto mount scratch disks (/scratch0, /scratch1, ...etc)
+    config['vm_groups']['servers']['disk_count'] = 7
     FLAGS.num_striped_disks = 7
     FLAGS.gce_ssd_interface = 'NVME'
   else:
@@ -115,6 +117,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
                       client_vms + [server_vm])
 
   if redis_server.REDIS_SIMULATE_AOF.value:
+    server_vm.Install('mdadm')
     server_vm.RemoteCommand(
         'yes | sudo mdadm --create /dev/md1 --level=stripe --force --raid-devices=1 /dev/nvme0n8'
         )
@@ -129,10 +132,11 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
     for disk in server_vm.scratch_disks:
       cmd = ('sudo fio --name=global --direct=1 --ioengine=libaio --numjobs=1 '
              '--refill_buffers --scramble_buffers=1 --allow_mounted_write=1 '
-             '--blocksize=128k --rw=write --iodepth=64 --size=100% '
-             f'--name=wipc --filename={disk.device_path}')
+             '--blocksize=128k --rw=write --iodepth=64 '
+             f'--size={disk.disk_size}G --name=wipc '
+             f'--filename={disk.mount_point}/fio_data &> /dev/null &')
       logging.info('Start filling %s. This may take up to 30min...',
-                   disk.device_path)
+                   disk.mount_point)
       server_vm.RemoteCommand(cmd)
 
   # Install redis on the 1st machine.
@@ -140,20 +144,22 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   redis_server.Start(server_vm)
 
   # Load the redis server with preexisting data.
-  for port in redis_server.GetRedisPorts():
-    memtier.Load(server_vm, 'localhost', str(port))
+  vm_util.RunThreaded(
+      lambda port: memtier.Load(server_vm, 'localhost', str(port)),
+      redis_server.GetRedisPorts(), 10)
 
   bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
-  vm_util.SetupSimulatedMaintenance(server_vm)
 
 
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   """Run memtier_benchmark against Redis."""
   client_vms = bm_spec.vm_groups['clients']
-  # Don't reference vm_groups['server'] directly, because this is reused by
-  # kubernetes_redis_memtier_benchmark, which doesn't have one.
-  measure_cpu_on_server_vm = (
-      REDIS_MEMTIER_MEASURE_CPU.value and 'servers' in bm_spec.vm_groups)
+  # IMPORTANT: Don't reference vm_groups['servers'] directly, because this is
+  # reused by kubernetes_redis_memtier_benchmark, which doesn't define it.
+  server_vm: Optional[virtual_machine.BaseVirtualMachine] = None
+  if 'servers' in bm_spec.vm_groups:
+    server_vm = bm_spec.vm_groups['servers'][0]
+  measure_cpu_on_server_vm = server_vm and REDIS_MEMTIER_MEASURE_CPU.value
 
   ports = [str(port) for port in redis_server.GetRedisPorts()]
   def DistributeClientsToPorts(port):
@@ -164,18 +170,7 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
 
   benchmark_metadata = {}
 
-  # if testing performance due to a live migration, simulate live migration.
-  # actual live migration timestamps is not reported by PKB.
-  if FLAGS.simulate_maintenance:
-    vm_util.StartSimulatedMaintenance()
-    simulate_maintenance_time = datetime.datetime.now() + datetime.timedelta(
-        seconds=FLAGS.simulate_maintenance_delay)
-    benchmark_metadata[
-        'simulate_maintenance_time'] = str(simulate_maintenance_time)
-    benchmark_metadata[
-        'simulate_maintenance_delay'] = FLAGS.simulate_maintenance_delay
   if measure_cpu_on_server_vm:
-    server_vm = bm_spec.vm_groups['servers'][0]
     top_cmd = f'top -b -d 1 -n {memtier.MEMTIER_RUN_DURATION.value} > {_TOP_OUTPUT} &'
     server_vm.RemoteCommand(
         f'echo "{top_cmd}" > {_TOP_SCRIPT}')
