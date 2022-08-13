@@ -392,19 +392,21 @@ def _GetChangesForMask(benchmark_spec, node_rank, script_path, nvprof_flags,
     config_sed.append(
         (r'BATCHSIZE=.*', fr'BATCHSIZE={FLAGS.mlperf_maskrcnn_batch_size}'))
 
-  run_and_time_sed += [(r' CMD=.*', r' CMD=( '
-                        r"'python' "
-                        r"'-u' "
-                        r"'-m' "
-                        r"'bind_launch' "
-                        f"'--nnodes={nnodes}' "
-                        f"'--node_rank={node_rank}' "
-                        f"'--master_addr={master_vm.internal_ip}' "
-                        f"'--master_port={PORT}' "
-                        f"'--nsockets_per_node={nsockets_per_node}' "
-                        f"'--ncores_per_socket={ncores_per_socket}' "
-                        f"'--nproc_per_node={nproc_per_node}' "
-                        ')')]
+  hyperthreads = '' if FLAGS.mlperf_hyperthreads else '--no_hyperthreads'
+  run_and_time_sed.append((r' CMD=.*', r' CMD=( '
+                           r"'python' "
+                           r"'-u' "
+                           r"'-m' "
+                           r"'bind_launch' "
+                           f"'{hyperthreads}' "
+                           f"'--nnodes={nnodes}' "
+                           f"'--node_rank={node_rank}' "
+                           f"'--master_addr={master_vm.internal_ip}' "
+                           f"'--master_port={PORT}' "
+                           f"'--nsockets_per_node={nsockets_per_node}' "
+                           f"'--ncores_per_socket={ncores_per_socket}' "
+                           f"'--nproc_per_node={nproc_per_node}' "
+                           ')'))
   if mlperf_benchmark.NVPROF in FLAGS.mlperf_profiler:
     run_and_time_sed += [(r'python', r'nvprof {nvprof_flags} python'
                           .format(nvprof_flags=nvprof_flags))]
@@ -553,19 +555,21 @@ def _GetChangesForBert(benchmark_spec, node_rank, nvprof_flags,
       f'cp training_results_v1.1/NVIDIA/benchmarks/bert/implementations/pytorch/bind_pyt.py training_results_{FLAGS.mlperf_training_version}/NVIDIA/benchmarks/bert/implementations/pytorch/'
   )
 
-  run_and_time_sed += [(r' CMD=.*', r' CMD=( '
-                        r"'python' "
-                        r"'-u' "
-                        r"'-m' "
-                        r"'bind_pyt' "
-                        f"'--nnodes={nnodes}' "
-                        f"'--node_rank={node_rank}' "
-                        f"'--master_addr={master_vm.internal_ip}' "
-                        f"'--master_port={PORT}' "
-                        f"'--nsockets_per_node={nsockets_per_node}' "
-                        f"'--ncores_per_socket={ncores_per_socket}' "
-                        f"'--nproc_per_node={nproc_per_node}' "
-                        ')')]
+  hyperthreads = '' if FLAGS.mlperf_hyperthreads else '--no_hyperthreads'
+  run_and_time_sed.append((r' CMD=.*', r' CMD=( '
+                           r"'python' "
+                           r"'-u' "
+                           r"'-m' "
+                           r"'bind_pyt' "
+                           f"'{hyperthreads}' "
+                           f"'--nnodes={nnodes}' "
+                           f"'--node_rank={node_rank}' "
+                           f"'--master_addr={master_vm.internal_ip}' "
+                           f"'--master_port={PORT}' "
+                           f"'--nsockets_per_node={nsockets_per_node}' "
+                           f"'--ncores_per_socket={ncores_per_socket}' "
+                           f"'--nproc_per_node={nproc_per_node}' "
+                           ')'))
 
   run_sed += [(r'.*run_and_time', r'.\/run_and_time')]
 
@@ -640,9 +644,12 @@ def _UpdateScripts(benchmark_spec, node_rank):
     run_sed += [(r'nvidia-docker run', fr'nvidia-docker run {device_args}')]
 
   if FLAGS.azure_infiniband:
-    run_sed += [
+    run_sed.append(
         (r'_cont_mounts=(',
-         r'_cont_mounts=(\"--volume=\/opt\/microsoft:\/opt\/microsoft\" ')]
+         r'_cont_mounts=(\"--volume=\/opt\/microsoft:\/opt\/microsoft\" '))
+    run_sed.append(
+        (r'^CONT_MOUNTS=\(.*\)$',
+         r'CONT_MOUNTS=\"\1 --volume=\/opt\/microsoft:\/opt\/microsoft\"'))
 
   nvprof_flags = r'-f -o \/results\/%h.%p.nvprof --profile-child-processes'
 
