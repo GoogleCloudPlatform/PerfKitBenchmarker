@@ -19,10 +19,15 @@ import time
 from typing import Any, Dict, List, NewType
 
 import numpy as np
+from perfkitbenchmarker import errors
 
 PERCENTILES_LIST = 0.1, 1, 5, 10, 50, 90, 95, 99, 99.9
 
 _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
+
+# Metric names for time series
+RAMP_UP_ENDS = 'ramp_up_ends'
+RAMP_DOWN_STARTS = 'ramp_down_starts'
 
 
 def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
@@ -217,3 +222,48 @@ def CreateHistogramSample(histogram: _Histogram[float, int],
   if additional_metadata:
     metadata.update(additional_metadata)
   return Sample(metric, 0, units, metadata)
+
+
+def CreateTimeSeriesSample(values: List[Any],
+                           timestamps: List[float],
+                           metric: str,
+                           units: str,
+                           interval: float,
+                           ramp_up_ends=None,
+                           ramp_down_starts=None,
+                           additional_metadata=None) -> Sample:
+  """Create time series samples.
+
+  Given  a list of values and the timestamp the values
+  created at create a time series samples. Each value correspond to the
+  timestamp that the value is collected. The size of the values and
+  timestamps have to be equal.
+
+  Args:
+    values: an value orderd based on time series
+    timestamps: an value orderd based on time series in Epoch micro timestamp
+    metric: name of time series samples
+    units: the units of measure of values
+    interval: interval of the metrics in seconds
+    ramp_up_ends: The timestamp when ramp up ends in Epoch micro timestamp
+    ramp_down_starts: The timestamp when ramp down starts in Epoch nano
+      timestamp
+    additional_metadata: any additional metadata to add
+
+  Returns:
+    sample: One sample object that reports the time series passed in.
+
+  """
+  if len(values) != len(timestamps):
+    raise errors.Error('Length of values is different to length of timestamps')
+  metadata = {'values': values, 'timestamps': timestamps, 'interval': interval}
+  if additional_metadata:
+    metadata.update(additional_metadata)
+
+  if ramp_up_ends:
+    metadata[RAMP_UP_ENDS] = ramp_up_ends
+
+  if ramp_down_starts:
+    metadata[RAMP_DOWN_STARTS] = ramp_down_starts
+  return Sample(metric, 0, units, metadata)
+
