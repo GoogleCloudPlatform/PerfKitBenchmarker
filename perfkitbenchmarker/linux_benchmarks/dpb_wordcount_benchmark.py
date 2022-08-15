@@ -178,7 +178,8 @@ def Run(benchmark_spec):
 
   # TODO(odiego): Refactor to avoid explicit service type checks.
   if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
-    avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(start_time, end_time)
+    avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(
+        start_time, end_time)
     results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))
 
     stats = dpb_service_instance.job_stats
