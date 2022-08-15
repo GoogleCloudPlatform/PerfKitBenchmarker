@@ -283,7 +283,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       type distribution. The dictionary contains keys such as
       count/max/mean/min/sum.
     """
-    if type not in (METRIC_TYPE_COUNTER, METRIC_TYPE_DISTRIBUTION):
+    if metric_type not in (METRIC_TYPE_COUNTER, METRIC_TYPE_DISTRIBUTION):
       raise ValueError(
           f'Invalid type provided to GetMetricValue(): {metric_type}')
 
