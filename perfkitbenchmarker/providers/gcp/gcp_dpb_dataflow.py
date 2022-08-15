@@ -179,11 +179,11 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     _, stderr, _ = vm_util.IssueCommand(cmd, timeout=FLAGS.dpb_dataflow_timeout)
 
     # Parse output to retrieve submitted job ID
-    match = re.search('Submitted job: (.\S*)', stderr)
+    match = re.search(r'Submitted job: (.\S*)', stderr)
     if not match:
       logging.warn('Dataflow output in unexpected format. Failed to parse Dataflow job ID.')
       return
-    
+
     self.job_id = match.group(1)
     logging.info('Dataflow job ID: %s', self.job_id)
 
@@ -224,7 +224,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     else:
       cost += total_vcpu_time * VCPU_PER_HR_STREAMING
       cost += total_mem_usage * MEM_PER_GB_HR_STREAMING
-    
+
     cost += total_pd_usage * PD_PER_GB_HR
     # TODO(rarsan): Add cost related to per-GB data processed by Dataflow Shuffle
     # (for batch) or Streaming Engine (for streaming) when applicable
@@ -238,7 +238,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # Raise exception if job id not available
     if self.job_id is None:
       raise Exception('Unable to pull job metrics. Job ID not available')
-    
+
     cmd = util.GcloudCommand(self, 'dataflow', 'metrics',
                             'list', self.job_id)
     cmd.use_alpha_gcloud = True
@@ -267,18 +267,18 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   def GetMetricValue(self, name, type=METRIC_TYPE_COUNTER):
     """Get value of a job's metric.
-    
+
     Returns:
       Integer if metric is of type counter
-      Dictionary if metric is of type distribution. Dictionary 
+      Dictionary if metric is of type distribution. Dictionary
       contains keys such as count/max/mean/min/sum
     """
     if type not in (METRIC_TYPE_COUNTER, METRIC_TYPE_DISTRIBUTION):
       raise ValueError(f'Invalid type provided to GetMetricValue(): {type}')
-    
+
     if self.job_metrics is None:
       self._PullJobMetrics()
-    
+
     return self.job_metrics[type][name]
 
   def GetAvgCpuUtilization(self, start_time: datetime, end_time: datetime):
@@ -293,7 +293,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     """
     client = monitoring_v3.MetricServiceClient()
     project_name = f'projects/{self.project}'
-    
+
     now_seconds = int(time.time())
     start_time_seconds = int(start_time.timestamp())
     end_time_seconds = int(end_time.timestamp())
@@ -362,5 +362,5 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       if time_series.unit == "10^2.%":
         averaged = round(averaged * 100, 2)
       return averaged
-    
+
     return None
