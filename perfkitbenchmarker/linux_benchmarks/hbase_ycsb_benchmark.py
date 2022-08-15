@@ -133,7 +133,7 @@ def CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
                              'limit_filesize': limit_filesize,
                              'n_splits': n_splits,
                              'use_snappy': use_snappy})
-  # TODO(connormccoy): on HBase update, add '-n' flag.
+  # TODO(user): on HBase update, add '-n' flag.
   command = "{0}/hbase shell {1}".format(hbase.HBASE_BIN, remote)
   vm.RemoteCommand(command, should_log=True)
 

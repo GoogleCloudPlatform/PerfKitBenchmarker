@@ -349,7 +349,7 @@ class AwsRelationalDb(relational_db.BaseRelationalDb):
 
       if self.spec.db_disk_spec.disk_type == aws_disk.IO1:
         cmd.append('--iops=%s' % self.spec.db_disk_spec.iops)
-      # TODO(ferneyhough): add backup_enabled and backup_window
+      # TODO(user): add backup_enabled and backup_window
 
       vm_util.IssueCommand(cmd)
 

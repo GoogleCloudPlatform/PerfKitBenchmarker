@@ -35,7 +35,7 @@ class PlotterTestCase(unittest.TestCase):
                       self.plotter.add_file, '')
 
   def testparse_file(self):
-    # TODO(samspano): Implement test that will raise PatternNotFoundError.
+    # TODO(user): Implement test that will raise PatternNotFoundError.
     path1 = os.path.join(
         os.path.dirname(__file__), TEST_FILE_1)
     with open(path1) as file1:

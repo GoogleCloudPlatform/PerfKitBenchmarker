@@ -101,7 +101,7 @@ class TestBackgroundNetworkWorkload(pkb_common_test_case.PkbCommonTestCase):
 
   def _CheckVmCallCounts(self, spec, working_groups, working_expected_counts,
                          non_working_groups, non_working_expected_counts):
-    # TODO(skschneider): This is also used in TestBackgroundNetworkWorkload.
+    # TODO(user): This is also used in TestBackgroundNetworkWorkload.
     # Consider moving to a shared function or base class.
     expected_call_counts = {group: working_expected_counts
                             for group in working_groups}

@@ -244,7 +244,7 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCloudFlag(self):
     pass
 
-  # TODO(jerlawson): Rename flags 'managed_db_' -> 'db_'.
+  # TODO(user): Rename flags 'managed_db_' -> 'db_'.
   def testDatabaseFlag(self):
     FLAGS['managed_db_engine'].parse('postgres')
     result = benchmark_config_spec._RelationalDbSpec(

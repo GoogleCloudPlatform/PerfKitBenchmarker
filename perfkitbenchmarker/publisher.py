@@ -235,7 +235,7 @@ class DefaultMetadataProvider(MetadataProvider):
     if benchmark_spec.relational_db:
       db = benchmark_spec.relational_db
       for k, v in six.iteritems(db.GetResourceMetadata()):
-        # TODO(jerlawson): Rename to relational_db.
+        # TODO(user): Rename to relational_db.
         metadata['managed_relational_db_' + k] = v
 
     for name, tpu in six.iteritems(benchmark_spec.tpu_groups):

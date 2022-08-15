@@ -90,7 +90,7 @@ class WaitUntilSleepTimer(threading.Thread):
 
   It assumes that the test driver is not parallelizing the tests using
   this method since that may lead to inconsistent results.
-  TODO(klausw): If that's an issue, could add a unique fractional part
+  TODO(user): If that's an issue, could add a unique fractional part
   to the sleep command args to distinguish them.
   """
 

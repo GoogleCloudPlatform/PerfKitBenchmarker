@@ -29,7 +29,7 @@ FLAGS = flags.FLAGS
 class BeamBenchmarkHelperTestCase(unittest.TestCase):
 
   def setUp(self):
-    # TODO(ferneyhough): See exactly why this is needed and find a better way
+    # TODO(user): See exactly why this is needed and find a better way
     # to do this. Unittests in PKB should not have to add this call manually.
     FLAGS.mark_as_parsed()
     super(BeamBenchmarkHelperTestCase, self).setUp()

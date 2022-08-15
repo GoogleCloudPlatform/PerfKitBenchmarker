@@ -13,7 +13,7 @@
 # limitations under the License.
 """Background tasks that propagate PKB thread context.
 
-TODO(skschneider): Many of the threading module flaws have been corrected in
+TODO(user): Many of the threading module flaws have been corrected in
 Python 3. When PKB switches to Python 3, this module can be simplified.
 
 PKB tries its best to clean up provisioned resources upon SIGINT. By default,
@@ -338,7 +338,7 @@ def _ExecuteBackgroundThreadTasks(worker_id, task_queue, response_queue):
       task.Run()
       response_queue.Put((worker_id, task_id))
   except KeyboardInterrupt:
-    # TODO(skschneider): Detect when the log would be unhelpful (e.g. if the
+    # TODO(user): Detect when the log would be unhelpful (e.g. if the
     # current thread was spinning in the _THREAD_WAIT_FOR_KEYBOARD_INTERRUPT
     # sub-loop). Only log in helpful cases, like when the task is interrupted.
     logging.debug('Child thread %s received a KeyboardInterrupt from its '
@@ -412,7 +412,7 @@ def _ExecuteProcessTask(task):
   Executes a specified task function and returns the result or exception
   traceback.
 
-  TODO(skschneider): Rework this helper function when moving to Python 3.5 or
+  TODO(user): Rework this helper function when moving to Python 3.5 or
   when the backport of concurrent.futures.ProcessPoolExecutor is able to
   preserve original traceback.
 
@@ -439,7 +439,7 @@ def _ExecuteProcessTask(task):
 class _BackgroundProcessTaskManager(_BackgroundTaskManager):
   """Manages states for background tasks started in child processes.
 
-  TODO(skschneider): This class uses futures.ProcessPoolExecutor. We have been
+  TODO(user): This class uses futures.ProcessPoolExecutor. We have been
   using this executor since before issues regarding KeyboardInterrupt were
   fully explored. The only consumer of this class is RunParallelProcesses, and
   currently the uses for RunParallelProcesses are limited. In the future, this
@@ -550,7 +550,7 @@ def _RunParallelTasks(target_arg_tuples, max_concurrency, get_task_manager,
       raise
 
   if error_strings:
-    # TODO(skschneider): Combine errors.VmUtil.ThreadException and
+    # TODO(user): Combine errors.VmUtil.ThreadException and
     # errors.VmUtil.CalledProcessException so this can be a single exception
     # type.
     raise parallel_exception_class(

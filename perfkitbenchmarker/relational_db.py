@@ -187,7 +187,7 @@ def GetRelationalDbClass(cloud, is_managed_db, engine):
 
 
 def VmsToBoot(vm_groups):
-  # TODO(jerlawson): Enable replications.
+  # TODO(user): Enable replications.
   return {
       name: spec  # pylint: disable=g-complex-comprehension
       for name, spec in six.iteritems(vm_groups)

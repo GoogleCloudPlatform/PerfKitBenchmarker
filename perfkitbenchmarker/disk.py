@@ -540,7 +540,7 @@ class NetworkDisk(BaseDisk):
     pass
 
 
-# TODO(chriswilkes): adds to the disk.GetDiskSpecClass registry
+# TODO(user): adds to the disk.GetDiskSpecClass registry
 # that only has the cloud as the key.  Look into using (cloud, disk_type)
 # if causes problems
 class NfsDisk(NetworkDisk):

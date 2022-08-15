@@ -127,7 +127,7 @@ REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/bigtable.admin',
     'https://www.googleapis.com/auth/bigtable.data')
 
-# TODO(connormccoy): Make table parameters configurable.
+# TODO(user): Make table parameters configurable.
 COLUMN_FAMILY = 'cf'
 BENCHMARK_DATA = {
     METRICS_CORE_JAR:

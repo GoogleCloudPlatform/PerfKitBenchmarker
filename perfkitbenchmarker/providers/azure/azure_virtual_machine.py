@@ -1077,7 +1077,7 @@ def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
   module_name_with_underscores_removed = module_name.replace('_', '-')
   destpath = posixpath.join(install_path, filename)
   if install_path:
-    # TODO(ferneyhough): Refactor this so that this mkdir command
+    # TODO(user): Refactor this so that this mkdir command
     # is run on all clouds, and is os-agnostic (this is linux specific).
     mkdir_command = 'mkdir -p %s' % posixpath.dirname(destpath)
 

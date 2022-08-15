@@ -162,4 +162,4 @@ class Plotter(object):
                                         self.iterations)
     output_gnuplot_file, _ = p.create_file()
     subprocess.Popen(['gnuplot', output_gnuplot_file])
-    # TODO(samspano): Implement copy command to copy output_chart
+    # TODO(user): Implement copy command to copy output_chart

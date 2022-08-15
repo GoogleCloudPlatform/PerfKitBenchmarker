@@ -99,7 +99,7 @@ class AwsEMR(spark_service.BaseSparkService):
 
   def __init__(self, spark_service_spec):
     super(AwsEMR, self).__init__(spark_service_spec)
-    # TODO(hildrum) use availability zone when appropriate
+    # TODO(user) use availability zone when appropriate
     worker_machine_type = self.spec.worker_group.vm_spec.machine_type
     leader_machine_type = self.spec.master_group.vm_spec.machine_type
     self.cmd_prefix = list(util.AWS_PREFIX)
