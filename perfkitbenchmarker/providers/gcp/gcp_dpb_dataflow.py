@@ -12,25 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing class for GCP's Dataflow service.
+
 Use this module for running Dataflow jobs from compiled jar files.
 
 No Clusters can be created or destroyed, since it is a managed solution
 See details at: https://cloud.google.com/dataflow/
 """
 
-from functools import cached_property
+import datetime
+import functools
+import json
+import logging
 import os
 import re
 import time
-import json
-import logging
-import datetime
 
 from absl import flags
 from google.cloud import monitoring_v3
-from google.cloud.monitoring_v3.types import TimeInterval
 from google.cloud.monitoring_v3.types import Aggregation
 from google.cloud.monitoring_v3.types import ListTimeSeriesResponse
+from google.cloud.monitoring_v3.types import TimeInterval
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -83,6 +84,7 @@ MEM_PER_GB_HR_BATCH = 0.003557
 MEM_PER_GB_HR_STREAMING = 0.0035557
 PD_PER_GB_HR = 0.000054
 PD_SSD_PER_GB_HR = 0.000298
+
 
 class GcpDpbDataflow(dpb_service.BaseDpbService):
   """Object representing GCP Dataflow Service."""
@@ -181,14 +183,13 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # Parse output to retrieve submitted job ID
     match = re.search(r'Submitted job: (.\S*)', stderr)
     if not match:
-      logging.warn('Dataflow output in unexpected format. Failed to parse Dataflow job ID.')
+      logging.warning(
+          'Dataflow output in unexpected format. Failed to parse Dataflow job '
+          'ID.')
       return
 
     self.job_id = match.group(1)
     logging.info('Dataflow job ID: %s', self.job_id)
-
-  def SetClusterProperty(self):
-    pass
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
@@ -198,40 +199,45 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data['dpb_job_id'] = self.job_id
     return basic_data
 
-  @cached_property
+  @functools.cached_property
   def job_stats(self):
     """Collect series of relevant performance and cost stats."""
     stats = {}
-    stats['total_vcpu_time'] = self.GetMetricValue('TotalVcpuTime')/3600         # vCPU-hr
-    stats['total_mem_usage'] = self.GetMetricValue('TotalMemoryUsage')/1024/3600 # GB-hr
-    stats['total_pd_usage'] = self.GetMetricValue('TotalPdUsage')/3600           # GB-hr
+    # vCPU-hr
+    stats['total_vcpu_time'] = self.GetMetricValue('TotalVcpuTime') / 3600
+    # GB-hr
+    stats['total_mem_usage'] = self.GetMetricValue(
+        'TotalMemoryUsage') / 1024 / 3600
+    # GB-hr
+    stats['total_pd_usage'] = self.GetMetricValue('TotalPdUsage') / 3600
     # TODO(rarsan): retrieve BillableShuffleDataProcessed
     # and/or BillableStreamingDataProcessed when applicable
     return stats
 
-  def CalculateCost(self, type=DATAFLOW_TYPE_BATCH):
-    if type not in (DATAFLOW_TYPE_BATCH, DATAFLOW_TYPE_STREAMING):
-      raise ValueError(f'Invalid type provided to CalculateCost(): {type}')
+  def CalculateCost(self, pricing_type=DATAFLOW_TYPE_BATCH):
+    if pricing_type not in (DATAFLOW_TYPE_BATCH, DATAFLOW_TYPE_STREAMING):
+      raise ValueError(
+          f'Invalid type provided to CalculateCost(): {pricing_type}')
 
     total_vcpu_time = self.job_stats['total_vcpu_time']
     total_mem_usage = self.job_stats['total_mem_usage']
     total_pd_usage = self.job_stats['total_pd_usage']
 
     cost = 0
-    if type == DATAFLOW_TYPE_BATCH:
-      cost +=  total_vcpu_time * VCPU_PER_HR_BATCH
-      cost +=  total_mem_usage * MEM_PER_GB_HR_BATCH
+    if pricing_type == DATAFLOW_TYPE_BATCH:
+      cost += total_vcpu_time * VCPU_PER_HR_BATCH
+      cost += total_mem_usage * MEM_PER_GB_HR_BATCH
     else:
       cost += total_vcpu_time * VCPU_PER_HR_STREAMING
       cost += total_mem_usage * MEM_PER_GB_HR_STREAMING
 
     cost += total_pd_usage * PD_PER_GB_HR
-    # TODO(rarsan): Add cost related to per-GB data processed by Dataflow Shuffle
-    # (for batch) or Streaming Engine (for streaming) when applicable
+    # TODO(rarsan): Add cost related to per-GB data processed by Dataflow
+    #  Shuffle (for batch) or Streaming Engine (for streaming) when applicable
     return cost
 
   def _PullJobMetrics(self, force_refresh=False):
-    """Retrieve and cache all job metrics from Dataflow API"""
+    """Retrieve and cache all job metrics from Dataflow API."""
     # Skip if job metrics is already populated unless force_refresh is True
     if self.job_metrics is not None and not force_refresh:
       return
@@ -240,7 +246,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       raise Exception('Unable to pull job metrics. Job ID not available')
 
     cmd = util.GcloudCommand(self, 'dataflow', 'metrics',
-                            'list', self.job_id)
+                             'list', self.job_id)
     cmd.use_alpha_gcloud = True
     cmd.flags = {
         'project': self.project,
@@ -258,28 +264,33 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       elif 'distribution' in metric:
         distributions[metric['name']['name']] = metric['distribution']
       else:
-        logging.warn(f'Unfamiliar metric type found: {metric}')
+        logging.warning('Unfamiliar metric type found: %s', metric)
 
     self.job_metrics = {
-      METRIC_TYPE_COUNTER: counters,
-      METRIC_TYPE_DISTRIBUTION: distributions
+        METRIC_TYPE_COUNTER: counters,
+        METRIC_TYPE_DISTRIBUTION: distributions,
     }
 
-  def GetMetricValue(self, name, type=METRIC_TYPE_COUNTER):
+  def GetMetricValue(self, name, metric_type=METRIC_TYPE_COUNTER):
     """Get value of a job's metric.
 
+    Args:
+      name: The name of the metric.
+      metric_type: Either METRIC_TYPE_COUNTER or METRIC_TYPE_DISTRIBUTION.
+
     Returns:
-      Integer if metric is of type counter
-      Dictionary if metric is of type distribution. Dictionary
-      contains keys such as count/max/mean/min/sum
+      An int if metric is of type counter or a dict if metric is of
+      type distribution. The dictionary contains keys such as
+      count/max/mean/min/sum.
     """
     if type not in (METRIC_TYPE_COUNTER, METRIC_TYPE_DISTRIBUTION):
-      raise ValueError(f'Invalid type provided to GetMetricValue(): {type}')
+      raise ValueError(
+          f'Invalid type provided to GetMetricValue(): {metric_type}')
 
     if self.job_metrics is None:
       self._PullJobMetrics()
 
-    return self.job_metrics[type][name]
+    return self.job_metrics[metric_type][name]
 
   def GetAvgCpuUtilization(self, start_time: datetime, end_time: datetime):
     """Get average cpu utilization across all pipeline workers.
@@ -299,7 +310,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     end_time_seconds = int(end_time.timestamp())
     # Cpu metrics data can take up to 240 seconds to appear
     if (now_seconds - end_time_seconds) < CPU_API_DELAY_SECONDS:
-      logging.info('Waiting for CPU metrics to be available (up to 4 minutes)...')
+      logging.info(
+          'Waiting for CPU metrics to be available (up to 4 minutes)...')
       time.sleep(CPU_API_DELAY_SECONDS - (now_seconds - end_time_seconds))
 
     interval = TimeInterval(
@@ -310,10 +322,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     )
 
     api_filter = (
-      'metric.type = "compute.googleapis.com/instance/cpu/utilization" '
-      f'AND resource.labels.project_id = "{self.project}" '
-      f'AND metadata.user_labels.dataflow_job_id = "{self.job_id}" '
-    )
+        'metric.type = "compute.googleapis.com/instance/cpu/utilization" '
+        f'AND resource.labels.project_id = "{self.project}" '
+        f'AND metadata.user_labels.dataflow_job_id = "{self.job_id}" ')
 
     aggregation = Aggregation(
         {
@@ -325,17 +336,18 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     )
 
     results = client.list_time_series(
-      request={
-        'name': project_name,
-        'filter': api_filter,
-        'interval': interval,
-        'view': monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
-        'aggregation': aggregation,
-      }
+        request={
+            'name': project_name,
+            'filter': api_filter,
+            'interval': interval,
+            'view': monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
+            'aggregation': aggregation,
+        }
     )
 
     if not results:
-      logging.warn('No monitoring data found. Unable to calculate avg CPU utilization.')
+      logging.warning(
+          'No monitoring data found. Unable to calculate avg CPU utilization.')
       return None
 
     return self._GetAvgValueFromTimeSeries(results)
@@ -344,7 +356,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     """Parses time series data and returns average across intervals.
 
     Args:
-      time_series: time series of cpu fractional utilization returned by monitoring.
+      time_series: time series of cpu fractional utilization returned by
+        monitoring.
 
     Returns:
       Average value across intervals
@@ -357,9 +370,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if points:
       # Average over all minute intervals captured
       averaged = sum(points) / len(points)
-      # If metric unit is a fractional number between 0 and 1 (e.g. CPU utilization metric)
-      # multiply by 100 to display a percentage usage.
-      if time_series.unit == "10^2.%":
+      # If metric unit is a fractional number between 0 and 1 (e.g. CPU
+      # utilization metric) multiply by 100 to display a percentage usage.
+      if time_series.unit == '10^2.%':
         averaged = round(averaged * 100, 2)
       return averaged
 
