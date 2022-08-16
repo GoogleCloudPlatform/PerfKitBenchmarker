@@ -27,6 +27,7 @@ import string
 import threading
 
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -440,7 +441,16 @@ class AwsDisk(disk.BaseDisk):
       create_cmd.append('--iops=%s' % self.iops)
     if self.disk_type == GP3 and self.throughput:
       create_cmd.append('--throughput=%s' % self.throughput)
-    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+
+    try:
+      stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    except errors.VmUtil.IssueCommandError as error:
+      error_message = str(error)
+      is_quota_error = 'MaxIOPSLimitExceeded' in error_message
+      if is_quota_error:
+        raise errors.Benchmarks.QuotaFailure(error_message)
+      raise error
+
     response = json.loads(stdout)
     self.id = response['VolumeId']
     util.AddDefaultTags(self.id, self.region)

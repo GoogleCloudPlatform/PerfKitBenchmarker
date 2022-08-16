@@ -272,7 +272,14 @@ rwmixread={{scenario['rwmixread']}}
 {%- if scenario['rwmixwrite'] is defined %}
 rwmixwrite={{scenario['rwmixwrite']}}
 {%- endif%}
+{%- if scenario['fsync'] is defined %}
+fsync={{scenario['fsync']}}
+{%- endif%}
+{%- if scenario['blocksize'] is defined %}
 blocksize={{scenario['blocksize']}}
+{%- elif scenario['bssplit'] is defined %}
+bssplit={{scenario['bssplit']}}
+{%- endif%}
 iodepth={{iodepth}}
 size={{scenario['size']}}
 numjobs={{numjob}}
@@ -321,8 +328,30 @@ MAP_ACCESS_OP_TO_RWKIND = {
 # fields explicitly and needs to be updated
 FIO_KNOWN_FIELDS_IN_JINJA = [
     'rwmixread',
-    'rwmixwrite'
+    'rwmixwrite',
+    'fsync',
 ]
+
+
+def _IsBlockSizeASplitSpecification(blocksize_str: str) -> bool:
+  """determines if a blocksize_str looks like a bssplit parameter.
+
+  an example parameter would be:
+
+  format is blocksize/percent:blocksize/percent:...blocksize/percent
+
+  e.g.
+  8k/28:12k/23:4k/23:16k/7:20k/2:32k/17
+
+  This is just a heuristic.
+
+  Args:
+    blocksize_str:  either a blocksize (like 4k) or a bssplit parameter
+
+  Returns:
+    True if this is split specification, false if a single block size.
+  """
+  return ':' in blocksize_str
 
 
 def GetScenarioFromScenarioString(scenario_string):
@@ -366,11 +395,15 @@ def GetScenarioFromScenarioString(scenario_string):
 
   # required fields of JOB_FILE_TEMPLATE
   result = {
-      'name': scenario_string,
+      'name': scenario_string.replace(',', '__'),
       'rwkind': rwkind,
-      'blocksize': blocksize_str,
       'size': workingset_str
     }
+
+  if _IsBlockSizeASplitSpecification(blocksize_str):
+    result['bssplit'] = blocksize_str
+  else:
+    result['blocksize'] = blocksize_str
 
   # The first four fields are well defined - after that, we use
   # key value pairs to encode any extra fields we need
@@ -417,7 +450,7 @@ def GenerateJobFileString(filename, scenario_strings,
   if 'all' in scenario_strings and FLAGS.fio_use_default_scenarios:
     scenarios = six.itervalues(SCENARIOS)
   else:
-    scenarios = [GetScenarioFromScenarioString(scenario_string)
+    scenarios = [GetScenarioFromScenarioString(scenario_string.strip('"'))
                  for scenario_string in scenario_strings]
 
   default_size_string = (str(working_set_size) + 'G'
