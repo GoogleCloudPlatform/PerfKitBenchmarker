@@ -67,10 +67,14 @@ class AwsElasticIP(resource.BaseResource):
         'describe-addresses',
         '--region', self.region,
         '--allocation-ids', self.allocation_id]
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
+    stdout, stderr, return_code = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
+
+    if return_code == 255:
+      return False
+
+    print(stdout)  
     response = json.loads(stdout)
-    addresses = response['Addresses']
-    return len(addresses) > 0
+    return len(response['Addresses']) > 0
 
   def AssociateAddress(self, attached_resource_id, is_network_interface=False):
     """Associates elastic IP with an EC2 instance in a VPC"""

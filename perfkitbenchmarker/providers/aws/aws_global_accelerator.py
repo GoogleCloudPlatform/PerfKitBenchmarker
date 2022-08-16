@@ -74,6 +74,8 @@ class AwsGlobalAccelerator(resource.BaseResource):
     # need to disable accelerator before it can be deleted
     self.Update(enabled=False)
     status = self.Describe()
+    print("ACCELERATOR STATUS")
+    print(status)
     while status['Accelerator']['Enabled'] == True:
       status = self.Describe()
 
@@ -88,7 +90,7 @@ class AwsGlobalAccelerator(resource.BaseResource):
         '--accelerator-arn', self.accelerator_arn]
     stdout, stderr, _ = vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
     print("ACCELERATOR DELETE STDOUT")
-    print(output)
+    print(stdout)
     exists = self._Exists()
     while exists:
       stdout, stderr, _ = vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
@@ -223,9 +225,16 @@ class AwsGlobalAcceleratorListener(resource.BaseResource):
     stdout, stderr, return_code = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
     print("LISTENER DESCRIBE STDOUT")
     print(stdout)
+    
+    if return_code == 255:
+      return False
+
     response = json.loads(stdout)
-    accelerator = response['Listener']
-    return len(accelerator) > 0
+
+    if 'Listener' in response:
+      return True
+
+
 
   def _Delete(self):
     """Deletes Listeners"""
@@ -326,11 +335,9 @@ class AwsEndpointGroup(resource.BaseResource):
     if return_code == 255:
       return False
 
-    try:
-      response = json.loads(stdout)
+    response = json.loads(stdout)
 
-      if response['EndpointGroup']:
-        return True
-    
-    except:
-      return False
+    if 'EndpointGroup' in response:
+      return True
+  
+    return False
