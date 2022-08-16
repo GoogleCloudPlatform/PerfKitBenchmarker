@@ -56,27 +56,6 @@ class AwsGlobalAcceleratorTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.global_accelerator.accelerator_arn, 
       'arn:aws:globalaccelerator::320929487545:accelerator/4e183541-0a46-4d7d-ad51-6a214fde8841')
 
-  # def testDelete(self):
-  #   self.mock_command.return_value = (None, '', None)
-  #   expected_output = [
-  #       'aws', 'elasticache', 'delete-replication-group', '--region',
-  #       'us-east-1', '--replication-group-id', 'pkb-run12345'
-  #   ]
-  #   self.redis._Delete()
-  #   self.mock_command.assert_called_once_with(
-  #       expected_output, raise_on_failure=False)
-
-  # def testExistTrue(self):
-  #   self.mock_command.return_value = (None, '', None)
-  #   expected_output = [
-  #       'aws', 'elasticache', 'describe-replication-groups', '--region',
-  #       'us-east-1', '--replication-group-id', 'pkb-run12345'
-  #   ]
-  #   self.redis._Exists()
-  #   self.mock_command.assert_called_once_with(
-  #       expected_output, raise_on_failure=False)
-
-
 class AwsGlobalAcceleratorListenerTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
@@ -133,19 +112,19 @@ class AwsEndpointGroupTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
       self.endpoint_group.endpoint_group_arn,
       'arn:aws:globalaccelerator::320929487545:accelerator/4e183541-0a46-4d7d-ad51-6a214fde8841/listener/9b984339/endpoint-group/667ed7678002')
-+
+
   @mock.patch.object(vm_util, 'IssueCommand')
   def testExists(self, mock_cmd):
-    endpoint_group_exists_output = _ReadTestDataFile('aws-endpoint-group-exists-output.json')
+    endpoint_group_exists_output = _ReadTestDataFile('aws-describe-endpoint-group-output.json')
     mock_cmd.side_effect = [(endpoint_group_exists_output, '', 0)]
     response = self.endpoint_group._Exists()
-    self.assertEqual(reponse,True)
+    self.assertEqual(response,True)
 
   @mock.patch.object(vm_util, 'IssueCommand')
   def testNotExists(self, mock_cmd):
     mock_cmd.side_effect = [('', '', 255)]
     response = self.endpoint_group._Exists()
-    self.assertEqual(reponse,False)
+    self.assertEqual(response,False)
 
 
 if __name__ == '__main__':

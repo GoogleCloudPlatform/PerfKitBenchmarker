@@ -109,12 +109,7 @@ class AwsGlobalAccelerator(resource.BaseResource):
       update_cmd += ['--enabled']
     else:
       update_cmd += ['--no-enabled']
-    stdout, _ = util.IssueRetryableCommand(update_cmd)
-    print("ACCELERATOR UPDATE STDOUT")
-    print(stdout)
-    response = json.loads(stdout)
-    accelerator = response['Accelerator']
-    # assert accelerator['Enabled'] == enabled, 'Accelerator not updated'
+    util.IssueRetryableCommand(update_cmd)
 
   def _Exists(self):
     """Returns true if the accelerator exists."""
@@ -190,7 +185,7 @@ class AwsGlobalAcceleratorListener(resource.BaseResource):
     self.protocol = protocol
     self.region = accelerator.region
     self.idempotency_token = None
-    self.arn = None
+    self.listener_arn = None
     self.endpoint_groups = []
 
   def _Create(self):
@@ -228,13 +223,9 @@ class AwsGlobalAcceleratorListener(resource.BaseResource):
     
     if return_code == 255:
       return False
-
     response = json.loads(stdout)
-
     if 'Listener' in response:
       return True
-
-
 
   def _Delete(self):
     """Deletes Listeners"""
