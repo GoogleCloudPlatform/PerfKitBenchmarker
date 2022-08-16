@@ -49,6 +49,7 @@ class ResourceTypes:
   SNAPSHOT = 'snapshot'
   DISK = 'disk'
   SECURITYGROUP = 'securitygroup'
+  KEYPAIR = 'keypair'
   VPC = 'VPC'
   VSWITCH = 'VSWITCH'
   ROUTETABLE = 'ROUTETABLE'

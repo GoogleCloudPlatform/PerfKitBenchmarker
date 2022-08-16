@@ -247,6 +247,12 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       util.AddTags(disk_id, util.ResourceTypes.DISK, self.region, **tags)
       util.AddDefaultTags(disk_id, util.ResourceTypes.DISK, self.region)
 
+    # Tag KeyPair
+    util.AddTags(self.key_pair_name, util.ResourceTypes.KEYPAIR, self.region,
+                 **tags)
+    util.AddDefaultTags(self.key_pair_name, util.ResourceTypes.KEYPAIR,
+                        self.region)
+
   def _CreateDependencies(self):
     """Create VM dependencies."""
     self.key_pair_name = AliCloudKeyFileManager.ImportKeyfile(self.region)
