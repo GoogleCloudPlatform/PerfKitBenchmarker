@@ -61,6 +61,8 @@ class AwsGlobalAccelerator(resource.BaseResource):
         '--region', self.region,
         '--idempotency-token', self.idempotency_token]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    print("ACCELERATOR CREATE STDOUT")
+    print(stdout)
     response = json.loads(stdout)
     self.accelerator_arn = response['Accelerator']['AcceleratorArn']
     self.ip_addresses = response['Accelerator']['IpSets'][0]['IpAddresses']
@@ -84,8 +86,9 @@ class AwsGlobalAccelerator(resource.BaseResource):
         'delete-accelerator',
         '--region', self.region,
         '--accelerator-arn', self.accelerator_arn]
-    output = vm_util.IssueRetryableCommand(delete_cmd)
-
+    stdout, stderr, _ = vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
+    print("ACCELERATOR DELETE STDOUT")
+    print(output)
     exists = self._Exists()
     while exists:
       stdout, stderr, _ = vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
@@ -105,6 +108,8 @@ class AwsGlobalAccelerator(resource.BaseResource):
     else:
       update_cmd += ['--no-enabled']
     stdout, _ = util.IssueRetryableCommand(update_cmd)
+    print("ACCELERATOR UPDATE STDOUT")
+    print(stdout)
     response = json.loads(stdout)
     accelerator = response['Accelerator']
     # assert accelerator['Enabled'] == enabled, 'Accelerator not updated'
@@ -118,6 +123,8 @@ class AwsGlobalAccelerator(resource.BaseResource):
         '--accelerator-arn', self.accelerator_arn]
     try:
       stdout, _, _ = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
+      print("ACCELERATOR EXISTS STDOUT")
+      print(stdout)
       response = json.loads(stdout)
       accelerator = response['Accelerator']
       return len(accelerator) > 0
@@ -199,6 +206,8 @@ class AwsGlobalAcceleratorListener(resource.BaseResource):
         '--idempotency-token', self.idempotency_token
     ]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    print("LISTENER CREATE STDOUT")
+    print(stdout)
     response = json.loads(stdout)
     self.listener_arn = response['Listener']['ListenerArn']
     logging.info("LISTENER ARN")
@@ -211,7 +220,9 @@ class AwsGlobalAcceleratorListener(resource.BaseResource):
         'describe-listener',
         '--region', self.region,
         '--listener-arn', self.listener_arn]
-    stdout, stderr = util.IssueRetryableCommand(describe_cmd)
+    stdout, stderr, return_code = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
+    print("LISTENER DESCRIBE STDOUT")
+    print(stdout)
     response = json.loads(stdout)
     accelerator = response['Listener']
     return len(accelerator) > 0
@@ -265,6 +276,8 @@ class AwsEndpointGroup(resource.BaseResource):
         '--region', self.region,
         '--idempotency-token', self.idempotency_token]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    print("ENDPOINT GROUP CREATE STDOUT")
+    print(stdout)
     response = json.loads(stdout)
     self.endpoint_group_arn = response['EndpointGroup']['EndpointGroupArn']
 
@@ -276,14 +289,16 @@ class AwsEndpointGroup(resource.BaseResource):
                       string.ascii_uppercase +  
                       string.digits) for i in range(50))
 
-    create_cmd = util.AWS_PREFIX + [
+    update_cmd = util.AWS_PREFIX + [
         'globalaccelerator',
         'update-endpoint-group',
         '--region', self.region,
         '--endpoint-group-arn', self.endpoint_group_arn,
         '--endpoint-configurations', 
         'EndpointId=%s,Weight=%s' % (endpoint, str(weight))]
-    stdout, _, _ = vm_util.IssueCommand(create_cmd)
+    stdout, _, _ = vm_util.IssueCommand(update_cmd)
+    print("ENDPOINT GROUP UPDATE STDOUT")
+    print(stdout)
 
   def _Delete(self):
     """Deletes the endpoint group."""
@@ -303,9 +318,19 @@ class AwsEndpointGroup(resource.BaseResource):
         '--endpoint-group-arn', self.endpoint_group_arn]
     stdout, stderr, return_code = vm_util.IssueCommand(describe_cmd, 
                                                        raise_on_failure=False)
-    response = json.loads(stdout)
 
-    if response['EndpointGroup']:
-      return True
-    elif return_code == 255:
+    print("ENDPOINT GROUP EXISTS STDOUT/ERR")
+    print(stdout)
+    print(stderr)
+
+    if return_code == 255:
+      return False
+
+    try:
+      response = json.loads(stdout)
+
+      if response['EndpointGroup']:
+        return True
+    
+    except:
       return False

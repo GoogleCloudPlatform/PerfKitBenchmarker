@@ -133,7 +133,7 @@ class AwsEndpointGroupTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
       self.endpoint_group.endpoint_group_arn,
       'arn:aws:globalaccelerator::320929487545:accelerator/4e183541-0a46-4d7d-ad51-6a214fde8841/listener/9b984339/endpoint-group/667ed7678002')
-
++
   @mock.patch.object(vm_util, 'IssueCommand')
   def testExists(self, mock_cmd):
     endpoint_group_exists_output = _ReadTestDataFile('aws-endpoint-group-exists-output.json')
