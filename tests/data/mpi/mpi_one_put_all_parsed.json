@@ -1,0 +1,31 @@
+[
+    {
+        "benchmark": "One_put_all",
+        "data": [
+            {
+                "bytes": 0,
+                "repetitions": 10,
+                "data": {
+                    "time_avg": 0.1,
+                    "throughput": 0.0
+                },
+                "is_error": false,
+                "histogram": null
+            },
+            {
+                "bytes": 1,
+                "repetitions": 10,
+                "data": {
+                    "time_avg": 10.01,
+                    "throughput": 0.1
+                },
+                "is_error": false,
+                "histogram": null
+            }
+        ],
+        "groups": null,
+        "processes_per_group": 2,
+        "mode": null,
+        "group_layout": null
+    }
+]

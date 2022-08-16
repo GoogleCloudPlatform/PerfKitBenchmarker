@@ -1,0 +1,41 @@
+#------------------------------------------------------------
+#    Intel(R) MPI Benchmarks 2019 Update 6, MPI-1 part
+#------------------------------------------------------------
+# Date                  : Sun Aug 30 22:14:36 2020
+# Machine               : x86_64
+# System                : Linux
+# Release               : 4.15.0-1080-gcp
+# Version               : #90~16.04.1-Ubuntu SMP Fri Jul 10 19:11:10 UTC 2020
+# MPI Version           : 3.1
+# MPI Thread Environment:
+
+
+# Calling sequence was:
+
+# mpi-benchmarks/IMB-MPI1 -msglog 10:11 -multi 0 -time 60 -off_cache -1 -iter 100000 -iter_policy off -zero_size off reduce
+
+# Minimum message length in bytes:   1024
+# Maximum message length in bytes:   2048
+#
+# MPI_Datatype                   :   MPI_BYTE
+# MPI_Datatype for reductions    :   MPI_FLOAT
+# MPI_Op                         :   MPI_SUM
+#
+#
+
+# List of Benchmarks to run:
+
+# Reduce
+
+#----------------------------------------------------------------
+# Benchmarking Reduce
+# #processes = 2
+#----------------------------------------------------------------
+       #bytes #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]
+         1024       100000         5.24        15.30        10.27
+         2048       100000         7.70        20.51        14.11
+
+
+# All processes entering MPI_Finalize
+
+

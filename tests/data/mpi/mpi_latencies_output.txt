@@ -1,0 +1,42 @@
+#------------------------------------------------------------
+#    Intel(R) MPI Benchmarks 2019 Update 6, MPI-1 part
+#------------------------------------------------------------
+# Date                  : Mon Jul  6 17:04:56 2020
+# Machine               : x86_64
+# System                : Linux
+# Release               : 5.3.0-1026-gcp
+# Version               : #28~18.04.1-Ubuntu SMP Sat Jun 6 00:09:26 UTC 2020
+# MPI Version           : 3.1
+# MPI Thread Environment:
+
+
+# Calling sequence was:
+
+# IMB-MPI1 pingpong -msglog 10:10 -multi 0 -show_tail yes -dumpfile /tmp/dump.txt -iter 1000000 -iter_policy off
+
+# Minimum message length in bytes:   0
+# Maximum message length in bytes:   1024
+#
+# MPI_Datatype                   :   MPI_BYTE
+# MPI_Datatype for reductions    :   MPI_FLOAT
+# MPI_Op                         :   MPI_SUM
+#
+#
+
+# List of Benchmarks to run:
+
+# PingPong
+
+#-----------------------------------------------------------------------------
+# Benchmarking PingPong
+# #processes = 2
+#-----------------------------------------------------------------------------
+       #bytes #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]   Mbytes/sec
+            0      1000000         1.17         1.17         1.17         0.00
+[ 0.83, 0.97, 0.98, 1.00, 1.02, 1.72, 1.75, 2.28, 3.12, 6.73, 50.00, 65.19 ]
+         1024      1000000         1.80         1.80         1.80       569.96
+[ 1.16, 1.27, 1.29, 1.81, 2.06, 2.17, 2.40, 3.46, 4.34, 10.27, 50.00, 215.10 ]
+
+
+# All processes entering MPI_Finalize
+

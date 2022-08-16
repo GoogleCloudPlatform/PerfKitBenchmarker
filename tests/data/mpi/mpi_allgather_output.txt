@@ -1,0 +1,324 @@
+#------------------------------------------------------------
+#    Intel(R) MPI Benchmarks 2019 Update 6, MPI-1 part
+#------------------------------------------------------------
+# Date                  : Sat Apr 10 00:55:13 2021
+# Machine               : x86_64
+# System                : Linux
+# Release               : 3.10.0-1160.15.2.el7.x86_64
+# Version               : #1 SMP Wed Feb 3 15:06:38 UTC 2021
+# MPI Version           : 3.1
+# MPI Thread Environment:
+
+
+# Calling sequence was:
+
+# mpi-benchmarks/IMB-MPI1 -msglog 9:9 -multi 0 -time 60 -off_cache -1 -iter 100000 -iter_policy off -zero_size off -show_tail yes -dumpfile /tmp/latency-Allgather-1dabaabb.txt Allgather
+
+# Minimum message length in bytes:   512
+# Maximum message length in bytes:   512
+#
+# MPI_Datatype                   :   MPI_BYTE
+# MPI_Datatype for reductions    :   MPI_FLOAT
+# MPI_Op                         :   MPI_SUM
+#
+#
+
+# List of Benchmarks to run:
+
+# Allgather
+
+#----------------------------------------------------------------
+# Benchmarking Multi-Allgather
+# ( 60 groups of 2 processes each running simultaneous )
+# Group  0:     0    1
+#
+# Group  1:     2    3
+#
+# Group  2:     4    5
+#
+# Group  3:     6    7
+#
+# Group  4:     8    9
+#
+# Group  5:    10   11
+#
+# Group  6:    12   13
+#
+# Group  7:    14   15
+#
+# Group  8:    16   17
+#
+# Group  9:    18   19
+#
+# Group  10:    20   21
+#
+# Group  11:    22   23
+#
+# Group  12:    24   25
+#
+# Group  13:    26   27
+#
+# Group  14:    28   29
+#
+# Group  15:    30   31
+#
+# Group  16:    32   33
+#
+# Group  17:    34   35
+#
+# Group  18:    36   37
+#
+# Group  19:    38   39
+#
+# Group  20:    40   41
+#
+# Group  21:    42   43
+#
+# Group  22:    44   45
+#
+# Group  23:    46   47
+#
+# Group  24:    48   49
+#
+# Group  25:    50   51
+#
+# Group  26:    52   53
+#
+# Group  27:    54   55
+#
+# Group  28:    56   57
+#
+# Group  29:    58   59
+#
+# Group  30:    60   61
+#
+# Group  31:    62   63
+#
+# Group  32:    64   65
+#
+# Group  33:    66   67
+#
+# Group  34:    68   69
+#
+# Group  35:    70   71
+#
+# Group  36:    72   73
+#
+# Group  37:    74   75
+#
+# Group  38:    76   77
+#
+# Group  39:    78   79
+#
+# Group  40:    80   81
+#
+# Group  41:    82   83
+#
+# Group  42:    84   85
+#
+# Group  43:    86   87
+#
+# Group  44:    88   89
+#
+# Group  45:    90   91
+#
+# Group  46:    92   93
+#
+# Group  47:    94   95
+#
+# Group  48:    96   97
+#
+# Group  49:    98   99
+#
+# Group  50:   100  101
+#
+# Group  51:   102  103
+#
+# Group  52:   104  105
+#
+# Group  53:   106  107
+#
+# Group  54:   108  109
+#
+# Group  55:   110  111
+#
+# Group  56:   112  113
+#
+# Group  57:   114  115
+#
+# Group  58:   116  117
+#
+# Group  59:   118  119
+#
+#----------------------------------------------------------------
+       #bytes #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]
+          512       100000        30.48        37.96        33.80
+[ 1.91, 21.93, 27.89, 33.14, 40.05, 47.92, 53.17, 67.00, 74.15, 108.00, 1500.00, 1789.09 ]
+
+#----------------------------------------------------------------
+# Benchmarking Multi-Allgather
+# ( 30 groups of 4 processes each running simultaneous )
+# Group  0:     0    1    2    3
+#
+# Group  1:     4    5    6    7
+#
+# Group  2:     8    9   10   11
+#
+# Group  3:    12   13   14   15
+#
+# Group  4:    16   17   18   19
+#
+# Group  5:    20   21   22   23
+#
+# Group  6:    24   25   26   27
+#
+# Group  7:    28   29   30   31
+#
+# Group  8:    32   33   34   35
+#
+# Group  9:    36   37   38   39
+#
+# Group  10:    40   41   42   43
+#
+# Group  11:    44   45   46   47
+#
+# Group  12:    48   49   50   51
+#
+# Group  13:    52   53   54   55
+#
+# Group  14:    56   57   58   59
+#
+# Group  15:    60   61   62   63
+#
+# Group  16:    64   65   66   67
+#
+# Group  17:    68   69   70   71
+#
+# Group  18:    72   73   74   75
+#
+# Group  19:    76   77   78   79
+#
+# Group  20:    80   81   82   83
+#
+# Group  21:    84   85   86   87
+#
+# Group  22:    88   89   90   91
+#
+# Group  23:    92   93   94   95
+#
+# Group  24:    96   97   98   99
+#
+# Group  25:   100  101  102  103
+#
+# Group  26:   104  105  106  107
+#
+# Group  27:   108  109  110  111
+#
+# Group  28:   112  113  114  115
+#
+# Group  29:   116  117  118  119
+#
+#----------------------------------------------------------------
+       #bytes #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]
+          512       100000        64.04        92.11        75.38
+[ 9.06, 43.87, 56.03, 72.96, 92.98, 113.96, 128.03, 157.12, 171.18, 253.20, 1500.00, 6736.99 ]
+
+#----------------------------------------------------------------
+# Benchmarking Multi-Allgather
+# ( 15 groups of 8 processes each running simultaneous )
+# Group  0:     0    1    2    3    4    5    6    7
+#
+# Group  1:     8    9   10   11   12   13   14   15
+#
+# Group  2:    16   17   18   19   20   21   22   23
+#
+# Group  3:    24   25   26   27   28   29   30   31
+#
+# Group  4:    32   33   34   35   36   37   38   39
+#
+# Group  5:    40   41   42   43   44   45   46   47
+#
+# Group  6:    48   49   50   51   52   53   54   55
+#
+# Group  7:    56   57   58   59   60   61   62   63
+#
+# Group  8:    64   65   66   67   68   69   70   71
+#
+# Group  9:    72   73   74   75   76   77   78   79
+#
+# Group  10:    80   81   82   83   84   85   86   87
+#
+# Group  11:    88   89   90   91   92   93   94   95
+#
+# Group  12:    96   97   98   99  100  101  102  103
+#
+# Group  13:   104  105  106  107  108  109  110  111
+#
+# Group  14:   112  113  114  115  116  117  118  119
+#
+#----------------------------------------------------------------
+       #bytes #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]
+          512       100000        69.61        97.04        82.71
+[ 14.07, 48.88, 63.90, 81.06, 101.09, 120.88, 133.99, 166.89, 189.07, 357.87, 1500.00, 7099.87 ]
+
+#----------------------------------------------------------------
+# Benchmarking Multi-Allgather
+# ( 7 groups of 16 processes each running simultaneous )
+# Group  0:     0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15
+#
+# Group  1:    16   17   18   19   20   21   22   23   24   25   26   27   28   29   30   31
+#
+# Group  2:    32   33   34   35   36   37   38   39   40   41   42   43   44   45   46   47
+#
+# Group  3:    48   49   50   51   52   53   54   55   56   57   58   59   60   61   62   63
+#
+# Group  4:    64   65   66   67   68   69   70   71   72   73   74   75   76   77   78   79
+#
+# Group  5:    80   81   82   83   84   85   86   87   88   89   90   91   92   93   94   95
+#
+# Group  6:    96   97   98   99  100  101  102  103  104  105  106  107  108  109  110  111
+#
+# ( 8 additional processes waiting in MPI_Barrier)
+#----------------------------------------------------------------
+       #bytes #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]
+          512       100000        77.43        93.56        84.53
+[ 15.97, 53.17, 67.00, 82.02, 97.99, 114.92, 128.03, 158.07, 179.05, 507.83, 1500.00, 7114.89 ]
+
+#----------------------------------------------------------------
+# Benchmarking Multi-Allgather
+# ( 3 groups of 32 processes each running simultaneous )
+# Group  0:     0    1    2    3    4    5    6    7    8    9   10   11   12   13   14   15
+#    16   17   18   19   20   21   22   23   24   25   26   27   28   29   30   31
+#
+# Group  1:    32   33   34   35   36   37   38   39   40   41   42   43   44   45   46   47
+#    48   49   50   51   52   53   54   55   56   57   58   59   60   61   62   63
+#
+# Group  2:    64   65   66   67   68   69   70   71   72   73   74   75   76   77   78   79
+#    80   81   82   83   84   85   86   87   88   89   90   91   92   93   94   95
+#
+# ( 24 additional processes waiting in MPI_Barrier)
+#----------------------------------------------------------------
+       #bytes #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]
+          512       100000        84.96        93.30        89.08
+[ 20.98, 56.98, 70.10, 86.07, 103.95, 123.02, 136.14, 174.05, 247.00, 1224.04, 1500.00, 11262.89 ]
+
+#----------------------------------------------------------------
+# Benchmarking Allgather
+# #processes = 64
+# ( 56 additional processes waiting in MPI_Barrier)
+#----------------------------------------------------------------
+       #bytes #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]
+          512       100000        89.38       135.46       113.14
+[ 70.81, 116.11, 120.16, 125.89, 133.99, 145.91, 154.97, 183.11, 231.98, 1411.91, 1500.00, 6277.08 ]
+
+#----------------------------------------------------------------
+# Benchmarking Allgather
+# #processes = 120
+#----------------------------------------------------------------
+       #bytes #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]
+          512       100000       127.62       227.38       177.07
+[ 139.00, 195.03, 205.99, 219.11, 233.89, 252.96, 263.93, 293.97, 313.04, 441.07, 1500.00, 1156.81 ]
+
+
+# All processes entering MPI_Finalize
+

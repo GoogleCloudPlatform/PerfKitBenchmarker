@@ -1,0 +1,40 @@
+[
+  {
+    "data":[
+      {
+        "data":{
+          "time_min":80.75,
+          "time_max":81.05,
+          "time_avg":80.9
+        },
+        "is_error":false,
+        "repetitions":100000,
+        "bytes":0
+      }
+    ],
+    "processes_per_group":2,
+    "benchmark":"Multi-Barrier",
+    "mode":null,
+    "group_layout": {"0": [0, 1], "1": [2, 3]},
+    "groups":2
+  },
+  {
+    "data":[
+      {
+        "data":{
+          "time_min":91.24,
+          "time_max":91.24,
+          "time_avg":91.24
+        },
+        "is_error":false,
+        "repetitions":100000,
+        "bytes":0
+      }
+    ],
+    "processes_per_group":4,
+    "benchmark":"Barrier",
+    "mode":null,
+    "group_layout":null,
+    "groups":null
+  }
+]

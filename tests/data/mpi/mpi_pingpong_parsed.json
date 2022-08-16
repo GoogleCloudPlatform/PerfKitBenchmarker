@@ -1,0 +1,33 @@
+[
+  {
+    "processes_per_group":2,
+    "benchmark":"Multi-PingPong",
+    "mode":null,
+    "group_layout": {"0": [0, 1], "1": [2, 3]},
+    "groups":2,
+    "data":[
+      {
+        "data":{
+          "throughput":16.68,
+          "time_min":56.92,
+          "time_max":61.39,
+          "time_avg":59.15
+        },
+        "is_error":false,
+        "repetitions":100000,
+        "bytes":1024
+      },
+      {
+        "data":{
+          "throughput":29.77,
+          "time_min":64.01,
+          "time_max":68.79,
+          "time_avg":66.4
+        },
+        "is_error":false,
+        "repetitions":100000,
+        "bytes":2048
+      }
+    ]
+  }
+]

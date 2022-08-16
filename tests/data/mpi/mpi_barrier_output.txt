@@ -1,0 +1,51 @@
+#------------------------------------------------------------
+#    Intel(R) MPI Benchmarks 2019 Update 6, MPI-1 part
+#------------------------------------------------------------
+# Date                  : Sun Aug 30 21:47:17 2020
+# Machine               : x86_64
+# System                : Linux
+# Release               : 4.15.0-1080-gcp
+# Version               : #90~16.04.1-Ubuntu SMP Fri Jul 10 19:11:10 UTC 2020
+# MPI Version           : 3.1
+# MPI Thread Environment:
+
+
+# Calling sequence was:
+
+# mpi-benchmarks/IMB-MPI1 -msglog 10:11 -multi 0 -time 60 -off_cache -1 -iter 100000 -iter_policy off -zero_size off barrier
+
+# Minimum message length in bytes:   1024
+# Maximum message length in bytes:   2048
+#
+# MPI_Datatype                   :   MPI_BYTE
+# MPI_Datatype for reductions    :   MPI_FLOAT
+# MPI_Op                         :   MPI_SUM
+#
+#
+
+# List of Benchmarks to run:
+
+# Barrier
+
+#---------------------------------------------------
+# Benchmarking Multi-Barrier
+# ( 2 groups of 2 processes each running simultaneous )
+# Group  0:     0    1
+#
+# Group  1:     2    3
+#
+#---------------------------------------------------
+ #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]
+       100000        80.75        81.05        80.90
+
+#---------------------------------------------------
+# Benchmarking Barrier
+# #processes = 4
+#---------------------------------------------------
+ #repetitions  t_min[usec]  t_max[usec]  t_avg[usec]
+       100000        91.24        91.24        91.24
+
+
+# All processes entering MPI_Finalize
+
+

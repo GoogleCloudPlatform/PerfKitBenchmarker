@@ -1,0 +1,28 @@
+# mpi-benchmarks/IMB-RMA -msglog 0:0 -multi 0 -time 60 -off_cache -1 -iter 10 -iter_policy off -zero_size off -show_tail yes -dumpfile /tmp/latency-One_put_all-839321dc.txt One_put_all
+
+# Minimum message length in bytes:   0
+# Maximum message length in bytes:   1
+#
+# MPI_Datatype                   :   MPI_BYTE
+# MPI_Datatype for reductions    :   MPI_FLOAT
+# MPI_Op                         :   MPI_SUM
+#
+#
+
+# List of Benchmarks to run:
+
+# One_put_all
+Invalid benchmark name -zero_size
+Invalid benchmark name off
+Invalid benchmark name -show_tail
+Invalid benchmark name yes
+Invalid benchmark name -dumpfile
+Invalid benchmark name /tmp/latency-one_put_all-839321dc.txt
+
+#---------------------------------------------------
+# Benchmarking One_put_all
+# #processes = 2
+#---------------------------------------------------
+       #bytes #repetitions      t[usec]   Mbytes/sec
+            0           10         0.10         0.00
+            1           10        10.01         0.10

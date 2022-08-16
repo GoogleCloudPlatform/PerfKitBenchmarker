@@ -1,0 +1,11 @@
+[0] MPI startup(): libfabric version: 1.9.0a1-impi
+[0] MPI startup(): libfabric provider: tcp;ofi_rxm
+[0] MPI startup(): Rank    Pid      Node name       Pin cpu
+[0] MPI startup(): 0       18790    pkb-f92e1167-0  {0,1,2,3}
+[0] MPI startup(): 1       18944    pkb-f92e1167-1  {0,1,2,3}
+[0] MPI startup(): I_MPI_ROOT=/opt/intel/compilers_and_libraries_2020.0.166/linux/mpi
+[0] MPI startup(): I_MPI_MPIRUN=mpirun
+[0] MPI startup(): I_MPI_HYDRA_TOPOLIB=hwloc
+[0] MPI startup(): I_MPI_INTERNAL_MEM_POLICY=default
+[0] MPI startup(): I_MPI_DEBUG=5
+#------------------------------------------------------------

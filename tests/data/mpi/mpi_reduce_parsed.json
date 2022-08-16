@@ -1,0 +1,30 @@
+[
+  {
+    "data":[
+      {
+        "data":{
+          "time_min":5.24,
+          "time_max":15.3,
+          "time_avg":10.27
+        },
+        "is_error":false,
+        "repetitions":100000,
+        "bytes":1024
+      },
+      {
+        "data":{
+          "time_min":7.7,
+          "time_max":20.51,
+          "time_avg":14.11
+        },
+        "is_error":false,
+        "repetitions":100000,
+        "bytes":2048
+      }
+    ],
+    "processes_per_group":2,
+    "benchmark":"Reduce",
+    "mode":null,
+    "groups":null
+  }
+]
