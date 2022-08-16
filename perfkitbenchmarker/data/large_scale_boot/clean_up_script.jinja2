@@ -3,7 +3,9 @@
 # delete some VMs
 {% if cloud == 'GCP' %}
 for i in {1..{{vm_count}}}; do
-/usr/bin/gcloud --quiet compute instances delete booter-{{ launcher_vm_name }}-$i  \
+# zero padding vm id. e.g. 1 => 001
+mask=$(printf "%0{{ mask_len }}d${vm_id}" "$i")
+/usr/bin/gcloud --quiet compute instances delete {{ boot_vm_name_prefix }}-$mask  \
 --format json  \
 --quiet  \
 --zone {{ zone }}  \
