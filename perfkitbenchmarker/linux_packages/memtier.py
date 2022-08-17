@@ -259,7 +259,7 @@ def Load(client_vm,
       key_maximum=load_key_maximum,
       requests='allkeys',
       password=server_password)
-  client_vm.RemoteCommand(cmd)
+  client_vm.RobustRemoteCommand(cmd)
 
 
 def RunOverAllThreadsPipelinesAndClients(
