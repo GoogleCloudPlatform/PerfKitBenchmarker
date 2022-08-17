@@ -29,6 +29,7 @@ import time
 
 from absl import flags
 from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3 import enums
 from google.cloud.monitoring_v3.types import Aggregation
 from google.cloud.monitoring_v3.types import ListTimeSeriesResponse
 from google.cloud.monitoring_v3.types import TimeInterval
@@ -314,12 +315,13 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
           'Waiting for CPU metrics to be available (up to 4 minutes)...')
       time.sleep(CPU_API_DELAY_SECONDS - (now_seconds - end_time_seconds))
 
-    interval = TimeInterval(
-        {
-            'start_time': {'seconds': start_time_seconds},
-            'end_time': {'seconds': end_time_seconds},
-        }
-    )
+    interval = TimeInterval()
+    # Shift TZ of datetime arguments since FromDatetime() assumes UTC
+    # See: https://googleapis.dev/python/protobuf/latest/google/protobuf/timestamp_pb2.html#google.protobuf.timestamp_pb2.Timestamp.FromDatetime
+    interval.start_time.FromDatetime(
+        start_time.astimezone(datetime.timezone.utc))
+    interval.end_time.FromDatetime(
+        end_time.astimezone(datetime.timezone.utc))
 
     api_filter = (
         'metric.type = "compute.googleapis.com/instance/cpu/utilization" '
@@ -327,22 +329,18 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
         f'AND metadata.user_labels.dataflow_job_id = "{self.job_id}" ')
 
     aggregation = Aggregation(
-        {
-            'alignment_period': {'seconds': 60},  # 1 minute
-            'per_series_aligner': Aggregation.Aligner.ALIGN_MEAN,
-            'cross_series_reducer': Aggregation.Reducer.REDUCE_MEAN,
-            'group_by_fields': ['resource.instance_id'],
-        }
+        alignment_period={'seconds': 60},  # 1 minute
+        per_series_aligner=Aggregation.Aligner.ALIGN_MEAN,
+        cross_series_reducer=Aggregation.Reducer.REDUCE_MEAN,
+        group_by_fields=['resource.instance_id'],
     )
 
     results = client.list_time_series(
-        request={
-            'name': project_name,
-            'filter': api_filter,
-            'interval': interval,
-            'view': monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
-            'aggregation': aggregation,
-        }
+        name=project_name,
+        filter_=api_filter,
+        interval=interval,
+        view=enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        aggregation=aggregation,
     )
 
     if not results:
@@ -350,7 +348,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
           'No monitoring data found. Unable to calculate avg CPU utilization.')
       return None
 
-    return self._GetAvgValueFromTimeSeries(results)
+    # Multiply fractional cpu util by 100 to display a percentage usage
+    return round(self._GetAvgValueFromTimeSeries(results) * 100, 2)
 
   def _GetAvgValueFromTimeSeries(self, time_series: ListTimeSeriesResponse):
     """Parses time series data and returns average across intervals.
@@ -370,10 +369,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if points:
       # Average over all minute intervals captured
       averaged = sum(points) / len(points)
-      # If metric unit is a fractional number between 0 and 1 (e.g. CPU
-      # utilization metric) multiply by 100 to display a percentage usage.
-      if time_series.unit == '10^2.%':
-        averaged = round(averaged * 100, 2)
       return averaged
 
     return None
