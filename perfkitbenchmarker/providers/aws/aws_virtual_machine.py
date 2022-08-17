@@ -730,7 +730,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.elastic_ip = aws_elastic_ip.AwsElasticIP(self.region, domain='vpc')
     self.elastic_ip.Create()
     self.ip_address = self.elastic_ip.public_ip
-    util.AddDefaultTags(self.allocation_id, self.region)
+    util.AddDefaultTags(self.elastic_ip.allocation_id, self.region)
     self.elastic_ip.AssociateAddress(network_interface_id, 
                                      is_network_interface=True)
 

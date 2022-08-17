@@ -37,7 +37,7 @@ class AwsElasticIP(resource.BaseResource):
     self.association_id = None
 
   def _Create(self):
-    """Creates the elastic IP address."""
+    """Creates the elastic IP address"""
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'allocate-address',
@@ -57,10 +57,10 @@ class AwsElasticIP(resource.BaseResource):
         'release-address',
         '--region', self.region,
         '--allocation-id', self.allocation_id]
-    vm_util.IssueCommand(delete_cmd)
+    util.IssueRetryableCommand(delete_cmd)
 
   def _Exists(self):
-    """Returns true if the elastic IP exists."""
+    """Returns true if the elastic IP exists"""
 
     describe_cmd = util.AWS_PREFIX + [
         'ec2',

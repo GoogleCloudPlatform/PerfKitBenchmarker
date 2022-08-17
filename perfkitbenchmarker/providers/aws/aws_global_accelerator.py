@@ -28,8 +28,8 @@ FLAGS = flags.FLAGS
 
 
 class AwsGlobalAccelerator(resource.BaseResource):
-  """An object representing an Aws Global Accelerator.
-  https://docs.aws.amazon.com/global-accelerator/latest/dg/getting-started.html
+  """An object representing an AWS Global Accelerator.
+     https://docs.aws.amazon.com/global-accelerator/latest/dg/getting-started.html
   """
 
   def __init__(self):
@@ -38,9 +38,9 @@ class AwsGlobalAccelerator(resource.BaseResource):
     self.region = 'us-west-2'
     self.idempotency_token = None
 
-    #The name can have a maximum of 32 characters, 
-    #must contain only alphanumeric characters or hyphens (-), 
-    #and must not begin or end with a hyphen.
+    # The name can have a maximum of 32 characters, 
+    # must contain only alphanumeric characters or hyphens (-), 
+    # and must not begin or end with a hyphen.
     self.name = None
     self.accelerator_arn = None
     self.enabled = False
@@ -61,8 +61,6 @@ class AwsGlobalAccelerator(resource.BaseResource):
         '--region', self.region,
         '--idempotency-token', self.idempotency_token]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
-    print("ACCELERATOR CREATE STDOUT")
-    print(stdout)
     response = json.loads(stdout)
     self.accelerator_arn = response['Accelerator']['AcceleratorArn']
     self.ip_addresses = response['Accelerator']['IpSets'][0]['IpAddresses']
@@ -74,8 +72,6 @@ class AwsGlobalAccelerator(resource.BaseResource):
     # need to disable accelerator before it can be deleted
     self.Update(enabled=False)
     status = self.Describe()
-    print("ACCELERATOR STATUS")
-    print(status)
     while status['Accelerator']['Enabled'] == True:
       status = self.Describe()
 
@@ -89,8 +85,6 @@ class AwsGlobalAccelerator(resource.BaseResource):
         '--region', self.region,
         '--accelerator-arn', self.accelerator_arn]
     stdout, stderr, _ = vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
-    print("ACCELERATOR DELETE STDOUT")
-    print(stdout)
     exists = self._Exists()
     while exists:
       stdout, stderr, _ = vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
@@ -99,7 +93,7 @@ class AwsGlobalAccelerator(resource.BaseResource):
       exists = self._Exists()
 
   def Update(self, enabled: bool):
-    """Updates the accelerator."""
+    """Updates the accelerator to enabled = True or False"""
     update_cmd = util.AWS_PREFIX + [
         'globalaccelerator',
         'update-accelerator',
@@ -112,7 +106,7 @@ class AwsGlobalAccelerator(resource.BaseResource):
     util.IssueRetryableCommand(update_cmd)
 
   def _Exists(self):
-    """Returns true if the accelerator exists."""
+    """Returns true if the accelerator exists"""
     describe_cmd = util.AWS_PREFIX + [
         'globalaccelerator',
         'describe-accelerator',
@@ -120,8 +114,6 @@ class AwsGlobalAccelerator(resource.BaseResource):
         '--accelerator-arn', self.accelerator_arn]
     try:
       stdout, _, _ = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
-      print("ACCELERATOR EXISTS STDOUT")
-      print(stdout)
       response = json.loads(stdout)
       accelerator = response['Accelerator']
       return len(accelerator) > 0
@@ -138,6 +130,15 @@ class AwsGlobalAccelerator(resource.BaseResource):
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     return response
+
+  def AddListener(self, protocol:str, start_port:int, end_port:int):
+    """Adds a new listener to the accelerator"""   
+    new_listener = AwsGlobalAcceleratorListener(self,
+                                                protocol,
+                                                start_port,
+                                                end_port)
+    new_listener.Create()
+    self.listeners.append(new_listener)
 
   def Status(self):
     """Returns status of accelerator"""
@@ -163,16 +164,6 @@ class AwsGlobalAccelerator(resource.BaseResource):
     status = response['Accelerator']['Status']
     return status
 
-  def AddListener(self, protocol:str, start_port:int, end_port:int):
-    """Adds a new listener to the accelerator"""   
-    new_listener = AwsGlobalAcceleratorListener(self,
-                                            protocol,
-                                            start_port,
-                                            end_port)
-    new_listener.Create()
-    self.listeners.append(new_listener)
-
-
 class AwsGlobalAcceleratorListener(resource.BaseResource):
   """Class representing an AWS Global Accelerator listener."""
 
@@ -189,7 +180,7 @@ class AwsGlobalAcceleratorListener(resource.BaseResource):
     self.endpoint_groups = []
 
   def _Create(self):
-    """Create the listener."""
+    """Create the listener"""
     if not self.idempotency_token:
       self.idempotency_token = str(uuid.uuid4())[-50:]
     create_cmd = util.AWS_PREFIX + [
@@ -203,23 +194,17 @@ class AwsGlobalAcceleratorListener(resource.BaseResource):
         '--idempotency-token', self.idempotency_token
     ]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
-    print("LISTENER CREATE STDOUT")
-    print(stdout)
     response = json.loads(stdout)
     self.listener_arn = response['Listener']['ListenerArn']
-    logging.info("LISTENER ARN")
-    logging.info(self.listener_arn)
 
   def _Exists(self):
-    """Returns true if the accelerator listener exists."""
+    """Returns true if the accelerator listener exists"""
     describe_cmd = util.AWS_PREFIX + [
         'globalaccelerator',
         'describe-listener',
         '--region', self.region,
         '--listener-arn', self.listener_arn]
-    stdout, stderr, return_code = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
-    print("LISTENER DESCRIBE STDOUT")
-    print(stdout)
+    stdout, _, return_code = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
     
     if return_code == 255:
       return False
@@ -228,7 +213,9 @@ class AwsGlobalAcceleratorListener(resource.BaseResource):
       return True
 
   def _Delete(self):
-    """Deletes Listeners"""
+    """Deletes Listener"""
+
+    # need to delete endpoint groups before we can delete listener
     for endpoint_group in self.endpoint_groups:
       endpoint_group.Delete()
 
@@ -244,8 +231,6 @@ class AwsGlobalAcceleratorListener(resource.BaseResource):
     self.endpoint_groups.append(AwsEndpointGroup(self, region))
     self.endpoint_groups[-1].Create()
     self.endpoint_groups[-1].Update(endpoint, weight)
-    print("update done")
-    return
 
 
 class AwsEndpointGroup(resource.BaseResource):
@@ -264,7 +249,7 @@ class AwsEndpointGroup(resource.BaseResource):
     self.endpoints = []
 
   def _Create(self):
-    """Creates the endpoint group."""
+    """Creates the endpoint group"""
     if not self.idempotency_token:
       self.idempotency_token = str(uuid.uuid4())[-50:]
 
@@ -276,13 +261,11 @@ class AwsEndpointGroup(resource.BaseResource):
         '--region', self.region,
         '--idempotency-token', self.idempotency_token]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
-    print("ENDPOINT GROUP CREATE STDOUT")
-    print(stdout)
     response = json.loads(stdout)
     self.endpoint_group_arn = response['EndpointGroup']['EndpointGroupArn']
 
   def Update(self, endpoint, weight=128):
-    """Update the endpoint group."""
+    """Update the endpoint group"""
     if not self.idempotency_token:
       self.idempotency_token = ''.join(
         random.choice(string.ascii_lowercase + 
@@ -297,11 +280,9 @@ class AwsEndpointGroup(resource.BaseResource):
         '--endpoint-configurations', 
         'EndpointId=%s,Weight=%s' % (endpoint, str(weight))]
     stdout, _, _ = vm_util.IssueCommand(update_cmd)
-    print("ENDPOINT GROUP UPDATE STDOUT")
-    print(stdout)
 
   def _Delete(self):
-    """Deletes the endpoint group."""
+    """Deletes the endpoint group"""
     delete_cmd = util.AWS_PREFIX + [
         'globalaccelerator',
         'delete-endpoint-group',
@@ -310,25 +291,18 @@ class AwsEndpointGroup(resource.BaseResource):
     vm_util.IssueCommand(delete_cmd)
 
   def _Exists(self):
-    """Returns true if the endpoint group exists."""
+    """Returns true if the endpoint group exists"""
     describe_cmd = util.AWS_PREFIX + [
         'globalaccelerator',
         'describe-endpoint-group',
         '--region', self.region,
         '--endpoint-group-arn', self.endpoint_group_arn]
-    stdout, stderr, return_code = vm_util.IssueCommand(describe_cmd, 
+    stdout, _, return_code = vm_util.IssueCommand(describe_cmd, 
                                                        raise_on_failure=False)
-
-    print("ENDPOINT GROUP EXISTS STDOUT/ERR")
-    print(stdout)
-    print(stderr)
-
     if return_code == 255:
       return False
 
     response = json.loads(stdout)
-
     if 'EndpointGroup' in response:
       return True
-  
     return False
