@@ -23,13 +23,21 @@ PyYAML==5.4.1
 pint
 numpy>=1.16.5
 contextlib2>=0.5.1
-six>=1.13.0
+six>=1.16.0
 pywinrm
 timeout-decorator
 google-cloud-datastore
 google-cloud-monitoring
 beautifulsoup4
 requests
+certifi==2022.6.15
+charset-normalizer==2.1.0
+idna==3.3
+influxdb==5.3.1
+msgpack==1.0.4
+python-dateutil==2.8.2
+pytz==2022.2.1
+urllib3==1.26.11
 
 # unlike setup.py requirements.txt cannot require a Python version AFAICT
 # this hack requires a non-existent package when Python is less than 3.9
