@@ -307,7 +307,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     project_name = f'projects/{self.project}'
 
     now_seconds = int(time.time())
-    start_time_seconds = int(start_time.timestamp())
     end_time_seconds = int(end_time.timestamp())
     # Cpu metrics data can take up to 240 seconds to appear
     if (now_seconds - end_time_seconds) < CPU_API_DELAY_SECONDS:
