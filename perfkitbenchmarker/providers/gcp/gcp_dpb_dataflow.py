@@ -316,7 +316,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     interval = TimeInterval()
     # Shift TZ of datetime arguments since FromDatetime() assumes UTC
-    # See: https://googleapis.dev/python/protobuf/latest/google/protobuf/timestamp_pb2.html#google.protobuf.timestamp_pb2.Timestamp.FromDatetime
+    # See
+    # https://googleapis.dev/python/protobuf/latest/google/protobuf/timestamp_pb2.html#google.protobuf.timestamp_pb2.Timestamp.FromDatetime
     interval.start_time.FromDatetime(
         start_time.astimezone(datetime.timezone.utc))
     interval.end_time.FromDatetime(
