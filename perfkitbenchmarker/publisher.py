@@ -843,13 +843,17 @@ class InfluxDBPublisher(SamplePublisher):
     else:
       client = InfluxDBClient(host=h, port=p)
 
-    try:
-      client.create_database(self.influx_db_name)
-    except Exception as e:
-      logging.error('Influxdb create database request could not be completed due to: %s', str(e))
-      raise
+    dbs = client.get_list_database()
+    if self.influx_db_name in [x['name'] for x in dbs]:
+      logging.debug('DB %s already exists', self.influx_db_name)
+    else:
+      try:
+        client.create_database(self.influx_db_name)
+      except Exception as e:
+        logging.error('Influxdb create database request could not be completed due to: %s', str(e))
+        raise
 
-    logging.debug('Success! %s DB Created', self.influx_db_name)
+      logging.debug('Success! %s DB Created', self.influx_db_name)
 
     try:
       client.write_points(formatted_samples, database=self.influx_db_name)
