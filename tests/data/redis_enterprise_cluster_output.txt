@@ -1,0 +1,30 @@
+CLUSTER NODES:
+NODE:ID ROLE   ADDRESS     EXTERNAL_ADDRESS HOSTNAME       SHARDS CORES FREE_RAM        PROVISIONAL_RAM VERSION  STATUS
+*node:1 master 10.240.0.68                  pkb-2bedd884-6 3/100  16    60.08GB/62.75GB 7.89GB/51.46GB  6.2.4-54 OK
+node:2  slave  10.240.0.45                  pkb-2bedd884-7 3/100  16    60.19GB/62.75GB 8GB/51.46GB     6.2.4-54 OK
+node:3  slave  10.240.0.73                  pkb-2bedd884-8 2/100  16    60.24GB/62.75GB 21.68GB/51.46GB 6.2.4-54 OK
+
+DATABASES:
+DB:ID NAME    TYPE  STATUS SHARDS PLACEMENT REPLICATION PERSISTENCE ENDPOINT
+db:1  redisdb redis active 1      dense     enabled     disabled    redis-17236.redis-cluster:17236
+db:2  redisdb redis active 1      dense     enabled     disabled    redis-14001.redis-cluster:14001
+db:3  redisdb redis active 1      dense     enabled     disabled    redis-12121.redis-cluster:12121
+db:4  redisdb redis active 1      dense     enabled     disabled    redis-17311.redis-cluster:17311
+
+ENDPOINTS:
+DB:ID   NAME       ID                NODE      ROLE                     SSL
+db:1    redisdb    endpoint:1:1      node:1    all-master-shards        No
+db:2    redisdb    endpoint:2:1      node:3    all-master-shards        No
+db:3    redisdb    endpoint:3:1      node:2    all-master-shards        No
+db:4    redisdb    endpoint:4:1      node:1    all-master-shards        No
+
+SHARDS:
+DB:ID       NAME      ID        NODE    ROLE    SLOTS     USED_MEMORY    STATUS
+db:1        redisdb   redis:1   node:1  master  0-16383   162.16MB       OK
+db:1        redisdb   redis:2   node:2  slave   0-16383   162MB          OK
+db:2        redisdb   redis:3   node:3  master  0-16383   162.12MB       OK
+db:2        redisdb   redis:4   node:1  slave   0-16383   162MB          OK
+db:3        redisdb   redis:5   node:2  master  0-16383   162.01MB       OK
+db:3        redisdb   redis:6   node:3  slave   0-16383   162MB          OK
+db:4        redisdb   redis:7   node:1  master  0-16383   162.16MB       OK
+db:4        redisdb   redis:8   node:2  slave   0-16383   162MB          OK

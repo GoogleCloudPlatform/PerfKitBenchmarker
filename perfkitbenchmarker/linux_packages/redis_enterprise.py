@@ -98,6 +98,8 @@ _XENIAL_TAR = f'redislabs-{_VERSION}-xenial-amd64.tar'
 _BIONIC_TAR = f'redislabs-{_VERSION}-bionic-amd64.tar'
 _USERNAME = 'user@google.com'
 _ONE_KILOBYTE = 1000
+_ONE_MEGABYTE = _ONE_KILOBYTE * 1000
+_ONE_GIGABYTE = _ONE_MEGABYTE * 1000
 PREPROVISIONED_DATA = {
     # These checksums correspond to version 6.2.4-54. To update, run
     # 'sha256sum <redislabs-{VERSION}-rhel7-x86_64.tar>' and replace the values
@@ -252,6 +254,15 @@ def _GetRestCommand() -> str:
           'https://localhost:9443/v1/bdbs')
 
 
+def GetDatabaseMemorySize(vm: _VM) -> int:
+  """Gets the available memory (bytes) that can be used to provision databases."""
+  output, _ = vm.RemoteCommand('sudo /opt/redislabs/bin/rladmin status')
+  node_output = output.splitlines()[2]
+  provisional_ram = node_output.split()[7]
+  size_gb = float(provisional_ram.split('/')[1].strip('GB'))
+  return int(size_gb * _ONE_GIGABYTE)
+
+
 def CreateDatabase(vms: List[_VM], redis_port: int,
                    shards: Optional[int] = None) -> None:
   """Creates a new Redis Enterprise database.
@@ -267,7 +278,7 @@ def CreateDatabase(vms: List[_VM], redis_port: int,
   db_shards = shards or _SHARDS.value
   content = {
       'name': 'redisdb',
-      'memory_size': int(vms[0].total_memory_kb * _ONE_KILOBYTE / 2 * len(vms)),
+      'memory_size': GetDatabaseMemorySize(vms[0]),
       'type': 'redis',
       'proxy_policy': 'all-master-shards',
       'port': redis_port,
