@@ -160,13 +160,7 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   if 'servers' in bm_spec.vm_groups:
     server_vm = bm_spec.vm_groups['servers'][0]
   measure_cpu_on_server_vm = server_vm and REDIS_MEMTIER_MEASURE_CPU.value
-
   ports = [str(port) for port in redis_server.GetRedisPorts()]
-  def DistributeClientsToPorts(port):
-    client_index = int(port) % len(ports) % len(client_vms)
-    vm = client_vms[client_index]
-    return memtier.RunOverAllThreadsPipelinesAndClients(
-        vm, bm_spec.redis_endpoint_ip, port)
 
   benchmark_metadata = {}
 
@@ -176,22 +170,19 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
         f'echo "{top_cmd}" > {_TOP_SCRIPT}')
     server_vm.RemoteCommand(f'bash {_TOP_SCRIPT}')
 
-  raw_results = vm_util.RunThreaded(DistributeClientsToPorts, ports)
+  raw_results = memtier.RunOverAllThreadsPipelinesAndClients(
+      client_vms, bm_spec.redis_endpoint_ip, ports)
   redis_metadata = redis_server.GetMetadata()
 
   top_results = []
   if measure_cpu_on_server_vm:
     top_results = _GetTopResults(server_vm)
 
-  results = []
-
   for server_result in raw_results:
-    for result_sample in server_result:
-      result_sample.metadata.update(redis_metadata)
-      result_sample.metadata.update(benchmark_metadata)
-      results.append(result_sample)
+    server_result.metadata.update(redis_metadata)
+    server_result.metadata.update(benchmark_metadata)
 
-  return results + top_results
+  return raw_results + top_results
 
 
 def Cleanup(bm_spec: _BenchmarkSpec) -> None:

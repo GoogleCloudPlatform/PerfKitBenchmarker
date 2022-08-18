@@ -138,8 +138,8 @@ flag_util.DEFINE_integerlist(
     'memtier_pipeline', [1],
     'Number of pipelines to use for memtier. Defaults to 1, '
     'i.e. no pipelining.')
-MEMTIER_CLUSTER_MODE = flags.DEFINE_bool(
-    'memtier_cluster_mode', False, 'Passthrough for --cluster-mode flag')
+MEMTIER_CLUSTER_MODE = flags.DEFINE_bool('memtier_cluster_mode', False,
+                                         'Passthrough for --cluster-mode flag')
 MEMTIER_TIME_SERIES = flags.DEFINE_bool(
     'memtier_time_series', False, 'Include per second time series output '
     'for ops and max latency. This greatly increase the number of samples.')
@@ -262,32 +262,71 @@ def Load(client_vm,
   client_vm.RobustRemoteCommand(cmd)
 
 
-def RunOverAllThreadsPipelinesAndClients(
-    client_vm,
+def RunOverAllClientVMs(
+    client_vms,
     server_ip: str,
-    server_port: str,
+    ports: List[str],
+    pipeline,
+    threads,
+    clients,
+    password: Optional[str] = None) -> 'List[MemtierResult]':
+  """Run redis memtier on all client vms.
+
+  Run redis memtier on all client vms based on given ports.
+
+  Args:
+    client_vms: A list of client vms.
+    server_ip: Ip address of the server.
+    ports: List of ports to run against the server.
+    pipeline: Number of pipeline to use in memtier.
+    threads: Number of threads to use in memtier.
+    clients: Number of clients to use in memtier.
+    password: Password of the server.
+
+  Returns:
+   List of memtier results.
+  """
+
+  def DistributeClientsToPorts(port):
+    client_index = int(port) % len(ports) % len(client_vms)
+    vm = client_vms[client_index]
+    return _Run(
+        vm=vm,
+        server_ip=server_ip,
+        server_port=port,
+        threads=threads,
+        pipeline=pipeline,
+        clients=clients,
+        password=password)
+
+  results = vm_util.RunThreaded(DistributeClientsToPorts, ports)
+
+  return results
+
+
+def RunOverAllThreadsPipelinesAndClients(
+    client_vms,
+    server_ip: str,
+    server_ports: List[str],
     password: Optional[str] = None) -> List[sample.Sample]:
   """Runs memtier over all pipeline and thread combinations."""
   samples = []
   for pipeline in FLAGS.memtier_pipeline:
-    for client_thread in FLAGS.memtier_threads:
-      for client in FLAGS.memtier_clients:
-        logging.info(
-            'Start benchmarking redis/memcached using memtier:\n'
-            '\tmemtier client: %s'
-            '\tmemtier threads: %s'
-            '\tmemtier pipeline, %s', client, client_thread, pipeline)
-        results = _Run(
-            vm=client_vm,
+    for threads in FLAGS.memtier_threads:
+      for clients in FLAGS.memtier_clients:
+        results = RunOverAllClientVMs(
+            client_vms=client_vms,
             server_ip=server_ip,
-            server_port=server_port,
-            threads=client_thread,
+            ports=server_ports,
+            threads=threads,
             pipeline=pipeline,
-            clients=client,
+            clients=clients,
             password=password)
         metadata = GetMetadata(
-            clients=client, threads=client_thread, pipeline=pipeline)
-        samples.extend(results.GetSamples(metadata))
+            clients=clients, threads=threads, pipeline=pipeline)
+
+        for result in results:
+          samples.extend(result.GetSamples(metadata))
   return samples
 
 
@@ -311,11 +350,7 @@ def MeasureLatencyCappedThroughput(
 
   for modify_load_func in [_ModifyPipelines, _ModifyClients]:
     parameters = MemtierBinarySearchParameters(
-        lower_bound=0,
-        upper_bound=math.inf,
-        pipelines=1,
-        threads=1,
-        clients=1)
+        lower_bound=0, upper_bound=math.inf, pipelines=1, threads=1, clients=1)
     current_max_result = MemtierResult(0, 0, 0, 0, 0, 0, [], [], [], [], {})
     current_metadata = None
     while parameters.lower_bound < (parameters.upper_bound - 1):
@@ -327,13 +362,13 @@ def MeasureLatencyCappedThroughput(
           pipeline=parameters.pipelines,
           clients=parameters.clients,
           password=password)
-      logging.info('Binary search for latency capped throughput.\n'
-                   '\tMemtier ops throughput: %s'
-                   '\tmemtier 95th percentile latency: %s'
-                   '\tupper bound: %s'
-                   '\tlower bound: %s',
-                   result.ops_per_sec, result.p95_latency,
-                   parameters.lower_bound, parameters.upper_bound)
+      logging.info(
+          'Binary search for latency capped throughput.\n'
+          '\tMemtier ops throughput: %s'
+          '\tmemtier 95th percentile latency: %s'
+          '\tupper bound: %s'
+          '\tlower bound: %s', result.ops_per_sec, result.p95_latency,
+          parameters.lower_bound, parameters.upper_bound)
       if result.ops_per_sec > current_max_result.ops_per_sec:
         current_max_result = result
         current_metadata = GetMetadata(
@@ -499,10 +534,16 @@ def _Run(vm,
          clients: int,
          password: Optional[str] = None) -> 'MemtierResult':
   """Runs the memtier benchmark on the vm."""
+  logging.info(
+      'Start benchmarking redis/memcached using memtier:\n'
+      '\tmemtier client: %s'
+      '\tmemtier threads: %s'
+      '\tmemtier pipeline, %s', clients, threads, pipeline)
   results_file = pathlib.PosixPath(f'{MEMTIER_RESULTS}_{server_port}')
   vm.RemoteCommand(f'rm -f {results_file}')
-  json_results_file = (pathlib.PosixPath(f'{JSON_OUT_FILE}_{server_port}')
-                       if MEMTIER_TIME_SERIES.value else None)
+  json_results_file = (
+      pathlib.PosixPath(f'{JSON_OUT_FILE}_{server_port}')
+      if MEMTIER_TIME_SERIES.value else None)
   vm.RemoteCommand(f'rm -f {json_results_file}')
   # Specify one of run requests or run duration.
   requests = (
@@ -533,15 +574,14 @@ def _Run(vm,
       json_out_file=json_results_file)
   vm.RemoteCommand(cmd)
 
-  output_path = os.path.join(
-      vm_util.GetTempDir(), f'memtier_results_{server_port}')
+  output_path = os.path.join(vm_util.GetTempDir(),
+                             f'memtier_results_{server_port}')
   vm_util.IssueCommand(['rm', '-f', output_path])
   vm.PullFile(vm_util.GetTempDir(), results_file)
 
   time_series_json = None
   if json_results_file:
-    json_path = os.path.join(
-        vm_util.GetTempDir(), f'json_data_{server_port}')
+    json_path = os.path.join(vm_util.GetTempDir(), f'json_data_{server_port}')
     vm_util.IssueCommand(['rm', '-f', json_path])
     vm.PullFile(vm_util.GetTempDir(), json_results_file)
     with open(json_path, 'r') as ts_json:
@@ -653,7 +693,7 @@ class MemtierResult:
         ops_time_series=ops_time_series,
         max_latency_time_series=max_latency_time_series,
         runtime_info=runtime_info,
-        )
+    )
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Return this result as a list of samples."""
@@ -754,14 +794,14 @@ def _ParseTotalThroughputAndLatency(
           raise errors.Benchmarks.RunError(
               f'Stats table does not contain "{key}" column.')
         return float(totals[columns.index(key)])  # pylint: disable=cell-var-from-loop
+
       return MemtierAggregateResult(
           ops_per_sec=_FetchStat('Ops/sec'),
           kb_per_sec=_FetchStat('KB/sec'),
           latency_ms=_FetchStat('Avg. Latency'),
           p90_latency=_FetchStat('p90 Latency'),
           p95_latency=_FetchStat('p95 Latency'),
-          p99_latency=_FetchStat('p99 Latency')
-          )
+          p99_latency=_FetchStat('p99 Latency'))
   raise errors.Benchmarks.RunError('No "Totals" line in memtier output.')
 
 
@@ -784,8 +824,9 @@ def _ConvertPercentToAbsolute(total_value: int, percent: float) -> float:
   return percent / 100 * total_value
 
 
-def _ParseTimeSeries(time_series_json: Optional[Text]
-                     ) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+def _ParseTimeSeries(
+    time_series_json: Optional[Text]
+) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
   """Parse time series ops throughput from json output."""
   ops_series = []
   max_latency_series = []

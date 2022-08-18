@@ -114,14 +114,14 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample instances.
   """
-  client = benchmark_spec.vm_groups['client'][0]
+  client = benchmark_spec.vm_groups['client']
   server = benchmark_spec.vm_groups['server'][0]
   server_ip = server.internal_ip
   metadata = {'memcached_version': memcached_server.GetVersion(server),
               'memcached_server_size': FLAGS.memcached_size_mb,
               'memcached_server_threads': FLAGS.memcached_num_threads}
   samples = memtier.RunOverAllThreadsPipelinesAndClients(
-      client, server_ip, memcached_server.MEMCACHED_PORT)
+      client, server_ip, [memcached_server.MEMCACHED_PORT])
   for sample in samples:
     sample.metadata.update(metadata)
 

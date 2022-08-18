@@ -111,8 +111,8 @@ def Run(benchmark_spec):
         benchmark_spec.cloud_redis_instance.GetMemoryStorePassword())
   else:
     samples = memtier.RunOverAllThreadsPipelinesAndClients(
-        memtier_vms[0], benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
-        benchmark_spec.cloud_redis_instance.GetMemoryStorePort(),
+        memtier_vms, benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
+        [benchmark_spec.cloud_redis_instance.GetMemoryStorePort()],
         benchmark_spec.cloud_redis_instance.GetMemoryStorePassword())
 
   for sample in samples:
