@@ -53,20 +53,7 @@ dpb_df_template_benchmark:
     worker_count: 1
 """
 
-flags.DEFINE_string('dpb_df_template_gcs_location', None,
-                  'GCS URI path for pre-built Dataflow template to run.'
-                  'Template must be available before running your pipeline.'
-                  'e.g. gs://dataflow-templates/latest/PubSub_To_BigQuery')
-flags.DEFINE_string('dpb_df_template_input_subscription', None,
-                  'Cloud Pub/Sub subscription ID for Dataflow template to ingest data from.'
-                  'Data must be pre-populated in subscription before running your pipeline.'
-                  'e.g. projects/<project>/subscriptions/<subscription>')
-flags.DEFINE_string('dpb_df_template_output_ptransform', None,
-                  'Pipeline PTransform from which to retrieve Dataflow output throughput.'
-                  'e.g. WriteSuccessfulRecords/StreamingInserts/StreamingWriteTables/StreamingWrite')
-flags.DEFINE_list('dpb_df_template_additional_args', [], 'Additional arguments '
-                  'which should be passed to job.')
-
+# Refer to flags with prefix 'dpb_df_template' defined in gcp provider flags.py
 FLAGS = flags.FLAGS
 
 # PubSub seek operation can take up to 1 minute to take full effect
@@ -85,9 +72,11 @@ def CheckPrerequisites(benchmark_config):
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
   if FLAGS.dpb_df_template_gcs_location is None:
-    raise errors.Config.InvalidValue('Unspecified Dataflow template GCS location.')
+    raise errors.Config.InvalidValue(
+        'Unspecified Dataflow template GCS location.')
   if FLAGS.dpb_df_template_input_subscription is None:
-    raise errors.Config.InvalidValue('Unspecified Pub/Sub subscription as input for Dataflow job.')
+    raise errors.Config.InvalidValue(
+        'Unspecified Pub/Sub subscription as input for Dataflow job.')
 
   # Get handle to the dpb service
   dpb_service_class = dpb_service.GetDpbServiceClass(
@@ -98,11 +87,15 @@ def CheckPrerequisites(benchmark_config):
 
 def Prepare(benchmark_spec):
   # Snapshot Pub/Sub input subscription to later restore at end of test
-  suffix = ''.join(random.choice(string.ascii_lowercase + string.digits) for i in range(6))
-  benchmark_spec.input_subscription_name = FLAGS.dpb_df_template_input_subscription.split('/')[-1]
-  benchmark_spec.input_subscription_snapshot_name = benchmark_spec.input_subscription_name + '-' + suffix
-  cmd = util.GcloudCommand(None, 'pubsub', 'snapshots',
-                          'create', benchmark_spec.input_subscription_snapshot_name)
+  suffix = ''.join(
+    random.choice(string.ascii_lowercase + string.digits) for i in range(6))
+  benchmark_spec.input_subscription_name = \
+    FLAGS.dpb_df_template_input_subscription.split('/')[-1]
+  benchmark_spec.input_subscription_snapshot_name = \
+    benchmark_spec.input_subscription_name + '-' + suffix
+
+  cmd = util.GcloudCommand(None, 'pubsub', 'snapshots', 'create',
+                          benchmark_spec.input_subscription_snapshot_name)
   cmd.flags = {
       'project':  util.GetDefaultProject(),
       'subscription': benchmark_spec.input_subscription_name,
@@ -110,7 +103,8 @@ def Prepare(benchmark_spec):
   }
   stdout, _, _ = cmd.Issue()
   snapshot_id = json.loads(stdout)[0]['snapshotId']
-  logging.info("Prepare: Created snapshot {} for input subscription data".format(snapshot_id))
+  logging.info('Prepare: Created snapshot {} for input subscription data'
+      .format(snapshot_id))
   pass
 
 def Run(benchmark_spec):
@@ -157,14 +151,16 @@ def Run(benchmark_spec):
   avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(start_time, end_time)
   results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))
 
-  max_thruput = dpb_service_instance.GetMaxOutputThroughput(output_ptransform, start_time, end_time)
+  max_thruput = dpb_service_instance.GetMaxOutputThroughput(
+      output_ptransform, start_time, end_time)
   results.append(sample.Sample('max_thruput', max_thruput, '1/s', metadata))
 
-  stats = dpb_service_instance.GetStats()
+  stats = dpb_service_instance.job_stats
   for name, value in stats.items():
     results.append(sample.Sample(name, value, 'number', metadata))
 
-  total_cost = dpb_service_instance.CalculateCost(gcp_dpb_dataflow.DATAFLOW_TYPE_STREAMING)
+  total_cost = dpb_service_instance.CalculateCost(
+      gcp_dpb_dataflow.DATAFLOW_TYPE_STREAMING)
   results.append(sample.Sample('total_cost', total_cost, '$', metadata))
 
   return results
@@ -181,21 +177,24 @@ def Cleanup(benchmark_spec):
   }
   stdout, _, _ = cmd.Issue()
   snapshot_id = json.loads(stdout)['snapshotId']
-  logging.info("Cleanup: Restore snapshot {} for input subscription data".format(snapshot_id))
+  logging.info('Cleanup: Restore snapshot {} for input subscription data'
+      .format(snapshot_id))
 
   # Wait for seek operation to take full effect
-  logging.info("Cleanup: Waiting for Pub/Sub seek operation to take full effect (up to 1 minute)")
+  logging.info(
+      'Cleanup: Waiting for Pub/Sub seek operation to take full effect (up to 1'
+      ' minute)')
   time.sleep(PUBSUB_SEEK_DELAY_SECONDS)
 
   # Delete snapshot itself
-  cmd = util.GcloudCommand(None, 'pubsub', 'snapshots',
-                          'delete', benchmark_spec.input_subscription_snapshot_name)
+  cmd = util.GcloudCommand(None, 'pubsub', 'snapshots', 'delete',
+                          benchmark_spec.input_subscription_snapshot_name)
   cmd.flags = {
       'project':  util.GetDefaultProject(),
       'format': 'json',
   }
   stdout, _, _ = cmd.Issue()
   snapshot_id = json.loads(stdout)[0]['snapshotId']
-  logging.info("Cleanup: Deleted snapshot {}".format(snapshot_id))
+  logging.info('Cleanup: Deleted snapshot {}'.format(snapshot_id))
   pass
 
