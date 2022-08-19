@@ -139,13 +139,9 @@ def BuildHostNames(name_pattern, count, use_public_ip):
     else:
       return GenerateHostIPs(start_vm_index, count)
 
-  else:  # GCP
-    results = []
-    for vm_id in range(1, count + 1):
-      mask = (len(str(count)) - len(str(vm_id))) * '0'
-      padded_vm_id = mask + str(vm_id)
-      results.append(name_pattern.replace('VM_ID', padded_vm_id))
-    return results
+  else:
+    return [name_pattern.replace('VM_ID', str(vm_id))
+            for vm_id in range(1, count + 1)]
 
 
 def WaitForHostNames(use_public_ip, timeout=MAX_TIME_SECONDS_NO_CALLING):

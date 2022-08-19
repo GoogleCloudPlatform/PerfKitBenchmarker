@@ -5,10 +5,6 @@ uses to spin up vms. The vms are spun up with a startup script to curl a
 listening server. The time taken to boot is the time between executing this
 script and the time the vms call back on the server. #}
 
-# variable reassignment to help jinja recognize bash {} operator.
-vm_count={{ vm_count }}
-mask=${vm_count//[0-9]/#}
-
 {% if contact_launcher %}
   LINUX_PING="curl -H 'X-Header: {{ launcher_vm_name }}' http://{{ server_ip }}:{{ server_port }}"
   WINDOWS_PING="Invoke-WebRequest -Uri '{{ server_ip }}:{{ server_port }}' -Headers @{'X-Header'='{{ launcher_vm_name }}'}"
@@ -21,8 +17,8 @@ mask=${vm_count//[0-9]/#}
   LINUX_START_UP_SCRIPT_PARAM="startup-script="
   WINDOWS_START_UP_SCRIPT_PARAM="windows-startup-script-ps1="
   WINDOWS_START_UP_SCRIPT_CLOSING_PARAM=""
-  # With bulk create api, VMs do not know its assigned name at creation.
-  DELETE_VM=""
+  DELETE_VM="{{ gcloud_path }} --quiet compute instances delete {{ boot_vm_name_prefix }}-$i --zone {{ zone }} --project {{ project }}
+/sbin/shutdown -hP now"
 {% elif cloud == 'AWS' %}
   LINUX_START_UP_SCRIPT_PARAM=""
   WINDOWS_START_UP_SCRIPT_PARAM="<powershell>"
@@ -74,16 +70,15 @@ echo $(date +%s%N) > {{start_time_file}}
     --no-restart-on-failure
     --zone {{ zone }}
     --metadata "${START_UP_SCRIPT}",{{ tags }}
-    --async
   )
   {% if os_type == 'linux' %}
-    gcloud_args+=( --network-tier=PREMIUM )
+    gcloud_args+=( --network-interface {{ use_public_ip }}address,network-tier=PREMIUM )
   {% endif %}
-  {% if use_public_ip == 'no-' %}
-    gcloud_args+=( --no-address )
+  {% if use_public_ip != '' %}
+    gcloud_args+=( --async )
   {% endif %}
-  {{ gcloud_path }} compute instances bulk create --name-pattern {{ boot_vm_name_prefix }}-$mask  \
-  --count {{ vm_count }} \
+  VM_NAMES=`seq -f '{{ boot_vm_name_prefix }}-%g' -s ' ' 1 {{ vm_count }}`
+  {{ gcloud_path }} compute instances create $VM_NAMES  \
   "${gcloud_args[@]}" &
 {% elif cloud == 'AWS' %}
   aws_args=(

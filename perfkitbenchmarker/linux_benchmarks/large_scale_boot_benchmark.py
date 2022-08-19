@@ -257,9 +257,6 @@ def CheckPrerequisites(_):
     raise errors.Benchmarks.PrepareException(
         'Booting Windows VMs on Azure with a start-up script is not supported. '
         'See https://github.com/Azure/azure-powershell/issues/9600.')
-  if FLAGS.cloud == 'GCP' and FLAGS.use_public_ip and not FLAGS.vms_contact_launcher:
-    raise errors.Benchmarks.PrepareException(
-        'GCP bulk create command does not support determining public ips.')
   if FLAGS.vms_contact_launcher and FLAGS.use_public_ip:
     raise errors.Benchmarks.PrepareException(
         'After VMs contact launcher server, launcher will check connectivity '
@@ -325,7 +322,6 @@ def _BuildContext(launcher_vm, booter_template_vm):
         'gcloud_path': FLAGS.gcloud_path,
         'project': FLAGS.project,
         'tags': gcp_util.MakeFormattedDefaultTags(),
-        'mask_len': len(str(FLAGS.boots_per_launcher)),
     })
   elif cloud == 'AWS':
     tags = aws_util.MakeDefaultTags()
