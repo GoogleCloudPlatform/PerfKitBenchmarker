@@ -26,7 +26,6 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 
 from absl import flags
-import numpy as np
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
@@ -442,77 +441,21 @@ class Result():
   latency_usec: int
   metadata: Dict[str, Any]
 
-
-@dataclasses.dataclass
-class AggregateResult():
-  """Aggregated throughput and latency results for whole cluster of DBs.
-
-  Attributes:
-    results: Maps database UID to a list of intervals with data from the run.
-    throughputs: Time series of average throughputs.
-    latencies: Time series of average latencies.
-  """
-  results: Dict[int, List[Result]] = dataclasses.field(default_factory=dict)
-
-  def _GetAverageList(self, attr: str) -> List[int]:
-    """Returns a list that represents the average of multiple lists.
-
-    Args:
-      attr: The attribute corresponding to an integer attribute of Result,
-        either "throughput" or "latency_usec".
-
-    Returns:
-      A list of the average attribute per interval time across DBs. For example:
-      db1 = [2, 1, 3, 5, 6]
-      db2 = [4, 3, 3, 7, 2]
-      ret = [3, 2, 3, 6, 4] (Average)
-    """
-    lists = []
-    for l in self.results.values():
-      lists.append([getattr(result, attr) for result in l])
-    result = np.average(np.array(lists), axis=0)
-    logging.info('Raw %s: %s', attr, np.array(lists))
-    logging.info('Average %s: %s', attr, result)
-    return result
-
-  @property
-  def throughputs(self) -> List[int]:
-    return self._GetAverageList('throughput')
-
-  @property
-  def latencies(self) -> List[int]:
-    return self._GetAverageList('latency_usec')
-
-  def ToSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
-    """Returns throughput samples attached with the given metadata."""
-    samples = []
-    for result_list in self.results.values():
-      for r in result_list:
-        r.metadata.update(metadata)
-        samples.append(
-            sample.Sample('throughput', r.throughput, 'ops/s', r.metadata))
-    return samples
+  def ToSample(self, metadata: Dict[str, Any]) -> sample.Sample:
+    """Returns throughput sample attached with the given metadata."""
+    self.metadata.update(metadata)
+    return sample.Sample('throughput', self.throughput, 'ops/s', self.metadata)
 
 
-def ParseResult(output: str) -> AggregateResult:
-  """Parses the result from the database statistics API."""
+def ParseResults(output: str) -> List[Result]:
+  """Parses the result from the cluster statistics API."""
   output_json = json.loads(output)
-  results = {}
-  time_series_length = float('inf')
-  # Parse database output
-  for database in output_json:
-    uid = database.get('uid')
-    results[uid] = []
-    for interval in database.get('intervals'):
-      result = Result(interval.get('total_req'),
-                      interval.get('avg_latency'),
-                      interval)
-      results[uid].append(result)
-    # Intervals can sometimes have different lengths (length 8-10).
-    time_series_length = min(time_series_length, len(results[uid]))
-  for result in results.values():
-    del result[time_series_length:]
-  return AggregateResult(results=results)
+  results = []
+  for interval in output_json.get('intervals'):
+    results.append(
+        Result(
+            interval.get('total_req'), interval.get('avg_latency'), interval))
+  return results
 
 
 def Run(redis_vms: List[_VM],
@@ -558,7 +501,8 @@ def Run(redis_vms: List[_VM],
     # 1min for throughput to stabilize and 10sec of data.
     measurement_command = (
         'sleep 15 && curl -v -k -u {user}:{password} '
-        'https://localhost:9443/v1/bdbs/stats?interval=1sec > ~/output'.format(
+        'https://localhost:9443/v1/cluster/stats?interval=1sec > ~/output'
+        .format(
             user=_USERNAME,
             password=FLAGS.run_uri,
         ))
@@ -567,25 +511,26 @@ def Run(redis_vms: List[_VM],
     vm_util.RunThreaded(lambda vm, command: vm.RemoteCommand(command), args)
     stdout, _ = redis_vm.RemoteCommand('cat ~/output')
 
-    result = ParseResult(stdout)
     metadata = GetMetadata(shards, threads, proxy_threads)
-    results.extend(result.ToSamples(metadata))
-
-    for throughput, latency in zip(result.throughputs, result.latencies):
+    run_results = ParseResults(stdout)
+    for result in run_results:
+      results.append(result.ToSample(metadata))
+      latency = result.latency_usec
       cur_max_latency = max(cur_max_latency, latency)
       if latency < 1000:
         max_throughput_for_completion_latency_under_1ms = max(
-            max_throughput_for_completion_latency_under_1ms, throughput)
+            max_throughput_for_completion_latency_under_1ms, result.throughput)
 
       logging.info('Threads : %d  (%f ops/sec, %f ms latency) < %f ms latency',
-                   threads, throughput, latency, latency_threshold)
+                   threads, result.throughput, latency, latency_threshold)
 
     threads += _THREAD_INCREMENT.value
 
   if cur_max_latency >= 1000:
-    results.append(sample.Sample(
-        'max_throughput_for_completion_latency_under_1ms',
-        max_throughput_for_completion_latency_under_1ms, 'ops/s', metadata))
+    results.append(
+        sample.Sample('max_throughput_for_completion_latency_under_1ms',
+                      max_throughput_for_completion_latency_under_1ms, 'ops/s',
+                      metadata))
 
   logging.info('Max throughput under 1ms: %s ops/sec.',
                max_throughput_for_completion_latency_under_1ms)
