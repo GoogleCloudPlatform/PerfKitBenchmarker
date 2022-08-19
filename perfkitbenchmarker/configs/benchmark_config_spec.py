@@ -40,6 +40,7 @@ from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.dpb_service import BaseDpbService
@@ -509,7 +510,7 @@ class _StaticVmListDecoder(option_decoders.ListDecoder):
         default=list, item_decoder=_StaticVmDecoder(), **kwargs)
 
 
-class _RelationalDbSpec(spec.BaseSpec):
+class _RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   """Configurable options of a database service."""
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):

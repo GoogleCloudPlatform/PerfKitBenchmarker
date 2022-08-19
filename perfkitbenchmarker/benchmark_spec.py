@@ -733,7 +733,7 @@ class BenchmarkSpec(object):
       self.dpb_service.Create()
     if hasattr(self, 'relational_db') and self.relational_db:
       self.relational_db.SetVms(self.vm_groups)
-      self.relational_db.Create()
+      self.relational_db.Create(restore=should_restore)
     if self.non_relational_db:
       self.non_relational_db.Create(restore=should_restore)
     if self.spanner:
