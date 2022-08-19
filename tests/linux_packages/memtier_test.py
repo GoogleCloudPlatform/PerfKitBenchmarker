@@ -3,6 +3,8 @@
 
 import json
 import unittest
+from unittest import mock
+
 from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
@@ -131,16 +133,6 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             unit='',
             metadata=set_metadata),
         sample.Sample(
-            metric='Ops Time Series',
-            value=0,
-            unit='ops',
-            metadata=time_series_metadata),
-        sample.Sample(
-            metric='Max Latency Time Series',
-            value=0,
-            unit='ms',
-            metadata=latency_series_metadata),
-        sample.Sample(
             metric='Memtier Duration',
             value=2,
             unit='ms',
@@ -150,6 +142,104 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     results = memtier.MemtierResult.Parse(TEST_OUTPUT, TIME_SERIES_JSON)
     samples.extend(results.GetSamples(METADATA))
     self.assertSampleListsEqualUpToTimestamp(samples, expected_result)
+
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  def testAggregateMemtierWithOneResult(self):
+    FLAGS.memtier_time_series = True
+    timestamps = [0, 1000, 2000, 3000, 4000]
+    ops_values = [1, 1, 1, 1, 1]
+    latency = [1, 2, 3, 4, 5]
+    results = [
+        memtier.MemtierResult(1, 2, 0, 0, 0, 0, [], [], timestamps, ops_values,
+                              latency, {})
+    ]
+    samples = memtier.AggregateMemtierResults(results, {})
+    expected_result = [
+        sample.Sample(
+            metric='Total Ops Throughput',
+            value=1.0,
+            unit='ops/s',
+            metadata={},
+            timestamp=0),
+        sample.Sample(
+            metric='Total KB Throughput',
+            value=2.0,
+            unit='KB/s',
+            metadata={},
+            timestamp=0),
+        sample.Sample(
+            metric='OPS_time_series',
+            value=0.0,
+            unit='ops',
+            metadata={
+                'values': [1, 1, 1, 1, 1],
+                'timestamps': [0, 1000, 2000, 3000, 4000],
+                'interval': 1
+            },
+            timestamp=0),
+        sample.Sample(
+            metric='Latency_time_series',
+            value=0.0,
+            unit='ms',
+            metadata={
+                'values': [1, 2, 3, 4, 5],
+                'timestamps': [0, 1000, 2000, 3000, 4000],
+                'interval': 1
+            },
+            timestamp=0)
+    ]
+    self.assertEqual(samples, expected_result)
+
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  def testAggregateMemtierResultsWithMultipleResults(self):
+    FLAGS.memtier_time_series = True
+    timestamps = [0, 1000, 2000, 3000, 4000]
+    ops_values_1 = [1, 1, 1, 1, 1]
+    latency_1 = [1, 2, 3, 4, 5]
+    ops_values_2 = [1, 1, 1, 1, 1]
+    latency_2 = [5, 4, 3, 2, 1]
+    results = [
+        memtier.MemtierResult(2, 4, 0, 0, 0, 0, [], [], timestamps,
+                              ops_values_1, latency_1, {}),
+        memtier.MemtierResult(2, 4, 0, 0, 0, 0, [], [], timestamps,
+                              ops_values_2, latency_2, {})
+    ]
+    samples = memtier.AggregateMemtierResults(results, {})
+    expected_result = [
+        sample.Sample(
+            metric='Total Ops Throughput',
+            value=4,
+            unit='ops/s',
+            metadata={},
+            timestamp=0),
+        sample.Sample(
+            metric='Total KB Throughput',
+            value=8,
+            unit='KB/s',
+            metadata={},
+            timestamp=0),
+        sample.Sample(
+            metric='OPS_time_series',
+            value=0.0,
+            unit='ops',
+            metadata={
+                'values': [2, 2, 2, 2, 2],
+                'timestamps': [0, 1000, 2000, 3000, 4000],
+                'interval': 1
+            },
+            timestamp=0),
+        sample.Sample(
+            metric='Latency_time_series',
+            value=0.0,
+            unit='ms',
+            metadata={
+                'values': [5, 4, 3, 4, 5],
+                'timestamps': [0, 1000, 2000, 3000, 4000],
+                'interval': 1
+            },
+            timestamp=0)
+    ]
+    self.assertEqual(samples, expected_result)
 
   def testParseResults_no_time_series(self):
     get_metadata = {

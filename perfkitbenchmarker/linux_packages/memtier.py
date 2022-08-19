@@ -327,6 +327,7 @@ def RunOverAllThreadsPipelinesAndClients(
 
         for result in results:
           samples.extend(result.GetSamples(metadata))
+        samples.extend(AggregateMemtierResults(results, metadata))
   return samples
 
 
@@ -351,7 +352,7 @@ def MeasureLatencyCappedThroughput(
   for modify_load_func in [_ModifyPipelines, _ModifyClients]:
     parameters = MemtierBinarySearchParameters(
         lower_bound=0, upper_bound=math.inf, pipelines=1, threads=1, clients=1)
-    current_max_result = MemtierResult(0, 0, 0, 0, 0, 0, [], [], [], [], {})
+    current_max_result = MemtierResult(0, 0, 0, 0, 0, 0, [], [], [], [], [], {})
     current_metadata = None
     while parameters.lower_bound < (parameters.upper_bound - 1):
       result = _Run(
@@ -630,8 +631,9 @@ class MemtierResult:
   p99_latency: float
   get_latency_histogram: MemtierHistogram
   set_latency_histogram: MemtierHistogram
-  ops_time_series: List[Tuple[int, int]]
-  max_latency_time_series: List[Tuple[int, int]]
+  timestamps: List[int]
+  ops_series: List[int]
+  max_latency_series: List[int]
   runtime_info: Dict[Text, Text]
 
   @classmethod
@@ -675,11 +677,12 @@ class MemtierResult:
     aggregated_result = _ParseTotalThroughputAndLatency(memtier_results)
     set_histogram, get_histogram = _ParseHistogram(memtier_results)
     runtime_info = {}
-    ops_time_series = []
-    max_latency_time_series = []
+    ops_series = []
+    max_latency_series = []
+    timestamps = []
     if time_series_json:
       runtime_info = _GetRuntimeInfo(time_series_json)
-      ops_time_series, max_latency_time_series = _ParseTimeSeries(
+      timestamps, ops_series, max_latency_series = _ParseTimeSeries(
           time_series_json)
     return cls(
         ops_per_sec=aggregated_result.ops_per_sec,
@@ -690,8 +693,9 @@ class MemtierResult:
         p99_latency=aggregated_result.p99_latency,
         get_latency_histogram=get_histogram,
         set_latency_histogram=set_histogram,
-        ops_time_series=ops_time_series,
-        max_latency_time_series=max_latency_time_series,
+        timestamps=timestamps,
+        ops_series=ops_series,
+        max_latency_series=max_latency_series,
         runtime_info=runtime_info,
     )
 
@@ -712,30 +716,84 @@ class MemtierResult:
       hist_meta.update({'histogram': json.dumps(histogram)})
       samples.append(
           sample.Sample(f'{name} latency histogram', 0, '', hist_meta))
-
-    if self.ops_time_series:
-      ops_time_series_dict = {}
-      for interval, count in self.ops_time_series:
-        ops_time_series_dict[interval] = count
-      ops_series_metadata = copy.deepcopy(metadata)
-      ops_series_metadata.update({'time_series': ops_time_series_dict})
-      samples.append(
-          sample.Sample('Ops Time Series', 0, 'ops', ops_series_metadata))
-
-    if self.max_latency_time_series:
-      latency_time_series_dict = {}
-      for interval, latency in self.max_latency_time_series:
-        latency_time_series_dict[interval] = latency
-      latency_series_metadata = copy.deepcopy(metadata)
-      latency_series_metadata.update({'time_series': latency_time_series_dict})
-      samples.append(
-          sample.Sample('Max Latency Time Series', 0, 'ms',
-                        latency_series_metadata))
     if self.runtime_info:
       samples.append(
           sample.Sample('Memtier Duration', self.runtime_info['Total_duration'],
                         'ms', self.runtime_info))
     return samples
+
+
+def AggregateMemtierResults(memtier_results: List[MemtierResult],
+                            metadata: Dict[str, Any]) -> List[sample.Sample]:
+  """Aggregate memtier time series from all clients.
+
+  Aggregation assume followings:
+    1. All memtier clients runs with the same duration
+    2. All memtier clients starts at the same time
+
+  To aggregate the ops_series, sum all ops from each clients.
+  To aggregate the max latency series, get
+  the max latency from all clients.
+
+  Args:
+    memtier_results: A list of memtier result.
+    metadata: Extra metadata.
+
+  Returns:
+    List of time series samples.
+  """
+  total_ops = 0
+  total_kb = 0
+  for memtier_result in memtier_results:
+    total_ops += memtier_result.ops_per_sec
+    total_kb += memtier_result.kb_per_sec
+
+  samples = [
+      sample.Sample(
+          'Total Ops Throughput', total_ops, 'ops/s', metadata=metadata),
+      sample.Sample(
+          'Total KB Throughput', total_kb, 'KB/s', metadata=metadata)
+  ]
+
+  if not MEMTIER_TIME_SERIES.value:
+    return samples
+  start_times = [result.timestamps[0] for result in memtier_results]
+  min_start_time = min(start_times)
+  max_start_time = max(start_times)
+  logging.info('Max difference in start time between clients is %d ms',
+               max_start_time - min_start_time)
+
+  timestamps = memtier_results[0].timestamps
+  ops_series = memtier_results[0].ops_series
+  max_latency_series = memtier_results[0].max_latency_series
+
+  length = len(timestamps)
+  # Assume all clients run with the same duration
+  for memtier_result in memtier_results[1:]:
+    for i in range(len(memtier_result.ops_series)):
+      if i >= length:
+        raise errors.Error('Memtier results contains'
+                           'different legnths of time series.')
+      ops_series[i] += memtier_result.ops_series[i]
+      max_latency_series[i] = max(max_latency_series[i],
+                                  memtier_result.max_latency_series[i])
+
+  return samples + [
+      sample.CreateTimeSeriesSample(
+          ops_series,
+          timestamps,
+          'OPS_time_series',
+          'ops',
+          1,
+          additional_metadata=metadata),
+      sample.CreateTimeSeriesSample(
+          max_latency_series,
+          timestamps,
+          'Latency_time_series',
+          'ms',
+          1,
+          additional_metadata=metadata)
+  ]
 
 
 def _ParseHistogram(
@@ -825,18 +883,22 @@ def _ConvertPercentToAbsolute(total_value: int, percent: float) -> float:
 
 
 def _ParseTimeSeries(
-    time_series_json: Optional[Text]
-) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]]]:
+    time_series_json: Optional[Text]) -> Tuple[List[int], List[int], List[int]]:
   """Parse time series ops throughput from json output."""
+  timestamps = []
   ops_series = []
   max_latency_series = []
   if time_series_json:
     raw = json.loads(time_series_json)
     time_series = raw['ALL STATS']['Totals']['Time-Serie']
+    start_time = int(raw['ALL STATS']['Runtime']['Start time'])
+
     for interval, data_dict in time_series.items():
-      ops_series.append((interval, data_dict['Count']))
-      max_latency_series.append((interval, data_dict['Max Latency']))
-  return ops_series, max_latency_series
+      current_time = int(interval) * 1000 + start_time
+      timestamps.append(current_time)
+      ops_series.append(data_dict['Count'])
+      max_latency_series.append(data_dict['Max Latency'])
+  return timestamps, ops_series, max_latency_series
 
 
 def _GetRuntimeInfo(time_series_json: Optional[Text]):
