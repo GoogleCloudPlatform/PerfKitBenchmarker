@@ -35,15 +35,18 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
 flags.DEFINE_string(
     'dpb_dataflow_temp_location', None,
-    'Cloud Storage path for Dataflow to stage most temporary files.')
+    'Cloud Storage path for Dataflow to stage most temporary files. If unset, '
+    'PKB will create a bucket and put them under the "temp/" directory.')
 flags.DEFINE_string(
     'dpb_dataflow_staging_location', None,
-    'Google Cloud Storage bucket for Dataflow to stage the binary files. '
-    'You must create this bucket ahead of time, before running your pipeline.')
+    'Google Cloud Storage bucket for Dataflow to stage the binary files. If '
+    'unset PKB will create a bucket and stage the files under the "staging/" '
+    'directory.')
 flags.DEFINE_string('dpb_dataflow_runner', 'DataflowRunner',
                     'Flag to specify the pipeline runner at runtime.')
 flags.DEFINE_string('dpb_dataflow_sdk', None,
@@ -96,18 +99,37 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     self.project = FLAGS.project
     self.job_id = None
     self.job_metrics = None
+    if not self.dpb_service_zone:
+      raise errors.Setup.InvalidSetupError(
+          'dpb_service_zone must be provided, for provisioning.')
+    self.region = util.GetRegionFromZone(self.dpb_service_zone)
+    self.storage_service = gcs.GoogleCloudStorageService()
+    self.storage_service.PrepareService(location=self.region)
+    self.persistent_fs_prefix = 'gs://'
+
+  def _GetTempLocation(self) -> str:
+    if FLAGS.dpb_dataflow_temp_location is None:
+      return f'gs://{self.bucket}/temp/'
+    return FLAGS.dpb_dataflow_temp_location
+
+  def _GetStagingLocation(self) -> str:
+    if FLAGS.dpb_dataflow_staging_location is None:
+      return f'gs://{self.bucket}/staging/'
+    return FLAGS.dpb_dataflow_staging_location
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
     del benchmark_config  # Unused
+    if FLAGS.dpb_job_jarfile and FLAGS.dpb_job_jarfile.startswith('gs://'):
+      return
     if not FLAGS.dpb_job_jarfile or not os.path.exists(FLAGS.dpb_job_jarfile):
       raise errors.Config.InvalidValue('Job jar missing.')
 
-  def Create(self):
+  def _Create(self):
     """See base class."""
     pass
 
-  def Delete(self):
+  def _Delete(self):
     """See base class."""
     pass
 
@@ -159,9 +181,15 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     cmd.append(classname)
     cmd += job_arguments
 
-    if FLAGS.dpb_dataflow_temp_location:
-      cmd.append('--gcpTempLocation={}'.format(
-          FLAGS.dpb_dataflow_temp_location))
+    cmd.append(f'--gcpTempLocation={self._GetTempLocation()}')
+    cmd.append(f'--stagingLocation={self._GetStagingLocation()}')
+    cmd.append(f'--runner={FLAGS.dpb_dataflow_runner}')
+    if not FLAGS.dpb_wordcount_out_base:
+      base_out = self._GetStagingLocation()
+    else:
+      base_out = f'gs://{FLAGS.dpb_wordcount_out_base}'
+    cmd.append(f'--output={os.path.join(base_out, "output")}')
+
     region = util.GetRegionFromZone(FLAGS.dpb_service_zone)
     cmd.append('--region={}'.format(region))
     cmd.append('--workerMachineType={}'.format(worker_machine_type))

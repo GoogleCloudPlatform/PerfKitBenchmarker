@@ -30,12 +30,14 @@ https://cloud.google.com/dataflow/docs/quickstarts/quickstart-java-maven
 
 import copy
 import datetime
+import os
 import tempfile
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
 
 BENCHMARK_NAME = 'dpb_wordcount_benchmark'
@@ -108,7 +110,16 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
-  pass
+  """Download jarfile locally if using Dataflow."""
+  dpb_service_instance = benchmark_spec.dpb_service
+  storage_service = dpb_service_instance.storage_service
+  benchmark_spec.dpb_wordcount_jarfile = FLAGS.dpb_job_jarfile
+  if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
+    if FLAGS.dpb_job_jarfile and FLAGS.dpb_job_jarfile.startswith('gs://'):
+      local_path = os.path.join(
+          temp_dir.GetRunDirPath(), os.path.basename(FLAGS.dpb_job_jarfile))
+      storage_service.Copy(FLAGS.dpb_job_jarfile, local_path)
+      benchmark_spec.dpb_wordcount_jarfile = local_path
 
 
 def Run(benchmark_spec):
@@ -137,22 +148,14 @@ def Run(benchmark_spec):
   if FLAGS.dpb_job_classname:
     classname = FLAGS.dpb_job_classname
   if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
-    jarfile = FLAGS.dpb_job_jarfile
-    job_arguments.append('--stagingLocation={}'.format(
-        FLAGS.dpb_dataflow_staging_location))
-    job_arguments.append('--runner={}'.format(FLAGS.dpb_dataflow_runner))
+    jarfile = benchmark_spec.dpb_wordcount_jarfile
     job_arguments.append('--inputFile={}'.format(input_location))
-    if not FLAGS.dpb_wordcount_out_base:
-      base_out = FLAGS.dpb_dataflow_staging_location
-    else:
-      base_out = 'gs://{}'.format(FLAGS.dpb_wordcount_out_base)
-    job_arguments.append('--output={}/output'.format(base_out))
   else:
     # Use user-provided jar file if present; otherwise use the default example
-    if not FLAGS.dpb_job_jarfile:
-      jarfile = dpb_service_instance.GetExecutionJarfile('spark', 'examples')
+    if not benchmark_spec.dpb_wordcount_jarfile:
+      jarfile = dpb_service_instance.GetExecutionJar('spark', 'examples')
     else:
-      jarfile = FLAGS.dpb_job_jarfile
+      jarfile = benchmark_spec.dpb_wordcount_jarfile
 
     job_arguments = [input_location]
   job_arguments.extend(FLAGS.dpb_wordcount_additional_args)
