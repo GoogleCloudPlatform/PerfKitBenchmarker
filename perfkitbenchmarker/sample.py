@@ -14,6 +14,7 @@
 """A performance sample class."""
 
 import collections
+import datetime
 import math
 import time
 from typing import Any, Dict, List, NewType
@@ -26,6 +27,7 @@ PERCENTILES_LIST = 0.1, 1, 5, 10, 50, 90, 95, 99, 99.9
 _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
 
 # Metric names for time series
+TPM_TIME_SERIES = 'TPM_time_series'
 RAMP_UP_ENDS = 'ramp_up_ends'
 RAMP_DOWN_STARTS = 'ramp_down_starts'
 
@@ -266,4 +268,8 @@ def CreateTimeSeriesSample(values: List[Any],
   if ramp_down_starts:
     metadata[RAMP_DOWN_STARTS] = ramp_down_starts
   return Sample(metric, 0, units, metadata)
+
+
+def ConvertDateTimeToUnixMs(date: datetime.datetime):
+  return time.mktime(date.timetuple()) * 1000
 

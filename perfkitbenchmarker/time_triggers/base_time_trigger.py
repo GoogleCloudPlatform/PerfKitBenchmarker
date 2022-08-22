@@ -87,10 +87,10 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
     """Run the trigger event."""
     for vm in self.vms:
       self.CreateAndStartTriggerThread(vm)
-    trigger_time = (
+    self.trigger_time = (
         datetime.datetime.now() +
         datetime.timedelta(seconds=self.delay))
-    self.metadata[self.trigger_name + '_time'] = str(trigger_time)
+    self.metadata[self.trigger_name + '_time'] = str(self.trigger_time)
 
   # pylint: disable=unused-argument
   def UpdateMetadata(self, unused_sender, benchmark_spec, samples):
