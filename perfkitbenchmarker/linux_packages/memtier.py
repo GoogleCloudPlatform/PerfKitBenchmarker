@@ -782,14 +782,14 @@ def AggregateMemtierResults(memtier_results: List[MemtierResult],
       sample.CreateTimeSeriesSample(
           ops_series,
           timestamps,
-          'OPS_time_series',
+          sample.OPS_TIME_SERIES,
           'ops',
           1,
           additional_metadata=metadata),
       sample.CreateTimeSeriesSample(
           max_latency_series,
           timestamps,
-          'Latency_time_series',
+          sample.LATENCY_TIME_SERIES,
           'ms',
           1,
           additional_metadata=metadata)

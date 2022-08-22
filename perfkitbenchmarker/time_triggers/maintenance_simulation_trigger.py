@@ -23,6 +23,9 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.time_triggers import base_time_trigger
 
+TIME_SERIES_SAMPLES_FOR_AGGREGATION = [
+    sample.TPM_TIME_SERIES, sample.OPS_TIME_SERIES
+]
 PERCENTILES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
 SIMULATE_MAINTENANCE = flags.DEFINE_boolean(
@@ -79,7 +82,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     """Finds the time series samples and add generate the aggregated metrics."""
     additional_samples = []
     for s in samples:
-      if s.metric in [sample.TPM_TIME_SERIES]:
+      if s.metric in TIME_SERIES_SAMPLES_FOR_AGGREGATION:
         additional_samples += self._AggregateThroughputSample(s)
     samples.extend(additional_samples)
 

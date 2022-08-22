@@ -28,6 +28,8 @@ _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
 
 # Metric names for time series
 TPM_TIME_SERIES = 'TPM_time_series'
+OPS_TIME_SERIES = 'OPS_time_series'
+LATENCY_TIME_SERIES = 'Latency_time_series'
 RAMP_UP_ENDS = 'ramp_up_ends'
 RAMP_DOWN_STARTS = 'ramp_down_starts'
 
