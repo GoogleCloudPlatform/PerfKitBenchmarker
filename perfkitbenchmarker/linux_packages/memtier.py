@@ -587,6 +587,8 @@ def _Run(vm,
     vm.PullFile(vm_util.GetTempDir(), json_results_file)
     with open(json_path, 'r') as ts_json:
       time_series_json = ts_json.read()
+      if not time_series_json:
+        logging.warning('No metrics in time series json.')
 
   with open(output_path, 'r') as output:
     summary_data = output.read()
@@ -757,23 +759,34 @@ def AggregateMemtierResults(memtier_results: List[MemtierResult],
 
   if not MEMTIER_TIME_SERIES.value:
     return samples
-  start_times = [result.timestamps[0] for result in memtier_results]
+
+  non_empty_results = []
+  for result in memtier_results:
+    if result.timestamps:
+      non_empty_results.append(result)
+    else:
+      logging.warning('There is empty result: %s %s %s',
+                      str(result.ops_per_sec), str(result.timestamps),
+                      str(result.runtime_info))
+
+  start_times = [result.timestamps[0] for result in non_empty_results]
   min_start_time = min(start_times)
   max_start_time = max(start_times)
   logging.info('Max difference in start time between clients is %d ms',
                max_start_time - min_start_time)
 
   timestamps = memtier_results[0].timestamps
-  ops_series = memtier_results[0].ops_series
-  max_latency_series = memtier_results[0].max_latency_series
 
-  length = len(timestamps)
-  # Assume all clients run with the same duration
-  for memtier_result in memtier_results[1:]:
+  # Not all clients have the same duration
+  for memtier_result in non_empty_results:
+    if len(memtier_result.timestamps) > len(timestamps):
+      timestamps = memtier_result.timestamps
+
+  ops_series = [0] * len(timestamps)
+  max_latency_series = [0] * len(timestamps)
+
+  for memtier_result in non_empty_results:
     for i in range(len(memtier_result.ops_series)):
-      if i >= length:
-        raise errors.Error('Memtier results contains'
-                           'different legnths of time series.')
       ops_series[i] += memtier_result.ops_series[i]
       max_latency_series[i] = max(max_latency_series[i],
                                   memtier_result.max_latency_series[i])
