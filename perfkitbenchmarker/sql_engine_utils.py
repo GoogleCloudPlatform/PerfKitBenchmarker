@@ -14,6 +14,7 @@
 
 """Utilities to support multiple engines."""
 import abc
+import dataclasses
 import logging
 import timeit
 from typing import Dict, List, Any, Tuple, Union, Optional
@@ -61,17 +62,15 @@ DEFAULT_COMMAND = 'default'
 
 
 # Query Related tools
+@dataclasses.dataclass
 class DbConnectionProperties():
   """Data class to store attrubutes needed for connecting to a database."""
-
-  def __init__(self, engine, engine_version, endpoint, port, database_username,
-               database_password):
-    self.engine = engine
-    self.engine_version = engine_version
-    self.endpoint = endpoint
-    self.port = port
-    self.database_username = database_username
-    self.database_password = database_password
+  engine: str
+  engine_version: str
+  endpoint: str
+  port: int
+  database_username: str
+  database_password: str
 
 
 class ISQLQueryTools(metaclass=abc.ABCMeta):
