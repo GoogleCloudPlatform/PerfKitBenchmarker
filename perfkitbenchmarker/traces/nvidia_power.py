@@ -64,7 +64,7 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
   def _CollectorRunCommand(self, vm: virtual_machine.BaseVirtualMachine,
                            collector_file: str) -> str:
     """See base class."""
-    return f'nvidia-smi --query-gpu=index,power.draw --format=csv -l {self.interval} > {collector_file} & echo $!'
+    return f'nvidia-smi --query-gpu=index,power.draw --format=csv -l {self.interval} > {collector_file} 2>&1 & echo $!'
 
   def Analyze(self, unused_sender, benchmark_spec: BenchmarkSpec,
               samples: List[sample.Sample]) -> None:
