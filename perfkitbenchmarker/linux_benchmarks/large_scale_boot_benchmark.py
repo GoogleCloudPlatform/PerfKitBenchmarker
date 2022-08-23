@@ -33,6 +33,7 @@ The way it works is as follows:
 """
 import logging
 import posixpath
+import statistics
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -171,6 +172,8 @@ BENCHMARK_DATA = {
 _SSH_PORT = linux_virtual_machine.DEFAULT_SSH_PORT
 # default windows rdp port
 _RDP_PORT = windows_virtual_machine.RDP_PORT
+# nano multiplier
+_NANO = 1000 * 1000 * 1000
 
 
 def GetAzBootVMStartIdByLauncher(launcher_name):
@@ -537,8 +540,19 @@ def _ParseResult(launcher_vms):
     samples.append(sample.Sample('Launcher Boot Details', -1,
                                  '', current_metadata))
 
+  mean_time = statistics.mean(durations)
+  median_time = statistics.median(durations)
   samples.append(sample.Sample('Cluster Max Boot Time', slowest_time,
                                'nanoseconds', common_metadata))
+  samples.append(
+      sample.Sample('Cluster Max Boot Sec', slowest_time / _NANO,
+                    'seconds', common_metadata))
+  samples.append(
+      sample.Sample('Cluster Mean Boot Sec', mean_time / _NANO,
+                    'seconds', common_metadata))
+  samples.append(
+      sample.Sample('Cluster Median Boot Sec', median_time / _NANO,
+                    'seconds', common_metadata))
   samples.append(sample.Sample('Cluster Expected Boots', _GetExpectedBoots(),
                                '', common_metadata))
   samples.append(sample.Sample('Cluster Success Boots', vm_count,

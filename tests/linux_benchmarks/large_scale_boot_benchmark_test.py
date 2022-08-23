@@ -116,6 +116,21 @@ class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             unit='nanoseconds',
             metadata=common_metadata),
         sample.Sample(
+            metric='Cluster Max Boot Sec',
+            value=0.000000007,
+            unit='seconds',
+            metadata=common_metadata),
+        sample.Sample(
+            metric='Cluster Mean Boot Sec',
+            value=0.000000003,
+            unit='seconds',
+            metadata=common_metadata),
+        sample.Sample(
+            metric='Cluster Median Boot Sec',
+            value=0.000000003,
+            unit='seconds',
+            metadata=common_metadata),
+        sample.Sample(
             metric='Cluster Expected Boots',
             value=6,
             unit='',
