@@ -142,6 +142,7 @@ class _DpbServiceSpec(spec.BaseSpec):
                     dpb_service.DATAPROC_GKE,
                     dpb_service.DATAPROC_SERVERLESS,
                     dpb_service.DATAFLOW,
+                    dpb_service.DATAFLOW_TEMPLATE,
                     dpb_service.EMR,
                     dpb_service.EMR_SERVERLESS,
                     dpb_service.GLUE,

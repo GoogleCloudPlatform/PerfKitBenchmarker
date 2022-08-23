@@ -13,6 +13,7 @@
 # limitations under the License.
 """Module containing class for GCP's Dataflow service.
 
+
 Use this module for running Dataflow jobs from compiled jar files.
 
 No Clusters can be created or destroyed, since it is a managed solution
@@ -56,7 +57,6 @@ flags.DEFINE_multi_string('dpb_dataflow_additional_args', [], 'Additional '
                           'arguments which should be passed to Dataflow job.')
 flags.DEFINE_integer('dpb_dataflow_timeout', 300,
                      'The default timeout for Dataflow job.')
-
 
 FLAGS = flags.FLAGS
 
@@ -203,7 +203,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     if FLAGS.dpb_dataflow_additional_args:
       cmd.extend(FLAGS.dpb_dataflow_additional_args)
-
     _, stderr, _ = vm_util.IssueCommand(cmd, timeout=FLAGS.dpb_dataflow_timeout)
 
     # Parse output to retrieve submitted job ID
@@ -224,6 +223,13 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
     basic_data['dpb_job_id'] = self.job_id
     return basic_data
+
+  def GetJobStatus(self):
+    cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'show', self.job_id)
+    cmd.flags = {
+        'project': self.project,
+        'format': 'json',
+    }
 
   @functools.cached_property
   def job_stats(self):
@@ -380,13 +386,95 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # Multiply fractional cpu util by 100 to display a percentage usage
     return round(self._GetAvgValueFromTimeSeries(results) * 100, 2)
 
+  def GetMaxOutputThroughput(self, ptransform: str,
+      start_time: datetime, end_time: datetime):
+    """Get max throughput from a particular pTransform during job run interval.
+
+    Args:
+      start_time: datetime specifying the beginning of the time interval.
+      end_time: datetime specifying the end of the time interval.
+
+    Returns:
+      Max value across time interval
+    """
+    client = monitoring_v3.MetricServiceClient()
+    project_name = f'projects/{self.project}'
+
+    now_seconds = int(time.time())
+    end_time_seconds = int(end_time.timestamp())
+    # Dataflow metrics data can take up to 180 seconds to appear
+    if (now_seconds - end_time_seconds) < DATAFLOW_METRICS_DELAY_SECONDS:
+      logging.info(
+          'Waiting for Dataflow metrics to be available (up to 3 minutes)...')
+      time.sleep(
+          DATAFLOW_METRICS_DELAY_SECONDS - (now_seconds - end_time_seconds))
+
+    interval = TimeInterval()
+    # Shift TZ of datetime arguments since FromDatetime() assumes UTC
+    # See
+    # https://googleapis.dev/python/protobuf/latest/google/protobuf/timestamp_pb2.html#google.protobuf.timestamp_pb2.Timestamp.FromDatetime
+    interval.start_time.FromDatetime(
+        start_time.astimezone(datetime.timezone.utc))
+    interval.end_time.FromDatetime(
+        end_time.astimezone(datetime.timezone.utc))
+
+    api_filter = (
+        'metric.type = "dataflow.googleapis.com/job/elements_produced_count" '
+        f'AND resource.labels.project_id = "{self.project}" '
+        f'AND metric.labels.job_id = "{self.job_id}" '
+        f'AND metric.labels.ptransform = "{ptransform}" ')
+
+    aggregation = Aggregation(
+        alignment_period={'seconds': 60},  # 1 minute
+        per_series_aligner=Aggregation.Aligner.ALIGN_RATE,
+    )
+
+    results = client.list_time_series(
+        name=project_name,
+        filter_=api_filter,
+        interval=interval,
+        view=enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        aggregation=aggregation,
+    )
+
+    if not results:
+      logging.warning(
+          'No monitoring data found. Unable to calculate max throughput.')
+      return None
+
+    return self._GetMaxValueFromTimeSeries(results)
+
+  def GetSubscriptionBacklogSize(self, subscription_name, interval_length=4):
+    client = monitoring_v3.MetricServiceClient()
+    project_name = f'projects/{self.project}'
+
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    delta = datetime.timedelta(minutes=interval_length)
+
+    interval = TimeInterval()
+    interval.start_time.FromDatetime(now-delta)
+    interval.end_time.FromDatetime(now)
+
+    api_filter = (
+        'metric.type = "pubsub.googleapis.com/subscription/'
+                       'num_undelivered_messages" '
+        f'AND resource.labels.subscription_id = "{subscription_name}" ')
+
+    results = client.list_time_series(
+        name=project_name,
+        filter_=api_filter,
+        interval=interval,
+        view=enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+    )
+
+    return round(self._GetLastValueFromTimeSeries(results), 2)
+
   def _GetAvgValueFromTimeSeries(
       self, time_series: types.ListTimeSeriesResponse):
     """Parses time series data and returns average across intervals.
 
     Args:
-      time_series: time series of cpu fractional utilization returned by
-        monitoring.
+      time_series: time series data returned by monitoring.
 
     Returns:
       Average value across intervals
@@ -402,3 +490,44 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       return averaged
 
     return None
+
+  def _GetMaxValueFromTimeSeries(
+    self, time_series: types.ListTimeSeriesResponse):
+    """Parses time series data and returns maximum across intervals.
+
+    Args:
+      time_series: time series data returned by monitoring.
+
+    Returns:
+      Maximum value across intervals
+    """
+    points = []
+    for time_interval in time_series:
+      for snapshot in time_interval.points:
+        points.append(snapshot.value.double_value)
+
+    if points:
+      # Max over all minute intervals captured
+      max_rate = max(points)
+      return max_rate
+
+    return None
+
+  def _GetLastValueFromTimeSeries(
+    self, time_series: types.ListTimeSeriesResponse):
+    """Parses time series data and returns last value in last interval.
+
+    Args:
+      time_series: time series data returned by monitoring.
+
+    Returns:
+      Last value across intervals
+    """
+    value = None
+    for i, time_interval in enumerate(time_series):
+      if i != 0: break
+      for j, snapshot in enumerate(time_interval.points):
+        if j != 0: break
+        value = snapshot.value.int64_value
+
+    return value
