@@ -13,7 +13,6 @@
 # limitations under the License.
 """Module containing class for GCP's Dataflow service.
 
-
 Use this module for running Dataflow jobs from compiled jar files.
 
 No Clusters can be created or destroyed, since it is a managed solution
@@ -386,8 +385,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # Multiply fractional cpu util by 100 to display a percentage usage
     return round(self._GetAvgValueFromTimeSeries(results) * 100, 2)
 
-  def GetMaxOutputThroughput(self, ptransform: str,
-      start_time: datetime, end_time: datetime):
+  def GetMaxOutputThroughput(
+      self, ptransform: str,
+      start_time: datetime.datetime, end_time: datetime.datetime):
     """Get max throughput from a particular pTransform during job run interval.
 
     Args:
@@ -409,7 +409,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       time.sleep(
           DATAFLOW_METRICS_DELAY_SECONDS - (now_seconds - end_time_seconds))
 
-    interval = TimeInterval()
+    interval = types.TimeInterval()
     # Shift TZ of datetime arguments since FromDatetime() assumes UTC
     # See
     # https://googleapis.dev/python/protobuf/latest/google/protobuf/timestamp_pb2.html#google.protobuf.timestamp_pb2.Timestamp.FromDatetime
@@ -424,16 +424,16 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
         f'AND metric.labels.job_id = "{self.job_id}" '
         f'AND metric.labels.ptransform = "{ptransform}" ')
 
-    aggregation = Aggregation(
+    aggregation = types.Aggregation(
         alignment_period={'seconds': 60},  # 1 minute
-        per_series_aligner=Aggregation.Aligner.ALIGN_RATE,
+        per_series_aligner=types.Aggregation.Aligner.ALIGN_RATE,
     )
 
     results = client.list_time_series(
         name=project_name,
         filter_=api_filter,
         interval=interval,
-        view=enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
         aggregation=aggregation,
     )
 
@@ -451,7 +451,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     delta = datetime.timedelta(minutes=interval_length)
 
-    interval = TimeInterval()
+    interval = types.TimeInterval()
     interval.start_time.FromDatetime(now-delta)
     interval.end_time.FromDatetime(now)
 
@@ -464,7 +464,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
         name=project_name,
         filter_=api_filter,
         interval=interval,
-        view=enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
     )
 
     return round(self._GetLastValueFromTimeSeries(results), 2)
@@ -523,11 +523,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     Returns:
       Last value across intervals
     """
-    value = None
-    for i, time_interval in enumerate(time_series):
-      if i != 0: break
-      for j, snapshot in enumerate(time_interval.points):
-        if j != 0: break
-        value = snapshot.value.int64_value
-
-    return value
+    try:
+      return list(time_series)[0].points[0].value.int64_value
+    except IndexError:
+      return None

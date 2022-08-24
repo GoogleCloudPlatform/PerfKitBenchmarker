@@ -92,7 +92,7 @@ def Prepare(benchmark_spec):
   benchmark_spec.input_subscription_name = \
     FLAGS.dpb_df_template_input_subscription.split('/')[-1]
   benchmark_spec.input_subscription_snapshot_name = \
-    benchmark_spec.input_subscription_name + '-' + suffix
+    f'{benchmark_spec.input_subscription_name}-{suffix}'
 
   cmd = util.GcloudCommand(None, 'pubsub', 'snapshots', 'create',
                           benchmark_spec.input_subscription_snapshot_name)
@@ -103,8 +103,8 @@ def Prepare(benchmark_spec):
   }
   stdout, _, _ = cmd.Issue()
   snapshot_id = json.loads(stdout)[0]['snapshotId']
-  logging.info('Prepare: Created snapshot {} for input subscription data'
-      .format(snapshot_id))
+  logging.info('Prepare: Created snapshot %s for input subscription data',
+      snapshot_id)
   pass
 
 def Run(benchmark_spec):
@@ -127,7 +127,7 @@ def Run(benchmark_spec):
 
   # Pass template parameters
   template_params = []
-  template_params.append('inputSubscription={}'.format(input_pubsub_id))
+  template_params.append(f'inputSubscription={input_pubsub_id}')
   for arg in additional_args:
     template_params.append(arg)
 
@@ -148,12 +148,14 @@ def Run(benchmark_spec):
   run_time = (end_time - start_time).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
 
-  avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(start_time, end_time)
+  avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(
+      start_time, end_time)
   results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))
 
-  max_thruput = dpb_service_instance.GetMaxOutputThroughput(
+  max_throughput = dpb_service_instance.GetMaxOutputThroughput(
       output_ptransform, start_time, end_time)
-  results.append(sample.Sample('max_thruput', max_thruput, '1/s', metadata))
+  results.append(sample.Sample('max_throughput', max_throughput, '1/s',
+      metadata))
 
   stats = dpb_service_instance.job_stats
   for name, value in stats.items():
@@ -177,8 +179,8 @@ def Cleanup(benchmark_spec):
   }
   stdout, _, _ = cmd.Issue()
   snapshot_id = json.loads(stdout)['snapshotId']
-  logging.info('Cleanup: Restore snapshot {} for input subscription data'
-      .format(snapshot_id))
+  logging.info('Cleanup: Restore snapshot %s for input subscription data',
+      snapshot_id)
 
   # Wait for seek operation to take full effect
   logging.info(
@@ -195,6 +197,6 @@ def Cleanup(benchmark_spec):
   }
   stdout, _, _ = cmd.Issue()
   snapshot_id = json.loads(stdout)[0]['snapshotId']
-  logging.info('Cleanup: Deleted snapshot {}'.format(snapshot_id))
+  logging.info('Cleanup: Deleted snapshot %s', snapshot_id)
   pass
 

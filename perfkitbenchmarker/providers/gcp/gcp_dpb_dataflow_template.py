@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing class for GCP's Dataflow service.
+
 Use this module for running Dataflow jobs from pre-built Dataflow templates
 such as https://cloud.google.com/dataflow/docs/guides/templates/provided-templates
 
@@ -100,7 +101,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
       result = json.loads(stdout)
       self.job_id = result['id']
     except Exception as err:
-      logging.error('Failed to parse Dataflow job ID: {}'.format(err))
+      logging.error('Failed to parse Dataflow job ID: %r', err)
       raise
 
     logging.info('Dataflow job ID: %s', self.job_id)
@@ -116,8 +117,8 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
     # otherwise keep waiting
     if not self.input_sub_empty:
       backlog_size = self.GetSubscriptionBacklogSize(job_input_sub)
-      logging.info('Polling: Backlog size of subscription {} is {}'
-          .format(job_input_sub, backlog_size))
+      logging.info('Polling: Backlog size of subscription %s is %s',
+          job_input_sub, backlog_size)
       if backlog_size == 0:
         self.input_sub_empty = True
         # Start draining job once input subscription is empty
@@ -128,7 +129,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
             'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
             'format': 'json',
         }
-        logging.info('Polling: Draining job {} ...'.format(self.job_id))
+        logging.info('Polling: Draining job %s ...', self.job_id)
         stdout, _, _ = cmd.Issue()
       else:
         return None
@@ -143,7 +144,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
       }
       stdout, _, _ = cmd.Issue()
       job_state = json.loads(stdout)['state']
-      logging.info('Polling: Job state is {} '.format(job_state))
+      logging.info('Polling: Job state is %s', job_state)
       if job_state == "Drained":
           self.job_drained = True
       else:
