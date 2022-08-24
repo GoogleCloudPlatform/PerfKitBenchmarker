@@ -40,29 +40,29 @@ flags: &myflags
   dpb_service_zone: us-central1-a
   dpb_dataflow_timeout: 1800 # 30 minutes
   dpb_dataflow_temp_location: gs://<MY_BUCKET>/temp
-  dpb_df_template_gcs_location: gs://dataflow-templates/latest/PubSub_Subscription_to_BigQuery
-  dpb_df_template_input_subscription: projects/<MY_PROJECT>/subscriptions/perftest-pubsub-input-sub-1M
-  dpb_df_template_output_ptransform: WriteSuccessfulRecords/StreamingInserts/StreamingWriteTables/StreamingWrite/BatchedStreamingWrite.ViaBundleFinalization/ParMultiDo(BatchAndInsertElements)
-  dpb_df_template_additional_args:
+  dpb_dataflow_template_gcs_location: gs://dataflow-templates/latest/PubSub_Subscription_to_BigQuery
+  dpb_dataflow_template_input_subscription: projects/<MY_PROJECT>/subscriptions/perftest-pubsub-input-sub-1M
+  dpb_dataflow_template_output_ptransform: WriteSuccessfulRecords/StreamingInserts/StreamingWriteTables/StreamingWrite/BatchedStreamingWrite.ViaBundleFinalization/ParMultiDo(BatchAndInsertElements)
+  dpb_dataflow_template_additional_args:
     - outputTableSpec=<MY_PROJECT>:test_dataset.test_run
 
 #################################
 # Benchmark variations to run
 #################################
 benchmarks:
-- dpb_df_template_benchmark: {
+- dpb_dataflow_template_benchmark: {
     dpb_service: { service_type: dataflow_template, worker_count: 1, worker_group: *sixteen_core },
     flags: *myflags
   }
-- dpb_df_template_benchmark: {
+- dpb_dataflow_template_benchmark: {
     dpb_service: { service_type: dataflow_template, worker_count: 1, worker_group: *eight_core },
     flags: *myflags
   }
-- dpb_df_template_benchmark: {
+- dpb_dataflow_template_benchmark: {
     dpb_service: { service_type: dataflow_template, worker_count: 1, worker_group: *four_core },
     flags: *myflags
   }
-- dpb_df_template_benchmark: {
+- dpb_dataflow_template_benchmark: {
     dpb_service: { service_type: dataflow_template, worker_count: 1, worker_group: *two_core },
     flags: *myflags
   }
@@ -70,7 +70,7 @@ benchmarks:
 #################################
 # Alternative benchmark config examples
 #################################
-# dpb_df_template_benchmark:
+# dpb_dataflow_template_benchmark:
 #   description: Run Dataflow template across several versions
 #   dpb_service:
 #     service_type: dataflow_template
@@ -79,14 +79,14 @@ benchmarks:
 #   flag_matrix: recent_versions
 #   flag_matrix_defs:
 #     recent_versions:
-#       dpb_df_template_gcs_location:
+#       dpb_dataflow_template_gcs_location:
 #       - gs://dataflow-templates/2022-07-04-00_RC00/PubSub_Subscription_to_BigQuery
 #       - gs://dataflow-templates/2022-06-27-00_RC00/PubSub_Subscription_to_BigQuery
 #       - gs://dataflow-templates/2022-06-21-00_RC00/PubSub_Subscription_to_BigQuery
 #       - gs://dataflow-templates/2022-06-06-00_RC00/PubSub_Subscription_to_BigQuery
 #       - gs://dataflow-templates/2022-05-30-00_RC00/PubSub_Subscription_to_BigQuery
 
-# dpb_df_template_benchmark:
+# dpb_dataflow_template_benchmark:
 #   description: Run Dataflow template across several input sizes
 #   dpb_service:
 #     service_type: dataflow_template
@@ -95,7 +95,7 @@ benchmarks:
 #   flag_matrix: input_sizes
 #   flag_matrix_defs:
 #     input_sizes:
-#       dpb_df_template_input_subscription:
+#       dpb_dataflow_template_input_subscription:
 #       - projects/<MY_PROJECT>/subscriptions/perftest-pubsub-input-sub-100k
 #       - projects/<MY_PROJECT>/subscriptions/perftest-pubsub-input-sub-1M
 #       - projects/<MY_PROJECT>/subscriptions/perftest-pubsub-input-sub-10M

@@ -36,10 +36,10 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
 from perfkitbenchmarker.providers.gcp import util
 
-BENCHMARK_NAME = 'dpb_df_template_benchmark'
+BENCHMARK_NAME = 'dpb_dataflow_template_benchmark'
 
 BENCHMARK_CONFIG = """
-dpb_df_template_benchmark:
+dpb_dataflow_template_benchmark:
   description: Run an Apache Beam template on Dataflow service
   dpb_service:
     service_type: dataflow_template
@@ -53,7 +53,7 @@ dpb_df_template_benchmark:
     worker_count: 1
 """
 
-# Refer to flags with prefix 'dpb_df_template' defined in gcp provider flags.py
+# Refer to flags with prefix 'dpb_dataflow_template' in gcp provider flags.py
 FLAGS = flags.FLAGS
 
 # PubSub seek operation can take up to 1 minute to take full effect
@@ -71,10 +71,10 @@ def CheckPrerequisites(benchmark_config):
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  if FLAGS.dpb_df_template_gcs_location is None:
+  if FLAGS.dpb_dataflow_template_gcs_location is None:
     raise errors.Config.InvalidValue(
         'Unspecified Dataflow template GCS location.')
-  if FLAGS.dpb_df_template_input_subscription is None:
+  if FLAGS.dpb_dataflow_template_input_subscription is None:
     raise errors.Config.InvalidValue(
         'Unspecified Pub/Sub subscription as input for Dataflow job.')
 
@@ -90,7 +90,7 @@ def Prepare(benchmark_spec):
   suffix = ''.join(
     random.choice(string.ascii_lowercase + string.digits) for i in range(6))
   benchmark_spec.input_subscription_name = \
-    FLAGS.dpb_df_template_input_subscription.split('/')[-1]
+    FLAGS.dpb_dataflow_template_input_subscription.split('/')[-1]
   benchmark_spec.input_subscription_snapshot_name = \
     f'{benchmark_spec.input_subscription_name}-{suffix}'
 
@@ -108,11 +108,11 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
-  template_gcs_location = FLAGS.dpb_df_template_gcs_location
-  output_ptransform = FLAGS.dpb_df_template_output_ptransform
-  input_pubsub_id = FLAGS.dpb_df_template_input_subscription
+  template_gcs_location = FLAGS.dpb_dataflow_template_gcs_location
+  output_ptransform = FLAGS.dpb_dataflow_template_output_ptransform
+  input_pubsub_id = FLAGS.dpb_dataflow_template_input_subscription
   input_pubsub_name = benchmark_spec.input_subscription_name
-  additional_args = FLAGS.dpb_df_template_additional_args
+  additional_args = FLAGS.dpb_dataflow_template_additional_args
 
   # Get handle to the dpb service
   dpb_service_instance = benchmark_spec.dpb_service

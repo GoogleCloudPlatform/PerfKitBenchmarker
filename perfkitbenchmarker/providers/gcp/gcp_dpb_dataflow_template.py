@@ -35,7 +35,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
 from perfkitbenchmarker.providers.gcp import util
 
-# Refer to flags with prefix 'dpb_df_template' defined in gcp provider flags.py
+# Refer to flags with prefix 'dpb_dataflow_template' defined in gcp/flags.py
 FLAGS = flags.FLAGS
 
 class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
@@ -53,7 +53,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
   @staticmethod
   def CheckPrerequisites(benchmark_config):
     del benchmark_config  # Unused
-    if not FLAGS.dpb_df_template_gcs_location:
+    if not FLAGS.dpb_dataflow_template_gcs_location:
       raise errors.Config.InvalidValue('Template GCS location missing.')
 
   def Create(self):
