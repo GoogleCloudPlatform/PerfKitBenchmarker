@@ -1,0 +1,305 @@
+diff --git a/third_party/mpi-benchmarks/src_c/IMB_allgather.c b/third_party/mpi-benchmarks/src_c/IMB_allgather.c
+index 5503c3e..9096789 100644
+--- a/third_party/mpi-benchmarks/src_c/IMB_allgather.c
++++ b/third_party/mpi-benchmarks/src_c/IMB_allgather.c
+@@ -153,6 +153,13 @@ Output variables:
+             t2 = MPI_Wtime();
+             *time += (t2 - t1);
+
++#ifdef GOOGLE_CHANGES
++            if( c_info->dump_on ) {
++	    	c_info->dump_time[c_info->dump_index] = t2 - t1;
++            	c_info->dump_index++;
++            }
++#endif
++
+             CHK_DIFF("Allgather",c_info, (char*)c_info->r_buffer + i % ITERATIONS->r_cache_iter * ITERATIONS->r_offs, 0,
+                      0, (size_t)c_info->num_procs * (size_t)size, 1,
+                      put, 0, ITERATIONS->n_sample, i,
+diff --git a/third_party/mpi-benchmarks/src_c/IMB_allreduce.c b/third_party/mpi-benchmarks/src_c/IMB_allreduce.c
+index 672029d..fea306c 100644
+--- a/third_party/mpi-benchmarks/src_c/IMB_allreduce.c
++++ b/third_party/mpi-benchmarks/src_c/IMB_allreduce.c
+@@ -126,6 +126,7 @@ Output variables:
+
+
+ */
++    double t1, t2;
+     int    i;
+
+     Type_Size s_size;
+@@ -148,13 +149,21 @@ Output variables:
+         IMB_do_n_barriers(c_info->communicator, N_BARR);
+
+         for (i = 0; i < ITERATIONS->n_sample; i++) {
+-            *time -= MPI_Wtime();
++            t1 = MPI_Wtime();
+             MPI_ERRHAND(MPI_Allreduce((char*)c_info->s_buffer + i % ITERATIONS->s_cache_iter * ITERATIONS->s_offs,
+                                       (char*)c_info->r_buffer + i % ITERATIONS->r_cache_iter * ITERATIONS->r_offs,
+                                       s_num,
+                                       c_info->red_data_type,c_info->op_type,
+                                       c_info->communicator));
+-            *time += MPI_Wtime();
++            t2 = MPI_Wtime();
++            *time += (t2 - t1);
++
++#ifdef GOOGLE_CHANGES
++            if( c_info->dump_on ) {
++              c_info->dump_time[c_info->dump_index] = t2 - t1;
++              c_info->dump_index++;
++            }
++#endif
+
+             CHK_DIFF("Allreduce",c_info, (char*)c_info->r_buffer + i % ITERATIONS->r_cache_iter * ITERATIONS->r_offs, 0,
+                      size, size, asize,
+diff --git a/third_party/mpi-benchmarks/src_c/IMB_comm_info.h b/third_party/mpi-benchmarks/src_c/IMB_comm_info.h
+index b7f1c16..a49759c 100644
+--- a/third_party/mpi-benchmarks/src_c/IMB_comm_info.h
++++ b/third_party/mpi-benchmarks/src_c/IMB_comm_info.h
+@@ -186,6 +186,16 @@ struct comm_info {
+     AGGREGATE_MODE aggregate_mode;  /*turn on different types of aggregate modes*/
+ #endif
+
++#ifdef GOOGLE_CHANGES
++    int dump_data;  /* Flag indicating if this run has data collection */
++    int dump_on;    /* Flag indicating if the data need to be collected */
++    int dump_index;
++    int dump_length;
++    double *dump_time;
++    FILE *dump_file;
++    int show_tail;
++#endif
++
+ };
+
+ #endif
+diff --git a/third_party/mpi-benchmarks/src_c/IMB_pingpong.c b/third_party/mpi-benchmarks/src_c/IMB_pingpong.c
+index 0b0b18a..7670b45 100644
+--- a/third_party/mpi-benchmarks/src_c/IMB_pingpong.c
++++ b/third_party/mpi-benchmarks/src_c/IMB_pingpong.c
+@@ -159,6 +159,11 @@ Output variables:
+
+         *time -= MPI_Wtime();
+         for (i = 0; i < ITERATIONS->n_sample; i++) {
++#ifdef GOOGLE_CHANGES
++            double t1;
++            t1 = MPI_Wtime();
++#endif
++
+             MPI_ERRHAND(MPI_Send((char*)c_info->s_buffer + i%ITERATIONS->s_cache_iter*ITERATIONS->s_offs,
+                                  s_num, c_info->s_data_type, dest,
+                                  s_tag, c_info->communicator));
+@@ -171,6 +176,12 @@ Output variables:
+                      size, size, asize,
+                      put, 0, ITERATIONS->n_sample, i,
+                      dest, &defect);
++#ifdef GOOGLE_CHANGES
++            if( c_info->dump_on ) {
++                c_info->dump_time[c_info->dump_index] =  MPI_Wtime() - t1;
++                c_info->dump_index++;
++            }
++#endif
+         } /*for*/
+         *time += MPI_Wtime();
+     } else if (c_info->rank == c_info->pair1) {
+@@ -182,6 +193,10 @@ Output variables:
+
+         *time -= MPI_Wtime();
+         for (i = 0; i < ITERATIONS->n_sample; i++) {
++#ifdef GOOGLE_CHANGES
++            double t1;
++            t1 = MPI_Wtime();
++#endif
+             MPI_ERRHAND(MPI_Recv((char*)c_info->r_buffer + i%ITERATIONS->r_cache_iter*ITERATIONS->r_offs,
+                                  r_num, c_info->r_data_type, source,
+                                  r_tag, c_info->communicator, &stat));
+@@ -194,8 +209,15 @@ Output variables:
+                      size, size, asize,
+                      put, 0, ITERATIONS->n_sample, i,
+                      dest, &defect);
++#ifdef GOOGLE_CHANGES
++            if( c_info->dump_on ) {
++                c_info->dump_time[c_info->dump_index] =  MPI_Wtime() - t1;
++                c_info->dump_index++;
++            }
++#endif
+         } /*for*/
+         *time += MPI_Wtime();
++
+     }
+     *time /= ITERATIONS->n_sample;
+ }
+diff --git a/third_party/mpi-benchmarks/src_cpp/MPI1/MPI1_suite.cpp b/third_party/mpi-benchmarks/src_cpp/MPI1/MPI1_suite.cpp
+index 0d89d9e..f0dd1fc 100644
+--- a/third_party/mpi-benchmarks/src_cpp/MPI1/MPI1_suite.cpp
++++ b/third_party/mpi-benchmarks/src_cpp/MPI1/MPI1_suite.cpp
+@@ -155,6 +155,20 @@ bool load_msg_sizes(const char *filename)
+     return true;
+ }
+
++#ifdef GOOGLE_CHANGES
++bool open_dump_file(const char *filename)
++{
++    using namespace NS_MPI1;
++
++    c_info.dump_file = fopen(filename, "w");
++    if (c_info.dump_file == NULL)
++        return false;
++
++    return true;
++}
++#endif
++
++
+ template <> bool BenchmarkSuite<BS_MPI1>::declare_args(args_parser &parser, std::ostream &output) const {
+     UNUSED(output);
+     parser.set_current_group(get_name());
+@@ -374,6 +388,20 @@ template <> bool BenchmarkSuite<BS_MPI1>::declare_args(args_parser &parser, std:
+                "\n"
+                "Default:\n"
+                "on\n");
++#ifdef GOOGLE_CHANGES
++   parser.add<bool>("show_tail", false).set_caption("on or off").
++           set_description(
++               "Display the latency percentiles of the MPI messages"
++               "possible argument values are on (1|enable|yes) or off (0|disable|no)\n"
++               "\n"
++               "Default:\n"
++               "off\n");
++   parser.add<string>("dumpfile", "").set_caption("Dumpfile_file").
++           set_description(
++               "The argument after -dumpfile is a file for storing the indvidual timing data 1 per line\n"
++               "Default:\n"
++               "no dump_file, No indvidual data collected\n");
++#endif
+     parser.set_default_current_group();
+     return true;
+ }
+@@ -549,6 +577,40 @@ template <> bool BenchmarkSuite<BS_MPI1>::prepare(const args_parser &parser, con
+         }
+     }
+
++#ifdef GOOGLE_CHANGES
++    if (parser.get<bool>("show_tail") == true) {
++        c_info.show_tail = 1;
++    } else {
++        c_info.show_tail = 0;
++    }
++
++    // dumpfile
++    string given_dump_filename = parser.get<string>("dumpfile");
++    if (given_dump_filename != "") {
++        if (!open_dump_file(given_dump_filename.c_str())) {
++            output << "Dump File " << given_dump_filename << " cannot open for writing" << endl;
++            cmd_line_error = true;
++        }
++    } else {
++        c_info.dump_file = NULL;
++    }
++
++    if (c_info.show_tail || c_info.dump_file != NULL) {
++            c_info.dump_data = true;
++            c_info.dump_index = 0;
++            c_info.dump_length = ITERATIONS.msgspersample;
++            c_info.dump_time = (double *)malloc(c_info.dump_length * sizeof(double));
++
++            if ( c_info.dump_time == NULL ) {
++                 output << "Dump Memory allocation failed" << endl;
++                 cmd_line_error = true;
++            }
++    } else {
++           c_info.dump_data = false;
++    }
++    c_info.dump_on = false;
++#endif
++
+     // msglog
+     vector<int> given_msglog;
+     parser.get<int>("msglog", given_msglog);
+diff --git a/third_party/mpi-benchmarks/src_cpp/Makefile b/third_party/mpi-benchmarks/src_cpp/Makefile
+index beed550..e40109c 100644
+--- a/third_party/mpi-benchmarks/src_cpp/Makefile
++++ b/third_party/mpi-benchmarks/src_cpp/Makefile
+@@ -77,8 +77,8 @@ ifeq ($(origin CXX),default)
+ CXX=mpiicpc
+ endif
+ override CPPFLAGS += -I.
+-override CFLAGS += -O0 -Wall -Wno-long-long
+-override CXXFLAGS += -O0 -Wall -Wextra -pedantic -Wno-long-long
++override CFLAGS += -O0 -Wall -Wno-long-long -DGOOGLE_CHANGES
++override CXXFLAGS += -O0 -Wall -Wextra -pedantic -Wno-long-long -DGOOGLE_CHANGES
+ ifdef WITH_OPENMP
+ override CFLAGS += -fopenmp
+ override CXXFLAGS += -fopenmp
+diff --git a/third_party/mpi-benchmarks/src_cpp/helpers/original_benchmark.h b/third_party/mpi-benchmarks/src_cpp/helpers/original_benchmark.h
+index c45d002..e5d7f4e 100644
+--- a/third_party/mpi-benchmarks/src_cpp/helpers/original_benchmark.h
++++ b/third_party/mpi-benchmarks/src_cpp/helpers/original_benchmark.h
+@@ -102,6 +102,26 @@ extern "C" {
+
+ #endif
+
++#ifdef GOOGLE_CHANGES
++int cmpfunc (const void * a, const void * b) {
++   if (*(double*)a > *(double*)b) return 1;
++   if (*(double*)a < *(double*)b) return -1;
++   return 0;
++}
++
++void print_tail(double *time, int length, int scale)
++{
++    double perc[] = { 0, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95, 0.99, 0.995, 0.999, 0.9999 };
++    qsort(time, length, sizeof(double), cmpfunc);
++    //printf("[%0.2f %0.2f %0.2f]\n", time[0]*scale, time[length/2]*scale, time[length-1]*scale);
++    printf("[");
++    for (int i = 0; i < 11; i++) {
++        printf(" %0.2f,", time[(int) (length*perc[i])]*scale);
++    }
++    printf(" %0.2f ]\n", time[length-1]*scale);
++}
++#endif
++
+ template <class bs, original_benchmark_func_t fn_ptr>
+ class OriginalBenchmark : public Benchmark {
+     protected:
+@@ -204,6 +224,7 @@ class OriginalBenchmark : public Benchmark {
+                 do_nonblocking_ = 0;
+             }
+ #endif
++
+             glob.size = size;
+             BMODE = &(BMark->RUN_MODES[imod]);
+             descr->IMB_init_buffers_iter(&c_info, &ITERATIONS, BMark, BMODE, glob.iter, size);
+@@ -211,6 +232,10 @@ class OriginalBenchmark : public Benchmark {
+             bool failed = (descr->stop_iterations || (BMark->sample_failure));
+             if (!failed) {
+                 IMB_warm_up(BMark, &c_info, size, &ITERATIONS, glob.iter);
++#ifdef GOOGLE_CHANGES
++                if(c_info.dump_data && c_info.w_rank == 0)
++                    c_info.dump_on = 1;
++#endif
+                 t = MPI_Wtime();
+                 fn_ptr(&c_info, size, &ITERATIONS, BMODE, time);
+                 t = MPI_Wtime() - t;
+@@ -218,6 +243,21 @@ class OriginalBenchmark : public Benchmark {
+                 SLEEP(t);
+             }
+             IMB_output(&c_info, BMark, BMODE, glob.header, size, &ITERATIONS, time);
++#ifdef GOOGLE_CHANGES
++                if(c_info.dump_data && c_info.w_rank == 0) {
++                    c_info.dump_on = 0;
++                    if (c_info.w_rank == 0 && c_info.dump_file != NULL) {
++                        for (int i = 0; i < c_info.dump_index; i++) {
++                            fprintf(c_info.dump_file, "%d %.3f\n", size, c_info.dump_time[i]* SCALE * BMark->scale_time);
++                        }
++                    }
++                    if (c_info.show_tail) {
++                        print_tail(c_info.dump_time, c_info.dump_index, SCALE * BMark->scale_time);
++                    }
++                    c_info.dump_index = 0;
++                }
++                /* TODO: Get rid of the following sleep? */
++#endif
+             IMB_close_transfer(&c_info, BMark, size);
+             if ((c_info.contig_type == CT_BASE_VEC || c_info.contig_type == CT_RESIZE_VEC) &&
+                 size != 0) {
