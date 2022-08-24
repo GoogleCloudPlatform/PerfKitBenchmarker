@@ -105,7 +105,7 @@ def Prepare(benchmark_spec):
   snapshot_id = json.loads(stdout)[0]['snapshotId']
   logging.info('Prepare: Created snapshot %s for input subscription data',
       snapshot_id)
-  pass
+
 
 def Run(benchmark_spec):
   template_gcs_location = FLAGS.dpb_df_template_gcs_location
@@ -117,13 +117,6 @@ def Run(benchmark_spec):
   # Get handle to the dpb service
   dpb_service_instance = benchmark_spec.dpb_service
   # TODO: set input pubsub name and id as job attributes
-
-  # Create a file handle to contain the response from running the job on
-  # the dpb service
-  stdout_file = tempfile.NamedTemporaryFile(suffix='.stdout',
-                                            prefix='dpb_df_template_benchmark',
-                                            delete=False)
-  stdout_file.close()
 
   # Pass template parameters
   template_params = []
@@ -198,5 +191,3 @@ def Cleanup(benchmark_spec):
   stdout, _, _ = cmd.Issue()
   snapshot_id = json.loads(stdout)[0]['snapshotId']
   logging.info('Cleanup: Deleted snapshot %s', snapshot_id)
-  pass
-

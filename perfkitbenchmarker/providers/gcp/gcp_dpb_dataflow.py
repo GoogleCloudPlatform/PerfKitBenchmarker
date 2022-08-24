@@ -444,6 +444,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     return self._GetMaxValueFromTimeSeries(results)
 
+  # TODO(rarsan): Consider move to separate class to deal specifically with
+  # streaming pubsub input workloads
   def GetSubscriptionBacklogSize(self, subscription_name, interval_length=4):
     client = monitoring_v3.MetricServiceClient()
     project_name = f'projects/{self.project}'
