@@ -177,6 +177,7 @@
     --google_bigtable_client_version and simplify dependency management.
 -   Support setting --dpb_dataflow_additional_args and --dpb_dataflow_timeout
     for dpb_dataflow_provider.
+-   Add support for T2A (ARM) VMs on GCE.
 
 ### Bug fixes and maintenance updates:
 

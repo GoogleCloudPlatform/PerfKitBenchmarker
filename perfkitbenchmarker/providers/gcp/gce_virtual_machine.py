@@ -79,6 +79,10 @@ _METADATA_PREEMPT_URI = 'http://metadata.google.internal/computeMetadata/v1/inst
 _METADATA_PREEMPT_CMD = f'curl {_METADATA_PREEMPT_URI} -H "Metadata-Flavor: Google"'
 _METADATA_PREEMPT_CMD_WIN = (f'Invoke-RestMethod -Uri {_METADATA_PREEMPT_URI} '
                              '-Headers @{"Metadata-Flavor"="Google"}')
+# Machine type to ARM architecture.
+_MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
+    't2a': 'neoverse-n1',
+}
 
 
 class GceUnexpectedWindowsAdapterOutputError(Exception):
@@ -380,6 +384,15 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
       accelerator_count)
 
 
+def GetArmArchitecture(machine_type):
+  """Returns the specific ARM processor architecture of the VM."""
+  # t2a-standard-1 -> t2a
+  if not machine_type:
+    return None
+  prefix = re.split(r'[dn]?\-', machine_type)[0]
+  return _MACHINE_TYPE_PREFIX_TO_ARM_ARCH.get(prefix)
+
+
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
@@ -472,6 +485,25 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.automatic_restart = FLAGS.gce_automatic_restart
     if self.preemptible:
       self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
+    arm_arch = GetArmArchitecture(self.machine_type)
+    if arm_arch:
+      # Assign host_arch to avoid running detect_host on ARM
+      self.host_arch = arm_arch
+
+      if 'arm64' not in self.image_family:
+        arm_image_family = f'{self.image_family}-arm64'
+        logging.warning(
+            'ARM image must be used; '
+            'changing image to %s',
+            arm_image_family,
+        )
+        self.image_family = arm_image_family
+
+    # Reset image when running client-server benchmarks where client must be x86
+    if (not arm_arch and self.image_family and 'arm64' in self.image_family):
+      logging.warning('Using default image and project for non-ARM VM')
+      self.image_family = self.DEFAULT_IMAGE_FAMILY
+      self.image_project = self.DEFAULT_IMAGE_PROJECT
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
