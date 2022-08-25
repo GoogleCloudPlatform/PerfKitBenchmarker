@@ -40,12 +40,19 @@ flags.DEFINE_integer(
     'act_service_threads', None,
     'Total number of service threads on which requests are '
     'generated and done. Default is 5x the number of CPUs.')
+flags.DEFINE_integer(
+    'act_max_lags_sec', 10,
+    'How much the large-block operations (act_storage) or '
+    'cache-thread operations (act_index) are allowed to lag '
+    'behind their target rates before the ACT test fails. '
+    'Default is 10.')
 # TODO(user): Support user provided config file.
 ACT_CONFIG_TEMPLATE = """
 device-names: {devices}
 test-duration-sec: {duration}
 read-reqs-per-sec: {read_iops}
 write-reqs-per-sec: {write_iops}
+max-lag-sec: {max_lags}
 """
 _READ_1X_1D = 2000
 _WRITE_1X_1D = 1000
@@ -108,7 +115,8 @@ def PrepActConfig(vm, load, index=None):
       devices=devices,
       duration=FLAGS.act_duration,
       read_iops=_CalculateReadIops(num_disk, load),
-      write_iops=_CalculateWriteIops(num_disk, load))
+      write_iops=_CalculateWriteIops(num_disk, load),
+      max_lags=FLAGS.act_max_lags_sec)
   if FLAGS.act_service_threads:
     content += 'service-threads: %d\n' % FLAGS.act_service_threads
   logging.info('ACT config: %s', content)
@@ -219,6 +227,7 @@ def GetActMetadata(num_disk, load):
       'record-bytes': 1536,
       'read-reqs-per-sec': _CalculateReadIops(num_disk, load),
       'write-reqs-per-sec': _CalculateWriteIops(num_disk, load),
+      'max-lag-sec': FLAGS.act_max_lags_sec,
       'microsecond-histograms': 'no',
       'scheduler-mode': 'noop'
   }
