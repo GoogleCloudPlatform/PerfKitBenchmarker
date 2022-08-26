@@ -12,21 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs an Apache Beam template on Dataflow processing data from Pub/Sub
+"""Runs an Apache Beam template on Dataflow processing data from Pub/Sub.
 
-For dataflow jobs, please build the dpb_job_jarfile based on
-https://cloud.google.com/dataflow/docs/quickstarts/quickstart-java-maven
+Templates must be pre-staged in dpb_dataflow_template_gcs_location GCS path.
+See https://cloud.google.com/dataflow/docs/concepts/dataflow-templates
 """
 
 import copy
-import time
 import datetime
-from operator import add
-import tempfile
-import random
-import string
 import json
 import logging
+import random
+import string
+import time
 
 from absl import flags
 from perfkitbenchmarker import configs
@@ -57,9 +55,11 @@ dpb_dataflow_template_benchmark:
 FLAGS = flags.FLAGS
 
 # PubSub seek operation can take up to 1 minute to take full effect
-# See https://cloud.google.com/pubsub/docs/replay-overview#seek_eventual_consistency
+# See
+# https://cloud.google.com/pubsub/docs/replay-overview#seek_eventual_consistency
 PUBSUB_SEEK_DELAY_MINUTES = 3
 PUBSUB_SEEK_DELAY_SECONDS = PUBSUB_SEEK_DELAY_MINUTES * 60
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -67,6 +67,9 @@ def GetConfig(user_config):
 
 def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
+
+  Args:
+    benchmark_config: Config needed to run this benchmark.
 
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
@@ -86,28 +89,29 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
-  # Snapshot Pub/Sub input subscription to later restore at end of test
+  """Snapshot Pub/Sub input subscription to later restore at end of test."""
   suffix = ''.join(
-    random.choice(string.ascii_lowercase + string.digits) for i in range(6))
-  benchmark_spec.input_subscription_name = \
-    FLAGS.dpb_dataflow_template_input_subscription.split('/')[-1]
-  benchmark_spec.input_subscription_snapshot_name = \
-    f'{benchmark_spec.input_subscription_name}-{suffix}'
+      random.choice(string.ascii_lowercase + string.digits) for i in range(6))
+  benchmark_spec.input_subscription_name = (
+      FLAGS.dpb_dataflow_template_input_subscription.split('/')[-1])
+  benchmark_spec.input_subscription_snapshot_name = (
+      f'{benchmark_spec.input_subscription_name}-{suffix}')
 
   cmd = util.GcloudCommand(None, 'pubsub', 'snapshots', 'create',
-                          benchmark_spec.input_subscription_snapshot_name)
+                           benchmark_spec.input_subscription_snapshot_name)
   cmd.flags = {
-      'project':  util.GetDefaultProject(),
+      'project': util.GetDefaultProject(),
       'subscription': benchmark_spec.input_subscription_name,
       'format': 'json',
   }
   stdout, _, _ = cmd.Issue()
   snapshot_id = json.loads(stdout)[0]['snapshotId']
   logging.info('Prepare: Created snapshot %s for input subscription data',
-      snapshot_id)
+               snapshot_id)
 
 
 def Run(benchmark_spec):
+  """Runs a Dataflow Template until input Pub/Sub topic is empty."""
   template_gcs_location = FLAGS.dpb_dataflow_template_gcs_location
   output_ptransform = FLAGS.dpb_dataflow_template_output_ptransform
   input_pubsub_id = FLAGS.dpb_dataflow_template_input_subscription
@@ -116,7 +120,7 @@ def Run(benchmark_spec):
 
   # Get handle to the dpb service
   dpb_service_instance = benchmark_spec.dpb_service
-  # TODO: set input pubsub name and id as job attributes
+  # TODO(rarsan): set input pubsub name and id as job attributes
 
   # Pass template parameters
   template_params = []
@@ -131,7 +135,7 @@ def Run(benchmark_spec):
       template_gcs_location=template_gcs_location,
       job_poll_interval=30,
       job_arguments=template_params,
-      job_input_sub = input_pubsub_name)
+      job_input_sub=input_pubsub_name)
   end_time = datetime.datetime.now()
 
   # Update metadata after job run to get job id
@@ -148,7 +152,7 @@ def Run(benchmark_spec):
   max_throughput = dpb_service_instance.GetMaxOutputThroughput(
       output_ptransform, start_time, end_time)
   results.append(sample.Sample('max_throughput', max_throughput, '1/s',
-      metadata))
+                               metadata))
 
   stats = dpb_service_instance.job_stats
   for name, value in stats.items():
@@ -162,18 +166,18 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
-  # Restore Pub/Sub to its original state before test started
+  """Restore Pub/Sub to its original state before test started."""
   cmd = util.GcloudCommand(None, 'pubsub', 'subscriptions',
-                          'seek',  benchmark_spec.input_subscription_name)
+                           'seek', benchmark_spec.input_subscription_name)
   cmd.flags = {
-      'project':  util.GetDefaultProject(),
+      'project': util.GetDefaultProject(),
       'snapshot': benchmark_spec.input_subscription_snapshot_name,
       'format': 'json',
   }
   stdout, _, _ = cmd.Issue()
   snapshot_id = json.loads(stdout)['snapshotId']
   logging.info('Cleanup: Restore snapshot %s for input subscription data',
-      snapshot_id)
+               snapshot_id)
 
   # Wait for seek operation to take full effect
   logging.info(
@@ -183,9 +187,9 @@ def Cleanup(benchmark_spec):
 
   # Delete snapshot itself
   cmd = util.GcloudCommand(None, 'pubsub', 'snapshots', 'delete',
-                          benchmark_spec.input_subscription_snapshot_name)
+                           benchmark_spec.input_subscription_snapshot_name)
   cmd.flags = {
-      'project':  util.GetDefaultProject(),
+      'project': util.GetDefaultProject(),
       'format': 'json',
   }
   stdout, _, _ = cmd.Issue()

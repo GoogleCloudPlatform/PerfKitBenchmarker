@@ -14,29 +14,26 @@
 """Module containing class for GCP's Dataflow service.
 
 Use this module for running Dataflow jobs from pre-built Dataflow templates
-such as https://cloud.google.com/dataflow/docs/guides/templates/provided-templates
+such as
+https://cloud.google.com/dataflow/docs/guides/templates/provided-templates.
 
 No Clusters can be created or destroyed, since it is a managed solution
 See details at: https://cloud.google.com/dataflow/
 """
 
-import os
-import re
-import time
+import datetime
 import json
 import logging
-import datetime
 
 from absl import flags
-from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
 from perfkitbenchmarker.providers.gcp import util
 
 # Refer to flags with prefix 'dpb_dataflow_template' defined in gcp/flags.py
 FLAGS = flags.FLAGS
+
 
 class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
   """Object representing GCP Dataflow service for running job templates."""
@@ -70,15 +67,16 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
       template_gcs_location=None,
       job_poll_interval=None,
       job_arguments=None,
-      job_input_sub = None):
+      job_input_sub=None):
 
     worker_machine_type = self.spec.worker_group.vm_spec.machine_type
     num_workers = self.spec.worker_count
     max_workers = self.spec.worker_count
 
     now = datetime.datetime.now()
-    job_name = template_gcs_location.split('/')[-1] \
-            + '_' + now.strftime("%Y%m%d_%H%M%S")
+    job_name = '_'.join([
+        template_gcs_location.split('/')[-1],
+        now.strftime('%Y%m%d_%H%M%S')])
     region = util.GetRegionFromZone(FLAGS.dpb_service_zone)
 
     cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'run', job_name)
@@ -106,7 +104,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
       raise
 
     logging.info('Dataflow job ID: %s', self.job_id)
-    # TODO: return JobResult() with pre-computed time stats
+    # TODO(rarsan): return JobResult() with pre-computed time stats.
     return self._WaitForJob(
         job_input_sub, FLAGS.dpb_dataflow_timeout, job_poll_interval)
 
@@ -119,7 +117,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
     if not self.input_sub_empty:
       backlog_size = self.GetSubscriptionBacklogSize(job_input_sub)
       logging.info('Polling: Backlog size of subscription %s is %s',
-          job_input_sub, backlog_size)
+                   job_input_sub, backlog_size)
       if backlog_size == 0:
         self.input_sub_empty = True
         # Start draining job once input subscription is empty
@@ -146,10 +144,10 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
       stdout, _, _ = cmd.Issue()
       job_state = json.loads(stdout)['state']
       logging.info('Polling: Job state is %s', job_state)
-      if job_state == "Drained":
-          self.job_drained = True
+      if job_state == 'Drained':
+        self.job_drained = True
       else:
-          return None
+        return None
 
-    # TODO: calculate run_time, pending_time as args for JobResult()
+    # TODO(rarsan): calculate run_time, pending_time as args for JobResult()
     return True

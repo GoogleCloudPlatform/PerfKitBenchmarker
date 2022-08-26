@@ -391,6 +391,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     """Get max throughput from a particular pTransform during job run interval.
 
     Args:
+      ptransform: name of pipeline's PTransform to get output throughput from.
       start_time: datetime specifying the beginning of the time interval.
       end_time: datetime specifying the end of the time interval.
 
@@ -459,7 +460,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     api_filter = (
         'metric.type = "pubsub.googleapis.com/subscription/'
-                       'num_undelivered_messages" '
+        'num_undelivered_messages" '
         f'AND resource.labels.subscription_id = "{subscription_name}" ')
 
     results = client.list_time_series(
@@ -494,7 +495,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     return None
 
   def _GetMaxValueFromTimeSeries(
-    self, time_series: types.ListTimeSeriesResponse):
+      self, time_series: types.ListTimeSeriesResponse):
     """Parses time series data and returns maximum across intervals.
 
     Args:
@@ -516,7 +517,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     return None
 
   def _GetLastValueFromTimeSeries(
-    self, time_series: types.ListTimeSeriesResponse):
+      self, time_series: types.ListTimeSeriesResponse):
     """Parses time series data and returns last value in last interval.
 
     Args:
