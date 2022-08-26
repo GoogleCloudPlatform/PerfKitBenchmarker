@@ -373,11 +373,12 @@ def _GetChangesForMask(benchmark_spec, node_rank, script_path, nvprof_flags,
   nnodes = benchmark_spec.num_vms
   dist_world_size = nproc_per_node * nnodes
 
-  vm.RemoteCommand(
-      'git clone https://github.com/mlcommons/training_results_v1.1.git')
-  vm.RemoteCommand(
-      f'cp training_results_v1.1/NVIDIA/benchmarks/maskrcnn/implementations/pytorch/bind_launch.py training_results_{FLAGS.mlperf_training_version}/NVIDIA/benchmarks/maskrcnn/implementations/pytorch/'
-  )
+  if FLAGS.mlperf_training_version == 'v2.0':
+    vm.RemoteCommand(
+        'git clone https://github.com/mlcommons/training_results_v1.1.git')
+    vm.RemoteCommand(
+        'cp training_results_v1.1/NVIDIA/benchmarks/maskrcnn/implementations/pytorch/bind_launch.py training_results_v2.0/NVIDIA/benchmarks/maskrcnn/implementations/pytorch/'
+    )
   config_sed += [(r'WALLTIME_MINUTES=30',
                   (r'WALLTIME_MINUTES=30\n'
                    r'export CONT=mlperf-nvidia:object_detection\n'
@@ -392,13 +393,13 @@ def _GetChangesForMask(benchmark_spec, node_rank, script_path, nvprof_flags,
     config_sed.append(
         (r'BATCHSIZE=.*', fr'BATCHSIZE={FLAGS.mlperf_maskrcnn_batch_size}'))
 
-  hyperthreads = '' if FLAGS.mlperf_hyperthreads else '--no_hyperthreads'
+  hyperthreads = '' if FLAGS.mlperf_hyperthreads else "'--no_hyperthreads'"
   run_and_time_sed.append((r' CMD=.*', r' CMD=( '
                            r"'python' "
                            r"'-u' "
                            r"'-m' "
                            r"'bind_launch' "
-                           f"'{hyperthreads}' "
+                           f"{hyperthreads} "
                            f"'--nnodes={nnodes}' "
                            f"'--node_rank={node_rank}' "
                            f"'--master_addr={master_vm.internal_ip}' "
@@ -549,19 +550,20 @@ def _GetChangesForBert(benchmark_spec, node_rank, nvprof_flags,
   if mlperf_benchmark.NVPROF in FLAGS.mlperf_profiler:
     run_and_time_sed += [(r'python', fr'nvprof {nvprof_flags} python')]
 
-  vm.RemoteCommand(
-      'git clone https://github.com/mlcommons/training_results_v1.1.git')
-  vm.RemoteCommand(
-      f'cp training_results_v1.1/NVIDIA/benchmarks/bert/implementations/pytorch/bind_pyt.py training_results_{FLAGS.mlperf_training_version}/NVIDIA/benchmarks/bert/implementations/pytorch/'
-  )
+  if FLAGS.mlperf_training_version == 'v2.0':
+    vm.RemoteCommand(
+        'git clone https://github.com/mlcommons/training_results_v1.1.git')
+    vm.RemoteCommand(
+        'cp training_results_v1.1/NVIDIA/benchmarks/bert/implementations/pytorch/bind_pyt.py training_results_v2.0/NVIDIA/benchmarks/bert/implementations/pytorch/'
+    )
 
-  hyperthreads = '' if FLAGS.mlperf_hyperthreads else '--no_hyperthreads'
+  hyperthreads = '' if FLAGS.mlperf_hyperthreads else "'--no_hyperthreads'"
   run_and_time_sed.append((r' CMD=.*', r' CMD=( '
                            r"'python' "
                            r"'-u' "
                            r"'-m' "
                            r"'bind_pyt' "
-                           f"'{hyperthreads}' "
+                           f"{hyperthreads} "
                            f"'--nnodes={nnodes}' "
                            f"'--node_rank={node_rank}' "
                            f"'--master_addr={master_vm.internal_ip}' "
@@ -688,7 +690,7 @@ def _UpdateScripts(benchmark_spec, node_rank):
         run_and_time_sed)
 
     config_files = [
-        'config_DGXA100_common.sh', 'config_DGXA100_multi_8x8x51.sh'
+        'config_DGXA100_common.sh', 'config_DGXA100_multi_8x8x*.sh'
     ]
 
   elif mlperf_benchmark.BERT in benchmark:
