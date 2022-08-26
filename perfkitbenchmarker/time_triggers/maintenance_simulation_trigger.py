@@ -14,8 +14,9 @@
 """Module containning methods for triggering maintenance simulation."""
 
 import collections
+import copy
 import statistics
-from typing import List
+from typing import Any, List, Dict
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -98,7 +99,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     Returns:
       A list of samples.
     """
-    metadata = s.metadata
+    metadata = copy.deepcopy(s.metadata)
     time_series = metadata['timestamps']
     values = metadata['values']
     interval = metadata['interval']
@@ -138,17 +139,22 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     median = statistics.median(base_line_values)
     mean = statistics.mean(base_line_values)
 
+    # Keep the metadata from the original sample except time series metadata
+    for field in sample.TIME_SERIES_METADATA:
+      if field in metadata:
+        del metadata[field]
+
     samples = self._ComputeLossPercentile(
-        mean, values_after_lm_starts) + self._ComputeLossWork(
-            median, values_after_lm_starts, interval)
+        mean, values_after_lm_starts, metadata) + self._ComputeLossWork(
+            median, values_after_lm_starts, interval, metadata)
 
     if values_after_lm_ends:
       mean_after_lm_ends = statistics.mean(values_after_lm_ends)
-      samples += self._ComputeDegradation(mean, mean_after_lm_ends)
+      samples += self._ComputeDegradation(mean, mean_after_lm_ends, metadata)
     return samples
 
-  def _ComputeLossPercentile(
-      self, mean: float, values_after_lm: List[float]) -> List[sample.Sample]:
+  def _ComputeLossPercentile(self, mean: float, values_after_lm: List[float],
+                             metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Compute loss percentile metrics.
 
     This method samples of seconds_dropped_below_x_percent from 0% to 90%
@@ -158,6 +164,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     Args:
       mean: Mean of the baseline
       values_after_lm: List of samples after Live migration.
+      metadata: Metadata for samples
 
     Returns:
       Samples of loss percentile metrics.
@@ -171,12 +178,15 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     samples = []
     for p in PERCENTILES:
       samples.append(
-          sample.Sample(f'seconds_dropped_below_{int(p * 100)}_percent',
-                        number_of_seconds_dropped_below_percentile[p], 's'))
+          sample.Sample(
+              f'seconds_dropped_below_{int(p * 100)}_percent',
+              number_of_seconds_dropped_below_percentile[p],
+              's',
+              metadata=metadata))
     return samples
 
   def _ComputeLossWork(self, median: float, values_after_lm: List[float],
-                       interval: float):
+                       interval: float, metadata: Dict[str, Any]):
     """Compute the loss work metrics for Live Migration.
 
     This method returns two metrics.
@@ -190,6 +200,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
       median: median of the baseline
       values_after_lm: List of samples after LM
       interval: Interval of the metrics.
+      metadata: Metadata for samples
 
     Returns:
       List of samples.
@@ -203,20 +214,28 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
 
     samples = []
     samples.append(
-        sample.Sample('unresponsive_metric', round(unresponsive_metric, 4),
-                      'metric'))
+        sample.Sample(
+            'unresponsive_metric',
+            round(unresponsive_metric, 4),
+            'metric',
+            metadata=metadata))
     samples.append(
-        sample.Sample('total_loss_seconds', round(total_loss_seconds, 4),
-                      'seconds'))
+        sample.Sample(
+            'total_loss_seconds',
+            round(total_loss_seconds, 4),
+            'seconds',
+            metadata=metadata))
     return samples
 
-  def _ComputeDegradation(self, baseline_mean: float,
-                          mean: float) -> List[sample.Sample]:
+  def _ComputeDegradation(self, baseline_mean: float, mean: float,
+                          metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Compute the degradation after LM ends to baseline."""
     return [
-        sample.Sample('degradation_percent',
-                      round((baseline_mean - mean) / baseline_mean * 100, 4),
-                      '%')
+        sample.Sample(
+            'degradation_percent',
+            round((baseline_mean - mean) / baseline_mean * 100, 4),
+            '%',
+            metadata=metadata)
     ]
 
   @property

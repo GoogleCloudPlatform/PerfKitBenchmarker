@@ -30,8 +30,16 @@ _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
 TPM_TIME_SERIES = 'TPM_time_series'
 OPS_TIME_SERIES = 'OPS_time_series'
 LATENCY_TIME_SERIES = 'Latency_time_series'
+
+# Metadata for time series
+VALUES = 'values'
 RAMP_UP_ENDS = 'ramp_up_ends'
 RAMP_DOWN_STARTS = 'ramp_down_starts'
+TIMESTAMPS = 'timestamps'
+INTERVAL = 'interval'
+TIME_SERIES_METADATA = [
+    RAMP_UP_ENDS, RAMP_DOWN_STARTS, VALUES, TIMESTAMPS, INTERVAL
+]
 
 
 def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
@@ -260,7 +268,7 @@ def CreateTimeSeriesSample(values: List[Any],
   """
   if len(values) != len(timestamps):
     raise errors.Error('Length of values is different to length of timestamps')
-  metadata = {'values': values, 'timestamps': timestamps, 'interval': interval}
+  metadata = {VALUES: values, TIMESTAMPS: timestamps, INTERVAL: interval}
   if additional_metadata:
     metadata.update(additional_metadata)
 
@@ -274,4 +282,3 @@ def CreateTimeSeriesSample(values: List[Any],
 
 def ConvertDateTimeToUnixMs(date: datetime.datetime):
   return time.mktime(date.timetuple()) * 1000
-
