@@ -24,6 +24,7 @@ import posixpath
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -50,9 +51,15 @@ ITERATIONS_PER_CPU = 1000000
 PARALLELISM_PTHREAD = 'PTHREAD'
 PARALLELISM_FORK = 'FORK'
 PARALLELISM_SOCKET = 'SOCKET'
-flags.DEFINE_enum('coremark_parallelism_method', PARALLELISM_PTHREAD,
-                  [PARALLELISM_PTHREAD, PARALLELISM_FORK, PARALLELISM_SOCKET],
-                  'Method to use for parallelism in the Coremark benchmark.')
+_COREMARK_PARALLELISM_METHOD = flags.DEFINE_enum(
+    'coremark_parallelism_method', PARALLELISM_PTHREAD,
+    [PARALLELISM_PTHREAD, PARALLELISM_FORK, PARALLELISM_SOCKET],
+    'Method to use for parallelism in the Coremark benchmark.')
+flag_util.DEFINE_integerlist(
+    'coremark_thread_counts', [0, 1],
+    'Runs n-threaded Coremark for each element n in the list. If n=0, '
+    'vm.NumCpusForBenchmark() is used.')
+
 FLAGS = flags.FLAGS
 
 
@@ -71,7 +78,7 @@ def PrepareCoremark(remote_command):
   Args:
     remote_command: Function to run a remote command on the VM.
   """
-  if FLAGS.coremark_parallelism_method == PARALLELISM_PTHREAD:
+  if _COREMARK_PARALLELISM_METHOD.value == PARALLELISM_PTHREAD:
     remote_command('sed -i -e "s/LFLAGS_END += -lrt/LFLAGS_END += -lrt '
                    '-lpthread/g" %s/%s' % (COREMARK_DIR, COREMARK_BUILDFILE))
 
@@ -87,29 +94,32 @@ def Prepare(benchmark_spec):
   PrepareCoremark(vm.RemoteCommand)
 
 
-def RunCoremark(remote_command, num_threads):
+def RunCoremark(remote_command, thread_count):
   """Runs coremark on the VM.
 
   Args:
     remote_command: Function to run a remote command on the VM.
-    num_threads: Number of threads to use.
+    thread_count: Number of threads to use.
 
   Returns:
     A list of sample.Sample objects with the performance results.
   """
-  remote_command('cd %s;make PORT_DIR=linux64 ITERATIONS=%s XCFLAGS="-g -O2 '
-                 '-DMULTITHREAD=%d -DUSE_%s -DPERFORMANCE_RUN=1"' %
-                 (COREMARK_DIR, ITERATIONS_PER_CPU, num_threads,
-                  FLAGS.coremark_parallelism_method))
+  remote_command(
+      'cd %s;make PORT_DIR=linux64 clean; make PORT_DIR=linux64 ITERATIONS=%s XCFLAGS="-g -O2 '
+      '-DMULTITHREAD=%d -DUSE_%s -DPERFORMANCE_RUN=1"' %
+      (COREMARK_DIR, ITERATIONS_PER_CPU, thread_count,
+       _COREMARK_PARALLELISM_METHOD.value))
   output, _ = remote_command('cat %s/run1.log' % COREMARK_DIR, should_log=True)
-  return _ParseOutputForSamples(output)
+
+  return _ParseOutputForSamples(output, thread_count)
 
 
-def _ParseOutputForSamples(output):
+def _ParseOutputForSamples(output, thread_count):
   """Parses the output from running Coremark to get performance samples.
 
   Args:
     output: The output from running Coremark.
+    thread_count: Number of threads used.
 
   Returns:
     A list of sample.Sample objects.
@@ -132,8 +142,12 @@ def _ParseOutputForSamples(output):
                                   output),
       'iterations':
           regex_util.ExtractInt(r'Iterations\s*:\s*([0-9]*)', output),
-      'iterations_per_cpu': ITERATIONS_PER_CPU,
-      'parallelism_method': FLAGS.coremark_parallelism_method,
+      'iterations_per_cpu':
+          ITERATIONS_PER_CPU,
+      'parallelism_method':
+          _COREMARK_PARALLELISM_METHOD.value,
+      'thread_count':
+          thread_count,
   }
   return [sample.Sample('Coremark Score', value, '', metadata)]
 
@@ -151,7 +165,13 @@ def Run(benchmark_spec):
     Benchmarks.RunError: If correct operation is not validated.
   """
   vm = benchmark_spec.vms[0]
-  return RunCoremark(vm.RemoteCommand, vm.NumCpusForBenchmark())
+  output_samples = []
+  for thread_count in FLAGS.coremark_thread_counts:
+    thread_count_arg = vm.NumCpusForBenchmark() if (thread_count
+                                                    == 0) else thread_count
+    output_samples += RunCoremark(vm.RemoteCommand, thread_count_arg)
+
+  return output_samples
 
 
 def CleanupCoremark(remote_command):
