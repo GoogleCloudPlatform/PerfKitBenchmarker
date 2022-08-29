@@ -35,6 +35,7 @@ STANDARD_TIER = 'STANDARD'
 BASIC_TIER = 'BASIC'
 # TODO(user): Put timeout back to 10 minutes after experiment.
 COMMAND_TIMEOUT = 1200  # 20 minutes
+DEFAULT_PORT = 6379
 
 
 class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
