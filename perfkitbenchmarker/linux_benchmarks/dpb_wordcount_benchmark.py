@@ -85,6 +85,9 @@ flags.DEFINE_string('dpb_wordcount_out_base', None,
                     'Base directory for word count output')
 flags.DEFINE_list('dpb_wordcount_additional_args', [], 'Additional arguments '
                   'which should be passed to job.')
+flags.DEFINE_bool('dpb_export_job_stats', True,
+                  'Exports job stats such as CPU usage and cost. Enabled by '
+                  'default, although only implemented in Dataflow.')
 
 FLAGS = flags.FLAGS
 
@@ -110,7 +113,7 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
-  """Download jarfile locally if using Dataflow."""
+  """Make the jarfile available if using Dataflow."""
   dpb_service_instance = benchmark_spec.dpb_service
   storage_service = dpb_service_instance.storage_service
   benchmark_spec.dpb_wordcount_jarfile = FLAGS.dpb_job_jarfile
@@ -180,7 +183,8 @@ def Run(benchmark_spec):
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
 
   # TODO(odiego): Refactor to avoid explicit service type checks.
-  if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
+  if (dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW and
+      FLAGS.dpb_export_job_stats):
     avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(
         start_time, end_time)
     results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))

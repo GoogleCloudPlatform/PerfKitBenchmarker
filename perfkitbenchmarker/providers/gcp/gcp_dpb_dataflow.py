@@ -34,6 +34,7 @@ from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
@@ -56,11 +57,21 @@ flags.DEFINE_multi_string('dpb_dataflow_additional_args', [], 'Additional '
                           'arguments which should be passed to Dataflow job.')
 flags.DEFINE_integer('dpb_dataflow_timeout', 300,
                      'The default timeout for Dataflow job.')
+flags.DEFINE_string(
+    'dpb_dataflow_service_account_key', None,
+    'GCS path to service account to run Dataflow jobs.')
+
+
+flags.register_validator(
+    'dpb_dataflow_service_account_key',
+    lambda value: value is None or value.startswith('gs://'),
+    message='--dpb_dataflow_service_account_key must be a GCS path.')
 
 
 FLAGS = flags.FLAGS
 
 DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
+DATAFLOW_EXECUTABLE = 'java'
 
 # Compute Engine CPU Monitoring API has up to 4 minute delay.
 # See https://cloud.google.com/monitoring/api/metrics_gcp#gcp-compute
@@ -88,7 +99,10 @@ PD_SSD_PER_GB_HR = 0.000298
 
 
 class GcpDpbDataflow(dpb_service.BaseDpbService):
-  """Object representing GCP Dataflow Service."""
+  """Object representing GCP Dataflow Service.
+
+  Requires a local java installation to run Dataflow.
+  """
 
   CLOUD = providers.GCP
   SERVICE_TYPE = 'dataflow'
@@ -124,10 +138,18 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       return
     if not FLAGS.dpb_job_jarfile or not os.path.exists(FLAGS.dpb_job_jarfile):
       raise errors.Config.InvalidValue('Job jar missing.')
+    if not vm_util.ExecutableOnPath(DATAFLOW_EXECUTABLE):
+      raise errors.Setup.MissingExecutableError(
+          'Could not find required executable "%s"' % DATAFLOW_EXECUTABLE)
 
   def _Create(self):
     """See base class."""
-    pass
+    if FLAGS.dpb_dataflow_service_account_key:
+      self._local_service_account_path = os.path.join(
+          temp_dir.GetRunDirPath(), 'sak.json')
+      self.storage_service.Copy(
+          FLAGS.dpb_dataflow_service_account_key,
+          self._local_service_account_path)
 
   def _Delete(self):
     """See base class."""
@@ -168,12 +190,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       disk_size_gb = None
 
     cmd = []
-    # Needed to verify java executable is on the path
-    dataflow_executable = 'java'
-    if not vm_util.ExecutableOnPath(dataflow_executable):
-      raise errors.Setup.MissingExecutableError(
-          'Could not find required executable "%s"' % dataflow_executable)
-    cmd.append(dataflow_executable)
+    cmd.append(DATAFLOW_EXECUTABLE)
 
     cmd.append('-cp')
     cmd.append(jarfile)
@@ -204,7 +221,12 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if FLAGS.dpb_dataflow_additional_args:
       cmd.extend(FLAGS.dpb_dataflow_additional_args)
 
-    _, stderr, _ = vm_util.IssueCommand(cmd, timeout=FLAGS.dpb_dataflow_timeout)
+    env = os.environ.copy()
+    if FLAGS.dpb_dataflow_service_account_key:
+      env['GOOGLE_APPLICATION_CREDENTIALS'] = self._local_service_account_path
+
+    _, stderr, _ = vm_util.IssueCommand(
+        cmd, timeout=FLAGS.dpb_dataflow_timeout, env=env)
 
     # Parse output to retrieve submitted job ID
     match = re.search(r'Submitted job: (.\S*)', stderr)
@@ -378,6 +400,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       return None
 
     # Multiply fractional cpu util by 100 to display a percentage usage
+    # TODO(odiego): Handle edge case where _GetAvgValueFromTimeSeries returns
+    # None.
     return round(self._GetAvgValueFromTimeSeries(results) * 100, 2)
 
   def _GetAvgValueFromTimeSeries(
