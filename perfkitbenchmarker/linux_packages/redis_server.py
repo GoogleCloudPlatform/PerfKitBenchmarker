@@ -154,6 +154,11 @@ def _BuildStartCommand(vm, port: int) -> str:
     cmd_args.append(f'--server_cpulist {cpu_affinity}')
   if _EVICTION_POLICY.value:
     cmd_args.append(f'--maxmemory-policy {_EVICTION_POLICY.value}')
+
+  # Set maxmemory flag for each redis instance. Total memory for all of the
+  # server instances combined should be 90% of server VM's total memory.
+  max_memory_per_instance = int(vm.total_memory_kb * 0.9 / _NUM_PROCESSES.value)
+  cmd_args.append(f'--maxmemory {max_memory_per_instance}kb')
   return cmd.format(redis_dir=redis_dir, args=' '.join(cmd_args))
 
 
