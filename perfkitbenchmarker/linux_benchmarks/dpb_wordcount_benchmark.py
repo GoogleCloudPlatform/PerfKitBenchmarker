@@ -84,7 +84,9 @@ flags.DEFINE_enum('dpb_wordcount_fs', dpb_service.BaseDpbService.GCS_FS,
 flags.DEFINE_string('dpb_wordcount_out_base', None,
                     'Base directory for word count output')
 flags.DEFINE_list('dpb_wordcount_additional_args', [], 'Additional arguments '
-                  'which should be passed to job.')
+                  "which should be passed to job. If the string ':BASE_DIR:' "
+                  'is contained in these arguments, it will get expanded to '
+                  'the root of the object storage bucket created for the run.')
 flags.DEFINE_bool('dpb_export_job_stats', True,
                   'Exports job stats such as CPU usage and cost. Enabled by '
                   'default, although only implemented in Dataflow.')
@@ -161,7 +163,7 @@ def Run(benchmark_spec):
       jarfile = benchmark_spec.dpb_wordcount_jarfile
 
     job_arguments = [input_location]
-  job_arguments.extend(FLAGS.dpb_wordcount_additional_args)
+  job_arguments.extend(_GetJobAdditionalArguments(dpb_service_instance))
 
   # TODO (saksena): Finalize more stats to gather
   results = []
@@ -209,3 +211,8 @@ def _GetJobArguments(dpb_service_type):
     raise NotImplementedError
   else:
     return WORD_COUNT_CONFIGURATION[dpb_service_type]
+
+
+def _GetJobAdditionalArguments(dpb_service_instance):
+  return [arg.replace(':BASE_DIR:', dpb_service_instance.base_dir)
+          for arg in FLAGS.dpb_wordcount_additional_args]
