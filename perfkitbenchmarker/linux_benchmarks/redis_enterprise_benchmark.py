@@ -51,6 +51,7 @@ _OPTIMIZE_THROUGHPUT = flags.DEFINE_boolean(
 BENCHMARK_NAME = 'redis_enterprise'
 REDIS_PORT = 12006
 REDIS_UI_PORT = 8443
+REDIS_MANAGEMENT_PORT = 9443
 
 
 BENCHMARK_CONFIG = """
@@ -115,10 +116,12 @@ def Prepare(benchmark_spec):
   client_vms = benchmark_spec.vm_groups['clients']
   server_vms = benchmark_spec.vm_groups['servers']
   vm_util.RunThreaded(_InstallRedisEnterprise, client_vms + server_vms)
+  vm_util.RunThreaded(lambda vm: vm.AuthenticateVm(), client_vms + server_vms)
 
   server_vm = server_vms[0]
   server_vm.AllowPort(REDIS_PORT)
   server_vm.AllowPort(REDIS_UI_PORT)
+  server_vm.AllowPort(REDIS_MANAGEMENT_PORT)
 
   redis_enterprise.OfflineCores(server_vms)
   redis_enterprise.CreateCluster(server_vms)
@@ -128,11 +131,12 @@ def Prepare(benchmark_spec):
   if _OPTIMIZE_THROUGHPUT.value:
     return
 
+  client = redis_enterprise.HttpClient(server_vms)
   redis_enterprise.TuneProxy(server_vm)
-  redis_enterprise.CreateDatabase(server_vms, REDIS_PORT)
+  client.CreateDatabases()
   redis_enterprise.PinWorkers(server_vms)
-  redis_enterprise.WaitForDatabaseUp(server_vm, REDIS_PORT)
-  redis_enterprise.LoadDatabase(server_vms, client_vms, REDIS_PORT)
+  redis_enterprise.LoadDatabases(
+      server_vms, client_vms, client.GetEndpoints())
 
 
 def Run(benchmark_spec):
@@ -160,8 +164,7 @@ def Run(benchmark_spec):
   }
 
   if _OPTIMIZE_THROUGHPUT.value:
-    optimizer = redis_enterprise.ThroughputOptimizer(redis_vms, load_vms,
-                                                     REDIS_PORT)
+    optimizer = redis_enterprise.ThroughputOptimizer(redis_vms, load_vms)
     optimal_throughput, results = optimizer.GetOptimalThroughput()
     if not optimal_throughput:
       raise errors.Benchmarks.RunError(
@@ -169,7 +172,7 @@ def Run(benchmark_spec):
           '--enterprise_redis_min_threads value.')
     logging.info('Found optimal throughput %s', optimal_throughput)
   else:
-    _, results = redis_enterprise.Run(redis_vms, load_vms, REDIS_PORT)
+    _, results = redis_enterprise.Run(redis_vms, load_vms)
 
   for result in results:
     result.metadata.update(setup_metadata)

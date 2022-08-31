@@ -63,9 +63,7 @@ class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
   def _GetOptimizer(self, num_cpus):
     mock_server = mock.Mock(num_cpus=num_cpus)
     mock_client = mock.Mock()
-    mock_port = 1
-    return redis_enterprise.ThroughputOptimizer([mock_server], [mock_client],
-                                                mock_port)
+    return redis_enterprise.ThroughputOptimizer([mock_server], [mock_client])
 
   def _CallList(self, calls):
     return [mock.call(*call) for call in calls]
@@ -74,9 +72,9 @@ class ThroughputOptimizerTest(pkb_common_test_case.PkbCommonTestCase):
     # Arrange
     optimizer = self._GetOptimizer(16)
     self.enter_context(
-        mock.patch.object(optimizer, '_CreateAndLoadDatabase'))
+        mock.patch.object(optimizer, '_CreateAndLoadDatabases'))
     self.enter_context(
-        mock.patch.object(redis_enterprise, '_GetDatabase', return_value={}))
+        mock.patch.object(optimizer.client, 'GetDatabases', return_value={}))
     throughput_responses = [
         (60, WRONG_RESULT),
         (40, WRONG_RESULT),
