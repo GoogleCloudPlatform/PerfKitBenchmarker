@@ -94,6 +94,9 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     pass
 
+  def _PrepareScratchDisk(self, scratch_disk, disk_spec):
+    pass
+
   def _GetNumCpus(self):
     pass
 

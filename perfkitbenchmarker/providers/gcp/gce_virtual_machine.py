@@ -904,7 +904,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.remote_disk_counter += 1
       disks.append(data_disk)
 
-    self._CreateScratchDiskFromDisks(disk_spec, disks)
+    scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
+    self._PrepareScratchDisk(scratch_disk, disk_spec)
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to disk."""

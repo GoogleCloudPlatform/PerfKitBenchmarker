@@ -1348,47 +1348,33 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                      self.mount_point, self.disk_size)
       vm.RemoteHostCommand(mnt_cmd)
 
-  def _CreateScratchDiskFromDisks(self, disk_spec, disks):
-    """Helper method to prepare data disks.
-
-    Given a list of BaseDisk objects, this will do most of the work creating,
-    attaching, striping, formatting, and mounting them. If multiple BaseDisk
-    objects are passed to this method, it will stripe them, combining them
-    into one 'logical' data disk (it will be treated as a single disk from a
-    benchmarks perspective). This is intended to be called from within a cloud
-    specific VM's CreateScratchDisk method.
+  def _PrepareScratchDisk(self, scratch_disk, disk_spec):
+    """Helper method to format and mount scratch disk.
 
     Args:
+      scratch_disk: Scratch disk to be formatted and mounted.
       disk_spec: The BaseDiskSpec object corresponding to the disk.
-      disks: A list of the disk(s) to be created, attached, striped,
-          formatted, and mounted. If there is more than one disk in
-          the list, then they will be striped together.
     """
-    if len(disks) > 1:
-      # If the disk_spec called for a striped disk, create one.
-      disk_spec.device_path = '/dev/md%d' % len(self.scratch_disks)
-      data_disk = disk.StripedDisk(disk_spec, disks)
-    else:
-      data_disk = disks[0]
-
-    self.scratch_disks.append(data_disk)
-
-    if data_disk.disk_type != disk.LOCAL:
-      data_disk.Create()
-      data_disk.Attach(self)
-
-    if data_disk.is_striped:
-      device_paths = [d.GetDevicePath() for d in data_disk.disks]
-      self.StripeDisks(device_paths, data_disk.GetDevicePath())
+    if scratch_disk.is_striped:
+      # the scratch disk is a logical device stripped together from raw disks
+      # scratch disk device path == disk_spec device path
+      # scratch disk device path != raw disks device path
+      scratch_disk_device_path = '/dev/md%d' % len(self.scratch_disks)
+      scratch_disk.device_path = scratch_disk_device_path
+      disk_spec.device_path = scratch_disk_device_path
+      raw_device_paths = [d.GetDevicePath() for d in scratch_disk.disks]
+      self.StripeDisks(raw_device_paths, scratch_disk.GetDevicePath())
 
     if disk_spec.mount_point:
-      if isinstance(data_disk, disk.MountableDisk):
-        data_disk.Mount(self)
+      if isinstance(scratch_disk, disk.MountableDisk):
+        scratch_disk.Mount(self)
       else:
-        self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)
-        self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point,
-                       disk_spec.disk_type, data_disk.mount_options,
-                       data_disk.fstab_options)
+        self.FormatDisk(scratch_disk.GetDevicePath(), disk_spec.disk_type)
+        self.MountDisk(scratch_disk.GetDevicePath(), disk_spec.mount_point,
+                       disk_spec.disk_type, scratch_disk.mount_options,
+                       scratch_disk.fstab_options)
+
+    self.scratch_disks.append(scratch_disk)
 
   def StripeDisks(self, devices, striped_device):
     """Raids disks together using mdadm.

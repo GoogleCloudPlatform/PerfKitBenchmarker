@@ -199,7 +199,8 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.disks.append(scratch_disk)
       self.disk_counter += 1
 
-    self._CreateScratchDiskFromDisks(disk_spec, self.disks)
+    scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, self.disks)
+    self._PrepareScratchDisk(scratch_disk, disk_spec)
 
 
 class CentOs7BasedCloudStackVirtualMachine(CloudStackVirtualMachine,

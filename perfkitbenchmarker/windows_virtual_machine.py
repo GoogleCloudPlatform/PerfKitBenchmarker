@@ -21,7 +21,6 @@ import time
 import uuid
 
 from absl import flags
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
@@ -616,39 +615,22 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand('diskpart /s {script_path}'.format(
           script_path=script_path))
 
-  def _CreateScratchDiskFromDisks(self, disk_spec, disks):
-    """Helper method to prepare data disks.
-
-    Given a list of BaseDisk objects, this will do most of the work creating,
-    attaching, striping, formatting, and mounting them. If multiple BaseDisk
-    objects are passed to this method, it will stripe them, combining them
-    into one 'logical' data disk (it will be treated as a single disk from a
-    benchmarks perspective). This is intended to be called from within a cloud
-    specific VM's CreateScratchDisk method.
+  def _PrepareScratchDisk(self, scratch_disk, disk_spec):
+    """Helper method to format and mount scratch disk.
 
     Args:
+      scratch_disk: Scratch disk to be formatted and mounted.
       disk_spec: The BaseDiskSpec object corresponding to the disk.
-      disks: A list of the disk(s) to be created, attached, striped,
-          formatted, and mounted. If there is more than one disk in
-          the list, then they will be striped together.
     """
-    if len(disks) > 1:
-      # If the disk_spec called for a striped disk, create one.
-      data_disk = disk.StripedDisk(disk_spec, disks)
-    else:
-      data_disk = disks[0]
-
-    self.scratch_disks.append(data_disk)
-
-    if data_disk.disk_type != disk.LOCAL:
-      data_disk.Create()
-      data_disk.Attach(self)
-
     # Create and then run a Diskpart script that will initialize the disks,
     # create a volume, and then format and mount the volume.
     script = ''
 
-    disk_numbers = [str(d.disk_number) for d in disks]
+    if scratch_disk.is_striped:
+      disk_numbers = [str(d.disk_number) for d in scratch_disk.disks]
+    else:
+      disk_numbers = [scratch_disk.disk_number]
+
     for disk_number in disk_numbers:
       # For each disk, set the status to online (if it is not already),
       # remove any formatting or partitioning on the disks, and convert
@@ -661,7 +643,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
                  'convert dynamic\n' % disk_number)
 
     # Create a volume out of the disk(s).
-    if data_disk.is_striped:
+    if scratch_disk.is_striped:
       script += 'create volume stripe disk=%s\n' % ','.join(disk_numbers)
     else:
       script += 'create volume simple\n'
@@ -682,6 +664,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
         'icacls {}: /grant Users:F /L'.format(ATTACHED_DISK_LETTER))
     self.RemoteCommand(
         'icacls {}: --% /grant Users:(OI)(CI)F /L'.format(ATTACHED_DISK_LETTER))
+
+    self.scratch_disks.append(scratch_disk)
 
   def SetReadAhead(self, num_sectors, devices):
     """Set read-ahead value for block devices.

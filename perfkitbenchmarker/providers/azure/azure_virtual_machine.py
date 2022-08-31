@@ -787,7 +787,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       data_disk.disk_number = disk_number
       disks.append(data_disk)
 
-    self._CreateScratchDiskFromDisks(disk_spec, disks)
+    scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
+    self._PrepareScratchDisk(scratch_disk, disk_spec)
 
   def InstallCli(self):
     """Installs the Azure cli and credentials on this Azure vm."""

@@ -729,22 +729,39 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       tf.close()
       self.RemoteCopy(tf.name, remote_path)
 
-  @abc.abstractmethod
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
-    """Helper method to prepare data disks.
+    """Helper method to create scratch data disks.
 
-    Given a list of BaseDisk objects, this will do most of the work creating,
-    attaching, striping, formatting, and mounting them. If multiple BaseDisk
-    objects are passed to this method, it will stripe them, combining them
-    into one 'logical' data disk (it will be treated as a single disk from a
-    benchmarks perspective). This is intended to be called from within a cloud
-    specific VM's CreateScratchDisk method.
+    Given a list of BaseDisk objects, create and attach scratch disk to VM.
+    Multiple BaseDisk objects are striped and combined into one 'logical' data
+    disk and treated as a single disk from a benchmarks perspective.
 
     Args:
       disk_spec: The BaseDiskSpec object corresponding to the disk.
-      disks: A list of the disk(s) to be created, attached, striped,
-          formatted, and mounted. If there is more than one disk in
-          the list, then they will be striped together.
+      disks: A list of the disk(s) to be created, attached, and striped.
+
+    Returns:
+      The created scratch disk.
+    """
+    if len(disks) > 1:
+      # If the disk_spec called for a striped disk, create one.
+      scratch_disk = disk.StripedDisk(disk_spec, disks)
+    else:
+      scratch_disk = disks[0]
+
+    if scratch_disk.disk_type != disk.LOCAL:
+      scratch_disk.Create()
+      scratch_disk.Attach(self)
+
+    return scratch_disk
+
+  @abc.abstractmethod
+  def _PrepareScratchDisk(self, scratch_disk, disk_spec):
+    """Helper method to format and mount scratch disk.
+
+    Args:
+      scratch_disk: Scratch disk to be formatted and mounted.
+      disk_spec: The BaseDiskSpec object corresponding to the disk.
     """
     raise NotImplementedError()
 

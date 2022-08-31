@@ -397,7 +397,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     disks = [os_disk.OpenStackDisk(disk_spec, name, self.zone)
              for name in disks_names]
 
-    self._CreateScratchDiskFromDisks(disk_spec, disks)
+    scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
+    self._PrepareScratchDisk(scratch_disk, disk_spec)
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the VM.

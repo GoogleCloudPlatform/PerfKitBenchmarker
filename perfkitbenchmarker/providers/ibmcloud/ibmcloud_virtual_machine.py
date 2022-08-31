@@ -350,7 +350,8 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
                                         encryption_key=self.data_encryption_key)
              for name in disks_names]
 
-    self._CreateScratchDiskFromDisks(disk_spec, disks)
+    scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
+    self._PrepareScratchDisk(scratch_disk, disk_spec)
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Creats a temp file, no download."""
