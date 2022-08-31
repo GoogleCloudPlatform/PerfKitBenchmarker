@@ -9,6 +9,7 @@ from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import memtier
+from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
@@ -74,7 +75,13 @@ TIME_SERIES_JSON = """
 """
 
 
-class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
+def GetMemtierResult(ops_per_sec, p95_latency):
+  return memtier.MemtierResult(
+      ops_per_sec, 0, 0, 0, p95_latency, 0, [], [], [], [], [], {})
+
+
+class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
+                      test_util.SamplesTestMixin):
 
   def testParseResults(self):
     get_metadata = {
@@ -296,6 +303,46 @@ class MemtierTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     results = memtier.MemtierResult.Parse(TEST_OUTPUT, None)
     samples.extend(results.GetSamples(METADATA))
     self.assertSampleListsEqualUpToTimestamp(samples, expected_result)
+
+  def testMeasureLatencyCappedThroughput(self):
+    mock_run_results = [
+        # Multi-pipeline
+        GetMemtierResult(7270, 0.175),
+        GetMemtierResult(386941, 6.751),
+        GetMemtierResult(424626, 3.247),
+        GetMemtierResult(408957, 1.591),
+        GetMemtierResult(398920, 0.839),
+        GetMemtierResult(408290, 1.207),
+        GetMemtierResult(405672, 1.015),
+        GetMemtierResult(408808, 0.951),
+        GetMemtierResult(405209, 0.967),
+        GetMemtierResult(398249, 1.015),
+        GetMemtierResult(409221, 0.967),
+        GetMemtierResult(413240, 0.975),
+        GetMemtierResult(412573, 0.975),
+        # Multi-client
+        GetMemtierResult(7433, 0.159),
+        GetMemtierResult(218505, 2.975),
+        GetMemtierResult(79875, 4.447),
+        GetMemtierResult(323469, 0.519),
+        GetMemtierResult(321503, 0.743),
+        GetMemtierResult(324469, 0.855),
+        GetMemtierResult(308853, 1.007),
+        GetMemtierResult(322717, 0.903),
+        GetMemtierResult(321258, 0.919),
+        GetMemtierResult(323695, 0.927),
+        GetMemtierResult(310044, 0.983),
+    ]
+    self.enter_context(
+        mock.patch.object(memtier, '_Run', side_effect=mock_run_results))
+
+    results = memtier.MeasureLatencyCappedThroughput(None, 'unused', 'unused')
+
+    actual_throughputs = []
+    for s in results:
+      if s.metric == 'Ops Throughput':
+        actual_throughputs.append(s.value)
+    self.assertEqual(actual_throughputs, [413240, 324469])
 
 
 if __name__ == '__main__':

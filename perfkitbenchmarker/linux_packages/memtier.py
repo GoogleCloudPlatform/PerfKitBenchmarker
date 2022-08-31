@@ -370,7 +370,8 @@ def MeasureLatencyCappedThroughput(
           '\tupper bound: %s'
           '\tlower bound: %s', result.ops_per_sec, result.p95_latency,
           parameters.lower_bound, parameters.upper_bound)
-      if result.ops_per_sec > current_max_result.ops_per_sec:
+      if (result.ops_per_sec > current_max_result.ops_per_sec
+          and result.p95_latency <= MEMTIER_LATENCY_CAP.value):
         current_max_result = result
         current_metadata = GetMetadata(
             clients=parameters.clients,
