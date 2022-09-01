@@ -85,7 +85,8 @@
 -   Add dpb_sparksql_serverless_benchmark, which submits one job for each
     TPC-DS/H query and measures the whole job execution time, instead of only
     the query run time.
-    Add Intel MPI benchmark.
+-   Add Intel MPI benchmark.
+-   Add support for Azure ARM VMs.
 
 ### Enhancements:
 
