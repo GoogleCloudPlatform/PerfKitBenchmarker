@@ -692,6 +692,7 @@ def _UpdateScripts(benchmark_spec, node_rank):
     config_files = [
         'config_DGXA100_common.sh', 'config_DGXA100_multi_8x8x*.sh'
     ]
+    mlperf_benchmark.UpdateScriptForSmallGpuMem(vm)
 
   elif mlperf_benchmark.BERT in benchmark:
     config_sed, run_sed, run_and_time_sed = _GetChangesForBert(

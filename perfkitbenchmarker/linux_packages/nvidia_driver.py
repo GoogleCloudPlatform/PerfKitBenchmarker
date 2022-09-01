@@ -21,6 +21,7 @@ from absl import logging
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import virtual_machine
 
 
 NVIDIA_DRIVER_LOCATION_BASE = 'https://us.download.nvidia.com/tesla'
@@ -202,6 +203,20 @@ def GetGpuType(vm):
   else:
     raise UnsupportedClockSpeedError(
         'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
+
+
+def GetGpuMem(vm: virtual_machine.BaseVirtualMachine) -> int:
+  """Returns NVIDIA GPU memory on the system.
+
+  Args:
+    vm: Virtual machine to query.
+
+  Returns:
+    Integer indicating the NVIDIA GPU memory on the vm.
+  """
+  stdout, _ = vm.RemoteCommand(
+      'sudo nvidia-smi --query-gpu=memory.total --id=0 --format=csv')
+  return regex_util.ExtractInt(r'(\d+) MiB', stdout.split('\n')[1])
 
 
 def QueryNumberOfGpus(vm):

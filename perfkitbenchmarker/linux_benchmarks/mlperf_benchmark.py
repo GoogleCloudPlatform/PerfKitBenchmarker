@@ -20,6 +20,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import docker
@@ -524,6 +525,20 @@ def SedPairsToString(pairs):
   return sed_str
 
 
+def UpdateScriptForSmallGpuMem(vm: virtual_machine.BaseVirtualMachine) -> None:
+  """Update the running script for small GPU memory.
+
+  Args:
+    vm: The VM to work on
+  """
+  if nvidia_driver.GetGpuMem(vm) < 80000 and nvidia_driver.QueryNumberOfGpus(
+      vm) > 8:
+    # A100 40G fails out of memory when creating dummy_eval_data on one GPU.
+    data_script = f'$HOME/training_results_{VERSION.value}/NVIDIA/benchmarks/resnet/implementations/mxnet/common/data.py'
+    vm_util.ReplaceText(vm, r"mx\.Context\('gpu'\)",
+                        'mx.gpu(hvd.local_rank())', data_script)
+
+
 def _UpdateScripts(benchmark_spec, vm):
   """Update the running scripts on the target vm.
 
@@ -561,6 +576,7 @@ def _UpdateScripts(benchmark_spec, vm):
   elif RESNET in benchmark:
     config_sed = _GetChangesForResnet(config_sed)
     config_files = ['config_DGXA100_common.sh', 'config_DGXA100.sh']
+    UpdateScriptForSmallGpuMem(vm)
 
   elif BERT in benchmark:
     config_sed = _GetChangesForBert(config_sed)
