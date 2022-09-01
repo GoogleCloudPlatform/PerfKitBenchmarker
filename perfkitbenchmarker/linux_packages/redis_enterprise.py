@@ -265,9 +265,10 @@ def PinWorkers(vms: List[_VM], proxy_threads: Optional[int] = None) -> None:
 def GetDatabaseMemorySize(vm: _VM) -> int:
   """Gets the available memory (bytes) that can be used to provision databases."""
   output, _ = vm.RemoteCommand('sudo /opt/redislabs/bin/rladmin status')
+  # See tests/data/redis_enterprise_cluster_output.txt
   node_output = output.splitlines()[2]
   provisional_ram = node_output.split()[7]
-  size_gb = float(provisional_ram.split('/')[1].strip('GB'))
+  size_gb = float(provisional_ram.split('/')[0].strip('GB'))
   return int(size_gb * _ONE_GIGABYTE)
 
 
@@ -341,6 +342,7 @@ class HttpClient():
     self.api_base_url = f'https://{server_vms[0].ip_address}:9443'
     self.session = requests.Session()
     self.session.auth = (_USERNAME, FLAGS.run_uri)
+    self.provisional_memory = 0
 
   def _LogCurlifiedCommand(self, response: requests.Response) -> None:
     """Logs the version of the request that can be run from curl."""
@@ -411,9 +413,10 @@ class HttpClient():
       Returns the JSON object corresponding to the database that was created.
     """
     db_shards = shards or _SHARDS.value
+    if not self.provisional_memory:
+      self.provisional_memory = GetDatabaseMemorySize(self.vms[0])
     per_db_memory_size = int(
-        GetDatabaseMemorySize(self.vms[0]) * len(self.vms) /
-        _NUM_DATABASES.value)
+        self.provisional_memory * len(self.vms) / _NUM_DATABASES.value)
     content = {
         'name': 'redisdb',
         'type': 'redis',

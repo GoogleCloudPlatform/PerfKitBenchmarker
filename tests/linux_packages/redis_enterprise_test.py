@@ -38,7 +38,7 @@ class RedisAdminTest(pkb_common_test_case.PkbCommonTestCase):
     mock_vm = mock.Mock()
     mock_vm.RemoteCommand.return_value = (output, None)
     actual = redis_enterprise.GetDatabaseMemorySize(mock_vm)
-    self.assertEqual(51460000000, actual)
+    self.assertEqual(7890000000, actual)
 
 
 class ResultParserTest(pkb_common_test_case.PkbCommonTestCase):
