@@ -65,10 +65,14 @@ dpb_wordcount_benchmark:
     worker_count: 2
 """
 
+# TODO(odiego): Deprecate WORD_COUNT_CONFIGURATION (not used in practice).
 WORD_COUNT_CONFIGURATION = dict(
     [
         (dpb_service.DATAPROC, ('org.apache.spark.examples.JavaWordCount',
                                 dpb_service.BaseDpbService.SPARK_JOB_TYPE)),
+        (dpb_service.DATAPROC_SERVERLESS,
+         ('org.apache.spark.examples.JavaWordCount',
+          dpb_service.BaseDpbService.SPARK_JOB_TYPE)),
         (dpb_service.DATAFLOW, ('org.example.WordCount',
                                 dpb_service.BaseDpbService.DATAFLOW_JOB_TYPE)),
         (dpb_service.EMR, ('org.apache.spark.examples.JavaWordCount',
