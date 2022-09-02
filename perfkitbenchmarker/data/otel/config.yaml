@@ -29,12 +29,12 @@ processors:
       new_name: cpu_utilization
       operations:
       - action: aggregate_labels
-        aggregation_type: mean
+        aggregation_type: sum
         label_set:
         - state
-        - blank
+        - cpu
       - action: update_label
-        label: blank
+        label: cpu
         new_label: cpu_number
       - action: update_label
         label: state
@@ -54,6 +54,9 @@ processors:
       - action: delete_label_value
         label: cpu_state
         label_value: nice
+      - action: delete_label_value
+        label: cpu_state
+        label_value: idle
     - action: update
       include: system.disk.read_io
       new_name: disk_read_bytes_count
