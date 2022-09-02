@@ -67,7 +67,6 @@ flags.register_validator(
     lambda value: value is None or value.startswith('gs://'),
     message='--dpb_dataflow_service_account_key must be a GCS path.')
 
-
 FLAGS = flags.FLAGS
 
 DATAFLOW_WC_INPUT = 'gs://dataflow-samples/shakespeare/kinglear.txt'
@@ -220,7 +219,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     if FLAGS.dpb_dataflow_additional_args:
       cmd.extend(FLAGS.dpb_dataflow_additional_args)
-
     env = os.environ.copy()
     if FLAGS.dpb_dataflow_service_account_key:
       env['GOOGLE_APPLICATION_CREDENTIALS'] = self._local_service_account_path
@@ -246,6 +244,13 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
     basic_data['dpb_job_id'] = self.job_id
     return basic_data
+
+  def GetJobStatus(self):
+    cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'show', self.job_id)
+    cmd.flags = {
+        'project': self.project,
+        'format': 'json',
+    }
 
   @functools.cached_property
   def job_stats(self):
@@ -404,13 +409,99 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # None.
     return round(self._GetAvgValueFromTimeSeries(results) * 100, 2)
 
+  def GetMaxOutputThroughput(
+      self, ptransform: str,
+      start_time: datetime.datetime, end_time: datetime.datetime):
+    """Get max throughput from a particular pTransform during job run interval.
+
+    Args:
+      ptransform: name of pipeline's PTransform to get output throughput from.
+      start_time: datetime specifying the beginning of the time interval.
+      end_time: datetime specifying the end of the time interval.
+
+    Returns:
+      Max value across time interval
+    """
+    client = monitoring_v3.MetricServiceClient()
+    project_name = f'projects/{self.project}'
+
+    now_seconds = int(time.time())
+    end_time_seconds = int(end_time.timestamp())
+    # Dataflow metrics data can take up to 180 seconds to appear
+    if (now_seconds - end_time_seconds) < DATAFLOW_METRICS_DELAY_SECONDS:
+      logging.info(
+          'Waiting for Dataflow metrics to be available (up to 3 minutes)...')
+      time.sleep(
+          DATAFLOW_METRICS_DELAY_SECONDS - (now_seconds - end_time_seconds))
+
+    interval = types.TimeInterval()
+    # Shift TZ of datetime arguments since FromDatetime() assumes UTC
+    # See
+    # https://googleapis.dev/python/protobuf/latest/google/protobuf/timestamp_pb2.html#google.protobuf.timestamp_pb2.Timestamp.FromDatetime
+    interval.start_time.FromDatetime(
+        start_time.astimezone(datetime.timezone.utc))
+    interval.end_time.FromDatetime(
+        end_time.astimezone(datetime.timezone.utc))
+
+    api_filter = (
+        'metric.type = "dataflow.googleapis.com/job/elements_produced_count" '
+        f'AND resource.labels.project_id = "{self.project}" '
+        f'AND metric.labels.job_id = "{self.job_id}" '
+        f'AND metric.labels.ptransform = "{ptransform}" ')
+
+    aggregation = types.Aggregation(
+        alignment_period={'seconds': 60},  # 1 minute
+        per_series_aligner=types.Aggregation.Aligner.ALIGN_RATE,
+    )
+
+    results = client.list_time_series(
+        name=project_name,
+        filter_=api_filter,
+        interval=interval,
+        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        aggregation=aggregation,
+    )
+
+    if not results:
+      logging.warning(
+          'No monitoring data found. Unable to calculate max throughput.')
+      return None
+
+    return self._GetMaxValueFromTimeSeries(results)
+
+  # TODO(user): Consider move to separate class to deal specifically with
+  # streaming pubsub input workloads
+  def GetSubscriptionBacklogSize(self, subscription_name, interval_length=4):
+    client = monitoring_v3.MetricServiceClient()
+    project_name = f'projects/{self.project}'
+
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    delta = datetime.timedelta(minutes=interval_length)
+
+    interval = types.TimeInterval()
+    interval.start_time.FromDatetime(now-delta)
+    interval.end_time.FromDatetime(now)
+
+    api_filter = (
+        'metric.type = "pubsub.googleapis.com/subscription/'
+        'num_undelivered_messages" '
+        f'AND resource.labels.subscription_id = "{subscription_name}" ')
+
+    results = client.list_time_series(
+        name=project_name,
+        filter_=api_filter,
+        interval=interval,
+        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+    )
+
+    return round(self._GetLastValueFromTimeSeries(results), 2)
+
   def _GetAvgValueFromTimeSeries(
       self, time_series: types.ListTimeSeriesResponse):
     """Parses time series data and returns average across intervals.
 
     Args:
-      time_series: time series of cpu fractional utilization returned by
-        monitoring.
+      time_series: time series data returned by monitoring.
 
     Returns:
       Average value across intervals
@@ -426,3 +517,40 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       return averaged
 
     return None
+
+  def _GetMaxValueFromTimeSeries(
+      self, time_series: types.ListTimeSeriesResponse):
+    """Parses time series data and returns maximum across intervals.
+
+    Args:
+      time_series: time series data returned by monitoring.
+
+    Returns:
+      Maximum value across intervals
+    """
+    points = []
+    for time_interval in time_series:
+      for snapshot in time_interval.points:
+        points.append(snapshot.value.double_value)
+
+    if points:
+      # Max over all minute intervals captured
+      max_rate = max(points)
+      return max_rate
+
+    return None
+
+  def _GetLastValueFromTimeSeries(
+      self, time_series: types.ListTimeSeriesResponse):
+    """Parses time series data and returns last value in last interval.
+
+    Args:
+      time_series: time series data returned by monitoring.
+
+    Returns:
+      Last value across intervals
+    """
+    try:
+      return list(time_series)[0].points[0].value.int64_value
+    except IndexError:
+      return None
