@@ -541,6 +541,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     arm_arch = GetArmArchitecture(self.machine_type)
     if arm_arch:
       self.host_arch = arm_arch
+      self.is_aarch64 = True
 
     if self.use_dedicated_host and util.IsRegion(self.zone):
       raise ValueError(

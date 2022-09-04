@@ -489,6 +489,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if arm_arch:
       # Assign host_arch to avoid running detect_host on ARM
       self.host_arch = arm_arch
+      self.is_aarch64 = True
 
       if 'arm64' not in self.image_family:
         arm_image_family = f'{self.image_family}-arm64'

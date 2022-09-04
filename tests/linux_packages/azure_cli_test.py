@@ -88,6 +88,9 @@ class AzureCliTest(unittest.TestCase):
   def testAptInstall(self):
     self.vm.RemoteCommand.return_value = ('wheezy', '')
     azure_cli.AptInstall(self.vm)
+    if hasattr(self.vm, 'is_aarch64') and self.vm.is_aarch64:
+      self.assertRemoteCommandsEqual(['sudo pip3 install azure-cli'])
+      return
     self.assertRemoteCommandsEqual([
         'lsb_release -cs', 'echo "deb [arch=amd64] '
         'https://packages.microsoft.com/repos/azure-cli/ wheezy main" | sudo '

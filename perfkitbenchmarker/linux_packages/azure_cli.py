@@ -66,12 +66,25 @@ def ZypperInstall(vm):
   vm.RemoteCommand('sudo zypper install -y --from azure-cli azure-cli')
 
 
+def _PipInstall(vm):
+  """Installs azure-cli via pip on the VM.
+
+  Args:
+    vm: Virtual Machine to install on.
+  """
+  vm.Install('pip3')
+  vm.RemoteCommand('sudo pip3 install azure-cli')
+
+
 def AptInstall(vm):
   """Installs the azure-cli package on the VM for Debian systems.
 
   Args:
     vm: Virtual Machine to install on.
   """
+  if hasattr(vm, 'is_aarch64') and vm.is_aarch64:
+    _PipInstall(vm)
+    return
   vm.Install('python')
   vm.Install('lsb_release')
   vm.Install('curl')

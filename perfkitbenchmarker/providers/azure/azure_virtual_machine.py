@@ -546,6 +546,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     arm_arch = 'neoverse-n1' if _MachineTypeIsArm(self.machine_type) else None
     if arm_arch:
       self.host_arch = arm_arch
+      self.is_aarch64 = True
     if vm_spec.image:
       self.image = vm_spec.image
     elif self.machine_type in _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES:
