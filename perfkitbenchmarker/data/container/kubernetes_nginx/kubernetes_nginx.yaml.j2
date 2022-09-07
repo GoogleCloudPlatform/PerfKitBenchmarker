@@ -13,6 +13,11 @@ spec:
         app: nginx
         appCluster: nginx-cluster
     spec:
+      tolerations:
+      - key: "kubernetes.io/arch"
+        operator: "Equal"
+        value: "arm64"
+        effect: "NoSchedule"
       {% if runtime_class_name %}runtimeClassName: {{ runtime_class_name }}{% endif %}
       affinity:
         nodeAffinity:

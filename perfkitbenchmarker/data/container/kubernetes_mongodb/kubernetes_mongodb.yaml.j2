@@ -30,6 +30,11 @@ spec:
           volumeMounts:
             - name: mongo-persistent-storage
               mountPath: /data/db
+      tolerations:
+      - key: "kubernetes.io/arch"
+        operator: "Equal"
+        value: "arm64"
+        effect: "NoSchedule"
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

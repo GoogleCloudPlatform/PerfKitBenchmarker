@@ -38,6 +38,11 @@ spec:
         labelSelector:
           matchLabels:
             app: redis
+      tolerations:
+      - key: "kubernetes.io/arch"
+        operator: "Equal"
+        value: "arm64"
+        effect: "NoSchedule"
       affinity:
         podAffinity:
           # Cluster Redis pods together (leader and follower)
