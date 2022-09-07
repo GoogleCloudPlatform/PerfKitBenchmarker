@@ -860,9 +860,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     devices = self._get_network_device_mtus()
     all_mtus = set(devices.values())
-    if len(all_mtus) != 1:
+    if len(all_mtus) > 1:
       raise ValueError(
           'To record, MTU must only have 1 unique MTU value not: ', devices)
+    elif not all_mtus:
+      logging.warning('No unique network devices')
     else:
       self.os_metadata['mtu'] = list(all_mtus)[0]
 
