@@ -175,7 +175,7 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return False
 
-  def CreateScratchDisk(self, disk_spec):
+  def CreateScratchDisk(self, _, disk_spec):
     """Create a VM's scratch disk.
 
     Args:

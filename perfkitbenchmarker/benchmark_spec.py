@@ -963,11 +963,11 @@ class BenchmarkSpec(object):
     # Prepare vm scratch disks:
     if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
       vm.SetupLocalDisks()
-    for disk_spec in vm.disk_specs:
+    for disk_spec_id, disk_spec in enumerate(vm.disk_specs):
       if disk_spec.disk_type == disk.RAM:
         vm.CreateRamDisk(disk_spec)
       else:
-        vm.CreateScratchDisk(disk_spec)
+        vm.CreateScratchDisk(disk_spec_id, disk_spec)
       # TODO(user): Simplify disk logic.
       if disk_spec.num_striped_disks > 1:
         # scratch disks has already been created and striped together.

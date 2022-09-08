@@ -1172,10 +1172,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         logging.warning('Failed to identify NVME boot drive index. Assuming 0.')
         return 0
 
-  def CreateScratchDisk(self, disk_spec):
+  def CreateScratchDisk(self, disk_spec_id, disk_spec):
     """Create a VM's scratch disk.
 
     Args:
+      disk_spec_id: Deterministic order of this disk_spec in the VM's list of
+        disk_specs.
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
 
     Raises:

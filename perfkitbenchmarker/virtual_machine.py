@@ -1126,10 +1126,12 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       return self.internal_ip
     return self.ip_address
 
-  def CreateScratchDisk(self, disk_spec):
+  def CreateScratchDisk(self, disk_spec_id, disk_spec):
     """Create a VM's scratch disk.
 
     Args:
+      disk_spec_id: Deterministic order of this disk_spec in the VM's list of
+        disk_specs.
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
     pass

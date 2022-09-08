@@ -110,7 +110,7 @@ class ScratchDiskTestMixin(object):
     vm = self._CreateVm()
 
     disk_spec = disk.BaseDiskSpec(_COMPONENT, mount_point='/mountpoint0')
-    vm.CreateScratchDisk(disk_spec)
+    vm.CreateScratchDisk(0, disk_spec)
 
     assert len(vm.scratch_disks) == 1, 'Disk not added to scratch disks.'
 
@@ -123,7 +123,7 @@ class ScratchDiskTestMixin(object):
         None, scratch_disk.mount_options, scratch_disk.fstab_options)
 
     disk_spec = disk.BaseDiskSpec(_COMPONENT, mount_point='/mountpoint1')
-    vm.CreateScratchDisk(disk_spec)
+    vm.CreateScratchDisk(0, disk_spec)
 
     assert len(vm.scratch_disks) == 2, 'Disk not added to scratch disks.'
 

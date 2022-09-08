@@ -88,7 +88,7 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
         'test_vm_spec.AWS', zone='us-east-1a', machine_type=machine_type)
     vm = aws_virtual_machine.Ubuntu1804BasedAwsVirtualMachine(vm_spec)
 
-    vm.CreateScratchDisk(disk_spec)
+    vm.CreateScratchDisk(0, disk_spec)
 
     self.assertDictContainsSubset(
         {disk.MEDIA: goal_media, disk.REPLICATION: goal_replication},
@@ -129,7 +129,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
     azure_disk.AzureDisk.Create = mock.Mock()
     azure_disk.AzureDisk.Attach = mock.Mock()
     vm.StripeDisks = mock.Mock()
-    vm.CreateScratchDisk(disk_spec)
+    vm.CreateScratchDisk(0, disk_spec)
 
     expected = {disk.MEDIA: goal_media,
                 disk.REPLICATION: goal_replication,

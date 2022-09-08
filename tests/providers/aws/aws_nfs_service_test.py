@@ -280,7 +280,7 @@ class AwsVirtualMachineTest(BaseTest):
     nfs.Create()
     self._SetBmSpec(nfs)
     aws_machine = self._CreateMockVm()
-    aws_machine.CreateScratchDisk(self._CreateDiskSpec(fs_type))
+    aws_machine.CreateScratchDisk(0, self._CreateDiskSpec(fs_type))
     return aws_machine
 
   def testCreateNfsDisk(self):

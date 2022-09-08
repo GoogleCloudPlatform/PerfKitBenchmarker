@@ -861,10 +861,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       pass
     return True
 
-  def CreateScratchDisk(self, disk_spec):
+  def _GenerateDiskNamePrefix(self, disk_spec_id, index):
+    """Generates a deterministic disk name given disk_spec_id and index."""
+    return f'{self.name}-data-{disk_spec_id}-{index}'
+
+  def CreateScratchDisk(self, disk_spec_id, disk_spec):
     """Create a VM's scratch disk.
 
     Args:
+      disk_spec_id: Deterministic order of this disk_spec in the VM's list of
+        disk_specs.
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
     disks = []
@@ -895,7 +901,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       elif disk_spec.disk_type == disk.OBJECT_STORAGE:
         data_disk = gcsfuse_disk.GcsFuseDisk(disk_spec)
       else:
-        name = '%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
+        name = self._GenerateDiskNamePrefix(disk_spec_id, i)
         data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project,
                                      replica_zones=replica_zones)
         # Remote disk numbers start at 1+max_local_disks (0 is the system disk

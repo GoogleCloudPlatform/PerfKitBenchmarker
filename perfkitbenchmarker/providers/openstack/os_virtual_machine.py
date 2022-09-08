@@ -390,7 +390,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
         floating_ip.floating_ip_address))
     return floating_ip
 
-  def CreateScratchDisk(self, disk_spec):
+  def CreateScratchDisk(self, _, disk_spec):
     disks_names = ('%s_data_%d_%d'
                    % (self.name, len(self.scratch_disks), i)
                    for i in range(disk_spec.num_striped_disks))
