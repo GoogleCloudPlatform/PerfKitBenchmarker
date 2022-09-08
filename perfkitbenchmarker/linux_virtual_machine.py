@@ -29,7 +29,6 @@ for you.
 import abc
 import collections
 import copy
-# import functools
 import logging
 import os
 import pipes
@@ -868,7 +867,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     else:
       self.os_metadata['mtu'] = list(all_mtus)[0]
 
-  # @functools.cached_property
   def _get_network_device_mtus(self) -> Dict[str, int]:
     """Returns network device names and their MTUs."""
     if not self._network_device_mtus:
