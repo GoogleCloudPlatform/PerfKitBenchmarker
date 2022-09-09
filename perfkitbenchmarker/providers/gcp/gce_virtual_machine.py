@@ -635,6 +635,31 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     cmd.flags['local-ssd'] = (['interface={0}'.format(
         self.ssd_interface)] * self.max_local_disks)
+
+    create_disks = []
+    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
+      if not self.DiskTypeCreatedOnVMCreation(disk_spec.disk_type):
+        continue
+      # local disks are handled above in a separate gcloud flag
+      if disk_spec.disk_type == disk.LOCAL:
+        continue
+      for i in range(disk_spec.num_striped_disks):
+        name = self._GenerateDiskNamePrefix(disk_spec_id, i)
+        pd_args = [
+            f'name={name}',
+            f'device-name={name}',
+            f'size={disk_spec.disk_size}',
+            f'type={disk_spec.disk_type}',
+            'auto-delete=yes',
+            'boot=no',
+            'mode=rw',
+        ]
+        if disk_spec.disk_type == gce_disk.PD_EXTREME:
+          pd_args += f'provisioned-iops={FLAGS.gcp_provisioned_iops}'
+        create_disks.append(','.join(pd_args))
+    if create_disks:
+      cmd.flags['create-disk'] = create_disks
+
     if FLAGS.gcloud_scopes:
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
@@ -890,8 +915,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           disk_number = self.local_disk_counter + self.NVME_START_INDEX
         else:
           raise errors.Error('Unknown Local SSD Interface.')
-        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project,
-                                     replica_zones=replica_zones)
+        # This is a local ssd, it does not need the regional pd flag.
+        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
         data_disk.disk_number = disk_number
         self.local_disk_counter += 1
         if self.local_disk_counter > self.max_local_disks:
@@ -914,13 +939,41 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
     self._PrepareScratchDisk(scratch_disk, disk_spec)
 
+  def DiskCreatedOnVMCreation(self, data_disk):
+    """Returns whether the disk has been created during VM creation."""
+    return self.DiskTypeCreatedOnVMCreation(data_disk.disk_type)
+
+  def DiskTypeCreatedOnVMCreation(self, disk_type):
+    """Returns whether the disk type has been created during VM creation."""
+    if not FLAGS.gcp_create_disks_with_vm:
+      return False
+    # GCE regional disks cannot use create-on-create.
+    if FLAGS.data_disk_zones:
+      return False
+    return disk_type in gce_disk.GCE_REMOTE_DISK_TYPES + [disk.LOCAL]
+
   def AddMetadata(self, **kwargs):
     """Adds metadata to disk."""
     # vm metadata added to vm on creation.
+    # Add metadata to boot disk
     cmd = util.GcloudCommand(
         self, 'compute', 'disks', 'add-labels', self.name)
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     cmd.Issue()
+
+    # Add metadata to data disks
+    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
+      if not self.DiskTypeCreatedOnVMCreation(disk_spec.disk_type):
+        continue
+      # local disks are not tagged
+      if disk_spec.disk_type == disk.LOCAL:
+        continue
+      for i in range(disk_spec.num_striped_disks):
+        name = self._GenerateDiskNamePrefix(disk_spec_id, i)
+        cmd = util.GcloudCommand(
+            self, 'compute', 'disks', 'add-labels', name)
+        cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+        cmd.Issue()
 
   def AllowRemoteAccessPorts(self):
     """Creates firewall rules for remote access if required."""

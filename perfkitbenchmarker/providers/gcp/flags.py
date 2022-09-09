@@ -155,6 +155,9 @@ flags.DEFINE_integer(
     'gcp_provisioned_iops', 100000,
     'Iops to provision for pd-extreme. Defaults to the gcloud '
     'default of 100000.')
+flags.DEFINE_boolean('gcp_create_disks_with_vm', True,
+                     'Whether to create PD disks at VM creation time. Defaults '
+                     'to True.')
 CLOUD_REDIS_API_OVERRIDE = flags.DEFINE_string(
     'gcp_cloud_redis_api_override',
     default='https://redis.googleapis.com/',

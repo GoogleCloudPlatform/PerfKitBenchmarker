@@ -729,6 +729,10 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       tf.close()
       self.RemoteCopy(tf.name, remote_path)
 
+  def DiskCreatedOnVMCreation(self, data_disk):
+    """Returns whether the disk has been created during VM creation."""
+    return data_disk.disk_type == disk.LOCAL
+
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     """Helper method to create scratch data disks.
 
@@ -749,7 +753,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     else:
       scratch_disk = disks[0]
 
-    if scratch_disk.disk_type != disk.LOCAL:
+    if not self.DiskCreatedOnVMCreation(scratch_disk):
       scratch_disk.Create()
       scratch_disk.Attach(self)
 

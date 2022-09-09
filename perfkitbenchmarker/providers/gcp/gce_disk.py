@@ -34,6 +34,8 @@ PD_SSD = 'pd-ssd'
 PD_BALANCED = 'pd-balanced'
 PD_EXTREME = 'pd-extreme'
 
+GCE_REMOTE_DISK_TYPES = [PD_STANDARD, PD_SSD, PD_BALANCED, PD_EXTREME]
+
 DISK_TYPE = {disk.STANDARD: PD_STANDARD, disk.REMOTE_SSD: PD_SSD}
 
 REGIONAL_DISK_SCOPE = 'regional'
@@ -248,5 +250,5 @@ class GceDisk(disk.BaseDisk):
     if self.disk_type == disk.LOCAL and self.interface == NVME:
       return '/dev/%s' % self.name
     else:
-      # by default, interface == SCSI and returns this name id
+      # by default, returns this name id.
       return '/dev/disk/by-id/google-%s' % self.name
