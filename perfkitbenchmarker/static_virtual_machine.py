@@ -166,7 +166,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       with self.vm_pool_lock:
         self.vm_pool.appendleft(self)
 
-  def CreateScratchDisk(self, disk_spec):
+  def CreateScratchDisk(self, _, disk_spec):
     """Create a VM's scratch disk.
 
     Args:
