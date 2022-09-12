@@ -655,7 +655,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             'mode=rw',
         ]
         if disk_spec.disk_type == gce_disk.PD_EXTREME:
-          pd_args += f'provisioned-iops={FLAGS.gcp_provisioned_iops}'
+          pd_args += [f'provisioned-iops={FLAGS.gcp_provisioned_iops}']
         create_disks.append(','.join(pd_args))
     if create_disks:
       cmd.flags['create-disk'] = create_disks
