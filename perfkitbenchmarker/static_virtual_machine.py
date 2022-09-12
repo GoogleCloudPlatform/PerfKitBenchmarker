@@ -374,3 +374,8 @@ class Debian9BasedStaticVirtualMachine(StaticVirtualMachine,
 class Debian10BasedStaticVirtualMachine(StaticVirtualMachine,
                                         linux_virtual_machine.Debian10Mixin):
   pass
+
+
+class Debian11BasedStaticVirtualMachine(StaticVirtualMachine,
+                                        linux_virtual_machine.Debian11Mixin):
+  pass
