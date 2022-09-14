@@ -1,6 +1,8 @@
 """Module containing class for BaseAppService and BaseAppServiceSpec."""
+from collections.abc import MutableMapping
 import threading
 import time
+from typing import Any, Dict, List, Optional, Type, TypeVar
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -11,24 +13,27 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('appservice', None,
-                    'Type of app service. e.g. AppEngine')
+flags.DEFINE_string('appservice', None, 'Type of app service. e.g. AppEngine')
 flags.DEFINE_string('appservice_region', None,
                     'Region of deployed app service.')
 flags.DEFINE_string('appservice_backend', None,
                     'Backend instance type of app service uses.')
-flags.DEFINE_string('app_runtime', None,
-                    'Runtime environment of app service uses. '
-                    'e.g. python, java')
+flags.DEFINE_string(
+    'app_runtime', None, 'Runtime environment of app service uses. '
+    'e.g. python, java')
 flags.DEFINE_string('app_type', None,
                     'Type of app packages builders should built.')
-flags.DEFINE_integer('appservice_count', 1,
-                     'Copies of applications to launch.')
+flags.DEFINE_integer('appservice_count', 1, 'Copies of applications to launch.')
 
 
-def GetAppServiceSpecClass(service):
-  return spec.GetSpecClass(
-      BaseAppServiceSpec, SERVICE=service)
+def GetAppServiceSpecClass(service) -> Type['BaseAppServiceSpec']:
+  """Returns class of the given AppServiceSpec.
+
+  Args:
+    service: String which matches an inherited BaseAppServiceSpec's required
+      SERVICE value.
+  """
+  return spec.GetSpecClass(BaseAppServiceSpec, SERVICE=service)
 
 
 class BaseAppServiceSpec(spec.BaseSpec):
@@ -45,16 +50,17 @@ class BaseAppServiceSpec(spec.BaseSpec):
     appservice: Name of the service (e.g. googlecloudfunction).
   """
 
-  SPEC_TYPE = 'BaseAppServiceSpec'
-  SPEC_ATTRS = ['SERVICE']
+  SPEC_TYPE: str = 'BaseAppServiceSpec'
+  SPEC_ATTRS: List[str] = ['SERVICE']
   appservice_region: str
   appservice_backend: str
   appservice: str
 
   @classmethod
-  def _ApplyFlags(cls, config_values, flag_values):
+  def _ApplyFlags(cls, config_values: MutableMapping[str, Any],
+                  flag_values: flags.FlagValues):
     super(BaseAppServiceSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['appservice_region'] .present:
+    if flag_values['appservice_region'].present:
       config_values['appservice_region'] = flag_values.appservice_region
     if flag_values['appservice_backend'].present:
       config_values['appservice_backend'] = flag_values.appservice_backend
@@ -62,48 +68,76 @@ class BaseAppServiceSpec(spec.BaseSpec):
       config_values['appservice'] = flag_values.appservice
 
   @classmethod
-  def _GetOptionDecoderConstructions(cls):
+  def _GetOptionDecoderConstructions(cls) -> Dict[str, Any]:
     result = super(BaseAppServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'appservice_region': (option_decoders.StringDecoder, {
-            'default': None, 'none_ok': True}),
+            'default': None,
+            'none_ok': True
+        }),
         'appservice_backend': (option_decoders.StringDecoder, {
-            'default': None, 'none_ok': True}),
+            'default': None,
+            'none_ok': True
+        }),
         'appservice': (option_decoders.StringDecoder, {
-            'default': None, 'none_ok': True})
+            'default': None,
+            'none_ok': True
+        })
     })
     return result
 
+AppServiceChild = TypeVar('AppServiceChild', bound='BaseAppService')
 
-def GetAppServiceClass(service):
-  return resource.GetResourceClass(
-      BaseAppService, SERVICE=service)
+
+def GetAppServiceClass(service: str) -> Optional[Type[AppServiceChild]]:
+  """Returns class of the given AppService.
+
+  Args:
+    service: String which matches an inherited BaseAppService's required SERVICE
+      value.
+  """
+  return resource.GetResourceClass(BaseAppService, SERVICE=service)
 
 
 class BaseAppService(resource.BaseResource):
-  """Base class for representing an App instance."""
+  """Base class for representing an App service / instance.
 
-  RESOURCE_TYPE = 'BaseAppService'
-  REQUIRED_ATTRS = ['SERVICE']
-  POLL_INTERVAL = 1
+  Handles lifecycle management (creation & deletion) for a given App service.
 
-  _appservice_counter = 0
+  Attributes:
+    RESOURCE_TYPE: The class name.
+    REQUIRED_ATTRS: Required field for subclass to override (one constant per
+      subclass).
+    region: Region the service should be in.
+    backend: Amount of memory allocated.
+    builder: A BaseAppBuilder matching the specified runtime & app type.
+    samples: Samples with lifecycle metrics (e.g. create time) recorded.
+  """
+
+  RESOURCE_TYPE: str = 'BaseAppService'
+  REQUIRED_ATTRS: List[str] = ['SERVICE']
+  SERVICE: str
+  _POLL_INTERVAL: int = 1
+
+  _appservice_counter: int = 0
   _appservice_counter_lock = threading.Lock()
 
-  def __init__(self, base_app_service_spec):
+  def __init__(self, base_app_service_spec: BaseAppServiceSpec):
     super(BaseAppService, self).__init__()
     with self._appservice_counter_lock:
-      self.appservice_number = self._appservice_counter
-      self.name = 'pkb-%s-%s' % (FLAGS.run_uri, self.appservice_number)
+      self.appservice_number: int = self._appservice_counter
+      self.name: str = 'pkb-%s-%s' % (FLAGS.run_uri, self.appservice_number)
       BaseAppService._appservice_counter += 1
-    self.region = base_app_service_spec.appservice_region
-    self.backend = base_app_service_spec.appservice_backend
-    self.builder = None
+    self.region: str = base_app_service_spec.appservice_region
+    self.backend: str = base_app_service_spec.appservice_backend
+    self.builder: Any = None
     # update metadata
-    self.metadata.update({'backend': self.backend,
-                          'region': self.region,
-                          'concurrency': 'default'})
-    self.samples = []
+    self.metadata.update({
+        'backend': self.backend,
+        'region': self.region,
+        'concurrency': 'default'
+    })
+    self.samples: List[sample.Sample] = []
 
   def _UpdateDependencies(self):
     """Update dependencies for AppService."""
@@ -113,12 +147,13 @@ class BaseAppService(resource.BaseResource):
     raise NotImplementedError()
 
   def Update(self):
-    """Update a deployed app instance."""
+    """Updates a deployed app instance."""
 
-    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0,
-                   timeout=self.READY_TIMEOUT,
-                   retryable_exceptions=(
-                       errors.Resource.RetryableCreationError,))
+    @vm_util.Retry(
+        poll_interval=self._POLL_INTERVAL,
+        fuzz=0,
+        timeout=self.READY_TIMEOUT,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,))
     def WaitUntilReady():
       if not self._IsReady():
         raise errors.Resource.RetryableCreationError('Not yet ready')
@@ -133,15 +168,15 @@ class BaseAppService(resource.BaseResource):
     self.update_ready_time = time.time()
     self.samples.append(
         sample.Sample('update latency',
-                      self.update_end_time - self.update_start_time,
-                      'seconds', {}))
+                      self.update_end_time - self.update_start_time, 'seconds',
+                      {}))
     self.samples.append(
         sample.Sample('update ready latency',
                       self.update_ready_time - self.update_start_time,
                       'seconds', {}))
 
-  def Invoke(self, args=None):
-    """Invoke a deployed app instance.
+  def Invoke(self, args: Any = None):
+    """Invokes a deployed app instance.
 
     Args:
       args: dict. Arguments passed to app.
@@ -154,17 +189,17 @@ class BaseAppService(resource.BaseResource):
       self.builder.Create()
 
   def _DeleteDependencies(self):
-    """Delete app package."""
+    """Deletes app package."""
     if self.builder:
       self.builder.Delete()
 
-  def SetBuilder(self, builder=None, **kwargs):
-    """Set builder for AppService."""
+  def SetBuilder(self, builder: Any = None, **kwargs: Any):
+    """Sets builder for AppService."""
     if builder:
       self.builder = builder
 
   def GetLifeCycleMetrics(self):
-    """Export internal lifecycle metrics."""
+    """Exports internal lifecycle metrics."""
     if self.builder:
       self.metadata.update(self.builder.GetResourceMetadata())
 
@@ -181,8 +216,8 @@ class BaseAppService(resource.BaseResource):
     super(BaseAppService, self).Create()
     self.samples.append(
         sample.Sample('create latency',
-                      self.create_end_time - self.create_start_time,
-                      'seconds', {}))
+                      self.create_end_time - self.create_start_time, 'seconds',
+                      {}))
     self.samples.append(
         sample.Sample('create ready latency',
                       self.resource_ready_time - self.create_start_time,
