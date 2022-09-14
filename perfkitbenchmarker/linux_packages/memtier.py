@@ -367,8 +367,8 @@ def MeasureLatencyCappedThroughput(
           'Binary search for latency capped throughput.\n'
           '\tMemtier ops throughput: %s'
           '\tmemtier 95th percentile latency: %s'
-          '\tupper bound: %s'
-          '\tlower bound: %s', result.ops_per_sec, result.p95_latency,
+          '\tlower bound: %s'
+          '\tupper bound: %s', result.ops_per_sec, result.p95_latency,
           parameters.lower_bound, parameters.upper_bound)
       if (result.ops_per_sec > current_max_result.ops_per_sec
           and result.p95_latency <= MEMTIER_LATENCY_CAP.value):
