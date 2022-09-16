@@ -185,14 +185,32 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     # In Python3 the mocking of subprocess.Popen in setup() is problematic for
     # platform.system(). It is called by RemoteCommand() in
     # _GetNvmeBootIndex() so we'll mock that instead.
-    self.patches.append(mock.patch(
-        aws_virtual_machine.__name__ + '.AwsVirtualMachine._GetNvmeBootIndex'))
+    self.patches.append(
+        mock.patch(aws_virtual_machine.__name__ +
+                   '.AwsVirtualMachine._GetNvmeBootIndex'))
+    self.patches.append(
+        mock.patch(aws_virtual_machine.__name__ +
+                   '.AwsVirtualMachine.GetVolumeIdByDevice'))
+    self.patches.append(
+        mock.patch(aws_virtual_machine.__name__ +
+                   '.AwsVirtualMachine.GetPathByDevice'))
 
   def _CreateVm(self):
-    vm_spec = aws_virtual_machine.AwsVmSpec('test_vm_spec.AWS',
-                                            zone='us-east-1a',
-                                            machine_type='test_machine_type')
-    return aws_virtual_machine.Ubuntu1604BasedAwsVirtualMachine(vm_spec)
+    vm_spec = aws_virtual_machine.AwsVmSpec(
+        'test_vm_spec.AWS', zone='us-east-1a', machine_type='test_machine_type')
+    vm = aws_virtual_machine.Ubuntu1604BasedAwsVirtualMachine(vm_spec)
+
+    vm.LogDeviceByDiskSpecId('0_0', 'foobar_1')
+    vm.LogDeviceByName('foobar_1', 'vol67890', None)
+    vm.GetNVMEDeviceInfo = mock.Mock()
+    vm.GetNVMEDeviceInfo.return_value = [
+        {
+            'DevicePath': '/dev/nvme1n2',
+            'SerialNumber': 'vol67890',
+            'ModelNumber': 'Amazon Elastic Block Store',
+        }
+    ]
+    return vm
 
   def _GetDiskClass(self):
     return aws_disk.AwsDisk

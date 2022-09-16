@@ -29,6 +29,7 @@ for you.
 import abc
 import collections
 import copy
+import json
 import logging
 import os
 import pipes
@@ -1540,6 +1541,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     for line in text.splitlines():
       vuln.AddLine(line)
     return vuln
+
+  def GetNVMEDeviceInfo(self):
+    """Get the NVME disk device info, by querying the VM."""
+    self.InstallPackages('nvme-cli')
+    stdout, _ = self.RemoteCommand('sudo nvme list --output-format json')
+    response = json.loads(stdout)
+    return response.get('Devices', [])
 
 
 class ClearMixin(BaseLinuxMixin):

@@ -265,6 +265,10 @@ class AwsVirtualMachineTest(BaseTest):
     aws_machine = aws_virtual_machine.Rhel7BasedAwsVirtualMachine(vm_spec)
     aws_machine.RemoteCommand = mock.Mock()
     aws_machine.RemoteHostCommand = mock.Mock()
+    aws_machine.GetNVMEDeviceInfo = mock.Mock()
+    aws_machine.GetNVMEDeviceInfo.return_value = []
+    aws_machine.GetPathByDevice = mock.Mock()
+    aws_machine.GetPathByDevice.return_value = '/dev/xvdb'
     return aws_machine
 
   def _SetBmSpec(self, nfs):

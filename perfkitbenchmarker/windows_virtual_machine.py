@@ -569,6 +569,10 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     result = sum(int(capacity) for capacity in stdout.split('\n') if capacity)
     return result / 1024
 
+  def GetNVMEDeviceInfo(self):
+    """Windows VMs rely on disk number instead of NVME info to prepare disks."""
+    return []
+
   def GetTotalMemoryMb(self):
     return self._GetTotalMemoryKb() / 1024
 

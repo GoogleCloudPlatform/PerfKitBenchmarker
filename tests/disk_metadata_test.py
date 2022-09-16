@@ -87,7 +87,16 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
     vm_spec = aws_virtual_machine.AwsVmSpec(
         'test_vm_spec.AWS', zone='us-east-1a', machine_type=machine_type)
     vm = aws_virtual_machine.Ubuntu1804BasedAwsVirtualMachine(vm_spec)
-
+    vm.GetNVMEDeviceInfo = mock.Mock()
+    vm.GetNVMEDeviceInfo.return_value = [
+        {
+            'DevicePath': '/dev/nvme1n2',
+            'SerialNumber': 'vol67890',
+            'ModelNumber': 'Amazon EC2 NVMe Instance Storage',
+        }
+    ]
+    vm.LogDeviceByDiskSpecId('0_0', 'foobar_1')
+    vm.LogDeviceByName('foobar_1', 'vol67890', None)
     vm.CreateScratchDisk(0, disk_spec)
 
     self.assertDictContainsSubset(

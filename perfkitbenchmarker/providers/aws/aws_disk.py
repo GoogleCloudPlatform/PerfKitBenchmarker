@@ -21,6 +21,7 @@ See http://aws.amazon.com/ebs/details/ for more information about AWS (EBS)
 disks.
 """
 
+import dataclasses
 import json
 import logging
 import string
@@ -49,12 +50,15 @@ IO2 = 'io2'
 ST1 = 'st1'
 SC1 = 'sc1'
 
+AWS_REMOTE_DISK_TYPES = [STANDARD, SC1, ST1, GP2, GP3, IO1, IO2]
+
 DISK_TYPE = {
     disk.STANDARD: STANDARD,
     disk.REMOTE_SSD: GP2,
     disk.PIOPS: IO1
 }
 
+# any disk types here, consider adding them to AWS_REMOTE_DISK_TYPES as well.
 DISK_METADATA = {
     STANDARD: {
         disk.MEDIA: disk.HDD,
@@ -384,13 +388,21 @@ class AwsDiskSpec(disk.BaseDiskSpec):
     return result
 
 
+@dataclasses.dataclass
+class AWSDiskIdentifiers:
+  """Identifiers of an AWS disk assigned by AWS at creation time."""
+  volume_id: str
+  path: str
+
+
 class AwsDisk(disk.BaseDisk):
   """Object representing an Aws Disk."""
 
   _lock = threading.Lock()
-  vm_devices = {}
+  # this is a mapping of vm_id to unused alphabetical device letters.
+  available_device_letters_by_vm = {}
 
-  def __init__(self, disk_spec, zone, machine_type):
+  def __init__(self, disk_spec, zone, machine_type, disk_spec_id=None):
     super(AwsDisk, self).__init__(disk_spec)
     self.iops = disk_spec.iops
     self.throughput = disk_spec.throughput
@@ -410,6 +422,7 @@ class AwsDisk(disk.BaseDisk):
       self.metadata['iops'] = self.iops
     if self.throughput:
       self.metadata['throughput'] = self.throughput
+    self.disk_spec_id = disk_spec_id
 
   def AssignDeviceLetter(self, letter_suggestion, nvme_boot_drive_index):
     if (LocalDriveIsNvme(self.machine_type) and
@@ -514,6 +527,33 @@ class AwsDisk(disk.BaseDisk):
                    self.id, self.attached_vm_id, status)
 
       raise AwsStateRetryableError()
+    volume_id = response['Volumes'][0]['Attachments'][0]['VolumeId']
+    device_name = response['Volumes'][0]['Attachments'][0]['Device']
+    return volume_id, device_name
+
+  @classmethod
+  def GenerateDeviceNamePrefix(cls, disk_type):
+    """Generates the device name prefix depending on the device type."""
+    if disk_type == disk.LOCAL:
+      return '/dev/xvd'
+    else:
+      return '/dev/xvdb'
+
+  @classmethod
+  def GenerateDeviceLetter(cls, vm_name):
+    """Generates the next available device letter for a given VM."""
+    with cls._lock:
+      if vm_name not in cls.available_device_letters_by_vm:
+        all_available_letters = set(string.ascii_lowercase)
+        # local ssds cannot use 'a' to allow for boot disk naming.
+        # remove 'a' as an available device letter,
+        # so that both local ssds and remote disks can share this naming
+        # convention.
+        all_available_letters.remove('a')
+        cls.available_device_letters_by_vm[vm_name] = all_available_letters
+      device_letter = min(cls.available_device_letters_by_vm[vm_name])
+      cls.available_device_letters_by_vm[vm_name].remove(device_letter)
+    return device_letter
 
   def Attach(self, vm):
     """Attaches the disk to a VM.
@@ -521,26 +561,24 @@ class AwsDisk(disk.BaseDisk):
     Args:
       vm: The AwsVirtualMachine instance to which the disk will be attached.
     """
-    with self._lock:
-      self.attached_vm_id = vm.id
-      if self.attached_vm_id not in AwsDisk.vm_devices:
-        AwsDisk.vm_devices[self.attached_vm_id] = set(
-            string.ascii_lowercase)
-      self.device_letter = min(AwsDisk.vm_devices[self.attached_vm_id])
-      AwsDisk.vm_devices[self.attached_vm_id].remove(self.device_letter)
+    self.device_letter = AwsDisk.GenerateDeviceLetter(vm.name)
 
-    device_name = '/dev/xvdb%s' % self.device_letter
+    device_name = (
+        self.GenerateDeviceNamePrefix(self.disk_type) + self.device_letter)
     attach_cmd = util.AWS_PREFIX + [
         'ec2',
         'attach-volume',
         '--region=%s' % self.region,
-        '--instance-id=%s' % self.attached_vm_id,
+        '--instance-id=%s' % vm.id,
         '--volume-id=%s' % self.id,
         '--device=%s' % device_name]
     logging.info('Attaching AWS volume %s. This may fail if the disk is not '
                  'ready, but will be retried.', self.id)
     util.IssueRetryableCommand(attach_cmd)
-    self._WaitForAttachedState()
+    volume_id, device_name = self._WaitForAttachedState()
+    vm.LogDeviceByName(device_name, volume_id)
+    if self.disk_spec_id:
+      vm.LogDeviceByDiskSpecId(self.disk_spec_id, device_name)
 
   def Detach(self):
     """Detaches the disk from a VM."""
@@ -553,24 +591,8 @@ class AwsDisk(disk.BaseDisk):
     util.IssueRetryableCommand(detach_cmd)
 
     with self._lock:
-      assert self.attached_vm_id in AwsDisk.vm_devices
-      AwsDisk.vm_devices[self.attached_vm_id].add(self.device_letter)
+      assert self.attached_vm_id in AwsDisk.available_device_letters_by_vm
+      AwsDisk.available_device_letters_by_vm[self.attached_vm_id].add(
+          self.device_letter)
       self.attached_vm_id = None
       self.device_letter = None
-
-  def GetDevicePath(self):
-    """Returns the path to the device inside the VM."""
-    if self.disk_type == disk.LOCAL:
-      if LocalDriveIsNvme(self.machine_type):
-        first_device_letter = 'b'
-        return '/dev/nvme%sn1' % str(
-            ord(self.device_letter) - ord(first_device_letter))
-      return '/dev/xvd%s' % self.device_letter
-    else:
-      if EbsDriveIsNvme(self.machine_type):
-        first_device_letter = 'a'
-        return '/dev/nvme%sn1' % (
-            1 + NUM_LOCAL_VOLUMES.get(self.machine_type, 0) +
-            ord(self.device_letter) - ord(first_device_letter))
-      else:
-        return '/dev/xvdb%s' % self.device_letter

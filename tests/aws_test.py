@@ -455,9 +455,6 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         '--tag-specifications=foobar',
         '--associate-public-ip-address',
         '--subnet-id=subnet-id',
-        ('--block-device-mappings=[{"VirtualName": "ephemeral0", '
-         '"DeviceName": "/dev/xvdb"}, {"VirtualName": "ephemeral1", '
-         '"DeviceName": "/dev/xvdc"}]'),
         ('--placement=AvailabilityZone=us-east-1a,'
          'GroupName=placement_group_name'),
         ('--instance-market-options={"MarketType": "spot", '
@@ -631,6 +628,11 @@ class AwsGetBlockDeviceMapTestCase(pkb_common_test_case.PkbCommonTestCase):
     p = mock.patch(util.__name__ + '.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={})
+    self.spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec,
+                                             _BENCHMARK_UID)
+    self.aws_vm = CreateTestAwsVm()
 
     path = os.path.join(os.path.dirname(__file__),
                         'data', 'describe_image_output.txt')
@@ -638,30 +640,27 @@ class AwsGetBlockDeviceMapTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.describe_image_output = fp.read()
 
   def testInvalidMachineType(self):
-    self.assertIsNone(aws_virtual_machine.GetBlockDeviceMap('invalid'))
+    self.aws_vm.machine_type = 'invalid'
+    self.assertIsNone(aws_virtual_machine.GetBlockDeviceMap(self.aws_vm))
 
   def testValidMachineTypeWithNoRootVolumeSize(self):
-    expected = [{'DeviceName': '/dev/xvdb',
-                 'VirtualName': 'ephemeral0'}]
-    actual = json.loads(aws_virtual_machine.GetBlockDeviceMap('c1.medium'))
-    self.assertEqual(actual, expected)
+    self.aws_vm.machine_type = 'c1.medium'
+    actual = aws_virtual_machine.GetBlockDeviceMap(self.aws_vm)
+    self.assertIsNone(actual)
 
   def testValidMachineTypeWithSpecifiedRootVolumeSize(self):
     util.IssueRetryableCommand.side_effect = [(self.describe_image_output,
                                                None)]
-    desired_root_volume_size_gb = 35
-    machine_type = 'c1.medium'
-    image_id = 'ami-a9d276c9'
-    region = 'us-west-2'
+    self.aws_vm.boot_disk_size = 35
+    self.aws_vm.machine_type = 'c1.medium'
+    self.aws_vm.image = 'ami-a9d276c9'
+    self.aws_vm.region = 'us-west-2'
     expected = [{'DeviceName': '/dev/sda1',
                  'Ebs': {'SnapshotId': 'snap-826344d5',
                          'DeleteOnTermination': True,
                          'VolumeType': 'gp2',
-                         'VolumeSize': 35}},
-                {'DeviceName': '/dev/xvdb',
-                 'VirtualName': 'ephemeral0'}]
-    actual = json.loads(aws_virtual_machine.GetBlockDeviceMap(
-        machine_type, desired_root_volume_size_gb, image_id, region))
+                         'VolumeSize': 35}}]
+    actual = json.loads(aws_virtual_machine.GetBlockDeviceMap(self.aws_vm))
     self.assertEqual(actual, expected)
 
 
