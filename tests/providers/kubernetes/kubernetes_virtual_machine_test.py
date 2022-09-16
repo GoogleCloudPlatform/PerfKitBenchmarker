@@ -54,6 +54,11 @@ _EXPECTED_CALL_BODY_WITHOUT_GPUS = """
                 "privileged": true
             },
             "command": ["tail", "-f", "/dev/null"]
+        }],
+        "tolerations": [{
+            "key": "kubernetes.io/arch",
+            "operator": "Exists",
+            "effect": "NoSchedule"
         }]
     },
     "kind": "Pod",
@@ -90,6 +95,11 @@ _EXPECTED_CALL_BODY_WITH_2_GPUS = """
                 }
             },
             "command": ["tail", "-f", "/dev/null"]
+        }],
+        "tolerations": [{
+            "key": "kubernetes.io/arch",
+            "operator": "Exists",
+            "effect": "NoSchedule"
         }]
     },
     "kind": "Pod",
@@ -118,6 +128,11 @@ _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE = """
                 "privileged": true
             },
             "command": ["tail", "-f", "/dev/null"]
+        }],
+        "tolerations": [{
+            "key": "kubernetes.io/arch",
+            "operator": "Exists",
+            "effect": "NoSchedule"
         }]
     },
     "kind": "Pod",
@@ -146,6 +161,11 @@ _EXPECTED_CALL_BODY_WITH_VM_GROUP = """
                 "privileged": true
             },
             "command": ["tail", "-f", "/dev/null"]
+        }],
+        "tolerations": [{
+            "key": "kubernetes.io/arch",
+            "operator": "Exists",
+            "effect": "NoSchedule"
         }],
         "nodeSelector": {
             "pkb_nodepool": "myvmgroup"

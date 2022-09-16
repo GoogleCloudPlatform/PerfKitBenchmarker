@@ -255,6 +255,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
             'volumes': volumes,
             'containers': [container],
             'dnsPolicy': 'ClusterFirst',
+            'tolerations': [
+                {
+                    'key': 'kubernetes.io/arch',
+                    'operator': 'Exists',
+                    'effect': 'NoSchedule'
+                }
+            ]
         }
     }
 
