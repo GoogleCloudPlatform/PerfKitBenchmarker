@@ -18,26 +18,6 @@ This is a set of benchmarks that measures performance of Sysbench Databases on
 managed MySQL or Postgres.
 
 As other cloud providers deliver a managed MySQL service, we will add it here.
-
-As of May 2017 to make this benchmark run for GCP you must install the
-gcloud beta component. This is necessary because creating a Cloud SQL instance
-with a non-default storage size is in beta right now. This can be removed when
-this feature is part of the default components.
-See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
-for more information.
-To run this benchmark for GCP it is required to install a non-default gcloud
-component. Otherwise this benchmark will fail.
-
-To ensure that gcloud beta is installed, type
-        'gcloud components list'
-into the terminal. This will output all components and status of each.
-Make sure that
-  name: gcloud Beta Commands
-  id:  beta
-has status: Installed.
-If not, run
-        'gcloud components install beta'
-to install it. This will allow this benchmark to properly create an instance.
 """
 
 
@@ -51,7 +31,6 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
-from perfkitbenchmarker import vm_util
 import six
 
 
@@ -86,19 +65,6 @@ flags.DEFINE_integer('sysbench_latency_percentile', 100,
 flags.DEFINE_integer('sysbench_report_interval', 2,
                      'The interval, in seconds, we ask sysbench to report '
                      'results.')
-flags.DEFINE_integer('sysbench_pre_failover_seconds', 0,
-                     'If non zero, then after the sysbench workload is '
-                     'complete, a failover test will be performed.  '
-                     'When a failover test is run, the database will be driven '
-                     'using the last entry in sysbench_thread_counts.  After '
-                     'sysbench_pre_failover_seconds, a failover will be '
-                     'triggered.  Time will be measured until sysbench '
-                     'is able to connect again.')
-flags.DEFINE_integer('sysbench_post_failover_seconds', 0,
-                     'When non Zero, will run the benchmark an additional '
-                     'amount of time after failover is complete.  Useful '
-                     'for detecting if there are any differences in TPS because'
-                     'of failover.')
 
 BENCHMARK_DATA = {
     'sysbench-tpcc.tar.gz':
@@ -197,9 +163,6 @@ DISABLE = 'disable'
 UNIFORM = 'uniform'
 
 SECONDS_UNIT = 'seconds'
-
-_MAX_FAILOVER_DURATION_SECONDS = 60 * 60  # 1 hour
-_FAILOVER_TEST_TPS_FREQUENCY_SECONDS = 10
 
 
 def GetConfig(user_config):
@@ -392,48 +355,6 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
   return stdout, stderr
 
 
-def _IssueSysbenchCommandWithReturnCode(
-    vm, duration, benchmark_spec, sysbench_thread_count, show_results=True):
-  """Run sysbench workload as specified by the benchmark_spec."""
-  stdout = ''
-  stderr = ''
-  retcode = -1
-  if duration > 0:
-    run_cmd = _GetSysbenchCommand(
-        duration,
-        benchmark_spec,
-        sysbench_thread_count)
-    stdout, stderr, retcode = vm.RemoteCommandWithReturnCode(
-        run_cmd,
-        should_log=show_results,
-        ignore_failure=True,
-        suppress_warning=True,
-        timeout=duration + 60)
-    if show_results:
-      logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
-                   stdout, stderr)
-
-  return stdout, stderr, retcode
-
-
-def _IssueMysqlPingCommandWithReturnCode(vm, benchmark_spec):
-  """Ping mysql with mysqladmin."""
-  db = benchmark_spec.relational_db
-  run_cmd_tokens = ['mysqladmin',
-                    '--count=1',
-                    '--sleep=1',
-                    'status',
-                    db.client_vm_query_tools.GetConnectionString()]
-  run_cmd = ' '.join(run_cmd_tokens)
-  stdout, stderr, retcode = vm.RemoteCommandWithReturnCode(
-      run_cmd,
-      should_log=False,
-      ignore_failure=True,
-      suppress_warning=True)
-
-  return stdout, stderr, retcode
-
-
 def _RunSysbench(
     vm, metadata, benchmark_spec, sysbench_thread_count):
   """Runs the Sysbench OLTP test.
@@ -504,207 +425,6 @@ def _GetDatabaseSize(benchmark_spec):
     size_mb = int(stdout.split()[2])
 
   return size_mb
-
-
-def _PerformFailoverTest(
-    vm, metadata, benchmark_spec, sysbench_thread_count):
-  """Runs the failover test - drive the workload while failing over."""
-  results = []
-  threaded_args = [
-      (_FailoverWorkloadThread, [
-          vm, benchmark_spec, sysbench_thread_count, results, metadata], {}),
-      (_FailOverThread, [benchmark_spec], {})]
-  vm_util.RunParallelThreads(threaded_args, len(threaded_args), 0)
-  return results
-
-
-class _Stopwatch(object):
-  """Stopwatch class for tracking elapsed time."""
-
-  def __init__(self):
-    self.start_time = time.time()
-
-  @property
-  def elapsed_seconds(self):
-    return time.time() - self.start_time
-
-  def ShouldContinue(self):
-    return self.elapsed_seconds < _MAX_FAILOVER_DURATION_SECONDS
-
-
-def _WaitForWorkloadToFail(
-    stopwatch, vm, benchmark_spec, sysbench_thread_count):
-  """Run the sysbench workload continuously until it fails."""
-  retcode = 0
-  did_tps_drop_to_zero = False
-
-  while (retcode == 0 and
-         not did_tps_drop_to_zero and
-         stopwatch.ShouldContinue()):
-    # keep the database busy until the expected time until failover
-    # the command will fail once the database connection is lost
-    stdout, _, retcode = _IssueSysbenchCommandWithReturnCode(
-        vm, _FAILOVER_TEST_TPS_FREQUENCY_SECONDS, benchmark_spec,
-        sysbench_thread_count)
-
-    # the tps will drop to 0 before connection failure on AWS
-    tps_array, _, _ = _ParseSysbenchOutput(stdout)
-    did_tps_drop_to_zero = any({x == 0 for x in tps_array})
-
-  did_all_succeed = retcode == 0 and not did_tps_drop_to_zero
-  if did_all_succeed:
-    return False
-
-  return True
-
-
-def _WaitForPingToFail(stopwatch, vm, benchmark_spec):
-  """Run a ping workload continuously until it fails."""
-  logging.info('\n Pinging until failure...\n')
-  retcode = 0
-  while retcode == 0 and stopwatch.ShouldContinue():
-    _, _, retcode = _IssueMysqlPingCommandWithReturnCode(
-        vm, benchmark_spec)
-
-  # exited without reaching failure
-  if retcode == 0:
-    return False
-
-  return True
-
-
-def _WaitForPingToSucceed(stopwatch, vm, benchmark_spec):
-  """Run a ping workload continuously until it succeeds."""
-  logging.info('\n Pinging until success...\n')
-  # issue ping while it fails, until it succeeds
-  retcode = 1
-  while retcode != 0 and stopwatch.ShouldContinue():
-    _, _, retcode = _IssueMysqlPingCommandWithReturnCode(
-        vm, benchmark_spec)
-
-  # exited without reaching success
-  if retcode == 1:
-    return False
-
-  return True
-
-
-def _WaitUntilSysbenchWorkloadConnect(
-    stopwatch, vm, benchmark_spec, sysbench_thread_count):
-  """Run the sysbench workload until it connects - and then exit."""
-
-  logging.info('\n Keep trying to connect sysbench until success...\n')
-  # try issuing sysbench command on 1 second intervals until it succeeds
-  retcode = 1
-  while retcode != 0 and stopwatch.ShouldContinue():
-    _, _, retcode = _IssueSysbenchCommandWithReturnCode(
-        vm, 1, benchmark_spec,
-        sysbench_thread_count, show_results=False)
-
-  if retcode == 1:
-    return False
-
-  return True
-
-
-def _GatherPostFailoverTPS(
-    vm, benchmark_spec, sysbench_thread_count, results, metadata):
-  """Gathers metrics on post failover performance."""
-  if not FLAGS.sysbench_post_failover_seconds:
-    return
-  logging.info('\n Gathering Post Failover Data...\n')
-  stdout, _ = _IssueSysbenchCommand(
-      vm, FLAGS.sysbench_post_failover_seconds, benchmark_spec,
-      sysbench_thread_count)
-  logging.info('\n Parsing Sysbench Results...\n')
-  AddMetricsForSysbenchOutput(stdout, results, metadata, 'failover_')
-
-
-def _FailoverWorkloadThread(
-    vm,
-    benchmark_spec,
-    sysbench_thread_count,
-    results,
-    metadata):
-  """Entry point for thraed that drives the workload for failover test.
-
-  The failover test requires 2 threads of execution.   The failover thread
-  will cause a failover after a certain timeout.
-
-  The workload thread is responsible for driving the database while waiting
-  for the failover to occur.   After failover, t then measures how long
-  it takes for the database to become operable again.  Finally, the
-  database is run under the regular workload again to gather statistics
-  on how the database behaves post-failover.
-
-  Args:
-    vm:  The vm of the client driving the database
-    benchmark_spec:  Benchmark spec including the database spec
-    sysbench_thread_count:  How many client threads to drive the database with
-                            while waiting for failover
-    results:  A list to append any sample to
-    metadata:  Metadata to be used in sample construction
-
-  Returns:
-    True if the thread made it through the expected workflow without timeouts
-    False if database failover could not be detected or it timed out.
-  """
-  logging.info('\n Running sysbench to drive database while '
-               'waiting for failover \n')
-
-  stopwatch = _Stopwatch()
-  if not _WaitForWorkloadToFail(
-      stopwatch, vm, benchmark_spec, sysbench_thread_count):
-    return False
-
-  if not _WaitForPingToFail(stopwatch, vm, benchmark_spec):
-    return False
-
-  time_until_failover = stopwatch.elapsed_seconds
-  results.append(sample.Sample('time_until_failover',
-                               time_until_failover, 's',
-                               metadata))
-
-  if not _WaitForPingToSucceed(stopwatch, vm, benchmark_spec):
-    return False
-
-  time_failover_to_ping = stopwatch.elapsed_seconds - time_until_failover
-  results.append(sample.Sample('time_failover_to_ping',
-                               time_failover_to_ping, 's',
-                               metadata))
-
-  if not _WaitUntilSysbenchWorkloadConnect(
-      stopwatch, vm, benchmark_spec, sysbench_thread_count):
-    return False
-
-  time_failover_to_connect = stopwatch.elapsed_seconds - time_until_failover
-  results.append(sample.Sample('time_failover_to_connect',
-                               time_failover_to_connect, 's',
-                               metadata))
-
-  _GatherPostFailoverTPS(
-      vm, benchmark_spec, sysbench_thread_count, results, metadata)
-
-  return True
-
-
-def _FailOverThread(benchmark_spec):
-  """Entry point for thread that performs the db failover.
-
-  The failover test requires 2 threads of execution.   The
-  workload thread waits for the database to fail and then waits for the database
-  to be useful again.   The failover thread is responsible for programmatically
-  making the database fail. There is a pause time before failure so that
-  we can make sure the database is under sufficient load at the point of
-  failure. Doing a failover on an idle database would not be an
-  interesting test.
-
-  Args:
-      benchmark_spec:   The benchmark spec of the database to failover
-  """
-  time.sleep(FLAGS.sysbench_pre_failover_seconds)
-  db = benchmark_spec.relational_db
-  db.Failover()
 
 
 def _PrepareSysbench(client_vm, benchmark_spec):
@@ -795,8 +515,6 @@ def CreateMetadataFromFlags(db):
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval,
       'sysbench_db_size_MB': db.sysbench_db_size_MB,
-      'sysbench_pre_failover_seconds': FLAGS.sysbench_post_failover_seconds,
-      'sysbench_post_failover_seconds': FLAGS.sysbench_pre_failover_seconds
   }
   return metadata
 
@@ -859,20 +577,7 @@ def Run(benchmark_spec):
     print(run_results)
     publisher.PublishRunStageSamples(benchmark_spec, run_results)
 
-  if (FLAGS.use_managed_db and
-      benchmark_spec.relational_db.spec.high_availability and
-      FLAGS.sysbench_pre_failover_seconds):
-    last_client_count = FLAGS.sysbench_thread_counts[
-        len(FLAGS.sysbench_thread_counts) - 1]
-    failover_results = _PerformFailoverTest(client_vm, metadata, benchmark_spec,
-                                            last_client_count)
-    print(failover_results)
-    publisher.PublishRunStageSamples(benchmark_spec, failover_results)
-
   # all results have already been published
-  # database results take a long time to gather.  If later client counts
-  # or failover tests fail, still want the data from the earlier tests.
-  # so, results are published as they are found.
   return []
 
 
