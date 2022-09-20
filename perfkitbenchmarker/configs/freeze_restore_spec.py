@@ -13,7 +13,7 @@
 # limitations under the License.
 """Benchmark-configurable options for freezing and restoring resources."""
 
-from typing import Dict, Optional
+from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker.configs import option_decoders
@@ -42,7 +42,7 @@ class FreezeRestoreSpec(spec.BaseSpec):
 
   def __init__(self,
                component_full_name: str,
-               flag_values: Optional[Dict[str, flags.FlagValues]] = None,
+               flag_values: Optional[flags.FlagValues] = None,
                **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
 

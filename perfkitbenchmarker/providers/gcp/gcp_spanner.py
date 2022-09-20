@@ -98,7 +98,7 @@ class SpannerSpec(freeze_restore_spec.FreezeRestoreSpec):
 
   def __init__(self,
                component_full_name: str,
-               flag_values: Optional[Dict[str, flags.FlagValues]] = None,
+               flag_values: Optional[flags.FlagValues] = None,
                **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
 
