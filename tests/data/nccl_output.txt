@@ -1,4 +1,4 @@
-# nThread 1 nGpus 1 minBytes 8 maxBytes 8589934592 step: 2(factor) warmup iters: 5 iters: 100 validation: 1
+# nThread 1 nGpus 1 minBytes 8 maxBytes 8589934592 step: 2(factor) warmup iters: 5 iters: 100 app iters: 1 validation: 1 graph: 0
 #
 # Using devices
 #   Rank  0 Pid  40529 on ip-172-31-20-44 device  0 [0x00] Tesla V100-SXM2-32GB

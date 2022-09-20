@@ -42,7 +42,9 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
         'step': '2(factor)',
         'warmup_iters': '5',
         'iters': '100',
+        'app_iters': '1',
         'validation': '1',
+        'graph': '0',
         'Rank  0': 'Pid  40529 on ip-172-31-20-44 device  0 [0x00] Tesla '
                    'V100-SXM2-32GB',
         'Rank  1': 'Pid  40530 on ip-172-31-20-44 device  1 [0x00] Tesla '

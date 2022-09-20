@@ -87,7 +87,9 @@ _SAMPLE_LINE_RE = re.compile(r'# nThread (?P<nThread>\d+) '
                              r'step: (?P<step>\S+) '
                              r'warmup iters: (?P<warmup_iters>\d+) '
                              r'iters: (?P<iters>\d+) '
-                             r'validation: (?P<validation>\d+)\s*')
+                             r'app iters: (?P<app_iters>\d+) '
+                             r'validation: (?P<validation>\d+) '
+                             r'graph: (?P<graph>\d+)\s*')
 
 # Without '--mca btl_tcp_if_exclude docker0,lo', it stuck forever
 # This is caused by Docker network in DLVM, use mca btl_tcp_if_exclude to skip
