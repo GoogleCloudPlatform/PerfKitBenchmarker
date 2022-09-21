@@ -29,7 +29,6 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import iaas_relational_db
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import os_types
@@ -781,14 +780,14 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     if flag_values['server_gcp_min_cpu_platform'].present:
       config_values['vm_groups']['servers']['vm_spec'][cloud][
           'min_cpu_platform'] = flag_values.server_gcp_min_cpu_platform
-    if iaas_relational_db.SERVER_GCE_NUM_LOCAL_SSDS.present and has_unmanaged_dbs:
+    if flag_values['server_gce_num_local_ssds'].present and has_unmanaged_dbs:
       config_values['vm_groups']['servers']['vm_spec'][cloud][
-          'num_local_ssds'] = iaas_relational_db.SERVER_GCE_NUM_LOCAL_SSDS.value
-    if iaas_relational_db.SERVER_GCE_SSD_INTERFACE.present and has_unmanaged_dbs:
+          'num_local_ssds'] = flag_values.server_gce_num_local_ssds
+    if flag_values['server_gce_ssd_interface'].present and has_unmanaged_dbs:
       config_values['vm_groups']['servers']['vm_spec'][cloud][
-          'ssd_interface'] = iaas_relational_db.SERVER_GCE_SSD_INTERFACE.value
+          'ssd_interface'] = flag_values.server_gce_ssd_interface
       config_values['vm_groups']['servers']['disk_spec'][cloud][
-          'interface'] = iaas_relational_db.SERVER_GCE_SSD_INTERFACE.value
+          'interface'] = flag_values.server_gce_ssd_interface
     if flag_values['client_vm_disk_size'].present:
       config_values['vm_groups']['clients']['disk_spec'][cloud]['disk_size'] = (
           flag_values.client_vm_disk_size)

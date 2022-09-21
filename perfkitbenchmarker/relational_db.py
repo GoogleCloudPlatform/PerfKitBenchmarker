@@ -114,6 +114,12 @@ flags.DEFINE_integer(
     'postgres_shared_buffer_size', None,
     'Size of the shared buffer size in GB. '
     'Defaults to 25% of VM memory if unset')
+SERVER_GCE_NUM_LOCAL_SSDS = flags.DEFINE_integer(
+    'server_gce_num_local_ssds', 0,
+    'The number of ssds that should be added to the Server.')
+SERVER_GCE_SSD_INTERFACE = flags.DEFINE_enum(
+    'server_gce_ssd_interface', 'SCSI', ['SCSI', 'NVME'],
+    'The ssd interface for GCE local SSD.')
 
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
