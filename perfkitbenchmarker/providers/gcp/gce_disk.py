@@ -69,6 +69,26 @@ NVME = 'NVME'
 disk.RegisterDiskTypeMap(providers.GCP, DISK_TYPE)
 
 
+NVME_PD_MACHINE_FAMILIES = [
+    'm3'
+]
+
+
+def PdDriveIsNvme(vm):
+  """Check if the machine uses NVMe for PD."""
+  machine_type = vm.machine_type
+  family = machine_type.split('-')[0].lower()
+  if family in NVME_PD_MACHINE_FAMILIES:
+    return True
+  # In other cases, only a sub-category of a family uses nvme,
+  # such as confidential VMs on Milan.
+  # this is not robust, but can get refactored when
+  # there is more clarity on what groups of VMs are NVMe.
+  if family in ['n2d', 'c2d'] and 'confidential' in vm.OS_TYPE:
+    return True
+  return False
+
+
 class GceDiskSpec(disk.BaseDiskSpec):
   """Object holding the information needed to create an GCPDisk."""
 
@@ -250,5 +270,7 @@ class GceDisk(disk.BaseDisk):
     if self.disk_type == disk.LOCAL and self.interface == NVME:
       return '/dev/%s' % self.name
     else:
+      if self.disk_type in GCE_REMOTE_DISK_TYPES and self.interface == NVME:
+        return self.name
       # by default, returns this name id.
       return '/dev/disk/by-id/google-%s' % self.name

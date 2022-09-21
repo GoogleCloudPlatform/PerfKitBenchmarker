@@ -171,7 +171,14 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _CreateVm(self):
     vm_spec = gce_virtual_machine.GceVmSpec('test_vm_spec.GCP',
                                             machine_type='test_machine_type')
-    return gce_virtual_machine.Ubuntu1804BasedGceVirtualMachine(vm_spec)
+    vm = gce_virtual_machine.Ubuntu1804BasedGceVirtualMachine(vm_spec)
+    vm.GetNVMEDeviceInfo = mock.Mock()
+    vm.GetNVMEDeviceInfo.return_value = [
+        {
+            'DevicePath': '/dev/nvme1n2',
+        }
+    ]
+    return vm
 
   def _GetDiskClass(self):
     return gce_disk.GceDisk

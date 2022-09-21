@@ -1546,6 +1546,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Get the NVME disk device info, by querying the VM."""
     self.InstallPackages('nvme-cli')
     stdout, _ = self.RemoteCommand('sudo nvme list --output-format json')
+    if not stdout:
+      return []
     response = json.loads(stdout)
     return response.get('Devices', [])
 

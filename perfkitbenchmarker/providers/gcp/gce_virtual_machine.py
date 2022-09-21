@@ -929,6 +929,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         name = self._GenerateDiskNamePrefix(disk_spec_id, i)
         data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project,
                                      replica_zones=replica_zones)
+        if gce_disk.PdDriveIsNvme(self):
+          data_disk.interface = gce_disk.NVME
         # Remote disk numbers start at 1+max_local_disks (0 is the system disk
         # and local disks occupy 1-max_local_disks).
         data_disk.disk_number = (self.remote_disk_counter +
@@ -937,7 +939,35 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       disks.append(data_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
+    nvme_devices = self.GetNVMEDeviceInfo()
+    remote_nvme_devices = self.FindRemoteNVMEDevices(scratch_disk, nvme_devices)
+    self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
     self._PrepareScratchDisk(scratch_disk, disk_spec)
+
+  def FindRemoteNVMEDevices(self, scratch_disk, nvme_devices):
+    """Find the paths for all remote NVME devices inside the VM."""
+    disks = scratch_disk.disks if scratch_disk.is_striped else [scratch_disk]
+    local_disks = []
+    for d in disks:
+      if d.disk_type == disk.LOCAL and d.interface == NVME:
+        local_disk_name = '/dev/%s' % self.name
+        local_disks.append(local_disk_name)
+    # filter out local nvme devices from all nvme devices
+    remote_nvme_devices = [
+        device['DevicePath']
+        for device in nvme_devices
+        if device['DevicePath'] not in local_disks
+    ]
+    # remove the boot disk, which is the disk with the lowest index
+    return sorted(remote_nvme_devices)[1:]
+
+  def UpdateDevicePath(self, scratch_disk, remote_nvme_devices):
+    """Updates the paths for all remote NVME devices inside the VM."""
+    disks = scratch_disk.disks if scratch_disk.is_striped else [scratch_disk]
+    # round robin assignment since we cannot tell the disks apart.
+    for d in disks:
+      if d.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES and d.interface == NVME:
+        d.name = remote_nvme_devices.pop()
 
   def DiskCreatedOnVMCreation(self, data_disk):
     """Returns whether the disk has been created during VM creation."""
