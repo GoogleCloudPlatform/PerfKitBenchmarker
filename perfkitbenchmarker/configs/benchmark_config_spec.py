@@ -150,7 +150,7 @@ class _DpbServiceSpec(spec.BaseSpec):
                     dpb_service.KUBERNETES_SPARK_CLUSTER,
                 ]
             }),
-        'worker_group': (_VmGroupSpecDecoder, {}),
+        'worker_group': (VmGroupSpecDecoder, {}),
         'worker_count': (option_decoders.IntDecoder, {
             'default': dpb_service.DEFAULT_WORKER_COUNT,
             'min': 0
@@ -603,10 +603,12 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
         'backup_start_time': (option_decoders.StringDecoder, {
             'default': '07:00'
         }),
-        'is_managed_db': (option_decoders.BooleanDecoder, {'default': True}),
+        'is_managed_db': (option_decoders.BooleanDecoder, {
+            'default': True
+        }),
         'db_spec': (option_decoders.PerCloudConfigDecoder, {}),
         'db_disk_spec': (option_decoders.PerCloudConfigDecoder, {}),
-        'vm_groups': (_VmGroupsDecoder, {
+        'vm_groups': (VmGroupsDecoder, {
             'default': {}
         }),
         'db_flags': (option_decoders.ListDecoder, {
@@ -841,8 +843,8 @@ class _SparkServiceSpec(spec.BaseSpec):
                 spark_service.PROVIDER_MANAGED, spark_service.PKB_MANAGED
             ]
         }),
-        'worker_group': (_VmGroupSpecDecoder, {}),
-        'master_group': (_VmGroupSpecDecoder, {
+        'worker_group': (VmGroupSpecDecoder, {}),
+        'master_group': (VmGroupSpecDecoder, {
             'default': None,
             'none_ok': True
         })
@@ -872,7 +874,7 @@ class _SparkServiceSpec(spec.BaseSpec):
                 flag_values.zone[0])
 
 
-class _VmGroupSpec(spec.BaseSpec):
+class VmGroupSpec(spec.BaseSpec):
   """Configurable options of a VM group.
 
   Attributes:
@@ -892,7 +894,7 @@ class _VmGroupSpec(spec.BaseSpec):
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super(_VmGroupSpec, self).__init__(
+    super(VmGroupSpec, self).__init__(
         component_full_name, flag_values=flag_values, **kwargs)
     ignore_package_requirements = (
         getattr(flag_values, 'ignore_package_requirements', True)
@@ -929,7 +931,7 @@ class _VmGroupSpec(spec.BaseSpec):
       The pair specifies a decoder class and its __init__() keyword arguments
       to construct in order to decode the named option.
     """
-    result = super(_VmGroupSpec, cls)._GetOptionDecoderConstructions()
+    result = super(VmGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS
@@ -974,7 +976,7 @@ class _VmGroupSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
         provided config values.
     """
-    super(_VmGroupSpec, cls)._ApplyFlags(config_values, flag_values)
+    super(VmGroupSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
     if flag_values['os_type'].present or 'os_type' not in config_values:
@@ -983,11 +985,11 @@ class _VmGroupSpec(spec.BaseSpec):
       config_values['vm_count'] = flag_values.num_vms
 
 
-class _VmGroupsDecoder(option_decoders.TypeVerifier):
+class VmGroupsDecoder(option_decoders.TypeVerifier):
   """Validates the vm_groups dictionary of a benchmark config object."""
 
   def __init__(self, **kwargs):
-    super(_VmGroupsDecoder, self).__init__(valid_types=(dict,), **kwargs)
+    super(VmGroupsDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies vm_groups dictionary of a benchmark config object.
@@ -1006,12 +1008,12 @@ class _VmGroupsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_configs = super(_VmGroupsDecoder,
+    vm_group_configs = super(VmGroupsDecoder,
                              self).Decode(value, component_full_name,
                                           flag_values)
     result = {}
     for vm_group_name, vm_group_config in six.iteritems(vm_group_configs):
-      result[vm_group_name] = _VmGroupSpec(
+      result[vm_group_name] = VmGroupSpec(
           '{0}.{1}'.format(
               self._GetOptionFullName(component_full_name), vm_group_name),
           flag_values=flag_values,
@@ -1019,11 +1021,11 @@ class _VmGroupsDecoder(option_decoders.TypeVerifier):
     return result
 
 
-class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
+class VmGroupSpecDecoder(option_decoders.TypeVerifier):
   """Validates a single VmGroupSpec dictionary."""
 
   def __init__(self, **kwargs):
-    super(_VmGroupSpecDecoder, self).__init__(valid_types=(dict,), **kwargs)
+    super(VmGroupSpecDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies vm_groups dictionary of a benchmark config object.
@@ -1041,10 +1043,10 @@ class _VmGroupSpecDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_config = super(_VmGroupSpecDecoder,
+    vm_group_config = super(VmGroupSpecDecoder,
                             self).Decode(value, component_full_name,
                                          flag_values)
-    return _VmGroupSpec(
+    return VmGroupSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
         **vm_group_config)
@@ -2107,7 +2109,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'none_ok': True,
             'valid_types': (dict,)
         }),
-        'vm_groups': (_VmGroupsDecoder, {
+        'vm_groups': (VmGroupsDecoder, {
             'default': {}
         }),
         'placement_group_specs': (_PlacementGroupSpecsDecoder, {

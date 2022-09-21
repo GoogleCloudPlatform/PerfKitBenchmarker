@@ -165,7 +165,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(VmGroupSpecTestCase, self).setUp()
-    self._spec_class = benchmark_config_spec._VmGroupSpec
+    self._spec_class = benchmark_config_spec.VmGroupSpec
     self._kwargs = {'cloud': providers.GCP, 'os_type': os_types.UBUNTU1804,
                     'vm_spec': _GCP_AWS_VM_CONFIG}
 
@@ -178,7 +178,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testDefaults(self):
     result = self._spec_class(_COMPONENT, **self._kwargs)
-    self.assertIsInstance(result, benchmark_config_spec._VmGroupSpec)
+    self.assertIsInstance(result, benchmark_config_spec.VmGroupSpec)
     self.assertEqual(result.cloud, 'GCP')
     self.assertEqual(result.disk_count, 1)
     self.assertIsNone(result.disk_spec)
@@ -254,7 +254,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         _COMPONENT, cloud=providers.AWS, disk_count=0,
         disk_spec=_GCP_AWS_DISK_CONFIG, os_type=os_types.AMAZONLINUX2,
         static_vms=[{}], vm_count=0, vm_spec=_GCP_AWS_VM_CONFIG)
-    self.assertIsInstance(result, benchmark_config_spec._VmGroupSpec)
+    self.assertIsInstance(result, benchmark_config_spec.VmGroupSpec)
     self.assertEqual(result.cloud, 'AWS')
     self.assertEqual(result.disk_count, 0)
     self.assertIsInstance(result.disk_spec, aws_disk.AwsDiskSpec)
@@ -352,7 +352,7 @@ class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(VmGroupsDecoderTestCase, self).setUp()
-    self._decoder = benchmark_config_spec._VmGroupsDecoder()
+    self._decoder = benchmark_config_spec.VmGroupsDecoder()
 
   def testNone(self):
     with self.assertRaises(errors.Config.InvalidValue):
@@ -364,7 +364,7 @@ class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
                     'vm_spec': _GCP_AWS_VM_CONFIG}}, _COMPONENT, {})
     self.assertIsInstance(result, dict)
     self.assertEqual(len(result), 1)
-    self.assertIsInstance(result['default'], benchmark_config_spec._VmGroupSpec)
+    self.assertIsInstance(result['default'], benchmark_config_spec.VmGroupSpec)
     self.assertEqual(result['default'].cloud, 'GCP')
     self.assertEqual(result['default'].os_type, 'ubuntu1804')
     self.assertIsInstance(result['default'].vm_spec,
@@ -448,7 +448,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsInstance(result.vm_groups, dict)
     self.assertEqual(len(result.vm_groups), 1)
     self.assertIsInstance(result.vm_groups['default'],
-                          benchmark_config_spec._VmGroupSpec)
+                          benchmark_config_spec.VmGroupSpec)
     self.assertEqual(result.vm_groups['default'].cloud, 'GCP')
     self.assertEqual(result.vm_groups['default'].os_type, 'ubuntu1804')
     self.assertIsInstance(result.vm_groups['default'].vm_spec,
@@ -497,7 +497,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsInstance(result.vm_groups, dict)
     self.assertEqual(len(result.vm_groups), 1)
     self.assertIsInstance(result.vm_groups['default'],
-                          benchmark_config_spec._VmGroupSpec)
+                          benchmark_config_spec.VmGroupSpec)
     self.assertEqual(result.vm_groups['default'].cloud, 'AWS')
     self.assertEqual(result.vm_groups['default'].os_type, 'ubuntu1804')
     self.assertIsInstance(result.vm_groups['default'].vm_spec,
