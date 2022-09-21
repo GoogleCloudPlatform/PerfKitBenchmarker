@@ -105,13 +105,13 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
         }
     }
 
-    self.mysql_spec = benchmark_config_spec._RelationalDbSpec(
+    self.mysql_spec = benchmark_config_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.min_mysql_spec)
 
-    self.postgres_spec = benchmark_config_spec._RelationalDbSpec(
+    self.postgres_spec = benchmark_config_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.min_postgres_spec)
 
-    self.sqlserver_spec = benchmark_config_spec._RelationalDbSpec(
+    self.sqlserver_spec = benchmark_config_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.min_sqlserver_spec)
 
   def testMakePostgresClientCommand(self):

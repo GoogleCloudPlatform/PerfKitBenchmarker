@@ -131,7 +131,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
     spec_dict.update(additional_spec_items)
 
-    mock_db_spec = mock.Mock(spec=benchmark_config_spec._RelationalDbSpec)
+    mock_db_spec = mock.Mock(spec=benchmark_config_spec.RelationalDbSpec)
     mock_db_spec.configure_mock(**spec_dict)
     return mock_db_spec
 
@@ -213,7 +213,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
     spec_dict.update(additional_spec_items)
 
-    mock_db_spec = mock.Mock(spec=benchmark_config_spec._RelationalDbSpec)
+    mock_db_spec = mock.Mock(spec=benchmark_config_spec.RelationalDbSpec)
     mock_db_spec.configure_mock(**spec_dict)
     return mock_db_spec
 

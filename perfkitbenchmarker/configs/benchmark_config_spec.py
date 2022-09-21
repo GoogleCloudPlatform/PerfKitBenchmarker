@@ -511,11 +511,11 @@ class _StaticVmListDecoder(option_decoders.ListDecoder):
         default=list, item_decoder=_StaticVmDecoder(), **kwargs)
 
 
-class _RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
+class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   """Configurable options of a database service."""
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super(_RelationalDbSpec, self).__init__(
+    super(RelationalDbSpec, self).__init__(
         component_full_name, flag_values=flag_values, **kwargs)
     # TODO(user): This is a lot of boilerplate, and is repeated
     # below in VmGroupSpec. See if some can be consolidated. Maybe we can
@@ -571,7 +571,7 @@ class _RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       The pair specifies a decoder class and its __init__() keyword arguments
       to construct in order to decode the named option.
     """
-    result = super(_RelationalDbSpec, cls)._GetOptionDecoderConstructions()
+    result = super(RelationalDbSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
             'valid_values': providers.VALID_CLOUDS
@@ -633,7 +633,7 @@ class _RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     # Currently the only way to modify the disk spec of the
     # db is to change the benchmark spec in the benchmark source code
     # itself.
-    super(_RelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
+    super(RelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
 
     # TODO(user): Rename flags 'managed_db_' -> 'db_'.
     has_db_machine_type = flag_values['managed_db_machine_type'].present
@@ -1491,7 +1491,7 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
     relational_db_config = super(_RelationalDbDecoder,
                                  self).Decode(value, component_full_name,
                                               flag_values)
-    result = _RelationalDbSpec(
+    result = RelationalDbSpec(
         self._GetOptionFullName(component_full_name), flag_values,
         **relational_db_config)
     return result
