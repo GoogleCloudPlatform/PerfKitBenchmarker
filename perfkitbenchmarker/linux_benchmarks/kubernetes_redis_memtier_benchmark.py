@@ -131,7 +131,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
 
   # Load Redis database
   memtier.Load(client_vms[0], bm_spec.redis_endpoint_ip,
-               str(redis_server.GetRedisPorts()[0]))
+               redis_server.GetRedisPorts()[0])
 
 
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:

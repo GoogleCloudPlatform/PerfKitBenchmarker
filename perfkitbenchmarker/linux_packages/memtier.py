@@ -190,7 +190,7 @@ def AptUninstall(vm):
 
 def BuildMemtierCommand(
     server: Optional[str] = None,
-    port: Optional[str] = None,
+    port: Optional[int] = None,
     protocol: Optional[str] = None,
     clients: Optional[int] = None,
     threads: Optional[int] = None,
@@ -246,7 +246,7 @@ def BuildMemtierCommand(
 
 def Load(client_vm,
          server_ip: str,
-         server_port: str,
+         server_port: int,
          server_password: Optional[str] = None) -> None:
   """Preload the server with data."""
   load_key_maximum = (
@@ -271,7 +271,7 @@ def Load(client_vm,
 def RunOverAllClientVMs(
     client_vms,
     server_ip: str,
-    ports: List[str],
+    ports: List[int],
     pipeline,
     threads,
     clients,
@@ -321,7 +321,7 @@ def RunOverAllClientVMs(
 def RunOverAllThreadsPipelinesAndClients(
     client_vms,
     server_ip: str,
-    server_ports: List[str],
+    server_ports: List[int],
     password: Optional[str] = None) -> List[sample.Sample]:
   """Runs memtier over all pipeline and thread combinations."""
   samples = []
@@ -358,7 +358,7 @@ class MemtierBinarySearchParameters:
 def MeasureLatencyCappedThroughput(
     client_vm,
     server_ip: str,
-    server_port: str,
+    server_port: int,
     password: Optional[str] = None) -> List[sample.Sample]:
   """Runs memtier to find the maximum throughput under a latency cap."""
   samples = []
@@ -528,7 +528,7 @@ def RunGetLatencyAtCpu(cloud_instance, client_vms):
       'this configuration and CPU utilization.')
 
 
-def _GetSingleThreadedLatency(client_vm, server_ip: str, server_port: str,
+def _GetSingleThreadedLatency(client_vm, server_ip: str, server_port: int,
                               password: str) -> 'MemtierResult':
   """Wait for background run to stabilize then send single threaded request."""
   time.sleep(300)
@@ -544,7 +544,7 @@ def _GetSingleThreadedLatency(client_vm, server_ip: str, server_port: str,
 
 def _Run(vm,
          server_ip: str,
-         server_port: str,
+         server_port: int,
          threads: int,
          pipeline: int,
          clients: int,
@@ -557,7 +557,7 @@ def _Run(vm,
       '\tmemtier threads: %s'
       '\tmemtier pipeline, %s', clients, threads, pipeline)
 
-  file_name_suffix = '_'.join(filter(None, [server_port, unique_id]))
+  file_name_suffix = '_'.join(filter(None, [str(server_port), unique_id]))
   memtier_results_file_name = '_'.join([MEMTIER_RESULTS, file_name_suffix])
   memtier_results_file = pathlib.PosixPath(
       f'{TMP_FOLDER}/{memtier_results_file_name}')

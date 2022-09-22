@@ -336,7 +336,7 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
     self.enter_context(
         mock.patch.object(memtier, '_Run', side_effect=mock_run_results))
 
-    results = memtier.MeasureLatencyCappedThroughput(None, 'unused', 'unused')
+    results = memtier.MeasureLatencyCappedThroughput(None, 'unused', 0)
 
     actual_throughputs = []
     for s in results:

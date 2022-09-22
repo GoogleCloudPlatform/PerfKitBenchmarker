@@ -15,6 +15,7 @@
 
 import abc
 import logging
+from typing import Optional
 from absl import flags
 from perfkitbenchmarker import resource
 
@@ -76,7 +77,7 @@ def GetManagedMemoryStoreClass(cloud, memory_store):
       BaseManagedMemoryStore, CLOUD=cloud, MEMORY_STORE=memory_store)
 
 
-def ParseReadableVersion(version):
+def ParseReadableVersion(version: str) -> str:
   """Parses Redis major and minor version number.
 
   Used for Azure and AWS versions.
@@ -109,36 +110,36 @@ class BaseManagedMemoryStore(resource.BaseResource):
     """
     super(BaseManagedMemoryStore, self).__init__()
     self.spec = spec
-    self.name = 'pkb-%s' % FLAGS.run_uri
-    self._ip = None
-    self._port = None
-    self._password = None
+    self.name: str = 'pkb-%s' % FLAGS.run_uri
+    self._ip: str = None
+    self._port: int = None
+    self._password: str = None
 
-  def GetMemoryStoreIp(self):
+  def GetMemoryStoreIp(self) -> str:
     """Returns the Ip address of the managed memory store."""
     if not self._ip:
       self._PopulateEndpoint()
     return self._ip
 
-  def GetMemoryStorePort(self):
+  def GetMemoryStorePort(self) -> int:
     """Returns the port number of the managed memory store."""
     if not self._port:
       self._PopulateEndpoint()
     return self._port
 
   @abc.abstractmethod
-  def _PopulateEndpoint(self):
+  def _PopulateEndpoint(self) -> None:
     """Populates the endpoint information for the managed memory store."""
     raise NotImplementedError()
 
-  def GetMemoryStorePassword(self):
+  def GetMemoryStorePassword(self) -> str:
     """Returns the access password of the managed memory store, if any."""
     return self._password
 
-  def MeasureCpuUtilization(self):
+  def MeasureCpuUtilization(self) -> Optional[float]:
     """Measures the CPU utilization of an instance using the cloud's API."""
-    return NotImplementedError()
+    raise NotImplementedError()
 
-  def GetInstanceSize(self):
+  def GetInstanceSize(self) -> int:
     """Returns size of instance in gigabytes."""
-    return NotImplementedError()
+    raise NotImplementedError()
