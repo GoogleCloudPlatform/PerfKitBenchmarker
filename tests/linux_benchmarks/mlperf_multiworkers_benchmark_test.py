@@ -33,15 +33,28 @@ class MlperfMultiworkersBenchmarkTestCase(
 
   def testTrainResults(self):
     samples = mlperf_multiworkers_benchmark.MakeSamplesFromOutput(
-        {'version': 'v1.0'}, self.contents, model='transformer')
-    golden = [
-        Sample('speed', 196673.0, 'samples/sec', {'version': 'v1.0'}),
-        Sample('speed', 203225.0, 'samples/sec', {'version': 'v1.0'}),
-        Sample('speed', 198987.0, 'samples/sec', {'version': 'v1.0'}),
-        Sample('Time', 2087, 'seconds', {'version': 'v1.0'})
-    ]
-    print(samples)
-    self.assertSampleListsEqualUpToTimestamp(golden, samples)
+        {'version': 'v2.0'}, self.contents, model='bert')
+    self.assertLen(samples, 458)
+    self.assertSamplesEqualUpToTimestamp(
+        Sample(
+            metric='speed',
+            value=2427.4356684047016,
+            unit='samples/sec',
+            metadata={'version': 'v2.0'}), samples[0])
+    self.assertSamplesEqualUpToTimestamp(
+        Sample(
+            metric='run_stop',
+            value=0.0,
+            unit='',
+            metadata={
+                'file': '/workspace/bert/run_pretraining.py',
+                'lineno': 1874,
+                'status': 'success',
+                'version': 'v2.0',
+                'namespace': '',
+                'event_type': 'INTERVAL_END',
+                'value': None
+            }), samples[-1])
 
 
 if __name__ == '__main__':

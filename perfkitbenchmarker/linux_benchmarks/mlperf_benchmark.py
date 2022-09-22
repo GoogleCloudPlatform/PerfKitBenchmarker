@@ -13,6 +13,7 @@
 # limitations under the License.
 """Run MLPerf benchmarks."""
 
+import json
 import posixpath
 import re
 from absl import flags
@@ -688,6 +689,30 @@ def MakeSamplesFromOutput(metadata, output, use_tpu=False, model=RESNET):
       times = regex_util.ExtractAllMatches(r'RESULT,.*,.*,(\d+),.*,.*', output)
     samples.append(sample.Sample('Time', int(times[0]), 'seconds', metadata))
 
+  samples.extend(MakeMLPerfSamplesFromOutput(metadata, output))
+  return samples
+
+
+def MakeMLPerfSamplesFromOutput(metadata, output):
+  """Create MLPerf log samples containing metrics.
+
+  Args:
+    metadata: dict contains all the metadata that reports.
+    output: string, command output
+
+  Returns:
+    Samples containing training metrics.
+  """
+  samples = []
+  for mllog in regex_util.ExtractAllMatches(r':::MLLOG (.*)', output):
+    data = json.loads(mllog)
+    mlperf_metadata = data['metadata']
+    mlperf_metadata.update(metadata)
+    for key in ('namespace', 'event_type', 'value'):
+      mlperf_metadata[key] = data[key]
+    samples.append(
+        sample.Sample(
+            data['key'], None, '', mlperf_metadata, timestamp=data['time_ms']))
   return samples
 
 

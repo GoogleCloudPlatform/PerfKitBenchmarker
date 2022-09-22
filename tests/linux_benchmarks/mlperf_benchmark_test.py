@@ -36,9 +36,29 @@ class MlperfBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
                                                      self.contents,
                                                      use_tpu=False,
                                                      model='resnet')
-    golden = Sample(metric='speed', value=17651.66, unit='samples/sec',
-                    metadata={'version': 'v1.0'})
-    self.assertSamplesEqualUpToTimestamp(golden, samples[0])
+    self.assertLen(samples, 1123)
+    self.assertSamplesEqualUpToTimestamp(
+        Sample(
+            metric='speed',
+            value=17651.66,
+            unit='samples/sec',
+            metadata={'version': 'v1.0'}), samples[0])
+    print(samples[-1])
+    self.assertSamplesEqualUpToTimestamp(
+        Sample(
+            metric='run_stop',
+            value=0.0,
+            unit='',
+            metadata={
+                'file': '/workspace/image_classification/common/fit.py',
+                'lineno': 1006,
+                'status': 'success',
+                'version': 'v1.0',
+                'namespace': '',
+                'event_type': 'INTERVAL_END',
+                'value': None
+            },
+            timestamp=1627332194930), samples[-1])
 
 
 if __name__ == '__main__':
