@@ -195,6 +195,7 @@ class BaseDpbService(resource.BaseResource):
                 job_arguments: Optional[List[str]] = None,
                 job_files: Optional[List[str]] = None,
                 job_jars: Optional[List[str]] = None,
+                job_py_files: Optional[List[str]] = None,
                 job_type: Optional[str] = None,
                 properties: Optional[Dict[str, str]] = None) -> JobResult:
     """Submit a data processing job to the backend.
@@ -214,7 +215,8 @@ class BaseDpbService(resource.BaseResource):
         These are not the arguments passed to the wrapper that submits the job.
       job_files: Files passed to a Spark Application to be distributed to
         executors.
-      job_jars: Jars to pass to the application
+      job_jars: Jars to pass to the application.
+      job_py_files: Python source files to pass to the application.
       job_type: Spark or Hadoop job
       properties: Dict of properties to pass with the job.
 
@@ -267,6 +269,7 @@ class BaseDpbService(resource.BaseResource):
       job_files: Optional[List[str]] = None,
       job_jars: Optional[List[str]] = None,
       job_type: Optional[str] = None,
+      job_py_files: Optional[List[str]] = None,
       properties: Optional[Dict[str, str]] = None,
       spark_submit_cmd: str = spark.SPARK_SUBMIT) -> List[str]:
     """Builds the command to run spark-submit on cluster."""
@@ -286,6 +289,8 @@ class BaseDpbService(resource.BaseResource):
       cmd += ['--conf', '{}={}'.format(k, v)]
     if job_files:
       cmd = ['--files', ','.join(job_files)]
+    if job_py_files:
+      cmd += ['--py-files', ','.join(job_py_files)]
     # Main jar/script goes last before args.
     if job_type == BaseDpbService.SPARK_JOB_TYPE:
       assert jarfile
@@ -547,6 +552,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
                 job_arguments=None,
                 job_files=None,
                 job_jars=None,
+                job_py_files=None,
                 job_type=None,
                 properties=None):
     """Submit a data processing job to the backend."""
@@ -636,6 +642,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
                 job_arguments=None,
                 job_files=None,
                 job_jars=None,
+                job_py_files=None,
                 job_type=None,
                 properties=None):
     """Submit a data processing job to the backend."""
@@ -646,6 +653,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
         job_arguments=job_arguments,
         job_files=job_files,
         job_jars=job_jars,
+        job_py_files=job_py_files,
         job_type=job_type,
         properties=properties)
     start_time = datetime.datetime.now()
@@ -809,6 +817,7 @@ class KubernetesSparkCluster(BaseDpbService):
                 job_arguments=None,
                 job_files=None,
                 job_jars=None,
+                job_py_files=None,
                 job_type=None,
                 properties=None):
     """Submit a data processing job to the backend."""
@@ -821,6 +830,7 @@ class KubernetesSparkCluster(BaseDpbService):
         job_arguments=job_arguments,
         job_files=job_files,
         job_jars=job_jars,
+        job_py_files=job_py_files,
         job_type=job_type,
         properties=properties)
     driver_name = self._GetDriverName()

@@ -93,6 +93,7 @@ class AwsDpbGlue(dpb_service.BaseDpbService):
                 job_arguments=None,
                 job_files=None,
                 job_jars=None,
+                job_py_files=None,
                 job_type=None,
                 properties=None):
     """See base class."""
@@ -109,9 +110,13 @@ class AwsDpbGlue(dpb_service.BaseDpbService):
           'ScriptLocation': self._glue_script_wrapper_url,
       }
       all_properties = self.GetJobProperties()
+      extra_py_files = [pyspark_file]
+      if job_py_files:
+        extra_py_files += job_py_files
       if properties:
         all_properties.update(properties)
-      glue_default_args = {'--extra-py-files': pyspark_file, **all_properties}
+      glue_default_args = {
+          '--extra-py-files': ','.join(extra_py_files), **all_properties}
     else:
       raise ValueError(f'Unsupported job type {job_type} for AWS Glue.')
     vm_util.IssueCommand(self.cmd_prefix + [

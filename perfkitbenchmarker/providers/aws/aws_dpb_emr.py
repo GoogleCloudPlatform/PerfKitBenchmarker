@@ -318,6 +318,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
                 job_arguments=None,
                 job_files=None,
                 job_jars=None,
+                job_py_files=None,
                 job_stdout_file=None,
                 job_type=None,
                 properties=None):
@@ -351,6 +352,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       arg_list = []
       if job_files:
         arg_list += ['--files', ','.join(job_files)]
+      if job_py_files:
+        arg_list += ['--py-files', ','.join(job_py_files)]
       if job_jars:
         arg_list += ['--jars', ','.join(job_jars)]
       for k, v in all_properties.items():
@@ -463,6 +466,7 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
                 job_arguments=None,
                 job_files=None,
                 job_jars=None,
+                job_py_files=None,
                 job_stdout_file=None,
                 job_type=None,
                 properties=None):
@@ -473,13 +477,15 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
     # Set vars according to job type.
     if job_type == self.PYSPARK_JOB_TYPE:
       application_type = 'SPARK'
+      spark_props = self.GetJobProperties()
+      if job_py_files:
+        spark_props['spark.submit.pyFiles'] = ','.join(job_py_files)
       job_driver_dict = {
           'sparkSubmit': {
               'entryPoint': pyspark_file,
               'entryPointArguments': job_arguments,
               'sparkSubmitParameters': ' '.join(
-                  f'--conf {prop}={val}'
-                  for prop, val in self.GetJobProperties().items())
+                  f'--conf {prop}={val}' for prop, val in spark_props.items())
           }
       }
     else:
