@@ -76,6 +76,9 @@ flags.DEFINE_enum('specjbb_run_mode', MULTIJVM_MODE,
 flags.DEFINE_integer('specjbb_num_groups', _DEFAULT_NUM_GROUPS,
                      'Used in MultiJVM, number of groups.')
 flags.DEFINE_bool(
+    'specjbb_numa_aware', True,
+    'Whether to have MultiJVM backends pinned to specific NUMA nodes.')
+flags.DEFINE_bool(
     'build_openjdk_neoverse', False,
     'Whether to build OpenJDK optimized for ARM Neoverse.'
     'Requires Ubuntu 1804 and OpenJDK 11.')
@@ -209,17 +212,23 @@ def ParseJbbOutput(stdout, metadata):
 def _RunBackgroundNumaPinnedCommand(vm, cmd_list, node_id):
   """In a shell session, cd and run a numa pinned background command.
 
+  A user may opt to not NUMA pin with the specjbb_numa_aware flag.
+
   Args:
     vm: VM to run the command on
     cmd_list: list of commands to be joined together
     node_id: NUMA node to pin command on.
   """
-  # Persist the nohup command past the ssh session, and numa pin.
-  # "sh -c 'cd /whereever; nohup ./whatever > /dev/null 2>&1 &'"
-  # "numa --cpunodebind 0 --membind 0 cmd"
-  cmd = ('sh -c \'cd {dir} && nohup numactl --cpunodebind {node_id} '
-         '--membind {node_id} {cmd} 2>&1 &\'').format(
-             node_id=node_id, dir=_SPEC_DIR, cmd=' '.join(cmd_list))
+  if FLAGS.specjbb_numa_aware:
+    # Persist the nohup command past the ssh session, and numa pin.
+    # "sh -c 'cd /whereever; nohup ./whatever > /dev/null 2>&1 &'"
+    # "numa --cpunodebind 0 --membind 0 cmd"
+    cmd = ('sh -c \'cd {dir} && nohup numactl --cpunodebind {node_id} '
+           '--membind {node_id} {cmd} 2>&1 &\'').format(
+               node_id=node_id, dir=_SPEC_DIR, cmd=' '.join(cmd_list))
+  else:
+    cmd = ('sh -c \'cd {dir} && nohup {cmd} 2>&1 &\'').format(
+        dir=_SPEC_DIR, cmd=' '.join(cmd_list))
   vm.RemoteCommand(cmd)
 
 
@@ -299,6 +308,7 @@ def Run(benchmark_spec):
       'max_heap_size': f'{max_heap_size_gb}g',
       'specjbb_mode': FLAGS.specjbb_run_mode,
       'sla_metrics': _CollectSLAMetrics(vm),
+      'specjbb_numa_aware': FLAGS.specjbb_numa_aware,
   }
   return ParseJbbOutput(stdout, metadata)
 
