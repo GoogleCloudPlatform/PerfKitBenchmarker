@@ -18,7 +18,7 @@ from unittest import mock
 
 from absl import flags
 from perfkitbenchmarker import iaas_relational_db
-from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker import relational_db_spec
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -105,13 +105,13 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
         }
     }
 
-    self.mysql_spec = benchmark_config_spec.RelationalDbSpec(
+    self.mysql_spec = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.min_mysql_spec)
 
-    self.postgres_spec = benchmark_config_spec.RelationalDbSpec(
+    self.postgres_spec = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.min_postgres_spec)
 
-    self.sqlserver_spec = benchmark_config_spec.RelationalDbSpec(
+    self.sqlserver_spec = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.min_sqlserver_spec)
 
   def testMakePostgresClientCommand(self):

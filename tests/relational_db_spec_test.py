@@ -18,7 +18,7 @@ from absl import flags
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import relational_db
-from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import pkb_common_test_case
 
@@ -79,71 +79,71 @@ class RelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
 
   def testMinimalConfig(self):
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.engine, 'mysql')
     self.assertEqual(result.cloud, 'GCP')
     self.assertIsInstance(result.db_spec, gce_virtual_machine.GceVmSpec)
 
   def testDefaultDatabaseName(self):
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.database_name, 'pkb-db-123')
 
   def testCustomDatabaseName(self):
     spec = _mergeDicts(self.minimal_spec, {'database_name': 'fakename'})
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.database_name, 'fakename')
 
   def testCustomDatabaseVersion(self):
     spec = _mergeDicts(self.minimal_spec, {'engine_version': '6.6'})
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.engine_version, '6.6')
 
   def testDefaultDatabasePassword(self):
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertIsInstance(result.database_password, str)
     self.assertEqual(len(result.database_password), 13)
 
   def testRandomDatabasePassword(self):
     spec = _mergeDicts(self.minimal_spec, {'database_password': 'fakepassword'})
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.database_password, 'fakepassword')
 
   def testDefaultHighAvailability(self):
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.high_availability, False)
 
   def testCustomHighAvailability(self):
     spec = _mergeDicts(self.minimal_spec, {'high_availability': True})
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.high_availability, True)
 
   def testDefaultBackupEnabled(self):
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.backup_enabled, True)
 
   def testCustomBackupEnabled(self):
     spec = _mergeDicts(self.minimal_spec, {'backup_enabled': False})
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.backup_enabled, False)
 
   def testDefaultBackupTime(self):
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.minimal_spec)
     self.assertEqual(result.backup_start_time, '07:00')
 
   def testCustomBackupTime(self):
     spec = _mergeDicts(self.minimal_spec, {'backup_start_time': '08:00'})
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **spec)
     self.assertEqual(result.backup_start_time, '08:00')
 
@@ -172,13 +172,13 @@ class RelationalDbMinimalSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testDiskSpecRequired(self):
     del self.spec['db_disk_spec']
     with self.assertRaisesRegexp(errors.Config.MissingOption, 'db_disk_spec'):
-      benchmark_config_spec.RelationalDbSpec(
+      relational_db_spec.RelationalDbSpec(
           _COMPONENT, flag_values=FLAGS, **self.spec)
 
   def testVmSpecRequired(self):
     del self.spec['db_spec']
     with self.assertRaisesRegexp(errors.Config.MissingOption, 'db_spec'):
-      benchmark_config_spec.RelationalDbSpec(
+      relational_db_spec.RelationalDbSpec(
           _COMPONENT, flag_values=FLAGS, **self.spec)
 
 
@@ -247,69 +247,69 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   # TODO(user): Rename flags 'managed_db_' -> 'db_'.
   def testDatabaseFlag(self):
     FLAGS['managed_db_engine'].parse('postgres')
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.engine, 'postgres')
 
   def testDatabaseNameFlag(self):
     FLAGS['managed_db_database_name'].parse('fakedbname')
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.database_name, 'fakedbname')
 
   def testDatabasePasswordFlag(self):
     FLAGS['managed_db_database_password'].parse('fakepassword')
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.database_password, 'fakepassword')
 
   def testHighAvailabilityFlag(self):
     FLAGS['managed_db_high_availability'].parse(True)
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.high_availability, True)
 
   def testDatabaseVersionFlag(self):
     FLAGS['managed_db_engine_version'].parse('5.6')
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.engine_version, '5.6')
 
   def testBackupEnabledFlag(self):
     FLAGS['managed_db_backup_enabled'].parse(False)
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.backup_enabled, False)
 
   def testBackupStartTimeFlag(self):
     FLAGS['managed_db_backup_start_time'].parse('12:23')
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.backup_start_time, '12:23')
 
   def testZoneFlag(self):
     FLAGS['managed_db_zone'].parse('us-east1-b')
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.db_spec.zone, 'us-east1-b')
     self.assertEqual(result.vm_groups['servers'].vm_spec.zone, 'us-east1-b')
 
   def testClientVmZoneFlag(self):
     FLAGS['client_vm_zone'].parse('us-east1-b')
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.vm_groups['clients'].vm_spec.zone, 'us-east1-b')
 
   def testDiskSizeFlag(self):
     FLAGS['managed_db_disk_size'].parse(2000)
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.db_disk_spec.disk_size, 2000)
     self.assertEqual(result.vm_groups['servers'].disk_spec.disk_size, 2000)
 
   def testClientVmDiskSizeFlag(self):
     FLAGS['client_vm_disk_size'].parse(2000)
-    result = benchmark_config_spec.RelationalDbSpec(
+    result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.vm_groups['clients'].disk_spec.disk_size, 2000)
 

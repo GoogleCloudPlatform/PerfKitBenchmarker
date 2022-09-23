@@ -21,6 +21,7 @@ import posixpath
 from absl import flags
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import db_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
@@ -209,7 +210,7 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
 
     if db_engine == sql_engine_utils.SQLSERVER:
       self.spec.database_username = 'sa'
-      self.spec.database_password = relational_db.GenerateRandomDbPassword()
+      self.spec.database_password = db_util.GenerateRandomDbPassword()
       self.server_vm.RemoteCommand('sqlcmd -Q "ALTER LOGIN sa ENABLE;"')
       self.server_vm.RemoteCommand(
           'sqlcmd -Q "ALTER LOGIN sa WITH PASSWORD = \'%s\' ;"' %

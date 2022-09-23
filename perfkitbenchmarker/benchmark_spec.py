@@ -288,7 +288,7 @@ class BenchmarkSpec(object):
       self.vms_to_boot['master_group'] = master_group_spec
 
   def ConstructRelationalDb(self):
-    """Create the relational db and create groups for its vms."""
+    """Creates the relational db and create groups for its vms."""
     if self.config.relational_db is None:
       return
     cloud = self.config.relational_db.cloud
@@ -297,6 +297,9 @@ class BenchmarkSpec(object):
     providers.LoadProvider(cloud)
     relational_db_class = (
         relational_db.GetRelationalDbClass(cloud, is_managed_db, engine))
+    if not self.config.relational_db.engine_version:
+      self.config.relational_db.engine_version = (
+          relational_db_class.GetDefaultEngineVersion(engine))
     self.relational_db = relational_db_class(self.config.relational_db)
 
   def ConstructNonRelationalDb(self) -> None:

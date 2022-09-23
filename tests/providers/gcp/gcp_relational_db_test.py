@@ -23,9 +23,9 @@ import mock
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import gcp_relational_db
 from perfkitbenchmarker.providers.gcp import util
@@ -57,7 +57,7 @@ def CreateMockServerVM(db_class):
 
 
 def CreateDbFromSpec(spec_dict):
-  mock_db_spec = mock.Mock(spec=benchmark_config_spec.RelationalDbSpec)
+  mock_db_spec = mock.Mock(spec=relational_db_spec.RelationalDbSpec)
   mock_db_spec.configure_mock(**spec_dict)
   db_class = gcp_relational_db.GCPRelationalDb(mock_db_spec)
   CreateMockClientVM(db_class)
@@ -65,7 +65,7 @@ def CreateDbFromSpec(spec_dict):
 
 
 def CreateIAASDbFromSpec(spec_dict):
-  mock_db_spec = mock.Mock(spec=benchmark_config_spec.RelationalDbSpec)
+  mock_db_spec = mock.Mock(spec=relational_db_spec.RelationalDbSpec)
   mock_db_spec.configure_mock(**spec_dict)
   db_class = gcp_relational_db.GCPIAASRelationalDb(mock_db_spec)
   CreateMockClientVM(db_class)
@@ -153,7 +153,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['use_managed_db'].parse(True)
 
     mock_db_spec_attrs = self.createMySQLSpecDict()
-    self.mock_db_spec = mock.Mock(spec=benchmark_config_spec.RelationalDbSpec)
+    self.mock_db_spec = mock.Mock(spec=relational_db_spec.RelationalDbSpec)
     self.mock_db_spec.configure_mock(**mock_db_spec_attrs)
 
   def testNoHighAvailability(self):

@@ -21,9 +21,9 @@ import unittest
 from absl import flags
 import mock
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.sql_engine_utils import AURORA_POSTGRES
@@ -131,7 +131,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
     spec_dict.update(additional_spec_items)
 
-    mock_db_spec = mock.Mock(spec=benchmark_config_spec.RelationalDbSpec)
+    mock_db_spec = mock.Mock(spec=relational_db_spec.RelationalDbSpec)
     mock_db_spec.configure_mock(**spec_dict)
     return mock_db_spec
 
@@ -213,7 +213,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
     spec_dict.update(additional_spec_items)
 
-    mock_db_spec = mock.Mock(spec=benchmark_config_spec.RelationalDbSpec)
+    mock_db_spec = mock.Mock(spec=relational_db_spec.RelationalDbSpec)
     mock_db_spec.configure_mock(**spec_dict)
     return mock_db_spec
 
