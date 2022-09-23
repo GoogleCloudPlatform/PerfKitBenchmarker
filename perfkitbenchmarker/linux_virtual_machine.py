@@ -861,14 +861,16 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     devices = self._get_network_device_mtus()
     all_mtus = set(devices.values())
     if len(all_mtus) > 1:
-      raise ValueError(
-          'To record, MTU must only have 1 unique MTU value not: ', devices)
+      logging.warning(
+          'MTU must only have 1 unique MTU value not: %s. MTU now a '
+          'concatenation of values.', all_mtus)
+      self.os_metadata['mtu'] = '-'.join(list(all_mtus))
     elif not all_mtus:
       logging.warning('No unique network devices')
     else:
       self.os_metadata['mtu'] = list(all_mtus)[0]
 
-  def _get_network_device_mtus(self) -> Dict[str, int]:
+  def _get_network_device_mtus(self) -> Dict[str, str]:
     """Returns network device names and their MTUs."""
     if not self._network_device_mtus:
       stdout, _ = self.RemoteCommand('PATH="${PATH}":/usr/sbin ip link show up')
@@ -879,7 +881,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           device_name = m['device_name']
           if not any(device_name.startswith(prefix)
                      for prefix in self._IGNORE_NETWORK_DEVICE_PREFIXES):
-            self._network_device_mtus[device_name] = int(m['mtu'])
+            self._network_device_mtus[device_name] = m['mtu']
     return self._network_device_mtus
 
   @vm_util.Retry(log_errors=False, poll_interval=1)

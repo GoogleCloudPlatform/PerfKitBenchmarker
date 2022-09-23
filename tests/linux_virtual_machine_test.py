@@ -471,7 +471,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     expected_os_metadata = {
         '/dev/sda': 1073741824,
         'kernel_release': self.kernel_release,
-        'mtu': 1500,
+        'mtu': '1500',
         'os_info': self.os_info,
         'cpu_arch': self.cpu_arch,
         'threads_per_core': 1,
@@ -501,7 +501,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     responses = self.normal_boot_responses.copy()
     vm = self.CreateVm(responses)
     names = vm._get_network_device_mtus()
-    self.assertEqual({'eth0': 1500, 'eth1': 1500}, names)
+    self.assertEqual({'eth0': '1500', 'eth1': '1500'}, names)
     mock_cmd = vm.RemoteHostCommandWithReturnCode
     mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ip link show up')
 
