@@ -222,15 +222,15 @@ def Run(benchmark_spec):
   run_kwargs = {
       'table': BENCHMARK_TABLE,
       'zeropadding': BENCHMARK_ZERO_PADDING,
-      'cloudspanner.instance': benchmark_spec.spanner.name,
-      'cloudspanner.database': benchmark_spec.spanner.database,
+      'cloudspanner.instance': spanner.name,
+      'cloudspanner.database': spanner.database,
       'cloudspanner.readmode': FLAGS.cloud_spanner_ycsb_readmode,
       'cloudspanner.boundedstaleness':
           FLAGS.cloud_spanner_ycsb_boundedstaleness,
       'cloudspanner.batchinserts': FLAGS.cloud_spanner_ycsb_batchinserts,
   }
   # Uses overridden cloud spanner endpoint in gcloud configuration
-  end_point = benchmark_spec.spanner.GetEndPoint()
+  end_point = spanner.GetEndPoint()
   if end_point:
     run_kwargs['cloudspanner.host'] = end_point
 
@@ -240,7 +240,7 @@ def Run(benchmark_spec):
   load_kwargs = run_kwargs.copy()
   samples = []
   metadata = {'ycsb_client_type': FLAGS.cloud_spanner_ycsb_client_type}
-  if not benchmark_spec.spanner.restored:
+  if not spanner.restored:
     samples += list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
   if _CPU_OPTIMIZATION.value:
     samples += CpuUtilizationRun(benchmark_spec.executor, spanner, vms,
