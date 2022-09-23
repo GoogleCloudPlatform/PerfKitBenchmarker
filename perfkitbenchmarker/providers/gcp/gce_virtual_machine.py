@@ -925,12 +925,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         data_disk = self._GetNfsService().CreateNfsDisk()
       elif disk_spec.disk_type == disk.OBJECT_STORAGE:
         data_disk = gcsfuse_disk.GcsFuseDisk(disk_spec)
-      else:
+      else:  # disk_type is PD
         name = self._GenerateDiskNamePrefix(disk_spec_id, i)
         data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project,
                                      replica_zones=replica_zones)
         if gce_disk.PdDriveIsNvme(self):
           data_disk.interface = gce_disk.NVME
+        else:
+          data_disk.interface = gce_disk.SCSI
         # Remote disk numbers start at 1+max_local_disks (0 is the system disk
         # and local disks occupy 1-max_local_disks).
         data_disk.disk_number = (self.remote_disk_counter +
