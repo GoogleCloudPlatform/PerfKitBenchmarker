@@ -111,6 +111,11 @@ flags.DEFINE_integer(
     'postgres_shared_buffer_size', None,
     'Size of the shared buffer size in GB. '
     'Defaults to 25% of VM memory if unset')
+
+OPTIMIZE_DB_SYSCTL_CONFIG = flags.DEFINE_bool(
+    'optimize_db_sysctl_config', True,
+    'Flag to run sysctl optimization for IAAS relational database.')
+
 SERVER_GCE_NUM_LOCAL_SSDS = flags.DEFINE_integer(
     'server_gce_num_local_ssds', 0,
     'The number of ssds that should be added to the Server.')

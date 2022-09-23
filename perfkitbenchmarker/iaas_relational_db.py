@@ -252,18 +252,19 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
     self.server_vm_query_tools.InstallPackages()
     self.server_vm.Install('rsync')
 
-    if self.client_vm.IS_REBOOTABLE:
-      self.client_vm.ApplySysctlPersistent({
-          'net.ipv4.tcp_keepalive_time': 100,
-          'net.ipv4.tcp_keepalive_intvl': 100,
-          'net.ipv4.tcp_keepalive_probes': 10
-      })
-    if self.server_vm.IS_REBOOTABLE:
-      self.server_vm.ApplySysctlPersistent({
-          'net.ipv4.tcp_keepalive_time': 100,
-          'net.ipv4.tcp_keepalive_intvl': 100,
-          'net.ipv4.tcp_keepalive_probes': 10
-      })
+    if relational_db.OPTIMIZE_DB_SYSCTL_CONFIG.value:
+      if self.client_vm.IS_REBOOTABLE:
+        self.client_vm.ApplySysctlPersistent({
+            'net.ipv4.tcp_keepalive_time': 100,
+            'net.ipv4.tcp_keepalive_intvl': 100,
+            'net.ipv4.tcp_keepalive_probes': 10
+        })
+      if self.server_vm.IS_REBOOTABLE:
+        self.server_vm.ApplySysctlPersistent({
+            'net.ipv4.tcp_keepalive_time': 100,
+            'net.ipv4.tcp_keepalive_intvl': 100,
+            'net.ipv4.tcp_keepalive_probes': 10
+        })
 
     if db_engine == 'mysql':
       self._InstallMySQLServer()
