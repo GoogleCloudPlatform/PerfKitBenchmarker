@@ -36,7 +36,6 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
         'name': 'test_instance',
         'description': 'test_description',
         'database': 'test_database',
-        'ddl': 'test_schema',
         'nodes': 2,
         'project': 'test_project',
     }
@@ -47,7 +46,6 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(spanner.name, 'test_instance')
     self.assertEqual(spanner._description, 'test_description')
     self.assertEqual(spanner.database, 'test_database')
-    self.assertEqual(spanner._ddl, 'test_schema')
     self.assertEqual(spanner.nodes, 2)
     self.assertEqual(spanner.project, 'test_project')
     self.assertEqual(spanner._config, 'regional-us-east1')

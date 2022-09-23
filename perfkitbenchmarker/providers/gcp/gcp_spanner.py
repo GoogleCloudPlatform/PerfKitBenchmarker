@@ -54,12 +54,6 @@ DEFAULT_SPANNER_TYPE = 'default'
 
 _DEFAULT_REGION = 'us-central1'
 _DEFAULT_DESCRIPTION = 'Spanner instance created by PKB.'
-_DEFAULT_DDL = """
-  CREATE TABLE pkb_table (
-    id     STRING(MAX),
-    field0 STRING(MAX)
-  ) PRIMARY KEY(id)
-  """
 _DEFAULT_ENDPOINT = 'https://spanner.googleapis.com'
 _DEFAULT_NODES = 1
 _FROZEN_NODE_COUNT = 1
@@ -91,7 +85,6 @@ class SpannerSpec(freeze_restore_spec.FreezeRestoreSpec):
   name: str
   description: str
   database: str
-  ddl: str
   config: str
   nodes: int
   project: str
@@ -124,7 +117,6 @@ class SpannerSpec(freeze_restore_spec.FreezeRestoreSpec):
         'name': (option_decoders.StringDecoder, _NONE_OK),
         'database': (option_decoders.StringDecoder, _NONE_OK),
         'description': (option_decoders.StringDecoder, _NONE_OK),
-        'ddl': (option_decoders.StringDecoder, _NONE_OK),
         'config': (option_decoders.StringDecoder, _NONE_OK),
         'nodes': (option_decoders.IntDecoder, _NONE_OK),
         'project': (option_decoders.StringDecoder, _NONE_OK),
@@ -172,7 +164,6 @@ class GcpSpannerInstance(resource.BaseResource):
     name:        Name of the instance to create.
     description: Description of the instance.
     database:    Name of the database to create
-    ddl:         The schema of the database.
   """
   # Required for registering the class.
   RESOURCE_TYPE = 'GcpSpannerInstance'
@@ -183,7 +174,6 @@ class GcpSpannerInstance(resource.BaseResource):
                name: Optional[str] = None,
                description: Optional[str] = None,
                database: Optional[str] = None,
-               ddl: Optional[str] = None,
                config: Optional[str] = None,
                nodes: Optional[int] = None,
                project: Optional[str] = None,
@@ -192,7 +182,6 @@ class GcpSpannerInstance(resource.BaseResource):
     self.name = name or f'pkb-instance-{FLAGS.run_uri}'
     self.database = database or f'pkb-database-{FLAGS.run_uri}'
     self._description = description or _DEFAULT_DESCRIPTION
-    self._ddl = ddl or _DEFAULT_DDL
     self._config = config or self._GetDefaultConfig()
     self.nodes = nodes or _DEFAULT_NODES
     self._end_point = None
@@ -217,7 +206,6 @@ class GcpSpannerInstance(resource.BaseResource):
         name=spanner_spec.name,
         description=spanner_spec.description,
         database=spanner_spec.database,
-        ddl=spanner_spec.ddl,
         config=spanner_spec.config,
         nodes=spanner_spec.nodes,
         project=spanner_spec.project,
@@ -246,15 +234,13 @@ class GcpSpannerInstance(resource.BaseResource):
       logging.error('Create GCP Spanner database failed.')
       return
 
+  def CreateTables(self, ddl: str) -> None:
+    """Creates the tables specified by the DDL."""
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'ddl', 'update',
                              self.database)
     cmd.flags['instance'] = self.name
-    cmd.flags['ddl'] = self._ddl
-    _, _, retcode = cmd.Issue(raise_on_failure=False)
-    if retcode != 0:
-      logging.error('Update GCP Spanner database schema failed.')
-    else:
-      logging.info('Created GCP Spanner instance and database.')
+    cmd.flags['ddl'] = ddl
+    cmd.Issue()
 
   def _Delete(self) -> None:
     """Deletes the instance."""
@@ -367,7 +353,6 @@ class GcpSpannerInstance(resource.BaseResource):
         'gcp_spanner_name': self.name,
         'gcp_spanner_database': self.database,
         'gcp_spanner_node_count': self.nodes,
-        'gcp_spanner_ddl': self._ddl,
         'gcp_spanner_config': self._config,
         'gcp_spanner_endpoint': self.GetEndPoint()
     }

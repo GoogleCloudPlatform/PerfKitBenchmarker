@@ -140,7 +140,6 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
-  config['spanner']['ddl'] = _BuildSchema()
   return config
 
 
@@ -187,6 +186,9 @@ def Prepare(benchmark_spec):
   vm_util.RunThreaded(_Install, vms)
 
   benchmark_spec.executor = ycsb.YCSBExecutor('cloudspanner')
+
+  spanner: gcp_spanner.GcpSpannerInstance = benchmark_spec.spanner
+  spanner.CreateTables(_BuildSchema())
 
 
 def _GetCpuOptimizationMetadata() -> Dict[str, Any]:
