@@ -128,6 +128,9 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'db_spec': default_server_db_spec,
         'db_disk_spec': default_server_db_disk_spec,
         'vm_groups': self.VmGroupSpec(),
+        'enable_freeze_restore': False,
+        'create_on_restore_error': False,
+        'delete_on_freeze_error': False,
     }
     spec_dict.update(additional_spec_items)
 
@@ -222,6 +225,11 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     return self.CreateDbFromMockSpec(mock_spec)
 
   def CreateAurora(self, additional_spec_items={}):
+    additional_spec_items.update({
+        'enable_freeze_restore': False,
+        'create_on_restore_error': False,
+        'delete_on_freeze_error': False,
+    })
     with self._PatchCriticalObjects() as issue_command:
       db = self.CreateAuroraDbFromSpec(additional_spec_items)
       db._Create()

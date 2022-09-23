@@ -291,6 +291,8 @@ class BenchmarkSpec(object):
     """Creates the relational db and create groups for its vms."""
     if self.config.relational_db is None:
       return
+    if self._InitializeFromSpec('relational_db', self.config.relational_db):
+      return
     cloud = self.config.relational_db.cloud
     is_managed_db = self.config.relational_db.is_managed_db
     engine = self.config.relational_db.engine

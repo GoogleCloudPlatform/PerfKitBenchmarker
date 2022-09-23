@@ -195,7 +195,10 @@ class BaseRelationalDb(resource.BaseResource):
     Args:
       relational_db_spec: spec of the managed database.
     """
-    super(BaseRelationalDb, self).__init__()
+    super(BaseRelationalDb, self).__init__(
+        enable_freeze_restore=relational_db_spec.enable_freeze_restore,
+        create_on_restore_error=relational_db_spec.create_on_restore_error,
+        delete_on_freeze_error=relational_db_spec.delete_on_freeze_error)
     self.spec = relational_db_spec
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.port = self.GetDefaultPort()
