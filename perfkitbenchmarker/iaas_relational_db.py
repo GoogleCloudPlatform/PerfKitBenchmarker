@@ -250,6 +250,7 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
   def _SetupLinuxUnmanagedDatabase(self):
     db_engine = self.spec.engine
     self.server_vm_query_tools.InstallPackages()
+    self.server_vm.Install('rsync')
 
     if self.client_vm.IS_REBOOTABLE:
       self.client_vm.ApplySysctlPersistent({
@@ -352,7 +353,6 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
         'sudo sed -i.bak "s:shared_buffers = 128MB:shared_buffers = {}GB:" '
         '{}'.format(self.postgres_shared_buffer_size, postgres_conf_file))
     # Update data path to new location
-    vm.InstallPackages('rsync')
     vm.RemoteCommand('sudo rsync -av /var/lib/postgresql /scratch')
 
     # # Use cat to move files because mv will override file permissions
