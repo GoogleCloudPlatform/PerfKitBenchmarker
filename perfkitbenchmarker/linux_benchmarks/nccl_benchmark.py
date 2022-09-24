@@ -87,7 +87,7 @@ _SAMPLE_LINE_RE = re.compile(r'# nThread (?P<nThread>\d+) '
                              r'step: (?P<step>\S+) '
                              r'warmup iters: (?P<warmup_iters>\d+) '
                              r'iters: (?P<iters>\d+) '
-                             r'app iters: (?P<app_iters>\d+) '
+                             r'agg iters: (?P<agg_iters>\d+) '
                              r'validation: (?P<validation>\d+) '
                              r'graph: (?P<graph>\d+)\s*')
 
@@ -228,6 +228,7 @@ def MakeSamplesFromOutput(metadata, output):
       r'(\d+)\s+'
       r'(\w+)\s+'
       r'[^1-9]+'
+      r'-?\d+\s+'
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
