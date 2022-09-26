@@ -74,12 +74,12 @@
     Service Bus).
 -   Add Intel perfspect as a new trace
 -   Add Ubuntu 22.04 support for GCP, AWS and Azure Providers.
--   Add support for Rocky Linux 8, CentOS Stream 8, and CentOS Stream 9 on GCP
-    and AWS Providers.
+-   Add support for Rocky Linux and CentOS Stream versions 8 and 9 on GCP and
+    AWS providers.
 -   Add support for chbench using s64da.
 -   Add sysbench_memory benchmark.
 -   Add support for RHEL 9 on AWS, Azure, and GCP.
--   Add GCP Optimized Rocky Linux 8 OS.
+-   Add GCP optimized Rocky Linux 8 and 9 OSes.
 -   Add mtu to os_metadata in linux_virtual_machine.
 -   Add support for TPC-DS/H benchmarks on AWS EMR Serverless.
 -   Add dpb_sparksql_serverless_benchmark, which submits one job for each

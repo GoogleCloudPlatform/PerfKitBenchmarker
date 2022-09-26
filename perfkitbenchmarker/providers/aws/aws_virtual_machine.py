@@ -1597,9 +1597,24 @@ class RockyLinux8BasedAwsVirtualMachine(AwsVirtualMachine,
                                         linux_virtual_machine.RockyLinux8Mixin):
   """Class with configuration for AWS Rocky Linux 8 virtual machines."""
   IMAGE_OWNER = MARKETPLACE_IMAGE_PROJECT
+  # Product code is x86 only.
+  # TODO(pclay): Consider relaxing or supporting multiple product codes for ARM
   IMAGE_PRODUCT_CODE_FILTER = 'cotnnspjrsi38lfn8qo4ibnnm'
   IMAGE_NAME_FILTER = 'Rocky-8-*'
   DEFAULT_USER_NAME = 'rocky'
+
+
+class RockyLinux9BasedAwsVirtualMachine(AwsVirtualMachine,
+                                        linux_virtual_machine.RockyLinux9Mixin):
+  """Class with configuration for AWS Rocky Linux 9 virtual machines."""
+  IMAGE_OWNER = MARKETPLACE_IMAGE_PROJECT
+  # Product code is x86 only.
+  # TODO(pclay): Consider relaxing or supporting multiple product codes for ARM
+  IMAGE_PRODUCT_CODE_FILTER = '3qk9e6x2ni81uiqnorll45r3f'
+  IMAGE_NAME_FILTER = 'Rocky-9-*'
+  DEFAULT_USER_NAME = 'rocky'
+  # No gp2 AMI available.
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
 
 
 class CentOsStream9BasedAwsVirtualMachine(

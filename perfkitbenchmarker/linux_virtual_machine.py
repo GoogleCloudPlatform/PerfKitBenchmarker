@@ -1946,6 +1946,18 @@ class RockyLinux8Mixin(BaseRhelMixin):
         'sudo dnf install -y epel-release')
 
 
+class RockyLinux9Mixin(BaseRhelMixin):
+  """Class holding Rocky Linux 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.ROCKY_LINUX9
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_almalinux_9_rocky_linux_98
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled crb &&'
+        'sudo dnf install -y epel-release')
+
+
 class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
   """Class holding COS specific VM methods and attributes."""
   OS_TYPE = os_types.COS

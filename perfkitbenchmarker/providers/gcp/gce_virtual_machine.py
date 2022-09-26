@@ -1374,6 +1374,18 @@ class RockyLinux8OptimizedBasedGceVirtualMachine(
   DEFAULT_IMAGE_FAMILY = 'rocky-linux-8-optimized-gcp'
 
 
+class RockyLinux9BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
+                                        linux_vm.RockyLinux9Mixin):
+  DEFAULT_IMAGE_FAMILY = 'rocky-linux-9'
+  DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
+
+
+class RockyLinux9OptimizedBasedGceVirtualMachine(
+    RockyLinux9BasedGceVirtualMachine):
+  OS_TYPE = os_types.ROCKY_LINUX9_OPTIMIZED
+  DEFAULT_IMAGE_FAMILY = 'rocky-linux-9-optimized-gcp'
+
+
 class CentOsStream9BasedGceVirtualMachine(BaseLinuxGceVirtualMachine,
                                           linux_vm.CentOsStream9Mixin):
   DEFAULT_IMAGE_FAMILY = 'centos-stream-9'

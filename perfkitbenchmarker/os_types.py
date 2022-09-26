@@ -32,6 +32,8 @@ RHEL8 = 'rhel8'
 RHEL9 = 'rhel9'
 ROCKY_LINUX8 = 'rocky_linux8'
 ROCKY_LINUX8_OPTIMIZED = 'rocky_linux8_optimized'
+ROCKY_LINUX9 = 'rocky_linux9'
+ROCKY_LINUX9_OPTIMIZED = 'rocky_linux9_optimized'
 UBUNTU_CONTAINER = 'ubuntu_container'
 UBUNTU1604 = 'ubuntu1604'  # deprecated
 UBUNTU1604_CUDA9 = 'ubuntu1604_cuda9'
@@ -84,6 +86,8 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     RHEL9,
     ROCKY_LINUX8,
     ROCKY_LINUX8_OPTIMIZED,
+    ROCKY_LINUX9,
+    ROCKY_LINUX9_OPTIMIZED,
     UBUNTU_CONTAINER,
     UBUNTU1604,  # deprecated
     UBUNTU1604_CUDA9,
