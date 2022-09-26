@@ -43,6 +43,9 @@ FLAGS = flags.FLAGS
 NETWORK_RANGE = '10.0.0.0/8'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
+_PLACEMENT_GROUP_PREFIXES = frozenset(
+    ['c2', 'c3', 'n2', 'n2d', 'c2d', 'a2'])
+
 
 class GceVpnGateway(network.BaseVpnGateway):
   """Object representing a GCE VPN Gateway."""
@@ -645,17 +648,20 @@ class GceNetworkSpec(network.BaseNetworkSpec):
   def __init__(self,
                project: Optional[str] = None,
                mtu: Optional[int] = None,
+               machine_type: Optional[str] = None,
                **kwargs):
     """Initializes the GceNetworkSpec.
 
     Args:
       project: The project for which the Network should be created.
       mtu: The MTU (max transmission unit) to use, if any.
+      machine_type: The machine type of VM's in the network.
       **kwargs: Additional key word arguments passed to BaseNetworkSpec.
     """
     super(GceNetworkSpec, self).__init__(**kwargs)
     self.project = project
     self.mtu = mtu
+    self.machine_type = machine_type
 
 
 class GceNetworkResource(resource.BaseResource):
@@ -742,6 +748,12 @@ class GceSubnetResource(resource.BaseResource):
     cmd.Issue(raise_on_failure=False)
 
 
+def IsPlacementGroupCompatible(machine_type):
+  """Returns True if VMs of 'machine_type' can be put in a placement group."""
+  prefix = machine_type.split('-')[0]
+  return prefix in _PLACEMENT_GROUP_PREFIXES
+
+
 class GceNetwork(network.BaseNetwork):
   """Object representing a GCE Network."""
 
@@ -815,7 +827,20 @@ class GceNetwork(network.BaseNetwork):
         FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
     if no_placement_group:
       self.placement_group = None
+    elif (FLAGS.placement_group_style in
+          [placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED,
+           placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED] and
+          not IsPlacementGroupCompatible(network_spec.machine_type)):
+      logging.warning(
+          'machine type %s does not support placement groups. '
+          'Placement group style set to none.', network_spec.machine_type)
+      self.placement_group = None
     else:
+      if not IsPlacementGroupCompatible(network_spec.machine_type):
+        raise errors.Benchmarks.UnsupportedConfigError(
+            f'machine type {network_spec.machine_type} does not support '
+            f'placement groups. Use placement group style cluster_if_supported '
+            f'or spread_if_supported.')
       placement_group_spec = gce_placement_group.GcePlacementGroupSpec(
           'GcePlacementGroupSpec',
           flag_values=FLAGS,
@@ -929,7 +954,11 @@ class GceNetwork(network.BaseNetwork):
   def _GetNetworkSpecFromVm(vm) -> GceNetworkSpec:
     """Returns a BaseNetworkSpec created from VM attributes."""
     return GceNetworkSpec(
-        project=vm.project, zone=vm.zone, cidr=vm.cidr, mtu=vm.mtu)
+        project=vm.project,
+        zone=vm.zone,
+        cidr=vm.cidr,
+        mtu=vm.mtu,
+        machine_type=vm.machine_type)
 
   @classmethod
   def _GetKeyFromNetworkSpec(

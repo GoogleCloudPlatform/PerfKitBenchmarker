@@ -75,7 +75,14 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
     self.name = (
         'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:]))
     self.region = util.GetRegionFromZone(self.zone)
+    # TODO(andytzhu) add placement group 'cluster' functionality, which
+    # forces placement groups regardless of machine type, and raises an error
+    # if not compatible.
     self.strategy = aws_placement_group_spec.placement_group_style
+    if self.strategy == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED:
+      self.strategy = placement_group.PLACEMENT_GROUP_CLUSTER
+    if self.strategy == placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED:
+      self.strategy = placement_group.PLACEMENT_GROUP_SPREAD
 
   def _Create(self):
     """Creates the Placement Group."""

@@ -94,15 +94,17 @@ class BaseFirewall(object):
 class BaseNetworkSpec(object):
   """Object containing all information needed to create a Network."""
 
-  def __init__(self, zone=None, cidr=None):
+  def __init__(self, zone=None, cidr=None, machine_type=None):
     """Initializes the BaseNetworkSpec.
 
     Args:
       zone: The zone in which to create the network.
       cidr: The subnet this network belongs to in CIDR notation
+      machine_type: The vm machine_type to determine placement policy
     """
     self.zone = zone
     self.cidr = cidr
+    self.machine_type = machine_type
 
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)
@@ -174,7 +176,8 @@ class BaseNetwork(object):
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
     """Returns a BaseNetworkSpec created from VM attributes."""
-    return BaseNetworkSpec(zone=vm.zone, cidr=vm.cidr)
+    return BaseNetworkSpec(
+        zone=vm.zone, cidr=vm.cidr, machine_type=vm.machine_type)
 
   @classmethod
   def _GetKeyFromNetworkSpec(cls, spec):

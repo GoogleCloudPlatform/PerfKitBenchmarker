@@ -112,6 +112,8 @@ netperf:
       vm_spec: *default_single_core
     vm_2:
       vm_spec: *default_single_core
+  flags:
+    placement_group_style: cluster_if_supported
 """
 
 MBPS = 'Mbits/sec'

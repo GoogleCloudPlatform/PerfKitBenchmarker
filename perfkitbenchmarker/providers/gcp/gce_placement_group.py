@@ -91,6 +91,11 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
     self.num_vms = gce_placement_group_spec.num_vms
     self.name = 'perfkit-{}'.format(context.GetThreadBenchmarkSpec().uuid)
     self.style = gce_placement_group_spec.placement_group_style
+    # Already checked for compatibility in gce_network.py
+    if self.style == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED:
+      self.style = placement_group.PLACEMENT_GROUP_CLUSTER
+    elif self.style == placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED:
+      self.style = placement_group.PLACEMENT_GROUP_SPREAD
     self.availability_domain_count = FLAGS.gce_availability_domain_count
     self.metadata.update({
         'placement_group_name': self.name,
