@@ -47,15 +47,16 @@ cloud_spanner_ycsb:
   description: >
       Run YCSB against Google Cloud Spanner.
       Configure the number of VMs via --ycsb_client_vms.
-  vm_groups:
-    default:
-      vm_spec: *default_single_core
-      vm_count: 1
-  spanner:
-    service_type: {gcp_spanner.DEFAULT_SPANNER_TYPE}
-    nodes: 1
-    description: {BENCHMARK_DESCRIPTION}
+  relational_db:
+    cloud: GCP
+    engine: spanner-googlesql
+    spanner_nodes: 1
+    spanner_description: {BENCHMARK_DESCRIPTION}
     enable_freeze_restore: True
+    vm_groups:
+      default:
+        vm_spec: *default_single_core
+        vm_count: 1
   flags:
     openjdk_version: 8
     gcloud_scopes: >
@@ -139,7 +140,8 @@ _CPU_OPTIMIZATION_TARGET_QPS_INCREMENT = flags.DEFINE_integer(
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
-    config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
+    config['relational_db']['vm_groups']['default'][
+        'vm_count'] = FLAGS.ycsb_client_vms
   return config
 
 
@@ -187,7 +189,7 @@ def Prepare(benchmark_spec):
 
   benchmark_spec.executor = ycsb.YCSBExecutor('cloudspanner')
 
-  spanner: gcp_spanner.GcpSpannerInstance = benchmark_spec.spanner
+  spanner: gcp_spanner.GcpSpannerInstance = benchmark_spec.relational_db
   spanner.CreateTables(_BuildSchema())
 
 
@@ -217,12 +219,12 @@ def Run(benchmark_spec):
     A list of sample.Sample instances.
   """
   vms = benchmark_spec.vms
-  spanner: gcp_spanner.GcpSpannerInstance = benchmark_spec.spanner
+  spanner: gcp_spanner.GcpSpannerInstance = benchmark_spec.relational_db
 
   run_kwargs = {
       'table': BENCHMARK_TABLE,
       'zeropadding': BENCHMARK_ZERO_PADDING,
-      'cloudspanner.instance': spanner.name,
+      'cloudspanner.instance': spanner.instance_id,
       'cloudspanner.database': spanner.database,
       'cloudspanner.readmode': FLAGS.cloud_spanner_ycsb_readmode,
       'cloudspanner.boundedstaleness':

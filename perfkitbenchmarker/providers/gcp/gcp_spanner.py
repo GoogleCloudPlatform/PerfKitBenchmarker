@@ -29,10 +29,10 @@ from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import query
 import numpy as np
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import resource
-from perfkitbenchmarker.configs import freeze_restore_spec
+from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import relational_db_spec
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import util
 import requests
 
@@ -49,14 +49,18 @@ flags.DEFINE_string('cloud_spanner_project',
                     'The project for the Cloud Spanner instance. Use default '
                     'project if unset.')
 
-# Valid GCP Spanner types:
-DEFAULT_SPANNER_TYPE = 'default'
+# Type aliases
+_RelationalDbSpec = relational_db_spec.RelationalDbSpec
 
 _DEFAULT_REGION = 'us-central1'
-_DEFAULT_DESCRIPTION = 'Spanner instance created by PKB.'
+_DEFAULT_DESCRIPTION = 'Created by PKB.'
 _DEFAULT_ENDPOINT = 'https://spanner.googleapis.com'
 _DEFAULT_NODES = 1
 _FROZEN_NODE_COUNT = 1
+
+# Dialect options
+GOOGLESQL = 'GOOGLE_STANDARD_SQL'
+_VALID_DIALECTS = frozenset([GOOGLESQL])
 
 # Common decoder configuration option.
 _NONE_OK = {'default': None, 'none_ok': True}
@@ -73,21 +77,15 @@ _WRITE_OPS_PER_NODE = 2000
 
 
 @dataclasses.dataclass
-class SpannerSpec(freeze_restore_spec.FreezeRestoreSpec):
+class SpannerSpec(relational_db_spec.RelationalDbSpec):
   """Configurable options of a Spanner instance."""
 
-  # Needed for registering the spec class.
-  SPEC_TYPE = 'SpannerSpec'
-  SPEC_ATTRS = ['SERVICE_TYPE']
-  SERVICE_TYPE = DEFAULT_SPANNER_TYPE
+  SERVICE_TYPE = 'spanner'
 
-  service_type: str
-  name: str
-  description: str
-  database: str
-  config: str
-  nodes: int
-  project: str
+  spanner_description: str
+  spanner_config: str
+  spanner_nodes: int
+  spanner_project: str
 
   def __init__(self,
                component_full_name: str,
@@ -106,20 +104,12 @@ class SpannerSpec(freeze_restore_spec.FreezeRestoreSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
-        'service_type': (
-            option_decoders.EnumDecoder,
-            {
-                'valid_values': [
-                    DEFAULT_SPANNER_TYPE,
-                ],
-                'default': DEFAULT_SPANNER_TYPE
-            }),
-        'name': (option_decoders.StringDecoder, _NONE_OK),
-        'database': (option_decoders.StringDecoder, _NONE_OK),
-        'description': (option_decoders.StringDecoder, _NONE_OK),
-        'config': (option_decoders.StringDecoder, _NONE_OK),
-        'nodes': (option_decoders.IntDecoder, _NONE_OK),
-        'project': (option_decoders.StringDecoder, _NONE_OK),
+        'spanner_description': (option_decoders.StringDecoder, _NONE_OK),
+        'spanner_config': (option_decoders.StringDecoder, _NONE_OK),
+        'spanner_nodes': (option_decoders.IntDecoder, _NONE_OK),
+        'spanner_project': (option_decoders.StringDecoder, _NONE_OK),
+        'db_spec': (option_decoders.PerCloudConfigDecoder, _NONE_OK),
+        'db_disk_spec': (option_decoders.PerCloudConfigDecoder, _NONE_OK),
     })
     return result
 
@@ -144,12 +134,7 @@ class SpannerSpec(freeze_restore_spec.FreezeRestoreSpec):
       config_values['project'] = flag_values.cloud_spanner_project
 
 
-def GetSpannerSpecClass(service_type) -> Optional[spec.BaseSpecMetaClass]:
-  """Return the SpannerSpec class corresponding to 'service_type'."""
-  return spec.GetSpecClass(SpannerSpec, SERVICE_TYPE=service_type)
-
-
-class GcpSpannerInstance(resource.BaseResource):
+class GcpSpannerInstance(relational_db.BaseRelationalDb):
   """Object representing a GCP Spanner Instance.
 
   The project and Cloud Spanner config must already exist. Instance and database
@@ -165,31 +150,21 @@ class GcpSpannerInstance(resource.BaseResource):
     description: Description of the instance.
     database:    Name of the database to create
   """
-  # Required for registering the class.
-  RESOURCE_TYPE = 'GcpSpannerInstance'
-  REQUIRED_ATTRS = ['SERVICE_TYPE']
-  SERVICE_TYPE = DEFAULT_SPANNER_TYPE
+  CLOUD = 'GCP'
+  IS_MANAGED = True
+  REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
 
-  def __init__(self,
-               name: Optional[str] = None,
-               description: Optional[str] = None,
-               database: Optional[str] = None,
-               config: Optional[str] = None,
-               nodes: Optional[int] = None,
-               project: Optional[str] = None,
-               **kwargs):
-    super(GcpSpannerInstance, self).__init__(**kwargs)
-    self.name = name or f'pkb-instance-{FLAGS.run_uri}'
-    self.database = database or f'pkb-database-{FLAGS.run_uri}'
-    self._description = description or _DEFAULT_DESCRIPTION
-    self._config = config or self._GetDefaultConfig()
-    self.nodes = nodes or _DEFAULT_NODES
+  def __init__(self, db_spec: SpannerSpec, **kwargs):
+    super(GcpSpannerInstance, self).__init__(db_spec, **kwargs)
+    self.database = db_spec.database_name or f'pkb-database-{FLAGS.run_uri}'
+    self._description = db_spec.spanner_description or _DEFAULT_DESCRIPTION
+    self._config = db_spec.spanner_config or self._GetDefaultConfig()
+    self.nodes = db_spec.spanner_nodes or _DEFAULT_NODES
     self._end_point = None
 
     # Cloud Spanner may not explicitly set the following common flags.
     self.project = (
-        project or FLAGS.project or util.GetDefaultProject())
-    self.zone = None
+        db_spec.spanner_project or FLAGS.project or util.GetDefaultProject())
 
   def _GetDefaultConfig(self) -> str:
     """Gets the config that corresponds the region used for the test."""
@@ -199,23 +174,14 @@ class GcpSpannerInstance(resource.BaseResource):
       region = _DEFAULT_REGION
     return f'regional-{region}'
 
-  @classmethod
-  def FromSpec(cls, spanner_spec: SpannerSpec) -> 'GcpSpannerInstance':
-    """Initialize Spanner from the provided spec."""
-    return cls(
-        name=spanner_spec.name,
-        description=spanner_spec.description,
-        database=spanner_spec.database,
-        config=spanner_spec.config,
-        nodes=spanner_spec.nodes,
-        project=spanner_spec.project,
-        enable_freeze_restore=spanner_spec.enable_freeze_restore,
-        create_on_restore_error=spanner_spec.create_on_restore_error,
-        delete_on_freeze_error=spanner_spec.delete_on_freeze_error)
+  @staticmethod
+  def GetDefaultEngineVersion(engine: str) -> str:
+    return 'default'
 
   def _Create(self) -> None:
     """Creates the instance, the database, and update the schema."""
-    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create', self.name)
+    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create',
+                             self.instance_id)
     cmd.flags['description'] = self._description
     cmd.flags['nodes'] = self.nodes
     cmd.flags['config'] = self._config
@@ -228,24 +194,24 @@ class GcpSpannerInstance(resource.BaseResource):
 
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'create',
                              self.database)
-    cmd.flags['instance'] = self.name
+    cmd.flags['instance'] = self.instance_id
+    cmd.flags['database-dialect'] = self.dialect
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Create GCP Spanner database failed.')
-      return
 
   def CreateTables(self, ddl: str) -> None:
     """Creates the tables specified by the DDL."""
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'ddl', 'update',
                              self.database)
-    cmd.flags['instance'] = self.name
+    cmd.flags['instance'] = self.instance_id
     cmd.flags['ddl'] = ddl
     cmd.Issue()
 
   def _Delete(self) -> None:
     """Deletes the instance."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'delete',
-                             self.name)
+                             self.instance_id)
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Delete GCP Spanner instance failed.')
@@ -255,12 +221,12 @@ class GcpSpannerInstance(resource.BaseResource):
   def _Exists(self, instance_only: bool = False) -> bool:
     """Returns true if the instance and the database exists."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'describe',
-                             self.name)
+                             self.instance_id)
 
     # Do not log error or warning when checking existence.
     _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
-      logging.info('Could not find GCP Spanner instance %s.', self.name)
+      logging.info('Could not find GCP Spanner instance %s.', self.instance_id)
       return False
 
     if instance_only:
@@ -268,12 +234,16 @@ class GcpSpannerInstance(resource.BaseResource):
 
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'describe',
                              self.database)
-    cmd.flags['instance'] = self.name
+    cmd.flags['instance'] = self.instance_id
 
     # Do not log error or warning when checking existence.
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    stdout, _, retcode = cmd.Issue(
+        suppress_warning=True, raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not find GCP Spanner database %s.', self.database)
+      return False
+    elif json.loads(stdout)['state'] != 'READY':
+      logging.info('Waiting for database to be ready.')
       return False
 
     return True
@@ -293,7 +263,8 @@ class GcpSpannerInstance(resource.BaseResource):
 
   def _SetNodes(self, nodes: int) -> None:
     """Sets the number of nodes on the Spanner instance."""
-    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'update', self.name)
+    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'update',
+                             self.instance_id)
     cmd.flags['nodes'] = nodes
     cmd.Issue(raise_on_failure=True)
 
@@ -317,7 +288,7 @@ class GcpSpannerInstance(resource.BaseResource):
   def _GetLabels(self) -> Dict[str, Any]:
     """Gets labels from the current instance."""
     cmd = util.GcloudCommand(self, 'spanner', 'instances', 'describe',
-                             self.name)
+                             self.instance_id)
     stdout, _, _ = cmd.Issue(raise_on_failure=True)
     return json.loads(stdout).get('labels', {})
 
@@ -325,7 +296,7 @@ class GcpSpannerInstance(resource.BaseResource):
     """Updates the labels of the current instance."""
     header = {'Authorization': f'Bearer {util.GetAccessToken()}'}
     url = (f'{self.GetEndPoint()}/v1/projects/'
-           f'{self.project}/instances/{self.name}')
+           f'{self.project}/instances/{self.instance_id}')
     # Keep any existing labels
     tags = self._GetLabels()
     tags.update(labels)
@@ -350,8 +321,9 @@ class GcpSpannerInstance(resource.BaseResource):
   def GetResourceMetadata(self) -> Dict[Any, Any]:
     """Returns useful metadata about the instance."""
     return {
-        'gcp_spanner_name': self.name,
+        'gcp_spanner_name': self.instance_id,
         'gcp_spanner_database': self.database,
+        'gcp_spanner_database_dialect': self.dialect,
         'gcp_spanner_node_count': self.nodes,
         'gcp_spanner_config': self._config,
         'gcp_spanner_endpoint': self.GetEndPoint()
@@ -372,7 +344,7 @@ class GcpSpannerInstance(resource.BaseResource):
         database=self.database, priority='high')
     # Filter by the Spanner instance
     cpu_query = cpu_query.select_resources(
-        instance_id=self.name, project_id=self.project)
+        instance_id=self.instance_id, project_id=self.project)
     # Aggregate user and system high priority by the minute
     time_series = list(cpu_query)
     # Expect 2 metrics: user and system high-priority CPU
@@ -408,8 +380,13 @@ class GcpSpannerInstance(resource.BaseResource):
     return int(sum(result) * self.nodes)
 
 
-def GetSpannerClass(
-    service_type: str) -> Optional[resource.AutoRegisterResourceMeta]:
-  """Return the Spanner class associated with service_type."""
-  return resource.GetResourceClass(
-      GcpSpannerInstance, SERVICE_TYPE=service_type)
+class GoogleSqlGcpSpannerInstance(GcpSpannerInstance):
+  """GoogleSQL-based Spanner instance."""
+  ENGINE = sql_engine_utils.SPANNER_GOOGLESQL
+
+  def __init__(self, db_spec: SpannerSpec, **kwargs: Any):
+    super().__init__(db_spec, **kwargs)
+    self.dialect = GOOGLESQL
+
+  def GetDefaultPort(self) -> int:
+    return 0  # Port is unused

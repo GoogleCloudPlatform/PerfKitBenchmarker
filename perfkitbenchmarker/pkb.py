@@ -740,7 +740,6 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructDpbService()
   spec.ConstructVirtualMachines()
   spec.ConstructRelationalDb()
-  spec.ConstructSpanner()
   spec.ConstructNonRelationalDb()
   spec.ConstructMessagingService()
   # CapacityReservations need to be constructed after VirtualMachines because

@@ -143,8 +143,12 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
     test_spec = inspect.cleandoc("""
     cloud_spanner_ycsb:
       description: Sample spanner benchmark
-      spanner:
-        service_type: default
+      relational_db:
+        engine: spanner-googlesql
+        database_name: test-database
+        spanner_description: test-description
+        spanner_config: test-config
+        spanner_nodes: 3
         enable_freeze_restore: True
         delete_on_freeze_error: True
         create_on_restore_error: True
@@ -152,31 +156,60 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
     self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
         yaml_string=test_spec, benchmark_name='cloud_spanner_ycsb')
 
+  @flagsaver.flagsaver(run_uri='test_uri')
   def testInitialization(self):
-    self.test_bm_spec.ConstructSpanner()
-    spanner_instance = self.test_bm_spec.spanner
-    self.assertIsInstance(spanner_instance, gcp_spanner.GcpSpannerInstance)
-    self.assertEqual(spanner_instance.SERVICE_TYPE, 'default')
+    self.test_bm_spec.ConstructRelationalDb()
+    spanner_instance = self.test_bm_spec.relational_db
+    self.assertIsInstance(spanner_instance,
+                          gcp_spanner.GoogleSqlGcpSpannerInstance)
     self.assertTrue(spanner_instance.enable_freeze_restore)
     self.assertTrue(spanner_instance.delete_on_freeze_error)
     self.assertTrue(spanner_instance.create_on_restore_error)
+    self.assertEqual(spanner_instance.database, 'test-database')
+    self.assertEqual(spanner_instance._description, 'test-description')
+    self.assertEqual(spanner_instance._config, 'test-config')
+    self.assertEqual(spanner_instance.nodes, 3)
 
-  @flagsaver.flagsaver
+  @flagsaver.flagsaver(run_uri='test_uri')
+  def testInitializationDefaults(self):
+    test_spec = inspect.cleandoc("""
+    cloud_spanner_ycsb:
+      description: Sample spanner benchmark
+      relational_db:
+        engine: spanner-googlesql
+    """)
+    self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=test_spec, benchmark_name='cloud_spanner_ycsb')
+
+    self.test_bm_spec.ConstructRelationalDb()
+    spanner_instance = self.test_bm_spec.relational_db
+    self.assertIsInstance(spanner_instance,
+                          gcp_spanner.GoogleSqlGcpSpannerInstance)
+    self.assertEqual(spanner_instance.instance_id, 'pkb-db-instance-test_uri')
+    self.assertEqual(spanner_instance.database, 'pkb-db-test_uri')
+    self.assertEqual(spanner_instance._description,
+                     gcp_spanner._DEFAULT_DESCRIPTION)
+    self.assertEqual(spanner_instance._config,
+                     f'regional-{gcp_spanner._DEFAULT_REGION}')
+    self.assertEqual(spanner_instance.nodes, gcp_spanner._DEFAULT_NODES)
+
+  @flagsaver.flagsaver(run_uri='test_uri')
   def testRestoreInstanceCopiedFromPreviousSpec(self):
     restore_spanner_spec = inspect.cleandoc("""
     cloud_spanner_ycsb:
-      spanner:
-        name: restore_spanner
-        service_type: default
+      relational_db:
+        database_name: restore_spanner
+        engine: spanner-googlesql
     """)
     # Set up the restore spec Spanner instance
     self.test_bm_spec.restore_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
         yaml_string=restore_spanner_spec, benchmark_name='cloud_spanner_ycsb')
-    self.test_bm_spec.restore_spec.ConstructSpanner()
+    self.test_bm_spec.restore_spec.ConstructRelationalDb()
 
-    self.test_bm_spec.ConstructSpanner()
+    self.test_bm_spec.ConstructRelationalDb()
 
-    self.assertEqual(self.test_bm_spec.spanner.name, 'restore_spanner')
+    self.assertEqual(self.test_bm_spec.relational_db.database,
+                     'restore_spanner')
 
 
 class ConstructVmsTestCase(_BenchmarkSpecTestCase):

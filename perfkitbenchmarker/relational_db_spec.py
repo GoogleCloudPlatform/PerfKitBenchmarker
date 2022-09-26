@@ -21,7 +21,20 @@ from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
+
+_NONE_OK = {'default': None, 'none_ok': True}
+
+
+def GetRelationalDbSpecClass(engine):
+  """Get the RelationalDbSpec class corresponding to 'engine'."""
+  if engine in [
+      # TODO(user) add sql_engine_utils.SPANNER_POSTGRES
+      sql_engine_utils.SPANNER_GOOGLESQL
+  ]:
+    return spec.GetSpecClass(RelationalDbSpec, SERVICE_TYPE='spanner')
+  return RelationalDbSpec
 
 
 class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
@@ -39,6 +52,9 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     db_disk_spec: disk.BaseDiskSpec: Configurable disk options.
     db_spec: virtual_machine.BaseVmSpec: Configurable VM options.
   """
+  SPEC_TYPE = 'RelationalDbSpec'
+  SPEC_ATTRS = ['SERVICE_TYPE']
+
   cloud: str
   engine: str
   engine_version: str
@@ -72,16 +88,17 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
           flag_values=flag_values,
           **disk_config)
 
-    db_vm_config = getattr(self.db_spec, self.cloud, None)
-    if db_vm_config is None:
-      raise errors.Config.MissingOption(
-          '{0}.cloud is "{1}", but {0}.db_spec does not contain a '
-          'configuration for "{1}".'.format(component_full_name, self.cloud))
-    db_vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
-    self.db_spec = db_vm_spec_class(
-        '{0}.db_spec.{1}'.format(component_full_name, self.cloud),
-        flag_values=flag_values,
-        **db_vm_config)
+    if self.db_spec:
+      db_vm_config = getattr(self.db_spec, self.cloud, None)
+      if db_vm_config is None:
+        raise errors.Config.MissingOption(
+            '{0}.cloud is "{1}", but {0}.db_spec does not contain a '
+            'configuration for "{1}".'.format(component_full_name, self.cloud))
+      db_vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
+      self.db_spec = db_vm_spec_class(
+          '{0}.db_spec.{1}'.format(component_full_name, self.cloud),
+          flag_values=flag_values,
+          **db_vm_config)
 
     # Set defaults that were not able to be set in
     # GetOptionDecoderConstructions()

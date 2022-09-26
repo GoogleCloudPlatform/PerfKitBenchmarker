@@ -38,10 +38,11 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.dpb_service import BaseDpbService
-from perfkitbenchmarker.providers.gcp import gcp_spanner
 import six
 
 _DEFAULT_VM_COUNT = 1
+
+_NONE_OK = {'default': None, 'none_ok': True}
 
 
 class _DpbApplicationListDecoder(option_decoders.ListDecoder):
@@ -135,7 +136,6 @@ class _DpbServiceSpec(spec.BaseSpec):
                     dpb_service.DATAPROC_GKE,
                     dpb_service.DATAPROC_SERVERLESS,
                     dpb_service.DATAFLOW,
-                    dpb_service.DATAFLOW_TEMPLATE,
                     dpb_service.EMR,
                     dpb_service.EMR_SERVERLESS,
                     dpb_service.GLUE,
@@ -969,18 +969,22 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
         BaseSpec constructors.
 
     Returns:
-      _RelationalDbService built from the config passed in in value.
+      RelationalDbSpec built from the config passed in value.
 
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    relational_db_config = super(_RelationalDbDecoder,
-                                 self).Decode(value, component_full_name,
-                                              flag_values)
-    result = relational_db_spec.RelationalDbSpec(
+    relational_db_config = super().Decode(value, component_full_name,
+                                          flag_values)
+    if 'engine' in relational_db_config:
+      db_spec_class = relational_db_spec.GetRelationalDbSpecClass(
+          relational_db_config['engine'])
+    else:
+      raise errors.Config.InvalidValue(
+          'Required attribute `engine` missing from relational_db config.')
+    return db_spec_class(
         self._GetOptionFullName(component_full_name), flag_values,
         **relational_db_config)
-    return result
 
 
 class _NonRelationalDbDecoder(option_decoders.TypeVerifier):
@@ -1017,41 +1021,6 @@ class _NonRelationalDbDecoder(option_decoders.TypeVerifier):
     return db_spec_class(
         self._GetOptionFullName(component_full_name), flag_values,
         **non_relational_db_config)
-
-
-class _SpannerDecoder(option_decoders.TypeVerifier):
-  """Validate the spanner dictionary of a benchmark config object."""
-
-  def __init__(self, **kwargs):
-    super(_SpannerDecoder, self).__init__(valid_types=(dict,), **kwargs)
-
-  def Decode(self, value, component_full_name, flag_values):
-    """Verify spanner dict of a benchmark config object.
-
-    Args:
-      value: dict. Config dictionary
-      component_full_name: string.  Fully qualified name of the configurable
-        component containing the config option.
-      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
-        BaseSpec constructors.
-
-    Returns:
-      _SpannerSpec built from the config passed in value.
-
-    Raises:
-      errors.Config.InvalidValue upon invalid input value.
-    """
-    spanner_config = super().Decode(value, component_full_name, flag_values)
-    # Allow for subclass-specific specs.
-    if 'service_type' in spanner_config:
-      spanner_spec_class = gcp_spanner.GetSpannerSpecClass(
-          spanner_config['service_type'])
-    else:
-      raise errors.Config.InvalidValue(
-          'Required attribute `service_type` missing from spanner config.')
-    return spanner_spec_class(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **spanner_config)
 
 
 class _TpuGroupsDecoder(option_decoders.TypeVerifier):
@@ -1638,10 +1607,6 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'none_ok': True,
         }),
         'non_relational_db': (_NonRelationalDbDecoder, {
-            'default': None,
-            'none_ok': True,
-        }),
-        'spanner': (_SpannerDecoder, {
             'default': None,
             'none_ok': True,
         }),

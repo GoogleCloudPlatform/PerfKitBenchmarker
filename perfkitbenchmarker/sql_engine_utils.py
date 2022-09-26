@@ -33,6 +33,7 @@ SQLSERVER = 'sqlserver'
 SQLSERVER_EXPRESS = 'sqlserver-ex'
 SQLSERVER_ENTERPRISE = 'sqlserver-ee'
 SQLSERVER_STANDARD = 'sqlserver-se'
+SPANNER_GOOGLESQL = 'spanner-googlesql'
 
 ALL_ENGINES = [
     MYSQL,
@@ -44,6 +45,7 @@ ALL_ENGINES = [
     SQLSERVER_EXPRESS,
     SQLSERVER_ENTERPRISE,
     SQLSERVER_STANDARD,
+    SPANNER_GOOGLESQL,
 ]
 
 ENGINE_TYPES = [
@@ -403,6 +405,8 @@ def GetDbEngineType(db_engine: str) -> str:
     return POSTGRES
   elif db_engine == AWS_AURORA_MYSQL_ENGINE or db_engine == AURORA_MYSQL56:
     return MYSQL
+  elif db_engine == SPANNER_GOOGLESQL:
+    return SPANNER_GOOGLESQL
 
   if db_engine not in ENGINE_TYPES:
     raise TypeError('Unsupported engine type', db_engine)

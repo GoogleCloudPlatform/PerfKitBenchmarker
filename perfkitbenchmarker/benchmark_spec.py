@@ -52,7 +52,6 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import vpn_service
 from perfkitbenchmarker.configs import freeze_restore_spec
-from perfkitbenchmarker.providers.gcp import gcp_spanner
 import six
 from six.moves import range
 import six.moves._thread
@@ -319,19 +318,6 @@ class BenchmarkSpec(object):
     non_relational_db_class = non_relational_db.GetNonRelationalDbClass(
         service_type)
     self.non_relational_db = non_relational_db_class.FromSpec(db_spec)
-
-  def ConstructSpanner(self) -> None:
-    """Initializes the spanner instance."""
-    spanner_spec: gcp_spanner.SpannerSpec = self.config.spanner
-    if not spanner_spec:
-      return
-    # Initialization from restore spec
-    if self._InitializeFromSpec('spanner', spanner_spec):
-      return
-    # Initialization from benchmark config spec
-    logging.info('Constructing spanner instance with spec: %s.', spanner_spec)
-    spanner_class = gcp_spanner.GetSpannerClass(spanner_spec.service_type)
-    self.spanner = spanner_class.FromSpec(spanner_spec)
 
   def ConstructTpuGroup(self, group_spec):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
@@ -741,8 +727,6 @@ class BenchmarkSpec(object):
       self.relational_db.Create(restore=should_restore)
     if self.non_relational_db:
       self.non_relational_db.Create(restore=should_restore)
-    if self.spanner:
-      self.spanner.Create(restore=should_restore)
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Create(), self.tpus)
     if self.edw_service:
