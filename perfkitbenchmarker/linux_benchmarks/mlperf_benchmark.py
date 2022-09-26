@@ -712,7 +712,11 @@ def MakeMLPerfSamplesFromOutput(metadata, output):
       mlperf_metadata[key] = data[key]
     samples.append(
         sample.Sample(
-            data['key'], None, '', mlperf_metadata, timestamp=data['time_ms']))
+            data['key'],
+            None,
+            '',
+            mlperf_metadata,
+            timestamp=data['time_ms'] / 1000))
   return samples
 
 
