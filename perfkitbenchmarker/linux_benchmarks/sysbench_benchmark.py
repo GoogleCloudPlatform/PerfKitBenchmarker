@@ -289,7 +289,7 @@ def _GetCommonSysbenchOptions(benchmark_spec):
         '--mysql-ignore-errors=1213,1205,1020,2013',
         '--db-driver=mysql'
     ]
-  elif engine == sql_engine_utils.POSTGRES:
+  elif engine in [sql_engine_utils.POSTGRES, sql_engine_utils.SPANNER_POSTGRES]:
     # TODO(chunla): might need to add pgsql-db
     result += [
         '--db-driver=pgsql',
@@ -424,6 +424,12 @@ def _GetDatabaseSize(benchmark_spec):
         ')/1024/1024')
     size_mb = int(stdout.split()[2])
 
+  # Spanner doesn't yet support pg_database_size.
+  # See https://cloud.google.com/spanner/quotas#instance_limits. Spanner
+  # supports 4TB per node, so use that number for now.
+  elif db_engine == sql_engine_utils.SPANNER_POSTGRES:
+    size_mb = 4096000 * db.nodes
+
   return size_mb
 
 
@@ -438,7 +444,7 @@ def _PrepareSysbench(client_vm, benchmark_spec):
     results: A list of results of the data loading step.
   """
 
-  _InstallLuaScriptsIfNecessary(client_vm)
+  _InstallLuaScriptsIfNecessary(client_vm, benchmark_spec.relational_db)
 
   results = []
 
@@ -453,8 +459,10 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   data_load_start_time = time.time()
   # Data loading is write only so need num_threads less than or equal to the
   # amount of tables - capped at 64 threads for when number of tables
-  # gets very large.
-  num_threads = min(FLAGS.sysbench_tables, 64)
+  # gets very large. For TPCC, parallelize with threads as long as scale > 1.
+  num_threads = (
+      min(FLAGS.sysbench_scale, 64)
+      if FLAGS.sysbench_testname == 'tpcc' else min(FLAGS.sysbench_tables, 64))
 
   data_load_cmd_tokens = ['nice',  # run with a niceness of lower priority
                           '-15',   # to encourage cpu time for ssh commands
@@ -491,11 +499,14 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   return results
 
 
-def _InstallLuaScriptsIfNecessary(vm):
+def _InstallLuaScriptsIfNecessary(vm, db):
   if FLAGS.sysbench_testname == 'tpcc':
     vm.InstallPreprovisionedBenchmarkData(
         BENCHMARK_NAME, ['sysbench-tpcc.tar.gz'], '~')
     vm.RemoteCommand('tar -zxvf sysbench-tpcc.tar.gz')
+    if db.spec.engine == sql_engine_utils.SPANNER_POSTGRES:
+      vm.PushDataFile('spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
+      vm.PushDataFile('spanner_pg_tpcc_run.lua', '~/tpcc_run.lua')
 
 
 def _IsValidFlag(flag):

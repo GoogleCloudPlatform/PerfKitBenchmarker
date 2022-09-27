@@ -60,7 +60,8 @@ _FROZEN_NODE_COUNT = 1
 
 # Dialect options
 GOOGLESQL = 'GOOGLE_STANDARD_SQL'
-_VALID_DIALECTS = frozenset([GOOGLESQL])
+POSTGRESQL = 'POSTGRESQL'
+_VALID_DIALECTS = frozenset([GOOGLESQL, POSTGRESQL])
 
 # Common decoder configuration option.
 _NONE_OK = {'default': None, 'none_ok': True}
@@ -390,3 +391,31 @@ class GoogleSqlGcpSpannerInstance(GcpSpannerInstance):
 
   def GetDefaultPort(self) -> int:
     return 0  # Port is unused
+
+
+class PostgresGcpSpannerInstance(GcpSpannerInstance):
+  """PostgreSQL-based Spanner instance."""
+  ENGINE = sql_engine_utils.SPANNER_POSTGRES
+
+  def __init__(self, db_spec: SpannerSpec, **kwargs: Any):
+    super().__init__(db_spec, **kwargs)
+    self.dialect = POSTGRESQL
+    self._endpoint = 'localhost'
+
+  def GetDefaultPort(self) -> int:
+    return relational_db.DEFAULT_POSTGRES_PORT
+
+  def _PostCreate(self):
+    super()._PostCreate()
+    self.client_vm_query_tools.InstallPackages()
+
+  @property
+  def client_vm_query_tools(self):
+    if not hasattr(self, '_client_vm_query_tools'):
+      connection_properties = sql_engine_utils.DbConnectionProperties(
+          self.spec.engine, self.spec.engine_version, self.endpoint, self.port,
+          self.spec.database_username, self.spec.database_password,
+          self.instance_id, self.database, self.project)
+      self._client_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
+          self.client_vm, connection_properties)
+    return self._client_vm_query_tools

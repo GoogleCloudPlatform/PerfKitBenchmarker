@@ -34,6 +34,7 @@ SQLSERVER_EXPRESS = 'sqlserver-ex'
 SQLSERVER_ENTERPRISE = 'sqlserver-ee'
 SQLSERVER_STANDARD = 'sqlserver-se'
 SPANNER_GOOGLESQL = 'spanner-googlesql'
+SPANNER_POSTGRES = 'spanner-postgres'
 
 ALL_ENGINES = [
     MYSQL,
@@ -46,6 +47,7 @@ ALL_ENGINES = [
     SQLSERVER_ENTERPRISE,
     SQLSERVER_STANDARD,
     SPANNER_GOOGLESQL,
+    SPANNER_POSTGRES,
 ]
 
 ENGINE_TYPES = [
@@ -73,6 +75,9 @@ class DbConnectionProperties():
   port: int
   database_username: str
   database_password: str
+  instance_name: Optional[str] = None
+  database_name: Optional[str] = None
+  project: Optional[str] = None
 
 
 class ISQLQueryTools(metaclass=abc.ABCMeta):
@@ -281,6 +286,43 @@ class PostgresCliQueryTools(ISQLQueryTools):
     return 'EXPLAIN (ANALYZE, BUFFERS, TIMING, SUMMARY, VERBOSE) '
 
 
+class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
+  """SQL Query class to issue Spanner postgres queries (subset of postgres)."""
+  ENGINE_TYPE = SPANNER_POSTGRES
+
+  # The default database in postgres
+  DEFAULT_DATABASE = POSTGRES
+
+  def InstallPackages(self):
+    """Installs packages required for making queries."""
+    self.vm.Install('pgadapter')
+    properties = self.connection_properties
+    self.vm.RemoteCommand('java -jar pgadapter.jar '
+                          '-dir /tmp '
+                          f'-p {properties.project} '
+                          f'-i {properties.instance_name} '
+                          f'-d {properties.database_name} &> /dev/null &')
+    self.vm.Install('postgres_client')
+
+  def MakeSqlCommand(self,
+                     command: str,
+                     database_name: str = '',
+                     session_variables: str = '') -> str:
+    """Makes Sql Command."""
+    sql_command = 'psql %s ' % self.GetConnectionString()
+    if session_variables:
+      for session_variable in session_variables:
+        sql_command += '-c "%s" ' % session_variable
+    sql_command += '-c "%s"' % command
+    return sql_command
+
+  def GetConnectionString(self) -> str:
+    return f'-h {self.connection_properties.endpoint}'
+
+  def GetSysbenchConnectionString(self) -> str:
+    return '--pgsql-host=/tmp'
+
+
 class MysqlCliQueryTools(ISQLQueryTools):
   """SQL Query class to issue Mysql related query."""
   ENGINE_TYPE = MYSQL
@@ -405,6 +447,8 @@ def GetDbEngineType(db_engine: str) -> str:
     return POSTGRES
   elif db_engine == AWS_AURORA_MYSQL_ENGINE or db_engine == AURORA_MYSQL56:
     return MYSQL
+  elif db_engine == SPANNER_POSTGRES:
+    return SPANNER_POSTGRES
   elif db_engine == SPANNER_GOOGLESQL:
     return SPANNER_GOOGLESQL
 
@@ -414,6 +458,7 @@ def GetDbEngineType(db_engine: str) -> str:
 
 
 def GetQueryToolsByEngine(vm, connection_properties):
+  """Returns the query tools to use for the engine."""
   engine_type = GetDbEngineType(connection_properties.engine)
   if engine_type == MYSQL:
     return MysqlCliQueryTools(vm, connection_properties)
@@ -421,4 +466,6 @@ def GetQueryToolsByEngine(vm, connection_properties):
     return PostgresCliQueryTools(vm, connection_properties)
   elif engine_type == SQLSERVER:
     return SqlServerCliQueryTools(vm, connection_properties)
+  elif engine_type == SPANNER_POSTGRES:
+    return SpannerPostgresCliQueryTools(vm, connection_properties)
   raise ValueError('Engine not supported')

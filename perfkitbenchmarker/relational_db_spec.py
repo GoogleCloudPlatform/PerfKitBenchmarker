@@ -30,8 +30,7 @@ _NONE_OK = {'default': None, 'none_ok': True}
 def GetRelationalDbSpecClass(engine):
   """Get the RelationalDbSpec class corresponding to 'engine'."""
   if engine in [
-      # TODO(user) add sql_engine_utils.SPANNER_POSTGRES
-      sql_engine_utils.SPANNER_GOOGLESQL
+      sql_engine_utils.SPANNER_GOOGLESQL, sql_engine_utils.SPANNER_POSTGRES
   ]:
     return spec.GetSpecClass(RelationalDbSpec, SERVICE_TYPE='spanner')
   return RelationalDbSpec
