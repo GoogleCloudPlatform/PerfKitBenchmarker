@@ -132,7 +132,7 @@ def GetClients(benchmark_spec):
 
 def GetServerIp(server):
   """Get server ip."""
-  return server.ip if _CLIENT_COUNT.value else 'localhost'
+  return server.internal_ip if _CLIENT_COUNT.value else 'localhost'
 
 
 def Prepare(benchmark_spec):
