@@ -316,7 +316,7 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
     sql_command += '-c "%s"' % command
     return sql_command
 
-  def GetConnectionString(self) -> str:
+  def GetConnectionString(self, database_name: str = '') -> str:
     return f'-h {self.connection_properties.endpoint}'
 
   def GetSysbenchConnectionString(self) -> str:
