@@ -88,7 +88,7 @@
     the query run time.
 -   Add Intel MPI benchmark.
 -   Add support for Azure ARM VMs.
--   Add an HTTP endpoint polling utility.
+-   Add an HTTP endpoint polling utility & incorporate it into app_service.
 
 ### Enhancements:
 

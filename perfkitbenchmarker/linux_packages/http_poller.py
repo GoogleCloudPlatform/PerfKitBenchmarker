@@ -11,6 +11,7 @@ script can be used as a standalone utility.
 """
 
 import ast
+import dataclasses
 import logging
 from perfkitbenchmarker import data
 
@@ -36,6 +37,20 @@ def AptInstall(vm):
 
 _SUCCEED_RESP = 'succeed'
 _FAILURE_INVALID_RESPONSE = 'invalid_response'
+
+
+@dataclasses.dataclass(frozen=True)
+class PollingResponse:
+  """Response from an HTTP poll.
+
+  Attributes:
+    success: Whether the poll was successful (200 & matching expected response)
+    response: The actual response string
+    latency: The latency of the request
+  """
+  success: bool
+  response: str
+  latency: float
 
 
 class HttpPoller(object):
@@ -82,7 +97,7 @@ class HttpPoller(object):
         or a regex.
 
     Returns:
-      Tuple of (boolean, string) and float. Indicates if endpoint is reachable
+      PollingResponse object, which indicates if endpoint is reachable
         and response is expected as well as the actual response
         and latency of response.
     """
@@ -100,7 +115,5 @@ class HttpPoller(object):
       logging.debug(
           'Unexpected response or unable to reach endpoint %s, resp: %s',
           endpoint, resp)
-    return (resp == _SUCCEED_RESP, ret), latency
-
-
-
+    return PollingResponse(
+        success=resp == _SUCCEED_RESP, response=ret, latency=latency)
