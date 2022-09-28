@@ -14,6 +14,7 @@
 """Runs nvidia-smi power.draw on VMs."""
 
 import csv
+import datetime
 import os
 from typing import Any, Dict, List
 
@@ -42,13 +43,17 @@ def _NvidiaPowerResults(metadata: Dict[str, Any], output: csv.DictReader,
                         samples: List[sample.Sample]) -> None:
   for line in output:
     gpu_metadata = line.copy()
+    timestamp = datetime.datetime.timestamp(
+        datetime.datetime.strptime(gpu_metadata[' timestamp'],
+                                   ' %Y/%m/%d %H:%M:%S.%f'))
     gpu_metadata.update(metadata)
     samples.append(
         sample.Sample(
             metric='power',
             value=float(line.get(' power.draw [W]').split()[0]),
             unit='watts',
-            metadata=gpu_metadata))
+            metadata=gpu_metadata,
+            timestamp=timestamp))
 
 
 class _NvidiaPowerCollector(base_collector.BaseCollector):
@@ -64,7 +69,7 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
   def _CollectorRunCommand(self, vm: virtual_machine.BaseVirtualMachine,
                            collector_file: str) -> str:
     """See base class."""
-    return f'nvidia-smi --query-gpu=index,power.draw --format=csv -l {self.interval} > {collector_file} 2>&1 & echo $!'
+    return f'nvidia-smi --query-gpu=index,power.draw,timestamp --format=csv -l {self.interval} > {collector_file} 2>&1 & echo $!'
 
   def Analyze(self, unused_sender, benchmark_spec: BenchmarkSpec,
               samples: List[sample.Sample]) -> None:
