@@ -1,21 +1,21 @@
 # Aerospike database developer configuration file.
 
-# This stanza must come first.
 service {
-  run-as-daemon false
-  paxos-single-replica-limit 1 # Number of nodes where the replica count is automatically reduced to 1.
+  run-as-daemon false # To work with gdb, and make console logging visible.
+
   service-threads {{ service_threads }}
-  # Note:  The number of concurrent connections to the database is limited by "proto-fd-max",
-  #         which is in turn limited by the system's maximum number of open file descriptors.
-  #         Read "man limits.conf" for how to set the system's "nofile" limit.
+
+  # The number of concurrent connections to the database is limited by
+  # proto-fd-max, and by the system's maximum number of open file descriptors.
+  # See "man limits.conf" for how to set the system's "nofile" limit.
   proto-fd-max 1024
+
   work-directory run/work
   pidfile run/asd.pid
 }
 
 mod-lua {
-  user-path   run/work/usr/udf/lua
-  system-path run/work/sys/udf/lua
+  user-path run/work/usr/udf/lua
 }
 
 logging {
@@ -32,27 +32,30 @@ logging {
 network {
   service {
     address any
-    port 3000
+    port {{ port_prefix }}000
   }
 
   heartbeat {
-    mode mesh                   # Send heartbeats using Mesh (Unicast) protocol
+    mode mesh
+    port {{ port_prefix }}002
 
-    port 3002                   # port on which this node is listening to
+    # To use unicast-mesh heartbeats, remove the 3 lines above, and see
+    # aerospike_mesh.conf for alternative.
 
-{%- for address in seed_addresses|default([], true) %}
-    mesh-seed-address-port {{ address }}  3002 # IP address for seed node in the cluster
-{% endfor %}
+    {%- for address in seed_addresses|default([], true) %}
+        mesh-seed-address-port {{ address }}  {{ port_prefix }}002 # IP address for seed node in the cluster
+    {% endfor %}
+
     interval 150
     timeout 10
   }
 
   fabric {
-    port 3001
+    port {{ port_prefix }}001
   }
 
   info {
-    port 3003
+    port {{ port_prefix }}003
   }
 }
 
@@ -79,7 +82,6 @@ namespace test {
 namespace bar {
   replication-factor 2
   memory-size 4G
-  default-ttl 0 # never expire/evict.
 
   storage-engine memory
 

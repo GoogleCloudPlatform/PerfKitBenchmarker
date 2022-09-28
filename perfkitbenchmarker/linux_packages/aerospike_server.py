@@ -25,11 +25,8 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/aerospike/aerospike-server.git'
-GIT_TAG = '4.9.0.31'
+GIT_TAG = '6.0.0.2'
 AEROSPIKE_DIR = '%s/aerospike-server' % linux_packages.INSTALL_DIR
-AEROSPIKE_CONF_PATH = '%s/as/etc/aerospike_dev.conf' % AEROSPIKE_DIR
-
-AEROSPIKE_DEFAULT_TELNET_PORT = 3003
 
 MEMORY = 'memory'
 DISK = 'disk'
@@ -44,19 +41,33 @@ flags.DEFINE_integer('aerospike_vms', 1,
                      'Number of vms (nodes) for aerospike server.')
 
 
+def _GetAerospikeDir(idx=None):
+  if idx is None:
+    return f'{linux_packages.INSTALL_DIR}/aerospike-server'
+  else:
+    return f'{linux_packages.INSTALL_DIR}/{idx}/aerospike-server'
+
+
+def _GetAerospikeConfig(idx=None):
+  return f'{_GetAerospikeDir(idx)}/as/etc/aerospike_dev.conf'
+
+
 def _Install(vm):
   """Installs the Aerospike server on the VM."""
   vm.Install('build_tools')
   vm.Install('lua5_1')
   vm.Install('openssl')
-  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, AEROSPIKE_DIR))
+  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, _GetAerospikeDir()))
   # Comment out Werror flag and compile. With newer compilers gcc7xx,
   # compilation is broken due to warnings.
   vm.RemoteCommand(
       'cd {0} && git checkout {1} && git submodule update --init '
       '&& sed -i "s/COMMON_CFLAGS += -Werror/# $COMMON_CFLAGS += -Werror/" '
       '{0}/make_in/Makefile.in '
-      '&& make'.format(AEROSPIKE_DIR, GIT_TAG))
+      '&& make'.format(_GetAerospikeDir(), GIT_TAG))
+  for idx in range(FLAGS.aerospike_instances):
+    vm.RemoteCommand(f'mkdir {linux_packages.INSTALL_DIR}/{idx}; '
+                     f'cp -rf {_GetAerospikeDir()} {_GetAerospikeDir(idx)}')
 
 
 def YumInstall(vm):
@@ -72,7 +83,7 @@ def AptInstall(vm):
 
 @vm_util.Retry(poll_interval=5, timeout=300,
                retryable_exceptions=(errors.Resource.RetryableCreationError))
-def _WaitForServerUp(server):
+def _WaitForServerUp(server, idx=None):
   """Block until the Aerospike server is up and responsive.
 
   Will timeout after 5 minutes, and raise an exception. Before the timeout
@@ -86,6 +97,7 @@ def _WaitForServerUp(server):
 
   Args:
     server: VirtualMachine Aerospike has been installed on.
+    idx: aerospike process index.
 
   Raises:
     errors.Resource.RetryableCreationError when response is not 'ok' or if there
@@ -93,9 +105,9 @@ def _WaitForServerUp(server):
       check command.
   """
   address = server.internal_ip
-  port = AEROSPIKE_DEFAULT_TELNET_PORT
+  port = f'{idx + 3}003'
 
-  logging.info("Trying to connect to Aerospike at %s:%s" % (address, port))
+  logging.info('Trying to connect to Aerospike at %s:%s', server, port)
   try:
     def _NetcatPrefix():
       _, stderr = server.RemoteCommand('nc -h', ignore_failure=True)
@@ -108,11 +120,11 @@ def _WaitForServerUp(server):
         '(echo -e "status\n" ; sleep 1)| %s %s %s' % (
             _NetcatPrefix(), address, port))
     if out.startswith('ok'):
-      logging.info("Aerospike server status is OK. Server up and running.")
+      logging.info('Aerospike server status is OK. Server up and running.')
       return
   except errors.VirtualMachine.RemoteCommandError as e:
     raise errors.Resource.RetryableCreationError(
-        "Aerospike server not up yet: %s." % str(e))
+        'Aerospike server not up yet: %s.' % str(e))
   else:
     raise errors.Resource.RetryableCreationError(
         "Aerospike server not up yet. Expected 'ok' but got '%s'." % out)
@@ -130,32 +142,71 @@ def ConfigureAndStart(server, seed_node_ips=None):
   seed_node_ips = seed_node_ips or [server.internal_ip]
 
   if FLAGS.aerospike_storage_type == DISK:
+    for scratch_disk in server.scratch_disks:
+      if scratch_disk.mount_point:
+        server.RemoteCommand(
+            f'sudo umount {scratch_disk.mount_point}', ignore_failure=True)
+
     devices = [scratch_disk.GetDevicePath()
                for scratch_disk in server.scratch_disks]
+
+    # https://docs.aerospike.com/server/operations/plan/ssd/ssd_init
+    # Expect to exit 1 with `No space left on device` error.
+    def _WipeDevice(device):
+      server.RobustRemoteCommand(
+          f'sudo dd if=/dev/zero of={device} bs=1M', ignore_failure=True)
+
+    vm_util.RunThreaded(_WipeDevice, devices)
+
+    @vm_util.Retry(
+        poll_interval=5,
+        timeout=300,
+        retryable_exceptions=(errors.Resource.RetryableCreationError))
+    def _ZeroizeHeader(device):
+      try:
+        server.RemoteCommand(f'sudo sudo blkdiscard -z --length 8MiB {device}')
+      except errors.Resource.RetryableCreationError as e:
+        raise errors.VirtualMachine.RemoteCommandError(
+            f'Device {device} header not zeroized: {e}.')
+
+    for device in devices:
+      _ZeroizeHeader(device)
+
   else:
     devices = []
 
-  server.RenderTemplate(
-      data.ResourcePath('aerospike.conf.j2'), AEROSPIKE_CONF_PATH,
-      {'devices': devices,
-       'memory_size': int(server.total_memory_kb * 0.8),
-       'seed_addresses': seed_node_ips,
-       'service_threads': FLAGS.aerospike_service_threads,
-       'replication_factor': FLAGS.aerospike_replication_factor})
+  for idx in range(FLAGS.aerospike_instances):
+    if devices:
+      num_device_per_instance = int(len(devices) / FLAGS.aerospike_instances)
+      current_devices = devices[idx * num_device_per_instance:(idx + 1) *
+                                num_device_per_instance]
+    server.RenderTemplate(
+        data.ResourcePath('aerospike.conf.j2'), _GetAerospikeConfig(idx), {
+            'devices':
+                current_devices,
+            'port_prefix':
+                3 + idx,
+            'memory_size':
+                int(server.total_memory_kb * 0.8 / FLAGS.aerospike_instances),
+            'seed_addresses':
+                seed_node_ips,
+            'service_threads':
+                FLAGS.aerospike_service_threads,
+            'replication_factor':
+                FLAGS.aerospike_replication_factor
+        })
 
-  for scratch_disk in server.scratch_disks:
-    if scratch_disk.mount_point:
-      server.RemoteCommand('sudo umount %s' % scratch_disk.mount_point)
-
-  server.RemoteCommand('cd %s && make init' % AEROSPIKE_DIR)
-  # Persist the nohup command past the ssh session
-  # "sh -c 'cd /whereever; nohup ./whatever > /dev/null 2>&1 &'"
-  cmd = (f'sh -c \'cd {AEROSPIKE_DIR} && nohup sudo make start > '
-         f'~/aerospike.log 2>&1 &\'')
-  server.RemoteCommand(cmd)
-  _WaitForServerUp(server)
-  logging.info('Aerospike server configured and started.')
+    server.RemoteCommand(f'cd {_GetAerospikeDir(idx)} && make init')
+    # Persist the nohup command past the ssh session
+    # "sh -c 'cd /whereever; nohup ./whatever > /dev/null 2>&1 &'"
+    log_file = f'~/aerospike-{server.name}-{idx}.log'
+    cmd = (f'sh -c \'cd {_GetAerospikeDir(idx)} && nohup sudo make start > '
+           f'{log_file} 2>&1 &\'')
+    server.RemoteCommand(cmd)
+    server.PullFile(vm_util.GetTempDir(), log_file)
+    _WaitForServerUp(server, idx)
+    logging.info('Aerospike server configured and started.')
 
 
 def Uninstall(vm):
-  vm.RemoteCommand('rm -rf %s' % AEROSPIKE_DIR)
+  del vm
