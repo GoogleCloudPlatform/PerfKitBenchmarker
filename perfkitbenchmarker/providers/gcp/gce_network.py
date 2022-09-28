@@ -821,7 +821,7 @@ class GceNetwork(network.BaseNetwork):
             vpn_gateway_name, name, util.GetRegionFromZone(network_spec.zone),
             network_spec.cidr, self.project)
 
-    # Add GCE Placement Group
+    # Placement Group
     no_placement_group = (
         not FLAGS.placement_group_style or
         FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)

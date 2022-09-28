@@ -57,6 +57,9 @@ FLAGS = flags.FLAGS
 REGION = 'region'
 ZONE = 'zone'
 
+NON_PLACEMENT_GROUP_PREFIXES = frozenset(
+    ['t2', 'm3', 't3', 't3a', 't4g', 'vt1'])
+
 
 class AwsFirewall(network.BaseFirewall):
   """An object representing the AWS Firewall."""
@@ -710,8 +713,9 @@ class _AwsRegionalNetwork(network.BaseNetwork):
 class AwsNetworkSpec(network.BaseNetworkSpec):
   """Configuration for creating an AWS network."""
 
-  def __init__(self, zone, vpc_id=None, subnet_id=None):
+  def __init__(self, zone, vpc_id=None, subnet_id=None, machine_type=None):
     super(AwsNetworkSpec, self).__init__(zone)
+    self.machine_type = machine_type
     if vpc_id or subnet_id:
       logging.info('Confirming vpc (%s) and subnet (%s) selections', vpc_id,
                    subnet_id)
@@ -799,6 +803,12 @@ def _get_default_subnet_id(zone: str) -> str:
   return json.loads(stdout)['Subnet']['SubnetId']
 
 
+def _is_placement_group_compatible(machine_type):
+  """Returns True if VMs of 'machine_type' can be put in a placement group."""
+  prefix = machine_type.split('.')[0]
+  return prefix not in NON_PLACEMENT_GROUP_PREFIXES
+
+
 class AwsNetwork(network.BaseNetwork):
   """Object representing an AWS Network.
 
@@ -826,9 +836,26 @@ class AwsNetwork(network.BaseNetwork):
         self.region, spec.vpc_id)
     self.subnet = None
     self.vpc_peering = None
-    if (FLAGS.placement_group_style ==
-        placement_group.PLACEMENT_GROUP_NONE):
+
+    # Placement Group
+    no_placement_group = (
+        not FLAGS.placement_group_style or
+        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
+    if no_placement_group:
       self.placement_group = None
+    elif (FLAGS.placement_group_style in [
+        placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED,
+        placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED
+    ] and not _is_placement_group_compatible(spec.machine_type)):
+      logging.warning(
+          'machine type %s does not support placement groups. '
+          'Placement group style set to none.', spec.machine_type)
+      self.placement_group = None
+    elif not _is_placement_group_compatible(spec.machine_type):
+      raise errors.Benchmarks.UnsupportedConfigError(
+          f'machine type {spec.machine_type} does not support '
+          f'placement groups. Use placement group style cluster_if_supported '
+          f'or spread_if_supported.')
     else:
       placement_group_spec = aws_placement_group.AwsPlacementGroupSpec(
           'AwsPlacementGroupSpec', flag_values=FLAGS, zone=spec.zone)
@@ -852,7 +879,7 @@ class AwsNetwork(network.BaseNetwork):
     else:
       vpc_id = _AWS_VPC.value
       subnet_id = _AWS_SUBNET.value
-    return AwsNetworkSpec(vm.zone, vpc_id, subnet_id)
+    return AwsNetworkSpec(vm.zone, vpc_id, subnet_id, vm.machine_type)
 
   def Create(self):
     """Creates the network."""

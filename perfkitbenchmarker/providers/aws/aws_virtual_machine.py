@@ -51,8 +51,6 @@ FLAGS = flags.FLAGS
 HVM = 'hvm'
 PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
-NON_PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['t2', 'm3', 't3', 't3a', 't4g', 'vt1'])
 DRIVE_START_LETTER = 'b'
 TERMINATED = 'terminated'
 SHUTTING_DOWN = 'shutting-down'
@@ -268,12 +266,6 @@ def GetBlockDeviceMap(vm):
 def BuildDiskSpecId(spec_index, strip_index):
   """Generates an unique string to represent a disk_spec position."""
   return f'{spec_index}_{strip_index}'
-
-
-def IsPlacementGroupCompatible(machine_type):
-  """Returns True if VMs of 'machine_type' can be put in a placement group."""
-  prefix = machine_type.split('.')[0]
-  return prefix not in NON_PLACEMENT_GROUP_PREFIXES
 
 
 def GetArmArchitecture(machine_type):
@@ -535,8 +527,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.max_local_disks = aws_disk.NUM_LOCAL_VOLUMES[self.machine_type]
     self.user_data = None
     self.network = aws_network.AwsNetwork.GetNetwork(self)
-    self.placement_group = getattr(vm_spec, 'placement_group',
-                                   self.network.placement_group)
+    self.placement_group = self.network.placement_group
     self.firewall = aws_network.AwsFirewall.GetFirewall()
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.num_vms_per_host = vm_spec.num_vms_per_host
@@ -828,12 +819,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       placement.append('Tenancy=host,HostId=%s' % self.host.id)
       num_hosts = len(self.host_list)
     elif self.placement_group:
-      if IsPlacementGroupCompatible(self.machine_type):
-        placement.append('GroupName=%s' % self.placement_group.name)
-      else:
-        logging.warning(
-            'VM not placed in Placement Group. VM Type %s not supported',
-            self.machine_type)
+      placement.append('GroupName=%s' % self.placement_group.name)
+
     placement = ','.join(placement)
     block_device_map = GetBlockDeviceMap(self)
     if not self.aws_tags:

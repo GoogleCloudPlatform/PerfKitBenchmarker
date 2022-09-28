@@ -20,9 +20,11 @@ import json
 import logging
 
 from absl import flags
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import spark_service
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
@@ -112,9 +114,9 @@ class AwsEMR(spark_service.BaseSparkService):
     if (self.spec.static_cluster_id is None and
         (worker_machine_type[0:2] in NEEDS_SUBNET or
          leader_machine_type[0:2] in NEEDS_SUBNET)):
-      # GetNetwork is supposed to take a VM, but all it uses
-      # from the VM is the zone attribute, which self has.
-      self.network = aws_network.AwsNetwork.GetNetwork(self)
+      vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
+          self.spec.master_group.vm_spec)
+      self.network = aws_network.AwsNetwork.GetNetwork(vm_config)
     else:
       self.network = None
     self.bucket_to_delete = None
