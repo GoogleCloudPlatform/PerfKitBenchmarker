@@ -502,8 +502,15 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
         key = f.read()
         self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
 
-    # software-properties-common is needed for add-apt-repository
-    self.InstallPackages('software-properties-common')
+    # Ubuntu docker images are based on Minimal Ubuntu
+    # https://wiki.ubuntu.com/Minimal
+    # The VM images PKB uses are based on a full Ubuntu Server flavor and have a
+    # bunch of useful utilities
+    # (curl, net-tools, software-properties-common). Install here so that we
+    # have similar base packages. This is essentially the same as running
+    # unminimize.
+    # TODO(pclay): Revisit if Debian images are added.
+    self.InstallPackages('ubuntu-server')
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a preprovisioned data file.
