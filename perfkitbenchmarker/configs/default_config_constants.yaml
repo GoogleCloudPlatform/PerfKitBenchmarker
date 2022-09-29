@@ -79,6 +79,8 @@ default_dual_core: &default_dual_core
     machine_type: cx2-4x8
     zone: us-south-1
     image: null
+  Kubernetes:
+    image: null
 
 # TODO(user): update the disk types below as more providers are
 # updated for the disk types refactor.
