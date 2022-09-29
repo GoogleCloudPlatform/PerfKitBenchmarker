@@ -24,14 +24,14 @@ As other cloud providers deliver a managed MySQL service, we will add it here.
 import logging
 import re
 import time
+from typing import List
 
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import publisher
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
-import six
 
 
 FLAGS = flags.FLAGS
@@ -169,7 +169,39 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def _ParseSysbenchOutput(sysbench_output):
+def _ParseSysbenchTransactions(sysbench_output,
+                               metadata) -> List[sample.Sample]:
+  """Parse sysbench transaction results."""
+  transactions_per_second = regex_util.ExtractFloat(
+      r'transactions: *[0-9]* \(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output)
+  queries_per_second = regex_util.ExtractFloat(
+      r'queries: *[0-9]* \(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output)
+  return [
+      sample.Sample('tps', transactions_per_second, 'tps', metadata),
+      sample.Sample('qps', queries_per_second, 'qps', metadata),
+  ]
+
+
+def _ParseSysbenchLatency(sysbench_output, metadata) -> List[sample.Sample]:
+  """Parse sysbench latency results."""
+  min_latency = regex_util.ExtractFloat('min: *([0-9]*[.]?[0-9]+)',
+                                        sysbench_output)
+
+  average_latency = regex_util.ExtractFloat('avg: *([0-9]*[.]?[0-9]+)',
+                                            sysbench_output)
+  max_latency = regex_util.ExtractFloat('max: *([0-9]*[.]?[0-9]+)',
+                                        sysbench_output)
+  total_latency = regex_util.ExtractFloat('sum: *([0-9]*[.]?[0-9]+)',
+                                          sysbench_output)
+  return [
+      sample.Sample('min_latency', min_latency, 'ms', metadata),
+      sample.Sample('average_latency', average_latency, 'ms', metadata),
+      sample.Sample('max_latency', max_latency, 'ms', metadata),
+      sample.Sample('total_latency', total_latency, 'ms', metadata)
+  ]
+
+
+def _ParseSysbenchTimeSeries(sysbench_output, metadata) -> List[sample.Sample]:
   """Parses sysbench output.
 
   Extract relevant TPS and latency numbers, and populate the final result
@@ -180,16 +212,16 @@ def _ParseSysbenchOutput(sysbench_output):
 
   Args:
     sysbench_output: The output from sysbench.
+    metadata: Metadata of the benchmark
+
   Returns:
-    Three arrays, the tps, latency and qps numbers.
+    Three arrays, the tps, latency and qps numbers and average latency.
 
   """
   tps_numbers = []
   latency_numbers = []
   qps_numbers = []
-
-  sysbench_output_io = six.StringIO(sysbench_output)
-  for line in sysbench_output_io:
+  for line in sysbench_output.split('\n'):
     # parse a line like (it's one line - broken up in the comment to fit):
     # [ 6s ] thds: 16 tps: 650.51 qps: 12938.26 (r/w/o: 9046.18/2592.05/1300.03)
     # lat (ms,99%): 40.37 err/s: 0.00 reconn/s: 0.00
@@ -209,46 +241,19 @@ def _ParseSysbenchOutput(sysbench_output):
       if line.startswith('SQL statistics:'):
         break
 
-  return tps_numbers, latency_numbers, qps_numbers
-
-
-def AddMetricsForSysbenchOutput(
-    sysbench_output, results, metadata, metric_prefix=''):
-  """Parses sysbench output.
-
-  Extract relevant TPS and latency numbers, and populate the final result
-  collection with these information.
-
-  Specifically, we are interested in tps and latency numbers reported by each
-  reporting interval.
-
-  Args:
-    sysbench_output: The output from sysbench.
-    results: The dictionary to store results based on sysbench output.
-    metadata: The metadata to be passed along to the Samples class.
-    metric_prefix:  An optional prefix to append to each metric generated.
-  """
-  tps_numbers, latency_numbers, qps_numbers = (
-      _ParseSysbenchOutput(sysbench_output))
-
   tps_metadata = metadata.copy()
-  tps_metadata.update({metric_prefix + 'tps': tps_numbers})
-  tps_sample = sample.Sample(metric_prefix + 'tps_array', -1,
-                             'tps', tps_metadata)
+  tps_metadata.update({'tps': tps_numbers})
+  tps_sample = sample.Sample('tps_array', -1, 'tps', tps_metadata)
 
   latency_metadata = metadata.copy()
-  latency_metadata.update({metric_prefix + 'latency': latency_numbers})
-  latency_sample = sample.Sample(metric_prefix + 'latency_array', -1, 'ms',
-                                 latency_metadata)
+  latency_metadata.update({'latency': latency_numbers})
+  latency_sample = sample.Sample('latency_array', -1, 'ms', latency_metadata)
 
   qps_metadata = metadata.copy()
-  qps_metadata.update({metric_prefix + 'qps': qps_numbers})
-  qps_sample = sample.Sample(metric_prefix + 'qps_array', -1, 'qps',
-                             qps_metadata)
+  qps_metadata.update({'qps': qps_numbers})
+  qps_sample = sample.Sample('qps_array', -1, 'qps', qps_metadata)
 
-  results.append(tps_sample)
-  results.append(latency_sample)
-  results.append(qps_sample)
+  return [tps_sample, latency_sample, qps_sample]
 
 
 # TODO(chunla) Move this to engine specific module
@@ -290,7 +295,6 @@ def _GetCommonSysbenchOptions(benchmark_spec):
         '--db-driver=mysql'
     ]
   elif engine in [sql_engine_utils.POSTGRES, sql_engine_utils.SPANNER_POSTGRES]:
-    # TODO(chunla): might need to add pgsql-db
     result += [
         '--db-driver=pgsql',
     ]
@@ -369,8 +373,6 @@ def _RunSysbench(
   Returns:
     Results: A list of results of this run.
   """
-  results = []
-
   # Now run the sysbench OLTP test and parse the results.
   # First step is to run the test long enough to cover the warmup period
   # as requested by the caller. Second step is the 'real' run where the results
@@ -388,9 +390,9 @@ def _RunSysbench(
                                     sysbench_thread_count)
 
   logging.info('\n Parsing Sysbench Results...\n')
-  AddMetricsForSysbenchOutput(stdout, results, metadata)
 
-  return results
+  return _ParseSysbenchTimeSeries(stdout, metadata) + _ParseSysbenchLatency(
+      stdout, metadata) + _ParseSysbenchTransactions(stdout, metadata)
 
 
 def _GetDatabaseSize(benchmark_spec):
@@ -559,8 +561,7 @@ def Prepare(benchmark_spec):
   # Setup common test tools required on the client VM
   client_vm.Install('sysbench')
 
-  prepare_results = _PrepareSysbench(client_vm, benchmark_spec)
-  print(prepare_results)
+  _PrepareSysbench(client_vm, benchmark_spec)
 
 
 def Run(benchmark_spec):
@@ -575,6 +576,7 @@ def Run(benchmark_spec):
   """
   logging.info('Start benchmarking, '
                'Cloud Provider is %s.', FLAGS.cloud)
+  results = []
   client_vm = benchmark_spec.vms[0]
   db = benchmark_spec.relational_db
 
@@ -583,13 +585,8 @@ def Run(benchmark_spec):
     metadata['sysbench_thread_count'] = thread_count
     # The run phase is common across providers. The VMs[0] object contains all
     # information and states necessary to carry out the run.
-    run_results = _RunSysbench(client_vm, metadata, benchmark_spec,
-                               thread_count)
-    print(run_results)
-    publisher.PublishRunStageSamples(benchmark_spec, run_results)
-
-  # all results have already been published
-  return []
+    results += _RunSysbench(client_vm, metadata, benchmark_spec, thread_count)
+  return results
 
 
 def Cleanup(benchmark_spec):
