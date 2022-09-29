@@ -1518,7 +1518,7 @@ class Rhel7BasedAwsVirtualMachine(AwsVirtualMachine,
   """Class with configuration for AWS RHEL 7 virtual machines."""
   # Documentation on finding RHEL images:
   # https://access.redhat.com/articles/3692431
-  IMAGE_NAME_FILTER = 'RHEL-7*_GA*'
+  IMAGE_NAME_FILTER = 'RHEL-7*'
   IMAGE_OWNER = RHEL_IMAGE_PROJECT
 
 
