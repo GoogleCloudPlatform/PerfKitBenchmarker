@@ -98,6 +98,17 @@ def GetConfig(user_config):
       # Didn't know max number of local disks, decide later.
       config['vm_groups']['workers']['disk_count'] = (
           config['vm_groups']['workers']['disk_count'] or None)
+      if FLAGS.cloud == 'GCP':
+        config['vm_groups']['workers']['vm_spec']['GCP'][
+            'num_local_ssds'] = FLAGS.gce_num_local_ssds or FLAGS.server_gce_num_local_ssds
+        FLAGS['gce_num_local_ssds'].present = False
+        FLAGS.gce_num_local_ssds = 0
+        if FLAGS['server_gce_ssd_interface'].present:
+          config['vm_groups']['workers']['vm_spec']['GCP'][
+              'ssd_interface'] = FLAGS.server_gce_ssd_interface
+          FLAGS['gce_ssd_interface'].present = False
+          FLAGS.gce_ssd_interface = FLAGS.server_gce_ssd_interface
+        config['vm_groups']['clients']['vm_spec']['GCP']['num_local_ssds'] = 0
     else:
       config['vm_groups']['workers']['disk_count'] = (
           config['vm_groups']['workers']['disk_count'] or 1)
