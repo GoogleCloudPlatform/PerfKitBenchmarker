@@ -528,30 +528,47 @@ class AzureNetwork(network.BaseNetwork):
     self.region = util.GetRegionFromZone(self.zone)
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
 
-    placement_group_spec = azure_placement_group.AzurePlacementGroupSpec(
-        'AzurePlacementGroupSpec',
-        flag_values=FLAGS,
-        zone=self.zone,
-        resource_group=self.resource_group.name)
-
     is_dedicated_host = bool(FLAGS.dedicated_hosts)
     in_availability_zone = bool(self.availability_zone)
-    cluster_placement_group = (
-        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_CLUSTER)
-    spread_placement_group = (
-        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_SPREAD)
 
-    if cluster_placement_group:
-      self.placement_group = azure_placement_group.AzureProximityGroup(
-          placement_group_spec)
-    # With dedicated hosting and/or an availability zone, an availability set
-    # cannot be created
-    elif spread_placement_group and not (is_dedicated_host or
-                                         in_availability_zone):
-      self.placement_group = azure_placement_group.AzureAvailSet(
-          placement_group_spec)
-    else:
+    # Placement Group
+    no_placement_group = (
+        not FLAGS.placement_group_style or
+        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
+    has_optional_pg = FLAGS.placement_group_style in [
+        placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED,
+        placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED]
+    if no_placement_group:
       self.placement_group = None
+    elif has_optional_pg and len(set(FLAGS.zone)) > 1:
+      logging.warning(
+          'inter-zone/inter-region tests do not support placement groups. '
+          'Placement group style set to none.'
+      )
+      self.placement_group = None
+    elif len(set(FLAGS.zone)) > 1:
+      raise errors.Benchmarks.UnsupportedConfigError(
+          'inter-zone/inter-region tests do not support placement groups. '
+          'Use placement group style cluster_if_supported or '
+          'spread_if_supported.')
+    else:
+      placement_group_spec = azure_placement_group.AzurePlacementGroupSpec(
+          'AzurePlacementGroupSpec',
+          flag_values=FLAGS,
+          zone=self.zone,
+          resource_group=self.resource_group.name)
+
+      if FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_CLUSTER:
+        self.placement_group = azure_placement_group.AzureProximityGroup(
+            placement_group_spec)
+      # With dedicated hosting and/or an availability zone, an availability set
+      # cannot be created
+      elif FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_SPREAD and not (
+          is_dedicated_host or in_availability_zone):
+        self.placement_group = azure_placement_group.AzureAvailSet(
+            placement_group_spec)
+      else:
+        self.placement_group = None
 
     # Storage account names can't include separator characters :(.
     storage_account_prefix = 'pkb%s' % FLAGS.run_uri

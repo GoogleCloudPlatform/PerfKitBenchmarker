@@ -841,21 +841,33 @@ class AwsNetwork(network.BaseNetwork):
     no_placement_group = (
         not FLAGS.placement_group_style or
         FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
+    has_optional_pg = FLAGS.placement_group_style in [
+        placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED,
+        placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED]
     if no_placement_group:
       self.placement_group = None
-    elif (FLAGS.placement_group_style in [
-        placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED,
-        placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED
-    ] and not _is_placement_group_compatible(spec.machine_type)):
+    elif has_optional_pg and not _is_placement_group_compatible(
+        spec.machine_type):
       logging.warning(
           'machine type %s does not support placement groups. '
           'Placement group style set to none.', spec.machine_type)
+      self.placement_group = None
+    elif has_optional_pg and len(set(FLAGS.zone)) > 1:
+      logging.warning(
+          'inter-zone/inter-region tests do not support placement groups. '
+          'Placement group style set to none.'
+      )
       self.placement_group = None
     elif not _is_placement_group_compatible(spec.machine_type):
       raise errors.Benchmarks.UnsupportedConfigError(
           f'machine type {spec.machine_type} does not support '
           f'placement groups. Use placement group style cluster_if_supported '
           f'or spread_if_supported.')
+    elif len(set(FLAGS.zone)) > 1:
+      raise errors.Benchmarks.UnsupportedConfigError(
+          'inter-zone/inter-region tests do not support placement groups. '
+          'Use placement group style cluster_if_supported or '
+          'spread_if_supported.')
     else:
       placement_group_spec = aws_placement_group.AwsPlacementGroupSpec(
           'AwsPlacementGroupSpec', flag_values=FLAGS, zone=spec.zone)
