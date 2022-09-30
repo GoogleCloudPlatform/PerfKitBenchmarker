@@ -173,9 +173,10 @@ def _ParseSysbenchTransactions(sysbench_output,
                                metadata) -> List[sample.Sample]:
   """Parse sysbench transaction results."""
   transactions_per_second = regex_util.ExtractFloat(
-      r'transactions: *[0-9]* \(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output)
+      r'transactions: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)',
+      sysbench_output)
   queries_per_second = regex_util.ExtractFloat(
-      r'queries: *[0-9]* \(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output)
+      r'queries: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output)
   return [
       sample.Sample('tps', transactions_per_second, 'tps', metadata),
       sample.Sample('qps', queries_per_second, 'qps', metadata),
