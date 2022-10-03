@@ -128,11 +128,11 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
     """
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['cloud_spanner_config'].present:
-      config_values['config'] = flag_values.cloud_spanner_config
+      config_values['spanner_config'] = flag_values.cloud_spanner_config
     if flag_values['cloud_spanner_nodes'].present:
-      config_values['nodes'] = flag_values.cloud_spanner_nodes
+      config_values['spanner_nodes'] = flag_values.cloud_spanner_nodes
     if flag_values['cloud_spanner_project'].present:
-      config_values['project'] = flag_values.cloud_spanner_project
+      config_values['spanner_project'] = flag_values.cloud_spanner_project
 
 
 class GcpSpannerInstance(relational_db.BaseRelationalDb):

@@ -36,6 +36,17 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.run_uri = 'test_uri'
     self.addCleanup(flagsaver.restore_flag_values, saved_flag_values)
 
+  def testFlagOverrides(self):
+    FLAGS['cloud_spanner_config'].parse('regional-us-central1')
+    FLAGS['cloud_spanner_nodes'].parse(5)
+    FLAGS['cloud_spanner_project'].parse('test_project')
+
+    test_instance = GetTestSpannerInstance()
+
+    self.assertEqual(test_instance.nodes, 5)
+    self.assertEqual(test_instance._config, 'regional-us-central1')
+    self.assertEqual(test_instance.project, 'test_project')
+
   def testSetNodes(self):
     test_instance = GetTestSpannerInstance()
     # Don't actually issue a command.
