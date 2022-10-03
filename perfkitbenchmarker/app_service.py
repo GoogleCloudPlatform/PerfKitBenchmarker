@@ -1,5 +1,6 @@
 """Module containing class for BaseAppService and BaseAppServiceSpec."""
 from collections.abc import MutableMapping
+import logging
 import threading
 import time
 from typing import Any, Dict, List, Optional, Type, TypeVar
@@ -8,9 +9,11 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.linux_packages import http_poller
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('appservice', None, 'Type of app service. e.g. AppEngine')
@@ -86,6 +89,7 @@ class BaseAppServiceSpec(spec.BaseSpec):
     })
     return result
 
+
 AppServiceChild = TypeVar('AppServiceChild', bound='BaseAppService')
 
 
@@ -112,6 +116,9 @@ class BaseAppService(resource.BaseResource):
     backend: Amount of memory allocated.
     builder: A BaseAppBuilder matching the specified runtime & app type.
     samples: Samples with lifecycle metrics (e.g. create time) recorded.
+    endpoint: An HTTP(s) endpoint the service can be accessed at.
+    poller: An HttpPoller for querying the endpoint.
+    vm: The vm which can be used to call the app service.
   """
 
   RESOURCE_TYPE: str = 'BaseAppService'
@@ -131,6 +138,9 @@ class BaseAppService(resource.BaseResource):
     self.region: str = base_app_service_spec.appservice_region
     self.backend: str = base_app_service_spec.appservice_backend
     self.builder: Any = None
+    self.endpoint: Optional[str] = None
+    self.poller: http_poller.HttpPoller = http_poller.HttpPoller()
+    self.vm: virtual_machine.BaseVirtualMachine
     # update metadata
     self.metadata.update({
         'backend': self.backend,
@@ -175,18 +185,41 @@ class BaseAppService(resource.BaseResource):
                       self.update_ready_time - self.update_start_time,
                       'seconds', {}))
 
-  def Invoke(self, args: Any = None):
+  def Invoke(self, args: Any = None) -> http_poller.PollingResponse:
     """Invokes a deployed app instance.
 
     Args:
       args: dict. Arguments passed to app.
+
+    Returns:
+      An object containing success, response string, & latency. Latency is
+      also negative in the case of a failure.
     """
-    raise NotImplementedError()
+    return self.poller.Run(
+        self.vm,
+        self.endpoint,
+        expected_response=self.builder.GetExpectedResponse())
+
+  def _IsReady(self) -> bool:
+    """Returns true if the underlying resource is ready.
+
+    Supplying this method is optional.  Use it when a resource can exist
+    without being ready.  If the subclass does not implement
+    it then it just returns true.
+
+    Returns:
+      True if the resource was ready in time, False if the wait timed out.
+    """
+    response = self.Invoke()
+    logging.info('Polling Endpoint, success: %s, latency: %s', response.success,
+                 response.latency)
+    return response.latency > 0
 
   def _CreateDependencies(self):
-    """Builds app package."""
+    """Creates dependencies needed before _CreateResource() is called."""
     if self.builder:
       self.builder.Create()
+    self.vm.Install('http_poller')
 
   def _DeleteDependencies(self):
     """Deletes app package."""
@@ -197,6 +230,7 @@ class BaseAppService(resource.BaseResource):
     """Sets builder for AppService."""
     if builder:
       self.builder = builder
+    self.vm = self.builder.vm
 
   def GetLifeCycleMetrics(self):
     """Exports internal lifecycle metrics."""
