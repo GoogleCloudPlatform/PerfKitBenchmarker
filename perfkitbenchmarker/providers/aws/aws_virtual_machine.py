@@ -225,11 +225,7 @@ def GetBlockDeviceMap(vm):
   for spec_index, disk_spec in enumerate(vm.disk_specs):
     if not vm.DiskTypeCreatedOnVMCreation(disk_spec.disk_type):
       continue
-    if disk_spec.disk_type == disk.LOCAL:
-      if (aws_disk.NUM_LOCAL_VOLUMES[vm.machine_type] !=
-          disk_spec.num_striped_disks):
-        raise ValueError('num_striped_disks is not equal to the total '
-                         'number of local ssds on this machine.')
+
     for i in range(disk_spec.num_striped_disks):
       mapping = collections.OrderedDict()
       device_letter = aws_disk.AwsDisk.GenerateDeviceLetter(vm.name)
@@ -1263,6 +1259,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       else:
         raise errors.Benchmarks.UnsupportedConfigError(
             f'{model_number} NVME devices is not supported.')
+
+    # because local devices are assigned in a round robin manner,
+    # some local devices might already have been assigned (previous spec_index).
+    # remove local devices that have been already been assigned.
+    for _, aws_id in self.disk_identifiers_by_device.items():
+      if aws_id.path in local_devices:
+        local_devices.remove(aws_id.path)
 
     if not local_devices and not ebs_devices:
       return

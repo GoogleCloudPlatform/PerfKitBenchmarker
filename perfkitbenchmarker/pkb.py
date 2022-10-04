@@ -245,12 +245,8 @@ flags.DEFINE_integer('scratch_disk_throughput', None,
                      'Throughput (MB/s) for volumes in AWS.')
 flags.DEFINE_integer('num_striped_disks', None,
                      'The number of data disks to stripe together to form one '
-                     '"logical" data disk. This defaults to 1 '
-                     '(except with local disks), which means no striping. '
-                     'When using local disks, they default to striping '
-                     'all disks together. The striped disks will appear as '
-                     'one disk (data_disk_0) in the metadata.',
-                     lower_bound=1)
+                     '"logical" data disk. This defaults to 1, '
+                     'which means no striping. ', lower_bound=1)
 flags.DEFINE_bool('install_packages', None,
                   'Override for determining whether packages should be '
                   'installed. If this is false, no packages will be installed '

@@ -946,13 +946,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
     self._PrepareScratchDisk(scratch_disk, disk_spec)
 
-  def FindRemoteNVMEDevices(self, scratch_disk, nvme_devices):
+  def FindRemoteNVMEDevices(self, _, nvme_devices):
     """Find the paths for all remote NVME devices inside the VM."""
-    disks = scratch_disk.disks if scratch_disk.is_striped else [scratch_disk]
     local_disks = []
-    for d in disks:
-      if d.disk_type == disk.LOCAL and d.interface == NVME:
-        local_disk_name = '/dev/%s' % self.name
+    if self.ssd_interface == NVME:
+      for local_disk_count in range(self.max_local_disks):
+        name, _ = self.RemoteCommand(f'find /dev/nvme*n{local_disk_count + 1}')
+        name = name.strip().split('/')[-1]
+        local_disk_name = '/dev/%s' % name
         local_disks.append(local_disk_name)
     # filter out local nvme devices from all nvme devices
     remote_nvme_devices = [
@@ -960,8 +961,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         for device in nvme_devices
         if device['DevicePath'] not in local_disks
     ]
+    # if boot disk is nvme,
     # remove the boot disk, which is the disk with the lowest index
-    return sorted(remote_nvme_devices)[1:]
+    if gce_disk.PdDriveIsNvme(self):
+      return sorted(remote_nvme_devices)[1:]
+    else:
+      return sorted(remote_nvme_devices)
 
   def UpdateDevicePath(self, scratch_disk, remote_nvme_devices):
     """Updates the paths for all remote NVME devices inside the VM."""
