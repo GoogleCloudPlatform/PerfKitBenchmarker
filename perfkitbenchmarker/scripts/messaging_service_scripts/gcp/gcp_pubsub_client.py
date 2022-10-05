@@ -12,11 +12,10 @@ from google.api_core import retry
 from google.cloud import pubsub_v1
 from google.cloud.pubsub_v1 import types
 from google.cloud.pubsub_v1.subscriber import message as pubsub_message
-# pytype: disable=import-error
-from google.protobuf import timestamp_pb2
-# pytype: enable=import-error
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
+
+from google.protobuf import timestamp_pb2
 
 BATCH_SETTINGS_MAX_MESSAGES = 1
 BATCH_SETTINGS_MAX_BYTES = 1
