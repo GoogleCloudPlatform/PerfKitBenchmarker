@@ -20,6 +20,7 @@ at https://cloud.google.com/dataproc/
 import datetime
 import json
 import logging
+import re
 from typing import Any, Dict, Optional
 
 from absl import flags
@@ -195,6 +196,10 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
 
     if FLAGS.gcp_dataproc_image:
       cmd.flags['image'] = FLAGS.gcp_dataproc_image
+
+    # http://cloud/dataproc/docs/guides/profiling#enable_profiling
+    if FLAGS.gcloud_scopes:
+      cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
 
     if FLAGS.dpb_cluster_properties:
       cmd.flags['properties'] = ','.join(FLAGS.dpb_cluster_properties)
