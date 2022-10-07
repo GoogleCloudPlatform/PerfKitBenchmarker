@@ -88,7 +88,7 @@ class AwsDpbGlue(dpb_service.BaseDpbService):
                 classname=None,
                 pyspark_file=None,
                 query_file=None,
-                job_poll_interval=5,
+                job_poll_interval=None,
                 job_stdout_file=None,
                 job_arguments=None,
                 job_files=None,

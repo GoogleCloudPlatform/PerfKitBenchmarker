@@ -63,6 +63,12 @@ flags.DEFINE_list(
     '"type:key=value" to be passed into DPB clusters. See '
     'https://cloud.google.com/dataproc/docs/concepts/configuring-clusters/cluster-properties.'
 )
+flags.DEFINE_float(
+    'dpb_job_poll_interval_secs', 5,
+    'Poll interval to check submitted job status in seconds. Only applies for '
+    'DPB service implementations that do not support synchronous job '
+    'submissions (i.e. not Dataproc).',
+    lower_bound=0, upper_bound=120)
 flags.DEFINE_string(
     'dpb_initialization_actions', None,
     'A comma separated list of Google Cloud Storage URIs of executables to run on each node in the DPB cluster. See https://cloud.google.com/sdk/gcloud/reference/dataproc/clusters/create#--initialization-actions.'
@@ -207,8 +213,9 @@ class BaseDpbService(resource.BaseResource):
         job. Must be one of the following file formats ".py, .zip, or .egg".
       query_file: HCFS URI of file containing Spark SQL script to execute as the
         job.
-      job_poll_interval: integer saying how often to poll for job completion.
-        Not used by providers for which submit job is a synchronous operation.
+      job_poll_interval: number of seconds saying how often to poll for job
+        completion. Not used by providers for which submit job is a synchronous
+        operation.
       job_stdout_file: String giving the location of the file in which to put
         the standard out of the job.
       job_arguments: List of string arguments to pass to driver application.
@@ -229,6 +236,9 @@ class BaseDpbService(resource.BaseResource):
     pass
 
   def _WaitForJob(self, job_id, timeout, poll_interval):
+
+    if poll_interval is None:
+      poll_interval = FLAGS.dpb_job_poll_interval_secs
 
     @vm_util.Retry(
         timeout=timeout,

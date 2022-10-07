@@ -181,6 +181,8 @@
 -   Support setting --dpb_dataflow_additional_args and --dpb_dataflow_timeout
     for dpb_dataflow_provider.
 -   Add support for T2A (ARM) VMs on GCE.
+-   Add `--dpb_job_poll_interval_secs` flag to control job polling frequency in DPB
+    benchmarks.
 
 ### Bug fixes and maintenance updates:
 
