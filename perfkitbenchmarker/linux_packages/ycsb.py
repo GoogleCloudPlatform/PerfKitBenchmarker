@@ -214,6 +214,11 @@ flags.DEFINE_boolean(
     'ycsb_log_remote_command_output', True,
     'Whether to log the remote command\'s output at the info '
     'level.')
+_SHOULD_RECORD_COMMAND_LINE = flags.DEFINE_boolean(
+    'ycsb_record_command_line', True,
+    'Whether to record the command line used for kicking off the runs as part '
+    'of metadata. When there are many VMs, this can get long and clutter the '
+    'PKB log.')
 _SHOULD_FAIL_ON_INCOMPLETE_LOADING = flags.DEFINE_boolean(
     'ycsb_fail_on_incomplete_loading', False,
     'Whether to fail the benchmarking if loading is not complete, '
@@ -904,11 +909,12 @@ def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
   """
   stage = 'load' if ycsb_result['command_line'].endswith('-load') else 'run'
   base_metadata = {
-      'command_line': ycsb_result['command_line'],
       'stage': stage,
       'ycsb_tar_url': _ycsb_tar_url,
       'ycsb_version': FLAGS.ycsb_version
   }
+  if _SHOULD_RECORD_COMMAND_LINE.value:
+    base_metadata['command_line'] = ycsb_result['command_line']
   base_metadata.update(kwargs)
 
   for group_name, group in six.iteritems(ycsb_result['groups']):
