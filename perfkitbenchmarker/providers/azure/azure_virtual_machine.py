@@ -982,9 +982,16 @@ class CentOs8BasedAzureVirtualMachine(AzureVirtualMachine,
 class RockyLinux8BasedAzureVirtualMachine(AzureVirtualMachine,
                                           linux_virtual_machine.RockyLinux8Mixin
                                          ):
-  GEN2_IMAGE_URN = 'erockyenterprisesoftwarefoundationinc1653071250513:rockylinux:free-gen2:latest'
-  IMAGE_URN = 'erockyenterprisesoftwarefoundationinc1653071250513:rockylinux:free:latest'
+  # TODO(pclay): Update to rockylinux-8:latest if that is ever so-named.
+  IMAGE_URN = 'erockyenterprisesoftwarefoundationinc1653071250513:rockylinux:free:8.6.0'
 
+
+# Requires enabling for your subscription:
+# https://portal.azure.com/#view/Microsoft_Azure_Marketplace/LegalTermsSkuProgrammaticAccessBlade/legalTermsSkuProgrammaticAccessData~/%7B%22product%22%3A%7B%22publisherId%22%3A%22erockyenterprisesoftwarefoundationinc1653071250513%22%2C%22offerId%22%3A%22rockylinux%22%2C%22planId%22%3A%22free%22%2C%22standardContractAmendmentsRevisionId%22%3Anull%2C%22isCspEnabled%22%3Atrue%7D%7D
+class RockyLinux9BasedAzureVirtualMachine(AzureVirtualMachine,
+                                          linux_virtual_machine.RockyLinux9Mixin
+                                         ):
+  IMAGE_URN = 'erockyenterprisesoftwarefoundationinc1653071250513:rockylinux-9:rockylinux-9:latest'
 
 # TODO(user): Add Fedora CoreOS when available:
 #   https://docs.fedoraproject.org/en-US/fedora-coreos/provisioning-azure/
