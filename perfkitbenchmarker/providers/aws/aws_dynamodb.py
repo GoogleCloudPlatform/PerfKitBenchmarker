@@ -56,12 +56,33 @@ flags.DEFINE_integer('aws_dynamodb_lsi_count', None,
 flags.DEFINE_integer('aws_dynamodb_gsi_count', None,
                      'Set amount of Global Secondary Indexes. Only set 0-5.'
                      'Defaults to 0.')
+# For info on autoscaling parameters, see
+# https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/AutoScaling.html
+_AUTOSCALING_MAX_WCU = flags.DEFINE_integer(
+    'aws_dynamodb_autoscaling_wcu_max', None, 'Maximum WCU for autoscaling.')
+_AUTOSCALING_MAX_RCU = flags.DEFINE_integer(
+    'aws_dynamodb_autoscaling_rcu_max', None, 'Maximum RCU for autoscaling.')
+_AUTOSCALING_CPU_TARGET = flags.DEFINE_integer(
+    'aws_dynamodb_autoscaling_target', None,
+    'The target utilization percent for autoscaling.')
 
 # Throughput constants
 _FREE_TIER_RCU = 25
 _FREE_TIER_WCU = 25
 
 _DEFAULT_ZONE = 'us-east-1b'
+
+# For autoscaling CLI parameters, see
+# https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/AutoScaling.CLI.html
+_WCU_SCALABLE_DIMENSION = 'dynamodb:table:WriteCapacityUnits'
+_RCU_SCALABLE_DIMENSION = 'dynamodb:table:ReadCapacityUnits'
+
+_WCU_SCALING_METRIC = 'DynamoDBWriteCapacityUtilization'
+_RCU_SCALING_METRIC = 'DynamoDBReadCapacityUtilization'
+
+_DEFAULT_SCALE_OUT_COOLDOWN = 0
+_DEFAULT_SCALE_IN_COOLDOWN = 0
+_DEFAULT_AUTOSCALING_TARGET = 65.0
 
 
 class DynamoDbSpec(non_relational_db.BaseNonRelationalDbSpec):
@@ -338,6 +359,62 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     if retcode != 0:
       logging.warning('Failed to create table! %s', stderror)
 
+  def _ShouldAutoscale(self) -> bool:
+    return any([_AUTOSCALING_CPU_TARGET.value,
+                _AUTOSCALING_MAX_RCU.value,
+                _AUTOSCALING_MAX_WCU.value])
+
+  def _PostCreate(self):
+    if not self._ShouldAutoscale():
+      return
+    self._CreateAutoscalingPolicy(_RCU_SCALABLE_DIMENSION,
+                                  _RCU_SCALING_METRIC,
+                                  self.rcu, _AUTOSCALING_MAX_RCU.value)
+    self._CreateAutoscalingPolicy(_WCU_SCALABLE_DIMENSION,
+                                  _WCU_SCALING_METRIC,
+                                  self.wcu, _AUTOSCALING_MAX_WCU.value)
+
+  def _CreateAutoscalingPolicy(self,
+                               scalable_dimension: str,
+                               scaling_metric: str,
+                               min_capacity: int,
+                               max_capacity: int) -> None:
+    """Creates an autoscaling policy for the table."""
+    logging.info('Registering scalable target.')
+    cmd = util.AWS_PREFIX + [
+        'application-autoscaling',
+        'register-scalable-target',
+        '--service-namespace', 'dynamodb',
+        '--resource-id', f'table/{self.table_name}',
+        '--scalable-dimension', scalable_dimension,
+        '--min-capacity', str(min_capacity),
+        '--max-capacity', str(max_capacity),
+        '--region', self.region]
+    vm_util.IssueCommand(cmd, raise_on_failure=True)
+
+    logging.info('Creating autoscaling policy.')
+    scaling_policy = {
+        'PredefinedMetricSpecification': {
+            'PredefinedMetricType': scaling_metric
+        },
+        'ScaleOutCooldown': _DEFAULT_SCALE_OUT_COOLDOWN,
+        'ScaleInCooldown': _DEFAULT_SCALE_IN_COOLDOWN,
+        'TargetValue': _AUTOSCALING_CPU_TARGET.value
+    }
+    cmd = util.AWS_PREFIX + [
+        'application-autoscaling',
+        'put-scaling-policy',
+        '--service-namespace', 'dynamodb',
+        '--resource-id', f'table/{self.table_name}',
+        '--scalable-dimension', scalable_dimension,
+        '--policy-name', f'{FLAGS.run_uri}-policy',
+        '--policy-type', 'TargetTrackingScaling',
+        '--target-tracking-scaling-policy-configuration',
+        json.dumps(scaling_policy),
+        '--region', self.region
+    ]
+    vm_util.IssueCommand(cmd, raise_on_failure=True)
+
   def _Delete(self) -> None:
     """Deletes the dynamodb table."""
     cmd = util.AWS_PREFIX + [
@@ -392,7 +469,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     Returns:
       dict mapping string property key to value.
     """
-    return {
+    metadata = {
         'aws_dynamodb_primarykey': self.primary_key,
         'aws_dynamodb_use_sort': self.use_sort,
         'aws_dynamodb_sortkey': self.sort_key,
@@ -402,6 +479,26 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         'aws_dynamodb_lsi_count': self.lsi_count,
         'aws_dynamodb_gsi_count': self.gsi_count,
     }
+    if self._ShouldAutoscale():
+      metadata.update({
+          'aws_dynamodb_autoscaling':
+              True,
+          'aws_dynamodb_autoscaling_rcu_min_capacity':
+              self.rcu,
+          'aws_dynamodb_autoscaling_rcu_max_capacity':
+              _AUTOSCALING_MAX_RCU.value or self.rcu,
+          'aws_dynamodb_autoscaling_wcu_min_capacity':
+              self.wcu,
+          'aws_dynamodb_autoscaling_wcu_max_capacity':
+              _AUTOSCALING_MAX_WCU.value or self.wcu,
+          'aws_dynamodb_autoscaling_scale_in_cooldown':
+              _DEFAULT_SCALE_IN_COOLDOWN,
+          'aws_dynamodb_autoscaling_scale_out_cooldown':
+              _DEFAULT_SCALE_OUT_COOLDOWN,
+          'aws_dynamodb_autoscaling_target':
+              _DEFAULT_AUTOSCALING_TARGET
+      })
+    return metadata
 
   def SetThroughput(self,
                     rcu: Optional[int] = None,

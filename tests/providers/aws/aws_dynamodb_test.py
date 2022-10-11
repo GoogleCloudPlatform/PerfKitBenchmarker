@@ -318,6 +318,30 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
 
     mock_set_throughput.assert_called_once_with(rcu=5000, wcu=1000)
 
+  @parameterized.parameters(
+      ('aws_dynamodb_autoscaling_target', 50),
+      ('aws_dynamodb_autoscaling_wcu_max', 100),
+      ('aws_dynamodb_autoscaling_rcu_max', 100))
+  @flagsaver.flagsaver
+  def testShouldAutoscale(self, flag, value):
+    FLAGS[flag].parse(value)
+    test_instance = GetTestDynamoDBInstance()
+    mock_create_policy = self.enter_context(
+        mock.patch.object(test_instance, '_CreateAutoscalingPolicy'))
+
+    test_instance._PostCreate()
+
+    self.assertLen(mock_create_policy.mock_calls, 2)
+
+  def testShouldNotAutoscale(self):
+    test_instance = GetTestDynamoDBInstance()
+    mock_create_policy = self.enter_context(
+        mock.patch.object(test_instance, '_CreateAutoscalingPolicy'))
+
+    test_instance._PostCreate()
+
+    mock_create_policy.assert_not_called()
+
 
 if __name__ == '__main__':
   unittest.main()
