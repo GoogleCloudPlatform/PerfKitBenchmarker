@@ -127,6 +127,8 @@ def ParseAsbenchStdout(output):
       })
     elif 'AEROSPIKE_ERR_TIMEOUT' in line or 'AEROSPIKE_ERR_CONNECTION' in line:
       continue
+    elif 'Add node' in line or 'Remove node' in line:
+      continue
     else:
       aggregation_metrics = regex_util.ExtractAllFloatMetrics(
           regex_util.ExtractExactlyOneMatch(r'total\(.*\)', line))

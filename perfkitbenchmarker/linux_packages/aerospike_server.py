@@ -40,6 +40,8 @@ flags.DEFINE_integer('aerospike_service_threads', 4,
 flags.DEFINE_integer('aerospike_vms', 1,
                      'Number of vms (nodes) for aerospike server.')
 
+MIN_FREE_KBYTES = 1160000
+
 
 def _GetAerospikeDir(idx=None):
   if idx is None:
@@ -175,7 +177,13 @@ def ConfigureAndStart(server, seed_node_ips=None):
   else:
     devices = []
 
+  # Linux best practice based on:
+  # https://docs.aerospike.com/server/operations/install/linux/bestpractices#linux-best-practices
+  server.RemoteCommand(f'echo {MIN_FREE_KBYTES * FLAGS.aerospike_instances} '
+                       '| sudo tee /proc/sys/vm/min_free_kbytes')
+  server.RemoteCommand('echo 0 | sudo tee /proc/sys/vm/swappiness')
   for idx in range(FLAGS.aerospike_instances):
+    current_devices = []
     if devices:
       num_device_per_instance = int(len(devices) / FLAGS.aerospike_instances)
       current_devices = devices[idx * num_device_per_instance:(idx + 1) *
@@ -193,7 +201,7 @@ def ConfigureAndStart(server, seed_node_ips=None):
             'service_threads':
                 FLAGS.aerospike_service_threads,
             'replication_factor':
-                FLAGS.aerospike_replication_factor
+                FLAGS.aerospike_replication_factor,
         })
 
     server.RemoteCommand(f'cd {_GetAerospikeDir(idx)} && make init')
