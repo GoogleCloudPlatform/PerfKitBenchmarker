@@ -1547,11 +1547,35 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def GetNVMEDeviceInfo(self):
     """Get the NVME disk device info, by querying the VM."""
     self.InstallPackages('nvme-cli')
-    stdout, _ = self.RemoteCommand('sudo nvme list --output-format json')
-    if not stdout or 'No NVMe devices detected' in stdout:
-      return []
-    response = json.loads(stdout)
-    return response.get('Devices', [])
+    version_str, _ = self.RemoteCommand('nvme --version')
+    version = float(version_str.split()[2])
+    if version >= 1.5:
+      stdout, _ = self.RemoteCommand('sudo nvme list --output-format json')
+      if not stdout:
+        return []
+      response = json.loads(stdout)
+      return response.get('Devices', [])
+    else:
+      # custom parsing for older OSes that do not ship nvme-cli ver 1.5+.
+      response = []
+      stdout, _ = self.RemoteCommand('sudo nvme list')
+      if 'No NVMe devices detected' in stdout:
+        return []
+      rows = stdout.splitlines()
+      delimiter_row = rows[1]  # row 0 is the column headers
+      delimiter_index = [0] + [
+          i for i in range(len(delimiter_row)) if delimiter_row[i] == ' ']
+      for row in rows[2:]:
+        device = {}
+        device_info = [
+            row[i:j]
+            for i, j in zip(delimiter_index, delimiter_index[1:] + [None])
+        ]
+        device['DevicePath'] = device_info[0].strip()
+        device['SerialNumber'] = device_info[1].strip()
+        device['ModelNumber'] = device_info[2].strip()
+        response.append(device)
+      return response
 
 
 class ClearMixin(BaseLinuxMixin):
