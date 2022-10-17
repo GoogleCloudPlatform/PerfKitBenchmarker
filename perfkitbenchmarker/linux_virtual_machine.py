@@ -37,10 +37,11 @@ import posixpath
 import re
 import threading
 import time
-from typing import Optional, Dict, Set
+from typing import Dict, Optional, Set
 import uuid
 
 from absl import flags
+from packaging import version as packaging_version
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -1547,9 +1548,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def GetNVMEDeviceInfo(self):
     """Get the NVME disk device info, by querying the VM."""
     self.InstallPackages('nvme-cli')
-    version_str, _ = self.RemoteCommand('nvme --version')
-    version = float(version_str.split()[2])
-    if version >= 1.5:
+    version_str, _ = self.RemoteCommand('sudo nvme --version')
+    version_num = version_str.split()[2]
+    if packaging_version.parse(version_num) >= packaging_version.parse('1.5'):
       stdout, _ = self.RemoteCommand('sudo nvme list --output-format json')
       if not stdout:
         return []
