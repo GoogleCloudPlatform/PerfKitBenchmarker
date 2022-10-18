@@ -637,9 +637,8 @@ def _CreateBenchmarkSpecs():
   for benchmark_module, user_config in benchmark_tuple_list:
     # Construct benchmark config object.
     name = benchmark_module.BENCHMARK_NAME
-    expected_os_types = None if FLAGS.multi_os_benchmark else (
-        os_types.WINDOWS_OS_TYPES if FLAGS.os_type in os_types.WINDOWS_OS_TYPES
-        else os_types.LINUX_OS_TYPES)
+    # This expected_os_type check seems rather unnecessary.
+    expected_os_types = os_types.ALL
     with flag_util.OverrideFlags(FLAGS, user_config.get('flags')):
       config_dict = benchmark_module.GetConfig(user_config)
     config_spec_class = getattr(

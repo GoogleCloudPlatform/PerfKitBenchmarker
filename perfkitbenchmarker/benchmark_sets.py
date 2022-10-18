@@ -37,6 +37,14 @@ flags.DEFINE_string('flag_zip', None,
                     'The name of the flag zip to run.')
 flags.DEFINE_integer('num_benchmark_copies', 1,
                      'The number of copies of each benchmark config to run.')
+LINUX = 'linux'
+WINDOWS = 'windows'
+CONTAINER = 'container'
+flags.DEFINE_enum('benchmark_os_type', None, [LINUX, WINDOWS, CONTAINER],
+                  'The benchmark os type, decides if pkb searches for a '
+                  'benchmark from linux_benchmarks directory or '
+                  'windows_benchmarks directory. If not set, defaults to that '
+                  'of the os_type flag.')
 
 MESSAGE = 'message'
 BENCHMARK_LIST = 'benchmark_list'
@@ -267,20 +275,36 @@ class FlagZipNotFoundException(Exception):
   pass
 
 
+def _GetBenchmarkOsType():
+  """Returns the benchmark os type."""
+  if FLAGS.benchmark_os_type == CONTAINER:
+    return CONTAINER
+  elif FLAGS.benchmark_os_type == WINDOWS:
+    return WINDOWS
+  elif FLAGS.benchmark_os_type == LINUX:
+    return LINUX
+  # benchmark_os_type is not set, falling back to looking at the os_type flag.
+  elif FLAGS.os_type in os_types.CONTAINER_OS_TYPES:
+    return CONTAINER
+  elif FLAGS.os_type in os_types.WINDOWS_OS_TYPES:
+    return WINDOWS
+  return LINUX
+
+
 def _GetValidBenchmarks():
   """Returns a dict mapping valid benchmark names to their modules."""
-  if FLAGS.os_type in os_types.CONTAINER_OS_TYPES:
+  if _GetBenchmarkOsType() == CONTAINER:
     return {'cluster_boot': linux_benchmarks.VALID_BENCHMARKS['cluster_boot']}
-  elif FLAGS.os_type in os_types.WINDOWS_OS_TYPES:
+  elif _GetBenchmarkOsType() == WINDOWS:
     return windows_benchmarks.VALID_BENCHMARKS
   return linux_benchmarks.VALID_BENCHMARKS
 
 
 def _GetValidPackages():
   """Returns a dict mapping valid package names to their modules."""
-  if FLAGS.os_type in os_types.CONTAINER_OS_TYPES:
+  if _GetBenchmarkOsType() == CONTAINER:
     return {}
-  elif FLAGS.os_type in os_types.WINDOWS_OS_TYPES:
+  elif _GetBenchmarkOsType() == WINDOWS:
     return windows_packages.PACKAGES
   return linux_packages.PACKAGES
 
@@ -321,9 +345,14 @@ def _GetBenchmarksFromUserConfig(user_config):
     name, user_config = entry.popitem()
     try:
       benchmark_module = valid_benchmarks[name]
-    except KeyError:
-      raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
-                       (name, FLAGS.os_type))
+    except KeyError as exc:
+      benchmark_os_type = _GetBenchmarkOsType()
+      raise ValueError('Benchmark_os_type flag is %s and os_type flag is %s. '
+                       'This resulting benchmark type is %s. '
+                       'However, benchmark of name %s is not found within the '
+                       'list of %s benchmarks. ' %
+                       (FLAGS.benchmark_os_type, FLAGS.os_type,
+                        benchmark_os_type, name, benchmark_os_type)) from exc
     benchmark_config_list.append((benchmark_module, user_config))
 
   return benchmark_config_list
@@ -418,8 +447,14 @@ def GetBenchmarksFromFlags():
     benchmark_module = valid_benchmarks.get(benchmark_name)
 
     if benchmark_module is None:
-      raise ValueError('Benchmark "%s" not valid on os_type "%s"' %
-                       (benchmark_name, FLAGS.os_type))
+      benchmark_os_type = _GetBenchmarkOsType()
+      raise ValueError('Benchmark_os_type flag is %s and os_type flag is %s. '
+                       'This resulting benchmark type is %s. '
+                       'However, benchmark of name %s is not found within the '
+                       'list of %s benchmarks. ' %
+                       (FLAGS.benchmark_os_type, FLAGS.os_type,
+                        benchmark_os_type, benchmark_name,
+                        benchmark_os_type))
 
     flag_matrix_name = (
         FLAGS.flag_matrix or benchmark_config.get('flag_matrix', None)
