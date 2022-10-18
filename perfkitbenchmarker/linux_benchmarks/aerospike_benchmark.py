@@ -74,6 +74,12 @@ flags.DEFINE_integer(
     'processes on the same VM. Flags such as '
     'aerospike_num_keys and client threads will be applied '
     'to each instance.')
+flags.DEFINE_string('aerospike_client_machine_type', None,
+                    'Machine type to use for the aerospike client if different '
+                    'from aerospike server machine type.')
+flags.DEFINE_string('aerospike_server_machine_type', None,
+                    'Machine type to use for the aerospike server if different '
+                    'from aerospike client machine type.')
 
 BENCHMARK_NAME = 'aerospike'
 BENCHMARK_CONFIG = """

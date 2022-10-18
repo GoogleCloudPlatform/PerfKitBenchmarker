@@ -22,7 +22,7 @@ from perfkitbenchmarker import providers
 
 class MesosProviderInfo(provider_info.BaseProviderInfo):
 
-  SUPPORTED_BENCHMARKS = ['aerospike_ycsb', 'block_storage_workload',
+  SUPPORTED_BENCHMARKS = ['block_storage_workload',
                           'cassandra_stress', 'cassandra_ycsb', 'cluster_boot',
                           'copy_throughput', 'fio', 'hbase_ycsb', 'hpcc',
                           'iperf', 'mongodb_ycsb', 'netperf', 'oldisim', 'ping',

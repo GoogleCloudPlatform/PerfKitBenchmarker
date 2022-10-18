@@ -119,7 +119,6 @@ BENCHMARK_SETS = {
         MESSAGE: ('This benchmark set is maintained by Google Cloud Platform '
                   'Performance Team.'),
         BENCHMARK_LIST: [
-            'aerospike_ycsb',
             'bidirectional_network',
             'block_storage_workload',
             'cassandra_stress',

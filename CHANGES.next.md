@@ -24,6 +24,7 @@
 -   Remove deprecated `--eks_zones` flags. Use `--zones` instead.
 -   Deprecate CentOS Linux 8 as it is EOL on 2021-12-31.
 -   `--zones` and `--extra_zones` deprecated in favor of `--zone`.
+-   Deprecate Aerospike_YCSB benchmark.
 
 ### New features:
 
