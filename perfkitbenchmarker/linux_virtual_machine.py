@@ -2062,6 +2062,9 @@ class BaseDebianMixin(BaseLinuxMixin):
   @vm_util.Retry()
   def InstallPackages(self, packages):
     """Installs packages using the apt package manager."""
+    if not self.install_packages:
+      return
+
     if not self._apt_updated:
       self.AptUpdate()
       self._apt_updated = True
