@@ -123,7 +123,7 @@ def RunPgBench(benchmark_spec,
       jobs = min(client, 16)
     command = (f'pgbench {connection_string} --client={client} '
                f'--jobs={jobs} --time={seconds_per_test} --progress=1 '
-               '--report-latencies')
+               '-r')
     if file and path:
       command = f'cd {path} && {command} --file={file}'
     _, stderr = vm.RobustRemoteCommand(command)
