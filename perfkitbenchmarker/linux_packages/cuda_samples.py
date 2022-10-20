@@ -36,6 +36,7 @@ BANDWIDTH_TEST_PATH = '/usr/local/cuda/extras/demo_suite/bandwidthTest'
 
 def Install(vm):
   vm.Install('cuda_toolkit')
+  vm.InstallPackages('libfreeimage3 libfreeimage-dev')
   version = _VERSION.value or FLAGS.cuda_toolkit_version
   vm.RemoteCommand(f'git clone --branch v{version} --depth 1 '
                    'https://github.com/NVIDIA/cuda-samples.git')
