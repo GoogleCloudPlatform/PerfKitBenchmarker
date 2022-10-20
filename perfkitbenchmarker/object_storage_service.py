@@ -365,7 +365,7 @@ def FindCredentialFile(default_location):
   return credential_file
 
 
-def FindBotoFile():
+def FindBotoFile() -> str:
   """Return the path to the boto file."""
   paths_to_check = [
       FLAGS.boto_file_location,
@@ -376,8 +376,9 @@ def FindBotoFile():
   for path in paths_to_check:
     if not path:
       continue
-    if pathlib.Path(path).exists():
-      return path
+    path = pathlib.Path(path).expanduser()
+    if path.exists():
+      return str(path)
 
   raise errors.Benchmarks.MissingObjectCredentialException(
       'Boto file cannot be found in %s.' % paths_to_check)
