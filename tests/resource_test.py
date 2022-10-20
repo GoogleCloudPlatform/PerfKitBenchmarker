@@ -3,12 +3,30 @@
 import unittest
 
 from absl import flags
+from absl.testing import parameterized
+
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
+
+
+class GetResourceClassTest(pkb_common_test_case.PkbCommonTestCase):
+  class BaseTestClassForAttributes(resource.BaseResource):
+    REQUIRED_ATTRS = ['SERVICE_TYPE']
+    RESOURCE_TYPE = 'BaseTestClassForAttributes'
+
+  class TestClassForAttributes(BaseTestClassForAttributes):
+    SERVICE_TYPE = ['Base', 'Base2']
+
+  @parameterized.named_parameters(('BaseTest', 'Base'), ('Base2Test', 'Base2'))
+  def test_list_of_attributes(self, service):
+    self.assertEqual(
+        resource.GetResourceClass(
+            self.BaseTestClassForAttributes, SERVICE_TYPE=service),
+        self.TestClassForAttributes)
 
 
 class NonFreezeRestoreResource(resource.BaseResource):

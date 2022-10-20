@@ -19,6 +19,7 @@ and checks for resource existence so that resources can be created and deleted
 reliably.
 """
 import abc
+import itertools
 import logging
 import time
 from typing import List
@@ -70,9 +71,25 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
             'Subclasses of %s must have the following attrs set: %s. For %s '
             'the following attrs were not set: %s.' %
             (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, cls.__name__, unset_attrs))
-      key = [cls.RESOURCE_TYPE]
-      key += sorted([(attr, getattr(cls, attr)) for attr in cls.REQUIRED_ATTRS])
-      _RESOURCE_REGISTRY[tuple(key)] = cls
+      # Flatten list type attributes with cartesian product.
+      # If a class have two list attributes i.e.
+      # class Example(AutoRegisterResourceMeta):
+      #   CLOUD = ['GCP', 'AWS']
+      #   ENGINE = ['mysql', 'postgres']
+      #   ....
+      # GetResourceClass(Example, CLOUD='GCP', ENGINE='mysql')
+      # would return Example.
+      attributes = [[cls.RESOURCE_TYPE]]
+      for attr in sorted(cls.REQUIRED_ATTRS):
+        value = getattr(cls, attr)
+        if not isinstance(value, list):
+          attributes.append([(attr, value)])
+        else:
+          attributes.append([(attr, i) for i in value])
+
+      # Cross product
+      for key in itertools.product(*attributes):
+        _RESOURCE_REGISTRY[tuple(key)] = cls
     super(AutoRegisterResourceMeta, cls).__init__(name, bases, dct)
 
 
