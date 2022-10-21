@@ -341,7 +341,7 @@ def CheckPrerequisites():
         'To apply dynamic load, set --ycsb_dynamic_load.')
 
 
-@vm_util.Retry(max_retries=5, poll_interval=1)
+@vm_util.Retry(poll_interval=1)
 def Install(vm):
   """Installs the YCSB and, if needed, hdrhistogram package on the VM."""
   vm.Install('openjdk')
@@ -369,8 +369,9 @@ def Install(vm):
     vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
     # _JAVA_OPTIONS needed to work around this issue:
     # https://stackoverflow.com/questions/53010200/maven-surefire-could-not-find-forkedbooter-class
+    # https://stackoverflow.com/questions/34170811/maven-connection-reset-error
     vm.RemoteCommand('cd {hist_dir}; _JAVA_OPTIONS=-Djdk.net.URLClassPath.'
-                     'disableClassPathURLCheck=true '
+                     'disableClassPathURLCheck=true,https.protocols=TLSv1.2 '
                      '{mvn_cmd}'.format(
                          hist_dir=HDRHISTOGRAM_DIR,
                          mvn_cmd=maven.GetRunCommand('install')))
