@@ -1,0 +1,50 @@
+2022-10-01 01:23:57:907 0 sec: 0 operations; est completion in 0 second
+2022-10-01 01:24:07:891 10 sec: 20846 operations; 2084.6 current ops/sec; est completion in 5 days 13 hours [READ AverageLatency(us)=22365.65]
+2022-10-01 01:24:17:891 20 sec: 45803 operations; 2495.7 current ops/sec; est completion in 5 days 1 hour [READ AverageLatency(us)=20884.12]
+2022-10-01 01:24:27:891 30 sec: 70775 operations; 2497.2 current ops/sec; est completion in 4 days 21 hours [READ AverageLatency(us)=17488]
+2022-10-01 01:24:37:891 40 sec: 95861 operations; 2508.6 current ops/sec; est completion in 4 days 19 hours [READ AverageLatency(us)=22344.81]
+2022-10-01 01:24:47:891 50 sec: 120757 operations; 2489.3 current ops/sec; est completion in 4 days 19 hours [READ AverageLatency(us)=19458.49]
+2022-10-01 01:24:57:891 60 sec: 145857 operations; 2510 current ops/sec; est completion in 4 days 18 hours [READ AverageLatency(us)=14855.12]
+2022-10-01 01:24:57:988 60 sec: 145947 operations; 937.5 current ops/sec; est completion in 4 days 18 hours [READ AverageLatency(us)=10245.58] [CLEANUP AverageLatency(us)=68.07]
+[OVERALL], RunTime(ms), 60095
+[OVERALL], Throughput(ops/sec), 2428.604709210417
+[TOTAL_GCS_PS_Scavenge], Count, 16
+[TOTAL_GC_TIME_PS_Scavenge], Time(ms), 107
+[TOTAL_GC_TIME_%_PS_Scavenge], Time(%), 0.17805141858723686
+[TOTAL_GCS_PS_MarkSweep], Count, 2
+[TOTAL_GC_TIME_PS_MarkSweep], Time(ms), 57
+[TOTAL_GC_TIME_%_PS_MarkSweep], Time(%), 0.09484982111656544
+[TOTAL_GCs], Count, 18
+[TOTAL_GC_TIME], Time(ms), 164
+[TOTAL_GC_TIME_%], Time(%), 0.2729012397038023
+[READ], Operations, 145947
+[READ], AverageLatency(us), 19479.12810814885
+[READ], MinLatency(us), 2589
+[READ], MaxLatency(us), 924425
+[READ], Return=OK, 145947
+[READ], 0, 41983.64836255375
+[READ], 1000, 25742.023255813954
+[READ], 2000, 22715.42782468838
+[READ], 3000, 18937.807952286283
+[READ], 4000, 14030.440746753247
+[READ], 5000, 15569.699881376038
+[READ], 6000, 19632.656532456862
+[READ], 7000, 17519.806401249025
+[READ], 8000, 12427.848152659359
+[READ], 9000, 13402.123028391166
+[READ], 10000, 14583.187627187628
+[READ], 11000, 19648.792601338057
+[READ], 12000, 21465.837489943686
+[READ], 13000, 35111.63052011776
+[READ], 14000, 40859.85603244339
+[READ], 15000, 19755.08925750395
+[READ], 16000, 14847.317745803357
+[READ], 17000, 14418.057306590257
+[READ], 18000, 10584.808112324494
+[READ], 19000, 13655.13615980432
+[READ], 20000, 16421.41550139832
+[READ], 21000, 17593.828355236958
+[READ], 22000, 15556.543219666932
+[READ], 23000, 11649.72311827957
+[READ], 24000, 30852.80266474613
+[READ], 25000, 15630.590407470288

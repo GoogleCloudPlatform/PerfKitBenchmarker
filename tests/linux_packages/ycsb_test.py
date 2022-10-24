@@ -38,6 +38,11 @@ def open_data_file(filename):
     return fp.read()
 
 
+def _parse_and_return_time_series(filename):
+  content = open_data_file(filename)
+  return ycsb.ParseResults(content, 'timeseries')
+
+
 class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
@@ -117,6 +122,46 @@ class DetailedResultParserTestCase(unittest.TestCase):
     percentiles = ycsb._PercentilesFromHistogram(hist)
     self.assertEqual(1, percentiles['p50'])
     self.assertEqual(7, percentiles['p99'])
+
+
+class ThroughputTimeSeriesParserTestCase(
+    pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.results_1 = _parse_and_return_time_series('ycsb-time-series.dat')
+    self.results_2 = _parse_and_return_time_series('ycsb-time-series-2.dat')
+
+  def testParsedThroughputTimeSeriesIsCorrect(self):
+    results = _parse_and_return_time_series('ycsb-time-series.dat')
+    expected = {
+        10: 2102.9,
+        20: 2494.5,
+        30: 2496.8,
+        40: 2509.6,
+        50: 2487.2,
+        60: 2513.2
+    }
+    self.assertEqual(results['throughput_time_series'], expected)
+
+  @flagsaver.flagsaver(ycsb_throughput_time_series=True)
+  def testCombinedThroughputTimeSeriesIsCorrect(self):
+    results_1 = _parse_and_return_time_series('ycsb-time-series.dat')
+    results_2 = _parse_and_return_time_series('ycsb-time-series-2.dat')
+
+    combined = ycsb._CombineResults(result_list=[results_1, results_2],
+                                    measurement_type=ycsb.TIMESERIES,
+                                    combined_hdr={})
+
+    expected = {
+        10: 4187.5,
+        20: 4990.2,
+        30: 4994.0,
+        40: 5018.2,
+        50: 4976.5,
+        60: 5023.2,
+    }
+    self.assertEqual(combined['throughput_time_series'], expected)
 
 
 class BadResultParserTestCase(unittest.TestCase):

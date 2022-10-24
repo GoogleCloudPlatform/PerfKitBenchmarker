@@ -145,6 +145,10 @@ flags.DEFINE_list(
     'ycsb_run_parameters', [],
     'Passed to YCSB during the run stage. Comma-separated list '
     'of "key=value" pairs.')
+_THROUGHPUT_TIME_SERIES = flags.DEFINE_bool(
+    'ycsb_throughput_time_series', False,
+    'If true, run prints status which includes a throughput time series (1s '
+    'granularity), and includes the results in the samples.')
 flags.DEFINE_list(
     'ycsb_threads_per_client', ['32'], 'Number of threads per '
     'loader during the benchmark run. Specify a list to vary the '
@@ -234,11 +238,18 @@ _ERROR_RATE_THRESHOLD = flags.DEFINE_float(
     'ycsb_max_error_rate', 1.00, 'The maximum error rate allowed for the run. '
     'By default, this allows any number of errors.')
 
+# Status line pattern
+_STATUS_PATTERN = r'(\d+) sec: \d+ operations; (\d+.\d+) current ops\/sec'
+# Status interval default is 10 sec, change to 1 sec.
+_STATUS_INTERVAL_SEC = 1
+
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
 
 # Customer YCSB tar url. If not set, the official YCSB release will be used.
 _ycsb_tar_url = None
+
+_ThroughputTimeSeries = dict[int, float]
 
 
 def SetYcsbTarUrl(url):
@@ -482,6 +493,7 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
   lines = []
   client_string = 'YCSB'
   command_line = 'unknown'
+  throughput_time_series = {}
   fp = six.StringIO(ycsb_result_string)
   result_string = next(fp).strip()
 
@@ -493,6 +505,13 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
       client_string = result_string
     if result_string.startswith('Command line:'):
       command_line = result_string
+    # Look for status lines which include throughput on a 1-sec basis.
+    match = re.search(_STATUS_PATTERN, result_string)
+    if match is not None:
+      timestamp, qps = int(match.group(1)), float(match.group(2))
+      # Repeats in the printed status are erroneous, ignore.
+      if timestamp not in throughput_time_series:
+        throughput_time_series[timestamp] = qps
     try:
       result_string = next(fp).strip()
     except StopIteration:
@@ -519,6 +538,8 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
 
   result = collections.OrderedDict([('client', client_string),
                                     ('command_line', command_line),
+                                    ('throughput_time_series',
+                                     throughput_time_series),
                                     ('groups', collections.OrderedDict())])
 
   for operation, lines in by_operation:
@@ -759,7 +780,9 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
 
   combined_weights = {}
 
-  def CombineTimeseries(combined_series, individual_series):
+  def _CombineLatencyTimeSeries(
+      combined_series: list[tuple[int, float]],
+      individual_series: list[tuple[int, float]]) -> list[tuple[int, float]]:
     """Combines two timeseries of average latencies.
 
     Args:
@@ -806,6 +829,27 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
       combined_weights[timestamp] += 1.0
     return result
 
+  def _CombineThroughputTimeSeries(
+      series1: _ThroughputTimeSeries,
+      series2: _ThroughputTimeSeries) -> _ThroughputTimeSeries:
+    """Returns a combined dict of [timestamp, total QPS] from the two series."""
+    timestamps1 = set(series1)
+    timestamps2 = set(series2)
+    all_timestamps = timestamps1 | timestamps2
+    diff_timestamps = timestamps1 ^ timestamps2
+    if diff_timestamps:
+      # This case is rare but does happen occassionally, so log a warning
+      # instead of raising an exception.
+      logging.warning(
+          'Expected combined timestamps to be the same, got different '
+          'timestamps: %s', diff_timestamps)
+    result = {}
+    for timestamp in all_timestamps:
+      result[timestamp] = (
+          series1.get(timestamp, 0) +
+          series2.get(timestamp, 0))
+    return result
+
   result = copy.deepcopy(result_list[0])
   DropUnaggregated(result)
 
@@ -845,7 +889,7 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
         result['groups'][group_name][HISTOGRAM] = CombineHistograms(
             result['groups'][group_name][HISTOGRAM], group[HISTOGRAM])
       elif measurement_type == TIMESERIES:
-        result['groups'][group_name][TIMESERIES] = CombineTimeseries(
+        result['groups'][group_name][TIMESERIES] = _CombineLatencyTimeSeries(
             result['groups'][group_name][TIMESERIES], group[TIMESERIES])
       else:
         result['groups'][group_name].pop(HISTOGRAM, None)
@@ -854,6 +898,10 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
         (result['command_line'], indiv['command_line']))
     if 'target' in result and 'target' in indiv:
       result['target'] += indiv['target']
+
+    if _THROUGHPUT_TIME_SERIES.value:
+      result['throughput_time_series'] = _CombineThroughputTimeSeries(
+          result['throughput_time_series'], indiv['throughput_time_series'])
 
   if measurement_type == HDRHISTOGRAM:
     for group_name in combined_hdr:
@@ -918,6 +966,12 @@ def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
     base_metadata['command_line'] = ycsb_result['command_line']
   base_metadata.update(kwargs)
 
+  throughput_time_series = ycsb_result.get('throughput_time_series', {})
+  if throughput_time_series:
+    yield sample.Sample(
+        'Throughput Time Series', 0, '',
+        {'throughput_time_series': sorted(throughput_time_series.items())})
+
   for group_name, group in six.iteritems(ycsb_result['groups']):
     meta = base_metadata.copy()
     meta['operation'] = group_name
@@ -969,6 +1023,9 @@ def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
         yield sample.Sample(
             ' '.join([group_name, 'AverageLatency (timeseries)']),
             average_latency, 'ms', timeseries_meta)
+      yield sample.Sample('Average Latency Time Series', 0, '', {
+          'latency_time_series': group[TIMESERIES]
+      })
 
 
 class YCSBExecutor(object):
@@ -1026,6 +1083,11 @@ class YCSBExecutor(object):
 
     parameters = self.parameters.copy()
     parameters.update(kwargs)
+
+    # Adding -s prints status which includes average throughput per sec.
+    if _THROUGHPUT_TIME_SERIES.value and command_name == 'run':
+      command.append('-s')
+      parameters['status.interval'] = _STATUS_INTERVAL_SEC
 
     # These are passed as flags rather than properties, so they
     # are handled differently.
