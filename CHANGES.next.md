@@ -181,8 +181,8 @@
 -   Support setting --dpb_dataflow_additional_args and --dpb_dataflow_timeout
     for dpb_dataflow_provider.
 -   Add support for T2A (ARM) VMs on GCE.
--   Add `--dpb_job_poll_interval_secs` flag to control job polling frequency in DPB
-    benchmarks.
+-   Add `--dpb_job_poll_interval_secs` flag to control job polling frequency in
+    DPB benchmarks.
 
 ### Bug fixes and maintenance updates:
 
@@ -269,3 +269,6 @@
     when running wordcount benchmark.
 -   Add some required types to BaseAppServiceSpec.
 -   Uses nic type of GVNIC by default (instead of VIRTIO_NET) on GCE
+-   Rename pkb's --placement_group_style value 'supercluster' to 'rack' in
+    response to gcloud compute API's change in behavior (--collocation=CLUSTERED
+    is now rack-level).

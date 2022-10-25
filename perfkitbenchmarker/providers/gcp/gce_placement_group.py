@@ -64,7 +64,7 @@ class GcePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
         'project': (option_decoders.StringDecoder, {'none_ok': False}),
         'num_vms': (option_decoders.IntDecoder, {'none_ok': False}),
         'placement_group_style': (option_decoders.EnumDecoder, {
-            'valid_values': set([placement_group.PLACEMENT_GROUP_SUPERCLUSTER] +
+            'valid_values': set([placement_group.PLACEMENT_GROUP_RACK] +
                                 list(placement_group.PLACEMENT_GROUP_OPTIONS)),
             'default': placement_group.PLACEMENT_GROUP_NONE,
         })
@@ -117,7 +117,7 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
       placement_policy['collocation'] = 'COLLOCATED'
       placement_policy['vm-count'] = self.num_vms
 
-    elif self.style == placement_group.PLACEMENT_GROUP_SUPERCLUSTER:
+    elif self.style == placement_group.PLACEMENT_GROUP_RACK:
       placement_policy['collocation'] = 'CLUSTERED'
       placement_policy['vm-count'] = self.num_vms
       # Only alpha API supported for CLUSTERED.

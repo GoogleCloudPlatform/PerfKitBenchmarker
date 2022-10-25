@@ -28,7 +28,7 @@ FLAGS = flags.FLAGS
 
 PLACEMENT_GROUP_CLUSTER = 'cluster'
 PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED = 'cluster_if_supported'
-PLACEMENT_GROUP_SUPERCLUSTER = 'supercluster'
+PLACEMENT_GROUP_RACK = 'rack'
 PLACEMENT_GROUP_SPREAD = 'spread'
 PLACEMENT_GROUP_SPREAD_IF_SUPPORTED = 'spread_if_supported'
 PLACEMENT_GROUP_NONE = 'none'
@@ -43,7 +43,7 @@ PLACEMENT_GROUP_OPTIONS = frozenset([
 # Default placement group style is specified by Cloud Specific Placement Group.
 flags.DEFINE_enum(
     'placement_group_style', None,
-    list(PLACEMENT_GROUP_OPTIONS) + [PLACEMENT_GROUP_SUPERCLUSTER],
+    list(PLACEMENT_GROUP_OPTIONS) + [PLACEMENT_GROUP_RACK],
     'The vm placement group option to use. Default set by cloud.')
 
 
