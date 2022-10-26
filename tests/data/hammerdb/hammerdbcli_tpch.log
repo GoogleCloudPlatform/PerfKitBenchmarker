@@ -1,0 +1,139 @@
+Copyright (C) 2003-2020 Steve Shaw
+Type "help" for a list of commands
+The xml is well-formed, applying configuration
+SETTING BUILD CONFIGURATION
+Database set to MySQL
+
+No Virtual Users found to destroy
+
+Benchmark set to TPC-H for MySQL
+
+Changed tpch:mysql_tpch_user from root to pkb5033530c4 for MySQL
+
+Changed tpch:mysql_tpch_pass from mysql to kC7a978fd43-6 for MySQL
+
+Value 3306 for connection:mysql_port is the same as existing value 3306, no change made
+
+Changed connection:mysql_host from 127.0.0.1 to 34.132.63.161 for MySQL
+
+Value 1 for tpch:mysql_scale_fact is the same as existing value 1, no change made
+
+Changed tpch:mysql_tpch_storage_engine from myisam to innodb for MySQL
+
+Value 1 for tpch:mysql_num_tpch_threads is the same as existing value 1, no change made
+
+TPROC-H Driver Script
+Script loaded, Type "print script" to view
+
+ load script completed
+No Virtual Users found to destroy
+
+SEQUENCE STARTED
+vu set done
+Vuser 1 created - WAIT IDLE
+
+1 Virtual Users Created
+
+vu create done
+Vuser 1:RUNNING
+
+Vuser 1:Executing Query 14 (1 of 22)
+
+vurun done
+Vuser 1:query 14 completed in 0.795 seconds
+
+Vuser 1:Executing Query 2 (2 of 22)
+
+Vuser 1:query 2 completed in 0.188 seconds
+
+Vuser 1:Executing Query 9 (3 of 22)
+
+Vuser 1:query 9 completed in 5.554 seconds
+
+Vuser 1:Executing Query 20 (4 of 22)
+
+Vuser 1:query 20 completed in 1.381 seconds
+
+Vuser 1:Executing Query 6 (5 of 22)
+
+Vuser 1:query 6 completed in 3.631 seconds
+
+Vuser 1:Executing Query 17 (6 of 22)
+
+Vuser 1:query 17 completed in 0.527 seconds
+
+Vuser 1:Executing Query 18 (7 of 22)
+
+Vuser 1:query 18 completed in 2.804 seconds
+
+Vuser 1:Executing Query 8 (8 of 22)
+
+Vuser 1:query 8 completed in 0.932 seconds
+
+Vuser 1:Executing Query 21 (9 of 22)
+
+Vuser 1:query 21 completed in 2.218 seconds
+
+Vuser 1:Executing Query 13 (10 of 22)
+
+Vuser 1:query 13 completed in 4.656 seconds
+
+Vuser 1:Executing Query 3 (11 of 22)
+
+Vuser 1:query 3 completed in 2.556 seconds
+
+Vuser 1:Executing Query 22 (12 of 22)
+
+Vuser 1:query 22 completed in 0.152 seconds
+
+Vuser 1:Executing Query 16 (13 of 22)
+
+Vuser 1:query 16 completed in 0.478 seconds
+
+Vuser 1:Executing Query 4 (14 of 22)
+
+Vuser 1:query 4 completed in 1.538 seconds
+
+Vuser 1:Executing Query 11 (15 of 22)
+
+Vuser 1:query 11 completed in 0.429 seconds
+
+Vuser 1:Executing Query 15 (16 of 22)
+
+Vuser 1:query 15 completed in 4.128 seconds
+
+Vuser 1:Executing Query 1 (17 of 22)
+
+Timer: 1 minutes elapsed
+Vuser 1:query 1 completed in 17.681 seconds
+
+Vuser 1:Executing Query 10 (18 of 22)
+
+Vuser 1:query 10 completed in 1.661 seconds
+
+Vuser 1:Executing Query 19 (19 of 22)
+
+Vuser 1:query 19 completed in 0.19 seconds
+
+Vuser 1:Executing Query 5 (20 of 22)
+
+Vuser 1:query 5 completed in 1.613 seconds
+
+Vuser 1:Executing Query 7 (21 of 22)
+
+Vuser 1:query 7 completed in 2.194 seconds
+
+Vuser 1:Executing Query 12 (22 of 22)
+
+Vuser 1:query 12 completed in 2.803 seconds
+
+Vuser 1:Completed 1 query set(s) in 91 seconds
+
+Vuser 1:FINISHED SUCCESS
+
+ALL VIRTUAL USERS COMPLETE
+
+TPROC-H Driver Script
+second time completed
+ delay for 5 seconds
+RUN SEQUENCE COMPLETE

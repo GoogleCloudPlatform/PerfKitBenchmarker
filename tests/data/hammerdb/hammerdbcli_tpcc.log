@@ -1,0 +1,149 @@
+Copyright (C) 2003-2020 Steve Shaw
+Type "help" for a list of commands
+The xml is well-formed, applying configuration
+SETTING CONFIGURATION
+SETTING CONFIGURATION
+No Virtual Users found to destroy
+
+Database set to MySQL
+
+Benchmark set to TPC-C for MySQL
+
+Changed connection:mysql_host from 127.0.0.1 to 34.71.228.71 for MySQL
+
+Value 3306 for connection:mysql_port is the same as existing value 3306, no change made
+
+Changed tpcc:mysql_pass from mysql to jJ7749289fa-4 for MySQL
+
+Changed tpcc:mysql_user from root to pkb5033530c3 for MySQL
+
+Changed tpcc:mysql_count_ware from 1 to 20 for MySQL
+
+Changed tpcc:mysql_allwarehouse from false to False for MySQL
+
+Changed tpcc:mysql_num_vu from 1 to 4 for MySQL
+
+Value false for tpcc:mysql_timeprofile is the same as existing value false, no change made
+
+Clearing Script, reload script to activate new setting
+
+Script cleared
+
+Changed tpcc:mysql_driver from test to timed for MySQL
+
+Changed tpcc:mysql_rampup from 2 to 5 for MySQL
+
+Changed tpcc:mysql_duration from 5 to 10 for MySQL
+
+Loading script
+Script loaded, Type "print script" to view
+
+TEST SEQUENCE STARTED
+No Virtual Users found to destroy
+
+4 VU TEST
+Vuser 1 created MONITOR - WAIT IDLE
+
+Vuser 2 created - WAIT IDLE
+
+Vuser 3 created - WAIT IDLE
+
+Vuser 4 created - WAIT IDLE
+
+Vuser 5 created - WAIT IDLE
+
+Logging activated
+to /tmp/hammerdb.log
+
+5 Virtual Users Created with Monitor VU
+
+Vuser 1:RUNNING
+
+Vuser 1:Beginning rampup time of 5 minutes
+
+Vuser 2:RUNNING
+
+Vuser 2:Processing 1000000 transactions with output suppressed...
+
+Vuser 3:RUNNING
+
+Vuser 3:Processing 1000000 transactions with output suppressed...
+
+Vuser 4:RUNNING
+
+Vuser 4:Processing 1000000 transactions with output suppressed...
+
+Vuser 5:RUNNING
+
+Vuser 5:Processing 1000000 transactions with output suppressed...
+
+Vuser 1:Rampup 1 minutes complete ...
+
+Timer: 1 minutes elapsed
+Vuser 1:Rampup 2 minutes complete ...
+
+Timer: 2 minutes elapsed
+Vuser 1:Rampup 3 minutes complete ...
+
+Timer: 3 minutes elapsed
+Vuser 1:Rampup 4 minutes complete ...
+
+Timer: 4 minutes elapsed
+Vuser 1:Rampup 5 minutes complete ...
+
+Vuser 1:Rampup complete, Taking start Transaction Count.
+
+Timer: 5 minutes elapsed
+Vuser 1:Timing test period of 10 in minutes
+
+Timer: 6 minutes elapsed
+Vuser 1:1 ...,
+
+Timer: 7 minutes elapsed
+Vuser 1:2 ...,
+
+Timer: 8 minutes elapsed
+Vuser 1:3 ...,
+
+Timer: 9 minutes elapsed
+Vuser 1:4 ...,
+
+Timer: 10 minutes elapsed
+Vuser 1:5 ...,
+
+Timer: 11 minutes elapsed
+Vuser 1:6 ...,
+
+Timer: 12 minutes elapsed
+Vuser 1:7 ...,
+
+Timer: 13 minutes elapsed
+Vuser 1:8 ...,
+
+Timer: 14 minutes elapsed
+Vuser 1:9 ...,
+
+Timer: 15 minutes elapsed
+Vuser 1:10 ...,
+
+Vuser 1:Test complete, Taking end Transaction Count.
+
+Vuser 1:4 Active Virtual Users configured
+
+Vuser 1:TEST RESULT : System achieved 8153 NOPM from 24772 MySQL TPM
+
+Vuser 1:FINISHED SUCCESS
+
+Vuser 4:FINISHED SUCCESS
+
+Vuser 5:FINISHED SUCCESS
+
+Vuser 3:FINISHED SUCCESS
+
+Vuser 2:FINISHED SUCCESS
+
+ALL VIRTUAL USERS COMPLETE
+
+vudestroy success
+
+TEST SEQUENCE COMPLETE

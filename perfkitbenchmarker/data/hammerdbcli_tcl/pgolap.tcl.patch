@@ -1,0 +1,298 @@
+--- HammerDB-4.0/src/postgresql/pgolap.tcl	2020-10-26 10:58:22.000000000 +0000
++++ HammerDB-fix-azure_postgres/src/postgresql/pgolap.tcl	2020-12-15 18:51:09.000000000 +0000
+@@ -50,16 +50,31 @@
+ return
+ }
+ 
+-proc ConnectToPostgres { host port user password dbname } {
++proc ConnectToPostgres { host port azure user password dbname } {
++    #Azure requres machine name suffix when login
++    if { $azure eq "true" } {
++        set contains_machine_name [string match "*@*" $user]
++        if {$contains_machine_name == 0} {
++            set machine [lindex [split  "$host"  .] 0]
++            set user "$user@$machine"
++        }
++    }
++
++    #Azure requires ssl connection
++    set sslConnectionEnabled 0
++    if { $azure eq "true" } {
++        set sslConnectionEnabled 1
++    }
++
+ global tcl_platform
+-if {[catch {set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname ]]} message]} {
++if {[catch {set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname requiressl = $sslConnectionEnabled ]]} message]} {
+ set lda "Failed" ; puts $message
+ error $message
+  } else {
+ if {$tcl_platform(platform) == "windows"} {
+ #Workaround for Bug #95 where first connection fails on Windows
+ catch {pg_disconnect $lda}
+-set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname ]]
++set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname requiressl = $sslConnectionEnabled ]]
+         }
+ pg_notice_handler $lda puts
+ set result [ pg_exec $lda "set CLIENT_MIN_MESSAGES TO 'ERROR'" ]
+@@ -68,14 +83,21 @@
+ return $lda
+ }
+ 
+-proc CreateUserDatabase { lda host port db tspace superuser superuser_password user password } {
++proc CreateUserDatabase { lda host port azure db tspace superuser superuser_password user password } {
+ set stmnt_count 1
+ puts "CREATING DATABASE $db under OWNER $user"
+ set result [ pg_exec $lda "SELECT 1 FROM pg_roles WHERE rolname = '$user'"]
+ if { [pg_result $result -numTuples] == 0 } {
+ set sql($stmnt_count) "CREATE USER $user PASSWORD '$password'"
+ incr stmnt_count;
++        if { $azure eq "true" } {
++            # After logging in to postgres
++            # we do not need the machine name
++            set superuser [lindex [split  "$superuser"  @] 0]
++        }
++
+ set sql($stmnt_count) "GRANT $user to $superuser"
++
+     } else {
+ puts "Using existing User $user for Schema build"
+ set sql($stmnt_count) "ALTER USER $user PASSWORD '$password'"
+@@ -85,7 +107,7 @@
+ if { [pg_result $result -numTuples] == 0} {
+ set sql($stmnt_count) "CREATE DATABASE $db OWNER $user"
+     } else {
+-set existing_db [ ConnectToPostgres $host $port $superuser $superuser_password $db ]
++set existing_db [ ConnectToPostgres $host $port $azure $superuser $superuser_password $db  ]
+ if { $existing_db eq "Failed" } {
+ error "error, the database connection to $host could not be established"
+         } else {
+@@ -520,7 +542,7 @@
+ set sql(7) "CREATE INDEX LINEITEM_PK ON LINEITEM (L_LINENUMBER, L_ORDERKEY)"
+ set sql(8) "CREATE INDEX CUSTOMER_PK ON CUSTOMER (C_CUSTKEY)"
+ 	} else {
+-set ind_cnt 16
++set ind_cnt 24
+ set sql(1) "ALTER TABLE REGION ADD CONSTRAINT REGION_PK PRIMARY KEY (R_REGIONKEY)"
+ set sql(2) "ALTER TABLE NATION ADD CONSTRAINT NATION_PK PRIMARY KEY (N_NATIONKEY)"
+ set sql(3) "ALTER TABLE SUPPLIER ADD CONSTRAINT SUPPLIER_PK PRIMARY KEY (S_SUPPKEY)"
+@@ -537,6 +559,14 @@
+ set sql(14) "ALTER TABLE CUSTOMER ADD CONSTRAINT CUSTOMER_NATION_FK FOREIGN KEY (C_NATIONKEY) REFERENCES NATION (N_NATIONKEY) NOT DEFERRABLE"
+ set sql(15) "ALTER TABLE NATION ADD CONSTRAINT NATION_REGION_FK FOREIGN KEY (N_REGIONKEY) REFERENCES REGION (R_REGIONKEY) NOT DEFERRABLE"
+ set sql(16) "ALTER TABLE LINEITEM ADD CONSTRAINT LINEITEM_ORDER_FK FOREIGN KEY (L_ORDERKEY) REFERENCES ORDERS (O_ORDERKEY) NOT DEFERRABLE"
++set sql(17) "CREATE INDEX LINEITEM_PART_SUPP_FKIDX ON LINEITEM (L_PARTKEY,L_SUPPKEY)"
++set sql(18) "CREATE INDEX ORDER_CUSTOMER_FKIDX ON ORDERS (O_CUSTKEY)"
++set sql(19) "CREATE INDEX PARTSUPP_PART_FKIDX ON PARTSUPP (PS_PARTKEY)"
++set sql(20) "CREATE INDEX PARTSUPP_SUPPLIER_FKIDX ON PARTSUPP (PS_SUPPKEY)"
++set sql(21) "CREATE INDEX SUPPLIER_NATION_FKIDX ON SUPPLIER (S_NATIONKEY)"
++set sql(22) "CREATE INDEX CUSTOMER_NATION_FKIDX ON CUSTOMER (C_NATIONKEY)"
++set sql(23) "CREATE INDEX NATION_REGIONKEY_FKIDX ON NATION (N_REGIONKEY)"
++set sql(24) "CREATE INDEX IDX_LINEITEM_ORDERKEY_FKIDX ON LINEITEM (L_ORDERKEY)"
+ 	}
+ for { set i 1 } { $i <= $ind_cnt } { incr i } {
+ set result [ pg_exec $lda $sql($i) ]
+@@ -549,7 +579,7 @@
+ return
+ }
+ 
+-proc do_tpch { host port scale_fact superuser superuser_password defaultdb db tspace user password greenplum gpcompress num_vu } {
++proc do_tpch { host port azure scale_fact superuser superuser_password defaultdb db tspace user password greenplum gpcompress num_vu } {
+ global dist_names dist_weights weights dists weights
+ ###############################################
+ #Generating following rows
+@@ -602,15 +632,15 @@
+   }
+ if { $threaded eq "SINGLE-THREADED" ||  $threaded eq "MULTI-THREADED" && $myposition eq 1 } {
+ puts "CREATING [ string toupper $user ] SCHEMA"
+-set lda [ ConnectToPostgres $host $port $superuser $superuser_password $defaultdb ]
++set lda [ ConnectToPostgres $host $port $azure $superuser $superuser_password $defaultdb ]
+ if { $lda eq "Failed" } {
+ error "error, the database connection to $host could not be established"
+  } else {
+-CreateUserDatabase $lda $host $port $db $tspace $superuser $superuser_password $user $password
++CreateUserDatabase $lda $host $port $azure $db $tspace $superuser $superuser_password $user $password
+ set result [ pg_exec $lda "commit" ]
+ pg_result $result -clear
+ pg_disconnect $lda
+-set lda [ ConnectToPostgres $host $port $user $password $db ]
++set lda [ ConnectToPostgres $host $port $azure $user $password $db ]
+ if { $lda eq "Failed" } {
+ error "error, the database connection to $host could not be established"
+  } else {
+@@ -669,7 +699,7 @@
+ }
+ after 5000
+ }
+-set lda [ ConnectToPostgres $host $port $user $password $db ]
++set lda [ ConnectToPostgres $host $port $azure $user $password $db ]
+ if { $lda eq "Failed" } {
+ error "error, the database connection to $host could not be established"
+  }
+@@ -712,7 +742,7 @@
+ 		}
+ 	}
+ }
+-.ed_mainFrame.mainwin.textFrame.left.text fastinsert end "do_tpch $pg_host $pg_port $pg_scale_fact $pg_tpch_superuser $pg_tpch_superuserpass $pg_tpch_defaultdbase $pg_tpch_dbase $pg_tpch_tspace $pg_tpch_user $pg_tpch_pass $pg_tpch_gpcompat $pg_tpch_gpcompress $pg_num_tpch_threads"
++.ed_mainFrame.mainwin.textFrame.left.text fastinsert end "do_tpch $pg_host $pg_port $pg_azure $pg_scale_fact $pg_tpch_superuser $pg_tpch_superuserpass $pg_tpch_defaultdbase $pg_tpch_dbase $pg_tpch_tspace $pg_tpch_user $pg_tpch_pass $pg_tpch_gpcompat $pg_tpch_gpcompress $pg_num_tpch_threads"
+ 	} else { return }
+ }
+ 
+@@ -738,6 +768,7 @@
+ set scale_factor $pg_scale_fact ;#Scale factor of the tpc-h schema
+ set host \"$pg_host\" ;# Address of the server hosting PostgreSQL
+ set port \"$pg_port\" ;# Port of the PostgreSQL Server
++set azure \"$pg_azure\";#Azure Type Connection
+ set user \"$pg_tpch_user\" ;# PostgreSQL user
+ set password \"$pg_tpch_pass\" ;# Password for the PostgreSQL user
+ set db \"$pg_tpch_dbase\" ;# Database containing the TPC Schema
+@@ -767,16 +798,31 @@
+ return [ expr $rowcount ]
+ }
+ 
+-proc ConnectToPostgres { host port user password dbname } {
++proc ConnectToPostgres { host port azure user password dbname } {
++    #Azure requres machine name suffix when login
++    if { $azure eq "true" } {
++        set contains_machine_name [string match "*@*" $user]
++        if {$contains_machine_name == 0} {
++            set machine [lindex [split  "$host"  .] 0]
++            set user "$user@$machine"
++        }
++    }
++
++    #Azure requires ssl connection
++    set sslConnectionEnabled 0
++    if { $azure eq "true" } {
++        set sslConnectionEnabled 1
++    }
++
+ global tcl_platform
+-if {[catch {set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname ]]} message]} {
++if {[catch {set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname requiressl = $sslConnectionEnabled ]]} message]} {
+ set lda "Failed" ; puts $message
+ error $message
+  } else {
+ if {$tcl_platform(platform) == "windows"} {
+ #Workaround for Bug #95 where first connection fails on Windows
+ catch {pg_disconnect $lda}
+-set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname ]]
++set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname requiressl = $sslConnectionEnabled ]]
+         }
+ pg_notice_handler $lda puts
+ set result [ pg_exec $lda "set CLIENT_MIN_MESSAGES TO 'ERROR'" ]
+@@ -784,6 +830,7 @@
+         }
+ return $lda
+ }
++
+ #########################
+ #TPCH REFRESH PROCEDURE
+ proc mk_order_ref { lda upd_num scale_factor trickle_refresh REFRESH_VERBOSE } {
+@@ -936,8 +983,8 @@
+ pg_result $result -clear
+ }
+ 
+-proc do_refresh { host port db user password scale_factor update_sets trickle_refresh REFRESH_VERBOSE RF_SET } {
+-set lda [ ConnectToPostgres $host $port $user $password $db ]
++proc do_refresh { host port azure db user password scale_factor update_sets trickle_refresh REFRESH_VERBOSE RF_SET } {
++set lda [ ConnectToPostgres $host $port $azure $user $password $db ]
+ if { $lda eq "Failed" } {
+ error "error, the database connection to $host could not be established"
+  	}
+@@ -1190,10 +1237,10 @@
+ }
+ #########################
+ #TPCH QUERY SETS PROCEDURE
+-proc do_tpch { host port db user password scale_factor RAISEERROR VERBOSE degree_of_parallel total_querysets myposition } {
++proc do_tpch { host port azure db user password scale_factor RAISEERROR VERBOSE degree_of_parallel total_querysets myposition } {
+ #Queries 17 and 20 are long running on PostgreSQL
+ set SKIP_QUERY_17_20 "false" 
+-set lda [ ConnectToPostgres $host $port $user $password $db ]
++set lda [ ConnectToPostgres $host $port $azure $user $password $db ]
+ if { $lda eq "Failed" } {
+ error "error, the database connection to $host could not be established"
+  	}
+@@ -1297,7 +1344,7 @@
+ set update_sets 1
+ set REFRESH_VERBOSE "false"
+ do_refresh $host $port $db $user $password $scale_factor $update_sets $trickle_refresh $REFRESH_VERBOSE RF1
+-do_tpch $host $port $db $user $password $scale_factor $RAISEERROR $VERBOSE $degree_of_parallel $total_querysets 0
++do_tpch $host $port $azure $db $user $password $scale_factor $RAISEERROR $VERBOSE $degree_of_parallel $total_querysets 0
+ do_refresh $host $port $db $user $password $scale_factor $update_sets $trickle_refresh $REFRESH_VERBOSE RF2
+ 	} else {
+ switch $myposition {
+@@ -1305,12 +1352,12 @@
+ do_refresh $host $port $db $user $password $scale_factor $update_sets $trickle_refresh $REFRESH_VERBOSE BOTH
+ 	}
+ default { 
+-do_tpch $host $port $db $user $password $scale_factor $RAISEERROR $VERBOSE $degree_of_parallel $total_querysets [ expr $myposition - 1 ] 
++do_tpch $host $port $azure $db $user $password $scale_factor $RAISEERROR $VERBOSE $degree_of_parallel $total_querysets [ expr $myposition - 1 ]
+ 	}
+     }
+  }
+ } else {
+-do_tpch $host $port $db $user $password $scale_factor $RAISEERROR $VERBOSE $degree_of_parallel $total_querysets $myposition 
++do_tpch $host $port $azure $db $user $password $scale_factor $RAISEERROR $VERBOSE $degree_of_parallel $total_querysets $myposition
+ 	}}
+ }
+ 
+@@ -1335,6 +1382,7 @@
+ set redshift_compat \"$pg_rs_compat\" ;# Queries to run against redshift (true or false)
+ set host \"$pg_host\" ;# Address of the server hosting PostgreSQL
+ set port \"$pg_port\" ;# Port of the PostgreSQL Server
++set azure \"$pg_azure\";#Azure Type Connection
+ set user \"$pg_tpch_user\" ;# PostgreSQL user
+ set password \"$pg_tpch_pass\" ;# Password for the PostgreSQL user
+ set db \"$pg_tpch_dbase\" ;# Database containing the TPC Schema
+@@ -1360,16 +1408,31 @@
+ return [ expr $rowcount ]
+ }
+ 
+-proc ConnectToPostgres { host port user password dbname } {
++proc ConnectToPostgres { host port azure user password dbname } {
++    #Azure requres machine name suffix when login
++    if { $azure eq "true" } {
++        set contains_machine_name [string match "*@*" $user]
++        if {$contains_machine_name == 0} {
++            set machine [lindex [split  "$host"  .] 0]
++            set user "$user@$machine"
++        }
++    }
++
++    #Azure requires ssl connection
++    set sslConnectionEnabled 0
++    if { $azure eq "true" } {
++        set sslConnectionEnabled 1
++    }
++
+ global tcl_platform
+-if {[catch {set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname ]]} message]} {
+-puts $message
++if {[catch {set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname requiressl = $sslConnectionEnabled ]]} message]} {
++set lda "Failed" ; puts $message
+ error $message
+  } else {
+ if {$tcl_platform(platform) == "windows"} {
+ #Workaround for Bug #95 where first connection fails on Windows
+ catch {pg_disconnect $lda}
+-set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname ]]
++set lda [pg_connect -conninfo [list host = $host port = $port user = $user password = $password dbname = $dbname requiressl = $sslConnectionEnabled ]]
+         }
+ pg_notice_handler $lda puts
+ set result [ pg_exec $lda "set CLIENT_MIN_MESSAGES TO 'ERROR'" ]
+@@ -1440,13 +1503,13 @@
+ }
+ #########################
+ #CLOUD ANALYTIC TPCH QUERY SETS PROCEDURE
+-proc do_cloud { host port user password db RAISEERROR VERBOSE degree_of_parallel redshift_compat } {
++proc do_cloud { host port azure password db RAISEERROR VERBOSE degree_of_parallel redshift_compat } {
+ if { $redshift_compat } {
+ set VERSION "redshift"	
+ 	} else {
+ set VERSION "postgres"	
+ 	}
+-set lda [ ConnectToPostgres $host $port $user $password $db ]
++set lda [ ConnectToPostgres $host $port $azure $user $password $db ]
+ if { $VERSION eq "postgres" } {
+ create_median_and_percentile $lda
+ set result [ pg_exec $lda "set max_parallel_workers_per_gather=$degree_of_parallel"]
