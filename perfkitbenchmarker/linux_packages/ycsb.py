@@ -218,6 +218,12 @@ flags.DEFINE_boolean(
     'ycsb_log_remote_command_output', True,
     'Whether to log the remote command\'s output at the info '
     'level.')
+_BURST_LOAD_MULTIPLIER = flags.DEFINE_integer(
+    'ycsb_burst_load', None,
+    'If set, applies burst load to the system, by running YCSB once, and then '
+    'immediately running again with --ycsb_burst_load times the '
+    'amount of load specified by the `target` parameter. Set to -1 for '
+    'the max throughput from the client.')
 _SHOULD_RECORD_COMMAND_LINE = flags.DEFINE_boolean(
     'ycsb_record_command_line', True,
     'Whether to record the command line used for kicking off the runs as part '
@@ -314,6 +320,15 @@ def GetWorkloadFileList() -> List[str]:
   return [data.ResourcePath(workload) for workload in FLAGS.ycsb_workload_files]
 
 
+def _GetRunParameters() -> dict[str, str]:
+  """Returns a dict of params from the --ycsb_run_parameters flag."""
+  result = {}
+  for kv in FLAGS.ycsb_run_parameters:
+    param, value = kv.split('=', 1)
+    result[param] = value
+  return result
+
+
 def CheckPrerequisites():
   """Verifies that the workload files are present and parameters are valid.
 
@@ -335,8 +350,10 @@ def CheckPrerequisites():
   if ycsb_version < 17:
     raise errors.Config.InvalidValue('must use YCSB version 0.17.0 or higher.')
 
+  run_params = _GetRunParameters()
+
   # Following flags are mutully exclusive.
-  run_target = 'target' in FLAGS.ycsb_run_parameters
+  run_target = 'target' in run_params
   per_thread_target = any(
       [':' in thread_qps for thread_qps in FLAGS.ycsb_threads_per_client])
   dynamic_load = FLAGS.ycsb_dynamic_load
@@ -350,6 +367,11 @@ def CheckPrerequisites():
   if FLAGS.ycsb_dynamic_load_throughput_lower_bound and not dynamic_load:
     raise errors.Config.InvalidValue(
         'To apply dynamic load, set --ycsb_dynamic_load.')
+
+  if _BURST_LOAD_MULTIPLIER.value and not run_target:
+    raise errors.Config.InvalidValue(
+        'Running in burst mode requires setting a target QPS using '
+        '--ycsb_run_parameters=target=qps. Got None.')
 
 
 @vm_util.Retry(poll_interval=1)
@@ -1535,12 +1557,35 @@ class YCSBExecutor(object):
     """Runs each workload/client count combination."""
     workloads = workloads or GetWorkloadFileList()
     assert workloads, 'no workloads'
-    samples = list(self.RunStaircaseLoads(vms, workloads, **(run_kwargs or {})))
+    if not run_kwargs:
+      run_kwargs = {}
+    if _BURST_LOAD_MULTIPLIER.value:
+      samples = self._RunBurstMode(vms, workloads, run_kwargs)
+    else:
+      samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
     if (FLAGS.ycsb_sleep_after_load_in_sec > 0 and
         not FLAGS.ycsb_skip_load_stage):
       for s in samples:
         s.metadata[
             'sleep_after_load_in_sec'] = FLAGS.ycsb_sleep_after_load_in_sec
+    return samples
+
+  def _RunBurstMode(self, vms, workloads, run_kwargs=None):
+    """Runs YCSB in burst mode, where the second run has increased QPS."""
+    run_params = _GetRunParameters()
+    initial_qps = int(run_params.get('target', 0))
+
+    samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
+
+    if _BURST_LOAD_MULTIPLIER.value == -1:
+      run_params.pop('target')  # Set to unlimited
+    else:
+      run_params['target'] = initial_qps * _BURST_LOAD_MULTIPLIER.value
+    FLAGS['ycsb_run_parameters'].unparse()
+    FLAGS['ycsb_run_parameters'].parse(
+        [f'{k}={v}' for k, v in run_params.items()])
+
+    samples += list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
     return samples
 
   def LoadAndRun(self, vms, workloads=None, load_kwargs=None, run_kwargs=None):

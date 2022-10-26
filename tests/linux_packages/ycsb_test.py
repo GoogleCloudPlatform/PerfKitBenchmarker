@@ -347,23 +347,63 @@ class PrerequisitesTestCase(pkb_common_test_case.PkbCommonTestCase):
     actual_version = ycsb._GetVersionFromUrl(url)
     self.assertEqual(actual_version, expected_version)
 
+  @flagsaver.flagsaver
+  def testBurstLoadCalledWithNoTargetRaises(self):
+    # Arrange
+    FLAGS.ycsb_burst_load = 1
+
+    # Act & Assert
+    with self.assertRaises(errors.Config.InvalidValue):
+      ycsb.CheckPrerequisites()
+
 
 class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
 
+  def setUp(self):
+    super().setUp()
+    FLAGS.ycsb_workload_files = ['workloadc']
+    self.test_executor = ycsb.YCSBExecutor('test_database')
+    # Result parsing is already handled elsewhere
+    self.enter_context(mock.patch.object(ycsb, 'ParseResults'))
+    # Test VM with mocked command
+    self.test_vm = mock.Mock()
+    self.test_cmd = self.test_vm.RobustRemoteCommand
+    self.test_cmd.return_value = ['', '']
+
   @flagsaver.flagsaver
   def testRunCalledWithCorrectTarget(self):
-    # Arrange
-    FLAGS.ycsb_workload_files = ['workloadc']
-    test_executor = ycsb.YCSBExecutor('test_database')
-    test_vm = mock.Mock()
-    test_vm.RobustRemoteCommand.return_value = ['', '']
-    self.enter_context(mock.patch.object(ycsb, 'ParseResults'))
-
     # Act
-    test_executor.Run([test_vm], run_kwargs={'target': 1000})
+    self.test_executor.Run([self.test_vm], run_kwargs={'target': 1000})
 
     # Assert
-    self.assertIn('-target 1000', test_vm.RobustRemoteCommand.call_args[0][0])
+    self.assertIn('-target 1000', self.test_cmd.call_args[0][0])
+
+  @flagsaver.flagsaver
+  def testBurstLoadUnlimitedMultiplier(self):
+    # Arrange
+    FLAGS.ycsb_burst_load = -1
+    FLAGS.ycsb_run_parameters = ['target=1000']
+
+    # Act
+    self.test_executor.Run([self.test_vm])
+
+    # Assert
+    print(self.test_cmd.call_args_list)
+    self.assertNotIn('target', self.test_cmd.call_args_list[1][0][0])
+
+  @flagsaver.flagsaver
+  def testBurstLoadCalledWithCorrectTarget(self):
+    # Arrange
+    FLAGS.ycsb_burst_load = 10
+    FLAGS.ycsb_run_parameters = ['target=1000']
+
+    # Act
+    self.test_executor.Run([self.test_vm])
+
+    # Assert
+    self.assertIn('-target 1000', self.test_cmd.call_args_list[0][0][0])
+    self.assertIn('-target 10000', self.test_cmd.call_args_list[1][0][0])
+
 
 if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)

@@ -414,9 +414,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     load_kwargs['threads'] = 1
 
   samples = []
+  executor: ycsb.YCSBExecutor = benchmark_spec.executor
   if not instance.restored:
-    samples += list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
-  samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
+    samples += list(executor.Load(vms, load_kwargs=load_kwargs))
+  samples += list(executor.Run(vms, run_kwargs=run_kwargs))
 
   # Optionally add new samples for cluster cpu utilization.
   if _GET_CPU_UTILIZATION.value:
