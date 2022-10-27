@@ -533,7 +533,7 @@ def UpdateScriptForSmallGpuMem(vm: virtual_machine.BaseVirtualMachine) -> None:
     vm: The VM to work on
   """
   if nvidia_driver.GetGpuMem(vm) < 80000 and nvidia_driver.QueryNumberOfGpus(
-      vm) > 8:
+      vm) >= 8:
     # A100 40G fails out of memory when creating dummy_eval_data on one GPU.
     data_script = f'$HOME/training_results_{VERSION.value}/NVIDIA/benchmarks/resnet/implementations/mxnet/common/data.py'
     vm_util.ReplaceText(vm, r"mx\.Context\('gpu'\)",

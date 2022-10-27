@@ -748,6 +748,9 @@ def _UpdateScripts(benchmark_spec, node_rank):
         f'cd aws-efa-nccl-baseami-pipeline && git checkout {NVIDIA_EFA_DOCKERFILE_COMMIT}'
     )
     vm.RemoteCommand(f'cat {NVIDIA_EFA_DOCKERFILE} >> {docker_file}')
+    vm.RemoteCommand(
+        f'echo "RUN rm -rf /opt/hpcx/ompi && ln -s /opt/amazon/openmpi /opt/hpcx/ompi" >> {docker_file}'
+    )
     vm_util.ReplaceText(vm, 'FROM nvcr.*', '', docker_file)
     vm_util.ReplaceText(vm, 'yum-utils.*', '', docker_file)
     vm_util.ReplaceText(vm, 'python3-distutils.*', 'python3-distutils',
