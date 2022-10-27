@@ -50,7 +50,13 @@ def GetResourceClass(base_class, **kwargs):
     raise errors.Resource.SubclassNotFoundError(
         'No %s subclass defined with the attributes: %s' %
         (base_class.__name__, kwargs))
-  return _RESOURCE_REGISTRY.get(tuple(key))
+  resource = _RESOURCE_REGISTRY.get(tuple(key))
+
+  # Set the required attributes of the resource
+  for key, value in kwargs.items():
+    setattr(resource, key, value)
+
+  return resource
 
 
 class AutoRegisterResourceMeta(abc.ABCMeta):

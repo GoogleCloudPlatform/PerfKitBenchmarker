@@ -336,6 +336,9 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
+      self.assertEqual(vm.GetDefaultImageFamily(), 'ubuntu-1804-lts')
+      self.assertEqual(vm.GetDefaultImageProject(), 'ubuntu-os-cloud')
+      self.assertTrue(vm.SupportGVNIC())
       self.assertIn('gcloud compute instances create', command_string)
       self.assertIn(
           '--image-family ubuntu-1804-lts --image-project ubuntu-os-cloud',

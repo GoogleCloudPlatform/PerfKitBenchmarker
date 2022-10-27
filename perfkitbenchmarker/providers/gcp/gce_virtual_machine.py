@@ -47,7 +47,6 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
@@ -74,23 +73,12 @@ _UNSUPPORTED_RESOURCE = 'Could not fetch resource'
 _GCE_VM_CREATE_TIMEOUT = 1200
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
 _SHUTDOWN_SCRIPT = 'su "{user}" -c "echo | gsutil cp - {preempt_marker}"'
-_WINDOWS_SHUTDOWN_SCRIPT_PS1 = 'Write-Host | gsutil cp - {preempt_marker}'
-_METADATA_PREEMPT_URI = 'http://metadata.google.internal/computeMetadata/v1/instance/preempted'
-_METADATA_PREEMPT_CMD = f'curl {_METADATA_PREEMPT_URI} -H "Metadata-Flavor: Google"'
-_METADATA_PREEMPT_CMD_WIN = (f'Invoke-RestMethod -Uri {_METADATA_PREEMPT_URI} '
-                             '-Headers @{"Metadata-Flavor"="Google"}')
+METADATA_PREEMPT_URI = 'http://metadata.google.internal/computeMetadata/v1/instance/preempted'
+_METADATA_PREEMPT_CMD = f'curl {METADATA_PREEMPT_URI} -H "Metadata-Flavor: Google"'
 # Machine type to ARM architecture.
 _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     't2a': 'neoverse-n1',
 }
-
-
-class GceUnexpectedWindowsAdapterOutputError(Exception):
-  """Raised when querying the status of a windows adapter failed."""
-
-
-class GceDriverDoesntSupportFeatureError(Exception):
-  """Raised if there is an attempt to set a feature not supported."""
 
 
 class GceVmSpec(virtual_machine.BaseVmSpec):
@@ -398,13 +386,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   CLOUD = providers.GCP
 
-  # Subclasses should override the default image OR
-  # both the image family and image_project.
   DEFAULT_IMAGE = None
-  DEFAULT_IMAGE_FAMILY = None
-  DEFAULT_IMAGE_PROJECT = None
-
-  # Subclasses may override these, but are recommended to leave them up to GCE.
   BOOT_DISK_SIZE_GB = None
   BOOT_DISK_TYPE = None
 
@@ -417,8 +399,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   _LM_TIMES_SEMAPHORE = threading.Semaphore(0)
   _LM_NOTICE_SCRIPT = 'gce_maintenance_notice.py'
   _LM_NOTICE_LOG = 'gce_maintenance_notice.log'
-
-  SUPPORTS_GVNIC = True
 
   def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
@@ -443,8 +423,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.spot_early_termination = False
     self.preemptible_status_code = None
     self.project = vm_spec.project or util.GetDefaultProject()
-    self.image_family = vm_spec.image_family or self.DEFAULT_IMAGE_FAMILY
-    self.image_project = vm_spec.image_project or self.DEFAULT_IMAGE_PROJECT
+    self.image_family = vm_spec.image_family or self.GetDefaultImageFamily()
+    self.image_project = vm_spec.image_project or self.GetDefaultImageProject()
     self.backfill_image = False
     self.mtu: Optional[int] = FLAGS.mtu
     self.network = self._GetNetwork()
@@ -463,7 +443,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_nic_type = FLAGS.gce_nic_type
-    if not self.SUPPORTS_GVNIC:
+    if not self.SupportGVNIC():
       logging.warning('Changing gce_nic_type to VIRTIO_NET')
       self.gce_nic_type = 'VIRTIO_NET'
     self.gce_egress_bandwidth_tier = gcp_flags.EGRESS_BANDWIDTH_TIER.value
@@ -503,8 +483,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Reset image when running client-server benchmarks where client must be x86
     if (not arm_arch and self.image_family and 'arm64' in self.image_family):
       logging.warning('Using default image and project for non-ARM VM')
-      self.image_family = self.DEFAULT_IMAGE_FAMILY
-      self.image_project = self.DEFAULT_IMAGE_PROJECT
+      self.image_family = self.GetDefaultImageFamily()  # pylint: disable=assignment-from-none
+      self.image_project = self.GetDefaultImageProject()  # pylint: disable=assignment-from-none
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
@@ -1245,6 +1225,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     return 3600
 
+  def SupportGVNIC(self) -> bool:
+    return True
+
+  def GetDefaultImageFamily(self) -> Optional[str]:
+    return None
+
+  def GetDefaultImageProject(self) -> Optional[str]:
+    return None
+
 
 class BaseLinuxGceVirtualMachine(GceVirtualMachine,
                                  linux_vm.BaseLinuxMixin):
@@ -1257,6 +1246,12 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
   _ETHTOOL_RE = re.compile(r'^(?P<key>.*?):\s*(?P<value>.*)\s*')
   # the "device" value in ethtool properties for gvnic
   _GVNIC_DEVICE_NAME = 'gve'
+
+ # Subclasses should override the default image OR
+  # both the image family and image_project.
+  DEFAULT_IMAGE_FAMILY = None
+  DEFAULT_IMAGE_PROJECT = None
+  SUPPORTS_GVNIC = True
 
   def __init__(self, vm_spec):
     super(BaseLinuxGceVirtualMachine, self).__init__(vm_spec)
@@ -1285,8 +1280,8 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
       driver = device.get('driver')
       driver_version = device.get('version')
       if not driver:
-        logging.error(
-            'Network device %s lacks a driver %s', device_name, device)
+        logging.error('Network device %s lacks a driver %s', device_name,
+                      device)
       elif driver == self._GVNIC_DEVICE_NAME:
         logging.info('gvnic properties %s', device)
         if driver_version:
@@ -1310,6 +1305,19 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
       if m:
         properties[m['key']] = m['value']
     return properties
+
+  def SupportGVNIC(self) -> bool:
+    return self.SUPPORTS_GVNIC
+
+  def GetDefaultImageFamily(self) -> str:
+    if not self.DEFAULT_IMAGE_FAMILY:
+      raise ValueError('DEFAULT_IMAGE_FAMILY can not be None')
+    return self.DEFAULT_IMAGE_FAMILY
+
+  def GetDefaultImageProject(self) -> str:
+    if not self.DEFAULT_IMAGE_PROJECT:
+      raise ValueError('DEFAULT_IMAGE_PROJECT can not be None')
+    return self.DEFAULT_IMAGE_PROJECT
 
 
 class Debian9BasedGceVirtualMachine(
@@ -1431,190 +1439,6 @@ class Ubuntu2204BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2204Mixin):
   DEFAULT_IMAGE_FAMILY = 'ubuntu-2204-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
-
-
-class BaseWindowsGceVirtualMachine(GceVirtualMachine,
-                                   windows_virtual_machine.BaseWindowsMixin):
-  """Class supporting Windows GCE virtual machines."""
-
-  DEFAULT_IMAGE_PROJECT = 'windows-cloud'
-
-  NVME_START_INDEX = 0
-
-  def __init__(self, vm_spec):
-    """Initialize a Windows GCE virtual machine.
-
-    Args:
-      vm_spec: virtual_machine.BaseVmSpec object of the vm.
-    """
-    super(BaseWindowsGceVirtualMachine, self).__init__(vm_spec)
-    self.boot_metadata[
-        'windows-startup-script-ps1'] = windows_virtual_machine.STARTUP_SCRIPT
-
-  def _GenerateResetPasswordCommand(self):
-    """Generates a command to reset a VM user's password.
-
-    Returns:
-      GcloudCommand. gcloud command to issue in order to reset the VM user's
-      password.
-    """
-    cmd = util.GcloudCommand(self, 'compute', 'reset-windows-password',
-                             self.name)
-    cmd.flags['user'] = self.user_name
-    return cmd
-
-  def _PostCreate(self):
-    super(BaseWindowsGceVirtualMachine, self)._PostCreate()
-    reset_password_cmd = self._GenerateResetPasswordCommand()
-    stdout, _ = reset_password_cmd.IssueRetryable()
-    response = json.loads(stdout)
-    self.password = response['password']
-
-  def _PreemptibleMetadataKeyValue(self) -> Tuple[str, str]:
-    """See base class."""
-    return 'windows-shutdown-script-ps1', _WINDOWS_SHUTDOWN_SCRIPT_PS1.format(
-        preempt_marker=self.preempt_marker)
-
-  @vm_util.Retry(
-      max_retries=10,
-      retryable_exceptions=(GceUnexpectedWindowsAdapterOutputError,
-                            errors.VirtualMachine.RemoteCommandError))
-  def GetResourceMetadata(self):
-    """Returns a dict containing metadata about the VM.
-
-    Returns:
-      dict mapping metadata key to value.
-    """
-    result = super(BaseWindowsGceVirtualMachine, self).GetResourceMetadata()
-    result['disable_rss'] = self.disable_rss
-    return result
-
-  def DisableRSS(self):
-    """Disables RSS on the GCE VM.
-
-    Raises:
-      GceDriverDoesntSupportFeatureError: If RSS is not supported.
-      GceUnexpectedWindowsAdapterOutputError: If querying the RSS state
-        returns unexpected output.
-    """
-    # First ensure that the driver supports interrupt moderation
-    net_adapters, _ = self.RemoteCommand('Get-NetAdapter')
-    if 'Red Hat VirtIO Ethernet Adapter' not in net_adapters:
-      raise GceDriverDoesntSupportFeatureError(
-          'Driver not tested with RSS disabled in PKB.')
-
-    command = 'netsh int tcp set global rss=disabled'
-    self.RemoteCommand(command)
-    try:
-      self.RemoteCommand('Restart-NetAdapter -Name "Ethernet"')
-    except IOError:
-      # Restarting the network adapter will always fail because
-      # the winrm connection used to issue the command will be
-      # broken.
-      pass
-
-    # Verify the setting went through
-    stdout, _ = self.RemoteCommand('netsh int tcp show global')
-    if 'Receive-Side Scaling State          : enabled' in stdout:
-      raise GceUnexpectedWindowsAdapterOutputError('RSS failed to disable.')
-
-  def _AcquireWritePermissionsLinux(self):
-    gcs.GoogleCloudStorageService.AcquireWritePermissionsWindows(self)
-
-  @property
-  def _MetadataPreemptCmd(self):
-    return _METADATA_PREEMPT_CMD_WIN
-
-
-class Windows2012CoreGceVirtualMachine(
-    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
-  DEFAULT_IMAGE_FAMILY = 'windows-2012-r2-core'
-  SUPPORTS_GVNIC = False
-
-
-class Windows2016CoreGceVirtualMachine(
-    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
-  DEFAULT_IMAGE_FAMILY = 'windows-2016-core'
-
-
-class Windows2019CoreGceVirtualMachine(
-    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2019CoreMixin):
-  DEFAULT_IMAGE_FAMILY = 'windows-2019-core'
-
-
-class Windows2022CoreGceVirtualMachine(
-    BaseWindowsGceVirtualMachine, windows_virtual_machine.Windows2022CoreMixin):
-  DEFAULT_IMAGE_FAMILY = 'windows-2022-core'
-
-
-class Windows2012DesktopGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.Windows2012DesktopMixin):
-  DEFAULT_IMAGE_FAMILY = 'windows-2012-r2'
-  SUPPORTS_GVNIC = False
-
-
-class Windows2016DesktopGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.Windows2016DesktopMixin):
-  DEFAULT_IMAGE_FAMILY = 'windows-2016'
-
-
-class Windows2019DesktopGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.Windows2019DesktopMixin):
-  DEFAULT_IMAGE_FAMILY = 'windows-2019'
-
-
-class Windows2022DesktopGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.Windows2022DesktopMixin):
-  DEFAULT_IMAGE_FAMILY = 'windows-2022'
-
-
-class Windows2019DesktopSQLServer2017StandardGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.Windows2019SQLServer2017Standard):
-  DEFAULT_IMAGE_FAMILY = 'sql-std-2017-win-2019'
-  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
-
-
-class Windows2019DesktopSQLServer2017EnterpriseGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.Windows2019SQLServer2017Enterprise):
-  DEFAULT_IMAGE_FAMILY = 'sql-ent-2017-win-2019'
-  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
-  SUPPORTS_GVNIC = False
-
-
-class Windows2019DesktopSQLServer2019StandardGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.Windows2019SQLServer2019Standard):
-  DEFAULT_IMAGE_FAMILY = 'sql-std-2019-win-2019'
-  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
-
-
-class Windows2019DesktopSQLServer2019EnterpriseGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.Windows2019SQLServer2019Enterprise):
-  DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2019'
-  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
-  SUPPORTS_GVNIC = False
-
-
-class Windows2022DesktopSQLServer2019StandardGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.Windows2022SQLServer2019Standard):
-  DEFAULT_IMAGE_FAMILY = 'sql-std-2019-win-2022'
-  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
-
-
-class Windows2022DesktopSQLServer2019EnterpriseGceVirtualMachine(
-    BaseWindowsGceVirtualMachine,
-    windows_virtual_machine.Windows2022SQLServer2019Enterprise):
-  DEFAULT_IMAGE_FAMILY = 'sql-ent-2019-win-2022'
-  DEFAULT_IMAGE_PROJECT = 'windows-sql-cloud'
-  SUPPORTS_GVNIC = False
 
 
 def GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
