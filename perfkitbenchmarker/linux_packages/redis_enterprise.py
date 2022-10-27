@@ -96,6 +96,11 @@ _REPLICATION = flags.DEFINE_bool(
     'enterprise_redis_db_replication', False,
     'If true, replicates each database to another node. Doubles the amount of '
     'memory used by the database records.')
+_MEMORY_SIZE_PERCENTAGE = flags.DEFINE_float(
+    'enterprise_redis_memory_size_percentage', 0.80,
+    'The percentage amount of memory to use out of all the available memory '
+    'reported by rladmin for provisioning databases. 1 means use all available '
+    'memory, which in practice tends to be error-prone.')
 
 _VM = virtual_machine.VirtualMachine
 _ThroughputSampleTuple = Tuple[float, List[sample.Sample]]
@@ -268,7 +273,8 @@ def GetDatabaseMemorySize(vm: _VM) -> int:
   # See tests/data/redis_enterprise_cluster_output.txt
   node_output = output.splitlines()[2]
   provisional_ram = node_output.split()[7]
-  size_gb = float(provisional_ram.split('/')[0].strip('GB'))
+  size_gb = float(provisional_ram.split('/')[0].strip('GB')) * (
+      _MEMORY_SIZE_PERCENTAGE.value)
   return int(size_gb * _ONE_GIGABYTE)
 
 
