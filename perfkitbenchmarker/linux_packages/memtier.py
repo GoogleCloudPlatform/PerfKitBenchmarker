@@ -33,7 +33,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
-GIT_TAG = '793d74dbc09395dfc241342d847730a6197d7c0c'
+GIT_TAG = '1.4.0'
 MEMTIER_DIR = '%s/memtier_benchmark' % linux_packages.INSTALL_DIR
 APT_PACKAGES = ('build-essential autoconf automake libpcre3-dev '
                 'libevent-dev pkg-config zlib1g-dev libssl-dev')
