@@ -42,12 +42,18 @@ class SamplesTestMixin(object):
   def assertSamplesEqualUpToTimestamp(self, a, b, msg=None):
     """Assert that two samples are equal, ignoring timestamp differences."""
 
-    self.assertEqual(a.metric, b.metric,
-                     msg or 'Samples %s and %s have different metrics' % (a, b))
-    self.assertEqual(a.value, b.value,
-                     msg or 'Samples %s and %s have different values' % (a, b))
-    self.assertEqual(a.unit, b.unit,
-                     msg or 'Samples %s and %s have different units' % (a, b))
+    self.assertEqual(a.metric, b.metric, msg or
+                     'Samples %s and %s have different metrics' % (a, b))
+    if isinstance(a.value, float) and isinstance(b.value, float):
+      self.assertAlmostEqual(
+          a.value, b.value, msg=msg or
+          'Samples %s and %s have different values' % (a, b))
+    else:
+      self.assertEqual(
+          a.value, b.value, msg or
+          'Samples %s and %s have different values' % (a, b))
+    self.assertEqual(a.unit, b.unit, msg or
+                     'Samples %s and %s have different units' % (a, b))
     self.assertDictEqual(a.metadata, b.metadata, msg or
                          'Samples %s and %s have different metadata' % (a, b))
     # Deliberately don't compare the timestamp fields of the samples.
