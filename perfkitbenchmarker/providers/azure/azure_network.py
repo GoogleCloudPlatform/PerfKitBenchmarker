@@ -558,12 +558,12 @@ class AzureNetwork(network.BaseNetwork):
           zone=self.zone,
           resource_group=self.resource_group.name)
 
-      if FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_CLUSTER:
+      if FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_CLUSTER or FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED:
         self.placement_group = azure_placement_group.AzureProximityGroup(
             placement_group_spec)
       # With dedicated hosting and/or an availability zone, an availability set
       # cannot be created
-      elif FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_SPREAD and not (
+      elif FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_SPREAD or FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED and not (
           is_dedicated_host or in_availability_zone):
         self.placement_group = azure_placement_group.AzureAvailSet(
             placement_group_spec)
