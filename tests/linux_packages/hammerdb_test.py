@@ -23,11 +23,13 @@ from unittest import mock
 
 from absl import flags
 from perfkitbenchmarker import sample
-
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages.hammerdb import ParseTpcCResults
 from perfkitbenchmarker.linux_packages.hammerdb import ParseTpcCTimeProfileResultsFromFile
 from perfkitbenchmarker.linux_packages.hammerdb import ParseTpcCTPMResultsFromFile
 from perfkitbenchmarker.linux_packages.hammerdb import ParseTpcHResults
+from tests import pkb_common_test_case
+
 
 # Used for flags
 # pylint: disable=unused-import
@@ -59,76 +61,23 @@ TPCH_LOG = _ReadFileToString(
     os.path.join(TEST_DATA_DIR, 'hammerdbcli_tpch.log'))
 
 
-# Enable tests when flags are migrated.
-'''
-class HammerdbBenchmarkTest(googletest.TestCase):
-
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
-  def testHammerdbBenchmarkRun(self):
-    benchmark_spec = mock.MagicMock()
-    FLAGS.hammerdbcli_script = 'tpc_c'
-    FLAGS.managed_db_engine = 'mysql'
-    FLAGS.hammerdbcli_tpcc_time_profile = False
-    FLAGS.hammerdbcli_num_vu = 4
-    FLAGS.hammerdbcli_version = '4.0'
-    vm = mock.Mock()
-    vm.RemoteCommand = mock.Mock(return_value=(TPCC_LOG, ''))
-    benchmark_spec.vms = [vm]
-    output = hammerdbcli_benchmark.Run(benchmark_spec)
-    expected = [
-        sample.Sample(
-            metric='TPM',
-            value=24772.0,
-            unit='TPM',
-            metadata={
-                'hammerdbcli_version': '4.0',
-                'hammerdbcli_script': 'tpc_c',
-                'hammerdbcli_vu': 4,
-                'hammerdbcli_build_tpcc_num_vu': 4,
-                'hammerdbcli_num_warehouse': 5,
-                'hammerdbcli_all_warehouse': False,
-                'hammerdbcli_tpcc_time_profile': False,
-                'hammerdbcli_rampup': 5,
-                'hammerdbcli_duration': 10,
-                'hammerdbcli_num_run': 1,
-                'hammerdbcli_tpcc_log_transactions': False,
-                'run_iteration': 1
-            },
-            timestamp=0),
-        sample.Sample(
-            metric='NOPM',
-            value=8153.0,
-            unit='NOPM',
-            metadata={
-                'hammerdbcli_version': '4.0',
-                'hammerdbcli_script': 'tpc_c',
-                'hammerdbcli_vu': 4,
-                'hammerdbcli_build_tpcc_num_vu': 4,
-                'hammerdbcli_num_warehouse': 5,
-                'hammerdbcli_all_warehouse': False,
-                'hammerdbcli_tpcc_time_profile': False,
-                'hammerdbcli_rampup': 5,
-                'hammerdbcli_duration': 10,
-                'hammerdbcli_num_run': 1,
-                'hammerdbcli_tpcc_log_transactions': False,
-                'run_iteration': 1
-            },
-            timestamp=0)
-    ]
-    self.assertCountEqual(output, expected)
-
-
-class HammerdbcliTest(googletest.TestCase):
+class HammerdbcliTest(pkb_common_test_case.PkbCommonTestCase,
+                      test_util.SamplesTestMixin):
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testParseTpcCTPMResultsFromFile(self):
     """Tests output from TPCC time profile."""
-    FLAGS.hammerdbcli_tpcc_time_profile = True
-    FLAGS.hammerdbcli_tpcc_rampup = 0
+    FLAGS['hammerdbcli_tpcc_time_profile'].parse(True)
+    FLAGS['hammerdbcli_tpcc_rampup'].parse(0)
     vm = mock.Mock()
     vm.RemoteCommand = mock.Mock(return_value=(TPM_PER_SECOND_4_3_LOG, ''))
     output = ParseTpcCTPMResultsFromFile(vm)
-    self.assertEqual(output, [
+    # Remove raw timestamps from metadata,
+    # github tests cannot parse it correctly.
+    output[0].metadata.pop('ramp_up_ends')
+    output[0].metadata.pop('ramp_down_starts')
+    output[0].metadata.pop('timestamps')
+    self.assertSampleListsEqualUpToTimestamp(output, [
         sample.Sample(
             metric='TPM_time_series',
             value=0.0,
@@ -153,44 +102,48 @@ class HammerdbcliTest(googletest.TestCase):
                     331800.0, 348780.0, 333000.0, 330960.0, 325440.0, 324240.0,
                     326160.0, 333540.0, 325020.0
                 ],
-                'timestamps': [
-                    1656657820000.0, 1656657821000.0, 1656657822000.0,
-                    1656657823000.0, 1656657824000.0, 1656657825000.0,
-                    1656657826000.0, 1656657827000.0, 1656657828000.0,
-                    1656657829000.0, 1656657830000.0, 1656657831000.0,
-                    1656657832000.0, 1656657833000.0, 1656657834000.0,
-                    1656657835000.0, 1656657836000.0, 1656657837000.0,
-                    1656657838000.0, 1656657839000.0, 1656657840000.0,
-                    1656657841000.0, 1656657842000.0, 1656657843000.0,
-                    1656657844000.0, 1656657845000.0, 1656657846000.0,
-                    1656657847000.0, 1656657848000.0, 1656657849000.0,
-                    1656657850000.0, 1656657851000.0, 1656657852000.0,
-                    1656657853000.0, 1656657854000.0, 1656657855000.0,
-                    1656657856000.0, 1656657857000.0, 1656657858000.0,
-                    1656657859000.0, 1656657860000.0, 1656657861000.0,
-                    1656657862000.0, 1656657863000.0, 1656657864000.0,
-                    1656657865000.0, 1656657866000.0, 1656657867000.0,
-                    1656657868000.0, 1656657869000.0, 1656657870000.0,
-                    1656657871000.0, 1656657872000.0, 1656657873000.0,
-                    1656657874000.0, 1656657875000.0, 1656657876000.0,
-                    1656657877000.0, 1656657878000.0, 1656657879000.0,
-                    1656657880000.0, 1656657881000.0, 1656657882000.0,
-                    1656657883000.0, 1656657884000.0, 1656657885000.0,
-                    1656657886000.0, 1656657887000.0, 1656657888000.0,
-                    1656657889000.0, 1656657890000.0, 1656657891000.0,
-                    1656657892000.0, 1656657893000.0, 1656657894000.0,
-                    1656657895000.0, 1656657896000.0, 1656657897000.0,
-                    1656657898000.0, 1656657899000.0, 1656657900000.0,
-                    1656657901000.0, 1656657902000.0, 1656657903000.0,
-                    1656657904000.0, 1656657905000.0, 1656657906000.0,
-                    1656657907000.0, 1656657908000.0, 1656657909000.0,
-                    1656657910000.0, 1656657911000.0, 1656657912000.0,
-                    1656657914000.0, 1656657915000.0, 1656657916000.0,
-                    1656657917000.0, 1656657918000.0, 1656657919000.0
-                ],
+                # Remove raw timestamps from metadata,
+                # github tests cannot parse it correctly.
+                # 'timestamps': [
+                #     1656657820000.0, 1656657821000.0, 1656657822000.0,
+                #     1656657823000.0, 1656657824000.0, 1656657825000.0,
+                #     1656657826000.0, 1656657827000.0, 1656657828000.0,
+                #     1656657829000.0, 1656657830000.0, 1656657831000.0,
+                #     1656657832000.0, 1656657833000.0, 1656657834000.0,
+                #     1656657835000.0, 1656657836000.0, 1656657837000.0,
+                #     1656657838000.0, 1656657839000.0, 1656657840000.0,
+                #     1656657841000.0, 1656657842000.0, 1656657843000.0,
+                #     1656657844000.0, 1656657845000.0, 1656657846000.0,
+                #     1656657847000.0, 1656657848000.0, 1656657849000.0,
+                #     1656657850000.0, 1656657851000.0, 1656657852000.0,
+                #     1656657853000.0, 1656657854000.0, 1656657855000.0,
+                #     1656657856000.0, 1656657857000.0, 1656657858000.0,
+                #     1656657859000.0, 1656657860000.0, 1656657861000.0,
+                #     1656657862000.0, 1656657863000.0, 1656657864000.0,
+                #     1656657865000.0, 1656657866000.0, 1656657867000.0,
+                #     1656657868000.0, 1656657869000.0, 1656657870000.0,
+                #     1656657871000.0, 1656657872000.0, 1656657873000.0,
+                #     1656657874000.0, 1656657875000.0, 1656657876000.0,
+                #     1656657877000.0, 1656657878000.0, 1656657879000.0,
+                #     1656657880000.0, 1656657881000.0, 1656657882000.0,
+                #     1656657883000.0, 1656657884000.0, 1656657885000.0,
+                #     1656657886000.0, 1656657887000.0, 1656657888000.0,
+                #     1656657889000.0, 1656657890000.0, 1656657891000.0,
+                #     1656657892000.0, 1656657893000.0, 1656657894000.0,
+                #     1656657895000.0, 1656657896000.0, 1656657897000.0,
+                #     1656657898000.0, 1656657899000.0, 1656657900000.0,
+                #     1656657901000.0, 1656657902000.0, 1656657903000.0,
+                #     1656657904000.0, 1656657905000.0, 1656657906000.0,
+                #     1656657907000.0, 1656657908000.0, 1656657909000.0,
+                #     1656657910000.0, 1656657911000.0, 1656657912000.0,
+                #     1656657914000.0, 1656657915000.0, 1656657916000.0,
+                #     1656657917000.0, 1656657918000.0, 1656657919000.0
+                # ],
                 'interval': 1,
-                'ramp_up_ends': 1656657820000.0,
-                'ramp_down_starts': 1656658420000.0
+                # Remove raw timestamps from metadata,
+                # github tests cannot parse it correctly.
+                # 'ramp_up_ends': 1656657820000.0,
+                # 'ramp_down_starts': 1656658420000.0
             },
             timestamp=0)
     ])
@@ -198,12 +151,17 @@ class HammerdbcliTest(googletest.TestCase):
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testParseTpcCTPMResultsFromFileWithRampUp(self):
     """Tests output from TPCC time profile."""
-    FLAGS.hammerdbcli_tpcc_time_profile = True
-    FLAGS.hammerdbcli_tpcc_rampup = 1
+    FLAGS['hammerdbcli_tpcc_time_profile'].parse(True)
+    FLAGS['hammerdbcli_tpcc_rampup'].parse(1)
     vm = mock.Mock()
     vm.RemoteCommand = mock.Mock(return_value=(TPM_PER_SECOND_4_3_LOG, ''))
     output = ParseTpcCTPMResultsFromFile(vm)
-    self.assertEqual(output, [
+    # Remove raw timestamps from metadata,
+    # github tests cannot parse it correctly.
+    output[0].metadata.pop('ramp_up_ends')
+    output[0].metadata.pop('ramp_down_starts')
+    output[0].metadata.pop('timestamps')
+    self.assertSampleListsEqualUpToTimestamp(output, [
         sample.Sample(
             metric='TPM_time_series',
             value=0.0,
@@ -228,44 +186,48 @@ class HammerdbcliTest(googletest.TestCase):
                     331800.0, 348780.0, 333000.0, 330960.0, 325440.0, 324240.0,
                     326160.0, 333540.0, 325020.0
                 ],
-                'timestamps': [
-                    1656657820000.0, 1656657821000.0, 1656657822000.0,
-                    1656657823000.0, 1656657824000.0, 1656657825000.0,
-                    1656657826000.0, 1656657827000.0, 1656657828000.0,
-                    1656657829000.0, 1656657830000.0, 1656657831000.0,
-                    1656657832000.0, 1656657833000.0, 1656657834000.0,
-                    1656657835000.0, 1656657836000.0, 1656657837000.0,
-                    1656657838000.0, 1656657839000.0, 1656657840000.0,
-                    1656657841000.0, 1656657842000.0, 1656657843000.0,
-                    1656657844000.0, 1656657845000.0, 1656657846000.0,
-                    1656657847000.0, 1656657848000.0, 1656657849000.0,
-                    1656657850000.0, 1656657851000.0, 1656657852000.0,
-                    1656657853000.0, 1656657854000.0, 1656657855000.0,
-                    1656657856000.0, 1656657857000.0, 1656657858000.0,
-                    1656657859000.0, 1656657860000.0, 1656657861000.0,
-                    1656657862000.0, 1656657863000.0, 1656657864000.0,
-                    1656657865000.0, 1656657866000.0, 1656657867000.0,
-                    1656657868000.0, 1656657869000.0, 1656657870000.0,
-                    1656657871000.0, 1656657872000.0, 1656657873000.0,
-                    1656657874000.0, 1656657875000.0, 1656657876000.0,
-                    1656657877000.0, 1656657878000.0, 1656657879000.0,
-                    1656657880000.0, 1656657881000.0, 1656657882000.0,
-                    1656657883000.0, 1656657884000.0, 1656657885000.0,
-                    1656657886000.0, 1656657887000.0, 1656657888000.0,
-                    1656657889000.0, 1656657890000.0, 1656657891000.0,
-                    1656657892000.0, 1656657893000.0, 1656657894000.0,
-                    1656657895000.0, 1656657896000.0, 1656657897000.0,
-                    1656657898000.0, 1656657899000.0, 1656657900000.0,
-                    1656657901000.0, 1656657902000.0, 1656657903000.0,
-                    1656657904000.0, 1656657905000.0, 1656657906000.0,
-                    1656657907000.0, 1656657908000.0, 1656657909000.0,
-                    1656657910000.0, 1656657911000.0, 1656657912000.0,
-                    1656657914000.0, 1656657915000.0, 1656657916000.0,
-                    1656657917000.0, 1656657918000.0, 1656657919000.0
-                ],
+                # Remove raw timestamps from metadata,
+                # github tests cannot parse it correctly.
+                # 'timestamps': [
+                #     1656657820000.0, 1656657821000.0, 1656657822000.0,
+                #     1656657823000.0, 1656657824000.0, 1656657825000.0,
+                #     1656657826000.0, 1656657827000.0, 1656657828000.0,
+                #     1656657829000.0, 1656657830000.0, 1656657831000.0,
+                #     1656657832000.0, 1656657833000.0, 1656657834000.0,
+                #     1656657835000.0, 1656657836000.0, 1656657837000.0,
+                #     1656657838000.0, 1656657839000.0, 1656657840000.0,
+                #     1656657841000.0, 1656657842000.0, 1656657843000.0,
+                #     1656657844000.0, 1656657845000.0, 1656657846000.0,
+                #     1656657847000.0, 1656657848000.0, 1656657849000.0,
+                #     1656657850000.0, 1656657851000.0, 1656657852000.0,
+                #     1656657853000.0, 1656657854000.0, 1656657855000.0,
+                #     1656657856000.0, 1656657857000.0, 1656657858000.0,
+                #     1656657859000.0, 1656657860000.0, 1656657861000.0,
+                #     1656657862000.0, 1656657863000.0, 1656657864000.0,
+                #     1656657865000.0, 1656657866000.0, 1656657867000.0,
+                #     1656657868000.0, 1656657869000.0, 1656657870000.0,
+                #     1656657871000.0, 1656657872000.0, 1656657873000.0,
+                #     1656657874000.0, 1656657875000.0, 1656657876000.0,
+                #     1656657877000.0, 1656657878000.0, 1656657879000.0,
+                #     1656657880000.0, 1656657881000.0, 1656657882000.0,
+                #     1656657883000.0, 1656657884000.0, 1656657885000.0,
+                #     1656657886000.0, 1656657887000.0, 1656657888000.0,
+                #     1656657889000.0, 1656657890000.0, 1656657891000.0,
+                #     1656657892000.0, 1656657893000.0, 1656657894000.0,
+                #     1656657895000.0, 1656657896000.0, 1656657897000.0,
+                #     1656657898000.0, 1656657899000.0, 1656657900000.0,
+                #     1656657901000.0, 1656657902000.0, 1656657903000.0,
+                #     1656657904000.0, 1656657905000.0, 1656657906000.0,
+                #     1656657907000.0, 1656657908000.0, 1656657909000.0,
+                #     1656657910000.0, 1656657911000.0, 1656657912000.0,
+                #     1656657914000.0, 1656657915000.0, 1656657916000.0,
+                #     1656657917000.0, 1656657918000.0, 1656657919000.0
+                # ],
                 'interval': 1,
-                'ramp_up_ends': 1656657880000.0,
-                'ramp_down_starts': 1656658480000.0
+                # Remove raw timestamps from metadata,
+                # github tests cannot parse it correctly.
+                # 'ramp_up_ends': 1656657880000.0,
+                # 'ramp_down_starts': 1656658480000.0
             },
             timestamp=0)
     ])
@@ -273,8 +235,9 @@ class HammerdbcliTest(googletest.TestCase):
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testParseTPCCWithTimeProfile(self):
     """Tests output from TPCC time profile."""
-    FLAGS.hammerdbcli_tpcc_time_profile = True
-    output = ParseTpcCResults(TPCC_TIMEPROFILE_LOG, None)
+    FLAGS['hammerdbcli_tpcc_time_profile'].parse(True)
+    vm = mock.Mock()
+    output = ParseTpcCResults(TPCC_TIMEPROFILE_LOG, vm)
     expected_result = [
         ('TPM', 17145, 'TPM'), ('NOPM', 5614, 'NOPM'),
         ('neword_MIN', 7.252800000000001, 'milliseconds'),
@@ -315,7 +278,7 @@ class HammerdbcliTest(googletest.TestCase):
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testParseTpcCTimeProfileResultsFromFile(self):
     """Tests output from TPCC time profile."""
-    FLAGS.hammerdbcli_tpcc_time_profile = True
+    FLAGS['hammerdbcli_tpcc_time_profile'].parse(True)
     vm = mock.Mock()
     vm.RemoteCommand = mock.Mock(return_value=(TPCC_TIMEPROFILE_4_3_LOG, ''))
     output = ParseTpcCTimeProfileResultsFromFile(vm)
@@ -508,8 +471,9 @@ class HammerdbcliTest(googletest.TestCase):
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testParseTPCCWithoutTimeProfile(self):
     """Tests parsing metadata from the ANSYS benchmark output."""
-    FLAGS.hammerdbcli_tpcc_time_profile = False
-    output = ParseTpcCResults(TPCC_LOG, None)
+    FLAGS['hammerdbcli_tpcc_time_profile'].parse(False)
+    vm = mock.Mock()
+    output = ParseTpcCResults(TPCC_LOG, vm)
     self.assertCountEqual(output, [
         sample.Sample('TPM', 24772, 'TPM'),
         sample.Sample('NOPM', 8153, 'NOPM')
@@ -544,7 +508,7 @@ class HammerdbcliTest(googletest.TestCase):
                        ('query_times_geomean', 1.40067754041747, 'seconds')]
     self.assertCountEqual(
         output, [sample.Sample(i[0], i[1], i[2]) for i in expected_result])
-'''
+
 
 if __name__ == '__main__':
   unittest.main()

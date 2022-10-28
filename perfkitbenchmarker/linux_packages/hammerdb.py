@@ -77,6 +77,94 @@ MILLISECONDS = 'milliseconds'
 TPM = 'TPM'
 NOPM = 'NOPM'
 
+# Default out of the box configuration shipped with the engine.
+NON_OPTIMIZED = 'non_optimized'
+MINIMUM_RECOVERY = 'minimum_recovery'
+RESTORABLE = 'restorable'
+
+HAMMERDB_VERSION = flags.DEFINE_enum(
+    'hammerdbcli_version', HAMMERDB_4_0,
+    [HAMMERDB_4_0, HAMMERDB_4_3],
+    'Version of the hammerdb. Currently supported patched '
+    'version of 4.0 and the public version of 4.3')
+
+HAMMERDB_SCRIPT = flags.DEFINE_enum(
+    'hammerdbcli_script', HAMMERDB_SCRIPT_TPC_C,
+    [HAMMERDB_SCRIPT_TPC_H, HAMMERDB_SCRIPT_TPC_C],
+    'The script to run for hammerdb.')
+
+_HAMMERDB_BUILD_TIMEOUT = flags.DEFINE_integer(
+    'hammerdbcli_build_timeout', 15000,
+    'Timeout hammerdb build phase when exceed build timeout.')
+
+HAMMERDB_RUN_TIMEOUT = flags.DEFINE_integer(
+    'hammerdbcli_run_timeout', None,
+    'Timeout when hammerdb exceed run time. No timeout when None is specified')
+
+_HAMMERDB_SET_LINUX_OPEN_FILE_LIMIT = flags.DEFINE_integer(
+    'hammerdbcli_set_linux_open_file_limit', None,
+    'Override the default linux open file limit, '
+    'hammerdb fails due when VU is over 1000 the open file limit is not  '
+    'override.')
+
+HAMMERDB_TPCH_DEGREE_OF_PARALLEL = flags.DEFINE_integer(
+    'hammerdbcli_tpch_degree_of_parallel', 2,
+    'Number of parallel worker in tpch postgres.')
+
+HAMMERDB_TPCC_RAMPUP = flags.DEFINE_integer(
+    'hammerdbcli_tpcc_rampup', 5,
+    'Duration in minutes for the database to ramp up before '
+    'gathering sampels.')
+
+HAMMERDB_TPCC_DURATION = flags.DEFINE_integer(
+    'hammerdbcli_tpcc_duration', 10,
+    'Duration in minutes of running the benchmark.')
+
+HAMMERDB_TPCC_NUM_WAREHOUSE = flags.DEFINE_integer(
+    'hammerdbcli_tpcc_num_warehouse', 5, 'Number of warehouses set in TPCC')
+
+HAMMERDB_TPCC_ALL_WAREHOUSE = flags.DEFINE_bool(
+    'hammerdbcli_tpcc_all_warehouse', False, 'Uses all '
+    'warehouse in TPCC benchmark')
+
+NUM_RUN = flags.DEFINE_integer(
+    'hammerdbcli_num_runs', 1, 'Run the benchmark '
+    'n times.')
+
+LOAD_TPCH_TABLES_TO_COLUMNAR_ENGINE = flags.DEFINE_bool(
+    'hammerdbcli_load_tpch_tables_to_columnar_engine', False,
+    'Load the table to columnar engine.')
+
+HAMMERDB_NUM_VU = flags.DEFINE_integer('hammerdbcli_num_vu', None,
+                                       'Number of virtual users')
+HAMMERDB_BUILD_TPCC_NUM_VU = flags.DEFINE_integer(
+    'hammerdbcli_build_tpcc_num_vu', None, 'Number of virtual '
+    'users to build the tpcc database. This is set to '
+    'hammerdb_num_vu if not set.')
+
+HAMMERDB_BUILD_TPCH_NUM_VU = flags.DEFINE_integer(
+    'hammerdbcli_build_tpch_num_vu', 8, 'Number of virtual'
+    ' users when building tpch table')
+
+HAMMERDB_TPCH_SCALE_FACTOR = flags.DEFINE_integer(
+    'hammerdbcli_tpch_scale_factor', 1, 'Scaling factor for TPCH')
+
+HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION = flags.DEFINE_enum(
+    'hammerdbcli_optimized_server_configuration', NON_OPTIMIZED,
+    [NON_OPTIMIZED, MINIMUM_RECOVERY, RESTORABLE],
+    'Server configuration to use when '
+    'benchmarking IAAS DB using HammerDB tool')
+
+TPCC_LOG_TRANSACTIONS = flags.DEFINE_bool(
+    'hammerdbcli_tpcc_log_transactions', False,
+    'Gather data for TPM every seconds. Only supported on hammerdb 4.3.')
+
+HAMMERDB_TPCC_TIME_PROFILE = flags.DEFINE_bool(
+    'hammerdbcli_tpcc_time_profile', False,
+    'Gather data for tpcc latency data by turning on time'
+    ' profile flag in hammerdb. Might decrease the '
+    'the TPM/NOPM, gathered due to extra measurements.')
+
 
 # define Hammerdb exception
 class HammerdbBenchmarkError(Exception):
@@ -134,15 +222,15 @@ class HammerDbTclScript(object):
                                        self.tcl_script_name)
     cmd = ''
 
-    if FLAGS.hammerdbcli_tpcc_log_transactions:
+    if TPCC_LOG_TRANSACTIONS.value:
       # Logs are appended to hdbtcount file. Remove this file in case
       # there are multiple run phase.
       vm.RemoteCommand(f'sudo rm -f {TRANSACTION_COUNT_LOCATION}')
     # When VU is over LINUX_OPEN_FILE_LIMIT the hammerdbcli will fail
     # due to exceeding the default open file limit on linux.
     # Increase the Open file limit to a large number.
-    if FLAGS.hammerdbcli_set_linux_open_file_limit:
-      cmd = f'ulimit -n {FLAGS.hammerdbcli_set_linux_open_file_limit} &&'
+    if _HAMMERDB_SET_LINUX_OPEN_FILE_LIMIT.value:
+      cmd = f'ulimit -n {_HAMMERDB_SET_LINUX_OPEN_FILE_LIMIT.value} &&'
     stdout, _ = vm.RemoteCommand(
         InDir(
             HAMMERDB_RUN_LOCATION, 'PATH="$PATH:/opt/mssql-tools/bin" &&'
@@ -209,50 +297,50 @@ class TclScriptParameters(object):
         SCRIPT_PARAMETER_PASSWORD: password,
         SCRIPT_PARAMETER_USER: user,
         SCRIPT_PARAMETER_AZURE: 'true' if is_managed_azure else 'false',
-        SCRIPT_PARAMETER_BUILD_TIMEOUT: FLAGS.hammerdbcli_build_timeout
+        SCRIPT_PARAMETER_BUILD_TIMEOUT: _HAMMERDB_BUILD_TIMEOUT.value
     }
 
     if hammerdb_script == HAMMERDB_SCRIPT_TPC_H:
       # If the script is TPCH and in build phase,
-      # uses hammerdbcli_build_tpch_num_vu as TPCH_USERS
+      # uses HAMMERDB_BUILD_TPCH_NUM_VU.value as TPCH_USERS
       tpch_user_param = None
       if script_type == BUILD_SCRIPT_TYPE:
-        tpch_user_param = FLAGS.hammerdbcli_build_tpch_num_vu
+        tpch_user_param = HAMMERDB_BUILD_TPCH_NUM_VU.value
       else:
-        tpch_user_param = FLAGS.hammerdbcli_num_vu
+        tpch_user_param = HAMMERDB_NUM_VU.value
 
       self.map_search_to_replace.update({
           SCRIPT_PARAMETER_TPCH_DEGREE_OF_PARALLEL:
-              FLAGS.hammerdbcli_tpch_degree_of_parallel,
+              HAMMERDB_TPCH_DEGREE_OF_PARALLEL.value,
           SCRIPT_PARAMETER_TPCH_USERS:
               tpch_user_param,
           SCRIPT_PARAMETER_TPCH_SCALE_FACTOR:
-              FLAGS.hammerdbcli_tpch_scale_factor,
+              HAMMERDB_TPCH_SCALE_FACTOR.value,
       })
 
     elif hammerdb_script == HAMMERDB_SCRIPT_TPC_C:
       # Wait to complete forces the script to stop.
       # Set the wait time to tpcc duration plus rampup time and add extra 10
       # minutes of buffer
-      wait_to_complete_seconds = (int(FLAGS.hammerdbcli_tpcc_duration) +
-                                  int(FLAGS.hammerdbcli_tpcc_rampup)) * 60 + 600
+      wait_to_complete_seconds = (int(HAMMERDB_TPCC_DURATION.value) +
+                                  int(HAMMERDB_TPCC_RAMPUP.value)) * 60 + 600
       self.map_search_to_replace.update({
           SCRIPT_PARAMETER_TPCC_DURATION:
-              FLAGS.hammerdbcli_tpcc_duration,
+              HAMMERDB_TPCC_DURATION.value,
           SCRIPT_PARAMETER_TPCC_RAMPUP:
-              FLAGS.hammerdbcli_tpcc_rampup,
+              HAMMERDB_TPCC_RAMPUP.value,
           SCRIPT_PARAMETER_TPCC_BUILD_USERS:
-              FLAGS.hammerdbcli_build_tpcc_num_vu,
+              HAMMERDB_BUILD_TPCC_NUM_VU.value,
           SCRIPT_PARAMETER_TPCC_USERS:
-              FLAGS.hammerdbcli_num_vu,
+              HAMMERDB_NUM_VU.value,
           SCRIPT_PARAMETER_TPCC_NUM_WAREHOUSE:
-              FLAGS.hammerdbcli_tpcc_num_warehouse,
+              HAMMERDB_TPCC_NUM_WAREHOUSE.value,
           SCRIPT_PARAMETER_TPCC_ALL_WAREHOUSE:
-              FLAGS.hammerdbcli_tpcc_all_warehouse,
+              HAMMERDB_TPCC_ALL_WAREHOUSE.value,
           SCRIPT_PARAMETER_TPCC_TIME_PROFILE:
-              'true' if FLAGS.hammerdbcli_tpcc_time_profile else 'false',
+              'true' if HAMMERDB_TPCC_TIME_PROFILE.value else 'false',
           SCRIPT_PARAMETER_TPCC_LOG_TRANSACTIONS:
-              'true' if FLAGS.hammerdbcli_tpcc_log_transactions else 'false',
+              'true' if TPCC_LOG_TRANSACTIONS.value else 'false',
           SCRIPT_PARAMETER_WAIT_TO_COMPLETE: wait_to_complete_seconds
       })
     else:
@@ -424,9 +512,9 @@ def ParseTpcCTPMResultsFromFile(
         tpm_metrics.append(float(tpm))
         time_series.append(sample.ConvertDateTimeToUnixMs(date))
 
-  ramp_up_ends = time_series[0] + FLAGS.hammerdbcli_tpcc_rampup * MINUTES_TO_MS
+  ramp_up_ends = time_series[0] + HAMMERDB_TPCC_RAMPUP.value * MINUTES_TO_MS
 
-  ramp_down_starts = ramp_up_ends + (FLAGS.hammerdbcli_tpcc_duration
+  ramp_down_starts = ramp_up_ends + (HAMMERDB_TPCC_DURATION.value
                                      * MINUTES_TO_MS)
   tpm_sample = sample.CreateTimeSeriesSample(tpm_metrics, time_series,
                                              sample.TPM_TIME_SERIES, TPM, 1,
@@ -448,13 +536,13 @@ def ParseTpcCResults(
 
   tpcc_metrics = [sample.Sample(TPM, tpm, TPM), sample.Sample(NOPM, nopm, NOPM)]
 
-  if FLAGS.hammerdbcli_tpcc_time_profile:
-    if FLAGS.hammerdbcli_version == HAMMERDB_4_0:
+  if HAMMERDB_TPCC_TIME_PROFILE.value:
+    if HAMMERDB_VERSION.value == HAMMERDB_4_0:
       tpcc_metrics += ParseTpcCTimeProfileResults(stdout)
     else:
       tpcc_metrics += ParseTpcCTimeProfileResultsFromFile(vm)
 
-  if FLAGS.hammerdbcli_tpcc_log_transactions:
+  if TPCC_LOG_TRANSACTIONS.value:
     tpcc_metrics += ParseTpcCTPMResultsFromFile(vm)
   return tpcc_metrics
 
@@ -534,11 +622,11 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
   vm.RemoteCommand('mkdir -p {0}'.format(LocalWorkingDirectory()))
   vm.RemoteCommand('sudo mkdir -p {0}'.format(HAMMERDB_RUN_LOCATION))
 
-  install_file = MAP_VERSION_TO_INSTALL_FILE_NAME[FLAGS.hammerdbcli_version]
+  install_file = MAP_VERSION_TO_INSTALL_FILE_NAME[HAMMERDB_VERSION.value]
 
   files_required = [install_file]
   # Push Hammerdb install files
-  if FLAGS.hammerdbcli_version == HAMMERDB_4_0:
+  if HAMMERDB_VERSION.value == HAMMERDB_4_0:
     # Patches hammerdb 4.0 for Postgres on Azure and time profile frequency
     files_required += ['pgolap.tcl.patch', 'pgoltp.tcl.patch',
                        'postgresql.xml.patch', 'etprof-1.1.tm.patch']
