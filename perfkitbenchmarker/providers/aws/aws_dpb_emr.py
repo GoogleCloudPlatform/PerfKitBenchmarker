@@ -216,15 +216,21 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     result = json.loads(stdout)
     self.cluster_id = result['ClusterId']
     logging.info('Cluster created with id %s', self.cluster_id)
-    for tag_key, tag_value in util.MakeDefaultTags().items():
-      self._AddTag(tag_key, tag_value)
+    self._AddTags(util.MakeDefaultTags())
 
-  def _AddTag(self, key, value):
+  def _AddTags(self, tags_dict: dict[str, str]):
+    tag_args = [f'{key}={value}' for key, value in tags_dict.items()]
     cmd = self.cmd_prefix + ['emr', 'add-tags',
                              '--resource-id', self.cluster_id,
-                             '--tag',
-                             '{}={}'.format(key, value)]
-    vm_util.IssueCommand(cmd)
+                             '--tags'] + tag_args
+    try:
+      vm_util.IssueCommand(cmd)
+    except errors.VmUtil.IssueCommandError as e:
+      error_message = str(e)
+      if 'ThrottlingException' in error_message:
+        raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(
+            error_message) from e
+      raise
 
   def _Delete(self):
     if self.cluster_id:
