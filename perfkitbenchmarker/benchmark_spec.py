@@ -148,7 +148,6 @@ class BenchmarkSpec(object):
     self.container_cluster = None
     self.relational_db = None
     self.non_relational_db = None
-    self.spanner = None
     self.tpus = []
     self.tpu_groups = {}
     self.edw_service = None
@@ -641,7 +640,8 @@ class BenchmarkSpec(object):
 
   def Provision(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
-    should_restore = hasattr(self, 'restore_spec') and self.restore_spec
+    should_restore = (hasattr(self, 'restore_spec')
+                      and self.restore_spec is not None)
     # Create capacity reservations if the cloud supports it. Note that the
     # capacity reservation class may update the VMs themselves. This is true
     # on AWS, because the VM needs to be aware of the capacity reservation id
@@ -749,7 +749,8 @@ class BenchmarkSpec(object):
     if self.deleted:
       return
 
-    should_freeze = hasattr(self, 'freeze_path') and self.freeze_path
+    should_freeze = (hasattr(self, 'freeze_path')
+                     and self.freeze_path is not None)
     if should_freeze:
       self.Freeze()
 
@@ -760,11 +761,9 @@ class BenchmarkSpec(object):
     if self.dpb_service:
       self.dpb_service.Delete()
     if hasattr(self, 'relational_db') and self.relational_db:
-      self.relational_db.Delete()
+      self.relational_db.Delete(freeze=should_freeze)
     if hasattr(self, 'non_relational_db') and self.non_relational_db:
       self.non_relational_db.Delete(freeze=should_freeze)
-    if hasattr(self, 'spanner') and self.spanner:
-      self.spanner.Delete(freeze=should_freeze)
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Delete(), self.tpus)
     if self.edw_service:

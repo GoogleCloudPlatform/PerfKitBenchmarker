@@ -550,6 +550,16 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-a')
     self.assertEmpty(test_retry_manager._zones_tried)
 
+  @flagsaver.flagsaver
+  def testDeprecatedZoneFlags(self):
+    FLAGS['zones'].parse(['3', '4'])
+    FLAGS['extra_zones'].parse(['5', '6'])
+    FLAGS['zone'].parse(['1', '2'])
+    pkb._WarnAndTranslateZoneFlags()
+    self.assertEqual(FLAGS.zone, ['1', '2', '3', '4', '5', '6'])
+    self.assertEmpty(FLAGS.extra_zones)
+    self.assertEmpty(FLAGS.zones)
+
 
 class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
 
@@ -597,16 +607,24 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
             }
         }) + '\n')
 
-  @flagsaver.flagsaver
-  def testDeprecatedZoneFlags(self):
-    FLAGS['zones'].parse(['3', '4'])
-    FLAGS['extra_zones'].parse(['5', '6'])
-    FLAGS['zone'].parse(['1', '2'])
-    pkb._WarnAndTranslateZoneFlags()
-    self.assertEqual(FLAGS.zone, ['1', '2', '3', '4', '5', '6'])
-    self.assertEmpty(FLAGS.extra_zones)
-    self.assertEmpty(FLAGS.zones)
+  def testRestoreRelationalDb(self):
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    test_bm_spec.restore_spec = 'test_spec'
+    test_bm_spec.relational_db = mock.Mock()
 
+    test_bm_spec.Provision()
+
+    test_bm_spec.relational_db.Create.assert_called_with(restore=True)
+
+  def testFreezeRelationalDb(self):
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    test_bm_spec.freeze_path = 'test_path'
+    self.enter_context(mock.patch.object(test_bm_spec, 'Freeze'))
+    test_bm_spec.relational_db = mock.Mock()
+
+    test_bm_spec.Delete()
+
+    test_bm_spec.relational_db.Delete.assert_called_with(freeze=True)
 
 if __name__ == '__main__':
   unittest.main()
