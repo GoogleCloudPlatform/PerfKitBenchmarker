@@ -186,6 +186,8 @@
 
 ### Bug fixes and maintenance updates:
 
+-   Make Speccpu17 fail if there are compilation errors that will cause missing
+    results.
 -   Tuned entity cleanup parameters.
 -   Fix wrong unit in MLPerf benchmark.
 -   Disabled TF_CUDNN_USE_AUTOTUNE for horovod benchmarks.
