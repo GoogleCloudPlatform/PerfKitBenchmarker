@@ -57,6 +57,18 @@ import six
 from six.moves import range
 from six.moves import zip
 
+# Object Naming Schemes
+SEQUENTIAL_BY_STREAM = 'sequential_by_stream'
+APPROXIMATELY_SEQUENTIAL = 'approximately_sequential'
+SEQUENTIAL_WITH_HASH_PREFIX = 'sequential_with_hash_prefix'
+PREFIX_BY_VM_AND_STREAM = 'prefix_by_vm_and_stream'
+NAMING_SCHEMES = [
+    SEQUENTIAL_BY_STREAM,
+    APPROXIMATELY_SEQUENTIAL,
+    PREFIX_BY_VM_AND_STREAM,
+    SEQUENTIAL_WITH_HASH_PREFIX,
+]
+
 flags.DEFINE_enum(
     'storage', providers.GCP,
     [providers.GCP, providers.AWS, providers.AZURE, providers.OPENSTACK],
@@ -125,15 +137,20 @@ flags.DEFINE_integer(
     'api_namespace scenario, a high number of iterations '
     'should be used (>=200).')
 flags.DEFINE_enum(
-    'object_storage_object_naming_scheme', 'sequential_by_stream',
-    ['sequential_by_stream', 'approximately_sequential'],
+    'object_storage_object_naming_scheme', SEQUENTIAL_BY_STREAM,
+    NAMING_SCHEMES,
     'How objects will be named. Only applies to the '
-    'api_multistream benchmark. '
+    'api_multistream benchmark.\n'
     'sequential_by_stream: object names from each stream '
     'will be sequential, but different streams will have '
-    'different name prefixes. '
+    'different name prefixes.\n'
+    'sequential_with_hash_prefix: '
+    'The same as sequential_by_stream, but prefixed by a 10 charachter partial '
+    'hexidecimal hash digest and a /.\n'
     'approximately_sequential: object names from all '
-    'streams will roughly increase together.')
+    'streams will roughly increase together.\n'
+    'prefix_by_vm_and_stream: '
+    'Directory prefix as vm_id/worker_id/ attached to each object name.')
 flags.DEFINE_string(
     'object_storage_objects_written_file_prefix', None,
     'If specified, the bucket and all of the objects will not '

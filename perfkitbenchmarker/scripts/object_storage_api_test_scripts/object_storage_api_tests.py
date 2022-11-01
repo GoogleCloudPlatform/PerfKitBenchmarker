@@ -23,6 +23,7 @@
 """
 
 
+import hashlib
 import json
 import logging
 import multiprocessing as mp
@@ -49,6 +50,18 @@ except ImportError:
   from perfkitbenchmarker.scripts.object_storage_api_test_scripts import azure_flags
   from perfkitbenchmarker.scripts.object_storage_api_test_scripts import gcs_flags
   from perfkitbenchmarker.scripts.object_storage_api_test_scripts import s3_flags
+
+# Object Naming Schemes
+SEQUENTIAL_BY_STREAM = 'sequential_by_stream'
+APPROXIMATELY_SEQUENTIAL = 'approximately_sequential'
+SEQUENTIAL_WITH_HASH_PREFIX = 'sequential_with_hash_prefix'
+PREFIX_BY_VM_AND_STREAM = 'prefix_by_vm_and_stream'
+NAMING_SCHEMES = [
+    SEQUENTIAL_BY_STREAM,
+    APPROXIMATELY_SEQUENTIAL,
+    PREFIX_BY_VM_AND_STREAM,
+    SEQUENTIAL_WITH_HASH_PREFIX,
+]
 
 FLAGS = flags.FLAGS
 
@@ -112,18 +125,21 @@ flags.DEFINE_string('object_storage_class', None, 'The storage class to use '
                     'which is passed in by the --bucket parameter.')
 
 flags.DEFINE_enum(
-    'object_naming_scheme', 'sequential_by_stream', [
-        'prefix_by_vm_and_stream', 'sequential_by_stream',
-        'approximately_sequential'
-    ], 'How objects will be named. Only applies to the '
-    'MultiStreamWrite benchmark. '
-    'prefix_by_vm_and_stream: object names from each stream will create a '
-    'directory prefix as vm_id/worker_id/ attached to each object name.'
+    'object_naming_scheme', SEQUENTIAL_BY_STREAM,
+    NAMING_SCHEMES,
+    'How objects will be named. Only applies to the '
+    'MultiStreamWrite benchmark.\n'
     'sequential_by_stream: object names from each stream '
     'will be sequential, but different streams will have '
-    'different name prefixes. '
+    'different name prefixes.\n'
+    'sequential_with_hash_prefix: '
+    'The same as sequential_by_stream, but prefixed by a 10 charachter partial '
+    'hexidecimal hash digest and a /.\n'
     'approximately_sequential: object names from all '
-    'streams will roughly increase together.')
+    'streams will roughly increase together.\n'
+    'prefix_by_vm_and_stream: '
+    'object names from each stream will create a '
+    'directory prefix as vm_id/worker_id/ attached to each object name.')
 
 flags.DEFINE_boolean(
     'bulk_delete', False,
@@ -307,7 +323,7 @@ class ObjectNameIterator(object):
     """
     return self
 
-  def next(self):
+  def __next__(self):
     """Generate a new name.
 
     Returns:
@@ -329,9 +345,6 @@ class PrefixCounterIterator(ObjectNameIterator):
     self.counter = self.counter + 1
     return name
 
-  # needed for Python2 compatibility
-  next = __next__
-
 
 class PrefixTimestampSuffixIterator(ObjectNameIterator):
   """Iterator for prefixed and suffixed timestamps."""
@@ -343,9 +356,19 @@ class PrefixTimestampSuffixIterator(ObjectNameIterator):
   def __next__(self):
     return '%s_%f_%s' % (self.prefix, time.time(), self.suffix)
 
-  # needed for Python2 compatibility
-  next = __next__
 
+class PrefixHashCountIterator(ObjectNameIterator):
+  """Iterator for a prefixed counter."""
+
+  def __init__(self, prefix):
+    self.prefix = prefix
+    self.counter = 0
+
+  def __next__(self):
+    name = f'{self.prefix}_{self.counter}'
+    self.counter = self.counter + 1
+    obj_hash = hashlib.md5(name.encode()).hexdigest()[:10]
+    return f'{obj_hash}/{name}'
 
 # ### Utilities for benchmarking ###
 
@@ -884,19 +907,24 @@ def WriteWorker(service, payload,
   latencies = []
   sizes = []
 
-  if naming_scheme == 'prefix_by_vm_and_stream':
+  if naming_scheme == PREFIX_BY_VM_AND_STREAM:
     # Unique prefix helps with backend sharding
     uuid_prefix = str(uuid.uuid4())[-8:]
     name_iterator = PrefixCounterIterator(
         '%s_vm_%s_worker_%s/pkb_write_worker_%s' %
         (uuid_prefix, FLAGS.vm_id, worker_num, worker_num))
-  elif naming_scheme == 'sequential_by_stream':
+  elif naming_scheme == SEQUENTIAL_BY_STREAM:
     name_iterator = PrefixCounterIterator(
         'pkb_write_worker_%f_%s' % (time.time(), worker_num))
-  elif naming_scheme == 'approximately_sequential':
+  elif naming_scheme == APPROXIMATELY_SEQUENTIAL:
     name_iterator = PrefixTimestampSuffixIterator(
         'pkb_writes_%s' % start_time,
         '%s' % worker_num)
+  elif naming_scheme == SEQUENTIAL_WITH_HASH_PREFIX:
+    name_iterator = PrefixHashCountIterator(
+        f'pkb_write_worker_{time.time()}_{worker_num}')
+  else:
+    raise ValueError(f'Unknown naming scheme {naming_scheme}')
   size_iterator = SizeDistributionIterator(size_distribution)
 
   payload_handle = six.BytesIO(payload)

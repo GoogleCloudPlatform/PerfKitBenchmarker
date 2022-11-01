@@ -71,17 +71,14 @@ class TestMaxSizeInDistribution(unittest.TestCase):
                      10)
 
 
-class TestPrefixCounterIterator(unittest.TestCase):
+class TestIterators(unittest.TestCase):
 
-  def testIterator(self):
+  def testPrefixCounterIterator(self):
     iterator = object_storage_api_tests.PrefixCounterIterator('foo')
     values = list(itertools.islice(iterator, 3))
     self.assertEqual(values, ['foo_0', 'foo_1', 'foo_2'])
 
-
-class TestPrefixTimestampSuffixIterator(unittest.TestCase):
-
-  def testIterator(self):
+  def testPrefixTimestampSuffixIterator(self):
     iterator = object_storage_api_tests.PrefixTimestampSuffixIterator(
         'foo', 'bar')
     with mock.patch(time.__name__ + '.time',
@@ -91,6 +88,12 @@ class TestPrefixTimestampSuffixIterator(unittest.TestCase):
                               'foo_1.000000_bar',
                               'foo_2.000000_bar'])
 
+  def testPrefixHashCountIterator(self):
+    iterator = object_storage_api_tests.PrefixHashCountIterator('foo')
+    values = list(itertools.islice(iterator, 3))
+    self.assertEqual(
+        values,
+        ['857db8c1dd/foo_0', 'a231267a73/foo_1', '538eec728d/foo_2'])
 
 if __name__ == '__main__':
   unittest.main()
