@@ -14,7 +14,6 @@
 """Tests for perfkitbenchmarker.providers.aws.aws_relational_db."""
 
 import contextlib
-import json
 import os
 import unittest
 
@@ -24,7 +23,9 @@ from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_aurora_db  # pylint: disable=unused-import
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_rds_db  # pylint: disable=unused-import
 from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.sql_engine_utils import AURORA_POSTGRES
 from perfkitbenchmarker.sql_engine_utils import MYSQL
@@ -41,9 +42,7 @@ _AWS_PREFIX = 'aws --output json'
 
 
 def _ReadTestDataFile(filename):
-  path = os.path.join(
-      os.path.dirname(__file__), '../../data',
-      filename)
+  path = os.path.join(os.path.dirname(__file__), '../../data', filename)
   with open(path) as fp:
     return fp.read()
 
@@ -108,7 +107,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         }
     }
 
-  def CreateMockSpec(self, additional_spec_items={}):
+  def CreateMockSpec(self, additional_spec_items=None):
     default_server_db_disk_spec = aws_disk.AwsDiskSpec(
         _COMPONENT, disk_size=5, disk_type=aws_disk.IO1, iops=1000)
 
@@ -132,7 +131,8 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'create_on_restore_error': False,
         'delete_on_freeze_error': False,
     }
-    spec_dict.update(additional_spec_items)
+    if additional_spec_items:
+      spec_dict.update(additional_spec_items)
 
     mock_db_spec = mock.Mock(spec=relational_db_spec.RelationalDbSpec)
     mock_db_spec.configure_mock(**spec_dict)
@@ -159,7 +159,8 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     return aws_db
 
   def CreateDbFromMockSpec(self, mock_spec):
-    aws_db = aws_relational_db.AwsRelationalDb(mock_spec)
+    cls = relational_db.GetRelationalDbClass('AWS', True, mock_spec.engine)
+    aws_db = cls(mock_spec)
 
     # Set necessary instance attributes that are not part of the spec
     aws_db.security_group_name = 'fake_security_group'
@@ -168,11 +169,11 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.CreateMockClientVM(aws_db)
     return aws_db
 
-  def CreateDbFromSpec(self, additional_spec_items={}):
+  def CreateDbFromSpec(self, additional_spec_items=None):
     mock_spec = self.CreateMockSpec(additional_spec_items)
     return self.CreateDbFromMockSpec(mock_spec)
 
-  def Create(self, additional_spec_items={}):
+  def Create(self, additional_spec_items=None):
     with self._PatchCriticalObjects() as issue_command:
       db = self.CreateDbFromSpec(additional_spec_items)
       db._Create()
@@ -196,7 +197,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       vms = relational_db.VmsToBoot(db.spec.vm_groups)
       self.assertNotIn('servers', vms)
 
-  def CreateAuroraMockSpec(self, additional_spec_items={}):
+  def CreateAuroraMockSpec(self, additional_spec_items=None):
     default_server_db_spec = virtual_machine.BaseVmSpec(
         'NAME', **{
             'machine_type': 'db.t1.micro',
@@ -214,17 +215,20 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'engine_version': '9.6.2',
         'high_availability': True
     }
-    spec_dict.update(additional_spec_items)
+    if additional_spec_items:
+      spec_dict.update(additional_spec_items)
 
     mock_db_spec = mock.Mock(spec=relational_db_spec.RelationalDbSpec)
     mock_db_spec.configure_mock(**spec_dict)
     return mock_db_spec
 
-  def CreateAuroraDbFromSpec(self, additional_spec_items={}):
+  def CreateAuroraDbFromSpec(self, additional_spec_items=None):
     mock_spec = self.CreateAuroraMockSpec(additional_spec_items)
     return self.CreateDbFromMockSpec(mock_spec)
 
-  def CreateAurora(self, additional_spec_items={}):
+  def CreateAurora(self, additional_spec_items=None):
+    if additional_spec_items is None:
+      additional_spec_items = {}
     additional_spec_items.update({
         'enable_freeze_restore': False,
         'create_on_restore_error': False,
@@ -240,19 +244,11 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateAurora(self):
     command_strings = self.CreateAurora()
-
-    self.assertIn(
-        '%s rds create-db-cluster' % _AWS_PREFIX, command_strings[0])
-    self.assertIn('--db-cluster-identifier=pkb-db-cluster-123',
-                  command_strings[0])
-    self.assertIn('--engine=aurora-postgresql', command_strings[0])
-    self.assertIn('--master-user-password=fakepassword', command_strings[0])
-
-    self.assertIn(
-        '%s rds create-db-instance' % _AWS_PREFIX, command_strings[1])
-    self.assertIn('--db-cluster-identifier=pkb-db-cluster-123',
-                  command_strings[1])
-    self.assertIn('--engine=aurora-postgresql', command_strings[1])
+    self.assertListEqual(command_strings, [
+        'aws --output json rds create-db-cluster --db-cluster-identifier=pkb-db-cluster-123 --engine=aurora-postgresql --engine-version=9.6.2 --master-username=fakeusername --master-user-password=fakepassword --region=us-east-1 --db-subnet-group-name=fake_db_subnet --vpc-security-group-ids=fake_security_group_id --availability-zones=us-east-1a --tags',
+        'aws --output json rds create-db-instance --db-instance-identifier=pkb-db-instance-123 --db-cluster-identifier=pkb-db-cluster-123 --engine=aurora-postgresql --engine-version=9.6.2 --no-auto-minor-version-upgrade --db-instance-class=db.t1.micro --region=us-east-1 --availability-zone=us-east-1a --tags',
+        'aws --output json rds create-db-instance --db-instance-identifier=pkb-db-instance-123-us-east-1d --db-cluster-identifier=pkb-db-cluster-123 --engine=aurora-postgresql --engine-version=9.6.2 --no-auto-minor-version-upgrade --db-instance-class=db.t1.micro --region=us-east-1 --availability-zone=us-east-1d --tags'
+    ])
 
   def testNoHighAvailability(self):
     spec_dict = {
@@ -315,26 +311,21 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
       self.assertEqual(True, db._IsReady())
 
-  def testParseEndpoint(self):
+  def testSetEndpoint(self):
     test_data = _ReadTestDataFile('aws-describe-db-instances-available.json')
-    with self._PatchCriticalObjects():
+    with self._PatchCriticalObjects(stdout=test_data):
       db = self.CreateDbFromSpec()
+      db._SetEndpoint()
 
       self.assertEqual(
           'pkb-db-instance-a4499926.cqxeajwjbqne.us-west-2.rds.amazonaws.com',
-          db._ParseEndpointFromInstance(json.loads(test_data)))
-
-  def testParsePort(self):
-    test_data = _ReadTestDataFile('aws-describe-db-instances-available.json')
-    with self._PatchCriticalObjects():
-      db = self.CreateDbFromSpec()
-
-      self.assertEqual(3306, db._ParsePortFromInstance(json.loads(test_data)))
+          db.endpoint)
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
       db = self.CreateDbFromSpec()
       db.all_instance_ids.append('pkb-db-instance-123')
+      db._InstanceExists = mock.MagicMock(return_value=False)
       db._Delete()
       command_string = ' '.join(issue_command.call_args[0][0])
 
