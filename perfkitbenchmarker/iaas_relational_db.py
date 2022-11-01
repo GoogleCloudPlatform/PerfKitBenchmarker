@@ -211,37 +211,10 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
     if db_engine == sql_engine_utils.SQLSERVER:
       self.spec.database_username = 'sa'
       self.spec.database_password = db_util.GenerateRandomDbPassword()
-      self.server_vm.RemoteCommand('sqlcmd -Q "ALTER LOGIN sa ENABLE;"')
-      self.server_vm.RemoteCommand(
-          'sqlcmd -Q "ALTER LOGIN sa WITH PASSWORD = \'%s\' ;"' %
+      ConfigureSQLServer(
+          self.server_vm,
+          self.spec.database_username,
           self.spec.database_password)
-
-      # Change the authentication method from windows authentication to
-      # SQL Server Authentication
-      # https://docs.microsoft.com/en-us/sql/database-engine/configure-windows/change-server-authentication-mode?view=sql-server-ver15
-      self.server_vm.RemoteCommand(
-          'sqlcmd -Q "EXEC xp_instance_regwrite'
-          ' N\'HKEY_LOCAL_MACHINE\','
-          ' N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
-          'N\'LoginMode\', REG_DWORD, 2"')
-
-      # Set the default database location to scratch disk
-      self.server_vm.RemoteCommand(
-          'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
-          'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
-          'N\'BackupDirectory\', REG_SZ, N\'C:\\scratch\'"')
-      self.server_vm.RemoteCommand(
-          'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
-          'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
-          'N\'DefaultData\', REG_SZ, N\'%s:\\\'"' %
-          self.server_vm.assigned_disk_letter)
-      self.server_vm.RemoteCommand(
-          'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
-          'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
-          'N\'DefaultLog\', REG_SZ, N\'%s:\\\'"' %
-          self.server_vm.assigned_disk_letter)
-      self.server_vm.RemoteCommand('net stop mssqlserver /y')
-      self.server_vm.RemoteCommand('net start mssqlserver')
       return
 
     raise relational_db.UnsupportedError('Only sql server is currently '
@@ -535,3 +508,29 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
     """Creates the PKB user and sets the password."""
     super()._PostCreate()
     self.client_vm_query_tools.InstallPackages()
+
+
+def ConfigureSQLServer(vm, username: str, password: str):
+  """Update the username and password on a SQL Server."""
+  vm.RemoteCommand(f'sqlcmd -Q "ALTER LOGIN {username} ENABLE;"')
+  vm.RemoteCommand(
+      f'sqlcmd -Q "ALTER LOGIN sa WITH PASSWORD = \'{password}\' ;"')
+  vm.RemoteCommand(
+      'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
+      'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
+      'N\'LoginMode\', REG_DWORD, 2"')
+  vm.RemoteCommand(
+      'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
+      'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
+      'N\'BackupDirectory\', REG_SZ, N\'C:\\scratch\'"')
+
+  vm.RemoteCommand(
+      'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
+      'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
+      f'N\'DefaultData\', REG_SZ, N\'{vm.assigned_disk_letter}:\\\'"')
+  vm.RemoteCommand(
+      'sqlcmd -Q "EXEC xp_instance_regwrite N\'HKEY_LOCAL_MACHINE\', '
+      'N\'Software\\Microsoft\\MSSQLServer\\MSSQLServer\', '
+      f'N\'DefaultLog\', REG_SZ, N\'{vm.assigned_disk_letter}:\\\'"')
+  vm.RemoteCommand('net stop mssqlserver /y')
+  vm.RemoteCommand('net start mssqlserver')

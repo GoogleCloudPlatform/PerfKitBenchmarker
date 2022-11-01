@@ -26,8 +26,8 @@ diset connection mssqls_linux_server {{DATABASE_IP}}
 diset connection mssqls_port {{DATABASE_PORT}}
 diset connection mssqls_pass {{DATABASE_PASSWORD}}
 diset connection mssqls_uid {{DATABASE_USER}}
-
 diset connection mssqls_tcp true
+diset connection mssqls_authentication sql
 diset tpch mssqls_driver timed
 diset tpch mssqls_refresh_on 1
 diset tpch mssqls_scale_fact {{SCALE_FACTOR_TPC_H}}

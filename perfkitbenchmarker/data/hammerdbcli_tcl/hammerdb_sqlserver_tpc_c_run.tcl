@@ -27,6 +27,7 @@ diset connection mssqls_port {{DATABASE_PORT}}
 diset connection mssqls_pass {{DATABASE_PASSWORD}}
 diset connection mssqls_uid {{DATABASE_USER}}
 diset connection mssqls_tcp true
+diset connection mssqls_authentication sql
 diset tpcc mssqls_count_ware {{NUM_WAREHOUSE_TPC_C}}
 diset tpcc mssqls_num_vu {{VIRTUAL_USERS_TPC_C}}
 diset tpcc mssqls_allwarehouse {{ALL_WAREHOUSE_TPC_C}}

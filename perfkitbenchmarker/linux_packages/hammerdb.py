@@ -43,6 +43,7 @@ HAMMERDB_SCRIPT_TPC_C = 'tpc_c'
 MINUTES_TO_MS = 60 * 1000
 HAMMERDB_4_0 = '4.0'
 HAMMERDB_4_3 = '4.3'
+HAMMERDB_4_5 = '4.5'
 
 TPCH_TABLES = [
     'customer', 'lineitem', 'nation', 'orders', 'part', 'partsupp',
@@ -84,9 +85,9 @@ RESTORABLE = 'restorable'
 
 HAMMERDB_VERSION = flags.DEFINE_enum(
     'hammerdbcli_version', HAMMERDB_4_0,
-    [HAMMERDB_4_0, HAMMERDB_4_3],
+    [HAMMERDB_4_0, HAMMERDB_4_3, HAMMERDB_4_5],
     'Version of the hammerdb. Currently supported patched '
-    'version of 4.0 and the public version of 4.3')
+    'version of 4.0 and the public versions of 4.3 and 4.5.')
 
 HAMMERDB_SCRIPT = flags.DEFINE_enum(
     'hammerdbcli_script', HAMMERDB_SCRIPT_TPC_C,
@@ -164,6 +165,17 @@ HAMMERDB_TPCC_TIME_PROFILE = flags.DEFINE_bool(
     'Gather data for tpcc latency data by turning on time'
     ' profile flag in hammerdb. Might decrease the '
     'the TPM/NOPM, gathered due to extra measurements.')
+
+
+def SetDefaultConfig():
+  """Set the default configurations of unfilled flags."""
+  if HAMMERDB_NUM_VU.value is None:
+    if HAMMERDB_SCRIPT.value == HAMMERDB_SCRIPT_TPC_H:
+      FLAGS.hammerdbcli_num_vu = 1
+    elif HAMMERDB_SCRIPT.value == HAMMERDB_SCRIPT_TPC_C:
+      FLAGS.hammerdbcli_num_vu = 4
+  if HAMMERDB_BUILD_TPCC_NUM_VU.value is None:
+    FLAGS.hammerdbcli_build_tpcc_num_vu = HAMMERDB_NUM_VU.value
 
 
 # define Hammerdb exception
