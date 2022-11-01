@@ -1614,7 +1614,6 @@ class CentOsStream9BasedAwsVirtualMachine(
   # https://wiki.centos.org/Cloud/AWS#Official_CentOS_Linux_:_Public_Images
   IMAGE_OWNER = CENTOS_IMAGE_PROJECT
   IMAGE_NAME_FILTER = 'CentOS Stream 9*'
-  DEFAULT_USER_NAME = 'centos'
 
 
 class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
