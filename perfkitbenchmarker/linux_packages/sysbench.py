@@ -15,16 +15,34 @@
 
 """Module containing sysbench installation and cleanup functions."""
 
+from absl import flags
+
+FLAGS = flags.FLAGS
+
+_IGNORE_CONCURRENT = flags.DEFINE_bool(
+    'sysbench_ignore_concurrent_modification', False,
+    'If true, ignores concurrent modification P0001 exceptions thrown by '
+    'some databases.')
+
+
 GIT_REPO = 'https://github.com/akopytov/sysbench'
-# release 1.0.20; committed Apr 24, 2020
+# release 1.0.20; committed Apr 24, 2020. When updating this, also update the
+# correct line for CONCURRENT_MODS, as it may have changed in between releases.
 RELEASE_TAG = '1.0.20'
 SYSBENCH_DIR = '~/sysbench'
+
+# Inserts this error code on line 534.
+CONCURRENT_MODS = ('534 i !strcmp(con->sql_state, "P0001")/* concurrent '
+                   'modification */ ||')
 
 
 def _Install(vm):
   """Installs the sysbench package on the VM."""
   vm.RemoteCommand(
       f'git clone {GIT_REPO} {SYSBENCH_DIR} --branch {RELEASE_TAG}')
+  if _IGNORE_CONCURRENT.value:
+    driver_file = f'{SYSBENCH_DIR}/src/drivers/pgsql/drv_pgsql.c'
+    vm.RemoteCommand(f"sed -i '{CONCURRENT_MODS}' {driver_file}")
   vm.RemoteCommand(f'cd {SYSBENCH_DIR} && ./autogen.sh '
                    '&& ./configure --with-pgsql')
   vm.RemoteCommand(f'cd {SYSBENCH_DIR} && make -j && sudo make install')
