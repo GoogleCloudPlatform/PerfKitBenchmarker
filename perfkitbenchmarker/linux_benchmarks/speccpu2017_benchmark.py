@@ -64,6 +64,9 @@ flags.DEFINE_string(
     'spec17_gcc_flags', '-O3',
     'Flags to be used to override the default GCC -O3 used '
     'to compile SPEC.')
+flags.DEFINE_boolean(
+    'spec17_best_effort', False,
+    'Best effort run of spec. Allow missing results without failing.')
 
 BENCHMARK_NAME = 'speccpu2017'
 BENCHMARK_CONFIG = """
@@ -246,9 +249,11 @@ def _Run(vm):
   stdout, _ = speccpu.Run(vm, cmd, ' '.join(FLAGS.spec17_subset),
                           version_specific_parameters)
 
-  if FLAGS.spec17_build_only:
+  if not FLAGS.spec17_best_effort:
     if 'Error' in stdout and 'Please review this file' in stdout:
       raise errors.Benchmarks.RunError('Error during SPEC compilation.')
+
+  if FLAGS.spec17_build_only:
     return [
         sample.Sample(
             'compilation_time',
