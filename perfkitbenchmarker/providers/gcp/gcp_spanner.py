@@ -13,7 +13,9 @@
 # limitations under the License.
 """Module containing class for GCP's spanner instances.
 
-Instances can be created and deleted.
+Instances can be created and deleted. Providing an instance ID and database ID
+causes the instance to be user_managed, meaning PKB will not manage any
+lifecycle for the instance.
 """
 
 import dataclasses
@@ -48,6 +50,13 @@ flags.DEFINE_string('cloud_spanner_project',
                     None,
                     'The project for the Cloud Spanner instance. Use default '
                     'project if unset.')
+flags.DEFINE_string('cloud_spanner_instance', None,
+                    'The name of the static Cloud Spanner instance. New '
+                    'instance created if unset.')
+flags.DEFINE_string('cloud_spanner_database', None,
+                    'The name of the static Cloud Spanner database. New '
+                    'database created if unset. cloud_spanner_instance flag is '
+                    'mandatory to use this flag.')
 
 # Type aliases
 _RelationalDbSpec = relational_db_spec.RelationalDbSpec
@@ -83,6 +92,8 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
 
   SERVICE_TYPE = 'spanner'
 
+  spanner_instance_id: str
+  spanner_database_id: str
   spanner_description: str
   spanner_config: str
   spanner_nodes: int
@@ -93,9 +104,15 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
                flag_values: Optional[flags.FlagValues] = None,
                **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    if (self.spanner_instance_id is None) ^ (self.spanner_database_id is None):
+      raise errors.Config.InvalidValue(
+          'Please set both spanner_instance_id and database_name '
+          'to denote a user managed instance. Got '
+          f'spanner_instance_id={self.spanner_instance_id} and '
+          f'spanner_database_id={self.spanner_database_id}.')
 
   @classmethod
-  def _GetOptionDecoderConstructions(cls):
+  def _GetOptionDecoderConstructions(cls) -> dict[str, Any]:
     """Gets decoder classes and constructor args for each configurable option.
 
     Returns:
@@ -105,6 +122,9 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
+        'spanner_instance_id': (option_decoders.StringDecoder, _NONE_OK),
+        # Base class supplies a database_name, but this is easier to find.
+        'spanner_database_id': (option_decoders.StringDecoder, _NONE_OK),
         'spanner_description': (option_decoders.StringDecoder, _NONE_OK),
         'spanner_config': (option_decoders.StringDecoder, _NONE_OK),
         'spanner_nodes': (option_decoders.IntDecoder, _NONE_OK),
@@ -115,7 +135,8 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
     return result
 
   @classmethod
-  def _ApplyFlags(cls, config_values, flag_values):
+  def _ApplyFlags(cls, config_values: dict[str, Any],
+                  flag_values: flags.FlagValues) -> None:
     """Modifies config options based on runtime flag values.
 
     Can be overridden by derived classes to add support for specific flags.
@@ -127,6 +148,10 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
           provided config values.
     """
     super()._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud_spanner_instance'].present:
+      config_values['spanner_instance_id'] = flag_values.cloud_spanner_instance
+    if flag_values['cloud_spanner_database'].present:
+      config_values['spanner_database_id'] = flag_values.cloud_spanner_database
     if flag_values['cloud_spanner_config'].present:
       config_values['spanner_config'] = flag_values.cloud_spanner_config
     if flag_values['cloud_spanner_nodes'].present:
@@ -157,7 +182,13 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
   def __init__(self, db_spec: SpannerSpec, **kwargs):
     super(GcpSpannerInstance, self).__init__(db_spec, **kwargs)
-    self.database = db_spec.database_name or f'pkb-database-{FLAGS.run_uri}'
+    self.user_managed = True if db_spec.spanner_instance_id else False
+    if self.user_managed:
+      self.instance_id = db_spec.spanner_instance_id
+      self.database = db_spec.spanner_database_id
+    else:
+      self.instance_id = f'pkb-instance-{FLAGS.run_uri}'
+      self.database = f'pkb-database-{FLAGS.run_uri}'
     self._description = db_spec.spanner_description or _DEFAULT_DESCRIPTION
     self._config = db_spec.spanner_config or self._GetDefaultConfig()
     self.nodes = db_spec.spanner_nodes or _DEFAULT_NODES
@@ -202,12 +233,26 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
       logging.error('Create GCP Spanner database failed.')
 
   def CreateTables(self, ddl: str) -> None:
-    """Creates the tables specified by the DDL."""
+    """Creates the tables specified by the DDL.
+
+    If the table already exists, this is a no-op.
+
+    Args:
+      ddl: The DDL statement used to create the table schema.
+
+    Raises:
+      errors.Benchmarks.RunError if updating the DDL fails.
+    """
     cmd = util.GcloudCommand(self, 'spanner', 'databases', 'ddl', 'update',
                              self.database)
     cmd.flags['instance'] = self.instance_id
     cmd.flags['ddl'] = ddl
-    cmd.Issue()
+    _, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    if 'Duplicate name in schema' in stderr:
+      logging.info('Table already exists, skipping.')
+      return
+    if retcode != 0:
+      raise errors.Benchmarks.RunError('Failed to update GCP Spanner DDL.')
 
   def _Delete(self) -> None:
     """Deletes the instance."""

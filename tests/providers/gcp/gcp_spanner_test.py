@@ -114,7 +114,7 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
 
     # Assert
     mock_request.assert_called_once_with(
-        'https://spanner.googleapis.com/v1/projects/test_project/instances/pkb-db-instance-test_uri',
+        'https://spanner.googleapis.com/v1/projects/test_project/instances/pkb-instance-test_uri',
         headers={'Authorization': 'Bearer test_token'},
         json={
             'instance': {
