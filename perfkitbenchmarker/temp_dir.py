@@ -20,6 +20,7 @@ more information).
 
 import functools
 import os
+import platform
 import tempfile
 
 from absl import flags
@@ -29,7 +30,18 @@ _PERFKITBENCHMARKER = 'perfkitbenchmarker'
 _RUNS = 'runs'
 _VERSIONS = 'versions'
 
-_TEMP_DIR = os.path.join(tempfile.gettempdir(), _PERFKITBENCHMARKER)
+
+def _GetPlatformDependentTempDir():
+  """Gets temporary directory based on platform."""
+  if platform.system() == 'Darwin':
+    # MacOS by default has extremely long temp directory path,
+    # resulting failure during ssh due to "too long for Unix domain socket".
+    return '/tmp'
+  else:
+    return tempfile.gettempdir()
+
+
+_TEMP_DIR = os.path.join(_GetPlatformDependentTempDir(), _PERFKITBENCHMARKER)
 
 flags.DEFINE_string('temp_dir', _TEMP_DIR, 'Temp directory PKB uses.')
 FLAGS = flags.FLAGS
