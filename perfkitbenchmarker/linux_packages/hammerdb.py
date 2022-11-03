@@ -451,11 +451,15 @@ TPCC_QUERY_METRICS = ['MIN', 'P50', 'P95', 'P99', 'MAX', 'SAMPLES']
 TPCC_QUERY_METRICS_4_3 = ['CALLS', 'MIN', 'MAX', 'P99', 'P95', 'P50']
 
 
-def ParseTpcCTimeProfileResultsFromFile(
-    vm: virtual_machine.BaseVirtualMachine) -> List[sample.Sample]:
+def _GetFileContent(vm: virtual_machine.BaseVirtualMachine,
+                    file_path: str) -> str:
+  stdout, _ = vm.RemoteCommand(f'cat {file_path}')
+  return stdout
+
+
+def ParseTpcCTimeProfileResultsFromFile(stdout: str) -> List[sample.Sample]:
   """Extracts latency result from time profile file."""
   tpcc_metrics = []
-  stdout, _ = vm.RemoteCommand(' cat /tmp/hdbxtprofile.log')
   # Timed profile output starts with >>>>>
   # The last 5 output  are the summary of all virtual users
   # The output have the following format
@@ -508,10 +512,8 @@ def ParseTpcCTimeProfileResults(stdout: str) -> List[sample.Sample]:
   return tpcc_metrics
 
 
-def ParseTpcCTPMResultsFromFile(
-    vm: virtual_machine.BaseVirtualMachine) -> List[sample.Sample]:
+def ParseTpcCTPMResultsFromFile(stdout: str) -> List[sample.Sample]:
   """Parse TPCC TPM metrics per seconds."""
-  stdout, _ = vm.RemoteCommand('cat /tmp/hdbtcount.log')
   tpm_metrics = []
   time_series = []
   for line in stdout.split('\n'):
@@ -537,6 +539,23 @@ def ParseTpcCTPMResultsFromFile(
 def ParseTpcCResults(
     stdout: str, vm: virtual_machine.BaseVirtualMachine) -> List[sample.Sample]:
   """Extract results from the TPC-C script."""
+  tpcc_metrics = ParseBasicTpcCResults(stdout)
+
+  if HAMMERDB_TPCC_TIME_PROFILE.value:
+    if HAMMERDB_VERSION.value == HAMMERDB_4_0:
+      tpcc_metrics += ParseTpcCTimeProfileResults(stdout)
+    else:
+      tpcc_results = _GetFileContent(vm, '/tmp/hdbxtprofile.log')
+      tpcc_metrics += ParseTpcCTimeProfileResultsFromFile(tpcc_results)
+
+  if TPCC_LOG_TRANSACTIONS.value:
+    tpcc_results = _GetFileContent(vm, '/tmp/hdbtcount.log')
+    tpcc_metrics += ParseTpcCTPMResultsFromFile(tpcc_results)
+  return tpcc_metrics
+
+
+def ParseBasicTpcCResults(stdout: str) -> List[sample.Sample]:
+  """Extract basic results from the TPC-C script."""
   # match a string like:
   # "Vuser 1:TEST RESULT : System achieved 40213 NOPM from 92856 SQL Server TPM"
 
@@ -547,15 +566,6 @@ def ParseTpcCResults(
   nopm = regex_util.ExtractInt(regex, stdout, group=1)
 
   tpcc_metrics = [sample.Sample(TPM, tpm, TPM), sample.Sample(NOPM, nopm, NOPM)]
-
-  if HAMMERDB_TPCC_TIME_PROFILE.value:
-    if HAMMERDB_VERSION.value == HAMMERDB_4_0:
-      tpcc_metrics += ParseTpcCTimeProfileResults(stdout)
-    else:
-      tpcc_metrics += ParseTpcCTimeProfileResultsFromFile(vm)
-
-  if TPCC_LOG_TRANSACTIONS.value:
-    tpcc_metrics += ParseTpcCTPMResultsFromFile(vm)
   return tpcc_metrics
 
 
@@ -722,3 +732,39 @@ def Run(vm: virtual_machine.BaseVirtualMachine,
     return ParseTpcHResults(stdout)
   else:
     return ParseTpcCResults(stdout, vm)
+
+
+def GetMetadata(db_engine: str):
+  """Returns the meta data needed for hammerdb."""
+  script = HAMMERDB_SCRIPT.value
+  metadata = {
+      'hammerdbcli_script': script,
+  }
+
+  metadata['hammerdbcli_version'] = HAMMERDB_VERSION.value
+  metadata['hammerdbcli_vu'] = HAMMERDB_NUM_VU.value
+  metadata['hammerdbcli_num_run'] = NUM_RUN.value
+  if not FLAGS.use_managed_db and HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value:
+    metadata['hammerdbcli_optimized_server_configuration'] = (
+        HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value)
+
+  if script == HAMMERDB_SCRIPT_TPC_H:
+    metadata['hammerdbcli_scale_factor'] = HAMMERDB_TPCH_SCALE_FACTOR.value
+    metadata['hammerdbcli_load_tpch_tables_to_columnar_engine'] = (
+        LOAD_TPCH_TABLES_TO_COLUMNAR_ENGINE.value)
+    metadata['hammerdbcli_build_tpch_num_vu'] = (
+        HAMMERDB_BUILD_TPCH_NUM_VU.value)
+    if db_engine == sql_engine_utils.POSTGRES:
+      metadata['hammerdbcli_degree_of_parallel'] = (
+          HAMMERDB_TPCH_DEGREE_OF_PARALLEL.value)
+  elif script == HAMMERDB_SCRIPT_TPC_C:
+    metadata['hammerdbcli_num_warehouse'] = HAMMERDB_TPCC_NUM_WAREHOUSE.value
+    metadata['hammerdbcli_all_warehouse'] = HAMMERDB_TPCC_ALL_WAREHOUSE.value
+    metadata['hammerdbcli_rampup'] = HAMMERDB_TPCC_RAMPUP.value
+    metadata['hammerdbcli_duration'] = HAMMERDB_TPCC_DURATION.value
+    metadata['hammerdbcli_tpcc_time_profile'] = HAMMERDB_TPCC_TIME_PROFILE.value
+    metadata['hammerdbcli_tpcc_log_transactions'] = TPCC_LOG_TRANSACTIONS.value
+    if HAMMERDB_BUILD_TPCC_NUM_VU.value is None:
+      FLAGS.hammerdbcli_build_tpcc_num_vu = HAMMERDB_NUM_VU.value
+    metadata['hammerdbcli_build_tpcc_num_vu'] = HAMMERDB_BUILD_TPCC_NUM_VU.value
+  return metadata

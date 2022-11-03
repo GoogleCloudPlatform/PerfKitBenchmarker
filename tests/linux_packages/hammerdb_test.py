@@ -69,9 +69,7 @@ class HammerdbcliTest(pkb_common_test_case.PkbCommonTestCase,
     """Tests output from TPCC time profile."""
     FLAGS['hammerdbcli_tpcc_time_profile'].parse(True)
     FLAGS['hammerdbcli_tpcc_rampup'].parse(0)
-    vm = mock.Mock()
-    vm.RemoteCommand = mock.Mock(return_value=(TPM_PER_SECOND_4_3_LOG, ''))
-    output = ParseTpcCTPMResultsFromFile(vm)
+    output = ParseTpcCTPMResultsFromFile(TPM_PER_SECOND_4_3_LOG)
     # Remove raw timestamps from metadata,
     # github tests cannot parse it correctly.
     output[0].metadata.pop('ramp_up_ends')
@@ -153,9 +151,7 @@ class HammerdbcliTest(pkb_common_test_case.PkbCommonTestCase,
     """Tests output from TPCC time profile."""
     FLAGS['hammerdbcli_tpcc_time_profile'].parse(True)
     FLAGS['hammerdbcli_tpcc_rampup'].parse(1)
-    vm = mock.Mock()
-    vm.RemoteCommand = mock.Mock(return_value=(TPM_PER_SECOND_4_3_LOG, ''))
-    output = ParseTpcCTPMResultsFromFile(vm)
+    output = ParseTpcCTPMResultsFromFile(TPM_PER_SECOND_4_3_LOG)
     # Remove raw timestamps from metadata,
     # github tests cannot parse it correctly.
     output[0].metadata.pop('ramp_up_ends')
@@ -279,9 +275,7 @@ class HammerdbcliTest(pkb_common_test_case.PkbCommonTestCase,
   def testParseTpcCTimeProfileResultsFromFile(self):
     """Tests output from TPCC time profile."""
     FLAGS['hammerdbcli_tpcc_time_profile'].parse(True)
-    vm = mock.Mock()
-    vm.RemoteCommand = mock.Mock(return_value=(TPCC_TIMEPROFILE_4_3_LOG, ''))
-    output = ParseTpcCTimeProfileResultsFromFile(vm)
+    output = ParseTpcCTimeProfileResultsFromFile(TPCC_TIMEPROFILE_4_3_LOG)
     expected_result = [
         sample.Sample(
             metric='neword_CALLS',

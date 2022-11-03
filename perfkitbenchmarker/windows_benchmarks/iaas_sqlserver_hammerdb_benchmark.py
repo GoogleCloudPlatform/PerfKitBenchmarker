@@ -21,6 +21,7 @@ client(s). It benchmarks IAAS VMs and not managed services.
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import db_util
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import iaas_relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
@@ -118,6 +119,14 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
+def CheckPrerequisites(_):
+  """Verifies that benchmark flags is correct."""
+  if hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value != hammerdb.NON_OPTIMIZED:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Non-optimized hammerdbcli_optimized_server_configuration'
+        ' is not implemented.')
+
+
 def Prepare(benchmark_spec):
   """Prepare the benchmark by installing dependencies.
 
@@ -170,10 +179,14 @@ def Run(benchmark_spec):
 
 
 def GetMetadata():
-  # add other metadata, merge with existing code.
-  return {
-      'hammerdbcli_script': hammerdb.HAMMERDB_SCRIPT.value,
-  }
+  metadata = hammerdb.GetMetadata(sql_engine_utils.SQLSERVER)
+  # No reason to support multiple runs in a single benchmark run yet.
+  metadata.pop('hammerdbcli_num_run', None)
+  # columnar engine not applicable to sqlserver.
+  metadata.pop('hammerdbcli_load_tpch_tables_to_columnar_engine', None)
+  # HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION not implemented.
+  metadata.pop('hammerdbcli_optimized_server_configuration', None)
+  return metadata
 
 
 def Cleanup(_):

@@ -37,6 +37,8 @@ HAMMERDB_4_5_URL = 'https://github.com/TPC-Council/HammerDB/releases/download/v4
 
 # import linux flags
 HAMMERDB_SCRIPT = linux_hammerdb.HAMMERDB_SCRIPT
+HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION = linux_hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION
+NON_OPTIMIZED = linux_hammerdb.NON_OPTIMIZED
 
 # Default run timeout
 EIGHT_HOURS = 60*60*8
@@ -73,19 +75,19 @@ class WindowsTclScriptParameters(linux_hammerdb.TclScriptParameters):
                               script_name)
 
 
-def ParseTpcCTimeProfileResultsFromFile():
+def _GetFileContent(vm, file_path: str) -> str:
+  stdout, _ = vm.RemoteCommand(f' type {file_path}')
+  return stdout
+
+
+def ParseTpcCTimeProfileResultsFromFile(stdout: str) -> List[sample.Sample]:
   """Extracts latency result from time profile file."""
-  pass
+  return linux_hammerdb.ParseTpcCTimeProfileResultsFromFile(stdout)
 
 
-def ParseTpcCTimeProfileResults():
-  """Extract latency result from time profile TPC-C runs."""
-  pass
-
-
-def ParseTpcCTPMResultsFromFile():
+def ParseTpcCTPMResultsFromFile(stdout: str) -> List[sample.Sample]:
   """Parse TPCC TPM metrics per seconds."""
-  pass
+  return linux_hammerdb.ParseTpcCTPMResultsFromFile(stdout)
 
 
 def SetDefaultConfig():
@@ -93,7 +95,18 @@ def SetDefaultConfig():
 
 
 def ParseTpcCResults(stdout: str, vm) -> List[sample.Sample]:
-  return linux_hammerdb.ParseTpcCResults(stdout, vm)
+  """Extract results from the TPC-C script."""
+  tpcc_metrics = linux_hammerdb.ParseBasicTpcCResults(stdout)
+  if linux_hammerdb.HAMMERDB_TPCC_TIME_PROFILE.value:
+    tpcc_results = _GetFileContent(
+        vm, ntpath.join(vm.temp_dir, '..', 'hdbxtprofile.log'))
+    tpcc_metrics += ParseTpcCTimeProfileResultsFromFile(tpcc_results)
+
+  if linux_hammerdb.TPCC_LOG_TRANSACTIONS.value:
+    tpcc_results = _GetFileContent(
+        vm, ntpath.join(vm.temp_dir, '..', 'hdbtcount.log'))
+    tpcc_metrics += ParseTpcCTPMResultsFromFile(tpcc_results)
+  return tpcc_metrics
 
 
 def ParseTpcHResults(stdout: str) -> List[sample.Sample]:
@@ -206,3 +219,8 @@ def Run(vm,
 def PushTestFile(vm, data_file: str, path: str):
   vm.PushFile(data.ResourcePath(posixpath.join(path, data_file)),
               ntpath.join(vm.temp_dir, HAMMERDB_4_5, data_file))
+
+
+def GetMetadata(db_engine: str):
+  """Returns the meta data needed for hammerdb."""
+  return linux_hammerdb.GetMetadata(db_engine)
