@@ -133,6 +133,7 @@ class _DpbServiceSpec(spec.BaseSpec):
                     dpb_service.DATAPROC,
                 'valid_values': [
                     dpb_service.DATAPROC,
+                    dpb_service.DATAPROC_FLINK,
                     dpb_service.DATAPROC_GKE,
                     dpb_service.DATAPROC_SERVERLESS,
                     dpb_service.DATAFLOW,

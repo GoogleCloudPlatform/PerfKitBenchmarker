@@ -66,19 +66,19 @@ dpb_wordcount_benchmark:
 """
 
 # TODO(odiego): Deprecate WORD_COUNT_CONFIGURATION (not used in practice).
-WORD_COUNT_CONFIGURATION = dict(
-    [
-        (dpb_service.DATAPROC, ('org.apache.spark.examples.JavaWordCount',
-                                dpb_service.BaseDpbService.SPARK_JOB_TYPE)),
-        (dpb_service.DATAPROC_SERVERLESS,
-         ('org.apache.spark.examples.JavaWordCount',
-          dpb_service.BaseDpbService.SPARK_JOB_TYPE)),
-        (dpb_service.DATAFLOW, ('org.example.WordCount',
-                                dpb_service.BaseDpbService.DATAFLOW_JOB_TYPE)),
-        (dpb_service.EMR, ('org.apache.spark.examples.JavaWordCount',
-                           dpb_service.BaseDpbService.SPARK_JOB_TYPE))
-    ]
-)
+WORD_COUNT_CONFIGURATION = dict([
+    (dpb_service.DATAPROC, ('org.apache.spark.examples.JavaWordCount',
+                            dpb_service.BaseDpbService.SPARK_JOB_TYPE)),
+    (dpb_service.DATAPROC_FLINK, ('org.example.WordCount',
+                                  dpb_service.BaseDpbService.FLINK_JOB_TYPE)),
+    (dpb_service.DATAPROC_SERVERLESS,
+     ('org.apache.spark.examples.JavaWordCount',
+      dpb_service.BaseDpbService.SPARK_JOB_TYPE)),
+    (dpb_service.DATAFLOW, ('org.example.WordCount',
+                            dpb_service.BaseDpbService.DATAFLOW_JOB_TYPE)),
+    (dpb_service.EMR, ('org.apache.spark.examples.JavaWordCount',
+                       dpb_service.BaseDpbService.SPARK_JOB_TYPE))
+])
 
 flags.DEFINE_string('dpb_wordcount_input', None, 'Input for word count')
 flags.DEFINE_enum('dpb_wordcount_fs', dpb_service.BaseDpbService.GCS_FS,
@@ -156,7 +156,8 @@ def Run(benchmark_spec):
       dpb_service_instance.SERVICE_TYPE)
   if FLAGS.dpb_job_classname:
     classname = FLAGS.dpb_job_classname
-  if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
+  if dpb_service_instance.SERVICE_TYPE in [
+      dpb_service.DATAFLOW, dpb_service.DATAPROC_FLINK]:
     jarfile = benchmark_spec.dpb_wordcount_jarfile
     job_arguments.append('--inputFile={}'.format(input_location))
   else:

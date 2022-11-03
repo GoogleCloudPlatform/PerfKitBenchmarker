@@ -20,14 +20,17 @@ at https://cloud.google.com/dataproc/
 import datetime
 import json
 import logging
+import os
 import re
 from typing import Any, Dict, Optional
 
 from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aws_credentials
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
@@ -41,6 +44,10 @@ disk_to_hdfs_map = {
     'pd-balanced': 'SSD (Balanced)',
     'pd-ssd': 'SSD',
 }
+
+DATAPROC_FLINK_INIT_SCRIPT = os.path.join('beam', 'flink-init.sh')
+DATAPROC_FLINK_PRESUBMIT_SCRIPT = os.path.join('beam', 'flink-presubmit.sh')
+DATAPROC_FLINK_TRIGGER_SCRIPT = os.path.join('beam', 'flink-trigger.sh')
 
 
 class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
@@ -576,3 +583,70 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
         'dpb_service_zone': basic_data['dpb_service_zone'],
         'dpb_job_properties': basic_data['dpb_job_properties'],
     }
+
+
+class GcpDpbDataprocFlink(GcpDpbDataproc):
+  """Dataproc with Flink component.
+
+  Extends from GcpDpbDataproc and not GcpDpbBaseDataproc as this represents a
+  cluster with managed infrastructure.
+  """
+
+  CLOUD = providers.GCP
+  SERVICE_TYPE = 'dataproc_flink'
+
+  def _Create(self):
+    # Make flink component installed when using Dataproc for flink jobs
+    if self.spec.applications:
+      self.spec.applications.append('flink')
+    else:
+      self.spec.applications = ['flink']
+    super()._Create()
+    self.ExecuteOnMaster(data.ResourcePath(DATAPROC_FLINK_INIT_SCRIPT), [])
+
+  def SubmitJob(self,
+                jarfile=None,
+                classname=None,
+                pyspark_file=None,
+                query_file=None,
+                job_poll_interval=None,
+                job_stdout_file=None,
+                job_arguments=None,
+                job_files=None,
+                job_jars=None,
+                job_py_files=None,
+                job_type=None,
+                properties=None):
+    """See base class."""
+    assert job_type == dpb_service.BaseDpbService.FLINK_JOB_TYPE, (
+        'Unsupported job type {}'.format(job_type))
+    logging.info('Running presubmit script...')
+    self.ExecuteOnMaster(data.ResourcePath(DATAPROC_FLINK_PRESUBMIT_SCRIPT),
+                         [jarfile])
+    logging.info('Submitting beam jobs with flink component enabled.')
+    job_script_args = []
+    job_script_args.append('-c {}'.format(classname))
+    job_script_args.append('--')
+    job_script_args.extend(job_arguments)
+    self.ExecuteOnMaster(data.ResourcePath(DATAPROC_FLINK_TRIGGER_SCRIPT),
+                         job_script_args)
+    logging.info('Flink job done.')
+
+  def ExecuteOnMaster(self, script_path, script_args):
+    master_name = self.cluster_id + '-m'
+    script_name = os.path.basename(script_path)
+    if FLAGS.gcp_internal_ip:
+      scp_cmd = ['gcloud', 'beta', 'compute', 'scp', '--internal-ip']
+    else:
+      scp_cmd = ['gcloud', 'compute', 'scp']
+    scp_cmd += ['--zone', self.dpb_service_zone, '--quiet', script_path,
+                'pkb@' + master_name + ':/tmp/' + script_name]
+    vm_util.IssueCommand(scp_cmd, force_info_log=True)
+    ssh_cmd = ['gcloud', 'compute', 'ssh']
+    if FLAGS.gcp_internal_ip:
+      ssh_cmd += ['--internal-ip']
+    ssh_cmd += ['--zone=' + self.dpb_service_zone, '--quiet',
+                'pkb@' + master_name, '--',
+                'chmod +x /tmp/' + script_name + '; sudo /tmp/' + script_name
+                + ' ' + ' '.join(script_args)]
+    vm_util.IssueCommand(ssh_cmd, force_info_log=True)

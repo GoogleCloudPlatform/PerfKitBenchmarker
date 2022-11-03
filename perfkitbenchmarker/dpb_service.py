@@ -78,6 +78,7 @@ FLAGS = flags.FLAGS
 
 # List of supported data processing backend services
 DATAPROC = 'dataproc'
+DATAPROC_FLINK = 'dataproc_flink'
 DATAPROC_GKE = 'dataproc_gke'
 DATAPROC_SERVERLESS = 'dataproc_serverless'
 DATAFLOW = 'dataflow'
@@ -149,6 +150,7 @@ class BaseDpbService(resource.BaseResource):
   HADOOP_JOB_TYPE = 'hadoop'
   DATAFLOW_JOB_TYPE = 'dataflow'
   BEAM_JOB_TYPE = 'beam'
+  FLINK_JOB_TYPE = 'flink'
 
   def _JobJars(self) -> Dict[str, Dict[str, str]]:
     """Known mappings of jars in the cluster used by GetExecutionJar."""
