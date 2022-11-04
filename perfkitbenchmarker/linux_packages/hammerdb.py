@@ -303,6 +303,8 @@ class TclScriptParameters(object):
 
   def __init__(self, ip, port, password, user, is_managed_azure,
                hammerdb_script, script_type):
+    if ':' in ip:
+      ip = ip.replace(':', '\\:')
     self.map_search_to_replace = {
         SCRIPT_PARAMETER_IP: ip,
         SCRIPT_PARAMETER_PORT: port,
