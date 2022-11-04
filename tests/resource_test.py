@@ -1,10 +1,10 @@
 """Tests for perfkitbenchmarker.resource."""
 
+import pickle
 import unittest
 
 from absl import flags
 from absl.testing import parameterized
-
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
@@ -18,8 +18,24 @@ class GetResourceClassTest(pkb_common_test_case.PkbCommonTestCase):
     REQUIRED_ATTRS = ['SERVICE_TYPE']
     RESOURCE_TYPE = 'BaseTestClassForAttributes'
 
+    def __init__(self, spec):
+      super().__init__()
+      self.spec = spec
+
+    def _Create(self):
+      pass
+
+    def _Delete(self):
+      pass
+
   class TestClassForAttributes(BaseTestClassForAttributes):
     SERVICE_TYPE = ['Base', 'Base2']
+
+    def _Create(self):
+      pass
+
+    def _Delete(self):
+      pass
 
   @parameterized.named_parameters(('BaseTest', 'Base'), ('Base2Test', 'Base2'))
   def test_list_of_attributes(self, service):
@@ -27,6 +43,13 @@ class GetResourceClassTest(pkb_common_test_case.PkbCommonTestCase):
         resource.GetResourceClass(
             self.BaseTestClassForAttributes, SERVICE_TYPE=service),
         self.TestClassForAttributes)
+
+  def test_pickle(self):
+    base = resource.GetResourceClass(
+        self.BaseTestClassForAttributes, SERVICE_TYPE='Base')('spec')
+
+    base = pickle.loads(pickle.dumps(base))
+    self.assertEqual(base.SERVICE_TYPE, 'Base')
 
 
 class NonFreezeRestoreResource(resource.BaseResource):

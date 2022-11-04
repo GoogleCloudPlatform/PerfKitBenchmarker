@@ -52,7 +52,7 @@ def GetResourceClass(base_class, **kwargs):
         (base_class.__name__, kwargs))
   resource = _RESOURCE_REGISTRY.get(tuple(key))
 
-  # Set the required attributes of the resource
+  # Set the required attributes of the resource class
   for key, value in kwargs.items():
     setattr(resource, key, value)
 
@@ -142,6 +142,10 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
       delete_on_freeze_error=False,
   ):
     super(BaseResource, self).__init__()
+    # Class level attributes does not persist after pickle
+    # Copy required attributes to the object
+    for attribute in self.REQUIRED_ATTRS:
+      setattr(self, attribute, getattr(self, attribute, None))
     self.created = user_managed
     self.deleted = user_managed
     self.user_managed = user_managed
