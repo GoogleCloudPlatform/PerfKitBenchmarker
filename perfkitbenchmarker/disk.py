@@ -153,46 +153,6 @@ def WarnAndTranslateDiskTypes(name, cloud):
     return name
 
 
-def WarnAndCopyFlag(old_name, new_name):
-  """Copy a value from an old flag to a new one, warning the user.
-
-  Args:
-    old_name: old name of flag.
-    new_name: new name of flag.
-  """
-
-  if FLAGS[old_name].present:
-    logging.warning(
-        'Flag --%s is deprecated and will be removed. Please '
-        'switch to --%s.', old_name, new_name)
-    if not FLAGS[new_name].present:
-      FLAGS[new_name].value = FLAGS[old_name].value
-
-      # Mark the new flag as present so we'll print it out in our list
-      # of flag values.
-      FLAGS[new_name].present = True
-    else:
-      logging.warning('Ignoring legacy flag %s because new flag %s is present.',
-                      old_name, new_name)
-  # We keep the old flag around so that providers that haven't been
-  # updated yet will continue to work.
-
-
-DISK_FLAGS_TO_TRANSLATE = {
-    'scratch_disk_type': 'data_disk_type',
-    'scratch_disk_iops': 'aws_provisioned_iops',
-    'scratch_disk_throughput': 'aws_provisioned_throughput',
-    'scratch_disk_size': 'data_disk_size'
-}
-
-
-def WarnAndTranslateDiskFlags():
-  """Translate old disk-related flags to new disk-related flags."""
-
-  for old, new in six.iteritems(DISK_FLAGS_TO_TRANSLATE):
-    WarnAndCopyFlag(old, new)
-
-
 class BaseDiskSpec(spec.BaseSpec):
   """Stores the information needed to create a disk.
 

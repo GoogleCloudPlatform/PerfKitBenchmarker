@@ -82,7 +82,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.region = util.GetRegionByZone(self.zone)
     self.bandwidth_in = FLAGS.ali_bandwidth_in
     self.bandwidth_out = FLAGS.ali_bandwidth_out
-    self.scratch_disk_size = FLAGS.scratch_disk_size or DEFAULT_DISK_SIZE
+    self.scratch_disk_size = FLAGS.data_disk_size or DEFAULT_DISK_SIZE
     self.system_disk_type = FLAGS.ali_system_disk_type
     self.system_disk_size = FLAGS.ali_system_disk_size
     self.eip_address_bandwidth = FLAGS.ali_eip_address_bandwidth
@@ -283,7 +283,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--SystemDisk.Category %s' % self.system_disk_type,
         '--SystemDisk.Size %s' % self.system_disk_size]
 
-    if FLAGS.scratch_disk_type == disk.LOCAL:
+    if FLAGS.data_disk_type == disk.LOCAL:
       disk_cmd = [
           '--DataDisk1Category ephemeral_ssd',
           '--DataDisk1Size %s' % self.scratch_disk_size,

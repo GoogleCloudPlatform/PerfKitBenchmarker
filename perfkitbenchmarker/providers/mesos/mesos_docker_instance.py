@@ -107,7 +107,7 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     """
     if self.disk_specs and self.disk_specs[0].disk_type == disk.STANDARD:
       raise Exception('Currently only local disks are supported. Please '
-                      're-run the benchmark with "--scratch_disk_type=local".')
+                      're-run the benchmark with "--data_disk_type=local".')
     if not FLAGS.marathon_address:
       raise Exception('Please provide the address and port of Marathon '
                       'framework. Example: 10:20:30:40:8080')
@@ -121,7 +121,7 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
         scratch_disk = LocalDisk(disk_num, disk_spec, self.name)
       else:
         raise Exception('Currently only local disks are supported. Please '
-                        're-run the benchmark with "--scratch_disk_type=local"')
+                        're-run the benchmark with "--data_disk_type=local"')
       scratch_disk._Create()
       self.scratch_disks.append(scratch_disk)
 

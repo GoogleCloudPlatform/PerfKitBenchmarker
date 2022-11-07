@@ -83,9 +83,9 @@ from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
+from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import log_util
@@ -221,28 +221,18 @@ flags.DEFINE_string('static_vm_file', None,
 flags.DEFINE_boolean('version', False, 'Display the version and exit.',
                      allow_override_cpp=True)
 flags.DEFINE_boolean('time_commands', False, 'Times each command issued.')
-flags.DEFINE_enum(
-    'scratch_disk_type', None,
-    [disk.STANDARD, disk.REMOTE_SSD, disk.PIOPS, disk.LOCAL],
-    'Type for all scratch disks. The default is standard')
 flags.DEFINE_string(
     'data_disk_type', None,
     'Type for all data disks. If a provider keeps the operating system and '
     'user data on separate disks, this only affects the user data disk(s).'
     'If the provider has OS and user data on the same disk, this flag affects'
     'that disk.')
-flags.DEFINE_integer('scratch_disk_size', None, 'Size, in gb, for all scratch '
-                     'disks.')
 flags.DEFINE_list(
     'data_disk_zones', [],
     'The zone of the data disk. This is only used to provision regional pd with'
     ' multiple zones on GCP.'
     )
 flags.DEFINE_integer('data_disk_size', None, 'Size, in gb, for all data disks.')
-flags.DEFINE_integer('scratch_disk_iops', None,
-                     'IOPS for Provisioned IOPS (SSD) volumes in AWS.')
-flags.DEFINE_integer('scratch_disk_throughput', None,
-                     'Throughput (MB/s) for volumes in AWS.')
 flags.DEFINE_integer('num_striped_disks', None,
                      'The number of data disks to stripe together to form one '
                      '"logical" data disk. This defaults to 1, '
@@ -495,7 +485,7 @@ def _InjectBenchmarkInfoIntoDocumentation():
                                       % '\n\t'.join(benchmark_sets_list))
 
 
-def _ParseFlags(argv=sys.argv):
+def _ParseFlags(argv):
   """Parses the command-line flags."""
   try:
     argv = FLAGS(argv)
@@ -1487,7 +1477,6 @@ def SetUpPKB():
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
 
   # Translate deprecated flags and log all provided flag values.
-  disk.WarnAndTranslateDiskFlags()
   _WarnAndTranslateZoneFlags()
   _LogCommandLineFlags()
 
@@ -1794,7 +1783,8 @@ def Main():
   assert sys.version_info >= (3, 9), 'PerfKitBenchmarker requires Python 3.9+'
   log_util.ConfigureBasicLogging()
   _InjectBenchmarkInfoIntoDocumentation()
-  _ParseFlags()
+  argv = flag_alias.AliasFlagsFromArgs(sys.argv)
+  _ParseFlags(argv)
   if FLAGS.helpmatch:
     _PrintHelp(FLAGS.helpmatch)
     return 0

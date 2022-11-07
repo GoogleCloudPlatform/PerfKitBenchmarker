@@ -263,6 +263,18 @@ class OverrideFlagsTestCase(unittest.TestCase):
     self.assertEqual(flag_values['test_flag'].value, value)
     self.assertEqual(flag_values['test_flag'].present, present)
 
+  def testFlagAlias(self):
+    flag_values = flags.FlagValues()
+    flags.DEFINE_integer('test_flag', 0, 'Test flag.', flag_values=flag_values)
+    flag_values([sys.argv[0]])
+    flag_values_overrides = {}
+    flag_values_overrides['test_flag_2'] = 1
+    self.assertFlagState(flag_values, 0, False)
+    with flag_util.OverrideFlags(flag_values, flag_values_overrides,
+                                 [{'test_flag_2': 'test_flag'}]):
+      self.assertFlagState(flag_values, 1, True)
+    self.assertFlagState(flag_values, 0, False)
+
   def testReadAndWrite(self):
     flag_values = flags.FlagValues()
     flags.DEFINE_integer('test_flag', 0, 'Test flag.', flag_values=flag_values)

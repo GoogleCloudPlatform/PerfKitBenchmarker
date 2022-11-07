@@ -21,8 +21,8 @@ import re
 
 from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import units
-
 import six
 from six.moves import range
 import yaml
@@ -264,7 +264,8 @@ def DEFINE_integerlist(name, default, help, on_nonincreasing=None,
 class OverrideFlags(object):
   """Context manager that applies any config_dict overrides to flag_values."""
 
-  def __init__(self, flag_values, config_dict):
+  def __init__(self, flag_values, config_dict,
+               alias=flag_alias.ALL_TRANSLATIONS):
     """Initializes an OverrideFlags context manager.
 
     Args:
@@ -274,9 +275,10 @@ class OverrideFlags(object):
         Upon exit, flag_values will be restored to its original state.
       config_dict: Merged config flags from the benchmark config and benchmark
         configuration yaml file.
+      alias: Alias to rename the flags to.
     """
     self._flag_values = flag_values
-    self._config_dict = config_dict
+    self._config_dict = flag_alias.AliasFlagsFromYaml(config_dict, alias)
     self._flags_to_reapply = {}
 
   def __enter__(self):
