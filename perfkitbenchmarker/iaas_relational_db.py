@@ -45,6 +45,11 @@ DEFAULT_ENGINE_VERSIONS = {
     sql_engine_utils.POSTGRES: DEFAULT_POSTGRES_VERSION,
 }
 
+_SETUP_APPARMOR_MYSQL = flags.DEFINE_boolean('setup_apparmor_mysql', True,
+                                             'Whether we should setup apparmor '
+                                             'for mysql, some machines do '
+                                             'not have apparmor.')
+
 
 class IAASRelationalDb(relational_db.BaseRelationalDb):
   """Object representing a IAAS relational database Service."""
@@ -260,23 +265,24 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
     self.server_vm.RemoteCommand('sudo rsync -avzh /tmp/ /scratch/tmp')
     self.server_vm.RemoteCommand('df', should_log=True)
     # Configure AppArmor.
-    self.server_vm.RemoteCommand(
-        'echo "alias /var/lib/mysql -> /scratch/mysql," | sudo tee -a '
-        '/etc/apparmor.d/tunables/alias')
-    self.server_vm.RemoteCommand(
-        'echo "alias /tmp -> /scratch/tmp," | sudo tee -a '
-        '/etc/apparmor.d/tunables/alias')
-    self.server_vm.RemoteCommand(
-        'sudo sed -i '
-        '"s|# Allow data files dir access|'
-        '  /scratch/mysql/ r, /scratch/mysql/** rwk, /scratch/tmp/ r, '
-        '/scratch/tmp/** rwk, /proc/*/status r, '
-        '/sys/devices/system/node/ r, /sys/devices/system/node/node*/meminfo r,'
-        ' /sys/devices/system/node/*/* r, /sys/devices/system/node/* r, '
-        '# Allow data files dir access|g" /etc/apparmor.d/usr.sbin.mysqld')
-    self.server_vm.RemoteCommand(
-        'sudo apparmor_parser -r /etc/apparmor.d/usr.sbin.mysqld')
-    self.server_vm.RemoteCommand('sudo systemctl restart apparmor')
+    if _SETUP_APPARMOR_MYSQL.value:
+      self.server_vm.RemoteCommand(
+          'echo "alias /var/lib/mysql -> /scratch/mysql," | sudo tee -a '
+          '/etc/apparmor.d/tunables/alias')
+      self.server_vm.RemoteCommand(
+          'echo "alias /tmp -> /scratch/tmp," | sudo tee -a '
+          '/etc/apparmor.d/tunables/alias')
+      self.server_vm.RemoteCommand(
+          'sudo sed -i '
+          '"s|# Allow data files dir access|'
+          '  /scratch/mysql/ r, /scratch/mysql/** rwk, /scratch/tmp/ r, '
+          '/scratch/tmp/** rwk, /proc/*/status r, '
+          '/sys/devices/system/node/ r, /sys/devices/system/node/node*/meminfo r,'
+          ' /sys/devices/system/node/*/* r, /sys/devices/system/node/* r, '
+          '# Allow data files dir access|g" /etc/apparmor.d/usr.sbin.mysqld')
+      self.server_vm.RemoteCommand(
+          'sudo apparmor_parser -r /etc/apparmor.d/usr.sbin.mysqld')
+      self.server_vm.RemoteCommand('sudo systemctl restart apparmor')
     # Finally, change the MySQL data directory.
     self.server_vm.RemoteCommand(
         'sudo sed -i '
@@ -302,12 +308,14 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
     vm.PushFile(
         data.ResourcePath(
             posixpath.join(POSTGRES_RESOURCE_PATH, POSTGRES_HBA_CONFIG)))
+    vm.RemoteCommand('sudo systemctl restart postgresql')
     vm.RemoteCommand('sudo -u postgres psql postgres -c '
                      '"ALTER USER postgres PASSWORD \'%s\';"' %
                      self.spec.database_password)
     vm.RemoteCommand('sudo -u postgres psql postgres -c '
                      '"CREATE ROLE %s LOGIN SUPERUSER PASSWORD \'%s\';"' %
                      (self.spec.database_username, self.spec.database_password))
+    vm.RemoteCommand('sudo systemctl stop postgresql')
 
     # Change the directory to scratch
     vm.RemoteCommand(
