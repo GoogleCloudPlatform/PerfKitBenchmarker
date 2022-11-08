@@ -11,13 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Class to represent an Azure Placement Group object.
 
 Cloud specific implementations of Placement Group.
 """
 
-import abc
 import json
 
 from absl import flags
@@ -28,8 +26,14 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import util
 
-
 FLAGS = flags.FLAGS
+
+PROXIMITY_PLACEMENT_GROUP = 'proximity-placement-group'
+AVAILABILITY_SET = 'availability-set'
+_CLI_STRATEGY_ARGS_DICT = {
+    PROXIMITY_PLACEMENT_GROUP: ['ppg'],
+    AVAILABILITY_SET: ['vm', 'availability-set']
+    }
 
 
 class AzurePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
@@ -53,10 +57,17 @@ class AzurePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
     result = super(AzurePlacementGroupSpec,
                    cls)._GetOptionDecoderConstructions()
     result.update({
-        'resource_group': (option_decoders.StringDecoder, {'none_ok': False}),
+        'resource_group': (option_decoders.StringDecoder, {
+            'none_ok': False
+        }),
         'placement_group_style': (option_decoders.EnumDecoder, {
-            'valid_values': placement_group.PLACEMENT_GROUP_OPTIONS,
-            'default': placement_group.PLACEMENT_GROUP_NONE,
+            'valid_values':
+                set([
+                    PROXIMITY_PLACEMENT_GROUP,
+                    AVAILABILITY_SET
+                ] + list(placement_group.PLACEMENT_GROUP_OPTIONS)),
+            'default':
+                placement_group.PLACEMENT_GROUP_NONE,
         })
     })
     return result
@@ -71,33 +82,25 @@ class AzurePlacementGroup(placement_group.BasePlacementGroup):
     """Init method for AzurePlacementGroup.
 
     Args:
-      azure_placement_group_spec: Object containing the
-        information needed to create an AzurePlacementGroup.
+      azure_placement_group_spec: Object containing the information needed to
+        create an AzurePlacementGroup.
     """
     super(AzurePlacementGroup, self).__init__(azure_placement_group_spec)
     self.resource_group = azure_placement_group_spec.resource_group
     self.name = '%s-%s' % (self.resource_group, self.zone)
     self.region = util.GetRegionFromZone(self.zone)
     self.strategy = azure_placement_group_spec.placement_group_style
-    if self.strategy == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED:
-      self.strategy = placement_group.PLACEMENT_GROUP_CLUSTER
-    if self.strategy == placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED:
-      self.strategy = placement_group.PLACEMENT_GROUP_SPREAD
-
-  @abc.abstractmethod
-  def AddVmArgs(self):
-    """List of arguments to add to vm creation."""
-    raise NotImplementedError()
-
-
-class AzureAvailSet(AzurePlacementGroup):
-  """Object representing an Azure Availability Set."""
+    if (self.strategy == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED
+       ) or (self.strategy == placement_group.PLACEMENT_GROUP_CLUSTER):
+      self.strategy = PROXIMITY_PLACEMENT_GROUP
+    if (self.strategy == placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED
+       ) or (self.strategy == placement_group.PLACEMENT_GROUP_SPREAD):
+      self.strategy = AVAILABILITY_SET
 
   def _Create(self):
-    """Create the availability set."""
-    create_cmd = [
-        azure.AZURE_PATH, 'vm', 'availability-set', 'create',
-        '--resource-group', self.resource_group, '--name', self.name
+    """Create the placement group."""
+    create_cmd = [azure.AZURE_PATH] + _CLI_STRATEGY_ARGS_DICT[self.strategy] + [
+        'create', '--resource-group', self.resource_group, '--name', self.name
     ]
     if self.region:
       create_cmd.extend(['--location', self.region])
@@ -108,45 +111,14 @@ class AzureAvailSet(AzurePlacementGroup):
 
   @vm_util.Retry()
   def _Exists(self):
-    """Returns True if the availability set exists."""
-    show_cmd = [
-        azure.AZURE_PATH, 'vm', 'availability-set', 'show', '--output', 'json',
-        '--resource-group', self.resource_group, '--name', self.name
-    ]
-    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
-    return bool(json.loads(stdout))
-
-  def AddVmArgs(self):
-    """Returns Azure command to add VM to availability set."""
-    return ['--availability-set', self.name]
-
-
-class AzureProximityGroup(AzurePlacementGroup):
-  """Object representing an Azure Proximity Placement Group."""
-
-  def _Create(self):
-    """Create the Proximity Placement Group."""
-    create_cmd = [
-        azure.AZURE_PATH, 'ppg', 'create',
-        '--resource-group', self.resource_group, '--name', self.name
-    ]
-    if self.region:
-      create_cmd.extend(['--location', self.region])
-    vm_util.IssueCommand(create_cmd)
-
-  def _Delete(self):
-    pass
-
-  @vm_util.Retry()
-  def _Exists(self):
-    """Returns True if the Proximity Placement Group exists."""
-    show_cmd = [
-        azure.AZURE_PATH, 'ppg', 'show', '--output', 'json',
-        '--resource-group', self.resource_group, '--name', self.name
+    """Returns True if the placement group exists."""
+    show_cmd = [azure.AZURE_PATH] + _CLI_STRATEGY_ARGS_DICT[self.strategy] + [
+        'show', '--output', 'json', '--resource-group', self.resource_group,
+        '--name', self.name
     ]
     stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
     return bool(json.loads(stdout))
 
   def AddVmArgs(self):
     """Returns Azure command to add VM to placement group."""
-    return ['--ppg', self.name]
+    return ['--' + _CLI_STRATEGY_ARGS_DICT[self.strategy][-1], self.name]

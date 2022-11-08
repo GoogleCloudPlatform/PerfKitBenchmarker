@@ -41,9 +41,8 @@ PLACEMENT_GROUP_OPTIONS = frozenset([
 ])
 
 # Default placement group style is specified by Cloud Specific Placement Group.
-flags.DEFINE_enum(
+flags.DEFINE_string(
     'placement_group_style', None,
-    list(PLACEMENT_GROUP_OPTIONS) + [PLACEMENT_GROUP_RACK],
     'The vm placement group option to use. Default set by cloud.')
 
 
