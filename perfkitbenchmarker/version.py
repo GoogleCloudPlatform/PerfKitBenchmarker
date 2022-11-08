@@ -37,7 +37,7 @@ def _GetVersion():
     # Could not get the version from git. Resort to contents of the static
     # version file.
     try:
-      version = pkg_resources.resource_string(perfkitbenchmarker.__name__,
+      version = pkg_resources.resource_string(perfkitbenchmarker.__name__,  # pytype: disable=not-callable
                                               _STATIC_VERSION_FILE)
     except IOError:
       # Could not determine version.
