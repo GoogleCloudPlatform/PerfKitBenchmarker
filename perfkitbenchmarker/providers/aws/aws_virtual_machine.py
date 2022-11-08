@@ -135,6 +135,8 @@ _EFA_PARAMS = {
 _EFA_URL = ('https://s3-us-west-2.amazonaws.com/aws-efa-installer/'
             'aws-efa-installer-{version}.tar.gz')
 
+FIVE_MINUTE_TIMEOUT = 300
+
 
 class AwsTransitionalVmRetryableError(Exception):
   """Error for retrying _Exists when an AWS VM is in a transitional state."""
@@ -1349,7 +1351,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.Install('awscli')
     self.Install('aws_credentials')
 
-  def DownloadPreprovisionedData(self, install_path, module_name, filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename,
+                                 timeout=FIVE_MINUTE_TIMEOUT):
     """Downloads a data file from an AWS S3 bucket with pre-provisioned data.
 
     Use --aws_preprovisioned_data_bucket to specify the name of the bucket.
@@ -1358,11 +1361,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       install_path: The install path on this VM.
       module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
+      timeout: Timeout value for downloading preprovisionedData, Five minutes
+      by default.
     """
     self.InstallCli()
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
-        install_path, module_name, filename))
+    self.RobustRemoteCommand(GenerateDownloadPreprovisionedDataCommand(
+        install_path, module_name, filename), timeout=timeout)
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""

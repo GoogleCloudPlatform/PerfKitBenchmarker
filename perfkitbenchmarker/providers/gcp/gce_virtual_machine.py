@@ -79,6 +79,7 @@ _METADATA_PREEMPT_CMD = f'curl {METADATA_PREEMPT_URI} -H "Metadata-Flavor: Googl
 _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     't2a': 'neoverse-n1',
 }
+FIVE_MINUTE_TIMEOUT = 300
 
 
 class GceVmSpec(virtual_machine.BaseVmSpec):
@@ -1118,7 +1119,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     events_dict[lm_total_time_key] = lm_total_time
     return events_dict
 
-  def DownloadPreprovisionedData(self, install_path, module_name, filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename,
+                                 timeout=FIVE_MINUTE_TIMEOUT):
     """Downloads a data file from a GCS bucket with pre-provisioned data.
 
     Use --gce_preprovisioned_data_bucket to specify the name of the bucket.
@@ -1127,10 +1129,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       install_path: The install path on this VM.
       module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
+      timeout: Timeout value for downloading preprovisionedData, Five minutes
+      by default.
     """
     # TODO(deitz): Add retry logic.
-    self.RemoteCommand(GenerateDownloadPreprovisionedDataCommand(
-        install_path, module_name, filename))
+    self.RobustRemoteCommand(GenerateDownloadPreprovisionedDataCommand(
+        install_path, module_name, filename), timeout=timeout)
 
   def InstallCli(self):
     """Installs the gcloud cli on this GCP vm."""

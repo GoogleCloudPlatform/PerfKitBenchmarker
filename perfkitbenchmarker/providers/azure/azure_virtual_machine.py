@@ -111,6 +111,8 @@ AZURE_ARM_TYPES = [
     r'(Standard_E[0-9]+pd?s_v5)',
 ]
 
+FIVE_MINUTE_TIMEOUT = 300
+
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
@@ -817,7 +819,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.Install('azure_cli')
     self.Install('azure_credentials')
 
-  def DownloadPreprovisionedData(self, install_path, module_name, filename):
+  def DownloadPreprovisionedData(self, install_path, module_name, filename,
+                                 timeout=FIVE_MINUTE_TIMEOUT):
     """Downloads a data file from Azure blob storage with pre-provisioned data.
 
     Use --azure_preprovisioned_data_bucket to specify the name of the account.
@@ -832,12 +835,14 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       install_path: The install path on this VM.
       module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
+      timeout: Timeout value for downloading preprovisionedData, Five minutes
+      by default.
     """
     # N.B. Should already be installed by ShouldDownloadPreprovisionedData
     self.Install('azure_cli')
-    self.RemoteCommand(
+    self.RobustRemoteCommand(
         GenerateDownloadPreprovisionedDataCommand(install_path, module_name,
-                                                  filename))
+                                                  filename), timeout=timeout)
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""

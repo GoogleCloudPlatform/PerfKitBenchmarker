@@ -186,6 +186,8 @@
 
 ### Bug fixes and maintenance updates:
 
+-   Set the command to download preprovisioned data to be robust and have a five
+    minute timeout.
 -   Make Speccpu17 fail if there are compilation errors that will cause missing
     results.
 -   Tuned entity cleanup parameters.

@@ -411,6 +411,30 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     raise NotImplementedError()
 
+  def RobustRemoteCommand(self, command, should_log=False, timeout=None,
+                          ignore_failure=False):
+    """Runs a command on the VM in a more robust way than RemoteCommand.
+
+    The default should be to call RemoteCommand and log that it is not yet
+    implemented. This function should be overwritten it is decendents.
+
+    Args:
+      command: The command to run.
+      should_log: Whether to log the command's output at the info level. The
+          output is always logged at the debug level.
+      timeout: The timeout for the command in seconds.
+      ignore_failure: Ignore any failure if set to true.
+
+    Returns:
+      A tuple of stdout, stderr from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem establishing the connection, or
+          the command fails.
+    """
+    logging.info('RobustRemoteCommand not implemented, using RemoteCommand.')
+    self.RemoteCommand(command, should_log, timeout, ignore_failure)
+
   def TryRemoteCommand(self, command, **kwargs):
     """Runs a remote command and returns True iff it succeeded."""
     try:
