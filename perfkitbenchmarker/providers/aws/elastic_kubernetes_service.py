@@ -69,6 +69,7 @@ class EksCluster(container_service.KubernetesCluster):
     self.cluster_version = FLAGS.container_cluster_version
     # TODO(user) support setting boot disk type if EKS does.
     self.boot_disk_type = self.vm_config.DEFAULT_ROOT_DISK_TYPE
+    self.account = util.GetAccount()
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -99,6 +100,7 @@ class EksCluster(container_service.KubernetesCluster):
         'version': self.cluster_version,
         # NAT mode uses an EIP.
         'vpc-nat-mode': 'Disable',
+        'with-oidc': True,
     }
     # If multiple zones are passed use them for the control plane.
     # Otherwise EKS will auto-select control plane zones in the region.
@@ -125,6 +127,34 @@ class EksCluster(container_service.KubernetesCluster):
 
     for name, node_group in self.nodepools.items():
       self._CreateNodeGroup(name, node_group)
+
+    # EBS CSI driver is required for creating EBS volumes in version > 1.23
+    # https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
+
+    # Name must be unique.
+    ebs_csi_driver_role = f'AmazonEKS_EBS_CSI_DriverRole_{self.name}'
+
+    cmd = [
+        FLAGS.eksctl, 'create', 'iamserviceaccount',
+        '--name=ebs-csi-controller-sa',
+        '--namespace=kube-system',
+        f'--region={self.region}',
+        f'--cluster={self.name}',
+        '--attach-policy-arn=arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy',
+        '--approve',
+        '--role-only',
+        f'--role-name={ebs_csi_driver_role}',
+    ]
+    vm_util.IssueCommand(cmd)
+
+    cmd = [
+        FLAGS.eksctl, 'create', 'addon',
+        '--name=aws-ebs-csi-driver',
+        f'--region={self.region}',
+        f'--cluster={self.name}',
+        f'--service-account-role-arn=arn:aws:iam::{self.account}:role/{ebs_csi_driver_role}',
+    ]
+    vm_util.IssueCommand(cmd)
 
   def _CreateNodeGroup(self, name: str, node_group):
     """Creates a node group."""
