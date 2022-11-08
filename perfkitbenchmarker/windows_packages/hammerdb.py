@@ -35,6 +35,10 @@ HAMMERDB_4_5_DIR = HAMMERDB_4_5 + '-Win'
 HAMMERDB_4_5_ZIP = HAMMERDB_4_5_DIR + '.zip'
 HAMMERDB_4_5_URL = 'https://github.com/TPC-Council/HammerDB/releases/download/v4.5/' + HAMMERDB_4_5_ZIP
 
+# ODBC driver ver17 download link
+ODBC_17_DOWNLOAD_LINK = 'https://go.microsoft.com/fwlink/?linkid=2200731'
+ODBC_17_INSTALLER = 'msodbcsql.msi'
+
 # import linux flags
 HAMMERDB_SCRIPT = linux_hammerdb.HAMMERDB_SCRIPT
 HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION = linux_hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION
@@ -128,6 +132,15 @@ def Install(vm):
     raise errors.Setup.InvalidFlagConfigurationError(
         f'Hammerdb version {linux_hammerdb.HAMMERDB_VERSION.value} is not '
         'supported on Windows. ')
+
+  # Downloading and installing odbc driver 17.
+  # Hammerdb ver4.5 expects odbc driver version 17 and only version 17.
+  # The default ODBC driver version may change with future hammerdb versions.
+  download_path = ntpath.join(vm.temp_dir, ODBC_17_INSTALLER)
+  vm.DownloadFile(ODBC_17_DOWNLOAD_LINK, download_path)
+  vm.RemoteCommand(
+      f'msiexec /i {download_path} IACCEPTMSODBCSQLLICENSETERMS=YES /passive')
+
   zip_path = ntpath.join(vm.temp_dir, HAMMERDB_4_5_ZIP)
   vm.DownloadFile(HAMMERDB_4_5_URL, zip_path)
   vm.UnzipFile(zip_path, vm.temp_dir)

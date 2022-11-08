@@ -74,7 +74,7 @@ iaas_sqlserver_hammerdb:
           num_striped_disks: 1
           mount_point: /scratch
     clients:
-      os_type: windows2022_desktop_sqlserver_2019_standard
+      os_type: windows2022_desktop
       vm_spec:
         GCP:
           machine_type: n2-standard-4
