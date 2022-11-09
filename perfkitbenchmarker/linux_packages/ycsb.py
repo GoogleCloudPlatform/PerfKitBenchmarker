@@ -913,13 +913,9 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
       elif measurement_type == TIMESERIES:
         result['groups'][group_name][TIMESERIES] = _CombineLatencyTimeSeries(
             result['groups'][group_name][TIMESERIES], group[TIMESERIES])
-      else:
-        result['groups'][group_name].pop(HISTOGRAM, None)
     result['client'] = ' '.join((result['client'], indiv['client']))
     result['command_line'] = ';'.join(
         (result['command_line'], indiv['command_line']))
-    if 'target' in result and 'target' in indiv:
-      result['target'] += indiv['target']
 
     if _THROUGHPUT_TIME_SERIES.value:
       result['throughput_time_series'] = _CombineThroughputTimeSeries(
