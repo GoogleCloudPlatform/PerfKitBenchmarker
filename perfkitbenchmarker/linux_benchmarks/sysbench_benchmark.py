@@ -15,7 +15,7 @@
 """Sysbench Benchmark.
 
 This is a set of benchmarks that measures performance of Sysbench Databases on
-managed MySQL or Postgres.
+  managed MySQL or Postgres.
 
 As other cloud providers deliver a managed MySQL service, we will add it here.
 """
@@ -281,13 +281,13 @@ def _GetSysbenchConnectionParameter(client_vm_query_tools):
 def _GetCommonSysbenchOptions(benchmark_spec):
   """Get Sysbench options."""
   db = benchmark_spec.relational_db
-  engine = sql_engine_utils.GetDbEngineType(FLAGS.managed_db_engine)
+  engine_type = db.engine_type
   result = []
 
   # Ignore possible mysql errors
   # https://github.com/actiontech/dble/issues/458
   # https://callisto.digital/posts/tools/using-sysbench-to-benchmark-mysql-5-7/
-  if engine == sql_engine_utils.MYSQL:
+  if engine_type == sql_engine_utils.MYSQL:
     result += [
         '--db-ps-mode=%s' % DISABLE,
         # Error 1205: Lock wait timeout exceeded
@@ -295,7 +295,9 @@ def _GetCommonSysbenchOptions(benchmark_spec):
         '--mysql-ignore-errors=1213,1205,1020,2013',
         '--db-driver=mysql'
     ]
-  elif engine in [sql_engine_utils.POSTGRES, sql_engine_utils.SPANNER_POSTGRES]:
+  elif engine_type in [
+      sql_engine_utils.POSTGRES, sql_engine_utils.SPANNER_POSTGRES
+  ]:
     result += [
         '--db-driver=pgsql',
     ]
@@ -399,9 +401,9 @@ def _RunSysbench(
 def _GetDatabaseSize(benchmark_spec):
   """Get the size of the database in MB."""
   db = benchmark_spec.relational_db
-  db_engine = sql_engine_utils.GetDbEngineType(FLAGS.managed_db_engine)
+  db_engine_type = db.engine_type
   stdout = None
-  if db_engine == sql_engine_utils.MYSQL:
+  if db_engine_type == sql_engine_utils.MYSQL:
     stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
         'SELECT table_schema AS \'Database\', '
         'ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) '
@@ -420,7 +422,7 @@ def _GetDatabaseSize(benchmark_spec):
       _, word_size_mb = line.split()
       size_mb += float(word_size_mb)
 
-  elif db_engine == sql_engine_utils.POSTGRES:
+  elif db_engine_type == sql_engine_utils.POSTGRES:
     stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
         r'SELECT pg_database_size('
         '\'sbtest\''
@@ -430,7 +432,7 @@ def _GetDatabaseSize(benchmark_spec):
   # Spanner doesn't yet support pg_database_size.
   # See https://cloud.google.com/spanner/quotas#instance_limits. Spanner
   # supports 4TB per node, so use that number for now.
-  elif db_engine == sql_engine_utils.SPANNER_POSTGRES:
+  elif db_engine_type == sql_engine_utils.SPANNER_POSTGRES:
     size_mb = 4096000 * db.nodes
 
   return size_mb

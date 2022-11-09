@@ -23,7 +23,7 @@ from perfkitbenchmarker import sql_engine_utils
 import six
 
 # TODO(chunla): Move IAAS flag to file
-flags.DEFINE_string('managed_db_engine', None,
+flags.DEFINE_string('db_engine', None,
                     'Managed database flavor to use (mysql, postgres)')
 flags.DEFINE_string('managed_db_engine_version', None,
                     'Version of the database flavor selected, e.g. 5.7')
@@ -205,6 +205,8 @@ class BaseRelationalDb(resource.BaseResource):
         create_on_restore_error=relational_db_spec.create_on_restore_error,
         delete_on_freeze_error=relational_db_spec.delete_on_freeze_error)
     self.spec = relational_db_spec
+    self.engine = self.spec.engine
+    self.engine_type = sql_engine_utils.GetDbEngineType(self.engine)
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.port = self.GetDefaultPort()
     self.is_managed_db = self.IS_MANAGED

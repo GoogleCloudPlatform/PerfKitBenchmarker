@@ -246,7 +246,7 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   # TODO(user): Rename flags 'managed_db_' -> 'db_'.
   def testDatabaseFlag(self):
-    FLAGS['managed_db_engine'].parse('postgres')
+    FLAGS['db_engine'].parse('postgres')
     result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.engine, 'postgres')

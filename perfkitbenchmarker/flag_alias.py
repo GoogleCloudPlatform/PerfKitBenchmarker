@@ -25,7 +25,12 @@ DISK_FLAGS_TO_TRANSLATE = {
     'scratch_disk_size': 'data_disk_size'
 }
 
-ALL_TRANSLATIONS = [DISK_FLAGS_TO_TRANSLATE]
+# Added 10th Nov 2022
+RELATIONAL_DB_FLAGS_TO_TRANSLATE = {
+    'managed_db_engine': 'db_engine'
+}
+
+ALL_TRANSLATIONS = [DISK_FLAGS_TO_TRANSLATE, RELATIONAL_DB_FLAGS_TO_TRANSLATE]
 
 # Make sure the regex only matches the argument instead of value
 # Arguments can come with either - or --
@@ -52,7 +57,7 @@ def AliasFlagsFromArgs(
           logging.warning(
               'The flag %s is deprecated and will be removed in the future. '
               'Translating to %s for now.', key, alias[key])
-      new_argv.append(arg)
+    new_argv.append(arg)
   return new_argv
 
 

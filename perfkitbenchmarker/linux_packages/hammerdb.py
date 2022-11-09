@@ -661,7 +661,7 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
   vm.RemoteCommand(InLocalDir(f'chmod +x {install_file}'))
   vm.RemoteCommand(InLocalDir(f'sudo ./{install_file}'))
 
-  db_engine = sql_engine_utils.GetDbEngineType(FLAGS.managed_db_engine)
+  db_engine = sql_engine_utils.GetDbEngineType(FLAGS.db_engine)
   if db_engine == sql_engine_utils.MYSQL:
     # Install specific mysql library for hammerdb
     vm.Install('libmysqlclient21')

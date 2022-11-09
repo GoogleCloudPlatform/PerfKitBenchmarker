@@ -221,8 +221,8 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
 
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
-    if flag_values['managed_db_engine'].present:
-      config_values['engine'] = flag_values.managed_db_engine
+    if flag_values['db_engine'].present:
+      config_values['engine'] = flag_values.db_engine
     if flag_values['managed_db_engine_version'].present:
       config_values['engine_version'] = flag_values.managed_db_engine_version
     if flag_values['managed_db_database_name'].present:
