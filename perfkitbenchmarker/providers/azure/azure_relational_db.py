@@ -244,7 +244,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     if not self.spec.high_availability:
       raise Exception('Azure databases can only be used in high '
                       'availability. Please rerurn with flag '
-                      '--managed_db_high_availability=True')
+                      '--db_high_availability=True')
 
     # Valid storage sizes range from minimum of 5120 MB
     # and additional increments of 1024 MB up to maximum of 16777216 MB.

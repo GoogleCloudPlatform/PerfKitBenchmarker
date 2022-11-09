@@ -244,7 +244,6 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCloudFlag(self):
     pass
 
-  # TODO(user): Rename flags 'managed_db_' -> 'db_'.
   def testDatabaseFlag(self):
     FLAGS['db_engine'].parse('postgres')
     result = relational_db_spec.RelationalDbSpec(
@@ -252,37 +251,37 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(result.engine, 'postgres')
 
   def testDatabaseNameFlag(self):
-    FLAGS['managed_db_database_name'].parse('fakedbname')
+    FLAGS['database_name'].parse('fakedbname')
     result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.database_name, 'fakedbname')
 
   def testDatabasePasswordFlag(self):
-    FLAGS['managed_db_database_password'].parse('fakepassword')
+    FLAGS['database_password'].parse('fakepassword')
     result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.database_password, 'fakepassword')
 
   def testHighAvailabilityFlag(self):
-    FLAGS['managed_db_high_availability'].parse(True)
+    FLAGS['db_high_availability'].parse(True)
     result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.high_availability, True)
 
   def testDatabaseVersionFlag(self):
-    FLAGS['managed_db_engine_version'].parse('5.6')
+    FLAGS['db_engine_version'].parse('5.6')
     result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.engine_version, '5.6')
 
   def testBackupEnabledFlag(self):
-    FLAGS['managed_db_backup_enabled'].parse(False)
+    FLAGS['db_backup_enabled'].parse(False)
     result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.backup_enabled, False)
 
   def testBackupStartTimeFlag(self):
-    FLAGS['managed_db_backup_start_time'].parse('12:23')
+    FLAGS['db_backup_start_time'].parse('12:23')
     result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.backup_start_time, '12:23')

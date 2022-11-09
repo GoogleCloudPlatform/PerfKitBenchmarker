@@ -25,22 +25,22 @@ import six
 # TODO(chunla): Move IAAS flag to file
 flags.DEFINE_string('db_engine', None,
                     'Managed database flavor to use (mysql, postgres)')
-flags.DEFINE_string('managed_db_engine_version', None,
+flags.DEFINE_string('db_engine_version', None,
                     'Version of the database flavor selected, e.g. 5.7')
-flags.DEFINE_string('managed_db_database_name', None,
+flags.DEFINE_string('database_name', None,
                     'Name of the database to create. Defaults to '
                     'pkb-db-[run-uri]')
-flags.DEFINE_string('managed_db_database_username', None,
+flags.DEFINE_string('database_username', None,
                     'Database username. Defaults to '
                     'pkb-db-user-[run-uri]')
-flags.DEFINE_string('managed_db_database_password', None,
+flags.DEFINE_string('database_password', None,
                     'Database password. Defaults to '
                     'a random 10-character alpha-numeric string')
-flags.DEFINE_boolean('managed_db_high_availability', False,
+flags.DEFINE_boolean('db_high_availability', False,
                      'Specifies if the database should be high availability')
-flags.DEFINE_boolean('managed_db_backup_enabled', True,
+flags.DEFINE_boolean('db_backup_enabled', True,
                      'Whether or not to enable automated backups')
-flags.DEFINE_string('managed_db_backup_start_time', '07:00',
+flags.DEFINE_string('db_backup_start_time', '07:00',
                     'Time in UTC that automated backups (if enabled) '
                     'will be scheduled. In the form HH:MM UTC. '
                     'Defaults to 07:00 UTC')
@@ -126,7 +126,7 @@ SERVER_GCE_SSD_INTERFACE = flags.DEFINE_enum(
 
 BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
 flags.register_validator(
-    'managed_db_backup_start_time',
+    'db_backup_start_time',
     lambda value: re.search(BACKUP_TIME_REGULAR_EXPRESSION, value) is not None,
     message=('--database_backup_start_time must be in the form HH:MM'))
 

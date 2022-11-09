@@ -27,7 +27,14 @@ DISK_FLAGS_TO_TRANSLATE = {
 
 # Added 10th Nov 2022
 RELATIONAL_DB_FLAGS_TO_TRANSLATE = {
-    'managed_db_engine': 'db_engine'
+    'managed_db_engine': 'db_engine',
+    'managed_db_engine_version': 'db_engine_version',
+    'managed_db_database_name': 'database_name',
+    'managed_db_database_username': 'database_username',
+    'managed_db_database_password': 'database_password',
+    'managed_db_high_availability': 'db_high_availability',
+    'managed_db_backup_enabled': 'db_backup_enabled',
+    'managed_db_backup_start_time': 'db_backup_start_time',
 }
 
 ALL_TRANSLATIONS = [DISK_FLAGS_TO_TRANSLATE, RELATIONAL_DB_FLAGS_TO_TRANSLATE]

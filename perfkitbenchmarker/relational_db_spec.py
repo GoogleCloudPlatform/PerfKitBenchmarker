@@ -223,24 +223,24 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       config_values['cloud'] = flag_values.cloud
     if flag_values['db_engine'].present:
       config_values['engine'] = flag_values.db_engine
-    if flag_values['managed_db_engine_version'].present:
-      config_values['engine_version'] = flag_values.managed_db_engine_version
-    if flag_values['managed_db_database_name'].present:
-      config_values['database_name'] = flag_values.managed_db_database_name
-    if flag_values['managed_db_database_username'].present:
+    if flag_values['db_engine_version'].present:
+      config_values['engine_version'] = flag_values.db_engine_version
+    if flag_values['database_name'].present:
+      config_values['database_name'] = flag_values.database_name
+    if flag_values['database_username'].present:
       config_values['database_username'] = (
-          flag_values.managed_db_database_username)
-    if flag_values['managed_db_database_password'].present:
+          flag_values.database_username)
+    if flag_values['database_password'].present:
       config_values['database_password'] = (
-          flag_values.managed_db_database_password)
-    if flag_values['managed_db_high_availability'].present:
+          flag_values.database_password)
+    if flag_values['db_high_availability'].present:
       config_values['high_availability'] = (
-          flag_values.managed_db_high_availability)
-    if flag_values['managed_db_backup_enabled'].present:
-      config_values['backup_enabled'] = (flag_values.managed_db_backup_enabled)
-    if flag_values['managed_db_backup_start_time'].present:
+          flag_values.db_high_availability)
+    if flag_values['db_backup_enabled'].present:
+      config_values['backup_enabled'] = (flag_values.db_backup_enabled)
+    if flag_values['db_backup_start_time'].present:
       config_values['backup_start_time'] = (
-          flag_values.managed_db_backup_start_time)
+          flag_values.db_backup_start_time)
     if flag_values['db_flags'].present:
       config_values['db_flags'] = flag_values.db_flags
     cloud = config_values['cloud']
