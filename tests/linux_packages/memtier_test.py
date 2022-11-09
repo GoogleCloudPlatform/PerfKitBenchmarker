@@ -51,7 +51,7 @@ METADATA = {
     'avg_latency': 1.54,
 }
 
-TIME_SERIES_JSON = """
+TIME_SERIES_JSON = json.loads("""
   {
     "ALL STATS":
     {
@@ -72,7 +72,7 @@ TIME_SERIES_JSON = """
       }
     }
   }
-"""
+""")
 
 
 def GetMemtierResult(ops_per_sec, p95_latency):

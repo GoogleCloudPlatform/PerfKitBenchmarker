@@ -384,8 +384,8 @@ def MeasureLatencyCappedThroughput(
           '\tlower bound: %s'
           '\tupper bound: %s', result.ops_per_sec, result.p95_latency,
           parameters.lower_bound, parameters.upper_bound)
-      if (result.ops_per_sec > current_max_result.ops_per_sec
-          and result.p95_latency <= MEMTIER_LATENCY_CAP.value):
+      if (result.ops_per_sec > current_max_result.ops_per_sec and
+          result.p95_latency <= MEMTIER_LATENCY_CAP.value):
         current_max_result = result
         current_metadata = GetMetadata(
             clients=parameters.clients,
@@ -610,6 +610,17 @@ def _Run(vm,
       time_series_json = ts_json.read()
       if not time_series_json:
         logging.warning('No metrics in time series json.')
+      else:
+        # If there is no thoughput the output from redis memtier might
+        # return -nan which breaks the json.
+        # Sample error line
+        # "Average Latency": -nan
+        # "Min Latency": 9223372036854776.000
+        # 9223372036854776 is likely caused by rounding long long in c++
+        time_series_json = time_series_json.replace('-nan', '0.000')
+        time_series_json = time_series_json.replace('9223372036854776.000',
+                                                    '0.000')
+        time_series_json = json.loads(time_series_json)
 
   with open(output_path, 'r') as output:
     summary_data = output.read()
@@ -661,7 +672,7 @@ class MemtierResult:
 
   @classmethod
   def Parse(cls, memtier_results: Text,
-            time_series_json: Optional[Text]) -> 'MemtierResult':
+            time_series_json: Optional[Dict[Any, Any]]) -> 'MemtierResult':
     """Parse memtier_benchmark result textfile and return results.
 
     Args:
@@ -774,8 +785,7 @@ def AggregateMemtierResults(memtier_results: List[MemtierResult],
   samples = [
       sample.Sample(
           'Total Ops Throughput', total_ops, 'ops/s', metadata=metadata),
-      sample.Sample(
-          'Total KB Throughput', total_kb, 'KB/s', metadata=metadata)
+      sample.Sample('Total KB Throughput', total_kb, 'KB/s', metadata=metadata)
   ]
 
   if not MEMTIER_TIME_SERIES.value:
@@ -917,15 +927,15 @@ def _ConvertPercentToAbsolute(total_value: int, percent: float) -> float:
 
 
 def _ParseTimeSeries(
-    time_series_json: Optional[Text]) -> Tuple[List[int], List[int], List[int]]:
+    time_series_json: Optional[Dict[Any, Any]]
+) -> Tuple[List[int], List[int], List[int]]:
   """Parse time series ops throughput from json output."""
   timestamps = []
   ops_series = []
   max_latency_series = []
   if time_series_json:
-    raw = json.loads(time_series_json)
-    time_series = raw['ALL STATS']['Totals']['Time-Serie']
-    start_time = int(raw['ALL STATS']['Runtime']['Start time'])
+    time_series = time_series_json['ALL STATS']['Totals']['Time-Serie']
+    start_time = int(time_series_json['ALL STATS']['Runtime']['Start time'])
 
     for interval, data_dict in time_series.items():
       current_time = int(interval) * 1000 + start_time
@@ -935,12 +945,11 @@ def _ParseTimeSeries(
   return timestamps, ops_series, max_latency_series
 
 
-def _GetRuntimeInfo(time_series_json: Optional[Text]):
+def _GetRuntimeInfo(time_series_json: Optional[Dict[Any, Any]]):
   """Fetch runtime info (i.e start, end times and duration) from json output."""
   runtime_info = {}
   if time_series_json:
-    raw = json.loads(time_series_json)
-    runtime_info = raw['ALL STATS']['Runtime']
+    runtime_info = time_series_json['ALL STATS']['Runtime']
     runtime_info = {
         key.replace(' ', '_'): val for key, val in runtime_info.items()
     }
