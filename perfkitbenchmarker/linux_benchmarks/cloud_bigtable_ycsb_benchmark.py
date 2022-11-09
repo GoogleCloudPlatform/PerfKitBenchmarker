@@ -362,11 +362,16 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   args = [((vm, instance), {}) for vm in vms]
   vm_util.RunThreaded(_Install, args)
 
-  table_name = _GetTableName()
   # If the table already exists, it will be an no-op.
-  hbase_ycsb.CreateYCSBTable(vms[0], table_name=table_name, use_snappy=False,
+  hbase_ycsb.CreateYCSBTable(vms[0],
+                             table_name=_GetTableName(),
+                             use_snappy=False,
                              limit_filesize=False)
 
+
+def _GetYcsbExecutor(
+    vms: list[virtual_machine.VirtualMachine]) -> ycsb.YCSBExecutor:
+  """Gets the YCSB executor class for loading and running the benchmark."""
   # Add hbase conf dir to the classpath.
   ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
   jvm_args = pipes.quote(f' -Xmx{ycsb_memory}m')
@@ -374,10 +379,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   executor_flags = {
       'cp': hbase.HBASE_CONF_DIR,
       'jvm-args': jvm_args,
-      'table': table_name}
+      'table': _GetTableName()}
 
-  benchmark_spec.executor = ycsb.YCSBExecutor(FLAGS.hbase_binding,
-                                              **executor_flags)
+  return ycsb.YCSBExecutor(FLAGS.hbase_binding, **executor_flags)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -414,7 +418,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     load_kwargs['threads'] = 1
 
   samples = []
-  executor: ycsb.YCSBExecutor = benchmark_spec.executor
+  executor: ycsb.YCSBExecutor = _GetYcsbExecutor(vms)
   if not instance.restored:
     samples += list(executor.Load(vms, load_kwargs=load_kwargs))
   samples += list(executor.Run(vms, run_kwargs=run_kwargs))
