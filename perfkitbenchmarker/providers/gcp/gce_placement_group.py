@@ -31,10 +31,14 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
 
+COLLOCATED = 'COLLOCATED'
+AVAILABILITY_DOMAIN = 'availability-domain'
+
+
 flags.DEFINE_integer(
     'gce_availability_domain_count',
     1,
-    'Number of fault domains to create for SPREAD placement group',
+    'Number of fault domains to create for availability-domain placement group',
     lower_bound=1,
     upper_bound=8)
 
@@ -64,7 +68,7 @@ class GcePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
         'project': (option_decoders.StringDecoder, {'none_ok': False}),
         'num_vms': (option_decoders.IntDecoder, {'none_ok': False}),
         'placement_group_style': (option_decoders.EnumDecoder, {
-            'valid_values': set([placement_group.PLACEMENT_GROUP_RACK] +
+            'valid_values': set([COLLOCATED, AVAILABILITY_DOMAIN] +
                                 list(placement_group.PLACEMENT_GROUP_OPTIONS)),
             'default': placement_group.PLACEMENT_GROUP_NONE,
         })
@@ -92,11 +96,17 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
     self.name = 'perfkit-{}'.format(context.GetThreadBenchmarkSpec().uuid)
     self.style = gce_placement_group_spec.placement_group_style
     # Already checked for compatibility in gce_network.py
-    if self.style == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED:
-      self.style = placement_group.PLACEMENT_GROUP_CLUSTER
-    elif self.style == placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED:
-      self.style = placement_group.PLACEMENT_GROUP_SPREAD
-    self.availability_domain_count = FLAGS.gce_availability_domain_count
+    if (self.style == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED or
+        self.style == placement_group.PLACEMENT_GROUP_CLUSTER):
+      self.style = COLLOCATED
+    elif (self.style in [placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED,
+                         placement_group.PLACEMENT_GROUP_SPREAD,
+                         AVAILABILITY_DOMAIN]):
+      self.style = AVAILABILITY_DOMAIN
+      self.availability_domain_count = max(FLAGS.gce_availability_domain_count,
+                                           2)
+    else:
+      self.availability_domain_count = FLAGS.gce_availability_domain_count
     self.metadata.update({
         'placement_group_name': self.name,
         'placement_group_style': self.style
@@ -107,25 +117,15 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
 
     cmd = gcp_util.GcloudCommand(self, 'compute', 'resource-policies',
                                  'create', 'group-placement', self.name)
-
     placement_policy = {
         'format': 'json',
         'region': self.region,
     }
 
-    if self.style == placement_group.PLACEMENT_GROUP_CLUSTER:
-      placement_policy['collocation'] = 'COLLOCATED'
+    if self.style == COLLOCATED:
+      placement_policy['collocation'] = self.style
       placement_policy['vm-count'] = self.num_vms
-
-    elif self.style == placement_group.PLACEMENT_GROUP_RACK:
-      placement_policy['collocation'] = 'CLUSTERED'
-      placement_policy['vm-count'] = self.num_vms
-      # Only alpha API supported for CLUSTERED.
-      cmd = gcp_util.GcloudCommand(self, 'alpha', 'compute',
-                                   'resource-policies', 'create',
-                                   'group-placement', self.name)
-
-    else:
+    elif self.availability_domain_count > 1:
       placement_policy[
           'availability-domain-count'] = self.availability_domain_count
 

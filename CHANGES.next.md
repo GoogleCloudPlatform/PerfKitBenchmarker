@@ -273,6 +273,5 @@
     when running wordcount benchmark.
 -   Add some required types to BaseAppServiceSpec.
 -   Uses nic type of GVNIC by default (instead of VIRTIO_NET) on GCE
--   Rename pkb's --placement_group_style value 'supercluster' to 'rack' in
-    response to gcloud compute API's change in behavior (--collocation=CLUSTERED
-    is now rack-level).
+-   Rename pkb's --placement_group_style values to reflect their cloud-specific
+CLI arguments
