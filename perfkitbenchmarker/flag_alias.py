@@ -35,6 +35,12 @@ RELATIONAL_DB_FLAGS_TO_TRANSLATE = {
     'managed_db_high_availability': 'db_high_availability',
     'managed_db_backup_enabled': 'db_backup_enabled',
     'managed_db_backup_start_time': 'db_backup_start_time',
+    'managed_db_zone': 'db_zone',
+    'managed_db_machine_type': 'db_machine_type',
+    'managed_db_cpus': 'db_cpus',
+    'managed_db_memory': 'db_memory',
+    'managed_db_disk_size': 'db_disk_size',
+    'managed_db_disk_type': 'db_disk_type',
 }
 
 ALL_TRANSLATIONS = [DISK_FLAGS_TO_TRANSLATE, RELATIONAL_DB_FLAGS_TO_TRANSLATE]

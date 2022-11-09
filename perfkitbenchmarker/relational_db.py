@@ -44,23 +44,23 @@ flags.DEFINE_string('db_backup_start_time', '07:00',
                     'Time in UTC that automated backups (if enabled) '
                     'will be scheduled. In the form HH:MM UTC. '
                     'Defaults to 07:00 UTC')
-flags.DEFINE_list('managed_db_zone', None,
+flags.DEFINE_list('db_zone', None,
                   'zone or region to launch the database in. '
                   'Defaults to the client vm\'s zone.')
 flags.DEFINE_string('client_vm_zone', None,
                     'zone or region to launch the client in. ')
-flags.DEFINE_string('managed_db_machine_type', None,
+flags.DEFINE_string('db_machine_type', None,
                     'Machine type of the database.')
-flags.DEFINE_integer('managed_db_cpus', None,
+flags.DEFINE_integer('db_cpus', None,
                      'Number of Cpus in the database.')
-flags.DEFINE_string('managed_db_memory', None,
+flags.DEFINE_string('db_memory', None,
                     'Amount of Memory in the database.  Uses the same format '
                     'string as custom machine memory type.')
-flags.DEFINE_integer('managed_db_disk_size', None,
+flags.DEFINE_integer('db_disk_size', None,
                      'Size of the database disk in GB.')
 flags.DEFINE_integer('db_num_striped_disks', None,
                      'The number of data disks to stripe together to form one.')
-flags.DEFINE_string('managed_db_disk_type', None, 'Disk type of the database.')
+flags.DEFINE_string('db_disk_type', None, 'Disk type of the database.')
 flags.DEFINE_integer('managed_db_disk_iops', None,
                      'Disk iops of the database on AWS io1 disks.')
 

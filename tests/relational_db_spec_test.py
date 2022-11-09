@@ -287,7 +287,7 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(result.backup_start_time, '12:23')
 
   def testZoneFlag(self):
-    FLAGS['managed_db_zone'].parse('us-east1-b')
+    FLAGS['db_zone'].parse('us-east1-b')
     result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.db_spec.zone, 'us-east1-b')
@@ -300,7 +300,7 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(result.vm_groups['clients'].vm_spec.zone, 'us-east1-b')
 
   def testDiskSizeFlag(self):
-    FLAGS['managed_db_disk_size'].parse(2000)
+    FLAGS['db_disk_size'].parse(2000)
     result = relational_db_spec.RelationalDbSpec(
         _COMPONENT, flag_values=FLAGS, **self.full_spec)
     self.assertEqual(result.db_disk_spec.disk_size, 2000)

@@ -1,5 +1,7 @@
 ### Breaking changes:
 
+-   Renamed Database-related flags from managed_db* to db* Added alias for
+    backwards compatibility, might not be supported in the future release.
 -   Require Python 3.9+
 -   The core_os os_type was removed from the Azure provider as
     [the image was deleted](https://docs.microsoft.com/en-us/azure/virtual-machines/linux/endorsed-distros#supported-distributions-and-versions),

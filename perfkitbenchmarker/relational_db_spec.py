@@ -184,9 +184,9 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     super(RelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
 
     # TODO(user): Rename flags 'managed_db_' -> 'db_'.
-    has_db_machine_type = flag_values['managed_db_machine_type'].present
-    has_db_cpus = flag_values['managed_db_cpus'].present
-    has_db_memory = flag_values['managed_db_memory'].present
+    has_db_machine_type = flag_values['db_machine_type'].present
+    has_db_cpus = flag_values['db_cpus'].present
+    has_db_memory = flag_values['db_memory'].present
     has_custom_machine_type = has_db_cpus and has_db_memory
     has_client_machine_type = flag_values['client_vm_machine_type'].present
     has_client_vm_cpus = flag_values['client_vm_cpus'].present
@@ -201,8 +201,8 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
 
     if (not has_custom_machine_type and (has_db_cpus or has_db_memory)):
       raise errors.Config.MissingOption(
-          'To specify a custom database machine instance, both managed_db_cpus '
-          'and managed_db_memory must be specified.')
+          'To specify a custom database machine instance, both db_cpus '
+          'and db_memory must be specified.')
 
     if has_client_custom_machine_type and has_client_machine_type:
       raise errors.Config.UnrecognizedOption(
@@ -247,34 +247,34 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     has_unmanaged_dbs = ('vm_groups' in config_values and
                          'servers' in config_values['vm_groups'])
 
-    if flag_values['managed_db_zone'].present:
-      config_values['db_spec'][cloud]['zone'] = flag_values.managed_db_zone[0]
-      config_values['zones'] = flag_values.managed_db_zone
+    if flag_values['db_zone'].present:
+      config_values['db_spec'][cloud]['zone'] = flag_values.db_zone[0]
+      config_values['zones'] = flag_values.db_zone
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['vm_spec'][cloud]['zone'] = (
-            flag_values.managed_db_zone[0])
+            flag_values.db_zone[0])
     if flag_values['client_vm_zone'].present:
       config_values['vm_groups']['clients']['vm_spec'][cloud]['zone'] = (
           flag_values.client_vm_zone)
     if has_db_machine_type:
       config_values['db_spec'][cloud]['machine_type'] = (
-          flag_values.managed_db_machine_type)
+          flag_values.db_machine_type)
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['vm_spec'][cloud][
             'machine_type'] = (
-                flag_values.managed_db_machine_type)
+                flag_values.db_machine_type)
     if has_custom_machine_type:
       config_values['db_spec'][cloud]['machine_type'] = {
-          'cpus': flag_values.managed_db_cpus,
-          'memory': flag_values.managed_db_memory
+          'cpus': flag_values.db_cpus,
+          'memory': flag_values.db_memory
       }
       # tox and pylint have contradictory closing brace rules, so avoid having
       # opening and closing brackets on different lines.
       config_values_vm_groups = config_values['vm_groups']
       if has_unmanaged_dbs:
         config_values_vm_groups['servers']['vm_spec'][cloud]['machine_type'] = {
-            'cpus': flag_values.managed_db_cpus,
-            'memory': flag_values.managed_db_memory
+            'cpus': flag_values.db_cpus,
+            'memory': flag_values.db_memory
         }
     if flag_values['managed_db_azure_compute_units'].present:
       config_values['db_spec'][cloud]['machine_type']['compute_units'] = (
@@ -295,18 +295,18 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     if flag_values['db_num_striped_disks'].present and has_unmanaged_dbs:
       config_values['vm_groups']['servers']['disk_spec'][cloud][
           'num_striped_disks'] = flag_values.db_num_striped_disks
-    if flag_values['managed_db_disk_size'].present:
+    if flag_values['db_disk_size'].present:
       config_values['db_disk_spec'][cloud]['disk_size'] = (
-          flag_values.managed_db_disk_size)
+          flag_values.db_disk_size)
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['disk_spec'][cloud][
-            'disk_size'] = flag_values.managed_db_disk_size
-    if flag_values['managed_db_disk_type'].present:
+            'disk_size'] = flag_values.db_disk_size
+    if flag_values['db_disk_type'].present:
       config_values['db_disk_spec'][cloud]['disk_type'] = (
-          flag_values.managed_db_disk_type)
+          flag_values.db_disk_type)
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['disk_spec'][cloud][
-            'disk_type'] = flag_values.managed_db_disk_type
+            'disk_type'] = flag_values.db_disk_type
     if flag_values['managed_db_disk_iops'].present:
       # This value will be used in aws_relation_db.py druing db creation
       config_values['db_disk_spec'][cloud]['iops'] = (
