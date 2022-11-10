@@ -56,6 +56,7 @@ WINDOWS2019_SQLSERVER_2019_STANDARD = 'windows2019_desktop_sqlserver_2019_standa
 WINDOWS2019_SQLSERVER_2019_ENTERPRISE = 'windows2019_desktop_sqlserver_2019_enterprise'
 WINDOWS2022_SQLSERVER_2019_STANDARD = 'windows2022_desktop_sqlserver_2019_standard'
 WINDOWS2022_SQLSERVER_2019_ENTERPRISE = 'windows2022_desktop_sqlserver_2019_enterprise'
+
 # Base-only OS types
 DEBIAN = 'debian'
 RHEL = 'rhel'

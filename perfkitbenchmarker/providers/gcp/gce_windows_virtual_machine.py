@@ -33,26 +33,17 @@ _METADATA_PREEMPT_CMD_WIN = (f'Invoke-RestMethod -Uri'
 
 FLAGS = flags.FLAGS
 
-GVNIC_DISABLED_OS_TYPES = [
-    os_types.WINDOWS2012_CORE, os_types.WINDOWS2012_DESKTOP
-]
-
-DEFAULT_IMAGE_FAMILY = {
-    os_types.WINDOWS2012_CORE: 'windows-2012-r2-core',
-    os_types.WINDOWS2016_CORE: 'windows-2016-core',
-    os_types.WINDOWS2019_CORE: 'windows-2019-core',
-    os_types.WINDOWS2022_CORE: 'windows-2022-core',
-    os_types.WINDOWS2012_DESKTOP: 'windows-2012-r2',
-    os_types.WINDOWS2016_DESKTOP: 'windows-2016',
-    os_types.WINDOWS2019_DESKTOP: 'windows-2019',
-    os_types.WINDOWS2022_DESKTOP: 'windows-2022',
-    os_types.WINDOWS2019_SQLSERVER_2017_STANDARD: 'sql-std-2017-win-2019',
-    os_types.WINDOWS2019_SQLSERVER_2017_ENTERPRISE: 'sql-ent-2017-win-2019',
-    os_types.WINDOWS2019_SQLSERVER_2019_STANDARD: 'sql-std-2019-win-2019',
-    os_types.WINDOWS2019_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2019',
-    os_types.WINDOWS2022_SQLSERVER_2019_STANDARD: 'sql-std-2019-win-2022',
-    os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2022',
-}
+BAT_SCRIPT = """
+'
+:WAIT
+echo waiting for MSSQLSERVER
+sc start MSSQLSERVER
+ping 127.0.0.1 -t 1 > NUL
+for /f "tokens=4" %%s in ('sc query MSSQLSERVER ^| find "STATE"') do if NOT "%%s"=="RUNNING" goto WAIT
+echo MSSQLSERVER is now running!
+sqlcmd.exe -Q "CREATE LOGIN [%COMPUTERNAME%\\perfkit] from windows;"
+sqlcmd.exe -Q "ALTER SERVER ROLE [sysadmin] ADD MEMBER [%COMPUTERNAME%\\perfkit]" '
+"""
 
 
 class GceUnexpectedWindowsAdapterOutputError(Exception):
@@ -66,9 +57,23 @@ class GceDriverDoesntSupportFeatureError(Exception):
 class WindowsGceVirtualMachine(gce_virtual_machine.GceVirtualMachine,
                                windows_virtual_machine.BaseWindowsMixin):
   """Class supporting Windows GCE virtual machines."""
+  DEFAULT_IMAGE_FAMILY = {
+      os_types.WINDOWS2012_CORE: 'windows-2012-r2-core',
+      os_types.WINDOWS2016_CORE: 'windows-2016-core',
+      os_types.WINDOWS2019_CORE: 'windows-2019-core',
+      os_types.WINDOWS2022_CORE: 'windows-2022-core',
+      os_types.WINDOWS2012_DESKTOP: 'windows-2012-r2',
+      os_types.WINDOWS2016_DESKTOP: 'windows-2016',
+      os_types.WINDOWS2019_DESKTOP: 'windows-2019',
+      os_types.WINDOWS2022_DESKTOP: 'windows-2022',
+  }
+
+  GVNIC_DISABLED_OS_TYPES = [
+      os_types.WINDOWS2012_CORE, os_types.WINDOWS2012_DESKTOP
+  ]
 
   NVME_START_INDEX = 0
-  OS_TYPE = os_types.WINDOWS_OS_TYPES
+  OS_TYPE = os_types.WINDOWS_CORE_OS_TYPES + os_types.WINDOWS_DESKOP_OS_TYPES
 
   def __init__(self, vm_spec):
     """Initialize a Windows GCE virtual machine.
@@ -151,10 +156,10 @@ class WindowsGceVirtualMachine(gce_virtual_machine.GceVirtualMachine,
     gcs.GoogleCloudStorageService.AcquireWritePermissionsWindows(self)
 
   def SupportGVNIC(self) -> bool:
-    return self.OS_TYPE not in GVNIC_DISABLED_OS_TYPES
+    return self.OS_TYPE not in self.GVNIC_DISABLED_OS_TYPES
 
   def GetDefaultImageFamily(self) -> str:
-    return DEFAULT_IMAGE_FAMILY[self.OS_TYPE]
+    return self.DEFAULT_IMAGE_FAMILY[self.OS_TYPE]
 
   def GetDefaultImageProject(self) -> str:
     if self.OS_TYPE in os_types.WINDOWS_SQLSERVER_OS_TYPES:
@@ -164,3 +169,21 @@ class WindowsGceVirtualMachine(gce_virtual_machine.GceVirtualMachine,
   @property
   def _MetadataPreemptCmd(self) -> str:
     return _METADATA_PREEMPT_CMD_WIN
+
+
+class WindowsGceSqlServerVirtualMachine(WindowsGceVirtualMachine):
+  """Class supporting Windows GCE sql server virtual machines."""
+  DEFAULT_IMAGE_FAMILY = {
+      os_types.WINDOWS2019_SQLSERVER_2017_STANDARD: 'sql-std-2017-win-2019',
+      os_types.WINDOWS2019_SQLSERVER_2017_ENTERPRISE: 'sql-ent-2017-win-2019',
+      os_types.WINDOWS2019_SQLSERVER_2019_STANDARD: 'sql-std-2019-win-2019',
+      os_types.WINDOWS2019_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2019',
+      os_types.WINDOWS2022_SQLSERVER_2019_STANDARD: 'sql-std-2019-win-2022',
+      os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2022',
+  }
+
+  OS_TYPE = os_types.WINDOWS_SQLSERVER_OS_TYPES
+
+  def __init__(self, vm_spec):
+    super().__init__(vm_spec)
+    self.boot_metadata['windows-startup-script-bat'] = BAT_SCRIPT
