@@ -30,6 +30,18 @@ from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 
+CLUSTER = 'cluster'
+SPREAD = 'spread'
+PARTITION = 'partition'
+
+flags.DEFINE_integer(
+    'aws_partition_count',
+    2,
+    'Number of partition placement groups. Only used if'
+    '--placement_group_style=partition.',
+    lower_bound=2,
+    upper_bound=7)
+
 
 class AwsPlacementGroupSpec(placement_group.BasePlacementGroupSpec):
   """Object containing the information needed to create an AwsPlacementGroup.
@@ -52,8 +64,11 @@ class AwsPlacementGroupSpec(placement_group.BasePlacementGroupSpec):
     result = super(AwsPlacementGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'placement_group_style': (option_decoders.EnumDecoder, {
-            'valid_values': placement_group.PLACEMENT_GROUP_OPTIONS,
-            'default': placement_group.PLACEMENT_GROUP_CLUSTER,
+            'valid_values':
+                set([CLUSTER, SPREAD, PARTITION] +
+                    list(placement_group.PLACEMENT_GROUP_OPTIONS)),
+            'default':
+                CLUSTER,
         })
     })
     return result
@@ -75,14 +90,15 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
     self.name = (
         'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:]))
     self.region = util.GetRegionFromZone(self.zone)
-    # TODO(andytzhu) add placement group 'cluster' functionality, which
-    # forces placement groups regardless of machine type, and raises an error
-    # if not compatible.
     self.strategy = aws_placement_group_spec.placement_group_style
+    # Already checked for compatibility in aws_network.py
     if self.strategy == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED:
-      self.strategy = placement_group.PLACEMENT_GROUP_CLUSTER
+      self.strategy = CLUSTER
     if self.strategy == placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED:
-      self.strategy = placement_group.PLACEMENT_GROUP_SPREAD
+      self.strategy = SPREAD
+    self.partition_count = 0
+    if self.strategy == PARTITION:
+      self.partition_count = FLAGS.aws_partition_count
 
   def _Create(self):
     """Creates the Placement Group."""
@@ -97,6 +113,9 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
         '--strategy=%s' % self.strategy,
         '--tag-specifications=%s' % formatted_tags
     ]
+
+    if self.partition_count:
+      create_cmd += ['--partition-count=%s' % self.partition_count]
 
     vm_util.IssueCommand(create_cmd)
 

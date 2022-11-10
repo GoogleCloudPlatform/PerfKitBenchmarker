@@ -546,6 +546,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'placement_group_strategy':
             self.placement_group.strategy
             if self.placement_group else placement_group.PLACEMENT_GROUP_NONE,
+        'partition_count':
+            self.placement_group.partition_count
+            if self.placement_group else 0,
         'aws_credit_specification':
             FLAGS.aws_credit_specification
             if FLAGS.aws_credit_specification else 'none'

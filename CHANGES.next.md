@@ -276,4 +276,6 @@
 -   Add some required types to BaseAppServiceSpec.
 -   Uses nic type of GVNIC by default (instead of VIRTIO_NET) on GCE
 -   Rename pkb's --placement_group_style values to reflect their cloud-specific
-CLI arguments
+    CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN';
+    AWS - 'cluster'/'spread'/'partition';
+    Azure - 'proximity-placement-group'/'availability-set')
