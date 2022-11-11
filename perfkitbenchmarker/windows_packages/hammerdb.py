@@ -35,6 +35,10 @@ HAMMERDB_4_5_DIR = HAMMERDB_4_5 + '-Win'
 HAMMERDB_4_5_ZIP = HAMMERDB_4_5_DIR + '.zip'
 HAMMERDB_4_5_URL = 'https://github.com/TPC-Council/HammerDB/releases/download/v4.5/' + HAMMERDB_4_5_ZIP
 
+# Visual C++ 2017 Redistribute
+VC_REDIST_DOWNLOAD_LINK = 'https://aka.ms/vs/15/release/vc_redist.x64.exe'
+VC_REDIST_INSTALLER = 'VC_redist.x64.exe'
+
 # ODBC driver ver17 download link
 ODBC_17_DOWNLOAD_LINK = 'https://go.microsoft.com/fwlink/?linkid=2200731'
 ODBC_17_INSTALLER = 'msodbcsql.msi'
@@ -132,6 +136,11 @@ def Install(vm):
     raise errors.Setup.InvalidFlagConfigurationError(
         f'Hammerdb version {linux_hammerdb.HAMMERDB_VERSION.value} is not '
         'supported on Windows. ')
+
+  # Download Visual C++ 2017 Redistributable.
+  download_path = ntpath.join(vm.temp_dir, VC_REDIST_INSTALLER)
+  vm.DownloadFile(VC_REDIST_DOWNLOAD_LINK, download_path)
+  vm.RemoteCommand(f'{download_path} /q /norestart')
 
   # Downloading and installing odbc driver 17.
   # Hammerdb ver4.5 expects odbc driver version 17 and only version 17.
