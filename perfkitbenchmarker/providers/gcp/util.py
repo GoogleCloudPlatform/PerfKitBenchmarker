@@ -376,8 +376,12 @@ class GcloudCommand(object):
 _QUOTA_EXCEEDED_REGEX = re.compile(
     r"(Quota '.*' exceeded|Insufficient .*\w+.* quota)")
 
-_NOT_ENOUGH_RESOURCES_STDERR = ('does not have enough resources available to '
-                                'fulfill the request.')
+# Resource availability errors documented at
+# https://cloud.google.com/compute/docs/resource-error#resource_availability
+_NOT_ENOUGH_RESOURCES_ERROR_SNIPPETS = (
+    'does not have enough resources available to fulfill the request.',
+    'ZONE_RESOURCE_POOL_EXHAUSTED',
+)
 _NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 
 _INVALID_MACHINE_TYPE_REGEX = re.compile(
@@ -398,10 +402,11 @@ def CheckGcloudResponseKnownFailures(stderr, retcode):
       message = virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr
       logging.error(message)
       raise errors.Benchmarks.QuotaFailure(message)
-    if _NOT_ENOUGH_RESOURCES_STDERR in stderr:
-      message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
-      logging.error(message)
-      raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
+    for snippet in _NOT_ENOUGH_RESOURCES_ERROR_SNIPPETS:
+      if snippet in stderr:
+        message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
+        logging.error(message)
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
     if _INVALID_MACHINE_TYPE_REGEX.search(stderr):
       message = _INVALID_MACHINE_TYPE_MESSAGE + stderr
       raise errors.Benchmarks.UnsupportedConfigError(message)

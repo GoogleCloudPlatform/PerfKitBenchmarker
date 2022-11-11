@@ -206,12 +206,6 @@ class GkeCluster(container_service.KubernetesCluster):
     # can take to provision a large GPU-accelerated GKE cluster.
     _, stderr, retcode = cmd.Issue(timeout=1200, raise_on_failure=False)
     if retcode:
-      # Log specific type of failure, if known.
-      if 'ZONE_RESOURCE_POOL_EXHAUSTED' in stderr:
-        logging.exception('Container resources exhausted: %s', stderr)
-        raise errors.Benchmarks.InsufficientCapacityCloudFailure(
-            'Container resources exhausted in zone %s: %s' %
-            (self.zone, stderr))
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
 
