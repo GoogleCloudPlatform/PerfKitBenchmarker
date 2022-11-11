@@ -746,6 +746,50 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
       with self.assertRaises(errors.Benchmarks.UnsupportedConfigError):
         vm._Create()
 
+  @parameterized.named_parameters(
+      {'testcase_name': 'old_message', 'fake_stderr': '''\
+"The zone 'projects/fake-project/zones/fake-zone' does not have enough \
+resources available to fulfill the request. Try a different zone, or try again \
+later."
+'''},
+      {'testcase_name': 'new_message', 'fake_stderr': '''\
+code: ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS
+errorDetails:
+- help:
+    links:
+    - description: Troubleshooting documentation
+      url: https://cloud.google.com/compute/docs/resource-error
+- localizedMessage:
+    locale: en-US
+    message: A a2-megagpu-16g VM instance with 16 NVIDIA_TESLA_A100 accelerator(s)
+      is currently unavailable in the us-central1-b zone. Consider trying your request
+      in the us-central1-f, us-central1-a, us-central1-c zone(s), which currently
+      has capacity to accommodate your request. Alternatively, you can try your request
+      again with a different VM hardware configuration or at a later time. For more
+      information, see the troubleshooting documentation.
+- errorInfo:
+    domain: compute.googleapis.com
+    metadatas:
+      attachment: NVIDIA_TESLA_A100:16
+      vmType: a2-megagpu-16g
+      zone: us-central1-b
+      zonesAvailable: us-central1-f,us-central1-a,us-central1-c
+    reason: stockout
+message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enough
+  resources available to fulfill the request.  '(resource type:compute)'.'''})
+  def testInsufficientCapacityCloudFailure(self, fake_stderr):
+    fake_rets = [('stdout', fake_stderr, 1)]
+    with PatchCriticalObjects(fake_rets):
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT, machine_type={
+              'cpus': 1,
+              'memory': '1.0GiB',
+          })
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+      with self.assertRaises(
+          errors.Benchmarks.InsufficientCapacityCloudFailure):
+        vm._Create()
+
   def testVmWithoutGpu(self):
     with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(
