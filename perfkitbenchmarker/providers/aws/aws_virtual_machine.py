@@ -502,6 +502,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   # description
   IMAGE_DESCRIPTION_FILTER = None
 
+  # Whether to include deprecated images in the list.
+  ALLOW_DEPRECATED_IMAGE = False
+
   DEFAULT_ROOT_DISK_TYPE = 'gp2'
   DEFAULT_USER_NAME = 'ec2-user'
 
@@ -647,6 +650,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if cls.IMAGE_DESCRIPTION_FILTER:
       describe_cmd.extend(['Name=description,Values=%s' %
                            cls.IMAGE_DESCRIPTION_FILTER])
+    if cls.ALLOW_DEPRECATED_IMAGE:
+      describe_cmd.append('--include-deprecated')
+    else:
+      # This is the default, but be explicit.
+      describe_cmd.append('--no-include-deprecated')
     describe_cmd.extend(['--owners'] + cls.IMAGE_OWNER)
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
 
@@ -1561,6 +1569,9 @@ class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_NAME_FILTER = 'CentOS 7*'
   IMAGE_OWNER = CENTOS_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'centos'
+
+  # Centos 7 is all marked deprecated as of 2022-11-11
+  ALLOW_DEPRECATED_IMAGE = True
 
   def _InstallEfa(self):
     logging.info('Upgrading Centos7 kernel, installing kernel headers and '
