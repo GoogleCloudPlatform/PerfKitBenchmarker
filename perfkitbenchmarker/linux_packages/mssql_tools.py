@@ -52,3 +52,8 @@ def AptInstall(vm):
                                                  location=_DEB_FILE_LOCATION))
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo ACCEPT_EULA=Y /usr/bin/apt-get -y install mssql-tools')
+  vm.RemoteCommand(
+      r'sudo sed -i "1 i\export PATH=$PATH:/opt/mssql-tools/bin/" ~/.bashrc')
+  vm.RemoteCommand(
+      r'sudo sed -i "1 i\export PATH=$PATH:/opt/mssql-tools/bin/" '
+      '/etc/bash.bashrc')

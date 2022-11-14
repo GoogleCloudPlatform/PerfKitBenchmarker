@@ -220,7 +220,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.port = db.GetDefaultPort()
     self.assertEqual(
         db.client_vm_query_tools.MakeSqlCommand('Select 1'),
-        '/opt/mssql-tools/bin/sqlcmd -S 1.1.1.1 -U root -P perfkitbenchmarker -Q "Select 1"'
+        'sqlcmd -S 1.1.1.1 -U root -P perfkitbenchmarker -Q "Select 1"'
     )
 
   def testMakeSqlserverCommandWithLocalHost(self):
@@ -232,7 +232,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.port = db.GetDefaultPort()
     self.assertEqual(
         db.server_vm_query_tools.MakeSqlCommand('Select 1'),
-        '/opt/mssql-tools/bin/sqlcmd -S localhost -U root -P perfkitbenchmarker -Q "Select 1"'
+        'sqlcmd -S localhost -U root -P perfkitbenchmarker -Q "Select 1"'
     )
 
   def testInstallMYSQLServer(self):

@@ -386,7 +386,7 @@ class SqlServerCliQueryTools(ISQLQueryTools):
     if session_variables:
       raise NotImplementedError(
           'Session variables is currently not supported in mysql')
-    sqlserver_command = '/opt/mssql-tools/bin/sqlcmd -S %s -U %s -P %s ' % (
+    sqlserver_command = 'sqlcmd -S %s -U %s -P %s ' % (
         self.connection_properties.endpoint,
         self.connection_properties.database_username,
         self.connection_properties.database_password)
