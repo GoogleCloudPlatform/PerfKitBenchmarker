@@ -639,10 +639,14 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
       scp_cmd = ['gcloud', 'beta', 'compute', 'scp', '--internal-ip']
     else:
       scp_cmd = ['gcloud', 'compute', 'scp']
+    if self.project is not None:
+      scp_cmd += ['--project', self.project]
     scp_cmd += ['--zone', self.dpb_service_zone, '--quiet', script_path,
                 'pkb@' + master_name + ':/tmp/' + script_name]
     vm_util.IssueCommand(scp_cmd, force_info_log=True)
     ssh_cmd = ['gcloud', 'compute', 'ssh']
+    if self.project is not None:
+      ssh_cmd += ['--project', self.project]
     if FLAGS.gcp_internal_ip:
       ssh_cmd += ['--internal-ip']
     ssh_cmd += ['--zone=' + self.dpb_service_zone, '--quiet',

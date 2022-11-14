@@ -60,6 +60,8 @@ flags.DEFINE_integer('dpb_dataflow_timeout', 300,
 flags.DEFINE_string(
     'dpb_dataflow_service_account_key', None,
     'GCS path to service account to run Dataflow jobs.')
+flags.DEFINE_bool('dpb_dataflow_enable_prime', False,
+                  'Enable Prime for Dataflow jobs. Disabled by default.')
 
 
 flags.register_validator(
@@ -208,7 +210,10 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     region = util.GetRegionFromZone(FLAGS.dpb_service_zone)
     cmd.append('--region={}'.format(region))
-    cmd.append('--workerMachineType={}'.format(worker_machine_type))
+    if FLAGS.dpb_dataflow_enable_prime:
+      cmd.append('--dataflowServiceOptions=enable_prime')
+    else:
+      cmd.append('--workerMachineType={}'.format(worker_machine_type))
     cmd.append('--numWorkers={}'.format(num_workers))
     cmd.append('--maxNumWorkers={}'.format(max_num_workers))
 
