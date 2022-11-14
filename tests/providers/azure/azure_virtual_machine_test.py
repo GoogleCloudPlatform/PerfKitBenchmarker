@@ -94,7 +94,15 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
               'successfully. Please check provisioning state later.',
           'expected_error':
               errors.Resource.ProvisionTimeoutError
-      },
+      }, {
+          'testcase_name': 'SkuNotAvailable',
+          'stderror': """{"error":{"code":"InvalidTemplateDeployment","message":"The template deployment 'vm_deploy_gwUdt7Sseaortu3nIvgZPN8rzgVucSOL' is not valid according to the validation procedure. The tracking id is '8b0552ca-7af5-4155-b653-8eb5f8713629'. See inner errors for details.","details":[{"code":"SkuNotAvailable","message":"The requested VM size for resource 'Following SKUs have failed for Capacity Restrictions: Standard_D2s_v4' is currently not available in location 'westus2'. Please try another size or deploy to a different location or different zone. See https://aka.ms/azureskunotavailable for details."}]}}""",  # pylint: disable=line-too-long
+          'expected_error': errors.Benchmarks.UnsupportedConfigError},
+      {
+          'testcase_name': 'ZonalAllocationFailed',
+          'stderror': """{"status":"Failed","error":{"code":"DeploymentFailed","message":"At least one resource deployment operation failed. Please list deployment operations for details. Please see https://aka.ms/DeployOperations for usage details.","details":[{"code":"Conflict","message":"{\r\n  \"status\": \"Failed\",\r\n  \"error\": {\r\n    \"code\": \"ResourceDeploymentFailure\",\r\n    \"message\": \"The resource operation completed with terminal provisioning state 'Failed'.\",\r\n    \"details\": [\r\n      {\r\n        \"code\": \"ZonalAllocationFailed\",\r\n        \"message\": \"Allocation failed. We do not have sufficient capacity for the requested VM size in this zone. Read more about improving likelihood of allocation success at http://aka.ms/allocation-guidance\"\r\n      }\r\n    ]\r\n  }\r\n}"}]}}""",  # pylint: disable=line-too-long
+          'expected_error': errors.Benchmarks.InsufficientCapacityCloudFailure
+      }
   )
   def testVmCreationError(self, stderror, expected_error):
     spec = azure_virtual_machine.AzureVmSpec(

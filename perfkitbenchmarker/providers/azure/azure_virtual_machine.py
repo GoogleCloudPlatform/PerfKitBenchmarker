@@ -710,6 +710,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
             ('AllocationFailed' in stderr or
              'OverconstrainedZonalAllocationRequest' in stderr)):
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
+      elif 'SkuNotAvailable' in  stderr:
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       else:
         raise errors.Resource.CreationError(
             'Failed to create VM: %s return code: %s' % (stderr, retcode))
