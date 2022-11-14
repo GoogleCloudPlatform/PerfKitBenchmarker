@@ -113,7 +113,7 @@ netperf:
     vm_2:
       vm_spec: *default_single_core
   flags:
-    placement_group_style: cluster_if_supported
+    placement_group_style: closest_supported
 """
 
 MBPS = 'Mbits/sec'

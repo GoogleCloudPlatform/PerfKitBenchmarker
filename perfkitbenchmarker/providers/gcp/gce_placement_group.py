@@ -97,6 +97,7 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
     self.style = gce_placement_group_spec.placement_group_style
     # Already checked for compatibility in gce_network.py
     if (self.style == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED or
+        self.style == placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED or
         self.style == placement_group.PLACEMENT_GROUP_CLUSTER):
       self.style = COLLOCATED
     elif (self.style in [placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED,

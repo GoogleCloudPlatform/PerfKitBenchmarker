@@ -537,6 +537,7 @@ class AzureNetwork(network.BaseNetwork):
         FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
     has_optional_pg = FLAGS.placement_group_style in [
         placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED,
+        placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED,
         placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED]
     if no_placement_group:
       self.placement_group = None

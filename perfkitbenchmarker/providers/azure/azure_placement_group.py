@@ -90,8 +90,9 @@ class AzurePlacementGroup(placement_group.BasePlacementGroup):
     self.name = '%s-%s' % (self.resource_group, self.zone)
     self.region = util.GetRegionFromZone(self.zone)
     self.strategy = azure_placement_group_spec.placement_group_style
-    if (self.strategy == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED
-       ) or (self.strategy == placement_group.PLACEMENT_GROUP_CLUSTER):
+    if (self.strategy == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED or
+        self.strategy == placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED or
+        self.strategy == placement_group.PLACEMENT_GROUP_CLUSTER):
       self.strategy = PROXIMITY_PLACEMENT_GROUP
     if (self.strategy == placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED
        ) or (self.strategy == placement_group.PLACEMENT_GROUP_SPREAD):

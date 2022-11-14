@@ -57,7 +57,7 @@ netperf_aggregate:
     client:
       vm_spec: *default_single_core
   flags:
-    placement_group_style: cluster_if_supported
+    placement_group_style: closest_supported
 """
 
 TRANSACTIONS_PER_SECOND = 'transactions_per_second'

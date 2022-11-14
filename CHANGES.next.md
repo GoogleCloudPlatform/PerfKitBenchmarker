@@ -278,4 +278,6 @@
 -   Rename pkb's --placement_group_style values to reflect their cloud-specific
     CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN';
     AWS - 'cluster'/'spread'/'partition';
-    Azure - 'proximity-placement-group'/'availability-set')
+    Azure - 'proximity-placement-group'/'availability-set'). Cloud-agnostic
+    value 'closest_supported' will choose the most tightly-coupled placement
+    policy supported.

@@ -18,7 +18,7 @@ _ZONE = 'us-east1-b'
 _REGION = 'us-east1'
 _RUN_URI = 'be67a2dd-e312-496d-864a-1d5bc1857dec'
 _PLACEMENT_GROUP_NAME = 'perfkit-{}'.format(_RUN_URI)
-_STRATEGY = placement_group.PLACEMENT_GROUP_CLUSTER
+_STRATEGY = placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED
 
 # The GcePlacementGroup._Create()
 _CREATE_RESPONSE = (json.dumps({
