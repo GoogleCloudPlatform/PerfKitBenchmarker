@@ -102,7 +102,10 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
           'testcase_name': 'ZonalAllocationFailed',
           'stderror': """{"status":"Failed","error":{"code":"DeploymentFailed","message":"At least one resource deployment operation failed. Please list deployment operations for details. Please see https://aka.ms/DeployOperations for usage details.","details":[{"code":"Conflict","message":"{\r\n  \"status\": \"Failed\",\r\n  \"error\": {\r\n    \"code\": \"ResourceDeploymentFailure\",\r\n    \"message\": \"The resource operation completed with terminal provisioning state 'Failed'.\",\r\n    \"details\": [\r\n      {\r\n        \"code\": \"ZonalAllocationFailed\",\r\n        \"message\": \"Allocation failed. We do not have sufficient capacity for the requested VM size in this zone. Read more about improving likelihood of allocation success at http://aka.ms/allocation-guidance\"\r\n      }\r\n    ]\r\n  }\r\n}"}]}}""",  # pylint: disable=line-too-long
           'expected_error': errors.Benchmarks.InsufficientCapacityCloudFailure
-      }
+      }, {'testcase_name': 'OverconstrainedZonalAllocationRequest',
+          'stderror': """{"status":"Failed","error":{"code":"DeploymentFailed","message":"At least one resource deployment operation failed. Please list deployment operations for details. Please see https://aka.ms/DeployOperations for usage details.","details":[{"code":"Conflict","message":"{\r\n  \"status\": \"Failed\",\r\n  \"error\": {\r\n    \"code\": \"ResourceDeploymentFailure\",\r\n    \"message\": \"The resource operation completed with terminal provisioning state 'Failed'.\",\r\n    \"details\": [\r\n      {\r\n        \"code\": \"OverconstrainedZonalAllocationRequest\",\r\n        \"message\": \"Allocation failed. VM(s) with the following constraints cannot be allocated, because the condition is too restrictive. Please remove some constraints and try again. Constraints applied are:\\n  - Availability Zone\\n  - VM Size\\n\"\r\n      }\r\n    ]\r\n  }\r\n}"}]}}""",  # pylint: disable=line-too-long
+          'expected_error': errors.Benchmarks.UnsupportedConfigError
+         }
   )
   def testVmCreationError(self, stderror, expected_error):
     spec = azure_virtual_machine.AzureVmSpec(

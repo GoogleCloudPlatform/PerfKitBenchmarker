@@ -706,10 +706,11 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
               new_host.Create()
             self.host = self.host_list[-1]
           raise errors.Resource.RetryableCreationError()
-      elif (not self.use_dedicated_host and
-            ('AllocationFailed' in stderr or
-             'OverconstrainedZonalAllocationRequest' in stderr)):
+      elif (not self.use_dedicated_host and 'AllocationFailed' in stderr):
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
+      elif (not self.use_dedicated_host and
+            'OverconstrainedZonalAllocationRequest' in stderr):
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       elif 'SkuNotAvailable' in  stderr:
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       else:
