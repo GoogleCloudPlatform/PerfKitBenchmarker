@@ -20,19 +20,10 @@ client(s). It benchmarks IAAS VMs and not managed services.
 
 from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import db_util
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import iaas_relational_db
 from perfkitbenchmarker import sql_engine_utils
-from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.windows_packages import hammerdb
-
-
-# Default SQLServer Port
-DEFAULT_SQLSERVER_PORT = 1433
-# Default SQLServer User
-DEFAULT_SQLSERVER_USER = 'sa'
 
 
 FLAGS = flags.FLAGS
@@ -41,54 +32,23 @@ BENCHMARK_NAME = 'iaas_sqlserver_hammerdb'
 BENCHMARK_CONFIG = """
 iaas_sqlserver_hammerdb:
   description: Runs hammerdb against iaas sqlserver.
-  vm_groups:
-    servers:
-      os_type: windows2022_desktop_sqlserver_2019_standard
-      vm_spec:
-        GCP:
-          machine_type: n2-standard-16
-          zone: us-central1-c
-          boot_disk_size: 50
-          boot_disk_type: pd-ssd
-        AWS:
-          machine_type: m6i.4xlarge
-          zone: us-east-1a
-        Azure:
-          machine_type: Standard_D16s_v5
-          zone: eastus
-          boot_disk_type: Premium_LRS
-      disk_spec:
-        GCP:
-          disk_size: 500
-          disk_type: pd-ssd
-          num_striped_disks: 1
-          mount_point: /scratch
-        AWS:
-          disk_size: 500
-          disk_type: gp2
-          num_striped_disks: 1
-          mount_point: /scratch
-        Azure:
-          disk_size: 500
-          disk_type: Premium_LRS
-          num_striped_disks: 1
-          mount_point: /scratch
-    clients:
-      os_type: windows2022_desktop
-      vm_spec:
-        GCP:
-          machine_type: n2-standard-4
-          zone: us-central1-c
-          boot_disk_size: 50
-          boot_disk_type: pd-ssd
-        AWS:
-          machine_type: m6i.xlarge
-          zone: us-east-1a
-        Azure:
-          machine_type: Standard_D4s_v5
-          zone: eastus
-          boot_disk_type: Premium_LRS
-      disk_spec:
+  relational_db:
+    engine: sqlserver
+    db_spec:
+      GCP:
+        machine_type:
+          cpus: 4
+          memory: 7680MiB
+        zone: us-central1-c
+      AWS:
+        machine_type: db.m5.xlarge
+        zone: us-west-1a
+      Azure:
+        machine_type:
+          tier: Premium
+          compute_units: 500
+        zone: eastus
+    db_disk_spec:
         GCP:
           disk_size: 500
           disk_type: pd-ssd
@@ -104,6 +64,69 @@ iaas_sqlserver_hammerdb:
           disk_type: Premium_LRS
           num_striped_disks: 1
           mount_point: /scratch
+    vm_groups:
+      servers:
+        os_type: windows2022_desktop_sqlserver_2019_standard
+        vm_spec:
+          GCP:
+            machine_type: n2-standard-4
+            zone: us-central1-c
+            boot_disk_size: 50
+            boot_disk_type: pd-ssd
+          AWS:
+            machine_type: m6i.xlarge
+            zone: us-east-1a
+          Azure:
+            machine_type: Standard_D4s_v5
+            zone: eastus
+            boot_disk_type: Premium_LRS
+        disk_spec:
+          GCP:
+            disk_size: 500
+            disk_type: pd-ssd
+            num_striped_disks: 1
+            mount_point: /scratch
+          AWS:
+            disk_size: 500
+            disk_type: gp2
+            num_striped_disks: 1
+            mount_point: /scratch
+          Azure:
+            disk_size: 500
+            disk_type: Premium_LRS
+            num_striped_disks: 1
+            mount_point: /scratch
+      clients:
+        os_type: windows2022_desktop
+        vm_spec:
+          GCP:
+            machine_type: n2-standard-16
+            zone: us-central1-c
+            boot_disk_size: 50
+            boot_disk_type: pd-ssd
+          AWS:
+            machine_type: m6i.4xlarge
+            zone: us-east-1a
+          Azure:
+            machine_type: Standard_D16s_v5
+            zone: eastus
+            boot_disk_type: Premium_LRS
+        disk_spec:
+          GCP:
+            disk_size: 500
+            disk_type: pd-ssd
+            num_striped_disks: 1
+            mount_point: /scratch
+          AWS:
+            disk_size: 500
+            disk_type: gp2
+            num_striped_disks: 1
+            mount_point: /scratch
+          Azure:
+            disk_size: 500
+            disk_type: Premium_LRS
+            num_striped_disks: 1
+            mount_point: /scratch
 """
 
 
@@ -135,25 +158,13 @@ def Prepare(benchmark_spec):
       required to run the benchmark.
   """
   hammerdb.SetDefaultConfig()
-  server_vms = benchmark_spec.vm_groups['servers']
-  client_vms = benchmark_spec.vm_groups['clients']
-  assert(len(server_vms)) == 1
-  assert(len(client_vms)) == 1
-  vm_util.RunThreaded(lambda vm: vm.Install('hammerdb'), client_vms)
-
-  username = DEFAULT_SQLSERVER_USER
-  password = db_util.GenerateRandomDbPassword()
-
-  def _ConfigureSQLServer(vm):
-    iaas_relational_db.ConfigureSQLServer(vm, username, password)
-  vm_util.RunThreaded(_ConfigureSQLServer, server_vms)
-
-  def _SetupConfig(vm):
-    hammerdb.SetupConfig(vm, sql_engine_utils.SQLSERVER,
-                         hammerdb.HAMMERDB_SCRIPT.value,
-                         server_vms[0].internal_ip, DEFAULT_SQLSERVER_PORT,
-                         password, username, False)
-  vm_util.RunThreaded(_SetupConfig, client_vms)
+  relational_db = benchmark_spec.relational_db
+  vm = relational_db.client_vm
+  vm.Install('hammerdb')
+  hammerdb.SetupConfig(vm, sql_engine_utils.SQLSERVER,
+                       hammerdb.HAMMERDB_SCRIPT.value, relational_db.endpoint,
+                       relational_db.port, relational_db.spec.database_password,
+                       relational_db.spec.database_username, False)
 
 
 def Run(benchmark_spec):
