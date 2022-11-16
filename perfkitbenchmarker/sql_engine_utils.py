@@ -28,7 +28,6 @@ MYSQL = 'mysql'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
 AURORA_MYSQL = 'aurora-mysql'
-AURORA_MYSQL56 = 'aurora'
 SQLSERVER = 'sqlserver'
 SQLSERVER_EXPRESS = 'sqlserver-ex'
 SQLSERVER_ENTERPRISE = 'sqlserver-ee'
@@ -41,7 +40,6 @@ ALL_ENGINES = [
     POSTGRES,
     AURORA_POSTGRES,
     AURORA_MYSQL,
-    AURORA_MYSQL56,
     SQLSERVER,
     SQLSERVER_EXPRESS,
     SQLSERVER_ENTERPRISE,
@@ -445,7 +443,7 @@ def GetDbEngineType(db_engine: str) -> str:
     return SQLSERVER
   elif db_engine == AWS_AURORA_POSTGRES_ENGINE:
     return POSTGRES
-  elif db_engine == AWS_AURORA_MYSQL_ENGINE or db_engine == AURORA_MYSQL56:
+  elif db_engine == AWS_AURORA_MYSQL_ENGINE:
     return MYSQL
   elif db_engine == SPANNER_POSTGRES:
     return SPANNER_POSTGRES
