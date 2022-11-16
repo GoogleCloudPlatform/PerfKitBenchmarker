@@ -67,6 +67,6 @@ def Install(vm):
     # This token is not used, it is simply used to prove that the CLI on the VM
     # is authenticated.
     vm.RemoteCommand('az account get-access-token')
-  except errors.VirtualMachine.RemoteExceptionError as e:
+  except errors.VirtualMachine.RemoteCommandError as e:
     raise errors.Benchmarks.MissingObjectCredentialException(
         'Failed to install azure_credentials on VM.') from e
