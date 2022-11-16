@@ -940,8 +940,12 @@ def _ParseTimeSeries(
     for interval, data_dict in time_series.items():
       current_time = int(interval) * 1000 + start_time
       timestamps.append(current_time)
-      ops_series.append(data_dict['Count'])
-      max_latency_series.append(data_dict['Max Latency'])
+      try:
+        ops_series.append(data_dict['Count'])
+        max_latency_series.append(data_dict['Max Latency'])
+      except KeyError:
+        logging.info('Parsing Failed: %s', data_dict)
+
   return timestamps, ops_series, max_latency_series
 
 
