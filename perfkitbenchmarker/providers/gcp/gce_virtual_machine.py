@@ -1087,7 +1087,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Block main thread until LM ended."""
     logging.info('[LM Notify] Wait for live migration to finish.')
     self._LM_TIMES_SEMAPHORE.acquire()
-    logging.info('[LM Notify] Live nigration is done.')
+    logging.info('[LM Notify] Live migration is done.')
 
   def CollectLMNotificationsTime(self):
     """Extract LM notifications from log file.
