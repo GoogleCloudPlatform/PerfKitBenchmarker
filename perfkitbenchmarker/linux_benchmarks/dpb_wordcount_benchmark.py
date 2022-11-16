@@ -94,6 +94,8 @@ flags.DEFINE_list('dpb_wordcount_additional_args', [], 'Additional arguments '
 flags.DEFINE_bool('dpb_export_job_stats', True,
                   'Exports job stats such as CPU usage and cost. Enabled by '
                   'default, although only implemented in Dataflow.')
+flags.DEFINE_bool('dpb_wordcount_force_beam_style_job_args', False, 'Force the'
+                  'job arguments passed in beam supported style.')
 
 FLAGS = flags.FLAGS
 
@@ -157,7 +159,8 @@ def Run(benchmark_spec):
   if FLAGS.dpb_job_classname:
     classname = FLAGS.dpb_job_classname
   if dpb_service_instance.SERVICE_TYPE in [
-      dpb_service.DATAFLOW, dpb_service.DATAPROC_FLINK]:
+      dpb_service.DATAFLOW, dpb_service.DATAPROC_FLINK
+  ] or FLAGS.dpb_wordcount_force_beam_style_job_args:
     jarfile = benchmark_spec.dpb_wordcount_jarfile
     job_arguments.append('--inputFile={}'.format(input_location))
   else:
@@ -186,7 +189,9 @@ def Run(benchmark_spec):
   metadata = copy.copy(dpb_service_instance.GetMetadata())
   metadata.update({'input_location': input_location,
                    'dpb_wordcount_additional_args': ','.join(
-                       FLAGS.dpb_wordcount_additional_args)})
+                       FLAGS.dpb_wordcount_additional_args),
+                   'dpb_wordcount_force_beam_style_job_args':
+                       FLAGS.dpb_wordcount_force_beam_style_job_args})
 
   run_time = (end_time - start_time).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
