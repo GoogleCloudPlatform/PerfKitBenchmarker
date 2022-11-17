@@ -24,6 +24,8 @@ from typing import Any, FrozenSet, List, Optional
 from absl import flags
 from dateutil import parser
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
@@ -53,7 +55,8 @@ TPCH_TABLES = [
 
 MAP_VERSION_TO_INSTALL_FILE_NAME = {
     HAMMERDB_4_0: 'install_hammerdb_4_0.sh',
-    HAMMERDB_4_3: 'install_hammerdb_4_3.sh'
+    HAMMERDB_4_3: 'install_hammerdb_4_3.sh',
+    HAMMERDB_4_5: 'install_hammerdb_4_5.sh',
 }
 
 MAP_SCRIPT_TO_DATABASE_NAME = {
@@ -176,6 +179,18 @@ def SetDefaultConfig():
       FLAGS.hammerdbcli_num_vu = 4
   if HAMMERDB_BUILD_TPCC_NUM_VU.value is None:
     FLAGS.hammerdbcli_build_tpcc_num_vu = HAMMERDB_NUM_VU.value
+
+
+def CheckPrerequisites(_):
+  """Verifies that benchmark setup is correct."""
+  # hammerdb 4.5 and later versions required glibc 2.29 or later,
+  # which is not available on ubuntu1804 and earlier.
+  if HAMMERDB_VERSION.value == HAMMERDB_4_5 and FLAGS.os_type in [
+      os_types.UBUNTU1604, os_types.UBUNTU1804
+  ]:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Hammerdb version 4.5 is not supported on os type {}.'
+        'Use a later version of the os or an earlier version of hammerdb.')
 
 
 # define Hammerdb exception

@@ -30,10 +30,10 @@ FLAGS = flags.FLAGS
 P3RF_CLOUD_SQL_TEST_DIR = linux_hammerdb.P3RF_CLOUD_SQL_TEST_DIR
 
 # Installation paths and sources etc.
-HAMMERDB_4_5 = 'HammerDB-4.5'
-HAMMERDB_4_5_DIR = HAMMERDB_4_5 + '-Win'
-HAMMERDB_4_5_ZIP = HAMMERDB_4_5_DIR + '.zip'
-HAMMERDB_4_5_URL = 'https://github.com/TPC-Council/HammerDB/releases/download/v4.5/' + HAMMERDB_4_5_ZIP
+HAMMERDB = 'HammerDB-{0}'
+HAMMERDB_DIR = HAMMERDB + '-Win'
+HAMMERDB_ZIP = HAMMERDB_DIR + '.zip'
+HAMMERDB_URL = 'https://github.com/TPC-Council/HammerDB/releases/download/v{0}/' + HAMMERDB_ZIP
 
 # import linux flags
 HAMMERDB_SCRIPT = linux_hammerdb.HAMMERDB_SCRIPT
@@ -56,7 +56,8 @@ class WindowsHammerDbTclScript(linux_hammerdb.HammerDbTclScript):
 
   def Run(self, vm, timeout: Optional[int] = 60*60*6) -> str:
     """Run hammerdbcli script."""
-    hammerdb_exe_dir = ntpath.join(vm.temp_dir, HAMMERDB_4_5)
+    hammerdb_exe_dir = ntpath.join(
+        vm.temp_dir, HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value))
     stdout, _ = vm.RemoteCommand(
         f'cd {hammerdb_exe_dir} ; '
         f'.\\hammerdbcli.bat auto {self.tcl_script_name}',
@@ -115,7 +116,8 @@ def ParseTpcHResults(stdout: str) -> List[sample.Sample]:
 
 
 def SearchAndReplaceTclScript(vm, search: str, replace: str, script_name: str):
-  hammerdb_exe_dir = ntpath.join(vm.temp_dir, HAMMERDB_4_5)
+  hammerdb_exe_dir = ntpath.join(
+      vm.temp_dir, HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value))
   vm.RemoteCommand(f'cd {hammerdb_exe_dir} ; '
                    f'(Get-Content {script_name}) '
                    f'-replace "{search}", "{replace}" | '
@@ -124,13 +126,13 @@ def SearchAndReplaceTclScript(vm, search: str, replace: str, script_name: str):
 
 def Install(vm):
   """Installs hammerdbcli and dependencies on the VM."""
-  if linux_hammerdb.HAMMERDB_VERSION.value != linux_hammerdb.HAMMERDB_4_5:
+  version = linux_hammerdb.HAMMERDB_VERSION.value
+  if version not in [linux_hammerdb.HAMMERDB_4_5, linux_hammerdb.HAMMERDB_4_3]:
     raise errors.Setup.InvalidFlagConfigurationError(
-        f'Hammerdb version {linux_hammerdb.HAMMERDB_VERSION.value} is not '
-        'supported on Windows. ')
+        f'Hammerdb version {version} is not supported on Windows. ')
   vm.Install('mssql_tools')
-  zip_path = ntpath.join(vm.temp_dir, HAMMERDB_4_5_ZIP)
-  vm.DownloadFile(HAMMERDB_4_5_URL, zip_path)
+  zip_path = ntpath.join(vm.temp_dir, HAMMERDB_ZIP.format(version))
+  vm.DownloadFile(HAMMERDB_URL.format(version), zip_path)
   vm.UnzipFile(zip_path, vm.temp_dir)
 
 
@@ -218,8 +220,11 @@ def Run(vm,
 
 
 def PushTestFile(vm, data_file: str, path: str):
-  vm.PushFile(data.ResourcePath(posixpath.join(path, data_file)),
-              ntpath.join(vm.temp_dir, HAMMERDB_4_5, data_file))
+  vm.PushFile(
+      data.ResourcePath(posixpath.join(path, data_file)),
+      ntpath.join(vm.temp_dir,
+                  HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value),
+                  data_file))
 
 
 def GetMetadata(db_engine: str):
