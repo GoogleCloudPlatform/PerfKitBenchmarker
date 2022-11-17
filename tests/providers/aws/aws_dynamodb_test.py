@@ -82,6 +82,13 @@ def GetTestDynamoDBInstance(minimal=False):
 
 class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
 
+  def _MockHasAutoscalingPolicies(self, test_instance, policies_exist):
+    self.enter_context(
+        mock.patch.object(
+            test_instance,
+            '_HasAutoscalingPolicies',
+            return_value=policies_exist))
+
   def assertArgumentInCommand(self, mock_cmd, arg):
     """Given an AWS command, checks that the argument is present."""
     command = ' '.join(mock_cmd.call_args[0][0])
@@ -285,6 +292,7 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
       })
   def testFreezeLowersThroughputToFreeTier(self, rcu, wcu):
     test_instance = GetTestDynamoDBInstance()
+    self._MockHasAutoscalingPolicies(test_instance, False)
     self.enter_context(
         mock.patch.object(
             test_instance, '_GetThroughput', return_value=(rcu, wcu)))
@@ -298,6 +306,7 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testFreezeDoesNotLowerThroughputIfAlreadyAtFreeTier(self):
     test_instance = GetTestDynamoDBInstance()
+    self._MockHasAutoscalingPolicies(test_instance, False)
     self.enter_context(
         mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5)))
     mock_set_throughput = self.enter_context(
@@ -307,24 +316,63 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
 
     mock_set_throughput.assert_not_called()
 
+  @flagsaver.flagsaver(
+      aws_dynamodb_autoscaling_target=50,
+      aws_dynamodb_autoscaling_wcu_max=100,
+      aws_dynamodb_autoscaling_rcu_max=200)
+  def testFreezeAutoscalingUsesFreeTierAsMin(self):
+    test_instance = GetTestDynamoDBInstance()
+    self._MockHasAutoscalingPolicies(test_instance, True)
+    mock_autoscale = self.enter_context(
+        mock.patch.object(test_instance, '_CreateScalableTarget'))
+
+    test_instance._Freeze()
+
+    mock_autoscale.assert_has_calls([
+        mock.call(aws_dynamodb._RCU_SCALABLE_DIMENSION,
+                  aws_dynamodb._FREE_TIER_RCU, 200),
+        mock.call(aws_dynamodb._WCU_SCALABLE_DIMENSION,
+                  aws_dynamodb._FREE_TIER_WCU, 100)
+    ])
+
   def testRestoreSetsThroughputBackToOriginalLevels(self):
     test_instance = GetTestDynamoDBInstance()
     test_instance.rcu = 5000
     test_instance.wcu = 1000
     mock_set_throughput = self.enter_context(
         mock.patch.object(test_instance, 'SetThroughput', autospec=True))
+    self._MockHasAutoscalingPolicies(test_instance, False)
 
     test_instance._Restore()
 
     mock_set_throughput.assert_called_once_with(rcu=5000, wcu=1000)
 
-  @parameterized.parameters(
-      ('aws_dynamodb_autoscaling_target', 50),
-      ('aws_dynamodb_autoscaling_wcu_max', 100),
-      ('aws_dynamodb_autoscaling_rcu_max', 100))
-  @flagsaver.flagsaver
-  def testShouldAutoscale(self, flag, value):
-    FLAGS[flag].parse(value)
+  @flagsaver.flagsaver(
+      aws_dynamodb_autoscaling_target=50,
+      aws_dynamodb_autoscaling_wcu_max=100,
+      aws_dynamodb_autoscaling_rcu_max=200)
+  def testRestoreAutoscalingUsesOriginalThroughputLevels(self):
+    test_instance = GetTestDynamoDBInstance()
+
+    mock_set_throughput = self.enter_context(
+        mock.patch.object(test_instance, 'SetThroughput', autospec=True))
+    self._MockHasAutoscalingPolicies(test_instance, True)
+    mock_autoscale = self.enter_context(
+        mock.patch.object(test_instance, '_CreateScalableTarget'))
+
+    test_instance._Restore()
+
+    mock_autoscale.assert_has_calls([
+        mock.call(aws_dynamodb._RCU_SCALABLE_DIMENSION, 5, 200),
+        mock.call(aws_dynamodb._WCU_SCALABLE_DIMENSION, 25, 100)
+    ])
+    mock_set_throughput.assert_not_called()
+
+  @flagsaver.flagsaver(
+      aws_dynamodb_autoscaling_target=50,
+      aws_dynamodb_autoscaling_wcu_max=100,
+      aws_dynamodb_autoscaling_rcu_max=100)
+  def testPostCreateAutoscalingPoliciesCreatedCorrectly(self):
     test_instance = GetTestDynamoDBInstance()
     mock_create_policy = self.enter_context(
         mock.patch.object(test_instance, '_CreateAutoscalingPolicy'))

@@ -16,25 +16,30 @@
 import unittest
 
 from absl import flags
+from absl.testing import flagsaver
 import mock
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import aws_dynamodb_ycsb_benchmark
+from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
 
 
-class RunTest(pkb_common_test_case.PkbCommonTestCase):
+class LoadStageTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
     self.enter_context(
         mock.patch.object(aws_dynamodb_ycsb_benchmark,
                           'GetRemoteVMCredentialsFullPath'))
+    self.enter_context(
+        mock.patch.object(vm_util, 'RunThreaded'))
+    self.enter_context(mock.patch.object(ycsb.YCSBExecutor, 'Load'))
     self.mock_spec = mock.MagicMock()
-    self.mock_spec.executor = mock.MagicMock()
 
-  def testRunThroughputIncreases(self):
+  def testLoadThroughputIncreases(self):
     # Benchmark raises WCU to 10k during loading if WCU < 10k.
     # Arrange
     instance = aws_dynamodb.AwsDynamoDBInstance(rcu=1000, wcu=1000)
@@ -43,13 +48,13 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_spec.non_relational_db = instance
 
     # Act
-    aws_dynamodb_ycsb_benchmark.Run(self.mock_spec)
+    aws_dynamodb_ycsb_benchmark.Prepare(self.mock_spec)
 
     # Assert
     mock_set_throughput.assert_has_calls(
         [mock.call(wcu=10000), mock.call()])
 
-  def testRunThroughputStaysSame(self):
+  def testLoadThroughputStaysSame(self):
     # WCU stays the same during loading if > 10k.
     # Arrange
     instance = aws_dynamodb.AwsDynamoDBInstance(rcu=1000, wcu=30000)
@@ -58,11 +63,25 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_spec.non_relational_db = instance
 
     # Act
-    aws_dynamodb_ycsb_benchmark.Run(self.mock_spec)
+    aws_dynamodb_ycsb_benchmark.Prepare(self.mock_spec)
 
     # Assert
     mock_set_throughput.assert_called_once_with()
 
+  @flagsaver.flagsaver(
+      aws_dynamodb_autoscaling_target=50,
+      aws_dynamodb_autoscaling_wcu_max=100,
+      aws_dynamodb_autoscaling_rcu_max=200,
+      aws_dynamodb_ycsb_provision_wcu=10000)
+  def testLoadPhaseWithAutoscalingDoesNotSetThroughput(self):
+    instance = aws_dynamodb.AwsDynamoDBInstance(rcu=1000, wcu=3000)
+    mock_set_throughput = self.enter_context(
+        mock.patch.object(instance, 'SetThroughput'))
+    self.mock_spec.non_relational_db = instance
+
+    aws_dynamodb_ycsb_benchmark.Prepare(self.mock_spec)
+
+    mock_set_throughput.assert_not_called()
 
 if __name__ == '__main__':
   unittest.main()

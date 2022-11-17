@@ -19,9 +19,10 @@ TODO: add DAX option.
 TODO: add global table option.
 """
 
+from collections.abc import Collection, Iterable, MutableMapping
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import configs
@@ -94,6 +95,28 @@ def CheckPrerequisites(benchmark_config):
   ycsb.CheckPrerequisites()
 
 
+def _GetYcsbArgs(client: virtual_machine.VirtualMachine,
+                 instance: aws_dynamodb.AwsDynamoDBInstance) -> dict[str, Any]:
+  """Returns args to pass to YCSB."""
+  run_kwargs = {
+      'dynamodb.awsCredentialsFile': GetRemoteVMCredentialsFullPath(client),
+      'dynamodb.primaryKey': instance.primary_key,
+      'dynamodb.endpoint': instance.GetEndPoint(),
+      'dynamodb.region': instance.region,
+      'table': instance.table_name,
+  }
+  if FLAGS.aws_dynamodb_use_sort:
+    run_kwargs.update({
+        'dynamodb.primaryKeyType': 'HASH_AND_RANGE',
+        'aws_dynamodb_connectMax': _MAX_CONNECTIONS.value,
+        'dynamodb.hashKeyName': instance.primary_key,
+        'dynamodb.primaryKey': instance.sort_key
+    })
+  if _CONSISTENT_READS.value:
+    run_kwargs['dynamodb.consistentReads'] = 'true'
+  return run_kwargs
+
+
 def Prepare(benchmark_spec):
   """Install YCSB on the target vm.
 
@@ -107,6 +130,23 @@ def Prepare(benchmark_spec):
   # Install required packages.
   vm_util.RunThreaded(_Install, vms)
   benchmark_spec.executor = ycsb.YCSBExecutor('dynamodb')
+
+  instance: aws_dynamodb.AwsDynamoDBInstance = benchmark_spec.non_relational_db
+
+  # Restored instances have already been loaded with data.
+  if instance.restored:
+    return
+
+  load_kwargs = _GetYcsbArgs(vms[0], instance)
+  if FLAGS['ycsb_preload_threads'].present:
+    load_kwargs['threads'] = FLAGS.ycsb_preload_threads
+  # More WCU results in a faster load stage.
+  if instance.wcu < _INITIAL_WRITES.value and not instance.ShouldAutoscale():
+    instance.SetThroughput(wcu=_INITIAL_WRITES.value)
+  benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs)
+  # Reset the WCU to the initial level.
+  if not instance.ShouldAutoscale():
+    instance.SetThroughput()
 
 
 def Run(benchmark_spec):
@@ -122,33 +162,8 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   instance: aws_dynamodb.AwsDynamoDBInstance = benchmark_spec.non_relational_db
 
-  run_kwargs = {
-      'dynamodb.awsCredentialsFile': GetRemoteVMCredentialsFullPath(vms[0]),
-      'dynamodb.primaryKey': instance.primary_key,
-      'dynamodb.endpoint': instance.GetEndPoint(),
-      'dynamodb.region': instance.region,
-      'table': instance.table_name,
-  }
-  if FLAGS.aws_dynamodb_use_sort:
-    run_kwargs.update({
-        'dynamodb.primaryKeyType': 'HASH_AND_RANGE',
-        'aws_dynamodb_connectMax': _MAX_CONNECTIONS.value,
-        'dynamodb.hashKeyName': instance.primary_key,
-        'dynamodb.primaryKey': instance.sort_key
-    })
-  if _CONSISTENT_READS.value:
-    run_kwargs.update({'dynamodb.consistentReads': 'true'})
-  load_kwargs = run_kwargs.copy()
-  if FLAGS['ycsb_preload_threads'].present:
-    load_kwargs['threads'] = FLAGS.ycsb_preload_threads
+  run_kwargs = _GetYcsbArgs(vms[0], instance)
   samples = []
-  if not instance.restored:
-    # More WCU results in a faster load stage.
-    if instance.wcu < _INITIAL_WRITES.value:
-      instance.SetThroughput(wcu=_INITIAL_WRITES.value)
-    samples += list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
-    # Reset the WCU to the initial level.
-    instance.SetThroughput()
   if _RAMP_UP.value:
     samples += RampUpRun(benchmark_spec.executor, instance, vms, run_kwargs)
   else:
@@ -164,7 +179,7 @@ def Run(benchmark_spec):
   return samples
 
 
-def _ExtractThroughput(samples: List[sample.Sample]) -> float:
+def _ExtractThroughput(samples: Iterable[sample.Sample]) -> float:
   for result in samples:
     if result.metric == 'overall Throughput':
       return result.value
@@ -173,8 +188,8 @@ def _ExtractThroughput(samples: List[sample.Sample]) -> float:
 
 def RampUpRun(executor: ycsb.YCSBExecutor,
               db: aws_dynamodb.AwsDynamoDBInstance,
-              vms: List[virtual_machine.VirtualMachine],
-              run_kwargs: Dict[str, Any]) -> List[sample.Sample]:
+              vms: Collection[virtual_machine.VirtualMachine],
+              run_kwargs: MutableMapping[str, Any]) -> list[sample.Sample]:
   """Runs YCSB starting from provisioned QPS until max throughput is found."""
   # Database is already provisioned with the correct QPS.
   qps = db.rcu + db.wcu

@@ -190,6 +190,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
                **kwargs):
     super(AwsDynamoDBInstance, self).__init__(**kwargs)
     self.table_name = table_name or f'pkb-{FLAGS.run_uri}'
+    self._resource_id = f'table/{self.table_name}'
     self.zone = zone or _DEFAULT_ZONE
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_arn: str = None  # Set during the _Exists() call.
@@ -359,13 +360,13 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     if retcode != 0:
       logging.warning('Failed to create table! %s', stderror)
 
-  def _ShouldAutoscale(self) -> bool:
-    return any([_AUTOSCALING_CPU_TARGET.value,
+  def ShouldAutoscale(self) -> bool:
+    return all([_AUTOSCALING_CPU_TARGET.value,
                 _AUTOSCALING_MAX_RCU.value,
                 _AUTOSCALING_MAX_WCU.value])
 
   def _PostCreate(self):
-    if not self._ShouldAutoscale():
+    if not self.ShouldAutoscale():
       return
     self._CreateAutoscalingPolicy(_RCU_SCALABLE_DIMENSION,
                                   _RCU_SCALING_METRIC,
@@ -374,24 +375,30 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
                                   _WCU_SCALING_METRIC,
                                   self.wcu, _AUTOSCALING_MAX_WCU.value)
 
-  def _CreateAutoscalingPolicy(self,
-                               scalable_dimension: str,
-                               scaling_metric: str,
-                               min_capacity: int,
-                               max_capacity: int) -> None:
-    """Creates an autoscaling policy for the table."""
+  def _CreateScalableTarget(self,
+                            scalable_dimension: str,
+                            min_capacity: int,
+                            max_capacity: int) -> None:
+    """Creates a scalable target which controls QPS limits for the table."""
     logging.info('Registering scalable target.')
     cmd = util.AWS_PREFIX + [
         'application-autoscaling',
         'register-scalable-target',
         '--service-namespace', 'dynamodb',
-        '--resource-id', f'table/{self.table_name}',
+        '--resource-id', self._resource_id,
         '--scalable-dimension', scalable_dimension,
         '--min-capacity', str(min_capacity),
         '--max-capacity', str(max_capacity),
         '--region', self.region]
     vm_util.IssueCommand(cmd, raise_on_failure=True)
 
+  def _CreateAutoscalingPolicy(self,
+                               scalable_dimension: str,
+                               scaling_metric: str,
+                               min_capacity: int,
+                               max_capacity: int) -> None:
+    """Creates an autoscaling policy for the table."""
+    self._CreateScalableTarget(scalable_dimension, min_capacity, max_capacity)
     logging.info('Creating autoscaling policy.')
     scaling_policy = {
         'PredefinedMetricSpecification': {
@@ -405,7 +412,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         'application-autoscaling',
         'put-scaling-policy',
         '--service-namespace', 'dynamodb',
-        '--resource-id', f'table/{self.table_name}',
+        '--resource-id', self._resource_id,
         '--scalable-dimension', scalable_dimension,
         '--policy-name', f'{FLAGS.run_uri}-policy',
         '--policy-type', 'TargetTrackingScaling',
@@ -414,6 +421,19 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         '--region', self.region
     ]
     vm_util.IssueCommand(cmd, raise_on_failure=True)
+
+  def _HasAutoscalingPolicies(self) -> bool:
+    """Returns whether autoscaling policies are in effect for this table."""
+    cmd = util.AWS_PREFIX + [
+        'application-autoscaling',
+        'describe-scaling-policies',
+        '--service-namespace', 'dynamodb',
+        '--resource-id', self._resource_id,
+        '--region', self.region
+    ]
+    stdout, _, _ = vm_util.IssueCommand(cmd, raise_on_failure=True)
+    result = json.loads(stdout).get('ScalingPolicies', [])
+    return bool(result)
 
   def _Delete(self) -> None:
     """Deletes the dynamodb table."""
@@ -479,7 +499,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         'aws_dynamodb_lsi_count': self.lsi_count,
         'aws_dynamodb_gsi_count': self.gsi_count,
     }
-    if self._ShouldAutoscale():
+    if self.ShouldAutoscale():
       metadata.update({
           'aws_dynamodb_autoscaling':
               True,
@@ -577,6 +597,14 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     many times throughput on a table may by lowered per day. See:
     https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ProvisionedThroughput.html.
     """
+    if self._HasAutoscalingPolicies():
+      self._CreateScalableTarget(_RCU_SCALABLE_DIMENSION,
+                                 _FREE_TIER_RCU,
+                                 _AUTOSCALING_MAX_RCU.value)
+      self._CreateScalableTarget(_WCU_SCALABLE_DIMENSION,
+                                 _FREE_TIER_WCU,
+                                 _AUTOSCALING_MAX_WCU.value)
+      return
     # Check that we actually need to lower before issuing command.
     rcu, wcu = self._GetThroughput()
     if rcu > _FREE_TIER_RCU or wcu > _FREE_TIER_WCU:
@@ -593,6 +621,15 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
       self.rcu = FLAGS.aws_dynamodb_read_capacity
     if FLAGS['aws_dynamodb_write_capacity'].present:
       self.wcu = FLAGS.aws_dynamodb_write_capacity
+    if self._HasAutoscalingPolicies():
+      # If the flags are not provided, this should default to previous levels.
+      self._CreateScalableTarget(_RCU_SCALABLE_DIMENSION,
+                                 self.rcu,
+                                 _AUTOSCALING_MAX_RCU.value)
+      self._CreateScalableTarget(_WCU_SCALABLE_DIMENSION,
+                                 self.wcu,
+                                 _AUTOSCALING_MAX_WCU.value)
+      return
     self.SetThroughput(self.rcu, self.wcu)
 
 
