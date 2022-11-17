@@ -65,6 +65,11 @@ flags.DEFINE_integer('sysbench_latency_percentile', 100,
 flags.DEFINE_integer('sysbench_report_interval', 2,
                      'The interval, in seconds, we ask sysbench to report '
                      'results.')
+_SKIP_LOAD_STAGE = flags.DEFINE_boolean(
+    'sysbench_skip_load_stage', False,
+    'If true, skips the loading stage of the benchmark. Useful for when '
+    'testing on a long-lived or static instance where the database has already '
+    'been loaded on a previous run.')
 
 BENCHMARK_DATA = {
     'sysbench-tpcc.tar.gz':
@@ -455,6 +460,17 @@ def _PrepareSysbench(client_vm, benchmark_spec):
 
   db = benchmark_spec.relational_db
 
+  # Some databases install these query tools during _PostCreate, which is
+  # skipped if the database is user managed / restored.
+  if db.user_managed or db.restored:
+    db.client_vm_query_tools.InstallPackages()
+
+  db.sysbench_db_size_MB = _GetDatabaseSize(benchmark_spec)
+
+  if _SKIP_LOAD_STAGE.value or db.restored:
+    logging.info('Skipping the load stage')
+    return results
+
   stdout, stderr = db.client_vm_query_tools.IssueSqlCommand(
       'create database sbtest;')
 
@@ -492,7 +508,6 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   logging.info('data loading results: \n stdout is:\n%s\nstderr is\n%s',
                stdout, stderr)
 
-  db.sysbench_db_size_MB = _GetDatabaseSize(benchmark_spec)
   metadata = CreateMetadataFromFlags(db)
 
   results.append(sample.Sample(
