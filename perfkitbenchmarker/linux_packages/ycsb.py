@@ -37,8 +37,11 @@ Each workload runs for at most 30 minutes.
 
 import bisect
 import collections
+from collections.abc import Iterable, Mapping
 import copy
 import csv
+import dataclasses
+import io
 import itertools
 import json
 import logging
@@ -48,19 +51,15 @@ import os
 import posixpath
 import re
 import time
-from typing import List
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import maven
-import six
-from six.moves import filter
-from six.moves import range
-from six.moves import zip
 
 FLAGS = flags.FLAGS
 
@@ -256,6 +255,8 @@ DEFAULT_PRELOAD_THREADS = 32
 _ycsb_tar_url = None
 
 _ThroughputTimeSeries = dict[int, float]
+# Tuple of (percentile, latency, count)
+_HdrHistogramTuple = tuple[float, float, int]
 
 
 def SetYcsbTarUrl(url):
@@ -309,7 +310,7 @@ def _GetThreadsQpsPerLoaderList():
   ]
 
 
-def GetWorkloadFileList() -> List[str]:
+def GetWorkloadFileList() -> list[str]:
   """Returns the list of workload files to run.
 
   Returns:
@@ -410,7 +411,45 @@ def Install(vm):
                          mvn_cmd=maven.GetRunCommand('install')))
 
 
-def ParseResults(ycsb_result_string, data_type='histogram'):
+@dataclasses.dataclass
+class _OpResult:
+  """Individual results for a single operation.
+
+  Attributes:
+    group: group name (e.g., update, insert, overall)
+    statistics: dict mapping from statistic name to value
+    data_type: Corresponds to --ycsb_measurement_type.
+    data:
+      For HISTOGRAM/HDRHISTOGRAM: list of (ms_lower_bound, count) tuples, e.g.
+      [(0, 530), (19, 1)] indicates that 530 ops took between 0ms and 1ms,
+      and 1 took between 19ms and 20ms. Empty bins are not reported.
+      For TIMESERIES: list of (time, latency us) tuples.
+  """
+  group: str = ''
+  data_type: str = ''
+  data: list[tuple[int, float]] = dataclasses.field(default_factory=list)
+  statistics: dict[str, float] = dataclasses.field(default_factory=dict)
+
+
+@dataclasses.dataclass
+class YcsbResult:
+  """Aggregate results for the YCSB run.
+
+  Attributes:
+    client: Contains YCSB version information.
+    command_line: Command line executed.
+    throughput_time_series: Time series of throughputs (interval, QPS).
+    groups: dict of operation group name to results for that operation.
+  """
+  client: str = ''
+  command_line: str = ''
+  throughput_time_series: _ThroughputTimeSeries = dataclasses.field(
+      default_factory=dict)
+  groups: dict[str, _OpResult] = dataclasses.field(default_factory=dict)
+
+
+def ParseResults(ycsb_result_string: str,
+                 data_type: str = 'histogram') -> 'YcsbResult':
   """Parse YCSB results.
 
   Example input for histogram datatype:
@@ -492,16 +531,7 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
       similarly.
 
   Returns:
-    A dictionary with keys:
-      client: containing YCSB version information.
-      command_line: Command line executed.
-      groups: list of operation group descriptions, each with schema:
-        group: group name (e.g., update, insert, overall)
-        statistics: dict mapping from statistic name to value
-        histogram: list of (ms_lower_bound, count) tuples, e.g.:
-          [(0, 530), (19, 1)]
-        indicates that 530 ops took between 0ms and 1ms, and 1 took between
-        19ms and 20ms. Empty bins are not reported.
+    A YcsbResult object that contains the results from parsing YCSB output.
   Raises:
     IOError: If the results contained unexpected lines.
   """
@@ -516,7 +546,7 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
   client_string = 'YCSB'
   command_line = 'unknown'
   throughput_time_series = {}
-  fp = six.StringIO(ycsb_result_string)
+  fp = io.StringIO(ycsb_result_string)
   result_string = next(fp).strip()
 
   def IsHeadOfResults(line):
@@ -538,13 +568,13 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
       result_string = next(fp).strip()
     except StopIteration:
       raise IOError(
-          'Could not parse YCSB output: {}'.format(ycsb_result_string))
+          f'Could not parse YCSB output: {ycsb_result_string}') from None
 
   if result_string.startswith('[OVERALL]'):  # YCSB > 0.7.0.
     lines.append(result_string)
   else:
     # Received unexpected header
-    raise IOError('Unexpected header: {0}'.format(client_string))
+    raise IOError(f'Unexpected header: {client_string}')
 
   # Some databases print additional output to stdout.
   # YCSB results start with [<OPERATION_NAME>];
@@ -558,11 +588,9 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
 
   by_operation = itertools.groupby(r, operator.itemgetter(0))
 
-  result = collections.OrderedDict([('client', client_string),
-                                    ('command_line', command_line),
-                                    ('throughput_time_series',
-                                     throughput_time_series),
-                                    ('groups', collections.OrderedDict())])
+  result = YcsbResult(client=client_string,
+                      command_line=command_line,
+                      throughput_time_series=throughput_time_series)
 
   for operation, lines in by_operation:
     operation = operation[1:-1].lower()
@@ -570,7 +598,8 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
     if operation == 'cleanup':
       continue
 
-    op_result = {'group': operation, data_type: [], 'statistics': {}}
+    op_result = _OpResult(group=operation,
+                          data_type=data_type)
     latency_unit = 'ms'
     for _, name, val in lines:
       name = name.strip()
@@ -583,20 +612,20 @@ def ParseResults(ycsb_result_string, data_type='histogram'):
         if val:
           if data_type == TIMESERIES and latency_unit == 'us':
             val /= 1000.0
-          op_result[data_type].append((int(name), val))
+          op_result.data.append((int(name), val))
       else:
         if '(us)' in name:
           name = name.replace('(us)', '(ms)')
           val /= 1000.0
           latency_unit = 'us'
-        op_result['statistics'][name] = val
+        op_result.statistics[name] = val
 
-    result['groups'][operation] = op_result
+    result.groups[operation] = op_result
   _ValidateErrorRate(result)
   return result
 
 
-def _ValidateErrorRate(result):
+def _ValidateErrorRate(result: YcsbResult) -> None:
   """Raises an error if results contains entries with too high error rate.
 
   Computes the error rate for each operation, example output looks like:
@@ -619,8 +648,8 @@ def _ValidateErrorRate(result):
     errors.Benchmarks.RunError: If the computed error rate is higher than the
       threshold.
   """
-  for operation in result['groups'].values():
-    name, stats = operation['group'], operation['statistics']
+  for operation in result.groups.values():
+    name, stats = operation.group, operation.statistics
     # The operation count can be 0
     count = stats.get('Operations', 0)
     if count == 0:
@@ -633,7 +662,7 @@ def _ValidateErrorRate(result):
           f'threshold {_ERROR_RATE_THRESHOLD.value}')
 
 
-def ParseHdrLogFile(logfile):
+def ParseHdrLogFile(logfile: str) -> list[_HdrHistogramTuple]:
   """Parse a hdrhistogram log file into a list of (percentile, latency, count).
 
   Example decrypted hdrhistogram logfile (value measures latency in microsec):
@@ -660,7 +689,7 @@ def ParseHdrLogFile(logfile):
     logfile: Hdrhistogram log file.
 
   Returns:
-    List of (percent, value, count) tuples
+    List of (percentile, value, count) tuples
   """
   result = []
   last_percent_value = -1
@@ -682,7 +711,8 @@ def ParseHdrLogFile(logfile):
   return result
 
 
-def ParseHdrLogs(hdrlogs):
+def ParseHdrLogs(
+    hdrlogs: Mapping[str, str]) -> dict[str, list[_HdrHistogramTuple]]:
   """Parse a dict of group to hdr logs into a dict of group to histogram tuples.
 
   Args:
@@ -692,7 +722,7 @@ def ParseHdrLogs(hdrlogs):
     Dict of group to histogram tuples of reportable percentile values.
   """
   parsed_hdr_histograms = {}
-  for group, logfile in six.iteritems(hdrlogs):
+  for group, logfile in hdrlogs.items():
     values = ParseHdrLogFile(logfile)
     parsed_hdr_histograms[group] = values
   return parsed_hdr_histograms
@@ -766,7 +796,9 @@ def _PercentilesFromHistogram(ycsb_histogram, percentiles=_DEFAULT_PERCENTILES):
   return result
 
 
-def _CombineResults(result_list, measurement_type, combined_hdr):
+def _CombineResults(result_list: Iterable[YcsbResult],
+                    measurement_type: str,
+                    combined_hdr: Mapping[str, list[_HdrHistogramTuple]]):
   """Combine results from multiple YCSB clients.
 
   Reduces a list of YCSB results (the output of ParseResults)
@@ -774,7 +806,7 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
   are summed; RunTime is replaced by the maximum runtime of any result.
 
   Args:
-    result_list: List of ParseResults outputs.
+    result_list: Iterable of ParseResults outputs.
     measurement_type: Measurement type used. If measurement type is histogram,
       histogram bins are summed across results. If measurement type is
       hdrhistogram, an aggregated hdrhistogram (combined_hdr) is expected.
@@ -784,12 +816,12 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
     A dictionary, as returned by ParseResults.
   """
 
-  def DropUnaggregated(result):
+  def DropUnaggregated(result: YcsbResult) -> None:
     """Remove statistics which 'operators' specify should not be combined."""
-    drop_keys = {k for k, v in six.iteritems(AGGREGATE_OPERATORS) if v is None}
-    for group in six.itervalues(result['groups']):
+    drop_keys = {k for k, v in AGGREGATE_OPERATORS.items() if v is None}
+    for group in result.groups.values():
       for k in drop_keys:
-        group['statistics'].pop(k, None)
+        group.statistics.pop(k, None)
 
   def CombineHistograms(hist1, hist2):
     h1 = dict(hist1)
@@ -872,16 +904,17 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
           series2.get(timestamp, 0))
     return result
 
+  result_list = list(result_list)
   result = copy.deepcopy(result_list[0])
   DropUnaggregated(result)
 
   for indiv in result_list[1:]:
-    for group_name, group in six.iteritems(indiv['groups']):
-      if group_name not in result['groups']:
+    for group_name, group in indiv.groups.items():
+      if group_name not in result.groups:
         logging.warning(
             'Found result group "%s" in individual YCSB result, '
             'but not in accumulator.', group_name)
-        result['groups'][group_name] = copy.deepcopy(group)
+        result.groups[group_name] = copy.deepcopy(group)
         continue
 
       # Combine reported statistics.
@@ -889,42 +922,42 @@ def _CombineResults(result_list, measurement_type, combined_hdr):
       # Otherwise, the aggregated value is either:
       # * The value in 'indiv', if the statistic is not present in 'result' or
       # * AGGREGATE_OPERATORS[statistic](result_value, indiv_value)
-      for k, v in six.iteritems(group['statistics']):
+      for k, v in group.statistics.items():
         if k not in AGGREGATE_OPERATORS:
           logging.warning('No operator for "%s". Skipping aggregation.', k)
           continue
         elif AGGREGATE_OPERATORS[k] is None:  # Drop
-          result['groups'][group_name]['statistics'].pop(k, None)
+          result.groups[group_name].statistics.pop(k, None)
           continue
-        elif k not in result['groups'][group_name]['statistics']:
+        elif k not in result.groups[group_name].statistics:
           logging.warning(
               'Found statistic "%s.%s" in individual YCSB result, '
               'but not in accumulator.', group_name, k)
-          result['groups'][group_name]['statistics'][k] = copy.deepcopy(v)
+          result.groups[group_name].statistics[k] = copy.deepcopy(v)
           continue
 
         op = AGGREGATE_OPERATORS[k]
-        result['groups'][group_name]['statistics'][k] = (
-            op(result['groups'][group_name]['statistics'][k], v))
+        result.groups[group_name].statistics[k] = (
+            op(result.groups[group_name].statistics[k], v))
 
       if measurement_type == HISTOGRAM:
-        result['groups'][group_name][HISTOGRAM] = CombineHistograms(
-            result['groups'][group_name][HISTOGRAM], group[HISTOGRAM])
+        result.groups[group_name].data = CombineHistograms(
+            result.groups[group_name].data, group.data)
       elif measurement_type == TIMESERIES:
-        result['groups'][group_name][TIMESERIES] = _CombineLatencyTimeSeries(
-            result['groups'][group_name][TIMESERIES], group[TIMESERIES])
-    result['client'] = ' '.join((result['client'], indiv['client']))
-    result['command_line'] = ';'.join(
-        (result['command_line'], indiv['command_line']))
+        result.groups[group_name].data = _CombineLatencyTimeSeries(
+            result.groups[group_name].data, group.data)
+    result.client = ' '.join((result.client, indiv.client))
+    result.command_line = ';'.join(
+        (result.command_line, indiv.command_line))
 
     if _THROUGHPUT_TIME_SERIES.value:
-      result['throughput_time_series'] = _CombineThroughputTimeSeries(
-          result['throughput_time_series'], indiv['throughput_time_series'])
+      result.throughput_time_series = _CombineThroughputTimeSeries(
+          result.throughput_time_series, indiv.throughput_time_series)
 
   if measurement_type == HDRHISTOGRAM:
     for group_name in combined_hdr:
-      if group_name in result['groups']:
-        result['groups'][group_name][HDRHISTOGRAM] = combined_hdr[group_name]
+      if group_name in result.groups:
+        result.groups[group_name].data = combined_hdr[group_name]
 
   return result
 
@@ -944,7 +977,7 @@ def ParseWorkload(contents):
     dict mapping from property key to property value for each property found in
     'contents'.
   """
-  fp = six.StringIO(contents)
+  fp = io.StringIO(contents)
   result = {}
   for line in fp:
     if (line.strip() and not line.lstrip().startswith('#') and
@@ -962,7 +995,9 @@ def PushWorkload(vm, workload_file, remote_path):
   vm.PushFile(workload_file, remote_path)
 
 
-def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
+def _CreateSamples(ycsb_result: YcsbResult,
+                   include_histogram: bool = False,
+                   **kwargs) -> list[sample.Sample]:
   """Create PKB samples from a YCSB result.
 
   Args:
@@ -974,26 +1009,27 @@ def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
   Yields:
     List of sample.Sample objects.
   """
-  stage = 'load' if ycsb_result['command_line'].endswith('-load') else 'run'
+  command_line = ycsb_result.command_line
+  stage = 'load' if command_line.endswith('-load') else 'run'
   base_metadata = {
       'stage': stage,
       'ycsb_tar_url': _ycsb_tar_url,
       'ycsb_version': FLAGS.ycsb_version
   }
   if _SHOULD_RECORD_COMMAND_LINE.value:
-    base_metadata['command_line'] = ycsb_result['command_line']
+    base_metadata['command_line'] = command_line
   base_metadata.update(kwargs)
 
-  throughput_time_series = ycsb_result.get('throughput_time_series', {})
+  throughput_time_series = ycsb_result.throughput_time_series
   if throughput_time_series:
     yield sample.Sample(
         'Throughput Time Series', 0, '',
         {'throughput_time_series': sorted(throughput_time_series.items())})
 
-  for group_name, group in six.iteritems(ycsb_result['groups']):
+  for group_name, group in ycsb_result.groups.items():
     meta = base_metadata.copy()
     meta['operation'] = group_name
-    for statistic, value in six.iteritems(group['statistics']):
+    for statistic, value in group.statistics.items():
       if value is None:
         continue
 
@@ -1004,27 +1040,27 @@ def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
         unit = m.group(2)
       yield sample.Sample(' '.join([group_name, statistic]), value, unit, meta)
 
-    if group.get(HISTOGRAM, []):
-      percentiles = _PercentilesFromHistogram(group[HISTOGRAM])
-      for label, value in six.iteritems(percentiles):
+    if group.data and group.data_type == HISTOGRAM:
+      percentiles = _PercentilesFromHistogram(group.data)
+      for label, value in percentiles.items():
         yield sample.Sample(' '.join([group_name, label, 'latency']), value,
                             'ms', meta)
       if include_histogram:
-        for time_ms, count in group[HISTOGRAM]:
+        for time_ms, count in group.data:
           yield sample.Sample(
               '{0}_latency_histogram_{1}_ms'.format(group_name, time_ms), count,
               'count', meta)
 
-    if group.get(HDRHISTOGRAM, []):
+    if group.data and group.data_type == HDRHISTOGRAM:
       # Strip percentile from the three-element tuples.
-      histogram = [value_count[-2:] for value_count in group[HDRHISTOGRAM]]
+      histogram = [value_count[-2:] for value_count in group.data]
       percentiles = _PercentilesFromHistogram(histogram)
-      for label, value in six.iteritems(percentiles):
+      for label, value in percentiles.items():
         yield sample.Sample(' '.join([group_name, label, 'latency']), value,
                             'ms', meta)
       if include_histogram:
         histogram = []
-        for _, value, bucket_count in group[HDRHISTOGRAM]:
+        for _, value, bucket_count in group.data:
           histogram.append({
               'microsec_latency': int(value * 1000),
               'count': bucket_count
@@ -1034,19 +1070,19 @@ def _CreateSamples(ycsb_result, include_histogram=False, **kwargs):
         yield sample.Sample('{0} latency histogram'.format(group_name), 0, '',
                             hist_meta)
 
-    if group.get(TIMESERIES):
-      for sample_time, average_latency in group[TIMESERIES]:
+    if group.data and group.data_type == TIMESERIES:
+      for sample_time, average_latency in group.data:
         timeseries_meta = meta.copy()
         timeseries_meta['sample_time'] = sample_time
         yield sample.Sample(
             ' '.join([group_name, 'AverageLatency (timeseries)']),
             average_latency, 'ms', timeseries_meta)
       yield sample.Sample('Average Latency Time Series', 0, '', {
-          'latency_time_series': group[TIMESERIES]
+          'latency_time_series': group.data
       })
 
 
-class YCSBExecutor(object):
+class YCSBExecutor:
   """Load data and run benchmarks using YCSB.
 
   See core/src/main/java/com/yahoo/ycsb/workloads/CoreWorkload.java for
@@ -1117,7 +1153,7 @@ class YCSBExecutor(object):
     for param_file in list(self.parameter_files) + list(parameter_files or []):
       command.extend(('-P', param_file))
 
-    for parameter, value in six.iteritems(parameters):
+    for parameter, value in parameters.items():
       command.extend(('-p', '{0}={1}'.format(parameter, value)))
 
     return 'cd %s; %s' % (YCSB_DIR, ' '.join(command))
@@ -1473,7 +1509,10 @@ class YCSBExecutor(object):
 
     return all_results
 
-  def CombineHdrHistogramLogFiles(self, hdr_files_dir, vms):
+  def CombineHdrHistogramLogFiles(self,
+                                  hdr_files_dir: str,
+                                  vms: Iterable[virtual_machine.VirtualMachine]
+                                  ) -> dict[str, str]:
     """Combine multiple hdr histograms by group type.
 
     Combine multiple hdr histograms in hdr log files format into 1 human
@@ -1492,6 +1531,7 @@ class YCSBExecutor(object):
     Returns:
       dict of hdrhistograms keyed by group type
     """
+    vms = list(vms)
     hdrhistograms = {}
     for grouptype in HDRHISTOGRAM_GROUPS:
       worker_vm = vms[0]

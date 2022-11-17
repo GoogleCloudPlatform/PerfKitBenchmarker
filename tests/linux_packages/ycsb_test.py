@@ -13,7 +13,6 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.packages.ycsb."""
 
-
 import copy
 import logging
 import os
@@ -26,8 +25,6 @@ import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import ycsb
 from tests import pkb_common_test_case
-import six
-from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -51,17 +48,18 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.results = ycsb.ParseResults(self.contents, 'histogram')
 
   def testCommandLineSet(self):
-    self.assertEqual('Command line: -db com.yahoo.ycsb.BasicDB '
-                     '-P workloads/workloada -t', self.results['command_line'])
+    self.assertEqual(
+        'Command line: -db com.yahoo.ycsb.BasicDB '
+        '-P workloads/workloada -t', self.results.command_line)
 
   def testClientSet(self):
-    self.assertEqual('YCSB Client 0.1', self.results['client'])
+    self.assertEqual('YCSB Client 0.1', self.results.client)
 
   def testUpdateStatisticsParsed(self):
-    self.assertDictEqual(
-        {
-            'group': 'update',
-            'statistics': {
+    self.assertEqual(
+        ycsb._OpResult(
+            group='update',
+            statistics={
                 'Operations': 531,
                 'Return=0': 531,
                 'AverageLatency(ms)': .0659774011299435,
@@ -70,15 +68,15 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
                 '95thPercentileLatency(ms)': 0,
                 '99thPercentileLatency(ms)': 0
             },
-            'histogram': [(0, 530), (19, 1)],
-        },
-        dict(self.results['groups']['update']))
+            data_type=ycsb.HISTOGRAM,
+            data=[(0, 530), (19, 1)]),
+        self.results.groups['update'])
 
   def testReadStatisticsParsed(self):
-    self.assertDictEqual(
-        {
-            'group': 'read',
-            'statistics': {
+    self.assertEqual(
+        ycsb._OpResult(
+            group='read',
+            statistics={
                 'Operations': 469,
                 'Return=0': 469,
                 'AverageLatency(ms)': 0.03847761194029851,
@@ -87,21 +85,21 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
                 '95thPercentileLatency(ms)': 0,
                 '99thPercentileLatency(ms)': 0
             },
-            'histogram': [(0, 469)],
-        },
-        dict(self.results['groups']['read']))
+            data_type=ycsb.HISTOGRAM,
+            data=[(0, 469)]),
+        self.results.groups['read'])
 
   def testOverallStatisticsParsed(self):
-    self.assertDictEqual(
-        {
-            'statistics': {
+    self.assertEqual(
+        ycsb._OpResult(
+            group='overall',
+            statistics={
                 'RunTime(ms)': 80.0,
                 'Throughput(ops/sec)': 12500.0
             },
-            'group': 'overall',
-            'histogram': []
-        },
-        self.results['groups']['overall'])
+            data_type='histogram',
+            data=[]),
+        self.results.groups['overall'])
 
 
 class DetailedResultParserTestCase(unittest.TestCase):
@@ -112,20 +110,20 @@ class DetailedResultParserTestCase(unittest.TestCase):
     self.results = ycsb.ParseResults(self.contents, 'histogram')
 
   def testPercentilesFromHistogram_read(self):
-    hist = self.results['groups']['read']['histogram']
+    hist = self.results.groups['read'].data
     percentiles = ycsb._PercentilesFromHistogram(hist)
     self.assertEqual(1, percentiles['p50'])
     self.assertEqual(7, percentiles['p99'])
 
   def testPercentilesFromHistogram_update(self):
-    hist = self.results['groups']['update']['histogram']
+    hist = self.results.groups['update'].data
     percentiles = ycsb._PercentilesFromHistogram(hist)
     self.assertEqual(1, percentiles['p50'])
     self.assertEqual(7, percentiles['p99'])
 
 
-class ThroughputTimeSeriesParserTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+class ThroughputTimeSeriesParserTestCase(pkb_common_test_case.PkbCommonTestCase
+                                        ):
 
   def setUp(self):
     super().setUp()
@@ -142,16 +140,17 @@ class ThroughputTimeSeriesParserTestCase(
         50: 2487.2,
         60: 2513.2
     }
-    self.assertEqual(results['throughput_time_series'], expected)
+    self.assertEqual(results.throughput_time_series, expected)
 
   @flagsaver.flagsaver(ycsb_throughput_time_series=True)
   def testCombinedThroughputTimeSeriesIsCorrect(self):
     results_1 = _parse_and_return_time_series('ycsb-time-series.dat')
     results_2 = _parse_and_return_time_series('ycsb-time-series-2.dat')
 
-    combined = ycsb._CombineResults(result_list=[results_1, results_2],
-                                    measurement_type=ycsb.TIMESERIES,
-                                    combined_hdr={})
+    combined = ycsb._CombineResults(
+        result_list=[results_1, results_2],
+        measurement_type=ycsb.TIMESERIES,
+        combined_hdr={})
 
     expected = {
         10: 4187.5,
@@ -161,7 +160,7 @@ class ThroughputTimeSeriesParserTestCase(
         50: 4976.5,
         60: 5023.2,
     }
-    self.assertEqual(combined['throughput_time_series'], expected)
+    self.assertEqual(combined.throughput_time_series, expected)
 
 
 class BadResultParserTestCase(unittest.TestCase):
@@ -240,62 +239,65 @@ class ParseWorkloadTestCase(unittest.TestCase):
 class CombineResultsTestCase(unittest.TestCase):
 
   def testGroupMissing(self):
-    r1 = {
-        'client': '',
-        'command_line': '',
-        'groups': {
-            'read': {
-                'group': 'read',
-                'statistics': {'Operations': 100,
-                               'Return=0': 100},
-                'histogram': []
-            }
-        }
-    }
-    r2 = {
-        'client': '',
-        'command_line': '',
-        'groups': {
-            'read': {
-                'group': 'read',
-                'statistics': {'Operations': 96, 'Return=0': 94,
-                               'Return=-1': 2},
-                'histogram': []
-            },
-            'update': {
-                'group': 'update',
-                'statistics': {'Operations': 100,
-                               'AverageLatency(ms)': 25},
-                'histogram': []
-            }
-        }
-    }
+    r1 = ycsb.YcsbResult(
+        groups={
+            'read': ycsb._OpResult(
+                group='read',
+                statistics={
+                    'Operations': 100,
+                    'Return=0': 100
+                },
+                data_type=ycsb.HISTOGRAM,
+            )
+        })
+    r2 = ycsb.YcsbResult(
+        groups={
+            'read': ycsb._OpResult(
+                group='read',
+                statistics={
+                    'Operations': 96,
+                    'Return=0': 94,
+                    'Return=-1': 2
+                },
+                data_type=ycsb.HISTOGRAM,
+            ),
+            'update': ycsb._OpResult(
+                group='update',
+                statistics={
+                    'Operations': 100,
+                    'AverageLatency(ms)': 25
+                },
+                data_type=ycsb.HISTOGRAM,
+            )
+        })
     combined = ycsb._CombineResults([r1, r2], 'histogram', {})
-    six.assertCountEqual(self, ['read', 'update'], combined['groups'])
-    six.assertCountEqual(self, ['Operations', 'Return=0', 'Return=-1'],
-                         combined['groups']['read']['statistics'])
-    read_stats = combined['groups']['read']['statistics']
-    self.assertEqual({'Operations': 196, 'Return=0': 194, 'Return=-1': 2},
-                     read_stats)
+    self.assertCountEqual(['read', 'update'], combined.groups)
+    self.assertCountEqual(['Operations', 'Return=0', 'Return=-1'],
+                          combined.groups['read'].statistics)
+    read_stats = combined.groups['read'].statistics
+    self.assertEqual({
+        'Operations': 196,
+        'Return=0': 194,
+        'Return=-1': 2
+    }, read_stats)
 
   def testDropUnaggregatedFromSingleResult(self):
-    r = {
-        'client': '',
-        'command_line': '',
-        'groups': {
-            'read': {
-                'group': 'read',
-                'statistics': {'AverageLatency(ms)': 21},
-                'histogram': []
-            }
-        }
-    }
+    r = ycsb.YcsbResult(
+        client='',
+        command_line='',
+        groups={
+            'read':
+                ycsb._OpResult(
+                    group='read',
+                    statistics={'AverageLatency(ms)': 21},
+                    data_type=ycsb.HISTOGRAM)
+        })
 
     r_copy = copy.deepcopy(r)
     self.assertEqual(r, r_copy)
     combined = ycsb._CombineResults([r], 'histogram', {})
     self.assertEqual(r, r_copy)
-    r['groups']['read']['statistics'] = {}
+    r.groups['read'].statistics = {}
     self.assertEqual(r, combined)
 
 
