@@ -47,9 +47,9 @@ def wait_for_maintenance(callback):
             'wait_for_change': True
         },
         headers=METADATA_HEADERS)
-    # During maintenance the service can return a 503, so these should
-    # be retried.
-    if r.status_code == 503:
+    # During maintenance the service can return a 503 or 104 (b/259443649),
+    # so these should be retried.
+    if r.status_code == 503 or r.status_code == 104:
       time.sleep(1)
       continue
     r.raise_for_status()
