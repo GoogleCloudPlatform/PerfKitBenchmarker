@@ -248,6 +248,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     basic_data['dpb_dataflow_runner'] = FLAGS.dpb_dataflow_runner
     basic_data['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
     basic_data['dpb_job_id'] = self.job_id
+    basic_data['dpb_dataflow_enable_prime'] = FLAGS.dpb_dataflow_enable_prime
     return basic_data
 
   def GetJobStatus(self):
