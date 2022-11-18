@@ -69,7 +69,6 @@ _INSUFFICIENT_HOST_CAPACITY = ('does not have enough resources available '
                                'to fulfill the request.')
 _FAILED_TO_START_DUE_TO_PREEMPTION = (
     'Instance failed to start due to preemption.')
-_UNSUPPORTED_RESOURCE = 'Could not fetch resource'
 _GCE_VM_CREATE_TIMEOUT = 1200
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
 _SHUTDOWN_SCRIPT = 'su "{user}" -c "echo | gsutil cp - {preempt_marker}"'
@@ -740,13 +739,17 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.spot_early_termination = True
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(
             'Interrupted before VM started')
-      if _UNSUPPORTED_RESOURCE in stderr:
-        if (re.search(r"subnetworks/\S+' is not ready", stderr) and
-            gcp_flags.RETRY_GCE_SUBNETWORK_NOT_READY.value):
-          # Commonly occurs when simultaneously creating GKE clusters
-          raise errors.Resource.RetryableCreationError(
-              f'subnet is currently being updated:\n{stderr}')
+      if (re.search(r"subnetworks/\S+' is not ready", stderr) and
+          gcp_flags.RETRY_GCE_SUBNETWORK_NOT_READY.value):
+        # Commonly occurs when simultaneously creating GKE clusters
+        raise errors.Resource.RetryableCreationError(
+            f'subnet is currently being updated:\n{stderr}')
+      if "Invalid value for field 'resource.machineType'" in stderr:
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
+      if re.search(r"The resource '.*' was not found", stderr):
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
+      if 'Internal error.' in stderr:
+        raise errors.Resource.CreationInternalError(stderr)
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (stderr, retcode))
 

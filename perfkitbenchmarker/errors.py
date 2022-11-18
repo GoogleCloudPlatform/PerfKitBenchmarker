@@ -201,6 +201,14 @@ class Resource(object):
     """An error on creation which is not retryable."""
     pass
 
+  class CreationInternalError(Error):
+    """An error on creation internal to the resource (cloud).
+
+    These errors should not be retried, but instead cleanly retry creating the
+    resource (probably by rerunning the benchmark).
+    """
+    pass
+
   class CleanupError(Error):
     pass
 
