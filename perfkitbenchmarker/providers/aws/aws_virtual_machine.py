@@ -247,9 +247,11 @@ def GetBlockDeviceMap(vm):
         ebs_block['VolumeType'] = disk_spec.disk_type
         ebs_block['VolumeSize'] = disk_spec.disk_size
         ebs_block['DeleteOnTermination'] = True
-        if disk_spec.iops:
+        if disk_spec.iops and disk_spec.disk_type in [
+            aws_disk.IO1, aws_disk.IO2, aws_disk.GP3
+        ]:
           ebs_block['Iops'] = disk_spec.iops
-        if disk_spec.throughput:
+        if disk_spec.throughput and disk_spec.disk_type in [aws_disk.GP3]:
           ebs_block['Throughput'] = disk_spec.throughput
         mapping['Ebs'] = ebs_block
       mappings.append(mapping)
