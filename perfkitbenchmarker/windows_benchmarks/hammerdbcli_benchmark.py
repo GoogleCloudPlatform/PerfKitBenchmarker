@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Benchmarking SQLServer with the Hammerdb benchmark on IAAS VMs.
+"""Benchmarking SQLServer with the Hammerdb benchmark.
 
-This benchmark uses Windows as the OS for both the MySQL Server and the HammerDB
-client(s). It benchmarks IAAS VMs and not managed services.
+This benchmark uses Windows as the OS for both the database server and the
+HammerDB client(s).
 """
 
 from absl import flags
@@ -28,10 +28,10 @@ from perfkitbenchmarker.windows_packages import hammerdb
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = 'iaas_sqlserver_hammerdb'
+BENCHMARK_NAME = 'hammerdbcli'
 BENCHMARK_CONFIG = """
-iaas_sqlserver_hammerdb:
-  description: Runs hammerdb against iaas sqlserver.
+hammerdbcli:
+  description: Runs hammerdb against specified databases.
   relational_db:
     engine: sqlserver
     db_spec:
