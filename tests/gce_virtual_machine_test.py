@@ -728,6 +728,15 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           'expected_error': errors.Benchmarks.UnsupportedConfigError
       }, {
           'testcase_name':
+              'unsupported_cpu_platform_type',
+          'fake_stderr':
+              ('ERROR: (gcloud.compute.instances.create) Could not fetch '
+               'resource:\n - '
+               "CPU platform type with name 'icelake' does not exist in zone "
+               "'europe-west8-a'."),
+          'expected_error': errors.Benchmarks.UnsupportedConfigError
+      }, {
+          'testcase_name':
               'unsupported_resource',
           'fake_stderr':
               ('ERROR: (gcloud.compute.instances.create) Could not fetch '

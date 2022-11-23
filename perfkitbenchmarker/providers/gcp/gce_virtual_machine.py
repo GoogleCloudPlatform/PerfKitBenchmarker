@@ -746,10 +746,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             f'subnet is currently being updated:\n{stderr}')
       if "Invalid value for field 'resource.machineType'" in stderr:
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
-      if re.search(r"The resource '.*' was not found", stderr):
+      if re.search("The resource '.*' was not found", stderr):
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if 'Internal error.' in stderr:
         raise errors.Resource.CreationInternalError(stderr)
+      if re.search("CPU platform type with name '.*' does not exist in zone",
+                   stderr):
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (stderr, retcode))
 
