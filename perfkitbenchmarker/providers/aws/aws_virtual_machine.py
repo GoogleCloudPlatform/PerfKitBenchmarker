@@ -1534,6 +1534,14 @@ class AmazonLinux2BasedAwsVirtualMachine(
   IMAGE_OWNER = AMAZON_LINUX_IMAGE_PROJECT
 
 
+class AmazonNeuronBasedAwsVirtualMachine(AwsVirtualMachine,
+                                         linux_virtual_machine.AmazonNeuronMixin
+                                        ):
+  """Class with configuration for AWS Amazon Neuron virtual machines."""
+  IMAGE_NAME_FILTER = 'amzn2-ami-kernel-*-hvm-*'
+  IMAGE_OWNER = AMAZON_LINUX_IMAGE_PROJECT
+
+
 class Rhel7BasedAwsVirtualMachine(AwsVirtualMachine,
                                   linux_virtual_machine.Rhel7Mixin):
   """Class with configuration for AWS RHEL 7 virtual machines."""

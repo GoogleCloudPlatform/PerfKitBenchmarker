@@ -1,0 +1,88 @@
+Some weights of BertForPreTraining were not initialized from the model checkpoint at bert-large-uncased and are newly initialized: ['cls.predictions.decoder.bias']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Some weights of BertForPreTraining were not initialized from the model checkpoint at bert-large-uncased and are newly initialized: ['cls.predictions.decoder.bias']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+--------TRAINING CONFIG----------
+Namespace(batch_size=2, data_dir='/scratch/examples_datasets/bert_pretrain_wikicorpus_tokenized_hdf5_seqlen512', debug=False, enable_pt_autocast=False, grad_accum_usteps=512, local_rank=0, lr=0.00028, max_pred_len=80, max_steps=1563, metrics_file='results.json', minimal_ckpt=False, num_ckpts_to_keep=1, output_dir='aws-neuron-samples/torch-neuronx/training/dp_bert_hf_pretrain/output', phase1_end_step=28125, phase2=True, print_grad_norm=False, resume_ckpt=True, resume_ckpt_path=None, resume_step=-1, seed=12349, seq_len=512, shards_per_ckpt=1, steps_this_run=1563, warmup_steps=781)
+--------MODEL CONFIG----------
+BertConfig {
+  "_name_or_path": "bert-large-uncased",
+  "architectures": [
+    "BertForMaskedLM"
+  ],
+  "attention_probs_dropout_prob": 0.1,
+  "classifier_dropout": null,
+  "gradient_checkpointing": false,
+  "hidden_act": "gelu",
+  "hidden_dropout_prob": 0.1,
+  "hidden_size": 1024,
+  "initializer_range": 0.02,
+  "intermediate_size": 4096,
+  "layer_norm_eps": 1e-12,
+  "max_position_embeddings": 512,
+  "model_type": "bert",
+  "num_attention_heads": 16,
+  "num_hidden_layers": 24,
+  "pad_token_id": 0,
+  "position_embedding_type": "absolute",
+  "transformers_version": "4.15.0",
+  "type_vocab_size": 2,
+  "use_cache": true,
+  "vocab_size": 30522
+}
+
+---------------------------------
+Writing data to the provided results file: results.json
+Updating with parameters data: {'Model': 'bert-large-uncased', 'Model configuration': 'BertConfig {\n  "_name_or_path": "bert-large-uncased",\n  "architectures": [\n    "BertForMaskedLM"\n  ],\n  "attention_probs_dropout_prob": 0.1,\n  "classifier_dropout": null,\n  "gradient_checkpointing": false,\n  "hidden_act": "gelu",\n  "hidden_dropout_prob": 0.1,\n  "hidden_size": 1024,\n  "initializer_range": 0.02,\n  "intermediate_size": 4096,\n  "layer_norm_eps": 1e-12,\n  "max_position_embeddings": 512,\n  "model_type": "bert",\n  "num_attention_heads": 16,\n  "num_hidden_layers": 24,\n  "pad_token_id": 0,\n  "position_embedding_type": "absolute",\n  "transformers_version": "4.15.0",\n  "type_vocab_size": 2,\n  "use_cache": true,\n  "vocab_size": 30522\n}\n', 'World size': 2, 'Data parallel degree': 2, 'Batch size': 2, 'Total steps': 1563, 'Seed': 12349, 'Optimizer': 'AdamW (\nParameter Group 0\n    betas: (0.9, 0.999)\n    correct_bias: True\n    eps: 1e-06\n    lr: 0.00028\n    weight_decay: 0.01\n\nParameter Group 1\n    betas: (0.9, 0.999)\n    correct_bias: True\n    eps: 1e-06\n    lr: 0.00028\n    weight_decay: 0.0\n)', 'Data type': 'torch.bfloat16', 'Gradient accumulation microsteps': 512, 'Warmup steps': 781, 'Shards per checkpoint': 1, 'Dataset': 'bert_pretrain_wikicorpus_tokenized_hdf5_seqlen512', 'Environment variables': {'XLA_USE_BF16': '1', 'NEURON_RT_ROOT_COMM_ID': 'localhost:39443', 'NEURON_RT_STOCHASTIC_ROUNDING_SEED': '0', 'NEURON_RT_STOCHASTIC_ROUNDING_EN': '1', 'XLA_FLAGS': ' --xla_cpu_enable_fast_math=false', 'NEURON_CC_FLAGS': '--model-type=transformer'}}
+Worker 0 resuming from checkpoint aws-neuron-samples/torch-neuronx/training/dp_bert_hf_pretrain/output/ckpt_28125.pt at step 28125
+Worker 1 resuming from checkpoint aws-neuron-samples/torch-neuronx/training/dp_bert_hf_pretrain/output/ckpt_28125.pt at step 28125
+Rank 1 working on shard /scratch/examples_datasets/bert_pretrain_wikicorpus_tokenized_hdf5_seqlen512/wikicorpus_en_training_436.hdf5
+2022-11-14 21:08:43.000306: INFO ||NCC_WRAPPER||: Using a cached neff at /var/tmp/neuron-compile-cache/USER_neuroncc-2.2.0.73+0af5a171c/MODULE_6222073402747976441/MODULE_SyncTensorsGraph.403_6222073402747976441/04e6735c-9b9f-4170-b5e8-23514af5f7e0/MODULE_SyncTensorsGraph.403_6222073402747976441.neff. Exiting with a successfully compiled graph
+Writing data to the provided results file: results.json
+Updating with parameters data: {'Sequence length': 512}
+Epoch 0 file index 1 begin Mon Nov 14 21:08:44 2022
+Rank 0 working on shard /scratch/examples_datasets/bert_pretrain_wikicorpus_tokenized_hdf5_seqlen512/wikicorpus_en_training_781.hdf5
+2022-11-14 21:08:44.000334: INFO ||NCC_WRAPPER||: No candidate found under /var/tmp/neuron-compile-cache/USER_neuroncc-2.2.0.73+0af5a171c/MODULE_16329081601280801880.
+2022-11-14 21:08:44.000337: INFO ||NCC_WRAPPER||: Cache dir for the neff: /var/tmp/neuron-compile-cache/USER_neuroncc-2.2.0.73+0af5a171c/MODULE_16329081601280801880/MODULE_1_SyncTensorsGraph.22247_16329081601280801880_ip-10-0-0-24.us-west-2.compute.internal-317eff4e-3998-5ed74a5060bcd/a2f8ca00-4bdf-49cb-a603-b774a2ba9667
+..........................
+Compiler status PASS
+2022-11-14 21:17:09.000139: INFO ||NCC_WRAPPER||: Exiting with a successfully compiled graph
+2022-11-14 21:17:18.000208: INFO ||NCC_WRAPPER||: No candidate found under /var/tmp/neuron-compile-cache/USER_neuroncc-2.2.0.73+0af5a171c/MODULE_7454158983525454842.
+2022-11-14 21:17:18.000211: INFO ||NCC_WRAPPER||: Cache dir for the neff: /var/tmp/neuron-compile-cache/USER_neuroncc-2.2.0.73+0af5a171c/MODULE_7454158983525454842/MODULE_2_SyncTensorsGraph.25431_7454158983525454842_ip-10-0-0-24.us-west-2.compute.internal-890d27d4-3998-5ed74c3a6b294/c8e69a82-c177-45e5-af64-c1f9ef5b3956
+............................
+Compiler status PASS
+2022-11-14 21:26:35.000144: INFO ||NCC_WRAPPER||: Exiting with a successfully compiled graph
+LOG Mon Nov 14 21:27:46 2022 - (0, 1) step_loss : 4.8438 learning_rate : 3.59e-07 throughput : 1.78
+2022-11-14 21:27:47.000319: INFO ||NCC_WRAPPER||: No candidate found under /var/tmp/neuron-compile-cache/USER_neuroncc-2.2.0.73+0af5a171c/MODULE_12557846872685654848.
+2022-11-14 21:27:47.000323: INFO ||NCC_WRAPPER||: Cache dir for the neff: /var/tmp/neuron-compile-cache/USER_neuroncc-2.2.0.73+0af5a171c/MODULE_12557846872685654848/MODULE_3_SyncTensorsGraph.24373_12557846872685654848_ip-10-0-0-24.us-west-2.compute.internal-4718168f-3998-5ed74e925c1f8/abf20df1-60e1-4e90-8dac-bf04dcb676b8
+......
+Compiler status PASS
+2022-11-14 21:29:44.000872: INFO ||NCC_WRAPPER||: Exiting with a successfully compiled graph
+LOG Mon Nov 14 21:30:49 2022 - (0, 2) step_loss : 4.6562 learning_rate : 7.17e-07 throughput : 3.06
+2022-11-14 21:30:50.000811: INFO ||NCC_WRAPPER||: No candidate found under /var/tmp/neuron-compile-cache/USER_neuroncc-2.2.0.73+0af5a171c/MODULE_14003446888941050328.
+2022-11-14 21:30:50.000814: INFO ||NCC_WRAPPER||: Cache dir for the neff: /var/tmp/neuron-compile-cache/USER_neuroncc-2.2.0.73+0af5a171c/MODULE_14003446888941050328/MODULE_4_SyncTensorsGraph.20643_14003446888941050328_ip-10-0-0-24.us-west-2.compute.internal-c53b718d-3998-5ed74f415896e/fc7e1e31-375d-40a5-b613-ca57aeddd544
+..............
+Compiler status PASS
+2022-11-14 21:35:29.000555: INFO ||NCC_WRAPPER||: Exiting with a successfully compiled graph
+LOG Mon Nov 14 21:36:35 2022 - (0, 3) step_loss : 4.8125 learning_rate : 1.08e-06 throughput : 3.65
+LOG Mon Nov 14 21:37:37 2022 - (0, 4) step_loss : 4.3125 learning_rate : 1.43e-06 throughput : 4.70
+LOG Mon Nov 14 21:38:40 2022 - (0, 5) step_loss : 4.7500 learning_rate : 1.79e-06 throughput : 5.67
+LOG Mon Nov 14 21:39:42 2022 - (0, 6) step_loss : 5.0000 learning_rate : 2.15e-06 throughput : 6.57
+LOG Mon Nov 14 21:40:44 2022 - (0, 7) step_loss : 4.6250 learning_rate : 2.51e-06 throughput : 7.42
+LOG Mon Nov 14 21:41:47 2022 - (0, 8) step_loss : 4.5312 learning_rate : 2.87e-06 throughput : 8.22
+LOG Mon Nov 14 21:42:49 2022 - (0, 9) step_loss : 4.3125 learning_rate : 3.23e-06 throughput : 8.96
+LOG Mon Nov 14 21:43:51 2022 - (0, 10) step_loss : 4.3750 learning_rate : 3.59e-06 throughput : 9.67
+LOG Mon Nov 14 21:44:53 2022 - (0, 11) step_loss : 4.3438 learning_rate : 3.94e-06 throughput : 19.93
+LOG Mon Nov 14 21:45:56 2022 - (0, 12) step_loss : 4.4688 learning_rate : 4.30e-06 throughput : 22.59
+LOG Mon Nov 14 21:46:58 2022 - (0, 13) step_loss : 4.5000 learning_rate : 4.66e-06 throughput : 32.88
+LOG Mon Nov 14 21:48:01 2022 - (0, 14) step_loss : 4.0000 learning_rate : 5.02e-06 throughput : 32.86
+LOG Mon Nov 14 21:49:03 2022 - (0, 15) step_loss : 4.2812 learning_rate : 5.38e-06 throughput : 32.86
+LOG Mon Nov 14 21:50:06 2022 - (0, 16) step_loss : 4.4062 learning_rate : 5.74e-06 throughput : 32.84
+LOG Mon Nov 14 21:51:08 2022 - (0, 17) step_loss : 4.2500 learning_rate : 6.09e-06 throughput : 32.84
+LOG Mon Nov 14 21:52:10 2022 - (0, 18) step_loss : 4.3438 learning_rate : 6.45e-06 throughput : 32.83
+LOG Mon Nov 14 21:53:13 2022 - (0, 19) step_loss : 4.0938 learning_rate : 6.81e-06 throughput : 32.82
+LOG Mon Nov 14 21:54:15 2022 - (0, 20) step_loss : 4.2188 learning_rate : 7.17e-06 throughput : 32.83
+LOG Mon Nov 14 21:55:18 2022 - (0, 21) step_loss : 4.3438 learning_rate : 7.53e-06 throughput : 32.81
+LOG Mon Nov 14 21:56:20 2022 - (0, 22) step_loss : 4.0938 learning_rate : 7.89e-06 throughput : 32.81
+LOG Mon Nov 14 21:57:23 2022 - (0, 23) step_loss : 3.9375 learning_rate : 8.25e-06 throughput : 32.81
+LOG Mon Nov 14 21:58:25 2022 - (0, 24) step_loss : 4.1250 learning_rate : 8.60e-06 throughput : 32.80

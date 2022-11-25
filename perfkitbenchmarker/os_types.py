@@ -16,6 +16,7 @@
 from absl import flags
 
 AMAZONLINUX2 = 'amazonlinux2'
+AMAZON_NEURON = 'amazon_neuron'
 CENTOS7 = 'centos7'
 CENTOS8 = 'centos8'  # deprecated
 CENTOS_STREAM8 = 'centos_stream8'
@@ -73,6 +74,7 @@ CONTAINER_OS_TYPES = [
 
 LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     AMAZONLINUX2,
+    AMAZON_NEURON,
     CENTOS7,
     CENTOS8,
     CENTOS_STREAM8,

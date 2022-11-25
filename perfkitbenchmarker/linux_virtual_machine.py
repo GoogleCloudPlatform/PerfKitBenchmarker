@@ -1875,6 +1875,11 @@ class AmazonLinux2Mixin(BaseRhelMixin):
     self.RemoteCommand('sudo amazon-linux-extras install epel -y')
 
 
+class AmazonNeuronMixin(AmazonLinux2Mixin):
+  """Class holding Neuron VM methods and attributes."""
+  OS_TYPE = os_types.AMAZON_NEURON
+
+
 class Rhel7Mixin(BaseRhelMixin):
   """Class holding RHEL 7 specific VM methods and attributes."""
   OS_TYPE = os_types.RHEL7
