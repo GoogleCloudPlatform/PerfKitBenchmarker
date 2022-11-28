@@ -219,7 +219,7 @@ class PkbSparkService(BaseSparkService):
   def _Delete(self):
     pass
 
-  def SubmitJob(self, jar_file, class_name, job_poll_interval=None,
+  def SubmitJob(self, jar_file, class_name, job_poll_interval=None,  # pytype: disable=signature-mismatch  # overriding-default-value-checks
                 job_stdout_file=None, job_arguments=None,
                 job_type=SPARK_JOB_TYPE):
     """Submit the jar file."""
