@@ -26,7 +26,6 @@ PREPROVISIONED_DATA = {
 }
 PACKAGE_DATA_URL = {GO_TAR: GO_URL}
 GO_VERSION = '1.17.2'
-GO_DIR = '%s/go-%s' % (linux_packages.INSTALL_DIR, GO_VERSION)
 GO_BIN = '/usr/local/go/bin/go'
 
 
@@ -36,7 +35,6 @@ def Install(vm):
                                       linux_packages.INSTALL_DIR)
   vm.RemoteCommand('cd %s && sudo tar -C /usr/local -xzf %s' %
                    (linux_packages.INSTALL_DIR, GO_TAR))
-  vm.RemoteCommand('export PATH=$PATH:/usr/local/go/bin')
 
 
 def Uninstall(_):

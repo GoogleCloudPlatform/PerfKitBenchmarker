@@ -276,8 +276,11 @@
 -   Add some required types to BaseAppServiceSpec.
 -   Uses nic type of GVNIC by default (instead of VIRTIO_NET) on GCE
 -   Rename pkb's --placement_group_style values to reflect their cloud-specific
-    CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN';
-    AWS - 'cluster'/'spread'/'partition';
-    Azure - 'proximity-placement-group'/'availability-set'). Cloud-agnostic
-    value 'closest_supported' will choose the most tightly-coupled placement
-    policy supported.
+    CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN'; AWS -
+    'cluster'/'spread'/'partition'; Azure -
+    'proximity-placement-group'/'availability-set'). Cloud-agnostic value
+    'closest_supported' will choose the most tightly-coupled placement policy
+    supported.
+-   Fix how the CBT client is installed for the cloud_bigtable_ycsb_benchmark
+    (when --google_bigtable_client_version is set) and use the `cbt` CLI instead
+    of the hbase shell to create and delete tables.

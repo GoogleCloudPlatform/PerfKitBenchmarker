@@ -1,8 +1,8 @@
 <!--
     Dummy project to be able to install
-    com.google.cloud.bigtable:bigtable-hbase-1.x-hadoop and all its required
+    com.google.cloud.bigtable:bigtable-hbase-1.x and all its required
     dependencies for cloud_bigtable_ycsb_benchmark. See
-    https://mvnrepository.com/artifact/com.google.cloud.bigtable/bigtable-hbase-1.x-hadoop
+    https://mvnrepository.com/artifact/com.google.cloud.bigtable/bigtable-hbase-1.x
     for the dependencies of the client.
 -->
 <project>
@@ -16,7 +16,7 @@
   <dependencies>
     <dependency>
       <groupId>com.google.cloud.bigtable</groupId>
-      <artifactId>bigtable-hbase-1.x-hadoop</artifactId>
+      <artifactId>bigtable-hbase-1.x</artifactId>
       <version>{{ google_bigtable_client_version }}</version>
 
       <!--Exclude SLF4J as it is included by another dependency.-->

@@ -39,6 +39,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import hbase_ycsb_benchmark as hbase_ycsb
 from perfkitbenchmarker.linux_packages import google_cloud_bigtable_client
+from perfkitbenchmarker.linux_packages import google_cloud_cbt
 from perfkitbenchmarker.linux_packages import hbase
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
@@ -236,9 +237,9 @@ def _InstallClientLegacy(vm: virtual_machine.VirtualMachine):
 
 
 def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
-  """Install YCSB and HBase on 'vm'."""
-  vm.Install('hbase')
+  """Install YCSB and CBT HBase client on 'vm'."""
   vm.Install('ycsb')
+  vm.Install('google_cloud_cbt')  # we use the CLI to create and delete tables
 
   if google_cloud_bigtable_client.CLIENT_VERSION.value:
     vm.Install('google_cloud_bigtable_client')
@@ -362,11 +363,23 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   args = [((vm, instance), {}) for vm in vms]
   vm_util.RunThreaded(_Install, args)
 
-  # If the table already exists, it will be an no-op.
-  hbase_ycsb.CreateYCSBTable(vms[0],
-                             table_name=_GetTableName(),
-                             use_snappy=False,
-                             limit_filesize=False)
+  vm = benchmark_spec.vms[0]
+  splits = ','.join([
+      f'user{1000 + i * (9999 - 1000) / hbase_ycsb.TABLE_SPLIT_COUNT}'
+      for i in range(hbase_ycsb.TABLE_SPLIT_COUNT)
+  ])
+  command = [
+      google_cloud_cbt.CBT_BIN,
+      f'-project={FLAGS.project or _GetDefaultProject()}',
+      f'-instance={instance.name}',
+      f'-admin-endpoint={_ADMIN_ENDPOINT.value}:443',
+      'createtable',
+      _GetTableName(),
+      # Settings derived from data/hbase/create-ycsb-table.hbaseshell.j2
+      f'families={COLUMN_FAMILY}:maxversions=1',
+      f'splits={splits}',
+  ]
+  vm.RemoteCommand(' '.join(command), should_log=True, ignore_failure=True)
 
 
 def _GetYcsbExecutor(
@@ -443,9 +456,16 @@ def _CleanupTable(benchmark_spec: bm_spec.BenchmarkSpec):
       required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
-  command = ("""echo 'disable "{0}"; drop "{0}"; exit' | """
-             """{1}/hbase shell""").format(_GetTableName(), hbase.HBASE_BIN)
-  vm.RemoteCommand(command, should_log=True)
+  instance: _Bigtable = benchmark_spec.non_relational_db
+  command = [
+      google_cloud_cbt.CBT_BIN,
+      f'-project={FLAGS.project or _GetDefaultProject()}',
+      f'-instance={instance.name}',
+      f'-admin-endpoint={_ADMIN_ENDPOINT.value}:443',
+      'deletetable',
+      _GetTableName(),
+  ]
+  vm.RemoteCommand(' '.join(command), should_log=True)
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:

@@ -19,7 +19,6 @@ from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_packages import hbase
 from perfkitbenchmarker.linux_packages import maven
 from perfkitbenchmarker.linux_packages import ycsb
 
@@ -46,9 +45,8 @@ def Install(vm):
     raise errors.Setup.InvalidFlagConfigurationError(
         '--google_bigtable_client_version must be set')
 
-  # Ensure YCSB and HBase are set up as that's where we copy the artifacts to.
+  # Ensure YCSB is set up as that's where we copy the artifacts to.
   vm.Install('ycsb')
-  vm.Install('hbase')
   vm.Install('maven')
 
   context = {
@@ -72,11 +70,3 @@ def Install(vm):
       f'-DoutputDirectory={dependency_install_dir}'
   ]
   vm.RemoteCommand(maven.GetRunCommand(' '.join(maven_args)))
-
-  # We also need to copy the client jar to the hbase lib folder so that the
-  # hbase shell works.
-  cbt_hbase_client_jar = posixpath.join(
-      dependency_install_dir,
-      f'bigtable-hbase-1.x-hadoop-{CLIENT_VERSION.value}.jar')
-  hbase_lib_dir = posixpath.join(hbase.HBASE_DIR, 'lib')
-  vm.RemoteCommand(f'cp {cbt_hbase_client_jar} {hbase_lib_dir}')
