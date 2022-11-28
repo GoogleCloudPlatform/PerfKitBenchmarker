@@ -784,7 +784,8 @@ class KubernetesCluster(BaseContainerCluster):
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster."""
     result = super().GetResourceMetadata()
-    result['container_cluster_version'] = self.k8s_version
+    if self.created:
+      result['container_cluster_version'] = self.k8s_version
     return result
 
   def DeployContainer(self, base_name, container_spec):

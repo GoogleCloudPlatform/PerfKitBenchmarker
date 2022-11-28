@@ -225,6 +225,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects(stdout=_KUBECTL_VERSION) as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster.created = True
       metadata = cluster.GetResourceMetadata()
       self.assertEqual(issue_command.call_count, 1)
       self.assertContainsSubset(
@@ -290,6 +291,7 @@ class GoogleKubernetesEngineAutoscalingTestCase(
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects(stdout=_KUBECTL_VERSION) as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster.created = True
       metadata = cluster.GetResourceMetadata()
       self.assertEqual(issue_command.call_count, 1)
       self.assertContainsSubset(
