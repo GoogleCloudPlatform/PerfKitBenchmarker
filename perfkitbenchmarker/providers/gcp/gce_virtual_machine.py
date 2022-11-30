@@ -753,6 +753,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       if re.search("CPU platform type with name '.*' does not exist in zone",
                    stderr):
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
+      if 'The service is currently unavailable' in stderr:
+        raise errors.Benchmarks.KnownIntermittentError(stderr)
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (stderr, retcode))
 

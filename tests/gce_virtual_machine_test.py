@@ -751,6 +751,13 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
                'resource:\n - Internal error. Please try again or contact '
                "Google Support. (Code: '5EB8741503E10.AC27D3.3305BC26')"),
           'expected_error': errors.Resource.CreationInternalError
+      }, {
+          'testcase_name':
+              'service_unavailable',
+          'fake_stderr':
+              ('ERROR: (gcloud.compute.instances.create) Could not fetch'
+               'resource:\n - The service is currently unavailable.'),
+          'expected_error': errors.Benchmarks.KnownIntermittentError
       })
   def testCreateVMErrorCases(self, fake_stderr, expected_error):
     fake_rets = [('stdout', fake_stderr, 1)]
