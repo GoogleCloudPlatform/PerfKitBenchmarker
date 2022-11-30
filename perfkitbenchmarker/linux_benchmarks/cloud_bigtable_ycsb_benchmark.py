@@ -239,6 +239,7 @@ def _InstallClientLegacy(vm: virtual_machine.VirtualMachine):
 def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
   """Install YCSB and CBT HBase client on 'vm'."""
   vm.Install('ycsb')
+  vm.Install('hbase')
   vm.Install('google_cloud_cbt')  # we use the CLI to create and delete tables
 
   if google_cloud_bigtable_client.CLIENT_VERSION.value:
