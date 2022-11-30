@@ -133,7 +133,14 @@ def GetZonesFromMachineType(machine_type: str) -> Set[str]:
       'format': 'value(zone)'
   }
   stdout, _, _ = cmd.Issue()
-  return set(stdout.splitlines()) or GetAllZones()
+  zones_with_machine_type = set(stdout.splitlines())
+  all_usable_zones = GetAllZones()
+  if zones_with_machine_type:
+    # Under some circumstances machine type lists can contain zones that we do
+    # not have permission to use in the given project. Intersect with all usable
+    # zones.
+    return zones_with_machine_type & all_usable_zones
+  return all_usable_zones
 
 
 def GetGeoFromRegion(region: str) -> str:

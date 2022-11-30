@@ -193,6 +193,41 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
     expected_regions = {'us-west1', 'us-west2'}
     self.assertEqual(found_regions, expected_regions)
 
+  @mock.patch.object(vm_util, 'IssueCommand', autospec=True)
+  def testGetZonesFromMachineType(self, mock_issue_command):
+    machine_type_zone_output = inspect.cleandoc("""
+        us-west1-a
+        us-west2-a
+        """)
+    usable_zone_output = inspect.cleandoc("""
+        us-west1-a
+        us-west1-b
+        """)
+    mock_issue_command.side_effect = [
+        (machine_type_zone_output, None, 0),
+        (usable_zone_output, None, 0)]
+
+    found_zones = util.GetZonesFromMachineType('test-machine-type')
+
+    expected_zones = {'us-west1-a'}
+    self.assertEqual(found_zones, expected_zones)
+
+  @mock.patch.object(vm_util, 'IssueCommand', autospec=True)
+  def testGetZonesFromMachineTypeNoneAvailable(self, mock_issue_command):
+    machine_type_zone_output = ''
+    usable_zone_output = inspect.cleandoc("""
+        us-west1-a
+        us-west1-b
+        """)
+    mock_issue_command.side_effect = [
+        (machine_type_zone_output, None, 0),
+        (usable_zone_output, None, 0)]
+
+    found_zones = util.GetZonesFromMachineType('test-machine-type')
+
+    expected_zones = {'us-west1-a', 'us-west1-b'}
+    self.assertEqual(found_zones, expected_zones)
+
   @parameterized.named_parameters(
       ('rate_limit_exceeded',
        'ERROR: (gcloud.compute.instances.create) Could not fetch resource:\n'
