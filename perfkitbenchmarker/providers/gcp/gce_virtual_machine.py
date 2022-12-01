@@ -748,6 +748,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if re.search("The resource '.*' was not found", stderr):
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
+      if 'features are not compatible for creating instance' in stderr:
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if 'Internal error.' in stderr:
         raise errors.Resource.CreationInternalError(stderr)
       if re.search("CPU platform type with name '.*' does not exist in zone",

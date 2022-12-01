@@ -745,6 +745,14 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           'expected_error': errors.Benchmarks.UnsupportedConfigError
       }, {
           'testcase_name':
+              'unsupported_features_not_compatible',
+          'fake_stderr':
+              ('ERROR: (gcloud.compute.instances.create) Could not fetch '
+               'resource:\n - [n1-standard-2, Absence of any accelerator] '
+               'features are not compatible for creating instance.'),
+          'expected_error': errors.Benchmarks.UnsupportedConfigError
+      }, {
+          'testcase_name':
               'internal_error',
           'fake_stderr':
               ('ERROR: (gcloud.compute.instances.create) Could not fetch '
