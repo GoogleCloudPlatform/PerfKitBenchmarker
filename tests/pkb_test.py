@@ -22,6 +22,7 @@ from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
@@ -321,6 +322,24 @@ class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase,
     expected_sample = sample.Sample('meminfo', 0, '', expected_metadata)
     self.assertSampleListsEqualUpToTimestamp([expected_sample], samples)
     vm.RemoteCommand.assert_called_with('cat /proc/meminfo')
+
+  def test_IsException_subclass(self):
+    e = errors.Resource.CreationInternalError('internal error')
+    self.assertTrue(pkb._IsException(e, errors.Resource.CreationInternalError))
+
+  def test_IsException_substring(self):
+
+    def RaiseCreationInternalError(unused):
+      raise errors.Resource.CreationInternalError('internal error')
+
+    with self.assertRaises(errors.VmUtil.ThreadException) as cm:
+      background_tasks.RunThreaded(RaiseCreationInternalError, [None])
+    self.assertTrue(
+        pkb._IsException(cm.exception, errors.Resource.CreationInternalError))
+
+  def test_IsException_false(self):
+    e = errors.Resource.CreationInternalError('internal error')
+    self.assertFalse(pkb._IsException(e, errors.Benchmarks.QuotaFailure))
 
 
 class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):

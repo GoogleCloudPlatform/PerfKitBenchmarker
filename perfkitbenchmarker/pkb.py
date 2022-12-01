@@ -71,7 +71,7 @@ import sys
 import threading
 import time
 import types
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Type
 import uuid
 
 from absl import flags
@@ -1037,6 +1037,30 @@ def _PublishEventSample(spec: bm_spec.BenchmarkSpec,
   collector.PublishSamples()
 
 
+def _IsException(e: Exception, exception_class: Type[Exception]) -> bool:
+  """Checks if the exception is of the class or contains the class name.
+
+  When exceptions happen on on background theads (e.g. CreationInternalError on
+  CreateAndBootVm) they are not propogated as exceptions to the caller, instead
+  they are propagated as text inside a wrapper exception such as
+  errors.VmUtil.ThreadException.
+
+  Args:
+    e: The exception instance to inspect.
+    exception_class: The exception class to check if e is an instance of.
+
+  Returns:
+     true if the exception is of the class or contains the class name.
+  """
+  if isinstance(e, exception_class):
+    return True
+
+  if str(exception_class.__name__) in str(e):
+    return True
+
+  return False
+
+
 def RunBenchmark(spec, collector):
   """Runs a single benchmark and adds the results to the collector.
 
@@ -1116,26 +1140,22 @@ def RunBenchmark(spec, collector):
       except (Exception, KeyboardInterrupt) as e:
         # Log specific type of failure, if known
         # TODO(dlott) Move to exception chaining with Python3 support
-        if (isinstance(e, errors.Benchmarks.InsufficientCapacityCloudFailure)
-            or 'InsufficientCapacityCloudFailure' in str(e)):
+        if _IsException(e, errors.Benchmarks.InsufficientCapacityCloudFailure):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY)
-        elif (isinstance(e, errors.Benchmarks.QuotaFailure)
-              or 'QuotaFailure' in str(e)):
+        elif _IsException(e, errors.Benchmarks.QuotaFailure):
           spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
-        elif (isinstance(e, errors.Benchmarks.KnownIntermittentError) or
-              isinstance(e, errors.Resource.CreationInternalError) or
-              isinstance(e, errors.Resource.ProvisionTimeoutError) or
-              'ProvisionTimeoutError' in str(e)):
+        elif (_IsException(e, errors.Benchmarks.KnownIntermittentError) or
+              _IsException(e, errors.Resource.CreationInternalError) or
+              _IsException(e, errors.Resource.ProvisionTimeoutError)):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT)
-        elif (isinstance(e, errors.Benchmarks.UnsupportedConfigError) or
-              'UnsupportedConfigError' in str(e)):
+        elif _IsException(e, errors.Benchmarks.UnsupportedConfigError):
           spec.failed_substatus = benchmark_status.FailedSubstatus.UNSUPPORTED
-        elif isinstance(e, errors.Resource.RestoreError):
+        elif _IsException(e, errors.Resource.RestoreError):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.RESTORE_FAILED)
-        elif isinstance(e, errors.Resource.FreezeError):
+        elif _IsException(e, errors.Resource.FreezeError):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.FREEZE_FAILED)
         else:
