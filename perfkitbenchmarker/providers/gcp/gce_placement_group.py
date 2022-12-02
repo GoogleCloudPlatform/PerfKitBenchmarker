@@ -96,14 +96,9 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
     self.name = 'perfkit-{}'.format(context.GetThreadBenchmarkSpec().uuid)
     self.style = gce_placement_group_spec.placement_group_style
     # Already checked for compatibility in gce_network.py
-    if (self.style == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED or
-        self.style == placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED or
-        self.style == placement_group.PLACEMENT_GROUP_CLUSTER):
+    if self.style == placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED:
       self.style = COLLOCATED
-    elif (self.style in [placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED,
-                         placement_group.PLACEMENT_GROUP_SPREAD,
-                         AVAILABILITY_DOMAIN]):
-      self.style = AVAILABILITY_DOMAIN
+    elif self.style == AVAILABILITY_DOMAIN:
       self.availability_domain_count = max(FLAGS.gce_availability_domain_count,
                                            2)
     else:

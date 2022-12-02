@@ -27,6 +27,8 @@
 -   Deprecate CentOS Linux 8 as it is EOL on 2021-12-31.
 -   `--zones` and `--extra_zones` deprecated in favor of `--zone`.
 -   Deprecate Aerospike_YCSB benchmark.
+-   Remove pkb's --placement_group_style cloud-agnostic values 'cluster'/
+    'cluster_if_supported'/'spread'/'spread_if_supported'.
 
 ### New features:
 
@@ -276,7 +278,7 @@
 -   Add some required types to BaseAppServiceSpec.
 -   Uses nic type of GVNIC by default (instead of VIRTIO_NET) on GCE
 -   Rename pkb's --placement_group_style values to reflect their cloud-specific
-    CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN'; AWS -
+        CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN'; AWS -
     'cluster'/'spread'/'partition'; Azure -
     'proximity-placement-group'/'availability-set'). Cloud-agnostic value
     'closest_supported' will choose the most tightly-coupled placement policy

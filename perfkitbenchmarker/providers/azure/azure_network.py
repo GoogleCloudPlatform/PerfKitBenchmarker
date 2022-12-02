@@ -535,10 +535,8 @@ class AzureNetwork(network.BaseNetwork):
     no_placement_group = (
         not FLAGS.placement_group_style or
         FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
-    has_optional_pg = FLAGS.placement_group_style in [
-        placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED,
-        placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED,
-        placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED]
+    has_optional_pg = (FLAGS.placement_group_style ==
+                       placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED)
     if no_placement_group:
       self.placement_group = None
     elif has_optional_pg and len(set(FLAGS.zone)) > 1:
@@ -550,15 +548,11 @@ class AzureNetwork(network.BaseNetwork):
     elif len(set(FLAGS.zone)) > 1:
       raise errors.Benchmarks.UnsupportedConfigError(
           'inter-zone/inter-region tests do not support placement groups. '
-          'Use placement group style cluster_if_supported or '
-          'spread_if_supported.')
+          'Use placement group style closest_supported.')
     # With dedicated hosting and/or an availability zone, an availability set
     # cannot be created
-    elif FLAGS.placement_group_style in [
-        placement_group.PLACEMENT_GROUP_SPREAD,
-        placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED,
-        azure_placement_group.AVAILABILITY_SET] and (
-            is_dedicated_host or in_availability_zone):
+    elif (FLAGS.placement_group_style == azure_placement_group.AVAILABILITY_SET
+          and (is_dedicated_host or in_availability_zone)):
       self.placement_group = None
     else:
       placement_group_spec = azure_placement_group.AzurePlacementGroupSpec(

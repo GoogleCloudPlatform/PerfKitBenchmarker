@@ -92,11 +92,8 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
     self.region = util.GetRegionFromZone(self.zone)
     self.strategy = aws_placement_group_spec.placement_group_style
     # Already checked for compatibility in aws_network.py
-    if (self.strategy == placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED or
-        placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED):
+    if self.strategy == placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED:
       self.strategy = CLUSTER
-    if self.strategy == placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED:
-      self.strategy = SPREAD
     self.partition_count = 0
     if self.strategy == PARTITION:
       self.partition_count = FLAGS.aws_partition_count

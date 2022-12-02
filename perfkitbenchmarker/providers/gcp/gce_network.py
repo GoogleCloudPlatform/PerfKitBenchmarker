@@ -825,10 +825,8 @@ class GceNetwork(network.BaseNetwork):
     no_placement_group = (
         not FLAGS.placement_group_style or
         FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
-    has_optional_pg = FLAGS.placement_group_style in [
-        placement_group.PLACEMENT_GROUP_CLUSTER_IF_SUPPORTED,
-        placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED,
-        placement_group.PLACEMENT_GROUP_SPREAD_IF_SUPPORTED]
+    has_optional_pg = (FLAGS.placement_group_style ==
+                       placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED)
     if no_placement_group:
       self.placement_group = None
     elif has_optional_pg and not IsPlacementGroupCompatible(
@@ -846,13 +844,11 @@ class GceNetwork(network.BaseNetwork):
     elif not IsPlacementGroupCompatible(network_spec.machine_type):
       raise errors.Benchmarks.UnsupportedConfigError(
           f'machine type {network_spec.machine_type} does not support '
-          f'placement groups. Use placement group style closest_supported '
-          f'or spread_if_supported.')
+          f'placement groups. Use placement group style none.')
     elif len(set(FLAGS.zone)) > 1:
       raise errors.Benchmarks.UnsupportedConfigError(
           'inter-zone/inter-region tests do not support placement groups. '
-          'Use placement group style closest_supported or '
-          'spread_if_supported.')
+          'Use placement group style closest_supported.')
     else:
       placement_group_spec = gce_placement_group.GcePlacementGroupSpec(
           'GcePlacementGroupSpec',
