@@ -449,6 +449,14 @@ class BaseDpbService(resource.BaseResource):
     """Gets service wrapper scripts to upload alongside benchmark scripts."""
     return []
 
+  def CalculateCost(self) -> Optional[float]:
+    """Returns the cost of last job submitted.
+
+    Returns:
+      A float representing the cost in dollars or None if not implemented.
+    """
+    return None
+
 
 class UnmanagedDpbService(BaseDpbService):
   """Object representing an un-managed dpb service."""

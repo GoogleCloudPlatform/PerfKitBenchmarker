@@ -177,7 +177,7 @@ def Run(benchmark_spec):
   results = []
 
   start_time = datetime.datetime.now()
-  dpb_service_instance.SubmitJob(
+  job_result = dpb_service_instance.SubmitJob(
       jarfile=jarfile,
       classname=classname,
       job_arguments=job_arguments,
@@ -195,20 +195,28 @@ def Run(benchmark_spec):
 
   run_time = (end_time - start_time).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))
+  if job_result is not None:
+    results.append(
+        sample.Sample('reported_run_time', job_result.run_time, 'seconds',
+                      metadata))
+    if job_result.pending_time is not None:
+      results.append(
+          sample.Sample('reported_pending_time', job_result.pending_time,
+                        'seconds', metadata))
 
   # TODO(odiego): Refactor to avoid explicit service type checks.
-  if (dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW and
-      FLAGS.dpb_export_job_stats):
-    avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(
-        start_time, end_time)
-    results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))
-
-    stats = dpb_service_instance.job_stats
-    for name, value in stats.items():
-      results.append(sample.Sample(name, value, 'number', metadata))
+  if FLAGS.dpb_export_job_stats:
+    if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
+      avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(
+          start_time, end_time)
+      results.append(sample.Sample('avg_cpu_util', avg_cpu_util, '%', metadata))
+      stats = dpb_service_instance.job_stats
+      for name, value in stats.items():
+        results.append(sample.Sample(name, value, 'number', metadata))
 
     total_cost = dpb_service_instance.CalculateCost()
-    results.append(sample.Sample('total_cost', total_cost, '$', metadata))
+    if total_cost is not None:
+      results.append(sample.Sample('total_cost', total_cost, '$', metadata))
 
   return results
 

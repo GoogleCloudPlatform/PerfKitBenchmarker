@@ -49,6 +49,16 @@ DATAPROC_FLINK_INIT_SCRIPT = os.path.join('beam', 'flink-init.sh')
 DATAPROC_FLINK_PRESUBMIT_SCRIPT = os.path.join('beam', 'flink-presubmit.sh')
 DATAPROC_FLINK_TRIGGER_SCRIPT = os.path.join('beam', 'flink-trigger.sh')
 
+# Dataproc serverless resources cost factors (showing us-central-1 pricing).
+# See https://cloud.google.com/dataproc-serverless/pricing
+DATAPROC_SERVERLESS_MILLI_DCU_PRICE_PER_SECOND = 0.06 / 1000 / 3600
+DATAPROC_SERVERLESS_SHUFFLE_STORAGE_PRICE_PER_GB_PER_SECOND = 0.04 / 30 / 3600
+
+
+class MetricNotReadyError(Exception):
+  """Used to signal metric is not ready."""
+  pass
+
 
 class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
   """Base class for all Dataproc-based services (cluster or serverless)."""
@@ -418,6 +428,7 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
   def __init__(self, dpb_service_spec):
     super().__init__(dpb_service_spec)
     self._job_counter = 0
+    self.batch_name = f'{self.cluster_id}-{self._job_counter}'
 
   def SubmitJob(self,
                 jarfile=None,
@@ -442,9 +453,9 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
 
     cmd = self.DataprocGcloudCommand(*args)
 
-    batch_name = f'{self.cluster_id}-{self._job_counter}'
+    self.batch_name = f'{self.cluster_id}-{self._job_counter}'
     self._job_counter += 1
-    cmd.flags['batch'] = batch_name
+    cmd.flags['batch'] = self.batch_name
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     job_jars = job_jars or []
@@ -491,7 +502,7 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
       raise dpb_service.JobSubmissionError(stderr)
 
     fetch_batch_cmd = self.DataprocGcloudCommand(
-        'batches', 'describe', batch_name)
+        'batches', 'describe', self.batch_name)
     stdout, stderr, retcode = fetch_batch_cmd.Issue(
         timeout=None, raise_on_failure=False)
     if retcode != 0:
@@ -584,6 +595,36 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
         'dpb_job_properties': basic_data['dpb_job_properties'],
     }
 
+  def CalculateCost(self):
+    fetch_batch_cmd = self.DataprocGcloudCommand('batches', 'describe',
+                                                 self.batch_name)
+    @vm_util.Retry(
+        timeout=120,
+        poll_interval=15,
+        fuzz=0,
+        retryable_exceptions=(MetricNotReadyError,))
+    def FetchBatchResults():
+      stdout, _, _ = fetch_batch_cmd.Issue(
+          timeout=None, raise_on_failure=False)
+      results = json.loads(stdout)
+      # If the approximate usage data is not available, sleep and retry
+      if 'runtimeInfo' not in results or 'approximateUsage' not in results[
+          'runtimeInfo']:
+        raise MetricNotReadyError('Usage metric is not ready')
+      return results
+
+    # Pricing may vary based on regions. Only implemented for default region.
+    if self.region == 'us-central1':
+      results = FetchBatchResults()
+      milli_dcu_seconds = int(results['runtimeInfo']
+                              ['approximateUsage']['milliDcuSeconds'])
+      shuffle_storage_gb_seconds = int(
+          results['runtimeInfo']['approximateUsage']['shuffleStorageGbSeconds'])
+      cost = DATAPROC_SERVERLESS_MILLI_DCU_PRICE_PER_SECOND * milli_dcu_seconds + DATAPROC_SERVERLESS_SHUFFLE_STORAGE_PRICE_PER_GB_PER_SECOND * shuffle_storage_gb_seconds
+      return cost
+    else:
+      return None
+
 
 class GcpDpbDataprocFlink(GcpDpbDataproc):
   """Dataproc with Flink component.
@@ -621,8 +662,10 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
     assert job_type == dpb_service.BaseDpbService.FLINK_JOB_TYPE, (
         'Unsupported job type {}'.format(job_type))
     logging.info('Running presubmit script...')
+    start_time = datetime.datetime.now()
     self.ExecuteOnMaster(data.ResourcePath(DATAPROC_FLINK_PRESUBMIT_SCRIPT),
                          [jarfile])
+    presubmit_done_time = datetime.datetime.now()
     logging.info('Submitting beam jobs with flink component enabled.')
     job_script_args = []
     job_script_args.append('-c {}'.format(classname))
@@ -630,7 +673,11 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
     job_script_args.extend(job_arguments)
     self.ExecuteOnMaster(data.ResourcePath(DATAPROC_FLINK_TRIGGER_SCRIPT),
                          job_script_args)
+    done_time = datetime.datetime.now()
     logging.info('Flink job done.')
+    return dpb_service.JobResult(
+        run_time=(done_time - presubmit_done_time).total_seconds(),
+        pending_time=(presubmit_done_time - start_time).total_seconds())
 
   def ExecuteOnMaster(self, script_path, script_args):
     master_name = self.cluster_id + '-m'
