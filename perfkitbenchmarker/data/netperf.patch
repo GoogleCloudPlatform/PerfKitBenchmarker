@@ -1,3 +1,15 @@
+diff -u -r netperf-netperf-2.7.0/src/nettest_omni.c netperf-netperf-2.7.0-patch/src/nettest_omni.c
+--- netperf-netperf-2.7.0/src/nettest_omni.c    2022-12-03 05:09:26.736666047 +0000
++++ netperf-netperf-2.7.0-patch/src/nettest_omni.c      2022-12-03 05:29:04.883140961 +0000
+@@ -4416,7 +4416,7 @@
+          /* "start over" on a demo interval. we will forget about
+          everything that happened in the demo interval up to the
+          timeout and begin fresh. */
+-         demo_reset(); 
++         //demo_reset(); 
+ #endif /* WANT_DEMO */
+ 
+          continue;
 diff -u -r netperf-2.7.0/src/nettest_omni.c netperf-2.7.0-patch/src/nettest_omni.c
 --- netperf-2.7.0/src/nettest_omni.c      2022-03-15 22:50:10.047785864 +0000
 +++ netperf-2.7.0-patch/src/nettest_omni.c        2022-03-15 23:10:09.067699443 +0000
