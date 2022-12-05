@@ -46,7 +46,7 @@ class ExtractGroupTestCase(unittest.TestCase):
   def testNumberedGroup_Invalid(self):
     regex = r'test ([\da-f]+) (.*)'
     string = 'test 12a3de text'
-    self.assertRaisesRegexp(IndexError, 'No such group 3 in',
+    self.assertRaisesRegexp(IndexError, 'No such group 3 in',  # pytype: disable=wrong-arg-count
                             regex_util.ExtractGroup, regex, string, group=3)
 
   def testNumberedGroup_Valid(self):
