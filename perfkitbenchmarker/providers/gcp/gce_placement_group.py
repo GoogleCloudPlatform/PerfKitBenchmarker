@@ -37,9 +37,9 @@ AVAILABILITY_DOMAIN = 'availability-domain'
 
 flags.DEFINE_integer(
     'gce_availability_domain_count',
-    1,
+    0,
     'Number of fault domains to create for availability-domain placement group',
-    lower_bound=1,
+    lower_bound=0,
     upper_bound=8)
 
 
@@ -98,11 +98,11 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
     # Already checked for compatibility in gce_network.py
     if self.style == placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED:
       self.style = COLLOCATED
-    elif self.style == AVAILABILITY_DOMAIN:
-      self.availability_domain_count = max(FLAGS.gce_availability_domain_count,
-                                           2)
-    else:
+    if FLAGS.gce_availability_domain_count:
       self.availability_domain_count = FLAGS.gce_availability_domain_count
+    else:
+      self.availability_domain_count = self.num_vms
+
     self.metadata.update({
         'placement_group_name': self.name,
         'placement_group_style': self.style
@@ -121,9 +121,11 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
     if self.style == COLLOCATED:
       placement_policy['collocation'] = self.style
       placement_policy['vm-count'] = self.num_vms
-    elif self.availability_domain_count > 1:
+    elif self.style == AVAILABILITY_DOMAIN:
       placement_policy[
           'availability-domain-count'] = self.availability_domain_count
+      self.metadata.update({
+          'availability_domain_count': self.availability_domain_count})
 
     cmd.flags.update(placement_policy)
 
