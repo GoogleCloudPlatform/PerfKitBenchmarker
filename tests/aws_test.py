@@ -324,30 +324,54 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     util.IssueRetryableCommand.side_effect = [(self.response, None)]
     self.assertTrue(self.vm._Exists())
 
-  def testVcpuLimitExceededDuringCreate(self):
-    stderr = (
-        'An error occurred (VcpuLimitExceeded) when calling the '
-        'RunInstances operation: You have requested more vCPU capacity '
-        'than your current vCPU limit of 1145 allows for the instance '
-        'bucket that the specified instance type belongs to. Please '
-        'visit http://aws.amazon.com/contact-us/ec2-request to request '
-        'an adjustment to this limit.'
-    )
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'vpcu_quota_exceeded',
+          'stderr': (
+              'An error occurred (VcpuLimitExceeded) when calling the '
+              'RunInstances operation: You have requested more vCPU capacity '
+              'than your current vCPU limit of 1145 allows for the instance '
+              'bucket that the specified instance type belongs to. Please '
+              'visit http://aws.amazon.com/contact-us/ec2-request to request '
+              'an adjustment to this limit.'
+          ),
+          'expected_error': errors.Benchmarks.QuotaFailure,
+      },
+      {
+          'testcase_name': 'instance_quota_exceed',
+          'stderr': (
+              'An error occurred (InstanceLimitExceeded) when calling the'
+              ' RunInstances operation: You have requested more instances (21)'
+              ' than your current instance limit of 20 allows for the specified'
+              ' instance type. Please visit'
+              ' http://aws.amazon.com/contact-us/ec2-request to request an'
+              ' adjustment to this limit.'
+          ),
+          'expected_error': errors.Benchmarks.QuotaFailure,
+      },
+      {
+          'testcase_name': 'instance_unsupported_config_create',
+          'stderr': (
+              'An error occurred (Unsupported) when calling the RunInstances'
+              ' operation: The requested configuration is currently not'
+              ' supported. Please check the documentation for supported'
+              ' configurations.'
+          ),
+          'expected_error': errors.Benchmarks.UnsupportedConfigError,
+      },
+      {
+          'testcase_name': 'instance_stocked_out_during_create',
+          'stderr': (
+              'An error occurred (InsufficientInstanceCapacity) when '
+              'the RunInstances operation (reached max retries: 4): '
+              'Insufficient capacity.'
+          ),
+          'expected_error': errors.Benchmarks.InsufficientCapacityCloudFailure,
+      },
+  )
+  def testVMCreationError(self, stderr, expected_error):
     vm_util.IssueCommand.side_effect = [(None, stderr, None)]
-    with self.assertRaises(errors.Benchmarks.QuotaFailure) as e:
-      self.vm._Create()
-    self.assertEqual(str(e.exception), stderr)
-
-  def testInstanceQuotaExceededDuringCreate(self):
-    stderr = (
-        'An error occurred (InstanceLimitExceeded) when calling the '
-        'RunInstances operation: You have requested more instances (21) than '
-        'your current instance limit of 20 allows for the specified instance '
-        'type. Please visit http://aws.amazon.com/contact-us/ec2-request to '
-        'request an adjustment to this limit.'
-    )
-    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
-    with self.assertRaises(errors.Benchmarks.QuotaFailure) as e:
+    with self.assertRaises(expected_error) as e:
       self.vm._Create()
     self.assertEqual(str(e.exception), stderr)
 
@@ -370,27 +394,6 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     vm_util.IssueCommand.side_effect = [(None, stderr, None)]
     with self.assertRaises(expected_error) as e:
-      self.vm._Create()
-    self.assertEqual(str(e.exception), stderr)
-
-  def testInstanceUnsupportedConfigCreate(self):
-    stderr = (
-        'An error occurred (Unsupported) when calling the RunInstances '
-        'operation: The requested configuration is currently not supported. '
-        'Please check the documentation for supported configurations.'
-    )
-    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
-    with self.assertRaises(errors.Benchmarks.UnsupportedConfigError) as e:
-      self.vm._Create()
-    self.assertEqual(str(e.exception), stderr)
-
-  def testInstanceStockedOutDuringCreate(self):
-    stderr = ('An error occurred (InsufficientInstanceCapacity) when calling '
-              'the RunInstances operation (reached max retries: 4): '
-              'Insufficient capacity.')
-    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
-    with self.assertRaises(
-        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
       self.vm._Create()
     self.assertEqual(str(e.exception), stderr)
 
