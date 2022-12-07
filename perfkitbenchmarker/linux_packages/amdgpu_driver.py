@@ -55,18 +55,6 @@ def AptInstall(vm: virtual_machine.BaseVirtualMachine) -> None:
   vm.RemoteCommand('sudo nohup Xorg :0 -verbose 2 vt2 '
                    '1> /tmp/stdout.log 2> /tmp/stderr.log &')
 
-  vm.RemoteCommand(
-      'wget -O - https://packages.lunarg.com/lunarg-signing-key-pub.asc | '
-      'sudo apt-key add -')
-  vm.RemoteCommand(
-      'sudo wget -O /etc/apt/sources.list.d/lunarg-vulkan-1.2.131-bionic.list '
-      'https://packages.lunarg.com/vulkan/1.2.131/lunarg-vulkan-1.2.131-bionic.list'
-  )
-  vm.RemoteCommand('sudo apt update')
-  vm.InstallPackages('vulkan-sdk')
-  vm.InstallPackages('vulkan-utils')
-  vm.InstallPackages('vulkan-tools')
-
 
 def YumInstall(vm: virtual_machine.BaseVirtualMachine) -> None:
   del vm  # unused
