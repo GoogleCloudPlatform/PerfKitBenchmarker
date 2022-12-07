@@ -949,6 +949,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise errors.Resource.RetryableCreationError(stderr)
       else:
         raise errors.Benchmarks.QuotaFailure(stderr)
+    if 'InternalError' in stderr:
+      raise errors.Resource.CreationInternalError(stderr)
 
     # When launching more than 1 VM into the same placement group, there is an
     # occasional error that the placement group has already been used in a

@@ -368,6 +368,15 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
           ),
           'expected_error': errors.Benchmarks.InsufficientCapacityCloudFailure,
       },
+      {
+          'testcase_name': 'instance_internal_error_during_create',
+          'stderr': (
+              'An error occurred (InternalError) when calling the RunInstances'
+              ' operation (reached max retries: 4): An internal error has'
+              ' occurred'
+          ),
+          'expected_error': errors.Resource.CreationInternalError,
+      },
   )
   def testVMCreationError(self, stderr, expected_error):
     vm_util.IssueCommand.side_effect = [(None, stderr, None)]
