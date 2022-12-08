@@ -59,21 +59,61 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.mock_flags = p.start()
     self.addCleanup(p.stop)
     self.mock_flags.gcloud_path = _GCLOUD_PATH
+    self.mock_flags.project = None
 
-  def testCommonFlagsWithoutOptionalFlags(self):
-    gce_resource = GceResource(project=None)
-    cmd = util.GcloudCommand(gce_resource, 'compute', 'images', 'list')
+  def testCommonFlags(self):
+    cmd = util.GcloudCommand(None, 'compute', 'images', 'list')
     self.assertEqual(cmd.GetCommand(), [
         'path/gcloud', 'compute', 'images', 'list', '--format', 'json',
         '--quiet'
     ])
 
-  def testCommonFlagsWithOptionalFlags(self):
-    gce_resource = GceResource(project='test-project', zone='test-zone')
-    cmd = util.GcloudCommand(gce_resource, 'compute', 'images', 'list')
+  def testCommonFlagsWithGlobalProject(self):
+    self.mock_flags.project = 'default-project'
+    cmd = util.GcloudCommand(None, 'compute', 'images', 'list')
     self.assertEqual(cmd.GetCommand(), [
         'path/gcloud', 'compute', 'images', 'list', '--format', 'json',
-        '--project', 'test-project', '--quiet', '--zone', 'test-zone'
+        '--project', 'default-project', '--quiet'
+    ])
+
+  def testCommonFlagsWithResource(self):
+    gce_resource = GceResource(project=None)
+    cmd = util.GcloudCommand(
+        gce_resource, 'compute', 'images', 'describe', 'fake-image')
+    self.assertEqual(cmd.GetCommand(), [
+        'path/gcloud', 'compute', 'images', 'describe', 'fake-image',
+        '--format', 'json', '--quiet'
+    ])
+
+  # This case is pathological. If --project is set every GCP resource we create
+  # should have project set.  It should honestly probably raise an error.
+  def testCommonFlagsWithResourceAndProject(self):
+    self.mock_flags.project = 'default-project'
+    gce_resource = GceResource(project=None)
+    cmd = util.GcloudCommand(
+        gce_resource, 'compute', 'images', 'describe', 'fake-image')
+    self.assertEqual(cmd.GetCommand(), [
+        'path/gcloud', 'compute', 'images', 'describe', 'fake-image',
+        '--format', 'json', '--project', 'default-project', '--quiet'
+    ])
+
+  def testCommonFlagsWithResourceWithProject(self):
+    gce_resource = GceResource(project='test-project')
+    cmd = util.GcloudCommand(
+        gce_resource, 'compute', 'images', 'describe', 'fake-image')
+    self.assertEqual(cmd.GetCommand(), [
+        'path/gcloud', 'compute', 'images', 'describe', 'fake-image',
+        '--format', 'json', '--project', 'test-project', '--quiet',
+    ])
+
+  def testCommonFlagsWithResourceWithProjectAndZone(self):
+    gce_resource = GceResource(project='test-project', zone='test-zone')
+    cmd = util.GcloudCommand(
+        gce_resource, 'compute', 'images', 'describe', 'fake-image')
+    self.assertEqual(cmd.GetCommand(), [
+        'path/gcloud', 'compute', 'images', 'describe', 'fake-image',
+        '--format', 'json', '--project', 'test-project',
+        '--quiet', '--zone', 'test-zone'
     ])
 
   def testListValue(self):
@@ -136,17 +176,21 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
     zone = 'us-central1-xyz'
     self.assertEqual(util.GetRegionFromZone(zone), 'us-central1')
 
-  def testGetAllZones(self):
+  @mock.patch.object(vm_util, 'IssueCommand', autospec=True)
+  def testGetAllZones(self, mock_issue_command):
+    self.mock_flags.project = 'default-project'
     test_output = inspect.cleandoc("""
         us-east1-a
         us-west1-b
         """)
-    self.enter_context(_MockIssueCommand(test_output))
+    mock_issue_command.return_value = (test_output, None, 0)
 
     found_zones = util.GetAllZones()
 
     expected_zones = {'us-east1-a', 'us-west1-b'}
     self.assertEqual(found_zones, expected_zones)
+    cmd = mock_issue_command.call_args[0][0]
+    self.assertContainsExactSubsequence(cmd, ['--project', 'default-project'])
 
   def testGetZonesInRegion(self):
     test_output = inspect.cleandoc("""

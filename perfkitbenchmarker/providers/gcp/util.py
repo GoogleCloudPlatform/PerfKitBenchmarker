@@ -97,9 +97,7 @@ def IsRegion(location: str) -> bool:
 def GetAllZones() -> Set[str]:
   """Gets a list of valid zones."""
   cmd = GcloudCommand(None, 'compute', 'zones', 'list')
-  cmd.flags = {
-      'format': 'value(name)',
-  }
+  cmd.flags['format'] = 'value(name)'
   stdout, _, _ = cmd.Issue()
   return set(stdout.splitlines())
 
@@ -107,9 +105,7 @@ def GetAllZones() -> Set[str]:
 def GetAllRegions() -> Set[str]:
   """Gets a list of valid regions."""
   cmd = GcloudCommand(None, 'compute', 'regions', 'list')
-  cmd.flags = {
-      'format': 'value(name)',
-  }
+  cmd.flags['format'] = 'value(name)'
   stdout, _, _ = cmd.Issue()
   return set(stdout.splitlines())
 
@@ -117,10 +113,10 @@ def GetAllRegions() -> Set[str]:
 def GetZonesInRegion(region) -> Set[str]:
   """Gets a list of zones for the given region."""
   cmd = GcloudCommand(None, 'compute', 'zones', 'list')
-  cmd.flags = {
+  cmd.flags.update({
       'filter': f"name~'{region}'",
       'format': 'value(name)',
-  }
+  })
   stdout, _, _ = cmd.Issue()
   return set(stdout.splitlines())
 
@@ -128,10 +124,10 @@ def GetZonesInRegion(region) -> Set[str]:
 def GetZonesFromMachineType(machine_type: str) -> Set[str]:
   """Gets a list of zones for the given machine type."""
   cmd = GcloudCommand(None, 'compute', 'machine-types', 'list')
-  cmd.flags = {
+  cmd.flags.update({
       'filter': f"name~'{machine_type}'",
-      'format': 'value(zone)'
-  }
+      'format': 'value(zone)',
+  })
   stdout, _, _ = cmd.Issue()
   zones_with_machine_type = set(stdout.splitlines())
   all_usable_zones = GetAllZones()
@@ -377,6 +373,9 @@ class GcloudCommand(object):
         self.flags['project'] = resource.project
       if hasattr(resource, 'zone') and resource.zone:
         self.flags['zone'] = resource.zone
+    if FLAGS.project:
+      # If resource did not set the flag use the global default.
+      self.flags.setdefault('project', FLAGS.project)
     self.additional_flags.extend(FLAGS.additional_gcloud_flags or ())
 
 
