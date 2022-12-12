@@ -67,13 +67,14 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   path = f'PATH={posixpath.join(neuron.ENV.value, "bin")}:$PATH'
   bm_spec.path = path
   vm.RemoteCommand(
-      f'{path} python3 -m pip install -r {posixpath.join(run_dir, "requirements.txt")}'
+      f'{path} python3 -m pip install -r'
+      f' {posixpath.join(run_dir, "requirements.txt")}'
   )
 
   data_dir = '/scratch/examples_datasets'
   dataset = 'bert_pretrain_wikicorpus_tokenized_hdf5_seqlen512'
   data_file = f'{dataset}.tar'
-  vm.DownloadPreprovisionedData(data_dir, BENCHMARK_NAME, data_file)
+  vm.DownloadPreprovisionedData(data_dir, BENCHMARK_NAME, data_file, 7200)
   vm.RemoteCommand(f'cd {data_dir} && tar -xf {data_file} && rm {data_file}')
   bm_spec.data_dir = posixpath.join(data_dir, dataset)
 
@@ -95,8 +96,12 @@ def MakeSamplesFromOutput(output: str) -> List[sample.Sample]:
   """
   samples = []
   results = regex_util.ExtractAllMatches(
-      r'LOG (.*) - \((\d+), (\d+)\) step_loss : (\S+)\s+learning_rate : (\S+)\s+throughput : (\S+)',
-      output)
+      (
+          r'LOG (.*) - \((\d+), (\d+)\) step_loss : (\S+)\s+learning_rate :'
+          r' (\S+)\s+throughput : (\S+)'
+      ),
+      output,
+  )
   for time_now, epoch, step, step_loss, learning_rate, throughput in results:
     metadata = {
         'epoch': int(epoch),
