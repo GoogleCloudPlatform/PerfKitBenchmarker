@@ -26,6 +26,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
+from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 import six
@@ -311,6 +312,17 @@ class GkeCluster(container_service.KubernetesCluster):
     cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
     _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
     return retcode == 0
+
+  def LabelDisks(self):
+    """Set common labels on PVCs.
+
+    GKE does this in the background every hour. Do it immediately in case the
+    cluster is deleted within that hour.
+    https://cloud.google.com/kubernetes-engine/docs/how-to/creating-managing-labels#label_propagation
+    """
+    pvcs = self._GetPvcs()
+    for pvc in pvcs:
+      gce_disk.AddLabels(self, pvc['spec']['volumeName'])
 
   def GetDefaultStorageClass(self) -> str:
     """Get the default storage class for the provider."""

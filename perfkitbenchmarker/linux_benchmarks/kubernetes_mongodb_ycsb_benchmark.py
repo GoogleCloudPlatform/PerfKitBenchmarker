@@ -118,6 +118,10 @@ def _PrepareDeployment(benchmark_spec):
   time.sleep(60)
 
   benchmark_spec.container_cluster.WaitForResource('pod/mongodb-0', 'Ready')
+  # If MongoDB is available we have provisioned the PVC.
+  # Manually label the corresponding disk on appropriate providers.
+  benchmark_spec.container_cluster.LabelDisks()
+
   mongodb_cluster_ip = benchmark_spec.container_cluster.GetClusterIP(
       'mongodb-service')
   benchmark_spec.mongodb_url = 'mongodb://{ip_address}:27017/ycsb'.format(

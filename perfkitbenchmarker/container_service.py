@@ -24,9 +24,10 @@ import collections
 import functools
 import ipaddress
 import itertools
+import logging
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from absl import flags
 import jinja2
@@ -113,6 +114,7 @@ spec:
     serviceName: {service_name}
     servicePort: 8080
 """
+RESOURCE_DELETE_SLEEP_SECONDS = 5
 
 
 class ContainerException(errors.Error):
@@ -777,6 +779,12 @@ class KubernetesCluster(BaseContainerCluster):
         'delete', 'pvc', '--all', '-n', 'default'
     ]
     RunKubectlCommand(run_cmd)
+    # There maybe a slight race if resources are cleaned up in the background
+    # where deleting the cluster immediately prevents the PVCs from being
+    # deleted.
+    logging.info('Sleeping for %s seconds to give resources time to delete.',
+                 RESOURCE_DELETE_SLEEP_SECONDS)
+    time.sleep(RESOURCE_DELETE_SLEEP_SECONDS)
 
   def _Delete(self):
     self._DeleteAllFromDefaultNamespace()
@@ -966,6 +974,14 @@ class KubernetesCluster(BaseContainerCluster):
         'exec', '-it', pod_name, '--'
     ] + cmd
     RunKubectlCommand(run_cmd)
+
+  def LabelDisks(self):
+    """Propagate cluster labels to disks if not done by cloud provider."""
+    pass
+
+  def _GetPvcs(self) -> Sequence[Any]:
+    stdout, _, _ = RunKubectlCommand(['get', 'pvc', '-o', 'yaml'])
+    return yaml.safe_load(stdout)['items']
 
   # TODO(pclay): integrate with kubernetes_disk.
   def GetDefaultStorageClass(self) -> str:

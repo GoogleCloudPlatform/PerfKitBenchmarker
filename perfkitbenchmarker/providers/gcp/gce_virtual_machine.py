@@ -984,10 +984,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Adds metadata to disk."""
     # vm metadata added to vm on creation.
     # Add metadata to boot disk
-    cmd = util.GcloudCommand(
-        self, 'compute', 'disks', 'add-labels', self.name)
-    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
-    cmd.Issue()
+    gce_disk.AddLabels(self, self.name)
 
     # Add metadata to data disks
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):

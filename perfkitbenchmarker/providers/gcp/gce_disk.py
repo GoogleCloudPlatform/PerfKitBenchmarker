@@ -23,6 +23,7 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import util
@@ -87,6 +88,21 @@ def PdDriveIsNvme(vm):
   if family in ['n2d', 'c2d'] and 'confidential' in vm.OS_TYPE:
     return True
   return False
+
+
+def AddLabels(gcp_resource: resource.BaseResource, disk_name: str):
+  """Add labels to a disk created by a service that fails to label a disk.
+
+  Disks created by PKB (and most services) are labeled at create time.
+
+  Args:
+    gcp_resource: a resource with the project and zone of the disk.
+    disk_name: the name of the disk
+  """
+  cmd = util.GcloudCommand(
+      gcp_resource, 'compute', 'disks', 'add-labels', disk_name)
+  cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+  cmd.Issue()
 
 
 class GceDiskSpec(disk.BaseDiskSpec):

@@ -47,6 +47,12 @@ _NODE_POOLS_LIST_OUTPUT = (
 _KUBECTL_VERSION = """\
 serverVersion:
   gitVersion: v1.2.3"""
+_PVC_VOLUME = 'pvc-19f8e47d-6410-4edf-9320-5a243676e6e8'
+_PVC_LIST = f"""
+items:
+- spec:
+    volumeName: {_PVC_VOLUME}
+"""
 
 
 @contextlib2.contextmanager
@@ -59,9 +65,6 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
     stack.enter_context(mock.patch(builtins.__name__ + '.open'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.NamedTemporaryFile'))
-    stack.enter_context(
-        mock.patch(
-            util.__name__ + '.GetDefaultProject', return_value='fakeproject'))
     stack.enter_context(
         mock.patch(
             util.__name__ + '.GetDefaultUser', return_value='fakeuser'))
@@ -128,6 +131,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
                     'boot_disk_type': 'foo',
                     'boot_disk_size': 200,
                     'num_local_ssds': 2,
+                    'project': 'fakeproject',
                 },
             },
             'vm_count': 2,
@@ -146,6 +150,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--cluster-ipv4-cidr /19', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
+      self.assertIn('--project fakeproject', command_string)
       self.assertIn('--zone us-central1-a', command_string)
       self.assertIn('--min-cpu-platform skylake', command_string)
       self.assertIn('--disk-size 200', command_string)
@@ -228,7 +233,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       cluster.created = True
       metadata = cluster.GetResourceMetadata()
       self.assertEqual(issue_command.call_count, 1)
-      self.assertContainsSubset(
+      self.assertDictContainsSubset(
           {
               'project': 'fakeproject',
               'gce_local_ssd_count': 2,
@@ -263,6 +268,7 @@ class GoogleKubernetesEngineAutoscalingTestCase(
             'vm_spec': {
                 'GCP': {
                     'machine_type': 'fake-machine-type',
+                    'project': 'fakeproject',
                     'zone': 'us-central1-a',
                 },
             },
@@ -294,15 +300,29 @@ class GoogleKubernetesEngineAutoscalingTestCase(
       cluster.created = True
       metadata = cluster.GetResourceMetadata()
       self.assertEqual(issue_command.call_count, 1)
-      self.assertContainsSubset(
+      self.assertDictContainsSubset(
           {
               'project': 'fakeproject',
               'cloud': 'GCP',
               'cluster_type': 'Kubernetes',
               'min_size': 1,
               'size': 2,
-              'max_size': 3
+              'max_size': 30
           }, metadata)
+
+  def testLabelDisks(self):
+    with patch_critical_objects(stdout=_PVC_LIST) as issue_command:
+      # spec must be createded inside context to get project
+      spec = self.create_kubernetes_engine_spec()
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster.created = True
+      cluster.LabelDisks()
+      self.assertEqual(issue_command.call_count, 2)
+      label_disk_cmd = ' '.join(issue_command.call_args_list[1][0][0])
+      self.assertIn('disks add-label', label_disk_cmd)
+      self.assertIn(_PVC_VOLUME, label_disk_cmd)
+      self.assertIn('--project fakeproject', label_disk_cmd)
+      self.assertIn('--zone us-central1-a', label_disk_cmd)
 
 
 class GoogleKubernetesEngineVersionFlagTestCase(
