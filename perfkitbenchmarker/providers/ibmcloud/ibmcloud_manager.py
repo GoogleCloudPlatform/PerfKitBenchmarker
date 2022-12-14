@@ -39,13 +39,22 @@ PLURALS = {
     'policy': 'policies'
 }
 
+API_VERSION_DATE = '2022-03-29'
 GENERATION = 'generation='
 HTTP_TIMEOUT_CONNECT = 10
 HTTP_TIMEOUT = 120
 
 
 def RoundRobin(l1, l2):
-  return list(next(it) for it in itertools.cycle([iter(l1), iter(l2)]))
+  list1 = []
+  for i, item in enumerate(l1):
+    if len(l2) > 0 and i < len(l2):
+      list1.append(item)
+      list1.append(l2[i])
+    else:
+      list1.append(item)
+      break
+  return list1
 
 
 def Plural(x):
@@ -76,7 +85,7 @@ class IbmCloud:
     self._force = force
     self._trace = trace
     self._vm_creator = vm_creator
-    self._generation = ('version=' + str(datetime.datetime.now().date()) + '&' +
+    self._generation = ('version=' + API_VERSION_DATE + '&' +
                         GENERATION +
                         (os.environ.get('IBMCLOUD_GENERATION') or '2'))
 
