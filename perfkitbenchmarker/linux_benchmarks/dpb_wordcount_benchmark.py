@@ -31,7 +31,6 @@ https://cloud.google.com/dataflow/docs/quickstarts/quickstart-java-maven
 import copy
 import datetime
 import os
-import tempfile
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
@@ -135,7 +134,7 @@ def Prepare(benchmark_spec):
 
 def Run(benchmark_spec):
 
-  # Configuring input location for the word count job
+  # Configuring input location and output for the word count job
   if FLAGS.dpb_wordcount_input is None:
     input_location = gcp_dpb_dataflow.DATAFLOW_WC_INPUT
   else:
@@ -144,13 +143,6 @@ def Run(benchmark_spec):
 
   # Get handle to the dpb service
   dpb_service_instance = benchmark_spec.dpb_service
-
-  # Create a file handle to contain the response from running the job on
-  # the dpb service
-  stdout_file = tempfile.NamedTemporaryFile(suffix='.stdout',
-                                            prefix='dpb_wordcount_benchmark',
-                                            delete=False)
-  stdout_file.close()
 
   # Switch the parameters for submit job function of specific dpb service
   job_arguments = []
@@ -163,6 +155,13 @@ def Run(benchmark_spec):
   ] or FLAGS.dpb_wordcount_force_beam_style_job_args:
     jarfile = benchmark_spec.dpb_wordcount_jarfile
     job_arguments.append('--inputFile={}'.format(input_location))
+    # Add the output argument for Dataflow
+    if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
+      if not FLAGS.dpb_wordcount_out_base:
+        base_out = dpb_service_instance.GetStagingLocation()
+      else:
+        base_out = f'gs://{FLAGS.dpb_wordcount_out_base}'
+      job_arguments.append(f'--output={os.path.join(base_out, "output")}')
   else:
     # Use user-provided jar file if present; otherwise use the default example
     if not benchmark_spec.dpb_wordcount_jarfile:
@@ -181,7 +180,6 @@ def Run(benchmark_spec):
       jarfile=jarfile,
       classname=classname,
       job_arguments=job_arguments,
-      job_stdout_file=stdout_file,
       job_type=job_type)
   end_time = datetime.datetime.now()
 
