@@ -55,8 +55,9 @@ flags.DEFINE_string('dpb_dataflow_sdk', None,
                     'will be used by default.')
 flags.DEFINE_multi_string('dpb_dataflow_additional_args', [], 'Additional '
                           'arguments which should be passed to Dataflow job.')
-flags.DEFINE_integer('dpb_dataflow_timeout', 300,
-                     'The default timeout for Dataflow job.')
+flags.DEFINE_integer('dpb_dataflow_timeout', None,
+                     'The default timeout for Dataflow job. Set to None to run'
+                     'indefinitely.')
 flags.DEFINE_string(
     'dpb_dataflow_service_account_key', None,
     'GCS path to service account to run Dataflow jobs.')

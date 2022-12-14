@@ -599,7 +599,7 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
     fetch_batch_cmd = self.DataprocGcloudCommand('batches', 'describe',
                                                  self.batch_name)
     @vm_util.Retry(
-        timeout=120,
+        timeout=180,
         poll_interval=15,
         fuzz=0,
         retryable_exceptions=(MetricNotReadyError,))
@@ -619,8 +619,13 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
       milli_dcu_seconds = int(results['runtimeInfo']
                               ['approximateUsage']['milliDcuSeconds'])
       shuffle_storage_gb_seconds = int(
-          results['runtimeInfo']['approximateUsage']['shuffleStorageGbSeconds'])
-      cost = DATAPROC_SERVERLESS_MILLI_DCU_PRICE_PER_SECOND * milli_dcu_seconds + DATAPROC_SERVERLESS_SHUFFLE_STORAGE_PRICE_PER_GB_PER_SECOND * shuffle_storage_gb_seconds
+          results['runtimeInfo']['approximateUsage']['shuffleStorageGbSeconds']
+      )
+      cost = (
+          DATAPROC_SERVERLESS_MILLI_DCU_PRICE_PER_SECOND * milli_dcu_seconds
+          + DATAPROC_SERVERLESS_SHUFFLE_STORAGE_PRICE_PER_GB_PER_SECOND
+          * shuffle_storage_gb_seconds
+      )
       return cost
     else:
       return None
@@ -700,4 +705,4 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
                 'pkb@' + master_name, '--',
                 'chmod +x /tmp/' + script_name + '; sudo /tmp/' + script_name
                 + ' ' + ' '.join(script_args)]
-    vm_util.IssueCommand(ssh_cmd, force_info_log=True)
+    vm_util.IssueCommand(ssh_cmd, timeout=None, force_info_log=True)
