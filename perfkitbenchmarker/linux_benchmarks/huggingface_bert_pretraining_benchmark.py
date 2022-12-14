@@ -89,7 +89,7 @@ def MakeSamplesFromOutput(output: str) -> List[sample.Sample]:
 
   Args:
     output: string, command output Example output:
-      perfkitbenchmarker/tests/linux_benchmarks/nccl_benchmark_test.py
+      perfkitbenchmarker/tests/linux_benchmarks/huggingface_bert_pretraining_benchmark_test.py
 
   Returns:
     Samples containing training metrics, and the bandwidth
