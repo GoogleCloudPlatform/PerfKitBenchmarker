@@ -188,6 +188,7 @@
 -   Add support for T2A (ARM) VMs on GCE.
 -   Add `--dpb_job_poll_interval_secs` flag to control job polling frequency in
     DPB benchmarks.
+-   Add support for more readings in nvidia_power tracking.
 
 ### Bug fixes and maintenance updates:
 

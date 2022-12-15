@@ -40,7 +40,8 @@ class NvidiaPowerTestCase(unittest.TestCase):
     samples = []
     nvidia_power._NvidiaPowerResults(metadata,
                                      csv.DictReader(io.StringIO(self.contents)),
-                                     samples)
+                                     samples,
+                                     ['index', 'timestamp', 'power.draw'])
 
     expected_values = [
         16.48,
