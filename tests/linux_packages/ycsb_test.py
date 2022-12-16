@@ -24,6 +24,7 @@ from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import ycsb
+from tests import matchers
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -405,6 +406,46 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     # Assert
     self.assertIn('-target 1000', self.test_cmd.call_args_list[0][0][0])
     self.assertIn('-target 10000', self.test_cmd.call_args_list[1][0][0])
+
+  @flagsaver.flagsaver
+  def testIncrementalLoadCalledWithCorrectTarget(self):
+    # Arrange
+    FLAGS.ycsb_incremental_load = 10000
+    FLAGS.ycsb_client_vms = 1
+
+    # Act
+    self.test_executor.Run([self.test_vm])
+
+    # Assert
+    self.assertSequenceEqual(
+        [
+            mock.call(matchers.HAS('-target 500'), should_log=mock.ANY),
+            mock.call(matchers.HAS('-target 750'), should_log=mock.ANY),
+            mock.call(matchers.HAS('-target 1125'), should_log=mock.ANY),
+            mock.call(matchers.HAS('-target 1687'), should_log=mock.ANY),
+            mock.call(matchers.HAS('-target 2531'), should_log=mock.ANY),
+            mock.call(matchers.HAS('-target 3796'), should_log=mock.ANY),
+            mock.call(matchers.HAS('-target 5695'), should_log=mock.ANY),
+            mock.call(matchers.HAS('-target 8542'), should_log=mock.ANY),
+            mock.call(matchers.HAS('-target 10000'), should_log=mock.ANY),
+        ],
+        self.test_cmd.mock_calls
+    )
+
+  @flagsaver.flagsaver
+  def testIncrementalLoadCalledWithLowerTarget(self):
+    # Arrange
+    FLAGS.ycsb_incremental_load = 200  # Lower than 500, the default start
+    FLAGS.ycsb_client_vms = 1
+
+    # Act
+    self.test_executor.Run([self.test_vm])
+
+    # Assert
+    self.assertSequenceEqual(
+        [mock.call(matchers.HAS('-target 200'), should_log=mock.ANY)],
+        self.test_cmd.mock_calls
+    )
 
 
 if __name__ == '__main__':

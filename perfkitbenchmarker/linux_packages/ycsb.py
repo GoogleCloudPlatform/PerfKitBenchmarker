@@ -37,7 +37,7 @@ Each workload runs for at most 30 minutes.
 
 import bisect
 import collections
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 import copy
 import csv
 import dataclasses
@@ -51,6 +51,7 @@ import os
 import posixpath
 import re
 import time
+from typing import Any
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -223,6 +224,12 @@ _BURST_LOAD_MULTIPLIER = flags.DEFINE_integer(
     'immediately running again with --ycsb_burst_load times the '
     'amount of load specified by the `target` parameter. Set to -1 for '
     'the max throughput from the client.')
+_INCREMENTAL_TARGET_QPS = flags.DEFINE_integer(
+    'ycsb_incremental_load', None,
+    'If set, applies an incrementally increasing load until the target QPS is '
+    'reached. This should be the aggregate load for all VMs. Running with '
+    'this flag requires that there is not a QPS target passed in through '
+    '--ycsb_run_parameters.')
 _SHOULD_RECORD_COMMAND_LINE = flags.DEFINE_boolean(
     'ycsb_record_command_line', True,
     'Whether to record the command line used for kicking off the runs as part '
@@ -253,6 +260,10 @@ DEFAULT_PRELOAD_THREADS = 32
 
 # Customer YCSB tar url. If not set, the official YCSB release will be used.
 _ycsb_tar_url = None
+
+# Parameters for incremental workload. Can be made into flags in the future.
+_INCREMENTAL_STARTING_QPS = 500
+_INCREMENTAL_TIMELIMIT_SEC = 60 * 5
 
 _ThroughputTimeSeries = dict[int, float]
 # Tuple of (percentile, latency, count)
@@ -373,6 +384,11 @@ def CheckPrerequisites():
     raise errors.Config.InvalidValue(
         'Running in burst mode requires setting a target QPS using '
         '--ycsb_run_parameters=target=qps. Got None.')
+
+  if _INCREMENTAL_TARGET_QPS.value and run_target:
+    raise errors.Config.InvalidValue(
+        'Running in incremental mode requires setting a target QPS using '
+        '--ycsb_incremental_load=target and not --ycsb_run_parameters.')
 
 
 @vm_util.Retry(poll_interval=1)
@@ -1534,19 +1550,20 @@ class YCSBExecutor:
     vms = list(vms)
     hdrhistograms = {}
     for grouptype in HDRHISTOGRAM_GROUPS:
-      worker_vm = vms[0]
-      hdr, _ = worker_vm.RemoteCommand(
-          'touch {0}{1}.hdr && tail -1 {0}{1}.hdr'.format(
-              hdr_files_dir, grouptype))
+
+      def _GetHdrHistogramLog(vm, group=grouptype):
+        filename = f'{hdr_files_dir}{group}.hdr'
+        return vm.RemoteCommand(f'touch {filename} && tail -1 {filename}')[0]
+
+      results = vm_util.RunThreaded(_GetHdrHistogramLog, vms)
+
       # It's possible that there is no result for certain group, e.g., read
       # only, update only.
-      if not hdr:
+      if not all(results):
         continue
 
-      for vm in vms[1:]:
-        hdr, _ = vm.RemoteCommand(
-            'touch {0}{1}.hdr && tail -1 {0}{1}.hdr'.format(
-                hdr_files_dir, grouptype))
+      worker_vm = vms[0]
+      for hdr in results[1:]:
         worker_vm.RemoteCommand(
             'sudo chmod 755 {1}{2}.hdr && echo "{0}" >> {1}{2}.hdr'.format(
                 hdr[:-1], hdr_files_dir, grouptype))
@@ -1589,14 +1606,18 @@ class YCSBExecutor:
     else:
       return []
 
-  def Run(self, vms, workloads=None, run_kwargs=None):
+  def Run(self, vms, workloads=None, run_kwargs=None) -> list[sample.Sample]:
     """Runs each workload/client count combination."""
+    if FLAGS.ycsb_skip_run_stage:
+      return []
     workloads = workloads or GetWorkloadFileList()
     assert workloads, 'no workloads'
     if not run_kwargs:
       run_kwargs = {}
     if _BURST_LOAD_MULTIPLIER.value:
       samples = self._RunBurstMode(vms, workloads, run_kwargs)
+    elif _INCREMENTAL_TARGET_QPS.value:
+      samples = self._RunIncrementalMode(vms, workloads, run_kwargs)
     else:
       samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
     if (FLAGS.ycsb_sleep_after_load_in_sec > 0 and
@@ -1605,6 +1626,14 @@ class YCSBExecutor:
         s.metadata[
             'sleep_after_load_in_sec'] = FLAGS.ycsb_sleep_after_load_in_sec
     return samples
+
+  def _SetRunParameters(self, params: Mapping[str, Any]) -> None:
+    """Sets the --ycsb_run_parameters flag."""
+    # Ideally YCSB should be refactored to include a function that just takes
+    # commands for a run, but that will be a large refactor.
+    FLAGS['ycsb_run_parameters'].unparse()
+    FLAGS['ycsb_run_parameters'].parse(
+        [f'{k}={v}' for k, v in params.items()])
 
   def _RunBurstMode(self, vms, workloads, run_kwargs=None):
     """Runs YCSB in burst mode, where the second run has increased QPS."""
@@ -1617,12 +1646,65 @@ class YCSBExecutor:
       run_params.pop('target')  # Set to unlimited
     else:
       run_params['target'] = initial_qps * _BURST_LOAD_MULTIPLIER.value
-    FLAGS['ycsb_run_parameters'].unparse()
-    FLAGS['ycsb_run_parameters'].parse(
-        [f'{k}={v}' for k, v in run_params.items()])
-
+    self._SetRunParameters(run_params)
     samples += list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
     return samples
+
+  def _GetIncrementalQpsTargets(self, target_qps: int) -> list[int]:
+    """Returns incremental QPS targets."""
+    qps = _INCREMENTAL_STARTING_QPS
+    result = []
+    while qps < target_qps:
+      result.append(qps)
+      qps *= 1.5
+    return result
+
+  def _RunIncrementalMode(
+      self,
+      vms: Sequence[virtual_machine.VirtualMachine],
+      workloads: Sequence[str],
+      run_kwargs: Mapping[str, str] = None,
+  ) -> list[sample.Sample]:
+    """Runs YCSB by gradually incrementing target QPS.
+
+    Note that this requires clients to be overprovisioned, as the target QPS
+    for YCSB is generally a "throttling" mechanism where the threads try to send
+    as much QPS as possible and then get throttled. If clients are
+    underprovisioned then it's possible for the run to not hit the desired
+    target, which may be undesired behavior.
+
+    See
+    https://cloud.google.com/datastore/docs/best-practices#ramping_up_traffic
+    for an example of why this is needed.
+
+    Args:
+      vms: The client VMs to generate the load.
+      workloads: List of workloads to run.
+      run_kwargs: Extra run arguments.
+
+    Returns:
+      A list of samples of benchmark results.
+    """
+    run_params = _GetRunParameters()
+    ending_qps = _INCREMENTAL_TARGET_QPS.value
+    ending_length = FLAGS.ycsb_timelimit
+    incremental_targets = self._GetIncrementalQpsTargets(ending_qps)
+    logging.info('Incremental targets: %s', incremental_targets)
+
+    # Warm-up phase is shorter and doesn't need results parsing
+    FLAGS['ycsb_timelimit'].parse(_INCREMENTAL_TIMELIMIT_SEC)
+    for target in incremental_targets:
+      target /= FLAGS.ycsb_client_vms
+      run_params['target'] = int(target)
+      self._SetRunParameters(run_params)
+      self.RunStaircaseLoads(vms, workloads, **run_kwargs)
+
+    # Reset back to the original workload args
+    FLAGS['ycsb_timelimit'].parse(ending_length)
+    ending_qps /= FLAGS.ycsb_client_vms
+    run_params['target'] = int(ending_qps)
+    self._SetRunParameters(run_params)
+    return list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
 
   def LoadAndRun(self, vms, workloads=None, load_kwargs=None, run_kwargs=None):
     """Load data using YCSB, then run each workload/client count combination.

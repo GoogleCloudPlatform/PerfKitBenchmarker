@@ -47,7 +47,9 @@ cloud_datastore_ycsb:
   vm_groups:
     default:
       vm_spec: *default_single_core
-      vm_count: 1"""
+      vm_count: 1
+  flags:
+    openjdk_version: 8"""
 
 # the name of the database entity created when running datastore YCSB
 # https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
@@ -80,6 +82,9 @@ flags.DEFINE_boolean('google_datastore_repopulate', False,
 # the JSON keyfile is needed to validate credentials when cleaning up the db
 flags.DEFINE_string('google_datastore_deletion_keyfile', None,
                     'The path to Google API JSON private key file')
+
+_INSERTION_RETRY_LIMIT = 100
+_SLEEP_AFTER_LOADING_SECS = 30 * 60
 
 
 def GetConfig(user_config):
@@ -135,8 +140,15 @@ def Prepare(benchmark_spec):
   # Install required packages and copy credential files
   vm_util.RunThreaded(_Install, vms)
 
-  # Restore YCSB_TAR_URL
-  benchmark_spec.executor = ycsb.YCSBExecutor('googledatastore')
+  load_kwargs = {
+      'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
+      'googledatastore.privateKeyFile': FLAGS.private_keyfile,
+      'googledatastore.serviceAccountEmail':
+          FLAGS.google_datastore_serviceAccount,
+      'googledatastore.debug': FLAGS.google_datastore_debug,
+      'core_workload_insertion_retry_limit': _INSERTION_RETRY_LIMIT,
+  }
+  ycsb.YCSBExecutor('googledatastore').Load(vms, load_kwargs=load_kwargs)
 
 
 def Run(benchmark_spec):
@@ -149,6 +161,11 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample instances.
   """
+  if FLAGS.google_datastore_repopulate and not FLAGS.ycsb_skip_run_stage:
+    logging.info('Sleeping 30 minutes to allow for compaction.')
+    time.sleep(_SLEEP_AFTER_LOADING_SECS)
+
+  executor = ycsb.YCSBExecutor('googledatastore')
   vms = benchmark_spec.vms
   run_kwargs = {
       'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
@@ -156,12 +173,10 @@ def Run(benchmark_spec):
       'googledatastore.serviceAccountEmail':
           FLAGS.google_datastore_serviceAccount,
       'googledatastore.debug': FLAGS.google_datastore_debug,
+      'readallfields': True,
+      'writeallfields': True,
   }
-  load_kwargs = run_kwargs.copy()
-  if FLAGS['ycsb_preload_threads'].present:
-    load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
-  samples = list(benchmark_spec.executor.LoadAndRun(
-      vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  samples = list(executor.Run(vms, run_kwargs=run_kwargs))
   return samples
 
 
@@ -282,8 +297,15 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
                                      _CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE]
           delete_keys = delete_keys[_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE:]
           logging.debug(
-              'Creating new Task %d - Read %d entities for %s kind , Read %d in total.',
-              task_id, entity_read_count, kind, total_entity_count)
+              (
+                  'Creating new Task %d - Read %d entities for %s kind , Read'
+                  ' %d in total.'
+              ),
+              task_id,
+              entity_read_count,
+              kind,
+              total_entity_count,
+          )
           deletion_task = _DeletionTask(kind, task_id)
           pool.apply_async(deletion_task.DeleteEntities, (
               dataset_id,
