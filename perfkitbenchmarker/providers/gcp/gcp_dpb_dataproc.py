@@ -52,7 +52,7 @@ DATAPROC_FLINK_TRIGGER_SCRIPT = os.path.join('beam', 'flink-trigger.sh')
 # Dataproc serverless resources cost factors (showing us-central-1 pricing).
 # See https://cloud.google.com/dataproc-serverless/pricing
 DATAPROC_SERVERLESS_MILLI_DCU_PRICE_PER_SECOND = 0.06 / 1000 / 3600
-DATAPROC_SERVERLESS_SHUFFLE_STORAGE_PRICE_PER_GB_PER_SECOND = 0.04 / 30 / 3600
+DATAPROC_SERVERLESS_SHUFFLE_STORAGE_PRICE_PER_GB_PER_SECOND = 0.04 / 730 / 3600
 
 
 class MetricNotReadyError(Exception):
