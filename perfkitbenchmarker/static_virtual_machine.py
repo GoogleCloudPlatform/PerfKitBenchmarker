@@ -356,6 +356,16 @@ class Rhel9BasedStaticVirtualMachine(StaticVirtualMachine,
   pass
 
 
+class Fedora36BasedStaticVirtualMachine(StaticVirtualMachine,
+                                        linux_virtual_machine.Fedora36Mixin):
+  pass
+
+
+class Fedora37BasedStaticVirtualMachine(StaticVirtualMachine,
+                                        linux_virtual_machine.Fedora37Mixin):
+  pass
+
+
 class CentOs7BasedStaticVirtualMachine(StaticVirtualMachine,
                                        linux_virtual_machine.CentOs7Mixin):
   pass

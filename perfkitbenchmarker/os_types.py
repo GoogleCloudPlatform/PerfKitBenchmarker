@@ -27,6 +27,8 @@ CORE_OS = 'core_os'
 DEBIAN9 = 'debian9'
 DEBIAN10 = 'debian10'
 DEBIAN11 = 'debian11'
+FEDORA36 = 'fedora36'
+FEDORA37 = 'fedora37'
 JUJU = 'juju'
 RHEL7 = 'rhel7'
 RHEL8 = 'rhel8'
@@ -83,6 +85,8 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     DEBIAN9,
     DEBIAN10,
     DEBIAN11,
+    FEDORA36,
+    FEDORA37,
     JUJU,
     RHEL7,
     RHEL8,

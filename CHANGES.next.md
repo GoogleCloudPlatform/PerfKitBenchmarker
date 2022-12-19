@@ -32,6 +32,7 @@
 
 ### New features:
 
+-   Add support for systems running fedora36 and fedora37
 -   Add support for static systems running debian11
 -   Add ibmcloud as a new provider.
 -   Add prefix/directory support for object storage service runs.
