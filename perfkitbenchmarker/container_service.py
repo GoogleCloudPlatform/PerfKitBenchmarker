@@ -953,21 +953,29 @@ class KubernetesCluster(BaseContainerCluster):
     stdout, _, _ = RunKubectlCommand(run_cmd)
     return yaml.safe_load(stdout)
 
-  def GetPodIps(self, resource_name):
+  def GetPodIpsByLabel(self, pod_label_key, pod_label_value) -> List[str]:
+    """Returns a list of internal IPs for pod label key-value.
+
+    Args:
+      pod_label_key: The pod label name
+      pod_label_value: The pod label value
+    """
+    get_cmd = [
+        'get', 'pods', '-l', f'{pod_label_key}={pod_label_value}',
+        '-o', 'jsonpath="{.items[*].status.podIP}"'
+    ]
+
+    stdout, _, _ = RunKubectlCommand(get_cmd)
+    return yaml.safe_load(stdout).split()
+
+  def GetPodIps(self, resource_name) -> List[str]:
     """Returns a list of internal IPs for a pod name.
 
     Args:
       resource_name: The pod resource name
     """
     pod_label = self.GetPodLabel(resource_name)
-
-    get_cmd = [
-        'get', 'pods', '-l', 'app=%s' % pod_label,
-        '-o', 'jsonpath="{.items[*].status.podIP}"'
-    ]
-
-    stdout, _, _ = RunKubectlCommand(get_cmd)
-    return yaml.safe_load(stdout).split()
+    return self.GetPodIpsByLabel('app', pod_label)
 
   def RunKubectlExec(self, pod_name, cmd):
     run_cmd = [
