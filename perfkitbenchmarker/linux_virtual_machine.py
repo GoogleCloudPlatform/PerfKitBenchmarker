@@ -2505,6 +2505,23 @@ class Fedora37Mixin(BaseRhelMixin):
 
   def SetupPackageManager(self):
     """Fedora does not need epel."""
+    """Class holding Fedora36 specific methods and attributes."""
+    OS_TYPE = os_types.FEDORA36
+    PYTHON_2_PACKAGE = None
+
+
+    def SetupPackageManager(self):
+        """Fedora does not need epel."""
+
+
+class Fedora37Mixin(BaseRhelMixin):
+    """Class holding Fedora37 specific methods and attributes."""
+    OS_TYPE = os_types.FEDORA37
+    PYTHON_2_PACKAGE = None
+
+
+    def SetupPackageManager(self):
+        """Fedora does not need epel."""
 
 
 class CentOs7Mixin(BaseRhelMixin):
