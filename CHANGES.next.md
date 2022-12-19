@@ -29,6 +29,7 @@
 -   Deprecate Aerospike_YCSB benchmark.
 -   Remove pkb's --placement_group_style cloud-agnostic values 'cluster'/
     'cluster_if_supported'/'spread'/'spread_if_supported'.
+-   Replace flag --ibm_azone with --ibm_region.
 
 ### New features:
 

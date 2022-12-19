@@ -269,7 +269,6 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd.user_data = self.user_data
     if self.boot_volume_size > 0:
       cmd.flags['capacity'] = self.boot_volume_size
-    cmd.flags['iops'] = self.boot_volume_iops
     if self.boot_encryption_key:
       cmd.flags['encryption_key'] = self.boot_encryption_key
     logging.info('Creating instance, flags: %s', cmd.flags)
@@ -313,7 +312,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       resp = cmd.InstanceShow()
       for network in resp['network_interfaces']:
         if network['subnet']['id'] == networkid:
-          ip_v4_address = network['primary_ipv4_address']
+          ip_v4_address = network['primary_ip']['address']
           break
       logging.info('Waiting on ip assignment: %s', ip_v4_address)
     if ip_v4_address == '0.0.0.0':
