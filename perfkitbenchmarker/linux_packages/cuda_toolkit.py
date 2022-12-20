@@ -35,12 +35,30 @@ CUDA_HOME = '/usr/local/cuda'
 
 flags.DEFINE_enum(
     'cuda_toolkit_version',
-    '11.6', [
-        '9.0', '10.0', '10.1', '10.2', '11.0', '11.1', '11.2', '11.3', '11.4',
-        '11.5', '11.6', 'None', ''
-    ], 'Version of CUDA Toolkit to install. '
-    'Input "None" or empty string to skip installation',
-    module_name=__name__)
+    '11.6',
+    [
+        '9.0',
+        '10.0',
+        '10.1',
+        '10.2',
+        '11.0',
+        '11.1',
+        '11.2',
+        '11.3',
+        '11.4',
+        '11.5',
+        '11.6',
+        '11.7',
+        '11.8',
+        'None',
+        '',
+    ],
+    (
+        'Version of CUDA Toolkit to install. '
+        'Input "None" or empty string to skip installation'
+    ),
+    module_name=__name__,
+)
 
 _KEY = flags.DEFINE_string(
     'cuda_toolkit_key', '7fa2af80',
@@ -50,6 +68,8 @@ FLAGS = flags.FLAGS
 
 CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/{cpu_arch}/cuda-{os}.pin'
 
+CUDA_11_8_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda-repo-{os}-11-8-local_11.8.0-520.61.05-1_{cpu_arch}.deb'
+CUDA_11_7_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.7.1/local_installers/cuda-repo-{os}-11-7-local_11.7.1-515.65.01-1_{cpu_arch}.deb'
 CUDA_11_6_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.6.2/local_installers/cuda-repo-{os}-11-6-local_11.6.2-510.47.03-1_{cpu_arch}.deb'
 CUDA_11_5_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.5.2/local_installers/cuda-repo-{os}-11-5-local_11.5.2-495.29.05-1_{cpu_arch}.deb'
 CUDA_11_4_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.4.4/local_installers/cuda-repo-{os}-11-4-local_11.4.4-470.82.01-1_{cpu_arch}.deb'
@@ -151,9 +171,18 @@ def GetCudaToolkitVersion(vm):
 
 
 def EnrollSigningKey(vm):
-  vm.RemoteCommand(
-      f'sudo apt-key adv --fetch-keys {GPG_KEY.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=GetCpuArchPath(vm), key=_KEY.value)}'
-  )
+  if FLAGS.cuda_toolkit_version in ('11.7', '11.8'):
+    version = FLAGS.cuda_toolkit_version.replace('.', '-')
+    vm.RemoteCommand(
+        'sudo cp'
+        f' /var/cuda-repo-{_CudaOs(vm.OS_TYPE)}-{version}-local/cuda-*-keyring.gpg'
+        ' /usr/share/keyrings/'
+    )
+  else:
+    vm.RemoteCommand(
+        'sudo apt-key adv --fetch-keys'
+        f' {GPG_KEY.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=GetCpuArchPath(vm), key=_KEY.value)}'
+    )
 
 
 def _InstallCudaPatch(vm, patch_url):
@@ -316,6 +345,14 @@ def _InstallCuda11Point6(vm):
   _InstallCuda11Generic(vm, CUDA_11_6_TOOLKIT, '11-6')
 
 
+def _InstallCuda11Point7(vm):
+  _InstallCuda11Generic(vm, CUDA_11_7_TOOLKIT, '11-7')
+
+
+def _InstallCuda11Point8(vm):
+  _InstallCuda11Generic(vm, CUDA_11_8_TOOLKIT, '11-8')
+
+
 def AptInstall(vm):
   """Installs CUDA toolkit on the VM if not already installed."""
   version_to_install = FLAGS.cuda_toolkit_version
@@ -357,6 +394,10 @@ def AptInstall(vm):
     _InstallCuda11Point5(vm)
   elif version_to_install == '11.6':
     _InstallCuda11Point6(vm)
+  elif version_to_install == '11.7':
+    _InstallCuda11Point7(vm)
+  elif version_to_install == '11.8':
+    _InstallCuda11Point8(vm)
   else:
     raise UnsupportedCudaVersionError()
   DoPostInstallActions(vm)

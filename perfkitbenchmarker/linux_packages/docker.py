@@ -79,6 +79,8 @@ def CreateImagePackages():
 
 def YumInstall(vm):
   """Installs the docker package on the VM."""
+  if IsInstalled(vm):
+    return
   vm.RemoteHostCommand('curl -o %s/docker.rpm -sSL %s' %
                        (linux_packages.INSTALL_DIR, DOCKER_RPM_URL))
   vm.RemoteHostCommand('sudo yum localinstall '
@@ -89,6 +91,8 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the docker package on the VM."""
+  if IsInstalled(vm):
+    return
   vm.RemoteHostCommand('curl -sSL https://get.docker.com/ | '
                        f'VERSION={VERSION.value or ""} sh')
 
