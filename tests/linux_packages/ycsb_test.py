@@ -433,6 +433,30 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
 
   @flagsaver.flagsaver
+  def testIncrementalLoadUsesCorrectThreadCounts(self):
+    # Arrange
+    FLAGS.ycsb_incremental_load = 2500
+    FLAGS.ycsb_client_vms = 1
+    FLAGS['ycsb_threads_per_client'].parse(['1000'])
+    mock_set_thread_count = self.enter_context(mock.patch.object(
+        self.test_executor, '_SetClientThreadCount'))
+
+    # Act
+    self.test_executor.Run([self.test_vm])
+
+    # Assert
+    self.assertSequenceEqual(
+        [
+            mock.call(500),
+            mock.call(750),
+            mock.call(1000),
+            mock.call(1000),
+            mock.call(1000),
+        ],
+        mock_set_thread_count.mock_calls
+    )
+
+  @flagsaver.flagsaver
   def testIncrementalLoadCalledWithLowerTarget(self):
     # Arrange
     FLAGS.ycsb_incremental_load = 200  # Lower than 500, the default start

@@ -1659,6 +1659,10 @@ class YCSBExecutor:
       qps *= 1.5
     return result
 
+  def _SetClientThreadCount(self, count: int) -> None:
+    FLAGS['ycsb_threads_per_client'].unparse()
+    FLAGS['ycsb_threads_per_client'].parse([str(count)])
+
   def _RunIncrementalMode(
       self,
       vms: Sequence[virtual_machine.VirtualMachine],
@@ -1688,6 +1692,7 @@ class YCSBExecutor:
     run_params = _GetRunParameters()
     ending_qps = _INCREMENTAL_TARGET_QPS.value
     ending_length = FLAGS.ycsb_timelimit
+    ending_threadcount = int(FLAGS.ycsb_threads_per_client[0])
     incremental_targets = self._GetIncrementalQpsTargets(ending_qps)
     logging.info('Incremental targets: %s', incremental_targets)
 
@@ -1696,6 +1701,7 @@ class YCSBExecutor:
     for target in incremental_targets:
       target /= FLAGS.ycsb_client_vms
       run_params['target'] = int(target)
+      self._SetClientThreadCount(min(ending_threadcount, int(target)))
       self._SetRunParameters(run_params)
       self.RunStaircaseLoads(vms, workloads, **run_kwargs)
 
@@ -1703,6 +1709,7 @@ class YCSBExecutor:
     FLAGS['ycsb_timelimit'].parse(ending_length)
     ending_qps /= FLAGS.ycsb_client_vms
     run_params['target'] = int(ending_qps)
+    self._SetClientThreadCount(ending_threadcount)
     self._SetRunParameters(run_params)
     return list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
 
