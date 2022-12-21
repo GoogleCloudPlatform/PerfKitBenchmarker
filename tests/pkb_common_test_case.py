@@ -148,7 +148,7 @@ class TestLinuxVirtualMachine(linux_virtual_machine.BaseLinuxVirtualMachine,
     pass
 
 
-class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):
+class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):  # pytype: disable=signature-mismatch  # overriding-return-type-checks
   pass
 
   def _PreemptibleMetadataKeyValue(self):
