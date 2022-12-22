@@ -65,6 +65,11 @@ flags.register_validator(
     lambda benchmarks: benchmarks and set(benchmarks).issubset(IPERF_BENCHMARKS)
     )
 
+flags.DEFINE_string(
+    'iperf_buffer_length', None,
+    'set read/write buffer size (TCP) or length (UDP) to n[kmKM]Bytes.'
+    '1kB= 10^3, 1mB= 10^6, 1KB=2^10, 1MB=2^20')
+
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'iperf'
@@ -158,6 +163,9 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     if FLAGS.iperf_tcp_per_stream_bandwidth:
       iperf_cmd += f' --bandwidth {FLAGS.iperf_tcp_per_stream_bandwidth}M'
 
+    if FLAGS.iperf_buffer_length:
+      iperf_cmd += f' --len {FLAGS.iperf_buffer_length}'
+
     # the additional time on top of the iperf runtime is to account for the
     # time it takes for the iperf process to start and exit
     timeout_buffer = FLAGS.iperf_timeout or 30 + thread_count
@@ -242,6 +250,9 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
 
     if FLAGS.iperf_udp_per_stream_bandwidth:
       iperf_cmd += f' --bandwidth {FLAGS.iperf_udp_per_stream_bandwidth}M'
+
+    if FLAGS.iperf_buffer_length:
+      iperf_cmd += f' --len {FLAGS.iperf_buffer_length}'
 
     # the additional time on top of the iperf runtime is to account for the
     # time it takes for the iperf process to start and exit
