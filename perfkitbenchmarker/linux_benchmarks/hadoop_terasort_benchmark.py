@@ -126,6 +126,7 @@ def Run(benchmark_spec):
             ('sort', sort_args),
             ('validate', validate_args)]
   cumulative_runtime = 0
+  terasort_bytes = FLAGS.terasort_num_rows * 100
   for (label, args) in stages:
     stats = spark_cluster.SubmitJob(terasort_jar,
                                     None,
@@ -134,6 +135,10 @@ def Run(benchmark_spec):
     if not stats[spark_service.SUCCESS]:
       raise Exception('Stage {0} unsuccessful'.format(label))
     current_time = datetime.datetime.now()
+    if label == 'generate':
+        results.append(sample.Sample('Terasort data', terasort_bytes,
+            'bytes', metadata))
+
     wall_time = (current_time - start).total_seconds()
     results.append(sample.Sample(label + '_wall_time',
                                  wall_time,
@@ -144,6 +149,11 @@ def Run(benchmark_spec):
       results.append(sample.Sample(label + '_runtime',
                                    stats[spark_service.RUNTIME],
                                    'seconds', metadata))
+      if label == 'sort':
+          sort_runtime = stats[spark_service.RUNTIME]
+          results.append(sample.Sample('Throughput Terasort',
+              terasort_bytes/sort_runtime,'bytes/s',metadata))
+
     cumulative_runtime += stats[spark_service.RUNTIME]
     if spark_service.WAITING in stats:
       results.append(sample.Sample(label + '_pending_time',

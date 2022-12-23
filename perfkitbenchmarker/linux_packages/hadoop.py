@@ -40,9 +40,14 @@ _VERSION = flags.DEFINE_string('hadoop_version', None, 'Version of Hadoop.')
 _URL_OVERRIDE = flags.DEFINE_string(
     'hadoop_bin_url', None, 'Specify to override url from HADOOP_URL_BASE.')
 
+_BLOCKSIZE_OVERRIDE = flags.DEFINE_integer('hadoop_blocksize', 128, 'Blocksize in mb to be used by\
+HDFS filesystem. This is the chunksize in which the HDFS file will be divided into')
+
+
+
 DATA_FILES = [
     'hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
-    'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml.j2',
+    'hadoop/hdfs-site.xml.j2', 'hadoop/mapred-site.xml.j2',
     'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2'
 ]
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
@@ -200,6 +205,8 @@ def _RenderConfig(vm,
   # This determines the number of reduce tasks in Terasort and is critical to
   # scale with the cluster.
   num_reduce_tasks = reduces_per_node * num_workers
+  if _BLOCKSIZE_OVERRIDE.value:
+    block_size = _BLOCKSIZE_OVERRIDE * 1024 * 1024
 
   if vm.scratch_disks:
     # TODO(pclay): support multiple scratch disks. A current suboptimal
@@ -231,7 +238,8 @@ def _RenderConfig(vm,
       'num_reduce_tasks': num_reduce_tasks,
       'aws_access_key': aws_access_key,
       'aws_secret_key': aws_secret_key,
-      'optional_tools': optional_tools
+      'optional_tools': optional_tools,
+      'block_size': block_size
   }
 
   for file_name in DATA_FILES:
