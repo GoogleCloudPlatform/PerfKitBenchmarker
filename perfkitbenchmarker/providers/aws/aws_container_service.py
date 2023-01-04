@@ -110,23 +110,33 @@ class ElasticContainerRegistry(container_service.BaseContainerRegistry):
     self.repositories.append(repository)
     repository.Create()
 
-  def GetFullRegistryTag(self, image):
-    """Gets the full tag of the image."""
-    tag = '{account}.dkr.ecr.{region}.amazonaws.com/{namespace}/{name}'.format(
-        account=self.account,
-        region=self.region,
-        namespace=self.name,
-        name=image)
-    return tag
+  def GetRegistryServer(self) -> str:
+    """Returns the registry server url."""
+    return f'{self.account}.dkr.ecr.{self.region}.amazonaws.com'
+
+  def GetFullRegistryTag(self, image) -> str:
+    """Returns the full tag of the image."""
+    return f'{self.GetRegistryServer()}/{self.name}/{image}'
 
   def Login(self):
     """Logs in to the registry."""
     get_login_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecr', 'get-login', '--no-include-email'
+        '--region',
+        self.region,
+        'ecr',
+        'get-login-password',
     ]
     stdout, _, _ = vm_util.IssueCommand(get_login_cmd)
-    login_cmd = stdout.split()
-    vm_util.IssueCommand(login_cmd)
+    docker_login_cmd = [
+        'docker',
+        'login',
+        '--username',
+        'AWS',
+        '--password',
+        stdout,
+        self.GetRegistryServer(),
+    ]
+    vm_util.IssueCommand(docker_login_cmd)
 
   def RemoteBuild(self, image):
     """Build the image remotely."""

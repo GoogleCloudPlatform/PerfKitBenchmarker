@@ -263,6 +263,7 @@
 -   Update the performance results of Bigtable testing which used a more proper
     client setup.
 -   Update the runner's AWS CLI to 1.19.75.
+-   Upgrade from AWS ecr get-login to ecr get-login-password.
 -   Minor fix of the Bigtable benchmarking user guide.
 -   Enable icelake and milan as --gcp_min_cpu_platform options.
 -   Update the bigtable tutorial readme with the content of batch_testing.md.
