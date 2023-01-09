@@ -24,6 +24,7 @@ from perfkitbenchmarker.linux_packages import intel_repo
 
 MPI_VERSION = flags.DEFINE_string('intelmpi_version', '2019.6-088',
                                   'MPI version.')
+
 FLAGS = flags.FLAGS
 
 _INTEL_ROOT = '/opt/intel'
