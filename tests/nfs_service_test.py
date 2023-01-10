@@ -14,12 +14,14 @@
 """Tests for NFS service."""
 
 import unittest
+from unittest import mock
+
 from absl import flags
-import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import nfs_service
 from tests import pkb_common_test_case
+
 
 FLAGS = flags.FLAGS
 _DEFAULT_NFS_TIER = 'foo'
@@ -132,9 +134,9 @@ class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertLen(vm.RemoteCommand.call_args_list, 3)
     exportfs_cmd = vm.RemoteCommand.call_args_list[0][0][0]
     self.assertRegex(exportfs_cmd, 'tee -a /etc/exports')
-    vm.RemoteCommand.has_calls([
-        mock.call('sudo systemctl enable nfs'),
-        mock.call('sudo systemctl restart nfs-kernel-server')
+    vm.RemoteCommand.assert_has_calls([
+        mock.call('sudo systemctl restart nfs-kernel-server'),
+        mock.call('sudo systemctl enable nfs', ignore_failure=True),
     ])
 
   def testNfsExportDirectoryAlreadyExported(self):
@@ -144,9 +146,9 @@ class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     nfs_service.NfsExport(vm, '/foo/bar')
     # RemoteCommand not called with the mkdir ... echo calls
     self.assertLen(vm.RemoteCommand.call_args_list, 2)
-    vm.RemoteCommand.has_calls([
-        mock.call('sudo systemctl enable nfs'),
-        mock.call('sudo systemctl restart nfs-kernel-server')
+    vm.RemoteCommand.assert_has_calls([
+        mock.call('sudo systemctl restart nfs-server'),
+        mock.call('sudo systemctl enable nfs', ignore_failure=True),
     ])
 
   def testNfsExportAndMount(self):
