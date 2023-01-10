@@ -83,6 +83,9 @@ _DEFAULT_DISK_FSTAB_OPTIONS = 'defaults'
 # regex for parsing lscpu and /proc/cpuinfo
 _COLON_SEPARATED_RE = re.compile(r'^\s*(?P<key>.*?)\s*:\s*(?P<value>.*?)\s*$')
 
+
+# TODO(user): update these to use a flag holder as recommended
+# in go/python-tips/051
 flags.DEFINE_bool('setup_remote_firewall', False,
                   'Whether PKB should configure the firewall of each remote'
                   'VM to make sure it accepts all internal connections.')
@@ -160,6 +163,14 @@ flags.DEFINE_integer(
     'This sets the maximum send buffer for TCP socket connections in bytes. '
     'Increasing this value may increase single stream TCP throughput '
     'for high latency connections')
+
+_TCP_MAX_NOTSENT_BYTES = flags.DEFINE_integer(
+    'tcp_max_notsent_bytes', None,
+    'Changes the third component of the sysctl value '
+    'net.ipv4.tcp_notsent_lowat. This sets the maximum number of unsent bytes '
+    'for TCP socket connections. Decreasing this value may to reduce usage '
+    'of kernel memory.'
+)
 
 flags.DEFINE_integer(
     'rmem_max', None,
@@ -699,11 +710,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def DoConfigureTCPWindow(self):
     """Change TCP window parameters in sysctl."""
 
+    possible_tcp_flags = [
+        FLAGS.tcp_max_receive_buffer,
+        FLAGS.tcp_max_send_buffer,
+        _TCP_MAX_NOTSENT_BYTES.value,
+        FLAGS.rmem_max,
+        FLAGS.wmem_max,
+    ]
     # Return if none of these flags are set
-    if all(x is None for x in [FLAGS.tcp_max_receive_buffer,
-                               FLAGS.tcp_max_send_buffer,
-                               FLAGS.rmem_max,
-                               FLAGS.wmem_max]):
+    if all(x is None for x in possible_tcp_flags):
       return
 
     # Get current values from VM
@@ -711,6 +726,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     rmem_values = stdout.split()
     stdout, _ = self.RemoteCommand('cat /proc/sys/net/ipv4/tcp_wmem')
     wmem_values = stdout.split()
+    stdout, _ = self.RemoteCommand('cat /proc/sys/net/ipv4/tcp_notsent_lowat')
+    notsent_lowat_values = stdout.split()
     stdout, _ = self.RemoteCommand('cat /proc/sys/net/core/rmem_max')
     rmem_max = int(stdout)
     stdout, _ = self.RemoteCommand('cat /proc/sys/net/core/wmem_max')
@@ -719,12 +736,16 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # third number is max receive/send
     max_receive = rmem_values[2]
     max_send = wmem_values[2]
-
+    max_not_sent = notsent_lowat_values[0]
+    logging.info(
+        'notsent[0]: %s', notsent_lowat_values[0])
     # if flags are set, override current values from vm
     if FLAGS.tcp_max_receive_buffer:
       max_receive = FLAGS.tcp_max_receive_buffer
     if FLAGS.tcp_max_send_buffer:
       max_send = FLAGS.tcp_max_send_buffer
+    if _TCP_MAX_NOTSENT_BYTES.value:
+      max_not_sent = _TCP_MAX_NOTSENT_BYTES.value
     if FLAGS.rmem_max:
       rmem_max = FLAGS.rmem_max
     if FLAGS.wmem_max:
@@ -733,6 +754,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # Add values to metadata
     self.os_metadata['tcp_max_receive_buffer'] = max_receive
     self.os_metadata['tcp_max_send_buffer'] = max_send
+    self.os_metadata['tcp_max_notsent_bytes'] = max_not_sent
     self.os_metadata['rmem_max'] = rmem_max
     self.os_metadata['wmem_max'] = wmem_max
 
@@ -742,10 +764,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     wmem_string = '{} {} {}'.format(wmem_values[0],
                                     wmem_values[1],
                                     max_send)
+    logging.info('rmem_string: ' + rmem_string + ' wmem_string: ' + wmem_string)
+    not_sent_string = '{}'.format(max_not_sent)
 
     self._ApplySysctlPersistent({
         'net.ipv4.tcp_rmem': rmem_string,
         'net.ipv4.tcp_wmem': wmem_string,
+        'net.ipv4.tcp_notsent_lowat': not_sent_string,
         'net.core.rmem_max': rmem_max,
         'net.core.wmem_max': wmem_max
     })
