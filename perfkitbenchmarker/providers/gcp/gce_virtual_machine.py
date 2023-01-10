@@ -1081,8 +1081,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def StartLMNotification(self):
     """Start meta-data server notification subscription."""
     def _Subscribe():
-      self.RobustRemoteCommand(self._GetLMNotificationCommand(),
-                               timeout=LM_NOTIFICATION_TIMEOUT_SECONDS)
+      self.RobustRemoteCommand(
+          self._GetLMNotificationCommand(),
+          timeout=LM_NOTIFICATION_TIMEOUT_SECONDS,
+          ignore_failure=True,
+      )
       self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
       logging.info('[LM Notify] Release live migration lock.')
       self._LM_TIMES_SEMAPHORE.release()
@@ -1109,7 +1112,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     lm_total_time_key = 'LM_total_time'
     lm_start_time_key = 'Host_maintenance_start'
     lm_end_time_key = 'Host_maintenance_end'
-    events_dict = {'machine_instance': self.instance_number}
+    events_dict = {
+        'machine_instance': self.instance_number,
+        lm_start_time_key: 0,
+        lm_end_time_key: 0,
+        lm_total_time_key: 0,
+    }
     lm_times, _ = self.RemoteCommand(f'cat {self._LM_NOTICE_LOG}')
     if not lm_times: return events_dict
 
@@ -1119,11 +1127,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       if len(event_info_parts) == 2:
         events_dict[event_info_parts[0]] = event_info_parts[1]
 
-    lm_total_time = 0
-    if lm_start_time_key in events_dict and lm_end_time_key in events_dict:
-      lm_total_time = float(events_dict[lm_end_time_key]) - float(
-          events_dict[lm_start_time_key])
-    events_dict[lm_total_time_key] = lm_total_time
+    events_dict[lm_total_time_key] = float(
+        events_dict[lm_end_time_key]
+    ) - float(events_dict[lm_start_time_key])
     return events_dict
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename,
