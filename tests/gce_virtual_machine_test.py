@@ -22,6 +22,7 @@ import re
 import unittest
 
 from absl import flags
+from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 
@@ -974,6 +975,7 @@ class GvnicTest(GceVirtualMachineTestCase):
     self.mock_cmd.assert_called_with(
         'PATH="${PATH}":/usr/sbin ethtool -i ens4')
 
+  @flagsaver.flagsaver(gce_nic_record_version=True)
   def testOnStartupSetGvnicVersion(self):
     self.mock_cmd.side_effect = [(_IP_LINK_TEXT, ''), (_ETHTOOL_TEXT, ''),
                                  (_IP_LINK_TEXT, '')]
@@ -983,6 +985,7 @@ class GvnicTest(GceVirtualMachineTestCase):
     self.assertEqual('1460',
                      list(self.vm._get_network_device_mtus().values())[0])
 
+  @flagsaver.flagsaver(gce_nic_record_version=True)
   def testMissingVersionInProperties(self):
     self.mock_cmd.side_effect = [(_IP_LINK_TEXT, ''), ('driver: gve', '')]
     with self.assertRaises(ValueError):

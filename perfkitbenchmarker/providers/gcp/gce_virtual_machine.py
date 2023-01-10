@@ -1284,6 +1284,9 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine,
 
   def GetGvnicVersion(self) -> Optional[str]:
     """Returns the gvnic network driver version."""
+    if not gcp_flags.GCE_NIC_RECORD_VERSION.value:
+      return
+
     all_device_properties = {}
     for device_name in self._get_network_device_mtus():
       device = self._GetNetworkDeviceProperties(device_name)
