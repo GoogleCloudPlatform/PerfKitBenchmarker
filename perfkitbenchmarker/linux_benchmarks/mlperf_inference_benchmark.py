@@ -15,7 +15,6 @@
 import json
 import logging
 import math
-import os
 import posixpath
 import re
 from typing import Any, Dict, List, Tuple
@@ -24,7 +23,6 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import mlperf_benchmark
 from perfkitbenchmarker.linux_packages import cuda_toolkit
@@ -39,17 +37,7 @@ _DLRM_DATA_MODULE = 'criteo'
 _DLRM_DATA = 'day_23.gz'
 _DLRM_PREPROCESSED_DATA = 'full_recalib.tar.gz'
 _DLRM_MODEL = '40m_limit.tar.gz'
-_DLRM_ROW_FREQ = [
-    'tb00_40M_ptaa',
-    'tb00_40M_ptab',
-    'tb00_40M_ptac',
-    'tb00_40M_ptad',
-    'tb00_40M_ptae',
-    'tb00_40M_ptaf',
-    'tb00_40M_ptag',
-    'tb00_40M_ptah',
-    'tb00_40M_ptai',
-]
+_DLRM_ROW_FREQ = 'tb00_40M.pt'
 BENCHMARK_NAME = 'mlperf_inference'
 BENCHMARK_CONFIG = """
 mlperf_inference:
@@ -187,12 +175,8 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     vm.RemoteCommand(f'cd {model_dir} && '
                      f'tar -zxvf {_DLRM_MODEL} && '
                      f'rm -f {_DLRM_MODEL}')
-    run_dir = temp_dir.GetRunDirPath()
-    for dlrm_row_freq in _DLRM_ROW_FREQ:
-      vm.DownloadPreprovisionedData(run_dir, benchmark, dlrm_row_freq)
-    vm.RemoteCommand(
-        f'cat {os.path.join(run_dir, "tb00_40M_pta*")} >> {os.path.join(model_dir, "tb00_40M.pt")}'
-    )
+    # tb00_40M.pt is 89.5 GB. Set timeout to one hour.
+    vm.DownloadPreprovisionedData(model_dir, benchmark, _DLRM_ROW_FREQ, 3600)
 
     # Preprocess Data
     preprocessed_data_dir = posixpath.join(_MLPERF_SCRATCH_PATH,
