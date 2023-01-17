@@ -119,7 +119,7 @@ def Prepare(benchmark_spec):
       vm.iperf_tcp_server_pid = stdout.strip()
     if UDP in FLAGS.iperf_benchmarks:
       stdout, _ = vm.RemoteCommand(
-          f'nohup iperf --server --udp --port {IPERF_UDP_PORT}'
+          f'nohup iperf --server --bind {vm} --udp --port {IPERF_UDP_PORT}'
           ' &> /dev/null & echo $!')
       # TODO(ssabhaya): store this in a better place once we have a better place
       vm.iperf_udp_server_pid = stdout.strip()

@@ -53,6 +53,8 @@ _K8S_PROVISIONERS = [
 flags.DEFINE_enum('k8s_volume_provisioner', None, _K8S_PROVISIONERS,
                   'The name of the provisioner to use for K8s storage '
                   'classes.')
+flags.DEFINE_string('k8s_sriov_network', None,
+                    'The name of the network with sriov enabled interfaces')
 
 SETUP_SSH = flags.DEFINE_boolean(
     'kubernetes_vm_setup_ssh', False,
