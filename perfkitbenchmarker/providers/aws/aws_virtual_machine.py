@@ -1614,6 +1614,9 @@ class CentOsStream8BasedAwsVirtualMachine(
   DEFAULT_USER_NAME = 'centos'
 
 
+# TODO(pclay): Move to AMIS owned by 792107900819 and documented at
+# https://rockylinux.org/cloud-images/ once
+# https://bugs.rockylinux.org/view.php?id=1684 is resolved.
 class RockyLinux8BasedAwsVirtualMachine(AwsVirtualMachine,
                                         linux_virtual_machine.RockyLinux8Mixin):
   """Class with configuration for AWS Rocky Linux 8 virtual machines."""
@@ -1634,8 +1637,6 @@ class RockyLinux9BasedAwsVirtualMachine(AwsVirtualMachine,
   IMAGE_PRODUCT_CODE_FILTER = '3qk9e6x2ni81uiqnorll45r3f'
   IMAGE_NAME_FILTER = 'Rocky-9-*'
   DEFAULT_USER_NAME = 'rocky'
-  # No gp2 AMI available.
-  DEFAULT_ROOT_DISK_TYPE = 'gp3'
 
 
 class CentOsStream9BasedAwsVirtualMachine(
