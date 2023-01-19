@@ -25,23 +25,36 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.time_triggers import base_time_trigger
 
 TIME_SERIES_SAMPLES_FOR_AGGREGATION = [
-    sample.TPM_TIME_SERIES, sample.OPS_TIME_SERIES
+    sample.TPM_TIME_SERIES,
+    sample.OPS_TIME_SERIES,
 ]
 PERCENTILES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
 SIMULATE_MAINTENANCE = flags.DEFINE_boolean(
-    'simulate_maintenance', False,
-    'Whether to simulate VM maintenance during the benchmark. '
-    'This simulate maintenance happens right after run stage starts.')
+    'simulate_maintenance',
+    False,
+    (
+        'Whether to simulate VM maintenance during the benchmark. '
+        'This simulate maintenance happens right after run stage starts.'
+    ),
+)
 SIMULATE_MAINTENANCE_DELAY = flags.DEFINE_integer(
-    'simulate_maintenance_delay', 0,
-    'The number of seconds to wait to start simulating '
-    'maintenance after run stage.')
+    'simulate_maintenance_delay',
+    0,
+    (
+        'The number of seconds to wait to start simulating '
+        'maintenance after run stage.'
+    ),
+)
 
 CAPTURE_LIVE_MIGRATION_TIMESTAMPS = flags.DEFINE_boolean(
-    'capture_live_migration_timestamps', False,
-    'Whether to capture maintenance times during migration. '
-    'This requires external python script for notification.')
+    'capture_live_migration_timestamps',
+    False,
+    (
+        'Whether to capture maintenance times during migration. '
+        'This requires external python script for notification.'
+    ),
+)
 
 
 class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
@@ -49,7 +62,9 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
 
   def __init__(self):
     super().__init__(SIMULATE_MAINTENANCE_DELAY.value)
-    self.capture_live_migration_timestamps = CAPTURE_LIVE_MIGRATION_TIMESTAMPS.value
+    self.capture_live_migration_timestamps = (
+        CAPTURE_LIVE_MIGRATION_TIMESTAMPS.value
+    )
     self.lm_ends = None
 
   def TriggerMethod(self, vm: virtual_machine.VirtualMachine):
@@ -63,8 +78,12 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
       for vm in self.vms:
         vm.SetupLMNotification()
 
-  def AppendSamples(self, unused_sender, benchmark_spec: bm_spec.BenchmarkSpec,
-                    samples: List[sample.Sample]):
+  def AppendSamples(
+      self,
+      unused_sender,
+      benchmark_spec: bm_spec.BenchmarkSpec,
+      samples: List[sample.Sample],
+  ):
     """Append samples related to Live Migration."""
     if self.capture_live_migration_timestamps:
       # Block test exit until LM ended.
@@ -74,8 +93,13 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
         lm_events_dict = vm.CollectLMNotificationsTime()
         lm_ends = max(lm_ends, float(lm_events_dict['Host_maintenance_end']))
         samples.append(
-            sample.Sample('LM Total Time', lm_events_dict['LM_total_time'],
-                          'seconds', lm_events_dict))
+            sample.Sample(
+                'LM Total Time',
+                lm_events_dict['LM_total_time'],
+                'seconds',
+                lm_events_dict,
+            )
+        )
       self.lm_ends = lm_ends
     self._AppendAggregatedMetrics(samples)
 
@@ -126,15 +150,27 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
 
     for i in range(len(values)):
       time = time_series[i]
-      value = values[i]
       if time >= ramp_up_ends and time <= ramp_down_starts:
+        interval_values = []
+        # If more than 1 sequential value is missing from the time series.
+        # Assume the worst case value (0.0) for the metric during those entries.
+        # Gaps of length 1 are expected due to normal time drift.
+        if i > 0:
+          time_gap_in_seconds = ((time - time_series[i - 1]) / 1000)
+          missing_entry_count = int((time_gap_in_seconds / interval) - 1)
+          if missing_entry_count > 1:
+            interval_values.extend(
+                [0.0 for second in range(missing_entry_count)]
+            )
+
+        interval_values.append(values[i])
         if time <= lm_start:
-          base_line_values.append(value)
+          base_line_values.extend(interval_values)
         else:
-          values_after_lm_starts.append(value)
+          values_after_lm_starts.extend(interval_values)
 
         if time > lm_ends:
-          values_after_lm_ends.append(value)
+          values_after_lm_ends.extend(interval_values)
 
     median = statistics.median(base_line_values)
     mean = statistics.mean(base_line_values)
@@ -145,16 +181,19 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
         del metadata[field]
 
     samples = self._ComputeLossPercentile(
-        mean, values_after_lm_starts, metadata) + self._ComputeLossWork(
-            median, values_after_lm_starts, interval, metadata)
+        mean, values_after_lm_starts, metadata
+    ) + self._ComputeLossWork(
+        median, values_after_lm_starts, interval, metadata
+    )
 
     if values_after_lm_ends:
       mean_after_lm_ends = statistics.mean(values_after_lm_ends)
       samples += self._ComputeDegradation(mean, mean_after_lm_ends, metadata)
     return samples
 
-  def _ComputeLossPercentile(self, mean: float, values_after_lm: List[float],
-                             metadata: Dict[str, Any]) -> List[sample.Sample]:
+  def _ComputeLossPercentile(
+      self, mean: float, values_after_lm: List[float], metadata: Dict[str, Any]
+  ) -> List[sample.Sample]:
     """Compute loss percentile metrics.
 
     This method samples of seconds_dropped_below_x_percent from 0% to 90%
@@ -182,11 +221,18 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
               f'seconds_dropped_below_{int(p * 100)}_percent',
               number_of_seconds_dropped_below_percentile[p],
               's',
-              metadata=metadata))
+              metadata=metadata,
+          )
+      )
     return samples
 
-  def _ComputeLossWork(self, median: float, values_after_lm: List[float],
-                       interval: float, metadata: Dict[str, Any]):
+  def _ComputeLossWork(
+      self,
+      median: float,
+      values_after_lm: List[float],
+      interval: float,
+      metadata: Dict[str, Any],
+  ):
     """Compute the loss work metrics for Live Migration.
 
     This method returns two metrics.
@@ -210,7 +256,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     for value in values_after_lm:
       if value < median * 0.95:
         total_loss_seconds += (median - value) / median * interval
-        unresponsive_metric += (((median - value) / median)**(3.0)) * interval
+        unresponsive_metric += (((median - value) / median) ** (3.0)) * interval
 
     samples = []
     samples.append(
@@ -218,24 +264,30 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
             'unresponsive_metric',
             round(unresponsive_metric, 4),
             'metric',
-            metadata=metadata))
+            metadata=metadata,
+        )
+    )
     samples.append(
         sample.Sample(
             'total_loss_seconds',
             round(total_loss_seconds, 4),
             'seconds',
-            metadata=metadata))
+            metadata=metadata,
+        )
+    )
     return samples
 
-  def _ComputeDegradation(self, baseline_mean: float, mean: float,
-                          metadata: Dict[str, Any]) -> List[sample.Sample]:
+  def _ComputeDegradation(
+      self, baseline_mean: float, mean: float, metadata: Dict[str, Any]
+  ) -> List[sample.Sample]:
     """Compute the degradation after LM ends to baseline."""
     return [
         sample.Sample(
             'degradation_percent',
             round((baseline_mean - mean) / baseline_mean * 100, 4),
             '%',
-            metadata=metadata)
+            metadata=metadata,
+        )
     ]
 
   @property
