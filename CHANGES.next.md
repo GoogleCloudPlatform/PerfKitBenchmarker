@@ -195,6 +195,7 @@
 
 ### Bug fixes and maintenance updates:
 
+-   Add 'runcpu --update' and 'runcpu --version' commands to install phase.
 -   Set the command to download preprovisioned data to be robust and have a five
     minute timeout.
 -   Make Speccpu17 fail if there are compilation errors that will cause missing
