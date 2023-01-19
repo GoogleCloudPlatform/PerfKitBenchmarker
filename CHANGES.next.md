@@ -292,3 +292,4 @@
 -   Fix how the CBT client is installed for the cloud_bigtable_ycsb_benchmark
     (when --google_bigtable_client_version is set) and use the `cbt` CLI instead
     of the hbase shell to create and delete tables.
+-   Changed the default benchmark to `cluster_boot` instead of the standard set.
