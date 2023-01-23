@@ -65,6 +65,8 @@ flags.DEFINE_integer('sysbench_latency_percentile', 100,
 flags.DEFINE_integer('sysbench_report_interval', 2,
                      'The interval, in seconds, we ask sysbench to report '
                      'results.')
+flags.DEFINE_boolean('sysbench_use_fk', True,
+                     'Use foreign keys. This is used by TPCC benchmark.')
 _SKIP_LOAD_STAGE = flags.DEFINE_boolean(
     'sysbench_skip_load_stage', False,
     'If true, skips the loading stage of the benchmark. Useful for when '
@@ -331,6 +333,8 @@ def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
                     '--report-interval=%d' % FLAGS.sysbench_report_interval,
                     '--max-requests=0',
                     '--time=%d' % duration]
+  if FLAGS.sysbench_testname == 'tpcc':
+    run_cmd_tokens.append('--use_fk=%d' % (1 if FLAGS.sysbench_use_fk else 0))
   run_cmd = ' '.join(run_cmd_tokens +
                      _GetCommonSysbenchOptions(benchmark_spec) +
                      ['run'])
@@ -543,6 +547,8 @@ def CreateMetadataFromFlags():
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval,
   }
+  if FLAGS.sysbench_testname == 'tpcc':
+    metadata['sysbench_use_fk'] = FLAGS.sysbench_use_fk
   return metadata
 
 
