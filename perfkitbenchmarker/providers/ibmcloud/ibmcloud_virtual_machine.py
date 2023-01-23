@@ -402,6 +402,11 @@ class Ubuntu1804BasedIbmCloudVirtualMachine(
     super(Ubuntu1804BasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
 
 
+class Ubuntu2004BasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
+                                            linux_virtual_machine.Ubuntu2004Mixin):
+  IMAGE_NAME_PREFIX = 'ibm-ubuntu-20-04-'
+
+
 class RhelBasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
                                       linux_virtual_machine.BaseRhelMixin):
 
