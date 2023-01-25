@@ -13,7 +13,7 @@
 # limitations under the License.
 rsa==4.7.2
 absl-py
-jinja2>=2.7
+jinja2>=2.10.2
 setuptools>=40.3.0
 colorlog[windows]==2.6.0
 blinker>=1.3
