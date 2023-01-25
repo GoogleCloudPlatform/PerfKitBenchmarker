@@ -93,8 +93,8 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     result = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                            machine_type='n1-standard-8')
     self.assertEqual(result.machine_type, 'n1-standard-8')
-    self.assertEqual(result.cpus, None)
-    self.assertEqual(result.memory, None)
+    self.assertIsNone(result.cpus)
+    self.assertIsNone(result.memory)
 
   def testStringMachineTypeWithGpus(self):
     gpu_count = 2
@@ -110,7 +110,7 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCustomMachineType(self):
     result = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
         'cpus': 1, 'memory': '7.5GiB'})
-    self.assertEqual(result.machine_type, None)
+    self.assertIsNone(result.machine_type)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
 
@@ -139,14 +139,14 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
             'memory': '7.5GiB'
         })
     self.assertEqual(result.machine_type, 'n1-standard-8')
-    self.assertEqual(result.cpus, None)
-    self.assertEqual(result.memory, None)
+    self.assertIsNone(result.cpus)
+    self.assertIsNone(result.memory)
 
   def testCustomMachineTypeFlagOverride(self):
     FLAGS['machine_type'].parse('{cpus: 1, memory: 7.5GiB}')
     result = gce_virtual_machine.GceVmSpec(
         _COMPONENT, flag_values=FLAGS, machine_type='n1-standard-8')
-    self.assertEqual(result.machine_type, None)
+    self.assertIsNone(result.machine_type)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
 
@@ -536,9 +536,9 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._CreateVmCommand(
           gce_migrate_on_maintenance=True, gpu_count=1, gpu_type='k80')
-      self.assertEqual(str(cm.exception), (
-          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
-          'or network placement groups, as it is not supported by GCP.'))
+    self.assertEqual(str(cm.exception), (
+        'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
+        'or network placement groups, as it is not supported by GCP.'))
 
   def testMigrateOnMaintenanceFlagFalseWithGpus(self):
     _, call_count = self._CreateVmCommand(
