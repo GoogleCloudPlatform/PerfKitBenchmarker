@@ -30,6 +30,10 @@
 -   Remove pkb's --placement_group_style cloud-agnostic values 'cluster'/
     'cluster_if_supported'/'spread'/'spread_if_supported'.
 -   Replace flag --ibm_azone with --ibm_region.
+-   Changed the default benchmark to `cluster_boot` instead of the standard set.
+    This makes the default behavior for PKB much faster and the standard set of
+    benchmarks was defined many years ago. It's not a reasonable introduction to
+    PKB or something that most people should run by default.
 
 ### New features:
 
@@ -285,7 +289,7 @@
 -   Add some required types to BaseAppServiceSpec.
 -   Uses nic type of GVNIC by default (instead of VIRTIO_NET) on GCE
 -   Rename pkb's --placement_group_style values to reflect their cloud-specific
-        CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN'; AWS -
+    CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN'; AWS -
     'cluster'/'spread'/'partition'; Azure -
     'proximity-placement-group'/'availability-set'). Cloud-agnostic value
     'closest_supported' will choose the most tightly-coupled placement policy
@@ -293,4 +297,3 @@
 -   Fix how the CBT client is installed for the cloud_bigtable_ycsb_benchmark
     (when --google_bigtable_client_version is set) and use the `cbt` CLI instead
     of the hbase shell to create and delete tables.
--   Changed the default benchmark to `cluster_boot` instead of the standard set.
