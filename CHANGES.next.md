@@ -196,6 +196,8 @@
 -   Add `--dpb_job_poll_interval_secs` flag to control job polling frequency in
     DPB benchmarks.
 -   Add support for more readings in nvidia_power tracking.
+-   Add samples for Create Time, Ready Time, and Delete Time for all resources
+    regardless of benchmark.
 
 ### Bug fixes and maintenance updates:
 

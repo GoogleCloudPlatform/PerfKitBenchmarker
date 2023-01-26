@@ -22,6 +22,7 @@ import logging
 import os
 import pickle
 import threading
+from typing import List
 import uuid
 
 from absl import flags
@@ -44,6 +45,7 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import resource as resource_type
 from perfkitbenchmarker import smb_service
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
@@ -128,6 +130,7 @@ class BenchmarkSpec(object):
     self.status_detail = None
     BenchmarkSpec.total_benchmarks += 1
     self.sequence_number = BenchmarkSpec.total_benchmarks
+    self.resources: List[resource_type.Resource] = []
     self.vms = []
     self.regional_networks = {}
     self.networks = {}
@@ -237,6 +240,7 @@ class BenchmarkSpec(object):
         cloud, cluster_type)
     self.container_cluster = container_cluster_class(
         self.config.container_cluster)
+    self.resources.append(self.container_cluster)
 
   def ConstructContainerRegistry(self):
     """Create the container registry."""
@@ -248,6 +252,7 @@ class BenchmarkSpec(object):
         cloud)
     self.container_registry = container_registry_class(
         self.config.container_registry)
+    self.resources.append(self.container_registry)
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""
@@ -262,6 +267,7 @@ class BenchmarkSpec(object):
     dpb_service_class = dpb_service.GetDpbServiceClass(dpb_service_cloud,
                                                        dpb_service_type)
     self.dpb_service = dpb_service_class(dpb_service_spec)
+    self.resources.append(self.dpb_service)
 
     # If the dpb service is un-managed, the provisioning needs to be handed
     # over to the vm creation module.
@@ -301,6 +307,7 @@ class BenchmarkSpec(object):
       self.config.relational_db.engine_version = (
           relational_db_class.GetDefaultEngineVersion(engine))
     self.relational_db = relational_db_class(self.config.relational_db)
+    self.resources.append(self.relational_db)
 
   def ConstructNonRelationalDb(self) -> None:
     """Initializes the non_relational db."""
@@ -317,6 +324,7 @@ class BenchmarkSpec(object):
     non_relational_db_class = non_relational_db.GetNonRelationalDbClass(
         service_type)
     self.non_relational_db = non_relational_db_class.FromSpec(db_spec)
+    self.resources.append(self.non_relational_db)
 
   def ConstructTpuGroup(self, group_spec):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
@@ -336,6 +344,7 @@ class BenchmarkSpec(object):
 
       self.tpu_groups[group_name] = tpu
       self.tpus.append(tpu)
+      self.resources.append(tpu)
 
   def ConstructEdwService(self):
     """Create the edw_service object."""
@@ -360,6 +369,7 @@ class BenchmarkSpec(object):
         edw_service_class_name[0].upper() + edw_service_class_name[1:])
     # Check if a new instance needs to be created or restored from snapshot
     self.edw_service = edw_service_class(self.config.edw_service)
+    self.resources.append(self.edw_service)
 
   def ConstructNfsService(self):
     """Construct the NFS service object.
@@ -389,6 +399,9 @@ class BenchmarkSpec(object):
       logging.debug('NFS service %s', self.nfs_service)
       break
 
+    if self.nfs_service:
+      self.resources.append(self.nfs_service)
+
   def ConstructSmbService(self):
     """Construct the SMB service object.
 
@@ -410,6 +423,8 @@ class BenchmarkSpec(object):
       self.smb_service = smb_class(disk_spec, group_spec.vm_spec.zone)
       logging.debug('SMB service %s', self.smb_service)
       break
+    if self.smb_service:
+      self.resources.append(self.smb_service)
 
   def ConstructVirtualMachineGroup(self, group_name, group_spec):
     """Construct the virtual machine(s) needed for a group."""
@@ -603,6 +618,7 @@ class BenchmarkSpec(object):
     if self.config.vpn_service is None:
       return
     self.vpn_service = vpn_service.VPNService(self.config.vpn_service)
+    self.resources.append(self.vpn_service)
 
   def ConstructMessagingService(self):
     """Create the messaging_service object.
@@ -619,6 +635,7 @@ class BenchmarkSpec(object):
     )
     self.messaging_service = messaging_service_class.FromSpec(
         self.config.messaging_service)
+    self.resources.append(self.messaging_service)
     self.messaging_service.setVms(self.vm_groups)
 
   def ConstructDataDiscoveryService(self):
@@ -633,6 +650,7 @@ class BenchmarkSpec(object):
     )
     self.data_discovery_service = data_discovery_service_class.FromSpec(
         self.config.data_discovery_service)
+    self.resources.append(self.data_discovery_service)
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
@@ -824,10 +842,8 @@ class BenchmarkSpec(object):
   def GetSamples(self):
     """Returns samples created from benchmark resources."""
     samples = []
-    if self.container_cluster:
-      samples.extend(self.container_cluster.GetSamples())
-    if self.container_registry:
-      samples.extend(self.container_registry.GetSamples())
+    for resource in self.resources:
+      samples.extend(resource.GetSamples())
     return samples
 
   def StartBackgroundWorkload(self):
@@ -921,7 +937,9 @@ class BenchmarkSpec(object):
           'VMs of type %s" are not currently supported on cloud "%s".' %
           (os_type, cloud))
 
-    return vm_class(vm_spec)
+    vm = vm_class(vm_spec)
+    self.resources.append(vm)
+    return vm
 
   def CreateAndBootVm(self, vm):
     """Creates a single VM and waits for boot to complete.
