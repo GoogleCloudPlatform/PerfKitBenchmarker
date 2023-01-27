@@ -814,6 +814,9 @@ def AggregateMemtierResults(memtier_results: List[MemtierResult],
   series_length = len(timestamps)
   if MEMTIER_RUN_DURATION.value:
     series_length = max(MEMTIER_RUN_DURATION.value + 1, series_length)
+    if series_length != len(timestamps):
+      new_timestamps = [timestamps[0] + 1000 * i for i in range(series_length)]
+      timestamps = new_timestamps
   ops_series = [0] * series_length
   max_latency_series = [0] * series_length
 
