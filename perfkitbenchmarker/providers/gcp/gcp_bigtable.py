@@ -29,7 +29,16 @@ import requests
 
 FLAGS = flags.FLAGS
 
-
+ENDPOINT = flags.DEFINE_string(
+    'google_bigtable_endpoint',
+    'bigtable.googleapis.com',
+    'Google API endpoint for Cloud Bigtable.',
+)
+ADMIN_ENDPOINT = flags.DEFINE_string(
+    'google_bigtable_admin_endpoint',
+    'bigtableadmin.googleapis.com',
+    'Google API endpoint for Cloud Bigtable table administration.',
+)
 flags.DEFINE_string('google_bigtable_instance_name', None,
                     'Bigtable instance name. If not specified, new instance '
                     'will be created and deleted on the fly. If specified, '
@@ -303,8 +312,10 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
   def _UpdateLabels(self, labels: Dict[str, Any]) -> None:
     """Updates the labels of the current instance."""
     header = {'Authorization': f'Bearer {util.GetAccessToken()}'}
-    url = ('https://bigtableadmin.googleapis.com/v2/'
-           f'projects/{self.project}/instances/{self.name}')
+    url = (
+        f'https://{ADMIN_ENDPOINT.value}/v2/'
+        f'projects/{self.project}/instances/{self.name}'
+    )
     # Keep any existing labels
     tags = self._GetLabels()
     tags.update(labels)

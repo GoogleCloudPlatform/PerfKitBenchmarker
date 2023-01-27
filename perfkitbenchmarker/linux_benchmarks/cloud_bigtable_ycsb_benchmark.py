@@ -56,13 +56,6 @@ BIGTABLE_CLIENT_VERSION = '1.4.0'
 YCSB_BIGTABLE_TABLE_SHARING_TAR_URL = (
     'https://storage.googleapis.com/cbt_ycsb_client_jar/ycsb-0.14.0.tar.gz')
 
-_ENDPOINT = flags.DEFINE_string('google_bigtable_endpoint',
-                                'bigtable.googleapis.com',
-                                'Google API endpoint for Cloud Bigtable.')
-_ADMIN_ENDPOINT = flags.DEFINE_string(
-    'google_bigtable_admin_endpoint', 'bigtableadmin.googleapis.com',
-    'Google API endpoint for Cloud Bigtable table '
-    'administration.')
 _STATIC_TABLE_NAME = flags.DEFINE_string(
     'google_bigtable_static_table_name', None,
     'Bigtable table name. If not specified, a temporary table '
@@ -251,11 +244,11 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
       f'echo "export JAVA_HOME=/usr" >> {hbase.HBASE_CONF_DIR}/hbase-env.sh')
 
   context = {
-      'google_bigtable_endpoint': _ENDPOINT.value,
-      'google_bigtable_admin_endpoint': _ADMIN_ENDPOINT.value,
+      'google_bigtable_endpoint': gcp_bigtable.ENDPOINT.value,
+      'google_bigtable_admin_endpoint': gcp_bigtable.ADMIN_ENDPOINT.value,
       'project': FLAGS.project or _GetDefaultProject(),
       'instance': bigtable.name,
-      'hbase_version': HBASE_CLIENT_VERSION.replace('.', '_')
+      'hbase_version': HBASE_CLIENT_VERSION.replace('.', '_'),
   }
 
   for file_name in HBASE_CONF_FILES:
@@ -373,7 +366,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       google_cloud_cbt.CBT_BIN,
       f'-project={FLAGS.project or _GetDefaultProject()}',
       f'-instance={instance.name}',
-      f'-admin-endpoint={_ADMIN_ENDPOINT.value}:443',
+      f'-admin-endpoint={gcp_bigtable.ADMIN_ENDPOINT.value}:443',
       'createtable',
       _GetTableName(),
       # Settings derived from data/hbase/create-ycsb-table.hbaseshell.j2
@@ -462,7 +455,7 @@ def _CleanupTable(benchmark_spec: bm_spec.BenchmarkSpec):
       google_cloud_cbt.CBT_BIN,
       f'-project={FLAGS.project or _GetDefaultProject()}',
       f'-instance={instance.name}',
-      f'-admin-endpoint={_ADMIN_ENDPOINT.value}:443',
+      f'-admin-endpoint={gcp_bigtable.ADMIN_ENDPOINT.value}:443',
       'deletetable',
       _GetTableName(),
   ]
