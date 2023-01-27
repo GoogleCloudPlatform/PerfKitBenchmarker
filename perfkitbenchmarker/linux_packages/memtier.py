@@ -809,12 +809,13 @@ def AggregateMemtierResults(memtier_results: List[MemtierResult],
   timestamps = memtier_results[0].timestamps
 
   # Not all clients have the same duration
-  for memtier_result in non_empty_results:
-    if len(memtier_result.timestamps) > len(timestamps):
-      timestamps = memtier_result.timestamps
-
-  ops_series = [0] * len(timestamps)
-  max_latency_series = [0] * len(timestamps)
+  # Determine the duration based on the max length
+  # or use the Memtier run duration as the max length
+  series_length = len(timestamps)
+  if MEMTIER_RUN_DURATION.value:
+    series_length = max(MEMTIER_RUN_DURATION.value + 1, series_length)
+  ops_series = [0] * series_length
+  max_latency_series = [0] * series_length
 
   for memtier_result in non_empty_results:
     for i in range(len(memtier_result.ops_series)):
