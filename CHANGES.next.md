@@ -34,6 +34,7 @@
     This makes the default behavior for PKB much faster and the standard set of
     benchmarks was defined many years ago. It's not a reasonable introduction to
     PKB or something that most people should run by default.
+-   --dpb_export_job_stats is now False by default.
 
 ### New features:
 

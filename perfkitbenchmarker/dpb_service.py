@@ -71,8 +71,14 @@ flags.DEFINE_float(
     lower_bound=0, upper_bound=120)
 flags.DEFINE_string(
     'dpb_initialization_actions', None,
-    'A comma separated list of Google Cloud Storage URIs of executables to run on each node in the DPB cluster. See https://cloud.google.com/sdk/gcloud/reference/dataproc/clusters/create#--initialization-actions.'
+    'A comma separated list of Google Cloud Storage URIs of executables to run '
+    'on each node in the DPB cluster. See '
+    'https://cloud.google.com/sdk/gcloud/reference/dataproc/clusters/create#--initialization-actions.'
 )
+flags.DEFINE_bool(
+    'dpb_export_job_stats', False,
+    'Exports job stats such as CPU usage and cost. Enabled by default, but not '
+    'necessarily implemented on all services.')
 
 FLAGS = flags.FLAGS
 
