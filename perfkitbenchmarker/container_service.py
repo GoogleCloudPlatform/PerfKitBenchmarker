@@ -552,7 +552,12 @@ class BaseContainerCluster(resource.BaseResource):
 
   def GetSamples(self):
     """Return samples with information about deployment times."""
-    samples = super().GetSamples()
+    samples = []
+    if self.resource_ready_time and self.create_start_time:
+      samples.append(
+          sample.Sample('Cluster Creation Time',
+                        self.resource_ready_time - self.create_start_time,
+                        'seconds'))
     for container in itertools.chain(*list(self.containers.values())):
       metadata = {'image': container.image.split('/')[-1]}
       if container.resource_ready_time and container.create_start_time:
