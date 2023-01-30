@@ -340,12 +340,16 @@ def IssueCommand(
     IssueCommandError: When raise_on_failure=True and retcode is non-zero.
     IssueCommandTimeoutError:  When raise_on_timeout=True and
                                command duration exceeds timeout
+    ValueError: When incorrect parameters are passed in.
   """
   if env:
     logging.debug('Environment variables: %s', env)
 
   # Force conversion to string so you get a nice log statement before hitting a
   # type error or NPE.
+  if isinstance(cmd, str):
+    raise ValueError(
+        f'Command must be a list of strings, but string {cmd} was received')
   full_cmd = ' '.join(str(w) for w in cmd)
   logging.info('Running: %s', full_cmd)
 
