@@ -359,7 +359,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""
-    return True
+    return False
 
 
 class DebianBasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
@@ -380,6 +380,11 @@ class Debian9BasedIbmCloudVirtualMachine(DebianBasedIbmCloudVirtualMachine,
 class Debian10BasedIbmCloudVirtualMachine(DebianBasedIbmCloudVirtualMachine,
                                           linux_virtual_machine.Debian10Mixin):
   IMAGE_NAME_PREFIX = 'ibm-debian-10-'
+
+
+class Debian11BasedIbmCloudVirtualMachine(DebianBasedIbmCloudVirtualMachine,
+                                          linux_virtual_machine.Debian11Mixin):
+  IMAGE_NAME_PREFIX = 'ibm-debian-11-'
 
 
 class Ubuntu1604BasedIbmCloudVirtualMachine(
