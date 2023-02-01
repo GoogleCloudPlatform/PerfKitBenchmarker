@@ -558,12 +558,14 @@ def _Run(vm,
       '\tmemtier pipeline, %s', clients, threads, pipeline)
 
   file_name_suffix = '_'.join(filter(None, [str(server_port), unique_id]))
-  memtier_results_file_name = '_'.join([MEMTIER_RESULTS, file_name_suffix])
+  memtier_results_file_name = (
+      '_'.join([MEMTIER_RESULTS, file_name_suffix]) + '.log'
+  )
   memtier_results_file = pathlib.PosixPath(
       f'{TMP_FOLDER}/{memtier_results_file_name}')
   vm.RemoteCommand(f'rm -f {memtier_results_file}')
 
-  json_results_file_name = '_'.join([JSON_OUT_FILE, file_name_suffix])
+  json_results_file_name = '_'.join([JSON_OUT_FILE, file_name_suffix]) + '.log'
   json_results_file = (
       pathlib.PosixPath(f'{TMP_FOLDER}/{json_results_file_name}')
       if MEMTIER_TIME_SERIES.value else None)
