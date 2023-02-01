@@ -421,7 +421,13 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         self.subnet.name, '--network-security-group', self.name
     ] + self.resource_group.args + self.subnet.vnet.args)
 
-  def AllowPort(self, vm, start_port, end_port=None, source_range=None):
+  def AllowPort(
+      self,
+      vm,
+      start_port,
+      end_port=None,
+      source_range=None,
+      protocol='*'):
     """Open a port or port range.
 
     Args:
@@ -430,6 +436,9 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
       end_port: if given, the end of the port range.
       source_range: List of source CIDRs to allow for this port. If None, all
         sources are allowed. i.e. ['0.0.0.0/0']
+      protocol: Network protocol this rule applies to. One of {*, Ah, Esp, Icmp,
+        Tcp, Udp}. See
+        https://learn.microsoft.com/en-us/cli/azure/network/nsg/rule?view=azure-cli-latest#az-network-nsg-rule-create
 
     Raises:
       ValueError: when there are too many firewall rules.
@@ -450,7 +459,8 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
 
     network_cmd = [
         azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create', '--name',
-        rule_name, '--destination-port-range', port_range, '--access', 'Allow',
+        rule_name, '--destination-port-range', port_range,
+        '--protocol', protocol, '--access', 'Allow',
         '--priority',
         str(rule_priority)
     ] + ['--source-address-prefixes'] + source_range
