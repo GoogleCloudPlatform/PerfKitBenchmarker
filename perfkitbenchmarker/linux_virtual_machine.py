@@ -1263,9 +1263,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def AuthenticateVm(self):
     """Authenticate a remote machine to access all peers."""
-    if not self.is_static and not self.has_private_key:
-      self.RemoteHostCopy(vm_util.GetPrivateKeyPath(),
-                          REMOTE_KEY_PATH)
+    if not self.has_private_key:
+      if not self.is_static:
+        self.RemoteHostCopy(vm_util.GetPrivateKeyPath(), REMOTE_KEY_PATH)
+      elif self.ssh_private_key and FLAGS.copy_ssh_private_keys_into_static_vms:
+        logging.warning('Copying ssh private keys into static VMs')
+        self.RemoteHostCopy(self.ssh_private_key, REMOTE_KEY_PATH)
+      else:
+        logging.warning(
+            'No key sharing for static VMs with'
+            ' --copy_ssh_private_keys_into_static_vms=False'
+        )
+        return
       self.RemoteCommand(
           'echo "Host *\n  StrictHostKeyChecking no\n" > ~/.ssh/config')
       self.RemoteCommand('chmod 600 ~/.ssh/config')
