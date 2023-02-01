@@ -100,6 +100,7 @@ class ScratchDiskTestMixin(object):
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
     self.addCleanup(flagsaver.restore_flag_values, self.saved_flag_values)
 
+  @flagsaver.flagsaver(azure_version_log=False)
   def testScratchDisks(self):
     """Test for creating and deleting scratch disks.
 

@@ -23,6 +23,7 @@ for more information about Azure Virtual Networks.
 import json
 import logging
 import threading
+from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import context
@@ -41,6 +42,9 @@ SSH_PORT = 22
 
 flags.DEFINE_boolean('azure_infiniband', False,
                      'Install Mellanox OpenFabrics drivers')
+_AZ_VERSION_LOG = flags.DEFINE_boolean(
+    'azure_version_log', True, 'Log az --version.'
+)
 
 DEFAULT_REGION = 'eastus2'
 
@@ -65,6 +69,8 @@ def GetResourceGroup(zone=None):
 
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
+  _az_lock = threading.Condition()
+  _az_version: Optional[str] = None
 
   def __init__(self,
                name,
@@ -73,6 +79,7 @@ class AzureResourceGroup(resource.BaseResource):
                timeout_minutes=None,
                raise_on_create_failure=True):
     super(AzureResourceGroup, self).__init__()
+    AzureResourceGroup._log_az_version()
     self.name = name
     self.use_existing = use_existing
     self.timeout_minutes = timeout_minutes
@@ -139,6 +146,17 @@ class AzureResourceGroup(resource.BaseResource):
     _, _, retcode = vm_util.IssueCommand(tag_cmd, raise_on_failure=False)
     if retcode:
       raise errors.Resource.CreationError('Error tagging Azure resource group.')
+
+  @classmethod
+  def _log_az_version(cls):
+    if not _AZ_VERSION_LOG.value:
+      return
+
+    with cls._az_lock:
+      if not cls._az_version:
+        cls.az_version, _, _ = vm_util.IssueCommand(
+            [azure.AZURE_PATH, '--version'],
+            raise_on_failure=True)
 
 
 class AzureStorageAccount(resource.BaseResource):
