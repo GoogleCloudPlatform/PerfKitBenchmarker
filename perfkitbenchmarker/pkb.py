@@ -733,6 +733,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructCapacityReservations()
   spec.ConstructTpu()
   spec.ConstructEdwService()
+  spec.ConstructEdwComputeResource()
   spec.ConstructVPNService()
   spec.ConstructNfsService()
   spec.ConstructSmbService()

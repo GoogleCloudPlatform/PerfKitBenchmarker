@@ -192,6 +192,19 @@ flags.DEFINE_string('dpb_dataflow_template_output_ptransform', None,
 flags.DEFINE_list('dpb_dataflow_template_additional_args', [],
                   'Additional arguments which should be passed to job.')
 
+# Flags for BigQuery flex slot allocation
+flags.DEFINE_integer(
+    'bq_slot_allocation_num', None,
+    'Number of flex slots to allocate.'
+)
+flags.DEFINE_string(
+    'bq_slot_allocation_region', None,
+    'Region to allocate flex slots in.'
+)
+flags.DEFINE_string(
+    'bq_slot_allocation_project', None,
+    'Project to allocate flex slots in.')
+
 
 def _ValidatePreemptFlags(flags_dict):
   if flags_dict['gce_preemptible_vms']:

@@ -103,6 +103,8 @@
 -   Add an HTTP endpoint polling utility & incorporate it into app_service.
 -   Added support for Data Plane Development Kit (DPDK) on Linux VM's to improve
     networking performance.
+-   Added support for dynamic provisioning of Bigquery flat rate slots at
+    benchmark runtime
 
 ### Enhancements:
 

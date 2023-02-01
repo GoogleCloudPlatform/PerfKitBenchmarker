@@ -33,6 +33,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import data_discovery_service
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import edw_compute_resource
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
@@ -151,6 +152,7 @@ class BenchmarkSpec(object):
     self.tpus = []
     self.tpu_groups = {}
     self.edw_service = None
+    self.edw_compute_resource = None
     self.nfs_service = None
     self.smb_service = None
     self.messaging_service = None
@@ -360,6 +362,23 @@ class BenchmarkSpec(object):
         edw_service_class_name[0].upper() + edw_service_class_name[1:])
     # Check if a new instance needs to be created or restored from snapshot
     self.edw_service = edw_service_class(self.config.edw_service)
+
+  def ConstructEdwComputeResource(self):
+    """Create an edw_compute_resource object."""
+    if self.config.edw_compute_resource is None:
+      return
+    edw_compute_resource_cloud = self.config.edw_compute_resource.cloud
+    edw_compute_resource_type = self.config.edw_compute_resource.type
+    providers.LoadProvider(edw_compute_resource_cloud)
+    edw_compute_resource_class = (
+        edw_compute_resource.GetEdwComputeResourceClass(
+            edw_compute_resource_cloud, edw_compute_resource_type
+        )
+    )
+    self.edw_compute_resource = edw_compute_resource_class(
+        self.config.edw_compute_resource
+    )
+    self.resources.append(self.edw_compute_resource)
 
   def ConstructNfsService(self):
     """Construct the NFS service object.
@@ -738,6 +757,8 @@ class BenchmarkSpec(object):
           if network.__class__.__name__ == 'AwsNetwork':
             self.edw_service.cluster_subnet_group.subnet_id = network.subnet.id
       self.edw_service.Create()
+    if self.edw_compute_resource:
+      self.edw_compute_resource.Create()
     if self.vpn_service:
       self.vpn_service.Create()
     if hasattr(self, 'messaging_service') and self.messaging_service:
@@ -768,6 +789,8 @@ class BenchmarkSpec(object):
       vm_util.RunThreaded(lambda tpu: tpu.Delete(), self.tpus)
     if self.edw_service:
       self.edw_service.Delete()
+    if hasattr(self, 'edw_compute_resource') and self.edw_compute_resource:
+      self.edw_compute_resource.Delete()
     if self.nfs_service:
       self.nfs_service.Delete()
     if self.smb_service:
