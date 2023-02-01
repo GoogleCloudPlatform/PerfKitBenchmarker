@@ -58,6 +58,11 @@ DATAPROC_TO_EMR_CONF_FILES = {
     'spark': 'spark-defaults',
 }
 
+# EMR Serverless Hourly VCPU prices
+EMR_S8S_US_EAST_1_VCPU_PER_HOUR_PRICE = 0.052624
+EMR_S8S_US_EAST_1_1GB_RAM_PER_HOUR_PRICE = 0.0057785
+EMR_S8S_US_EAST_1_1GB_SHUFFLE_DISK_PER_HOUR_PRICE = 0.000111
+
 
 def _GetClusterConfiguration():
   """Return a JSON string containing dpb_cluster_properties."""
@@ -455,6 +460,9 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
           'release-versions.html')
     self.role = FLAGS.aws_emr_serverless_role
 
+    # Last job run cost
+    self._run_cost = None
+
   def _Create(self):
     # Since there's no managed infrastructure, this is a no-op.
     pass
@@ -535,6 +543,9 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
     return self._WaitForJob(
         (application_id, job_run_id), EMR_TIMEOUT, job_poll_interval)
 
+  def CalculateCost(self) -> Optional[float]:
+    return self._run_cost
+
   def GetJobProperties(self) -> Dict[str, str]:
     result = {'spark.dynamicAllocation.enabled': 'FALSE'}
     if self.spec.emr_serverless_core_count:
@@ -563,6 +574,19 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
     result = json.loads(stdout)
     return result
 
+  def _ComputeJobRunCost(
+      self,
+      memory_gb_hour: float,
+      storage_gb_hour: float,
+      vcpu_hour: float) -> Optional[float]:
+    # TODO(odiego): Handle other regions prices. Now we only support us-east-1.
+    if self.region != 'us-east-1':
+      return None
+    return (
+        memory_gb_hour * EMR_S8S_US_EAST_1_1GB_RAM_PER_HOUR_PRICE +
+        storage_gb_hour * EMR_S8S_US_EAST_1_1GB_SHUFFLE_DISK_PER_HOUR_PRICE +
+        vcpu_hour * EMR_S8S_US_EAST_1_VCPU_PER_HOUR_PRICE)
+
   def _GetCompletedJob(self, job_id):
     """See base class."""
     application_id, job_run_id = job_id
@@ -587,4 +611,12 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
     if state == 'SUCCESS':
       start_time = result['jobRun']['createdAt']
       end_time = result['jobRun']['updatedAt']
+      resource_utilization = (
+          result.get('jobRun', {}).get('totalResourceUtilization', {}))
+      memory_gb_hour = resource_utilization.get('memoryGBHour')
+      storage_gb_hour = resource_utilization.get('storageGBHour')
+      vcpu_hour = resource_utilization.get('vCPUHour')
+      if None not in (memory_gb_hour, storage_gb_hour, vcpu_hour):
+        self._run_cost = self._ComputeJobRunCost(
+            memory_gb_hour, storage_gb_hour, vcpu_hour)
       return dpb_service.JobResult(run_time=end_time - start_time)
