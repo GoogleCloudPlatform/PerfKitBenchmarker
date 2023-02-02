@@ -203,7 +203,7 @@
 -   Add samples for Create Time, Ready Time, and Delete Time for all resources
     regardless of benchmark.
 -   Report benchmark run costs for dpb_sparksql_benchmark runs on Dataproc
-    Serverless & AWS EMR Serverless.
+    Serverless, AWS EMR Serverless & AWS Glue.
 
 ### Bug fixes and maintenance updates:
 
