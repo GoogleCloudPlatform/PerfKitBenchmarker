@@ -351,7 +351,7 @@ class AzureDedicatedHostGroup(resource.BaseResource):
         '--location',
         self.region,
         # number of fault domains (physical racks) to span across
-        # TODO(buggay): add support for multiple fault domains
+        # TODO(user): add support for multiple fault domains
         # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/dedicated-hosts#high-availability-considerations
         '--platform-fault-domain-count',
         '1',
@@ -391,7 +391,7 @@ class AzureDedicatedHostGroup(resource.BaseResource):
 
 def _GetSkuType(machine_type):
   """Returns the host SKU type derived from the VM machine type."""
-  # TODO(buggay): add support for FSv2 machine types when no longer in preview
+  # TODO(user): add support for FSv2 machine types when no longer in preview
   # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/dedicated-hosts
   sku = ''
   if re.match('Standard_D[0-9]*s_v3', machine_type):
@@ -456,7 +456,7 @@ class AzureDedicatedHost(resource.BaseResource):
         self.region,
         # the specific fault domain (physical rack) for the host dependent on
         # the number (count) of fault domains of the host group
-        # TODO(buggay): add support for specifying multiple fault domains if
+        # TODO(user): add support for specifying multiple fault domains if
         # benchmarks require
         '--platform-fault-domain',
         '0',
@@ -512,7 +512,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = providers.AZURE
 
   _lock = threading.Lock()
-  # TODO(buggay): remove host groups & hosts as globals -> create new spec
+  # TODO(user): remove host groups & hosts as globals -> create new spec
   # globals guarded by _lock
   host_map = collections.defaultdict(list)
 

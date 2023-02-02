@@ -101,7 +101,7 @@ def _MeasureStop(
                                     vms)
 
 
-# TODO(nsmit): Refactor to be useable in other files
+# TODO(user): Refactor to be useable in other files
 def _GetVmOperationDataSamples(
     operation_times: List[int], cluster_time: float, operation: str,
     vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:

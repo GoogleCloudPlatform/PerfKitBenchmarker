@@ -115,7 +115,7 @@ def Prepare(benchmark_spec):
       stdout, _ = vm.RemoteCommand(f'nohup iperf --server --port {IPERF_PORT}'
                                    ' &> /dev/null & echo $!')
 
-      # TODO(ssabhaya): store this in a better place once we have a better place
+      # TODO(user): store this in a better place once we have a better place
       vm.iperf_tcp_server_pid = stdout.strip()
       # Check that the server is actually running
       vm.RemoteCommand(f'ps -p {vm.iperf_tcp_server_pid}')
@@ -123,7 +123,7 @@ def Prepare(benchmark_spec):
       stdout, _ = vm.RemoteCommand(
           f'nohup iperf --server --bind {vm.internal_ip} --udp '
           f'--port {IPERF_UDP_PORT} &> /dev/null & echo $!')
-      # TODO(ssabhaya): store this in a better place once we have a better place
+      # TODO(user): store this in a better place once we have a better place
       vm.iperf_udp_server_pid = stdout.strip()
       # Check that the server is actually running
       vm.RemoteCommand(f'ps -p {vm.iperf_udp_server_pid}')
