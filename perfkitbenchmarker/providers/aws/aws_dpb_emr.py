@@ -28,6 +28,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_dpb_emr_serverless_prices
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import s3
@@ -57,11 +58,6 @@ DATAPROC_TO_EMR_CONF_FILES = {
     # https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark-configure.html
     'spark': 'spark-defaults',
 }
-
-# EMR Serverless Hourly VCPU prices
-EMR_S8S_US_EAST_1_VCPU_PER_HOUR_PRICE = 0.052624
-EMR_S8S_US_EAST_1_1GB_RAM_PER_HOUR_PRICE = 0.0057785
-EMR_S8S_US_EAST_1_1GB_SHUFFLE_DISK_PER_HOUR_PRICE = 0.000111
 
 
 def _GetClusterConfiguration():
@@ -579,13 +575,18 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
       memory_gb_hour: float,
       storage_gb_hour: float,
       vcpu_hour: float) -> Optional[float]:
-    # TODO(odiego): Handle other regions prices. Now we only support us-east-1.
-    if self.region != 'us-east-1':
+    region_prices = aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES.get(
+        self.region, {})
+    memory_gb_hour_price = region_prices.get('memory_gb_hours')
+    storage_gb_hour_price = region_prices.get('storage_gb_hours')
+    vcpu_hour_price = region_prices.get('vcpu_hours')
+    if (memory_gb_hour_price is None or storage_gb_hour_price is None or
+        vcpu_hour_price is None):
       return None
     return (
-        memory_gb_hour * EMR_S8S_US_EAST_1_1GB_RAM_PER_HOUR_PRICE +
-        storage_gb_hour * EMR_S8S_US_EAST_1_1GB_SHUFFLE_DISK_PER_HOUR_PRICE +
-        vcpu_hour * EMR_S8S_US_EAST_1_VCPU_PER_HOUR_PRICE)
+        memory_gb_hour * memory_gb_hour_price +
+        storage_gb_hour * storage_gb_hour_price +
+        vcpu_hour * vcpu_hour_price)
 
   def _GetCompletedJob(self, job_id):
     """See base class."""

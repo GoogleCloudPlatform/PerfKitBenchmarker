@@ -13,7 +13,9 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.aws.aws_dpb_emr."""
 
+import copy
 import json
+from typing import Any, Optional
 import unittest
 from unittest import mock
 
@@ -22,6 +24,7 @@ from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
+from perfkitbenchmarker.providers.aws import aws_dpb_emr_serverless_prices
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
@@ -29,7 +32,8 @@ from tests import pkb_common_test_case
 TEST_RUN_URI = 'fakeru'
 AWS_ZONE_US_EAST_1A = 'us-east-1a'
 FLAGS = flags.FLAGS
-JOB_RUN_MOCK_PAYLOAD = {
+
+_BASE_JOB_RUN_PAYLOAD = {
     'jobRun': {
         'applicationId': 'foobar',
         'jobRunId': 'bazquux',
@@ -66,6 +70,21 @@ JOB_RUN_MOCK_PAYLOAD = {
         }
     }
 }
+
+
+def _GetJobRunMockPayload(
+    vcpu_hour: Optional[float],
+    memory_gb_hour: Optional[float],
+    storage_gb_hour: Optional[float],
+) -> dict[str, Any]:
+  payload = copy.deepcopy(_BASE_JOB_RUN_PAYLOAD)
+  if vcpu_hour is not None:
+    payload['jobRun']['vCPUHour'] = vcpu_hour
+  if memory_gb_hour is not None:
+    payload['jobRun']['memoryGBHour'] = memory_gb_hour
+  if storage_gb_hour is not None:
+    payload['jobRun']['storageGBHour'] = storage_gb_hour
+  return payload
 
 
 SERVERLESS_SPEC = mock.Mock(
@@ -111,13 +130,36 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         (json.dumps(create_application_response), '', 0),
         (json.dumps(get_application_response), '', 0),
         (json.dumps(start_job_run_response), '', 0),
-        (json.dumps(JOB_RUN_MOCK_PAYLOAD), '', 0)
+        (json.dumps(
+            _GetJobRunMockPayload(vcpu_hour=59.422, memory_gb_hour=237.689,
+                                  storage_gb_hour=1901.511)), '', 0),
     ]
 
-    emr_serverless.SubmitJob(
-        pyspark_file='s3://test/hello.py',
-        job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE)
+    with mock.patch.object(
+        aws_dpb_emr_serverless_prices, 'EMR_SERVERLESS_PRICES'):
+      # The actual prices are expected to change over time, but we don't want to
+      # update the test every time.
+      aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES = {
+          'us-east-1': {
+              'vcpu_hours': 0.052624,
+              'memory_gb_hours': 0.0057785,
+              'storage_gb_hours': 0.000111,
+          },
+      }
+      emr_serverless.SubmitJob(
+          pyspark_file='s3://test/hello.py',
+          job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE)
+
     self.assertEqual(emr_serverless.CalculateCost(), 4.711576935499999)
+
+  def testEmrServerlessPricesSchema(self):
+    # Checking schema of EMR_SERVERLESS_PRICES
+    emr_serverless_prices = aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES
+    for region, price_dict in emr_serverless_prices.items():
+      self.assertIsInstance(region, str)
+      self.assertIsInstance(price_dict['vcpu_hours'], float)
+      self.assertIsInstance(price_dict['memory_gb_hours'], float)
+      self.assertIsInstance(price_dict['storage_gb_hours'], float)
 
 
 if __name__ == '__main__':

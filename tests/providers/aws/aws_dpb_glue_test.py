@@ -57,9 +57,9 @@ def _GetJobRunMockPayload(dpu_seconds, max_capacity, execution_time):
 
   if dpu_seconds is not None:
     payload['JobRun']['DPUSeconds'] = dpu_seconds
-  if dpu_seconds is not None:
+  if max_capacity is not None:
     payload['JobRun']['MaxCapacity'] = max_capacity
-  if dpu_seconds is not None:
+  if execution_time is not None:
     payload['JobRun']['ExecutionTime'] = execution_time
 
   return payload
