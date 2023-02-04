@@ -30,7 +30,7 @@ from perfkitbenchmarker.linux_packages import docker
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
 FLAGS = flags.FLAGS
-MLPERF_INFERENCE_VERSION = 'v1.1'
+MLPERF_INFERENCE_VERSION = 'v2.1'
 
 _MLPERF_SCRATCH_PATH = '/scratch'
 _DLRM_DATA_MODULE = 'criteo'
@@ -92,13 +92,15 @@ _ACCURACY_METADATA = [
     'power_limit',
     'cpu_freq',
     'test_mode',
-    'gpu_num_bundles',
     'log_dir',
 ]
 _PERFORMANCE_METRIC = 'result_completed_samples_per_sec'
 _VALID = 'Result is : VALID'
 _INVALID = 'Result is : INVALID'
-_PATCH = 'mlperf_inference.patch'
+_CUSTOM_CONFIG = 'mlperf_inference_{benchmark}_custom.py'
+_CUSTOM_CONFIG_PATH = 'closed/NVIDIA/configs/{benchmark}/Server/custom.py'
+_CUSTOM_CONFIG_LIST = 'mlperf_inference_custom_list.py'
+_CUSTOM_CONFIG_LIST_PATH = 'closed/NVIDIA/code/common/systems/custom_list.py'
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -127,26 +129,31 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
 
   repository = f'inference_results_{MLPERF_INFERENCE_VERSION}'
   vm.RemoteCommand(f'git clone https://github.com/mlcommons/{repository}.git')
-  vm.PushDataFile(_PATCH)
-  vm.RemoteCommand(f'patch -p0 < {_PATCH}')
 
   makefile = f'{repository}/closed/NVIDIA/Makefile'
   vm_util.ReplaceText(vm, 'shell uname -p', 'shell uname -m', makefile)
 
-  requirements1 = f'{repository}/closed/NVIDIA/docker/requirements.1'
-  vm_util.ReplaceText(vm, 'opencv-python-headless==4.5.2.52',
-                      'opencv-python-headless==4.5.3.56', requirements1)
-  requirements2 = f'{repository}/closed/NVIDIA/docker/requirements.2'
-
   benchmark = FLAGS.mlperf_benchmark
-  if _SERVER_TARGET_QPS.value:
-    config = f'{repository}/closed/NVIDIA/configs/{benchmark}/Server/__init__.py'
-    vm_util.ReplaceText(vm, 'server_target_qps = .*',
-                        f'server_target_qps = {_SERVER_TARGET_QPS.value}',
-                        config)
 
-  for requirements in (requirements1, requirements2):
-    vm_util.ReplaceText(vm, 'git:', 'https:', requirements)
+  custom_config = _CUSTOM_CONFIG.format(benchmark=benchmark)
+  custom_config_path = posixpath.join(
+      repository, _CUSTOM_CONFIG_PATH.format(benchmark=benchmark)
+  )
+  vm.PushDataFile(custom_config, custom_config_path)
+
+  custom_config_list_path = posixpath.join(repository, _CUSTOM_CONFIG_LIST_PATH)
+  vm.PushDataFile(_CUSTOM_CONFIG_LIST, custom_config_list_path)
+
+  if _SERVER_TARGET_QPS.value:
+    config = (
+        f'{repository}/closed/NVIDIA/configs/{benchmark}/Server/__init__.py'
+    )
+    vm_util.ReplaceText(
+        vm,
+        'server_target_qps = .*',
+        f'server_target_qps = {_SERVER_TARGET_QPS.value}',
+        config,
+    )
 
   if nvidia_driver.CheckNvidiaGpuExists(vm):
     vm.Install('cuda_toolkit')
@@ -166,7 +173,8 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   if benchmark == mlperf_benchmark.DLRM:
     # Download data
     data_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'data', _DLRM_DATA_MODULE)
-    vm.DownloadPreprovisionedData(data_dir, _DLRM_DATA_MODULE, _DLRM_DATA)
+    # day_23.gz is 13.9 GB. Set timeout to 1 hour.
+    vm.DownloadPreprovisionedData(data_dir, _DLRM_DATA_MODULE, _DLRM_DATA, 3600)
     vm.RemoteCommand(f'cd {data_dir} && gzip -d {_DLRM_DATA}')
 
     # Download model
@@ -175,15 +183,17 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     vm.RemoteCommand(f'cd {model_dir} && '
                      f'tar -zxvf {_DLRM_MODEL} && '
                      f'rm -f {_DLRM_MODEL}')
-    # tb00_40M.pt is 89.5 GB. Set timeout to one hour.
-    vm.DownloadPreprovisionedData(model_dir, benchmark, _DLRM_ROW_FREQ, 3600)
+    # tb00_40M.pt is 89.5 GB. Set timeout to 4 hours.
+    vm.DownloadPreprovisionedData(model_dir, benchmark, _DLRM_ROW_FREQ, 14400)
 
     # Preprocess Data
     preprocessed_data_dir = posixpath.join(_MLPERF_SCRATCH_PATH,
                                            'preprocessed_data',
                                            _DLRM_DATA_MODULE)
-    vm.DownloadPreprovisionedData(preprocessed_data_dir, _DLRM_DATA_MODULE,
-                                  _DLRM_PREPROCESSED_DATA)
+    # full_recalib.tar.gz is 7.9 GB. Set timeout to 1 hour.
+    vm.DownloadPreprovisionedData(
+        preprocessed_data_dir, _DLRM_DATA_MODULE, _DLRM_PREPROCESSED_DATA, 3600
+    )
     vm.RemoteCommand(f'cd {preprocessed_data_dir} && '
                      f'tar -zxvf {_DLRM_PREPROCESSED_DATA} && '
                      f'rm -f {_DLRM_PREPROCESSED_DATA}')
@@ -323,19 +333,25 @@ def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
     Whether the system under test passes under the serer target QPS.
   """
   vm = bm_spec.vms[0]
-  config = f'configs/{FLAGS.mlperf_benchmark}/Server/__init__.py'
+  config = f'configs/{FLAGS.mlperf_benchmark}/Server/*.py'
   vm.RobustRemoteCommand(
-      f'{bm_spec.env_cmd} && '
-      f'make launch_docker DOCKER_COMMAND="sed -i \'s/server_target_qps = .*/server_target_qps = {target_qps}/g\' {config}"',
-      should_log=True)
+      (
+          f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND="sed -i'
+          f" 's/server_target_qps = .*/server_target_qps = {target_qps}/g'"
+          f' {config}"'
+      ),
+      should_log=True,
+  )
   # For valid log, result_validity is VALID
   # For invalid log, result_validity is INVALID
   stdout, _ = vm.RobustRemoteCommand(
-      f'{bm_spec.env_cmd} && '
-      'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
-      f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly --fast\'"',
-      should_log=True)
+      (
+          f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND="make run_harness'
+          f" RUN_ARGS='--benchmarks={FLAGS.mlperf_benchmark} --scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly"
+          ' --fast\'"'
+      ),
+      should_log=True,
+  )
   return _VALID in stdout
 
 
