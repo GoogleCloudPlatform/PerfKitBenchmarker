@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from setuptools import setup, find_packages
+import os
 
 setup(
     name='perfkitbenchmarker',
