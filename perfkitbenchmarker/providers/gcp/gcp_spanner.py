@@ -270,7 +270,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
                              self.instance_id)
 
     # Do not log error or warning when checking existence.
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not find GCP Spanner instance %s.', self.instance_id)
       return False
@@ -283,8 +283,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     cmd.flags['instance'] = self.instance_id
 
     # Do not log error or warning when checking existence.
-    stdout, _, retcode = cmd.Issue(
-        suppress_warning=True, raise_on_failure=False)
+    stdout, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not find GCP Spanner database %s.', self.database)
       return False

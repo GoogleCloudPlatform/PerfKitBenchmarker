@@ -71,8 +71,7 @@ class EcrRepository(resource.BaseResource):
         'ecr', 'describe-repositories', '--region', self.region,
         '--repository-names', self.name
     ]
-    stdout, _, _ = vm_util.IssueCommand(
-        describe_cmd, suppress_warning=True, raise_on_failure=False)
+    stdout, _, _ = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
     if not stdout or not json.loads(stdout)['repositories']:
       return False
     return True
@@ -581,5 +580,5 @@ class AwsKopsCluster(container_service.KubernetesCluster):
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     _, _, retcode = vm_util.IssueCommand(
-        validate_cmd, env=env, suppress_warning=True, raise_on_failure=False)
+        validate_cmd, env=env, raise_on_failure=False)
     return not retcode

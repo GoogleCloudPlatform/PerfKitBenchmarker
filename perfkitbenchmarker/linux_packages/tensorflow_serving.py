@@ -108,10 +108,7 @@ def AptInstall(vm):
 def Uninstall(vm):
   """Uninstalls TensorFlow Serving on the VM."""
 
-  vm.RemoteCommand(
-      'sudo pip uninstall -y tensorflow_serving_api', should_log=True)
-  vm.RemoteHostCommand(
-      'sudo docker rmi benchmarks/tensorflow-serving', should_log=True)
-  vm.RemoteHostCommand(
-      'sudo docker rmi benchmarks/tensorflow-serving-devel', should_log=True)
+  vm.RemoteCommand('sudo pip uninstall -y tensorflow_serving_api')
+  vm.RemoteHostCommand('sudo docker rmi benchmarks/tensorflow-serving')
+  vm.RemoteHostCommand('sudo docker rmi benchmarks/tensorflow-serving-devel')
   del vm

@@ -149,7 +149,7 @@ def Run(benchmark_spec):
                 FLAGS.silo_benchmark,
                 nthreads)
   logging.info('Silo Results:')
-  stdout, stderr = vm.RemoteCommand(command, should_log=True)
+  stdout, stderr = vm.RemoteCommand(command)
   return ParseResults(stderr)
 
 

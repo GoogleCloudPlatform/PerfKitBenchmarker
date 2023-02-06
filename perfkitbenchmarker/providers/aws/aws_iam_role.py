@@ -170,8 +170,7 @@ class AwsIamRole(resource.BaseResource):
   def _RoleExists(self):
     """Returns true if the IAM role exists."""
     cmd = util.AWS_PREFIX + ['iam', 'get-role', '--role-name', self.role_name]
-    stdout, _, retcode = vm_util.IssueCommand(
-        cmd, suppress_warning=True, raise_on_failure=False)
+    stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     return retcode == 0 and stdout and json.loads(stdout)['Role']
 
   def _PolicyExists(self):
@@ -179,6 +178,5 @@ class AwsIamRole(resource.BaseResource):
     cmd = util.AWS_PREFIX + [
         'iam', 'get-policy', '--policy-arn', self.policy_arn
     ]
-    stdout, _, retcode = vm_util.IssueCommand(
-        cmd, suppress_warning=True, raise_on_failure=False)
+    stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     return retcode == 0 and stdout and json.loads(stdout)['Policy']

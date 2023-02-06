@@ -213,7 +213,7 @@ class LogDmesgTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.log_dmesg = True
     with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
       self.vm._PreDelete()
-    remote_command.assert_called_once_with('hostname && dmesg', should_log=True)
+    remote_command.assert_called_once_with('hostname && dmesg')
 
 
 class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):

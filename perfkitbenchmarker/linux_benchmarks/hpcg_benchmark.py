@@ -307,7 +307,7 @@ def Run(benchmark_spec):
   run_command = 'cd %s && %s ./%s' % (hpcg.HPCG_DIR,
                                       _GetEnvironmentVars(benchmark_spec),
                                       RUN_SCRIPT)
-  output, _ = master_vm.RobustRemoteCommand(run_command, should_log=True)
+  output, _ = master_vm.RobustRemoteCommand(run_command)
   return _MakeSamplesFromOutput(benchmark_spec, output)
 
 

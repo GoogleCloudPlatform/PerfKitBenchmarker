@@ -145,8 +145,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--kubeconfig=%s' % FLAGS.kubeconfig, 'get', 'pod', '-o=json', self.name
     ]
     logging.info('Waiting for POD %s', self.name)
-    pod_info, _, _ = vm_util.IssueCommand(
-        exists_cmd, suppress_warning=True, raise_on_failure=False)
+    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if pod_info:
       pod_info = json.loads(pod_info)
       containers = pod_info['spec']['containers']
@@ -175,8 +174,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         FLAGS.kubectl,
         '--kubeconfig=%s' % FLAGS.kubeconfig, 'get', 'pod', '-o=json', self.name
     ]
-    pod_info, _, _ = vm_util.IssueCommand(
-        exists_cmd, suppress_warning=True, raise_on_failure=False)
+    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if pod_info:
       return True
     return False
@@ -404,11 +402,9 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
 
   def RemoteHostCommandWithReturnCode(self,
                                       command,
-                                      should_log=False,
                                       retries=None,
                                       ignore_failure=False,
                                       login_shell=False,
-                                      suppress_warning=False,
                                       timeout=None):
     """Runs a command in the Kubernetes container."""
     if retries is None:
@@ -421,8 +417,6 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     for _ in range(retries):
       stdout, stderr, retcode = vm_util.IssueCommand(
           cmd,
-          force_info_log=should_log,
-          suppress_warning=suppress_warning,
           timeout=timeout,
           raise_on_failure=False)
       # Check for ephemeral connection issues.

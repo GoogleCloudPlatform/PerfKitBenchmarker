@@ -236,7 +236,7 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['region'] = self.region
       del cmd.flags['zone']
 
-    stdout, _, _ = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    stdout, _, _ = cmd.Issue(raise_on_failure=False)
     try:
       result = json.loads(stdout)
     except ValueError:

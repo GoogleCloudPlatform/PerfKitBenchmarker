@@ -279,7 +279,7 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-templates', 'describe', self.name)
     cmd.flags['region'] = self.region
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
   def _Delete(self):
@@ -338,7 +338,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
     """Returns True if the host exists."""
     cmd = util.GcloudCommand(self, 'compute', 'sole-tenancy',
                              'node-groups', 'describe', self.name)
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
   def _Delete(self):
@@ -859,8 +859,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Returns true if the VM exists."""
     getinstance_cmd = util.GcloudCommand(self, 'compute', 'instances',
                                          'describe', self.name)
-    stdout, _, _ = getinstance_cmd.Issue(suppress_warning=True,
-                                         raise_on_failure=False)
+    stdout, _, _ = getinstance_cmd.Issue(raise_on_failure=False)
     try:
       response = json.loads(stdout)
     except ValueError:
@@ -1161,7 +1160,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _UpdateInterruptibleVmStatusThroughMetadataService(self):
     _, _, retcode = vm_util.IssueCommand(
         [FLAGS.gsutil_path, 'stat', self.preempt_marker],
-        raise_on_failure=False, suppress_warning=True)
+        raise_on_failure=False)
     # The VM is preempted if the command exits without an error
     self.spot_early_termination = not bool(retcode)
     if self.WasInterrupted():

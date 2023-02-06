@@ -601,7 +601,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
 
     start_time = datetime.datetime.now()
     try:
-      stdout, _ = self.leader.RobustRemoteCommand(cmd_string, should_log=True)
+      stdout, _ = self.leader.RobustRemoteCommand(cmd_string)
     except errors.VirtualMachine.RemoteCommandError as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
@@ -684,8 +684,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
         properties=properties)
     start_time = datetime.datetime.now()
     try:
-      stdout, _ = self.leader.RobustRemoteCommand(
-          ' '.join(cmd), should_log=True)
+      stdout, _ = self.leader.RobustRemoteCommand(' '.join(cmd))
     except errors.VirtualMachine.RemoteCommandError as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()

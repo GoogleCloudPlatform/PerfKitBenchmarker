@@ -114,7 +114,7 @@ def Run(benchmark_spec):
   benchmark_cmd = ('sudo docker run --rm --net host --volumes-from data '
                    'cloudsuite/graph-analytics %s --master spark://%s:7077' %
                    (memory_option, master.internal_ip))
-  stdout, _ = master.RemoteCommand(benchmark_cmd, should_log=True)
+  stdout, _ = master.RemoteCommand(benchmark_cmd)
 
   matches = re.findall(r'Running time = (\d+)', stdout)
   if len(matches) != 1:

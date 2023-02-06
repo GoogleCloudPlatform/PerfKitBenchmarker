@@ -438,7 +438,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
   remote_cmd = (f'./{REMOTE_SCRIPT} --netperf_cmd="{netperf_cmd}" '
                 f'--num_streams={num_streams} --port_start={PORT_START}')
   remote_stdout, _ = vm.RobustRemoteCommand(
-      remote_cmd, should_log=True, timeout=remote_cmd_timeout)
+      remote_cmd, timeout=remote_cmd_timeout)
 
   # Decode stdouts, stderrs, and return codes from remote command's stdout
   json_out = json.loads(remote_stdout)

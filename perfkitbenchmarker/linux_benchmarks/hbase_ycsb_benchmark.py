@@ -135,7 +135,7 @@ def CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
                              'use_snappy': use_snappy})
   # TODO(user): on HBase update, add '-n' flag.
   command = "{0}/hbase shell {1}".format(hbase.HBASE_BIN, remote)
-  vm.RemoteCommand(command, should_log=True)
+  vm.RemoteCommand(command)
 
 
 def _GetVMsByRole(vm_groups):

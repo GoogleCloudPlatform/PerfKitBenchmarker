@@ -301,7 +301,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       if (datetime.datetime.now() - start_time).seconds > timeout:
         logging.exception('Timeout waiting for sql instance to be ready')
         return False
-      stdout, _, _ = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+      stdout, _, _ = cmd.Issue(raise_on_failure=False)
 
       try:
         json_output = json.loads(stdout)

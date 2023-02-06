@@ -373,7 +373,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       f'families={COLUMN_FAMILY}:maxversions=1',
       f'splits={splits}',
   ]
-  vm.RemoteCommand(' '.join(command), should_log=True, ignore_failure=True)
+  vm.RemoteCommand(' '.join(command), ignore_failure=True)
 
 
 def _GetYcsbExecutor(
@@ -459,7 +459,7 @@ def _CleanupTable(benchmark_spec: bm_spec.BenchmarkSpec):
       'deletetable',
       _GetTableName(),
   ]
-  vm.RemoteCommand(' '.join(command), should_log=True)
+  vm.RemoteCommand(' '.join(command))
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:

@@ -50,7 +50,7 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
       return False
     stdout, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH, 'acr', 'show', '--name', self.name,
-    ], suppress_warning=True, raise_on_failure=False)
+    ], raise_on_failure=False)
     try:
       registry = json.loads(stdout)
       self.login_server = registry['loginServer']
@@ -242,10 +242,9 @@ class AksCluster(container_service.KubernetesCluster):
         '--admin',
         '--name', self.name,
         '--file', FLAGS.kubeconfig,
-    ] + self.resource_group.args, suppress_warning=True)
+    ] + self.resource_group.args)
     version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
-    _, _, retcode = vm_util.IssueCommand(version_cmd, suppress_warning=True,
-                                         raise_on_failure=False)
+    _, _, retcode = vm_util.IssueCommand(version_cmd, raise_on_failure=False)
     if retcode:
       return False
     # POD creation will fail until the default service account is created.

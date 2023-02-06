@@ -180,7 +180,6 @@ def RunNetperfAggregate(vm, server_ips):
       'chmod +x runemomniaggdemo.sh && '
       './runemomniaggdemo.sh',
       ignore_failure=True,
-      should_log=True,
       login_shell=False,
       timeout=1800)
 

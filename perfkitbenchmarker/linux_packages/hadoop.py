@@ -297,7 +297,7 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   script_path = posixpath.join(HADOOP_DIR, 'start-hadoop.sh')
   master.RenderTemplate(
       data.ResourcePath(START_HADOOP_SCRIPT), script_path, context=context)
-  master.RemoteCommand('bash {0}'.format(script_path), should_log=True)
+  master.RemoteCommand('bash {0}'.format(script_path))
 
   logging.info('Sleeping 10s for Hadoop nodes to join.')
   time.sleep(10)

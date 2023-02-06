@@ -35,7 +35,7 @@ class IbmcloudDiskGetDevicePathTest(pkb_common_test_case.PkbCommonTestCase):
                            lambda self: None):
       self.disk = ibmcloud_disk.IbmCloudDisk()
 
-  def run_cmd(self, cmd, should_log=True):
+  def run_cmd(self, cmd):
     return (
         'Disk /dev/vde: 8589.9 GB, 8589934592000 bytes, 16777216000 '
         'sectors\nUnits = sectors of 1 * 512 = 512 bytes\n',

@@ -310,7 +310,7 @@ class GkeCluster(container_service.KubernetesCluster):
   def _Exists(self):
     """Returns True if the cluster exits."""
     cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return retcode == 0
 
   def LabelDisks(self):

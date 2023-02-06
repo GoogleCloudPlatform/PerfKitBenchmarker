@@ -405,7 +405,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           self.PushDataFile(f, remote_path)
         self._has_remote_command_script = True
 
-  def RobustRemoteCommand(self, command, should_log=False, timeout=None,
+  def RobustRemoteCommand(self, command, timeout=None,
                           ignore_failure=False):
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
@@ -429,8 +429,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     Args:
       command: The command to run.
-      should_log: Whether to log the command's output at the info level. The
-          output is always logged at the debug level.
       timeout: The timeout for the command in seconds.
       ignore_failure: Ignore any failure if set to true.
 
@@ -479,20 +477,20 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       stdout = ''
       while 'Command finished.' not in stdout:
         stdout, _ = self.RemoteCommand(
-            ' '.join(wait_command), should_log=should_log, timeout=1800)
+            ' '.join(wait_command), timeout=1800)
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
           '--delete',
       ])  # pyformat: disable
-      return self.RemoteCommand(' '.join(wait_command), should_log=should_log,
+      return self.RemoteCommand(' '.join(wait_command),
                                 ignore_failure=ignore_failure)
 
     try:
       return _WaitForCommand()
     except errors.VirtualMachine.RemoteCommandError:
       # In case the error was with the wrapper script itself, print the log.
-      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, should_log=False)
+      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log)
       if stdout.strip():
         logging.warning('Exception during RobustRemoteCommand. '
                         'Wrapper script log:\n%s', stdout)
@@ -874,8 +872,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Waits until the VM is ready."""
     # Always wait for remote host command to succeed, because it is necessary to
     # run benchmarks
-    resp, _ = self.RemoteHostCommand('hostname', retries=1,
-                                     suppress_warning=True)
+    resp, _ = self.RemoteHostCommand('hostname', retries=1)
     if self.hostname is None:
       self.hostname = resp[:-1]
 
@@ -929,7 +926,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     https://unix.stackexchange.com/questions/165002/how-to-reliably-get-timestamp-at-which-the-system-booted.
     """
     stdout, _ = self.RemoteHostCommand(
-        'stat -c %z /proc/', retries=1, suppress_warning=True)
+        'stat -c %z /proc/', retries=1)
     if stdout.startswith('1970-01-01'):
       # Fix for ARM returning epochtime
       date_fmt = '+%Y-%m-%d %H:%M:%S.%s %z'
@@ -1037,7 +1034,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def LogVmDebugInfo(self):
     """Logs the output of calling dmesg on the VM."""
     if FLAGS.log_dmesg:
-      self.RemoteCommand('hostname && dmesg', should_log=True)
+      self.RemoteCommand('hostname && dmesg')
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     self.RemoteHostCopy(file_path, remote_path, copy_to)
@@ -1117,11 +1114,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def RemoteHostCommandWithReturnCode(self,
                                       command,
-                                      should_log=False,
                                       retries=None,
                                       ignore_failure=False,
                                       login_shell=False,
-                                      suppress_warning=False,
                                       timeout=None):
     """Runs a command on the VM.
 
@@ -1130,16 +1125,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     Args:
       command: A valid bash command.
-      should_log: A boolean indicating whether the command result should be
-          logged at the info level. Even if it is false, the results will
-          still be logged at the debug level.
       retries: The maximum number of times RemoteCommand should retry SSHing
           when it receives a 255 return code. If None, it defaults to the value
           of the flag ssh_retries.
       ignore_failure: Ignore any failure if set to true.
       login_shell: Run command in a login shell.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-          return code is non-zero.
       timeout: The timeout for IssueCommand.
 
     Returns:
@@ -1169,9 +1159,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
       for _ in range(retries):
         stdout, stderr, retcode = vm_util.IssueCommand(
-            ssh_cmd, force_info_log=should_log,
-            suppress_warning=suppress_warning,
-            timeout=timeout, raise_on_failure=False)
+            ssh_cmd, timeout=timeout, raise_on_failure=False)
         # Retry on 255 because this indicates an SSH failure
         if retcode != RETRYABLE_SSH_RETCODE:
           break
@@ -1665,8 +1653,7 @@ class ClearMixin(BaseLinuxMixin):
   def HasPackage(self, package):
     """Returns True iff the package is available for installation."""
     return self.TryRemoteCommand(
-        'sudo swupd bundle-list --all | grep {0}'.format(package),
-        suppress_warning=True)
+        'sudo swupd bundle-list --all | grep {0}'.format(package))
 
   def InstallPackages(self, packages: str) -> None:
     """Installs packages using the swupd bundle manager."""
@@ -1832,8 +1819,7 @@ class BaseRhelMixin(BaseLinuxMixin):
 
   def HasPackage(self, package):
     """Returns True iff the package is available for installation."""
-    return self.TryRemoteCommand('sudo yum info %s' % package,
-                                 suppress_warning=True)
+    return self.TryRemoteCommand('sudo yum info %s' % package)
 
   # yum talks to the network on each request so transient issues may fix
   # themselves on retry
@@ -2106,7 +2092,7 @@ class BaseDebianMixin(BaseLinuxMixin):
     # It does always log `N: No packages found` to STDOUT in that case though
     stdout, stderr, retcode = self.RemoteCommandWithReturnCode(
         'apt-cache --quiet=0 show ' + package,
-        ignore_failure=True, should_log=True)
+        ignore_failure=True)
     return not retcode and 'No packages found' not in (stdout + stderr)
 
   @vm_util.Retry()
@@ -2335,8 +2321,7 @@ class ContainerizedDebianMixin(BaseDebianMixin):
 
   def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""
-    resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True,
-                                     suppress_warning=True)
+    resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True)
     if resp.rstrip() == '':
       return False
     return True

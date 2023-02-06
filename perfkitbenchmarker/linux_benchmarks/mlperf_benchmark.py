@@ -191,8 +191,7 @@ def PrepareBenchmark(benchmark_spec, vm=None):
   vm.RemoteCommand(
       f'if [ ! -d "$HOME/training_results_{VERSION.value}" ]; then '
       f'  git clone https://github.com/mlcommons/training_results_{VERSION.value}.git ; '
-      'fi',
-      should_log=True)
+      'fi')
   vm.Install('pip3')
   if not HYPERTHREADS.value:
     if BERT in benchmark_spec.benchmark:
@@ -375,16 +374,14 @@ def PrepareRunner(benchmark_spec, vm=None):
     if RESNET in benchmark_spec.benchmark:
       vm.RemoteCommand(
           f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/resnet/implementations/mxnet &&'
-          ' docker build --network=host . -t mlperf-nvidia:image_classification',
-          should_log=True)
+          ' docker build --network=host . -t mlperf-nvidia:image_classification')
       _DownloadData(benchmark_spec.imagenet_data_dir,
                     posixpath.join('/data', 'imagenet'), vm)
 
     if TRANSFORMER in benchmark_spec.benchmark:
       vm.RemoteCommand(
           f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/transformer/implementations/pytorch &&'
-          ' docker build --network=host . -t mlperf-nvidia:translation',
-          should_log=True)
+          ' docker build --network=host . -t mlperf-nvidia:translation')
       _DownloadData(benchmark_spec.wmt_data_dir, posixpath.join('/data', 'wmt'),
                     vm)
 
@@ -395,38 +392,33 @@ def PrepareRunner(benchmark_spec, vm=None):
           FLAGS.minigo_model_dir.replace('/', r'\/')), run_script)
       vm.RemoteCommand(
           'cd {} && docker build --network=host -t '
-          'mlperf-nvidia:minigo .'.format(build_path),
-          should_log=True)
+          'mlperf-nvidia:minigo .'.format(build_path))
 
     if MASK in benchmark_spec.benchmark:
       vm.RemoteCommand(
           f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/maskrcnn/implementations/pytorch && '
-          'docker build --network=host -t mlperf-nvidia:object_detection . ',
-          should_log=True)
+          'docker build --network=host -t mlperf-nvidia:object_detection . ')
       _DownloadData(benchmark_spec.coco_data_dir,
                     posixpath.join('/data', 'coco2017'), vm)
 
     if GNMT in benchmark_spec.benchmark:
       vm.RemoteCommand(
           f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/gnmt/implementations/pytorch && '
-          'docker build --network=host -t mlperf-nvidia:rnn_translator . ',
-          should_log=True)
+          'docker build --network=host -t mlperf-nvidia:rnn_translator . ')
       _DownloadData(benchmark_spec.gnmt_data_dir,
                     posixpath.join('/data', 'gnmt'), vm)
 
     if SSD in benchmark_spec.benchmark:
       vm.RemoteCommand(
           f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/ssd/implementations/pytorch && '
-          'docker build --network=host -t mlperf-nvidia:single_stage_detector . ',
-          should_log=True)
+          'docker build --network=host -t mlperf-nvidia:single_stage_detector . ')
       _DownloadData(benchmark_spec.coco_data_dir,
                     posixpath.join('/data', 'coco2017'), vm)
 
     if BERT in benchmark_spec.benchmark:
       vm.RemoteCommand(
           f'cd training_results_{VERSION.value}/NVIDIA/benchmarks/bert/implementations/pytorch && '
-          'docker build --network=host -t mlperf-nvidia:language_model . ',
-          should_log=True)
+          'docker build --network=host -t mlperf-nvidia:language_model . ')
       _DownloadData(benchmark_spec.bert_data_dir,
                     posixpath.join('/data', 'bert_data'), vm)
 
@@ -827,7 +819,7 @@ def Run(benchmark_spec):
 
   samples = []
   metadata = _CreateMetadataDict(benchmark_spec)
-  stdout, _ = vm.RobustRemoteCommand(mlperf_benchmark_cmd, should_log=True)
+  stdout, _ = vm.RobustRemoteCommand(mlperf_benchmark_cmd)
   if NONE in FLAGS.mlperf_profiler:
     samples.extend(
         MakeSamplesFromOutput(

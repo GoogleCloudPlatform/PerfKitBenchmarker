@@ -168,8 +168,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       'make build_docker NO_BUILD=1 && '
       'make docker_add_user && '
       'make launch_docker DOCKER_COMMAND="make clean" && '
-      'make launch_docker DOCKER_COMMAND="make link_dirs"',
-      should_log=True)
+      'make launch_docker DOCKER_COMMAND="make link_dirs"')
   if benchmark == mlperf_benchmark.DLRM:
     # Download data
     data_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'data', _DLRM_DATA_MODULE)
@@ -223,18 +222,15 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     vm.RobustRemoteCommand(
         f'{bm_spec.env_cmd} && '
         'make launch_docker DOCKER_COMMAND='
-        f'"make download_data BENCHMARKS={benchmark}"',
-        should_log=True)
+        f'"make download_data BENCHMARKS={benchmark}"')
     vm.RobustRemoteCommand(
         f'{bm_spec.env_cmd} && '
         'make launch_docker DOCKER_COMMAND='
-        f'"make download_model BENCHMARKS={benchmark}"',
-        should_log=True)
+        f'"make download_model BENCHMARKS={benchmark}"')
     vm.RobustRemoteCommand(
         f'{bm_spec.env_cmd} && '
         'make launch_docker DOCKER_COMMAND='
-        f'"make preprocess_data BENCHMARKS={benchmark}"',
-        should_log=True)
+        f'"make preprocess_data BENCHMARKS={benchmark}"')
 
   vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
@@ -243,8 +239,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       'make launch_docker DOCKER_COMMAND='
       '"make run RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} --fast\'"',
-      should_log=True)
+      f'--scenarios={_SCENARIOS.value} --fast\'"')
 
 
 def _CreateMetadataDict(
@@ -340,18 +335,15 @@ def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
           f" 's/server_target_qps = .*/server_target_qps = {target_qps}/g'"
           f' {config}"'
       ),
-      should_log=True,
   )
   # For valid log, result_validity is VALID
   # For invalid log, result_validity is INVALID
   stdout, _ = vm.RobustRemoteCommand(
-      (
-          f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND="make run_harness'
-          f" RUN_ARGS='--benchmarks={FLAGS.mlperf_benchmark} --scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly"
-          ' --fast\'"'
-      ),
-      should_log=True,
-  )
+      f'{bm_spec.env_cmd} && '
+      'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
+      f'--benchmarks={FLAGS.mlperf_benchmark} '
+      f'--scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly --fast\'"',
+      should_log=True)
   return _VALID in stdout
 
 
@@ -369,8 +361,7 @@ def _LastRunResults(bm_spec: benchmark_spec.BenchmarkSpec) -> str:
   stdout, _ = vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND='
       '"grep -l \'\\"VALID\\"\' build/logs/*/*/*/*/mlperf_log_detail.txt | '
-      'xargs ls -t | head -n 1 | xargs cat"',
-      should_log=True)
+      'xargs ls -t | head -n 1 | xargs cat"')
   return stdout
 
 
@@ -440,8 +431,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} --test_mode=AccuracyOnly --fast\'"',
-      should_log=True)
+      f'--scenarios={_SCENARIOS.value} --test_mode=AccuracyOnly --fast\'"')
   accuracy_samples = MakeAccuracySamplesFromOutput(metadata, stdout)
   return performance_samples + accuracy_samples
 

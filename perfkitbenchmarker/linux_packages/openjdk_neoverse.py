@@ -58,4 +58,4 @@ def InstallNeoverseCompiledOpenJDK(vm, jdk_version: int):
     vm.RemoteCommand(f'sudo update-alternatives --set {binary} '
                      f'{build_dir}/jdk/bin/{binary}')
 
-    vm.RemoteCommand(f'{binary} --version', should_log=True)
+    vm.RemoteCommand(f'{binary} --version')

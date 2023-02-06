@@ -202,7 +202,7 @@ class RackspaceRemoteDisk(RackspaceDisk):
       return False
     cmd = util.RackCLICommand(self, 'block-storage', 'volume', 'get')
     cmd.flags['id'] = self.id
-    stdout, stderr, _ = cmd.Issue(suppress_warning=True)
+    stdout, stderr, _ = cmd.Issue()
     if stdout and stdout.strip():
       return stdout
     return not stderr

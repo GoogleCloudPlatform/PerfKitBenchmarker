@@ -175,7 +175,6 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     timeout_buffer = FLAGS.iperf_timeout or 30 + thread_count
     stdout, _ = sending_vm.RemoteCommand(
         iperf_cmd,
-        should_log=True,
         timeout=FLAGS.iperf_runtime_in_seconds + timeout_buffer)
 
     window_size_match = re.search(
@@ -263,7 +262,6 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     timeout_buffer = FLAGS.iperf_timeout or 30 + thread_count
     stdout, _ = sending_vm.RemoteCommand(
         iperf_cmd,
-        should_log=True,
         timeout=FLAGS.iperf_runtime_in_seconds + timeout_buffer)
 
     match = re.search(

@@ -253,7 +253,7 @@ def ConfigureAndStart(leader, workers, configure_s3=False):
 
   # HDFS setup and formatting, Spark startup
   leader.RemoteCommand(
-      'bash {0}/start-all.sh'.format(SPARK_SBIN), should_log=True)
+      'bash {0}/start-all.sh'.format(SPARK_SBIN))
 
   logging.info('Sleeping 10s for Spark nodes to join.')
   time.sleep(10)

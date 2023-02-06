@@ -119,8 +119,7 @@ class AwsDax(resource.BaseResource):
     cmd = util.AWS_PREFIX + [
         'dax', 'describe-clusters', '--cluster-names', self.cluster_name
     ]
-    _, _, retcode = vm_util.IssueCommand(
-        cmd, suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     return not retcode
 
   def _IsReady(self):
@@ -133,8 +132,7 @@ class AwsDax(resource.BaseResource):
         'dax', 'describe-clusters', '--cluster-names', self.cluster_name
     ]
 
-    stdout, _, retcode = vm_util.IssueCommand(
-        cmd, suppress_warning=True, raise_on_failure=False)
+    stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0 or not stdout:
       return False
     result = json.loads(stdout)

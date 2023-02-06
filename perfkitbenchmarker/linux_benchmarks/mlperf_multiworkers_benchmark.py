@@ -920,7 +920,7 @@ def Run(benchmark_spec):
 
   samples = []
   metadata = _CreateMetadataDict(benchmark_spec)
-  stdout, _ = master_vm.RobustRemoteCommand(cmd, should_log=True)
+  stdout, _ = master_vm.RobustRemoteCommand(cmd)
   if mlperf_benchmark.NONE in FLAGS.mlperf_profiler:
     samples.extend(
         MakeSamplesFromOutput(metadata, stdout, model=benchmark))

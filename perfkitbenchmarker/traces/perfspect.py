@@ -93,7 +93,7 @@ class PerfspectCollector():
     vm.RemoteCommand(f'sudo chmod +x {perf_collect_file}')
     perf_dir = posixpath.join(self.telemetry_dir, 'perfspect')
     stdout, _ = vm.RemoteCommand(
-        f'cd {perf_dir} && sudo ./perf-collect.sh', should_log=True)
+        f'cd {perf_dir} && sudo ./perf-collect.sh')
     self.pid = stdout.strip()
     logging.debug('fpid of PerfSpect collector process: %s', self.pid)
 

@@ -24,11 +24,11 @@ flags.DEFINE_string('tensorflow_models_commit_hash',
 def Install(vm):
   """Installs TensorFlow models on the VM."""
   vm.InstallPackages('git')
-  vm.RemoteCommand('git clone {}'.format(TF_MODELS_GIT), should_log=True)
+  vm.RemoteCommand('git clone {}'.format(TF_MODELS_GIT))
   vm.RemoteCommand('cd models && git checkout {}'.format(
       FLAGS.tensorflow_models_commit_hash))
 
 
 def Uninstall(vm):
   """Uninstalls TensorFlow models on the VM."""
-  vm.RemoteCommand('rm -rf models', should_log=True)
+  vm.RemoteCommand('rm -rf models')

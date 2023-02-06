@@ -509,7 +509,7 @@ def RunWithVMs(vms, extra_envs=None):
         '--logdir {log_dir}/maskrcnn ').format(
             log_dir=vm_util.VM_TMP_DIR,
             step=FLAGS.horovod_num_steps * total_gpus // 8)
-  stdout, stderr = master_vm.RobustRemoteCommand(run_command, should_log=True)
+  stdout, stderr = master_vm.RobustRemoteCommand(run_command)
 
   if FLAGS.horovod_timeline:
     master_vm.PullFile(vm_util.GetTempDir(),

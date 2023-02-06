@@ -601,7 +601,7 @@ def ParseOutput(vm,
   for log in log_files:
     results_dir = results_directory or '%s/result' % speccpu_vm_state.spec_dir
     stdout, _ = vm.RemoteCommand(
-        'cat %s/%s' % (results_dir, log), should_log=True)
+        'cat %s/%s' % (results_dir, log))
     results.extend(
         _ExtractScore(stdout, vm, FLAGS.runspec_keep_partial_results or
                       is_partial_results, runspec_metric))

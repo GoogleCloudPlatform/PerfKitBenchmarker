@@ -205,7 +205,7 @@ def RunLoadTest(benchmark_spec, fanout):
       launch_script, FLAGS.oldisim_latency_metric, FLAGS.oldisim_latency_target,
       driver_binary, driver_args, driver_vm.NumCpusForBenchmark())
   logging.info('Driver cmdline: %s', driver_cmd)
-  stdout, _ = driver_vm.RemoteCommand(driver_cmd, should_log=True)
+  stdout, _ = driver_vm.RemoteCommand(driver_cmd)
   return ParseOutput(stdout)
 
 

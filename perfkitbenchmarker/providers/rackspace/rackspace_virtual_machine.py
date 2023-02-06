@@ -199,7 +199,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       return False
     get_cmd = util.RackCLICommand(self, 'servers', 'instance', 'get')
     get_cmd.flags['id'] = self.id
-    stdout, _, _ = get_cmd.Issue(suppress_warning=True)
+    stdout, _, _ = get_cmd.Issue()
     try:
       resp = json.loads(stdout)
     except ValueError:
@@ -302,7 +302,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Executes delete command for removing a Rackspace VM."""
     cmd = util.RackCLICommand(self, 'servers', 'instance', 'delete')
     cmd.flags['id'] = self.id
-    stdout, _, _ = cmd.Issue(suppress_warning=True)
+    stdout, _, _ = cmd.Issue()
     resp = json.loads(stdout)
     if 'result' not in resp or 'Deleting' not in resp['result']:
       raise errors.Resource.RetryableDeletionError()

@@ -295,8 +295,6 @@ def _ReadIssueCommandOutput(tf_out, tf_err):
 
 def IssueCommand(
     cmd: Iterable[str],
-    force_info_log: bool = False,
-    suppress_warning: bool = False,
     env: Optional[Dict[str, str]] = None,
     timeout: Optional[int] = DEFAULT_TIMEOUT,
     cwd: Optional[str] = None,
@@ -308,13 +306,6 @@ def IssueCommand(
   Args:
     cmd: A list of strings such as is given to the subprocess.Popen()
         constructor.
-    force_info_log: A boolean indicating whether the command result should
-        always be logged at the info level. Command results will always be
-        logged at the debug level if they aren't logged at another level.
-    suppress_warning: A boolean indicating whether the results should
-        not be logged at the info level in the event of a non-zero
-        return code. When force_info_log is True, the output is logged
-        regardless of suppress_warning's value.
     env: A dict of key/value strings, such as is given to the subprocess.Popen()
         constructor, that contains environment variables to be injected.
     timeout: Timeout for the command in seconds. If the command has not finished
@@ -411,10 +402,7 @@ def IssueCommand(
 
   debug_text = ('Ran: {%s}\nReturnCode:%s%s\nSTDOUT: %s\nSTDERR: %s' %
                 (full_cmd, process.returncode, timing_output, stdout, stderr))
-  if force_info_log or (process.returncode and not suppress_warning):
-    logging.info(debug_text)
-  else:
-    logging.debug(debug_text)
+  logging.info(debug_text)
 
   # Raise timeout error regardless of raise_on_failure - as the intended
   # semantics is to ignore expected errors caused by invoking the command

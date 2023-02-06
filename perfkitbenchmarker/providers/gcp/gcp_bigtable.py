@@ -343,8 +343,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
   def _DescribeInstance(self) -> Dict[str, Any]:
     cmd = _GetBigtableGcloudCommand(
         self, 'bigtable', 'instances', 'describe', self.name)
-    stdout, stderr, retcode = cmd.Issue(
-        suppress_warning=True, raise_on_failure=False)
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Describing instance %s failed: %s', self.name, stderr)
       return {}
@@ -378,8 +377,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
   def _GetClusters(self) -> List[Dict[str, Any]]:
     cmd = _GetBigtableGcloudCommand(self, 'bigtable', 'clusters', 'list')
     cmd.flags['instances'] = self.name
-    stdout, stderr, retcode = cmd.Issue(
-        suppress_warning=True, raise_on_failure=False)
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Listing clusters %s failed: %s', self.name, stderr)
       return []
@@ -425,8 +423,7 @@ def GetClustersDescription(instance_name, project):
   cmd = util.GcloudCommand(None, 'bigtable', 'clusters', 'list')
   cmd.flags['instances'] = instance_name
   cmd.flags['project'] = project
-  stdout, stderr, retcode = cmd.Issue(
-      suppress_warning=True, raise_on_failure=False)
+  stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
   if retcode:
     logging.error('Command "%s" failed:\nSTDOUT:\n%s\nSTDERR:\n%s',
                   repr(cmd), stdout, stderr)

@@ -93,8 +93,7 @@ def Run(benchmark_spec):
   master = benchmark_spec.vm_groups['master'][0]
   results = []
 
-  stdout, _ = master.RemoteCommand('sudo docker exec master benchmark 2>&1',
-                                   should_log=True)
+  stdout, _ = master.RemoteCommand('sudo docker exec master benchmark 2>&1')
 
   matches = re.findall(r'^Benchmark time: (\d+)ms$', stdout, re.MULTILINE)
   if len(matches) != 1:

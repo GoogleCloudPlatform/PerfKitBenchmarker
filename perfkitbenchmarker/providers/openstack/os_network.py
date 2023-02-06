@@ -62,7 +62,7 @@ class OpenStackFirewall(network.BaseFirewall):
     with self._lock:
       cmd = utils.OpenStackCLICommand(self, OSC_SEC_GROUP_CMD, 'show',
                                       SC_GROUP_NAME)
-      stdout, stderr, _ = cmd.Issue(suppress_warning=True)
+      stdout, stderr, _ = cmd.Issue()
       if stderr:
         cmd = utils.OpenStackCLICommand(self, OSC_SEC_GROUP_CMD, 'create',
                                         SC_GROUP_NAME)
@@ -92,7 +92,7 @@ class OpenStackFirewall(network.BaseFirewall):
         cmd.flags['src-ip'] = source_range
       cmd.flags['dst-port'] = str(icmp_type)
       cmd.flags['proto'] = ICMP
-      cmd.Issue(suppress_warning=True)
+      cmd.Issue()
       self.sec_group_rules_set.add(sec_group_rule)
 
   def AllowPort(self, vm, start_port, end_port=None, source_range=None):
@@ -124,7 +124,7 @@ class OpenStackFirewall(network.BaseFirewall):
       cmd.flags['dst-port'] = '%d:%d' % (start_port, end_port)
       for prot in (TCP, UDP,):
         cmd.flags['proto'] = prot
-        cmd.Issue(suppress_warning=True)
+        cmd.Issue()
       self.sec_group_rules_set.add(sec_group_rule)
 
   def DisallowAllPorts(self):
@@ -189,7 +189,7 @@ class OpenStackFloatingIPPool(object):
   def release(self, vm, floating_ip_obj):
     cmd = utils.OpenStackCLICommand(vm, OSC_FLOATING_IP_CMD, 'show',
                                     floating_ip_obj.id)
-    stdout, stderr, _ = cmd.Issue(suppress_warning=True)
+    stdout, stderr, _ = cmd.Issue()
     if stderr:
       return  # Not found, moving on
     floating_ip_dict = json.loads(stdout)
@@ -197,4 +197,4 @@ class OpenStackFloatingIPPool(object):
       delete_cmd = utils.OpenStackCLICommand(vm, OSC_FLOATING_IP_CMD, 'delete',
                                              floating_ip_dict['id'])
       del delete_cmd.flags['format']  # Command not support json output format
-      stdout, stderr, _ = delete_cmd.Issue(suppress_warning=True)
+      stdout, stderr, _ = delete_cmd.Issue()

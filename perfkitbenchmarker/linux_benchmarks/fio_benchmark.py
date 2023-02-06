@@ -776,7 +776,7 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
 
   start_time = time.time()
   stdout, _ = vm.RobustRemoteCommand(
-      fio_command, should_log=True, timeout=FLAGS.fio_command_timeout_sec)
+      fio_command, timeout=FLAGS.fio_command_timeout_sec)
   end_time = time.time()
   bin_vals = []
   if collect_logs:

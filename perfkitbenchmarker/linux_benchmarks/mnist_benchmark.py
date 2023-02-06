@@ -348,8 +348,7 @@ def Run(benchmark_spec):
               train_epochs=benchmark_spec.train_epochs))
 
     start = time.time()
-    stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_train_cmd,
-                                            should_log=True)
+    stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_train_cmd)
     elapsed_seconds = (time.time() - start)
     samples.extend(MakeSamplesFromTrainOutput(
         metadata, stdout + stderr, elapsed_seconds, benchmark_spec.train_steps))
@@ -367,8 +366,7 @@ def Run(benchmark_spec):
       mnist_benchmark_eval_cmd = ('{cmd} --eval_steps={eval_steps}'.format(
           cmd=mnist_benchmark_cmd, eval_steps=benchmark_spec.eval_steps))
 
-    stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_eval_cmd,
-                                            should_log=True)
+    stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_eval_cmd)
     samples.extend(MakeSamplesFromEvalOutput(metadata, stdout + stderr,
                                              elapsed_seconds))
   return samples

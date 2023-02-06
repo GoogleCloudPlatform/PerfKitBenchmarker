@@ -285,7 +285,7 @@ def Run(benchmark_spec):
                             transfer_size_range[2]))
 
   for i in range(num_iterations):
-    stdout, _ = vm.RemoteCommand(run_command, should_log=True)
+    stdout, _ = vm.RemoteCommand(run_command)
     raw_results.append(_ParseOutputFromSingleIteration(stdout))
     if 'device_info' not in metadata:
       metadata['device_info'] = _ParseDeviceInfo(stdout)

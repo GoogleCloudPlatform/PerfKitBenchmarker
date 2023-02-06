@@ -365,8 +365,7 @@ def Run(benchmark_spec):
                 max_train_steps=step))
 
       start = time.time()
-      stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_train_cmd,
-                                              should_log=True)
+      stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_train_cmd)
       elapsed_seconds += (time.time() - start)
       samples.extend(mnist_benchmark.MakeSamplesFromTrainOutput(
           metadata, stdout + stderr, elapsed_seconds, step))
@@ -383,8 +382,7 @@ def Run(benchmark_spec):
         resnet_benchmark_eval_cmd = ('{cmd} --eval_only'.format(
             cmd=resnet_benchmark_cmd))
 
-      stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_eval_cmd,
-                                              should_log=True)
+      stdout, stderr = vm.RobustRemoteCommand(resnet_benchmark_eval_cmd)
       samples.extend(
           MakeSamplesFromEvalOutput(
               metadata,

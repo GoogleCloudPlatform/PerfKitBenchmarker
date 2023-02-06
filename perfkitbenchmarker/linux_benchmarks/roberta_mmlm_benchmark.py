@@ -368,7 +368,7 @@ def _Run(benchmark_spec, rank):
       f'$HOME/fairseq/train.py {DATA_PATH}/data-bin/mlm-w103 '
       f'{roberta_benchmark_flags}')
   metadata = _CreateMetadataDict(benchmark_spec)
-  stdout, _ = vm.RobustRemoteCommand(roberta_benchmark_cmd, should_log=True)
+  stdout, _ = vm.RobustRemoteCommand(roberta_benchmark_cmd)
   return MakeSamplesFromOutput(metadata, stdout) if master == vm else []
 
 

@@ -35,7 +35,8 @@
     benchmarks was defined many years ago. It's not a reasonable introduction to
     PKB or something that most people should run by default.
 -   --dpb_export_job_stats is now False by default.
--   Validate arguments to IssueCommand.
+-   Validate arguments to IssueCommand. Remove force_info_log & suppress_warning
+    parameters.
 
 ### New features:
 

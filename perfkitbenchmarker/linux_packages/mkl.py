@@ -96,7 +96,7 @@ def _LogEnvVariables(vm):
   for env_var in ('CPATH', 'LD_LIBRARY_PATH', 'MKLROOT', 'NLSPATH',
                   'PKG_CONFIG_PATH'):
     txt, _ = vm.RemoteCommand(
-        f'{SourceVarsCommand()}; echo ${env_var}', should_log=False)
+        f'{SourceVarsCommand()}; echo ${env_var}')
     env_vars.append(f'{env_var}={txt.strip()}')
   logging.info('MKL environment variables: %s', ' '.join(env_vars))
 

@@ -153,11 +153,10 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
     p = mock.patch(util.__name__ + '.vm_util.IssueCommand',
                    return_value=mock_issue_return_value)
     with p as mock_issue:
-      return_value = cmd.Issue(suppress_warning=True)
+      return_value = cmd.Issue()
       mock_issue.assert_called_with(
           ['path/gcloud', 'compute', 'images', 'list', '--format', 'json',
-           '--quiet'],
-          suppress_warning=True)
+           '--quiet'])
     self.assertEqual(return_value, mock_issue_return_value)
 
   def testIssueRetryable(self):

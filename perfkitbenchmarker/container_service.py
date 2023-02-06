@@ -414,7 +414,7 @@ class BaseContainerRegistry(resource.BaseResource):
       # manifest inspect inpspects the registry's copy
       inspect_cmd = ['docker', 'manifest', 'inspect', full_image]
       _, _, retcode = vm_util.IssueCommand(
-          inspect_cmd, suppress_warning=True, raise_on_failure=False)
+          inspect_cmd, raise_on_failure=False)
       if retcode == 0:
         return full_image
     self._Build(image)

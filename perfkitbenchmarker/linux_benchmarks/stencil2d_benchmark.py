@@ -179,7 +179,7 @@ def _RunSingleIteration(master_vm, problem_size, num_processes, num_iterations,
   metadata['run_command'] = run_command
   metadata['problem_size'] = current_problem_size
 
-  stdout, _ = master_vm.RemoteCommand(run_command, should_log=True)
+  stdout, _ = master_vm.RemoteCommand(run_command)
   return _MakeSamplesFromStencilOutput(stdout, metadata.copy())
 
 

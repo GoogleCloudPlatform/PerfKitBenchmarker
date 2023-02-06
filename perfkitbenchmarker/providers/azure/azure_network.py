@@ -112,7 +112,6 @@ class AzureResourceGroup(resource.BaseResource):
   def _Exists(self):
     stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'show', '--name', self.name],
-        suppress_warning=True,
         raise_on_failure=False)
     try:
       json.loads(stdout)
@@ -229,7 +228,6 @@ class AzureStorageAccount(resource.BaseResource):
             azure.AZURE_PATH, 'storage', 'account', 'show', '--output', 'json',
             '--name', self.name
         ] + self.resource_group.args,
-        suppress_warning=True,
         raise_on_failure=False)
 
     try:
@@ -339,7 +337,6 @@ class AzureVirtualNetwork(network.BaseNetwork):
             azure.AZURE_PATH, 'network', 'vnet', 'show', '--output', 'json',
             '--name', self.name
         ] + self.resource_group.args,
-        suppress_warning=True,
         raise_on_failure=False)
 
     return bool(json.loads(stdout))
