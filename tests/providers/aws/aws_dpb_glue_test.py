@@ -13,7 +13,9 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.aws.aws_dpb_emr."""
 
+import copy
 import json
+from typing import Any, Optional
 import unittest
 from unittest import mock
 
@@ -22,39 +24,44 @@ from absl import flags
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_dpb_glue
+from perfkitbenchmarker.providers.aws import aws_dpb_glue_prices
 from tests import pkb_common_test_case
 
 TEST_RUN_URI = 'fakeru'
 AWS_ZONE_US_EAST_1A = 'us-east-1a'
 FLAGS = flags.FLAGS
+_BASE_JOB_RUN_PAYLOAD = {
+    'JobRun': {
+        'Id': 'jr_01234567890abcdef',
+        'Attempt': 0,
+        'JobName': 'pkb-deadbeef-0',
+        'StartedOn': 1675103057.784,
+        'LastModifiedOn': 1675105738.096,
+        'CompletedOn': 1675105738.096,
+        'JobRunState': 'SUCCEEDED',
+        'Arguments': {
+            '--pkb_main': 'hello',
+            '--pkb_args': '[]'
+        },
+        'PredecessorRuns': [],
+        'AllocatedCapacity': 32,
+        'ExecutionTime': 2672,
+        'Timeout': 2880,
+        'MaxCapacity': 32.0,
+        'WorkerType': 'G.2X',
+        'NumberOfWorkers': 4,
+        'LogGroupName': '/aws-glue/jobs',
+        'GlueVersion': '3.0'
+    }
+}
 
 
-def _GetJobRunMockPayload(dpu_seconds, max_capacity, execution_time):
-  payload = {
-      'JobRun': {
-          'Id': 'jr_01234567890abcdef',
-          'Attempt': 0,
-          'JobName': 'pkb-deadbeef-0',
-          'StartedOn': 1675103057.784,
-          'LastModifiedOn': 1675105738.096,
-          'CompletedOn': 1675105738.096,
-          'JobRunState': 'SUCCEEDED',
-          'Arguments': {
-              '--pkb_main': 'hello',
-              '--pkb_args': '[]'
-          },
-          'PredecessorRuns': [],
-          'AllocatedCapacity': 32,
-          'ExecutionTime': 2672,
-          'Timeout': 2880,
-          'MaxCapacity': 32.0,
-          'WorkerType': 'G.2X',
-          'NumberOfWorkers': 4,
-          'LogGroupName': '/aws-glue/jobs',
-          'GlueVersion': '3.0'
-      }
-  }
-
+def _GetJobRunMockPayload(
+    dpu_seconds: Optional[float],
+    max_capacity: Optional[float],
+    execution_time: Optional[float]
+) -> dict[str, Any]:
+  payload = copy.deepcopy(_BASE_JOB_RUN_PAYLOAD)
   if dpu_seconds is not None:
     payload['JobRun']['DPUSeconds'] = dpu_seconds
   if max_capacity is not None:
@@ -95,11 +102,21 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
                                   execution_time=2672)), '', 0)
     ]
 
-    dpb_glue.SubmitJob(
-        pyspark_file='s3://test/hello.py',
-        job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE,
-        job_arguments=[])
+    with mock.patch.object(aws_dpb_glue_prices, 'GLUE_PRICES'):
+      # The actual prices are expected to change over time, but we don't want to
+      # update the test every time.
+      aws_dpb_glue_prices.GLUE_PRICES = {'us-east-1': 0.44}
+      dpb_glue.SubmitJob(
+          pyspark_file='s3://test/hello.py',
+          job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE,
+          job_arguments=[])
+
     self.assertEqual(dpb_glue.CalculateCost(), 10.45048888888889)
+
+  def testGluePricesSchema(self):
+    for region, price in aws_dpb_glue_prices.GLUE_PRICES.items():
+      self.assertIsInstance(region, str)
+      self.assertIsInstance(price, float)
 
 
 if __name__ == '__main__':

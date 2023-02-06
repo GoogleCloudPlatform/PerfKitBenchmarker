@@ -12,17 +12,18 @@ import os
 from typing import List, Optional
 
 from absl import flags
+
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_dpb_glue_prices
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 
 GLUE_TIMEOUT = 14400
-GLUE_US_EAST_1_DPU_PER_HOUR_PRICE = 0.44
 
 
 def _ModuleFromPyFilename(py_filename):
@@ -227,10 +228,10 @@ class AwsDpbGlue(dpb_service.BaseDpbService):
       A float representing the job run cost in USD, or None if the cost cannot
       be computed for the current region.
     """
-    # TODO(odiego): Handle other regions prices.
-    if self.region != 'us-east-1':
+    dpu_hourly_price = aws_dpb_glue_prices.GLUE_PRICES.get(self.region)
+    if dpu_hourly_price is None:
       return None
     # dpu_seconds is only reported directly in auto-scaling jobs.
     if dpu_seconds is None:
       dpu_seconds = max_capacity * execution_time
-    return dpu_seconds / 3600 * GLUE_US_EAST_1_DPU_PER_HOUR_PRICE
+    return dpu_seconds / 3600 * dpu_hourly_price
