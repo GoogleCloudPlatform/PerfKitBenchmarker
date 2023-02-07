@@ -22,6 +22,7 @@ import logging
 import os
 import pickle
 import threading
+from typing import List
 import uuid
 
 from absl import flags
@@ -45,6 +46,7 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import resource as resource_type
 from perfkitbenchmarker import smb_service
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
@@ -129,6 +131,7 @@ class BenchmarkSpec(object):
     self.status_detail = None
     BenchmarkSpec.total_benchmarks += 1
     self.sequence_number = BenchmarkSpec.total_benchmarks
+    self.resources: List[resource_type.Resource] = []
     self.vms = []
     self.regional_networks = {}
     self.networks = {}
@@ -239,6 +242,7 @@ class BenchmarkSpec(object):
         cloud, cluster_type)
     self.container_cluster = container_cluster_class(
         self.config.container_cluster)
+    self.resources.append(self.container_cluster)
 
   def ConstructContainerRegistry(self):
     """Create the container registry."""
@@ -250,6 +254,7 @@ class BenchmarkSpec(object):
         cloud)
     self.container_registry = container_registry_class(
         self.config.container_registry)
+    self.resources.append(self.container_registry)
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""
@@ -847,10 +852,8 @@ class BenchmarkSpec(object):
   def GetSamples(self):
     """Returns samples created from benchmark resources."""
     samples = []
-    if self.container_cluster:
-      samples.extend(self.container_cluster.GetSamples())
-    if self.container_registry:
-      samples.extend(self.container_registry.GetSamples())
+    for resource in self.resources:
+      samples.extend(resource.GetSamples())
     return samples
 
   def StartBackgroundWorkload(self):

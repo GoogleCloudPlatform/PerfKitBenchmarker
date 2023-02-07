@@ -201,10 +201,11 @@
 -   Add `--dpb_job_poll_interval_secs` flag to control job polling frequency in
     DPB benchmarks.
 -   Add support for more readings in nvidia_power tracking.
--   Add samples for Create Time, Ready Time, and Delete Time for all resources
-    regardless of benchmark.
 -   Report benchmark run costs for dpb_sparksql_benchmark runs on Dataproc
     Serverless, AWS EMR Serverless & AWS Glue.
+-   Create a list of resources in benchmark_spec to extract common lifecycle
+    timing samples from regardless of benchmark. The set is initially small, but
+    can be expanded to any resource.
 
 ### Bug fixes and maintenance updates:
 

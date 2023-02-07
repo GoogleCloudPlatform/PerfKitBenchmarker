@@ -26,6 +26,7 @@ from typing import List
 
 from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -420,6 +421,14 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     if self.user_managed:
       return
 
+    # Some resources (specifically VMs) lazily compute their metadata rather
+    # than computing it after provisioning and stashing in their metadata dict
+    # or static fields as they are supposed to.
+    # Asking for metadata before deleting it should cache it and make it
+    # available after we tear down resources, which is necessary for attaching
+    # metadata in benchmark_spec.GetSamples()
+    self.GetResourceMetadata()
+
     if freeze and self.enable_freeze_restore:
       try:
         self.Freeze()
@@ -455,3 +464,41 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
           'Class %s does not have _UpdateTimeout() implemented, which is '
           'needed for Freeze(). Please add an implementation.', self.__class__)
       raise
+
+  def GetSamples(self) -> List[sample.Sample]:
+    """Get samples relating to the provisioning of the resource."""
+    # This should not be necessary. Resources are responsible to wire their
+    # GetResourceMetadata into publisher.py, but some do not.
+    metadata = self.GetResourceMetadata()
+    metadata['resource_type'] = self.RESOURCE_TYPE
+    metadata['resource_class'] = self.__class__.__name__
+
+    samples = []
+    if self.create_start_time and self.create_end_time:
+      samples.append(
+          sample.Sample(
+              'Time to Create',
+              self.create_end_time - self.create_start_time,
+              'seconds',
+              metadata,
+          )
+      )
+    if self.create_start_time and self.resource_ready_time:
+      samples.append(
+          sample.Sample(
+              'Time to Ready',
+              self.resource_ready_time - self.create_start_time,
+              'seconds',
+              metadata,
+          )
+      )
+    if self.delete_start_time and self.delete_end_time:
+      samples.append(
+          sample.Sample(
+              'Time to Delete',
+              self.delete_end_time - self.delete_start_time,
+              'seconds',
+              metadata,
+          )
+      )
+    return samples
