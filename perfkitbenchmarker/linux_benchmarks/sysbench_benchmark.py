@@ -509,26 +509,6 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   logging.info('data loading results: \n stdout is:\n%s\nstderr is\n%s',
                stdout, stderr)
 
-  if (
-      FLAGS.sysbench_testname == 'tpcc'
-      and db.spec.engine == sql_engine_utils.SPANNER_POSTGRES
-  ):
-    data_index_start_time = time.time()
-    # For Cloud Spanner, we load the data first and then build all indexes.
-    data_index_cmd = ' '.join(
-        data_load_cmd_tokens
-        + _GetCommonSysbenchOptions(benchmark_spec)
-        + ['index']
-    )
-    stdout, stderr = client_vm.RobustRemoteCommand(data_index_cmd)
-    # Loading duration includes the time of data loading and index building.
-    index_duration = time.time() - data_index_start_time
-    load_duration += index_duration
-    logging.info('It took %d seconds to finish the index building step',
-                 index_duration)
-    logging.info('index building results: \n stdout is:\n%s\nstderr is\n%s',
-                 stdout, stderr)
-
   metadata = CreateMetadataFromFlags()
 
   results.append(sample.Sample(
