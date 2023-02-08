@@ -144,9 +144,16 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   redis_server.Start(server_vm)
 
   # Load the redis server with preexisting data.
-  vm_util.RunThreaded(
-      lambda port: memtier.Load(server_vm, 'localhost', port),
-      redis_server.GetRedisPorts(), 10)
+  # Run 4 at a time to reduce memory fragmentation and avoid overloaded
+  # the server
+  ports = redis_server.GetRedisPorts()
+  ports_group_of_four = [ports[i : i + 4] for i in range(0, len(ports), 4)]
+  for ports_group in ports_group_of_four:
+    vm_util.RunThreaded(
+        lambda port: memtier.Load(server_vm, 'localhost', port),
+        ports_group,
+        10,
+    )
 
   bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
 
