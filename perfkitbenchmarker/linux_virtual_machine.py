@@ -353,6 +353,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._partition_table = {}
     self._proccpu_cache = None
     self._smp_affinity_script = None
+    self.name: str
     self._os_info: Optional[str] = None
     self._kernel_release: Optional[KernelRelease] = None
     self._cpu_arch: Optional[str] = None
@@ -1150,6 +1151,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     ssh_private_key = (self.ssh_private_key if self.is_static else
                        vm_util.GetPrivateKeyPath())
     ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
+    logging.info('Running on %s via ssh: %s', self.name, command)
     try:
       if login_shell:
         ssh_cmd.extend(['-t', '-t', 'bash -l -c "%s"' % command])
@@ -1159,7 +1161,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
       for _ in range(retries):
         stdout, stderr, retcode = vm_util.IssueCommand(
-            ssh_cmd, timeout=timeout, raise_on_failure=False)
+            ssh_cmd,
+            timeout=timeout,
+            should_pre_log=False,
+            raise_on_failure=False,
+        )
         # Retry on 255 because this indicates an SSH failure
         if retcode != RETRYABLE_SSH_RETCODE:
           break

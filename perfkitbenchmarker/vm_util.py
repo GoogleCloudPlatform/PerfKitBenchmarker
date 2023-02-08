@@ -298,6 +298,7 @@ def IssueCommand(
     env: Optional[Dict[str, str]] = None,
     timeout: Optional[int] = DEFAULT_TIMEOUT,
     cwd: Optional[str] = None,
+    should_pre_log: bool = True,
     raise_on_failure: bool = True,
     suppress_failure: Optional[Callable[[str, str, int], bool]] = None,
     raise_on_timeout: bool = True) -> Tuple[str, str, int]:
@@ -315,6 +316,9 @@ def IssueCommand(
         contain what had already been written to them before the process was
         killed.
     cwd: Directory in which to execute the command.
+    should_pre_log: A boolean indicating if command should be outputted alone
+        prior to the output with command, stdout, & stderr. Useful for e.g.
+        timing command length & standing out in logs.
     raise_on_failure: A boolean indicating if non-zero return codes should raise
         IssueCommandError.
     suppress_failure: A function passed (stdout, stderr, ret_code) for non-zero
@@ -342,7 +346,8 @@ def IssueCommand(
     raise ValueError(
         f'Command must be a list of strings, but string {cmd} was received')
   full_cmd = ' '.join(str(w) for w in cmd)
-  logging.info('Running: %s', full_cmd)
+  if should_pre_log:
+    logging.info('Running: %s', full_cmd)
 
   time_file_path = '/usr/bin/time'
 
