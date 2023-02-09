@@ -342,8 +342,7 @@ def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly --fast\'"',
-      should_log=True)
+      f'--scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly --fast\'"')
   return _VALID in stdout
 
 
