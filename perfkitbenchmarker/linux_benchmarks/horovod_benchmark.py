@@ -33,11 +33,12 @@ horovod:
   description: Runs Horovod. Specify the number of VMs with --num_vms
   vm_groups:
     default:
+      os_type: ubuntu2004
       vm_spec:
         GCP:
           machine_type: n1-highmem-96
           zone: us-central1-a
-          image_family: tf-latest-gpu-debian-10
+          image_family: tf-latest-gpu-ubuntu-2004
           image_project: deeplearning-platform-release
           boot_disk_size: 300
           gpu_type: v100
