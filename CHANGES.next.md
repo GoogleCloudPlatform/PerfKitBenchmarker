@@ -106,6 +106,9 @@
     networking performance.
 -   Added support for dynamic provisioning of Bigquery flat rate slots at
     benchmark runtime
+-   Create a new subdirectory of linux_packages called provisioning_benchmarks
+    for benchmarking lifecycle management timings of cloud resources and
+    operations.
 
 ### Enhancements:
 
