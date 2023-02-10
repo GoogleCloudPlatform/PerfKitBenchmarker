@@ -38,6 +38,16 @@ SIMULATE_MAINTENANCE = flags.DEFINE_boolean(
         'This simulate maintenance happens right after run stage starts.'
     ),
 )
+
+SIMULATE_MAINTENANCE_WITH_LOG = flags.DEFINE_boolean(
+    'simulate_maintenance_with_log',
+    False,
+    (
+        'Whether to create a log file with the vm information instead of '
+        'invoking trigger simulation.'
+    ),
+)
+
 SIMULATE_MAINTENANCE_DELAY = flags.DEFINE_integer(
     'simulate_maintenance_delay',
     0,
@@ -70,7 +80,10 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
   def TriggerMethod(self, vm: virtual_machine.VirtualMachine):
     if self.capture_live_migration_timestamps:
       vm.StartLMNotification()
-    vm.SimulateMaintenanceEvent()
+    if SIMULATE_MAINTENANCE_WITH_LOG.value:
+      vm.SimulateMaintenanceWithLog()
+    else:
+      vm.SimulateMaintenanceEvent()
 
   def SetUp(self):
     """Base class."""

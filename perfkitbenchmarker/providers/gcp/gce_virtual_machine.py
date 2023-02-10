@@ -27,6 +27,7 @@ operate on the VM: boot, shutdown, etc.
 
 import collections
 import copy
+import datetime
 import itertools
 import json
 import logging
@@ -398,6 +399,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   _LM_TIMES_SEMAPHORE = threading.Semaphore(0)
   _LM_NOTICE_SCRIPT = 'gce_maintenance_notice.py'
+  _LM_SIGNAL_LOG = 'lm_signal.log'
   _LM_NOTICE_LOG = 'gce_maintenance_notice.log'
 
   def __init__(self, vm_spec):
@@ -1054,6 +1056,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.network.mtu:
       result['mtu'] = self.network.mtu
     return result
+
+  def SimulateMaintenanceWithLog(self):
+    """Create a json file with information related to the vm."""
+    simulate_maintenance_json = {
+        'current_time': datetime.datetime.now().timestamp() * 1000,
+        'instance_id': self.instance_number,
+        'project': self.project,
+        'instance_name': self.name,
+        'zone': self.zone,
+    }
+    vm_path = posixpath.join(vm_util.GetTempDir(), self._LM_SIGNAL_LOG)
+    with open(vm_path, 'w+') as f:
+      json.dump(simulate_maintenance_json, f, indent=2, sort_keys=True)
 
   def SimulateMaintenanceEvent(self):
     """Simulates a maintenance event on the VM."""
