@@ -6,6 +6,7 @@ import unittest
 from unittest import mock
 
 from absl import flags
+from absl.testing import flagsaver
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import memtier
@@ -194,6 +195,70 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
                 'interval': 1
             },
             timestamp=0)
+    ]
+    self.assertEqual(samples, expected_result)
+
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @flagsaver.flagsaver(memtier_time_series=True)
+  def testAggregateMemtierResultsWithMultipleResultsDifferentStartTime(self):
+    timestamps_1 = [0, 1000, 2000, 3000, 4000]
+    ops_values_1 = [1, 1, 1, 1, 1]
+    latency_1 = [1, 2, 3, 4, 5]
+    timestamps_2 = [1000, 2000, 3000, 4000, 5000]
+    ops_values_2 = [1, 1, 1, 1, 1]
+    latency_2 = [5, 4, 3, 2, 1]
+    timestamps_3 = [2000, 3000, 4000, 5000, 6000]
+    ops_values_3 = [1, 1, 1, 1, 1]
+    latency_3 = [5, 4, 3, 1000, 1000]
+    results = [
+        memtier.MemtierResult(
+            2, 4, 0, 0, 0, 0, [], [], timestamps_1, ops_values_1, latency_1, {}
+        ),
+        memtier.MemtierResult(
+            2, 4, 0, 0, 0, 0, [], [], timestamps_2, ops_values_2, latency_2, {}
+        ),
+        memtier.MemtierResult(
+            2, 4, 0, 0, 0, 0, [], [], timestamps_3, ops_values_3, latency_3, {}
+        ),
+    ]
+    samples = memtier.AggregateMemtierResults(results, {})
+    expected_result = [
+        sample.Sample(
+            metric='Total Ops Throughput',
+            value=6.0,
+            unit='ops/s',
+            metadata={},
+            timestamp=0,
+        ),
+        sample.Sample(
+            metric='Total KB Throughput',
+            value=12.0,
+            unit='KB/s',
+            metadata={},
+            timestamp=0,
+        ),
+        sample.Sample(
+            metric='OPS_time_series',
+            value=0.0,
+            unit='ops',
+            metadata={
+                'values': [1, 2, 3, 3, 3],
+                'timestamps': [0, 1000, 2000, 3000, 4000],
+                'interval': 1,
+            },
+            timestamp=0,
+        ),
+        sample.Sample(
+            metric='Latency_time_series',
+            value=0.0,
+            unit='ms',
+            metadata={
+                'values': [1, 5, 5, 4, 5],
+                'timestamps': [0, 1000, 2000, 3000, 4000],
+                'interval': 1,
+            },
+            timestamp=0,
+        ),
     ]
     self.assertEqual(samples, expected_result)
 

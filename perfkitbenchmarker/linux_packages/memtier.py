@@ -794,6 +794,42 @@ class MemtierResult:
     return samples
 
 
+def AlignTimeDiffMemtierResults(
+    memtier_results: List[MemtierResult],
+) -> None:
+  """Realign the timestamps if time diff between clients are greater than 1s."""
+  start_times = [result.timestamps[0] for result in memtier_results]
+  min_start_time = min(start_times)
+  max_start_time = max(start_times)
+  diff_time = max_start_time - min_start_time
+  logging.info(
+      'Max difference in start time between clients is %d ms',
+      max_start_time - min_start_time,
+  )
+  if diff_time < 1000:
+    return
+
+  # There are time diff greater than 1s
+  # We add 0 padding to the start of the series and remove the end
+  # based on the time diff
+  for result in memtier_results:
+    diff_in_seconds = (result.timestamps[0] - min_start_time) // 1000
+    if diff_in_seconds < 1:
+      continue
+
+    extra_timestamps = [
+        result.timestamps[0] - 1000 * t
+        for t in range(diff_in_seconds + 1, 1, -1)
+    ]
+    empty_results = [0 for i in range(diff_in_seconds)]
+    result.timestamps = extra_timestamps + result.timestamps[:-diff_in_seconds]
+    result.max_latency_series = (
+        empty_results + result.max_latency_series[:-diff_in_seconds]
+    )
+
+    result.ops_series = empty_results + result.ops_series[:-diff_in_seconds]
+
+
 def AggregateMemtierResults(memtier_results: List[MemtierResult],
                             metadata: Dict[str, Any]) -> List[sample.Sample]:
   """Aggregate memtier time series from all clients.
@@ -836,18 +872,7 @@ def AggregateMemtierResults(memtier_results: List[MemtierResult],
       logging.warning('There is empty result: %s %s %s',
                       str(result.ops_per_sec), str(result.timestamps),
                       str(result.runtime_info))
-
-  start_times = [result.timestamps[0] for result in non_empty_results]
-  min_start_time = min(start_times)
-  max_start_time = max(start_times)
-  diff_time = max_start_time - min_start_time
-  logging.info('Max difference in start time between clients is %d ms',
-               max_start_time - min_start_time)
-  if diff_time > 1000:
-    raise errors.Benchmarks.RunError(
-        f'Clients starting at {diff_time} ms apart'
-    )
-
+  AlignTimeDiffMemtierResults(non_empty_results)
   timestamps = memtier_results[0].timestamps
 
   # Not all clients have the same duration
