@@ -209,7 +209,29 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
       cwnd_scale = None
       total_stats = {}
 
-      if thread_count > 1:
+      if thread_count == 1:
+        r = re.compile((
+            r'\[\s*(?P<thread_num>\d+)\]\s+(?P<interval>\d+\.\d+-\d+\.\d+)\s+sec\s+'
+            r'(?P<transfer>\d+\.?\d*)\s\w+\s+(?P<throughput>\d+\.?\d*)\sMbits\/sec\s+'
+            r'(?P<write>\d+)\/(?P<err>\d+)\s+(?P<retry>\d+)\s+(?P<cwnd>-?\d+)(?P<cwnd_scale>\w*)\/'
+            r'(?P<rtt>\d+)\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.?\d*)'))
+        interval_stats = [m.groupdict() for m in r.finditer(stdout)]
+
+        for count in range(0,len(interval_stats)-1):
+          i = interval_stats[count]
+          interval_time = i['interval'].split('-')
+          interval_start = float(interval_time[0])
+          interval_start_time_list.append(interval_start)
+          interval_throughput_list.append(float(i['throughput']))
+          rtt_avg_list.append(float(i['rtt']))
+          cwnd_avg_list.append(int(i['cwnd']))
+          cwnd_scale = i['cwnd_scale']
+          netpwr_sum_list.append(float(i['netpwr']))
+          retry_sum_list.append(int(i['retry']))
+
+        total_stats = interval_stats[len(interval_stats)-1]
+
+      elif thread_count > 1:
         # Parse aggregates of multiple sending threads for each report interval
         r = re.compile((
             r'\[SUM\]\s+(?P<interval>\d+\.\d+-\d+\.\d+)\s\w+\s+(?P<transfer>\d+\.?\d*)'
@@ -261,31 +283,7 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
         total_stats['cwnd'] = sum(cwnd_avg_list)/len(cwnd_avg_list)
         total_stats['netpwr'] = sum(netpwr_sum_list)/len(netpwr_sum_list)
         total_stats['rtt_unit'] = thread_results_for_interval[0]['rtt_unit']
-
         total_throughput = total_stats['throughput']
-
-      elif thread_count == 1:
-        
-        r = re.compile((
-            r'\[\s*(?P<thread_num>\d+)\]\s+(?P<interval>\d+\.\d+-\d+\.\d+)\s+sec\s+'
-            r'(?P<transfer>\d+\.?\d*)\s\w+\s+(?P<throughput>\d+\.?\d*)\sMbits\/sec\s+'
-            r'(?P<write>\d+)\/(?P<err>\d+)\s+(?P<retry>\d+)\s+(?P<cwnd>-?\d+)(?P<cwnd_scale>\w*)\/'
-            r'(?P<rtt>\d+)\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.?\d*)'))
-        interval_stats = [m.groupdict() for m in r.finditer(stdout)]
-
-        for count in range(0,len(interval_stats)-1):
-          i = interval_stats[count]
-          interval_time = i['interval'].split('-')
-          interval_start = float(interval_time[0])
-          interval_start_time_list.append(interval_start)
-          interval_throughput_list.append(float(i['throughput']))
-          rtt_avg_list.append(float(i['rtt']))
-          cwnd_avg_list.append(int(i['cwnd']))
-          cwnd_scale = i['cwnd_scale']
-          netpwr_sum_list.append(float(i['netpwr']))
-          retry_sum_list.append(int(i['retry']))
-
-        total_stats = interval_stats[len(interval_stats)-1]
 
       tcp_metadata = {
           'buffer_size': buffer_size,
@@ -495,6 +493,8 @@ def Run(benchmark_spec):
 
   for protocol in FLAGS.iperf_benchmarks:
     for thread_count in FLAGS.iperf_sending_thread_count:
+      if thread_count < 1:
+        continue
       # Send traffic in both directions
       for sending_vm, receiving_vm in vms, reversed(vms):
         # Send using external IP addresses
