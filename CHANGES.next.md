@@ -209,6 +209,7 @@
 -   Create a list of resources in benchmark_spec to extract common lifecycle
     timing samples from regardless of benchmark. The set is initially small, but
     can be expanded to any resource.
+-   Add per-VM resource metadata for id, name, and IP address.
 
 ### Bug fixes and maintenance updates:
 

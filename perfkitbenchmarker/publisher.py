@@ -159,6 +159,13 @@ EXTERNAL_PUBLISHERS = []
 # Used to publish samples in Pacific datetime
 _PACIFIC_TZ = pytz.timezone('US/Pacific')
 
+# metadata to list all entries instead of using a representative VM
+_VM_METADATA_TO_LIST_PLURAL = {
+    'id': 'ids',
+    'name': 'names',
+    'ip_address': 'ip_addresses'
+}
+
 
 def PublishRunStageSamples(benchmark_spec, samples):
   """Publishes benchmark run-stage samples immediately.
@@ -245,12 +252,14 @@ class DefaultMetadataProvider(MetadataProvider):
     for name, vms in six.iteritems(benchmark_spec.vm_groups):
       if len(vms) == 0:
         continue
+
       # Get a representative VM so that we can publish the cloud, zone,
       # machine type, and image.
       vm = vms[-1]
       name_prefix = '' if name == 'default' else name + '_'
       for k, v in six.iteritems(vm.GetResourceMetadata()):
-        metadata[name_prefix + k] = v
+        if k not in _VM_METADATA_TO_LIST_PLURAL:
+          metadata[name_prefix + k] = v
       metadata[name_prefix + 'vm_count'] = len(vms)
       for k, v in six.iteritems(vm.GetOSResourceMetadata()):
         metadata[name_prefix + k] = v
@@ -260,6 +269,23 @@ class DefaultMetadataProvider(MetadataProvider):
         metadata[name_prefix + 'data_disk_count'] = len(vm.scratch_disks)
         for key, value in six.iteritems(data_disk.GetResourceMetadata()):
           metadata[name_prefix + 'data_disk_0_%s' % (key,)] = value
+
+    # Get some metadata from all VMs:
+    # Here having a lack of a prefix indicate the union of all groups, where it
+    # signaled the default vm group above.
+    vm_groups_and_all = benchmark_spec.vm_groups | {None: benchmark_spec.vms}
+    for group_name, vms in vm_groups_and_all.items():
+      name_prefix = group_name + '_' if group_name  else ''
+      # since id and name are generic metadata prefix vm, so it is clear
+      # what the resource is.
+      name_prefix += 'vm_'
+      for key, key_plural in _VM_METADATA_TO_LIST_PLURAL.items():
+        values = []
+        for vm in vms:
+          if value := vm.GetResourceMetadata().get(key):
+            values.append(value)
+        if values:
+          metadata[name_prefix + key_plural] = ','.join(values)
 
     if FLAGS.set_files:
       metadata['set_files'] = ','.join(FLAGS.set_files)

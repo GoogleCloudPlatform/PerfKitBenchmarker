@@ -256,6 +256,27 @@ class SampleCollectorTestCase(unittest.TestCase):
         self.instance.samples[0])
 
 
+def CreateMockVM(hostname='Hostname', vm_id='12345', ip_address='1.2.3.4'):
+  mock_vm = mock.MagicMock(
+      CLOUD='GCP',
+      zone='us-central1-a',
+      machine_type='n1-standard-1',
+      image='ubuntu-14-04',
+      scratch_disks=[],
+      hostname=hostname,
+  )
+  mock_vm.GetResourceMetadata.return_value = {
+      'machine_type': mock_vm.machine_type,
+      'image': mock_vm.image,
+      'zone': mock_vm.zone,
+      'cloud': mock_vm.CLOUD,
+      'id': vm_id,
+      'name': hostname,
+      'ip_address': ip_address,
+  }
+  return mock_vm
+
+
 class DefaultMetadataProviderTestCase(unittest.TestCase):
 
   def setUp(self):
@@ -288,18 +309,7 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     }
     self.mock_disk.GetResourceMetadata.return_value = self.disk_metadata
 
-    self.mock_vm = mock.MagicMock(CLOUD='GCP',
-                                  zone='us-central1-a',
-                                  machine_type='n1-standard-1',
-                                  image='ubuntu-14-04',
-                                  scratch_disks=[],
-                                  hostname='Hostname')
-    self.mock_vm.GetResourceMetadata.return_value = {
-        'machine_type': self.mock_vm.machine_type,
-        'image': self.mock_vm.image,
-        'zone': self.mock_vm.zone,
-        'cloud': self.mock_vm.CLOUD,
-    }
+    self.mock_vm = CreateMockVM()
     self.mock_spec = mock.MagicMock(vm_groups={'default': [self.mock_vm]},
                                     vms=[self.mock_vm])
 
@@ -309,15 +319,23 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                          'machine_type': self.mock_vm.machine_type,
                          'image': self.mock_vm.image,
                          'vm_count': 1,
-                         'hostnames': 'Hostname'}
+                         'hostnames': 'Hostname',
+                         'vm_ids': '12345',
+                         'vm_names': 'Hostname',
+                         'vm_ip_addresses': '1.2.3.4',
+                         'default_vm_ids': '12345',
+                         'default_vm_names': 'Hostname',
+                         'default_vm_ip_addresses': '1.2.3.4',
+                         }
 
-  def _RunTest(self, spec, expected, input_metadata=None):
-    input_metadata = input_metadata or {}
+  def _RunTest(self, spec, expected):
+    input_metadata = {'some_key': 'some_value'}
+    expected = expected | input_metadata
     instance = publisher.DefaultMetadataProvider()
-    result = instance.AddMetadata(input_metadata, self.mock_spec)
+    result = instance.AddMetadata(input_metadata, spec)
     self.assertIsNot(input_metadata, result,
                      msg='Input metadata was not copied.')
-    self.assertDictContainsSubset(expected, result)
+    self.assertEqual(expected, result)
 
   def testAddMetadata_ScratchDiskUndefined(self):
     self._RunTest(self.mock_spec, self.default_meta)
@@ -367,6 +385,35 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
                     data_disk_0_num_stripes=1,
                     data_disk_0_foo='bar')
     self._RunTest(self.mock_spec, expected)
+
+  def testMultipleVms(self):
+    vm2 = CreateMockVM(hostname='foo', vm_id='42', ip_address='5.6.7.8')
+    vm3 = CreateMockVM(hostname='bar', vm_id='321', ip_address='3.2.1')
+    mock_spec = mock.MagicMock(
+        vm_groups={'default': [self.mock_vm], 'other': [vm2, vm3]},
+        vms=[self.mock_vm, vm2, vm3],
+    )
+    expected = self.default_meta | {
+        'other_cloud': 'GCP',
+        'other_image': 'ubuntu-14-04',
+        'other_machine_type': 'n1-standard-1',
+        'other_vm_count': 2,
+        'other_vm_ids': '42,321',
+        'other_vm_ip_addresses': '5.6.7.8,3.2.1',
+        'other_vm_names': 'foo,bar',
+        'other_zone': 'us-central1-a',
+        # Default vm group metadata
+        # This is confusing, but it has always been this way.
+        # In practice we rarely have multiple vm groups where one is called
+        # default like this.
+        'vm_count': 1,
+        # All VM metadata
+        'hostnames': 'Hostname,foo,bar',
+        'vm_ids': '12345,42,321',
+        'vm_ip_addresses': '1.2.3.4,5.6.7.8,3.2.1',
+        'vm_names': 'Hostname,foo,bar',
+    }
+    self._RunTest(mock_spec, expected)
 
 
 class CSVPublisherTestCase(unittest.TestCase):

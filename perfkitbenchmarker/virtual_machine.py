@@ -1124,6 +1124,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.capacity_reservation_id = None
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
     self.vm_group = None
+    self.id = None
 
   @property
   @classmethod
@@ -1248,6 +1249,14 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       result['num_cpus'] = self.num_cpus
       if self.NumCpusForBenchmark() != self.num_cpus:
         result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
+    # Some metadata is unique per VM.
+    # Update publisher._VM_METADATA_TO_LIST to add more
+    if self.id is not None:
+      result['id'] = self.id
+    if self.name is not None:
+      result['name'] = self.name
+    if self.ip_address is not None:
+      result['ip_address'] = self.ip_address
     return result
 
   def SimulateMaintenanceEvent(self):
