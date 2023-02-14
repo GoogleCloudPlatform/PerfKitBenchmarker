@@ -248,7 +248,7 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
       'google_bigtable_admin_endpoint': gcp_bigtable.ADMIN_ENDPOINT.value,
       'project': FLAGS.project or _GetDefaultProject(),
       'instance': bigtable.name,
-      'hbase_version': HBASE_CLIENT_VERSION.replace('.', '_'),
+      'hbase_major_version': FLAGS.hbase_version.split('.')[0],
   }
 
   for file_name in HBASE_CONF_FILES:

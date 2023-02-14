@@ -109,6 +109,8 @@
 -   Create a new subdirectory of linux_packages called provisioning_benchmarks
     for benchmarking lifecycle management timings of cloud resources and
     operations.
+-   Add support for using the hbase2 binding in the Cloud Bigtable YCSB
+    benchmark.
 
 ### Enhancements:
 

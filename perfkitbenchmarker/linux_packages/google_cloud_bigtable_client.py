@@ -50,6 +50,7 @@ def Install(vm):
   vm.Install('maven')
 
   context = {
+      'hbase_major_version': FLAGS.hbase_version.split('.')[0],
       'google_bigtable_client_version': CLIENT_VERSION.value,
   }
 
