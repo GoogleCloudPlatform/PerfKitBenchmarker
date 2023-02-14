@@ -62,7 +62,7 @@ class PollHttpEndpointTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(response_type, expected_response_type)
     self.assertEqual(response_code, expected_response_code)
     self.assertAlmostEqual(latency, 0.5)
-    self.assertEqual(response, 'hello world<curl_time_total:0.5>')
+    self.assertEqual(response, 'hello world')
 
   @parameterized.named_parameters(
       ('response match', 'succeed', 'hello world'),
@@ -115,7 +115,7 @@ class PollHttpEndpointTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertAlmostEqual(latency, expected_latency)
     self.assertEqual(response_type, expected_response_type)
-    self.assertEqual(response, 'hello world<curl_time_total:0.5>')
+    self.assertEqual(response, 'hello world')
     self.assertEqual(self.mock_subprocess.call_count, num_retries)
 
   def test_poll_fails_with_timeout(self):

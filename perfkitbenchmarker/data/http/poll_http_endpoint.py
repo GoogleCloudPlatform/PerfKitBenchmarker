@@ -116,6 +116,8 @@ def call_curl(endpoint, headers=None, expected_response_code=None,
       match = re.search(_CURL_METRICS_REGEXP, http_stdout)
       if match:
         latency = float(match.group(1))
+        # Remove <curl_time_total:##> from the response.
+        http_stdout = http_stdout.split(match.group(0))[0]
 
     return latency or -1, poll_stats, int(http_resp_code), http_stdout
 
