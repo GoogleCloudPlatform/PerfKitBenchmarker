@@ -25,8 +25,10 @@ from perfkitbenchmarker.linux_packages import ycsb
 FLAGS = flags.FLAGS
 
 CLIENT_VERSION = flags.DEFINE_string(
-    'google_bigtable_client_version', None,
-    'Google Bigtable client version, e.g. "2.5.0"')
+    'google_bigtable_client_version',
+    '2.5.0',
+    'Google Bigtable client version, e.g. "2.5.0"',
+)
 
 _MVN_DEPENDENCY_PLUGIN_VERSION = '3.3.0'
 _MVN_DEPENDENCY_PLUGIN = 'org.apache.maven.plugins:maven-dependency-plugin'

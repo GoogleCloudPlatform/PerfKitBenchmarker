@@ -315,3 +315,8 @@
     of the hbase shell to create and delete tables.
 -   Update Bigtable benchmarking configs along with new docker image release.
     Important dates are added to the user guide.
+-   Remove `--google_bigtable_enable_table_object_sharing`. Use
+    `--ycsb_tar_url=https://storage.googleapis.com/cbt_ycsb_client_jar/ycsb-0.14.0.tar.gz`
+    to retain the previous behavior.
+-   Remove `--google_bigtable_hbase_jar_url`. Rely on
+    `--google_bigtable_client_version` instead.
