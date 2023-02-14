@@ -329,6 +329,8 @@
     external (public) IPs for better security and reduced costs on AWS, Azure,
     and GCP. The `--connect_via_internal_ip` flag should also be used in this
     case.
+-   Add `azure_subnet_id` flag to use an existing subnet instead of creating a
+    new one.
 -   Remove `--google_bigtable_enable_table_object_sharing`. Use
     `--ycsb_tar_url=https://storage.googleapis.com/cbt_ycsb_client_jar/ycsb-0.14.0.tar.gz`
     to retain the previous behavior.
