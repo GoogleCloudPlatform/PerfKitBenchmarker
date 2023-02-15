@@ -278,6 +278,7 @@ def Load(
       key_minimum=1,
       key_maximum=load_key_maximum,
       requests='allkeys',
+      cluster_mode=MEMTIER_CLUSTER_MODE.value,
       password=server_password)
   _IssueRetryableCommand(client_vm, cmd)
 
