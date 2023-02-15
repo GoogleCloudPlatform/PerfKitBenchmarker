@@ -36,8 +36,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
-import six
-from six.moves import range
 
 PKB_FIO_LOG_FILE_NAME = 'pkb_fio_avg'
 LOCAL_JOB_FILE_SUFFIX = '_fio.job'  # used with vm_util.PrependTempDir()
@@ -448,7 +446,7 @@ def GenerateJobFileString(filename, scenario_strings,
   """
 
   if 'all' in scenario_strings and FLAGS.fio_use_default_scenarios:
-    scenarios = six.itervalues(SCENARIOS)
+    scenarios = SCENARIOS.values()
   else:
     scenarios = [GetScenarioFromScenarioString(scenario_string.strip('"'))
                  for scenario_string in scenario_strings]
@@ -778,7 +776,7 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
 
   start_time = time.time()
   stdout, _ = vm.RobustRemoteCommand(
-      fio_command, should_log=True, timeout=FLAGS.fio_command_timeout_sec)
+      fio_command, timeout=FLAGS.fio_command_timeout_sec)
   end_time = time.time()
   bin_vals = []
   if collect_logs:

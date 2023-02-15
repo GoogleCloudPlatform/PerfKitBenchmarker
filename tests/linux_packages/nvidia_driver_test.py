@@ -49,7 +49,7 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm.RemoteCommand.assert_called_with(
         'sudo nvidia-smi '
         '--query-gpu=clocks.applications.memory,'
-        'clocks.applications.graphics --format=csv --id=3', should_log=True)
+        'clocks.applications.graphics --format=csv --id=3')
 
   def testGetDriverVersion(self):
     vm = mock.MagicMock()
@@ -70,8 +70,7 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     expected = 'Y Y N N;Y Y N N;N N Y Y;N N Y Y'
     actual = nvidia_driver.GetPeerToPeerTopology(vm)
     self.assertEqual(expected, actual)
-    vm.RemoteCommand.assert_called_with('nvidia-smi topo -p2p r',
-                                        should_log=True)
+    vm.RemoteCommand.assert_called_with('nvidia-smi topo -p2p r')
 
   def testQueryAutoboostNull(self):
     path = os.path.join(os.path.dirname(__file__), '../data',

@@ -93,7 +93,7 @@ def CheckNvidiaGpuExists(vm):
   if vm.BASE_OS_TYPE != os_types.DEBIAN:
     return False
   vm.Install('pciutils')
-  output, _ = vm.RemoteCommand('sudo lspci', should_log=True)
+  output, _ = vm.RemoteCommand('sudo lspci')
   regex = re.compile(r'3D controller: NVIDIA Corporation')
   return regex.search(output) is not None
 
@@ -110,9 +110,7 @@ def CheckNvidiaSmiExists(vm):
   # PKB only supports NVIDIA driver on DEBIAN for now.
   if vm.BASE_OS_TYPE != os_types.DEBIAN:
     return False
-  resp, _ = vm.RemoteHostCommand('command -v nvidia-smi',
-                                 ignore_failure=True,
-                                 suppress_warning=True)
+  resp, _ = vm.RemoteHostCommand('command -v nvidia-smi', ignore_failure=True)
   return bool(resp.rstrip())
 
 
@@ -128,7 +126,7 @@ def GetDriverVersion(vm):
   Raises:
     NvidiaSmiParseOutputError: If nvidia-smi output cannot be parsed.
   """
-  stdout, _ = vm.RemoteCommand('nvidia-smi', should_log=True)
+  stdout, _ = vm.RemoteCommand('nvidia-smi')
   regex = r'Driver Version\:\s+(\S+)'
   match = re.search(regex, stdout)
   if match:
@@ -168,7 +166,7 @@ def GetGpuType(vm):
     ['V100-SXM2-16GB', 'V100-SXM2-16GB', 'V100-SXM2-16GB', 'V100-SXM2-16GB',
      'V100-SXM2-16GB', 'V100-SXM2-16GB', 'V100-SXM2-16GB', 'V100-SXM2-16GB']
   """
-  stdout, _ = vm.RemoteCommand('nvidia-smi -L', should_log=True)
+  stdout, _ = vm.RemoteCommand('nvidia-smi -L')
   try:
     gpu_types = []
     for line in stdout.splitlines():
@@ -229,7 +227,7 @@ def QueryNumberOfGpus(vm):
     Integer indicating the number of NVIDIA GPUs present on the vm.
   """
   stdout, _ = vm.RemoteCommand('sudo nvidia-smi --query-gpu=count --id=0 '
-                               '--format=csv', should_log=True)
+                               '--format=csv')
   return int(stdout.split()[1])
 
 
@@ -250,7 +248,7 @@ def GetPeerToPeerTopology(vm):
 
     GetTopology will return 'Y Y N N;Y Y N N;N N Y Y;N N Y Y'
   """
-  stdout, _ = vm.RemoteCommand('nvidia-smi topo -p2p r', should_log=True)
+  stdout, _ = vm.RemoteCommand('nvidia-smi topo -p2p r')
   lines = [line.split() for line in stdout.splitlines()]
   num_gpus = len(lines[0])
 
@@ -334,7 +332,7 @@ def QueryGpuClockSpeed(vm, device_id):
   query = ('sudo nvidia-smi --query-gpu=clocks.applications.memory,'
            'clocks.applications.graphics --format=csv --id={0}'
            .format(device_id))
-  stdout, _ = vm.RemoteCommand(query, should_log=True)
+  stdout, _ = vm.RemoteCommand(query)
   clock_speeds = stdout.splitlines()[1]
   matches = regex_util.ExtractAllMatches(EXTRACT_CLOCK_SPEEDS_REGEX,
                                          clock_speeds)[0]
@@ -388,7 +386,7 @@ def QueryAutoboostPolicy(vm, device_id):
   autoboost_regex = r'Auto Boost\s*:\s*(\S+)'
   autoboost_default_regex = r'Auto Boost Default\s*:\s*(\S+)'
   query = 'sudo nvidia-smi -q -d CLOCK --id={0}'.format(device_id)
-  stdout, _ = vm.RemoteCommand(query, should_log=True)
+  stdout, _ = vm.RemoteCommand(query)
   autoboost_match = re.search(autoboost_regex, stdout)
   autoboost_default_match = re.search(autoboost_default_regex, stdout)
 
@@ -465,14 +463,12 @@ def Install(vm):
   tokens = re.split('/', location)
   filename = tokens[-1]
   vm.RemoteCommand('wget {location} && chmod 755 {filename} '
-                   .format(location=location, filename=filename),
-                   should_log=True)
+                   .format(location=location, filename=filename))
   vm.RemoteCommand(
       'sudo ./{filename} -q -x-module-path={x_module_path} '
       '--ui=none -x-library-path={x_library_path}'.format(
           filename=filename,
           x_module_path=FLAGS.nvidia_driver_x_module_path,
-          x_library_path=FLAGS.nvidia_driver_x_library_path),
-      should_log=True)
+          x_library_path=FLAGS.nvidia_driver_x_library_path))
   if FLAGS.nvidia_driver_persistence_mode:
     EnablePersistenceMode(vm)

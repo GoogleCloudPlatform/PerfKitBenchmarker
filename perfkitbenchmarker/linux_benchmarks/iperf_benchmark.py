@@ -115,14 +115,18 @@ def Prepare(benchmark_spec):
       stdout, _ = vm.RemoteCommand(f'nohup iperf --server --port {IPERF_PORT}'
                                    ' &> /dev/null & echo $!')
 
-      # TODO(ssabhaya): store this in a better place once we have a better place
+      # TODO(user): store this in a better place once we have a better place
       vm.iperf_tcp_server_pid = stdout.strip()
+      # Check that the server is actually running
+      vm.RemoteCommand(f'ps -p {vm.iperf_tcp_server_pid}')
     if UDP in FLAGS.iperf_benchmarks:
       stdout, _ = vm.RemoteCommand(
-          f'nohup iperf --server --udp --port {IPERF_UDP_PORT}'
-          ' &> /dev/null & echo $!')
-      # TODO(ssabhaya): store this in a better place once we have a better place
+          f'nohup iperf --server --bind {vm.internal_ip} --udp '
+          f'--port {IPERF_UDP_PORT} &> /dev/null & echo $!')
+      # TODO(user): store this in a better place once we have a better place
       vm.iperf_udp_server_pid = stdout.strip()
+      # Check that the server is actually running
+      vm.RemoteCommand(f'ps -p {vm.iperf_udp_server_pid}')
 
 
 @vm_util.Retry(max_retries=IPERF_RETRIES)
@@ -171,7 +175,6 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     timeout_buffer = FLAGS.iperf_timeout or 30 + thread_count
     stdout, _ = sending_vm.RemoteCommand(
         iperf_cmd,
-        should_log=True,
         timeout=FLAGS.iperf_runtime_in_seconds + timeout_buffer)
 
     window_size_match = re.search(
@@ -259,7 +262,6 @@ def _RunIperf(sending_vm, receiving_vm, receiving_ip_address, thread_count,
     timeout_buffer = FLAGS.iperf_timeout or 30 + thread_count
     stdout, _ = sending_vm.RemoteCommand(
         iperf_cmd,
-        should_log=True,
         timeout=FLAGS.iperf_runtime_in_seconds + timeout_buffer)
 
     match = re.search(

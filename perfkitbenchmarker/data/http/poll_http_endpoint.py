@@ -37,6 +37,22 @@ POLL_STATUS = (POLL_SUCCEED, FAILURE_CURL,
                FAILURE_INVALID_RESPONSE, FAILURE_INVALID_RESPONSE_CODE)
 
 
+def _generate_file_names():
+  """Returns a file name as tuple (output, error).. mostly for mocking."""
+  name_base = str(uuid.uuid4())[:6]
+  return (name_base + '.out', name_base + '.err')
+
+
+def _get_time() -> float:
+  """Returns current time, mostly for mocking."""
+  return time.time()
+
+
+def _popen(curl_cmd, stdout, stderr, shell):
+  """Wraps subprocess.Popen for mocking."""
+  return subprocess.Popen(curl_cmd, stdout=stdout, stderr=stderr, shell=shell)
+
+
 def call_curl(endpoint, headers=None, expected_response_code=None,
               expected_response=None):
   """Curl endpoint once and return response.
@@ -61,7 +77,7 @@ def call_curl(endpoint, headers=None, expected_response_code=None,
       String indicates the actual HTTP response.
   """
   poll_stats = POLL_SUCCEED
-  tmpid = str(uuid.uuid4())[:6]
+  outid, errid = _generate_file_names()
   header = ''
   if headers:
     header = '-H %s ' % ' '.join(headers)
@@ -70,13 +86,13 @@ def call_curl(endpoint, headers=None, expected_response_code=None,
       metrics=_CURL_METRICS,
       header=header,
       endpoint=endpoint)
-  with open(tmpid + '.out', 'w+') as stdout:
-    with open(tmpid + '.err', 'w+') as stderr:
-      p = subprocess.Popen(
+  with open(outid, 'w+') as stdout:
+    with open(errid, 'w+') as stderr:
+      p = _popen(
           curl_cmd, stdout=stdout, stderr=stderr, shell=True)
       retcode = p.wait()
   http_resp_code = None
-  with open(tmpid + '.err', 'r') as stderr:
+  with open(errid, 'r') as stderr:
     http_stderr = stderr.read()
     for line in http_stderr.split('\n'):
       match = re.search(_HTTP_RESPCODE_REGEXP, line)
@@ -91,13 +107,17 @@ def call_curl(endpoint, headers=None, expected_response_code=None,
         'Error: received non-zero return code running %s, stderr: %s',
         curl_cmd, http_stderr)
   latency = 0
-  with open(tmpid + '.out', 'r') as stdout:
+  with open(outid, 'r') as stdout:
     http_stdout = stdout.read()
     if expected_response and (
         re.search(expected_response, http_stdout) is None):
       poll_stats = FAILURE_INVALID_RESPONSE
     else:
-      latency = float(re.search(_CURL_METRICS_REGEXP, http_stdout).group(1))
+      match = re.search(_CURL_METRICS_REGEXP, http_stdout)
+      if match:
+        latency = float(match.group(1))
+        # Remove <curl_time_total:##> from the response.
+        http_stdout = http_stdout.split(match.group(0))[0]
 
     return latency or -1, poll_stats, int(http_resp_code), http_stdout
 
@@ -127,7 +147,7 @@ def poll(endpoint, headers=None, max_retries=0, retry_interval=0.5,
         expected response and code, or reasons of failure.
       String represents actual response.
   """
-  start = time.time()
+  start = _get_time()
   end = start
   latency = 0
   attempt = 0
@@ -138,12 +158,12 @@ def poll(endpoint, headers=None, max_retries=0, retry_interval=0.5,
                                                      expected_response)
     if poll_stats != POLL_SUCCEED:
       time.sleep(retry_interval)
-      end = time.time()
+      end = _get_time()
       attempt += 1
     else:
       latency = attempt_latency
       break
-  return time.time() - start - latency, latency or -1, poll_stats, resp
+  return _get_time() - start - latency, latency or -1, poll_stats, resp
 
 
 def main():

@@ -157,7 +157,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   num_cpus = vm.NumCpusForBenchmark()
   stdout, _ = vm.RemoteCommand(f'for CPU in `seq 0 {num_cpus-1}`; do echo -n '
                                '"CPU $CPU "; taskset --cpu-list $CPU sysbench '
-                               'memory run; done', should_log=True)
+                               'memory run; done')
 
   return GenerateMetricsForSysbenchMemoryOutput(stdout, metadata)
 

@@ -30,6 +30,13 @@
 -   Remove pkb's --placement_group_style cloud-agnostic values 'cluster'/
     'cluster_if_supported'/'spread'/'spread_if_supported'.
 -   Replace flag --ibm_azone with --ibm_region.
+-   Changed the default benchmark to `cluster_boot` instead of the standard set.
+    This makes the default behavior for PKB much faster and the standard set of
+    benchmarks was defined many years ago. It's not a reasonable introduction to
+    PKB or something that most people should run by default.
+-   --dpb_export_job_stats is now False by default.
+-   Validate arguments to IssueCommand. Remove force_info_log & suppress_warning
+    parameters, add should_pre_log.
 
 ### New features:
 
@@ -95,6 +102,15 @@
 -   Add Intel MPI benchmark.
 -   Add support for Azure ARM VMs.
 -   Add an HTTP endpoint polling utility & incorporate it into app_service.
+-   Added support for Data Plane Development Kit (DPDK) on Linux VM's to improve
+    networking performance.
+-   Added support for dynamic provisioning of Bigquery flat rate slots at
+    benchmark runtime
+-   Create a new subdirectory of linux_packages called provisioning_benchmarks
+    for benchmarking lifecycle management timings of cloud resources and
+    operations.
+-   Add support for using the hbase2 binding in the Cloud Bigtable YCSB
+    benchmark.
 
 ### Enhancements:
 
@@ -190,9 +206,16 @@
 -   Add `--dpb_job_poll_interval_secs` flag to control job polling frequency in
     DPB benchmarks.
 -   Add support for more readings in nvidia_power tracking.
+-   Report benchmark run costs for dpb_sparksql_benchmark runs on Dataproc
+    Serverless, AWS EMR Serverless & AWS Glue.
+-   Create a list of resources in benchmark_spec to extract common lifecycle
+    timing samples from regardless of benchmark. The set is initially small, but
+    can be expanded to any resource.
+-   Add per-VM resource metadata for id, name, and IP address.
 
 ### Bug fixes and maintenance updates:
 
+-   Add 'runcpu --update' and 'runcpu --version' commands to install phase.
 -   Set the command to download preprovisioned data to be robust and have a five
     minute timeout.
 -   Make Speccpu17 fail if there are compilation errors that will cause missing
@@ -263,6 +286,7 @@
 -   Update the performance results of Bigtable testing which used a more proper
     client setup.
 -   Update the runner's AWS CLI to 1.19.75.
+-   Upgrade from AWS ecr get-login to ecr get-login-password.
 -   Minor fix of the Bigtable benchmarking user guide.
 -   Enable icelake and milan as --gcp_min_cpu_platform options.
 -   Update the bigtable tutorial readme with the content of batch_testing.md.
@@ -281,7 +305,7 @@
 -   Add some required types to BaseAppServiceSpec.
 -   Uses nic type of GVNIC by default (instead of VIRTIO_NET) on GCE
 -   Rename pkb's --placement_group_style values to reflect their cloud-specific
-        CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN'; AWS -
+    CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN'; AWS -
     'cluster'/'spread'/'partition'; Azure -
     'proximity-placement-group'/'availability-set'). Cloud-agnostic value
     'closest_supported' will choose the most tightly-coupled placement policy
@@ -289,3 +313,10 @@
 -   Fix how the CBT client is installed for the cloud_bigtable_ycsb_benchmark
     (when --google_bigtable_client_version is set) and use the `cbt` CLI instead
     of the hbase shell to create and delete tables.
+-   Update Bigtable benchmarking configs along with new docker image release.
+    Important dates are added to the user guide.
+-   Remove `--google_bigtable_enable_table_object_sharing`. Use
+    `--ycsb_tar_url=https://storage.googleapis.com/cbt_ycsb_client_jar/ycsb-0.14.0.tar.gz`
+    to retain the previous behavior.
+-   Remove `--google_bigtable_hbase_jar_url`. Rely on
+    `--google_bigtable_client_version` instead.

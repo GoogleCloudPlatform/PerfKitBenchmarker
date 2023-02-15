@@ -24,17 +24,16 @@ flags.DEFINE_string('mxnet_commit_hash',
 def Install(vm):
   """Installs MXNet on the VM."""
   vm.InstallPackages('git')
-  vm.RemoteCommand('git clone %s' % MXNET_GIT, should_log=True)
+  vm.RemoteCommand('git clone %s' % MXNET_GIT)
   vm.RemoteCommand('cd incubator-mxnet && git checkout %s' %
                    FLAGS.mxnet_commit_hash)
 
 
 def Uninstall(vm):
   """Uninstalls MXNet on the VM."""
-  vm.RemoteCommand('rm -rf tpu-demos', should_log=True)
+  vm.RemoteCommand('rm -rf tpu-demos')
 
 
 def GetCommit(vm):
-  stdout, _ = vm.RemoteCommand('cd incubator-mxnet && git rev-parse HEAD',
-                               should_log=True)
+  stdout, _ = vm.RemoteCommand('cd incubator-mxnet && git rev-parse HEAD')
   return stdout

@@ -452,6 +452,16 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
   in_result_section = False
   at_peak_results_line, peak_name, peak_score = False, None, None
 
+  # Extract the CPU version
+  cpu2017_version = ''
+  for line in stdout.splitlines():
+    if re.search(r'Tested with SPEC CPU.*', line):
+      version_groups = re.search(r'2017 v(.*?) on', line)
+      if version_groups:
+        cpu2017_version = version_groups.group(1)
+      break
+    continue
+
   # Extract the summary section
   for line in stdout.splitlines():
     if in_result_section:
@@ -495,7 +505,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       'spec17_threads': FLAGS.spec17_threads,
       'spec17_fdo': FLAGS.spec17_fdo,
       'spec17_subset': FLAGS.spec17_subset,
-      'gcc_version': build_tools.GetVersion(vm, 'gcc')
+      'gcc_version': build_tools.GetVersion(vm, 'gcc'),
+      'CPU2017_version': cpu2017_version,
   }
 
   missing_results = []
@@ -590,7 +601,7 @@ def ParseOutput(vm,
   for log in log_files:
     results_dir = results_directory or '%s/result' % speccpu_vm_state.spec_dir
     stdout, _ = vm.RemoteCommand(
-        'cat %s/%s' % (results_dir, log), should_log=True)
+        'cat %s/%s' % (results_dir, log))
     results.extend(
         _ExtractScore(stdout, vm, FLAGS.runspec_keep_partial_results or
                       is_partial_results, runspec_metric))

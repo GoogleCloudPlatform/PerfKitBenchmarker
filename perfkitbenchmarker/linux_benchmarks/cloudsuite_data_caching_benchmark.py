@@ -117,7 +117,7 @@ def Run(benchmark_spec):
                    ' cloudsuite/data-caching:client -rps %d' %
                    FLAGS.cloudsuite_data_caching_rps)
 
-  stdout, _ = client_vm.RemoteCommand(benchmark_cmd, should_log=True)
+  stdout, _ = client_vm.RemoteCommand(benchmark_cmd)
 
   return _ParseOutput(stdout)
 

@@ -123,8 +123,7 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         '--db-cluster-identifier=%s' % self.cluster_id,
         '--region=%s' % self.region
     ]
-    stdout, _, retcode = vm_util.IssueCommand(cmd, suppress_warning=True,
-                                              raise_on_failure=False)
+    stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       return None
     json_output = json.loads(stdout)

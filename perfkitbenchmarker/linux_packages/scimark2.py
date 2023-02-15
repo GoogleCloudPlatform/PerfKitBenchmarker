@@ -64,7 +64,7 @@ def Install(vm):
       '(cd {0} && make CFLAGS="{1}")'.format(C_SRC, C_CFLAGS),
   ]
   for cmd in cmds:
-    vm.RemoteCommand(cmd, should_log=True)
+    vm.RemoteCommand(cmd)
 
 
 def Uninstall(vm):

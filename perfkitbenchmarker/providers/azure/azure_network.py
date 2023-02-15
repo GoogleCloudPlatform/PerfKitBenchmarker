@@ -23,6 +23,7 @@ for more information about Azure Virtual Networks.
 import json
 import logging
 import threading
+from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import context
@@ -41,6 +42,9 @@ SSH_PORT = 22
 
 flags.DEFINE_boolean('azure_infiniband', False,
                      'Install Mellanox OpenFabrics drivers')
+_AZ_VERSION_LOG = flags.DEFINE_boolean(
+    'azure_version_log', True, 'Log az --version.'
+)
 
 DEFAULT_REGION = 'eastus2'
 
@@ -65,6 +69,8 @@ def GetResourceGroup(zone=None):
 
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
+  _az_lock = threading.Condition()
+  _az_version: Optional[str] = None
 
   def __init__(self,
                name,
@@ -73,6 +79,7 @@ class AzureResourceGroup(resource.BaseResource):
                timeout_minutes=None,
                raise_on_create_failure=True):
     super(AzureResourceGroup, self).__init__()
+    AzureResourceGroup._log_az_version()
     self.name = name
     self.use_existing = use_existing
     self.timeout_minutes = timeout_minutes
@@ -105,7 +112,6 @@ class AzureResourceGroup(resource.BaseResource):
   def _Exists(self):
     stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'show', '--name', self.name],
-        suppress_warning=True,
         raise_on_failure=False)
     try:
       json.loads(stdout)
@@ -139,6 +145,17 @@ class AzureResourceGroup(resource.BaseResource):
     _, _, retcode = vm_util.IssueCommand(tag_cmd, raise_on_failure=False)
     if retcode:
       raise errors.Resource.CreationError('Error tagging Azure resource group.')
+
+  @classmethod
+  def _log_az_version(cls):
+    if not _AZ_VERSION_LOG.value:
+      return
+
+    with cls._az_lock:
+      if not cls._az_version:
+        cls.az_version, _, _ = vm_util.IssueCommand(
+            [azure.AZURE_PATH, '--version'],
+            raise_on_failure=True)
 
 
 class AzureStorageAccount(resource.BaseResource):
@@ -211,7 +228,6 @@ class AzureStorageAccount(resource.BaseResource):
             azure.AZURE_PATH, 'storage', 'account', 'show', '--output', 'json',
             '--name', self.name
         ] + self.resource_group.args,
-        suppress_warning=True,
         raise_on_failure=False)
 
     try:
@@ -321,7 +337,6 @@ class AzureVirtualNetwork(network.BaseNetwork):
             azure.AZURE_PATH, 'network', 'vnet', 'show', '--output', 'json',
             '--name', self.name
         ] + self.resource_group.args,
-        suppress_warning=True,
         raise_on_failure=False)
 
     return bool(json.loads(stdout))
@@ -421,7 +436,13 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         self.subnet.name, '--network-security-group', self.name
     ] + self.resource_group.args + self.subnet.vnet.args)
 
-  def AllowPort(self, vm, start_port, end_port=None, source_range=None):
+  def AllowPort(
+      self,
+      vm,
+      start_port,
+      end_port=None,
+      source_range=None,
+      protocol='*'):
     """Open a port or port range.
 
     Args:
@@ -430,6 +451,9 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
       end_port: if given, the end of the port range.
       source_range: List of source CIDRs to allow for this port. If None, all
         sources are allowed. i.e. ['0.0.0.0/0']
+      protocol: Network protocol this rule applies to. One of {*, Ah, Esp, Icmp,
+        Tcp, Udp}. See
+        https://learn.microsoft.com/en-us/cli/azure/network/nsg/rule?view=azure-cli-latest#az-network-nsg-rule-create
 
     Raises:
       ValueError: when there are too many firewall rules.
@@ -450,7 +474,8 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
 
     network_cmd = [
         azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create', '--name',
-        rule_name, '--destination-port-range', port_range, '--access', 'Allow',
+        rule_name, '--destination-port-range', port_range,
+        '--protocol', protocol, '--access', 'Allow',
         '--priority',
         str(rule_priority)
     ] + ['--source-address-prefixes'] + source_range

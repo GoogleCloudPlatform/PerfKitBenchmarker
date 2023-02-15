@@ -249,8 +249,7 @@ def _StartServer(vm):
       '--mount type=bind,source={0},target=/models/resnet '
       '-e MODEL_NAME=resnet '
       '-t benchmarks/tensorflow-serving --port={1}'.format(
-          model_download_directory, SERVER_PORT),
-      should_log=True)
+          model_download_directory, SERVER_PORT))
 
 
 def _StartClient(vm, server_ip, client_thread_count):
@@ -275,8 +274,7 @@ def _StartClient(vm, server_ip, client_thread_count):
                          CLIENT_SCRIPT), server_ip, SERVER_PORT,
           posixpath.join(linux_packages.INSTALL_DIR,
                          posixpath.splitext(ILSVRC_VALIDATION_IMAGES_TAR)[0]),
-          FLAGS.tf_serving_runtime, client_thread_count),
-      should_log=True)
+          FLAGS.tf_serving_runtime, client_thread_count))
 
   # Ensure that stderr from the client script is empty.
   # If it is, stderr from the remote command should contain a single line:

@@ -295,11 +295,10 @@ def _ReadIssueCommandOutput(tf_out, tf_err):
 
 def IssueCommand(
     cmd: Iterable[str],
-    force_info_log: bool = False,
-    suppress_warning: bool = False,
     env: Optional[Dict[str, str]] = None,
     timeout: Optional[int] = DEFAULT_TIMEOUT,
     cwd: Optional[str] = None,
+    should_pre_log: bool = True,
     raise_on_failure: bool = True,
     suppress_failure: Optional[Callable[[str, str, int], bool]] = None,
     raise_on_timeout: bool = True) -> Tuple[str, str, int]:
@@ -308,13 +307,6 @@ def IssueCommand(
   Args:
     cmd: A list of strings such as is given to the subprocess.Popen()
         constructor.
-    force_info_log: A boolean indicating whether the command result should
-        always be logged at the info level. Command results will always be
-        logged at the debug level if they aren't logged at another level.
-    suppress_warning: A boolean indicating whether the results should
-        not be logged at the info level in the event of a non-zero
-        return code. When force_info_log is True, the output is logged
-        regardless of suppress_warning's value.
     env: A dict of key/value strings, such as is given to the subprocess.Popen()
         constructor, that contains environment variables to be injected.
     timeout: Timeout for the command in seconds. If the command has not finished
@@ -324,6 +316,9 @@ def IssueCommand(
         contain what had already been written to them before the process was
         killed.
     cwd: Directory in which to execute the command.
+    should_pre_log: A boolean indicating if command should be outputted alone
+        prior to the output with command, stdout, & stderr. Useful for e.g.
+        timing command length & standing out in logs.
     raise_on_failure: A boolean indicating if non-zero return codes should raise
         IssueCommandError.
     suppress_failure: A function passed (stdout, stderr, ret_code) for non-zero
@@ -340,14 +335,19 @@ def IssueCommand(
     IssueCommandError: When raise_on_failure=True and retcode is non-zero.
     IssueCommandTimeoutError:  When raise_on_timeout=True and
                                command duration exceeds timeout
+    ValueError: When incorrect parameters are passed in.
   """
   if env:
     logging.debug('Environment variables: %s', env)
 
   # Force conversion to string so you get a nice log statement before hitting a
   # type error or NPE.
+  if isinstance(cmd, str):
+    raise ValueError(
+        f'Command must be a list of strings, but string {cmd} was received')
   full_cmd = ' '.join(str(w) for w in cmd)
-  logging.info('Running: %s', full_cmd)
+  if should_pre_log:
+    logging.info('Running: %s', full_cmd)
 
   time_file_path = '/usr/bin/time'
 
@@ -407,10 +407,7 @@ def IssueCommand(
 
   debug_text = ('Ran: {%s}\nReturnCode:%s%s\nSTDOUT: %s\nSTDERR: %s' %
                 (full_cmd, process.returncode, timing_output, stdout, stderr))
-  if force_info_log or (process.returncode and not suppress_warning):
-    logging.info(debug_text)
-  else:
-    logging.debug(debug_text)
+  logging.info(debug_text)
 
   # Raise timeout error regardless of raise_on_failure - as the intended
   # semantics is to ignore expected errors caused by invoking the command
@@ -639,7 +636,7 @@ def GenerateRandomWindowsPassword(password_length=PASSWORD_LENGTH):
   # special characters. This greatly limits the set of characters
   # that we can safely use. See
   # https://github.com/Azure/azure-xplat-cli/blob/master/lib/commands/arm/vm/vmOsProfile._js#L145
-  special_chars = '*!@#$%+='
+  special_chars = '*!@#$+'
   # Ensure that the password contains at least one of each 4 required
   # character types starting with letters to avoid starting with chars which
   # are problematic on the command line e.g. @.

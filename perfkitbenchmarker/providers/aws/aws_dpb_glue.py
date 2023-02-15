@@ -12,10 +12,12 @@ import os
 from typing import List, Optional
 
 from absl import flags
+
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_dpb_glue_prices
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 
@@ -54,6 +56,9 @@ class AwsDpbGlue(dpb_service.BaseDpbService):
     self._cluster_create_time = None
     self._job_counter = 0
 
+    # Last job run cost
+    self._run_cost = None
+
   @property
   def _glue_script_wrapper_url(self):
     return os.path.join(self.base_dir, self.SPARK_SQL_GLUE_WRAPPER_SCRIPT)
@@ -79,6 +84,11 @@ class AwsDpbGlue(dpb_service.BaseDpbService):
       started_on = result['JobRun']['StartedOn']
       completed_on = result['JobRun']['CompletedOn']
       execution_time = result['JobRun']['ExecutionTime']
+      self._run_cost = self._ComputeJobRunCost(
+          result['JobRun'].get('DPUSeconds'),
+          result['JobRun'].get('MaxCapacity'),
+          result['JobRun'].get('ExecutionTime'),
+      )
       return dpb_service.JobResult(
           run_time=execution_time,
           pending_time=completed_on - started_on - execution_time)
@@ -190,3 +200,38 @@ class AwsDpbGlue(dpb_service.BaseDpbService):
   def GetServiceWrapperScriptsToUpload(self) -> List[str]:
     """Gets service wrapper scripts to upload alongside benchmark scripts."""
     return [self.SPARK_SQL_GLUE_WRAPPER_SCRIPT]
+
+  def CalculateCost(self) -> Optional[float]:
+    return self._run_cost
+
+  def _ComputeJobRunCost(
+      self,
+      dpu_seconds: Optional[float],
+      max_capacity: Optional[float],
+      execution_time: Optional[float],
+  ) -> Optional[float]:
+    """Computes the job run cost.
+
+    If dpu_seconds is not None, then the job run cost will be computed only with
+    that argument. Otherwise max_capacity and execution_time will be used. (This
+    is because DPU seconds are only reported for autoscaling jobs).
+
+    Currently run costs can only be computed for the us-east-1 region.
+
+    Args:
+      dpu_seconds: float. DPU * seconds as reported by the AWS Glue API.
+      max_capacity: float. Max capacity as reported by the AWS Glue API.
+      execution_time: float. Execution time in seconds as reported by the AWS
+        Glue API.
+
+    Returns:
+      A float representing the job run cost in USD, or None if the cost cannot
+      be computed for the current region.
+    """
+    dpu_hourly_price = aws_dpb_glue_prices.GLUE_PRICES.get(self.region)
+    if dpu_hourly_price is None:
+      return None
+    # dpu_seconds is only reported directly in auto-scaling jobs.
+    if dpu_seconds is None:
+      dpu_seconds = max_capacity * execution_time
+    return dpu_seconds / 3600 * dpu_hourly_price

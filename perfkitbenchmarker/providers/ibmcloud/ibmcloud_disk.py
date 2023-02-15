@@ -185,7 +185,7 @@ class IbmCloudDisk(disk.BaseDisk):
     endtime = time.time() + _MAX_FIND_DEVICE_SECONDS
     self.device_path = None
     while time.time() < endtime:
-      stdout, _ = self.attached_vm.RemoteCommand(cmd, should_log=True)
+      stdout, _ = self.attached_vm.RemoteCommand(cmd)
       # parse for lines that contain disk size in bytes
       disks = re.findall(r'\Disk (\S+): .* (\d+) bytes,', stdout)
       for device_path, disk_size in disks:

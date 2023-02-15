@@ -86,6 +86,9 @@ flags.DEFINE_enum('gce_nic_type', 'GVNIC', ['VIRTIO_NET', 'GVNIC'],
                   'The virtual NIC type of GCE VMs. All machine types '
                   'currently support GVNIC, but certain OS types will be '
                   'excluded in gce_virtual_machine.')
+GCE_NIC_RECORD_VERSION = flags.DEFINE_boolean(
+    'gce_nic_record_version', False,
+    'If True, records the NIC version for supported NICs (currently GVNIC).')
 EGRESS_BANDWIDTH_TIER = flags.DEFINE_enum(
     'gce_egress_bandwidth_tier', None, ['TIER_1'],
     'Egress bandwidth tier of the GCE VMs.')
@@ -188,6 +191,19 @@ flags.DEFINE_string('dpb_dataflow_template_output_ptransform', None,
                     'StreamingWriteTables/StreamingWrite')
 flags.DEFINE_list('dpb_dataflow_template_additional_args', [],
                   'Additional arguments which should be passed to job.')
+
+# Flags for BigQuery flex slot allocation
+flags.DEFINE_integer(
+    'bq_slot_allocation_num', None,
+    'Number of flex slots to allocate.'
+)
+flags.DEFINE_string(
+    'bq_slot_allocation_region', None,
+    'Region to allocate flex slots in.'
+)
+flags.DEFINE_string(
+    'bq_slot_allocation_project', None,
+    'Project to allocate flex slots in.')
 
 
 def _ValidatePreemptFlags(flags_dict):

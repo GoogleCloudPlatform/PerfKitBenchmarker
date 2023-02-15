@@ -136,7 +136,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       return False
 
     show_cmd = os_utils.OpenStackCLICommand(self, 'server', 'show', self.id)
-    stdout, _, _ = show_cmd.Issue(suppress_warning=True)
+    stdout, _, _ = show_cmd.Issue()
     try:
       resp = json.loads(stdout)
       return resp
@@ -346,7 +346,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd = os_utils.OpenStackCLICommand(self, 'server', 'delete', self.id)
     del cmd.flags['format']  # delete does not support json output
     cmd.flags['wait'] = True
-    cmd.Issue(suppress_warning=True)
+    cmd.Issue()
 
   def _SetIPAddresses(self):
     show_cmd = os_utils.OpenStackCLICommand(self, 'server', 'show', self.name)

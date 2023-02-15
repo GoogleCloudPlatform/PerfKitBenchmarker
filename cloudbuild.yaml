@@ -17,11 +17,14 @@ steps:
     args:
       - build
       - '-t'
-      - 'gcr.io/$PROJECT_ID/pkb:$COMMIT_SHA'
+      - 'us-west1-docker.pkg.dev/$PROJECT_ID/pkb-cloud-build/pkb:$COMMIT_SHA'
       - .
   - name: gcr.io/cloud-builders/docker
     args:
       - run
-      - 'gcr.io/$PROJECT_ID/pkb:$COMMIT_SHA'
+      - 'us-west1-docker.pkg.dev/$PROJECT_ID/pkb-cloud-build/pkb:$COMMIT_SHA'
+serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/cloud-build@bionic-baton-343.iam.gserviceaccount.com'
+options:
+  logging: CLOUD_LOGGING_ONLY
 images:
-  - 'gcr.io/$PROJECT_ID/pkb:$COMMIT_SHA'
+  - 'us-west1-docker.pkg.dev/$PROJECT_ID/pkb-cloud-build/pkb:$COMMIT_SHA'

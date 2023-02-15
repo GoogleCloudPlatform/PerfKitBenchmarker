@@ -301,6 +301,17 @@ class KubernetesResourcesTestCase(
       actual = kub_vm.GetResourceMetadata()
       self.assertDictContainsSubset(subset_of_expected_metadata, actual)
 
+  def testAnnotations(self):
+    spec = self.create_virtual_machine_spec()
+    FLAGS.k8s_sriov_network = 'sriov-vlan50'
+    with patch_critical_objects():
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      subset_of_expected_metadata = {
+          'annotations': {'sriov_network': 'sriov-vlan50'}
+      }
+      actual = kub_vm.GetResourceMetadata()
+      self.assertDictContainsSubset(subset_of_expected_metadata, actual)
+
 
 class KubernetesVirtualMachineOsTypesTestCase(
     BaseKubernetesVirtualMachineTestCase):

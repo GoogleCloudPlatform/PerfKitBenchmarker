@@ -28,6 +28,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_dpb_emr_serverless_prices
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import s3
@@ -455,6 +456,9 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
           'release-versions.html')
     self.role = FLAGS.aws_emr_serverless_role
 
+    # Last job run cost
+    self._run_cost = None
+
   def _Create(self):
     # Since there's no managed infrastructure, this is a no-op.
     pass
@@ -535,6 +539,9 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
     return self._WaitForJob(
         (application_id, job_run_id), EMR_TIMEOUT, job_poll_interval)
 
+  def CalculateCost(self) -> Optional[float]:
+    return self._run_cost
+
   def GetJobProperties(self) -> Dict[str, str]:
     result = {'spark.dynamicAllocation.enabled': 'FALSE'}
     if self.spec.emr_serverless_core_count:
@@ -563,6 +570,24 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
     result = json.loads(stdout)
     return result
 
+  def _ComputeJobRunCost(
+      self,
+      memory_gb_hour: float,
+      storage_gb_hour: float,
+      vcpu_hour: float) -> Optional[float]:
+    region_prices = aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES.get(
+        self.region, {})
+    memory_gb_hour_price = region_prices.get('memory_gb_hours')
+    storage_gb_hour_price = region_prices.get('storage_gb_hours')
+    vcpu_hour_price = region_prices.get('vcpu_hours')
+    if (memory_gb_hour_price is None or storage_gb_hour_price is None or
+        vcpu_hour_price is None):
+      return None
+    return (
+        memory_gb_hour * memory_gb_hour_price +
+        storage_gb_hour * storage_gb_hour_price +
+        vcpu_hour * vcpu_hour_price)
+
   def _GetCompletedJob(self, job_id):
     """See base class."""
     application_id, job_run_id = job_id
@@ -587,4 +612,12 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
     if state == 'SUCCESS':
       start_time = result['jobRun']['createdAt']
       end_time = result['jobRun']['updatedAt']
+      resource_utilization = (
+          result.get('jobRun', {}).get('totalResourceUtilization', {}))
+      memory_gb_hour = resource_utilization.get('memoryGBHour')
+      storage_gb_hour = resource_utilization.get('storageGBHour')
+      vcpu_hour = resource_utilization.get('vCPUHour')
+      if None not in (memory_gb_hour, storage_gb_hour, vcpu_hour):
+        self._run_cost = self._ComputeJobRunCost(
+            memory_gb_hour, storage_gb_hour, vcpu_hour)
       return dpb_service.JobResult(run_time=end_time - start_time)

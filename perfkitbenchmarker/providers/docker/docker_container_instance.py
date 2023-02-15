@@ -210,7 +210,6 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     logging.info('Checking Container Information')
     inspect_cmd = ['docker', 'inspect', self.name]
     info, _, return_code = vm_util.IssueCommand(inspect_cmd,
-                                                suppress_warning=True,
                                                 raise_on_failure=False)
     info = json.loads(info)
     return info, return_code
@@ -249,7 +248,6 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     """Returns whether a Docker image exists locally."""
     inspect_cmd = ['docker', 'image', 'inspect', docker_image_name]
     info, _, return_code = vm_util.IssueCommand(inspect_cmd,
-                                                suppress_warning=True,
                                                 raise_on_failure=False)
     info = json.loads(info)
     logging.info('Checking if Docker Image Exists')

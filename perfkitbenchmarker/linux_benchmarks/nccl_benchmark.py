@@ -59,11 +59,12 @@ nccl:
   vm_groups:
     default:
       vm_count: null
+      os_type: ubuntu2004
       vm_spec:
         GCP:
           machine_type: n1-highmem-96
           zone: us-central1-a
-          image_family: tf-latest-gpu-debian-10
+          image_family: tf-latest-gpu-ubuntu-2004
           image_project: deeplearning-platform-release
           boot_disk_size: 130
           gpu_type: v100
@@ -75,7 +76,7 @@ nccl:
         Azure:
           machine_type: Standard_ND40rs_v2
           zone: eastus
-          image: microsoft-dsvm:ubuntu-hpc:1804:latest
+          image: microsoft-dsvm:ubuntu-hpc:2004:latest
           boot_disk_size: 130
 """
 

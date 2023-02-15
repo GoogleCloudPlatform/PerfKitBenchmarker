@@ -83,6 +83,9 @@ _DEFAULT_DISK_FSTAB_OPTIONS = 'defaults'
 # regex for parsing lscpu and /proc/cpuinfo
 _COLON_SEPARATED_RE = re.compile(r'^\s*(?P<key>.*?)\s*:\s*(?P<value>.*?)\s*$')
 
+
+# TODO(user): update these to use a flag holder as recommended
+# in go/python-tips/051
 flags.DEFINE_bool('setup_remote_firewall', False,
                   'Whether PKB should configure the firewall of each remote'
                   'VM to make sure it accepts all internal connections.')
@@ -161,6 +164,14 @@ flags.DEFINE_integer(
     'Increasing this value may increase single stream TCP throughput '
     'for high latency connections')
 
+_TCP_MAX_NOTSENT_BYTES = flags.DEFINE_integer(
+    'tcp_max_notsent_bytes', None,
+    'Changes the third component of the sysctl value '
+    'net.ipv4.tcp_notsent_lowat. This sets the maximum number of unsent bytes '
+    'for TCP socket connections. Decreasing this value may to reduce usage '
+    'of kernel memory.'
+)
+
 flags.DEFINE_integer(
     'rmem_max', None,
     'Sets the sysctl value net.core.rmem_max. This sets the max OS '
@@ -177,6 +188,11 @@ flags.DEFINE_boolean('gce_hpc_tools', False,
 flags.DEFINE_boolean('disable_smt', False,
                      'Whether to disable SMT (Simultaneous Multithreading) '
                      'in BIOS.')
+
+flags.DEFINE_bool(
+    'install_dpdk', False,
+    'Determines whether to install Data Plane Development Kit (DPDK) for '
+    'faster network packet processing.')
 
 _DISABLE_YUM_CRON = flags.DEFINE_boolean(
     'disable_yum_cron', True, 'Whether to disable the cron-run yum service.')
@@ -328,6 +344,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.remote_access_ports = [self.ssh_port]
     self.primary_remote_access_port = self.ssh_port
     self.has_private_key = False
+    self.has_dpdk = False
 
     self._remote_command_script_upload_lock = threading.Lock()
     self._has_remote_command_script = False
@@ -336,6 +353,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self._partition_table = {}
     self._proccpu_cache = None
     self._smp_affinity_script = None
+    self.name: str
     self._os_info: Optional[str] = None
     self._kernel_release: Optional[KernelRelease] = None
     self._cpu_arch: Optional[str] = None
@@ -388,7 +406,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           self.PushDataFile(f, remote_path)
         self._has_remote_command_script = True
 
-  def RobustRemoteCommand(self, command, should_log=False, timeout=None,
+  def RobustRemoteCommand(self, command, timeout=None,
                           ignore_failure=False):
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
@@ -412,8 +430,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     Args:
       command: The command to run.
-      should_log: Whether to log the command's output at the info level. The
-          output is always logged at the debug level.
       timeout: The timeout for the command in seconds.
       ignore_failure: Ignore any failure if set to true.
 
@@ -462,20 +478,20 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       stdout = ''
       while 'Command finished.' not in stdout:
         stdout, _ = self.RemoteCommand(
-            ' '.join(wait_command), should_log=should_log, timeout=1800)
+            ' '.join(wait_command), timeout=1800)
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
           '--delete',
       ])  # pyformat: disable
-      return self.RemoteCommand(' '.join(wait_command), should_log=should_log,
+      return self.RemoteCommand(' '.join(wait_command),
                                 ignore_failure=ignore_failure)
 
     try:
       return _WaitForCommand()
     except errors.VirtualMachine.RemoteCommandError:
       # In case the error was with the wrapper script itself, print the log.
-      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, should_log=False)
+      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log)
       if stdout.strip():
         logging.warning('Exception during RobustRemoteCommand. '
                         'Wrapper script log:\n%s', stdout)
@@ -525,6 +541,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       # Call SetupPackageManager lazily from HasPackage/InstallPackages like
       # ShouldDownloadPreprovisionedData sets up object storage CLIs.
       self.SetupPackageManager()
+    # Install DPDK for better networking performance.
+    if FLAGS.install_dpdk:
+      self.InstallPackages('dpdk')
+      self.has_dpdk = True
     self.SetFiles()
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
@@ -689,11 +709,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def DoConfigureTCPWindow(self):
     """Change TCP window parameters in sysctl."""
 
+    possible_tcp_flags = [
+        FLAGS.tcp_max_receive_buffer,
+        FLAGS.tcp_max_send_buffer,
+        _TCP_MAX_NOTSENT_BYTES.value,
+        FLAGS.rmem_max,
+        FLAGS.wmem_max,
+    ]
     # Return if none of these flags are set
-    if all(x is None for x in [FLAGS.tcp_max_receive_buffer,
-                               FLAGS.tcp_max_send_buffer,
-                               FLAGS.rmem_max,
-                               FLAGS.wmem_max]):
+    if all(x is None for x in possible_tcp_flags):
       return
 
     # Get current values from VM
@@ -701,6 +725,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     rmem_values = stdout.split()
     stdout, _ = self.RemoteCommand('cat /proc/sys/net/ipv4/tcp_wmem')
     wmem_values = stdout.split()
+    stdout, _ = self.RemoteCommand('cat /proc/sys/net/ipv4/tcp_notsent_lowat')
+    notsent_lowat_values = stdout.split()
     stdout, _ = self.RemoteCommand('cat /proc/sys/net/core/rmem_max')
     rmem_max = int(stdout)
     stdout, _ = self.RemoteCommand('cat /proc/sys/net/core/wmem_max')
@@ -709,12 +735,16 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # third number is max receive/send
     max_receive = rmem_values[2]
     max_send = wmem_values[2]
-
+    max_not_sent = notsent_lowat_values[0]
+    logging.info(
+        'notsent[0]: %s', notsent_lowat_values[0])
     # if flags are set, override current values from vm
     if FLAGS.tcp_max_receive_buffer:
       max_receive = FLAGS.tcp_max_receive_buffer
     if FLAGS.tcp_max_send_buffer:
       max_send = FLAGS.tcp_max_send_buffer
+    if _TCP_MAX_NOTSENT_BYTES.value:
+      max_not_sent = _TCP_MAX_NOTSENT_BYTES.value
     if FLAGS.rmem_max:
       rmem_max = FLAGS.rmem_max
     if FLAGS.wmem_max:
@@ -723,6 +753,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     # Add values to metadata
     self.os_metadata['tcp_max_receive_buffer'] = max_receive
     self.os_metadata['tcp_max_send_buffer'] = max_send
+    self.os_metadata['tcp_max_notsent_bytes'] = max_not_sent
     self.os_metadata['rmem_max'] = rmem_max
     self.os_metadata['wmem_max'] = wmem_max
 
@@ -732,10 +763,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     wmem_string = '{} {} {}'.format(wmem_values[0],
                                     wmem_values[1],
                                     max_send)
+    logging.info('rmem_string: ' + rmem_string + ' wmem_string: ' + wmem_string)
+    not_sent_string = '{}'.format(max_not_sent)
 
     self._ApplySysctlPersistent({
         'net.ipv4.tcp_rmem': rmem_string,
         'net.ipv4.tcp_wmem': wmem_string,
+        'net.ipv4.tcp_notsent_lowat': not_sent_string,
         'net.core.rmem_max': rmem_max,
         'net.core.wmem_max': wmem_max
     })
@@ -839,8 +873,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Waits until the VM is ready."""
     # Always wait for remote host command to succeed, because it is necessary to
     # run benchmarks
-    resp, _ = self.RemoteHostCommand('hostname', retries=1,
-                                     suppress_warning=True)
+    resp, _ = self.RemoteHostCommand('hostname', retries=1)
     if self.hostname is None:
       self.hostname = resp[:-1]
 
@@ -853,6 +886,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.os_metadata['os_info'] = self.os_info
     self.os_metadata['kernel_release'] = str(self.kernel_release)
     self.os_metadata['cpu_arch'] = self.cpu_arch
+    self.os_metadata['has_dpdk'] = self.has_dpdk
     self.os_metadata.update(self.partition_table)
     if FLAGS.append_kernel_command_line:
       self.os_metadata['kernel_command_line'] = self.kernel_command_line
@@ -893,7 +927,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     https://unix.stackexchange.com/questions/165002/how-to-reliably-get-timestamp-at-which-the-system-booted.
     """
     stdout, _ = self.RemoteHostCommand(
-        'stat -c %z /proc/', retries=1, suppress_warning=True)
+        'stat -c %z /proc/', retries=1)
     if stdout.startswith('1970-01-01'):
       # Fix for ARM returning epochtime
       date_fmt = '+%Y-%m-%d %H:%M:%S.%s %z'
@@ -1001,7 +1035,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def LogVmDebugInfo(self):
     """Logs the output of calling dmesg on the VM."""
     if FLAGS.log_dmesg:
-      self.RemoteCommand('hostname && dmesg', should_log=True)
+      self.RemoteCommand('hostname && dmesg')
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     self.RemoteHostCopy(file_path, remote_path, copy_to)
@@ -1081,11 +1115,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def RemoteHostCommandWithReturnCode(self,
                                       command,
-                                      should_log=False,
                                       retries=None,
                                       ignore_failure=False,
                                       login_shell=False,
-                                      suppress_warning=False,
                                       timeout=None):
     """Runs a command on the VM.
 
@@ -1094,16 +1126,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     Args:
       command: A valid bash command.
-      should_log: A boolean indicating whether the command result should be
-          logged at the info level. Even if it is false, the results will
-          still be logged at the debug level.
       retries: The maximum number of times RemoteCommand should retry SSHing
           when it receives a 255 return code. If None, it defaults to the value
           of the flag ssh_retries.
       ignore_failure: Ignore any failure if set to true.
       login_shell: Run command in a login shell.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-          return code is non-zero.
       timeout: The timeout for IssueCommand.
 
     Returns:
@@ -1124,6 +1151,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     ssh_private_key = (self.ssh_private_key if self.is_static else
                        vm_util.GetPrivateKeyPath())
     ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
+    logging.info('Running on %s via ssh: %s', self.name, command)
     try:
       if login_shell:
         ssh_cmd.extend(['-t', '-t', 'bash -l -c "%s"' % command])
@@ -1133,9 +1161,11 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
       for _ in range(retries):
         stdout, stderr, retcode = vm_util.IssueCommand(
-            ssh_cmd, force_info_log=should_log,
-            suppress_warning=suppress_warning,
-            timeout=timeout, raise_on_failure=False)
+            ssh_cmd,
+            timeout=timeout,
+            should_pre_log=False,
+            raise_on_failure=False,
+        )
         # Retry on 255 because this indicates an SSH failure
         if retcode != RETRYABLE_SSH_RETCODE:
           break
@@ -1227,9 +1257,18 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def AuthenticateVm(self):
     """Authenticate a remote machine to access all peers."""
-    if not self.is_static and not self.has_private_key:
-      self.RemoteHostCopy(vm_util.GetPrivateKeyPath(),
-                          REMOTE_KEY_PATH)
+    if not self.has_private_key:
+      if not self.is_static:
+        self.RemoteHostCopy(vm_util.GetPrivateKeyPath(), REMOTE_KEY_PATH)
+      elif self.ssh_private_key and FLAGS.copy_ssh_private_keys_into_static_vms:
+        logging.warning('Copying ssh private keys into static VMs')
+        self.RemoteHostCopy(self.ssh_private_key, REMOTE_KEY_PATH)
+      else:
+        logging.warning(
+            'No key sharing for static VMs with'
+            ' --copy_ssh_private_keys_into_static_vms=False'
+        )
+        return
       self.RemoteCommand(
           'echo "Host *\n  StrictHostKeyChecking no\n" > ~/.ssh/config')
       self.RemoteCommand('chmod 600 ~/.ssh/config')
@@ -1620,8 +1659,7 @@ class ClearMixin(BaseLinuxMixin):
   def HasPackage(self, package):
     """Returns True iff the package is available for installation."""
     return self.TryRemoteCommand(
-        'sudo swupd bundle-list --all | grep {0}'.format(package),
-        suppress_warning=True)
+        'sudo swupd bundle-list --all | grep {0}'.format(package))
 
   def InstallPackages(self, packages: str) -> None:
     """Installs packages using the swupd bundle manager."""
@@ -1787,8 +1825,7 @@ class BaseRhelMixin(BaseLinuxMixin):
 
   def HasPackage(self, package):
     """Returns True iff the package is available for installation."""
-    return self.TryRemoteCommand('sudo yum info %s' % package,
-                                 suppress_warning=True)
+    return self.TryRemoteCommand('sudo yum info %s' % package)
 
   # yum talks to the network on each request so transient issues may fix
   # themselves on retry
@@ -2026,10 +2063,10 @@ class BaseDebianMixin(BaseLinuxMixin):
   def AptUpdate(self):
     """Updates the package lists on VMs using apt."""
     try:
-      # setting the timeout on the apt-get to 5 minutes because
+      # setting the timeout on the apt-get to 10 minutes because
       # it is known to get stuck.  In a normal update this
-      # takes less than 30 seconds.
-      self.RemoteCommand('sudo apt-get update', timeout=300)
+      # takes less than 30 seconds, but far flung regions can be slower.
+      self.RemoteCommand('sudo apt-get update', timeout=600)
     except errors.VirtualMachine.RemoteCommandError as e:
       # If there is a problem, remove the lists in order to get rid of
       # "Hash Sum mismatch" errors (the files will be restored when
@@ -2061,7 +2098,7 @@ class BaseDebianMixin(BaseLinuxMixin):
     # It does always log `N: No packages found` to STDOUT in that case though
     stdout, stderr, retcode = self.RemoteCommandWithReturnCode(
         'apt-cache --quiet=0 show ' + package,
-        ignore_failure=True, should_log=True)
+        ignore_failure=True)
     return not retcode and 'No packages found' not in (stdout + stderr)
 
   @vm_util.Retry()
@@ -2290,8 +2327,7 @@ class ContainerizedDebianMixin(BaseDebianMixin):
 
   def _CheckDockerExists(self):
     """Returns whether docker is installed or not."""
-    resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True,
-                                     suppress_warning=True)
+    resp, _ = self.RemoteHostCommand('command -v docker', ignore_failure=True)
     if resp.rstrip() == '':
       return False
     return True

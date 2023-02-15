@@ -492,7 +492,7 @@ def SplitTags(tags):
     An OrderedDict mapping tag keys to values in the order the tags were given.
   """
   return collections.OrderedDict(
-      tag_pair.split('=') for tag_pair in tags.split(','))
+      tag_pair.split('=', 1) for tag_pair in tags.split(','))
 
 
 def GetDefaultTags(timeout_minutes=None):

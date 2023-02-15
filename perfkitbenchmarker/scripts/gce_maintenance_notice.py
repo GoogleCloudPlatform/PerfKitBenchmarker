@@ -40,13 +40,16 @@ def wait_for_maintenance(callback):
   last_etag = '0'
   should_break = False
   while True:
-    r = requests.get(
-        url,
-        params={
-            'last_etag': last_etag,
-            'wait_for_change': True
-        },
-        headers=METADATA_HEADERS)
+    try:
+      r = requests.get(
+          url,
+          params={'last_etag': last_etag, 'wait_for_change': True},
+          headers=METADATA_HEADERS,
+      )
+    except requests.exceptions.RequestException as err:
+      print('Exception: %s.' % err)
+      time.sleep(1)
+      continue
     # During maintenance the service can return a 503 or 104 (b/259443649),
     # so these should be retried.
     if r.status_code == 503 or r.status_code == 104:

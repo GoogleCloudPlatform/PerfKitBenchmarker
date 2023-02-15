@@ -100,8 +100,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     self.assigned_disk_letter = ATTACHED_DISK_LETTER
     self._send_remote_commands_to_cygwin = False
 
-  def RobustRemoteCommand(self, command, should_log=False, ignore_failure=False,
-                          suppress_warning=False, timeout=None):
+  def RobustRemoteCommand(self, command, ignore_failure=False, timeout=None):
     """Runs a powershell command on the VM.
 
     Should be more robust than its counterpart, RemoteCommand. In the event of
@@ -121,12 +120,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     Args:
       command: A valid powershell command.
-      should_log: A boolean indicating whether the command result should be
-        logged at the info level. Even if it is false, the results will still be
-        logged at the debug level.
       ignore_failure: Ignore any failure if set to true.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-        return code is non-zero.
       timeout: Float. A timeout in seconds for the command. If None is passed,
         no timeout is applied. Timeout kills the winrm session which then kills
         the process being executed.
@@ -149,9 +143,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     try:
       self.RemoteCommand(
           logged_command,
-          should_log=should_log,
           ignore_failure=ignore_failure,
-          suppress_warning=suppress_warning,
           timeout=timeout)
     except errors.VirtualMachine.RemoteCommandError:
       logging.exception(
@@ -179,18 +171,12 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     return stdout, stderr
 
-  def RemoteCommand(self, command, should_log=False, ignore_failure=False,
-                    suppress_warning=False, timeout=None):
+  def RemoteCommand(self, command, ignore_failure=False, timeout=None):
     """Runs a powershell command on the VM.
 
     Args:
       command: A valid powershell command.
-      should_log: A boolean indicating whether the command result should be
-          logged at the info level. Even if it is false, the results will
-          still be logged at the debug level.
       ignore_failure: Ignore any failure if set to true.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-          return code is non-zero.
       timeout: Float. A timeout in seconds for the command. If None is passed,
           no timeout is applied. Timeout kills the winrm session which then
           kills the process being executed.
@@ -222,10 +208,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     debug_text = ('Ran %s on %s. Return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
                   (command, self, retcode, stdout, stderr))
-    if should_log or (retcode and not suppress_warning):
-      logging.info(debug_text)
-    else:
-      logging.debug(debug_text)
+    logging.info(debug_text)
 
     if retcode and not ignore_failure:
       error_text = ('Got non-zero return code (%s) executing %s\n'
@@ -439,7 +422,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
   def _WaitForSSH(self):
     """Waits for the VMs to be ready."""
-    stdout, _ = self.RemoteCommand('hostname', suppress_warning=True, timeout=5)
+    stdout, _ = self.RemoteCommand('hostname', timeout=5)
     if self.hostname is None:
       self.hostname = stdout.rstrip()
 
@@ -466,8 +449,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
     """Returns the time the VM was last rebooted as reported by the VM."""
-    resp, _ = self.RemoteCommand(
-        'systeminfo | find /i "Boot Time"', suppress_warning=True)
+    resp, _ = self.RemoteCommand('systeminfo | find /i "Boot Time"')
     return resp
 
   def _AfterReboot(self):

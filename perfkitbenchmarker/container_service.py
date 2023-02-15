@@ -414,7 +414,7 @@ class BaseContainerRegistry(resource.BaseResource):
       # manifest inspect inpspects the registry's copy
       inspect_cmd = ['docker', 'manifest', 'inspect', full_image]
       _, _, retcode = vm_util.IssueCommand(
-          inspect_cmd, suppress_warning=True, raise_on_failure=False)
+          inspect_cmd, raise_on_failure=False)
       if retcode == 0:
         return full_image
     self._Build(image)
@@ -552,12 +552,7 @@ class BaseContainerCluster(resource.BaseResource):
 
   def GetSamples(self):
     """Return samples with information about deployment times."""
-    samples = []
-    if self.resource_ready_time and self.create_start_time:
-      samples.append(
-          sample.Sample('Cluster Creation Time',
-                        self.resource_ready_time - self.create_start_time,
-                        'seconds'))
+    samples = super().GetSamples()
     for container in itertools.chain(*list(self.containers.values())):
       metadata = {'image': container.image.split('/')[-1]}
       if container.resource_ready_time and container.create_start_time:

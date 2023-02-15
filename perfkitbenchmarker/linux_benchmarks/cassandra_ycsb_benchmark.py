@@ -98,7 +98,7 @@ def _CreateYCSBTable(vm, keyspace=KEYSPACE_NAME, column_family=COLUMN_FAMILY,
   cassandra_cli = cassandra.GetCassandraCliPath(vm)
   command = '{0} -f {1} -h {2}'.format(cassandra_cli, remote_path,
                                        vm.internal_ip)
-  vm.RemoteCommand(command, should_log=True)
+  vm.RemoteCommand(command)
 
 
 def _GetVMsByRole(benchmark_spec):

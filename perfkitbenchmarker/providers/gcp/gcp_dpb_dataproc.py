@@ -834,7 +834,7 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
       scp_cmd += ['--project', self.project]
     scp_cmd += ['--zone', self.dpb_service_zone, '--quiet', script_path,
                 'pkb@' + master_name + ':/tmp/' + script_name]
-    vm_util.IssueCommand(scp_cmd, force_info_log=True)
+    vm_util.IssueCommand(scp_cmd)
     ssh_cmd = ['gcloud', 'compute', 'ssh']
     if self.project is not None:
       ssh_cmd += ['--project', self.project]
@@ -844,4 +844,4 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
                 'pkb@' + master_name, '--',
                 'chmod +x /tmp/' + script_name + '; sudo /tmp/' + script_name
                 + ' ' + ' '.join(script_args)]
-    vm_util.IssueCommand(ssh_cmd, timeout=None, force_info_log=True)
+    vm_util.IssueCommand(ssh_cmd, timeout=None)

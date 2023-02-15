@@ -44,6 +44,10 @@ flags.DEFINE_list('static_vm_tags', None,
                   'VMs are specified in a config, if they aren\'t in this list '
                   'they will be skipped during VM creation.')
 
+flags.DEFINE_bool('copy_ssh_private_keys_into_static_vms', False,
+                  'A flag to allow the VM to copy ssh private key to '
+                  'authenticate static VMs.')
+
 
 class StaticVmSpec(virtual_machine.BaseVmSpec):
   """Object containing all info needed to create a Static VM."""

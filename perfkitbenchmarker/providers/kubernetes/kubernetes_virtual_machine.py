@@ -68,6 +68,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.resource_limits = vm_spec.resource_limits
     self.resource_requests = vm_spec.resource_requests
     self.cloud = FLAGS.container_cluster_cloud
+    self.sriov_network = FLAGS.k8s_sriov_network or None
 
   def GetResourceMetadata(self):
     metadata = super(KubernetesVirtualMachine, self).GetResourceMetadata()
@@ -81,6 +82,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
           'pod_cpu_request': self.resource_requests.cpus,
           'pod_memory_request_mb': self.resource_requests.memory,
       })
+    if self.sriov_network:
+      metadata.update(
+          {'annotations': {'sriov_network': self.sriov_network}}
+      )
     return metadata
 
   def _CreateDependencies(self):
@@ -140,8 +145,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--kubeconfig=%s' % FLAGS.kubeconfig, 'get', 'pod', '-o=json', self.name
     ]
     logging.info('Waiting for POD %s', self.name)
-    pod_info, _, _ = vm_util.IssueCommand(
-        exists_cmd, suppress_warning=True, raise_on_failure=False)
+    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if pod_info:
       pod_info = json.loads(pod_info)
       containers = pod_info['spec']['containers']
@@ -170,8 +174,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         FLAGS.kubectl,
         '--kubeconfig=%s' % FLAGS.kubeconfig, 'get', 'pod', '-o=json', self.name
     ]
-    pod_info, _, _ = vm_util.IssueCommand(
-        exists_cmd, suppress_warning=True, raise_on_failure=False)
+    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if pod_info:
       return True
     return False
@@ -203,6 +206,19 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self.internal_ip = pod_ip
     self.ip_address = pod_ip
+    if self.sriov_network:
+      annotations = json.loads(
+          kubernetes_helper.Get('pods', self.name, '', '.metadata.annotations')
+      )
+      sriov_ip = json.loads(annotations['k8s.v1.cni.cncf.io/network-status'])[
+          1
+      ]['ips'][0]
+
+      if not sriov_ip:
+        raise Exception('SRIOV interface ip address not found. Retrying.')
+
+      self.internal_ip = sriov_ip
+      self.ip_address = sriov_ip
 
   def _ConfigureProxy(self):
     """Configures Proxy.
@@ -291,6 +307,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       }
       template['metadata']['labels']['pkb_anti_affinity'] = ''
 
+    if self.sriov_network:
+      annotations = self._addAnnotations()
+      template['metadata'].update({'annotations': annotations})
     return json.dumps(template)
 
   def _BuildVolumesBody(self):
@@ -330,6 +349,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     container['command'] = ['tail', '-f', '/dev/null']
 
     return container
+
+  def _addAnnotations(self):
+    """Constructs annotations required for Kubernetes."""
+    annotations = {}
+    if self.sriov_network:
+      annotations.update({'k8s.v1.cni.cncf.io/networks': self.sriov_network})
+    return annotations
 
   def _BuildResourceBody(self):
     """Constructs a dictionary that specifies resource limits and requests.
@@ -376,11 +402,9 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
 
   def RemoteHostCommandWithReturnCode(self,
                                       command,
-                                      should_log=False,
                                       retries=None,
                                       ignore_failure=False,
                                       login_shell=False,
-                                      suppress_warning=False,
                                       timeout=None):
     """Runs a command in the Kubernetes container."""
     if retries is None:
@@ -393,8 +417,6 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     for _ in range(retries):
       stdout, stderr, retcode = vm_util.IssueCommand(
           cmd,
-          force_info_log=should_log,
-          suppress_warning=suppress_warning,
           timeout=timeout,
           raise_on_failure=False)
       # Check for ephemeral connection issues.
@@ -506,11 +528,14 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     # https://wiki.ubuntu.com/Minimal
     # The VM images PKB uses are based on a full Ubuntu Server flavor and have a
     # bunch of useful utilities
-    # (curl, net-tools, software-properties-common). Install here so that we
+    # Utilities packages install here so that we
     # have similar base packages. This is essentially the same as running
     # unminimize.
-    # TODO(pclay): Revisit if Debian images are added.
-    self.InstallPackages('ubuntu-server')
+    # ubunut-minimal contains iputils-ping
+    # ubuntu-server contains curl, net-tools, software-properties-common
+    # ubuntu-standard contains wget
+    # TODO(pclay): Revisit if Debian or RHEL images are added.
+    self.InstallPackages('ubuntu-minimal ubuntu-server ubuntu-standard')
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a preprovisioned data file.

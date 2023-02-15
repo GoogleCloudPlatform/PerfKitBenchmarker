@@ -229,8 +229,7 @@ class PersistentVolumeClaim(resource.BaseResource):
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pvc', '-o=json', self.name]
     logging.info('Waiting for PVC %s', self.name)
-    pvc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True,
-                                          raise_on_failure=False)
+    pvc_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if pvc_info:
       pvc_info = json.loads(pvc_info)
       pvc = pvc_info['status']['phase']
@@ -295,8 +294,7 @@ class StorageClass(resource.BaseResource):
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'sc', '-o=json', self.name]
 
-    sc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True,
-                                         raise_on_failure=False)
+    sc_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if sc_info:
       sc_info = json.loads(sc_info)
       sc_name = sc_info['metadata']['name']

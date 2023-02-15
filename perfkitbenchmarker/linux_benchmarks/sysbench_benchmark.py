@@ -65,6 +65,8 @@ flags.DEFINE_integer('sysbench_latency_percentile', 100,
 flags.DEFINE_integer('sysbench_report_interval', 2,
                      'The interval, in seconds, we ask sysbench to report '
                      'results.')
+flags.DEFINE_boolean('sysbench_use_fk', True,
+                     'Use foreign keys. This is used by TPCC benchmark.')
 _SKIP_LOAD_STAGE = flags.DEFINE_boolean(
     'sysbench_skip_load_stage', False,
     'If true, skips the loading stage of the benchmark. Useful for when '
@@ -331,6 +333,8 @@ def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
                     '--report-interval=%d' % FLAGS.sysbench_report_interval,
                     '--max-requests=0',
                     '--time=%d' % duration]
+  if FLAGS.sysbench_testname == 'tpcc':
+    run_cmd_tokens.append('--use_fk=%d' % (1 if FLAGS.sysbench_use_fk else 0))
   run_cmd = ' '.join(run_cmd_tokens +
                      _GetCommonSysbenchOptions(benchmark_spec) +
                      ['run'])
@@ -403,9 +407,8 @@ def _RunSysbench(
       stdout, metadata) + _ParseSysbenchTransactions(stdout, metadata)
 
 
-def _GetDatabaseSize(benchmark_spec):
+def _GetDatabaseSize(db):
   """Get the size of the database in MB."""
-  db = benchmark_spec.relational_db
   db_engine_type = db.engine_type
   stdout = None
   if db_engine_type == sql_engine_utils.MYSQL:
@@ -465,8 +468,6 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   if db.user_managed or db.restored:
     db.client_vm_query_tools.InstallPackages()
 
-  db.sysbench_db_size_MB = _GetDatabaseSize(benchmark_spec)
-
   if _SKIP_LOAD_STAGE.value or db.restored:
     logging.info('Skipping the load stage')
     return results
@@ -508,7 +509,7 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   logging.info('data loading results: \n stdout is:\n%s\nstderr is\n%s',
                stdout, stderr)
 
-  metadata = CreateMetadataFromFlags(db)
+  metadata = CreateMetadataFromFlags()
 
   results.append(sample.Sample(
       'sysbench data load time',
@@ -534,7 +535,7 @@ def _IsValidFlag(flag):
           _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS[FLAGS.sysbench_testname])
 
 
-def CreateMetadataFromFlags(db):
+def CreateMetadataFromFlags():
   """Create meta data with all flags for sysbench."""
   metadata = {
       'sysbench_testname': FLAGS.sysbench_testname,
@@ -545,8 +546,9 @@ def CreateMetadataFromFlags(db):
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval,
-      'sysbench_db_size_MB': db.sysbench_db_size_MB,
   }
+  if FLAGS.sysbench_testname == 'tpcc':
+    metadata['sysbench_use_fk'] = FLAGS.sysbench_use_fk
   return metadata
 
 
@@ -599,7 +601,8 @@ def Run(benchmark_spec):
   db = benchmark_spec.relational_db
 
   for thread_count in FLAGS.sysbench_thread_counts:
-    metadata = CreateMetadataFromFlags(db)
+    metadata = CreateMetadataFromFlags()
+    metadata['sysbench_db_size_MB'] = _GetDatabaseSize(db)
     metadata['sysbench_thread_count'] = thread_count
     # The run phase is common across providers. The VMs[0] object contains all
     # information and states necessary to carry out the run.

@@ -157,8 +157,7 @@ def GetCudaToolkitVersion(vm):
     NvccParseOutputError: On can not parse nvcc output
   """
   stdout, _ = vm.RemoteCommand(
-      posixpath.join(CUDA_HOME, 'bin/nvcc') + ' --version',
-      ignore_failure=True, suppress_warning=True)
+      posixpath.join(CUDA_HOME, 'bin/nvcc') + ' --version', ignore_failure=True)
   if bool(stdout.rstrip()):
     regex = r'release (\S+),'
     match = re.search(regex, stdout)

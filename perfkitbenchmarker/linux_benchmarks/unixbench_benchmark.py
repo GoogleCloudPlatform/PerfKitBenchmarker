@@ -182,7 +182,7 @@ def Run(benchmark_spec):
   unixbench_command = 'cd {0} && UB_TMPDIR={1} ./Run'.format(
       unixbench.UNIXBENCH_DIR, vm.GetScratchDir())
   logging.info('Unixbench Results:')
-  stdout, _ = vm.RemoteCommand(unixbench_command, should_log=True)
+  stdout, _ = vm.RemoteCommand(unixbench_command)
   return ParseResults(stdout)
 
 

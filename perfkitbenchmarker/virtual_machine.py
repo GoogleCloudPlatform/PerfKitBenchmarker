@@ -384,8 +384,8 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def RemoteCommand(self, command, should_log=False, ignore_failure=False,
-                    suppress_warning=False, timeout=None, **kwargs):
+  def RemoteCommand(self, command, ignore_failure=False, timeout=None,
+                    **kwargs):
     """Runs a command on the VM.
 
     Derived classes may add additional kwargs if necessary, but they should not
@@ -393,12 +393,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     Args:
       command: A valid bash command.
-      should_log: A boolean indicating whether the command result should be
-          logged at the info level. Even if it is false, the results will
-          still be logged at the debug level.
       ignore_failure: Ignore any failure if set to true.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-          return code is non-zero.
       timeout: The time to wait in seconds for the command before exiting.
           None means no timeout.
       **kwargs: Additional command arguments.
@@ -411,8 +406,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     raise NotImplementedError()
 
-  def RobustRemoteCommand(self, command, should_log=False, timeout=None,
-                          ignore_failure=False):
+  def RobustRemoteCommand(self, command, timeout=None, ignore_failure=False):
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
     The default should be to call RemoteCommand and log that it is not yet
@@ -420,8 +414,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     Args:
       command: The command to run.
-      should_log: Whether to log the command's output at the info level. The
-          output is always logged at the debug level.
       timeout: The timeout for the command in seconds.
       ignore_failure: Ignore any failure if set to true.
 
@@ -433,7 +425,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           the command fails.
     """
     logging.info('RobustRemoteCommand not implemented, using RemoteCommand.')
-    self.RemoteCommand(command, should_log, timeout, ignore_failure)
+    self.RemoteCommand(command, timeout, ignore_failure)
 
   def TryRemoteCommand(self, command, **kwargs):
     """Runs a remote command and returns True iff it succeeded."""
@@ -1132,6 +1124,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.capacity_reservation_id = None
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
     self.vm_group = None
+    self.id = None
 
   @property
   @classmethod
@@ -1256,6 +1249,14 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       result['num_cpus'] = self.num_cpus
       if self.NumCpusForBenchmark() != self.num_cpus:
         result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
+    # Some metadata is unique per VM.
+    # Update publisher._VM_METADATA_TO_LIST to add more
+    if self.id is not None:
+      result['id'] = self.id
+    if self.name is not None:
+      result['name'] = self.name
+    if self.ip_address is not None:
+      result['ip_address'] = self.ip_address
     return result
 
   def SimulateMaintenanceEvent(self):

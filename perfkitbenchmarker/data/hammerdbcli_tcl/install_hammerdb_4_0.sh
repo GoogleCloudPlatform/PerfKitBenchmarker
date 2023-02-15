@@ -1,6 +1,6 @@
 #!/bin/bash
 
-wget https://github.com/TPC-Council/HammerDB/releases/download/v4.0/HammerDB-4.0-Linux.tar.gz
+curl -LO 'https://github.com/TPC-Council/HammerDB/releases/download/v4.0/HammerDB-4.0-Linux.tar.gz'
 echo 'fa9c4e2654a49f856cecf63c8ca9be5b  HammerDB-4.0-Linux.tar.gz'  > hammerdb.md5
 
 if ! md5sum -c hammerdb.md5

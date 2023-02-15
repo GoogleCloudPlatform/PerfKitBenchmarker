@@ -38,7 +38,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import hbase_ycsb_benchmark as hbase_ycsb
-from perfkitbenchmarker.linux_packages import google_cloud_bigtable_client
 from perfkitbenchmarker.linux_packages import google_cloud_cbt
 from perfkitbenchmarker.linux_packages import hbase
 from perfkitbenchmarker.linux_packages import ycsb
@@ -46,23 +45,6 @@ from perfkitbenchmarker.providers.gcp import gcp_bigtable
 
 FLAGS = flags.FLAGS
 
-HBASE_CLIENT_VERSION = '1.x'
-BIGTABLE_CLIENT_VERSION = '1.4.0'
-
-# TODO(user): remove the custom ycsb build once the head version of YCSB
-# is updated to share Bigtable table object. The source code of the patched YCSB
-# 0.14.0 can be found at 'https://storage.googleapis.com/cbt_ycsb_client_jar/'
-# 'YCSB-0.14.0-Bigtable-table-object-sharing.zip'.
-YCSB_BIGTABLE_TABLE_SHARING_TAR_URL = (
-    'https://storage.googleapis.com/cbt_ycsb_client_jar/ycsb-0.14.0.tar.gz')
-
-_ENDPOINT = flags.DEFINE_string('google_bigtable_endpoint',
-                                'bigtable.googleapis.com',
-                                'Google API endpoint for Cloud Bigtable.')
-_ADMIN_ENDPOINT = flags.DEFINE_string(
-    'google_bigtable_admin_endpoint', 'bigtableadmin.googleapis.com',
-    'Google API endpoint for Cloud Bigtable table '
-    'administration.')
 _STATIC_TABLE_NAME = flags.DEFINE_string(
     'google_bigtable_static_table_name', None,
     'Bigtable table name. If not specified, a temporary table '
@@ -71,18 +53,6 @@ _DELETE_STATIC_TABLE = flags.DEFINE_boolean(
     'google_bigtable_delete_static_table', False,
     'Whether or not to delete a static table during cleanup. Temporary tables '
     'are always cleaned up.')
-_TABLE_OBJECT_SHARING = flags.DEFINE_boolean(
-    'google_bigtable_enable_table_object_sharing', False,
-    'If true, will use a YCSB binary that shares the same '
-    'Bigtable table object across all the threads on a VM.')
-_HBASE_JAR_URL = flags.DEFINE_string(
-    'google_bigtable_hbase_jar_url',
-    'https://oss.sonatype.org/service/local/repositories/releases/content/'
-    'com/google/cloud/bigtable/bigtable-hbase-{0}-hadoop/'
-    '{1}/bigtable-hbase-{0}-hadoop-{1}.jar'.format(HBASE_CLIENT_VERSION,
-                                                   BIGTABLE_CLIENT_VERSION),
-    'URL for the Bigtable-HBase client JAR. Deprecated: Prefer to use '
-    '--google_bigtable_client_version instead.')
 _GET_CPU_UTILIZATION = flags.DEFINE_boolean(
     'get_bigtable_cluster_cpu_utilization', False,
     'If true, will gather bigtable cluster cpu utilization '
@@ -214,48 +184,22 @@ def _GetDefaultProject() -> str:
     raise KeyError(f'No default project found in {config}') from key_error
 
 
-def _InstallClientLegacy(vm: virtual_machine.VirtualMachine):
-  """Legacy function for installing the bigtable client from a given URL."""
-  vm.Install('curl')
-
-  hbase_lib = posixpath.join(hbase.HBASE_DIR, 'lib')
-
-  if 'hbase-1.x' in _HBASE_JAR_URL.value:
-    preprovisioned_pkgs = [METRICS_CORE_JAR]
-    ycsb_hbase_lib = posixpath.join(ycsb.YCSB_DIR,
-                                    FLAGS.hbase_binding + '-binding', 'lib')
-    vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, preprovisioned_pkgs,
-                                          ycsb_hbase_lib)
-    vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, preprovisioned_pkgs,
-                                          hbase_lib)
-
-  url = _HBASE_JAR_URL.value
-  jar_name = os.path.basename(url)
-  jar_path = posixpath.join(ycsb_hbase_lib, jar_name)
-  vm.RemoteCommand(f'curl -Lo {jar_path} {url}')
-  vm.RemoteCommand(f'cp {jar_path} {hbase_lib}')
-
-
 def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
   """Install YCSB and CBT HBase client on 'vm'."""
   vm.Install('ycsb')
   vm.Install('hbase')
   vm.Install('google_cloud_cbt')  # we use the CLI to create and delete tables
-
-  if google_cloud_bigtable_client.CLIENT_VERSION.value:
-    vm.Install('google_cloud_bigtable_client')
-  else:
-    _InstallClientLegacy(vm)
+  vm.Install('google_cloud_bigtable_client')
 
   vm.RemoteCommand(
       f'echo "export JAVA_HOME=/usr" >> {hbase.HBASE_CONF_DIR}/hbase-env.sh')
 
   context = {
-      'google_bigtable_endpoint': _ENDPOINT.value,
-      'google_bigtable_admin_endpoint': _ADMIN_ENDPOINT.value,
+      'google_bigtable_endpoint': gcp_bigtable.ENDPOINT.value,
+      'google_bigtable_admin_endpoint': gcp_bigtable.ADMIN_ENDPOINT.value,
       'project': FLAGS.project or _GetDefaultProject(),
       'instance': bigtable.name,
-      'hbase_version': HBASE_CLIENT_VERSION.replace('.', '_')
+      'hbase_major_version': FLAGS.hbase_version.split('.')[0],
   }
 
   for file_name in HBASE_CONF_FILES:
@@ -357,8 +301,6 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """
   benchmark_spec.always_call_cleanup = True
   vms = benchmark_spec.vms
-  if _TABLE_OBJECT_SHARING.value:
-    ycsb.SetYcsbTarUrl(YCSB_BIGTABLE_TABLE_SHARING_TAR_URL)
 
   instance: _Bigtable = benchmark_spec.non_relational_db
   args = [((vm, instance), {}) for vm in vms]
@@ -373,14 +315,14 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       google_cloud_cbt.CBT_BIN,
       f'-project={FLAGS.project or _GetDefaultProject()}',
       f'-instance={instance.name}',
-      f'-admin-endpoint={_ADMIN_ENDPOINT.value}:443',
+      f'-admin-endpoint={gcp_bigtable.ADMIN_ENDPOINT.value}:443',
       'createtable',
       _GetTableName(),
       # Settings derived from data/hbase/create-ycsb-table.hbaseshell.j2
       f'families={COLUMN_FAMILY}:maxversions=1',
       f'splits={splits}',
   ]
-  vm.RemoteCommand(' '.join(command), should_log=True, ignore_failure=True)
+  vm.RemoteCommand(' '.join(command), ignore_failure=True)
 
 
 def _GetYcsbExecutor(
@@ -462,11 +404,11 @@ def _CleanupTable(benchmark_spec: bm_spec.BenchmarkSpec):
       google_cloud_cbt.CBT_BIN,
       f'-project={FLAGS.project or _GetDefaultProject()}',
       f'-instance={instance.name}',
-      f'-admin-endpoint={_ADMIN_ENDPOINT.value}:443',
+      f'-admin-endpoint={gcp_bigtable.ADMIN_ENDPOINT.value}:443',
       'deletetable',
       _GetTableName(),
   ]
-  vm.RemoteCommand(' '.join(command), should_log=True)
+  vm.RemoteCommand(' '.join(command))
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:

@@ -533,7 +533,7 @@ def _RunModelOnVm(vm, model, batch_size, benchmark_spec, args='', job_name=''):
   tf_cnn_benchmark_dir = 'benchmarks/scripts/tf_cnn_benchmarks'
   run_command = 'cd {path} ; {cmd}'.format(path=tf_cnn_benchmark_dir,
                                            cmd=tf_cnn_benchmark_cmd)
-  output, _ = vm.RobustRemoteCommand(run_command, should_log=True)
+  output, _ = vm.RobustRemoteCommand(run_command)
   if job_name == 'ps':
     return _ExtractTfParameterServerPid(output)
   else:

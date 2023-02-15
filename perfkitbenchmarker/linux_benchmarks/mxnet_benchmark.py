@@ -306,7 +306,7 @@ def Run(benchmark_spec):
       mx_benchmark_cmd = '%s --num-layers %s' % (mx_benchmark_cmd, num_layers)
     run_command = 'cd %s && %s' % (mx_benchmark_dir,
                                    mx_benchmark_cmd)
-    stdout, stderr = vm.RobustRemoteCommand(run_command, should_log=True)
+    stdout, stderr = vm.RobustRemoteCommand(run_command)
 
     results.append(_MakeSamplesFromOutput(benchmark_spec, stdout or stderr))
 

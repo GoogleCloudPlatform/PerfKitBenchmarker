@@ -965,7 +965,7 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args, streams_per_vm):
         '--stream_num_start=%s' % (vm_idx * streams_per_vm),
         '--vm_id=%s' % vm_idx
     ])
-    out, _ = vms[vm_idx].RobustRemoteCommand(cmd, should_log=False)
+    out, _ = vms[vm_idx].RobustRemoteCommand(cmd)
     output[vm_idx] = out
 
   # Each vm/process has a thread managing it.

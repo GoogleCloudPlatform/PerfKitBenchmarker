@@ -39,13 +39,12 @@ def AptInstall(vm):
     raise Exception('No CUDNN version found for given CUDA version.')
   # dirmngr is needed for getting the certificate from network
   vm.RemoteCommand(
-      'sudo apt-get install -y --no-install-recommends dirmngr',
-      should_log=True)
+      'sudo apt-get install -y --no-install-recommends dirmngr')
   cuda_toolkit.EnrollSigningKey(vm)
   vm.RemoteCommand(
       'sudo bash -c \'echo "deb https://developer.download.nvidia.com/compute/'
       'machine-learning/repos/ubuntu1604/x86_64 /" > /etc/apt/sources.list.d/'
-      'nvidia-ml.list\'', should_log=True)
-  vm.RemoteCommand('sudo apt-get update', should_log=True)
+      'nvidia-ml.list\'')
+  vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo apt-get install -y --no-install-recommends '
-                   '{}'.format(cudnn_version), should_log=True)
+                   '{}'.format(cudnn_version))

@@ -127,9 +127,9 @@ DOCSTRING_REGEX = r'"""(.*?|$)"""'  # Pattern that matches triple quoted comment
 
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
 flags.DEFINE_boolean('use_ipv6', False, 'Whether to use ipv6 for ssh/scp.')
-flags.DEFINE_list('benchmarks', [benchmark_sets.STANDARD_SET],
+flags.DEFINE_list('benchmarks', ['cluster_boot'],
                   'Benchmarks and/or benchmark sets that should be run. The '
-                  'default is the standard set. For more information about '
+                  'default is cluster_boot. For more information about '
                   'benchmarks and benchmark sets, see the README and '
                   'benchmark_sets.py.')
 flags.DEFINE_boolean('multi_os_benchmark', False, 'Whether is benchmark will '
@@ -733,6 +733,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructCapacityReservations()
   spec.ConstructTpu()
   spec.ConstructEdwService()
+  spec.ConstructEdwComputeResource()
   spec.ConstructVPNService()
   spec.ConstructNfsService()
   spec.ConstructSmbService()

@@ -161,7 +161,7 @@ class OpenStackDisk(disk.BaseDisk):
     if self.id is None:
       return False
     cmd = os_utils.OpenStackCLICommand(self, 'volume', 'show', self.id)
-    stdout, stderr, _ = cmd.Issue(suppress_warning=True)
+    stdout, stderr, _ = cmd.Issue()
     if stdout and stdout.strip():
       return stdout
     return not stderr
@@ -233,7 +233,7 @@ class OpenStackDisk(disk.BaseDisk):
     if self.id is None:
       return
     cmd = os_utils.OpenStackCLICommand(self, 'volume', 'show', self.id)
-    stdout, stderr, _ = cmd.Issue(suppress_warning=True)
+    stdout, stderr, _ = cmd.Issue()
     if stderr.strip():
       return  # Volume could not be found, inferred that has been deleted.
     resp = json.loads(stdout)

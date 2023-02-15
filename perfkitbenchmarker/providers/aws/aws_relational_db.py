@@ -204,7 +204,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
           '--region=%s' % self.region, '--description="AWS pkb option group"'
       ]
 
-      vm_util.IssueCommand(cmd, suppress_warning=True)
+      vm_util.IssueCommand(cmd)
 
       cmd = util.AWS_PREFIX + [
           'rds', 'modify-db-instance',
@@ -213,7 +213,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
           '--region=%s' % self.region, '--apply-immediately'
       ]
 
-      vm_util.IssueCommand(cmd, suppress_warning=True)
+      vm_util.IssueCommand(cmd)
 
       for flag in self.spec.db_flags:
         key_value_pair = flag.split('=')
@@ -227,7 +227,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
             '--region=%s' % self.region
         ]
 
-        vm_util.IssueCommand(cmd, suppress_warning=True)
+        vm_util.IssueCommand(cmd)
 
       self._Reboot()
 
@@ -279,8 +279,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
         '--db-instance-identifier=%s' % instance_id,
         '--region=%s' % self.region
     ]
-    stdout, _, retcode = vm_util.IssueCommand(
-        cmd, suppress_warning=True, raise_on_failure=False)
+    stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       return None
     json_output = json.loads(stdout)
@@ -344,7 +343,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
         '--region=%s' % self.region
     ]
 
-    vm_util.IssueCommand(cmd, suppress_warning=True)
+    vm_util.IssueCommand(cmd)
 
     if not self._IsInstanceReady(self.instance_id, timeout=IS_READY_TIMEOUT):
       raise Exception('Instance could not be set to ready after reboot')

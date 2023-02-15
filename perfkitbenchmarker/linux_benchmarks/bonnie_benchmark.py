@@ -343,7 +343,7 @@ def Run(benchmark_spec):
                     (vm.GetScratchDir(),
                      2 * vm.total_memory_kb / 1024))
   logging.info('Bonnie++ Results:')
-  out, _ = vm.RemoteCommand(bonnie_command, should_log=True)
+  out, _ = vm.RemoteCommand(bonnie_command)
   return ParseCSVResults(out.strip())
 
 

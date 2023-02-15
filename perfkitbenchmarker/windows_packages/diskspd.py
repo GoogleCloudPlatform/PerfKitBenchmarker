@@ -232,7 +232,7 @@ def _RemoveXml(vm):
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
   rm_command = 'cd {diskspd_exe_dir}; rm xml.txt'.format(
       diskspd_exe_dir=diskspd_exe_dir)
-  vm.RemoteCommand(rm_command, ignore_failure=True, suppress_warning=True)
+  vm.RemoteCommand(rm_command, ignore_failure=True)
 
 
 def _CatXml(vm):
@@ -247,7 +247,7 @@ def _RemoveTempFile(vm):
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
   rm_command = 'cd {diskspd_exe_dir}; rm .\\{tmp_file_name}'.format(
       diskspd_exe_dir=diskspd_exe_dir, tmp_file_name=DISKSPD_TMPFILE)
-  vm.RemoteCommand(rm_command, ignore_failure=True, suppress_warning=True)
+  vm.RemoteCommand(rm_command, ignore_failure=True)
 
 
 def _RunDiskSpd(running_vm, access_pattern,

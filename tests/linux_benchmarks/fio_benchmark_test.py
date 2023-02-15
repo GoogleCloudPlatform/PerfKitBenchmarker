@@ -73,6 +73,83 @@ numjobs=1"""
             None, None, 600, True, ['randrepeat=0', 'offset_increment=1k']),
         expected_jobfile)
 
+  def testAllScenarios(self):
+    expected_jobfile = """
+[global]
+ioengine=libaio
+invalidate=1
+direct=1
+runtime=600
+time_based
+filename=/test/filename
+do_verify=0
+verify_fatal=0
+group_reporting=1
+
+[sequential_write-io-depth-1-num-jobs-1]
+stonewall
+rw=write
+blocksize=512k
+iodepth=1
+size=100%
+numjobs=1
+
+[sequential_read-io-depth-1-num-jobs-1]
+stonewall
+rw=read
+blocksize=512k
+iodepth=1
+size=100%
+numjobs=1
+
+[random_write-io-depth-1-num-jobs-1]
+stonewall
+rw=randwrite
+blocksize=4k
+iodepth=1
+size=100%
+numjobs=1
+
+[random_read-io-depth-1-num-jobs-1]
+stonewall
+rw=randread
+blocksize=4k
+iodepth=1
+size=100%
+numjobs=1
+
+[random_read_write-io-depth-1-num-jobs-1]
+stonewall
+rw=randrw
+blocksize=4k
+iodepth=1
+size=100%
+numjobs=1
+
+[sequential_trim-io-depth-1-num-jobs-1]
+stonewall
+rw=trim
+blocksize=512k
+iodepth=1
+size=100%
+numjobs=1
+
+[rand_trim-io-depth-1-num-jobs-1]
+stonewall
+rw=randtrim
+blocksize=4k
+iodepth=1
+size=100%
+numjobs=1"""
+
+    self.assertEqual(
+        fio_benchmark.GenerateJobFileString(
+            self.filename,
+            ['all'],
+            [1], [1],
+            None, None, 600, True, []),
+        expected_jobfile)
+
   def testMultipleScenarios(self):
     expected_jobfile = """
 [global]

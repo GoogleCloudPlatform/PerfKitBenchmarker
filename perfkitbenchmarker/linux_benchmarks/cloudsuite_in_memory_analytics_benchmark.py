@@ -112,7 +112,7 @@ def Run(benchmark_spec):
                    (FLAGS.cloudsuite_in_memory_analytics_dataset,
                     FLAGS.cloudsuite_in_memory_analytics_ratings_file,
                     master.internal_ip))
-  stdout, _ = master.RemoteCommand(benchmark_cmd, should_log=True)
+  stdout, _ = master.RemoteCommand(benchmark_cmd)
 
   matches = re.findall(r'Benchmark execution time: (\d+)ms', stdout)
   if len(matches) != 1:

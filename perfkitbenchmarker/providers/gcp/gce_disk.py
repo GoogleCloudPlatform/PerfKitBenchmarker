@@ -34,8 +34,15 @@ PD_STANDARD = 'pd-standard'
 PD_SSD = 'pd-ssd'
 PD_BALANCED = 'pd-balanced'
 PD_EXTREME = 'pd-extreme'
-
-GCE_REMOTE_DISK_TYPES = [PD_STANDARD, PD_SSD, PD_BALANCED, PD_EXTREME]
+GCE_REMOTE_DISK_TYPES = [
+    PD_STANDARD,
+    PD_SSD,
+    PD_BALANCED,
+    PD_EXTREME,
+]
+GCE_REMOTE_EXTREME_DISK_TYPES = [
+    PD_EXTREME,
+]
 
 DISK_TYPE = {disk.STANDARD: PD_STANDARD, disk.REMOTE_SSD: PD_SSD}
 
@@ -173,7 +180,7 @@ class GceDisk(disk.BaseDisk):
     self.replica_zones = replica_zones
     self.region = util.GetRegionFromZone(self.zone)
     self.provisioned_iops = None
-    if self.disk_type == PD_EXTREME:
+    if self.disk_type in GCE_REMOTE_EXTREME_DISK_TYPES:
       self.provisioned_iops = FLAGS.gcp_provisioned_iops
 
     disk_metadata = DISK_METADATA[disk_spec.disk_type]
@@ -183,7 +190,10 @@ class GceDisk(disk.BaseDisk):
     self.metadata.update(DISK_METADATA[disk_spec.disk_type])
     if self.disk_type == disk.LOCAL:
       self.metadata['interface'] = self.interface
-    if self.provisioned_iops and self.disk_type == PD_EXTREME:
+    if (
+        self.provisioned_iops
+        and self.disk_type in GCE_REMOTE_EXTREME_DISK_TYPES
+    ):
       self.metadata['provisioned_iops'] = self.provisioned_iops
 
   def _Create(self):
@@ -191,7 +201,10 @@ class GceDisk(disk.BaseDisk):
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'create', self.name)
     cmd.flags['size'] = self.disk_size
     cmd.flags['type'] = self.disk_type
-    if self.provisioned_iops and self.disk_type == PD_EXTREME:
+    if (
+        self.provisioned_iops
+        and self.disk_type in GCE_REMOTE_EXTREME_DISK_TYPES
+    ):
       cmd.flags['provisioned-iops'] = self.provisioned_iops
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     if self.image:
@@ -223,7 +236,7 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['region'] = self.region
       del cmd.flags['zone']
 
-    stdout, _, _ = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    stdout, _, _ = cmd.Issue(raise_on_failure=False)
     try:
       result = json.loads(stdout)
     except ValueError:

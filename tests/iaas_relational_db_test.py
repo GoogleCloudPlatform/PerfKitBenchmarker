@@ -142,7 +142,6 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
             'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker'
             ' dbname=abc\' -c "Select 1"',
             ignore_failure=False,
-            suppress_warning=False,
             timeout=None)
     ]
 
@@ -161,7 +160,6 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
           session_variables=['Set a=b;'],
           database_name='abc',
           ignore_failure=False,
-          suppress_warning=False,
           timeout=None)
 
     command = [
@@ -169,7 +167,6 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
             'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker'
             ' dbname=abc\' -c "Set a=b;" -c "Select 1"',
             ignore_failure=False,
-            suppress_warning=False,
             timeout=None)
     ]
     self.assertCountEqual(remote_command.call_args_list, command)
@@ -257,7 +254,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.call('sudo chown mysql:mysql /scratch/tmp'),
         mock.call('sudo rsync -avzh /var/lib/mysql/ /scratch/mysql'),
         mock.call('sudo rsync -avzh /tmp/ /scratch/tmp'),
-        mock.call('df', should_log=True),
+        mock.call('df'),
         mock.call(
             'echo "alias /var/lib/mysql -> /scratch/mysql," | sudo tee -a /etc/apparmor.d/tunables/alias'
         ),
@@ -288,31 +285,27 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
         ),
         mock.call('echo "\nlog_error_verbosity        = 3" | sudo tee -a None'),
         mock.call('sudo service None restart'),
-        mock.call('sudo cat None', should_log=True),
+        mock.call('sudo cat None'),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker '
             '-e "SET GLOBAL max_connections=8000;"',
             ignore_failure=False,
-            suppress_warning=False,
             timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"CREATE USER \'root\'@\'None\' '
             'IDENTIFIED BY \'perfkitbenchmarker\';"',
             ignore_failure=True,
-            suppress_warning=False,
             timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"GRANT ALL PRIVILEGES ON *.* TO \'root\'@\'None\';"',
             ignore_failure=True,
-            suppress_warning=False,
             timeout=None),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"FLUSH PRIVILEGES;"',
             ignore_failure=True,
-            suppress_warning=False,
             timeout=None)
     ]
 

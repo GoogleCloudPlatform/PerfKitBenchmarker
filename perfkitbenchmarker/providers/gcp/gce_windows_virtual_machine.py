@@ -34,7 +34,6 @@ _METADATA_PREEMPT_CMD_WIN = (f'Invoke-RestMethod -Uri'
 FLAGS = flags.FLAGS
 
 BAT_SCRIPT = """
-'
 :WAIT
 echo waiting for MSSQLSERVER
 sc start MSSQLSERVER
@@ -42,7 +41,7 @@ ping 127.0.0.1 -t 1 > NUL
 for /f "tokens=4" %%s in ('sc query MSSQLSERVER ^| find "STATE"') do if NOT "%%s"=="RUNNING" goto WAIT
 echo MSSQLSERVER is now running!
 sqlcmd.exe -Q "CREATE LOGIN [%COMPUTERNAME%\\perfkit] from windows;"
-sqlcmd.exe -Q "ALTER SERVER ROLE [sysadmin] ADD MEMBER [%COMPUTERNAME%\\perfkit]" '
+sqlcmd.exe -Q "ALTER SERVER ROLE [sysadmin] ADD MEMBER [%COMPUTERNAME%\\perfkit]"
 """
 
 
@@ -85,24 +84,22 @@ class WindowsGceVirtualMachine(gce_virtual_machine.GceVirtualMachine,
     self.boot_metadata[
         'windows-startup-script-ps1'] = windows_virtual_machine.STARTUP_SCRIPT
 
-  def _GenerateResetPasswordCommand(self):
-    """Generates a command to reset a VM user's password.
+  def _GetWindowsPassword(self):
+    """Generates a command to get a VM user's password.
 
     Returns:
-      GcloudCommand. gcloud command to issue in order to reset the VM user's
-      password.
+      Password for the windows user.
     """
     cmd = util.GcloudCommand(self, 'compute', 'reset-windows-password',
                              self.name)
     cmd.flags['user'] = self.user_name
-    return cmd
+    stdout, _ = cmd.IssueRetryable()
+    response = json.loads(stdout)
+    return response['password']
 
   def _PostCreate(self):
     super(WindowsGceVirtualMachine, self)._PostCreate()
-    reset_password_cmd = self._GenerateResetPasswordCommand()
-    stdout, _ = reset_password_cmd.IssueRetryable()
-    response = json.loads(stdout)
-    self.password = response['password']
+    self.password = self._GetWindowsPassword()
 
   def _PreemptibleMetadataKeyValue(self) -> Tuple[str, str]:
     """See base class."""
@@ -186,4 +183,4 @@ class WindowsGceSqlServerVirtualMachine(WindowsGceVirtualMachine):
 
   def __init__(self, vm_spec):
     super().__init__(vm_spec)
-    self.boot_metadata['windows-startup-script-bat'] = BAT_SCRIPT
+    self.boot_metadata['windows-startup-script-bat'] = "'" + BAT_SCRIPT + "'"

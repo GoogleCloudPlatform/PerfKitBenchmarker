@@ -30,7 +30,9 @@ https://cloud.google.com/dataflow/docs/quickstarts/quickstart-java-maven
 
 import copy
 import datetime
+import logging
 import os
+
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_service
@@ -90,9 +92,6 @@ flags.DEFINE_list('dpb_wordcount_additional_args', [], 'Additional arguments '
                   "which should be passed to job. If the string ':BASE_DIR:' "
                   'is contained in these arguments, it will get expanded to '
                   'the root of the object storage bucket created for the run.')
-flags.DEFINE_bool('dpb_export_job_stats', True,
-                  'Exports job stats such as CPU usage and cost. Enabled by '
-                  'default, although only implemented in Dataflow.')
 flags.DEFINE_bool('dpb_wordcount_force_beam_style_job_args', False, 'Force the'
                   'job arguments passed in beam supported style.')
 
@@ -215,6 +214,10 @@ def Run(benchmark_spec):
     total_cost = dpb_service_instance.CalculateCost()
     if total_cost is not None:
       results.append(sample.Sample('total_cost', total_cost, '$', metadata))
+  else:
+    logging.info(
+        '--dpb_export_job_stats flag is False (which is the new default). Not '
+        'exporting job stats.')
 
   return results
 

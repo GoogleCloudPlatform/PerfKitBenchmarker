@@ -99,9 +99,7 @@ def AptInstall(vm):
 
 def IsInstalled(vm):
   """Checks whether docker is installed on the VM."""
-  resp, _ = vm.RemoteCommand('command -v docker',
-                             ignore_failure=True,
-                             suppress_warning=True)
+  resp, _ = vm.RemoteCommand('command -v docker', ignore_failure=True)
   return bool(resp.rstrip())
 
 

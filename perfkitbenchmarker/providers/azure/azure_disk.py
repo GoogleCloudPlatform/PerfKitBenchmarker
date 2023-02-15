@@ -41,9 +41,11 @@ FLAGS = flags.FLAGS
 MAX_DRIVE_SUFFIX_LENGTH = 2  # Last allowable device is /dev/sdzz.
 
 PREMIUM_STORAGE = 'Premium_LRS'
+PREMIUM_STORAGE_V2 = 'PremiumV2_LRS'
 STANDARD_DISK = 'Standard_LRS'
 ULTRA_STORAGE = 'UltraSSD_LRS'
 
+# Deprecated
 DISK_TYPE = {disk.STANDARD: STANDARD_DISK, disk.REMOTE_SSD: PREMIUM_STORAGE}
 
 HOST_CACHING = 'host_caching'
@@ -161,7 +163,8 @@ class AzureDisk(disk.BaseDisk):
     self.is_image = is_image
     self._deleted = False
     self.machine_type = vm.machine_type
-    if self.disk_type == PREMIUM_STORAGE:
+    if (self.disk_type == PREMIUM_STORAGE or
+        self.disk_type == PREMIUM_STORAGE_V2):
       self.metadata.update({
           disk.MEDIA: disk.SSD,
           disk.REPLICATION: disk.ZONE,
@@ -212,7 +215,7 @@ class AzureDisk(disk.BaseDisk):
         raise errors.Resource.RetryableCreationError(
             'Error tagging Azure disk.')
 
-      if (self.disk_type == ULTRA_STORAGE and (
+      if (self.disk_type in [ULTRA_STORAGE, PREMIUM_STORAGE_V2] and (
           FLAGS.azure_provisioned_iops or FLAGS.azure_provisioned_throughput)):
         args = ([azure.AZURE_PATH, 'disk', 'update', '--name', self.name] +
                 self.resource_group.args)

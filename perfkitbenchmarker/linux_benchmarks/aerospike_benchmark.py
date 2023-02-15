@@ -179,7 +179,7 @@ def Prepare(benchmark_spec):
                     f'--keys {loader_counts[client_idx]} '
                     f'--start-key {sum(loader_counts[:client_idx])} '
                     f' -h {ips} -p {3 + process_idx}000')
-    clients[client_idx].RobustRemoteCommand(load_command, should_log=True)
+    clients[client_idx].RobustRemoteCommand(load_command)
 
   run_params = []
   for child_idx in range(len(clients)):
@@ -222,8 +222,7 @@ def Run(benchmark_spec):
           '--latency --percentiles 50,90,99,99.9,99.99 '
           '--output-file '
           f'result.{client_idx}.{process_idx}.{threads}')
-      stdout, _ = clients[client_idx].RobustRemoteCommand(
-          run_command, should_log=True)
+      stdout, _ = clients[client_idx].RobustRemoteCommand(run_command)
       stdout_samples.extend(aerospike_client.ParseAsbenchStdout(stdout))  # pylint: disable=cell-var-from-loop
 
     run_params = []

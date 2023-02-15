@@ -419,15 +419,15 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     # Assert
     self.assertSequenceEqual(
         [
-            mock.call(matchers.HAS('-target 500'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 750'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 1125'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 1687'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 2531'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 3796'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 5695'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 8542'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 10000'), should_log=mock.ANY),
+            mock.call(matchers.HAS('-target 500')),
+            mock.call(matchers.HAS('-target 750')),
+            mock.call(matchers.HAS('-target 1125')),
+            mock.call(matchers.HAS('-target 1687')),
+            mock.call(matchers.HAS('-target 2531')),
+            mock.call(matchers.HAS('-target 3796')),
+            mock.call(matchers.HAS('-target 5695')),
+            mock.call(matchers.HAS('-target 8542')),
+            mock.call(matchers.HAS('-target 10000')),
         ],
         self.test_cmd.mock_calls
     )
@@ -467,7 +467,7 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     # Assert
     self.assertSequenceEqual(
-        [mock.call(matchers.HAS('-target 200'), should_log=mock.ANY)],
+        [mock.call(matchers.HAS('-target 200'))],
         self.test_cmd.mock_calls
     )
 

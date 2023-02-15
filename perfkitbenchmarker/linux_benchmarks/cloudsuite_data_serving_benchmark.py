@@ -134,7 +134,7 @@ def Run(benchmark_spec):
   benchmark_cmd = ('sudo docker run %s %s --rm --name cassandra-client'
                    ' --net host cloudsuite/data-serving:client %s' %
                    (rec_count_cfg, op_count_cfg, server_ips))
-  stdout, _ = client.RemoteCommand(benchmark_cmd, should_log=True)
+  stdout, _ = client.RemoteCommand(benchmark_cmd)
 
   def GetResults(match_str, result_label, result_metric):
     matches = re.findall(match_str, stdout)

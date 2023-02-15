@@ -466,6 +466,75 @@ class _EdwServiceSpec(spec.BaseSpec):
       config_values['password'] = flag_values.edw_service_cluster_password
 
 
+class _EdwComputeResourceDecoder(option_decoders.TypeVerifier):
+  """Validates the edw compute resource dictionary of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super(_EdwComputeResourceDecoder, self).__init__(
+        valid_types=(dict,), **kwargs
+    )
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies edw compute resource dictionary of a benchmark config object.
+
+    Args:
+      value: dict edw_compute_resource config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _EdwComputeResourceSpec Built from the config passed in value.
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    edw_compute_resource_config = super(
+        _EdwComputeResourceDecoder, self
+    ).Decode(value, component_full_name, flag_values)
+    result = _EdwComputeResourceSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **edw_compute_resource_config,
+    )
+    return result
+
+
+class _EdwComputeResourceSpec(spec.BaseSpec):
+  """Configurable options of an EDW compute resource.
+
+  Attributes:
+    type: string. The type of the EDW compute resource (bigquery_slots, etc.)
+  """
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_EdwComputeResourceSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    result = super(
+        _EdwComputeResourceSpec, cls
+    )._GetOptionDecoderConstructions()
+    result.update({
+        'type': (
+            option_decoders.StringDecoder,
+            {'default': 'bigquery_slots', 'none_ok': False},
+        ),
+        'cloud': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    super(_EdwComputeResourceSpec, cls)._ApplyFlags(config_values, flag_values)
+    if 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
+
+
 class _SparkServiceSpec(spec.BaseSpec):
   """Configurable options of an Apache Spark Service.
 
@@ -1590,6 +1659,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         }),
         'tpu_groups': (_TpuGroupsDecoder, {
             'default': {}
+        }),
+        'edw_compute_resource': (_EdwComputeResourceDecoder, {
+            'default': None
         }),
         'edw_service': (_EdwServiceDecoder, {
             'default': None

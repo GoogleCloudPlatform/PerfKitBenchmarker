@@ -24,19 +24,18 @@ flags.DEFINE_string('cloud_tpu_commit_hash',
 def Install(vm):
   """Installs cloud TPU models on the VM."""
   vm.InstallPackages('git')
-  vm.RemoteCommand('git clone {}'.format(CLOUD_TPU_GIT), should_log=True)
+  vm.RemoteCommand('git clone {}'.format(CLOUD_TPU_GIT))
   vm.RemoteCommand('cd tpu && git checkout {}'.format(
-      FLAGS.cloud_tpu_commit_hash), should_log=True)
+      FLAGS.cloud_tpu_commit_hash))
   vm.Install('pip')
-  vm.RemoteCommand('sudo pip install absl-py', should_log=True)
+  vm.RemoteCommand('sudo pip install absl-py')
 
 
 def Uninstall(vm):
   """Uninstalls cloud TPU models on the VM."""
-  vm.RemoteCommand('rm -rf tpu', should_log=True)
+  vm.RemoteCommand('rm -rf tpu')
 
 
 def GetCommit(vm):
-  stdout, _ = vm.RemoteCommand('cd tpu && git rev-parse HEAD',
-                               should_log=True)
+  stdout, _ = vm.RemoteCommand('cd tpu && git rev-parse HEAD')
   return stdout

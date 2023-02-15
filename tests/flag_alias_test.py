@@ -35,14 +35,12 @@ class TestFlagAlias(parameterized.TestCase):
     self.assertListEqual(
         flag_alias.AliasFlagsFromArgs(argv, flags), expected_argv)
 
-  @parameterized.named_parameters(('BaseCase1', {'a': 'cat'}, {'ab': 'cat'}),
-                                  ('BaseCase2', {}, {}), ('BaseCase3', {
-                                      'a': 'ab',
-                                      'b': 'ab'
-                                  }, {
-                                      'ab': 'ab',
-                                      'd': 'ab'
-                                  }))
+  @parameterized.named_parameters(
+      ('BaseCase1', {'a': 'cat'}, {'ab': 'cat'}),
+      ('BaseCase2', {}, {}),
+      ('BaseCase3', {'a': 'ab', 'b': 'ab'}, {'ab': 'ab', 'd': 'ab'}),
+      ('Unchanged', {'ab': 'a'}, {'ab': 'a'}),
+  )
   def testAliasFlagsFromYaml(self, dic, expected_dic):
     flags = [{'a': 'ab'}, {'b': 'd'}]
     self.assertDictEqual(

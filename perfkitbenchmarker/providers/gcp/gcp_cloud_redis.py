@@ -130,8 +130,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     """
     cmd = util.GcloudCommand(self, 'redis', 'instances', 'describe', self.name)
     cmd.flags['region'] = self.redis_region
-    stdout, stderr, retcode = cmd.Issue(
-        suppress_warning=True, raise_on_failure=False)
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not find redis instance %s', self.name)
     return stdout, stderr, retcode

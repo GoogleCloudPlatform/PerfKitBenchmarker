@@ -279,7 +279,7 @@ def Run(benchmark_spec):
 
   stdout, _ = vm.RobustRemoteCommand(
       'cd {0} && cd results/x86_64-linux-gnu && cat *.*'.format(
-          lmbench.LMBENCH_DIR), should_log=True)
+          lmbench.LMBENCH_DIR))
 
   vm.RobustRemoteCommand(
       'cd {0} && cd results/x86_64-linux-gnu && '

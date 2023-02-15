@@ -14,9 +14,9 @@
 """Tests for PerfKitBenchmarker' StaticVirtualMachine."""
 import io
 import unittest
+from unittest import mock
 
 from absl import flags
-import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import static_virtual_machine as svm
 from perfkitbenchmarker import vm_util
@@ -189,7 +189,8 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     vm0 = svm.StaticVirtualMachine.GetStaticVirtualMachine()
     self.assertTrue(vm0.from_pool)
     self.assertEqual(1, len(svm.StaticVirtualMachine.vm_pool))
-    vm0.Delete()
+    with mock.patch.object(vm0, 'GetResourceMetadata', return_value={}):
+      vm0.Delete()
     self.assertEqual(2, len(svm.StaticVirtualMachine.vm_pool))
     vm1 = svm.StaticVirtualMachine.GetStaticVirtualMachine()
     self.assertIs(vm0, vm1)

@@ -109,7 +109,7 @@ def RunCoremark(remote_command, thread_count):
       '-DMULTITHREAD=%d -DUSE_%s -DPERFORMANCE_RUN=1"' %
       (COREMARK_DIR, ITERATIONS_PER_CPU, thread_count,
        _COREMARK_PARALLELISM_METHOD.value))
-  output, _ = remote_command('cat %s/run1.log' % COREMARK_DIR, should_log=True)
+  output, _ = remote_command('cat %s/run1.log' % COREMARK_DIR)
 
   return _ParseOutputForSamples(output, thread_count)
 
