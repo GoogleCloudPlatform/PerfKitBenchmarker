@@ -18,6 +18,7 @@ import logging
 import ntpath
 import os
 import time
+from typing import Optional, Tuple
 import uuid
 
 from absl import flags
@@ -100,7 +101,12 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     self.assigned_disk_letter = ATTACHED_DISK_LETTER
     self._send_remote_commands_to_cygwin = False
 
-  def RobustRemoteCommand(self, command, ignore_failure=False, timeout=None):
+  def RobustRemoteCommand(
+      self,
+      command: str,
+      ignore_failure: bool = False,
+      timeout: Optional[float] = None,
+  ) -> Tuple[str, str]:
     """Runs a powershell command on the VM.
 
     Should be more robust than its counterpart, RemoteCommand. In the event of
@@ -171,7 +177,12 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     return stdout, stderr
 
-  def RemoteCommand(self, command, ignore_failure=False, timeout=None):
+  def RemoteCommand(
+      self,
+      command: str,
+      ignore_failure: bool = False,
+      timeout: Optional[float] = None,
+  ) -> Tuple[str, str]:
     """Runs a powershell command on the VM.
 
     Args:

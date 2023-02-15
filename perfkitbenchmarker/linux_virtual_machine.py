@@ -37,7 +37,7 @@ import posixpath
 import re
 import threading
 import time
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Tuple, Set
 import uuid
 
 from absl import flags
@@ -406,8 +406,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           self.PushDataFile(f, remote_path)
         self._has_remote_command_script = True
 
-  def RobustRemoteCommand(self, command, timeout=None,
-                          ignore_failure=False):
+  def RobustRemoteCommand(
+      self,
+      command: str,
+      timeout: Optional[float] = None,
+      ignore_failure: bool = False,
+  ) -> Tuple[str, str]:
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
     This is used for long-running commands that might experience network issues
@@ -1081,7 +1085,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                     (retcode, full_cmd, stdout, stderr))
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-  def RemoteCommand(self, *args, **kwargs):
+  def RemoteCommand(self, *args, **kwargs) -> Tuple[str, str]:
     """Runs a command on the VM.
 
     Args:
@@ -1097,13 +1101,15 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """
     return self.RemoteCommandWithReturnCode(*args, **kwargs)[:2]
 
-  def RemoteCommandWithReturnCode(self, *args, **kwargs):
+  def RemoteCommandWithReturnCode(
+      self, *args, **kwargs
+  ) -> Tuple[str, str, int]:
     """Runs a command on the VM.
 
     Args:
       *args: Arguments passed directly to RemoteHostCommandWithReturnCode.
       **kwargs: Keyword arguments passed directly to
-          RemoteHostCommandWithReturnCode.
+        RemoteHostCommandWithReturnCode.
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -1113,12 +1119,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """
     return self.RemoteHostCommandWithReturnCode(*args, **kwargs)
 
-  def RemoteHostCommandWithReturnCode(self,
-                                      command,
-                                      retries=None,
-                                      ignore_failure=False,
-                                      login_shell=False,
-                                      timeout=None):
+  def RemoteHostCommandWithReturnCode(
+      self,
+      command: str,
+      retries: Optional[int] = None,
+      ignore_failure: bool = False,
+      login_shell: bool = False,
+      timeout: Optional[float] = None,
+  ) -> Tuple[str, str, int]:
     """Runs a command on the VM.
 
     This is guaranteed to run on the host VM, whereas RemoteCommand might run
@@ -1183,7 +1191,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     return (stdout, stderr, retcode)
 
-  def RemoteHostCommand(self, *args, **kwargs):
+  def RemoteHostCommand(self, *args, **kwargs) -> Tuple[str, str]:
     """Runs a command on the VM.
 
     This is guaranteed to run on the host VM, whereas RemoteCommand might run

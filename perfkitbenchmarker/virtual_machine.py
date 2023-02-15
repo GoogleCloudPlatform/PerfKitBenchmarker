@@ -27,7 +27,7 @@ import socket
 import threading
 import time
 import typing
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from absl import flags
 import jinja2
@@ -384,8 +384,13 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def RemoteCommand(self, command, ignore_failure=False, timeout=None,
-                    **kwargs):
+  def RemoteCommand(
+      self,
+      command: str,
+      ignore_failure: bool = False,
+      timeout: Optional[float] = None,
+      **kwargs
+  ) -> Tuple[str, str]:
     """Runs a command on the VM.
 
     Derived classes may add additional kwargs if necessary, but they should not
@@ -406,7 +411,12 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     raise NotImplementedError()
 
-  def RobustRemoteCommand(self, command, timeout=None, ignore_failure=False):
+  def RobustRemoteCommand(
+      self,
+      command: str,
+      timeout: Optional[float] = None,
+      ignore_failure: bool = False,
+  ) -> Tuple[str, str]:
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
     The default should be to call RemoteCommand and log that it is not yet
@@ -425,9 +435,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           the command fails.
     """
     logging.info('RobustRemoteCommand not implemented, using RemoteCommand.')
-    self.RemoteCommand(command, timeout, ignore_failure)
+    return self.RemoteCommand(command, ignore_failure, timeout)
 
-  def TryRemoteCommand(self, command, **kwargs):
+  def TryRemoteCommand(self, command: str, **kwargs):
     """Runs a remote command and returns True iff it succeeded."""
     try:
       self.RemoteCommand(command, **kwargs)
