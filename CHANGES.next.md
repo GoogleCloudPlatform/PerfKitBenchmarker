@@ -111,6 +111,7 @@
     operations.
 -   Add support for using the hbase2 binding in the Cloud Bigtable YCSB
     benchmark.
+-   Add iPerf interval reporting.
 
 ### Enhancements:
 
