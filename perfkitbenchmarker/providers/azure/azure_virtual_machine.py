@@ -276,11 +276,14 @@ class AzureNIC(resource.BaseResource):
 
   def _Create(self):
     cmd = [
-        azure.AZURE_PATH, 'network', 'nic', 'create', '--location',
-        self.region, '--vnet-name', self.subnet.vnet.name, '--subnet',
-        self.subnet.name, '--public-ip-address', self.public_ip, '--name',
-        self.name
-    ] + self.resource_group.args
+        azure.AZURE_PATH, 'network', 'nic', 'create',
+        '--location', self.region,
+        '--vnet-name', self.subnet.vnet.name,
+        '--subnet', self.subnet.name,
+        '--public-ip-address', self.public_ip,
+        '--name', self.name
+    ]  # pyformat: disable
+    cmd += self.resource_group.args
     if self.private_ip:
       cmd += ['--private-ip-address', self.private_ip]
     if self.accelerated_networking:
@@ -627,12 +630,21 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     tags.update(util.GetResourceTags(self.resource_group.timeout_minutes))
     tag_args = ['--tags'] + util.FormatTags(tags)
 
-    create_cmd = ([
-        azure.AZURE_PATH, 'vm', 'create', '--location', self.region,
-        '--image', self.image, '--size', self.machine_type, '--admin-username',
-        self.user_name, '--storage-sku', self.os_disk.disk_type, '--name',
-        self.name
-    ] + disk_size_args + self.resource_group.args + self.nic.args + tag_args)
+    create_cmd = (
+        [
+            azure.AZURE_PATH, 'vm', 'create',
+            '--location', self.region,
+            '--image', self.image,
+            '--size', self.machine_type,
+            '--admin-username', self.user_name,
+            '--storage-sku', self.os_disk.disk_type,
+            '--name', self.name
+        ]  # pyformat: disable
+        + disk_size_args
+        + self.resource_group.args
+        + self.nic.args
+        + tag_args
+    )
 
     if self._RequiresUltraDisk():
       self.ultra_ssd_enabled = True
