@@ -20,7 +20,11 @@ from . import PowerSetting
 from . import ServerGPUBaseConfig
 
 
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
 class T4x1(ServerGPUBaseConfig):
+  system = KnownSystem.T4x1
   enable_interleaved = True
   active_sms = 100
   gpu_batch_size = 16
@@ -32,6 +36,9 @@ class T4x1(ServerGPUBaseConfig):
   use_small_tile_gemm_plugin = None
 
 
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
 class T4x1HighAccuracy(T4x1):
   gpu_inference_streams = 1
   precision = "fp16"
@@ -43,17 +50,27 @@ class T4x1HighAccuracy(T4x1):
   )
 
 
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
 class T4x1Triton(T4x1):
   server_target_qps = 324
   use_triton = True
 
 
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
 class T4x1HighAccuracyTriton(T4x1HighAccuracy):
   server_target_qps = 144
   use_triton = True
 
 
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
 class T4x4(T4x1):
+  system = KnownSystem.T4x4
   gpu_batch_size = 14
   graphs_max_seqlen = 260
   server_num_issue_query_threads = 8
@@ -61,6 +78,9 @@ class T4x4(T4x1):
   soft_drop = 0.992
 
 
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
 class T4x4HighAccuracy(T4x4):
   gpu_inference_streams = 1
   precision = "fp16"
@@ -70,177 +90,15 @@ class T4x4HighAccuracy(T4x4):
   soft_drop = 0.992
 
 
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
 class T4x4Triton(T4x4):
   use_triton = True
 
 
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
 class T4x4HighAccuracyTriton(T4x4HighAccuracy):
   use_triton = True
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class GcpT4x1(T4x1):
-  system = KnownSystem.GcpT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class GcpT4x1HighAccuracy(T4x1HighAccuracy):
-  system = KnownSystem.GcpT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class GcpT4x1Triton(T4x1Triton):
-  system = KnownSystem.GcpT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class GcpT4x1HighAccuracyTriton(T4x1HighAccuracyTriton):
-  system = KnownSystem.GcpT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class GcpT4x4(T4x4):
-  system = KnownSystem.GcpT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class GcpT4x4HighAccuracy(T4x4HighAccuracy):
-  system = KnownSystem.GcpT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class GcpT4x4Triton(T4x4Triton):
-  system = KnownSystem.GcpT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class GcpT4x4HighAccuracyTriton(T4x4HighAccuracyTriton):
-  system = KnownSystem.GcpT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class AwsT4x1(T4x1):
-  system = KnownSystem.AwsT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class AwsT4x1HighAccuracy(T4x1HighAccuracy):
-  system = KnownSystem.AwsT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class AwsT4x1Triton(T4x1Triton):
-  system = KnownSystem.AwsT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class AwsT4x1HighAccuracyTriton(T4x1HighAccuracyTriton):
-  system = KnownSystem.AwsT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class AwsT4x4(T4x4):
-  system = KnownSystem.AwsT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class AwsT4x4HighAccuracy(T4x4HighAccuracy):
-  system = KnownSystem.AwsT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class AwsT4x4Triton(T4x4Triton):
-  system = KnownSystem.AwsT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class AwsT4x4HighAccuracyTriton(T4x4HighAccuracyTriton):
-  system = KnownSystem.AwsT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class AzureT4x1(T4x1):
-  system = KnownSystem.AzureT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class AzureT4x1HighAccuracy(T4x1HighAccuracy):
-  system = KnownSystem.AzureT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class AzureT4x1Triton(T4x1Triton):
-  system = KnownSystem.AzureT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class AzureT4x1HighAccuracyTriton(T4x1HighAccuracyTriton):
-  system = KnownSystem.AzureT4x1
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class AzureT4x4(T4x4):
-  system = KnownSystem.AzureT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class AzureT4x4HighAccuracy(T4x4HighAccuracy):
-  system = KnownSystem.AzureT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class AzureT4x4Triton(T4x4Triton):
-  system = KnownSystem.AzureT4x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class AzureT4x4HighAccuracyTriton(T4x4HighAccuracyTriton):
-  system = KnownSystem.AzureT4x4
