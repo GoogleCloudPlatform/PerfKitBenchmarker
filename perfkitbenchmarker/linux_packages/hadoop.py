@@ -206,7 +206,7 @@ def _RenderConfig(vm,
   # scale with the cluster.
   num_reduce_tasks = reduces_per_node * num_workers
   if _BLOCKSIZE_OVERRIDE.value:
-    block_size = _BLOCKSIZE_OVERRIDE * 1024 * 1024
+    block_size = _BLOCKSIZE_OVERRIDE.value * 1024 * 1024
 
   if vm.scratch_disks:
     # TODO(pclay): support multiple scratch disks. A current suboptimal
