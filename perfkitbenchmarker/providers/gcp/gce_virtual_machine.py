@@ -1138,7 +1138,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Create a json file with information related to the vm."""
     simulate_maintenance_json = {
         'current_time': datetime.datetime.now().timestamp() * 1000,
-        'instance_id': self.instance_number,
+        'instance_id': self.id,
         'project': self.project,
         'instance_name': self.name,
         'zone': self.zone,
