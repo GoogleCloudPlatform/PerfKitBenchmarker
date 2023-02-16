@@ -213,6 +213,7 @@
     timing samples from regardless of benchmark. The set is initially small, but
     can be expanded to any resource.
 -   Add per-VM resource metadata for id, name, and IP address.
+-   Add Key Management Service (KMS) resource for cloud cryptographic keys.
 
 ### Bug fixes and maintenance updates:
 

@@ -38,6 +38,7 @@ from perfkitbenchmarker import edw_compute_resource
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import key as cloud_key
 from perfkitbenchmarker import messaging_service
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import non_relational_db
@@ -150,6 +151,7 @@ class BenchmarkSpec(object):
     self.spark_service = None
     self.dpb_service = None
     self.container_cluster = None
+    self.key = None
     self.relational_db = None
     self.non_relational_db = None
     self.tpus = []
@@ -324,6 +326,16 @@ class BenchmarkSpec(object):
     non_relational_db_class = non_relational_db.GetNonRelationalDbClass(
         service_type)
     self.non_relational_db = non_relational_db_class.FromSpec(db_spec)
+
+  def ConstructKey(self) -> None:
+    """Initializes the cryptographic key."""
+    key_spec: cloud_key.BaseKeySpec = self.config.key
+    if not key_spec:
+      return
+    logging.info('Constructing key with spec: %s.', key_spec)
+    key_class = cloud_key.GetKeyClass(key_spec.cloud)
+    self.key = key_class(key_spec)
+    self.resources.append(self.key)
 
   def ConstructTpuGroup(self, group_spec):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
@@ -751,6 +763,8 @@ class BenchmarkSpec(object):
       self.relational_db.Create(restore=should_restore)
     if self.non_relational_db:
       self.non_relational_db.Create(restore=should_restore)
+    if hasattr(self, 'key') and self.key:
+      self.key.Create()
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Create(), self.tpus)
     if self.edw_service:
@@ -790,6 +804,8 @@ class BenchmarkSpec(object):
       self.relational_db.Delete(freeze=should_freeze)
     if hasattr(self, 'non_relational_db') and self.non_relational_db:
       self.non_relational_db.Delete(freeze=should_freeze)
+    if hasattr(self, 'key') and self.key:
+      self.key.Delete()
     if self.tpus:
       vm_util.RunThreaded(lambda tpu: tpu.Delete(), self.tpus)
     if self.edw_service:
