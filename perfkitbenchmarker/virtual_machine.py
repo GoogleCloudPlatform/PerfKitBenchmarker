@@ -127,9 +127,18 @@ GPU_A100 = 'a100'
 GPU_P4 = 'p4'
 GPU_P4_VWS = 'p4-vws'
 GPU_T4 = 't4'
-GPU_A10G = 'A10G'
+GPU_L4 = 'l4'
+GPU_A10G = 'a10g'
 VALID_GPU_TYPES = [
-    GPU_K80, GPU_P100, GPU_V100, GPU_A100, GPU_P4, GPU_P4_VWS, GPU_T4, GPU_A10G
+    GPU_K80,
+    GPU_P100,
+    GPU_V100,
+    GPU_A100,
+    GPU_P4,
+    GPU_P4_VWS,
+    GPU_T4,
+    GPU_L4,
+    GPU_A10G,
 ]
 CPUARCH_X86_64 = 'x86_64'
 CPUARCH_AARCH64 = 'aarch64'
@@ -875,7 +884,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     raise NotImplementedError()
 
   def IsReachable(self, target_vm):
-    """Indicates whether the target VM can be reached from it's internal ip.
+    """Indicates whether the target VM can be reached from its internal ip.
 
     Args:
       target_vm: The VM whose reachability is being tested.

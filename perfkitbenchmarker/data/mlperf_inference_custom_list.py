@@ -68,3 +68,87 @@ custom_systems["T4x4"] = SystemConfiguration(
     numa_conf=None,
     system_id="T4x4",
 )
+
+custom_systems["L4x1"] = SystemConfiguration(
+    host_cpu_conf=MATCH_ANY,
+    host_mem_conf=MATCH_ANY,
+    accelerator_conf=AcceleratorConfiguration(
+        layout={
+            GPU(
+                name="Tesla L4",
+                accelerator_type=AcceleratorType.Discrete,
+                vram=match_float_approximate(
+                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
+                ),
+                max_power_limit=75.0,
+                pci_id="0x27B810DE",
+                compute_sm=89,
+            ): 1
+        }
+    ),
+    numa_conf=None,
+    system_id="L4x1",
+)
+
+custom_systems["L4x2"] = SystemConfiguration(
+    host_cpu_conf=MATCH_ANY,
+    host_mem_conf=MATCH_ANY,
+    accelerator_conf=AcceleratorConfiguration(
+        layout={
+            GPU(
+                name="Tesla L4",
+                accelerator_type=AcceleratorType.Discrete,
+                vram=match_float_approximate(
+                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
+                ),
+                max_power_limit=75.0,
+                pci_id="0x27B810DE",
+                compute_sm=89,
+            ): 2
+        }
+    ),
+    numa_conf=None,
+    system_id="L4x2",
+)
+
+custom_systems["L4x4"] = SystemConfiguration(
+    host_cpu_conf=MATCH_ANY,
+    host_mem_conf=MATCH_ANY,
+    accelerator_conf=AcceleratorConfiguration(
+        layout={
+            GPU(
+                name="Tesla L4",
+                accelerator_type=AcceleratorType.Discrete,
+                vram=match_float_approximate(
+                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
+                ),
+                max_power_limit=75.0,
+                pci_id="0x27B810DE",
+                compute_sm=89,
+            ): 4
+        }
+    ),
+    numa_conf=None,
+    system_id="L4x4",
+)
+
+custom_systems["L4x8"] = SystemConfiguration(
+    host_cpu_conf=MATCH_ANY,
+    host_mem_conf=MATCH_ANY,
+    accelerator_conf=AcceleratorConfiguration(
+        layout={
+            GPU(
+                name="Tesla L4",
+                accelerator_type=AcceleratorType.Discrete,
+                vram=match_float_approximate(
+                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
+                ),
+                max_power_limit=75.0,
+                pci_id="0x27B810DE",
+                compute_sm=89,
+            ): 8
+        }
+    ),
+    numa_conf=None,
+    system_id="L4x8",
+)

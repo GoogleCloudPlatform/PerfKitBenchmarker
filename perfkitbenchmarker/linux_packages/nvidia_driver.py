@@ -31,6 +31,7 @@ NVIDIA_TESLA_P4 = 'p4'
 NVIDIA_TESLA_P100 = 'p100'
 NVIDIA_TESLA_V100 = 'v100'
 NVIDIA_TESLA_T4 = 't4'
+NVIDIA_TESLA_L4 = 'l4'
 NVIDIA_TESLA_A100 = 'a100'
 NVIDIA_TESLA_A10G = 'a10g'
 
@@ -45,9 +46,13 @@ flags.DEFINE_boolean('gpu_autoboost_enabled', None,
                      'whether gpu autoboost is enabled')
 
 flags.DEFINE_string(
-    'nvidia_driver_version', '510.47.03',
-    'The version of nvidia driver to install. '
-    'For example, "418.67" or "418.87.01."')
+    'nvidia_driver_version',
+    '525.85.12',
+    (
+        'The version of nvidia driver to install. '
+        'For example, "418.67" or "418.87.01."'
+    ),
+)
 flags.DEFINE_boolean('nvidia_driver_force_install', False,
                      'Whether to install NVIDIA driver, even if it is already '
                      'installed.')
@@ -194,6 +199,8 @@ def GetGpuType(vm):
     return NVIDIA_TESLA_V100
   elif 'T4' in gpu_types[0]:
     return NVIDIA_TESLA_T4
+  elif 'L4' in gpu_types[0]:
+    return NVIDIA_TESLA_L4
   elif 'A100' in gpu_types[0]:
     return NVIDIA_TESLA_A100
   elif 'A10G' in gpu_types[0]:
