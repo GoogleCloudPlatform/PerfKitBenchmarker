@@ -67,6 +67,19 @@ _MONITORING_ADDRESS = flags.DEFINE_string(
     'google_monitoring_endpoint', 'monitoring.googleapis.com',
     'Google API endpoint for monitoring requests. Used when '
     '--get_bigtable_cluster_cpu_utilization is enabled.')
+_USE_JAVA_VENEER_CLIENT = flags.DEFINE_boolean(
+    'google_bigtable_use_java_veneer_client',
+    False,
+    'If true, will use the googlebigtableclient with ycsb.',
+)
+_ENABLE_TRAFFIC_DIRECTOR = flags.DEFINE_boolean(
+    'google_bigtable_enable_traffic_director',
+    False,
+    (
+        'If true, will use the googlebigtable'
+        'client with ycsb to enable traffic through traffic director.'
+    ),
+)
 
 BENCHMARK_NAME = 'cloud_bigtable_ycsb'
 BENCHMARK_CONFIG = """
@@ -194,6 +207,8 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
   vm.RemoteCommand(
       f'echo "export JAVA_HOME=/usr" >> {hbase.HBASE_CONF_DIR}/hbase-env.sh')
 
+  if _ENABLE_TRAFFIC_DIRECTOR.value and _USE_JAVA_VENEER_CLIENT.value:
+    vm.RemoteCommand('export GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true')
   context = {
       'google_bigtable_endpoint': gcp_bigtable.ENDPOINT.value,
       'google_bigtable_admin_endpoint': gcp_bigtable.ADMIN_ENDPOINT.value,
@@ -332,11 +347,14 @@ def _GetYcsbExecutor(
   ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
   jvm_args = pipes.quote(f' -Xmx{ycsb_memory}m')
 
+  if _USE_JAVA_VENEER_CLIENT.value:
+    executor_flags = {'jvm-args': jvm_args, 'table': _GetTableName()}
+    return ycsb.YCSBExecutor('googlebigtable', **executor_flags)
+
   executor_flags = {
       'cp': hbase.HBASE_CONF_DIR,
       'jvm-args': jvm_args,
       'table': _GetTableName()}
-
   return ycsb.YCSBExecutor(FLAGS.hbase_binding, **executor_flags)
 
 
@@ -346,7 +364,6 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
-
   Returns:
     A list of sample.Sample instances.
   """
@@ -357,23 +374,14 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
       'ycsb_client_vms': len(vms),
   }
   metadata.update(instance.GetResourceMetadata())
-
-  # By default YCSB uses a BufferedMutator for Puts / Deletes.
-  # This leads to incorrect update latencies, since since the call returns
-  # before the request is acked by the server.
-  # Disable this behavior during the benchmark run.
   run_kwargs = {
       'columnfamily': COLUMN_FAMILY,
       'clientbuffering': 'false'}
   load_kwargs = run_kwargs.copy()
 
-  # During the load stage, use a buffered mutator with a single thread.
-  # The BufferedMutator will handle multiplexing RPCs.
-  load_kwargs['clientbuffering'] = 'true'
-  if not FLAGS['ycsb_preload_threads'].present:
-    load_kwargs['threads'] = 1
-
   samples = []
+  load_kwargs = _GenerateLoadKwargs(instance)
+  run_kwargs = _GenerateRunKwargs(instance)
   executor: ycsb.YCSBExecutor = _GetYcsbExecutor(vms)
   if not instance.restored:
     samples += list(executor.Load(vms, load_kwargs=load_kwargs))
@@ -388,6 +396,63 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     current_sample.metadata.update(metadata)
 
   return samples
+
+
+def _GenerateRunKwargs(instance: _Bigtable) -> Dict[str, str]:
+  """Generates run arguments for YCSB.
+
+  Args:
+    instance: The instance the test will be run against.
+  Returns:
+    Run arguments for YCSB.
+  """
+  # By default YCSB uses a BufferedMutator for Puts / Deletes.
+  # This leads to incorrect update latencies, since since the call returns
+  # before the request is acked by the server.
+  # Disable this behavior during the benchmark run.
+  run_kwargs = {'columnfamily': COLUMN_FAMILY, 'clientbuffering': 'false'}
+  if _USE_JAVA_VENEER_CLIENT.value:
+    run_kwargs['google.bigtable.instance.id'] = instance.name
+    run_kwargs['google.bigtable.project.id'] = (
+        FLAGS.project or _GetDefaultProject()
+    )
+    run_kwargs['columnfamily'] = COLUMN_FAMILY
+    run_kwargs['google.bigtable.data.endpoint'] = (
+        gcp_bigtable.ENDPOINT.value + ':443'
+    )
+
+  return run_kwargs
+
+
+def _GenerateLoadKwargs(instance: _Bigtable) -> Dict[str, str]:
+  """Generates load arguments for YCSB.
+
+  Args:
+    instance: The instance the test will be run against.
+  Returns:
+    Load arguments for YCSB.
+  """
+  # By default YCSB uses a BufferedMutator for Puts / Deletes.
+  # This leads to incorrect update latencies, since since the call returns
+  # before the request is acked by the server.
+  # Disable this behavior during the benchmark run.
+  load_kwargs = {'columnfamily': COLUMN_FAMILY, 'clientbuffering': 'false'}
+  # During the load stage, use a buffered mutator with a single thread.
+  # The BufferedMutator will handle multiplexing RPCs.
+  load_kwargs['clientbuffering'] = 'true'
+  if not FLAGS['ycsb_preload_threads'].present:
+    load_kwargs['threads'] = '1'
+  if _USE_JAVA_VENEER_CLIENT.value:
+    load_kwargs['google.bigtable.instance.id'] = instance.name
+    load_kwargs['google.bigtable.project.id'] = (
+        FLAGS.project or _GetDefaultProject()
+    )
+    load_kwargs['columnfamily'] = COLUMN_FAMILY
+    load_kwargs['google.bigtable.data.endpoint'] = (
+        gcp_bigtable.ENDPOINT.value + ':443'
+    )
+
+  return load_kwargs
 
 
 @vm_util.Retry()
