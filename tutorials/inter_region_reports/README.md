@@ -2,7 +2,7 @@
 
 This is a hands-on lab/tutorial about running PerfKit Benchmarker (PKB) on
 Google Cloud. You can reproduce your own
-[inter-region latency and throughput reports](https://datastudio.google.com/c/u/0/reporting/fc733b10-9744-4a72-a502-92290f608571/page/70YCB)
+[inter-region latency and throughput reports](https://lookerstudio.google.com/c/u/0/reporting/fc733b10-9744-4a72-a502-92290f608571/page/70YCB)
 by following these instructions. This lab is referenced in the Google Cloud
 [VPC Network performance online documentation](https://cloud.google.com/vpc/docs/vpc#network-performance).
 
@@ -34,7 +34,7 @@ In this lab, you will:
 *   Start a benchmark test for latency
 *   Start a benchmark test for throughput
 *   Work with the test result data in BigQuery
-*   Create a new [Data Studio](https://datastudio.google.com) data source and
+*   Create a new [Looker Studio](https://lookerstudio.google.com) data source and
     report
 
 __Note:__ this lab is biased to running __networking__ benchmarks, on __Google
@@ -483,9 +483,9 @@ other options for each VM.
 
 You will learn to __visualize__ such data, in the next section.
 
-## Task 6. Create a new Data Studio data source and report
+## Task 6. Create a new Looker Studio data source and report
 
-1.  Open [Data Studio](https://datastudio.google.com).
+1.  Open [Looker Studio](https://lookerstudio.google.com).
 
 1.  Click __Create__ > __Report__.
 
@@ -566,7 +566,7 @@ You will learn to __visualize__ such data, in the next section.
 
     Click __Edit__ to edit again. You can customize the report setup to create
     your own
-    [inter-region latency and throughput reports](https://datastudio.google.com/c/u/0/reporting/fc733b10-9744-4a72-a502-92290f608571/page/70YCB).
+    [inter-region latency and throughput reports](https://lookerstudio.google.com/c/u/0/reporting/fc733b10-9744-4a72-a502-92290f608571/page/70YCB).
 
 Enjoy.
 
@@ -577,7 +577,7 @@ remove.
 
 *   The `pkb_results` dataset in BigQuery
 *   The `all_region_results` table in the `pkb_results` dataset
-*   Any reports you copied/created in Data Studio
+*   Any reports you copied/created in Looker Studio
 
 ## Congratulations!
 
