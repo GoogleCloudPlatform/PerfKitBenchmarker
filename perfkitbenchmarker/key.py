@@ -4,16 +4,11 @@ import dataclasses
 from typing import Optional
 
 from absl import flags
-from perfkitbenchmarker import data
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 
 FLAGS = flags.FLAGS
-
-TEST_FILE = 'hello_world.txt'
 
 
 @dataclasses.dataclass
@@ -47,22 +42,6 @@ class BaseKey(resource.BaseResource):
   """Object representing a cryptographic key."""
   RESOURCE_TYPE = 'BaseKey'
   CLOUD = None
-
-  def Encrypt(self, input_file: str, output_file: str) -> None:
-    """Ecrypts the given input file."""
-    raise NotImplementedError()
-
-  def _EncryptSimple(self):
-    input_file = data.ResourcePath(f'key/{TEST_FILE}')
-    output_file = vm_util.PrependTempDir(f'{TEST_FILE}.encrypted')
-    self.Encrypt(input_file, output_file)
-
-  def _IsReady(self) -> bool:
-    try:
-      self._EncryptSimple()
-    except errors.Error:
-      return False
-    return True
 
 
 def GetKeySpecClass(cloud: str) -> Optional[spec.BaseSpecMetaClass]:

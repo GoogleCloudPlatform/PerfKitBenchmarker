@@ -24,8 +24,10 @@ import logging
 from typing import Any, Dict, Optional
 
 from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import key
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import util
 
@@ -54,6 +56,8 @@ _VALID_PURPOSES = [
     'mac',
 ]
 _VALID_PROTECTION_LEVELS = ['software', 'hsm', 'external', 'external-vpc']
+
+_TEST_FILE = 'hello_world.txt'
 
 
 @dataclasses.dataclass
@@ -170,6 +174,41 @@ class GcpKey(key.BaseKey):
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     cmd.Issue(raise_on_failure=True)
 
+  def _Encrypt(self, input_file: str, output_file: str):
+    cmd = util.GcloudCommand(self, 'kms', 'encrypt')
+    cmd.flags['keyring'] = self.keyring_name
+    cmd.flags['location'] = self.location
+    cmd.flags['key'] = self.name
+    cmd.flags['plaintext-file'] = input_file
+    cmd.flags['ciphertext-file'] = output_file
+    cmd.Issue(raise_on_failure=True)
+
+  def _EncryptSimple(self):
+    input_file = data.ResourcePath(f'key/{_TEST_FILE}')
+    output_file = vm_util.PrependTempDir(f'{_TEST_FILE}.encrypted')
+    self._Encrypt(input_file, output_file)
+
+  def _GetPublicKey(self):
+    cmd = util.GcloudCommand(
+        self, 'kms', 'keys', 'versions', 'get-public-key', '1'
+    )
+    cmd.flags['keyring'] = self.keyring_name
+    cmd.flags['location'] = self.location
+    cmd.flags['key'] = self.name
+    cmd.flags['output-file'] = vm_util.PrependTempDir(f'{self.name}-public-key')
+    cmd.Issue(raise_on_failure=True)
+
+  def _IsReady(self) -> bool:
+    try:
+      # TODO(user): create separate subclasses based on purpose.
+      if self.purpose == 'encryption':
+        self._EncryptSimple()
+      elif self.purpose == 'asymmetric-encryption':
+        self._GetPublicKey()
+    except errors.Error:
+      return False
+    return True
+
   def _Delete(self) -> None:
     """Deletes the key."""
     # Keys are deleted by default automatically after 24 hours:
@@ -192,15 +231,6 @@ class GcpKey(key.BaseKey):
       logging.info('Could not find GCP KMS Key %s.', self.name)
       return False
     return True
-
-  def Encrypt(self, input_file: str, output_file: str):
-    cmd = util.GcloudCommand(self, 'kms', 'encrypt')
-    cmd.flags['keyring'] = self.keyring_name
-    cmd.flags['location'] = self.location
-    cmd.flags['key'] = self.name
-    cmd.flags['plaintext-file'] = input_file
-    cmd.flags['ciphertext-file'] = output_file
-    cmd.Issue(raise_on_failure=True)
 
   def GetResourceMetadata(self) -> Dict[Any, Any]:
     """Returns useful metadata about the key."""
