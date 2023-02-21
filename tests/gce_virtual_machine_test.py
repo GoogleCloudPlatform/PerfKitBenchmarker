@@ -605,7 +605,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
         gcp_instance_metadata=['k1:v1', 'k2:v2,k3:v3'], owner='test-owner')
     self.assertEqual(call_count, 1)
     actual_metadata = re.compile(
-        r'--metadata\s+(.*)(\s+--)?').search(cmd).group(1)
+        r'--metadata\s+(.*)(\s+--)?').search(cmd).group(1)  # pytype: disable=attribute-error  # re-none
     self.assertIn('k1=v1', actual_metadata)
     self.assertIn('k2=v2', actual_metadata)
     self.assertIn('k3=v3', actual_metadata)
@@ -617,7 +617,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
         gcp_instance_metadata_from_file=['k1:p1', 'k2:p2,k3:p3'])
     self.assertEqual(call_count, 1)
     actual_metadata_from_file = re.compile(
-        r'--metadata-from-file\s+(.*)(\s+--)?').search(cmd).group(1)
+        r'--metadata-from-file\s+(.*)(\s+--)?').search(cmd).group(1)  # pytype: disable=attribute-error  # re-none
     self.assertIn('k1=p1', actual_metadata_from_file)
     self.assertIn('k2=p2', actual_metadata_from_file)
     self.assertIn('k3=p3', actual_metadata_from_file)
