@@ -128,7 +128,7 @@ GPU_P4 = 'p4'
 GPU_P4_VWS = 'p4-vws'
 GPU_T4 = 't4'
 GPU_L4 = 'l4'
-GPU_A10G = 'a10g'
+GPU_A10 = 'a10'
 VALID_GPU_TYPES = [
     GPU_K80,
     GPU_P100,
@@ -138,7 +138,7 @@ VALID_GPU_TYPES = [
     GPU_P4_VWS,
     GPU_T4,
     GPU_L4,
-    GPU_A10G,
+    GPU_A10,
 ]
 CPUARCH_X86_64 = 'x86_64'
 CPUARCH_AARCH64 = 'aarch64'

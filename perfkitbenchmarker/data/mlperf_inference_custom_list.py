@@ -152,3 +152,87 @@ custom_systems["L4x8"] = SystemConfiguration(
     numa_conf=None,
     system_id="L4x8",
 )
+
+custom_systems["A10x1"] = SystemConfiguration(
+    host_cpu_conf=MATCH_ANY,
+    host_mem_conf=MATCH_ANY,
+    accelerator_conf=AcceleratorConfiguration(
+        layout={
+            GPU(
+                name="NVIDIA A10G",
+                accelerator_type=AcceleratorType.Discrete,
+                vram=match_float_approximate(
+                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
+                ),
+                max_power_limit=300.0,
+                pci_id="0x223710DE",
+                compute_sm=86,
+            ): 1
+        }
+    ),
+    numa_conf=None,
+    system_id="A10x1",
+)
+
+custom_systems["A10x2"] = SystemConfiguration(
+    host_cpu_conf=MATCH_ANY,
+    host_mem_conf=MATCH_ANY,
+    accelerator_conf=AcceleratorConfiguration(
+        layout={
+            GPU(
+                name="NVIDIA A10G",
+                accelerator_type=AcceleratorType.Discrete,
+                vram=match_float_approximate(
+                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
+                ),
+                max_power_limit=300.0,
+                pci_id="0x223710DE",
+                compute_sm=86,
+            ): 2
+        }
+    ),
+    numa_conf=None,
+    system_id="A10x2",
+)
+
+custom_systems["A10x4"] = SystemConfiguration(
+    host_cpu_conf=MATCH_ANY,
+    host_mem_conf=MATCH_ANY,
+    accelerator_conf=AcceleratorConfiguration(
+        layout={
+            GPU(
+                name="NVIDIA A10G",
+                accelerator_type=AcceleratorType.Discrete,
+                vram=match_float_approximate(
+                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
+                ),
+                max_power_limit=300.0,
+                pci_id="0x223710DE",
+                compute_sm=86,
+            ): 4
+        }
+    ),
+    numa_conf=None,
+    system_id="A10x4",
+)
+
+custom_systems["A10x8"] = SystemConfiguration(
+    host_cpu_conf=MATCH_ANY,
+    host_mem_conf=MATCH_ANY,
+    accelerator_conf=AcceleratorConfiguration(
+        layout={
+            GPU(
+                name="NVIDIA A10G",
+                accelerator_type=AcceleratorType.Discrete,
+                vram=match_float_approximate(
+                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
+                ),
+                max_power_limit=300.0,
+                pci_id="0x223710DE",
+                compute_sm=86,
+            ): 8
+        }
+    ),
+    numa_conf=None,
+    system_id="A10x8",
+)

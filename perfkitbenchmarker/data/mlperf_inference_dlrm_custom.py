@@ -66,7 +66,6 @@ class T4x4(T4x1):
   gpu_num_bundles = 1
   num_staging_batches = 4
   num_staging_threads = 4
-  server_target_qps = 125000
   use_jemalloc = True
 
 
@@ -81,7 +80,6 @@ class T4x4HighAccuracy(T4x4):
     HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
 )
 class T4x4Triton(T4x4):
-  server_target_qps = 27500
   use_triton = True
 
 
@@ -138,7 +136,6 @@ class L4x2(L4x1):
   gpu_num_bundles = 1
   num_staging_batches = 2
   num_staging_threads = 4
-  server_target_qps = 62500
   use_jemalloc = True
 
 
@@ -153,7 +150,6 @@ class L4x2HighAccuracy(L4x2):
     HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
 )
 class L4x2Triton(L4x2):
-  server_target_qps = 13750
   use_triton = True
 
 
@@ -172,7 +168,6 @@ class L4x4(L4x1):
   gpu_num_bundles = 1
   num_staging_batches = 4
   num_staging_threads = 4
-  server_target_qps = 125000
   use_jemalloc = True
 
 
@@ -187,7 +182,6 @@ class L4x4HighAccuracy(L4x4):
     HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
 )
 class L4x4Triton(L4x4):
-  server_target_qps = 27500
   use_triton = True
 
 
@@ -206,7 +200,6 @@ class L4x8(L4x1):
   gpu_num_bundles = 1
   num_staging_batches = 8
   num_staging_threads = 4
-  server_target_qps = 250000
   use_jemalloc = True
 
 
@@ -221,7 +214,6 @@ class L4x8HighAccuracy(L4x8):
     HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
 )
 class L4x8Triton(L4x8):
-  server_target_qps = 55000
   use_triton = True
 
 
@@ -229,4 +221,151 @@ class L4x8Triton(L4x8):
     HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
 )
 class L4x8HighAccuracyTriton(L4x8Triton):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10x1(ServerGPUBaseConfig):
+  system = KnownSystem.A10x1
+  deque_timeout_usec = 1
+  embedding_weights_on_gpu_part = 0.8
+  gpu_batch_size = 65500
+  gpu_num_bundles = 2
+  num_staging_batches = 2
+  num_staging_threads = 4
+  server_target_qps = 68000
+  use_jemalloc = True
+  use_small_tile_gemm_plugin = True
+  gemm_plugin_fairshare_cache_size = 18
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10x1HighAccuracy(A10x1):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10x1Triton(A10x1):
+  buffer_manager_thread_count = 0
+  use_triton = True
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10x1HighAccuracyTriton(A10x1Triton):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10x2(A10x1):
+  system = KnownSystem.A10x2
+  gpu_batch_size = 60000
+  num_staging_batches = 2
+  num_staging_threads = 8
+  use_jemalloc = False
+  numa_config = "0-3:0-27,56-83&4-7:28-55,84-111"
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10x2HighAccuracy(A10x2):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10x2Triton(A10x2):
+  buffer_manager_thread_count = 0
+  use_triton = True
+  batch_triton_requests = True
+  gather_kernel_buffer_threshold = 64
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10x2HighAccuracyTriton(A10x2Triton):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10x4(A10x1):
+  system = KnownSystem.A10x4
+  gpu_batch_size = 60000
+  num_staging_batches = 4
+  num_staging_threads = 8
+  use_jemalloc = False
+  numa_config = "0-3:0-27,56-83&4-7:28-55,84-111"
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10x4HighAccuracy(A10x4):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10x4Triton(A10x4):
+  buffer_manager_thread_count = 0
+  use_triton = True
+  batch_triton_requests = True
+  gather_kernel_buffer_threshold = 64
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10x4HighAccuracyTriton(A10x4Triton):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10x8(A10x1):
+  system = KnownSystem.A10x8
+  gpu_batch_size = 60000
+  num_staging_batches = 8
+  num_staging_threads = 8
+  use_jemalloc = False
+  numa_config = "0-3:0-27,56-83&4-7:28-55,84-111"
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10x8HighAccuracy(A10x8):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10x8Triton(A10x8):
+  buffer_manager_thread_count = 0
+  use_triton = True
+  batch_triton_requests = True
+  gather_kernel_buffer_threshold = 64
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10x8HighAccuracyTriton(A10x8Triton):
   pass

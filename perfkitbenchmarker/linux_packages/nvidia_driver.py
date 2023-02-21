@@ -33,7 +33,7 @@ NVIDIA_TESLA_V100 = 'v100'
 NVIDIA_TESLA_T4 = 't4'
 NVIDIA_TESLA_L4 = 'l4'
 NVIDIA_TESLA_A100 = 'a100'
-NVIDIA_TESLA_A10G = 'a10g'
+NVIDIA_TESLA_A10 = 'a10'
 
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
 
@@ -203,8 +203,8 @@ def GetGpuType(vm):
     return NVIDIA_TESLA_L4
   elif 'A100' in gpu_types[0]:
     return NVIDIA_TESLA_A100
-  elif 'A10G' in gpu_types[0]:
-    return NVIDIA_TESLA_A10G
+  elif 'A10' in gpu_types[0]:
+    return NVIDIA_TESLA_A10
   else:
     raise UnsupportedClockSpeedError(
         'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
