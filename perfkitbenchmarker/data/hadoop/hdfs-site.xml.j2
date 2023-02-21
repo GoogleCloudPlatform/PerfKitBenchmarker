@@ -8,8 +8,7 @@
     </property>
   <property>
     <name>dfs.block.size</name>
-    <!-- 128 MB -->
-    <value>134217728</value>
+    <value>{{ block_size }}</value>
   </property>
   <!-- TODO(pclay): consider dfs.client.read.shortcircuit (requires native libs) -->
   <!-- https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/ShortCircuitLocalReads.html -->
