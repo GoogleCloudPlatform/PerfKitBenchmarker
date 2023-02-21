@@ -20,6 +20,7 @@ added as a PKB resource because they cannot be deleted.
 """
 
 import dataclasses
+import json
 import logging
 from typing import Any, Dict, Optional
 
@@ -211,14 +212,13 @@ class GcpKey(key.BaseKey):
 
   def _Delete(self) -> None:
     """Deletes the key."""
-    # Keys are deleted by default automatically after 24 hours:
+    # Key versions are deleted by default after 24 hours:
     # https://cloud.google.com/kms/docs/create-key#soft_delete
-    # Raise an error which causes the delete to end on the second invocation
-    # since it checks for `self.deleted``.
-    self.deleted = True
-    raise errors.Resource.RetryableDeletionError(
-        'Keys automatically delete after a set time period.'
-    )
+    cmd = util.GcloudCommand(self, 'kms', 'keys', 'versions', 'destroy', '1')
+    cmd.flags['keyring'] = self.keyring_name
+    cmd.flags['location'] = self.location
+    cmd.flags['key'] = self.name
+    cmd.Issue(raise_on_failure=True)
 
   def _Exists(self) -> bool:
     """Returns true if the key exists."""
@@ -226,9 +226,11 @@ class GcpKey(key.BaseKey):
     cmd.flags['keyring'] = self.keyring_name
     cmd.flags['location'] = self.location
     # Do not log error or warning when checking existence.
-    _, _, retcode = cmd.Issue(raise_on_failure=False)
+    result, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not find GCP KMS Key %s.', self.name)
+      return False
+    if json.loads(result)['primary']['state'] == 'DESTROY_SCHEDULED':
       return False
     return True
 
