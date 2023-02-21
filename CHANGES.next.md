@@ -37,6 +37,9 @@
 -   --dpb_export_job_stats is now False by default.
 -   Validate arguments to IssueCommand. Remove force_info_log & suppress_warning
     parameters, add should_pre_log.
+-   Remove Dataflow parameter --maxNumWorkers by default and add
+    dataflow_max_worker_count in spec to allow users to set this parameter on
+    their own.
 
 ### New features:
 

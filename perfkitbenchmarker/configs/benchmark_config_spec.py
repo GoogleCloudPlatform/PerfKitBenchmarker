@@ -168,6 +168,10 @@ class _DpbServiceSpec(spec.BaseSpec):
             'default': None,
             'none_ok': True
         }),
+        'dataflow_max_worker_count': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True,
+        }),
         'dataproc_serverless_core_count': (option_decoders.IntDecoder, {
             'default': None,
             'none_ok': True,
