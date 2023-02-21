@@ -171,15 +171,24 @@ class BaseAppService(resource.BaseResource):
     if self.user_managed:
       return
     self._UpdateDependencies()
+    logging.info('Starting the update timer')
     self.update_start_time = time.time()
     self._Update()
     self.update_end_time = time.time()
+    logging.info(
+        'Ending the update timer with %.5fs elapsed. Ready still going.',
+        self.update_end_time - self.update_start_time,
+    )
     WaitUntilReady()
     self.update_ready_time = time.time()
     self.samples.append(
-        sample.Sample('update latency',
-                      self.update_end_time - self.update_start_time, 'seconds',
-                      {}))
+        sample.Sample(
+            'update latency',
+            self.update_end_time - self.update_start_time,
+            'seconds',
+            {},
+        )
+    )
     self.samples.append(
         sample.Sample('update ready latency',
                       self.update_ready_time - self.update_start_time,
