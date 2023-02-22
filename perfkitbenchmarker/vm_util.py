@@ -208,7 +208,6 @@ def GetSshOptions(ssh_key_filename, connect_timeout=None):
 
 # TODO(user): Remove at least RunParallelProcesses and RunParallelThreads
 # from this file (update references to call directly into background_tasks).
-RunParallelProcesses = background_tasks.RunParallelProcesses
 RunParallelThreads = background_tasks.RunParallelThreads
 
 
