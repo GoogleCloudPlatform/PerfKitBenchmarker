@@ -57,7 +57,8 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
 
     self.swift_command_prefix = ' '.join(self.swift_command_parts)
 
-  def MakeBucket(self, bucket, raise_on_failure=True):
+  def MakeBucket(self, bucket, raise_on_failure=True, tag_bucket=True):
+    del tag_bucket
     _, stderr, ret_code = vm_util.IssueCommand(
         ['swift'] + self.swift_command_parts + ['post', bucket],
         raise_on_failure=False)

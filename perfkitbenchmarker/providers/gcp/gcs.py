@@ -59,7 +59,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   def PrepareService(self, location):
     self.location = location or DEFAULT_GCP_REGION
 
-  def MakeBucket(self, bucket, raise_on_failure=True):
+  def MakeBucket(self, bucket, raise_on_failure=True, tag_bucket=True):
     command = ['gsutil', 'mb']
     if self.location:
       command.extend(['-l', self.location])
@@ -76,13 +76,15 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     if ret_code and raise_on_failure:
       raise errors.Benchmarks.BucketCreationError(stderr)
 
-    command = ['gsutil', 'label', 'ch']
-    for key, value in util.GetDefaultTags().items():
-      command.extend(['-l', f'{key}:{value}'])
-    command.extend([f'gs://{bucket}'])
-    _, stderr, ret_code = vm_util.IssueCommand(command, raise_on_failure=False)
-    if ret_code and raise_on_failure:
-      raise errors.Benchmarks.BucketCreationError(stderr)
+    if tag_bucket:
+      command = ['gsutil', 'label', 'ch']
+      for key, value in util.GetDefaultTags().items():
+        command.extend(['-l', f'{key}:{value}'])
+      command.extend([f'gs://{bucket}'])
+      _, stderr, ret_code = vm_util.IssueCommand(
+          command, raise_on_failure=False)
+      if ret_code and raise_on_failure:
+        raise errors.Benchmarks.BucketCreationError(stderr)
 
   def Copy(self, src_url, dst_url, recursive=False):
     """See base class."""

@@ -46,7 +46,7 @@ class S3Service(object_storage_service.ObjectStorageService):
   def PrepareService(self, location):
     self.region = location or DEFAULT_AWS_REGION
 
-  def MakeBucket(self, bucket_name, raise_on_failure=True):
+  def MakeBucket(self, bucket_name, raise_on_failure=True, tag_bucket=True):
     command = [
         'aws', 's3', 'mb',
         's3://%s' % bucket_name,
@@ -56,17 +56,18 @@ class S3Service(object_storage_service.ObjectStorageService):
     if ret_code and raise_on_failure:
       raise errors.Benchmarks.BucketCreationError(stderr)
 
-    # Tag the bucket with the persistent timeout flag so that buckets can
-    # optionally stick around after PKB runs.
-    default_tags = util.MakeFormattedDefaultTags(
-        timeout_minutes=max(FLAGS.timeout_minutes,
-                            FLAGS.persistent_timeout_minutes))
-    tag_set = ','.join('{%s}' % tag for tag in default_tags)
-    vm_util.IssueRetryableCommand(
-        ['aws', 's3api', 'put-bucket-tagging',
-         '--bucket', bucket_name,
-         '--tagging', 'TagSet=[%s]' % tag_set,
-         '--region=%s' % self.region])
+    if tag_bucket:
+      # Tag the bucket with the persistent timeout flag so that buckets can
+      # optionally stick around after PKB runs.
+      default_tags = util.MakeFormattedDefaultTags(
+          timeout_minutes=max(FLAGS.timeout_minutes,
+                              FLAGS.persistent_timeout_minutes))
+      tag_set = ','.join('{%s}' % tag for tag in default_tags)
+      vm_util.IssueRetryableCommand(
+          ['aws', 's3api', 'put-bucket-tagging',
+           '--bucket', bucket_name,
+           '--tagging', 'TagSet=[%s]' % tag_set,
+           '--region=%s' % self.region])
 
   def Copy(self, src_url, dst_url, recursive=False):
     """See base class."""

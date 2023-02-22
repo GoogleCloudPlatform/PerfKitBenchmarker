@@ -122,7 +122,8 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     if hasattr(self, 'resource_group') and self.resource_group:
       self.resource_group.Delete()
 
-  def MakeBucket(self, bucket, raise_on_failure=True):
+  def MakeBucket(self, bucket, raise_on_failure=True, tag_bucket=True):
+    del tag_bucket
     _, stderr, ret_code = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'storage', 'container', 'create', '--name', bucket] +
         self.storage_account.connection_args,

@@ -109,9 +109,11 @@
     networking performance.
 -   Added support for dynamic provisioning of Bigquery flat rate slots at
     benchmark runtime
--   Create a new subdirectory of linux_packages called provisioning_benchmarks
-    for benchmarking lifecycle management timings of cloud resources and
-    operations.
+-   Create a new subdirectory of linux_benchmarks called provisioning_benchmarks
+    for benchmarking lifecycle management timings of cloud resources. Including:
+    - Kubernetes Clusters
+    - KMS cryptographic keys
+    - Object storage buckets
 -   Add support for using the hbase2 binding in the Cloud Bigtable YCSB
     benchmark.
 -   Add iPerf interval reporting.
