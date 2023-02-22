@@ -20,9 +20,9 @@ import logging
 import tempfile
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from six.moves import range
 
 FLAGS = flags.FLAGS
@@ -94,8 +94,9 @@ def RunActPrep(vm):
   assert len(vm.scratch_disks) > FLAGS.act_reserved_partitions, (
       'More reserved partition than total partitions available.')
   # Only salt partitions will be used.
-  vm_util.RunThreaded(
-      _RunActPrep, vm.scratch_disks[FLAGS.act_reserved_partitions:])
+  background_tasks.RunThreaded(
+      _RunActPrep, vm.scratch_disks[FLAGS.act_reserved_partitions :]
+  )
 
 
 def PrepActConfig(vm, load, index=None):

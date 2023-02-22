@@ -19,9 +19,9 @@ import shutil
 import tempfile
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import nginx_benchmark
 
 FLAGS = flags.FLAGS
@@ -144,7 +144,7 @@ def Prepare(benchmark_spec):
   prepare_fns = ([functools.partial(_PrepareCluster, benchmark_spec)] +
                  [functools.partial(vm.Install, 'wrk2') for vm in clients])
 
-  vm_util.RunThreaded(lambda f: f(), prepare_fns)
+  background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
   benchmark_spec.nginx_endpoint_ip = (
       benchmark_spec.container_cluster.GetClusterIP('nginx-cluster'))

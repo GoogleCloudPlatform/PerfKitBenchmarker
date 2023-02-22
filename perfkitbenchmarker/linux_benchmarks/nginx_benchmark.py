@@ -17,9 +17,9 @@
 import ipaddress
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import wrk2
 
 FLAGS = flags.FLAGS
@@ -216,7 +216,7 @@ def Prepare(benchmark_spec):
   server = benchmark_spec.vm_groups['server'][0]
   server.Install('nginx')
   _ConfigureNginx(server)
-  vm_util.RunThreaded(lambda vm: vm.Install('wrk2'), clients)
+  background_tasks.RunThreaded(lambda vm: vm.Install('wrk2'), clients)
 
   benchmark_spec.nginx_endpoint_ip = (
       benchmark_spec.vm_groups['server'][0].internal_ip)
@@ -237,7 +237,7 @@ def _RunMultiClient(clients, target, rate, connections, duration, threads):
     results.extend(client_results)
 
   args = [((client, i), {}) for i, client in enumerate(clients)]
-  vm_util.RunThreaded(_RunSingleClient, args)
+  background_tasks.RunThreaded(_RunSingleClient, args)
 
   requests = 0
   errors = 0

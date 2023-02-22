@@ -17,12 +17,12 @@ import functools
 import logging
 from typing import Any, Dict, List
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_samples
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
@@ -91,7 +91,9 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   Args:
     bm_spec: The benchmark specification
   """
-  vm_util.RunThreaded(lambda vm: vm.Install('cuda_samples'), bm_spec.vms)
+  background_tasks.RunThreaded(
+      lambda vm: vm.Install('cuda_samples'), bm_spec.vms
+  )
 
 
 def _MetadataFromFlags() -> [str, Any]:
@@ -164,9 +166,10 @@ def _CollectGpuSamples(
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
-  vm_util.RunThreaded(lambda vm: vm.InstallPackages('freeglut3-dev'),
-                      bm_spec.vms)
-  sample_lists = vm_util.RunThreaded(_CollectGpuSamples, bm_spec.vms)
+  background_tasks.RunThreaded(
+      lambda vm: vm.InstallPackages('freeglut3-dev'), bm_spec.vms
+  )
+  sample_lists = background_tasks.RunThreaded(_CollectGpuSamples, bm_spec.vms)
   return (functools.reduce(lambda a, b: a + b, sample_lists) if sample_lists
           else [])
 

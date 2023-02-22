@@ -25,10 +25,10 @@ import os
 from typing import Any
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
 
@@ -128,7 +128,7 @@ def Prepare(benchmark_spec):
 
   vms = benchmark_spec.vms
   # Install required packages.
-  vm_util.RunThreaded(_Install, vms)
+  background_tasks.RunThreaded(_Install, vms)
   benchmark_spec.executor = ycsb.YCSBExecutor('dynamodb')
 
   instance: aws_dynamodb.AwsDynamoDBInstance = benchmark_spec.non_relational_db

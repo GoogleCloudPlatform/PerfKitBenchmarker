@@ -22,10 +22,10 @@ See https://github.com/hpc/ior for more info.
 import itertools
 import posixpath
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import hpc_util
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ior
 
 FLAGS = flags.FLAGS
@@ -80,8 +80,8 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(lambda vm: vm.Install('ior'), vms)
-  vm_util.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
+  background_tasks.RunThreaded(lambda vm: vm.Install('ior'), vms)
+  background_tasks.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
   hpc_util.CreateMachineFile(vms)
 
 
@@ -115,7 +115,9 @@ def Run(benchmark_spec):
   for args in mdtest_args:
     results += ior.RunMdtest(master_vm, FLAGS.mdtest_num_procs, args)
     if FLAGS.mdtest_drop_caches:
-      vm_util.RunThreaded(lambda vm: vm.DropCaches(), benchmark_spec.vms)
+      background_tasks.RunThreaded(
+          lambda vm: vm.DropCaches(), benchmark_spec.vms
+      )
 
   return results
 

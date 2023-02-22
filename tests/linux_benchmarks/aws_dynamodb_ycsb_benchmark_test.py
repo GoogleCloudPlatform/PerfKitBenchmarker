@@ -18,7 +18,7 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
-from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker.linux_benchmarks import aws_dynamodb_ycsb_benchmark
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
@@ -34,8 +34,7 @@ class LoadStageTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(
         mock.patch.object(aws_dynamodb_ycsb_benchmark,
                           'GetRemoteVMCredentialsFullPath'))
-    self.enter_context(
-        mock.patch.object(vm_util, 'RunThreaded'))
+    self.enter_context(mock.patch.object(background_tasks, 'RunThreaded'))
     self.enter_context(mock.patch.object(ycsb.YCSBExecutor, 'Load'))
     self.mock_spec = mock.MagicMock()
 

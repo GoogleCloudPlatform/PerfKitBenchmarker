@@ -16,11 +16,11 @@
 import posixpath
 import re
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
@@ -210,7 +210,7 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
   list_params = [((benchmark_spec, rank), {})
                  for rank in range(benchmark_spec.num_vms)]
-  vm_util.RunThreaded(_PrepareVm, list_params)
+  background_tasks.RunThreaded(_PrepareVm, list_params)
   master = vms[0]
   if nvidia_driver.CheckNvidiaGpuExists(master):
     gpus_per_vm = nvidia_driver.QueryNumberOfGpus(master)
@@ -377,7 +377,7 @@ def Run(benchmark_spec):
   samples = []
   list_params = [((benchmark_spec, rank), {})
                  for rank in range(benchmark_spec.num_vms)]
-  for results in vm_util.RunThreaded(_Run, list_params):
+  for results in background_tasks.RunThreaded(_Run, list_params):
     samples.extend(results)
   return samples
 

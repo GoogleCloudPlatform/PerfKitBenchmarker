@@ -1228,8 +1228,9 @@ def PublishFailedRunSample(
       'run_stage': run_stage_that_failed,
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
-  vm_util.RunThreaded(lambda vm: vm.UpdateInterruptibleVmStatus(use_api=True),
-                      spec.vms)
+  background_tasks.RunThreaded(
+      lambda vm: vm.UpdateInterruptibleVmStatus(use_api=True), spec.vms
+  )
 
   interruptible_vm_count = 0
   interrupted_vm_count = 0
@@ -1691,7 +1692,7 @@ def _CreateCpuVulnerabilitySamples(vms) -> List[sample.Sample]:
     return sample.Sample('cpu_vuln', 0, '', metadata)
 
   linux_vms = [vm for vm in vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES]
-  return vm_util.RunThreaded(CreateSample, linux_vms)
+  return background_tasks.RunThreaded(CreateSample, linux_vms)
 
 
 def _CreateGccSamples(vms):
@@ -1706,7 +1707,7 @@ def _CreateGccSamples(vms):
 
   return [
       sample.Sample('gcc_version', 0, '', metadata)
-      for metadata in vm_util.RunThreaded(_GetGccMetadata, vms)
+      for metadata in background_tasks.RunThreaded(_GetGccMetadata, vms)
   ]
 
 
@@ -1727,7 +1728,7 @@ def _CreateGlibcSamples(vms):
 
   return [
       sample.Sample('glibc_version', 0, '', metadata)
-      for metadata in vm_util.RunThreaded(_GetGlibcMetadata, vms)
+      for metadata in background_tasks.RunThreaded(_GetGlibcMetadata, vms)
   ]
 
 
@@ -1798,7 +1799,7 @@ def _CollectMeminfoHandler(unused_sender, benchmark_spec: bm_spec.BenchmarkSpec,
       vm for vm in benchmark_spec.vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES
   ]
 
-  samples.extend(vm_util.RunThreaded(CollectMeminfo, linux_vms))
+  samples.extend(background_tasks.RunThreaded(CollectMeminfo, linux_vms))
 
 
 def Main():

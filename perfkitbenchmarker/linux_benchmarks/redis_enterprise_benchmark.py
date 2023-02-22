@@ -32,9 +32,9 @@ To run this benchmark:
 import logging
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import redis_enterprise
 
 FLAGS = flags.FLAGS
@@ -115,8 +115,10 @@ def Prepare(benchmark_spec):
   """
   client_vms = benchmark_spec.vm_groups['clients']
   server_vms = benchmark_spec.vm_groups['servers']
-  vm_util.RunThreaded(_InstallRedisEnterprise, client_vms + server_vms)
-  vm_util.RunThreaded(lambda vm: vm.AuthenticateVm(), client_vms + server_vms)
+  background_tasks.RunThreaded(_InstallRedisEnterprise, client_vms + server_vms)
+  background_tasks.RunThreaded(
+      lambda vm: vm.AuthenticateVm(), client_vms + server_vms
+  )
 
   server_vm = server_vms[0]
   server_vm.AllowPort(REDIS_PORT)

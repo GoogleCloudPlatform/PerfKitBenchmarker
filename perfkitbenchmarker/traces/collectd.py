@@ -20,6 +20,7 @@ import logging
 import os
 import posixpath
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import events
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import vm_util
@@ -54,7 +55,7 @@ class _CollectdCollector(object):
     """
     logging.info('Installing collectd')
     vms = benchmark_spec.vms
-    vm_util.RunThreaded(lambda vm: vm.Install('collectd'), vms)
+    background_tasks.RunThreaded(lambda vm: vm.Install('collectd'), vms)
 
   def After(self, unused_sender, benchmark_spec):
     """Stop / delete collectd, fetch results from VMs.
@@ -65,7 +66,7 @@ class _CollectdCollector(object):
     """
     logging.info('Stopping collectd')
     vms = benchmark_spec.vms
-    vm_util.RunThreaded(self._FetchResults, vms)
+    background_tasks.RunThreaded(self._FetchResults, vms)
 
 
 def Register(parsed_flags):

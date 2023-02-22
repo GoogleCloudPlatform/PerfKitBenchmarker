@@ -42,9 +42,9 @@ import logging
 import re
 import time
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.linux_packages import oldisim_dependencies
 from six.moves import map
@@ -107,7 +107,7 @@ def Prepare(benchmark_spec):
               if vm_idx >= (NUM_DRIVERS + NUM_ROOTS)]
 
   if vms:
-    vm_util.RunThreaded(InstallAndBuild, vms)
+    background_tasks.RunThreaded(InstallAndBuild, vms)
 
   # Launch job on the leaf nodes.
   leaf_server_bin = oldisim_dependencies.BinaryPath('LeafNode')

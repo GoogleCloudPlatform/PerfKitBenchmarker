@@ -21,12 +21,12 @@ import logging
 import os
 import re
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import hpcg
 from perfkitbenchmarker.linux_packages import nvidia_driver
@@ -185,7 +185,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(_PrepareHpcg, vms)
+  background_tasks.RunThreaded(_PrepareHpcg, vms)
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   for vm in vms:
     _CopyAndUpdateRunScripts(vm, benchmark_spec)

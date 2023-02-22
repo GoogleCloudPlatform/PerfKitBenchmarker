@@ -3,10 +3,10 @@
 import logging
 import os
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 
 flags.DEFINE_string(
     'gcsfuse_data_dir', '',
@@ -60,7 +60,7 @@ def Prepare(benchmark_spec):
       required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(_Prepare, vms)
+  background_tasks.RunThreaded(_Prepare, vms)
 
 
 def _Prepare(vm):
@@ -83,8 +83,12 @@ def Run(benchmark_spec):
     A list of sample.Sample instances.
   """
   vms = benchmark_spec.vms
-  gfile_sample_lists = vm_util.RunThreaded(_ReadThroughputTestViaGfile, vms)
-  gcsfuse_sample_lists = vm_util.RunThreaded(_ReadThroughputTestViaGcsfuse, vms)
+  gfile_sample_lists = background_tasks.RunThreaded(
+      _ReadThroughputTestViaGfile, vms
+  )
+  gcsfuse_sample_lists = background_tasks.RunThreaded(
+      _ReadThroughputTestViaGcsfuse, vms
+  )
   samples = []
   for sample_list in gfile_sample_lists + gcsfuse_sample_lists:
     samples.extend(sample_list)

@@ -16,6 +16,7 @@
 from __future__ import print_function
 import posixpath
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import hpc_util
@@ -794,20 +795,20 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(_PrepareWorker, vms)
+  background_tasks.RunThreaded(_PrepareWorker, vms)
 
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   list_params = [((benchmark_spec, node_rank), {})
                  for node_rank in range(len(vms))]
   _PrepareBucket(benchmark_spec)
 
-  vm_util.RunThreaded(_ClearTmpDirectory, list_params)
+  background_tasks.RunThreaded(_ClearTmpDirectory, list_params)
 
-  vm_util.RunThreaded(_PrepareMLPerfBenchmark, list_params)
+  background_tasks.RunThreaded(_PrepareMLPerfBenchmark, list_params)
 
-  vm_util.RunThreaded(_UpdateScripts, list_params)
+  background_tasks.RunThreaded(_UpdateScripts, list_params)
 
-  vm_util.RunThreaded(_PrepareMLPerfRunner, list_params)
+  background_tasks.RunThreaded(_PrepareMLPerfRunner, list_params)
 
   hpc_util.CreateMachineFile(vms, lambda _: benchmark_spec.gpus_per_vm,
                              HOSTFILE)

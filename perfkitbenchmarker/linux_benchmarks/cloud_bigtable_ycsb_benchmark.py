@@ -31,6 +31,7 @@ import posixpath
 import subprocess
 from typing import Any, Dict, List
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -319,7 +320,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   instance: _Bigtable = benchmark_spec.non_relational_db
   args = [((vm, instance), {}) for vm in vms]
-  vm_util.RunThreaded(_Install, args)
+  background_tasks.RunThreaded(_Install, args)
 
   vm = benchmark_spec.vms[0]
   splits = ','.join([

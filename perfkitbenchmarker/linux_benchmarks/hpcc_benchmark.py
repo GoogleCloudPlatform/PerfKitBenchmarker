@@ -45,6 +45,7 @@ import re
 from typing import Any, Dict, List, Tuple
 from absl import flags
 import dataclasses
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -309,14 +310,16 @@ def PrepareBinaries(vms: List[linux_vm.BaseLinuxVirtualMachine]) -> None:
   """Prepare binaries on all vms."""
   if hpcc.USE_INTEL_COMPILED_HPL.value:
     intelmpi.NfsExportIntelDirectory(vms)
-    vm_util.RunThreaded(lambda vm: vm.Install('numactl'), vms)
+    background_tasks.RunThreaded(lambda vm: vm.Install('numactl'), vms)
     return
   headnode_vm = vms[0]
   if FLAGS.hpcc_binary:
     headnode_vm.PushFile(data.ResourcePath(FLAGS.hpcc_binary), './hpcc')
   else:
     headnode_vm.RemoteCommand(f'cp {hpcc.HPCC_DIR}/hpcc hpcc')
-  vm_util.RunThreaded(lambda vm: _PrepareBinaries(headnode_vm, vm), vms[1:])
+  background_tasks.RunThreaded(
+      lambda vm: _PrepareBinaries(headnode_vm, vm), vms[1:]
+  )
 
 
 def _PrepareBinaries(headnode_vm: linux_vm.BaseLinuxVirtualMachine,
@@ -453,7 +456,7 @@ def RunHpccSource(
   hpcc_exec = './hpcc'
   if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
     # Must exec HPCC wrapper script to pickup location of libiomp5.so
-    vm_util.RunThreaded(_CreateHpccWrapper, vms)
+    background_tasks.RunThreaded(_CreateHpccWrapper, vms)
     hpcc_exec = f'./{HPCC_WRAPPER}'
 
   if FLAGS.hpcc_numa_binding:

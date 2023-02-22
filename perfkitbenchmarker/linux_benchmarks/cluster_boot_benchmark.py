@@ -17,10 +17,10 @@ import logging
 import time
 from typing import List
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 
 BENCHMARK_NAME = 'cluster_boot'
 BENCHMARK_CONFIG = """
@@ -174,7 +174,7 @@ def _MeasureReboot(vms):
     time.
   """
   before_reboot_timestamp = time.time()
-  reboot_times = vm_util.RunThreaded(lambda vm: vm.Reboot(), vms)
+  reboot_times = background_tasks.RunThreaded(lambda vm: vm.Reboot(), vms)
   cluster_reboot_time = time.time() - before_reboot_timestamp
   return _GetVmOperationDataSamples(reboot_times, cluster_reboot_time, 'Reboot',
                                     vms)
@@ -192,7 +192,7 @@ def MeasureDelete(
     time.
   """
   before_delete_timestamp = time.time()
-  vm_util.RunThreaded(lambda vm: vm.Delete(), vms)
+  background_tasks.RunThreaded(lambda vm: vm.Delete(), vms)
   delete_times = [vm.delete_end_time - vm.delete_start_time for vm in vms]
   max_delete_end_time = max([vm.delete_end_time for vm in vms])
   cluster_delete_time = max_delete_end_time - before_delete_timestamp

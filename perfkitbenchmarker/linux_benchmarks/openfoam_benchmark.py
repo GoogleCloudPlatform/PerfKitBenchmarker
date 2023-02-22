@@ -29,6 +29,7 @@ import collections
 import logging
 import posixpath
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import hpc_util
@@ -164,11 +165,13 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark spec for this sample benchmark.
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(lambda vm: vm.Install('openfoam'), vms)
+  background_tasks.RunThreaded(lambda vm: vm.Install('openfoam'), vms)
   # Allow ssh access to other vms.
-  vm_util.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
+  background_tasks.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
   # Avoids printing ssh warnings and prevents too many auth errors.
-  vm_util.RunThreaded(lambda vm: vm.RemoteCommand(_SSH_CONFIG_CMD), vms)
+  background_tasks.RunThreaded(
+      lambda vm: vm.RemoteCommand(_SSH_CONFIG_CMD), vms
+  )
   # Tell mpirun about other nodes.
   hpc_util.CreateMachineFile(vms, remote_path=_MACHINE_FILE)
 

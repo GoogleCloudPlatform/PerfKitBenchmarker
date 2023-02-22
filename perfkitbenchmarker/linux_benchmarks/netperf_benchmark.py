@@ -28,6 +28,7 @@ import logging
 import os
 import re
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -160,7 +161,7 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vms = vms[:2]
-  vm_util.RunThreaded(PrepareNetperf, vms)
+  background_tasks.RunThreaded(PrepareNetperf, vms)
 
   num_streams = max(FLAGS.netperf_num_streams)
 

@@ -33,6 +33,7 @@ import time
 from absl import flags
 from google.cloud import datastore
 from google.oauth2 import service_account
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
@@ -138,7 +139,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
 
   # Install required packages and copy credential files
-  vm_util.RunThreaded(_Install, vms)
+  background_tasks.RunThreaded(_Install, vms)
 
   load_kwargs = {
       'googledatastore.datasetId': FLAGS.google_datastore_datasetId,

@@ -15,6 +15,7 @@
 import json
 import logging
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import vm_util
@@ -86,7 +87,9 @@ class ElastiCacheMemcacheService(MemcacheService):
     # Don't have to delete the subnet group. It will be deleted with the subnet.
 
   def Flush(self):
-    vm_util.RunThreaded(memcached_server.FlushMemcachedServer, self.hosts)
+    background_tasks.RunThreaded(
+        memcached_server.FlushMemcachedServer, self.hosts
+    )
 
   def GetHosts(self):
     return ['%s:%s' % (ip, port) for ip, port in self.hosts]

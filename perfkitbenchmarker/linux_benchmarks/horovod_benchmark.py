@@ -15,6 +15,7 @@
 
 import logging
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import hpc_util
@@ -199,7 +200,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(PrepareHorovod, vms)
+  background_tasks.RunThreaded(PrepareHorovod, vms)
   hpc_util.CreateMachineFile(vms, nvidia_driver.QueryNumberOfGpus, MACHINEFILE)
 
 
@@ -353,7 +354,9 @@ def RunWithVMs(vms, extra_envs=None):
   Returns:
     A list of sample.Sample objects.
   """
-  vm_util.RunThreaded(lambda vm: vm.RemoteCommand('rm -rf /tmp/models'), vms)
+  background_tasks.RunThreaded(
+      lambda vm: vm.RemoteCommand('rm -rf /tmp/models'), vms
+  )
   master_vm = vms[0]
 
   gpus_per_node = nvidia_driver.QueryNumberOfGpus(master_vm)

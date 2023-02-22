@@ -37,6 +37,7 @@ import functools
 from typing import Any, Dict
 from absl import flags
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
@@ -154,7 +155,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
       [functools.partial(_PrepareCluster)] +
       [functools.partial(vm.Install, 'memtier') for vm in client_vms])
 
-  vm_util.RunThreaded(lambda f: f(), prepare_fns)
+  background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
 
 def Run(bm_spec: _BenchmarkSpec):

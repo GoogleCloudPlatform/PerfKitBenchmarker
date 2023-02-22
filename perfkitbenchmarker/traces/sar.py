@@ -17,6 +17,7 @@
 import logging
 import os
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
@@ -122,8 +123,9 @@ class _SarCollector(base_collector.BaseCollector):
         }
         _AddStealResults(metadata, output, samples)
 
-    vm_util.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)])
+    background_tasks.RunThreaded(
+        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+    )
 
 
 def Register(parsed_flags):

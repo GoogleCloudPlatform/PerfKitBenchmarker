@@ -20,6 +20,7 @@ import os
 from typing import Any, Dict, List
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
@@ -221,8 +222,9 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
         _NvidiaPowerResults(metadata, csv.DictReader(fp), samples,
                             self.query_items)
 
-    vm_util.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)])
+    background_tasks.RunThreaded(
+        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+    )
 
 
 def Register(parsed_flags: flags) -> None:

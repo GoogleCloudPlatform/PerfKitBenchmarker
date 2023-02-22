@@ -18,6 +18,7 @@ import posixpath
 import re
 from typing import Optional
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import intel_repo
@@ -161,7 +162,7 @@ def NfsExportIntelDirectory(vms) -> None:
   """
   nfs_service.NfsExportAndMount(vms, _INTEL_ROOT)
   # Still need to have clients ulimit and ptrace fixed
-  vm_util.RunThreaded(FixEnvironment, vms[1:])
+  background_tasks.RunThreaded(FixEnvironment, vms[1:])
   TestInstall(vms)
 
 

@@ -25,12 +25,12 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
 
@@ -113,8 +113,9 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   server_vm = bm_spec.vm_groups['servers'][0]
 
   # Install memtier
-  vm_util.RunThreaded(lambda client: client.Install('memtier'),
-                      client_vms + [server_vm])
+  background_tasks.RunThreaded(
+      lambda client: client.Install('memtier'), client_vms + [server_vm]
+  )
 
   if redis_server.REDIS_SIMULATE_AOF.value:
     server_vm.Install('mdadm')
@@ -149,7 +150,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   ports = redis_server.GetRedisPorts()
   ports_group_of_four = [ports[i : i + 4] for i in range(0, len(ports), 4)]
   for ports_group in ports_group_of_four:
-    vm_util.RunThreaded(
+    background_tasks.RunThreaded(
         lambda port: memtier.Load(server_vm, 'localhost', port),
         ports_group,
         10,

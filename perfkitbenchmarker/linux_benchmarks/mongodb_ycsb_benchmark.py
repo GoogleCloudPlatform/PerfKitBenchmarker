@@ -24,8 +24,8 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 import functools
 import posixpath
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 
 # See http://api.mongodb.org/java/2.13/com/mongodb/WriteConcern.html
@@ -104,7 +104,9 @@ def Prepare(benchmark_spec):
   client_partials = [functools.partial(_PrepareClient, client)
                      for client in benchmark_spec.vm_groups['clients']]
 
-  vm_util.RunThreaded((lambda f: f()), server_partials + client_partials)
+  background_tasks.RunThreaded(
+      (lambda f: f()), server_partials + client_partials
+  )
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   server = benchmark_spec.vm_groups['workers'][0]
   benchmark_spec.mongodb_url = 'mongodb://%s:27017/' % server.internal_ip,

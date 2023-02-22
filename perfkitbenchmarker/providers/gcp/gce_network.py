@@ -27,13 +27,13 @@ import threading
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import vpn_service
 from perfkitbenchmarker.providers.gcp import gce_placement_group
 from perfkitbenchmarker.providers.gcp import util
@@ -267,16 +267,20 @@ class GceVpnGateway(network.BaseVpnGateway):
       self.ip_resource.Delete()
 
     if self.tunnels:
-      vm_util.RunThreaded(lambda tun: self.tunnels[tun].Delete(),
-                          list(self.tunnels.keys()))
+      background_tasks.RunThreaded(
+          lambda tun: self.tunnels[tun].Delete(), list(self.tunnels.keys())
+      )
 
     if self.forwarding_rules:
-      vm_util.RunThreaded(lambda fr: self.forwarding_rules[fr].Delete(),
-                          list(self.forwarding_rules.keys()))
+      background_tasks.RunThreaded(
+          lambda fr: self.forwarding_rules[fr].Delete(),
+          list(self.forwarding_rules.keys()),
+      )
 
     if self.routes:
-      vm_util.RunThreaded(lambda route: self.routes[route].Delete(),
-                          list(self.routes.keys()))
+      background_tasks.RunThreaded(
+          lambda route: self.routes[route].Delete(), list(self.routes.keys())
+      )
 
     if self.vpn_gateway_resource:
       self.vpn_gateway_resource.Delete()
@@ -999,13 +1003,15 @@ class GceNetwork(network.BaseNetwork):
       if self.default_firewall_rule:
         self.default_firewall_rule.Create()
       if self.external_nets_rules:
-        vm_util.RunThreaded(
+        background_tasks.RunThreaded(
             lambda rule: self.external_nets_rules[rule].Create(),
-            list(self.external_nets_rules.keys()))
+            list(self.external_nets_rules.keys()),
+        )
       if getattr(self, 'vpn_gateway', False):
-        vm_util.RunThreaded(
+        background_tasks.RunThreaded(
             lambda gateway: self.vpn_gateway[gateway].Create(),
-            list(self.vpn_gateway.keys()))
+            list(self.vpn_gateway.keys()),
+        )
     if self.placement_group:
       self.placement_group.Create()
 
@@ -1015,15 +1021,17 @@ class GceNetwork(network.BaseNetwork):
       self.placement_group.Delete()
     if not FLAGS.gce_network_name:
       if getattr(self, 'vpn_gateway', False):
-        vm_util.RunThreaded(
+        background_tasks.RunThreaded(
             lambda gateway: self.vpn_gateway[gateway].Delete(),
-            list(self.vpn_gateway.keys()))
+            list(self.vpn_gateway.keys()),
+        )
       if self.default_firewall_rule.created:
         self.default_firewall_rule.Delete()
       if self.external_nets_rules:
-        vm_util.RunThreaded(
+        background_tasks.RunThreaded(
             lambda rule: self.external_nets_rules[rule].Delete(),
-            list(self.external_nets_rules.keys()))
+            list(self.external_nets_rules.keys()),
+        )
       if self.subnet_resource:
         self.subnet_resource.Delete()
       self.network_resource.Delete()

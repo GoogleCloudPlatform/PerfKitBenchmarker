@@ -25,8 +25,8 @@ import functools
 from itertools import repeat
 import math
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import redis_server
 from perfkitbenchmarker.linux_packages import ycsb
 from six.moves import range
@@ -79,7 +79,7 @@ def Prepare(benchmark_spec):
   prepare_fns = ([functools.partial(PrepareServer, redis_vm)] +
                  [functools.partial(vm.Install, 'ycsb') for vm in ycsb_vms])
 
-  vm_util.RunThreaded(lambda f: f(), prepare_fns)
+  background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
   num_ycsb = FLAGS.redis_ycsb_processes
   num_server = FLAGS.redis_total_num_processes

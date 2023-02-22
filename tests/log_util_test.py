@@ -17,8 +17,8 @@ import logging
 import threading
 import unittest
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import log_util
-from perfkitbenchmarker import vm_util
 from tests import pkb_common_test_case
 
 
@@ -79,8 +79,7 @@ class LogUtilTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(copied.label, 'LABEL-A ')
 
   def testRunThreadedContextCopy(self):
-    """Verify that ThreadLogContext is copied to threads by vm_util.RunThreaded.
-    """
+    """Verify that ThreadLogContext is copied to threads by background_tasks.RunThreaded."""
     original = log_util.ThreadLogContext()
     log_util.SetThreadLogContext(original)
     t1_list = ['T1']
@@ -88,9 +87,10 @@ class LogUtilTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(original.label, '')
     with original.ExtendLabel('T0'):
       self.assertEqual(original.label, 'T0 ')
-      vm_util.RunThreaded(
+      background_tasks.RunThreaded(
           target=LogUtilTestCase.RunThreadedContextCopyHelper,
-          thread_params=[t1_list, t2_list])
+          thread_params=[t1_list, t2_list],
+      )
       self.assertEqual(original.label, 'T0 ')
       self.assertEqual(t1_list, ['T1', 'T0 ', 'T0 T1 ', 'T0 '])
       self.assertEqual(t2_list, ['T2', 'T0 ', 'T0 T2 ', 'T0 '])

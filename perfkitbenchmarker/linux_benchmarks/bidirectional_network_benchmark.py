@@ -26,10 +26,10 @@ import json
 import logging
 import os
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
 from six.moves import range
 
@@ -101,7 +101,7 @@ def Prepare(benchmark_spec):
       required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(PrepareNetperf, vms)
+  background_tasks.RunThreaded(PrepareNetperf, vms)
 
   num_streams = FLAGS.bidirectional_stream_num_streams
 
@@ -309,7 +309,7 @@ def Run(benchmark_spec):
   args = [((vms[0], vms[i + 1], FLAGS.bidirectional_network_tests[i],
             num_streams, i, test_results), {}) for i in range(num_tests)]
 
-  vm_util.RunThreaded(RunNetperf, args, num_tests)
+  background_tasks.RunThreaded(RunNetperf, args, num_tests)
 
   total_inbound = 0
   total_outbound = 0

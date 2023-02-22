@@ -25,6 +25,7 @@ by the "aerospike_storage_type" and "data_disk_type" flags.
 import functools
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -162,7 +163,9 @@ def Prepare(benchmark_spec):
       functools.partial(vm.Install, 'aerospike_client') for vm in clients
   ]
 
-  vm_util.RunThreaded(lambda f: f(), aerospike_install_fns + client_install_fns)
+  background_tasks.RunThreaded(
+      lambda f: f(), aerospike_install_fns + client_install_fns
+  )
 
   loader_counts = [
       int(FLAGS.aerospike_num_keys) // len(clients) +
@@ -186,7 +189,7 @@ def Prepare(benchmark_spec):
     for process_idx in range(FLAGS.aerospike_instances):
       run_params.append(((child_idx, process_idx), {}))
 
-  vm_util.RunThreaded(_Load, run_params)
+  background_tasks.RunThreaded(_Load, run_params)
 
 
 def Run(benchmark_spec):
@@ -230,7 +233,7 @@ def Run(benchmark_spec):
       for process_idx in range(FLAGS.aerospike_instances):
         run_params.append(((child_idx, process_idx), {}))
 
-    vm_util.RunThreaded(_Run, run_params)
+    background_tasks.RunThreaded(_Run, run_params)
 
     if num_client_vms * FLAGS.aerospike_instances == 1:
       detailed_samples = stdout_samples
@@ -281,10 +284,10 @@ def Cleanup(benchmark_spec):
   def StopClient(client):
     client.RemoteCommand('sudo rm -rf aerospike*')
 
-  vm_util.RunThreaded(StopClient, clients)
+  background_tasks.RunThreaded(StopClient, clients)
 
   def StopServer(server):
     server.RemoteCommand('cd %s && nohup sudo make stop' %
                          aerospike_server.AEROSPIKE_DIR)
     server.RemoteCommand('sudo rm -rf aerospike*')
-  vm_util.RunThreaded(StopServer, servers)
+  background_tasks.RunThreaded(StopServer, servers)

@@ -30,6 +30,7 @@ import os
 import posixpath
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
@@ -160,10 +161,10 @@ class PerfspectCollector():
         data.ResourcePath(posixpath.join('perfspect', 'perf-collect.sh')),
         self.perf_dir + '/'
     ])
-    vm_util.RunThreaded(self._InstallTelemetry, vms)
+    background_tasks.RunThreaded(self._InstallTelemetry, vms)
 
     logging.info('Starting PerfSpect telemetry')
-    vm_util.RunThreaded(self._StartTelemetry, vms)
+    background_tasks.RunThreaded(self._StartTelemetry, vms)
 
   def After(self, unused_sender, benchmark_spec):
     """Stops PerfSpect telemetry, fetch results from VM(s).
@@ -174,9 +175,9 @@ class PerfspectCollector():
         running.
     """
     vms = benchmark_spec.vms
-    vm_util.RunThreaded(self._StopTelemetry, vms)
-    vm_util.RunThreaded(self._FetchResults, vms)
-    vm_util.RunThreaded(self._CleanupTelemetry, vms)
+    background_tasks.RunThreaded(self._StopTelemetry, vms)
+    background_tasks.RunThreaded(self._FetchResults, vms)
+    background_tasks.RunThreaded(self._CleanupTelemetry, vms)
 
 
 def Register(parsed_flags):

@@ -24,6 +24,7 @@ import re
 from absl import flags
 import numpy as np
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
@@ -123,12 +124,14 @@ class _DStatCollector(base_collector.BaseCollector):
                              os.path.basename(file)), 'r') as f:
         fp = iter(f)
         labels, out = dstat.ParseCsvFile(fp)
-        vm_util.RunThreaded(
+        background_tasks.RunThreaded(
             _AnalyzeEvent,
-            [((role, labels, out, e), {}) for e in events.TracingEvent.events])
+            [((role, labels, out, e), {}) for e in events.TracingEvent.events],
+        )
 
-    vm_util.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)])
+    background_tasks.RunThreaded(
+        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+    )
 
 
 def Register(parsed_flags):

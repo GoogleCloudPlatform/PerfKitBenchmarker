@@ -26,6 +26,7 @@ import posixpath
 from typing import Any, Dict, List, Optional, Tuple
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
@@ -216,7 +217,7 @@ def OfflineCores(vms: List[_VM]) -> None:
                        '"echo 0 > /sys/devices/system/cpu/cpu%s/online"' %
                        cpu_id)
 
-  vm_util.RunThreaded(_Offline, vms)
+  background_tasks.RunThreaded(_Offline, vms)
 
 
 def TuneProxy(vm: _VM, proxy_threads: Optional[int] = None) -> None:
@@ -264,7 +265,7 @@ def PinWorkers(vms: List[_VM], proxy_threads: Optional[int] = None) -> None:
               proxies_per_node=proxies_per_node,
               node_cpu_list=node_cpu_list))
 
-  vm_util.RunThreaded(_Pin, vms)
+  background_tasks.RunThreaded(_Pin, vms)
 
 
 def GetDatabaseMemorySize(vm: _VM) -> int:
@@ -336,8 +337,9 @@ def LoadDatabases(redis_vms: List[_VM],
               cluster_mode=cluster_mode,
               server_ip=endpoint)))
 
-  vm_util.RunThreaded(
-      _LoadDatabaseSingleVM, [(arg, {}) for arg in load_requests])
+  background_tasks.RunThreaded(
+      _LoadDatabaseSingleVM, [(arg, {}) for arg in load_requests]
+  )
 
 
 class HttpClient():
@@ -597,7 +599,9 @@ def Run(redis_vms: List[_VM],
         ))
     args += [((redis_vm, measurement_command), {})]
     # Run
-    vm_util.RunThreaded(lambda vm, command: vm.RemoteCommand(command), args)
+    background_tasks.RunThreaded(
+        lambda vm, command: vm.RemoteCommand(command), args
+    )
     stdout, _ = redis_vm.RemoteCommand('cat ~/output')
 
     # Parse results and iterate
@@ -811,5 +815,3 @@ class ThroughputOptimizer():
         _PROXY_THREADS.value and not _SHARDS.value):
       return self.DoLinearSearch()
     return self.DoGraphSearch()
-
-

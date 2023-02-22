@@ -42,6 +42,7 @@ import uuid
 from absl import flags
 import numpy as np
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -1117,8 +1118,9 @@ def _MultiStreamOneWay(results, metadata, vms, command_builder, service,
     # Get the objects written from all the VMs
     # Note these are JSON lists with the following format:
     # [[object1_name, object1_size],[object2_name, object2_size],...]
-    outs = vm_util.RunThreaded(
-        lambda vm: vm.RemoteCommand('cat ' + objects_written_file), vms)
+    outs = background_tasks.RunThreaded(
+        lambda vm: vm.RemoteCommand('cat ' + objects_written_file), vms
+    )
     maybe_storage_account = ''
     maybe_resource_group = ''
     if FLAGS.storage == 'Azure':
@@ -1495,8 +1497,12 @@ def Prepare(benchmark_spec):
     else:
       raise ColdDataError(
           'Object data older than %d hours does not exist. Current cold data '
-          'files include the following: %s' %
-          (FLAGS.object_storage_read_objects_min_hours, read_objects_filenames))
+          'files include the following: %s'
+          % (
+              FLAGS.object_storage_read_objects_min_hours,
+              read_objects_filenames,
+          )
+      )
 
     with open(read_objects_filename) as read_objects_file:
       # Format of json structure is:
@@ -1561,7 +1567,7 @@ def Prepare(benchmark_spec):
     service.PrepareService(FLAGS.object_storage_region)
 
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(lambda vm: PrepareVM(vm, service), vms)
+  background_tasks.RunThreaded(lambda vm: PrepareVM(vm, service), vms)
 
   # Make the bucket.
   if benchmark_spec.read_objects is None:
@@ -1684,7 +1690,7 @@ def Cleanup(benchmark_spec):
   bucket_name = benchmark_spec.bucket_name
   vms = benchmark_spec.vms
 
-  vm_util.RunThreaded(lambda vm: CleanupVM(vm, service), vms)
+  background_tasks.RunThreaded(lambda vm: CleanupVM(vm, service), vms)
 
   # Only clean up bucket if we're not saving the objects for a later run
   keep_bucket = (

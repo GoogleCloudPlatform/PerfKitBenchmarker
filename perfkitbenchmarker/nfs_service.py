@@ -42,11 +42,11 @@ import re
 from typing import Optional
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import vm_util
 
 flags.DEFINE_string('nfs_tier', None, 'NFS Mode')
 flags.DEFINE_string('nfs_version', None, 'NFS Version')
@@ -255,6 +255,7 @@ def NfsExportAndMount(vms, client_path, server_path=None) -> None:
   """
   nfs_server, clients = vms[0], vms[1:]
   NfsExport(nfs_server, server_path or client_path)
-  vm_util.RunThreaded(
+  background_tasks.RunThreaded(
       lambda vm: NfsMount(nfs_server.internal_ip, vm, client_path, server_path),
-      clients)
+      clients,
+  )

@@ -154,7 +154,8 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
 
   # Initialize the main thread's ThreadLogContext. This object must be
   # initialized to use the PkbLogFilter, and it is used to derive the
-  # ThreadLogContext of other threads started through vm_util.RunThreaded.
+  # ThreadLogContext of other threads started through
+  # background_tasks.RunThreaded.
   SetThreadLogContext(ThreadLogContext())
 
   # Add handler to output to stderr.

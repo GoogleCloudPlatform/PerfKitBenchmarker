@@ -28,6 +28,7 @@ import time
 from absl import flags
 import jinja2
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -616,7 +617,7 @@ def CheckPrerequisites(benchmark_config):
 def Prepare(benchmark_spec):
   exec_path = fio.GetFioExec()
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(lambda vm: PrepareWithExec(vm, exec_path), vms)
+  background_tasks.RunThreaded(lambda vm: PrepareWithExec(vm, exec_path), vms)
 
 
 def GetFileAsString(file_path):
@@ -671,8 +672,9 @@ def Run(benchmark_spec):
   samples = []
 
   path = REMOTE_JOB_FILE_PATH
-  samples_list = vm_util.RunThreaded(
-      lambda vm: RunWithExec(vm, fio_exe, path, default_job_file_contents), vms)
+  samples_list = background_tasks.RunThreaded(
+      lambda vm: RunWithExec(vm, fio_exe, path, default_job_file_contents), vms
+  )
   for i, _ in enumerate(samples_list):
     for item in samples_list[i]:
       item.metadata['machine_instance'] = i

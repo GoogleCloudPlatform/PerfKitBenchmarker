@@ -27,6 +27,7 @@ import math
 import posixpath
 import time
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -318,11 +319,15 @@ def Prepare(benchmark_spec):
   client_vms[0].AuthenticateVm()
 
   logging.info('Preparing data files and Java on all vms.')
-  vm_util.RunThreaded(lambda vm: vm.Install('cassandra'), cassandra_vms)
-  vm_util.RunThreaded(lambda vm: vm.Install('cassandra_stress'), client_vms)
+  background_tasks.RunThreaded(
+      lambda vm: vm.Install('cassandra'), cassandra_vms
+  )
+  background_tasks.RunThreaded(
+      lambda vm: vm.Install('cassandra_stress'), client_vms
+  )
   seed_vm = cassandra_vms[0]
   configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
-  vm_util.RunThreaded(configure, cassandra_vms)
+  background_tasks.RunThreaded(configure, cassandra_vms)
 
   cassandra.StartCluster(seed_vm, cassandra_vms[1:])
 
@@ -431,7 +436,7 @@ def RunCassandraStressTest(cassandra_vms, loader_vms, num_operations,
             command, profile_operations, population_per_vm,
             population_dist, population_params), {})
           for i in range(0, num_loaders)]
-  vm_util.RunThreaded(RunTestOnLoader, args)
+  background_tasks.RunThreaded(RunTestOnLoader, args)
 
 
 def CollectResultFile(vm, results):
@@ -471,7 +476,7 @@ def CollectResults(benchmark_spec, metadata):
   loader_vms = vm_dict[CLIENT_GROUP]
   raw_results = collections.defaultdict(list)
   args = [((vm, raw_results), {}) for vm in loader_vms]
-  vm_util.RunThreaded(CollectResultFile, args)
+  background_tasks.RunThreaded(CollectResultFile, args)
   results = []
   for metric in RESULTS_METRICS:
     if metric in MAXIMUM_METRICS:
@@ -525,5 +530,5 @@ def Cleanup(benchmark_spec):
   vm_dict = benchmark_spec.vm_groups
   cassandra_vms = vm_dict[CASSANDRA_GROUP]
 
-  vm_util.RunThreaded(cassandra.Stop, cassandra_vms)
-  vm_util.RunThreaded(cassandra.CleanNode, cassandra_vms)
+  background_tasks.RunThreaded(cassandra.Stop, cassandra_vms)
+  background_tasks.RunThreaded(cassandra.CleanNode, cassandra_vms)

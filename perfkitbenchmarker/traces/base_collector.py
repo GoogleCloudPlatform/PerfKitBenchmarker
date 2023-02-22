@@ -24,6 +24,7 @@ import threading
 import time
 import uuid
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import vm_util
@@ -149,7 +150,7 @@ class BaseCollector(object):
     """
     del sender  # unused
     func = functools.partial(self._StartOnVm, suffix=id_suffix)
-    vm_util.RunThreaded(func, vms)
+    background_tasks.RunThreaded(func, vms)
     self._start_time = time.time()
     return
 
@@ -172,7 +173,7 @@ class BaseCollector(object):
     for role, vms in six.iteritems(self.vm_groups):
       args.extend([((
           vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)])
-    vm_util.RunThreaded(self._StopOnVm, args)
+    background_tasks.RunThreaded(self._StopOnVm, args)
     return
 
   @abc.abstractmethod

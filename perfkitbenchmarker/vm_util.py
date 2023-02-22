@@ -210,7 +210,6 @@ def GetSshOptions(ssh_key_filename, connect_timeout=None):
 # from this file (update references to call directly into background_tasks).
 RunParallelProcesses = background_tasks.RunParallelProcesses
 RunParallelThreads = background_tasks.RunParallelThreads
-RunThreaded = background_tasks.RunThreaded
 
 
 def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,

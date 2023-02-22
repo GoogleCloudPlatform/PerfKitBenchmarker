@@ -25,11 +25,11 @@ import os
 import posixpath
 import time
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages.ant import ANT_HOME_DIR
 from six.moves import range
 
@@ -317,7 +317,7 @@ def StartCluster(seed_vm, vms):
 
     logging.warn('Try %d: only %s of %s up. Restarting and sleeping %ds', i,
                  vms_up, vm_count, NODE_START_SLEEP)
-    vm_util.RunThreaded(_StartCassandraIfNotRunning, vms)
+    background_tasks.RunThreaded(_StartCassandraIfNotRunning, vms)
     time.sleep(NODE_START_SLEEP)
   else:
     raise IOError('Failed to start Cassandra cluster.')

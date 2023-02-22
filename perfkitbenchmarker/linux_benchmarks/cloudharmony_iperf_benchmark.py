@@ -6,10 +6,10 @@ See https://github.com/cloudharmony/iperf for more info.
 import posixpath
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import cloud_harmony_util
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 
 BENCHMARK_GIT_URL = 'https://github.com/cloudharmony/iperf.git'
 BENCHMARK_NAME = 'cloudharmony_iperf'
@@ -103,8 +103,10 @@ def _PrepareVm(vm):
 def Prepare(benchmark_spec):
   """Prepares the cloudharmony iperf benchmark."""
   vm_groups = benchmark_spec.vm_groups
-  vm_util.RunThreaded(_PrepareVm, vm_groups['client'] + vm_groups['server'])
-  vm_util.RunThreaded(_StartServer, vm_groups['server'])
+  background_tasks.RunThreaded(
+      _PrepareVm, vm_groups['client'] + vm_groups['server']
+  )
+  background_tasks.RunThreaded(_StartServer, vm_groups['server'])
 
 
 def _Run(benchmark_spec):

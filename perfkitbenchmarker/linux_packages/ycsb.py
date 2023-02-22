@@ -53,6 +53,7 @@ import re
 import time
 from typing import Any
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
@@ -1236,7 +1237,7 @@ class YCSBExecutor:
                                  os.path.basename(workload_file))
 
     args = [((vm, workload_file, remote_path), {}) for vm in dict.fromkeys(vms)]
-    vm_util.RunThreaded(PushWorkload, args)
+    background_tasks.RunThreaded(PushWorkload, args)
 
     kwargs['parameter_files'] = [remote_path]
 
@@ -1250,7 +1251,7 @@ class YCSBExecutor:
       logging.info('VM %d (%s) finished', loader_index, vms[loader_index])
 
     start = time.time()
-    vm_util.RunThreaded(_Load, list(range(len(vms))))
+    background_tasks.RunThreaded(_Load, list(range(len(vms))))
     events.record_event.send(
         type(self).__name__,
         event='load',
@@ -1335,7 +1336,7 @@ class YCSBExecutor:
       results.append(self._Run(vm, **params))
       logging.info('VM %d (%s) finished', loader_index, vm)
 
-    vm_util.RunThreaded(_Run, list(range(len(vms))))
+    background_tasks.RunThreaded(_Run, list(range(len(vms))))
 
     if len(results) != len(vms):
       raise IOError('Missing results: only {0}/{1} reported\n{2}'.format(
@@ -1429,7 +1430,7 @@ class YCSBExecutor:
       args = [
           ((vm, workload_file, remote_path), {}) for vm in dict.fromkeys(vms)
       ]
-      vm_util.RunThreaded(PushWorkload, args)
+      background_tasks.RunThreaded(PushWorkload, args)
 
       parameters['parameter_files'] = [remote_path]
 
@@ -1553,7 +1554,7 @@ class YCSBExecutor:
         filename = f'{hdr_files_dir}{group}.hdr'
         return vm.RemoteCommand(f'touch {filename} && tail -1 {filename}')[0]
 
-      results = vm_util.RunThreaded(_GetHdrHistogramLog, vms)
+      results = background_tasks.RunThreaded(_GetHdrHistogramLog, vms)
 
       # It's possible that there is no result for certain group, e.g., read
       # only, update only.

@@ -24,9 +24,9 @@ import functools
 import logging
 import os
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cassandra
 from perfkitbenchmarker.linux_packages import ycsb
 
@@ -140,12 +140,14 @@ def Prepare(benchmark_spec):
   ycsb_install_fns = [functools.partial(vm.Install, 'ycsb')
                       for vm in loaders]
   if FLAGS.ycsb_client_vms:
-    vm_util.RunThreaded(lambda f: f(), cassandra_install_fns + ycsb_install_fns)
+    background_tasks.RunThreaded(
+        lambda f: f(), cassandra_install_fns + ycsb_install_fns
+    )
   else:
     # If putting server and client on same vm, prepare packages one by one to
     # avoid race condition.
-    vm_util.RunThreaded(lambda f: f(), cassandra_install_fns)
-    vm_util.RunThreaded(lambda f: f(), ycsb_install_fns)
+    background_tasks.RunThreaded(lambda f: f(), cassandra_install_fns)
+    background_tasks.RunThreaded(lambda f: f(), ycsb_install_fns)
 
   cassandra.StartCluster(seed_vm, by_role['non_seed_cassandra_vms'])
 
@@ -203,5 +205,5 @@ def Cleanup(benchmark_spec):
         required to run the benchmark.
   """
   cassandra_vms = _GetVMsByRole(benchmark_spec)['cassandra_vms']
-  vm_util.RunThreaded(cassandra.Stop, cassandra_vms)
-  vm_util.RunThreaded(cassandra.CleanNode, cassandra_vms)
+  background_tasks.RunThreaded(cassandra.Stop, cassandra_vms)
+  background_tasks.RunThreaded(cassandra.CleanNode, cassandra_vms)

@@ -26,6 +26,7 @@ import time
 from typing import Any, Dict, List, Optional, Text, Tuple, Union
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_packages
@@ -328,8 +329,9 @@ def RunOverAllClientVMs(
         password=password,
         unique_id=str(port_index))
 
-  results = vm_util.RunThreaded(DistributeClientsToPorts,
-                                list(range(len(ports))))
+  results = background_tasks.RunThreaded(
+      DistributeClientsToPorts, list(range(len(ports)))
+  )
 
   return results
 

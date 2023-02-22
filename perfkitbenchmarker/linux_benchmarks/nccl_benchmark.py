@@ -18,11 +18,11 @@ import re
 import time
 from absl import flags
 import numpy as np
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
 flags.DEFINE_integer('nccl_slots', 8,
@@ -176,7 +176,7 @@ def Prepare(benchmark_spec):
   """
   benchmark_spec.always_call_cleanup = True
   if _NCCL_TESTS.value:
-    vm_util.RunThreaded(PrepareVm, benchmark_spec.vms)
+    background_tasks.RunThreaded(PrepareVm, benchmark_spec.vms)
   hpc_util.CreateMachineFile(
       benchmark_spec.vms, nvidia_driver.QueryNumberOfGpus, HOSTFILE)
 

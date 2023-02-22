@@ -52,10 +52,10 @@ import os
 from typing import Any, Dict, List, Optional
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.traces import base_collector
 import six
 
@@ -422,8 +422,9 @@ class MpstatCollector(base_collector.BaseCollector):
                 per_interval_samples=self.per_interval_samples,
                 ))
 
-    vm_util.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)])
+    background_tasks.RunThreaded(
+        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+    )
 
 
 def Register(parsed_flags):

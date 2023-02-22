@@ -8,13 +8,13 @@ import logging
 from typing import Any, Dict, Iterator, List, Tuple
 from absl import flags
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.linux_packages import mpi
 
@@ -179,9 +179,9 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
 
 def Prepare(spec: benchmark_spec.BenchmarkSpec) -> None:
   vms = spec.vms
-  vm_util.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
+  background_tasks.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
   logging.info('Installing mpi package')
-  vm_util.RunThreaded(lambda vm: vm.Install('mpi'), vms)
+  background_tasks.RunThreaded(lambda vm: vm.Install('mpi'), vms)
   mpi.VerifyInstall(vms)
 
 

@@ -29,6 +29,7 @@ import uuid
 from enum import Enum
 
 from typing import List, Tuple
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
@@ -304,8 +305,9 @@ class VPNService(resource.BaseResource):
       self.vpns[vpn_id] = VPN().GetVPN(gateway_pair, suffix)
       self.vpns[vpn_id].tunnel_config.setConfig(**self.vpn_properties)
 
-    vm_util.RunThreaded(lambda vpn: self.vpns[vpn].ConfigureTunnel(),
-                        list(self.vpns.keys()))
+    background_tasks.RunThreaded(
+        lambda vpn: self.vpns[vpn].ConfigureTunnel(), list(self.vpns.keys())
+    )
 
   def _Delete(self):
     pass

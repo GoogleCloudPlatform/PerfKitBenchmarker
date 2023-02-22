@@ -47,12 +47,12 @@ When the benchmark is finished, all resources are torn down.
 import logging
 import posixpath
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import tensorflow_serving
 
 FLAGS = flags.FLAGS
@@ -214,7 +214,9 @@ def Prepare(benchmark_spec):
   for c in clients:
     vms.append(((_PrepareClient, c), {}))
 
-  vm_util.RunThreaded(lambda prepare_function, vm: prepare_function(vm), vms)
+  background_tasks.RunThreaded(
+      lambda prepare_function, vm: prepare_function(vm), vms
+  )
 
 
 def _CreateMetadataDict(benchmark_spec, client_thread_count):
@@ -419,6 +421,8 @@ def Cleanup(benchmark_spec):
   for c in clients:
     vms.append(((_CleanupClient, c), {}))
 
-  vm_util.RunThreaded(lambda cleanup_function, vm: cleanup_function(vm), vms)
+  background_tasks.RunThreaded(
+      lambda cleanup_function, vm: cleanup_function(vm), vms
+  )
 
   del benchmark_spec

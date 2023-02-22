@@ -27,10 +27,10 @@ from typing import Dict
 from absl import flags
 import bs4
 from packaging import version
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aws_credentials
 from perfkitbenchmarker.linux_packages import hadoop
 import requests
@@ -239,7 +239,7 @@ def ConfigureAndStart(leader, workers, configure_s3=False):
   workers = workers or [leader]
   fn = functools.partial(
       _RenderConfig, leader=leader, workers=workers, configure_s3=configure_s3)
-  vm_util.RunThreaded(fn, vms)
+  background_tasks.RunThreaded(fn, vms)
 
   leader.RemoteCommand("rm -f {0} && ssh-keygen -q -t rsa -N '' -f {0}".format(
       SPARK_PRIVATE_KEY))
@@ -249,7 +249,7 @@ def ConfigureAndStart(leader, workers, configure_s3=False):
   def AddKey(vm):
     vm.RemoteCommand('echo "{0}" >> ~/.ssh/authorized_keys'.format(public_key))
 
-  vm_util.RunThreaded(AddKey, vms)
+  background_tasks.RunThreaded(AddKey, vms)
 
   # HDFS setup and formatting, Spark startup
   leader.RemoteCommand(

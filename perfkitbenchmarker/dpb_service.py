@@ -26,6 +26,7 @@ import logging
 from typing import Dict, List, Optional, Type
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -562,8 +563,9 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     if 'worker_group' not in self.vms:
       raise errors.Resource.CreationError(
           'UnmanagedDpbServiceYarnCluster requires VMs in a worker_group.')
-    vm_util.RunThreaded(InstallHadoop,
-                        self.vms['worker_group'] + self.vms['master_group'])
+    background_tasks.RunThreaded(
+        InstallHadoop, self.vms['worker_group'] + self.vms['master_group']
+    )
     self.leader = self.vms['master_group'][0]
     hadoop.ConfigureAndStart(
         self.leader, self.vms['worker_group'], configure_s3=self.cloud == 'AWS')
@@ -652,8 +654,9 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
       raise errors.Resource.CreationError(
           'UnmanagedDpbSparkCluster requires VMs in a worker_group.')
 
-    vm_util.RunThreaded(InstallSpark,
-                        self.vms['worker_group'] + self.vms['master_group'])
+    background_tasks.RunThreaded(
+        InstallSpark, self.vms['worker_group'] + self.vms['master_group']
+    )
     self.leader = self.vms['master_group'][0]
     spark.ConfigureAndStart(
         self.leader, self.vms['worker_group'], configure_s3=self.cloud == 'AWS')
