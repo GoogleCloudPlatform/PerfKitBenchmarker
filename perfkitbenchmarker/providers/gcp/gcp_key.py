@@ -222,16 +222,20 @@ class GcpKey(key.BaseKey):
 
   def _Exists(self) -> bool:
     """Returns true if the key exists."""
-    cmd = util.GcloudCommand(self, 'kms', 'keys', 'describe', self.name)
+    cmd = util.GcloudCommand(self, 'kms', 'keys', 'versions', 'describe', '1')
     cmd.flags['keyring'] = self.keyring_name
     cmd.flags['location'] = self.location
+    cmd.flags['key'] = self.name
     # Do not log error or warning when checking existence.
     result, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not find GCP KMS Key %s.', self.name)
       return False
-    if json.loads(result)['primary']['state'] == 'DESTROY_SCHEDULED':
-      return False
+    try:
+      if json.loads(result)['state'] == 'DESTROY_SCHEDULED':
+        return False
+    except KeyError:
+      return True
     return True
 
   def GetResourceMetadata(self) -> Dict[Any, Any]:
