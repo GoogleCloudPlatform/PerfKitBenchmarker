@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import sys
-
+import os
 from perfkitbenchmarker.pkb import Main
 
 sys.exit(Main())
