@@ -85,16 +85,11 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   time_to_ls = time.time() - start_time
 
   samples = managed_disk.GetSamples()
+  metadata = managed_disk.GetResourceMetadata()
   samples.extend([
+      sample.Sample('Time to Create Disk', create_time, 'seconds', metadata),
       sample.Sample(
-          'Time to Create Disk',
-          create_time,
-          'seconds',
-      ),
-      sample.Sample(
-          'Time to Create and Attach Disk',
-          time_to_ls,
-          'seconds',
+          'Time to Create and Attach Disk', time_to_ls, 'seconds', metadata
       ),
   ])
   return samples
