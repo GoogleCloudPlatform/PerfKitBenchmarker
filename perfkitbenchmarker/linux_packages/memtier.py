@@ -533,7 +533,8 @@ def RunGetLatencyAtCpu(cloud_instance, client_vms):
           (_GetSingleThreadedLatency,
            [latency_measurement_vm, server_ip, server_port, password], {})
       ]
-      results = vm_util.RunParallelThreads(process_args, len(process_args))
+      results = background_tasks.RunParallelThreads(
+          process_args, len(process_args))
       metadata = GetMetadata(
           clients=current_clients, threads=threads, pipeline=pipeline)
       metadata['measured_cpu_percent'] = cloud_instance.MeasureCpuUtilization(

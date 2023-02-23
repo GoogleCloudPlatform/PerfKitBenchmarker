@@ -31,7 +31,6 @@ from typing import Callable, Dict, Iterable, Optional, Tuple
 
 from absl import flags
 import jinja2
-from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import temp_dir
@@ -204,11 +203,6 @@ def GetSshOptions(ssh_key_filename, connect_timeout=None):
   options.extend(FLAGS.ssh_options)
 
   return options
-
-
-# TODO(user): Remove at least RunParallelProcesses and RunParallelThreads
-# from this file (update references to call directly into background_tasks).
-RunParallelThreads = background_tasks.RunParallelThreads
 
 
 def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,

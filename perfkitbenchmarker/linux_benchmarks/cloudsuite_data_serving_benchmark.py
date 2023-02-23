@@ -19,10 +19,10 @@ More info: http://cloudsuite.ch/dataserving/
 
 import re
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import docker
 
 FLAGS = flags.FLAGS
@@ -102,7 +102,7 @@ def Prepare(benchmark_spec):
   target_arg_tuples = ([(PrepareServerSeed, [server_seed], {})] +
                        [(PrepareServer, [vm], {}) for vm in servers] +
                        [(PrepareClient, [client], {})])
-  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
+  background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
 def Run(benchmark_spec):
@@ -211,4 +211,4 @@ def Cleanup(benchmark_spec):
 
   target_arg_tuples = ([(CleanupServerSeed, [server_seed], {})] +
                        [(CleanupServer, [vm], {}) for vm in servers])
-  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
+  background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))

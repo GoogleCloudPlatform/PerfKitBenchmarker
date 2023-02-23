@@ -673,7 +673,7 @@ class BenchmarkSpec(object):
 
   def Prepare(self):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
-    vm_util.RunParallelThreads(targets, len(targets))
+    background_tasks.RunParallelThreads(targets, len(targets))
 
   def Provision(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
@@ -879,11 +879,11 @@ class BenchmarkSpec(object):
 
   def StartBackgroundWorkload(self):
     targets = [(vm.StartBackgroundWorkload, (), {}) for vm in self.vms]
-    vm_util.RunParallelThreads(targets, len(targets))
+    background_tasks.RunParallelThreads(targets, len(targets))
 
   def StopBackgroundWorkload(self):
     targets = [(vm.StopBackgroundWorkload, (), {}) for vm in self.vms]
-    vm_util.RunParallelThreads(targets, len(targets))
+    background_tasks.RunParallelThreads(targets, len(targets))
 
   def _IsSafeKeyOrValueCharacter(self, char):
     return char.isalpha() or char.isnumeric() or char == '_'

@@ -22,6 +22,7 @@ from typing import Optional, Tuple
 import uuid
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
@@ -404,7 +405,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     to_wait_for = [self._WaitForWinRmCommand]
     if FLAGS.cluster_boot_test_rdp_port_listening:
       to_wait_for.append(self._WaitForRdpPort)
-    vm_util.RunParallelThreads([(method, [], {}) for method in to_wait_for], 2)
+    background_tasks.RunParallelThreads(
+        [(method, [], {}) for method in to_wait_for], 2)
 
   @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
   def _WaitForRdpPort(self):
