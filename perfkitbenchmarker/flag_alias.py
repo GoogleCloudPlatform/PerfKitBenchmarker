@@ -43,7 +43,13 @@ RELATIONAL_DB_FLAGS_TO_TRANSLATE = {
     'managed_db_disk_type': 'db_disk_type',
 }
 
-ALL_TRANSLATIONS = [DISK_FLAGS_TO_TRANSLATE, RELATIONAL_DB_FLAGS_TO_TRANSLATE]
+LIST_TO_MULTISTRING_TRANSLATIONS = {'zones': 'zone', 'extra_zones': 'zone'}
+
+ALL_TRANSLATIONS = [
+    DISK_FLAGS_TO_TRANSLATE,
+    RELATIONAL_DB_FLAGS_TO_TRANSLATE,
+    LIST_TO_MULTISTRING_TRANSLATIONS,
+]
 
 # Make sure the regex only matches the argument instead of value
 # Arguments can come with either - or --
@@ -62,6 +68,12 @@ def _FlattenTranslationsDicts(dicts: List[Dict[str, str]]) -> Dict[str, str]:
   return result
 
 
+def _GetMultiStringFromList(flag: str, args: str) -> List[str]:
+  """Gets multi string args from a comma-delineated string."""
+  items = args.strip('=').split(',')
+  return [f'--{flag}={item}' for item in items]
+
+
 # pylint: disable=dangerous-default-value
 def AliasFlagsFromArgs(
     argv: List[str],
@@ -70,14 +82,17 @@ def AliasFlagsFromArgs(
   original_to_translation = _FlattenTranslationsDicts(alias_dict)
   new_argv = []
   for arg in argv:
-    result = arg
+    result = [arg]
     for original in original_to_translation:
       regex = PRIOR_ALIAS_REGEX.format(original)
       m = re.match(regex, arg)
       if not m:
         continue
       translation = original_to_translation[original]
-      result = re.sub(regex, r'\1{0}\2'.format(translation), arg)
+      if original in LIST_TO_MULTISTRING_TRANSLATIONS:
+        result = _GetMultiStringFromList(translation, m.group(2))
+      else:
+        result[0] = re.sub(regex, r'\1{0}\2'.format(translation), arg)
       logging.warning(
           (
               'The flag %s is deprecated and will be removed in the future.'
@@ -86,7 +101,7 @@ def AliasFlagsFromArgs(
           original,
           translation,
       )
-    new_argv.append(result)
+    new_argv.extend(result)
   return new_argv
 
 
@@ -103,7 +118,14 @@ def AliasFlagsFromYaml(
   for original, value in config.items():
     if original in original_to_translation:
       translation = original_to_translation[original]
-      new_dict[translation] = value
+      if original in LIST_TO_MULTISTRING_TRANSLATIONS:
+        current_list = new_dict.get(translation, [])
+        # Flag can either be a list or a single str, both work
+        if isinstance(value, str):
+          value = [value]
+        new_dict[translation] = current_list + value
+      else:
+        new_dict[translation] = value
       logging.warning(
           (
               'The config flag %s is deprecated and will be '

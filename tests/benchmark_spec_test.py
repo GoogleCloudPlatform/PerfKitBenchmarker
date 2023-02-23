@@ -22,6 +22,7 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
+from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -283,7 +284,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
                           for disk_spec in vm.disk_specs))
 
   @flagsaver.flagsaver
-  def testZonesFlag(self):
+  def testZoneFlag(self):
     FLAGS.zone = ['us-east-1b', 'zone2']
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
@@ -292,10 +293,10 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     self.assertEqual(spec.vm_groups['group2'][0].zone, 'zone2')
 
   @flagsaver.flagsaver
-  def testZonesFlagWithZoneFlag(self):
-    FLAGS['zone'].parse(['us-east-1b'])
-    FLAGS['zones'].parse(['us-west-2b'])
-    pkb._WarnAndTranslateZoneFlags()
+  def testZoneFlagWithZonesFlag(self):
+    argv = ['./pkb.py', '--zone=us-east-1b', '--zones=us-west-2b']
+    argv = flag_alias.AliasFlagsFromArgs(argv)
+    pkb._ParseFlags(argv)
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
     self.assertEqual(len(spec.vms), 2)
