@@ -16,6 +16,7 @@
 
 
 import contextlib
+import enum
 import logging
 import os
 import platform
@@ -117,6 +118,26 @@ class IpAddressSubset(object):
   EXTERNAL = 'EXTERNAL'
 
   ALL = (REACHABLE, BOTH, INTERNAL, EXTERNAL)
+
+
+@enum.unique
+class VmCommandLogMode(enum.Enum):
+  """The log mode for vm_util.IssueCommand function."""
+
+  ALWAYS_LOG = 'always_log'
+  LOG_ON_ERROR = 'log_on_error'
+
+
+_VM_COMMAND_LOG_MODE = flags.DEFINE_enum_class(
+    'vm_command_log_mode',
+    VmCommandLogMode.ALWAYS_LOG,
+    VmCommandLogMode,
+    (
+        'Controls the logging behavior of vm_util.IssueCommand, and'
+        ' specifically its full log statement including output & error message.'
+    ),
+)
+
 
 flags.DEFINE_enum('ip_addresses', IpAddressSubset.REACHABLE,
                   IpAddressSubset.ALL,
@@ -399,7 +420,11 @@ def IssueCommand(
 
   debug_text = ('Ran: {%s}\nReturnCode:%s%s\nSTDOUT: %s\nSTDERR: %s' %
                 (full_cmd, process.returncode, timing_output, stdout, stderr))
-  logging.info(debug_text)
+  if _VM_COMMAND_LOG_MODE.value == VmCommandLogMode.ALWAYS_LOG or (
+      _VM_COMMAND_LOG_MODE.value == VmCommandLogMode.LOG_ON_ERROR
+      and process.returncode
+  ):
+    logging.info(debug_text)
 
   # Raise timeout error regardless of raise_on_failure - as the intended
   # semantics is to ignore expected errors caused by invoking the command
