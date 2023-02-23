@@ -199,10 +199,10 @@ class _CommandDecoder(option_decoders.ListDecoder):
 class BaseContainer(resource.BaseResource):
   """Class representing a single container."""
 
-  def __init__(self, container_spec=None, **_):
+  def __init__(self, container_spec=None):
     # Hack to make container_spec a kwarg
     assert container_spec
-    super(BaseContainer, self).__init__()
+    super().__init__()
     self.cpus = container_spec.cpus
     self.memory = container_spec.memory
     self.command = container_spec.command
@@ -591,7 +591,8 @@ class KubernetesPod:
   or created with ApplyManifest and directly constructed.
   """
 
-  def __init__(self, name=None, **_):
+  def __init__(self, name=None, **kwargs):
+    super().__init__(**kwargs)
     assert name
     self.name = name
 
@@ -646,7 +647,8 @@ class KubernetesPod:
     return stdout
 
 
-class KubernetesContainer(BaseContainer, KubernetesPod):
+# Order KubernetesPod first so that it's constructor is called first.
+class KubernetesContainer(KubernetesPod, BaseContainer):
   """A KubernetesPod based flavor of Container."""
 
   def _Create(self):
