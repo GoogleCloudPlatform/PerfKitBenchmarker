@@ -280,10 +280,11 @@ class AzureNIC(resource.BaseResource):
         '--location', self.region,
         '--vnet-name', self.subnet.vnet.name,
         '--subnet', self.subnet.name,
-        '--public-ip-address', self.public_ip,
         '--name', self.name
     ]  # pyformat: disable
     cmd += self.resource_group.args
+    if self.public_ip:
+      cmd += ['--public-ip-address', self.public_ip]
     if self.private_ip:
       cmd += ['--private-ip-address', self.private_ip]
     if self.accelerated_networking:
@@ -542,10 +543,15 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._deleted = False
 
     self.resource_group = azure_network.GetResourceGroup()
-    self.public_ip = AzurePublicIPAddress(self.region, self.availability_zone,
-                                          self.name + '-public-ip')
+    if self.assign_external_ip:
+      public_ip_name = self.name + '-public-ip'
+      self.public_ip = AzurePublicIPAddress(self.region, self.availability_zone,
+                                            public_ip_name)
+    else:
+      public_ip_name = None
+      self.public_ip = None
     self.nic = AzureNIC(self.network.subnet, self.name + '-nic',
-                        self.public_ip.name, vm_spec.accelerated_networking,
+                        public_ip_name, vm_spec.accelerated_networking,
                         self.network.nsg)
     self.storage_account = self.network.storage_account
     arm_arch = 'neoverse-n1' if _MachineTypeIsArm(self.machine_type) else None
@@ -595,7 +601,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
-    self.public_ip.Create()
+    if self.public_ip:
+      self.public_ip.Create()
     self.nic.Create()
 
     if self.use_dedicated_host:
@@ -752,7 +759,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     start_cmd = ([azure.AZURE_PATH, 'vm', 'start', '--name', self.name] +
                  self.resource_group.args)
     vm_util.IssueCommand(start_cmd)
-    self.ip_address = self.public_ip.GetIPAddress()
+    if self.public_ip:
+      self.ip_address = self.public_ip.GetIPAddress()
 
   def _Stop(self):
     """Stops the VM."""
@@ -788,7 +796,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         util.GetTagsJson(self.resource_group.timeout_minutes)
     ] + self.resource_group.args)
     self.internal_ip = self.nic.GetInternalIP()
-    self.ip_address = self.public_ip.GetIPAddress()
+    if self.public_ip:
+      self.ip_address = self.public_ip.GetIPAddress()
 
   def CreateScratchDisk(self, _, disk_spec):
     """Create a VM's scratch disk.

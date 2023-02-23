@@ -557,6 +557,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       ni_args.append(f'network={self.network.network_resource.name}')
     ni_args.append(f'network-tier={self.gce_network_tier.upper()}')
     ni_args.append(f'nic-type={self.gce_nic_type.upper()}')
+    if not self.assign_external_ip:
+      ni_args.append('no-address')
     cmd.flags['network-interface'] = ','.join(ni_args)
 
     if self.image:
@@ -868,7 +870,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.id = describe_response['id']
     network_interface = describe_response['networkInterfaces'][0]
     self.internal_ip = network_interface['networkIP']
-    self.ip_address = network_interface['accessConfigs'][0]['natIP']
+    if 'accessConfigs' in network_interface:
+      self.ip_address = network_interface['accessConfigs'][0]['natIP']
 
   @property
   def HasIpAddress(self):
@@ -877,7 +880,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _NeedsToParseDescribeResponse(self):
     """Returns whether the ID and IP addresses still need to be set."""
-    return not self.id or not self.internal_ip or not self.ip_address
+    return (
+        not self.id
+        or not self.internal_ip
+        or (self.assign_external_ip and not self.ip_address)
+    )
 
   @vm_util.Retry()
   def _PostCreate(self):

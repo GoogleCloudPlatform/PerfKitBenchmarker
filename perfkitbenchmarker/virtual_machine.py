@@ -110,6 +110,11 @@ flags.DEFINE_boolean(
     'Whether to use internal IP addresses for running commands on and pushing '
     'data to VMs. By default, PKB interacts with VMs using external IP '
     'addresses.')
+_ASSIGN_EXTERNAL_IP = flags.DEFINE_boolean(
+    'assign_external_ip',
+    True,
+    'If True, an external (public) IP will be created for VMs. '
+    'If False, --connect_via_internal_ip may also be needed.')
 
 # Deprecated. Use connect_via_internal_ip.
 flags.DEFINE_boolean(
@@ -174,6 +179,7 @@ class BaseVmSpec(spec.BaseSpec):
     gpu_count: None or int. Number of gpus to attach to the VM.
     gpu_type: None or string. Type of gpus to attach to the VM.
     image: The disk image to boot from.
+    assign_external_ip: Bool.  If true, create an external (public) IP.
     install_packages: If false, no packages will be installed. This is
         useful if benchmark dependencies have already been installed.
     background_cpu_threads: The number of threads of background CPU usage
@@ -197,6 +203,7 @@ class BaseVmSpec(spec.BaseSpec):
     self.gpu_count = None
     self.gpu_type = None
     self.image = None
+    self.assign_external_ip = None
     self.install_packages = None
     self.background_cpu_threads = None
     self.background_network_mbits_per_sec = None
@@ -246,6 +253,8 @@ class BaseVmSpec(spec.BaseSpec):
       config_values['gpu_type'] = flag_values.gpu_type
     if flag_values['gpu_count'].present:
       config_values['gpu_count'] = flag_values.gpu_count
+    if flag_values['assign_external_ip'].present:
+      config_values['assign_external_ip'] = flag_values.assign_external_ip
     if flag_values['disable_interrupt_moderation'].present:
       config_values['disable_interrupt_moderation'] = (
           flag_values.disable_interrupt_moderation)
@@ -283,6 +292,10 @@ class BaseVmSpec(spec.BaseSpec):
         'install_packages': (option_decoders.BooleanDecoder, {'default': True}),
         'machine_type': (option_decoders.StringDecoder, {'none_ok': True,
                                                          'default': None}),
+        'assign_external_ip': (
+            option_decoders.BooleanDecoder,
+            {'default': True},
+        ),
         'gpu_type': (option_decoders.EnumDecoder, {
             'valid_values': VALID_GPU_TYPES,
             'default': None}),
@@ -1065,6 +1078,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   Attributes:
     image: The disk image used to boot.
     internal_ip: Internal IP address.
+    assign_external_ip: If True, create an external (public) IP.
     ip_address: Public (external) IP address.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     project: The provider-specific project associated with the VM (e.g.
@@ -1117,6 +1131,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.gpu_type = vm_spec.gpu_type
     self.image = vm_spec.image
     self.install_packages = vm_spec.install_packages
+    self.assign_external_ip = vm_spec.assign_external_ip
     self.ip_address = None
     self.internal_ip = None
     self.user_name = DEFAULT_USERNAME
@@ -1164,6 +1179,11 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     """Gets the IP to use for connecting to the VM."""
     if FLAGS.ssh_via_internal_ip or FLAGS.connect_via_internal_ip:
       return self.internal_ip
+    if not self.ip_address:
+      raise errors.VirtualMachine.VirtualMachineError(
+          f'{self.name} does not have a (public) ip_address.  Do you need to'
+          ' specify --connect_via_internal_ip?'
+      )
     return self.ip_address
 
   def CreateScratchDisk(self, disk_spec_id, disk_spec):

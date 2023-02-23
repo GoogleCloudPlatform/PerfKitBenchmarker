@@ -883,13 +883,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             'Groups': self.group_id,
             'SubnetId': self.network.subnet.id
         })
-        if FLAGS.aws_efa_count == 1:
+        if FLAGS.aws_efa_count == 1 and self.assign_external_ip:
           efa_params['AssociatePublicIpAddress'] = True
         efas.append(','.join(f'{key}={value}' for key, value in
                              sorted(efa_params.items())))
       create_cmd.extend(efas)
     else:
-      create_cmd.append('--associate-public-ip-address')
+      if self.assign_external_ip:
+        create_cmd.append('--associate-public-ip-address')
       create_cmd.append(f'--subnet-id={self.network.subnet.id}')
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
@@ -928,8 +929,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             (self.num_vms_per_host, self.machine_type))
       else:
         logging.warning(
-            'Creation failed due to insufficient host capacity. A new host will '
-            'be created and instance creation will be retried.')
+            'Creation failed due to insufficient host capacity. A new host '
+            'will be created and instance creation will be retried.'
+        )
         with self._lock:
           if num_hosts == len(self.host_list):
             host = AwsDedicatedHost(self.machine_type, self.zone)

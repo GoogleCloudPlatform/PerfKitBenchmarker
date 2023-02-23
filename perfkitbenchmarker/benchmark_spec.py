@@ -977,7 +977,7 @@ class BenchmarkSpec(object):
         vm: The BaseVirtualMachine object representing the VM.
     """
     vm.Create()
-    logging.info('VM: %s', vm.ip_address)
+    logging.info('VM: %s (%s)', vm.ip_address, vm.internal_ip)
     logging.info('Waiting for boot completion.')
     vm.AllowRemoteAccessPorts()
     vm.WaitForBootCompletion()
