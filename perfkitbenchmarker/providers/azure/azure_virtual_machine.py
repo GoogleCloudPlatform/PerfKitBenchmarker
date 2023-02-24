@@ -33,6 +33,7 @@ import logging
 import posixpath
 import re
 import threading
+from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
@@ -256,41 +257,44 @@ class AzureNIC(resource.BaseResource):
   """Class to represent an Azure NIC."""
 
   def __init__(self,
-               subnet,
-               name,
-               public_ip,
-               accelerated_networking,
-               network_security_group=None,
+               network: azure_network.AzureNetwork,
+               name: str,
+               public_ip: Optional[str],
+               accelerated_networking: bool,
                private_ip=None):
     super(AzureNIC, self).__init__()
-    self.subnet = subnet
+    self.network = network
     self.name = name
     self.public_ip = public_ip
     self.private_ip = private_ip
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
-    self.region = self.subnet.vnet.region
+    self.region = self.network.region
     self.args = ['--nics', self.name]
     self.accelerated_networking = accelerated_networking
-    self.network_security_group = network_security_group
 
   def _Create(self):
     cmd = [
         azure.AZURE_PATH, 'network', 'nic', 'create',
         '--location', self.region,
-        '--vnet-name', self.subnet.vnet.name,
-        '--subnet', self.subnet.name,
         '--name', self.name
     ]  # pyformat: disable
     cmd += self.resource_group.args
+    if self.network.subnet.id:
+      # pre-existing subnet from --azure_subnet_id
+      cmd += ['--subnet', self.network.subnet.id]
+    else:
+      # auto created subnet
+      cmd += ['--vnet-name', self.network.subnet.vnet.name,
+              '--subnet', self.network.subnet.name]
     if self.public_ip:
       cmd += ['--public-ip-address', self.public_ip]
     if self.private_ip:
       cmd += ['--private-ip-address', self.private_ip]
     if self.accelerated_networking:
       cmd += ['--accelerated-networking', 'true']
-    if self.network_security_group:
-      cmd += ['--network-security-group', self.network_security_group.name]
+    if self.network.nsg:
+      cmd += ['--network-security-group', self.network.nsg.name]
     vm_util.IssueCommand(cmd)
 
   def _Exists(self):
@@ -541,8 +545,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type) or 1
     self._lun_counter = itertools.count()
     self._deleted = False
-
     self.resource_group = azure_network.GetResourceGroup()
+
+    # Configure NIC
     if self.assign_external_ip:
       public_ip_name = self.name + '-public-ip'
       self.public_ip = AzurePublicIPAddress(self.region, self.availability_zone,
@@ -550,9 +555,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       public_ip_name = None
       self.public_ip = None
-    self.nic = AzureNIC(self.network.subnet, self.name + '-nic',
-                        public_ip_name, vm_spec.accelerated_networking,
-                        self.network.nsg)
+    self.nic = AzureNIC(self.network, self.name + '-nic',
+                        public_ip_name, vm_spec.accelerated_networking)
+
     self.storage_account = self.network.storage_account
     arm_arch = 'neoverse-n1' if _MachineTypeIsArm(self.machine_type) else None
     if arm_arch:
