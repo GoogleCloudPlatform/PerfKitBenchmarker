@@ -15,7 +15,9 @@
 
 """Module containing aerospike server installation and cleanup functions."""
 
+import enum
 import logging
+
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
@@ -29,11 +31,51 @@ GIT_REPO = 'https://github.com/aerospike/aerospike-server.git'
 GIT_TAG = '6.0.0.2'
 AEROSPIKE_DIR = '%s/aerospike-server' % linux_packages.INSTALL_DIR
 
+
+@enum.unique
+class AerospikeEdition(enum.Enum):
+  """Aerospike Edition constant."""
+
+  COMNUNITY = 'comnunity'
+  ENTERPRISE = 'enterprise'
+
+
 MEMORY = 'memory'
 DISK = 'disk'
-flags.DEFINE_enum('aerospike_storage_type', MEMORY, [MEMORY, DISK],
-                  'The type of storage to use for Aerospike data. The type of '
-                  'disk is controlled by the "data_disk_type" flag.')
+
+VERSION = '6.2.0'
+
+# Linke could be found here
+# https://aerospike.com/download/#servers
+_AEROSPIKE_ENTERPISE_PACKAGE_INSTALL_URL = flags.DEFINE_string(
+    'aerospike_enterprise_package_install_url',
+    f'https://enterprise.aerospike.com/enterprise/download/server/{VERSION}/artifact/ubuntu20_amd64',
+    'The url of the aerospike package',
+)
+_AEROSPIKE_EDITION = flags.DEFINE_enum_class(
+    'aerospike_edition',
+    AerospikeEdition.COMNUNITY,
+    AerospikeEdition,
+    'The type of version aerospike uses.',
+)
+flags.DEFINE_enum(
+    'aerospike_storage_type',
+    MEMORY,
+    [MEMORY, DISK],
+    (
+        'The type of storage to use for Aerospike data. The type of '
+        'disk is controlled by the "data_disk_type" flag.'
+    ),
+)
+
+_AEROSPIKE_ZEROIZE_DISK = flags.DEFINE_bool(
+    'aerospike_zeroize_disk',
+    True,
+    (
+        'Whether to zeroize the disk. If set to false, it will run blkddiscard'
+        ' to zeroize the header. If set to true, it will wipe the full disk.'
+    ),
+)
 flags.DEFINE_integer('aerospike_replication_factor', 1,
                      'Replication factor for aerospike server.')
 flags.DEFINE_integer('aerospike_service_threads', 4,
@@ -44,22 +86,30 @@ flags.DEFINE_integer('aerospike_vms', 1,
 MIN_FREE_KBYTES = 1160000
 
 
+_AEROSPIKE_CONFIGS = {
+    AerospikeEdition.COMNUNITY: 'aerospike_community.conf.j2',
+    AerospikeEdition.ENTERPRISE: 'aerospike_enterprise.conf.j2',
+}
+
+
 def _GetAerospikeDir(idx=None):
-  if idx is None:
-    return f'{linux_packages.INSTALL_DIR}/aerospike-server'
+  if _AEROSPIKE_EDITION.value == AerospikeEdition.COMNUNITY:
+    if idx is None:
+      return f'{linux_packages.INSTALL_DIR}/aerospike-server'
+    else:
+      return f'{linux_packages.INSTALL_DIR}/{idx}/aerospike-server'
   else:
-    return f'{linux_packages.INSTALL_DIR}/{idx}/aerospike-server'
+    return '/etc/aerospike'
 
 
 def _GetAerospikeConfig(idx=None):
-  return f'{_GetAerospikeDir(idx)}/as/etc/aerospike_dev.conf'
+  if _AEROSPIKE_EDITION.value == AerospikeEdition.COMNUNITY:
+    return f'{_GetAerospikeDir(idx)}/as/etc/aerospike_dev.conf'
+  else:
+    return '~/aerospike/aerospike.conf'
 
 
-def _Install(vm):
-  """Installs the Aerospike server on the VM."""
-  vm.Install('build_tools')
-  vm.Install('lua5_1')
-  vm.Install('openssl')
+def _InstallFromGit(vm):
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, _GetAerospikeDir()))
   # Comment out Werror flag and compile. With newer compilers gcc7xx,
   # compilation is broken due to warnings.
@@ -71,6 +121,40 @@ def _Install(vm):
   for idx in range(FLAGS.aerospike_instances):
     vm.RemoteCommand(f'mkdir {linux_packages.INSTALL_DIR}/{idx}; '
                      f'cp -rf {_GetAerospikeDir()} {_GetAerospikeDir(idx)}')
+
+
+def _InstallFromPackage(vm):
+  """Installs the aerospike_server package on the VM."""
+  if FLAGS.aerospike_instances != 1:
+    raise NotImplementedError(
+        'Only support one instance of aerospike on enterprise'
+    )
+  # https://docs.aerospike.com/server/operations/install/linux/ubuntu
+  vm.RemoteCommand(
+      f'wget -O aerospike.tgz {_AEROSPIKE_ENTERPISE_PACKAGE_INSTALL_URL.value}'
+  )
+  # Create log directory
+  vm.RemoteCommand('sudo mkdir -p /var/log/aerospike')
+
+  vm.RemoteCommand('mkdir -p aerospike')
+  vm.RemoteCommand('tar -xvf aerospike.tgz -C aerospike --strip-components=1')
+  vm.RemoteCommand('cd ./aerospike && sudo ./asinstall')
+  # lincense key file needs to be in prepvosional data directory
+  vm.DownloadPreprovisionedData('./aerospike', 'aerospike', 'features.conf')
+  vm.RemoteCommand(
+      'sudo mv ./aerospike/features.conf /etc/aerospike/features.conf'
+  )
+
+
+def _Install(vm):
+  """Installs the Aerospike server on the VM."""
+  vm.Install('build_tools')
+  vm.Install('lua5_1')
+  vm.Install('openssl')
+  if _AEROSPIKE_EDITION.value == AerospikeEdition.COMNUNITY:
+    _InstallFromGit(vm)
+  else:
+    _InstallFromPackage(vm)
 
 
 def YumInstall(vm):
@@ -133,48 +217,82 @@ def _WaitForServerUp(server, idx=None):
         "Aerospike server not up yet. Expected 'ok' but got '%s'." % out)
 
 
+def WipeDisk(server, devices):
+  """Wipe the disk on the server."""
+  for scratch_disk in server.scratch_disks:
+    if scratch_disk.mount_point:
+      server.RemoteCommand(
+          f'sudo umount {scratch_disk.mount_point}', ignore_failure=True
+      )
+
+  # https://docs.aerospike.com/server/operations/plan/ssd/ssd_init
+  # Expect to exit 1 with `No space left on device` error.
+  def _WipeDevice(device):
+    if _AEROSPIKE_ZEROIZE_DISK.value:
+      server.RobustRemoteCommand(
+          f'sudo dd if=/dev/zero of={device} bs=1M', ignore_failure=True
+      )
+    else:
+      server.RobustRemoteCommand(f'sudo blkdiscard {device}')
+      server.RobustRemoteCommand(f'sudo blkdiscard -z --length 8MiB {device}')
+
+    background_tasks.RunThreaded(_WipeDevice, devices)
+
+  @vm_util.Retry(
+      poll_interval=5,
+      timeout=300,
+      retryable_exceptions=(errors.Resource.RetryableCreationError),
+  )
+  def _ZeroizeHeader(device):
+    try:
+      server.RemoteCommand(f'sudo sudo blkdiscard -z --length 8MiB {device}')
+    except errors.Resource.RetryableCreationError as e:
+      raise errors.VirtualMachine.RemoteCommandError(
+          f'Device {device} header not zeroized: {e}.'
+      )
+
+  for device in devices:
+    _ZeroizeHeader(device)
+
+
+def BuildAndStartCommunityAerospike(server, idx):
+  """Build and start commmunity version of aerospike."""
+  server.RemoteCommand(f'cd {_GetAerospikeDir(idx)} && make init')
+  # Persist the nohup command past the ssh session
+  # "sh -c 'cd /wherever; nohup ./whatever > /dev/null 2>&1 &'"
+  log_file = f'~/aerospike-{server.name}-{idx}.log'
+  cmd = (
+      f"sh -c 'cd {_GetAerospikeDir(idx)} && nohup sudo make start > "
+      f"{log_file} 2>&1 &'"
+  )
+  server.RemoteCommand(cmd)
+  server.PullFile(vm_util.GetTempDir(), log_file)
+  _WaitForServerUp(server, idx)
+  logging.info('Aerospike server configured and started.')
+
+
+def RestartEnterpriseAerospike(server):
+  server.RemoteCommand('sudo mv ~/aerospike/aerospike.conf /etc/aerospike/')
+  server.RemoteCommand('sudo systemctl restart aerospike')
+  _WaitForServerUp(server, 0)
+
+
 def ConfigureAndStart(server, seed_node_ips=None):
   """Prepare the Aerospike server on a VM.
 
   Args:
     server: VirtualMachine to install and start Aerospike on.
-    seed_node_ips: internal IP addresses of seed nodes in the cluster.
-      Leave unspecified for a single-node deployment.
+    seed_node_ips: internal IP addresses of seed nodes in the cluster. Leave
+      unspecified for a single-node deployment.
   """
   server.Install('aerospike_server')
   seed_node_ips = seed_node_ips or [server.internal_ip]
 
   if FLAGS.aerospike_storage_type == DISK:
-    for scratch_disk in server.scratch_disks:
-      if scratch_disk.mount_point:
-        server.RemoteCommand(
-            f'sudo umount {scratch_disk.mount_point}', ignore_failure=True)
-
-    devices = [scratch_disk.GetDevicePath()
-               for scratch_disk in server.scratch_disks]
-
-    # https://docs.aerospike.com/server/operations/plan/ssd/ssd_init
-    # Expect to exit 1 with `No space left on device` error.
-    def _WipeDevice(device):
-      server.RobustRemoteCommand(
-          f'sudo dd if=/dev/zero of={device} bs=1M', ignore_failure=True)
-
-    background_tasks.RunThreaded(_WipeDevice, devices)
-
-    @vm_util.Retry(
-        poll_interval=5,
-        timeout=300,
-        retryable_exceptions=(errors.Resource.RetryableCreationError))
-    def _ZeroizeHeader(device):
-      try:
-        server.RemoteCommand(f'sudo sudo blkdiscard -z --length 8MiB {device}')
-      except errors.Resource.RetryableCreationError as e:
-        raise errors.VirtualMachine.RemoteCommandError(
-            f'Device {device} header not zeroized: {e}.')
-
-    for device in devices:
-      _ZeroizeHeader(device)
-
+    devices = [
+        scratch_disk.GetDevicePath() for scratch_disk in server.scratch_disks
+    ]
+    WipeDisk(server, devices)
   else:
     devices = []
 
@@ -190,31 +308,23 @@ def ConfigureAndStart(server, seed_node_ips=None):
       current_devices = devices[idx * num_device_per_instance:(idx + 1) *
                                 num_device_per_instance]
     server.RenderTemplate(
-        data.ResourcePath('aerospike.conf.j2'), _GetAerospikeConfig(idx), {
-            'devices':
-                current_devices,
-            'port_prefix':
-                3 + idx,
-            'memory_size':
-                int(server.total_memory_kb * 0.8 / FLAGS.aerospike_instances),
-            'seed_addresses':
-                seed_node_ips,
-            'service_threads':
-                FLAGS.aerospike_service_threads,
-            'replication_factor':
-                FLAGS.aerospike_replication_factor,
-        })
-
-    server.RemoteCommand(f'cd {_GetAerospikeDir(idx)} && make init')
-    # Persist the nohup command past the ssh session
-    # "sh -c 'cd /whereever; nohup ./whatever > /dev/null 2>&1 &'"
-    log_file = f'~/aerospike-{server.name}-{idx}.log'
-    cmd = (f'sh -c \'cd {_GetAerospikeDir(idx)} && nohup sudo make start > '
-           f'{log_file} 2>&1 &\'')
-    server.RemoteCommand(cmd)
-    server.PullFile(vm_util.GetTempDir(), log_file)
-    _WaitForServerUp(server, idx)
-    logging.info('Aerospike server configured and started.')
+        data.ResourcePath(_AEROSPIKE_CONFIGS[_AEROSPIKE_EDITION.value]),
+        _GetAerospikeConfig(idx),
+        {
+            'devices': current_devices,
+            'port_prefix': 3 + idx,
+            'memory_size': int(
+                server.total_memory_kb * 0.8 / FLAGS.aerospike_instances
+            ),
+            'seed_addresses': seed_node_ips,
+            'service_threads': FLAGS.aerospike_service_threads,
+            'replication_factor': FLAGS.aerospike_replication_factor,
+        },
+    )
+    if _AEROSPIKE_EDITION.value == AerospikeEdition.COMNUNITY:
+      BuildAndStartCommunityAerospike(server, idx)
+    else:
+      RestartEnterpriseAerospike(server)
 
 
 def Uninstall(vm):
