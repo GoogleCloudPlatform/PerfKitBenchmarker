@@ -222,6 +222,8 @@
 -   Add Key Management Service (KMS) resource for cloud cryptographic keys.
 -   Add support for using java veneer client with google bigtable
     `google_bigtable_use_java_veneer_client`.
+-   Allow configuring the number of channels used per VM for the Cloud Bigtable
+    YCSB benchmark with `--google_bigtable_channel_count`.
 
 ### Bug fixes and maintenance updates:
 

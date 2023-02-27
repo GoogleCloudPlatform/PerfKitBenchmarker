@@ -81,6 +81,14 @@ _ENABLE_TRAFFIC_DIRECTOR = flags.DEFINE_boolean(
         'client with ycsb to enable traffic through traffic director.'
     ),
 )
+_CHANNEL_COUNT = flags.DEFINE_integer(
+    'google_bigtable_channel_count',
+    None,
+    (
+        'If specified, will use this many channels (i.e. connections) for '
+        'Bigtable RPCs instead of the default number.'
+    ),
+)
 
 BENCHMARK_NAME = 'cloud_bigtable_ycsb'
 BENCHMARK_CONFIG = """
@@ -216,6 +224,7 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
       'project': FLAGS.project or _GetDefaultProject(),
       'instance': bigtable.name,
       'hbase_major_version': FLAGS.hbase_version.split('.')[0],
+      'channel_count': _CHANNEL_COUNT.value,
   }
 
   for file_name in HBASE_CONF_FILES:

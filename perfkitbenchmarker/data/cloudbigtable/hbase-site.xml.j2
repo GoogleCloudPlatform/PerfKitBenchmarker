@@ -19,6 +19,16 @@
     <name>hbase.client.registry.impl</name>
     <value>org.apache.hadoop.hbase.client.BigtableAsyncRegistry</value>
   </property>
+  {% if channel_count %}
+  <property>
+    <name>google.bigtable.grpc.channel.count</name>
+    <value>{{ channel_count }}</value>
+  </property>
+  {% endif %}
+  <property>
+    <name>hbase.client.registry.impl</name>
+    <value>org.apache.hadoop.hbase.client.BigtableAsyncRegistry</value>
+  </property>
   <property>
     <name>google.bigtable.project.id</name>
     <value>{{ project }}</value>
