@@ -25,6 +25,32 @@ from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers import ibmcloud
 
+# TODO(user) These constants were moved to provider info to break
+# circular dependencies to enable pytyping.  These forward links should be
+# removed once their callers are updated.
+MESOS = provider_info.MESOS
+PROFITBRICKS = provider_info.PROFITBRICKS
+DOCKER = provider_info.DOCKER
+GCP = 'GCP'
+AZURE = 'Azure'
+AWS = 'AWS'
+IBMCLOUD = 'IBMCloud'
+ALICLOUD = 'AliCloud'
+KUBERNETES = 'Kubernetes'
+DIGITALOCEAN = 'DigitalOcean'
+OPENSTACK = 'OpenStack'
+CLOUDSTACK = 'CloudStack'
+RACKSPACE = 'Rackspace'
+MESOS = 'Mesos'
+PROFITBRICKS = 'ProfitBricks'
+# Though Docker is not a cloud provider, it's inclusion is useful
+# for performing on premise to cloud benchmarks
+DOCKER = 'Docker'
+OCI = 'OCI'
+
+VALID_CLOUDS = (GCP, AZURE, AWS, IBMCLOUD, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS, PROFITBRICKS, DOCKER, OCI)
+
 _imported_providers = set()
 
 

@@ -6,7 +6,6 @@ default_single_core: &default_single_core
     machine_type: n1-standard-1
     zone: us-central1-a
     image: null
-    subnet_name: null
   Azure:
     machine_type: Standard_A1
     zone: eastus2
@@ -63,7 +62,6 @@ default_dual_core: &default_dual_core
     machine_type: n1-standard-2
     zone: us-central1-a
     image: null
-    subnet_name: null
   Azure:
     machine_type: Standard_D2_v3
     zone: eastus2
@@ -96,16 +94,15 @@ default_dual_core: &default_dual_core
 # updated for the disk types refactor.
 default_500_gb: &default_500_gb
   GCP:
-    # pd-standard unsupported on gen 3 VMs
-    disk_type: pd-balanced
+    disk_type: pd-standard
     disk_size: 500
     mount_point: /scratch
   Azure:
-    disk_type: Premium_LRS
+    disk_type: Standard_LRS
     disk_size: 500
     mount_point: /scratch
   AWS:
-    disk_type: gp2
+    disk_type: standard
     disk_size: 500
     mount_point: /scratch
   AliCloud:
@@ -152,21 +149,19 @@ default_500_gb: &default_500_gb
     disk_size: 500
     mount_point: /scratch
 
-
 # TODO(user): update the disk types below as more providers are
 # updated for the disk types refactor.
 default_50_gb: &default_50_gb
   GCP:
-    # pd-standard unsupported on gen 3 VMs
-    disk_type: pd-balanced
+    disk_type: pd-standard
     disk_size: 50
     mount_point: /scratch
   Azure:
-    disk_type: Premium_LRS
+    disk_type: Standard_LRS
     disk_size: 50
     mount_point: /scratch
   AWS:
-    disk_type: gp2
+    disk_type: standard
     disk_size: 50
     mount_point: /scratch
   AliCloud:
@@ -212,4 +207,3 @@ default_50_gb: &default_50_gb
     disk_type: paravirtualized
     disk_size: 50
     mount_point: /scratch
-
