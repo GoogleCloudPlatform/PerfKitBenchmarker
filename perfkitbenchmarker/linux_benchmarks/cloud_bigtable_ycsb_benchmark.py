@@ -217,7 +217,10 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
       f'echo "export JAVA_HOME=/usr" >> {hbase.HBASE_CONF_DIR}/hbase-env.sh')
 
   if _ENABLE_TRAFFIC_DIRECTOR.value and _USE_JAVA_VENEER_CLIENT.value:
-    vm.RemoteCommand('export GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true')
+    vm.RemoteCommand(
+        'echo "export GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true" | sudo tee -a'
+        ' /etc/environment'
+    )
   context = {
       'google_bigtable_endpoint': gcp_bigtable.ENDPOINT.value,
       'google_bigtable_admin_endpoint': gcp_bigtable.ADMIN_ENDPOINT.value,
