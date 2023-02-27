@@ -23,6 +23,7 @@ For more information, see the README.md under /compute.
 """
 
 import datetime
+import sys
 import time
 
 import requests
@@ -32,9 +33,9 @@ METADATA_URL = 'http://metadata.google.internal/computeMetadata/v1/'
 METADATA_HEADERS = {'Metadata-Flavor': 'Google'}
 
 
-def wait_for_maintenance(callback):
+def wait_for_maintenance(callback, metadata_field='instance/maintenance-event'):
   """Pull events from GCE meta-data server."""
-  url = METADATA_URL + 'instance/maintenance-event'
+  url = METADATA_URL + metadata_field
   last_maintenance_event = None
   # [START hanging_get]
   last_etag = '0'
@@ -82,7 +83,10 @@ def maintenance_callback(event):
 
 
 def main():
-  wait_for_maintenance(maintenance_callback)
+  if len(sys.argv) > 1:
+    wait_for_maintenance(maintenance_callback, metadata_field=sys.argv[1])
+  else:
+    wait_for_maintenance(maintenance_callback)
 
 
 if __name__ == '__main__':
