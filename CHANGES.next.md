@@ -118,6 +118,7 @@
 -   Add support for using the hbase2 binding in the Cloud Bigtable YCSB
     benchmark.
 -   Add iPerf interval reporting.
+-   Add support for DynamoDB on demand instances.
 
 ### Enhancements:
 
@@ -222,6 +223,8 @@
 -   Add Key Management Service (KMS) resource for cloud cryptographic keys.
 -   Add support for using java veneer client with google bigtable
     `google_bigtable_use_java_veneer_client`.
+-   Allow configuring the number of channels used per VM for the Cloud Bigtable
+    YCSB benchmark with `--google_bigtable_channel_count`.
 
 ### Bug fixes and maintenance updates:
 
@@ -329,10 +332,11 @@
     external (public) IPs for better security and reduced costs on AWS, Azure,
     and GCP. The `--connect_via_internal_ip` flag should also be used in this
     case.
--   Add `azure_subnet_id` flag to use an existing subnet instead of creating a
+-   Add `--azure_subnet_id` flag to use an existing subnet instead of creating a
     new one.
 -   Remove `--google_bigtable_enable_table_object_sharing`. Use
     `--ycsb_tar_url=https://storage.googleapis.com/cbt_ycsb_client_jar/ycsb-0.14.0.tar.gz`
     to retain the previous behavior.
 -   Remove `--google_bigtable_hbase_jar_url`. Rely on
     `--google_bigtable_client_version` instead.
+-   Fix how environment variable is set for direct path

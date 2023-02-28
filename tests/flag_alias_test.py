@@ -17,6 +17,7 @@ import unittest
 
 from absl.testing import parameterized
 from perfkitbenchmarker import flag_alias
+from tests import pkb_common_test_case
 
 
 class TestFlagAlias(parameterized.TestCase):
@@ -45,6 +46,40 @@ class TestFlagAlias(parameterized.TestCase):
     flags = [{'a': 'ab'}, {'b': 'd'}]
     self.assertDictEqual(
         flag_alias.AliasFlagsFromYaml(dic, flags), expected_dic)
+
+
+class TestZonesFlagAlias(pkb_common_test_case.PkbCommonTestCase):
+
+  @parameterized.parameters(
+      (['-zones=test1'], ['--zone=test1']),
+      (['--zones=test1,test2'], ['--zone=test1', '--zone=test2']),
+      (
+          ['--zone=test0', '--zones=test1,test2'],
+          ['--zone=test0', '--zone=test1', '--zone=test2'],
+      ),
+      (['--extra_zones=test1,test2'], ['--zone=test1', '--zone=test2']),
+      (
+          ['--zones=test1,test2', '--extra_zones=test3,test4'],
+          ['--zone=test1', '--zone=test2', '--zone=test3', '--zone=test4'],
+      ),
+  )
+  def testZoneFlagsFromArgs(self, argv, expected_argv):
+    self.assertEqual(flag_alias.AliasFlagsFromArgs(argv), expected_argv)
+
+  @parameterized.parameters(
+      (
+          {'zones': 'test1', 'extra_zones': 'test2'},
+          {'zone': ['test1', 'test2']},
+      ),
+      ({'zones': ['test1', 'test2']}, {'zone': ['test1', 'test2']}),
+      ({'extra_zones': ['test1', 'test2']}, {'zone': ['test1', 'test2']}),
+      (
+          {'zones': ['test1', 'test2'], 'extra_zones': ['test3', 'test4']},
+          {'zone': ['test1', 'test2', 'test3', 'test4']},
+      ),
+  )
+  def testZoneFlagsFromYaml(self, dic, expected_dic):
+    self.assertEqual(flag_alias.AliasFlagsFromYaml(dic), expected_dic)
 
 
 if __name__ == '__main__':

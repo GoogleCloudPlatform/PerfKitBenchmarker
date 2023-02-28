@@ -85,6 +85,12 @@ _METADATA_PREEMPT_CMD = (
 _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     't2a': 'neoverse-n1',
 }
+
+_LM_NOTIFICATION_METADATA_NAME = flags.DEFINE_string(
+    'lm_notification_metadata_name',
+    'instance/maintenance-event',
+    'Lm notification metadata name to listen on.',
+)
 FIVE_MINUTE_TIMEOUT = 300
 
 
@@ -1178,10 +1184,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _GetLMNotificationCommand(self):
     """Return Remote python execution command for LM notify script."""
-    vm_name = self.name
     vm_path = posixpath.join(vm_util.VM_TMP_DIR, self._LM_NOTICE_SCRIPT)
     server_log = self._LM_NOTICE_LOG
-    return f'python3 {vm_path} {vm_name} > {server_log} 2>&1'
+    return (
+        f'python3 {vm_path} {_LM_NOTIFICATION_METADATA_NAME.value} >'
+        f' {server_log} 2>&1'
+    )
 
   def StartLMNotification(self):
     """Start meta-data server notification subscription."""

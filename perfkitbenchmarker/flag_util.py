@@ -270,7 +270,7 @@ class OverrideFlags(object):
 
     Args:
       flag_values: FlagValues that is temporarily modified so that any options
-        in override_dict that are not 'present' in flag_values are applied to
+        in config_dict that are not 'present' in flag_values are applied to
         flag_values.
         Upon exit, flag_values will be restored to its original state.
       config_dict: Merged config flags from the benchmark config and benchmark
@@ -282,7 +282,7 @@ class OverrideFlags(object):
     self._flags_to_reapply = {}
 
   def __enter__(self):
-    """Overrides flag_values with options in override_dict."""
+    """Overrides flag_values with options in config_dict."""
     if not self._config_dict:
       return
 

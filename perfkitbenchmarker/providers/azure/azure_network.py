@@ -295,8 +295,8 @@ class AzureVirtualNetwork(network.BaseNetwork):
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
     if azure_flags.AZURE_SUBNET_ID.value:
-      # AzureVirtualNetworks are not Resources, so we just run None here as
-      # the network exists but will be accessed via the subnet
+      # AzureVirtualNetworks are not Resources, so we just return None here as
+      # the network exists but will be accessed via the subnet.
       return None
     key = cls.CLOUD, REGION, region
     # Because this method is only called from the AzureNetwork constructor,

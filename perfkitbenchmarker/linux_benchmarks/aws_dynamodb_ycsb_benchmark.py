@@ -141,11 +141,11 @@ def Prepare(benchmark_spec):
   if FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = FLAGS.ycsb_preload_threads
   # More WCU results in a faster load stage.
-  if instance.wcu < _INITIAL_WRITES.value and not instance.ShouldAutoscale():
+  if instance.wcu < _INITIAL_WRITES.value and not instance.IsServerless():
     instance.SetThroughput(wcu=_INITIAL_WRITES.value)
   benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs)
   # Reset the WCU to the initial level.
-  if not instance.ShouldAutoscale():
+  if not instance.IsServerless():
     instance.SetThroughput()
 
 
