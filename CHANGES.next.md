@@ -118,6 +118,7 @@
 -   Add support for using the hbase2 binding in the Cloud Bigtable YCSB
     benchmark.
 -   Add iPerf interval reporting.
+-   Add support for DynamoDB on demand instances.
 
 ### Enhancements:
 
