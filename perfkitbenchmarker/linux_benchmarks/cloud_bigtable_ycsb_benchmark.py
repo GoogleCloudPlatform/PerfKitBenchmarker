@@ -69,18 +69,16 @@ _MONITORING_ADDRESS = flags.DEFINE_string(
     'Google API endpoint for monitoring requests. Used when '
     '--get_bigtable_cluster_cpu_utilization is enabled.')
 _USE_JAVA_VENEER_CLIENT = flags.DEFINE_boolean(
-    'google_bigtable_use_java_veneer_client',
-    False,
-    'If true, will use the googlebigtableclient with ycsb.',
-)
+    'google_bigtable_use_java_veneer_client', False,
+    'If true, will use the googlebigtableclient with ycsb.')
 _ENABLE_TRAFFIC_DIRECTOR = flags.DEFINE_boolean(
-    'google_bigtable_enable_traffic_director',
-    False,
-    (
-        'If true, will use the googlebigtable'
-        'client with ycsb to enable traffic through traffic director.'
-    ),
-)
+    'google_bigtable_enable_traffic_director', False,
+    'If true, will use the googlebigtable'
+    'client with ycsb to enable traffic through traffic director.')
+_ENABLE_RLS_ROUTING = flags.DEFINE_boolean(
+    'google_bigtable_enable_rls_routing', False,
+    'If true, will use the googlebigtableclient with ycsb to enable traffic'
+    'through RLS with direct path')
 _CHANNEL_COUNT = flags.DEFINE_integer(
     'google_bigtable_channel_count',
     None,
@@ -221,6 +219,11 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
         'echo "export GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true" | sudo tee -a'
         ' /etc/environment'
     )
+    if _ENABLE_RLS_ROUTING.value:
+      vm.RemoteCommand(
+          'echo "export GRPC_EXPERIMENTAL_XDS_RLS_LB=true" | sudo tee -a'
+          ' /etc/environment'
+      )
   context = {
       'google_bigtable_endpoint': gcp_bigtable.ENDPOINT.value,
       'google_bigtable_admin_endpoint': gcp_bigtable.ADMIN_ENDPOINT.value,

@@ -227,6 +227,8 @@
     YCSB benchmark with `--google_bigtable_channel_count`.
 -   Add `--pkb_log_bucket` flag, allowing users to route PKB logs to a GCS
     bucket and clean up space on their machines.
+-   Add support for rls routing with direct path with new flag
+    `google_bigtable_enable_rls_routing`.
 
 ### Bug fixes and maintenance updates:
 
