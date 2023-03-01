@@ -86,11 +86,6 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     't2a': 'neoverse-n1',
 }
 
-_LM_NOTIFICATION_METADATA_NAME = flags.DEFINE_string(
-    'lm_notification_metadata_name',
-    'instance/maintenance-event',
-    'Lm notification metadata name to listen on.',
-)
 FIVE_MINUTE_TIMEOUT = 300
 
 
@@ -1187,9 +1182,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     vm_path = posixpath.join(vm_util.VM_TMP_DIR, self._LM_NOTICE_SCRIPT)
     server_log = self._LM_NOTICE_LOG
     return (
-        f'python3 {vm_path} {_LM_NOTIFICATION_METADATA_NAME.value} >'
+        f'python3 {vm_path} {gcp_flags.LM_NOTIFICATION_METADATA_NAME.value} >'
         f' {server_log} 2>&1'
     )
+
+  def _PullLMNoticeLog(self):
+    """Pull the LM Notice Log onto the local VM."""
+    self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
 
   def StartLMNotification(self):
     """Start meta-data server notification subscription."""
@@ -1200,7 +1199,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           timeout=LM_NOTIFICATION_TIMEOUT_SECONDS,
           ignore_failure=True,
       )
-      self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
+      self._PullLMNoticeLog()
       logging.info('[LM Notify] Release live migration lock.')
       self._LM_TIMES_SEMAPHORE.release()
 
@@ -1213,6 +1212,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info('[LM Notify] Wait for live migration to finish.')
     self._LM_TIMES_SEMAPHORE.acquire()
     logging.info('[LM Notify] Live migration is done.')
+
+  def _ReadLMNoticeContents(self):
+    """Read the contents of the LM Notice Log into a string."""
+    return self.RemoteCommand(f'cat {self._LM_NOTICE_LOG}')[0]
 
   def CollectLMNotificationsTime(self):
     """Extract LM notifications from log file.
@@ -1233,7 +1236,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         lm_end_time_key: 0,
         lm_total_time_key: 0,
     }
-    lm_times, _ = self.RemoteCommand(f'cat {self._LM_NOTICE_LOG}')
+    lm_times = self._ReadLMNoticeContents()
     if not lm_times:
       return events_dict
 

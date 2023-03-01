@@ -205,6 +205,12 @@ flags.DEFINE_string(
     'bq_slot_allocation_project', None,
     'Project to allocate flex slots in.')
 
+LM_NOTIFICATION_METADATA_NAME = flags.DEFINE_string(
+    'lm_notification_metadata_name',
+    'instance/maintenance-event',
+    'Lm notification metadata name to listen on.',
+)
+
 
 def _ValidatePreemptFlags(flags_dict):
   if flags_dict['gce_preemptible_vms']:
