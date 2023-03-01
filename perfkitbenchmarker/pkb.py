@@ -111,7 +111,6 @@ from perfkitbenchmarker.linux_packages import build_tools
 import six
 from six.moves import zip
 
-LOG_FILE_NAME = 'pkb.log'
 COMPLETION_STATUS_FILE_NAME = 'completion_statuses.json'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
 REQUIRED_EXECUTABLES = frozenset(['ssh', 'ssh-keygen', 'scp', 'openssl'])
@@ -135,7 +134,8 @@ flags.DEFINE_list('benchmarks', ['cluster_boot'],
 flags.DEFINE_boolean('multi_os_benchmark', False, 'Whether is benchmark will '
                      'involve multiple os types.')
 flags.DEFINE_string('archive_bucket', None,
-                    'Archive results to the given S3/GCS bucket.')
+                    'Archive results to the given S3/GCS bucket.'
+                    'Must include gs:// or s3:// prefix.')
 flags.DEFINE_string('project', None, 'GCP project ID under which '
                     'to create the virtual machines')
 flags.DEFINE_multi_string(
@@ -1012,6 +1012,10 @@ def _PublishRunStartedSample(spec):
   metadata = {
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
+  # Publish the path to this spec's PKB logs at the start of the runs.
+  if log_util.log_cloud_path:
+    metadata['pkb_log_path'] = log_util.log_cloud_path
+
   _PublishEventSample(spec, 'Run Started', metadata)
 
 
@@ -1229,8 +1233,7 @@ def PublishFailedRunSample(
       'flags': str(flag_util.GetProvidedCommandLineFlags())
   }
   background_tasks.RunThreaded(
-      lambda vm: vm.UpdateInterruptibleVmStatus(use_api=True), spec.vms
-  )
+      lambda vm: vm.UpdateInterruptibleVmStatus(use_api=True), spec.vms)
 
   interruptible_vm_count = 0
   interrupted_vm_count = 0
@@ -1480,7 +1483,7 @@ def SetUpPKB():
   if FLAGS.use_pkb_logging:
     log_util.ConfigureLogging(
         stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
-        log_path=vm_util.PrependTempDir(LOG_FILE_NAME),
+        log_path=vm_util.PrependTempDir(log_util.LOG_FILE_NAME),
         run_uri=FLAGS.run_uri,
         file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level])
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
@@ -1580,7 +1583,7 @@ def RunBenchmarks():
       logging.info(benchmark_status.CreateSummary(benchmark_specs))
 
     logging.info('Complete logs can be found at: %s',
-                 vm_util.PrependTempDir(LOG_FILE_NAME))
+                 log_util.log_local_path)
     logging.info('Completion statuses can be found at: %s',
                  vm_util.PrependTempDir(COMPLETION_STATUS_FILE_NAME))
 
@@ -1604,6 +1607,8 @@ def RunBenchmarks():
 
   all_benchmarks_succeeded = all(spec.status == benchmark_status.SUCCEEDED
                                  for spec in benchmark_specs)
+  # Upload PKB logs to GCS after all benchmark runs are complete.
+  log_util.CollectPKBLogs()
   return 0 if all_benchmarks_succeeded else 1
 
 

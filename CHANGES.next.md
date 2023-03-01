@@ -225,6 +225,8 @@
     `google_bigtable_use_java_veneer_client`.
 -   Allow configuring the number of channels used per VM for the Cloud Bigtable
     YCSB benchmark with `--google_bigtable_channel_count`.
+-   Add `--pkb_log_bucket` flag, allowing users to route PKB logs to a GCS
+    bucket and clean up space on their machines.
 
 ### Bug fixes and maintenance updates:
 
