@@ -421,14 +421,23 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def CreateVm(self, run_cmd_response: Union[str, Dict[str, str]]):
     vm = CreateTestLinuxVm()
+
     def FakeRemoteHostCommandWithReturnCode(cmd, **_):
       if isinstance(run_cmd_response, str):
         stdout = run_cmd_response
       elif isinstance(run_cmd_response, dict):
-        # NOTE: unfortunately @vm_util.Retry will infinitely retry a key error
-        # on this map, which can be tricky to diagnose.
+        # NOTE: @vm_util.Retry would infinitely retry a KeyError on this map so
+        # we raise SystemExit which does not inherit from Exception.
+        # Unfortunately other issues, like a typo can raise
+        # AttributeError which is retried until the test times out.
+        # See b/271465182 for more discussion.
+        if cmd not in run_cmd_response:
+          raise SystemExit(f'Define response for {cmd}')
         stdout = run_cmd_response[cmd]
-      return stdout, ''  # pytype: disable=name-error  # py310-upgrade
+      else:
+        raise NotImplementedError()
+      return stdout, '', 0
+
     vm.RemoteHostCommandWithReturnCode = mock.Mock(
         side_effect=FakeRemoteHostCommandWithReturnCode)
     vm.CheckLsCpu = mock.Mock(
