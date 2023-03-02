@@ -350,6 +350,8 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   disable_rss: str  # mixed from BaseVirtualMachine
   num_disable_cpus: str  # mixed from BaseVirtualMachine
   ip_address: str  # mixed from BaseVirtualMachine
+  internal_ip: str  # mixed from BaseVirtualMachine
+  can_connect_via_internal_ip: bool  # mixed from BaseVirtualMachine
 
   @abc.abstractmethod
   def GetConnectionIp(self):
@@ -1131,6 +1133,8 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.gpu_type = vm_spec.gpu_type
     self.image = vm_spec.image
     self.install_packages = vm_spec.install_packages
+    self.can_connect_via_internal_ip = (FLAGS.ssh_via_internal_ip
+                                        or FLAGS.connect_via_internal_ip)
     self.assign_external_ip = vm_spec.assign_external_ip
     self.ip_address = None
     self.internal_ip = None
@@ -1177,7 +1181,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
 
   def GetConnectionIp(self):
     """Gets the IP to use for connecting to the VM."""
-    if FLAGS.ssh_via_internal_ip or FLAGS.connect_via_internal_ip:
+    if self.can_connect_via_internal_ip:
       return self.internal_ip
     if not self.ip_address:
       raise errors.VirtualMachine.VirtualMachineError(
