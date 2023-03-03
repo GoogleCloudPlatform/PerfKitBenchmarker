@@ -42,6 +42,11 @@ def GetSpecClass(base_class, **kwargs):
 class BaseSpecMetaClass(type):
   """Metaclass that allows each BaseSpec derived class to have its own decoders.
   """
+  # The name of the spec class that will be extended with auto-registered
+  # subclasses.
+  SPEC_TYPE = None
+  # A list of the attributes that are used to register the subclasses.
+  SPEC_ATTRS = ['CLOUD']
 
   def __init__(cls, name, bases, dct):
     super(BaseSpecMetaClass, cls).__init__(name, bases, dct)
@@ -60,12 +65,6 @@ class BaseSpecMetaClass(type):
 
 class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
   """Object decoded from a YAML config."""
-  # The name of the spec class that will be extended with auto-registered
-  # subclasses.
-  SPEC_TYPE = None
-  # A list of the attributes that are used to register the subclasses.
-  SPEC_ATTRS = ['CLOUD']
-
   # Each derived class has its own copy of the following three variables. They
   # are initialized by BaseSpecMetaClass.__init__ and later populated by
   # _InitDecoders when the first instance of the derived class is created.
