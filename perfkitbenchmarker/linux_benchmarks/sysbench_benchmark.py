@@ -182,6 +182,7 @@ def _ParseSysbenchTransactions(sysbench_output,
   transactions_per_second = regex_util.ExtractFloat(
       r'transactions: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)',
       sysbench_output)
+  logging.info('test')
   queries_per_second = regex_util.ExtractFloat(
       r'queries: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output)
   return [

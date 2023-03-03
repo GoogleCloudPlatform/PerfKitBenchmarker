@@ -20,6 +20,7 @@ import re
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import openjdk
 from perfkitbenchmarker.linux_packages import openjdk_neoverse
@@ -82,6 +83,15 @@ flags.DEFINE_bool(
     'build_openjdk_neoverse', False,
     'Whether to build OpenJDK optimized for ARM Neoverse.'
     'Requires Ubuntu 1804 and OpenJDK 11.')
+flag_util.DEFINE_integerlist(
+    'specjbb_multijvm_nodes', None,
+    'By default specjbb jvm groups are bound to all numa nodes in '
+    'host in a round robin way. When specjbb_multijvm_nodes is specified, '
+    'specjbb jvm groups are bound to the specified numa nodes in a '
+    'round robin way. For example, if user want to bind 4 specjbb '
+    'jvm groups to numa node 0 and 1 in the following order: 1, 0, '
+    '1, 0, user can specify the specjbb_multijvm_nodes flag as following:'
+    '--specjbb_multijvm_nodes=1,0')
 
 
 def GetConfig(user_config):
@@ -249,12 +259,16 @@ def Run(benchmark_spec):
   if FLAGS.specjbb_run_mode == MULTIJVM_MODE:
     numactl_stdout, _ = vm.RemoteCommand('numactl -H | grep cpus | wc -l')
     numa_zones = int(numactl_stdout)
+    if FLAGS.specjbb_multijvm_nodes:
+      node_ids = FLAGS.specjbb_multijvm_nodes
+    else:
+      node_ids = [numa_id for numa_id in range(0, numa_zones)]
 
     # Run backends and txinjectors as background commands
     # java -jar specjbb2015.jar -m txinjector -G GRP1 -J JVM1 > grp1jvm1.log
     # java -jar specjbb2015.jar -m backend -G GRP1 -J JVM1 > grp1jvm2.log
     for group in range(1, FLAGS.specjbb_num_groups + 1):
-      node_id = group % numa_zones
+      node_id = node_ids[(group - 1) % len(node_ids)]
 
       txinjector_cmd = [
           'java',
