@@ -339,6 +339,8 @@
     external (public) IPs for better security and reduced costs on AWS, Azure,
     and GCP. The `--connect_via_internal_ip` flag should also be used in this
     case.
+-   Add `--boot_completion_ip_subset` flag to determine how to measure Boot
+    Completion
 -   Add `--azure_subnet_id` flag to use an existing subnet instead of creating a
     new one.
 -   Remove `--google_bigtable_enable_table_object_sharing`. Use

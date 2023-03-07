@@ -879,13 +879,19 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.bootable_time = time.time()
 
   def _WaitForSshExternal(self):
-    if not self.ip_address:
+    if self.boot_completion_ip_subset not in (
+        virtual_machine.BootCompletionIpSubset.EXTERNAL,
+        virtual_machine.BootCompletionIpSubset.BOTH,
+    ):
       return
     self._WaitForSSH(self.ip_address)
     self.ssh_external_time = time.time()
 
   def _WaitForSshInternal(self):
-    if not self.can_connect_via_internal_ip:
+    if self.boot_completion_ip_subset not in (
+        virtual_machine.BootCompletionIpSubset.INTERNAL,
+        virtual_machine.BootCompletionIpSubset.BOTH,
+    ):
       return
     self._WaitForSSH(self.internal_ip)
     self.ssh_internal_time = time.time()

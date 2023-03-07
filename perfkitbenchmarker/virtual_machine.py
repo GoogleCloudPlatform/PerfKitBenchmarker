@@ -21,6 +21,7 @@ operate on the VM: boot, shutdown, etc.
 
 import abc
 import contextlib
+import enum
 import logging
 import os.path
 import socket
@@ -116,6 +117,24 @@ _ASSIGN_EXTERNAL_IP = flags.DEFINE_boolean(
     'If True, an external (public) IP will be created for VMs. '
     'If False, --connect_via_internal_ip may also be needed.')
 
+
+@enum.unique
+class BootCompletionIpSubset(enum.Enum):
+  DEFAULT = enum.auto()
+  EXTERNAL = enum.auto()
+  INTERNAL = enum.auto()
+  BOTH = enum.auto()
+
+
+_BOOT_COMPLETION_IP_SUBSET = flags.DEFINE_enum_class(
+    'boot_completion_ip_subset',
+    BootCompletionIpSubset.DEFAULT,
+    BootCompletionIpSubset,
+    (
+        'The ip(s) to use to measure BootCompletion.  If DEFAULT, determined'
+        ' based on --connect_via_internal_ip.'
+    ),
+)
 # Deprecated. Use connect_via_internal_ip.
 flags.DEFINE_boolean(
     'ssh_via_internal_ip', False,
@@ -352,6 +371,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   ip_address: str  # mixed from BaseVirtualMachine
   internal_ip: str  # mixed from BaseVirtualMachine
   can_connect_via_internal_ip: bool  # mixed from BaseVirtualMachine
+  boot_completion_ip_subset: bool  # mixed from BaseVirtualMachine
 
   @abc.abstractmethod
   def GetConnectionIp(self):
@@ -1074,6 +1094,16 @@ class DeprecatedOsMixin(BaseOsMixin):
     logging.warning(warning)
 
 
+def GetBootCompletionIpSubset():
+  if _BOOT_COMPLETION_IP_SUBSET.value == BootCompletionIpSubset.DEFAULT:
+    if FLAGS.connect_via_internal_ip:
+      return BootCompletionIpSubset.INTERNAL
+    else:
+      return BootCompletionIpSubset.EXTERNAL
+  else:
+    return _BOOT_COMPLETION_IP_SUBSET.value
+
+
 class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   """Base class for Virtual Machines.
 
@@ -1139,6 +1169,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.install_packages = vm_spec.install_packages
     self.can_connect_via_internal_ip = (FLAGS.ssh_via_internal_ip
                                         or FLAGS.connect_via_internal_ip)
+    self.boot_completion_ip_subset = GetBootCompletionIpSubset()
     self.assign_external_ip = vm_spec.assign_external_ip
     self.ip_address = None
     self.internal_ip = None
