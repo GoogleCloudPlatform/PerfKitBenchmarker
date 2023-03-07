@@ -37,7 +37,7 @@ import posixpath
 import re
 import threading
 import time
-from typing import Dict, Optional, Tuple, Set
+from typing import Dict, Optional, Set, Tuple, Union
 import uuid
 
 from absl import flags
@@ -891,7 +891,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.ssh_internal_time = time.time()
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
-  def _WaitForSSH(self, ip_address: str):
+  def _WaitForSSH(self, ip_address: Union[str, None] = None):
     """Waits until the VM is ready."""
     # Always wait for remote host command to succeed, because it is necessary to
     # run benchmarks

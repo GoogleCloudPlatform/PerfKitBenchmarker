@@ -640,10 +640,14 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def _WaitForSSH(self):
+  def _WaitForSSH(self, ip_address: Union[str, None] = None):
     """Waits until VM is ready.
 
     Implementations of this method should set the 'hostname' attribute.
+
+    Args:
+      ip_address: The IP address to use for SSH, if None an implementation
+        default is used.
     """
     raise NotImplementedError()
 
