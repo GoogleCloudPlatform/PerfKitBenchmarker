@@ -323,7 +323,13 @@ class AzureNIC(resource.BaseResource):
     ] + self.resource_group.args)
 
     response = json.loads(stdout)
-    return response['ipConfigurations'][0]['privateIpAddress']
+    ip_config = response['ipConfigurations'][0]
+    # Azure CLI used privateIpAddress between versions 1.2.0 and 2.45.0
+    # https://learn.microsoft.com/en-us/cli/azure/release-notes-azure-cli?toc=%2Fcli%2Fazure%2Ftoc.json&bc=%2Fcli%2Fazure%2Fbreadcrumb%2Ftoc.json#network
+    for key in ('privateIPAddress', 'privateIpAddress'):
+      if key in ip_config:
+        return ip_config[key]
+    raise KeyError('No known private IP address key found.')
 
   def _Delete(self):
     self._deleted = True
