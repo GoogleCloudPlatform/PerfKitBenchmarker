@@ -95,18 +95,11 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _DeleteDependencies(self):
     self._DeleteVolumes()
 
-  def _Create(self):
-    self._CreatePod()
-    self._WaitForPodBootCompletion()
-
   @vm_util.Retry()
   def _PostCreate(self):
     self._GetInternalIp()
     self._ConfigureProxy()
     self._SetupDevicesPaths()
-
-  def _Delete(self):
-    self._DeletePod()
 
   # Kubernetes VMs do not implement _Start or _Stop
   def _Start(self):
@@ -130,15 +123,14 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise Exception('Please provide a list of Ceph Monitors using '
                         '--ceph_monitors flag.')
 
-  def _CreatePod(self):
+  def _Create(self):
     """Creates a POD (Docker container with optional volumes)."""
     create_rc_body = self._BuildPodBody()
     logging.info('About to create a pod with the following configuration:')
     logging.info(create_rc_body)
     kubernetes_helper.CreateResource(create_rc_body)
 
-  @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
-  def _WaitForPodBootCompletion(self):
+  def _IsReady(self):
     """Need to wait for the PODs to get up, they're created with a little delay."""
     exists_cmd = [
         FLAGS.kubectl,
@@ -154,11 +146,14 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         if (containers[0]['name'].startswith(self.name)
             and pod_status == 'Running'):
           logging.info('POD is up and running.')
-          return
-    raise Exception('POD %s is not running. Retrying to check status.' %
-                    self.name)
+          return True
+    return False
 
-  def _DeletePod(self):
+  def WaitForBootCompletion(self):
+    """No-op, because waiting for boot completion covered by _IsReady."""
+    self.bootable_time = self.resource_ready_time
+
+  def _Delete(self):
     """Deletes a POD."""
     delete_pod = [
         FLAGS.kubectl,
@@ -405,8 +400,11 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
                                       retries=None,
                                       ignore_failure=False,
                                       login_shell=False,
-                                      timeout=None):
+                                      timeout=None,
+                                      ip_address=None):
     """Runs a command in the Kubernetes container."""
+    if ip_address:
+      raise AssertionError('Kubernetes VMs cannot use IP')
     if retries is None:
       retries = FLAGS.ssh_retries
     cmd = [
