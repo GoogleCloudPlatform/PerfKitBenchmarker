@@ -122,6 +122,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     self.threads_per_core: int = None
     self.gce_tags: List[str] = None
     self.min_node_cpus: int = None
+    self.network_name: str = None
+    self.network_type: str = None
     super(GceVmSpec, self).__init__(*args, **kwargs)
 
     if isinstance(
@@ -217,47 +219,53 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
           arguments to construct in order to decode the named option.
     """
     result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
-    result.update(
-        {
-            'machine_type': (
-                custom_virtual_machine_spec.MachineTypeDecoder,
-                {'default': None},
-            ),
-            'ssd_interface': (
-                option_decoders.StringDecoder,
-                {'default': 'SCSI'},
-            ),
-            'num_local_ssds': (
-                option_decoders.IntDecoder,
-                {'default': 0, 'min': 0},
-            ),
-            'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
-            'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
-            'boot_disk_type': (
-                option_decoders.StringDecoder,
-                {'default': None},
-            ),
-            'project': (option_decoders.StringDecoder, {'default': None}),
-            'image_family': (option_decoders.StringDecoder, {'default': None}),
-            'image_project': (option_decoders.StringDecoder, {'default': None}),
-            'node_type': (
-                option_decoders.StringDecoder,
-                {'default': 'n1-node-96-624'},
-            ),
-            'min_cpu_platform': (
-                option_decoders.StringDecoder,
-                {'default': None},
-            ),
-            'threads_per_core': (option_decoders.IntDecoder, {'default': None}),
-            'gce_tags': (
-                option_decoders.ListDecoder,
-                {
-                    'item_decoder': option_decoders.StringDecoder(),
-                    'default': None,
-                },
-            ),
-        }
-    )
+    result.update({
+        'machine_type': (
+            custom_virtual_machine_spec.MachineTypeDecoder,
+            {'default': None},
+        ),
+        'ssd_interface': (
+            option_decoders.StringDecoder,
+            {'default': 'SCSI'},
+        ),
+        'num_local_ssds': (
+            option_decoders.IntDecoder,
+            {'default': 0, 'min': 0},
+        ),
+        'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
+        'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
+        'boot_disk_type': (
+            option_decoders.StringDecoder,
+            {'default': None},
+        ),
+        'project': (option_decoders.StringDecoder, {'default': None}),
+        'image_family': (option_decoders.StringDecoder, {'default': None}),
+        'image_project': (option_decoders.StringDecoder, {'default': None}),
+        'node_type': (
+            option_decoders.StringDecoder,
+            {'default': 'n1-node-96-624'},
+        ),
+        'min_cpu_platform': (
+            option_decoders.StringDecoder,
+            {'default': None},
+        ),
+        'threads_per_core': (option_decoders.IntDecoder, {'default': None}),
+        'gce_tags': (
+            option_decoders.ListDecoder,
+            {
+                'item_decoder': option_decoders.StringDecoder(),
+                'default': None,
+            },
+        ),
+        'network_name': (
+            option_decoders.StringDecoder,
+            {'none_ok': True, 'default': None},
+        ),
+        'network_type': (
+            option_decoders.StringDecoder,
+            {'none_ok': True, 'default': None},
+        ),
+    })
     return result
 
 
@@ -446,6 +454,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.image_project = vm_spec.image_project or self.GetDefaultImageProject()
     self.backfill_image = False
     self.mtu: Optional[int] = FLAGS.mtu
+    self.network_name = vm_spec.network_name
+    self.network_type = vm_spec.network_type
     self.network = self._GetNetwork()
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk_size = vm_spec.boot_disk_size or self.BOOT_DISK_SIZE_GB
@@ -1129,6 +1139,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.max_local_disks:
       result['gce_local_ssd_count'] = self.max_local_disks
       result['gce_local_ssd_interface'] = self.ssd_interface
+    result['gce_network_name'] = self.network.network_resource.name
+    result['gce_network_type'] = self.network.network_resource.mode
     result['gce_network_tier'] = self.gce_network_tier
     result['gce_nic_type'] = self.gce_nic_type
     if self.gce_egress_bandwidth_tier:

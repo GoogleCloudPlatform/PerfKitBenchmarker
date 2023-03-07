@@ -229,6 +229,9 @@
     bucket and clean up space on their machines.
 -   Add support for rls routing with direct path with new flag
     `google_bigtable_enable_rls_routing`.
+-   Set default YAML config vm_spec.GCP_network_name to null, and added the
+    corresponding attribute to GCEVMSpec, GCENetworkSpec and GCEVirtualMachine.
+    vm_spec overrides FLAGS.gce_network_name.
 
 ### Bug fixes and maintenance updates:
 

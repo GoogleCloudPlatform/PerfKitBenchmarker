@@ -35,6 +35,7 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vpn_service
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_placement_group
 from perfkitbenchmarker.providers.gcp import util
 import six
@@ -653,6 +654,8 @@ class GceNetworkSpec(network.BaseNetworkSpec):
                project: Optional[str] = None,
                mtu: Optional[int] = None,
                machine_type: Optional[str] = None,
+               network_name: Optional[str] = None,
+               network_type: Optional[str] = None,
                **kwargs):
     """Initializes the GceNetworkSpec.
 
@@ -660,12 +663,16 @@ class GceNetworkSpec(network.BaseNetworkSpec):
       project: The project for which the Network should be created.
       mtu: The MTU (max transmission unit) to use, if any.
       machine_type: The machine type of VM's in the network.
+      network_name: Name of the existing network.
+      network_type: Type of network (i.e. 'auto', 'custom')
       **kwargs: Additional key word arguments passed to BaseNetworkSpec.
     """
     super(GceNetworkSpec, self).__init__(**kwargs)
     self.project = project
     self.mtu = mtu
     self.machine_type = machine_type
+    self.network_name = network_name
+    self.network_type = network_type
 
 
 class GceNetworkResource(resource.BaseResource):
@@ -780,19 +787,28 @@ class GceNetwork(network.BaseNetwork):
       self.cidr = network_spec.cidr
     self.mtu = network_spec.mtu
 
-    name = self._MakeGceNetworkName()
+    self.is_existing_network = False
+    if network_spec.network_name:
+      name = network_spec.network_name
+      self.is_existing_network = True
+    elif gcp_flags.GCE_NETWORK_NAME.value:
+      name = gcp_flags.GCE_NETWORK_NAME.value
+      self.is_existing_network = True
+    else:
+      name = self._MakeGceNetworkName()
 
-    subnet_region = (FLAGS.gce_subnet_region if not network_spec.cidr else
-                     util.GetRegionFromZone(network_spec.zone))
-    mode = 'auto' if subnet_region is None else 'custom'
+    mode = network_spec.network_type
+    if mode is None:
+      mode = 'auto'
     self.network_resource = GceNetworkResource(name, mode, self.project,
                                                self.mtu)
-    if subnet_region is None:
-      self.subnet_resource = None
-    else:
+    if mode == 'custom':
+      subnet_region = util.GetRegionFromZone(network_spec.zone)
       self.subnet_resource = GceSubnetResource(FLAGS.gce_subnet_name or name,
                                                name, subnet_region,
                                                self.cidr, self.project)
+    else:
+      self.subnet_resource = None
 
     # Stage FW rules.
     self.all_nets = self._GetNetworksFromSpec(
@@ -907,9 +923,6 @@ class GceNetwork(network.BaseNetwork):
     Returns:
       String The name of this network.
     """
-    if FLAGS.gce_network_name:  # Return user managed network name if defined.
-      return FLAGS.gce_network_name
-
     net_type = net_type or self.net_type
     cidr = cidr or self.cidr
     uri = uri or FLAGS.run_uri
@@ -971,15 +984,22 @@ class GceNetwork(network.BaseNetwork):
         zone=vm.zone,
         cidr=vm.cidr,
         mtu=vm.mtu,
-        machine_type=vm.machine_type)
+        machine_type=vm.machine_type,
+        network_name=vm.network_name,
+        network_type=vm.network_type,
+    )
 
   @classmethod
   def _GetKeyFromNetworkSpec(
-      cls, spec) -> Union[Tuple[str, str], Tuple[str, str, str]]:
+      cls, spec
+  ) -> Union[Tuple[str, str], Tuple[str, str, str], Tuple[str, str, str, str]]:
     """Returns a key used to register Network instances."""
+    network_key = (cls.CLOUD, spec.project)
     if spec.cidr:
-      return (cls.CLOUD, spec.project, spec.cidr)
-    return (cls.CLOUD, spec.project)
+      network_key += (spec.cidr,)
+    if spec.network_name:
+      network_key += (spec.network_name,)
+    return network_key
 
   def _GetNumberVms(self) -> int:
     """Counts the number of VMs to be used in this benchmark.
@@ -996,7 +1016,7 @@ class GceNetwork(network.BaseNetwork):
 
   def Create(self):
     """Creates the actual network."""
-    if not FLAGS.gce_network_name:
+    if not (gcp_flags.GCE_NETWORK_NAME.value or self.is_existing_network):
       self.network_resource.Create()
       if self.subnet_resource:
         self.subnet_resource.Create()
@@ -1019,7 +1039,7 @@ class GceNetwork(network.BaseNetwork):
     """Deletes the actual network."""
     if self.placement_group:
       self.placement_group.Delete()
-    if not FLAGS.gce_network_name:
+    if not (gcp_flags.GCE_NETWORK_NAME.value or self.is_existing_network):
       if getattr(self, 'vpn_gateway', False):
         background_tasks.RunThreaded(
             lambda gateway: self.vpn_gateway[gateway].Delete(),

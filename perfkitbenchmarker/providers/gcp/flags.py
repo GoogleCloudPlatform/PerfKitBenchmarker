@@ -43,7 +43,7 @@ flags.DEFINE_string(
     'image_project', None, 'The project against which all image references will'
     ' be resolved. See: '
     'https://cloud.google.com/sdk/gcloud/reference/compute/disks/create')
-flags.DEFINE_string(
+GCE_NETWORK_NAME = flags.DEFINE_string(
     'gce_network_name', None, 'The name of an already created '
     'network to use instead of creating a new one.')
 flags.DEFINE_string(
