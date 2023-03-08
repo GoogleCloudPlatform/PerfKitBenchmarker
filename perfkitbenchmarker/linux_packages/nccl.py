@@ -20,7 +20,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 flags.DEFINE_string(
-    'nccl_version', '2.12.12-1', 'NCCL version to install. '
+    'nccl_version', 'v2.12.12-1', 'NCCL version to install. '
     'Input "None" to bypass installation.')
 flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin name')
 flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
@@ -35,7 +35,7 @@ GIT_REPO = 'https://github.com/NVIDIA/nccl.git'
 
 def _Build(vm):
   """Installs the NCCL package on the VM."""
-  vm.RemoteCommand('[ -d "nccl" ] || git clone {git_repo} --branch v{version}'
+  vm.RemoteCommand('[ -d "nccl" ] || git clone {git_repo} --branch {version}'
                    .format(git_repo=GIT_REPO, version=FLAGS.nccl_version))
   cuda_home = cuda_toolkit.CUDA_HOME
   vm.InstallPackages('build-essential devscripts debhelper fakeroot')
@@ -60,11 +60,10 @@ def AptInstall(vm):
   vm.Install('cuda_toolkit')
   _Build(vm)
   vm.InstallPackages('--allow-downgrades --allow-change-held-packages '
-                     '{build}libnccl2_{nccl}+cuda{cuda}_amd64.deb '
-                     '{build}libnccl-dev_{nccl}+cuda{cuda}_amd64.deb'
+                     '{build}libnccl2_*+cuda{cuda}_amd64.deb '
+                     '{build}libnccl-dev_*+cuda{cuda}_amd64.deb'
                      .format(
                          build='./nccl/build/pkg/deb/',
-                         nccl=FLAGS.nccl_version,
                          cuda=FLAGS.cuda_toolkit_version))
 
   if FLAGS.nccl_net_plugin:
