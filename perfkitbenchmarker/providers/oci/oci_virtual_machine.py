@@ -199,6 +199,7 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
             'launch',
             f'--subnet-id {self.network.network_id}',
             f'--display-name {self.name}',
+            f'--hostname-label {self.name}',
             f'--region {self.region}',
             f'--availability-domain {self.availability_domain}',
             f'--fault-domain {self.fault_domain}',
@@ -291,13 +292,13 @@ class Ubuntu1804BasedOCIVirtualMachine(OciVirtualMachine,
     DEFAULT_IMAGE_PROJECT = 'ubuntu-1804-lts'
 
 
-#class Oracle9BasedVirtualMachine(OciVirtualMachine,
-#                                 linux_virtual_machine.Oracle9Mixin):
-#    DEFAULT_IMAGE_FAMILY = 'Oracle Linux'
-#    DEFAULT_IMAGE_PROJECT = '9'
+class Oracle9BasedVirtualMachine(OciVirtualMachine,
+                                 linux_virtual_machine.Oracle9Mixin):
+    DEFAULT_IMAGE_FAMILY = 'Oracle Linux'
+    DEFAULT_IMAGE_PROJECT = '9'
 
 
-#class Oracle8BasedVirtualMachine(OciVirtualMachine,
-#                                 linux_virtual_machine.Oracle8Mixin):
-#    DEFAULT_IMAGE_FAMILY = 'Oracle Linux'
-#    DEFAULT_IMAGE_PROJECT = '8'
+class Oracle8BasedVirtualMachine(OciVirtualMachine,
+                                 linux_virtual_machine.Oracle8Mixin):
+    DEFAULT_IMAGE_FAMILY = 'Oracle Linux'
+    DEFAULT_IMAGE_PROJECT = '8'
