@@ -31,7 +31,7 @@ class BaseNetworkTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testGetKeyFromNetworkSpec(self):
     spec = network.BaseNetworkSpec(
         zone='us-central1-a', cidr=None, machine_type=None)
-    spec.network_name = 'test'
+    spec.subnet_name = 'test'
     actual_key = TestNetwork._GetKeyFromNetworkSpec(spec)
     expected_key = ('test_cloud', 'us-central1-a', 'test')
     self.assertEqual(actual_key, expected_key)

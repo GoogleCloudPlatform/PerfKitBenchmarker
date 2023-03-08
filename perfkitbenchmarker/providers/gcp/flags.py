@@ -46,6 +46,8 @@ flags.DEFINE_string(
 GCE_NETWORK_NAME = flags.DEFINE_string(
     'gce_network_name', None, 'The name of an already created '
     'network to use instead of creating a new one.')
+GCE_NETWORK_TYPE = flags.DEFINE_string(
+    'gce_network_type', None, 'The network type or mode (i.e. auto, custom)')
 flags.DEFINE_string(
     'gce_subnet_name', None, 'The name of an already created '
     'subnet to use instead of creating a new one.')

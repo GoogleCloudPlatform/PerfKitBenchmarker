@@ -654,8 +654,7 @@ class GceNetworkSpec(network.BaseNetworkSpec):
                project: Optional[str] = None,
                mtu: Optional[int] = None,
                machine_type: Optional[str] = None,
-               network_name: Optional[str] = None,
-               network_type: Optional[str] = None,
+               subnet_name: Optional[str] = None,
                **kwargs):
     """Initializes the GceNetworkSpec.
 
@@ -663,16 +662,14 @@ class GceNetworkSpec(network.BaseNetworkSpec):
       project: The project for which the Network should be created.
       mtu: The MTU (max transmission unit) to use, if any.
       machine_type: The machine type of VM's in the network.
-      network_name: Name of the existing network.
-      network_type: Type of network (i.e. 'auto', 'custom')
+      subnet_name: Name of the existing subnet.
       **kwargs: Additional key word arguments passed to BaseNetworkSpec.
     """
     super(GceNetworkSpec, self).__init__(**kwargs)
     self.project = project
     self.mtu = mtu
     self.machine_type = machine_type
-    self.network_name = network_name
-    self.network_type = network_type
+    self.subnet_name = subnet_name
 
 
 class GceNetworkResource(resource.BaseResource):
@@ -788,8 +785,8 @@ class GceNetwork(network.BaseNetwork):
     self.mtu = network_spec.mtu
 
     self.is_existing_network = False
-    if network_spec.network_name:
-      name = network_spec.network_name
+    if network_spec.subnet_name:
+      name = network_spec.subnet_name
       self.is_existing_network = True
     elif gcp_flags.GCE_NETWORK_NAME.value:
       name = gcp_flags.GCE_NETWORK_NAME.value
@@ -797,7 +794,7 @@ class GceNetwork(network.BaseNetwork):
     else:
       name = self._MakeGceNetworkName()
 
-    mode = network_spec.network_type
+    mode = gcp_flags.GCE_NETWORK_TYPE.value
     if mode is None:
       mode = 'auto'
     self.network_resource = GceNetworkResource(name, mode, self.project,
@@ -985,8 +982,7 @@ class GceNetwork(network.BaseNetwork):
         cidr=vm.cidr,
         mtu=vm.mtu,
         machine_type=vm.machine_type,
-        network_name=vm.network_name,
-        network_type=vm.network_type,
+        subnet_name=vm.subnet_name,
     )
 
   @classmethod
@@ -997,8 +993,8 @@ class GceNetwork(network.BaseNetwork):
     network_key = (cls.CLOUD, spec.project)
     if spec.cidr:
       network_key += (spec.cidr,)
-    if spec.network_name:
-      network_key += (spec.network_name,)
+    if spec.subnet_name:
+      network_key += (spec.subnet_name,)
     return network_key
 
   def _GetNumberVms(self) -> int:

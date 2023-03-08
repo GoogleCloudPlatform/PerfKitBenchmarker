@@ -184,8 +184,8 @@ class BaseNetwork(object):
     """Returns a key used to register Network instances."""
     if cls.CLOUD is None:
       raise errors.Error('Networks should have CLOUD attributes.')
-    if spec.network_name:
-      return (cls.CLOUD, spec.zone, spec.network_name)
+    if spec.subnet_name:
+      return (cls.CLOUD, spec.zone, spec.subnet_name)
     return (cls.CLOUD, spec.zone)
 
   @classmethod

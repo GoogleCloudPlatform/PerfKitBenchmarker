@@ -284,7 +284,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     zone = 'us-north1-b'
     cidr = None
     # long_cidr = '123.567.901/13'  # @TODO net_utils for address sanity checks
-    vm = mock.Mock(zone=zone, project=project, cidr=cidr, network_name=None)
+    vm = mock.Mock(zone=zone, project=project, cidr=cidr, subnet_name=None)
     net = gce_network.GceNetwork.GetNetwork(vm)
     net_name = net._MakeGceNetworkName()
 
@@ -307,7 +307,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     project = _PROJECT
     zone = 'us-north1-b'
     cidr = None
-    vm = mock.Mock(zone=zone, project=project, cidr=cidr, network_name=None)
+    vm = mock.Mock(zone=zone, project=project, cidr=cidr, subnet_name=None)
     net = gce_network.GceNetwork.GetNetwork(vm)
     net_name = net._MakeGceNetworkName()
 
@@ -328,7 +328,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     project = _PROJECT
     zone = 'us-north1-b'
     cidr = '1.2.3.4/56'
-    vm = mock.Mock(zone=zone, project=project, cidr=cidr, network_name=None)
+    vm = mock.Mock(zone=zone, project=project, cidr=cidr, subnet_name=None)
     net = gce_network.GceNetwork.GetNetwork(vm)
     net_name = net._MakeGceNetworkName()
 
@@ -355,7 +355,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
         zone='us-north1-b',
         project=_PROJECT,
         cidr='1.2.3.4/56',
-        network_name=None,
+        subnet_name=None,
     )
     net = gce_network.GceNetwork.GetNetwork(vm)
     self.assertTrue(net.is_existing_network)
@@ -363,15 +363,16 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     self.assertIsNone(net.subnet_resource)
 
   @flagsaver.flagsaver(
-      gce_network_name='my-network', gce_subnet_name='my-subnet'
+      gce_network_name='my-network',
+      gce_subnet_name='my-subnet',
+      gce_network_type='custom',
   )
   def testSpecifySubnetName(self):
     vm = mock.Mock(
         zone='us-north1-b',
         project=_PROJECT,
         cidr='1.2.3.4/56',
-        network_name=None,
-        network_type='custom'
+        subnet_name=None,
     )
     net = gce_network.GceNetwork.GetNetwork(vm)
     self.assertTrue(net.is_existing_network)
@@ -386,7 +387,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
         zone='us-north1-b',
         project=_PROJECT,
         cidr='1.2.3.4/56',
-        network_name='default',
+        subnet_name='default',
     )
     net = gce_network.GceNetwork.GetNetwork(vm)
     self.assertTrue(net.is_existing_network)
@@ -397,7 +398,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
         zone='us-north1-b',
         project=_PROJECT,
         cidr='1.2.3.4/56',
-        network_name='default',
+        subnet_name='default',
     )
     net = gce_network.GceNetwork.GetNetwork(vm)
     self.assertTrue(net.is_existing_network)
@@ -553,7 +554,7 @@ class TestGceNetwork(BaseGceNetworkTest):
     project = 'myproject'
     zone = 'us-east1-a'
     vm = mock.Mock(
-        zone=zone, project=project, cidr=None, mtu=None, network_name=None
+        zone=zone, project=project, cidr=None, mtu=None, subnet_name=None
     )
 
     net = gce_network.GceNetwork.GetNetwork(vm)
@@ -569,7 +570,7 @@ class TestGceNetwork(BaseGceNetworkTest):
 
   @mock.patch.object(vm_util, 'IssueCommand', return_value=('', '', 0))
   def testMtuSupport(self, mock_issue):
-    vm = mock.Mock(project='abc', cidr=None, mtu=1500, network_name=None)
+    vm = mock.Mock(project='abc', cidr=None, mtu=1500, subnet_name=None)
 
     net = gce_network.GceNetwork.GetNetwork(vm)
     net.Create()

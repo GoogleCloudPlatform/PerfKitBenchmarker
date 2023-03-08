@@ -6,8 +6,7 @@ default_single_core: &default_single_core
     machine_type: n1-standard-1
     zone: us-central1-a
     image: null
-    network_name: null
-    network_type: null
+    subnet_name: null
   Azure:
     machine_type: Standard_A1
     zone: eastus2
@@ -60,7 +59,7 @@ default_dual_core: &default_dual_core
     machine_type: n1-standard-2
     zone: us-central1-a
     image: null
-    network_name: null
+    subnet_name: null
   Azure:
     machine_type: Standard_D2_v3
     zone: eastus2
