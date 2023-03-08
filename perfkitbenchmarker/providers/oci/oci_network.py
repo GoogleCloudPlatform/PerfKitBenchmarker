@@ -93,6 +93,7 @@ class OciVcn(resource.BaseResource):
             'vcn',
             'create',
             f'--display-name pkb-{FLAGS.run_uri}',
+            f'--dns-label vcn{FLAGS.run_uri}',
             f'--freeform-tags {self.tags}',
             '--from-json \'{"cidr-blocks":["172.16.0.0/16"]}\'']
         create_cmd = util.GetEncodedCmd(create_cmd)
@@ -149,6 +150,7 @@ class OciVcn(resource.BaseResource):
             'subnet',
             'create',
             f'--display-name pkb-{FLAGS.run_uri}',
+            f'--dns-label sub{FLAGS.run_uri}',
             f'--cidr-block {self.cidr_block}',
             f'--vcn-id {self.vcn_id}']
         create_cmd = util.GetEncodedCmd(create_cmd)
