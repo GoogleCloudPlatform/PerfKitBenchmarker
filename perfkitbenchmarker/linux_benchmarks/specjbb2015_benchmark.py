@@ -92,6 +92,17 @@ flag_util.DEFINE_integerlist(
     'jvm groups to numa node 0 and 1 in the following order: 1, 0, '
     '1, 0, user can specify the specjbb_multijvm_nodes flag as following:'
     '--specjbb_multijvm_nodes=1,0')
+flags.DEFINE_integer(
+    'specjbb_file_descriptors_limit', 64*1024,
+    'Set FD limit for specjbb backend java processes. Specjbb '
+    'background processes tends to create a lot of network connections. '
+    'It could fail if FD limit is too low. Please search for "Too many '
+    'open files" in the web page for detailed info: '
+    'http://spec.org/jbb2015/docs/knownissues.html'
+    'Please be careful when setting this flag. its value should be '
+    'smaller than sysctl flag fs.nr_open. Benchmark will fail if this '
+    'flag is set to a value bigger than fs.nr_open.',
+    lower_bound=0)
 
 
 def GetConfig(user_config):
@@ -229,16 +240,21 @@ def _RunBackgroundNumaPinnedCommand(vm, cmd_list, node_id):
     cmd_list: list of commands to be joined together
     node_id: NUMA node to pin command on.
   """
+  fd_limit_cmd = f'ulimit -n {FLAGS.specjbb_file_descriptors_limit}'
   if FLAGS.specjbb_numa_aware:
     # Persist the nohup command past the ssh session, and numa pin.
     # "sh -c 'cd /whereever; nohup ./whatever > /dev/null 2>&1 &'"
     # "numa --cpunodebind 0 --membind 0 cmd"
-    cmd = ('sh -c \'cd {dir} && nohup numactl --cpunodebind {node_id} '
+    cmd = ('sh -c \'{fd_limit_cmd} && cd {dir} && nohup numactl '
+           '--cpunodebind {node_id} '
            '--membind {node_id} {cmd} 2>&1 &\'').format(
+               fd_limit_cmd=fd_limit_cmd,
                node_id=node_id, dir=_SPEC_DIR, cmd=' '.join(cmd_list))
   else:
-    cmd = ('sh -c \'cd {dir} && nohup {cmd} 2>&1 &\'').format(
-        dir=_SPEC_DIR, cmd=' '.join(cmd_list))
+    cmd = ('sh -c \'{fd_limit_cmd} && cd {dir} && '
+           'nohup {cmd} 2>&1 &\'').format(
+               fd_limit_cmd=fd_limit_cmd,
+               dir=_SPEC_DIR, cmd=' '.join(cmd_list))
   vm.RemoteCommand(cmd)
 
 
