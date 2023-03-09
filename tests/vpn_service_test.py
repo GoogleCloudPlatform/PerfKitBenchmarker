@@ -20,7 +20,7 @@ from absl.testing import flagsaver
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_benchmarks
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import benchmark_config_spec
 from tests import pkb_common_test_case
 from perfkitbenchmarker.vpn_service import TunnelConfig
@@ -28,7 +28,7 @@ from perfkitbenchmarker.vpn_service import TunnelConfig
 FLAGS = flags.FLAGS
 
 PROJECT = 'mock_project'
-CLOUD = providers.GCP
+CLOUD = provider_info.GCP
 BENCHMARK_NAME = 'iperf'
 URI = 'uri45678'
 

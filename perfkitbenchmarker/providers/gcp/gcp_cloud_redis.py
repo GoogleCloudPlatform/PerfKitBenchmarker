@@ -25,7 +25,7 @@ from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3.types import TimeInterval
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util
@@ -41,7 +41,7 @@ DEFAULT_PORT = 6379
 class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
   """Object representing a GCP cloud redis instance."""
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   MEMORY_STORE = managed_memory_store.REDIS
 
   def __init__(self, spec):

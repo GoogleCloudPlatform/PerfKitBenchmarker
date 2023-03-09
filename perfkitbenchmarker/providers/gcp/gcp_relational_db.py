@@ -30,7 +30,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import iaas_relational_db
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
@@ -96,7 +96,7 @@ class UnsupportedDatabaseEngineError(Exception):
 
 class GCPIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
   """A GCP IAAS database resource."""
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
 
 class GCPRelationalDb(relational_db.BaseRelationalDb):
@@ -107,7 +107,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   ideal; however, a password is still required to connect. Currently only
   MySQL 5.7 and Postgres 9.6 are supported.
   """
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   IS_MANAGED = True
 
   def __init__(self, relational_db_spec):

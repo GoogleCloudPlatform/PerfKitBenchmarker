@@ -25,7 +25,7 @@ import threading
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.alicloud import ali_disk
@@ -61,7 +61,7 @@ INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AliCloud Virtual Machine."""
 
-  CLOUD = providers.ALICLOUD
+  CLOUD = provider_info.ALICLOUD
   DEFAULT_ZONE = 'us-west-1a'
   DEFAULT_MACHINE_TYPE = 'ecs.s3.large'
 

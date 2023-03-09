@@ -28,20 +28,14 @@ from perfkitbenchmarker.providers import ibmcloud
 # TODO(user) These constants were moved to provider info to break
 # circular dependencies to enable pytyping.  These forward links should be
 # removed once their callers are updated.
-GCP = provider_info.GCP
 AZURE = provider_info.AZURE
 AWS = provider_info.AWS
-IBMCLOUD = provider_info.IBMCLOUD
-ALICLOUD = provider_info.ALICLOUD
 KUBERNETES = provider_info.KUBERNETES
-DIGITALOCEAN = provider_info.DIGITALOCEAN
-OPENSTACK = provider_info.OPENSTACK
 CLOUDSTACK = provider_info.CLOUDSTACK
 RACKSPACE = provider_info.RACKSPACE
 MESOS = provider_info.MESOS
 PROFITBRICKS = provider_info.PROFITBRICKS
 DOCKER = provider_info.DOCKER
-VALID_CLOUDS = provider_info.VALID_CLOUDS
 
 _imported_providers = set()
 
@@ -68,7 +62,7 @@ def LoadProviderFlags(providers):
 
 
 # Import flag definitions for all cloud providers.
-LoadProviderFlags(VALID_CLOUDS)
+LoadProviderFlags(provider_info.VALID_CLOUDS)
 
 
 def LoadProviderUtils(cloud: str) -> types.ModuleType:

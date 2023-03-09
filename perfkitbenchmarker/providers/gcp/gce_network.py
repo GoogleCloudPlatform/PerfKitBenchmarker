@@ -32,7 +32,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vpn_service
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
@@ -50,7 +50,7 @@ _PLACEMENT_GROUP_PREFIXES = frozenset(
 
 class GceVpnGateway(network.BaseVpnGateway):
   """Object representing a GCE VPN Gateway."""
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   def __init__(self, name: str, network_name: str, region: str, cidr: str,
                project: str):
@@ -559,7 +559,7 @@ class GceFirewallRule(resource.BaseResource):
 class GceFirewall(network.BaseFirewall):
   """An object representing the GCE Firewall."""
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   def __init__(self):
     """Initialize GCE firewall class."""
@@ -765,7 +765,7 @@ def IsPlacementGroupCompatible(machine_type):
 class GceNetwork(network.BaseNetwork):
   """Object representing a GCE Network."""
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   def __init__(self, network_spec: GceNetworkSpec):
     super(GceNetwork, self).__init__(network_spec)

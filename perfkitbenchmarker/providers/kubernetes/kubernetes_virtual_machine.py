@@ -26,7 +26,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
@@ -49,7 +49,7 @@ def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Kubernetes POD."""
-  CLOUD = providers.KUBERNETES
+  CLOUD = provider_info.KUBERNETES
   DEFAULT_IMAGE = None
   HOME_DIR = '/root'
   IS_REBOOTABLE = False

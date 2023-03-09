@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from absl import flags
 import pandas as pd
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.gcp import util as gcp_util
@@ -123,7 +123,7 @@ def GetCommonMetadata(custom_metadata: Optional[Dict[str, Any]] = None) -> str:
      A string of metadata that should be appended to the cloudharmony
      benchmark run.
   """
-  if FLAGS.cloud != providers.GCP:
+  if FLAGS.cloud != provider_info.GCP:
     # Should not be including cloudharmony metadata for non-gcp runs.
     return ''
 

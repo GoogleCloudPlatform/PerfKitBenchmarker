@@ -26,7 +26,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
@@ -52,7 +52,7 @@ FLAGS = flags.FLAGS
 class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   """Interface to Google Cloud Storage."""
 
-  STORAGE_NAME = providers.GCP
+  STORAGE_NAME = provider_info.GCP
 
   location: str
 

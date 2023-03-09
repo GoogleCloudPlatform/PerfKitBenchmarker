@@ -17,7 +17,7 @@ import logging
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.openstack import utils as os_utils
@@ -87,7 +87,7 @@ def WaitForVolumeCreation(resource, volume_id):
     raise errors.Resource.RetryableCreationError(msg)
 
 
-disk.RegisterDiskTypeMap(providers.OPENSTACK, DISK_TYPE)
+disk.RegisterDiskTypeMap(provider_info.OPENSTACK, DISK_TYPE)
 
 
 class OpenStackDiskSpec(disk.BaseDiskSpec):
@@ -100,7 +100,7 @@ class OpenStackDiskSpec(disk.BaseDiskSpec):
 
   """
 
-  CLOUD = providers.OPENSTACK
+  CLOUD = provider_info.OPENSTACK
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):

@@ -15,10 +15,9 @@
 """Provider info for AliCloud."""
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
 
 
 class AliCloudProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
-  CLOUD = providers.ALICLOUD
+  CLOUD = provider_info.ALICLOUD

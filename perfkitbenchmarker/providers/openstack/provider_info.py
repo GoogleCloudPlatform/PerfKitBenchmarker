@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for Open Stack Platform
+"""Provider info for Open Stack Platform.
 
 """
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
 
 
 class OpenStackProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
-  CLOUD = providers.OPENSTACK
+  CLOUD = provider_info.OPENSTACK

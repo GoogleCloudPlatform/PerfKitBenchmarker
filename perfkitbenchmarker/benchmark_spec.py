@@ -85,7 +85,7 @@ SKIP_CHECK = 'none'
 METADATA_TIME_FORMAT = '%Y%m%dt%H%M%Sz'
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('cloud', providers.GCP, providers.VALID_CLOUDS,
+flags.DEFINE_enum('cloud', provider_info.GCP, provider_info.VALID_CLOUDS,
                   'Name of the cloud to use.')
 flags.DEFINE_string('scratch_dir', None,
                     'Base name for all scratch disk directories in the VM. '

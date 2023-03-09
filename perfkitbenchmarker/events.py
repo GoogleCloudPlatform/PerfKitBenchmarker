@@ -44,7 +44,7 @@ Payload: parsed_flags, the parsed FLAGS object.""")
 provider_imported = _events.signal('provider-imported', doc="""
 Signal sent after a cloud provider's modules have been imported.
 
-Sender: string. Cloud provider name chosen from providers.VALID_CLOUDS.""")
+Sender: string. Cloud provider name chosen from provider_info.VALID_CLOUDS.""")
 
 benchmark_start = _events.signal('benchmark-start', doc="""
 Signal sent at the beginning of a benchmark before any resources are

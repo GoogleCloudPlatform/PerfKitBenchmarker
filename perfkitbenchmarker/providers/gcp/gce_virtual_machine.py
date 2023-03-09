@@ -44,7 +44,7 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -107,7 +107,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     boot_disk_type: string or None. The type of the boot disk.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   def __init__(self, *args, **kwargs):
     self.num_local_ssds: int = None
@@ -405,7 +405,7 @@ def GetArmArchitecture(machine_type):
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   DEFAULT_IMAGE = None
   BOOT_DISK_SIZE_GB = None

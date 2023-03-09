@@ -33,7 +33,7 @@ from google.cloud.monitoring_v3 import types
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcs
@@ -106,7 +106,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
   Requires a local java installation to run Dataflow.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   SERVICE_TYPE = 'dataflow'
 
   def __init__(self, dpb_service_spec):
