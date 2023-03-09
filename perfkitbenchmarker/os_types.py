@@ -26,7 +26,9 @@ COS = 'cos'
 CORE_OS = 'core_os'
 DEBIAN9 = 'debian9'
 DEBIAN10 = 'debian10'
+DEBIAN10_BACKPORTS = 'debian10_backports'
 DEBIAN11 = 'debian11'
+DEBIAN11_BACKPORTS = 'debian11_backports'
 JUJU = 'juju'
 RHEL7 = 'rhel7'
 RHEL8 = 'rhel8'
@@ -82,7 +84,9 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     CLEAR,
     DEBIAN9,
     DEBIAN10,
+    DEBIAN10_BACKPORTS,
     DEBIAN11,
+    DEBIAN11_BACKPORTS,
     JUJU,
     RHEL7,
     RHEL8,

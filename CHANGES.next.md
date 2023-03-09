@@ -119,6 +119,7 @@
     benchmark.
 -   Add iPerf interval reporting.
 -   Add support for DynamoDB on demand instances.
+-   Add support for Debian 10 & 11 with backported kernels on AWS.
 
 ### Enhancements:
 

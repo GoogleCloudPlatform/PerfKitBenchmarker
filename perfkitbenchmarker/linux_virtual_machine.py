@@ -2268,6 +2268,11 @@ class Debian10Mixin(BaseDebianMixin):
   OS_TYPE = os_types.DEBIAN10
 
 
+class Debian10BackportsMixin(Debian10Mixin):
+  """Debian 10 with backported kernel."""
+  OS_TYPE = os_types.DEBIAN10_BACKPORTS
+
+
 class Debian11Mixin(BaseDebianMixin):
   """Class holding Debian 11 specific VM methods and attributes."""
   OS_TYPE = os_types.DEBIAN11
@@ -2277,6 +2282,11 @@ class Debian11Mixin(BaseDebianMixin):
     # partitioning.
     self.InstallPackages('fdisk')
     super().PrepareVMEnvironment()
+
+
+class Debian11BackportsMixin(Debian11Mixin):
+  """Debian 11 with backported kernel."""
+  OS_TYPE = os_types.DEBIAN11_BACKPORTS
 
 
 class BaseUbuntuMixin(BaseDebianMixin):

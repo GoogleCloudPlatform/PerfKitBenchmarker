@@ -1476,17 +1476,31 @@ class Debian9BasedAwsVirtualMachine(AwsVirtualMachine,
 class Debian10BasedAwsVirtualMachine(AwsVirtualMachine,
                                      linux_virtual_machine.Debian10Mixin):
   # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
-  IMAGE_NAME_FILTER = 'debian-10-*64*'
+  # 10-a*64 matches 10-amd64 and 10-arm64, but not 10-backports
+  IMAGE_NAME_FILTER = 'debian-10-a*64-*'
   IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'admin'
+
+
+class Debian10BackportsBasedAwsVirtualMachine(
+    Debian10BasedAwsVirtualMachine,
+    linux_virtual_machine.Debian10BackportsMixin):
+  IMAGE_NAME_FILTER = 'debian-10-backports-*64-*'
 
 
 class Debian11BasedAwsVirtualMachine(AwsVirtualMachine,
                                      linux_virtual_machine.Debian11Mixin):
-  # From https://wiki.debian.org/Cloud/AmazonEC2Image/Buster
-  IMAGE_NAME_FILTER = 'debian-11-*64*'
+  # From https://wiki.debian.org/Cloud/AmazonEC2Image/Bullseye
+  # 11-a*64 matches 11-amd64 and 11-arm64, but not 11-backports
+  IMAGE_NAME_FILTER = 'debian-11-a*64-*'
   IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'admin'
+
+
+class Debian11BackportsBasedAwsVirtualMachine(
+    Debian11BasedAwsVirtualMachine,
+    linux_virtual_machine.Debian11BackportsMixin):
+  IMAGE_NAME_FILTER = 'debian-11-backports-*64-*'
 
 
 class UbuntuBasedAwsVirtualMachine(AwsVirtualMachine):
@@ -1585,12 +1599,9 @@ class CentOs7BasedAwsVirtualMachine(AwsVirtualMachine,
   """Class with configuration for AWS CentOS 7 virtual machines."""
   # Documentation on finding the CentOS 7 image:
   # https://wiki.centos.org/Cloud/AWS#x86_64
-  IMAGE_NAME_FILTER = 'CentOS 7*'
+  IMAGE_NAME_FILTER = 'CentOS Linux 7*'
   IMAGE_OWNER = CENTOS_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'centos'
-
-  # Centos 7 is all marked deprecated as of 2022-11-11
-  ALLOW_DEPRECATED_IMAGE = True
 
   def _InstallEfa(self):
     logging.info('Upgrading Centos7 kernel, installing kernel headers and '
