@@ -170,7 +170,8 @@ class WindowsGceVirtualMachine(
   def SupportGVNIC(self) -> bool:
     return self.OS_TYPE not in self.GVNIC_DISABLED_OS_TYPES
 
-  def GetDefaultImageFamily(self) -> str:
+  def GetDefaultImageFamily(self, is_arm: bool) -> str:
+    assert not is_arm
     return self.DEFAULT_IMAGE_FAMILY[self.OS_TYPE]
 
   def GetDefaultImageProject(self) -> str:

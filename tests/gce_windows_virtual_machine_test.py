@@ -62,7 +62,7 @@ class GceWindowsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm = vm_class(self.spec)
     self.assertEqual(vm.OS_TYPE, os_type)
     self.assertEqual(vm.SupportGVNIC(), gvnic)
-    self.assertEqual(vm.GetDefaultImageFamily(), family)
+    self.assertEqual(vm.GetDefaultImageFamily(False), family)
     self.assertEqual(vm.GetDefaultImageProject(), project)
 
 

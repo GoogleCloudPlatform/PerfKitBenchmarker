@@ -445,7 +445,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.spot_early_termination = False
     self.preemptible_status_code = None
     self.project = vm_spec.project or util.GetDefaultProject()
-    self.image_family = vm_spec.image_family or self.GetDefaultImageFamily()
     self.image_project = vm_spec.image_project or self.GetDefaultImageProject()
     self.backfill_image = False
     self.mtu: Optional[int] = FLAGS.mtu
@@ -499,20 +498,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       # Assign host_arch to avoid running detect_host on ARM
       self.host_arch = arm_arch
       self.is_aarch64 = True
-
-      if 'arm64' not in self.image_family:
-        arm_image_family = f'{self.image_family}-arm64'
-        logging.warning(
-            'ARM image must be used; changing image to %s',
-            arm_image_family,
-        )
-        self.image_family = arm_image_family
-
-    # Reset image when running client-server benchmarks where client must be x86
-    if not arm_arch and self.image_family and 'arm64' in self.image_family:
-      logging.warning('Using default image and project for non-ARM VM')
-      self.image_family = self.GetDefaultImageFamily()  # pylint: disable=assignment-from-none
-      self.image_project = self.GetDefaultImageProject()  # pylint: disable=assignment-from-none
+    self.image_family = (
+        vm_spec.image_family or self.GetDefaultImageFamily(self.is_aarch64))
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
@@ -1378,7 +1365,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def SupportGVNIC(self) -> bool:
     return True
 
-  def GetDefaultImageFamily(self) -> Optional[str]:
+  def GetDefaultImageFamily(self, is_arm: bool) -> Optional[str]:
     return None
 
   def GetDefaultImageProject(self) -> Optional[str]:
@@ -1400,6 +1387,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   # Subclasses should override the default image OR
   # both the image family and image_project.
   DEFAULT_IMAGE_FAMILY = None
+  DEFAULT_ARM_IMAGE_FAMILY = None
   DEFAULT_IMAGE_PROJECT = None
   SUPPORTS_GVNIC = True
 
@@ -1465,9 +1453,20 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   def SupportGVNIC(self) -> bool:
     return self.SUPPORTS_GVNIC
 
-  def GetDefaultImageFamily(self) -> str:
+  # Use an explicit is_arm parameter to not accidentally assume a default
+  def GetDefaultImageFamily(self, is_arm: bool) -> str:
     if not self.DEFAULT_IMAGE_FAMILY:
       raise ValueError('DEFAULT_IMAGE_FAMILY can not be None')
+    if is_arm:
+      if self.DEFAULT_ARM_IMAGE_FAMILY:
+        return self.DEFAULT_ARM_IMAGE_FAMILY
+      if 'arm64' not in self.DEFAULT_IMAGE_FAMILY:
+        arm_image_family = self.DEFAULT_IMAGE_FAMILY + '-arm64'
+        logging.info(
+            'ARM image must be used; changing image to %s',
+            arm_image_family,
+        )
+        return arm_image_family
     return self.DEFAULT_IMAGE_FAMILY
 
   def GetDefaultImageProject(self) -> str:
@@ -1578,6 +1577,7 @@ class ContainerOptimizedOsBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.ContainerOptimizedOsMixin
 ):
   DEFAULT_IMAGE_FAMILY = 'cos-stable'
+  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-stable'
   DEFAULT_IMAGE_PROJECT = 'cos-cloud'
 
 

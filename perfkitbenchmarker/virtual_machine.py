@@ -1198,6 +1198,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
     self.vm_group = None
     self.id = None
+    self.is_aarch64 = False
 
   @property
   @classmethod
