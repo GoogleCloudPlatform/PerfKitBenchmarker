@@ -115,7 +115,7 @@ def GetTimeToBoot(vms):
         'create_delay_sec': '%0.1f' % create_delay_sec
     }
     boot_time_sec = vm.bootable_time - min_create_start_time
-    if isinstance(vm, linux_virtual_machine.BaseLinuxVirtualMachine):
+    if isinstance(vm, linux_virtual_machine.BaseLinuxMixin):
       # TODO(pclay): Remove when Windows refactor below is complete.
       if vm.ssh_external_time:
         samples.append(
