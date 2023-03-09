@@ -26,7 +26,6 @@ import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import pkb
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from tests import pkb_common_test_case
@@ -258,7 +257,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
 
   def testRecordLscpuOutputLinux(self):
     vm = self.CreateVm(os_types.DEFAULT, self.LsCpuText(self.LSCPU_DATA))
-    samples = pkb._CreateLscpuSamples([vm])
+    samples = linux_virtual_machine.CreateLscpuSamples([vm])
     vm.RemoteCommand.assert_called_with('lscpu')
     self.assertEqual(1, len(samples))
     metadata = {'node_name': vm.name}
@@ -268,7 +267,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
 
   def testRecordLscpuOutputNonLinux(self):
     vm = self.CreateVm(os_types.WINDOWS, '')
-    samples = pkb._CreateLscpuSamples([vm])
+    samples = linux_virtual_machine.CreateLscpuSamples([vm])
     self.assertEqual(0, len(samples))
     vm.RemoteCommand.assert_not_called()
 
@@ -310,7 +309,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
 
   def testProcCpuSamples(self):
     vm = self.CreateVm(os_types.DEFAULT, self.PROC_CPU_TEXT)
-    samples = pkb._CreateProcCpuSamples([vm])
+    samples = linux_virtual_machine.CreateProcCpuSamples([vm])
     proccpu_metadata = {
         'cpu family': '6',
         'node_name': 'pkb-test',

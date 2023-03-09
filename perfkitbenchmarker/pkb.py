@@ -88,6 +88,7 @@ from perfkitbenchmarker import events
 from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_benchmarks
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import package_lookup
@@ -886,10 +887,10 @@ def DoRunPhase(spec, collector, timer):
       samples.extend(cuda_memcpy_benchmark.Run(spec))
 
     if FLAGS.record_lscpu:
-      samples.extend(_CreateLscpuSamples(spec.vms))
+      samples.extend(linux_virtual_machine.CreateLscpuSamples(spec.vms))
 
     if FLAGS.record_proccpu:
-      samples.extend(_CreateProcCpuSamples(spec.vms))
+      samples.extend(linux_virtual_machine.CreateProcCpuSamples(spec.vms))
     if FLAGS.record_cpu_vuln and run_number == 0:
       samples.extend(_CreateCpuVulnerabilitySamples(spec.vms))
 
@@ -1641,35 +1642,6 @@ def _GenerateBenchmarkDocumentation():
                            vm_str or total_vm_count,
                            scratch_disk_str))
   return '\n\t'.join(benchmark_docs)
-
-
-def _CreateLscpuSamples(vms):
-  """Creates samples from linux VMs of lscpu output."""
-  samples = []
-  for vm in vms:
-    if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
-      metadata = {'node_name': vm.name}
-      metadata.update(vm.CheckLsCpu().data)
-      samples.append(sample.Sample('lscpu', 0, '', metadata))
-  return samples
-
-
-def _CreateProcCpuSamples(vms):
-  """Creates samples from linux VMs of lscpu output."""
-  samples = []
-  for vm in vms:
-    if vm.OS_TYPE not in os_types.LINUX_OS_TYPES:
-      continue
-    data = vm.CheckProcCpu()
-    metadata = {'node_name': vm.name}
-    metadata.update(data.GetValues())
-    samples.append(sample.Sample('proccpu', 0, '', metadata))
-    metadata = {'node_name': vm.name}
-    for processor_id, raw_values in data.mappings.items():
-      values = ['%s=%s' % item for item in raw_values.items()]
-      metadata['proc_{}'.format(processor_id)] = ';'.join(sorted(values))
-    samples.append(sample.Sample('proccpu_mapping', 0, '', metadata))
-  return samples
 
 
 def _CreateCpuVulnerabilitySamples(vms) -> List[sample.Sample]:

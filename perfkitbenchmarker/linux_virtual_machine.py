@@ -49,6 +49,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -2536,6 +2537,17 @@ def _ParseTextProperties(text):
     yield current_data
 
 
+def CreateLscpuSamples(vms):
+  """Creates samples from linux VMs of lscpu output."""
+  samples = []
+  for vm in vms:
+    if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
+      metadata = {'node_name': vm.name}
+      metadata.update(vm.CheckLsCpu().data)
+      samples.append(sample.Sample('lscpu', 0, '', metadata))
+  return samples
+
+
 class LsCpuResults(object):
   """Holds the contents of the command lscpu."""
 
@@ -2588,6 +2600,24 @@ class LsCpuResults(object):
     self.cores_per_socket = GetInt('Core(s) per socket')
     self.socket_count = GetInt('Socket(s)')
     self.threads_per_core = GetInt('Thread(s) per core')
+
+
+def CreateProcCpuSamples(vms):
+  """Creates samples from linux VMs of lscpu output."""
+  samples = []
+  for vm in vms:
+    if vm.OS_TYPE not in os_types.LINUX_OS_TYPES:
+      continue
+    data = vm.CheckProcCpu()
+    metadata = {'node_name': vm.name}
+    metadata.update(data.GetValues())
+    samples.append(sample.Sample('proccpu', 0, '', metadata))
+    metadata = {'node_name': vm.name}
+    for processor_id, raw_values in data.mappings.items():
+      values = ['%s=%s' % item for item in raw_values.items()]
+      metadata['proc_{}'.format(processor_id)] = ';'.join(sorted(values))
+    samples.append(sample.Sample('proccpu_mapping', 0, '', metadata))
+  return samples
 
 
 class ProcCpuResults(object):
