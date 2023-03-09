@@ -103,6 +103,12 @@ flags.DEFINE_integer(
     'smaller than sysctl flag fs.nr_open. Benchmark will fail if this '
     'flag is set to a value bigger than fs.nr_open.',
     lower_bound=0)
+flags.DEFINE_integer(
+    'specjbb_connection_pool_size', 256,
+    'User can use this flag to set connection pool size for all specjbb '
+    'agents. Please refer to section 16.1 of specjbb userguide:'
+    'https://www.spec.org/jbb2015/docs/userguide.pdf',
+    lower_bound=0)
 
 
 def GetConfig(user_config):
@@ -179,13 +185,16 @@ def _SpecArgs(vm, mode):
   spec_num_groups_arg = f' -Dspecjbb.group.count={FLAGS.specjbb_num_groups}'
   spec_rt_curve_arg = '-Dspecjbb.controller.rtcurve.warmup.step=0.5'
   spec_mr_arg = f'-Dspecjbb.mapreducer.pool.size={_DEFAULT_NUM_GROUPS * 2}'
+  spec_connect_pool_size_arg = (
+      f'-Dspecjbb.comm.connect.client.pool.size={FLAGS.specjbb_connection_pool_size}'
+  )
 
   if mode == TXINJECTOR_MODE:
     return ''
   elif mode == MULTICONTROLLER_MODE:
     return ' '.join([
         spec_rt_curve_arg, spec_mr_arg, spec_num_workers_arg,
-        spec_num_groups_arg
+        spec_num_groups_arg, spec_connect_pool_size_arg
     ])
   elif mode == BACKEND_MODE:
     return ''
