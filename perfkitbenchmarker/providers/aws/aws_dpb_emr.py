@@ -25,7 +25,7 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_dpb_emr_serverless_prices
@@ -99,7 +99,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     dpb_version: EMR version to use.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
   SERVICE_TYPE = 'emr'
 
   def __init__(self, dpb_service_spec):
@@ -428,7 +428,7 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
   https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/emr-serverless.html
   """
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
   SERVICE_TYPE = 'emr_serverless'
 
   def __init__(self, dpb_service_spec):

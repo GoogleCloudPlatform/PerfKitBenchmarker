@@ -23,7 +23,7 @@ from typing import Dict, Text, Tuple
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
@@ -219,7 +219,7 @@ def RunScriptCommand(script_command):
 class Athena(edw_service.EdwService):
   """Object representing a Athena data warehouse."""
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
   SERVICE_TYPE = 'athena'
 
   def __init__(self, edw_service_spec):

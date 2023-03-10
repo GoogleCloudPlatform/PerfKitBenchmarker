@@ -27,7 +27,7 @@ from typing import Any, Dict
 from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -39,7 +39,7 @@ FLAGS = flags.FLAGS
 class EksCluster(container_service.KubernetesCluster):
   """Class representing an Elastic Kubernetes Service cluster."""
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
 
   def __init__(self, spec):
     super(EksCluster, self).__init__(spec)

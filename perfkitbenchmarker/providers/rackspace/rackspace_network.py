@@ -21,7 +21,7 @@ import threading
 
 from absl import flags
 from perfkitbenchmarker import network
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.rackspace import util
 
@@ -230,7 +230,7 @@ class RackspaceNetworkResource(resource.BaseResource):
 class RackspaceNetwork(network.BaseNetwork):
   """An object representing a Rackspace Network."""
 
-  CLOUD = providers.RACKSPACE
+  CLOUD = provider_info.RACKSPACE
 
   def __init__(self, network_spec):
     super(RackspaceNetwork, self).__init__(network_spec)
@@ -294,7 +294,7 @@ class RackspaceFirewall(network.BaseFirewall):
   """An object representing a Rackspace Security Group applied to PublicNet and
   ServiceNet."""
 
-  CLOUD = providers.RACKSPACE
+  CLOUD = provider_info.RACKSPACE
 
   def __init__(self):
     # TODO(meteorfox) Support a Firewall per region

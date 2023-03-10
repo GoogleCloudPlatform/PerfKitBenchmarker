@@ -37,7 +37,7 @@ import tempfile
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -108,7 +108,7 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
     rack_profile: None or string. Rack CLI profile configuration.
   """
 
-  CLOUD = providers.RACKSPACE
+  CLOUD = provider_info.RACKSPACE
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -148,7 +148,7 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
 class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Rackspace Public Cloud Virtual Machine."""
 
-  CLOUD = providers.RACKSPACE
+  CLOUD = provider_info.RACKSPACE
   DEFAULT_IMAGE = None
 
   def __init__(self, vm_spec):

@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import messaging_service as msgsvc
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 
@@ -24,7 +24,7 @@ MESSAGING_SERVICE_SCRIPTS_AWS_BIN = 'messaging_service_scripts/aws_benchmark.py'
 class AwsSqs(msgsvc.BaseMessagingService):
   """AWS SQS Interface Class."""
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
 
   def __init__(self):
     super().__init__()

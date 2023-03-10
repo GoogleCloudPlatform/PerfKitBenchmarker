@@ -17,10 +17,9 @@
 """
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
 
 
 class CloudStackProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
-  CLOUD = providers.CLOUDSTACK
+  CLOUD = provider_info.CLOUDSTACK

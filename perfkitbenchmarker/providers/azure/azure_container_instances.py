@@ -22,7 +22,7 @@ import json
 from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -58,7 +58,7 @@ class AciContainer(container_service.BaseContainer):
         '--memory',
         '%0.1f' % (self.memory / 1024.0),
     ] + self.resource_group.args
-    if self.registry and self.registry.CLOUD == providers.AZURE:
+    if self.registry and self.registry.CLOUD == provider_info.AZURE:
       create_cmd.extend([
           '--registry-login-server',
           self.registry.login_server,
@@ -135,7 +135,7 @@ class AciContainer(container_service.BaseContainer):
 class AciCluster(container_service.BaseContainerCluster):
   """Class that can deploy ACI containers."""
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
   CLUSTER_TYPE = 'aci'
 
   def __init__(self, cluster_spec):

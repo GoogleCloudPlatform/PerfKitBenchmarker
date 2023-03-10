@@ -20,7 +20,7 @@ import json
 
 from absl import flags
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers import azure
@@ -43,7 +43,7 @@ class AzurePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
       zone: The Azure zone the Placement Group is in.
   """
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -76,7 +76,7 @@ class AzurePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
 class AzurePlacementGroup(placement_group.BasePlacementGroup):
   """Object representing an Azure Placement Group."""
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   def __init__(self, azure_placement_group_spec):
     """Init method for AzurePlacementGroup.

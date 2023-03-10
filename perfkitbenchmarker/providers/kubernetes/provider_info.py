@@ -17,7 +17,6 @@
 """
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
 
 
 class KubernetesProviderInfo(provider_info.BaseProviderInfo):
@@ -28,7 +27,7 @@ class KubernetesProviderInfo(provider_info.BaseProviderInfo):
                           'netperf', 'redis']
   UNSUPPORTED_BENCHMARKS = ['bonnieplusplus', 'sysbench']
 
-  CLOUD = providers.KUBERNETES
+  CLOUD = provider_info.KUBERNETES
 
   @classmethod
   def IsBenchmarkSupported(cls, benchmark):

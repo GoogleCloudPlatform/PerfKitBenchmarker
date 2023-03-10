@@ -22,7 +22,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import kubernetes_helper
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -44,7 +44,7 @@ def CreateDisks(disk_specs, vm_name):
 
 class KubernetesDiskSpec(disk.BaseDiskSpec):
   """Kubernetes disk Spec class."""
-  CLOUD = providers.KUBERNETES
+  CLOUD = provider_info.KUBERNETES
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):

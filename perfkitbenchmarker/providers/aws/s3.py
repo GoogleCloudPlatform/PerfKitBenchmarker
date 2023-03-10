@@ -24,7 +24,7 @@ from absl import logging
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 
@@ -39,7 +39,7 @@ _WRITE = 's3:PutObject'
 class S3Service(object_storage_service.ObjectStorageService):
   """Interface to Amazon S3."""
 
-  STORAGE_NAME = providers.AWS
+  STORAGE_NAME = provider_info.AWS
 
   region: str
 

@@ -28,11 +28,6 @@ from perfkitbenchmarker.providers import ibmcloud
 # TODO(user) These constants were moved to provider info to break
 # circular dependencies to enable pytyping.  These forward links should be
 # removed once their callers are updated.
-AZURE = provider_info.AZURE
-AWS = provider_info.AWS
-KUBERNETES = provider_info.KUBERNETES
-CLOUDSTACK = provider_info.CLOUDSTACK
-RACKSPACE = provider_info.RACKSPACE
 MESOS = provider_info.MESOS
 PROFITBRICKS = provider_info.PROFITBRICKS
 DOCKER = provider_info.DOCKER
