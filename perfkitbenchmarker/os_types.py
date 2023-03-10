@@ -30,6 +30,8 @@ DEBIAN10_BACKPORTS = 'debian10_backports'
 DEBIAN11 = 'debian11'
 DEBIAN11_BACKPORTS = 'debian11_backports'
 JUJU = 'juju'
+ORACLE8 = 'oracle8'
+ORACLE9 = 'oracle9'
 RHEL7 = 'rhel7'
 RHEL8 = 'rhel8'
 RHEL9 = 'rhel9'
@@ -88,6 +90,8 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     DEBIAN11,
     DEBIAN11_BACKPORTS,
     JUJU,
+    ORACLE8,
+    ORACLE9,
     RHEL7,
     RHEL8,
     RHEL9,
