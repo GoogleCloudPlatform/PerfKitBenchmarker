@@ -20,7 +20,7 @@ import os
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -100,7 +100,7 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
     cores: None or int. CPU cores value for custom ProfitBricks VM.
   """
 
-  CLOUD = providers.PROFITBRICKS
+  CLOUD = provider_info.PROFITBRICKS
 
   def __init__(self, *args, **kwargs):
     super(ProfitBricksVmSpec, self).__init__(*args, **kwargs)
@@ -164,212 +164,211 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
 
 
 class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
-    """Object representing a ProfitBricks Virtual Machine."""
+  """Object representing a ProfitBricks Virtual Machine."""
 
-    CLOUD = providers.PROFITBRICKS
-    DEFAULT_IMAGE = None
+  CLOUD = provider_info.PROFITBRICKS
+  DEFAULT_IMAGE = None
 
-    def __init__(self, vm_spec):
-        """Initialize a ProfitBricks virtual machine.
+  def __init__(self, vm_spec):
+    """Initialize a ProfitBricks virtual machine.
 
-        Args:
-        vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
-        """
-        super(ProfitBricksVirtualMachine, self).__init__(vm_spec)
+    Args:
+    vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+    """
+    super(ProfitBricksVirtualMachine, self).__init__(vm_spec)
 
-        # Get user authentication credentials
-        user_config_path = os.path.expanduser(FLAGS.profitbricks_config)
+    # Get user authentication credentials
+    user_config_path = os.path.expanduser(FLAGS.profitbricks_config)
 
-        with open(user_config_path) as f:
-            user_creds = f.read().rstrip('\n')
-            self.user_token = base64.b64encode(user_creds)
+    with open(user_config_path) as f:
+      user_creds = f.read().rstrip('\n')
+      self.user_token = base64.b64encode(user_creds)
 
-        self.server_id = None
-        self.server_status = None
-        self.dc_id = None
-        self.dc_status = None
-        self.lan_id = None
-        self.lan_status = None
-        self.max_local_disks = 1
-        self.local_disk_counter = 0
-        self.ram = vm_spec.ram
-        self.cores = vm_spec.cores
-        self.machine_type = vm_spec.machine_type
-        self.image = self.image or self.DEFAULT_IMAGE
-        self.image_alias = vm_spec.image_alias
-        self.boot_volume_type = vm_spec.boot_volume_type
-        self.boot_volume_size = vm_spec.boot_volume_size
-        self.location = vm_spec.location
-        self.user_name = 'root'
-        self.availability_zone = vm_spec.availability_zone
-        self.header = {
-            'Authorization': 'Basic %s' % self.user_token,
-            'Content-Type': 'application/vnd.profitbricks.resource+json',
-            'User-Agent': 'profitbricks-perfkitbenchmarker',
-        }
+    self.server_id = None
+    self.server_status = None
+    self.dc_id = None
+    self.dc_status = None
+    self.lan_id = None
+    self.lan_status = None
+    self.max_local_disks = 1
+    self.local_disk_counter = 0
+    self.ram = vm_spec.ram
+    self.cores = vm_spec.cores
+    self.machine_type = vm_spec.machine_type
+    self.image = self.image or self.DEFAULT_IMAGE
+    self.image_alias = vm_spec.image_alias
+    self.boot_volume_type = vm_spec.boot_volume_type
+    self.boot_volume_size = vm_spec.boot_volume_size
+    self.location = vm_spec.location
+    self.user_name = 'root'
+    self.availability_zone = vm_spec.availability_zone
+    self.header = {
+        'Authorization': 'Basic %s' % self.user_token,
+        'Content-Type': 'application/vnd.profitbricks.resource+json',
+        'User-Agent': 'profitbricks-perfkitbenchmarker',
+    }
 
-    def _Create(self):
-        """Create a ProfitBricks VM instance."""
+  def _Create(self):
+    """Create a ProfitBricks VM instance."""
 
-        # Grab ssh pub key to inject into new VM
-        with open(self.ssh_public_key) as f:
-            public_key = f.read().rstrip('\n')
+    # Grab ssh pub key to inject into new VM
+    with open(self.ssh_public_key) as f:
+      public_key = f.read().rstrip('\n')
 
-        if self.image_alias is None:
-            # Find an Ubuntu image that matches our location
-            self.image = util.ReturnImage(self.header, self.location)
+    if self.image_alias is None:
+      # Find an Ubuntu image that matches our location
+      self.image = util.ReturnImage(self.header, self.location)
 
-        # Create server POST body
-        new_server = {
-            'properties': {
-                'name': self.name,
-                'ram': self.ram,
-                'cores': self.cores,
-                'availabilityZone': self.zone
+    # Create server POST body
+    new_server = {
+        'properties': {
+            'name': self.name,
+            'ram': self.ram,
+            'cores': self.cores,
+            'availabilityZone': self.zone,
+        },
+        'entities': {
+            'volumes': {
+                'items': [
+                    {
+                        'properties': {
+                            'size': self.boot_volume_size,
+                            'name': 'boot volume',
+                            'image': self.image,
+                            'imageAlias': self.image_alias,
+                            'type': self.boot_volume_type,
+                            'sshKeys': [public_key],
+                            'availabilityZone': self.availability_zone,
+                        }
+                    }
+                ]
             },
-            'entities': {
-                'volumes': {
-                    'items': [
-                        {
-                            'properties': {
-                                'size': self.boot_volume_size,
-                                'name': 'boot volume',
-                                'image': self.image,
-                                'imageAlias': self.image_alias,
-                                'type': self.boot_volume_type,
-                                'sshKeys': [public_key],
-                                'availabilityZone': self.availability_zone
+            'nics': {
+                'items': [
+                    {
+                        'properties': {
+                            'name': 'nic1',
+                            'lan': self.lan_id
                             }
                         }
                     ]
-                },
-                'nics': {
-                    'items': [
-                        {
-                            'properties': {
-                                'name': 'nic1',
-                                'lan': self.lan_id
-                            }
-                        }
-                    ]
-                }
-            }
-        }
+            },
+        },
+    }
 
-        # Build Server URL
-        url = '%s/datacenters/%s/servers' % (PROFITBRICKS_API, self.dc_id)
+    # Build Server URL
+    url = '%s/datacenters/%s/servers' % (PROFITBRICKS_API, self.dc_id)
 
-        # Provision Server
-        r = util.PerformRequest('post', url, self.header, json=new_server)
-        logging.info('Creating VM: %s' % self.name)
+    # Provision Server
+    r = util.PerformRequest('post', url, self.header, json=new_server)
+    logging.info('Creating VM: %s', self.name)
 
-        # Parse Required values from response
-        self.server_status = r.headers['Location']
-        response = r.json()
-        self.server_id = response['id']
+    # Parse Required values from response
+    self.server_status = r.headers['Location']
+    response = r.json()
+    self.server_id = response['id']
 
-        # The freshly created server will be in a locked and unusable
-        # state for a while, and it cannot be deleted or modified in
-        # this state. Wait for the action to finish and check the
-        # reported result.
-        if not self._WaitUntilReady(self.server_status):
-            raise errors.Error('VM creation failed, see log.')
+    # The freshly created server will be in a locked and unusable
+    # state for a while, and it cannot be deleted or modified in
+    # this state. Wait for the action to finish and check the
+    # reported result.
+    if not self._WaitUntilReady(self.server_status):
+      raise errors.Error('VM creation failed, see log.')
 
-    @vm_util.Retry()
-    def _PostCreate(self):
-        """Get the instance's public IP address."""
+  @vm_util.Retry()
+  def _PostCreate(self):
+    """Get the instance's public IP address."""
 
-        # Build URL
-        url = '%s/datacenters/%s/servers/%s?depth=5' % (PROFITBRICKS_API,
-                                                        self.dc_id,
-                                                        self.server_id)
+    # Build URL
+    url = '%s/datacenters/%s/servers/%s?depth=5' % (PROFITBRICKS_API,
+                                                    self.dc_id,
+                                                    self.server_id)
 
-        # Perform Request
-        r = util.PerformRequest('get', url, self.header)
-        response = r.json()
-        nic = response['entities']['nics']['items'][0]
-        self.ip_address = nic['properties']['ips'][0]
+    # Perform Request
+    r = util.PerformRequest('get', url, self.header)
+    response = r.json()
+    nic = response['entities']['nics']['items'][0]
+    self.ip_address = nic['properties']['ips'][0]
 
-    def _Delete(self):
-        """Delete a ProfitBricks VM."""
+  def _Delete(self):
+    """Delete a ProfitBricks VM."""
 
-        # Build URL
-        url = '%s/datacenters/%s/servers/%s' % (PROFITBRICKS_API, self.dc_id,
-                                                self.server_id)
+    # Build URL
+    url = '%s/datacenters/%s/servers/%s' % (PROFITBRICKS_API, self.dc_id,
+                                            self.server_id)
 
-        # Make call
-        logging.info('Deleting VM: %s' % self.server_id)
-        r = util.PerformRequest('delete', url, self.header)
+    # Make call
+    logging.info('Deleting VM: %s', self.server_id)
+    r = util.PerformRequest('delete', url, self.header)
 
-        # Check to make sure deletion has finished
-        delete_status = r.headers['Location']
-        if not self._WaitUntilReady(delete_status):
-            raise errors.Error('VM deletion failed, see log.')
+    # Check to make sure deletion has finished
+    delete_status = r.headers['Location']
+    if not self._WaitUntilReady(delete_status):
+      raise errors.Error('VM deletion failed, see log.')
 
-    def _CreateDependencies(self):
-        """Create a data center and LAN prior to creating VM."""
+  def _CreateDependencies(self):
+    """Create a data center and LAN prior to creating VM."""
 
-        # Create data center
-        self.dc_id, self.dc_status = util.CreateDatacenter(self.header,
-                                                           self.location)
-        if not self._WaitUntilReady(self.dc_status):
-            raise errors.Error('Data center creation failed, see log.')
+    # Create data center
+    self.dc_id, self.dc_status = util.CreateDatacenter(self.header,
+                                                       self.location)
+    if not self._WaitUntilReady(self.dc_status):
+      raise errors.Error('Data center creation failed, see log.')
 
-        # Create LAN
-        self.lan_id, self.lan_status = util.CreateLan(self.header,
-                                                      self.dc_id)
-        if not self._WaitUntilReady(self.lan_status):
-            raise errors.Error('LAN creation failed, see log.')
+    # Create LAN
+    self.lan_id, self.lan_status = util.CreateLan(self.header,
+                                                  self.dc_id)
+    if not self._WaitUntilReady(self.lan_status):
+      raise errors.Error('LAN creation failed, see log.')
 
-    def _DeleteDependencies(self):
-        """Delete a data center and LAN."""
+  def _DeleteDependencies(self):
+    """Delete a data center and LAN."""
 
-        # Build URL
-        url = '%s/datacenters/%s' % (PROFITBRICKS_API, self.dc_id)
+    # Build URL
+    url = '%s/datacenters/%s' % (PROFITBRICKS_API, self.dc_id)
 
-        # Make call to delete data center
-        logging.info('Deleting Datacenter: %s' % self.dc_id)
-        r = util.PerformRequest('delete', url, self.header)
+    # Make call to delete data center
+    logging.info('Deleting Datacenter: %s', self.dc_id)
+    r = util.PerformRequest('delete', url, self.header)
 
-        # Check to make sure deletion has finished
-        delete_status = r.headers['Location']
-        if not self._WaitUntilReady(delete_status):
-            raise errors.Error('Data center deletion failed, see log.')
+    # Check to make sure deletion has finished
+    delete_status = r.headers['Location']
+    if not self._WaitUntilReady(delete_status):
+      raise errors.Error('Data center deletion failed, see log.')
 
-    @vm_util.Retry(timeout=TIMEOUT, log_errors=False)
-    def _WaitUntilReady(self, status_url):
-        """Returns true if the ProfitBricks resource is ready."""
+  @vm_util.Retry(timeout=TIMEOUT, log_errors=False)
+  def _WaitUntilReady(self, status_url):
+    """Returns true if the ProfitBricks resource is ready."""
 
-        # Poll resource for status update
-        logging.info('Polling ProfitBricks resource.')
-        r = util.PerformRequest('get', status_url, self.header)
-        response = r.json()
-        status = response['metadata']['status']
+    # Poll resource for status update
+    logging.info('Polling ProfitBricks resource.')
+    r = util.PerformRequest('get', status_url, self.header)
+    response = r.json()
+    status = response['metadata']['status']
 
-        # Keep polling resource until a "DONE" state is returned
-        if status != 'DONE':
-            raise Exception  # Exception triggers vm_util.Retry to go again
+    # Keep polling resource until a "DONE" state is returned
+    if status != 'DONE':
+      raise Exception  # Exception triggers vm_util.Retry to go again
 
-        return True
+    return True
 
-    def CreateScratchDisk(self, disk_spec):
-        """Create a VM's scratch disk.
+  def CreateScratchDisk(self, disk_spec):
+    """Create a VM's scratch disk.
 
-        Args:
-          disk_spec: virtual_machine.BaseDiskSpec object of the disk.
-        """
-        if disk_spec.disk_type != disk.STANDARD:
-            raise errors.Error('ProfitBricks does not support disk type %s.' %
-                               disk_spec.disk_type)
+    Args:
+      disk_spec: virtual_machine.BaseDiskSpec object of the disk.
+    """
+    if disk_spec.disk_type != disk.STANDARD:
+      raise errors.Error('ProfitBricks does not support disk type %s.' %
+                         disk_spec.disk_type)
 
-        if self.scratch_disks:
-            # We have a "disk" already, don't add more.
-            raise errors.Error('ProfitBricks does not require '
-                               'a separate disk.')
+    if self.scratch_disks:
+      # We have a "disk" already, don't add more.
+      raise errors.Error('ProfitBricks does not require '
+                         'a separate disk.')
 
-        # Just create a local directory at the specified path, don't mount
-        # anything.
-        self.RemoteCommand('sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'
-                           .format(disk_spec.mount_point))
-        self.scratch_disks.append(profitbricks_disk.ProfitBricksDisk(
-                                  disk_spec))
+    # Just create a local directory at the specified path, don't mount
+    # anything.
+    self.RemoteCommand('sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'
+                       .format(disk_spec.mount_point))
+    self.scratch_disks.append(profitbricks_disk.ProfitBricksDisk(disk_spec))

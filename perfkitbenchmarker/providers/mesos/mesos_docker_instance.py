@@ -16,7 +16,7 @@ import json
 import logging
 from absl import flags
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -41,7 +41,7 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
         should be run in privileged mode.
   """
 
-  CLOUD = providers.MESOS
+  CLOUD = provider_info.MESOS
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -69,7 +69,7 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
   Represents a Docker instance spawned by Marathon framework on a Mesos cluster
   """
 
-  CLOUD = providers.MESOS
+  CLOUD = provider_info.MESOS
 
   def __init__(self, vm_spec):
     super(MesosDockerInstance, self).__init__(vm_spec)

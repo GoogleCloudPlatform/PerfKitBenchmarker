@@ -25,13 +25,6 @@ from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers import ibmcloud
 
-# TODO(user) These constants were moved to provider info to break
-# circular dependencies to enable pytyping.  These forward links should be
-# removed once their callers are updated.
-MESOS = provider_info.MESOS
-PROFITBRICKS = provider_info.PROFITBRICKS
-DOCKER = provider_info.DOCKER
-
 _imported_providers = set()
 
 
