@@ -156,7 +156,8 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--warehouse {self.warehouse} '
         f'--database {self.database} '
         f'--schema {self.schema} '
-        f'--query_streams {"".join([",".join(stream) for stream in concurrency_streams])}'
+        '--query_streams '
+        f'{" ".join([",".join(stream) for stream in concurrency_streams])}'
     )
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     return stdout

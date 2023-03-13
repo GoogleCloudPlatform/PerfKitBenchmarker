@@ -350,3 +350,5 @@
 -   Remove `--google_bigtable_hbase_jar_url`. Rely on
     `--google_bigtable_client_version` instead.
 -   Fix how environment variable is set for direct path
+-   Fix incorrect string concatenation causing Snowflake Throughput runs to
+    fail.
