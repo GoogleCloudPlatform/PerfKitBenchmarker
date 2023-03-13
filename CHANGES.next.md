@@ -237,6 +237,8 @@
     vm_spec overrides FLAGS.gce_network_name.
 -   Add `--dpb_sparksql_queries_url` flag to provide custom object store path
     (i.e. GCS/S3) where the queries will be used for `dpb_sparksql_benchmark`.
+-   Add `--gke_node_system_config` flag to the GKE provider for passing kubelet
+    and linux parameters.
 
 ### Bug fixes and maintenance updates:
 

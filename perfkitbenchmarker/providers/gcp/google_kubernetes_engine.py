@@ -254,6 +254,9 @@ class GkeCluster(container_service.KubernetesCluster):
     else:
       cmd.args.append('--no-enable-gvnic')
 
+    if FLAGS.gke_node_system_config is not None:
+      cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
+
     if sandbox_config is not None:
       cmd.flags['sandbox'] = sandbox_config.ToSandboxFlag()
 
