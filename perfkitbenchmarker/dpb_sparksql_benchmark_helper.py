@@ -16,11 +16,12 @@
 import json
 import os
 import re
-from typing import List, Optional
+from typing import Any, Optional
 
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
 
@@ -76,6 +77,13 @@ flags.DEFINE_enum(
     'Lazy will cache tables as they are read. This might have some '
     'counter-intuitive results and Spark reads more data than necessary to '
     "populate it's cache.")
+_QUERIES_URL = flags.DEFINE_string(
+    'dpb_sparksql_queries_url', None,
+    'Object Storage (e.g. GCS or S3) directory URL where the benchmark queries '
+    'are contained. They must be named like "q<number>.sql", e.g: "q1.sql", '
+    '"q14a.sql", etc. If omitted, queries will be fetched from '
+    'databricks/spark-sql-perf Github repo and use the --dpb_sparksql_query '
+    'flag to decide whether to get TPC-DS or TPC-H queries.')
 
 FLAGS = flags.FLAGS
 
@@ -115,7 +123,10 @@ def GetTableMetadata(benchmark_spec):
   return metadata
 
 
-def StageMetadata(json_metadata, storage_service, staged_file: str):
+def StageMetadata(
+    json_metadata: Any,
+    storage_service: object_storage_service.ObjectStorageService,
+    staged_file: str):
   """Write JSON metadata to object storage."""
   # Write computed metadata to object storage.
   temp_run_dir = temp_dir.GetRunDirPath()
@@ -159,13 +170,15 @@ def Prepare(benchmark_spec):
     benchmark_spec.data_dir = FLAGS.dpb_sparksql_data
 
 
-def LoadAndStageQueries(storage_service, base_dir: str) -> List[str]:
-  """Loads queries from Github and stages them in object storage.
+def LoadAndStageQueries(
+    storage_service: object_storage_service.ObjectStorageService,
+    base_dir: str) -> list[str]:
+  """Loads queries stages them in object storage if needed.
 
   Queries are selected using --dpb_sparksql_query and --dpb_sparksql_order.
 
   Args:
-    storage_service: object_strorage_service to stage queries into.
+    storage_service: object_storage_service to stage queries into.
     base_dir: object storage directory to stage queries into.
 
   Returns:
@@ -173,6 +186,51 @@ def LoadAndStageQueries(storage_service, base_dir: str) -> List[str]:
 
   Raises:
     PrepareException if a requested query is not found.
+  """
+
+  if _QUERIES_URL.value:
+    return _GetQueryFilesFromUrl(storage_service, _QUERIES_URL.value)
+  return _StageQueriesFromRepo(storage_service, base_dir)
+
+
+def _GetQueryFilesFromUrl(
+    storage_service: object_storage_service.ObjectStorageService,
+    queries_url: str) -> list[str]:
+  """Gets relevant query files from queries_url.
+
+  Args:
+    storage_service: object_storage_service to list query files.
+    queries_url: Object Storage directory URL where the benchmark queries are
+      contained.
+
+  Returns:
+    A list of object store paths to the queries.
+  """
+  query_paths = [
+      os.path.join(queries_url, f'q{q}.sql') for q in FLAGS.dpb_sparksql_order]
+  queries_missing = set()
+  for path in query_paths:
+    try:
+      storage_service.List(path)
+    except errors.VmUtil.IssueCommandError:  # Handling query not found
+      queries_missing.add(GetQueryId(path))
+  if queries_missing:
+    raise errors.Benchmarks.PrepareException(
+        'Could not find queries {}'.format(', '.join(sorted(queries_missing))))
+  return query_paths
+
+
+def _StageQueriesFromRepo(
+    storage_service: object_storage_service.ObjectStorageService,
+    base_dir: str) -> list[str]:
+  """Copies queries from default Github repo to object storage.
+
+  Args:
+    storage_service: object_storage_service to stage queries into.
+    base_dir: object storage directory to stage queries into.
+
+  Returns:
+    A list of object store paths to the queries.
   """
   temp_run_dir = temp_dir.GetRunDirPath()
   spark_sql_perf_dir = os.path.join(temp_run_dir, 'spark_sql_perf_dir')

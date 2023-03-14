@@ -233,6 +233,8 @@
 -   Set default YAML config vm_spec.GCP_network_name to null, and added the
     corresponding attribute to GCEVMSpec, GCENetworkSpec and GCEVirtualMachine.
     vm_spec overrides FLAGS.gce_network_name.
+-   Add `--dpb_sparksql_queries_url` flag to provide custom object store path
+    (i.e. GCS/S3) where the queries will be used for `dpb_sparksql_benchmark`.
 
 ### Bug fixes and maintenance updates:
 
