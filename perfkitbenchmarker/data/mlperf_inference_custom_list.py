@@ -25,214 +25,51 @@ from code.common.systems.known_hardware import match_float_approximate
 from code.common.systems.systems import SystemConfiguration
 
 
-custom_systems = dict()
+def system_configuration(
+    gpu_type: GPU, num_gpus: int, system_id: str
+) -> SystemConfiguration:
+  return SystemConfiguration(
+      host_cpu_conf=MATCH_ANY,
+      host_mem_conf=MATCH_ANY,
+      accelerator_conf=AcceleratorConfiguration(layout={gpu_type: num_gpus}),
+      numa_conf=None,
+      system_id=system_id,
+  )
 
-custom_systems["T4x1"] = SystemConfiguration(
-    host_cpu_conf=MATCH_ANY,
-    host_mem_conf=MATCH_ANY,
-    accelerator_conf=AcceleratorConfiguration(
-        layout={
-            GPU(
-                name="Tesla T4",
-                accelerator_type=AcceleratorType.Discrete,
-                vram=match_float_approximate(
-                    Memory(quantity=15, byte_suffix=ByteSuffix.GiB)
-                ),
-                max_power_limit=70.0,
-                pci_id="0x1EB810DE",
-                compute_sm=75,
-            ): 1
-        }
-    ),
-    numa_conf=None,
-    system_id="T4x1",
-)
 
-custom_systems["T4x4"] = SystemConfiguration(
-    host_cpu_conf=MATCH_ANY,
-    host_mem_conf=MATCH_ANY,
-    accelerator_conf=AcceleratorConfiguration(
-        layout={
-            GPU(
-                name="Tesla T4",
-                accelerator_type=AcceleratorType.Discrete,
-                vram=match_float_approximate(
-                    Memory(quantity=15, byte_suffix=ByteSuffix.GiB)
-                ),
-                max_power_limit=70.0,
-                pci_id="0x1EB810DE",
-                compute_sm=75,
-            ): 4
-        }
-    ),
-    numa_conf=None,
-    system_id="T4x4",
-)
+def gpu(
+    name: str,
+    memory_quantity: int,
+    max_power_limit: float,
+    pci_id: str,
+    compute_cm: int,
+) -> GPU:
+  return GPU(
+      name=name,
+      accelerator_type=AcceleratorType.Discrete,
+      vram=match_float_approximate(
+          Memory(quantity=memory_quantity, byte_suffix=ByteSuffix.GiB)
+      ),
+      max_power_limit=max_power_limit,
+      pci_id=pci_id,
+      compute_sm=compute_cm,
+  )
 
-custom_systems["L4x1"] = SystemConfiguration(
-    host_cpu_conf=MATCH_ANY,
-    host_mem_conf=MATCH_ANY,
-    accelerator_conf=AcceleratorConfiguration(
-        layout={
-            GPU(
-                name="Tesla L4",
-                accelerator_type=AcceleratorType.Discrete,
-                vram=match_float_approximate(
-                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
-                ),
-                max_power_limit=75.0,
-                pci_id="0x27B810DE",
-                compute_sm=89,
-            ): 1
-        }
-    ),
-    numa_conf=None,
-    system_id="L4x1",
-)
+T4 = GPU("Tesla T4", 15, 70.0, "0x1EB810DE", 75)
+L4 = GPU("Tesla L4", 22, 75.0, "0x27B810DE", 89)
+A10G = GPU("NVIDIA A10G", 22, 300.0, "0x223710DE", 86)
+A10 = GPU("NVIDIA A10-4Q", 24, None, "0x223610DE", 86)
 
-custom_systems["L4x2"] = SystemConfiguration(
-    host_cpu_conf=MATCH_ANY,
-    host_mem_conf=MATCH_ANY,
-    accelerator_conf=AcceleratorConfiguration(
-        layout={
-            GPU(
-                name="Tesla L4",
-                accelerator_type=AcceleratorType.Discrete,
-                vram=match_float_approximate(
-                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
-                ),
-                max_power_limit=75.0,
-                pci_id="0x27B810DE",
-                compute_sm=89,
-            ): 2
-        }
-    ),
-    numa_conf=None,
-    system_id="L4x2",
-)
-
-custom_systems["L4x4"] = SystemConfiguration(
-    host_cpu_conf=MATCH_ANY,
-    host_mem_conf=MATCH_ANY,
-    accelerator_conf=AcceleratorConfiguration(
-        layout={
-            GPU(
-                name="Tesla L4",
-                accelerator_type=AcceleratorType.Discrete,
-                vram=match_float_approximate(
-                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
-                ),
-                max_power_limit=75.0,
-                pci_id="0x27B810DE",
-                compute_sm=89,
-            ): 4
-        }
-    ),
-    numa_conf=None,
-    system_id="L4x4",
-)
-
-custom_systems["L4x8"] = SystemConfiguration(
-    host_cpu_conf=MATCH_ANY,
-    host_mem_conf=MATCH_ANY,
-    accelerator_conf=AcceleratorConfiguration(
-        layout={
-            GPU(
-                name="Tesla L4",
-                accelerator_type=AcceleratorType.Discrete,
-                vram=match_float_approximate(
-                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
-                ),
-                max_power_limit=75.0,
-                pci_id="0x27B810DE",
-                compute_sm=89,
-            ): 8
-        }
-    ),
-    numa_conf=None,
-    system_id="L4x8",
-)
-
-custom_systems["A10x1"] = SystemConfiguration(
-    host_cpu_conf=MATCH_ANY,
-    host_mem_conf=MATCH_ANY,
-    accelerator_conf=AcceleratorConfiguration(
-        layout={
-            GPU(
-                name="NVIDIA A10G",
-                accelerator_type=AcceleratorType.Discrete,
-                vram=match_float_approximate(
-                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
-                ),
-                max_power_limit=300.0,
-                pci_id="0x223710DE",
-                compute_sm=86,
-            ): 1
-        }
-    ),
-    numa_conf=None,
-    system_id="A10x1",
-)
-
-custom_systems["A10x2"] = SystemConfiguration(
-    host_cpu_conf=MATCH_ANY,
-    host_mem_conf=MATCH_ANY,
-    accelerator_conf=AcceleratorConfiguration(
-        layout={
-            GPU(
-                name="NVIDIA A10G",
-                accelerator_type=AcceleratorType.Discrete,
-                vram=match_float_approximate(
-                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
-                ),
-                max_power_limit=300.0,
-                pci_id="0x223710DE",
-                compute_sm=86,
-            ): 2
-        }
-    ),
-    numa_conf=None,
-    system_id="A10x2",
-)
-
-custom_systems["A10x4"] = SystemConfiguration(
-    host_cpu_conf=MATCH_ANY,
-    host_mem_conf=MATCH_ANY,
-    accelerator_conf=AcceleratorConfiguration(
-        layout={
-            GPU(
-                name="NVIDIA A10G",
-                accelerator_type=AcceleratorType.Discrete,
-                vram=match_float_approximate(
-                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
-                ),
-                max_power_limit=300.0,
-                pci_id="0x223710DE",
-                compute_sm=86,
-            ): 4
-        }
-    ),
-    numa_conf=None,
-    system_id="A10x4",
-)
-
-custom_systems["A10x8"] = SystemConfiguration(
-    host_cpu_conf=MATCH_ANY,
-    host_mem_conf=MATCH_ANY,
-    accelerator_conf=AcceleratorConfiguration(
-        layout={
-            GPU(
-                name="NVIDIA A10G",
-                accelerator_type=AcceleratorType.Discrete,
-                vram=match_float_approximate(
-                    Memory(quantity=22, byte_suffix=ByteSuffix.GiB)
-                ),
-                max_power_limit=300.0,
-                pci_id="0x223710DE",
-                compute_sm=86,
-            ): 8
-        }
-    ),
-    numa_conf=None,
-    system_id="A10x8",
-)
+custom_systems = {
+    "T4x1": system_configuration(T4, 1, "T4x1"),
+    "T4x4": system_configuration(T4, 4, "T4x4"),
+    "L4x1": system_configuration(L4, 1, "L4x1"),
+    "L4x2": system_configuration(L4, 2, "L4x2"),
+    "L4x4": system_configuration(L4, 4, "L4x4"),
+    "L4x8": system_configuration(L4, 8, "L4x8"),
+    "A10Gx1": system_configuration(A10G, 1, "A10Gx1"),
+    "A10Gx4": system_configuration(A10G, 4, "A10Gx4"),
+    "A10Gx8": system_configuration(A10G, 8, "A10Gx8"),
+    "A10x1": system_configuration(A10, 1, "A10x1"),
+    "A10x2": system_configuration(A10, 2, "A10x2"),
+}

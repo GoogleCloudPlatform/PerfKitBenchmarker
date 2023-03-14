@@ -249,6 +249,101 @@ class L4x8HighAccuracyTriton(L4x8HighAccuracy):
 @ConfigRegistry.register(
     HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
 )
+class A10Gx1(ServerGPUBaseConfig):
+  system = KnownSystem.A10Gx1
+  active_sms = 100
+  gpu_batch_size = 16
+  graphs_max_seqlen = 240
+  server_num_issue_query_threads = 0
+  server_target_qps = 900
+  soft_drop = 0.993
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10Gx1HighAccuracy(A10Gx1):
+  precision = "fp16"
+  gpu_batch_size = 8
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10Gx1Triton(A10Gx1):
+  use_triton = True
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10Gx1HighAccuracyTriton(A10Gx1HighAccuracy):
+  use_triton = True
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10Gx4(A10Gx1):
+  system = KnownSystem.A10Gx4
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10Gx4HighAccuracy(A10Gx4):
+  precision = "fp16"
+  gpu_batch_size = 8
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10Gx4Triton(A10Gx4):
+  use_triton = True
+  max_queue_delay_usec = 9000
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10Gx4HighAccuracyTriton(A10Gx4HighAccuracy):
+  use_triton = True
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10Gx8(A10Gx1):
+  system = KnownSystem.A10Gx8
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10Gx8HighAccuracy(A10Gx8):
+  precision = "fp16"
+  gpu_batch_size = 8
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class A10Gx8Triton(A10Gx8):
+  use_triton = True
+  max_queue_delay_usec = 9000
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class A10Gx8HighAccuracyTriton(A10Gx8HighAccuracy):
+  use_triton = True
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
 class A10x1(ServerGPUBaseConfig):
   system = KnownSystem.A10x1
   active_sms = 100
@@ -308,64 +403,4 @@ class A10x2Triton(A10x2):
     HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
 )
 class A10x2HighAccuracyTriton(A10x2HighAccuracy):
-  use_triton = True
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class A10x4(A10x1):
-  system = KnownSystem.A10x4
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class A10x4HighAccuracy(A10x4):
-  precision = "fp16"
-  gpu_batch_size = 8
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class A10x4Triton(A10x4):
-  use_triton = True
-  max_queue_delay_usec = 9000
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class A10x4HighAccuracyTriton(A10x4HighAccuracy):
-  use_triton = True
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class A10x8(A10x1):
-  system = KnownSystem.A10x8
-
-
-@ConfigRegistry.register(
-    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class A10x8HighAccuracy(A10x8):
-  precision = "fp16"
-  gpu_batch_size = 8
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
-)
-class A10x8Triton(A10x8):
-  use_triton = True
-  max_queue_delay_usec = 9000
-
-
-@ConfigRegistry.register(
-    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
-)
-class A10x8HighAccuracyTriton(A10x8HighAccuracy):
   use_triton = True

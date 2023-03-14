@@ -25,6 +25,7 @@ from perfkitbenchmarker import virtual_machine
 
 
 NVIDIA_DRIVER_LOCATION_BASE = 'https://us.download.nvidia.com/tesla'
+AZURE_NVIDIA_GRID_DRIVER = 'https://download.microsoft.com/download/c/e/9/ce913061-ccf1-4c88-94ff-294e48c55439/NVIDIA-Linux-x86_64-525.85.05-grid-azure.run'
 
 NVIDIA_TESLA_K80 = 'k80'
 NVIDIA_TESLA_P4 = 'p4'
@@ -35,7 +36,7 @@ NVIDIA_TESLA_L4 = 'l4'
 NVIDIA_TESLA_A100 = 'a100'
 NVIDIA_TESLA_A10 = 'a10'
 
-EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
+EXTRACT_CLOCK_SPEEDS_REGEX = r'(\S*).*,\s*(\S*)'
 
 flag_util.DEFINE_integerlist('gpu_clock_speeds',
                              None,
@@ -343,7 +344,7 @@ def QueryGpuClockSpeed(vm, device_id):
   clock_speeds = stdout.splitlines()[1]
   matches = regex_util.ExtractAllMatches(EXTRACT_CLOCK_SPEEDS_REGEX,
                                          clock_speeds)[0]
-  return (int(matches[0]), int(matches[1]))
+  return (matches[0], matches[1])
 
 
 def EnablePersistenceMode(vm):
@@ -461,10 +462,14 @@ def Install(vm):
     logging.warn('NVIDIA drivers already detected. Not installing.')
     return
 
-  location = ('{base}/{version}/NVIDIA-Linux-{cpu_arch}-{version}.run'.format(
-      base=NVIDIA_DRIVER_LOCATION_BASE,
-      version=version_to_install,
-      cpu_arch=vm.cpu_arch))
+  if re.match(r'Standard_NV\d+ads_A10_v5', vm.machine_type):
+    location = AZURE_NVIDIA_GRID_DRIVER
+  else:
+    location = '{base}/{version}/NVIDIA-Linux-{cpu_arch}-{version}.run'.format(
+        base=NVIDIA_DRIVER_LOCATION_BASE,
+        version=version_to_install,
+        cpu_arch=vm.cpu_arch,
+    )
 
   vm.Install('wget')
   tokens = re.split('/', location)
