@@ -55,10 +55,10 @@ def gpu(
       compute_sm=compute_cm,
   )
 
-T4 = GPU("Tesla T4", 15, 70.0, "0x1EB810DE", 75)
-L4 = GPU("Tesla L4", 22, 75.0, "0x27B810DE", 89)
-A10G = GPU("NVIDIA A10G", 22, 300.0, "0x223710DE", 86)
-A10 = GPU("NVIDIA A10-4Q", 24, None, "0x223610DE", 86)
+T4 = gpu("Tesla T4", 15, 70.0, "0x1EB810DE", 75)
+L4 = gpu("Tesla L4", 22, 75.0, "0x27B810DE", 89)
+A10G = gpu("NVIDIA A10G", 22, 300.0, "0x223710DE", 86)
+A10 = gpu("NVIDIA A10-4Q", 24, None, "0x223610DE", 86)
 
 custom_systems = {
     "T4x1": system_configuration(T4, 1, "T4x1"),
