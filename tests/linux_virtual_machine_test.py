@@ -14,6 +14,7 @@
 
 """Tests for linux_virtual_machine.py."""
 
+import logging
 from typing import Dict, Union
 import unittest
 
@@ -28,7 +29,10 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker import vm_util
+from tests import matchers
 from tests import pkb_common_test_case
+
 
 FLAGS = flags.FLAGS
 
@@ -327,6 +331,78 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
         sample.Sample('proccpu_mapping', 0, '', proccpu_mapping_metadata)
     ]
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
+
+
+class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
+  """Test class for testing linux_virtual_machine.RemoteCommand internals."""
+
+  def setUp(self):
+    super().setUp()
+    self.vm = CreateTestLinuxVm()
+    self.vm.name = 'pkb-test'
+    self.issue_cmd_mock = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand', autospec=True)
+    )
+    self.issue_cmd_mock.return_value = ('output', '', 0)
+    self.vm.ip_address = 'localhost:4000'
+
+  def testSshAppendedToCommandButNotLog(self):
+    self.logging = self.enter_context(
+        mock.patch.object(logging, 'info', autospec=True))
+    self.vm.RemoteCommand('foo')
+    self.logging.assert_called_once_with(
+        'Running on %s via ssh: %s', 'pkb-test', 'foo'
+    )
+    self.issue_cmd_mock.assert_called_once_with(
+        matchers.HASALLOF('ssh', 'foo'),
+        timeout=None,
+        should_pre_log=False,
+        raise_on_failure=False,
+    )
+
+  def testLoginShellAppendsBash(self):
+    self.vm.RemoteCommand('foo', login_shell=True)
+    self.issue_cmd_mock.assert_called_once_with(
+        matchers.HASALLOF('-t', 'bash -l -c "foo"'),
+        timeout=None,
+        should_pre_log=False,
+        raise_on_failure=False,
+    )
+
+  def testNonZeroReturnCodeRaises(self):
+    self.issue_cmd_mock.return_value = ('output', 'err', 1)
+    with self.assertRaises(errors.VirtualMachine.RemoteCommandError):
+      self.vm.RemoteCommand('foo')
+
+  def testNonZeroReturnCodeIgnored(self):
+    self.issue_cmd_mock.return_value = ('output', 'err', 1)
+    stdout, stderr, ret = self.vm.RemoteCommandWithReturnCode(
+        'foo', ignore_failure=True)
+    self.assertEqual(stdout, 'output')
+    self.assertEqual(stderr, 'err')
+    self.assertEqual(ret, 1)
+
+  def testRetriesInLimitSucceeds(self):
+    self.issue_cmd_mock.side_effect = [(
+        'o',
+        '',
+        linux_virtual_machine.RETRYABLE_SSH_RETCODE,
+    )] * 2 + [
+        ('o', '', 0),
+    ]
+    _, _, ret_val = self.vm.RemoteCommandWithReturnCode('foo', retries=3)
+    self.assertEqual(ret_val, 0)
+
+  def testRetriesOutOfLimitFails(self):
+    self.issue_cmd_mock.side_effect = [(
+        'o',
+        '',
+        linux_virtual_machine.RETRYABLE_SSH_RETCODE,
+    )] * 2 + [
+        ('o', '', 0),
+    ]
+    with self.assertRaises(errors.VirtualMachine.RemoteCommandError):
+      self.vm.RemoteCommand('foo', retries=2)
 
 
 class TestPartitionTable(unittest.TestCase):

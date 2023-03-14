@@ -2571,7 +2571,7 @@ class LsCpuResults(object):
       lscpu: A string in the format of "lscpu" command
 
     Raises:
-      ValueError: if the format of lscpu isnt what was expected for parsing
+      ValueError: if the format of lscpu isn't what was expected for parsing
 
     Example value of lscpu is:
     Architecture:          x86_64
@@ -2724,7 +2724,7 @@ class JujuMixin(BaseDebianMixin):
   is_controller = False
 
   # A reference to the juju controller, useful when operations occur against
-  # a unit's VM but need to be preformed from the controller.
+  # a unit's VM but need to be performed from the controller.
   controller = None
 
   vm_group = None
