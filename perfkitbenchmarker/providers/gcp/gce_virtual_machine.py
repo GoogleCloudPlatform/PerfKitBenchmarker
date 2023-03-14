@@ -34,6 +34,7 @@ import logging
 import posixpath
 import re
 import threading
+import time
 from typing import Dict, List, Optional, Tuple
 
 from absl import flags
@@ -61,6 +62,18 @@ import yaml
 
 FLAGS = flags.FLAGS
 
+# GCE Instance life cycle:
+# https://cloud.google.com/compute/docs/instances/instance-life-cycle
+RUNNING = 'RUNNING'
+TERMINATED = 'TERMINATED'
+INSTANCE_DELETED_STATUSES = frozenset([TERMINATED])
+INSTANCE_TRANSITIONAL_STATUSES = frozenset(['PROVISIONING', 'STAGING'])
+INSTANCE_EXISTS_STATUSES = (INSTANCE_TRANSITIONAL_STATUSES |
+                            frozenset(['PROVISIONING', 'STAGING', 'RUNNING',
+                                       'REPAIRING', 'SUSPENDING', 'SUSPENDED',
+                                       'STOPPING', 'STOPPED']))
+INSTANCE_KNOWN_STATUSES = (INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES)
+
 # 2h timeout for LM notificaiton
 LM_NOTIFICATION_TIMEOUT_SECONDS = 60 * 60 * 2
 
@@ -87,6 +100,14 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
 }
 
 FIVE_MINUTE_TIMEOUT = 300
+
+
+class GceTransitionalVmRetryableError(Exception):
+  """Error for retrying _Exists when a GCE VM is in a transitional state."""
+
+
+class GceUnknownStatusError(Exception):
+  """Error indicating an unknown status was encountered."""
 
 
 class GceVmSpec(virtual_machine.BaseVmSpec):
@@ -519,7 +540,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
-    args = ['compute', 'instances', 'create', self.name]
+    args = ['compute', 'instances', 'create', self.name, '--async']
 
     cmd = util.GcloudCommand(self, *args)
 
@@ -820,6 +841,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Resource.CreationError(
           f'Failed to create VM {self.name}:\n{stderr}\nreturn code: {retcode}'
       )
+    if not self.create_return_time:
+      self.create_return_time = time.time()
 
   def _CreateDependencies(self):
     super(GceVirtualMachine, self)._CreateDependencies()
@@ -927,27 +950,51 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Response is a list of size one
     self._ParseDescribeResponse(response[0])
 
+  @vm_util.Retry(poll_interval=1, log_errors=False)
   def _Exists(self):
     """Returns true if the VM exists."""
     getinstance_cmd = util.GcloudCommand(
         self, 'compute', 'instances', 'describe', self.name
     )
     stdout, _, _ = getinstance_cmd.Issue(raise_on_failure=False)
-    try:
-      response = json.loads(stdout)
-    except ValueError:
-      return False
-    try:
-      # The VM may exist before we can fully parse the describe response for the
-      # IP address or ID of the VM. For example, if the VM has a status of
-      # provisioning, we can't yet parse the IP address. If this is the case, we
-      # will continue to invoke the describe command in _PostCreate above.
-      # However, if we do have this information now, it's better to stash it and
-      # avoid invoking the describe command again.
-      self._ParseDescribeResponse(response)
-    except (KeyError, IndexError):
-      pass
-    return True
+    response = json.loads(stdout)
+    # The VM may exist before we can fully parse the describe response for the
+    # IP address or ID of the VM. For example, if the VM has a status of
+    # provisioning, we can't yet parse the IP address. If this is the case, we
+    # will continue to invoke the describe command in _PostCreate above.
+    # However, if we do have this information now, it's better to stash it and
+    # avoid invoking the describe command again.
+    self._ParseDescribeResponse(response)
+    status = response['status']
+    return status in INSTANCE_EXISTS_STATUSES
+
+  @vm_util.Retry(
+      poll_interval=1,
+      log_errors=False,
+      retryable_exceptions=(GceTransitionalVmRetryableError,))
+  def _WaitUntilRunning(self):
+    """Waits until the VM has reached the RUNNING state."""
+    getinstance_cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'describe', self.name
+    )
+    stdout, _, _ = getinstance_cmd.Issue(raise_on_failure=False)
+    response = json.loads(stdout)
+    status = response['status']
+    if status in INSTANCE_TRANSITIONAL_STATUSES:
+      logging.info('VM has status %s; retrying instances describe command.',
+                   status)
+      raise GceTransitionalVmRetryableError()
+    elif status == TERMINATED:
+      logging.info('VM has been terminated.')
+      return
+    # Set the running time
+    elif status == RUNNING:
+      if not self.is_running_time:
+        self.is_running_time = time.time()
+    # TODO(user): Adjust this function to properly handle ALL potential
+    #  VM statuses. In the meantime, just retry if the VM is not yet running.
+    else:
+      raise GceUnknownStatusError(f'Unknown status: {status}')
 
   def _GenerateDiskNamePrefix(self, disk_spec_id, index):
     """Generates a deterministic disk name given disk_spec_id and index."""

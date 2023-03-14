@@ -241,6 +241,9 @@
     (i.e. GCS/S3) where the queries will be used for `dpb_sparksql_benchmark`.
 -   Add `--gke_node_system_config` flag to the GKE provider for passing kubelet
     and linux parameters.
+-   Add 'Time to Create' and 'Time to Running' samples on cluster_boot for
+    GCEVirtualMachine and AWSVirtualMachine instances that are provisioned
+    with asynchronous 'create' invocations.
 
 ### Bug fixes and maintenance updates:
 
