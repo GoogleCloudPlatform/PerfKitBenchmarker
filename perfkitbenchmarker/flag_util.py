@@ -14,7 +14,7 @@
 
 """Utility functions for working with user-supplied flags."""
 
-
+import enum
 import logging
 import os
 import re
@@ -555,4 +555,13 @@ def GetProvidedCommandLineFlags():
   Returns:
     A dictionary of provided flags in the form: {flag_name: flag_value}.
   """
-  return {k: FLAGS[k].value for k in FLAGS if FLAGS[k].present}
+  def _GetSerializeableValue(v):
+    if isinstance(v, enum.Enum):
+      return v.name
+    return v
+
+  return {
+      k: _GetSerializeableValue(FLAGS[k].value)
+      for k in FLAGS
+      if FLAGS[k].present
+  }
