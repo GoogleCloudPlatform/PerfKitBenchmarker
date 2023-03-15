@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import re
+import time
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
@@ -457,31 +458,40 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
 
   # Give the remote script the max possible test length plus 5 minutes to
   # complete
-  remote_cmd_timeout = \
+  remote_cmd_timeout = (
       FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300
-  remote_cmd = (f'./{REMOTE_SCRIPT} --netperf_cmd="{netperf_cmd}" '
-                f'--num_streams={num_streams} --port_start={PORT_START}')
+  )
+  remote_cmd = (
+      f'./{REMOTE_SCRIPT} --netperf_cmd="{netperf_cmd}" '
+      f'--num_streams={num_streams} --port_start={PORT_START}'
+  )
+
+  start_time = time.time()
   remote_stdout, _ = vm.RobustRemoteCommand(
-      remote_cmd, timeout=remote_cmd_timeout)
+      remote_cmd, timeout=remote_cmd_timeout
+  )
+  end_time = time.time()
+  start_time_sample = sample.Sample('start_time', start_time, 'sec', metadata)
+  end_time_sample = sample.Sample('end_time', end_time, 'sec', metadata)
 
   # Decode stdouts, stderrs, and return codes from remote command's stdout
   json_out = json.loads(remote_stdout)
   stdouts = json_out[0]
 
   parsed_output = [
-      ParseNetperfOutput(stdout, metadata, benchmark_name,
-                         enable_latency_histograms) for stdout in stdouts
+      ParseNetperfOutput(
+          stdout, metadata, benchmark_name, enable_latency_histograms
+      )
+      for stdout in stdouts
   ]
 
+  samples = [start_time_sample, end_time_sample]
   if len(parsed_output) == 1:
     # Only 1 netperf thread
     throughput_sample, latency_samples, histogram = parsed_output[0]
-    return [throughput_sample] + latency_samples
+    return samples + [throughput_sample] + latency_samples
   else:
     # Multiple netperf threads
-
-    samples = []
-
     # Unzip parsed output
     # Note that latency_samples are invalid with multiple threads because stats
     # are computed per-thread by netperf, so we don't use them here.

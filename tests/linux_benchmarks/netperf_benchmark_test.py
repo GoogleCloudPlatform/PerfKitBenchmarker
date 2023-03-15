@@ -79,7 +79,11 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     vm_spec.vms[0].RobustRemoteCommand.side_effect = [
         (i, '') for i in self.expected_stdout]
 
-    result = netperf_benchmark.Run(vm_spec)
+    run_result = netperf_benchmark.Run(vm_spec)
+    result = []
+    for sample in run_result:
+      if sample[0] not in ['start_time', 'end_time']:
+        result.append(sample)
 
     tps = 'transactions_per_second'
     mbps = 'Mbits/sec'
