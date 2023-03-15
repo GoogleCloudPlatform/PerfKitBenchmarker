@@ -241,6 +241,8 @@ def _Run(vm):
                                      (FLAGS.spec17_copies or copies))
   version_specific_parameters.append(
       ' --threads=%s ' % (FLAGS.spec17_threads or vm.NumCpusForBenchmark()))
+  version_specific_parameters.append(
+      ' --define build_ncpus=%s ' % (vm.NumCpusForBenchmark()))
 
   if FLAGS.spec17_fdo:
     version_specific_parameters.append('--feedback ')
