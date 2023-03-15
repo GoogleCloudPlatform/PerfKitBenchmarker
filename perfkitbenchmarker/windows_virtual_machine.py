@@ -205,7 +205,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       RemoteCommandError: If there was a problem issuing the command or the
           command timed out.
     """
-    logging.info('Running command on %s: %s', self, command)
+    logging.info('Running command on %s: %s', self, command, stacklevel=2)
     s = winrm.Session(
         'https://%s:%s' % (self.GetConnectionIp(), self.winrm_port),
         auth=(self.user_name, self.password),
@@ -225,7 +225,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     debug_text = ('Ran %s on %s. Return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
                   (command, self, retcode, stdout, stderr))
-    logging.info(debug_text)
+    logging.info(debug_text, stacklevel=2)
 
     if retcode and not ignore_failure:
       error_text = ('Got non-zero return code (%s) executing %s\n'

@@ -315,7 +315,8 @@ def IssueCommand(
     should_pre_log: bool = True,
     raise_on_failure: bool = True,
     suppress_failure: Optional[Callable[[str, str, int], bool]] = None,
-    raise_on_timeout: bool = True) -> Tuple[str, str, int]:
+    raise_on_timeout: bool = True,
+    stack_level: int = 2) -> Tuple[str, str, int]:
   """Tries running the provided command once.
 
   Args:
@@ -341,6 +342,8 @@ def IssueCommand(
         exist.
     raise_on_timeout: A boolean indicating if killing the process due to the
         timeout being hit should raise a IssueCommandTimeoutError
+    stack_level: Number of stack frames to skip & get an "interesting" caller,
+        for logging. 2 skips this function, 3 skips this & its caller, etc..
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
@@ -351,8 +354,9 @@ def IssueCommand(
                                command duration exceeds timeout
     ValueError: When incorrect parameters are passed in.
   """
+  stack_level += 1
   if env:
-    logging.debug('Environment variables: %s', env)
+    logging.debug('Environment variables: %s', env, stacklevel=stack_level)
 
   # Force conversion to string so you get a nice log statement before hitting a
   # type error or NPE.
@@ -361,7 +365,7 @@ def IssueCommand(
         f'Command must be a list of strings, but string {cmd} was received')
   full_cmd = ' '.join(str(w) for w in cmd)
   if should_pre_log:
-    logging.info('Running: %s', full_cmd)
+    logging.info('Running: %s', full_cmd, stacklevel=stack_level)
 
   time_file_path = '/usr/bin/time'
 
@@ -401,7 +405,8 @@ def IssueCommand(
       did_timeout.value = True
       if not raise_on_timeout:
         logging.warning('IssueCommand timed out after %d seconds. '
-                        'Killing command "%s".', timeout, full_cmd)
+                        'Killing command "%s".', timeout, full_cmd,
+                        stacklevel=stack_level)
       process.kill()
       was_killed.value = True
 
@@ -425,7 +430,7 @@ def IssueCommand(
       _VM_COMMAND_LOG_MODE.value == VmCommandLogMode.LOG_ON_ERROR
       and process.returncode
   ):
-    logging.info(debug_text)
+    logging.info(debug_text, stacklevel=stack_level)
 
   # Raise timeout error regardless of raise_on_failure - as the intended
   # semantics is to ignore expected errors caused by invoking the command
@@ -483,7 +488,9 @@ def IssueRetryableCommand(cmd, env=None):
   Returns:
     A tuple of stdout and stderr from running the provided command.
   """
-  stdout, stderr, retcode = IssueCommand(cmd, env=env, raise_on_failure=False)
+  stdout, stderr, retcode = IssueCommand(
+      cmd, env=env, raise_on_failure=False, stack_level=2
+  )
   if retcode:
     debug_text = ('Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' %
                   (' '.join(cmd), retcode, stdout, stderr))

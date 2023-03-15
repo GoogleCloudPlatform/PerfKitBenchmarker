@@ -220,7 +220,12 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
         mock.patch(vm_util.__name__ + '.NamedTemporaryFile'))
 
     issue_command = stack.enter_context(
-        mock.patch(vm_util.__name__ + '.IssueCommand', return_value=retval))
+        mock.patch(
+            vm_util.__name__ + '.IssueCommand',
+            return_value=retval,
+            autospec=True,
+        )
+    )
 
     yield issue_command, temp_file
 

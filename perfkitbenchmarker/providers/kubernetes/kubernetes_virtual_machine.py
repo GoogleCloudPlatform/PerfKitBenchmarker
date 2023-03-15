@@ -401,12 +401,14 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
                                       ignore_failure=False,
                                       login_shell=False,
                                       timeout=None,
-                                      ip_address=None):
+                                      ip_address=None,
+                                      stack_level: int = 2):
     """Runs a command in the Kubernetes container."""
     if ip_address:
       raise AssertionError('Kubernetes VMs cannot use IP')
     if retries is None:
       retries = FLAGS.ssh_retries
+    stack_level += 1
     cmd = [
         FLAGS.kubectl,
         '--kubeconfig=%s' % FLAGS.kubeconfig, 'exec', '-i', self.name, '--',
@@ -416,7 +418,8 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
       stdout, stderr, retcode = vm_util.IssueCommand(
           cmd,
           timeout=timeout,
-          raise_on_failure=False)
+          raise_on_failure=False,
+          stack_level=stack_level)
       # Check for ephemeral connection issues.
       if not _IsKubectlErrorEphemeral(retcode, stderr):
         break
@@ -529,7 +532,7 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     # Utilities packages install here so that we
     # have similar base packages. This is essentially the same as running
     # unminimize.
-    # ubunut-minimal contains iputils-ping
+    # ubuntu-minimal contains iputils-ping
     # ubuntu-server contains curl, net-tools, software-properties-common
     # ubuntu-standard contains wget
     # TODO(pclay): Revisit if Debian or RHEL images are added.
@@ -632,7 +635,7 @@ class Ubuntu2204BasedKubernetesVirtualMachine(
 
   def _InstallPrepareVmEnvironmentDependencies(self):
     # fdisk is not installed. It needs to be installed after sudo, but before
-    # RecordAdditionalMetatada.
+    # RecordAdditionalMetadata.
     super()._InstallPrepareVmEnvironmentDependencies()
     # util-linux budled in the image no longer depends on fdisk.
     # Ubuntu 22 VMs get fdisk from ubuntu-server (which maybe we should

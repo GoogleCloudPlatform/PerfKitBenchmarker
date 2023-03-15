@@ -37,7 +37,7 @@ import posixpath
 import re
 import threading
 import time
-from typing import Dict, Optional, Set, Tuple, Union
+from typing import Any, Dict, Optional, Set, Tuple, Union
 import uuid
 
 from absl import flags
@@ -477,7 +477,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     start_command = '%s 1> %s 2>&1 &' % (' '.join(start_command),
                                          wrapper_log)
-    self.RemoteCommand(start_command)
+    self.RemoteCommand(start_command, stack_level=3)
 
     def _WaitForCommand():
       wait_command = ['python3', wait_path,
@@ -486,20 +486,21 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       stdout = ''
       while 'Command finished.' not in stdout:
         stdout, _ = self.RemoteCommand(
-            ' '.join(wait_command), timeout=1800)
+            ' '.join(wait_command), timeout=1800, stack_level=4)
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
           '--delete',
       ])  # pyformat: disable
       return self.RemoteCommand(' '.join(wait_command),
-                                ignore_failure=ignore_failure)
+                                ignore_failure=ignore_failure,
+                                stack_level=4)
 
     try:
       return _WaitForCommand()
     except errors.VirtualMachine.RemoteCommandError:
       # In case the error was with the wrapper script itself, print the log.
-      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log)
+      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, stack_level=3)
       if stdout.strip():
         logging.warning('Exception during RobustRemoteCommand. '
                         'Wrapper script log:\n%s', stdout)
@@ -1125,6 +1126,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
+    kwargs = _IncrementStackLevel(**kwargs)
     return self.RemoteCommandWithReturnCode(*args, **kwargs)[:2]
 
   def RemoteCommandWithReturnCode(
@@ -1143,6 +1145,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
+    kwargs = _IncrementStackLevel(**kwargs)
     return self.RemoteHostCommandWithReturnCode(*args, **kwargs)
 
   def RemoteHostCommandWithReturnCode(
@@ -1153,6 +1156,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       login_shell: bool = False,
       timeout: Optional[float] = None,
       ip_address: Optional[str] = None,
+      stack_level: int = 2,
   ) -> Tuple[str, str, int]:
     """Runs a command on the VM.
 
@@ -1169,6 +1173,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       timeout: The timeout for IssueCommand.
       ip_address: The ip address to use to connect to host.  If None, uses
         self.GetConnectionIp()
+      stack_level: Number of stack frames to skip & get an "interesting" caller,
+        for logging. 2 skips this function, 3 skips this & its caller, etc..
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -1176,6 +1182,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
+    stack_level += 1
     if retries is None:
       retries = FLAGS.ssh_retries
     if vm_util.RunningOnWindows():
@@ -1190,7 +1197,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     ssh_private_key = (self.ssh_private_key if self.is_static else
                        vm_util.GetPrivateKeyPath())
     ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
-    logging.info('Running on %s via ssh: %s', self.name, command)
+    logging.info(
+        'Running on %s via ssh: %s',
+        self.name,
+        command,
+        stacklevel=stack_level,
+    )
     try:
       if login_shell:
         ssh_cmd.extend(['-t', '-t', 'bash -l -c "%s"' % command])
@@ -1204,6 +1216,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
             timeout=timeout,
             should_pre_log=False,
             raise_on_failure=False,
+            stack_level=stack_level,
         )
         # Retry on 255 because this indicates an SSH failure
         if retcode != RETRYABLE_SSH_RETCODE:
@@ -1239,6 +1252,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
+    kwargs = _IncrementStackLevel(**kwargs)
     return self.RemoteHostCommandWithReturnCode(*args, **kwargs)[:2]
 
   def _CheckRebootability(self):
@@ -1655,6 +1669,17 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         device['ModelNumber'] = device_info[2].strip()
         response.append(device)
       return response
+
+
+def _IncrementStackLevel(**kwargs: Any) -> Any:
+  """Increments the stack_level variable stored in kwargs."""
+  if 'stack_level' in kwargs:
+    kwargs['stack_level'] += 1
+  else:
+    # Default to 3 - one for helper function this is called from, one for
+    # RemoteHostCommandWithReturnCode, & one for logging.info itself.
+    kwargs['stack_level'] = 3
+  return kwargs
 
 
 class ClearMixin(BaseLinuxMixin):
@@ -2428,7 +2453,7 @@ class ContainerizedDebianMixin(BaseDebianMixin):
     # Escapes bash sequences
     command = command.replace("'", r"'\''")
 
-    logging.info('Docker running: %s', command)
+    logging.info('Docker running: %s', command, stacklevel=2)
     command = "sudo docker exec %s bash -c '%s'" % (self.docker_id, command)
     return self.RemoteHostCommand(command, **kwargs)
 

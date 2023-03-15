@@ -14,7 +14,6 @@
 
 """Tests for linux_virtual_machine.py."""
 
-import logging
 from typing import Dict, Union
 import unittest
 
@@ -347,18 +346,42 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
     self.vm.ip_address = 'localhost:4000'
 
   def testSshAppendedToCommandButNotLog(self):
-    self.logging = self.enter_context(
-        mock.patch.object(logging, 'info', autospec=True))
-    self.vm.RemoteCommand('foo')
-    self.logging.assert_called_once_with(
-        'Running on %s via ssh: %s', 'pkb-test', 'foo'
+    with self.assertLogs() as logs:
+      self.vm.RemoteCommand('foo')
+    self.assertEqual(
+        logs.output,
+        ['INFO:root:Running on %s via ssh: %s' % ('pkb-test', 'foo')],
     )
     self.issue_cmd_mock.assert_called_once_with(
-        matchers.HASALLOF('ssh', 'foo'),
+        matchers.HASALLOF('ssh', 'PasswordAuthentication=no', 'foo'),
         timeout=None,
         should_pre_log=False,
         raise_on_failure=False,
+        stack_level=mock.ANY,
     )
+
+  def testIssueCommanndCalledWithStackLevel(self):
+    self.vm.RemoteCommand('foo')
+    self.issue_cmd_mock.assert_called_once_with(
+        mock.ANY,
+        timeout=None,
+        should_pre_log=False,
+        raise_on_failure=False,
+        stack_level=5,
+    )
+
+  @parameterized.parameters(
+      'RemoteCommand',
+      'RemoteCommandWithReturnCode',
+      'RemoteHostCommand',
+      'RemoteHostCommandWithReturnCode',
+  )
+  def testLogComesFromRightFile(self, method_name):
+    method = getattr(self.vm, method_name)
+    with self.assertLogs() as logs:
+      method('foo')
+    self.assertLen(logs.output, 1)
+    self.assertIn('linux_virtual_machine_test', logs.records[0].pathname)
 
   def testLoginShellAppendsBash(self):
     self.vm.RemoteCommand('foo', login_shell=True)
@@ -367,6 +390,7 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
         timeout=None,
         should_pre_log=False,
         raise_on_failure=False,
+        stack_level=mock.ANY,
     )
 
   def testNonZeroReturnCodeRaises(self):
@@ -588,7 +612,8 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     names = vm._get_network_device_mtus()
     self.assertEqual({'eth0': '1500', 'eth1': '1500'}, names)
     mock_cmd = vm.RemoteHostCommandWithReturnCode
-    mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ip link show up')
+    mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ip link show up',
+                                stack_level=4)
 
   def testCpuVulnerabilitiesEmpty(self):
     self.assertEqual({}, self.CreateVm('').cpu_vulnerabilities.asdict)
