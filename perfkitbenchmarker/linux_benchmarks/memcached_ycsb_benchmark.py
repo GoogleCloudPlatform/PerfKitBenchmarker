@@ -23,17 +23,18 @@ YCSB and workloads described in perfkitbenchmarker.linux_packages.ycsb.
 import functools
 import logging
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memcached_server
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_network
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('memcached_managed', providers.GCP,
-                  [providers.GCP, providers.AWS],
+flags.DEFINE_enum('memcached_managed', provider_info.GCP,
+                  [provider_info.GCP, provider_info.AWS],
                   'Managed memcached provider (GCP/AWS) to use.')
 
 flags.DEFINE_enum('memcached_scenario', 'custom',
@@ -115,10 +116,10 @@ def Prepare(benchmark_spec):
     # We need to delete the managed memcached backend when we're done
     benchmark_spec.always_call_cleanup = True
 
-    if FLAGS.memcached_managed == providers.GCP:
+    if FLAGS.memcached_managed == provider_info.GCP:
       raise NotImplementedError("GCP managed memcached backend not implemented "
                                 "yet")
-    elif FLAGS.memcached_managed == providers.AWS:
+    elif FLAGS.memcached_managed == provider_info.AWS:
       cluster_id = 'pkb%s' % FLAGS.run_uri
       service = providers.aws.elasticache.ElastiCacheMemcacheService(
           aws_network.AwsNetwork.GetNetwork(clients[0]),
@@ -137,7 +138,7 @@ def Prepare(benchmark_spec):
     memcached_install_fns = \
         [functools.partial(memcached_server.ConfigureAndStart, vm)
          for vm in servers]
-    vm_util.RunThreaded(lambda f: f(), memcached_install_fns)
+    background_tasks.RunThreaded(lambda f: f(), memcached_install_fns)
     hosts = ['%s:%s' % (vm.internal_ip, memcached_server.MEMCACHED_PORT)
              for vm in servers]
     benchmark_spec.metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
@@ -148,7 +149,7 @@ def Prepare(benchmark_spec):
 
   ycsb_install_fns = [functools.partial(vm.Install, 'ycsb')
                       for vm in clients]
-  vm_util.RunThreaded(lambda f: f(), ycsb_install_fns)
+  background_tasks.RunThreaded(lambda f: f(), ycsb_install_fns)
   benchmark_spec.executor = ycsb.YCSBExecutor(
       'memcached',
       **{'memcached.hosts': ','.join(hosts)})
@@ -191,4 +192,4 @@ def Cleanup(benchmark_spec):
   else:
     # Custom scenario
     servers = benchmark_spec.vm_groups['servers']
-    vm_util.RunThreaded(memcached_server.StopMemcached, servers)
+    background_tasks.RunThreaded(memcached_server.StopMemcached, servers)

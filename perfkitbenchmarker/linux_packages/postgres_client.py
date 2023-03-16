@@ -37,4 +37,4 @@ def AptInstall(vm):
 
 def _Uninstall(vm):
   """Uninstalls the postgres client package on the VM."""
-  vm.RemoteCommand('sudo apt-get purge -y postgresql-client', should_log=True)
+  vm.RemoteCommand('sudo apt-get purge -y postgresql-client')

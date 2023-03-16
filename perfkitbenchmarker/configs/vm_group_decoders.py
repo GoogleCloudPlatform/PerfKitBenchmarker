@@ -15,6 +15,7 @@
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
@@ -96,7 +97,7 @@ class VmGroupSpec(spec.BaseSpec):
     result = super(VmGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS
+            'valid_values': provider_info.VALID_CLOUDS
         }),
         'disk_count': (option_decoders.IntDecoder, {
             'default': _DEFAULT_DISK_COUNT,

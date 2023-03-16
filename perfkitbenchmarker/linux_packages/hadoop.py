@@ -26,11 +26,11 @@ import time
 from absl import flags
 import bs4
 from packaging import version
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aws_credentials
 import requests
 
@@ -40,9 +40,14 @@ _VERSION = flags.DEFINE_string('hadoop_version', None, 'Version of Hadoop.')
 _URL_OVERRIDE = flags.DEFINE_string(
     'hadoop_bin_url', None, 'Specify to override url from HADOOP_URL_BASE.')
 
+_BLOCKSIZE_OVERRIDE = flags.DEFINE_integer(
+    'hadoop_hdfs_blocksize', 128,
+    'Blocksize in MiB to be used by the HDFS filesystem. '
+    'This is the chunksize in which the HDFS file will be divided into.')
+
 DATA_FILES = [
     'hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
-    'hadoop/hdfs-site.xml', 'hadoop/mapred-site.xml.j2',
+    'hadoop/hdfs-site.xml.j2', 'hadoop/mapred-site.xml.j2',
     'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2'
 ]
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
@@ -200,6 +205,8 @@ def _RenderConfig(vm,
   # This determines the number of reduce tasks in Terasort and is critical to
   # scale with the cluster.
   num_reduce_tasks = reduces_per_node * num_workers
+  if _BLOCKSIZE_OVERRIDE.value:
+    block_size = _BLOCKSIZE_OVERRIDE.value * 1024 * 1024
 
   if vm.scratch_disks:
     # TODO(pclay): support multiple scratch disks. A current suboptimal
@@ -231,7 +238,8 @@ def _RenderConfig(vm,
       'num_reduce_tasks': num_reduce_tasks,
       'aws_access_key': aws_access_key,
       'aws_secret_key': aws_secret_key,
-      'optional_tools': optional_tools
+      'optional_tools': optional_tools,
+      'block_size': block_size
   }
 
   for file_name in DATA_FILES:
@@ -275,7 +283,7 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   workers = workers or [master]
   fn = functools.partial(
       _RenderConfig, master=master, workers=workers, configure_s3=configure_s3)
-  vm_util.RunThreaded(fn, vms)
+  background_tasks.RunThreaded(fn, vms)
 
   master.RemoteCommand("rm -f {0} && ssh-keygen -q -t rsa -N '' -f {0}".format(
       HADOOP_PRIVATE_KEY))
@@ -285,7 +293,7 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   def AddKey(vm):
     vm.RemoteCommand('echo "{0}" >> ~/.ssh/authorized_keys'.format(public_key))
 
-  vm_util.RunThreaded(AddKey, vms)
+  background_tasks.RunThreaded(AddKey, vms)
 
   context = {
       'hadoop_dir': HADOOP_DIR,
@@ -297,7 +305,7 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   script_path = posixpath.join(HADOOP_DIR, 'start-hadoop.sh')
   master.RenderTemplate(
       data.ResourcePath(START_HADOOP_SCRIPT), script_path, context=context)
-  master.RemoteCommand('bash {0}'.format(script_path), should_log=True)
+  master.RemoteCommand('bash {0}'.format(script_path))
 
   logging.info('Sleeping 10s for Hadoop nodes to join.')
   time.sleep(10)

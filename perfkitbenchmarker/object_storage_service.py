@@ -88,13 +88,14 @@ class ObjectStorageService(
   # Bucket management
 
   @abc.abstractmethod
-  def MakeBucket(self, bucket, raise_on_failure=True):
+  def MakeBucket(self, bucket, raise_on_failure=True, tag_bucket=True):
     """Make an object storage bucket.
 
     Args:
       bucket: the name of the bucket to create.
       raise_on_failure: Whether to raise errors.Benchmarks.BucketCreationError
           if the bucket fails to be created.
+      tag_bucket: Whether to put default labels like timeout on the bucket.
     """
     pass
 

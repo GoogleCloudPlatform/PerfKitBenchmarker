@@ -21,13 +21,14 @@ operate on the VM: boot, shutdown, etc.
 
 import abc
 import contextlib
+import enum
 import logging
 import os.path
 import socket
 import threading
 import time
 import typing
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from absl import flags
 import jinja2
@@ -110,7 +111,30 @@ flags.DEFINE_boolean(
     'Whether to use internal IP addresses for running commands on and pushing '
     'data to VMs. By default, PKB interacts with VMs using external IP '
     'addresses.')
+_ASSIGN_EXTERNAL_IP = flags.DEFINE_boolean(
+    'assign_external_ip',
+    True,
+    'If True, an external (public) IP will be created for VMs. '
+    'If False, --connect_via_internal_ip may also be needed.')
 
+
+@enum.unique
+class BootCompletionIpSubset(enum.Enum):
+  DEFAULT = enum.auto()
+  EXTERNAL = enum.auto()
+  INTERNAL = enum.auto()
+  BOTH = enum.auto()
+
+
+_BOOT_COMPLETION_IP_SUBSET = flags.DEFINE_enum_class(
+    'boot_completion_ip_subset',
+    BootCompletionIpSubset.DEFAULT,
+    BootCompletionIpSubset,
+    (
+        'The ip(s) to use to measure BootCompletion.  If DEFAULT, determined'
+        ' based on --connect_via_internal_ip.'
+    ),
+)
 # Deprecated. Use connect_via_internal_ip.
 flags.DEFINE_boolean(
     'ssh_via_internal_ip', False,
@@ -127,9 +151,18 @@ GPU_A100 = 'a100'
 GPU_P4 = 'p4'
 GPU_P4_VWS = 'p4-vws'
 GPU_T4 = 't4'
-GPU_A10G = 'A10G'
+GPU_L4 = 'l4'
+GPU_A10 = 'a10'
 VALID_GPU_TYPES = [
-    GPU_K80, GPU_P100, GPU_V100, GPU_A100, GPU_P4, GPU_P4_VWS, GPU_T4, GPU_A10G
+    GPU_K80,
+    GPU_P100,
+    GPU_V100,
+    GPU_A100,
+    GPU_P4,
+    GPU_P4_VWS,
+    GPU_T4,
+    GPU_L4,
+    GPU_A10,
 ]
 CPUARCH_X86_64 = 'x86_64'
 CPUARCH_AARCH64 = 'aarch64'
@@ -165,6 +198,7 @@ class BaseVmSpec(spec.BaseSpec):
     gpu_count: None or int. Number of gpus to attach to the VM.
     gpu_type: None or string. Type of gpus to attach to the VM.
     image: The disk image to boot from.
+    assign_external_ip: Bool.  If true, create an external (public) IP.
     install_packages: If false, no packages will be installed. This is
         useful if benchmark dependencies have already been installed.
     background_cpu_threads: The number of threads of background CPU usage
@@ -188,6 +222,7 @@ class BaseVmSpec(spec.BaseSpec):
     self.gpu_count = None
     self.gpu_type = None
     self.image = None
+    self.assign_external_ip = None
     self.install_packages = None
     self.background_cpu_threads = None
     self.background_network_mbits_per_sec = None
@@ -237,6 +272,8 @@ class BaseVmSpec(spec.BaseSpec):
       config_values['gpu_type'] = flag_values.gpu_type
     if flag_values['gpu_count'].present:
       config_values['gpu_count'] = flag_values.gpu_count
+    if flag_values['assign_external_ip'].present:
+      config_values['assign_external_ip'] = flag_values.assign_external_ip
     if flag_values['disable_interrupt_moderation'].present:
       config_values['disable_interrupt_moderation'] = (
           flag_values.disable_interrupt_moderation)
@@ -274,6 +311,10 @@ class BaseVmSpec(spec.BaseSpec):
         'install_packages': (option_decoders.BooleanDecoder, {'default': True}),
         'machine_type': (option_decoders.StringDecoder, {'none_ok': True,
                                                          'default': None}),
+        'assign_external_ip': (
+            option_decoders.BooleanDecoder,
+            {'default': True},
+        ),
         'gpu_type': (option_decoders.EnumDecoder, {
             'valid_values': VALID_GPU_TYPES,
             'default': None}),
@@ -328,6 +369,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   disable_rss: str  # mixed from BaseVirtualMachine
   num_disable_cpus: str  # mixed from BaseVirtualMachine
   ip_address: str  # mixed from BaseVirtualMachine
+  internal_ip: str  # mixed from BaseVirtualMachine
+  can_connect_via_internal_ip: bool  # mixed from BaseVirtualMachine
+  boot_completion_ip_subset: bool  # mixed from BaseVirtualMachine
 
   @abc.abstractmethod
   def GetConnectionIp(self):
@@ -384,8 +428,13 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def RemoteCommand(self, command, should_log=False, ignore_failure=False,
-                    suppress_warning=False, timeout=None, **kwargs):
+  def RemoteCommand(
+      self,
+      command: str,
+      ignore_failure: bool = False,
+      timeout: Optional[float] = None,
+      **kwargs
+  ) -> Tuple[str, str]:
     """Runs a command on the VM.
 
     Derived classes may add additional kwargs if necessary, but they should not
@@ -393,12 +442,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     Args:
       command: A valid bash command.
-      should_log: A boolean indicating whether the command result should be
-          logged at the info level. Even if it is false, the results will
-          still be logged at the debug level.
       ignore_failure: Ignore any failure if set to true.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-          return code is non-zero.
       timeout: The time to wait in seconds for the command before exiting.
           None means no timeout.
       **kwargs: Additional command arguments.
@@ -411,8 +455,12 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     raise NotImplementedError()
 
-  def RobustRemoteCommand(self, command, should_log=False, timeout=None,
-                          ignore_failure=False):
+  def RobustRemoteCommand(
+      self,
+      command: str,
+      timeout: Optional[float] = None,
+      ignore_failure: bool = False,
+  ) -> Tuple[str, str]:
     """Runs a command on the VM in a more robust way than RemoteCommand.
 
     The default should be to call RemoteCommand and log that it is not yet
@@ -420,8 +468,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     Args:
       command: The command to run.
-      should_log: Whether to log the command's output at the info level. The
-          output is always logged at the debug level.
       timeout: The timeout for the command in seconds.
       ignore_failure: Ignore any failure if set to true.
 
@@ -433,9 +479,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           the command fails.
     """
     logging.info('RobustRemoteCommand not implemented, using RemoteCommand.')
-    self.RemoteCommand(command, should_log, timeout, ignore_failure)
+    return self.RemoteCommand(command, ignore_failure, timeout)
 
-  def TryRemoteCommand(self, command, **kwargs):
+  def TryRemoteCommand(self, command: str, **kwargs):
     """Runs a remote command and returns True iff it succeeded."""
     try:
       self.RemoteCommand(command, **kwargs)
@@ -614,10 +660,14 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def _WaitForSSH(self):
+  def _WaitForSSH(self, ip_address: Union[str, None] = None):
     """Waits until VM is ready.
 
     Implementations of this method should set the 'hostname' attribute.
+
+    Args:
+      ip_address: The IP address to use for SSH, if None an implementation
+        default is used.
     """
     raise NotImplementedError()
 
@@ -873,7 +923,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     raise NotImplementedError()
 
   def IsReachable(self, target_vm):
-    """Indicates whether the target VM can be reached from it's internal ip.
+    """Indicates whether the target VM can be reached from its internal ip.
 
     Args:
       target_vm: The VM whose reachability is being tested.
@@ -1044,6 +1094,16 @@ class DeprecatedOsMixin(BaseOsMixin):
     logging.warning(warning)
 
 
+def GetBootCompletionIpSubset():
+  if _BOOT_COMPLETION_IP_SUBSET.value == BootCompletionIpSubset.DEFAULT:
+    if FLAGS.connect_via_internal_ip:
+      return BootCompletionIpSubset.INTERNAL
+    else:
+      return BootCompletionIpSubset.EXTERNAL
+  else:
+    return _BOOT_COMPLETION_IP_SUBSET.value
+
+
 class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   """Base class for Virtual Machines.
 
@@ -1054,6 +1114,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   Attributes:
     image: The disk image used to boot.
     internal_ip: Internal IP address.
+    assign_external_ip: If True, create an external (public) IP.
     ip_address: Public (external) IP address.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     project: The provider-specific project associated with the VM (e.g.
@@ -1106,6 +1167,10 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.gpu_type = vm_spec.gpu_type
     self.image = vm_spec.image
     self.install_packages = vm_spec.install_packages
+    self.can_connect_via_internal_ip = (FLAGS.ssh_via_internal_ip
+                                        or FLAGS.connect_via_internal_ip)
+    self.boot_completion_ip_subset = GetBootCompletionIpSubset()
+    self.assign_external_ip = vm_spec.assign_external_ip
     self.ip_address = None
     self.internal_ip = None
     self.user_name = DEFAULT_USERNAME
@@ -1132,6 +1197,8 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.capacity_reservation_id = None
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
     self.vm_group = None
+    self.id = None
+    self.is_aarch64 = False
 
   @property
   @classmethod
@@ -1150,8 +1217,13 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
 
   def GetConnectionIp(self):
     """Gets the IP to use for connecting to the VM."""
-    if FLAGS.ssh_via_internal_ip or FLAGS.connect_via_internal_ip:
+    if self.can_connect_via_internal_ip:
       return self.internal_ip
+    if not self.ip_address:
+      raise errors.VirtualMachine.VirtualMachineError(
+          f'{self.name} does not have a (public) ip_address.  Do you need to'
+          ' specify --connect_via_internal_ip?'
+      )
     return self.ip_address
 
   def CreateScratchDisk(self, disk_spec_id, disk_spec):
@@ -1256,6 +1328,14 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       result['num_cpus'] = self.num_cpus
       if self.NumCpusForBenchmark() != self.num_cpus:
         result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
+    # Some metadata is unique per VM.
+    # Update publisher._VM_METADATA_TO_LIST to add more
+    if self.id is not None:
+      result['id'] = self.id
+    if self.name is not None:
+      result['name'] = self.name
+    if self.ip_address is not None:
+      result['ip_address'] = self.ip_address
     return result
 
   def SimulateMaintenanceEvent(self):

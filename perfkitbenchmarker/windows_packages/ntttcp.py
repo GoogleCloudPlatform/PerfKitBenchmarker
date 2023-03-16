@@ -170,7 +170,7 @@ def Install(vm):
 @vm_util.Retry(poll_interval=60, fuzz=1, max_retries=NTTTCP_RETRIES)
 def _TaskKillNtttcp(vm):
   kill_command = 'taskkill /IM ntttcp /F'
-  vm.RemoteCommand(kill_command, ignore_failure=True, suppress_warning=True)
+  vm.RemoteCommand(kill_command, ignore_failure=True)
 
 
 def _RunNtttcp(vm, options):
@@ -187,7 +187,7 @@ def _RemoveXml(vm):
   ntttcp_exe_dir = vm.temp_dir
   rm_command = 'cd {ntttcp_exe_dir}; rm xml.txt'.format(
       ntttcp_exe_dir=ntttcp_exe_dir)
-  vm.RemoteCommand(rm_command, ignore_failure=True, suppress_warning=True)
+  vm.RemoteCommand(rm_command, ignore_failure=True)
 
 
 def _CatXml(vm):

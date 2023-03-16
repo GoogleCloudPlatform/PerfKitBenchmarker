@@ -19,10 +19,10 @@ More info: http://cloudsuite.ch/dataanalytics/
 
 import re
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import docker
 
 FLAGS = flags.FLAGS
@@ -77,7 +77,7 @@ def Prepare(benchmark_spec):
 
   target_arg_tuples = ([(PrepareSlave, [vm], {}) for vm in slaves] +
                        [(PrepareMaster, [master], {})])
-  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
+  background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
 def Run(benchmark_spec):
@@ -93,8 +93,7 @@ def Run(benchmark_spec):
   master = benchmark_spec.vm_groups['master'][0]
   results = []
 
-  stdout, _ = master.RemoteCommand('sudo docker exec master benchmark 2>&1',
-                                   should_log=True)
+  stdout, _ = master.RemoteCommand('sudo docker exec master benchmark 2>&1')
 
   matches = re.findall(r'^Benchmark time: (\d+)ms$', stdout, re.MULTILINE)
   if len(matches) != 1:
@@ -127,4 +126,4 @@ def Cleanup(benchmark_spec):
 
   target_arg_tuples = ([(CleanupSlave, [vm], {}) for vm in slaves] +
                        [(CleanupMaster, [master], {})])
-  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
+  background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))

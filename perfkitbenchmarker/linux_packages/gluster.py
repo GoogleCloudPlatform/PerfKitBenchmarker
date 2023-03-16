@@ -18,8 +18,8 @@
 import posixpath
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
@@ -103,13 +103,17 @@ def ConfigureServers(gluster_servers, volume_name):
     gluster_servers: The VMs that will be used to create the GlusterFS volume.
     volume_name: The name of the volume to be created.
   """
-  vm_util.RunThreaded(lambda vm: vm.Install('gluster'), gluster_servers)
-  vm_util.RunThreaded(
+  background_tasks.RunThreaded(
+      lambda vm: vm.Install('gluster'), gluster_servers
+  )
+  background_tasks.RunThreaded(
       lambda vm: vm.RemoteCommand('sudo systemctl enable glusterd'),
-      gluster_servers)
-  vm_util.RunThreaded(
+      gluster_servers,
+  )
+  background_tasks.RunThreaded(
       lambda vm: vm.RemoteCommand('sudo systemctl start glusterd'),
-      gluster_servers)
+      gluster_servers,
+  )
 
   bricks = []
   for vm in gluster_servers:

@@ -37,6 +37,7 @@ import functools
 from typing import Any, Dict
 from absl import flags
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
@@ -128,7 +129,6 @@ def _PrepareCluster() -> None:
 
   vm_util.IssueCommand(
       CreateHelmCommand(),
-      force_info_log=True,
       cwd=vm_util.GetTempDir(),
   )
 
@@ -143,7 +143,6 @@ def _PrepareCluster() -> None:
           'app=memcached',
           f'--timeout={WAIT_FOR_REPLICA_TIMEOUT}',
       ],
-      force_info_log=True,
       cwd=vm_util.GetTempDir(),
   )
 
@@ -156,7 +155,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
       [functools.partial(_PrepareCluster)] +
       [functools.partial(vm.Install, 'memtier') for vm in client_vms])
 
-  vm_util.RunThreaded(lambda f: f(), prepare_fns)
+  background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
 
 def Run(bm_spec: _BenchmarkSpec):

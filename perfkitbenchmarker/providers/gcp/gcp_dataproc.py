@@ -23,7 +23,7 @@ import os
 import re
 
 from absl import flags
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
@@ -40,7 +40,7 @@ class GcpDataproc(spark_service.BaseSparkService):
     project: ID of the project.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   SERVICE_NAME = 'dataproc'
 
   def __init__(self, spark_service_spec):
@@ -219,7 +219,7 @@ class GcpDataproc(spark_service.BaseSparkService):
       scp_cmd = ['gcloud', 'compute', 'scp']
     scp_cmd += ['--zone', self.GetZone(), '--quiet', script_path,
                 'pkb@' + master_name + ':/tmp/' + script_name]
-    vm_util.IssueCommand(scp_cmd, force_info_log=True)
+    vm_util.IssueCommand(scp_cmd)
     ssh_cmd = ['gcloud', 'compute', 'ssh']
     if FLAGS.gcp_internal_ip:
       ssh_cmd += ['--internal-ip']
@@ -227,7 +227,7 @@ class GcpDataproc(spark_service.BaseSparkService):
                 'pkb@' + master_name, '--',
                 'chmod +x /tmp/' + script_name + '; sudo /tmp/' + script_name
                 + ' ' + ' '.join(script_args)]
-    vm_util.IssueCommand(ssh_cmd, force_info_log=True)
+    vm_util.IssueCommand(ssh_cmd)
 
   def CopyFromMaster(self, remote_path, local_path):
     master_name = self.cluster_id + '-m'
@@ -238,7 +238,7 @@ class GcpDataproc(spark_service.BaseSparkService):
     scp_cmd += ['--zone=' + self.GetZone(), '--quiet',
                 'pkb@' + master_name + ':' +
                 remote_path, local_path]
-    vm_util.IssueCommand(scp_cmd, force_info_log=True)
+    vm_util.IssueCommand(scp_cmd)
 
   def SetClusterProperty(self):
     pass

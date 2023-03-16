@@ -8,14 +8,14 @@ from absl.testing import parameterized
 import mock
 
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.aws import aws_placement_group
 from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
 
-CLOUD = providers.AWS
+CLOUD = provider_info.AWS
 ZONE = 'us-west-1a'
 REGION = 'us-west-1'
 STRATEGY = aws_placement_group.CLUSTER

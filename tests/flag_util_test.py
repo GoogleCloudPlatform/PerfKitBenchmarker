@@ -20,6 +20,7 @@ import unittest
 from absl import flags
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import units
+from perfkitbenchmarker import virtual_machine
 
 
 class TestIntegerList(unittest.TestCase):
@@ -441,9 +442,12 @@ class TestGetProvidedCommandLineFlags(unittest.TestCase):
 
   def setUp(self):
     flag_dict = {
-        'flag1': MockFlag('flag1', '1', True),
-        'flag2': MockFlag('flag2', '2', True),
-        'flag3': MockFlag('flag3', '3', False)
+        'flag_int': MockFlag('flag_int', 1, True),
+        'flag_str': MockFlag('flag_str', 'str', True),
+        'flag_not_present': MockFlag('flag_not_present', '3', False),
+        'flag_enum': MockFlag(
+            'flag_enum', virtual_machine.BootCompletionIpSubset.BOTH, True
+        ),
     }
     flag_util.FLAGS = flag_dict
 
@@ -452,8 +456,9 @@ class TestGetProvidedCommandLineFlags(unittest.TestCase):
 
   def testGetProvidedCommandLineFlags(self):
     self.assertDictEqual({
-        'flag1': '1',
-        'flag2': '2',
+        'flag_int': 1,
+        'flag_str': 'str',
+        'flag_enum': 'BOTH',
     }, flag_util.GetProvidedCommandLineFlags())
 
 

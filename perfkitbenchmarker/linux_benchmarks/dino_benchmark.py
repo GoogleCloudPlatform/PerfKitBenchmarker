@@ -20,6 +20,7 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 
 _ENV = flags.DEFINE_string('dino_env', 'PATH=/opt/conda/bin:$PATH', 'Env')
 
@@ -34,17 +35,17 @@ dino:
       disk_spec: *default_500_gb
       vm_spec:
         GCP:
-          machine_type: a2-highgpu-8g
+          machine_type: a2-ultragpu-8g
           zone: us-central1-c
-          image_family: pytorch-latest-cu113-debian-10
-          image_project: deeplearning-platform-release
+          boot_disk_size: 130
         AWS:
           machine_type: p4d.24xlarge
           zone: us-east-1a
+          boot_disk_size: 130
         Azure:
           machine_type: Standard_ND96amsr_A100_v4
           zone: eastus
-          image: microsoft-dsvm:ubuntu-hpc:1804:latest
+          boot_disk_size: 130
 """
 _IMAGENET = 'ILSVRC2012_img_train.tar'
 
@@ -82,7 +83,8 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
         f'{posixpath.join(data_dir, file)}'
     )
   vm.RemoteCommand('git clone https://github.com/facebookresearch/dino.git')
-  vm.RemoteCommand('/opt/conda/bin/pip3 install timm')
+  vm.Install('pytorch')
+  vm.RemoteCommand('sudo pip3 install timm')
   bm_spec.imagenet_dir = imagenet_dir
   bm_spec.data_dir = data_dir
 
@@ -127,6 +129,17 @@ def MakeSamplesFromOutput(output: str) -> List[sample.Sample]:
   return samples
 
 
+@vm_util.Retry()
+def _Run(bm_spec: benchmark_spec.BenchmarkSpec) -> str:
+  vm = bm_spec.vms[0]
+  stdout, _ = vm.RobustRemoteCommand(
+      'cd dino && python3 -m torch.distributed.launch --nproc_per_node=8'
+      f' main_dino.py --arch vit_small --data_path {bm_spec.imagenet_dir}'
+      f' --output_dir {bm_spec.data_dir}'
+  )
+  return stdout
+
+
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Run Dino benchmark.
 
@@ -136,13 +149,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
-  vm = bm_spec.vms[0]
-  stdout, _ = vm.RobustRemoteCommand(
-      'cd dino && /opt/conda/bin/python3 -m torch.distributed.launch'
-      ' --nproc_per_node=8 main_dino.py --arch vit_small --data_path'
-      f' {bm_spec.imagenet_dir} --output_dir {bm_spec.data_dir}'
-  )
-  return MakeSamplesFromOutput(stdout)
+  return MakeSamplesFromOutput(_Run(bm_spec))
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:

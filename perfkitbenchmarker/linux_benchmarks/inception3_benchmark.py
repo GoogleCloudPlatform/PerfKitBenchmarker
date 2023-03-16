@@ -213,8 +213,7 @@ def Run(benchmark_spec):
               cmd=inception3_benchmark_cmd_step,
               tpu=tpu, num_shards=num_shards))
       start = time.time()
-      stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_train_cmd,
-                                              should_log=True)
+      stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_train_cmd)
       elapsed_seconds += (time.time() - start)
       samples.extend(mnist_benchmark.MakeSamplesFromTrainOutput(
           metadata, stdout + stderr, elapsed_seconds, step))
@@ -229,8 +228,7 @@ def Run(benchmark_spec):
           '{cmd} --tpu={tpu} --mode=eval {num_shards}'.format(
               cmd=inception3_benchmark_cmd_step,
               tpu=tpu, num_shards=num_shards))
-      stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_eval_cmd,
-                                              should_log=True)
+      stdout, stderr = vm.RobustRemoteCommand(inception3_benchmark_eval_cmd)
       samples.extend(resnet_benchmark.MakeSamplesFromEvalOutput(
           metadata, stdout + stderr, elapsed_seconds))
   return samples

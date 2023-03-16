@@ -22,7 +22,7 @@ import logging
 
 from absl import flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.cloudstack import cloudstack_disk
@@ -36,7 +36,7 @@ FLAGS = flags.FLAGS
 class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a CloudStack Virtual Machine."""
 
-  CLOUD = providers.CLOUDSTACK
+  CLOUD = provider_info.CLOUDSTACK
   DEFAULT_ZONE = 'QC-1'
   DEFAULT_MACHINE_TYPE = '1vCPU.1GB'
   DEFAULT_IMAGE = None

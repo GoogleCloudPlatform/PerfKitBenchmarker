@@ -21,7 +21,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import iaas_relational_db
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
@@ -56,7 +56,7 @@ CREATE_AZURE_DB_TIMEOUT = 60 * 30
 
 class AzureIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
   """An Azure IAAS database resource."""
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
 
 class AzureRelationalDb(relational_db.BaseRelationalDb):
@@ -78,7 +78,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   must be the same.
 
   """
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   database_name: str
 

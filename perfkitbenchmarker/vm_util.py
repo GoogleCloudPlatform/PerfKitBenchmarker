@@ -16,6 +16,7 @@
 
 
 import contextlib
+import enum
 import logging
 import os
 import platform
@@ -31,7 +32,6 @@ from typing import Callable, Dict, Iterable, Optional, Tuple
 
 from absl import flags
 import jinja2
-from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import temp_dir
@@ -118,6 +118,26 @@ class IpAddressSubset(object):
   EXTERNAL = 'EXTERNAL'
 
   ALL = (REACHABLE, BOTH, INTERNAL, EXTERNAL)
+
+
+@enum.unique
+class VmCommandLogMode(enum.Enum):
+  """The log mode for vm_util.IssueCommand function."""
+
+  ALWAYS_LOG = 'always_log'
+  LOG_ON_ERROR = 'log_on_error'
+
+
+_VM_COMMAND_LOG_MODE = flags.DEFINE_enum_class(
+    'vm_command_log_mode',
+    VmCommandLogMode.ALWAYS_LOG,
+    VmCommandLogMode,
+    (
+        'Controls the logging behavior of vm_util.IssueCommand, and'
+        ' specifically its full log statement including output & error message.'
+    ),
+)
+
 
 flags.DEFINE_enum('ip_addresses', IpAddressSubset.REACHABLE,
                   IpAddressSubset.ALL,
@@ -206,13 +226,6 @@ def GetSshOptions(ssh_key_filename, connect_timeout=None):
   return options
 
 
-# TODO(user): Remove at least RunParallelProcesses and RunParallelThreads
-# from this file (update references to call directly into background_tasks).
-RunParallelProcesses = background_tasks.RunParallelProcesses
-RunParallelThreads = background_tasks.RunParallelThreads
-RunThreaded = background_tasks.RunThreaded
-
-
 def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
           timeout=None, fuzz=FUZZ, log_errors=True,
           retryable_exceptions=None):
@@ -241,6 +254,7 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
         used as a decorator.
   """
   if retryable_exceptions is None:
+    # TODO(user) Make retries less aggressive.
     retryable_exceptions = Exception
 
   def Wrap(f):
@@ -295,26 +309,19 @@ def _ReadIssueCommandOutput(tf_out, tf_err):
 
 def IssueCommand(
     cmd: Iterable[str],
-    force_info_log: bool = False,
-    suppress_warning: bool = False,
     env: Optional[Dict[str, str]] = None,
     timeout: Optional[int] = DEFAULT_TIMEOUT,
     cwd: Optional[str] = None,
+    should_pre_log: bool = True,
     raise_on_failure: bool = True,
     suppress_failure: Optional[Callable[[str, str, int], bool]] = None,
-    raise_on_timeout: bool = True) -> Tuple[str, str, int]:
+    raise_on_timeout: bool = True,
+    stack_level: int = 2) -> Tuple[str, str, int]:
   """Tries running the provided command once.
 
   Args:
     cmd: A list of strings such as is given to the subprocess.Popen()
         constructor.
-    force_info_log: A boolean indicating whether the command result should
-        always be logged at the info level. Command results will always be
-        logged at the debug level if they aren't logged at another level.
-    suppress_warning: A boolean indicating whether the results should
-        not be logged at the info level in the event of a non-zero
-        return code. When force_info_log is True, the output is logged
-        regardless of suppress_warning's value.
     env: A dict of key/value strings, such as is given to the subprocess.Popen()
         constructor, that contains environment variables to be injected.
     timeout: Timeout for the command in seconds. If the command has not finished
@@ -324,6 +331,9 @@ def IssueCommand(
         contain what had already been written to them before the process was
         killed.
     cwd: Directory in which to execute the command.
+    should_pre_log: A boolean indicating if command should be outputted alone
+        prior to the output with command, stdout, & stderr. Useful for e.g.
+        timing command length & standing out in logs.
     raise_on_failure: A boolean indicating if non-zero return codes should raise
         IssueCommandError.
     suppress_failure: A function passed (stdout, stderr, ret_code) for non-zero
@@ -332,6 +342,8 @@ def IssueCommand(
         exist.
     raise_on_timeout: A boolean indicating if killing the process due to the
         timeout being hit should raise a IssueCommandTimeoutError
+    stack_level: Number of stack frames to skip & get an "interesting" caller,
+        for logging. 2 skips this function, 3 skips this & its caller, etc..
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
@@ -340,14 +352,20 @@ def IssueCommand(
     IssueCommandError: When raise_on_failure=True and retcode is non-zero.
     IssueCommandTimeoutError:  When raise_on_timeout=True and
                                command duration exceeds timeout
+    ValueError: When incorrect parameters are passed in.
   """
+  stack_level += 1
   if env:
-    logging.debug('Environment variables: %s', env)
+    logging.debug('Environment variables: %s', env, stacklevel=stack_level)
 
   # Force conversion to string so you get a nice log statement before hitting a
   # type error or NPE.
+  if isinstance(cmd, str):
+    raise ValueError(
+        f'Command must be a list of strings, but string {cmd} was received')
   full_cmd = ' '.join(str(w) for w in cmd)
-  logging.info('Running: %s', full_cmd)
+  if should_pre_log:
+    logging.info('Running: %s', full_cmd, stacklevel=stack_level)
 
   time_file_path = '/usr/bin/time'
 
@@ -387,7 +405,8 @@ def IssueCommand(
       did_timeout.value = True
       if not raise_on_timeout:
         logging.warning('IssueCommand timed out after %d seconds. '
-                        'Killing command "%s".', timeout, full_cmd)
+                        'Killing command "%s".', timeout, full_cmd,
+                        stacklevel=stack_level)
       process.kill()
       was_killed.value = True
 
@@ -407,10 +426,11 @@ def IssueCommand(
 
   debug_text = ('Ran: {%s}\nReturnCode:%s%s\nSTDOUT: %s\nSTDERR: %s' %
                 (full_cmd, process.returncode, timing_output, stdout, stderr))
-  if force_info_log or (process.returncode and not suppress_warning):
-    logging.info(debug_text)
-  else:
-    logging.debug(debug_text)
+  if _VM_COMMAND_LOG_MODE.value == VmCommandLogMode.ALWAYS_LOG or (
+      _VM_COMMAND_LOG_MODE.value == VmCommandLogMode.LOG_ON_ERROR
+      and process.returncode
+  ):
+    logging.info(debug_text, stacklevel=stack_level)
 
   # Raise timeout error regardless of raise_on_failure - as the intended
   # semantics is to ignore expected errors caused by invoking the command
@@ -468,7 +488,9 @@ def IssueRetryableCommand(cmd, env=None):
   Returns:
     A tuple of stdout and stderr from running the provided command.
   """
-  stdout, stderr, retcode = IssueCommand(cmd, env=env, raise_on_failure=False)
+  stdout, stderr, retcode = IssueCommand(
+      cmd, env=env, raise_on_failure=False, stack_level=2
+  )
   if retcode:
     debug_text = ('Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' %
                   (' '.join(cmd), retcode, stdout, stderr))
@@ -639,7 +661,7 @@ def GenerateRandomWindowsPassword(password_length=PASSWORD_LENGTH):
   # special characters. This greatly limits the set of characters
   # that we can safely use. See
   # https://github.com/Azure/azure-xplat-cli/blob/master/lib/commands/arm/vm/vmOsProfile._js#L145
-  special_chars = '*!@#$%+='
+  special_chars = '*!@#$+'
   # Ensure that the password contains at least one of each 4 required
   # character types starting with letters to avoid starting with chars which
   # are problematic on the command line e.g. @.

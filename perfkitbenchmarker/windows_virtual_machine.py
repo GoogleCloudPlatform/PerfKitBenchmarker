@@ -18,9 +18,11 @@ import logging
 import ntpath
 import os
 import time
+from typing import Optional, Tuple
 import uuid
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
@@ -100,8 +102,12 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     self.assigned_disk_letter = ATTACHED_DISK_LETTER
     self._send_remote_commands_to_cygwin = False
 
-  def RobustRemoteCommand(self, command, should_log=False, ignore_failure=False,
-                          suppress_warning=False, timeout=None):
+  def RobustRemoteCommand(
+      self,
+      command: str,
+      ignore_failure: bool = False,
+      timeout: Optional[float] = None,
+  ) -> Tuple[str, str]:
     """Runs a powershell command on the VM.
 
     Should be more robust than its counterpart, RemoteCommand. In the event of
@@ -121,12 +127,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     Args:
       command: A valid powershell command.
-      should_log: A boolean indicating whether the command result should be
-        logged at the info level. Even if it is false, the results will still be
-        logged at the debug level.
       ignore_failure: Ignore any failure if set to true.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-        return code is non-zero.
       timeout: Float. A timeout in seconds for the command. If None is passed,
         no timeout is applied. Timeout kills the winrm session which then kills
         the process being executed.
@@ -149,9 +150,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     try:
       self.RemoteCommand(
           logged_command,
-          should_log=should_log,
           ignore_failure=ignore_failure,
-          suppress_warning=suppress_warning,
           timeout=timeout)
     except errors.VirtualMachine.RemoteCommandError:
       logging.exception(
@@ -166,12 +165,17 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       # Spin on the VM until the "done" file is created. It is better to spin
       # on the VM rather than creating a new session for each test.
       done_out = ''
+      timeout = (
+          None
+          if timeout is None
+          else timeout - (time.time() - start_command_time)
+      )
       while 'True' not in done_out:
         done_out, _ = self.RemoteCommand(
             '$retries=0; while ((-not (Test-Path %s.done)) -and '
             '($retries -le 60)) { Start-Sleep -Seconds 1; $retries++ }; '
             'Test-Path %s.done' % (command_id, command_id),
-            timeout=timeout - (time.time() - start_command_time))
+            timeout=timeout)
 
     wait_for_done_file()
     stdout, _ = self.RemoteCommand('Get-Content %s.out' % (command_id,))
@@ -179,18 +183,17 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     return stdout, stderr
 
-  def RemoteCommand(self, command, should_log=False, ignore_failure=False,
-                    suppress_warning=False, timeout=None):
+  def RemoteCommand(
+      self,
+      command: str,
+      ignore_failure: bool = False,
+      timeout: Optional[float] = None,
+  ) -> Tuple[str, str]:
     """Runs a powershell command on the VM.
 
     Args:
       command: A valid powershell command.
-      should_log: A boolean indicating whether the command result should be
-          logged at the info level. Even if it is false, the results will
-          still be logged at the debug level.
       ignore_failure: Ignore any failure if set to true.
-      suppress_warning: Suppress the result logging from IssueCommand when the
-          return code is non-zero.
       timeout: Float. A timeout in seconds for the command. If None is passed,
           no timeout is applied. Timeout kills the winrm session which then
           kills the process being executed.
@@ -202,7 +205,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       RemoteCommandError: If there was a problem issuing the command or the
           command timed out.
     """
-    logging.info('Running command on %s: %s', self, command)
+    logging.info('Running command on %s: %s', self, command, stacklevel=2)
     s = winrm.Session(
         'https://%s:%s' % (self.GetConnectionIp(), self.winrm_port),
         auth=(self.user_name, self.password),
@@ -222,10 +225,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     debug_text = ('Ran %s on %s. Return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
                   (command, self, retcode, stdout, stderr))
-    if should_log or (retcode and not suppress_warning):
-      logging.info(debug_text)
-    else:
-      logging.debug(debug_text)
+    logging.info(debug_text, stacklevel=2)
 
     if retcode and not ignore_failure:
       error_text = ('Got non-zero return code (%s) executing %s\n'
@@ -410,7 +410,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     to_wait_for = [self._WaitForWinRmCommand]
     if FLAGS.cluster_boot_test_rdp_port_listening:
       to_wait_for.append(self._WaitForRdpPort)
-    vm_util.RunParallelThreads([(method, [], {}) for method in to_wait_for], 2)
+    background_tasks.RunParallelThreads(
+        [(method, [], {}) for method in to_wait_for], 2)
 
   @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
   def _WaitForRdpPort(self):
@@ -439,7 +440,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
   def _WaitForSSH(self):
     """Waits for the VMs to be ready."""
-    stdout, _ = self.RemoteCommand('hostname', suppress_warning=True, timeout=5)
+    stdout, _ = self.RemoteCommand('hostname', timeout=5)
     if self.hostname is None:
       self.hostname = stdout.rstrip()
 
@@ -466,8 +467,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def VMLastBootTime(self):
     """Returns the time the VM was last rebooted as reported by the VM."""
-    resp, _ = self.RemoteCommand(
-        'systeminfo | find /i "Boot Time"', suppress_warning=True)
+    resp, _ = self.RemoteCommand('systeminfo | find /i "Boot Time"')
     return resp
 
   def _AfterReboot(self):
@@ -611,6 +611,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
   def _RunDiskpartScript(self, script):
     """Runs the supplied Diskpart script on the VM."""
+    logging.info('Writing diskpart script \n %s', script)
     with vm_util.NamedTemporaryFile(prefix='diskpart', mode='w') as tf:
       tf.write(script)
       tf.close()

@@ -3,11 +3,11 @@
 import time
 from typing import List
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 
 BENCHMARK_NAME = 'suspend_resume'
 BENCHMARK_CONFIG = """
@@ -112,7 +112,7 @@ def GetTimeToSuspend(
   before_suspend_timestamp = time.time()
 
   # call suspend function on the list of vms.
-  suspend_durations = vm_util.RunThreaded(lambda vm: vm.Suspend(), vms)
+  suspend_durations = background_tasks.RunThreaded(lambda vm: vm.Suspend(), vms)
 
   # get cluster_suspend_time(duration)
   cluster_suspend_time = time.time() - before_suspend_timestamp
@@ -140,7 +140,7 @@ def GetTimeToResume(
   before_resume_timestamp = time.time()
 
   # call resume function on the list of vms to get the resume times
-  resume_durations = vm_util.RunThreaded(lambda vm: vm.Resume(), vms)
+  resume_durations = background_tasks.RunThreaded(lambda vm: vm.Resume(), vms)
 
   # get cluster resume time(duration)
   cluster_resume_time = time.time() - before_resume_timestamp

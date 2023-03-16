@@ -22,7 +22,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import kubernetes_helper
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -44,7 +44,7 @@ def CreateDisks(disk_specs, vm_name):
 
 class KubernetesDiskSpec(disk.BaseDiskSpec):
   """Kubernetes disk Spec class."""
-  CLOUD = providers.KUBERNETES
+  CLOUD = provider_info.KUBERNETES
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -229,8 +229,7 @@ class PersistentVolumeClaim(resource.BaseResource):
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'pvc', '-o=json', self.name]
     logging.info('Waiting for PVC %s', self.name)
-    pvc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True,
-                                          raise_on_failure=False)
+    pvc_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if pvc_info:
       pvc_info = json.loads(pvc_info)
       pvc = pvc_info['status']['phase']
@@ -295,8 +294,7 @@ class StorageClass(resource.BaseResource):
     exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
                   'sc', '-o=json', self.name]
 
-    sc_info, _, _ = vm_util.IssueCommand(exists_cmd, suppress_warning=True,
-                                         raise_on_failure=False)
+    sc_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if sc_info:
       sc_info = json.loads(sc_info)
       sc_name = sc_info['metadata']['name']

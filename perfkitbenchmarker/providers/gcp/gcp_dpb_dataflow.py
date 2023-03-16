@@ -33,7 +33,7 @@ from google.cloud.monitoring_v3 import types
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcs
@@ -106,7 +106,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
   Requires a local java installation to run Dataflow.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   SERVICE_TYPE = 'dataflow'
 
   def __init__(self, dpb_service_spec):
@@ -182,7 +182,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     worker_machine_type = self.spec.worker_group.vm_spec.machine_type
     num_workers = self.spec.worker_count
-    max_num_workers = self.spec.worker_count
+    max_num_workers = self.spec.dataflow_max_worker_count
     if (self.spec.worker_group.disk_spec and
         self.spec.worker_group.disk_spec.disk_size is not None):
       disk_size_gb = self.spec.worker_group.disk_spec.disk_size
@@ -210,8 +210,10 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       cmd.append('--dataflowServiceOptions=enable_prime')
     else:
       cmd.append('--workerMachineType={}'.format(worker_machine_type))
+
     cmd.append('--numWorkers={}'.format(num_workers))
-    cmd.append('--maxNumWorkers={}'.format(max_num_workers))
+    if max_num_workers:
+      cmd.append('--maxNumWorkers={}'.format(max_num_workers))
 
     if disk_size_gb:
       cmd.append('--diskSizeGb={}'.format(disk_size_gb))

@@ -263,7 +263,7 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
     self.server_vm.RemoteCommand(
         'sudo rsync -avzh /var/lib/mysql/ /scratch/mysql')
     self.server_vm.RemoteCommand('sudo rsync -avzh /tmp/ /scratch/tmp')
-    self.server_vm.RemoteCommand('df', should_log=True)
+    self.server_vm.RemoteCommand('df')
     # Configure AppArmor.
     if _SETUP_APPARMOR_MYSQL.value:
       self.server_vm.RemoteCommand(
@@ -421,8 +421,7 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
     self.server_vm.RemoteCommand('sudo service %s restart' %
                                  self.server_vm.GetServiceName(mysql_name))
     self.server_vm.RemoteCommand(
-        'sudo cat %s' % self.server_vm.GetPathToConfig(mysql_name),
-        should_log=True)
+        'sudo cat %s' % self.server_vm.GetPathToConfig(mysql_name))
 
     self.server_vm_query_tools.IssueSqlCommand(
         'SET GLOBAL max_connections=8000;', superuser=True)

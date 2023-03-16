@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional
 
 from absl import flags
 import pandas as pd
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import regex_util
@@ -244,7 +245,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   client_vms = benchmark_spec.vm_groups['client']
   server = benchmark_spec.vm_groups['server'][0]
 
-  vm_util.RunThreaded(lambda vm: vm.Install('apache2_utils'), client_vms)
+  background_tasks.RunThreaded(
+      lambda vm: vm.Install('apache2_utils'), client_vms
+  )
   server.Install('apache2_server')
 
   server.AllowPort(_PORT)
@@ -466,10 +469,11 @@ def _Run(client_vms: List[virtual_machine.VirtualMachine],
   """Runs apachebench benchmark."""
   apache2_server.StartServer(server_vm)
   cmd = run_config.GetCommand(ip_config, server_vm)
-  vm_util.RunThreaded(lambda vm: vm.RemoteCommand(cmd), client_vms)
+  background_tasks.RunThreaded(lambda vm: vm.RemoteCommand(cmd), client_vms)
 
-  result = vm_util.RunThreaded(lambda vm: _ParseResults(vm, ip_config),
-                               client_vms)[0]
+  result = background_tasks.RunThreaded(
+      lambda vm: _ParseResults(vm, ip_config), client_vms
+  )[0]
 
   result.cpu_seconds = apache2_server.GetApacheCPUSeconds(server_vm)
   return result

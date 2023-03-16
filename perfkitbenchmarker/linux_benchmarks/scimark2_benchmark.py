@@ -94,7 +94,7 @@ def Run(benchmark_spec):
           scimark2.C_SRC),
   ]
   for cmd in cmds:
-    stdout, _ = vm.RemoteCommand(cmd, should_log=True)
+    stdout, _ = vm.RemoteCommand(cmd)
     samples.extend(ParseResults(stdout))
   return samples
 

@@ -41,12 +41,12 @@ class ProviderBenchmarkChecks(unittest.TestCase):
         'it did{1}.'.format(*fmt_args, provider=cloud, benchmark=benchmark)))
 
   def testIperfSupport(self):
-    expected = {providers.GCP: True, providers.DIGITALOCEAN: True}
+    expected = {provider_info.GCP: True, provider_info.DIGITALOCEAN: True}
     for cloud, support_expected in six.iteritems(expected):
       self._VerifyProviderBenchmarkSupport(cloud, 'iperf', support_expected)
 
   def testMYSQLSupport(self):
-    expected = {providers.GCP: True, providers.DIGITALOCEAN: False}
+    expected = {provider_info.GCP: True, provider_info.DIGITALOCEAN: False}
     for cloud, support_expected in six.iteritems(expected):
       self._VerifyProviderBenchmarkSupport(cloud, 'mysql_service',
                                            support_expected)

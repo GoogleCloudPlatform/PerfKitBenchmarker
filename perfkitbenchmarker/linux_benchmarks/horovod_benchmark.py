@@ -15,6 +15,7 @@
 
 import logging
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import hpc_util
@@ -33,11 +34,12 @@ horovod:
   description: Runs Horovod. Specify the number of VMs with --num_vms
   vm_groups:
     default:
+      os_type: ubuntu2004
       vm_spec:
         GCP:
           machine_type: n1-highmem-96
           zone: us-central1-a
-          image_family: tf-latest-gpu-debian-10
+          image_family: tf-latest-gpu-ubuntu-2004
           image_project: deeplearning-platform-release
           boot_disk_size: 300
           gpu_type: v100
@@ -198,7 +200,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(PrepareHorovod, vms)
+  background_tasks.RunThreaded(PrepareHorovod, vms)
   hpc_util.CreateMachineFile(vms, nvidia_driver.QueryNumberOfGpus, MACHINEFILE)
 
 
@@ -352,7 +354,9 @@ def RunWithVMs(vms, extra_envs=None):
   Returns:
     A list of sample.Sample objects.
   """
-  vm_util.RunThreaded(lambda vm: vm.RemoteCommand('rm -rf /tmp/models'), vms)
+  background_tasks.RunThreaded(
+      lambda vm: vm.RemoteCommand('rm -rf /tmp/models'), vms
+  )
   master_vm = vms[0]
 
   gpus_per_node = nvidia_driver.QueryNumberOfGpus(master_vm)
@@ -509,7 +513,7 @@ def RunWithVMs(vms, extra_envs=None):
         '--logdir {log_dir}/maskrcnn ').format(
             log_dir=vm_util.VM_TMP_DIR,
             step=FLAGS.horovod_num_steps * total_gpus // 8)
-  stdout, stderr = master_vm.RobustRemoteCommand(run_command, should_log=True)
+  stdout, stderr = master_vm.RobustRemoteCommand(run_command)
 
   if FLAGS.horovod_timeline:
     master_vm.PullFile(vm_util.GetTempDir(),

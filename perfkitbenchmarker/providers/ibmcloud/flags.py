@@ -15,7 +15,7 @@
 
 from absl import flags
 
-flags.DEFINE_string('ibmcloud_azone', None,
+flags.DEFINE_string('ibmcloud_region', None,
                     'IBMCloud internal DC name')
 
 flags.DEFINE_integer('ibmcloud_volume_iops', 20000,

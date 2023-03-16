@@ -28,8 +28,9 @@ import logging
 import threading
 from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
-from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import os_disk
 from perfkitbenchmarker.providers.openstack import os_network
@@ -46,7 +47,7 @@ FLAGS = flags.FLAGS
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an OpenStack Virtual Machine"""
 
-  CLOUD = providers.OPENSTACK
+  CLOUD = provider_info.OPENSTACK
   DEFAULT_IMAGE = None
 
   _lock = threading.Lock()  # _lock guards the following:
@@ -136,7 +137,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       return False
 
     show_cmd = os_utils.OpenStackCLICommand(self, 'server', 'show', self.id)
-    stdout, _, _ = show_cmd.Issue(suppress_warning=True)
+    stdout, _, _ = show_cmd.Issue()
     try:
       resp = json.loads(stdout)
       return resp
@@ -346,7 +347,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd = os_utils.OpenStackCLICommand(self, 'server', 'delete', self.id)
     del cmd.flags['format']  # delete does not support json output
     cmd.flags['wait'] = True
-    cmd.Issue(suppress_warning=True)
+    cmd.Issue()
 
   def _SetIPAddresses(self):
     show_cmd = os_utils.OpenStackCLICommand(self, 'server', 'show', self.name)

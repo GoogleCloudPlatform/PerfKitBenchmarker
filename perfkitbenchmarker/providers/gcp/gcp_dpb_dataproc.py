@@ -29,9 +29,10 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aws_credentials
+from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc_serverless_prices
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
@@ -48,11 +49,6 @@ disk_to_hdfs_map = {
 DATAPROC_FLINK_INIT_SCRIPT = os.path.join('beam', 'flink-init.sh')
 DATAPROC_FLINK_PRESUBMIT_SCRIPT = os.path.join('beam', 'flink-presubmit.sh')
 DATAPROC_FLINK_TRIGGER_SCRIPT = os.path.join('beam', 'flink-trigger.sh')
-
-# Dataproc serverless resources cost factors (showing us-central-1 pricing).
-# See https://cloud.google.com/dataproc-serverless/pricing
-DATAPROC_SERVERLESS_MILLI_DCU_PRICE_PER_SECOND = 0.06 / 1000 / 3600
-DATAPROC_SERVERLESS_SHUFFLE_STORAGE_PRICE_PER_GB_PER_SECOND = 0.04 / 730 / 3600
 
 
 class MetricNotReadyError(Exception):
@@ -142,7 +138,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     project: ID of the project.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   SERVICE_TYPE = 'dataproc'
 
   def __init__(self, dpb_service_spec):
@@ -372,7 +368,7 @@ class GcpDpbDpgke(GcpDpbDataproc):
   cluster with managed infrastructure.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   SERVICE_TYPE = 'dataproc_gke'
 
   def __init__(self, dpb_service_spec):
@@ -422,7 +418,7 @@ class GcpDpbDpgke(GcpDpbDataproc):
 class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
   """Resource that allows spawning serverless Dataproc Jobs."""
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   SERVICE_TYPE = 'dataproc_serverless'
 
   def __init__(self, dpb_service_spec):
@@ -613,22 +609,30 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
         raise MetricNotReadyError('Usage metric is not ready')
       return results
 
-    # Pricing may vary based on regions. Only implemented for default region.
-    if self.region == 'us-central1':
-      results = FetchBatchResults()
-      milli_dcu_seconds = int(results['runtimeInfo']
-                              ['approximateUsage']['milliDcuSeconds'])
-      shuffle_storage_gb_seconds = int(
-          results['runtimeInfo']['approximateUsage']['shuffleStorageGbSeconds']
-      )
-      cost = (
-          DATAPROC_SERVERLESS_MILLI_DCU_PRICE_PER_SECOND * milli_dcu_seconds
-          + DATAPROC_SERVERLESS_SHUFFLE_STORAGE_PRICE_PER_GB_PER_SECOND
-          * shuffle_storage_gb_seconds
-      )
-      return cost
-    else:
+    # Pricing may vary based on regions. Only some regions available.
+    usd_per_milli_dcu_sec = (
+        gcp_dpb_dataproc_serverless_prices.DATAPROC_SERVERLESS_PRICES.get(
+            self.region, {}
+        ).get('usd_per_milli_dcu_sec')
+    )
+    usd_per_shuffle_storage_gb_sec = (
+        gcp_dpb_dataproc_serverless_prices.DATAPROC_SERVERLESS_PRICES.get(
+            self.region, {}
+        ).get('usd_per_shuffle_storage_gb_sec')
+    )
+    if usd_per_milli_dcu_sec is None or usd_per_shuffle_storage_gb_sec is None:
       return None
+    results = FetchBatchResults()
+    milli_dcu_seconds = int(results['runtimeInfo']
+                            ['approximateUsage']['milliDcuSeconds'])
+    shuffle_storage_gb_seconds = int(
+        results['runtimeInfo']['approximateUsage']['shuffleStorageGbSeconds']
+    )
+    cost = (
+        usd_per_milli_dcu_sec * milli_dcu_seconds +
+        usd_per_shuffle_storage_gb_sec * shuffle_storage_gb_seconds
+    )
+    return cost
 
 
 class GcpDpbDataprocFlink(GcpDpbDataproc):
@@ -638,7 +642,7 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
   cluster with managed infrastructure.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   SERVICE_TYPE = 'dataproc_flink'
 
   def _Create(self):
@@ -695,7 +699,7 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
       scp_cmd += ['--project', self.project]
     scp_cmd += ['--zone', self.dpb_service_zone, '--quiet', script_path,
                 'pkb@' + master_name + ':/tmp/' + script_name]
-    vm_util.IssueCommand(scp_cmd, force_info_log=True)
+    vm_util.IssueCommand(scp_cmd)
     ssh_cmd = ['gcloud', 'compute', 'ssh']
     if self.project is not None:
       ssh_cmd += ['--project', self.project]
@@ -705,4 +709,4 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
                 'pkb@' + master_name, '--',
                 'chmod +x /tmp/' + script_name + '; sudo /tmp/' + script_name
                 + ' ' + ' '.join(script_args)]
-    vm_util.IssueCommand(ssh_cmd, timeout=None, force_info_log=True)
+    vm_util.IssueCommand(ssh_cmd, timeout=None)

@@ -319,6 +319,11 @@ def Run(benchmark_spec):
                       metadata))
   results.append(sample.Sample('dpb_sparksql_job_pending',
                                job_result.pending_time, 'seconds', metadata))
+  if FLAGS.dpb_export_job_stats:
+    run_cost = cluster.CalculateCost()
+    if run_cost is not None:
+      results.append(
+          sample.Sample('sparksql_run_cost', run_cost, '$', metadata))
   return results
 
 

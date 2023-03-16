@@ -20,6 +20,7 @@ import re
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import openjdk
 from perfkitbenchmarker.linux_packages import openjdk_neoverse
@@ -82,6 +83,32 @@ flags.DEFINE_bool(
     'build_openjdk_neoverse', False,
     'Whether to build OpenJDK optimized for ARM Neoverse.'
     'Requires Ubuntu 1804 and OpenJDK 11.')
+flag_util.DEFINE_integerlist(
+    'specjbb_multijvm_nodes', None,
+    'By default specjbb jvm groups are bound to all numa nodes in '
+    'host in a round robin way. When specjbb_multijvm_nodes is specified, '
+    'specjbb jvm groups are bound to the specified numa nodes in a '
+    'round robin way. For example, if user want to bind 4 specjbb '
+    'jvm groups to numa node 0 and 1 in the following order: 1, 0, '
+    '1, 0, user can specify the specjbb_multijvm_nodes flag as following:'
+    '--specjbb_multijvm_nodes=1,0')
+flags.DEFINE_integer(
+    'specjbb_file_descriptors_limit', 64*1024,
+    'Set FD limit for specjbb backend java processes. Specjbb '
+    'background processes tends to create a lot of network connections. '
+    'It could fail if FD limit is too low. Please search for "Too many '
+    'open files" in the web page for detailed info: '
+    'http://spec.org/jbb2015/docs/knownissues.html'
+    'Please be careful when setting this flag. its value should be '
+    'smaller than sysctl flag fs.nr_open. Benchmark will fail if this '
+    'flag is set to a value bigger than fs.nr_open.',
+    lower_bound=0)
+flags.DEFINE_integer(
+    'specjbb_connection_pool_size', 256,
+    'User can use this flag to set connection pool size for all specjbb '
+    'agents. Please refer to section 16.1 of specjbb userguide:'
+    'https://www.spec.org/jbb2015/docs/userguide.pdf',
+    lower_bound=0)
 
 
 def GetConfig(user_config):
@@ -158,13 +185,16 @@ def _SpecArgs(vm, mode):
   spec_num_groups_arg = f' -Dspecjbb.group.count={FLAGS.specjbb_num_groups}'
   spec_rt_curve_arg = '-Dspecjbb.controller.rtcurve.warmup.step=0.5'
   spec_mr_arg = f'-Dspecjbb.mapreducer.pool.size={_DEFAULT_NUM_GROUPS * 2}'
+  spec_connect_pool_size_arg = (
+      f'-Dspecjbb.comm.connect.client.pool.size={FLAGS.specjbb_connection_pool_size}'
+  )
 
   if mode == TXINJECTOR_MODE:
     return ''
   elif mode == MULTICONTROLLER_MODE:
     return ' '.join([
         spec_rt_curve_arg, spec_mr_arg, spec_num_workers_arg,
-        spec_num_groups_arg
+        spec_num_groups_arg, spec_connect_pool_size_arg
     ])
   elif mode == BACKEND_MODE:
     return ''
@@ -219,16 +249,21 @@ def _RunBackgroundNumaPinnedCommand(vm, cmd_list, node_id):
     cmd_list: list of commands to be joined together
     node_id: NUMA node to pin command on.
   """
+  fd_limit_cmd = f'ulimit -n {FLAGS.specjbb_file_descriptors_limit}'
   if FLAGS.specjbb_numa_aware:
     # Persist the nohup command past the ssh session, and numa pin.
     # "sh -c 'cd /whereever; nohup ./whatever > /dev/null 2>&1 &'"
     # "numa --cpunodebind 0 --membind 0 cmd"
-    cmd = ('sh -c \'cd {dir} && nohup numactl --cpunodebind {node_id} '
+    cmd = ('sh -c \'{fd_limit_cmd} && cd {dir} && nohup numactl '
+           '--cpunodebind {node_id} '
            '--membind {node_id} {cmd} 2>&1 &\'').format(
+               fd_limit_cmd=fd_limit_cmd,
                node_id=node_id, dir=_SPEC_DIR, cmd=' '.join(cmd_list))
   else:
-    cmd = ('sh -c \'cd {dir} && nohup {cmd} 2>&1 &\'').format(
-        dir=_SPEC_DIR, cmd=' '.join(cmd_list))
+    cmd = ('sh -c \'{fd_limit_cmd} && cd {dir} && '
+           'nohup {cmd} 2>&1 &\'').format(
+               fd_limit_cmd=fd_limit_cmd,
+               dir=_SPEC_DIR, cmd=' '.join(cmd_list))
   vm.RemoteCommand(cmd)
 
 
@@ -249,12 +284,16 @@ def Run(benchmark_spec):
   if FLAGS.specjbb_run_mode == MULTIJVM_MODE:
     numactl_stdout, _ = vm.RemoteCommand('numactl -H | grep cpus | wc -l')
     numa_zones = int(numactl_stdout)
+    if FLAGS.specjbb_multijvm_nodes:
+      node_ids = FLAGS.specjbb_multijvm_nodes
+    else:
+      node_ids = [numa_id for numa_id in range(0, numa_zones)]
 
     # Run backends and txinjectors as background commands
     # java -jar specjbb2015.jar -m txinjector -G GRP1 -J JVM1 > grp1jvm1.log
     # java -jar specjbb2015.jar -m backend -G GRP1 -J JVM1 > grp1jvm2.log
     for group in range(1, FLAGS.specjbb_num_groups + 1):
-      node_id = group % numa_zones
+      node_id = node_ids[(group - 1) % len(node_ids)]
 
       txinjector_cmd = [
           'java',

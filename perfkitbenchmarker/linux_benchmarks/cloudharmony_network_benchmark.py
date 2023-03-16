@@ -18,6 +18,7 @@ import logging
 import posixpath
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import cloud_harmony_util
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -289,7 +290,7 @@ def Prepare(benchmark_spec):
     client.RemoteCommand('echo insecure >> $HOME/.curlrc')
 
   if FLAGS.ch_network_test_service_type == COMPUTE:
-    vm_util.RunThreaded(_PrepareServer, vm_groups['server'])
+    background_tasks.RunThreaded(_PrepareServer, vm_groups['server'])
   elif FLAGS.ch_network_test_service_type == STORAGE:
     _PrepareBucket(benchmark_spec)
   elif FLAGS.ch_network_test_service_type == DNS:

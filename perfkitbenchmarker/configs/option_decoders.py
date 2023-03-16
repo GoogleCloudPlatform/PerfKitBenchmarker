@@ -17,7 +17,7 @@
 import abc
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import spec
 import six
 
@@ -341,7 +341,7 @@ class _PerCloudConfigSpec(spec.BaseSpec):
       to construct in order to decode the named option.
     """
     result = super(_PerCloudConfigSpec, cls)._GetOptionDecoderConstructions()
-    for cloud in providers.VALID_CLOUDS:
+    for cloud in provider_info.VALID_CLOUDS:
       result[cloud] = TypeVerifier, {
           'default': None,
           'valid_types': (dict,)

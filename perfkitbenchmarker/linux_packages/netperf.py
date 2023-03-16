@@ -20,7 +20,7 @@ import re
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import regex_util
 
 flags.DEFINE_integer(
@@ -96,7 +96,7 @@ def _CopyTar(vm):
   """
 
   # Kubernetes VMs sometimes fail to copy the whole archive
-  if vm.CLOUD != providers.KUBERNETES:
+  if vm.CLOUD != provider_info.KUBERNETES:
     try:
       vm.PushDataFile(
           NETPERF_TAR, remote_path=(linux_packages.INSTALL_DIR + '/'))

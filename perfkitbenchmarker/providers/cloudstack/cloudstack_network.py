@@ -14,7 +14,7 @@
 
 from absl import flags
 from perfkitbenchmarker import network
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.cloudstack import util
 
@@ -24,7 +24,7 @@ FLAGS = flags.FLAGS
 class CloudStackNetwork(network.BaseNetwork):
   """Object representing a CloudStack Network."""
 
-  CLOUD = providers.CLOUDSTACK
+  CLOUD = provider_info.CLOUDSTACK
 
   def __init__(self, spec):
 

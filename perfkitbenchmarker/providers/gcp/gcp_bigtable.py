@@ -29,7 +29,16 @@ import requests
 
 FLAGS = flags.FLAGS
 
-
+ENDPOINT = flags.DEFINE_string(
+    'google_bigtable_endpoint',
+    'bigtable.googleapis.com',
+    'Google API endpoint for Cloud Bigtable.',
+)
+ADMIN_ENDPOINT = flags.DEFINE_string(
+    'google_bigtable_admin_endpoint',
+    'bigtableadmin.googleapis.com',
+    'Google API endpoint for Cloud Bigtable table administration.',
+)
 flags.DEFINE_string('google_bigtable_instance_name', None,
                     'Bigtable instance name. If not specified, new instance '
                     'will be created and deleted on the fly. If specified, '
@@ -303,8 +312,10 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
   def _UpdateLabels(self, labels: Dict[str, Any]) -> None:
     """Updates the labels of the current instance."""
     header = {'Authorization': f'Bearer {util.GetAccessToken()}'}
-    url = ('https://bigtableadmin.googleapis.com/v2/'
-           f'projects/{self.project}/instances/{self.name}')
+    url = (
+        f'https://{ADMIN_ENDPOINT.value}/v2/'
+        f'projects/{self.project}/instances/{self.name}'
+    )
     # Keep any existing labels
     tags = self._GetLabels()
     tags.update(labels)
@@ -332,8 +343,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
   def _DescribeInstance(self) -> Dict[str, Any]:
     cmd = _GetBigtableGcloudCommand(
         self, 'bigtable', 'instances', 'describe', self.name)
-    stdout, stderr, retcode = cmd.Issue(
-        suppress_warning=True, raise_on_failure=False)
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Describing instance %s failed: %s', self.name, stderr)
       return {}
@@ -367,8 +377,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
   def _GetClusters(self) -> List[Dict[str, Any]]:
     cmd = _GetBigtableGcloudCommand(self, 'bigtable', 'clusters', 'list')
     cmd.flags['instances'] = self.name
-    stdout, stderr, retcode = cmd.Issue(
-        suppress_warning=True, raise_on_failure=False)
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Listing clusters %s failed: %s', self.name, stderr)
       return []
@@ -414,8 +423,7 @@ def GetClustersDescription(instance_name, project):
   cmd = util.GcloudCommand(None, 'bigtable', 'clusters', 'list')
   cmd.flags['instances'] = instance_name
   cmd.flags['project'] = project
-  stdout, stderr, retcode = cmd.Issue(
-      suppress_warning=True, raise_on_failure=False)
+  stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
   if retcode:
     logging.error('Command "%s" failed:\nSTDOUT:\n%s\nSTDERR:\n%s',
                   repr(cmd), stdout, stderr)

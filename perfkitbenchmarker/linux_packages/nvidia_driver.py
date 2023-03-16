@@ -25,16 +25,18 @@ from perfkitbenchmarker import virtual_machine
 
 
 NVIDIA_DRIVER_LOCATION_BASE = 'https://us.download.nvidia.com/tesla'
+AZURE_NVIDIA_GRID_DRIVER = 'https://download.microsoft.com/download/c/e/9/ce913061-ccf1-4c88-94ff-294e48c55439/NVIDIA-Linux-x86_64-525.85.05-grid-azure.run'
 
 NVIDIA_TESLA_K80 = 'k80'
 NVIDIA_TESLA_P4 = 'p4'
 NVIDIA_TESLA_P100 = 'p100'
 NVIDIA_TESLA_V100 = 'v100'
 NVIDIA_TESLA_T4 = 't4'
+NVIDIA_TESLA_L4 = 'l4'
 NVIDIA_TESLA_A100 = 'a100'
-NVIDIA_TESLA_A10G = 'a10g'
+NVIDIA_TESLA_A10 = 'a10'
 
-EXTRACT_CLOCK_SPEEDS_REGEX = r'(\d*).*,\s*(\d*)'
+EXTRACT_CLOCK_SPEEDS_REGEX = r'(\S*).*,\s*(\S*)'
 
 flag_util.DEFINE_integerlist('gpu_clock_speeds',
                              None,
@@ -45,9 +47,13 @@ flags.DEFINE_boolean('gpu_autoboost_enabled', None,
                      'whether gpu autoboost is enabled')
 
 flags.DEFINE_string(
-    'nvidia_driver_version', '510.47.03',
-    'The version of nvidia driver to install. '
-    'For example, "418.67" or "418.87.01."')
+    'nvidia_driver_version',
+    '525.85.12',
+    (
+        'The version of nvidia driver to install. '
+        'For example, "418.67" or "418.87.01."'
+    ),
+)
 flags.DEFINE_boolean('nvidia_driver_force_install', False,
                      'Whether to install NVIDIA driver, even if it is already '
                      'installed.')
@@ -93,7 +99,7 @@ def CheckNvidiaGpuExists(vm):
   if vm.BASE_OS_TYPE != os_types.DEBIAN:
     return False
   vm.Install('pciutils')
-  output, _ = vm.RemoteCommand('sudo lspci', should_log=True)
+  output, _ = vm.RemoteCommand('sudo lspci')
   regex = re.compile(r'3D controller: NVIDIA Corporation')
   return regex.search(output) is not None
 
@@ -110,9 +116,7 @@ def CheckNvidiaSmiExists(vm):
   # PKB only supports NVIDIA driver on DEBIAN for now.
   if vm.BASE_OS_TYPE != os_types.DEBIAN:
     return False
-  resp, _ = vm.RemoteHostCommand('command -v nvidia-smi',
-                                 ignore_failure=True,
-                                 suppress_warning=True)
+  resp, _ = vm.RemoteHostCommand('command -v nvidia-smi', ignore_failure=True)
   return bool(resp.rstrip())
 
 
@@ -128,7 +132,7 @@ def GetDriverVersion(vm):
   Raises:
     NvidiaSmiParseOutputError: If nvidia-smi output cannot be parsed.
   """
-  stdout, _ = vm.RemoteCommand('nvidia-smi', should_log=True)
+  stdout, _ = vm.RemoteCommand('nvidia-smi')
   regex = r'Driver Version\:\s+(\S+)'
   match = re.search(regex, stdout)
   if match:
@@ -168,7 +172,7 @@ def GetGpuType(vm):
     ['V100-SXM2-16GB', 'V100-SXM2-16GB', 'V100-SXM2-16GB', 'V100-SXM2-16GB',
      'V100-SXM2-16GB', 'V100-SXM2-16GB', 'V100-SXM2-16GB', 'V100-SXM2-16GB']
   """
-  stdout, _ = vm.RemoteCommand('nvidia-smi -L', should_log=True)
+  stdout, _ = vm.RemoteCommand('nvidia-smi -L')
   try:
     gpu_types = []
     for line in stdout.splitlines():
@@ -196,10 +200,12 @@ def GetGpuType(vm):
     return NVIDIA_TESLA_V100
   elif 'T4' in gpu_types[0]:
     return NVIDIA_TESLA_T4
+  elif 'L4' in gpu_types[0]:
+    return NVIDIA_TESLA_L4
   elif 'A100' in gpu_types[0]:
     return NVIDIA_TESLA_A100
-  elif 'A10G' in gpu_types[0]:
-    return NVIDIA_TESLA_A10G
+  elif 'A10' in gpu_types[0]:
+    return NVIDIA_TESLA_A10
   else:
     raise UnsupportedClockSpeedError(
         'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
@@ -229,7 +235,7 @@ def QueryNumberOfGpus(vm):
     Integer indicating the number of NVIDIA GPUs present on the vm.
   """
   stdout, _ = vm.RemoteCommand('sudo nvidia-smi --query-gpu=count --id=0 '
-                               '--format=csv', should_log=True)
+                               '--format=csv')
   return int(stdout.split()[1])
 
 
@@ -250,7 +256,7 @@ def GetPeerToPeerTopology(vm):
 
     GetTopology will return 'Y Y N N;Y Y N N;N N Y Y;N N Y Y'
   """
-  stdout, _ = vm.RemoteCommand('nvidia-smi topo -p2p r', should_log=True)
+  stdout, _ = vm.RemoteCommand('nvidia-smi topo -p2p r')
   lines = [line.split() for line in stdout.splitlines()]
   num_gpus = len(lines[0])
 
@@ -334,11 +340,11 @@ def QueryGpuClockSpeed(vm, device_id):
   query = ('sudo nvidia-smi --query-gpu=clocks.applications.memory,'
            'clocks.applications.graphics --format=csv --id={0}'
            .format(device_id))
-  stdout, _ = vm.RemoteCommand(query, should_log=True)
+  stdout, _ = vm.RemoteCommand(query)
   clock_speeds = stdout.splitlines()[1]
   matches = regex_util.ExtractAllMatches(EXTRACT_CLOCK_SPEEDS_REGEX,
                                          clock_speeds)[0]
-  return (int(matches[0]), int(matches[1]))
+  return (matches[0], matches[1])
 
 
 def EnablePersistenceMode(vm):
@@ -388,7 +394,7 @@ def QueryAutoboostPolicy(vm, device_id):
   autoboost_regex = r'Auto Boost\s*:\s*(\S+)'
   autoboost_default_regex = r'Auto Boost Default\s*:\s*(\S+)'
   query = 'sudo nvidia-smi -q -d CLOCK --id={0}'.format(device_id)
-  stdout, _ = vm.RemoteCommand(query, should_log=True)
+  stdout, _ = vm.RemoteCommand(query)
   autoboost_match = re.search(autoboost_regex, stdout)
   autoboost_default_match = re.search(autoboost_default_regex, stdout)
 
@@ -456,23 +462,25 @@ def Install(vm):
     logging.warn('NVIDIA drivers already detected. Not installing.')
     return
 
-  location = ('{base}/{version}/NVIDIA-Linux-{cpu_arch}-{version}.run'.format(
-      base=NVIDIA_DRIVER_LOCATION_BASE,
-      version=version_to_install,
-      cpu_arch=vm.cpu_arch))
+  if re.match(r'Standard_NV\d+ads_A10_v5', vm.machine_type):
+    location = AZURE_NVIDIA_GRID_DRIVER
+  else:
+    location = '{base}/{version}/NVIDIA-Linux-{cpu_arch}-{version}.run'.format(
+        base=NVIDIA_DRIVER_LOCATION_BASE,
+        version=version_to_install,
+        cpu_arch=vm.cpu_arch,
+    )
 
   vm.Install('wget')
   tokens = re.split('/', location)
   filename = tokens[-1]
   vm.RemoteCommand('wget {location} && chmod 755 {filename} '
-                   .format(location=location, filename=filename),
-                   should_log=True)
+                   .format(location=location, filename=filename))
   vm.RemoteCommand(
       'sudo ./{filename} -q -x-module-path={x_module_path} '
       '--ui=none -x-library-path={x_library_path}'.format(
           filename=filename,
           x_module_path=FLAGS.nvidia_driver_x_module_path,
-          x_library_path=FLAGS.nvidia_driver_x_library_path),
-      should_log=True)
+          x_library_path=FLAGS.nvidia_driver_x_library_path))
   if FLAGS.nvidia_driver_persistence_mode:
     EnablePersistenceMode(vm)

@@ -14,6 +14,7 @@
 """Class to represent a GCE Windows Virtual Machine object."""
 
 import json
+import ntpath
 from typing import Any, Dict, Tuple
 
 from absl import flags
@@ -21,20 +22,22 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
 _WINDOWS_SHUTDOWN_SCRIPT_PS1 = 'Write-Host | gsutil cp - {preempt_marker}'
 
-_METADATA_PREEMPT_CMD_WIN = (f'Invoke-RestMethod -Uri'
-                             f' {gce_virtual_machine.METADATA_PREEMPT_URI} '
-                             '-Headers @{"Metadata-Flavor"="Google"}')
+_METADATA_PREEMPT_CMD_WIN = (
+    'Invoke-RestMethod -Uri'
+    f' {gce_virtual_machine.METADATA_PREEMPT_URI} '
+    '-Headers @{"Metadata-Flavor"="Google"}'
+)
 
 FLAGS = flags.FLAGS
 
 BAT_SCRIPT = """
-'
 :WAIT
 echo waiting for MSSQLSERVER
 sc start MSSQLSERVER
@@ -42,7 +45,7 @@ ping 127.0.0.1 -t 1 > NUL
 for /f "tokens=4" %%s in ('sc query MSSQLSERVER ^| find "STATE"') do if NOT "%%s"=="RUNNING" goto WAIT
 echo MSSQLSERVER is now running!
 sqlcmd.exe -Q "CREATE LOGIN [%COMPUTERNAME%\\perfkit] from windows;"
-sqlcmd.exe -Q "ALTER SERVER ROLE [sysadmin] ADD MEMBER [%COMPUTERNAME%\\perfkit]" '
+sqlcmd.exe -Q "ALTER SERVER ROLE [sysadmin] ADD MEMBER [%COMPUTERNAME%\\perfkit]"
 """
 
 
@@ -54,9 +57,12 @@ class GceDriverDoesntSupportFeatureError(Exception):
   """Raised if there is an attempt to set a feature not supported."""
 
 
-class WindowsGceVirtualMachine(gce_virtual_machine.GceVirtualMachine,
-                               windows_virtual_machine.BaseWindowsMixin):
+class WindowsGceVirtualMachine(
+    gce_virtual_machine.GceVirtualMachine,
+    windows_virtual_machine.BaseWindowsMixin,
+):
   """Class supporting Windows GCE virtual machines."""
+
   DEFAULT_IMAGE_FAMILY = {
       os_types.WINDOWS2012_CORE: 'windows-2012-r2-core',
       os_types.WINDOWS2016_CORE: 'windows-2016-core',
@@ -69,7 +75,8 @@ class WindowsGceVirtualMachine(gce_virtual_machine.GceVirtualMachine,
   }
 
   GVNIC_DISABLED_OS_TYPES = [
-      os_types.WINDOWS2012_CORE, os_types.WINDOWS2012_DESKTOP
+      os_types.WINDOWS2012_CORE,
+      os_types.WINDOWS2012_DESKTOP,
   ]
 
   NVME_START_INDEX = 0
@@ -82,37 +89,41 @@ class WindowsGceVirtualMachine(gce_virtual_machine.GceVirtualMachine,
       vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
     super(WindowsGceVirtualMachine, self).__init__(vm_spec)
-    self.boot_metadata[
-        'windows-startup-script-ps1'] = windows_virtual_machine.STARTUP_SCRIPT
+    self.boot_metadata['windows-startup-script-ps1'] = (
+        windows_virtual_machine.STARTUP_SCRIPT
+    )
 
-  def _GenerateResetPasswordCommand(self):
-    """Generates a command to reset a VM user's password.
+  def _GetWindowsPassword(self):
+    """Generates a command to get a VM user's password.
 
     Returns:
-      GcloudCommand. gcloud command to issue in order to reset the VM user's
-      password.
+      Password for the windows user.
     """
-    cmd = util.GcloudCommand(self, 'compute', 'reset-windows-password',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'reset-windows-password', self.name
+    )
     cmd.flags['user'] = self.user_name
-    return cmd
+    stdout, _ = cmd.IssueRetryable()
+    response = json.loads(stdout)
+    return response['password']
 
   def _PostCreate(self):
     super(WindowsGceVirtualMachine, self)._PostCreate()
-    reset_password_cmd = self._GenerateResetPasswordCommand()
-    stdout, _ = reset_password_cmd.IssueRetryable()
-    response = json.loads(stdout)
-    self.password = response['password']
+    self.password = self._GetWindowsPassword()
 
   def _PreemptibleMetadataKeyValue(self) -> Tuple[str, str]:
     """See base class."""
     return 'windows-shutdown-script-ps1', _WINDOWS_SHUTDOWN_SCRIPT_PS1.format(
-        preempt_marker=self.preempt_marker)
+        preempt_marker=self.preempt_marker
+    )
 
   @vm_util.Retry(
       max_retries=10,
-      retryable_exceptions=(GceUnexpectedWindowsAdapterOutputError,
-                            errors.VirtualMachine.RemoteCommandError))
+      retryable_exceptions=(
+          GceUnexpectedWindowsAdapterOutputError,
+          errors.VirtualMachine.RemoteCommandError,
+      ),
+  )
   def GetResourceMetadata(self) -> Dict[str, Any]:
     """Returns a dict containing metadata about the VM.
 
@@ -135,7 +146,8 @@ class WindowsGceVirtualMachine(gce_virtual_machine.GceVirtualMachine,
     net_adapters, _ = self.RemoteCommand('Get-NetAdapter')
     if 'Red Hat VirtIO Ethernet Adapter' not in net_adapters:
       raise GceDriverDoesntSupportFeatureError(
-          'Driver not tested with RSS disabled in PKB.')
+          'Driver not tested with RSS disabled in PKB.'
+      )
 
     command = 'netsh int tcp set global rss=disabled'
     self.RemoteCommand(command)
@@ -158,13 +170,41 @@ class WindowsGceVirtualMachine(gce_virtual_machine.GceVirtualMachine,
   def SupportGVNIC(self) -> bool:
     return self.OS_TYPE not in self.GVNIC_DISABLED_OS_TYPES
 
-  def GetDefaultImageFamily(self) -> str:
+  def GetDefaultImageFamily(self, is_arm: bool) -> str:
+    assert not is_arm
     return self.DEFAULT_IMAGE_FAMILY[self.OS_TYPE]
 
   def GetDefaultImageProject(self) -> str:
     if self.OS_TYPE in os_types.WINDOWS_SQLSERVER_OS_TYPES:
       return 'windows-sql-cloud'
     return 'windows-cloud'
+
+  def SetupLMNotification(self):
+    """Prepare environment for /scripts/gce_maintenance_notify.py script."""
+    self.Install('python3')
+    self.RemoteCommand('pip install requests')
+    self.PushDataFile(
+        self._LM_NOTICE_SCRIPT, f'{self.temp_dir}\\{self._LM_NOTICE_SCRIPT}'
+    )
+
+  def _GetLMNotificationCommand(self):
+    """Return Remote python execution command for LM notify script."""
+    vm_path = ntpath.join(self.temp_dir, self._LM_NOTICE_SCRIPT)
+    return (
+        f'python {vm_path} {gcp_flags.LM_NOTIFICATION_METADATA_NAME.value} >'
+        f' {self.temp_dir}\\{self._LM_NOTICE_LOG} 2>&1'
+    )
+
+  def _PullLMNoticeLog(self):
+    """Pull the LM Notice Log onto the local VM."""
+    self.PullFile(
+        f'{vm_util.GetTempDir()}/{self._LM_NOTICE_LOG}',
+        f'{self.temp_dir}\\{self._LM_NOTICE_LOG}',
+    )
+
+  def _ReadLMNoticeContents(self):
+    """Read the contents of the LM Notice Log into a string."""
+    return self.RemoteCommand(f'type {self.temp_dir}\\{self._LM_NOTICE_LOG}')[0]
 
   @property
   def _MetadataPreemptCmd(self) -> str:
@@ -173,6 +213,7 @@ class WindowsGceVirtualMachine(gce_virtual_machine.GceVirtualMachine,
 
 class WindowsGceSqlServerVirtualMachine(WindowsGceVirtualMachine):
   """Class supporting Windows GCE sql server virtual machines."""
+
   DEFAULT_IMAGE_FAMILY = {
       os_types.WINDOWS2019_SQLSERVER_2017_STANDARD: 'sql-std-2017-win-2019',
       os_types.WINDOWS2019_SQLSERVER_2017_ENTERPRISE: 'sql-ent-2017-win-2019',
@@ -186,4 +227,4 @@ class WindowsGceSqlServerVirtualMachine(WindowsGceVirtualMachine):
 
   def __init__(self, vm_spec):
     super().__init__(vm_spec)
-    self.boot_metadata['windows-startup-script-bat'] = BAT_SCRIPT
+    self.boot_metadata['windows-startup-script-bat'] = "'" + BAT_SCRIPT + "'"

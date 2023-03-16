@@ -19,9 +19,9 @@ Spins up a cloud redis instance, runs YCSB against it, then spins it down.
 
 import logging
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import managed_memory_store
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 
 FLAGS = flags.FLAGS
@@ -79,7 +79,7 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
 
   ycsb_vms = benchmark_spec.vm_groups['clients']
-  vm_util.RunThreaded(_Install, ycsb_vms)
+  background_tasks.RunThreaded(_Install, ycsb_vms)
 
   cloud_redis_class = (
       managed_memory_store.GetManagedMemoryStoreClass(

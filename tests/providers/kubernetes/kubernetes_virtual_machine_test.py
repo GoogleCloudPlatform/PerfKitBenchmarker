@@ -22,7 +22,7 @@ from absl import flags as flgs
 import contextlib2
 import mock
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import util as azure_util
@@ -220,7 +220,12 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
         mock.patch(vm_util.__name__ + '.NamedTemporaryFile'))
 
     issue_command = stack.enter_context(
-        mock.patch(vm_util.__name__ + '.IssueCommand', return_value=retval))
+        mock.patch(
+            vm_util.__name__ + '.IssueCommand',
+            return_value=retval,
+            autospec=True,
+        )
+    )
 
     yield issue_command, temp_file
 
@@ -301,6 +306,17 @@ class KubernetesResourcesTestCase(
       actual = kub_vm.GetResourceMetadata()
       self.assertDictContainsSubset(subset_of_expected_metadata, actual)
 
+  def testAnnotations(self):
+    spec = self.create_virtual_machine_spec()
+    FLAGS.k8s_sriov_network = 'sriov-vlan50'
+    with patch_critical_objects():
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      subset_of_expected_metadata = {
+          'annotations': {'sriov_network': 'sriov-vlan50'}
+      }
+      actual = kub_vm.GetResourceMetadata()
+      self.assertDictContainsSubset(subset_of_expected_metadata, actual)
+
 
 class KubernetesVirtualMachineOsTypesTestCase(
     BaseKubernetesVirtualMachineTestCase):
@@ -309,7 +325,7 @@ class KubernetesVirtualMachineOsTypesTestCase(
   def create_kubernetes_vm(os_type):
     spec = kubernetes_pod_spec.KubernetesPodSpec(
         _COMPONENT)
-    vm_class = virtual_machine.GetVmClass(providers.KUBERNETES,
+    vm_class = virtual_machine.GetVmClass(provider_info.KUBERNETES,
                                           os_type)
     kub_vm = vm_class(spec)
     kub_vm._WaitForPodBootCompletion = lambda: None
@@ -500,7 +516,7 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
 
   def testCreatePodBodyWrittenCorrectly(self):
     spec = self.create_virtual_machine_spec()
-    vm_class = virtual_machine.GetVmClass(providers.KUBERNETES,
+    vm_class = virtual_machine.GetVmClass(provider_info.KUBERNETES,
                                           os_types.UBUNTU1604_CUDA9)
     with patch_critical_objects() as (_, temp_file):
       kub_vm = vm_class(spec)

@@ -54,7 +54,7 @@ def GetEnvironmentVars(vm):
   """
   env_vars = []
   if nvidia_driver.CheckNvidiaGpuExists(vm):
-    output, _ = vm.RemoteCommand('getconf LONG_BIT', should_log=True)
+    output, _ = vm.RemoteCommand('getconf LONG_BIT')
     long_bit = output.strip()
     lib_name = 'lib' if long_bit == '32' else 'lib64'
     env_vars.extend([
@@ -98,17 +98,15 @@ def Install(vm):
   vm.Install('pip')
   vm.RemoteCommand('sudo pip install requests')
   vm.RemoteCommand('sudo pip install --upgrade absl-py')
-  vm.RemoteCommand('sudo pip install --upgrade %s' % tf_pip_package,
-                   should_log=True)
+  vm.RemoteCommand('sudo pip install --upgrade %s' % tf_pip_package)
   vm.RemoteCommand(
-      'sudo pip install --upgrade %s' % FLAGS.t2t_pip_package, should_log=True)
+      'sudo pip install --upgrade %s' % FLAGS.t2t_pip_package)
   vm.InstallPackages('git')
   _, _, retcode = vm.RemoteHostCommandWithReturnCode(
-      'test -d benchmarks', ignore_failure=True, suppress_warning=True)
+      'test -d benchmarks', ignore_failure=True)
   if retcode != 0:
     vm.RemoteCommand(
-        'git clone https://github.com/tensorflow/benchmarks.git',
-        should_log=True)
+        'git clone https://github.com/tensorflow/benchmarks.git')
   vm.RemoteCommand(
       'cd benchmarks && git checkout {}'.format(FLAGS.tf_cnn_benchmarks_branch)
   )
@@ -119,5 +117,4 @@ def Install(vm):
 
 def Uninstall(vm):
   """Uninstalls TensorFlow on the VM."""
-  vm.RemoteCommand('sudo pip uninstall tensorflow',
-                   should_log=True)
+  vm.RemoteCommand('sudo pip uninstall tensorflow')

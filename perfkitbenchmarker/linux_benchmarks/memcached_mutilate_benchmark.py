@@ -38,8 +38,8 @@ import functools
 import time
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memcached_server
 from perfkitbenchmarker.linux_packages import mutilate
 
@@ -147,7 +147,9 @@ def Prepare(benchmark_spec):
   client_install_fns = [
       functools.partial(vm.Install, 'mutilate') for vm in clients]
   server_install_fns = [functools.partial(server.Install, 'memcached_server')]
-  vm_util.RunThreaded(lambda f: f(), client_install_fns + server_install_fns)
+  background_tasks.RunThreaded(
+      lambda f: f(), client_install_fns + server_install_fns
+  )
 
 
 def Run(benchmark_spec):

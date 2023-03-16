@@ -113,7 +113,7 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
 
   logging.info('Ping results (ip_type = %s):', ip_type)
   ping_cmd = f'ping -c 100 {receiving_ip}'
-  stdout, _ = sending_vm.RemoteCommand(ping_cmd, should_log=True)
+  stdout, _ = sending_vm.RemoteCommand(ping_cmd)
   stats = re.findall('([0-9]*\\.[0-9]*)', stdout.splitlines()[-1])
   assert len(stats) == len(METRICS), stats
   results = []

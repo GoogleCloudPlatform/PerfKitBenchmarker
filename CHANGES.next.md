@@ -29,6 +29,20 @@
 -   Deprecate Aerospike_YCSB benchmark.
 -   Remove pkb's --placement_group_style cloud-agnostic values 'cluster'/
     'cluster_if_supported'/'spread'/'spread_if_supported'.
+-   Replace flag --ibm_azone with --ibm_region.
+-   Changed the default benchmark to `cluster_boot` instead of the standard set.
+    This makes the default behavior for PKB much faster and the standard set of
+    benchmarks was defined many years ago. It's not a reasonable introduction to
+    PKB or something that most people should run by default.
+-   --dpb_export_job_stats is now False by default.
+-   Validate arguments to IssueCommand & RobustRemoteCommand. Replaced
+    force_info_log & suppress_warning parameters with vm_command_log_mode flag,
+    added should_pre_log parameter. Passed stacklevel variable to logging to
+    better distinguish between RemoteCommand call sites. See stacklevel docs:
+    https://docs.python.org/3/library/logging.html#logging.Logger.debug
+-   Remove Dataflow parameter --maxNumWorkers by default and add
+    dataflow_max_worker_count in spec to allow users to set this parameter on
+    their own.
 
 ### New features:
 
@@ -95,6 +109,20 @@
 -   Add Intel MPI benchmark.
 -   Add support for Azure ARM VMs.
 -   Add an HTTP endpoint polling utility & incorporate it into app_service.
+-   Added support for Data Plane Development Kit (DPDK) on Linux VM's to improve
+    networking performance.
+-   Added support for dynamic provisioning of Bigquery flat rate slots at
+    benchmark runtime
+-   Create a new subdirectory of linux_benchmarks called provisioning_benchmarks
+    for benchmarking lifecycle management timings of cloud resources. Including:
+    - Kubernetes Clusters
+    - KMS cryptographic keys
+    - Object storage buckets
+-   Add support for using the hbase2 binding in the Cloud Bigtable YCSB
+    benchmark.
+-   Add iPerf interval reporting.
+-   Add support for DynamoDB on demand instances.
+-   Add support for Debian 10 & 11 with backported kernels on AWS.
 
 ### Enhancements:
 
@@ -190,9 +218,32 @@
 -   Add `--dpb_job_poll_interval_secs` flag to control job polling frequency in
     DPB benchmarks.
 -   Add support for more readings in nvidia_power tracking.
+-   Report benchmark run costs for dpb_sparksql_benchmark runs on Dataproc
+    Serverless, AWS EMR Serverless & AWS Glue.
+-   Create a list of resources in benchmark_spec to extract common lifecycle
+    timing samples from regardless of benchmark. The set is initially small, but
+    can be expanded to any resource.
+-   Add per-VM resource metadata for id, name, and IP address.
+-   Add Key Management Service (KMS) resource for cloud cryptographic keys.
+-   Add support for using java veneer client with google bigtable
+    `google_bigtable_use_java_veneer_client`.
+-   Allow configuring the number of channels used per VM for the Cloud Bigtable
+    YCSB benchmark with `--google_bigtable_channel_count`.
+-   Add `--pkb_log_bucket` flag, allowing users to route PKB logs to a GCS
+    bucket and clean up space on their machines.
+-   Add support for rls routing with direct path with new flag
+    `google_bigtable_enable_rls_routing`.
+-   Set default YAML config vm_spec.GCP_network_name to null, and added the
+    corresponding attribute to GCEVMSpec, GCENetworkSpec and GCEVirtualMachine.
+    vm_spec overrides FLAGS.gce_network_name.
+-   Add `--dpb_sparksql_queries_url` flag to provide custom object store path
+    (i.e. GCS/S3) where the queries will be used for `dpb_sparksql_benchmark`.
+-   Add `--gke_node_system_config` flag to the GKE provider for passing kubelet
+    and linux parameters.
 
 ### Bug fixes and maintenance updates:
 
+-   Add 'runcpu --update' and 'runcpu --version' commands to install phase.
 -   Set the command to download preprovisioned data to be robust and have a five
     minute timeout.
 -   Make Speccpu17 fail if there are compilation errors that will cause missing
@@ -263,6 +314,7 @@
 -   Update the performance results of Bigtable testing which used a more proper
     client setup.
 -   Update the runner's AWS CLI to 1.19.75.
+-   Upgrade from AWS ecr get-login to ecr get-login-password.
 -   Minor fix of the Bigtable benchmarking user guide.
 -   Enable icelake and milan as --gcp_min_cpu_platform options.
 -   Update the bigtable tutorial readme with the content of batch_testing.md.
@@ -281,7 +333,7 @@
 -   Add some required types to BaseAppServiceSpec.
 -   Uses nic type of GVNIC by default (instead of VIRTIO_NET) on GCE
 -   Rename pkb's --placement_group_style values to reflect their cloud-specific
-        CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN'; AWS -
+    CLI arguments (GCP - 'COLLOCATED'/'AVAILABILITY-DOMAIN'; AWS -
     'cluster'/'spread'/'partition'; Azure -
     'proximity-placement-group'/'availability-set'). Cloud-agnostic value
     'closest_supported' will choose the most tightly-coupled placement policy
@@ -289,3 +341,21 @@
 -   Fix how the CBT client is installed for the cloud_bigtable_ycsb_benchmark
     (when --google_bigtable_client_version is set) and use the `cbt` CLI instead
     of the hbase shell to create and delete tables.
+-   Update Bigtable benchmarking configs along with new docker image release.
+    Important dates are added to the user guide.
+-   Add `--assign_external_ip` flag to allow benchmarking VMs without creating
+    external (public) IPs for better security and reduced costs on AWS, Azure,
+    and GCP. The `--connect_via_internal_ip` flag should also be used in this
+    case.
+-   Add `--boot_completion_ip_subset` flag to determine how to measure Boot
+    Completion
+-   Add `--azure_subnet_id` flag to use an existing subnet instead of creating a
+    new one.
+-   Remove `--google_bigtable_enable_table_object_sharing`. Use
+    `--ycsb_tar_url=https://storage.googleapis.com/cbt_ycsb_client_jar/ycsb-0.14.0.tar.gz`
+    to retain the previous behavior.
+-   Remove `--google_bigtable_hbase_jar_url`. Rely on
+    `--google_bigtable_client_version` instead.
+-   Fix how environment variable is set for direct path
+-   Fix incorrect string concatenation causing Snowflake Throughput runs to
+    fail.

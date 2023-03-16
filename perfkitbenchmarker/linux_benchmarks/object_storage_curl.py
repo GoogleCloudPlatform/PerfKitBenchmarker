@@ -27,13 +27,13 @@ from typing import List, Tuple
 
 from absl import flags
 import numpy as np
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import object_storage_service_benchmark
 
 BENCHMARK_NAME = 'object_storage_curl'
@@ -120,7 +120,7 @@ def Prepare(benchmark_spec):
   service.MakeBucketPubliclyReadable(bucket_name, also_make_writable=True)
 
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(lambda vm: vm.InstallPackages('curl'), vms)
+  background_tasks.RunThreaded(lambda vm: vm.InstallPackages('curl'), vms)
 
 
 def Run(benchmark_spec) -> List[sample.Sample]:
@@ -165,9 +165,10 @@ def Run(benchmark_spec) -> List[sample.Sample]:
   streams_per_vm = FLAGS.object_storage_streams_per_vm
   samples = []
   for operation, func in (('upload', Upload), ('download', Download)):
-    output = vm_util.RunThreaded(
+    output = background_tasks.RunThreaded(
         func,
-        [(args, {}) for args in itertools.product(vms, range(streams_per_vm))])
+        [(args, {}) for args in itertools.product(vms, range(streams_per_vm))],
+    )
     start_times, latencies = _LoadWorkerOutput(output)
     object_storage_service_benchmark.ProcessMultiStreamResults(
         start_times,

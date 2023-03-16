@@ -199,10 +199,10 @@ class _CommandDecoder(option_decoders.ListDecoder):
 class BaseContainer(resource.BaseResource):
   """Class representing a single container."""
 
-  def __init__(self, container_spec=None, **_):
+  def __init__(self, container_spec=None):
     # Hack to make container_spec a kwarg
     assert container_spec
-    super(BaseContainer, self).__init__()
+    super().__init__()
     self.cpus = container_spec.cpus
     self.memory = container_spec.memory
     self.command = container_spec.command
@@ -414,7 +414,7 @@ class BaseContainerRegistry(resource.BaseResource):
       # manifest inspect inpspects the registry's copy
       inspect_cmd = ['docker', 'manifest', 'inspect', full_image]
       _, _, retcode = vm_util.IssueCommand(
-          inspect_cmd, suppress_warning=True, raise_on_failure=False)
+          inspect_cmd, raise_on_failure=False)
       if retcode == 0:
         return full_image
     self._Build(image)
@@ -552,12 +552,7 @@ class BaseContainerCluster(resource.BaseResource):
 
   def GetSamples(self):
     """Return samples with information about deployment times."""
-    samples = []
-    if self.resource_ready_time and self.create_start_time:
-      samples.append(
-          sample.Sample('Cluster Creation Time',
-                        self.resource_ready_time - self.create_start_time,
-                        'seconds'))
+    samples = super().GetSamples()
     for container in itertools.chain(*list(self.containers.values())):
       metadata = {'image': container.image.split('/')[-1]}
       if container.resource_ready_time and container.create_start_time:
@@ -596,7 +591,8 @@ class KubernetesPod:
   or created with ApplyManifest and directly constructed.
   """
 
-  def __init__(self, name=None, **_):
+  def __init__(self, name=None, **kwargs):
+    super().__init__(**kwargs)
     assert name
     self.name = name
 
@@ -651,7 +647,8 @@ class KubernetesPod:
     return stdout
 
 
-class KubernetesContainer(BaseContainer, KubernetesPod):
+# Order KubernetesPod first so that it's constructor is called first.
+class KubernetesContainer(KubernetesPod, BaseContainer):
   """A KubernetesPod based flavor of Container."""
 
   def _Create(self):

@@ -29,7 +29,7 @@ import threading
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import util
@@ -355,7 +355,7 @@ class AwsDiskSpec(disk.BaseDiskSpec):
     throughput: None or int. Throughput for (SSD) volumes in AWS.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):

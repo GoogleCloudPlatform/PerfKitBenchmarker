@@ -25,12 +25,12 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
 
@@ -40,6 +40,16 @@ _TOP_OUTPUT = 'top.txt'
 _TOP_SCRIPT = 'top_script.sh'
 
 FLAGS = flags.FLAGS
+CLIENT_OS_TYPE = flags.DEFINE_string(
+    'redis_memtier_client_os_type',
+    None,
+    'If provided, overrides the memtier client os type.',
+)
+SERVER_OS_TYPE = flags.DEFINE_string(
+    'redis_memtier_server_os_type',
+    None,
+    'If provided, overrides the redis server os type.',
+)
 flags.DEFINE_string('redis_memtier_client_machine_type', None,
                     'If provided, overrides the memtier client machine type.')
 flags.DEFINE_string('redis_memtier_server_machine_type', None,
@@ -81,6 +91,12 @@ def CheckPrerequisites(_):
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   """Load and return benchmark config spec."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if CLIENT_OS_TYPE.value:
+    config['vm_groups']['clients']['os_type'] = CLIENT_OS_TYPE.value
+
+  if SERVER_OS_TYPE.value:
+    config['vm_groups']['servers']['os_type'] = SERVER_OS_TYPE.value
+
   if FLAGS.redis_memtier_client_machine_type:
     vm_spec = config['vm_groups']['clients']['vm_spec']
     for cloud in vm_spec:
@@ -113,8 +129,9 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   server_vm = bm_spec.vm_groups['servers'][0]
 
   # Install memtier
-  vm_util.RunThreaded(lambda client: client.Install('memtier'),
-                      client_vms + [server_vm])
+  background_tasks.RunThreaded(
+      lambda client: client.Install('memtier'), client_vms
+  )
 
   if redis_server.REDIS_SIMULATE_AOF.value:
     server_vm.Install('mdadm')
@@ -144,11 +161,20 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   redis_server.Start(server_vm)
 
   # Load the redis server with preexisting data.
-  vm_util.RunThreaded(
-      lambda port: memtier.Load(server_vm, 'localhost', port),
-      redis_server.GetRedisPorts(), 10)
-
+  # Run 4 at a time to reduce memory fragmentation and avoid overloaded
+  # the server
   bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
+  ports = redis_server.GetRedisPorts()
+  ports_group_of_four = [ports[i : i + 4] for i in range(0, len(ports), 4)]
+  for ports_group in ports_group_of_four:
+    # pylint: disable=g-long-lambda
+    background_tasks.RunThreaded(
+        lambda port: memtier.Load(
+            client_vms[0], bm_spec.redis_endpoint_ip, port
+        ),
+        ports_group,
+        10,
+    )
 
 
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
@@ -164,13 +190,15 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   benchmark_metadata = {}
 
   if measure_cpu_on_server_vm:
-    top_cmd = f'top -b -d 1 -n {memtier.MEMTIER_RUN_DURATION.value} > {_TOP_OUTPUT} &'
-    server_vm.RemoteCommand(
-        f'echo "{top_cmd}" > {_TOP_SCRIPT}')
+    top_cmd = (
+        f'top -b -d 1 -n {memtier.MEMTIER_RUN_DURATION.value} > {_TOP_OUTPUT} &'
+    )
+    server_vm.RemoteCommand(f'echo "{top_cmd}" > {_TOP_SCRIPT}')
     server_vm.RemoteCommand(f'bash {_TOP_SCRIPT}')
 
   raw_results = memtier.RunOverAllThreadsPipelinesAndClients(
-      client_vms, bm_spec.redis_endpoint_ip, redis_server.GetRedisPorts())
+      client_vms, bm_spec.redis_endpoint_ip, redis_server.GetRedisPorts()
+  )
   redis_metadata = redis_server.GetMetadata()
 
   top_results = []

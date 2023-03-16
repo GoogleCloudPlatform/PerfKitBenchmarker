@@ -569,16 +569,6 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-a')
     self.assertEmpty(test_retry_manager._zones_tried)
 
-  @flagsaver.flagsaver
-  def testDeprecatedZoneFlags(self):
-    FLAGS['zones'].parse(['3', '4'])
-    FLAGS['extra_zones'].parse(['5', '6'])
-    FLAGS['zone'].parse(['1', '2'])
-    pkb._WarnAndTranslateZoneFlags()
-    self.assertEqual(FLAGS.zone, ['1', '2', '3', '4', '5', '6'])
-    self.assertEmpty(FLAGS.extra_zones)
-    self.assertEmpty(FLAGS.zones)
-
 
 class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
 

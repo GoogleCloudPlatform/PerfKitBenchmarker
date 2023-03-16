@@ -77,6 +77,7 @@ class IbmCloudVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     spec.gpu_type = 'test-gpu-type'
     spec.image = 'test-image'
     spec.install_packages = 'None'
+    spec.assign_external_ip = True
     spec.background_cpu_threads = 'None'
     spec.background_network_mbits_per_sec = '1'
     spec.background_network_ip_type = 'None'

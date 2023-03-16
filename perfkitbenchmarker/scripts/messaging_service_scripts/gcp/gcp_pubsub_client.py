@@ -58,7 +58,7 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     self.subscription_path = self.subscriber.subscription_path(
         self.project, self.subscription)
 
-  def generate_message(self, seq: int, message_size: int) -> bytes:
+  def generate_message(self, seq: int, message_size: int) -> bytes:  # pytype: disable=signature-mismatch  # overriding-return-type-checks
     return super().generate_message(seq, message_size).encode('utf-8')
 
   def publish_message(self, message: bytes) -> str:

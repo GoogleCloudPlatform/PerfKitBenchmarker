@@ -45,7 +45,7 @@ from absl import flags
 from perfkitbenchmarker import capacity_reservation
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 
@@ -67,7 +67,7 @@ class CreationError(Exception):
 
 class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
   """An object representing an AWS EC2 CapacityReservation."""
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
 
   def __init__(self, vm_group):
     if not vm_group:

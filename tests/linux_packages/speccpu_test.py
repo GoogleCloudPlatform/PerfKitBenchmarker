@@ -57,7 +57,8 @@ GOOD_METADATA = {'runspec_config': 'linux64-x64-gcc47.cfg',
                  'spec17_copies': None,
                  'spec17_threads': None,
                  'spec17_subset': ['intspeed', 'fpspeed', 'intrate', 'fprate'],
-                 'gcc_version': '7'}
+                 'gcc_version': '7',
+                 'CPU2017_version': ''}
 
 EXPECTED_RESULT_SPECINT = [
     sample.Sample(metric='400.perlbench', value=23.4, unit='',

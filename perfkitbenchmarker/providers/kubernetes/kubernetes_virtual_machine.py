@@ -26,7 +26,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
@@ -49,7 +49,7 @@ def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
 
 class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Kubernetes POD."""
-  CLOUD = providers.KUBERNETES
+  CLOUD = provider_info.KUBERNETES
   DEFAULT_IMAGE = None
   HOME_DIR = '/root'
   IS_REBOOTABLE = False
@@ -68,6 +68,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.resource_limits = vm_spec.resource_limits
     self.resource_requests = vm_spec.resource_requests
     self.cloud = FLAGS.container_cluster_cloud
+    self.sriov_network = FLAGS.k8s_sriov_network or None
 
   def GetResourceMetadata(self):
     metadata = super(KubernetesVirtualMachine, self).GetResourceMetadata()
@@ -81,6 +82,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
           'pod_cpu_request': self.resource_requests.cpus,
           'pod_memory_request_mb': self.resource_requests.memory,
       })
+    if self.sriov_network:
+      metadata.update(
+          {'annotations': {'sriov_network': self.sriov_network}}
+      )
     return metadata
 
   def _CreateDependencies(self):
@@ -90,18 +95,11 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _DeleteDependencies(self):
     self._DeleteVolumes()
 
-  def _Create(self):
-    self._CreatePod()
-    self._WaitForPodBootCompletion()
-
   @vm_util.Retry()
   def _PostCreate(self):
     self._GetInternalIp()
     self._ConfigureProxy()
     self._SetupDevicesPaths()
-
-  def _Delete(self):
-    self._DeletePod()
 
   # Kubernetes VMs do not implement _Start or _Stop
   def _Start(self):
@@ -125,23 +123,21 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise Exception('Please provide a list of Ceph Monitors using '
                         '--ceph_monitors flag.')
 
-  def _CreatePod(self):
+  def _Create(self):
     """Creates a POD (Docker container with optional volumes)."""
     create_rc_body = self._BuildPodBody()
     logging.info('About to create a pod with the following configuration:')
     logging.info(create_rc_body)
     kubernetes_helper.CreateResource(create_rc_body)
 
-  @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=False)
-  def _WaitForPodBootCompletion(self):
+  def _IsReady(self):
     """Need to wait for the PODs to get up, they're created with a little delay."""
     exists_cmd = [
         FLAGS.kubectl,
         '--kubeconfig=%s' % FLAGS.kubeconfig, 'get', 'pod', '-o=json', self.name
     ]
     logging.info('Waiting for POD %s', self.name)
-    pod_info, _, _ = vm_util.IssueCommand(
-        exists_cmd, suppress_warning=True, raise_on_failure=False)
+    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if pod_info:
       pod_info = json.loads(pod_info)
       containers = pod_info['spec']['containers']
@@ -150,11 +146,14 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         if (containers[0]['name'].startswith(self.name)
             and pod_status == 'Running'):
           logging.info('POD is up and running.')
-          return
-    raise Exception('POD %s is not running. Retrying to check status.' %
-                    self.name)
+          return True
+    return False
 
-  def _DeletePod(self):
+  def WaitForBootCompletion(self):
+    """No-op, because waiting for boot completion covered by _IsReady."""
+    self.bootable_time = self.resource_ready_time
+
+  def _Delete(self):
     """Deletes a POD."""
     delete_pod = [
         FLAGS.kubectl,
@@ -170,8 +169,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         FLAGS.kubectl,
         '--kubeconfig=%s' % FLAGS.kubeconfig, 'get', 'pod', '-o=json', self.name
     ]
-    pod_info, _, _ = vm_util.IssueCommand(
-        exists_cmd, suppress_warning=True, raise_on_failure=False)
+    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if pod_info:
       return True
     return False
@@ -203,6 +201,19 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self.internal_ip = pod_ip
     self.ip_address = pod_ip
+    if self.sriov_network:
+      annotations = json.loads(
+          kubernetes_helper.Get('pods', self.name, '', '.metadata.annotations')
+      )
+      sriov_ip = json.loads(annotations['k8s.v1.cni.cncf.io/network-status'])[
+          1
+      ]['ips'][0]
+
+      if not sriov_ip:
+        raise Exception('SRIOV interface ip address not found. Retrying.')
+
+      self.internal_ip = sriov_ip
+      self.ip_address = sriov_ip
 
   def _ConfigureProxy(self):
     """Configures Proxy.
@@ -291,6 +302,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       }
       template['metadata']['labels']['pkb_anti_affinity'] = ''
 
+    if self.sriov_network:
+      annotations = self._addAnnotations()
+      template['metadata'].update({'annotations': annotations})
     return json.dumps(template)
 
   def _BuildVolumesBody(self):
@@ -330,6 +344,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     container['command'] = ['tail', '-f', '/dev/null']
 
     return container
+
+  def _addAnnotations(self):
+    """Constructs annotations required for Kubernetes."""
+    annotations = {}
+    if self.sriov_network:
+      annotations.update({'k8s.v1.cni.cncf.io/networks': self.sriov_network})
+    return annotations
 
   def _BuildResourceBody(self):
     """Constructs a dictionary that specifies resource limits and requests.
@@ -376,15 +397,18 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
 
   def RemoteHostCommandWithReturnCode(self,
                                       command,
-                                      should_log=False,
                                       retries=None,
                                       ignore_failure=False,
                                       login_shell=False,
-                                      suppress_warning=False,
-                                      timeout=None):
+                                      timeout=None,
+                                      ip_address=None,
+                                      stack_level: int = 2):
     """Runs a command in the Kubernetes container."""
+    if ip_address:
+      raise AssertionError('Kubernetes VMs cannot use IP')
     if retries is None:
       retries = FLAGS.ssh_retries
+    stack_level += 1
     cmd = [
         FLAGS.kubectl,
         '--kubeconfig=%s' % FLAGS.kubeconfig, 'exec', '-i', self.name, '--',
@@ -393,10 +417,9 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     for _ in range(retries):
       stdout, stderr, retcode = vm_util.IssueCommand(
           cmd,
-          force_info_log=should_log,
-          suppress_warning=suppress_warning,
           timeout=timeout,
-          raise_on_failure=False)
+          raise_on_failure=False,
+          stack_level=stack_level)
       # Check for ephemeral connection issues.
       if not _IsKubectlErrorEphemeral(retcode, stderr):
         break
@@ -506,11 +529,14 @@ class DebianBasedKubernetesVirtualMachine(KubernetesVirtualMachine,
     # https://wiki.ubuntu.com/Minimal
     # The VM images PKB uses are based on a full Ubuntu Server flavor and have a
     # bunch of useful utilities
-    # (curl, net-tools, software-properties-common). Install here so that we
+    # Utilities packages install here so that we
     # have similar base packages. This is essentially the same as running
     # unminimize.
-    # TODO(pclay): Revisit if Debian images are added.
-    self.InstallPackages('ubuntu-server')
+    # ubuntu-minimal contains iputils-ping
+    # ubuntu-server contains curl, net-tools, software-properties-common
+    # ubuntu-standard contains wget
+    # TODO(pclay): Revisit if Debian or RHEL images are added.
+    self.InstallPackages('ubuntu-minimal ubuntu-server ubuntu-standard')
 
   def DownloadPreprovisionedData(self, install_path, module_name, filename):
     """Downloads a preprovisioned data file.
@@ -609,7 +635,7 @@ class Ubuntu2204BasedKubernetesVirtualMachine(
 
   def _InstallPrepareVmEnvironmentDependencies(self):
     # fdisk is not installed. It needs to be installed after sudo, but before
-    # RecordAdditionalMetatada.
+    # RecordAdditionalMetadata.
     super()._InstallPrepareVmEnvironmentDependencies()
     # util-linux budled in the image no longer depends on fdisk.
     # Ubuntu 22 VMs get fdisk from ubuntu-server (which maybe we should

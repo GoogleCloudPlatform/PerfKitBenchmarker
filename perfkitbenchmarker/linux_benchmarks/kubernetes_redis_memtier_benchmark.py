@@ -27,11 +27,11 @@ import functools
 from typing import Any, Dict, List
 from absl import flags
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import redis_memtier_benchmark
 from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
@@ -127,7 +127,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
       [functools.partial(_PrepareCluster, bm_spec)] +
       [functools.partial(vm.Install, 'memtier') for vm in client_vms])
 
-  vm_util.RunThreaded(lambda f: f(), prepare_fns)
+  background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
   # Load Redis database
   memtier.Load(client_vms[0], bm_spec.redis_endpoint_ip,

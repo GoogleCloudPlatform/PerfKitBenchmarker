@@ -201,7 +201,7 @@ def Run(benchmark_spec):
         '--master={master}'.format(
             master=benchmark_spec.tpu_groups['train'].GetMasterGrpcAddress()))
 
-  stdout, stderr = vm.RobustRemoteCommand(t2t_benchmark_cmd, should_log=True)
+  stdout, stderr = vm.RobustRemoteCommand(t2t_benchmark_cmd)
 
   # TODO(user) Add timestamp to tensor2tensor output to enable samples like
   # resnet_benchmark

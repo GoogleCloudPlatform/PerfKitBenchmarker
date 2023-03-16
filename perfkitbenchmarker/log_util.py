@@ -14,9 +14,12 @@
 """Utilities related to loggers and logging."""
 
 from contextlib import contextmanager
+import datetime
 import logging
 import sys
 import threading
+from absl import flags
+from perfkitbenchmarker import vm_util
 
 try:
   import colorlog
@@ -34,6 +37,19 @@ LOG_LEVELS = {
     WARNING: logging.WARNING,
     ERROR: logging.ERROR
 }
+
+# Paths for log writing and exporting.
+log_local_path = None
+log_cloud_path = None
+LOG_FILE_NAME = 'pkb.log'
+
+
+_PKB_LOG_BUCKET = flags.DEFINE_string(
+    'pkb_log_bucket', None,
+    'Name of the GCS bucket that PKB logs should route to. If this is not '
+    'specified, then PKB logs will remain on the VM. This bucket must exist '
+    'and the caller must have write permissions on the bucket for a successful '
+    'export.')
 
 
 class ThreadLogContext(object):
@@ -137,6 +153,18 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
     file_log_level: Messages at this level and above are written to the log
       file.
   """
+  # Set local log file path global variable so it can be used by PKB.
+  global log_local_path
+  log_local_path = log_path
+
+  # Set the GCS destination path global variable so it can be used by PKB.
+  global log_cloud_path
+  run_date = datetime.date.today()
+  log_cloud_path = (f'gs://{_PKB_LOG_BUCKET.value}/'
+                    + f'{run_date.year:04d}/{run_date.month:02d}/'
+                    + f'{run_date.day:02d}/'
+                    + f'{run_uri}-{LOG_FILE_NAME}')
+
   # Build the format strings for the stderr and log file message formatters.
   stderr_format = ('%(asctime)s {} %(threadName)s %(pkb_label)s'
                    '%(levelname)-8s %(message)s').format(run_uri)
@@ -154,7 +182,8 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
 
   # Initialize the main thread's ThreadLogContext. This object must be
   # initialized to use the PkbLogFilter, and it is used to derive the
-  # ThreadLogContext of other threads started through vm_util.RunThreaded.
+  # ThreadLogContext of other threads started through
+  # background_tasks.RunThreaded.
   SetThreadLogContext(ThreadLogContext())
 
   # Add handler to output to stderr.
@@ -169,10 +198,17 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
   logger.addHandler(handler)
 
   # Add handler for output to log file.
-  logging.info('Verbose logging to: %s', log_path)
-  handler = logging.FileHandler(filename=log_path)
+  logging.info('Verbose logging to: %s', log_local_path)
+  handler = logging.FileHandler(filename=log_local_path)
   handler.addFilter(PkbLogFilter())
   handler.setLevel(file_log_level)
   handler.setFormatter(logging.Formatter(file_format))
   logger.addHandler(handler)
   logging.getLogger('requests').setLevel(logging.ERROR)
+
+
+def CollectPKBLogs() -> None:
+  """Move PKB log files over to a GCS bucket (`pkb_log_bucket` flag)."""
+  if _PKB_LOG_BUCKET.value:
+    vm_util.IssueRetryableCommand(['gsutil', '-h', 'Content-Type:text/plain',
+                                   'mv', '-Z', log_local_path, log_cloud_path])

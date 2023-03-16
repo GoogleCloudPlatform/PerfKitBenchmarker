@@ -19,9 +19,9 @@ More info: http://cloudsuite.ch/webserving/
 
 import re
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import docker
 
 flags.DEFINE_integer('cloudsuite_web_serving_pm_max_children', 150,
@@ -110,7 +110,7 @@ def Prepare(benchmark_spec):
   target_arg_tuples = [(PrepareFrontend, [frontend], {}),
                        (PrepareBackend, [backend], {}),
                        (PrepareClient, [client], {})]
-  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
+  background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
 def Run(benchmark_spec):
@@ -177,4 +177,4 @@ def Cleanup(benchmark_spec):
   target_arg_tuples = [(CleanupFrontend, [frontend], {}),
                        (CleanupBackend, [backend], {}),
                        (CleanupClient, [client], {})]
-  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
+  background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))

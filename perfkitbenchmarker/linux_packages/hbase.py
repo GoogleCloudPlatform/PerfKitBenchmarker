@@ -23,9 +23,9 @@ import os
 import posixpath
 import re
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 
 
@@ -138,12 +138,12 @@ def ConfigureAndStart(master, regionservers, zk_nodes):
                       'ln -s {1} {0}/lib/native/Linux-amd64-64').format(
                           HBASE_DIR,
                           posixpath.join(hadoop.HADOOP_DIR, 'lib', 'native')))
-  vm_util.RunThreaded(LinkNativeLibraries, vms)
+  background_tasks.RunThreaded(LinkNativeLibraries, vms)
   fn = functools.partial(_RenderConfig, master_ip=master.internal_ip,
                          zk_ips=[vm.internal_ip for vm in zk_nodes],
                          regionserver_ips=[regionserver.internal_ip
                                            for regionserver in regionservers])
-  vm_util.RunThreaded(fn, vms)
+  background_tasks.RunThreaded(fn, vms)
 
   master.RemoteCommand('{0} dfs -mkdir /hbase'.format(
       posixpath.join(hadoop.HADOOP_BIN, 'hdfs')))

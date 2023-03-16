@@ -73,6 +73,10 @@ flags.DEFINE_boolean('azure_accelerated_networking', False,
                      'create-vm-accelerated-networking-cli'
                      'for more information.')
 
+AZURE_SUBNET_ID = flags.DEFINE_string(
+    'azure_subnet_id', None,
+    'The id of an already created subnet to use instead of creating a new one.')
+
 flags.DEFINE_enum('azure_tier', 'Basic', VALID_TIERS,
                   'Performance tier to use for the machine type. Defaults to '
                   'Basic.')

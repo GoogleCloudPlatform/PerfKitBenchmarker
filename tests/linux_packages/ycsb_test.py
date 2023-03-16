@@ -419,17 +419,41 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     # Assert
     self.assertSequenceEqual(
         [
-            mock.call(matchers.HAS('-target 500'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 750'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 1125'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 1687'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 2531'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 3796'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 5695'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 8542'), should_log=mock.ANY),
-            mock.call(matchers.HAS('-target 10000'), should_log=mock.ANY),
+            mock.call(matchers.HAS('-target 500')),
+            mock.call(matchers.HAS('-target 750')),
+            mock.call(matchers.HAS('-target 1125')),
+            mock.call(matchers.HAS('-target 1687')),
+            mock.call(matchers.HAS('-target 2531')),
+            mock.call(matchers.HAS('-target 3796')),
+            mock.call(matchers.HAS('-target 5695')),
+            mock.call(matchers.HAS('-target 8542')),
+            mock.call(matchers.HAS('-target 10000')),
         ],
         self.test_cmd.mock_calls
+    )
+
+  @flagsaver.flagsaver
+  def testIncrementalLoadUsesCorrectThreadCounts(self):
+    # Arrange
+    FLAGS.ycsb_incremental_load = 2500
+    FLAGS.ycsb_client_vms = 1
+    FLAGS['ycsb_threads_per_client'].parse(['1000'])
+    mock_set_thread_count = self.enter_context(mock.patch.object(
+        self.test_executor, '_SetClientThreadCount'))
+
+    # Act
+    self.test_executor.Run([self.test_vm])
+
+    # Assert
+    self.assertSequenceEqual(
+        [
+            mock.call(500),
+            mock.call(750),
+            mock.call(1000),
+            mock.call(1000),
+            mock.call(1000),
+        ],
+        mock_set_thread_count.mock_calls
     )
 
   @flagsaver.flagsaver
@@ -443,7 +467,7 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     # Assert
     self.assertSequenceEqual(
-        [mock.call(matchers.HAS('-target 200'), should_log=mock.ANY)],
+        [mock.call(matchers.HAS('-target 200'))],
         self.test_cmd.mock_calls
     )
 

@@ -32,9 +32,7 @@ APT_PACKAGES = 'wget automake git zip libopenmpi-dev'
 def _IsShocInstalled(vm):
   """Returns whether shoc is installed or not"""
   command = os.path.join(SHOC_BIN_DIR, 'shocdriver')
-  resp, _ = vm.RemoteHostCommand('command -v %s' % command,
-                                 ignore_failure=True,
-                                 suppress_warning=True)
+  resp, _ = vm.RemoteHostCommand('command -v %s' % command, ignore_failure=True)
   if resp.rstrip() == "":
     return False
   return True

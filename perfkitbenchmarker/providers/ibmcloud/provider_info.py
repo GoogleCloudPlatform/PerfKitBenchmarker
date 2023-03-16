@@ -15,10 +15,9 @@
 """Provider info for IBM Cloud Platform."""
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
 
 
 class IBMCloudProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = []
-  CLOUD = providers.IBMCLOUD
+  CLOUD = provider_info.IBMCLOUD

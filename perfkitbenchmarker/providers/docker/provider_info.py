@@ -15,7 +15,6 @@
 """Provider info for Docker."""
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
 
 
 class DockerProviderInfo(provider_info.BaseProviderInfo):
@@ -23,7 +22,7 @@ class DockerProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = ['sysbench']
 
-  CLOUD = providers.DOCKER
+  CLOUD = provider_info.DOCKER
 
   @classmethod
   def IsBenchmarkSupported(cls, benchmark):

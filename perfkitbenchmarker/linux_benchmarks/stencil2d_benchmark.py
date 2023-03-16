@@ -15,11 +15,11 @@
 
 import os
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import shoc_benchmark_suite
@@ -99,7 +99,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vm_util.RunThreaded(_InstallAndAuthenticateVm, benchmark_spec.vms)
+  background_tasks.RunThreaded(_InstallAndAuthenticateVm, benchmark_spec.vms)
 
   master_vm = benchmark_spec.vms[0]
   benchmark_spec.num_gpus = nvidia_driver.QueryNumberOfGpus(master_vm)
@@ -179,7 +179,7 @@ def _RunSingleIteration(master_vm, problem_size, num_processes, num_iterations,
   metadata['run_command'] = run_command
   metadata['problem_size'] = current_problem_size
 
-  stdout, _ = master_vm.RemoteCommand(run_command, should_log=True)
+  stdout, _ = master_vm.RemoteCommand(run_command)
   return _MakeSamplesFromStencilOutput(stdout, metadata.copy())
 
 

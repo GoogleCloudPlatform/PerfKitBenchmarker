@@ -19,8 +19,8 @@ import unittest
 
 import mock
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context
-from perfkitbenchmarker import vm_util
 from tests import pkb_common_test_case
 from six.moves import range
 
@@ -48,7 +48,7 @@ class ThreadLocalBenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(new_benchmark_spec,
                        context.GetThreadBenchmarkSpec())
 
-    vm_util.RunThreaded(_DoWork, list(range(10)))
+    background_tasks.RunThreaded(_DoWork, list(range(10)))
 
 
 if __name__ == '__main__':

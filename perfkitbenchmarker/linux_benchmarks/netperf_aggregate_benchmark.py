@@ -27,6 +27,7 @@ import logging
 import os
 import re
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -110,7 +111,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   client_vm = benchmark_spec.vm_groups['client'][0]
 
-  vm_util.RunThreaded(PrepareNetperfAggregate, vms)
+  background_tasks.RunThreaded(PrepareNetperfAggregate, vms)
   client_vm.RemoteCommand(
       f'sudo chmod 755 {os.path.join(netperf.NETPERF_EXAMPLE_DIR, REMOTE_SCRIPT)}'
   )
@@ -180,7 +181,6 @@ def RunNetperfAggregate(vm, server_ips):
       'chmod +x runemomniaggdemo.sh && '
       './runemomniaggdemo.sh',
       ignore_failure=True,
-      should_log=True,
       login_shell=False,
       timeout=1800)
 

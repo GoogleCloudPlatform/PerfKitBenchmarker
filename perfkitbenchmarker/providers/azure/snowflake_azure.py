@@ -18,7 +18,7 @@ Azure. Relevant functionality is in providers/snowflake/Snowflake.
 """
 
 from absl import flags
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.providers.snowflake import snowflake
 
 FLAGS = flags.FLAGS
@@ -28,11 +28,11 @@ FLAGS = flags.FLAGS
 
 class Snowflake(snowflake.Snowflake):
   """Class representing a Snowflake Data Warehouse Instance hosted on Azure."""
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
   SERVICE_TYPE = 'snowflake_azure'
 
 
 class Snowflakeexternal(snowflake.Snowflake):
   """Class representing Snowflake External Warehouses on Azure."""
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
   SERVICE_TYPE = 'snowflakeexternal_azure'

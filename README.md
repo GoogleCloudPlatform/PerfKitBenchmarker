@@ -294,10 +294,9 @@ for an example implementation.
 
 # How to Run All Standard Benchmarks
 
-Run without the `--benchmarks` parameter and every benchmark in the standard set
-will run serially which can take a couple of hours (alternatively, run with
-`--benchmarks="standard_set"`). Additionally, if you don't specify
-`--cloud=...`, all benchmarks will run on the Google Cloud Platform.
+Run with `--benchmarks="standard_set"` and every benchmark in the standard set
+will run serially which can take a couple of hours. Additionally, if you don't
+specify `--cloud=...`, all benchmarks will run on the Google Cloud Platform.
 
 # How to Run All Benchmarks in a Named Set
 

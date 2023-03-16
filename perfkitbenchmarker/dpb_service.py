@@ -26,6 +26,7 @@ import logging
 from typing import Dict, List, Optional, Type
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -71,8 +72,14 @@ flags.DEFINE_float(
     lower_bound=0, upper_bound=120)
 flags.DEFINE_string(
     'dpb_initialization_actions', None,
-    'A comma separated list of Google Cloud Storage URIs of executables to run on each node in the DPB cluster. See https://cloud.google.com/sdk/gcloud/reference/dataproc/clusters/create#--initialization-actions.'
+    'A comma separated list of Google Cloud Storage URIs of executables to run '
+    'on each node in the DPB cluster. See '
+    'https://cloud.google.com/sdk/gcloud/reference/dataproc/clusters/create#--initialization-actions.'
 )
+flags.DEFINE_bool(
+    'dpb_export_job_stats', False,
+    'Exports job stats such as CPU usage and cost. Enabled by default, but not '
+    'necessarily implemented on all services.')
 
 FLAGS = flags.FLAGS
 
@@ -556,8 +563,9 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     if 'worker_group' not in self.vms:
       raise errors.Resource.CreationError(
           'UnmanagedDpbServiceYarnCluster requires VMs in a worker_group.')
-    vm_util.RunThreaded(InstallHadoop,
-                        self.vms['worker_group'] + self.vms['master_group'])
+    background_tasks.RunThreaded(
+        InstallHadoop, self.vms['worker_group'] + self.vms['master_group']
+    )
     self.leader = self.vms['master_group'][0]
     hadoop.ConfigureAndStart(
         self.leader, self.vms['worker_group'], configure_s3=self.cloud == 'AWS')
@@ -595,7 +603,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
 
     start_time = datetime.datetime.now()
     try:
-      stdout, _ = self.leader.RobustRemoteCommand(cmd_string, should_log=True)
+      stdout, _ = self.leader.RobustRemoteCommand(cmd_string)
     except errors.VirtualMachine.RemoteCommandError as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
@@ -646,8 +654,9 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
       raise errors.Resource.CreationError(
           'UnmanagedDpbSparkCluster requires VMs in a worker_group.')
 
-    vm_util.RunThreaded(InstallSpark,
-                        self.vms['worker_group'] + self.vms['master_group'])
+    background_tasks.RunThreaded(
+        InstallSpark, self.vms['worker_group'] + self.vms['master_group']
+    )
     self.leader = self.vms['master_group'][0]
     spark.ConfigureAndStart(
         self.leader, self.vms['worker_group'], configure_s3=self.cloud == 'AWS')
@@ -678,8 +687,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
         properties=properties)
     start_time = datetime.datetime.now()
     try:
-      stdout, _ = self.leader.RobustRemoteCommand(
-          ' '.join(cmd), should_log=True)
+      stdout, _ = self.leader.RobustRemoteCommand(' '.join(cmd))
     except errors.VirtualMachine.RemoteCommandError as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()

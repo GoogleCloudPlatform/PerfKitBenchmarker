@@ -22,6 +22,7 @@ import functools
 import logging
 import posixpath
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -148,11 +149,11 @@ def Prepare(benchmark_spec):
         required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(PreparePrivateKey, vms)
+  background_tasks.RunThreaded(PreparePrivateKey, vms)
 
   args = [((vm, benchmark_spec.config.data_size_in_mb), {})
           for vm in benchmark_spec.vms]
-  vm_util.RunThreaded(PrepareDataFile, args)
+  background_tasks.RunThreaded(PrepareDataFile, args)
 
 
 def RunCp(vms, data_size_in_mb, metadata):

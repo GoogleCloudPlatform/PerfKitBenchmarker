@@ -22,6 +22,7 @@ import re
 import unittest
 
 from absl import flags
+from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 
@@ -29,7 +30,7 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -92,8 +93,8 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     result = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                            machine_type='n1-standard-8')
     self.assertEqual(result.machine_type, 'n1-standard-8')
-    self.assertEqual(result.cpus, None)
-    self.assertEqual(result.memory, None)
+    self.assertIsNone(result.cpus)
+    self.assertIsNone(result.memory)
 
   def testStringMachineTypeWithGpus(self):
     gpu_count = 2
@@ -109,7 +110,7 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCustomMachineType(self):
     result = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
         'cpus': 1, 'memory': '7.5GiB'})
-    self.assertEqual(result.machine_type, None)
+    self.assertIsNone(result.machine_type)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
 
@@ -138,14 +139,14 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
             'memory': '7.5GiB'
         })
     self.assertEqual(result.machine_type, 'n1-standard-8')
-    self.assertEqual(result.cpus, None)
-    self.assertEqual(result.memory, None)
+    self.assertIsNone(result.cpus)
+    self.assertIsNone(result.memory)
 
   def testCustomMachineTypeFlagOverride(self):
     FLAGS['machine_type'].parse('{cpus: 1, memory: 7.5GiB}')
     result = gce_virtual_machine.GceVmSpec(
         _COMPONENT, flag_values=FLAGS, machine_type='n1-standard-8')
-    self.assertEqual(result.machine_type, None)
+    self.assertIsNone(result.machine_type)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
 
@@ -326,7 +327,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     return fake_rets
 
   def testCreateUbuntu1804(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP,
+                                          os_types.UBUNTU1804)
     fake_image = 'fake-ubuntu1804'
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)) as issue_command:
@@ -336,7 +338,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
-      self.assertEqual(vm.GetDefaultImageFamily(), 'ubuntu-1804-lts')
+      self.assertEqual(vm.GetDefaultImageFamily(False), 'ubuntu-1804-lts')
+      self.assertEqual(vm.GetDefaultImageFamily(True), 'ubuntu-1804-lts-arm64')
       self.assertEqual(vm.GetDefaultImageProject(), 'ubuntu-os-cloud')
       self.assertTrue(vm.SupportGVNIC())
       self.assertIn('gcloud compute instances create', command_string)
@@ -356,7 +359,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateUbuntuInCustomProject(self):
     """Test simulating passing --image and --image_project."""
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP,
+                                          os_types.UBUNTU1804)
     fake_image = 'fake-ubuntu1804'
     fake_image_project = 'fake-project'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
@@ -386,7 +390,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateUbuntuInCustomDisk(self):
     """Test simulating passing --image and --image_project."""
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP,
+                                          os_types.UBUNTU1804)
     fake_image = 'fake-ubuntu1804'
     fake_image_project = 'fake-project'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
@@ -417,7 +422,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertNotIn('image_family', vm_metadata)
 
   def testCreateRhel7CustomImage(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.RHEL7)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.RHEL7)
     fake_image = 'fake-custom-rhel-image'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type',
@@ -442,7 +447,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertNotIn('image_family', vm_metadata)
 
   def testCreateCentOs7CustomImage(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.CENTOS7)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.CENTOS7)
     fake_image = 'fake-custom-centos7-image'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type',
@@ -467,7 +472,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertNotIn('image_family', vm_metadata)
 
   def testCosVm(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.COS)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.COS)
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type')
     fake_image = 'fake_cos_image'
@@ -495,7 +500,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(GCEVMFlagsTestCase, self).setUp()
-    FLAGS.cloud = providers.GCP
+    FLAGS.cloud = provider_info.GCP
     FLAGS.gcloud_path = 'test_gcloud'
     FLAGS.run_uri = 'aaaaaa'
     FLAGS.gcp_instance_metadata = []
@@ -535,9 +540,9 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._CreateVmCommand(
           gce_migrate_on_maintenance=True, gpu_count=1, gpu_type='k80')
-      self.assertEqual(str(cm.exception), (
-          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
-          'or network placement groups, as it is not supported by GCP.'))
+    self.assertEqual(str(cm.exception), (
+        'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
+        'or network placement groups, as it is not supported by GCP.'))
 
   def testMigrateOnMaintenanceFlagFalseWithGpus(self):
     _, call_count = self._CreateVmCommand(
@@ -604,7 +609,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
         gcp_instance_metadata=['k1:v1', 'k2:v2,k3:v3'], owner='test-owner')
     self.assertEqual(call_count, 1)
     actual_metadata = re.compile(
-        r'--metadata\s+(.*)(\s+--)?').search(cmd).group(1)
+        r'--metadata\s+(.*)(\s+--)?').search(cmd).group(1)  # pytype: disable=attribute-error  # re-none
     self.assertIn('k1=v1', actual_metadata)
     self.assertIn('k2=v2', actual_metadata)
     self.assertIn('k3=v3', actual_metadata)
@@ -616,7 +621,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
         gcp_instance_metadata_from_file=['k1:p1', 'k2:p2,k3:p3'])
     self.assertEqual(call_count, 1)
     actual_metadata_from_file = re.compile(
-        r'--metadata-from-file\s+(.*)(\s+--)?').search(cmd).group(1)
+        r'--metadata-from-file\s+(.*)(\s+--)?').search(cmd).group(1)  # pytype: disable=attribute-error  # re-none
     self.assertIn('k1=p1', actual_metadata_from_file)
     self.assertIn('k2=p2', actual_metadata_from_file)
     self.assertIn('k3=p3', actual_metadata_from_file)
@@ -974,6 +979,7 @@ class GvnicTest(GceVirtualMachineTestCase):
     self.mock_cmd.assert_called_with(
         'PATH="${PATH}":/usr/sbin ethtool -i ens4')
 
+  @flagsaver.flagsaver(gce_nic_record_version=True)
   def testOnStartupSetGvnicVersion(self):
     self.mock_cmd.side_effect = [(_IP_LINK_TEXT, ''), (_ETHTOOL_TEXT, ''),
                                  (_IP_LINK_TEXT, '')]
@@ -983,6 +989,7 @@ class GvnicTest(GceVirtualMachineTestCase):
     self.assertEqual('1460',
                      list(self.vm._get_network_device_mtus().values())[0])
 
+  @flagsaver.flagsaver(gce_nic_record_version=True)
   def testMissingVersionInProperties(self):
     self.mock_cmd.side_effect = [(_IP_LINK_TEXT, ''), ('driver: gve', '')]
     with self.assertRaises(ValueError):

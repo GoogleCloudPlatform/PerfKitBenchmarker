@@ -28,6 +28,7 @@ import time
 from absl import flags
 import jinja2
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -36,8 +37,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
-import six
-from six.moves import range
 
 PKB_FIO_LOG_FILE_NAME = 'pkb_fio_avg'
 LOCAL_JOB_FILE_SUFFIX = '_fio.job'  # used with vm_util.PrependTempDir()
@@ -448,7 +447,7 @@ def GenerateJobFileString(filename, scenario_strings,
   """
 
   if 'all' in scenario_strings and FLAGS.fio_use_default_scenarios:
-    scenarios = six.itervalues(SCENARIOS)
+    scenarios = SCENARIOS.values()
   else:
     scenarios = [GetScenarioFromScenarioString(scenario_string.strip('"'))
                  for scenario_string in scenario_strings]
@@ -616,9 +615,15 @@ def CheckPrerequisites(benchmark_config):
 
 
 def Prepare(benchmark_spec):
+  """Prepare VM's in benchmark_spec to run FIO.
+
+  Args:
+    benchmark_spec: The benchmarks specification.
+
+  """
   exec_path = fio.GetFioExec()
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(lambda vm: PrepareWithExec(vm, exec_path), vms)
+  background_tasks.RunThreaded(lambda vm: PrepareWithExec(vm, exec_path), vms)
 
 
 def GetFileAsString(file_path):
@@ -667,14 +672,27 @@ def PrepareWithExec(vm, exec_path):
 
 def Run(benchmark_spec):
   """Spawn fio on vm(s) and gather results."""
+  vms = benchmark_spec.vms
+  return RunFioOnVMs(vms)
+
+
+def RunFioOnVMs(vms):
+  """Spawn fio on vm(s) and gather results.
+
+  Args:
+    vms: A list of VMs to run FIO on.
+
+  Returns:
+    A list of sample.Sample objects.
+  """
   fio_exe = fio.GetFioExec()
   default_job_file_contents = GetFileAsString(data.ResourcePath('fio.job'))
-  vms = benchmark_spec.vms
   samples = []
 
   path = REMOTE_JOB_FILE_PATH
-  samples_list = vm_util.RunThreaded(
-      lambda vm: RunWithExec(vm, fio_exe, path, default_job_file_contents), vms)
+  samples_list = background_tasks.RunThreaded(
+      lambda vm: RunWithExec(vm, fio_exe, path, default_job_file_contents), vms
+  )
   for i, _ in enumerate(samples_list):
     for item in samples_list[i]:
       item.metadata['machine_instance'] = i
@@ -778,7 +796,7 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
 
   start_time = time.time()
   stdout, _ = vm.RobustRemoteCommand(
-      fio_command, should_log=True, timeout=FLAGS.fio_command_timeout_sec)
+      fio_command, timeout=FLAGS.fio_command_timeout_sec)
   end_time = time.time()
   bin_vals = []
   if collect_logs:
@@ -807,7 +825,11 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  vm = benchmark_spec.vms[0]
+  vms = benchmark_spec.vms
+  background_tasks.RunThreaded(CleanupVM, vms)
+
+
+def CleanupVM(vm):
   logging.info('FIO Cleanup up on %s', vm)
   vm.RemoveFile(REMOTE_JOB_FILE_PATH)
   if not AgainstDevice() and not FLAGS.fio_jobfile:

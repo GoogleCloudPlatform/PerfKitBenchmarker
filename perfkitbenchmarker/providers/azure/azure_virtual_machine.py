@@ -33,6 +33,7 @@ import logging
 import posixpath
 import re
 import threading
+from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
@@ -40,7 +41,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -126,7 +127,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     low_priority: boolean. True if the VM should be low-priority, else False.
   """
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   def __init__(self, *args, **kwargs):
     super(AzureVmSpec, self).__init__(*args, **kwargs)
@@ -256,37 +257,44 @@ class AzureNIC(resource.BaseResource):
   """Class to represent an Azure NIC."""
 
   def __init__(self,
-               subnet,
-               name,
-               public_ip,
-               accelerated_networking,
-               network_security_group=None,
+               network: azure_network.AzureNetwork,
+               name: str,
+               public_ip: Optional[str],
+               accelerated_networking: bool,
                private_ip=None):
     super(AzureNIC, self).__init__()
-    self.subnet = subnet
+    self.network = network
     self.name = name
     self.public_ip = public_ip
     self.private_ip = private_ip
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
-    self.region = self.subnet.vnet.region
+    self.region = self.network.region
     self.args = ['--nics', self.name]
     self.accelerated_networking = accelerated_networking
-    self.network_security_group = network_security_group
 
   def _Create(self):
     cmd = [
-        azure.AZURE_PATH, 'network', 'nic', 'create', '--location',
-        self.region, '--vnet-name', self.subnet.vnet.name, '--subnet',
-        self.subnet.name, '--public-ip-address', self.public_ip, '--name',
-        self.name
-    ] + self.resource_group.args
+        azure.AZURE_PATH, 'network', 'nic', 'create',
+        '--location', self.region,
+        '--name', self.name
+    ]  # pyformat: disable
+    cmd += self.resource_group.args
+    if self.network.subnet.id:
+      # pre-existing subnet from --azure_subnet_id
+      cmd += ['--subnet', self.network.subnet.id]
+    else:
+      # auto created subnet
+      cmd += ['--vnet-name', self.network.subnet.vnet.name,
+              '--subnet', self.network.subnet.name]
+    if self.public_ip:
+      cmd += ['--public-ip-address', self.public_ip]
     if self.private_ip:
       cmd += ['--private-ip-address', self.private_ip]
     if self.accelerated_networking:
       cmd += ['--accelerated-networking', 'true']
-    if self.network_security_group:
-      cmd += ['--network-security-group', self.network_security_group.name]
+    if self.network.nsg:
+      cmd += ['--network-security-group', self.network.nsg.name]
     vm_util.IssueCommand(cmd)
 
   def _Exists(self):
@@ -315,7 +323,13 @@ class AzureNIC(resource.BaseResource):
     ] + self.resource_group.args)
 
     response = json.loads(stdout)
-    return response['ipConfigurations'][0]['privateIpAddress']
+    ip_config = response['ipConfigurations'][0]
+    # Azure CLI used privateIpAddress between versions 1.2.0 and 2.45.0
+    # https://learn.microsoft.com/en-us/cli/azure/release-notes-azure-cli?toc=%2Fcli%2Fazure%2Ftoc.json&bc=%2Fcli%2Fazure%2Fbreadcrumb%2Ftoc.json#network
+    for key in ('privateIPAddress', 'privateIpAddress'):
+      if key in ip_config:
+        return ip_config[key]
+    raise KeyError('No known private IP address key found.')
 
   def _Delete(self):
     self._deleted = True
@@ -351,7 +365,7 @@ class AzureDedicatedHostGroup(resource.BaseResource):
         '--location',
         self.region,
         # number of fault domains (physical racks) to span across
-        # TODO(buggay): add support for multiple fault domains
+        # TODO(user): add support for multiple fault domains
         # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/dedicated-hosts#high-availability-considerations
         '--platform-fault-domain-count',
         '1',
@@ -391,7 +405,7 @@ class AzureDedicatedHostGroup(resource.BaseResource):
 
 def _GetSkuType(machine_type):
   """Returns the host SKU type derived from the VM machine type."""
-  # TODO(buggay): add support for FSv2 machine types when no longer in preview
+  # TODO(user): add support for FSv2 machine types when no longer in preview
   # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/dedicated-hosts
   sku = ''
   if re.match('Standard_D[0-9]*s_v3', machine_type):
@@ -456,7 +470,7 @@ class AzureDedicatedHost(resource.BaseResource):
         self.region,
         # the specific fault domain (physical rack) for the host dependent on
         # the number (count) of fault domains of the host group
-        # TODO(buggay): add support for specifying multiple fault domains if
+        # TODO(user): add support for specifying multiple fault domains if
         # benchmarks require
         '--platform-fault-domain',
         '0',
@@ -509,10 +523,10 @@ def _MachineTypeIsArm(machine_type):
 
 class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an Azure Virtual Machine."""
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   _lock = threading.Lock()
-  # TODO(buggay): remove host groups & hosts as globals -> create new spec
+  # TODO(user): remove host groups & hosts as globals -> create new spec
   # globals guarded by _lock
   host_map = collections.defaultdict(list)
 
@@ -537,13 +551,19 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type) or 1
     self._lun_counter = itertools.count()
     self._deleted = False
-
     self.resource_group = azure_network.GetResourceGroup()
-    self.public_ip = AzurePublicIPAddress(self.region, self.availability_zone,
-                                          self.name + '-public-ip')
-    self.nic = AzureNIC(self.network.subnet, self.name + '-nic',
-                        self.public_ip.name, vm_spec.accelerated_networking,
-                        self.network.nsg)
+
+    # Configure NIC
+    if self.assign_external_ip:
+      public_ip_name = self.name + '-public-ip'
+      self.public_ip = AzurePublicIPAddress(self.region, self.availability_zone,
+                                            public_ip_name)
+    else:
+      public_ip_name = None
+      self.public_ip = None
+    self.nic = AzureNIC(self.network, self.name + '-nic',
+                        public_ip_name, vm_spec.accelerated_networking)
+
     self.storage_account = self.network.storage_account
     arm_arch = 'neoverse-n1' if _MachineTypeIsArm(self.machine_type) else None
     if arm_arch:
@@ -592,7 +612,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
-    self.public_ip.Create()
+    if self.public_ip:
+      self.public_ip.Create()
     self.nic.Create()
 
     if self.use_dedicated_host:
@@ -627,12 +648,21 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     tags.update(util.GetResourceTags(self.resource_group.timeout_minutes))
     tag_args = ['--tags'] + util.FormatTags(tags)
 
-    create_cmd = ([
-        azure.AZURE_PATH, 'vm', 'create', '--location', self.region,
-        '--image', self.image, '--size', self.machine_type, '--admin-username',
-        self.user_name, '--storage-sku', self.os_disk.disk_type, '--name',
-        self.name
-    ] + disk_size_args + self.resource_group.args + self.nic.args + tag_args)
+    create_cmd = (
+        [
+            azure.AZURE_PATH, 'vm', 'create',
+            '--location', self.region,
+            '--image', self.image,
+            '--size', self.machine_type,
+            '--admin-username', self.user_name,
+            '--storage-sku', self.os_disk.disk_type,
+            '--name', self.name
+        ]  # pyformat: disable
+        + disk_size_args
+        + self.resource_group.args
+        + self.nic.args
+        + tag_args
+    )
 
     if self._RequiresUltraDisk():
       self.ultra_ssd_enabled = True
@@ -740,7 +770,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     start_cmd = ([azure.AZURE_PATH, 'vm', 'start', '--name', self.name] +
                  self.resource_group.args)
     vm_util.IssueCommand(start_cmd)
-    self.ip_address = self.public_ip.GetIPAddress()
+    if self.public_ip:
+      self.ip_address = self.public_ip.GetIPAddress()
 
   def _Stop(self):
     """Stops the VM."""
@@ -776,7 +807,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         util.GetTagsJson(self.resource_group.timeout_minutes)
     ] + self.resource_group.args)
     self.internal_ip = self.nic.GetInternalIP()
-    self.ip_address = self.public_ip.GetIPAddress()
+    if self.public_ip:
+      self.ip_address = self.public_ip.GetIPAddress()
 
   def CreateScratchDisk(self, _, disk_spec):
     """Create a VM's scratch disk.

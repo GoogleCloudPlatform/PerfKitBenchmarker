@@ -24,7 +24,7 @@ from typing import Dict, List, Text, Tuple
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.providers.gcp import util as gcp_util
@@ -324,7 +324,7 @@ class Bigquery(edw_service.EdwService):
     job_id_prefix: A string prefix for the job id for bigquery job.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   SERVICE_TYPE = 'bigquery'
 
   def __init__(self, edw_service_spec):

@@ -18,11 +18,11 @@ import re
 import time
 from absl import flags
 import numpy as np
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
 flags.DEFINE_integer('nccl_slots', 8,
@@ -59,11 +59,12 @@ nccl:
   vm_groups:
     default:
       vm_count: null
+      os_type: ubuntu2004
       vm_spec:
         GCP:
           machine_type: n1-highmem-96
           zone: us-central1-a
-          image_family: tf-latest-gpu-debian-10
+          image_family: tf-latest-gpu-ubuntu-2004
           image_project: deeplearning-platform-release
           boot_disk_size: 130
           gpu_type: v100
@@ -75,7 +76,7 @@ nccl:
         Azure:
           machine_type: Standard_ND40rs_v2
           zone: eastus
-          image: microsoft-dsvm:ubuntu-hpc:1804:latest
+          image: microsoft-dsvm:ubuntu-hpc:2004:latest
           boot_disk_size: 130
 """
 
@@ -175,7 +176,7 @@ def Prepare(benchmark_spec):
   """
   benchmark_spec.always_call_cleanup = True
   if _NCCL_TESTS.value:
-    vm_util.RunThreaded(PrepareVm, benchmark_spec.vms)
+    background_tasks.RunThreaded(PrepareVm, benchmark_spec.vms)
   hpc_util.CreateMachineFile(
       benchmark_spec.vms, nvidia_driver.QueryNumberOfGpus, HOSTFILE)
 

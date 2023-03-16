@@ -16,6 +16,7 @@
 
 import unittest
 from absl import flags
+from absl.testing import flagsaver
 import mock
 
 from perfkitbenchmarker import benchmark_spec
@@ -148,6 +149,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
       expected[azure_disk.HOST_CACHING] = goal_host_caching
     self.assertDictContainsSubset(expected, vm.scratch_disks[0].metadata)
 
+  @flagsaver.flagsaver(azure_version_log=False)
   def testPremiumStorage(self):
     self.DoAzureDiskTest(azure_flags.PLRS,
                          azure_disk.PREMIUM_STORAGE,
@@ -156,6 +158,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                          disk.ZONE,
                          azure_flags.READ_ONLY)
 
+  @flagsaver.flagsaver(azure_version_log=False)
   def testStandardDisk(self):
     self.DoAzureDiskTest(azure_flags.ZRS,
                          azure_disk.STANDARD_DISK,
@@ -164,6 +167,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                          disk.REGION,
                          azure_flags.NONE)
 
+  @flagsaver.flagsaver(azure_version_log=False)
   def testLocalHDD(self):
     self.DoAzureDiskTest(azure_flags.LRS,
                          disk.LOCAL,
@@ -172,6 +176,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                          disk.NONE,
                          None)
 
+  @flagsaver.flagsaver(azure_version_log=False)
   def testLocalSSD(self):
     self.DoAzureDiskTest(azure_flags.LRS,
                          disk.LOCAL,
@@ -180,6 +185,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
                          disk.NONE,
                          None)
 
+  @flagsaver.flagsaver(azure_version_log=False)
   def testStripedDisk(self):
     self.DoAzureDiskTest(azure_flags.LRS,
                          azure_disk.STANDARD_DISK,

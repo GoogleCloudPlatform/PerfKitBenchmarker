@@ -69,8 +69,7 @@ def Get(resource, resourceInstanceName, labelFilter, jsonSelector):
   if len(labelFilter) > 0:
     get_pod_cmd.append('-l ' + labelFilter)
   get_pod_cmd.append('-ojsonpath={{{}}}'.format(jsonSelector))
-  stdout, stderr, _ = vm_util.IssueCommand(get_pod_cmd, suppress_warning=True,
-                                           raise_on_failure=False)
+  stdout, stderr, _ = vm_util.IssueCommand(get_pod_cmd, raise_on_failure=False)
   if len(stderr) > 0:
     raise Exception("Error received from kubectl get: " + stderr)
   return stdout

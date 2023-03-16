@@ -31,8 +31,8 @@ import functools
 import logging
 import operator
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import tomcat
 from perfkitbenchmarker.linux_packages import wrk
 import six
@@ -114,9 +114,13 @@ def Prepare(benchmark_spec):
 
   tomcat_vm.AllowPort(tomcat.TOMCAT_HTTP_PORT)
 
-  vm_util.RunThreaded((lambda f: f()),
-                      [functools.partial(_PrepareServer, tomcat_vm),
-                       functools.partial(_PrepareClient, wrk_vm)])
+  background_tasks.RunThreaded(
+      (lambda f: f()),
+      [
+          functools.partial(_PrepareServer, tomcat_vm),
+          functools.partial(_PrepareClient, wrk_vm),
+      ],
+  )
 
 
 def Run(benchmark_spec):
@@ -211,4 +215,4 @@ def Cleanup(benchmark_spec):
   """
   tomcat_vm = benchmark_spec.vm_groups['server'][0]
   tomcat.Stop(tomcat_vm)
-  vm_util.RunThreaded(_RemoveOpenFileLimit, benchmark_spec.vms)
+  background_tasks.RunThreaded(_RemoveOpenFileLimit, benchmark_spec.vms)

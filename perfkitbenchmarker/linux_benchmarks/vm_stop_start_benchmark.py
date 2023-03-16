@@ -15,11 +15,11 @@
 
 import time
 from typing import Any, Dict, List
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 
 BENCHMARK_NAME = 'vm_stop_start'
 BENCHMARK_CONFIG = """
@@ -77,7 +77,7 @@ def _MeasureStart(
     time.
   """
   before_start_timestamp = time.time()
-  start_times = vm_util.RunThreaded(lambda vm: vm.Start(), vms)
+  start_times = background_tasks.RunThreaded(lambda vm: vm.Start(), vms)
   cluster_start_time = time.time() - before_start_timestamp
   return _GetVmOperationDataSamples(start_times, cluster_start_time, 'Start',
                                     vms)
@@ -95,13 +95,13 @@ def _MeasureStop(
     time.
   """
   before_stop_timestamp = time.time()
-  stop_times = vm_util.RunThreaded(lambda vm: vm.Stop(), vms)
+  stop_times = background_tasks.RunThreaded(lambda vm: vm.Stop(), vms)
   cluster_stop_time = time.time() - before_stop_timestamp
   return _GetVmOperationDataSamples(stop_times, cluster_stop_time, 'Stop',
                                     vms)
 
 
-# TODO(nsmit): Refactor to be useable in other files
+# TODO(user): Refactor to be useable in other files
 def _GetVmOperationDataSamples(
     operation_times: List[int], cluster_time: float, operation: str,
     vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:

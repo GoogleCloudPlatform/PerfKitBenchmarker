@@ -24,8 +24,8 @@ to test Firestore.
 import logging
 import posixpath
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 
 BENCHMARK_NAME = 'cloud_firestore_ycsb'
@@ -76,7 +76,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
 
   # Install required packages and copy credential files
-  vm_util.RunThreaded(_Install, vms)
+  background_tasks.RunThreaded(_Install, vms)
 
   # Restore YCSB_TAR_URL
   ycsb.SetYcsbTarUrl(None)

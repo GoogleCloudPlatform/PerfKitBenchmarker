@@ -35,6 +35,7 @@ import logging
 import posixpath
 import statistics
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -424,8 +425,9 @@ def Prepare(benchmark_spec):
           private_ip=private_ip)
       nic.Create()
 
-  vm_util.RunThreaded(
-      lambda vm: _Install(vm, booter_template_vm), launcher_vms)
+  background_tasks.RunThreaded(
+      lambda vm: _Install(vm, booter_template_vm), launcher_vms
+  )
 
 
 def _GetExpectedBoots():
@@ -447,7 +449,7 @@ def _WaitForResponses(launcher_vms):
     error, _ = vm.RemoteCommand('grep ERROR ' + _LISTENER_SERVER_LOG,
                                 ignore_failure=True)
     return error
-  error_str = vm_util.RunThreaded(_LauncherError, launcher_vms)
+  error_str = background_tasks.RunThreaded(_LauncherError, launcher_vms)
   if any(error_str):
     raise errors.Benchmarks.RunError(
         'Some listening server errored out: %s' % error_str)
@@ -459,15 +461,17 @@ def _WaitForResponses(launcher_vms):
     except ValueError:
       return -1
 
-  boots = vm_util.RunThreaded(
-      lambda vm: _CountState(vm, STATUS_PASSING), launcher_vms)
+  boots = background_tasks.RunThreaded(
+      lambda vm: _CountState(vm, STATUS_PASSING), launcher_vms
+  )
   for vm, boot_count in zip(launcher_vms, boots):
     logging.info('Launcher %s reported %d/%d booted VMs',
                  vm.internal_ip, boot_count, FLAGS.boots_per_launcher)
   total_running_count = 0
   if _ReportRunningStatus():
-    running = vm_util.RunThreaded(
-        lambda vm: _CountState(vm, STATUS_RUNNING), launcher_vms)
+    running = background_tasks.RunThreaded(
+        lambda vm: _CountState(vm, STATUS_RUNNING), launcher_vms
+    )
     for vm, running_count in zip(launcher_vms, running):
       logging.info('Launcher %s reported %d/%d running VMs',
                    vm.internal_ip, running_count, FLAGS.boots_per_launcher)
@@ -573,9 +577,10 @@ def Run(benchmark_spec):
     A list of benchmark samples.
   """
   launcher_vms = benchmark_spec.vm_groups['servers']
-  vm_util.RunThreaded(
+  background_tasks.RunThreaded(
       lambda vm: vm.RemoteCommand('bash {} 2>&1 | tee log'.format(_BOOT_PATH)),
-      launcher_vms)
+      launcher_vms,
+  )
   try:
     _WaitForResponses(launcher_vms)
   except InsufficientBootsError:
@@ -597,6 +602,6 @@ def Cleanup(benchmark_spec):
   """
   launcher_vms = benchmark_spec.vm_groups['servers']
   command = 'bash {} 2>&1 | tee clean_up_log'.format(_CLEAN_UP_SCRIPT_PATH)
-  vm_util.RunThreaded(
-      lambda vm: vm.RemoteCommand(command),
-      launcher_vms)
+  background_tasks.RunThreaded(
+      lambda vm: vm.RemoteCommand(command), launcher_vms
+  )

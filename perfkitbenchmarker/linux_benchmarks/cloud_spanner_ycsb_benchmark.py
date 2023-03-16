@@ -23,11 +23,11 @@ import time
 from typing import Any, Dict, List
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_spanner
 from perfkitbenchmarker.providers.gcp import util
@@ -185,7 +185,7 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
 
   # Install required packages and copy credential files
-  vm_util.RunThreaded(_Install, vms)
+  background_tasks.RunThreaded(_Install, vms)
 
   benchmark_spec.executor = ycsb.YCSBExecutor('cloudspanner')
 

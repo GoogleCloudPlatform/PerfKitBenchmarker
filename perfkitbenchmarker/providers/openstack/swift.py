@@ -18,7 +18,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_boolean('openstack_swift_insecure', False,
@@ -33,7 +33,7 @@ SWIFTCLIENT_LIB_VERSION = 'python-swiftclient_lib_version'
 class SwiftStorageService(object_storage_service.ObjectStorageService):
   """Interface to OpenStack Swift."""
 
-  STORAGE_NAME = providers.OPENSTACK
+  STORAGE_NAME = provider_info.OPENSTACK
 
   def __init__(self):
     self.swift_command_prefix = ''
@@ -57,7 +57,8 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
 
     self.swift_command_prefix = ' '.join(self.swift_command_parts)
 
-  def MakeBucket(self, bucket, raise_on_failure=True):
+  def MakeBucket(self, bucket, raise_on_failure=True, tag_bucket=True):
+    del tag_bucket
     _, stderr, ret_code = vm_util.IssueCommand(
         ['swift'] + self.swift_command_parts + ['post', bucket],
         raise_on_failure=False)

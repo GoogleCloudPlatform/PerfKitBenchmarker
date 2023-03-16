@@ -19,9 +19,9 @@ More info: http://cloudsuite.ch/websearch/
 
 import re
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import docker
 
 FLAGS = flags.FLAGS
@@ -91,10 +91,10 @@ def Prepare(benchmark_spec):
     PrepareCommon(vm)
     server_cmd = ('sudo echo \'DOCKER_OPTS="-g %s"\''
                   '| sudo tee /etc/default/docker > /dev/null' % (DISK_PATH))
-    stdout, _ = vm.RemoteCommand(server_cmd, should_log=True)
+    stdout, _ = vm.RemoteCommand(server_cmd)
 
     server_cmd = 'sudo service docker restart'
-    stdout, _ = vm.RemoteCommand(server_cmd, should_log=True)
+    stdout, _ = vm.RemoteCommand(server_cmd)
 
     vm.Install('cloudsuite/web-search:server')
 
@@ -102,7 +102,7 @@ def Prepare(benchmark_spec):
                   '--name server cloudsuite/web-search:server %s 1' %
                   (FLAGS.cloudsuite_web_search_server_heap_size))
 
-    stdout, _ = servers.RemoteCommand(server_cmd, should_log=True)
+    stdout, _ = servers.RemoteCommand(server_cmd)
 
   def PrepareClient(vm):
     PrepareCommon(vm)
@@ -111,7 +111,7 @@ def Prepare(benchmark_spec):
   PrepareServer(servers)
 
   target_arg_tuples = ([(PrepareClient, [vm], {}) for vm in clients])
-  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
+  background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
 def Run(benchmark_spec):
@@ -134,7 +134,7 @@ def Run(benchmark_spec):
                     FLAGS.cloudsuite_web_search_ramp_up,
                     FLAGS.cloudsuite_web_search_steady_state,
                     FLAGS.cloudsuite_web_search_ramp_down))
-  stdout, _ = clients.RemoteCommand(benchmark_cmd, should_log=True)
+  stdout, _ = clients.RemoteCommand(benchmark_cmd)
 
   ops_per_sec = re.findall(r'\<metric unit="ops/sec"\>(\d+\.?\d*)', stdout)
   num_ops_per_sec = float(ops_per_sec[0])
@@ -171,4 +171,4 @@ def Cleanup(benchmark_spec):
 
   target_arg_tuples = ([(CleanupClient, [vm], {}) for vm in clients] +
                        [(CleanupServer, [servers], {})])
-  vm_util.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
+  background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))

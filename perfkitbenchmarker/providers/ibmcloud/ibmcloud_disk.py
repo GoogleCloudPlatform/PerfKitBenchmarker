@@ -30,6 +30,7 @@ FLAGS = flags.FLAGS
 
 _MAX_DISK_ATTACH_SECONDS = 300
 _MAX_FIND_DEVICE_SECONDS = 120
+DEFAULT_DISK_SIZE = 1000
 
 
 class IbmCloudDisk(disk.BaseDisk):
@@ -55,6 +56,11 @@ class IbmCloudDisk(disk.BaseDisk):
     self.attached_vm = None
     self.attached_vdisk_uri = None
     self.device_path = None
+    self.data_disk_size = (
+        FLAGS.data_disk_size
+        if FLAGS.data_disk_size is not None
+        else DEFAULT_DISK_SIZE
+    )
 
   def _Create(self):
     """Creates an external block volume."""
@@ -64,7 +70,7 @@ class IbmCloudDisk(disk.BaseDisk):
         'zone': self.zone,
         'iops': FLAGS.ibmcloud_volume_iops,
         'profile': FLAGS.ibmcloud_volume_profile,
-        'capacity': self.disk_size
+        'capacity': self.data_disk_size
     })
     if self.encryption_key is not None:
       volcmd.flags['encryption_key'] = self.encryption_key
@@ -185,7 +191,7 @@ class IbmCloudDisk(disk.BaseDisk):
     endtime = time.time() + _MAX_FIND_DEVICE_SECONDS
     self.device_path = None
     while time.time() < endtime:
-      stdout, _ = self.attached_vm.RemoteCommand(cmd, should_log=True)
+      stdout, _ = self.attached_vm.RemoteCommand(cmd)
       # parse for lines that contain disk size in bytes
       disks = re.findall(r'\Disk (\S+): .* (\d+) bytes,', stdout)
       for device_path, disk_size in disks:

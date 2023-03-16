@@ -31,9 +31,9 @@ import datetime
 import posixpath
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 
 flags.DEFINE_string('spark_static_cluster_id', None,
@@ -210,8 +210,9 @@ class PkbSparkService(BaseSparkService):
     if 'worker_group' not in self.vms:
       raise errors.Resource.CreationError(
           'PkbSparkService requires worker_group VMs.')
-    vm_util.RunThreaded(InstallHadoop,
-                        self.vms['worker_group'] + self.vms['master_group'])
+    background_tasks.RunThreaded(
+        InstallHadoop, self.vms['worker_group'] + self.vms['master_group']
+    )
     self.leader = self.vms['master_group'][0]
     hadoop.ConfigureAndStart(self.leader,
                              self.vms['worker_group'])

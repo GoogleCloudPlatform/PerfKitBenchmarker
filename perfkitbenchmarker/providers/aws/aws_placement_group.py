@@ -22,7 +22,7 @@ import uuid
 
 from absl import flags
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import util
@@ -50,7 +50,7 @@ class AwsPlacementGroupSpec(placement_group.BasePlacementGroupSpec):
       zone: The AWS zone the Placement Group is in.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -77,7 +77,7 @@ class AwsPlacementGroupSpec(placement_group.BasePlacementGroupSpec):
 class AwsPlacementGroup(placement_group.BasePlacementGroup):
   """Object representing an AWS Placement Group."""
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
 
   def __init__(self, aws_placement_group_spec):
     """Init method for AwsPlacementGroup.

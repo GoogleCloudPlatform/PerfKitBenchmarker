@@ -26,6 +26,7 @@ import re
 import time
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
@@ -142,7 +143,7 @@ def Prepare(benchmark_spec):
       required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(_Prepare, vms)
+  background_tasks.RunThreaded(_Prepare, vms)
 
 
 def _Prepare(vm):
@@ -186,7 +187,7 @@ def Run(benchmark_spec):
   """
   vms = benchmark_spec.vms
   samples = []
-  grouped_samples = vm_util.RunThreaded(_Run, vms)
+  grouped_samples = background_tasks.RunThreaded(_Run, vms)
 
   for samples_list in grouped_samples:
     samples.extend(samples_list)
@@ -240,6 +241,8 @@ def _Run(vm):
                                      (FLAGS.spec17_copies or copies))
   version_specific_parameters.append(
       ' --threads=%s ' % (FLAGS.spec17_threads or vm.NumCpusForBenchmark()))
+  version_specific_parameters.append(
+      ' --define build_ncpus=%s ' % (vm.NumCpusForBenchmark()))
 
   if FLAGS.spec17_fdo:
     version_specific_parameters.append('--feedback ')
@@ -304,4 +307,4 @@ def Cleanup(benchmark_spec):
       required to run the benchmark.
   """
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(speccpu.Uninstall, vms)
+  background_tasks.RunThreaded(speccpu.Uninstall, vms)

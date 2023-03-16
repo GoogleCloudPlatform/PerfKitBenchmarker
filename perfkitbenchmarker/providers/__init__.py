@@ -19,31 +19,11 @@ import types
 
 from perfkitbenchmarker import events
 from perfkitbenchmarker import import_util
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker.providers import aws
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers import ibmcloud
-
-
-GCP = 'GCP'
-AZURE = 'Azure'
-AWS = 'AWS'
-IBMCLOUD = 'IBMCloud'
-ALICLOUD = 'AliCloud'
-KUBERNETES = 'Kubernetes'
-DIGITALOCEAN = 'DigitalOcean'
-OPENSTACK = 'OpenStack'
-CLOUDSTACK = 'CloudStack'
-RACKSPACE = 'Rackspace'
-MESOS = 'Mesos'
-PROFITBRICKS = 'ProfitBricks'
-# Though Docker is not a cloud provider, it's inclusion is useful
-# for performing on premise to cloud benchmarks
-DOCKER = 'Docker'
-
-VALID_CLOUDS = (GCP, AZURE, AWS, IBMCLOUD, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS, PROFITBRICKS, DOCKER)
-
 
 _imported_providers = set()
 
@@ -70,7 +50,7 @@ def LoadProviderFlags(providers):
 
 
 # Import flag definitions for all cloud providers.
-LoadProviderFlags(VALID_CLOUDS)
+LoadProviderFlags(provider_info.VALID_CLOUDS)
 
 
 def LoadProviderUtils(cloud: str) -> types.ModuleType:

@@ -27,14 +27,15 @@ import threading
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import vpn_service
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_placement_group
 from perfkitbenchmarker.providers.gcp import util
 import six
@@ -49,7 +50,7 @@ _PLACEMENT_GROUP_PREFIXES = frozenset(
 
 class GceVpnGateway(network.BaseVpnGateway):
   """Object representing a GCE VPN Gateway."""
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   def __init__(self, name: str, network_name: str, region: str, cidr: str,
                project: str):
@@ -267,16 +268,20 @@ class GceVpnGateway(network.BaseVpnGateway):
       self.ip_resource.Delete()
 
     if self.tunnels:
-      vm_util.RunThreaded(lambda tun: self.tunnels[tun].Delete(),
-                          list(self.tunnels.keys()))
+      background_tasks.RunThreaded(
+          lambda tun: self.tunnels[tun].Delete(), list(self.tunnels.keys())
+      )
 
     if self.forwarding_rules:
-      vm_util.RunThreaded(lambda fr: self.forwarding_rules[fr].Delete(),
-                          list(self.forwarding_rules.keys()))
+      background_tasks.RunThreaded(
+          lambda fr: self.forwarding_rules[fr].Delete(),
+          list(self.forwarding_rules.keys()),
+      )
 
     if self.routes:
-      vm_util.RunThreaded(lambda route: self.routes[route].Delete(),
-                          list(self.routes.keys()))
+      background_tasks.RunThreaded(
+          lambda route: self.routes[route].Delete(), list(self.routes.keys())
+      )
 
     if self.vpn_gateway_resource:
       self.vpn_gateway_resource.Delete()
@@ -307,7 +312,7 @@ class GceVpnGatewayResource(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'target-vpn-gateways', 'describe',
                              self.name)
     cmd.flags['region'] = self.region
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
   def _Delete(self):
@@ -352,7 +357,7 @@ class GceIPAddress(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe',
                              self.name)
     cmd.flags['region'] = self.region
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
 
@@ -395,14 +400,14 @@ class GceStaticTunnel(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'describe',
                              self.name)
     cmd.flags['region'] = self.region
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
   def IsReady(self) -> bool:
     cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'describe',
                              self.name)
     cmd.flags['region'] = self.region
-    response = cmd.Issue(suppress_warning=True)
+    response = cmd.Issue()
     return 'established' in str(response).lower()
 
 
@@ -437,7 +442,7 @@ class GceRoute(resource.BaseResource):
     """Returns True if the Route exists."""
     cmd = util.GcloudCommand(self, 'compute', 'routes', 'describe',
                              self.name)
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
 
@@ -491,7 +496,7 @@ class GceForwardingRule(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'describe',
                              self.name)
     cmd.flags['region'] = self.src_region
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
 
@@ -547,14 +552,14 @@ class GceFirewallRule(resource.BaseResource):
     """Returns True if the Firewall Rule exists."""
     cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'describe',
                              self.name)
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
 
 class GceFirewall(network.BaseFirewall):
   """An object representing the GCE Firewall."""
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   def __init__(self):
     """Initialize GCE firewall class."""
@@ -649,6 +654,7 @@ class GceNetworkSpec(network.BaseNetworkSpec):
                project: Optional[str] = None,
                mtu: Optional[int] = None,
                machine_type: Optional[str] = None,
+               subnet_name: Optional[str] = None,
                **kwargs):
     """Initializes the GceNetworkSpec.
 
@@ -656,12 +662,14 @@ class GceNetworkSpec(network.BaseNetworkSpec):
       project: The project for which the Network should be created.
       mtu: The MTU (max transmission unit) to use, if any.
       machine_type: The machine type of VM's in the network.
+      subnet_name: Name of the existing subnet.
       **kwargs: Additional key word arguments passed to BaseNetworkSpec.
     """
     super(GceNetworkSpec, self).__init__(**kwargs)
     self.project = project
     self.mtu = mtu
     self.machine_type = machine_type
+    self.subnet_name = subnet_name
 
 
 class GceNetworkResource(resource.BaseResource):
@@ -698,7 +706,7 @@ class GceNetworkResource(resource.BaseResource):
   def _Exists(self) -> bool:
     """Returns True if the Network resource exists."""
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'describe', self.name)
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
   def _GetAllFirewallRules(self) -> List[GceFirewallRule]:
@@ -706,7 +714,7 @@ class GceNetworkResource(resource.BaseResource):
     cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'list')
     cmd.flags['filter'] = 'network=%s' % self.name
 
-    stdout, _, _ = cmd.Issue(suppress_warning=True)
+    stdout, _, _ = cmd.Issue()
     result = json.loads(stdout)
     return [GceFirewallRule(entry['name'], self.project, ALLOW_ALL, self.name,
                             NETWORK_RANGE) for entry in result]
@@ -737,7 +745,7 @@ class GceSubnetResource(resource.BaseResource):
                              self.name)
     if self.region:
       cmd.flags['region'] = self.region
-    _, _, retcode = cmd.Issue(suppress_warning=True, raise_on_failure=False)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
   def _Delete(self):
@@ -757,7 +765,7 @@ def IsPlacementGroupCompatible(machine_type):
 class GceNetwork(network.BaseNetwork):
   """Object representing a GCE Network."""
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   def __init__(self, network_spec: GceNetworkSpec):
     super(GceNetwork, self).__init__(network_spec)
@@ -776,19 +784,28 @@ class GceNetwork(network.BaseNetwork):
       self.cidr = network_spec.cidr
     self.mtu = network_spec.mtu
 
-    name = self._MakeGceNetworkName()
+    self.is_existing_network = False
+    if network_spec.subnet_name:
+      name = network_spec.subnet_name
+      self.is_existing_network = True
+    elif gcp_flags.GCE_NETWORK_NAME.value:
+      name = gcp_flags.GCE_NETWORK_NAME.value
+      self.is_existing_network = True
+    else:
+      name = self._MakeGceNetworkName()
 
-    subnet_region = (FLAGS.gce_subnet_region if not network_spec.cidr else
-                     util.GetRegionFromZone(network_spec.zone))
-    mode = 'auto' if subnet_region is None else 'custom'
+    mode = gcp_flags.GCE_NETWORK_TYPE.value
+    if mode is None:
+      mode = 'auto'
     self.network_resource = GceNetworkResource(name, mode, self.project,
                                                self.mtu)
-    if subnet_region is None:
-      self.subnet_resource = None
-    else:
+    if mode == 'custom':
+      subnet_region = util.GetRegionFromZone(network_spec.zone)
       self.subnet_resource = GceSubnetResource(FLAGS.gce_subnet_name or name,
                                                name, subnet_region,
                                                self.cidr, self.project)
+    else:
+      self.subnet_resource = None
 
     # Stage FW rules.
     self.all_nets = self._GetNetworksFromSpec(
@@ -903,9 +920,6 @@ class GceNetwork(network.BaseNetwork):
     Returns:
       String The name of this network.
     """
-    if FLAGS.gce_network_name:  # Return user managed network name if defined.
-      return FLAGS.gce_network_name
-
     net_type = net_type or self.net_type
     cidr = cidr or self.cidr
     uri = uri or FLAGS.run_uri
@@ -967,15 +981,21 @@ class GceNetwork(network.BaseNetwork):
         zone=vm.zone,
         cidr=vm.cidr,
         mtu=vm.mtu,
-        machine_type=vm.machine_type)
+        machine_type=vm.machine_type,
+        subnet_name=vm.subnet_name,
+    )
 
   @classmethod
   def _GetKeyFromNetworkSpec(
-      cls, spec) -> Union[Tuple[str, str], Tuple[str, str, str]]:
+      cls, spec
+  ) -> Union[Tuple[str, str], Tuple[str, str, str], Tuple[str, str, str, str]]:
     """Returns a key used to register Network instances."""
+    network_key = (cls.CLOUD, spec.project)
     if spec.cidr:
-      return (cls.CLOUD, spec.project, spec.cidr)
-    return (cls.CLOUD, spec.project)
+      network_key += (spec.cidr,)
+    if spec.subnet_name:
+      network_key += (spec.subnet_name,)
+    return network_key
 
   def _GetNumberVms(self) -> int:
     """Counts the number of VMs to be used in this benchmark.
@@ -992,20 +1012,22 @@ class GceNetwork(network.BaseNetwork):
 
   def Create(self):
     """Creates the actual network."""
-    if not FLAGS.gce_network_name:
+    if not (gcp_flags.GCE_NETWORK_NAME.value or self.is_existing_network):
       self.network_resource.Create()
       if self.subnet_resource:
         self.subnet_resource.Create()
       if self.default_firewall_rule:
         self.default_firewall_rule.Create()
       if self.external_nets_rules:
-        vm_util.RunThreaded(
+        background_tasks.RunThreaded(
             lambda rule: self.external_nets_rules[rule].Create(),
-            list(self.external_nets_rules.keys()))
+            list(self.external_nets_rules.keys()),
+        )
       if getattr(self, 'vpn_gateway', False):
-        vm_util.RunThreaded(
+        background_tasks.RunThreaded(
             lambda gateway: self.vpn_gateway[gateway].Create(),
-            list(self.vpn_gateway.keys()))
+            list(self.vpn_gateway.keys()),
+        )
     if self.placement_group:
       self.placement_group.Create()
 
@@ -1013,17 +1035,19 @@ class GceNetwork(network.BaseNetwork):
     """Deletes the actual network."""
     if self.placement_group:
       self.placement_group.Delete()
-    if not FLAGS.gce_network_name:
+    if not (gcp_flags.GCE_NETWORK_NAME.value or self.is_existing_network):
       if getattr(self, 'vpn_gateway', False):
-        vm_util.RunThreaded(
+        background_tasks.RunThreaded(
             lambda gateway: self.vpn_gateway[gateway].Delete(),
-            list(self.vpn_gateway.keys()))
+            list(self.vpn_gateway.keys()),
+        )
       if self.default_firewall_rule.created:
         self.default_firewall_rule.Delete()
       if self.external_nets_rules:
-        vm_util.RunThreaded(
+        background_tasks.RunThreaded(
             lambda rule: self.external_nets_rules[rule].Delete(),
-            list(self.external_nets_rules.keys()))
+            list(self.external_nets_rules.keys()),
+        )
       if self.subnet_resource:
         self.subnet_resource.Delete()
       self.network_resource.Delete()

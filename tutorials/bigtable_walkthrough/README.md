@@ -36,6 +36,9 @@ Please check out the
 [PKB README](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/README.md)
 for a detailed introduction.
 
+**PKB docker image update**: we have updated the docker image for
+[Task 5](#task-5-run-the-benchmarks), using the latest PKB code on 2023/02/08.
+
 ### Bigtable benchmarking overview
 
 **Prerequisites**:
@@ -724,7 +727,8 @@ loading.
 1.  There are factors that may impact the performance, such as the
     **network congestion** and the **distance** between the VMs and the Bigtable
     instances. Also note that the test table is pre-split with 200 keys.
-1.  New releases of Bigtable may improve the performance.
+1.  The results were obtained on 2021/12/09. New releases of Bigtable may have
+    improved the performance.
 1.  The cost estimate is calculated based on the Bigtable nodes and an
     **approximation** of the **logical table size**. The **actual disk usage**
     is charged in practice.

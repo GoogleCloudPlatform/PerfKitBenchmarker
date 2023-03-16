@@ -37,7 +37,7 @@ import tempfile
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -108,7 +108,7 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
     rack_profile: None or string. Rack CLI profile configuration.
   """
 
-  CLOUD = providers.RACKSPACE
+  CLOUD = provider_info.RACKSPACE
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -148,7 +148,7 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
 class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Rackspace Public Cloud Virtual Machine."""
 
-  CLOUD = providers.RACKSPACE
+  CLOUD = provider_info.RACKSPACE
   DEFAULT_IMAGE = None
 
   def __init__(self, vm_spec):
@@ -199,7 +199,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       return False
     get_cmd = util.RackCLICommand(self, 'servers', 'instance', 'get')
     get_cmd.flags['id'] = self.id
-    stdout, _, _ = get_cmd.Issue(suppress_warning=True)
+    stdout, _, _ = get_cmd.Issue()
     try:
       resp = json.loads(stdout)
     except ValueError:
@@ -302,7 +302,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Executes delete command for removing a Rackspace VM."""
     cmd = util.RackCLICommand(self, 'servers', 'instance', 'delete')
     cmd.flags['id'] = self.id
-    stdout, _, _ = cmd.Issue(suppress_warning=True)
+    stdout, _, _ = cmd.Issue()
     resp = json.loads(stdout)
     if 'result' not in resp or 'Deleting' not in resp['result']:
       raise errors.Resource.RetryableDeletionError()

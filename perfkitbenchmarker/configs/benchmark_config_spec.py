@@ -27,9 +27,11 @@ from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import key
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import spark_service
@@ -167,6 +169,10 @@ class _DpbServiceSpec(spec.BaseSpec):
             'default': None,
             'none_ok': True
         }),
+        'dataflow_max_worker_count': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True,
+        }),
         'dataproc_serverless_core_count': (option_decoders.IntDecoder, {
             'default': None,
             'none_ok': True,
@@ -251,7 +257,7 @@ class _TpuGroupSpec(spec.BaseSpec):
     result = super(_TpuGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS
+            'valid_values': provider_info.VALID_CLOUDS
         }),
         'tpu_cidr_range': (option_decoders.StringDecoder, {
             'default': None
@@ -464,6 +470,75 @@ class _EdwServiceSpec(spec.BaseSpec):
       config_values['user'] = flag_values.edw_service_cluster_user
     if flag_values['edw_service_cluster_password'].present:
       config_values['password'] = flag_values.edw_service_cluster_password
+
+
+class _EdwComputeResourceDecoder(option_decoders.TypeVerifier):
+  """Validates the edw compute resource dictionary of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super(_EdwComputeResourceDecoder, self).__init__(
+        valid_types=(dict,), **kwargs
+    )
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies edw compute resource dictionary of a benchmark config object.
+
+    Args:
+      value: dict edw_compute_resource config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _EdwComputeResourceSpec Built from the config passed in value.
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    edw_compute_resource_config = super(
+        _EdwComputeResourceDecoder, self
+    ).Decode(value, component_full_name, flag_values)
+    result = _EdwComputeResourceSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **edw_compute_resource_config,
+    )
+    return result
+
+
+class _EdwComputeResourceSpec(spec.BaseSpec):
+  """Configurable options of an EDW compute resource.
+
+  Attributes:
+    type: string. The type of the EDW compute resource (bigquery_slots, etc.)
+  """
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super(_EdwComputeResourceSpec, self).__init__(
+        component_full_name, flag_values=flag_values, **kwargs)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    result = super(
+        _EdwComputeResourceSpec, cls
+    )._GetOptionDecoderConstructions()
+    result.update({
+        'type': (
+            option_decoders.StringDecoder,
+            {'default': 'bigquery_slots', 'none_ok': False},
+        ),
+        'cloud': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+    })
+    return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    super(_EdwComputeResourceSpec, cls)._ApplyFlags(config_values, flag_values)
+    if 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
 
 
 class _SparkServiceSpec(spec.BaseSpec):
@@ -855,7 +930,7 @@ class _ContainerClusterSpec(spec.BaseSpec):
             'none_ok': True
         }),
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS
+            'valid_values': provider_info.VALID_CLOUDS
         }),
         'type': (option_decoders.StringDecoder, {
             'default': container_service.KUBERNETES,
@@ -1078,7 +1153,7 @@ class _CloudRedisSpec(spec.BaseSpec):
     result = super(_CloudRedisSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS
+            'valid_values': provider_info.VALID_CLOUDS
         }),
         'redis_name': (option_decoders.StringDecoder, {
             'default': None,
@@ -1370,7 +1445,7 @@ class _MessagingServiceSpec(spec.BaseSpec):
     result = super()._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS}),
+            'valid_values': provider_info.VALID_CLOUDS}),
         # TODO(odiego): Add support for push delivery mechanism
         'delivery': (option_decoders.EnumDecoder, {
             'valid_values': ('pull',)}),
@@ -1439,7 +1514,7 @@ class _DataDiscoveryServiceSpec(spec.BaseSpec):
     result = super()._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS
+            'valid_values': provider_info.VALID_CLOUDS
         }),
         'service_type': (
             option_decoders.EnumDecoder,
@@ -1498,6 +1573,26 @@ class _DataDiscoveryServiceDecoder(option_decoders.TypeVerifier):
         self._GetOptionFullName(component_full_name), flag_values,
         **data_discovery_service_config)
     return result
+
+
+class _KeyDecoder(option_decoders.TypeVerifier):
+  """Validates the key dict of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super().__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies the key dict of a benchmark config object."""
+    key_config = super().Decode(value, component_full_name, flag_values)
+    if 'cloud' in key_config:
+      providers.LoadProvider(key_config['cloud'])
+      key_spec_class = key.GetKeySpecClass(key_config['cloud'])
+    else:
+      raise errors.Config.InvalidValue(
+          'Required attribute "cloud" missing from "key" config.')
+    return key_spec_class(
+        self._GetOptionFullName(component_full_name), flag_values,
+        **key_config)
 
 
 class BenchmarkConfigSpec(spec.BaseSpec):
@@ -1591,6 +1686,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'tpu_groups': (_TpuGroupsDecoder, {
             'default': {}
         }),
+        'edw_compute_resource': (_EdwComputeResourceDecoder, {
+            'default': None
+        }),
         'edw_service': (_EdwServiceDecoder, {
             'default': None
         }),
@@ -1615,6 +1713,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'default': None,
         }),
         'data_discovery_service': (_DataDiscoveryServiceDecoder, {
+            'default': None,
+            'none_ok': True,
+        }),
+        'key': (_KeyDecoder, {
             'default': None,
             'none_ok': True,
         })

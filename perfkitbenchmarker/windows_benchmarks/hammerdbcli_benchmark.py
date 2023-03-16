@@ -195,8 +195,6 @@ def GetMetadata():
   metadata.pop('hammerdbcli_num_run', None)
   # columnar engine not applicable to sqlserver.
   metadata.pop('hammerdbcli_load_tpch_tables_to_columnar_engine', None)
-  # HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION not implemented.
-  metadata.pop('hammerdbcli_optimized_server_configuration', None)
   return metadata
 
 

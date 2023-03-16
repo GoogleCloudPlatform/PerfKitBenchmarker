@@ -19,7 +19,7 @@ from typing import List
 
 from absl import flags
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -32,7 +32,7 @@ FLAGS = flags.FLAGS
 class AzureContainerRegistry(container_service.BaseContainerRegistry):
   """Class for building and storing container images on Azure."""
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   def __init__(self, registry_spec):
     super(AzureContainerRegistry, self).__init__(registry_spec)
@@ -50,7 +50,7 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
       return False
     stdout, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH, 'acr', 'show', '--name', self.name,
-    ], suppress_warning=True, raise_on_failure=False)
+    ], raise_on_failure=False)
     try:
       registry = json.loads(stdout)
       self.login_server = registry['loginServer']
@@ -113,7 +113,7 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
 class AksCluster(container_service.KubernetesCluster):
   """Class representing an Azure Kubernetes Service cluster."""
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   def __init__(self, spec):
     """Initializes the cluster."""
@@ -242,10 +242,9 @@ class AksCluster(container_service.KubernetesCluster):
         '--admin',
         '--name', self.name,
         '--file', FLAGS.kubeconfig,
-    ] + self.resource_group.args, suppress_warning=True)
+    ] + self.resource_group.args)
     version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
-    _, _, retcode = vm_util.IssueCommand(version_cmd, suppress_warning=True,
-                                         raise_on_failure=False)
+    _, _, retcode = vm_util.IssueCommand(version_cmd, raise_on_failure=False)
     if retcode:
       return False
     # POD creation will fail until the default service account is created.

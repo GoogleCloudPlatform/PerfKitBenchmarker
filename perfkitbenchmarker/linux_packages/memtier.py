@@ -26,6 +26,7 @@ import time
 from typing import Any, Dict, List, Optional, Text, Tuple, Union
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_packages
@@ -151,6 +152,18 @@ MEMTIER_SERVER_SELECTION = flags.DEFINE_enum(
     'Supported distributions are uniform and random. Defaults to uniform.')
 
 
+class BuildFailureError(Exception):
+  pass
+
+
+class RunFailureError(Exception):
+  pass
+
+
+class RetryableRunError(Exception):
+  pass
+
+
 def YumInstall(vm):
   """Installs the memtier package on the VM."""
   vm.Install('build_tools')
@@ -244,10 +257,12 @@ def BuildMemtierCommand(
   return ' '.join(cmd)
 
 
-def Load(client_vm,
-         server_ip: str,
-         server_port: int,
-         server_password: Optional[str] = None) -> None:
+def Load(
+    client_vm,
+    server_ip: str,
+    server_port: int,
+    server_password: Optional[str] = None,
+) -> None:
   """Preload the server with data."""
   load_key_maximum = (
       MEMTIER_LOAD_KEY_MAXIMUM.value
@@ -264,8 +279,9 @@ def Load(client_vm,
       key_minimum=1,
       key_maximum=load_key_maximum,
       requests='allkeys',
+      cluster_mode=MEMTIER_CLUSTER_MODE.value,
       password=server_password)
-  client_vm.RobustRemoteCommand(cmd)
+  _IssueRetryableCommand(client_vm, cmd)
 
 
 def RunOverAllClientVMs(
@@ -275,7 +291,8 @@ def RunOverAllClientVMs(
     pipeline,
     threads,
     clients,
-    password: Optional[str] = None) -> 'List[MemtierResult]':
+    password: Optional[str] = None,
+) -> 'List[MemtierResult]':
   """Run redis memtier on all client vms.
 
   Run redis memtier on all client vms based on given ports.
@@ -312,8 +329,9 @@ def RunOverAllClientVMs(
         password=password,
         unique_id=str(port_index))
 
-  results = vm_util.RunThreaded(DistributeClientsToPorts,
-                                list(range(len(ports))))
+  results = background_tasks.RunThreaded(
+      DistributeClientsToPorts, list(range(len(ports)))
+  )
 
   return results
 
@@ -322,7 +340,8 @@ def RunOverAllThreadsPipelinesAndClients(
     client_vms,
     server_ip: str,
     server_ports: List[int],
-    password: Optional[str] = None) -> List[sample.Sample]:
+    password: Optional[str] = None,
+) -> List[sample.Sample]:
   """Runs memtier over all pipeline and thread combinations."""
   samples = []
   for pipeline in FLAGS.memtier_pipeline:
@@ -359,7 +378,8 @@ def MeasureLatencyCappedThroughput(
     client_vm,
     server_ip: str,
     server_port: int,
-    password: Optional[str] = None) -> List[sample.Sample]:
+    password: Optional[str] = None,
+) -> List[sample.Sample]:
   """Runs memtier to find the maximum throughput under a latency cap."""
   samples = []
 
@@ -513,7 +533,8 @@ def RunGetLatencyAtCpu(cloud_instance, client_vms):
           (_GetSingleThreadedLatency,
            [latency_measurement_vm, server_ip, server_port, password], {})
       ]
-      results = vm_util.RunParallelThreads(process_args, len(process_args))
+      results = background_tasks.RunParallelThreads(
+          process_args, len(process_args))
       metadata = GetMetadata(
           clients=current_clients, threads=threads, pipeline=pipeline)
       metadata['measured_cpu_percent'] = cloud_instance.MeasureCpuUtilization(
@@ -528,8 +549,9 @@ def RunGetLatencyAtCpu(cloud_instance, client_vms):
       'this configuration and CPU utilization.')
 
 
-def _GetSingleThreadedLatency(client_vm, server_ip: str, server_port: int,
-                              password: str) -> 'MemtierResult':
+def _GetSingleThreadedLatency(
+    client_vm, server_ip: str, server_port: int, password: str
+) -> 'MemtierResult':
   """Wait for background run to stabilize then send single threaded request."""
   time.sleep(300)
   return _Run(
@@ -542,14 +564,31 @@ def _GetSingleThreadedLatency(client_vm, server_ip: str, server_port: int,
       password=password)
 
 
-def _Run(vm,
-         server_ip: str,
-         server_port: int,
-         threads: int,
-         pipeline: int,
-         clients: int,
-         password: Optional[str] = None,
-         unique_id: Optional[str] = None) -> 'MemtierResult':
+@vm_util.Retry(
+    poll_interval=0,
+    timeout=0,
+    max_retries=5,
+    retryable_exceptions=(RetryableRunError),
+)
+def _IssueRetryableCommand(vm, cmd: str) -> None:
+  """Issue redis command, retry connection failure."""
+  _, stderr = vm.RobustRemoteCommand(cmd)
+  if 'Connection error' in stderr:
+    raise RetryableRunError('Redis client connection failed, retrying')
+  if 'handle error response' in stderr:
+    raise RunFailureError(stderr)
+
+
+def _Run(
+    vm,
+    server_ip: str,
+    server_port: int,
+    threads: int,
+    pipeline: int,
+    clients: int,
+    password: Optional[str] = None,
+    unique_id: Optional[str] = None,
+) -> 'MemtierResult':
   """Runs the memtier benchmark on the vm."""
   logging.info(
       'Start benchmarking redis/memcached using memtier:\n'
@@ -558,12 +597,14 @@ def _Run(vm,
       '\tmemtier pipeline, %s', clients, threads, pipeline)
 
   file_name_suffix = '_'.join(filter(None, [str(server_port), unique_id]))
-  memtier_results_file_name = '_'.join([MEMTIER_RESULTS, file_name_suffix])
+  memtier_results_file_name = (
+      '_'.join([MEMTIER_RESULTS, file_name_suffix]) + '.log'
+  )
   memtier_results_file = pathlib.PosixPath(
       f'{TMP_FOLDER}/{memtier_results_file_name}')
   vm.RemoteCommand(f'rm -f {memtier_results_file}')
 
-  json_results_file_name = '_'.join([JSON_OUT_FILE, file_name_suffix])
+  json_results_file_name = '_'.join([JSON_OUT_FILE, file_name_suffix]) + '.log'
   json_results_file = (
       pathlib.PosixPath(f'{TMP_FOLDER}/{json_results_file_name}')
       if MEMTIER_TIME_SERIES.value else None)
@@ -595,7 +636,7 @@ def _Run(vm,
       outfile=memtier_results_file,
       cluster_mode=MEMTIER_CLUSTER_MODE.value,
       json_out_file=json_results_file)
-  vm.RemoteCommand(cmd)
+  _IssueRetryableCommand(vm, cmd)
 
   output_path = os.path.join(vm_util.GetTempDir(), memtier_results_file_name)
   vm_util.IssueCommand(['rm', '-f', output_path])
@@ -757,6 +798,42 @@ class MemtierResult:
     return samples
 
 
+def AlignTimeDiffMemtierResults(
+    memtier_results: List[MemtierResult],
+) -> None:
+  """Realign the timestamps if time diff between clients are greater than 1s."""
+  start_times = [result.timestamps[0] for result in memtier_results]
+  min_start_time = min(start_times)
+  max_start_time = max(start_times)
+  diff_time = max_start_time - min_start_time
+  logging.info(
+      'Max difference in start time between clients is %d ms',
+      max_start_time - min_start_time,
+  )
+  if diff_time < 1000:
+    return
+
+  # There are time diff greater than 1s
+  # We add 0 padding to the start of the series and remove the end
+  # based on the time diff
+  for result in memtier_results:
+    diff_in_seconds = (result.timestamps[0] - min_start_time) // 1000
+    if diff_in_seconds < 1:
+      continue
+
+    extra_timestamps = [
+        result.timestamps[0] - 1000 * t
+        for t in range(diff_in_seconds + 1, 1, -1)
+    ]
+    empty_results = [0 for i in range(diff_in_seconds)]
+    result.timestamps = extra_timestamps + result.timestamps[:-diff_in_seconds]
+    result.max_latency_series = (
+        empty_results + result.max_latency_series[:-diff_in_seconds]
+    )
+
+    result.ops_series = empty_results + result.ops_series[:-diff_in_seconds]
+
+
 def AggregateMemtierResults(memtier_results: List[MemtierResult],
                             metadata: Dict[str, Any]) -> List[sample.Sample]:
   """Aggregate memtier time series from all clients.
@@ -799,22 +876,20 @@ def AggregateMemtierResults(memtier_results: List[MemtierResult],
       logging.warning('There is empty result: %s %s %s',
                       str(result.ops_per_sec), str(result.timestamps),
                       str(result.runtime_info))
-
-  start_times = [result.timestamps[0] for result in non_empty_results]
-  min_start_time = min(start_times)
-  max_start_time = max(start_times)
-  logging.info('Max difference in start time between clients is %d ms',
-               max_start_time - min_start_time)
-
+  AlignTimeDiffMemtierResults(non_empty_results)
   timestamps = memtier_results[0].timestamps
 
   # Not all clients have the same duration
-  for memtier_result in non_empty_results:
-    if len(memtier_result.timestamps) > len(timestamps):
-      timestamps = memtier_result.timestamps
-
-  ops_series = [0] * len(timestamps)
-  max_latency_series = [0] * len(timestamps)
+  # Determine the duration based on the max length
+  # or use the Memtier run duration as the max length
+  series_length = len(timestamps)
+  if MEMTIER_RUN_DURATION.value:
+    series_length = max(MEMTIER_RUN_DURATION.value + 1, series_length)
+    if series_length != len(timestamps):
+      new_timestamps = [timestamps[0] + 1000 * i for i in range(series_length)]
+      timestamps = new_timestamps
+  ops_series = [0] * series_length
+  max_latency_series = [0] * series_length
 
   for memtier_result in non_empty_results:
     for i in range(len(memtier_result.ops_series)):

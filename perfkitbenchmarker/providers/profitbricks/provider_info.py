@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for ProfitBricks
+"""Provider info for ProfitBricks.
 """
 
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
 
 
 class ProfitBricksProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
-  CLOUD = providers.PROFITBRICKS
+  CLOUD = provider_info.PROFITBRICKS

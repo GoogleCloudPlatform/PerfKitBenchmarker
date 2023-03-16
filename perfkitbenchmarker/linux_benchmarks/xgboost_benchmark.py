@@ -16,13 +16,13 @@
 import logging
 from typing import Any, Dict, List
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import xgboost
 
@@ -146,7 +146,7 @@ def _CollectGpuSamples(
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
-  return vm_util.RunThreaded(_CollectGpuSamples, bm_spec.vms)
+  return background_tasks.RunThreaded(_CollectGpuSamples, bm_spec.vms)
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:

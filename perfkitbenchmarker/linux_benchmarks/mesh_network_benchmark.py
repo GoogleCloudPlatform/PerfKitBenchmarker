@@ -23,10 +23,10 @@ import logging
 import re
 import threading
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
 from six.moves import range
 
@@ -87,7 +87,7 @@ def Prepare(benchmark_spec):
   for vm in vms:
     vms[0].MoveFile(vm, netperf.NETPERF_PATH)
     vms[0].MoveFile(vm, netperf.NETSERVER_PATH)
-  vm_util.RunThreaded(PrepareVM, vms, len(vms))
+  background_tasks.RunThreaded(PrepareVM, vms, len(vms))
 
 
 def RunNetperf(vm, benchmark_name, servers, result):
@@ -167,7 +167,7 @@ def Run(benchmark_spec):
       value = 0.0
     result = [metric, value, unit, metadata]
     args = [((source, netperf_benchmark, vms, result), {}) for source in vms]
-    vm_util.RunThreaded(RunNetperf, args, num_vms)
+    background_tasks.RunThreaded(RunNetperf, args, num_vms)
     result = sample.Sample(*result)
     if netperf_benchmark == 'TCP_RR':
       denom = ((num_vms - 1) *

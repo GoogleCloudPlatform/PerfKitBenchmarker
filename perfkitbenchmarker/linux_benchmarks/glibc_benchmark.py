@@ -190,20 +190,19 @@ def Run(benchmark_spec):
   # Parse the output for "bench-math", "bench-string" and "bench-pthread".
   if any(i in GLIBC_BENCH for i in FLAGS.glibc_benchset):
     stdout, _ = vm.RemoteCommand(
-        'cat {0}/bench.out'.format(RESULTS_DIR), should_log=True)
+        'cat {0}/bench.out'.format(RESULTS_DIR))
     ParseOutput(stdout, 'functions', results, metadata)
   # Parse the output for "malloc-thread".
   if any(i in GLIBC_BENCH_MALLOC for i in FLAGS.glibc_benchset):
     thread_num = ['1', '8', '16', '32']
     for num in thread_num:
       stdout, _ = vm.RemoteCommand(
-          'cat {0}/bench-malloc-thread-{1}.out'.format(RESULTS_DIR, num),
-          should_log=True)
+          'cat {0}/bench-malloc-thread-{1}.out'.format(RESULTS_DIR, num))
       ParseOutput(stdout, 'functions', results, metadata)
   # Parse the output for "math-benchset".
   if any(i in GLIBC_MATH_BENCHSET for i in FLAGS.glibc_benchset):
     stdout, _ = vm.RemoteCommand(
-        'cat {0}/bench-math-inlines.out'.format(RESULTS_DIR), should_log=True)
+        'cat {0}/bench-math-inlines.out'.format(RESULTS_DIR))
     ParseOutput('{%s}' % stdout, 'math-inlines', results, metadata)
   return results
 

@@ -17,9 +17,9 @@ Spins up a cloud redis instance, runs memtier against it, then spins it down.
 """
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import managed_memory_store
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memtier
 
 FLAGS = flags.FLAGS
@@ -77,7 +77,7 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
 
   memtier_vms = benchmark_spec.vm_groups['clients']
-  vm_util.RunThreaded(_Install, memtier_vms)
+  background_tasks.RunThreaded(_Install, memtier_vms)
 
   benchmark_spec.cloud_redis_instance = _GetManagedMemoryStore(benchmark_spec)
   benchmark_spec.cloud_redis_instance.Create()

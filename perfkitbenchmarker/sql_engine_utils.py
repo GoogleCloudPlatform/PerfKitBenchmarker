@@ -160,7 +160,6 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
                       session_variables: str = '',
                       timeout: Optional[int] = None,
                       ignore_failure: bool = False,
-                      suppress_warning: bool = False,
                       suppress_stdout: bool = False):
     """Issue Sql Command."""
     command_string = None
@@ -185,8 +184,7 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
       command_string = command_string + ' >/dev/null 2>&1'
 
     return self.vm.RemoteCommand(
-        command_string, timeout=timeout, ignore_failure=ignore_failure,
-        suppress_warning=suppress_warning)
+        command_string, timeout=timeout, ignore_failure=ignore_failure)
 
   @abc.abstractmethod
   def InstallPackages(self) -> None:

@@ -19,10 +19,10 @@ See https://github.com/aerospike/act for more info.
 
 import math
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import act
 from six.moves import range
 
@@ -123,7 +123,7 @@ def Run(benchmark_spec):
       args = [((float(load), idx), {})
               for idx in range(
                   FLAGS.act_reserved_partitions, len(vm.scratch_disks))]
-      vm_util.RunThreaded(_Run, args)
+      background_tasks.RunThreaded(_Run, args)
     else:
       run_samples.extend(act.RunAct(vm, float(load)))
     samples.extend(run_samples)

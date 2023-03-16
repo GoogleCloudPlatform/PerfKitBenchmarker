@@ -12,7 +12,7 @@ from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import messaging_service as msgsvc
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -30,7 +30,7 @@ MESSAGING_SERVICE_SCRIPTS_AZURE_BIN = 'messaging_service_scripts/azure_benchmark
 class AzureServiceBus(msgsvc.BaseMessagingService):
   """Azure Service Bus Interface Class."""
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   def __init__(self):
     super().__init__()

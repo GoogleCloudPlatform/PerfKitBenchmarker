@@ -23,17 +23,19 @@ for more information about Azure Virtual Networks.
 import json
 import logging
 import threading
+from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_placement_group
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
@@ -41,6 +43,9 @@ SSH_PORT = 22
 
 flags.DEFINE_boolean('azure_infiniband', False,
                      'Install Mellanox OpenFabrics drivers')
+_AZ_VERSION_LOG = flags.DEFINE_boolean(
+    'azure_version_log', True, 'Log az --version.'
+)
 
 DEFAULT_REGION = 'eastus2'
 
@@ -65,6 +70,8 @@ def GetResourceGroup(zone=None):
 
 class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
+  _az_lock = threading.Condition()
+  _az_version: Optional[str] = None
 
   def __init__(self,
                name,
@@ -73,6 +80,7 @@ class AzureResourceGroup(resource.BaseResource):
                timeout_minutes=None,
                raise_on_create_failure=True):
     super(AzureResourceGroup, self).__init__()
+    AzureResourceGroup._log_az_version()
     self.name = name
     self.use_existing = use_existing
     self.timeout_minutes = timeout_minutes
@@ -105,7 +113,6 @@ class AzureResourceGroup(resource.BaseResource):
   def _Exists(self):
     stdout, _, _ = vm_util.IssueCommand(
         [azure.AZURE_PATH, 'group', 'show', '--name', self.name],
-        suppress_warning=True,
         raise_on_failure=False)
     try:
       json.loads(stdout)
@@ -139,6 +146,17 @@ class AzureResourceGroup(resource.BaseResource):
     _, _, retcode = vm_util.IssueCommand(tag_cmd, raise_on_failure=False)
     if retcode:
       raise errors.Resource.CreationError('Error tagging Azure resource group.')
+
+  @classmethod
+  def _log_az_version(cls):
+    if not _AZ_VERSION_LOG.value:
+      return
+
+    with cls._az_lock:
+      if not cls._az_version:
+        cls.az_version, _, _ = vm_util.IssueCommand(
+            [azure.AZURE_PATH, '--version'],
+            raise_on_failure=True)
 
 
 class AzureStorageAccount(resource.BaseResource):
@@ -211,7 +229,6 @@ class AzureStorageAccount(resource.BaseResource):
             azure.AZURE_PATH, 'storage', 'account', 'show', '--output', 'json',
             '--name', self.name
         ] + self.resource_group.args,
-        suppress_warning=True,
         raise_on_failure=False)
 
     try:
@@ -237,7 +254,7 @@ class AzureVirtualNetwork(network.BaseNetwork):
   _regional_network_count = 0
   vnet_lock = threading.Lock()
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   def __init__(self, spec, region, name, number_subnets):
     super(AzureVirtualNetwork, self).__init__(spec)
@@ -254,7 +271,8 @@ class AzureVirtualNetwork(network.BaseNetwork):
     self.is_created = False
 
   @classmethod
-  def GetForRegion(cls, spec, region, name, number_subnets=1):
+  def GetForRegion(cls, spec, region, name, number_subnets=1
+                   ) -> Optional['AzureVirtualNetwork']:
     """Retrieves or creates an AzureVirtualNetwork.
 
     Args:
@@ -265,14 +283,21 @@ class AzureVirtualNetwork(network.BaseNetwork):
         contain.
 
     Returns:
-      AzureVirtualNetwork. If an AzureVirtualNetwork for the same region already
-      exists in the benchmark spec, that instance is returned. Otherwise, a new
+      AzureVirtualNetwork | None. If AZURE_SUBNET_ID is specified, an existing
+      network is used via a subnet, and PKB does not add it to the benchmark
+      spec so this method returns None.
+      If an AzureVirtualNetwork for the same region already exists in the
+      benchmark spec, that instance is returned. Otherwise, a new
       AzureVirtualNetwork is created and returned.
     """
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
       raise errors.Error('GetNetwork called in a thread without a '
                          'BenchmarkSpec.')
+    if azure_flags.AZURE_SUBNET_ID.value:
+      # AzureVirtualNetworks are not Resources, so we just return None here as
+      # the network exists but will be accessed via the subnet.
+      return None
     key = cls.CLOUD, REGION, region
     # Because this method is only called from the AzureNetwork constructor,
     # which is only called from AzureNetwork.GetNetwork, we already hold the
@@ -321,7 +346,6 @@ class AzureVirtualNetwork(network.BaseNetwork):
             azure.AZURE_PATH, 'network', 'vnet', 'show', '--output', 'json',
             '--name', self.name
         ] + self.resource_group.args,
-        suppress_warning=True,
         raise_on_failure=False)
 
     return bool(json.loads(stdout))
@@ -332,11 +356,22 @@ class AzureSubnet(resource.BaseResource):
 
   def __init__(self, vnet, name):
     super(AzureSubnet, self).__init__()
-    self.resource_group = GetResourceGroup()
-    self.vnet = vnet
-    self.name = name
-    self.args = ['--subnet', self.name]
-    self.address_space = None
+    if azure_flags.AZURE_SUBNET_ID.value:
+      # use pre-existing subnet
+      self.id = azure_flags.AZURE_SUBNET_ID.value
+      self.user_managed = True
+    else:
+      # create a new subnet.
+      # id could be set after _Exists succeeds, but is only used by AzureNIC()
+      # before AzureSubnet.Create() is called.
+      self.id = None
+      self.user_managed = False
+
+      self.resource_group = GetResourceGroup()
+      self.vnet = vnet
+      self.name = name
+      self.args = ['--subnet', self.name]
+      self.address_space = None
 
   def _Create(self):
     # Avoids getting additional address space when create retries.
@@ -421,7 +456,13 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
         self.subnet.name, '--network-security-group', self.name
     ] + self.resource_group.args + self.subnet.vnet.args)
 
-  def AllowPort(self, vm, start_port, end_port=None, source_range=None):
+  def AllowPort(
+      self,
+      vm,
+      start_port,
+      end_port=None,
+      source_range=None,
+      protocol='*'):
     """Open a port or port range.
 
     Args:
@@ -430,6 +471,9 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
       end_port: if given, the end of the port range.
       source_range: List of source CIDRs to allow for this port. If None, all
         sources are allowed. i.e. ['0.0.0.0/0']
+      protocol: Network protocol this rule applies to. One of {*, Ah, Esp, Icmp,
+        Tcp, Udp}. See
+        https://learn.microsoft.com/en-us/cli/azure/network/nsg/rule?view=azure-cli-latest#az-network-nsg-rule-create
 
     Raises:
       ValueError: when there are too many firewall rules.
@@ -450,7 +494,8 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
 
     network_cmd = [
         azure.AZURE_PATH, 'network', 'nsg', 'rule', 'create', '--name',
-        rule_name, '--destination-port-range', port_range, '--access', 'Allow',
+        rule_name, '--destination-port-range', port_range,
+        '--protocol', protocol, '--access', 'Allow',
         '--priority',
         str(rule_priority)
     ] + ['--source-address-prefixes'] + source_range
@@ -478,16 +523,19 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
 
 
 class AzureFirewall(network.BaseFirewall):
-  """A fireall on Azure is a Network Security Group.
+  """A firewall on Azure is a Network Security Group.
 
   NSGs are per-subnet, but this class is per-provider, so we just
   proxy methods through to the right NSG instance.
   """
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   def AllowPort(self, vm, start_port, end_port=None, source_range=None):
     """Opens a port on the firewall.
+
+    This is a no-op if there is no firewall configured for the VM.  This can
+    happen when using an already existing subnet.
 
     Args:
       vm: The BaseVirtualMachine object to open the port for.
@@ -496,8 +544,9 @@ class AzureFirewall(network.BaseFirewall):
       source_range: unsupported at present.
     """
 
-    vm.network.nsg.AllowPort(
-        vm, start_port, end_port=end_port, source_range=source_range)
+    if vm.network.nsg:
+      vm.network.nsg.AllowPort(
+          vm, start_port, end_port=end_port, source_range=source_range)
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
@@ -520,7 +569,7 @@ class AzureNetwork(network.BaseNetwork):
   we need for an Azure zone (aka region).
   """
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   def __init__(self, spec):
     super(AzureNetwork, self).__init__(spec)
@@ -581,13 +630,17 @@ class AzureNetwork(network.BaseNetwork):
     if len(vnet_name) > 64:
       vnet_name = prefix[:59] + '-vnet'
     self.vnet = AzureVirtualNetwork.GetForRegion(spec, self.region, vnet_name)
-    subnet_name = self.vnet.name
+    subnet_name = vnet_name
     if self.availability_zone:
       subnet_name += '-' + self.availability_zone
     subnet_name += '-subnet'
     self.subnet = AzureSubnet(self.vnet, subnet_name)
-    self.nsg = AzureNetworkSecurityGroup(self.region, self.subnet,
-                                         self.subnet.name + '-nsg')
+    if azure_flags.AZURE_SUBNET_ID.value:
+      # usage of an nsg is not currently supported with an existing subnet.
+      self.nsg = None
+    else:
+      self.nsg = AzureNetworkSecurityGroup(self.region, self.subnet,
+                                           self.subnet.name + '-nsg')
 
   @vm_util.Retry()
   def Create(self):
@@ -603,12 +656,13 @@ class AzureNetwork(network.BaseNetwork):
 
     self.storage_account.Create()
 
-    self.vnet.Create()
-
-    self.subnet.Create()
-
-    self.nsg.Create()
-    self.nsg.AttachToSubnet()
+    if self.vnet:
+      self.vnet.Create()
+    if self.subnet:
+      self.subnet.Create()
+    if self.nsg:
+      self.nsg.Create()
+      self.nsg.AttachToSubnet()
 
   def Delete(self):
     """Deletes the network."""

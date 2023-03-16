@@ -29,6 +29,7 @@ against a filesystem can run against Gluster.
 import posixpath
 import xml.etree.ElementTree
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import flag_util
@@ -212,10 +213,10 @@ def Prepare(benchmark_spec):
 
     args = [((client, gluster_servers[0], _VOLUME_NAME, _MOUNT_POINT), {})
             for client in clients]
-    vm_util.RunThreaded(gluster.MountGluster, args)
+    background_tasks.RunThreaded(gluster.MountGluster, args)
 
   # Set up SPEC
-  vm_util.RunThreaded(_PrepareSpec, clients)
+  background_tasks.RunThreaded(_PrepareSpec, clients)
 
   # Create a backup of the config file.
   prime_client.RemoteCommand('cp {0} {0}.bak'.format(

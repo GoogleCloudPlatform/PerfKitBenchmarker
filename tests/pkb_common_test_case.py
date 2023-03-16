@@ -57,8 +57,7 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
   def PackageCleanup(self):
     pass
 
-  def RemoteCommand(self, command, should_log, ignore_failure, suppress_warning,
-                    timeout, **kwargs):
+  def RemoteCommand(self, command, ignore_failure, timeout, **kwargs):
     pass
 
   def RemoteCopy(self, file_path, remote_path, copy_to):
@@ -148,7 +147,7 @@ class TestLinuxVirtualMachine(linux_virtual_machine.BaseLinuxVirtualMachine,
     pass
 
 
-class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):
+class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):  # pytype: disable=signature-mismatch  # overriding-return-type-checks
   pass
 
   def _PreemptibleMetadataKeyValue(self):

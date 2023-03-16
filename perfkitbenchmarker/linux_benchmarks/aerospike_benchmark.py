@@ -25,6 +25,7 @@ by the "aerospike_storage_type" and "data_disk_type" flags.
 import functools
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -105,8 +106,9 @@ def GetConfig(user_config):
       config['vm_groups']['workers']['disk_count'] = (
           config['vm_groups']['workers']['disk_count'] or None)
       if FLAGS.cloud == 'GCP':
-        config['vm_groups']['workers']['vm_spec']['GCP'][
-            'num_local_ssds'] = FLAGS.gce_num_local_ssds or FLAGS.server_gce_num_local_ssds
+        config['vm_groups']['workers']['vm_spec']['GCP']['num_local_ssds'] = (
+            FLAGS.gce_num_local_ssds or FLAGS.server_gce_num_local_ssds
+        )
         FLAGS['gce_num_local_ssds'].present = False
         FLAGS.gce_num_local_ssds = 0
         if FLAGS['server_gce_ssd_interface'].present:
@@ -162,7 +164,9 @@ def Prepare(benchmark_spec):
       functools.partial(vm.Install, 'aerospike_client') for vm in clients
   ]
 
-  vm_util.RunThreaded(lambda f: f(), aerospike_install_fns + client_install_fns)
+  background_tasks.RunThreaded(
+      lambda f: f(), aerospike_install_fns + client_install_fns
+  )
 
   loader_counts = [
       int(FLAGS.aerospike_num_keys) // len(clients) +
@@ -179,14 +183,14 @@ def Prepare(benchmark_spec):
                     f'--keys {loader_counts[client_idx]} '
                     f'--start-key {sum(loader_counts[:client_idx])} '
                     f' -h {ips} -p {3 + process_idx}000')
-    clients[client_idx].RobustRemoteCommand(load_command, should_log=True)
+    clients[client_idx].RobustRemoteCommand(load_command)
 
   run_params = []
   for child_idx in range(len(clients)):
     for process_idx in range(FLAGS.aerospike_instances):
       run_params.append(((child_idx, process_idx), {}))
 
-  vm_util.RunThreaded(_Load, run_params)
+  background_tasks.RunThreaded(_Load, run_params)
 
 
 def Run(benchmark_spec):
@@ -222,8 +226,7 @@ def Run(benchmark_spec):
           '--latency --percentiles 50,90,99,99.9,99.99 '
           '--output-file '
           f'result.{client_idx}.{process_idx}.{threads}')
-      stdout, _ = clients[client_idx].RobustRemoteCommand(
-          run_command, should_log=True)
+      stdout, _ = clients[client_idx].RobustRemoteCommand(run_command)
       stdout_samples.extend(aerospike_client.ParseAsbenchStdout(stdout))  # pylint: disable=cell-var-from-loop
 
     run_params = []
@@ -231,7 +234,7 @@ def Run(benchmark_spec):
       for process_idx in range(FLAGS.aerospike_instances):
         run_params.append(((child_idx, process_idx), {}))
 
-    vm_util.RunThreaded(_Run, run_params)
+    background_tasks.RunThreaded(_Run, run_params)
 
     if num_client_vms * FLAGS.aerospike_instances == 1:
       detailed_samples = stdout_samples
@@ -261,6 +264,7 @@ def Run(benchmark_spec):
         'replication_factor': FLAGS.aerospike_replication_factor,
         'client_threads': threads,
         'read_percent': FLAGS.aerospike_read_percent,
+        'aerospike_edition': FLAGS.aerospike_edition,
     })
     for s in temp_samples:
       s.metadata.update(metadata)
@@ -282,10 +286,10 @@ def Cleanup(benchmark_spec):
   def StopClient(client):
     client.RemoteCommand('sudo rm -rf aerospike*')
 
-  vm_util.RunThreaded(StopClient, clients)
+  background_tasks.RunThreaded(StopClient, clients)
 
   def StopServer(server):
     server.RemoteCommand('cd %s && nohup sudo make stop' %
                          aerospike_server.AEROSPIKE_DIR)
     server.RemoteCommand('sudo rm -rf aerospike*')
-  vm_util.RunThreaded(StopServer, servers)
+  background_tasks.RunThreaded(StopServer, servers)

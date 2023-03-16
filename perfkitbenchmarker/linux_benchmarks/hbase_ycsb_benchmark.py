@@ -45,6 +45,7 @@ import logging
 import os
 import posixpath
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
@@ -135,7 +136,7 @@ def CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
                              'use_snappy': use_snappy})
   # TODO(user): on HBase update, add '-n' flag.
   command = "{0}/hbase shell {1}".format(hbase.HBASE_BIN, remote)
-  vm.RemoteCommand(command, should_log=True)
+  vm.RemoteCommand(command)
 
 
 def _GetVMsByRole(vm_groups):
@@ -189,7 +190,9 @@ def Prepare(benchmark_spec):
   ycsb_install_fns = [functools.partial(vm.Install, 'ycsb')
                       for vm in loaders]
 
-  vm_util.RunThreaded(lambda f: f(), hbase_install_fns + ycsb_install_fns)
+  background_tasks.RunThreaded(
+      lambda f: f(), hbase_install_fns + ycsb_install_fns
+  )
 
   hadoop.ConfigureAndStart(master, workers, start_yarn=False)
   hbase.ConfigureAndStart(master, workers, zk_quorum)
@@ -209,7 +212,7 @@ def Prepare(benchmark_spec):
         os.path.join(vm_util.GetTempDir(), HBASE_SITE),
         posixpath.join(conf_dir, HBASE_SITE))
 
-  vm_util.RunThreaded(PushHBaseSite, loaders)
+  background_tasks.RunThreaded(PushHBaseSite, loaders)
   benchmark_spec.executor = ycsb.YCSBExecutor(FLAGS.hbase_binding)
 
 
@@ -265,4 +268,4 @@ def Cleanup(benchmark_spec):
   by_role = _GetVMsByRole(benchmark_spec.vm_groups)
   hbase.Stop(by_role['master'])
   hadoop.StopHDFS(by_role['master'])
-  vm_util.RunThreaded(hadoop.CleanDatanode, by_role['workers'])
+  background_tasks.RunThreaded(hadoop.CleanDatanode, by_role['workers'])

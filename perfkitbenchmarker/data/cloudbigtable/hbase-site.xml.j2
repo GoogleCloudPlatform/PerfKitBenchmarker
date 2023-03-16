@@ -9,7 +9,25 @@
   </property>
   <property>
     <name>hbase.client.connection.impl</name>
-    <value>com.google.cloud.bigtable.hbase{{ hbase_version }}.BigtableConnection</value>
+    <value>com.google.cloud.bigtable.hbase{{ hbase_major_version }}_x.BigtableConnection</value>
+  </property>
+  <property>
+    <name>hbase.client.async.connection.impl</name>
+    <value>org.apache.hadoop.hbase.client.BigtableAsyncConnection</value>
+  </property>
+  <property>
+    <name>hbase.client.registry.impl</name>
+    <value>org.apache.hadoop.hbase.client.BigtableAsyncRegistry</value>
+  </property>
+  {% if channel_count %}
+  <property>
+    <name>google.bigtable.grpc.channel.count</name>
+    <value>{{ channel_count }}</value>
+  </property>
+  {% endif %}
+  <property>
+    <name>hbase.client.registry.impl</name>
+    <value>org.apache.hadoop.hbase.client.BigtableAsyncRegistry</value>
   </property>
   <property>
     <name>google.bigtable.project.id</name>

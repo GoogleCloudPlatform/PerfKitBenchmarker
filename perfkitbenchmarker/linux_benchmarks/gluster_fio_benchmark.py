@@ -16,8 +16,8 @@
 
 import json
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import vm_util
 
 from perfkitbenchmarker.linux_packages import fio
 from perfkitbenchmarker.linux_packages import gluster
@@ -69,7 +69,9 @@ def Prepare(benchmark_spec):
   clients = benchmark_spec.vm_groups['clients']
   client_vm = clients[0]
 
-  vm_util.RunThreaded(lambda vm: vm.Install('fio'), gluster_servers + clients)
+  background_tasks.RunThreaded(
+      lambda vm: vm.Install('fio'), gluster_servers + clients
+  )
   for vm in gluster_servers:
     vm.SetReadAhead(_NUM_SECTORS_READ_AHEAD,
                     [d.GetDevicePath() for d in vm.scratch_disks])
@@ -80,7 +82,7 @@ def Prepare(benchmark_spec):
 
     args = [((client, gluster_servers[0], _VOLUME_NAME, _MOUNT_POINT), {})
             for client in clients]
-    vm_util.RunThreaded(gluster.MountGluster, args)
+    background_tasks.RunThreaded(gluster.MountGluster, args)
 
     gluster_address = gluster_servers[0].internal_ip
     client_vm.RemoteCommand('sudo mkdir -p /testdir')

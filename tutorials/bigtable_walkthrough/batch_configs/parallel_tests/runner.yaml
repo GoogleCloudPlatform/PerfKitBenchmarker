@@ -31,7 +31,7 @@ runner:
     #################################
     hbase_bin_url: https://storage.googleapis.com/cbt_ycsb_client_jar/hbase-1.4.7-bin.tar.gz
     hadoop_bin_url: https://storage.googleapis.com/cbt_ycsb_client_jar/hadoop-3.3.1.tar.gz
-    google_bigtable_hbase_jar_url: https://storage.googleapis.com/cbt_ycsb_client_jar/bigtable-hbase-1.x-hadoop-1.20.1.jar
+    google_bigtable_client_version: 2.5.0
     ycsb_version: 0.17.0
     ycsb_log_remote_command_output: false
 

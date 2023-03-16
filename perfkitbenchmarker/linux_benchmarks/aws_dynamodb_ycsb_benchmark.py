@@ -25,10 +25,10 @@ import os
 from typing import Any
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
 
@@ -128,7 +128,7 @@ def Prepare(benchmark_spec):
 
   vms = benchmark_spec.vms
   # Install required packages.
-  vm_util.RunThreaded(_Install, vms)
+  background_tasks.RunThreaded(_Install, vms)
   benchmark_spec.executor = ycsb.YCSBExecutor('dynamodb')
 
   instance: aws_dynamodb.AwsDynamoDBInstance = benchmark_spec.non_relational_db
@@ -141,11 +141,11 @@ def Prepare(benchmark_spec):
   if FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = FLAGS.ycsb_preload_threads
   # More WCU results in a faster load stage.
-  if instance.wcu < _INITIAL_WRITES.value and not instance.ShouldAutoscale():
+  if instance.wcu < _INITIAL_WRITES.value and not instance.IsServerless():
     instance.SetThroughput(wcu=_INITIAL_WRITES.value)
   benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs)
   # Reset the WCU to the initial level.
-  if not instance.ShouldAutoscale():
+  if not instance.IsServerless():
     instance.SetThroughput()
 
 

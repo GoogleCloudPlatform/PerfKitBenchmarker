@@ -25,11 +25,11 @@ needs a variable, it accesses it from the parameter server directly.
 import collections
 import posixpath
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
 from six.moves import range
@@ -298,7 +298,7 @@ def Prepare(benchmark_spec):
   """
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vms = benchmark_spec.vms
-  vm_util.RunThreaded(_PrepareVm, vms)
+  background_tasks.RunThreaded(_PrepareVm, vms)
   benchmark_spec.tensorflow_version = tensorflow.GetTensorFlowVersion(vms[0])
 
   if nvidia_driver.CheckNvidiaGpuExists(vms[0]):
@@ -533,7 +533,7 @@ def _RunModelOnVm(vm, model, batch_size, benchmark_spec, args='', job_name=''):
   tf_cnn_benchmark_dir = 'benchmarks/scripts/tf_cnn_benchmarks'
   run_command = 'cd {path} ; {cmd}'.format(path=tf_cnn_benchmark_dir,
                                            cmd=tf_cnn_benchmark_cmd)
-  output, _ = vm.RobustRemoteCommand(run_command, should_log=True)
+  output, _ = vm.RobustRemoteCommand(run_command)
   if job_name == 'ps':
     return _ExtractTfParameterServerPid(output)
   else:
@@ -603,7 +603,7 @@ def _RunDistributedTf(benchmark_spec):
                                                            index=task_index)
         args.append(((vm, model, batch_size, benchmark_spec, dist_worker_args,
                       'worker'), {}))
-      result = vm_util.RunThreaded(_RunModelOnVm, args)
+      result = background_tasks.RunThreaded(_RunModelOnVm, args)
       for ps_pid in ps_pids:
         ps_pid.vm.RemoteCommand('kill -9 %s' % ps_pid.pid)
       flattened_results.extend(vm_result for vm_result in result)
@@ -622,7 +622,7 @@ def _RunTf(benchmark_spec):
   """
   vms = benchmark_spec.vms
   args = [((vm, benchmark_spec), {}) for vm in vms]
-  run_results = vm_util.RunThreaded(_RunOnVm, args)
+  run_results = background_tasks.RunThreaded(_RunOnVm, args)
 
   # Add vm index to results metadata
   for idx, vm_result in enumerate(run_results):
