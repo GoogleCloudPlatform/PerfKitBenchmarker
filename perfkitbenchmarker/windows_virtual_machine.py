@@ -165,7 +165,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       # Spin on the VM until the "done" file is created. It is better to spin
       # on the VM rather than creating a new session for each test.
       done_out = ''
-      timeout = (
+      command_timeout = (
           None
           if timeout is None
           else timeout - (time.time() - start_command_time)
@@ -175,7 +175,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
             '$retries=0; while ((-not (Test-Path %s.done)) -and '
             '($retries -le 60)) { Start-Sleep -Seconds 1; $retries++ }; '
             'Test-Path %s.done' % (command_id, command_id),
-            timeout=timeout)
+            timeout=command_timeout)
 
     wait_for_done_file()
     stdout, _ = self.RemoteCommand('Get-Content %s.out' % (command_id,))
