@@ -184,7 +184,6 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.flags['network'] = self.vm_config.network.network_resource.name
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
-    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     cmd.args.append('--no-enable-shielded-nodes')
     self._IssueResourceCreationCommand(cmd)
 
@@ -213,6 +212,8 @@ class GkeCluster(container_service.KubernetesCluster):
   def _AddNodeParamsToCmd(
       self, vm_config, num_nodes, sandbox_config, name, cmd):
     """Modifies cmd to include node specific command arguments."""
+    # Apply labels to all nodepools.
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if vm_config.gpu_count:
       cmd.flags['accelerator'] = (
