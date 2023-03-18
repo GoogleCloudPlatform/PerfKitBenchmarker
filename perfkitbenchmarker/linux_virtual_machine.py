@@ -95,14 +95,14 @@ flags.DEFINE_bool('setup_remote_firewall', False,
 flags.DEFINE_list('sysctl', [],
                   'Sysctl values to set. This flag should be a comma-separated '
                   'list of path=value pairs. Each pair will be appended to'
-                  '/etc/sysctl.conf.  The presence of any items in this list '
-                  'will cause a reboot to occur after VM prepare. '
+                  '/etc/sysctl.conf.  '
                   'For example, if you pass '
                   '--sysctls=vm.dirty_background_ratio=10,vm.dirty_ratio=25, '
                   'PKB will append "vm.dirty_background_ratio=10" and'
-                  '"vm.dirty_ratio=25" on separate lines to /etc/sysctrl.conf'
-                  ' and then the machine will be rebooted before starting'
-                  'the benchmark.')
+                  '"vm.dirty_ratio=25" on separate lines to /etc/sysctrl.conf')
+
+flags.DEFINE_bool('reboot_after_changing_sysctl', False,
+                  'Whether PKB should reboot after applying sysctl changes')
 
 flags.DEFINE_list(
     'set_files',
@@ -119,8 +119,7 @@ flags.DEFINE_bool('network_enable_BBR', False,
                   'A shortcut to enable BBR congestion control on the network. '
                   'equivalent to appending to --sysctls the following values '
                   '"net.core.default_qdisc=fq, '
-                  '"net.ipv4.tcp_congestion_control=bbr" '
-                  'As with other sysctrls, will cause a reboot to happen.')
+                  '"net.ipv4.tcp_congestion_control=bbr" ')
 
 flags.DEFINE_integer('num_disable_cpus', None,
                      'Number of CPUs to disable on the virtual machine.'
@@ -655,10 +654,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
               out_file=out_file, fill_size=FLAGS.disk_fill_size))
 
   def _ApplySysctlPersistent(self, sysctl_params):
-    """Apply "key=value" pairs to /etc/sysctl.conf and mark the VM for reboot.
+    """Apply "key=value" pairs to /etc/sysctl.conf and load via sysctl -p.
 
-    The reboot ensures the values take effect and remain persistent across
-    future reboots.
+    These values should remain persistent across future reboots.
 
     Args:
       sysctl_params: dict - the keys and values to write
@@ -670,19 +668,21 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand('sudo bash -c \'echo "%s=%s" >> /etc/sysctl.conf\''
                          % (key, value))
 
-    self._needs_reboot = True
+    # See https://www.golinuxcloud.com/sysctl-reload-without-reboot/
+    self.RemoteCommand('sudo sysctl -p')
 
-  def ApplySysctlPersistent(self, sysctl_params):
-    """Apply "key=value" pairs to /etc/sysctl.conf and reboot immediately.
+  def ApplySysctlPersistent(self, sysctl_params, should_reboot=False):
+    """Apply "key=value" pairs to /etc/sysctl.conf and load via sysctl -p.
 
-    The reboot ensures the values take effect and remain persistent across
-    future reboots.
+    These values should remain persistent across future reboots.
 
     Args:
       sysctl_params: dict - the keys and values to write
+      should_reboot: bool - whether to reboot after applying sysctl changes
     """
     self._ApplySysctlPersistent(sysctl_params)
-    self._RebootIfNecessary()
+    if should_reboot or FLAGS.reboot_after_changing_sysctl:
+      self.Reboot()
 
   def DoSysctls(self):
     """Apply --sysctl to the VM.

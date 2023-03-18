@@ -144,7 +144,8 @@ class TestSysctl(pkb_common_test_case.PkbCommonTestCase):
         [mock.call('sudo bash -c \'echo "vm.dirty_background_ratio=10" >> '
                    '/etc/sysctl.conf\''),
          mock.call('sudo bash -c \'echo "vm.dirty_ratio=25" >> '
-                   '/etc/sysctl.conf\'')])
+                   '/etc/sysctl.conf\''),
+         mock.call('sudo sysctl -p')])
 
   def testNoSysctl(self):
     self.runTest([],

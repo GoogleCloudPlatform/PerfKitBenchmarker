@@ -358,3 +358,4 @@
 -   Fix how environment variable is set for direct path
 -   Fix incorrect string concatenation causing Snowflake Throughput runs to
     fail.
+-   Remove reboot after changing sysctl and load via sysctl -p instead.
