@@ -122,6 +122,8 @@
 -   Add iPerf interval reporting.
 -   Add support for DynamoDB on demand instances.
 -   Add support for Debian 10 & 11 with backported kernels on AWS.
+-   Add fio_netperf benchmark, which executes the run stages of fio and netperf
+    benchmarks in parallel using the first 2 VM's in benchmark_spec.
 
 ### Enhancements:
 

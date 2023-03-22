@@ -145,6 +145,11 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     for benchmark_module in linux_benchmarks.BENCHMARKS:
       self.valid_benchmark_names.add(benchmark_module.BENCHMARK_NAME)
 
+    for combo_benchmark in benchmark_sets.BENCHMARK_SETS[
+        benchmark_sets.COMBO_SET
+    ][benchmark_sets.BENCHMARK_LIST]:
+      self.valid_benchmark_names.add(combo_benchmark)
+
     self.valid_benchmark_set_names = set()
     # include the benchmark_set names since these can also appear
     # as a valid name.  At runtime they get expanded.
