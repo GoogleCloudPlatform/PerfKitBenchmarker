@@ -818,7 +818,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       if 'The service is currently unavailable' in stderr:
         raise errors.Benchmarks.KnownIntermittentError(stderr)
       raise errors.Resource.CreationError(
-          'Failed to create VM: %s return code: %s' % (stderr, retcode)
+          f'Failed to create VM {self.name}:\n{stderr}\nreturn code: {retcode}'
       )
 
   def _CreateDependencies(self):
