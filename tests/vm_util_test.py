@@ -150,6 +150,21 @@ class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
     _, _, retcode = vm_util.IssueCommand(['sleep', '0s'], timeout=None)
     self.assertEqual(retcode, 0)
 
+  def testLogsInfo(self):
+    with self.assertLogs(level='INFO') as logs:
+      vm_util.IssueCommand(['sleep', '0s'])
+    self.assertIn('Running: sleep 0s', logs.output[0])
+    self.assertIn('Ran: {sleep 0s}\nReturnCode:0', logs.output[1])
+
+  def testLogsSemicolonWarning(self):
+    with mock.patch('subprocess.Popen', spec=subprocess.Popen) as mock_popen:
+      with self.assertLogs(level='WARNING') as logs:
+        mock_popen.return_value.wait.return_value = ''
+        mock_popen.return_value.returncode = 0
+        # Throws invalid time interval ';' if run unmocked.
+        vm_util.IssueCommand(['sleep', '0s', ';', 'sleep', '0s'])
+    self.assertIn('Semicolon ; detected in command', logs.output[0])
+
   def testNoTimeout_ExceptionRaised(self):
     with mock.patch('subprocess.Popen', spec=subprocess.Popen) as mock_popen:
       mock_popen.return_value.wait.side_effect = KeyboardInterrupt()

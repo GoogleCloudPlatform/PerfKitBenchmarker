@@ -366,6 +366,15 @@ def IssueCommand(
   full_cmd = ' '.join(str(w) for w in cmd)
   if should_pre_log:
     logging.info('Running: %s', full_cmd, stacklevel=stack_level)
+  if '; ' in full_cmd:
+    logging.warning(
+        (
+            'Semicolon ; detected in command. Prefer && for better error '
+            'handling. Feel free to ignore if not using semicolon to split '
+            'commands. Full command: %s'
+        ),
+        full_cmd,
+    )
 
   time_file_path = '/usr/bin/time'
 
