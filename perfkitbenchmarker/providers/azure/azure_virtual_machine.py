@@ -548,7 +548,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
-    self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type) or 1
+    self.max_local_disks = self._GetMaxLocalDisk()
     self._lun_counter = itertools.count()
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
@@ -650,13 +650,21 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     create_cmd = (
         [
-            azure.AZURE_PATH, 'vm', 'create',
-            '--location', self.region,
-            '--image', self.image,
-            '--size', self.machine_type,
-            '--admin-username', self.user_name,
-            '--storage-sku', self.os_disk.disk_type,
-            '--name', self.name
+            azure.AZURE_PATH,
+            'vm',
+            'create',
+            '--location',
+            self.region,
+            '--image',
+            self.image,
+            '--size',
+            self.machine_type,
+            '--admin-username',
+            self.user_name,
+            '--storage-sku',
+            self.os_disk.disk_type,
+            '--name',
+            self.name,
         ]  # pyformat: disable
         + disk_size_args
         + self.resource_group.args
@@ -809,6 +817,17 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.internal_ip = self.nic.GetInternalIP()
     if self.public_ip:
       self.ip_address = self.public_ip.GetIPAddress()
+
+  def _GetMaxLocalDisk(self):
+    """Get the maximum local disk in this machine."""
+    max_local_disk = 1
+    if azure_disk.HasTempDrive(self.machine_type):
+      max_local_disk += 1
+    local_disk = NUM_LOCAL_VOLUMES.get(self.machine_type)
+    if local_disk:
+      max_local_disk += local_disk
+
+    return max_local_disk
 
   def CreateScratchDisk(self, _, disk_spec):
     """Create a VM's scratch disk.
