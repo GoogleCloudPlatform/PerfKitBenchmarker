@@ -104,6 +104,7 @@ cloud_bigtable_ycsb:
   flags:
     openjdk_version: 8
     gcloud_scopes: >
+      https://www.googleapis.com/auth/monitoring.write
       https://www.googleapis.com/auth/bigtable.admin
       https://www.googleapis.com/auth/bigtable.data"""
 
@@ -115,8 +116,10 @@ HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
 
 REQUIRED_SCOPES = (
+    'https://www.googleapis.com/auth/monitoring.write',
     'https://www.googleapis.com/auth/bigtable.admin',
-    'https://www.googleapis.com/auth/bigtable.data')
+    'https://www.googleapis.com/auth/bigtable.data',
+)
 
 # TODO(user): Make table parameters configurable.
 COLUMN_FAMILY = 'cf'
@@ -145,14 +148,22 @@ def CheckPrerequisites(benchmark_config: Dict[str, Any]) -> None:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
   del benchmark_config
-  for resource in HBASE_CONF_FILES:
-    data.ResourcePath(resource)
+  if not _USE_JAVA_VENEER_CLIENT.value:
+    # HBase prereqs
+    for resource in HBASE_CONF_FILES:
+      data.ResourcePath(resource)
+    hbase.CheckPrerequisites()
 
-  hbase.CheckPrerequisites()
   ycsb.CheckPrerequisites()
 
   for scope in REQUIRED_SCOPES:
     if scope not in FLAGS.gcloud_scopes:
+      if (
+          scope == 'https://www.googleapis.com/auth/monitoring.write'
+          and not _USE_JAVA_VENEER_CLIENT.value
+      ):
+        # Client side metrics are only required with the Veneer client.
+        continue
       raise ValueError('Scope {0} required.'.format(scope))
 
 
@@ -207,12 +218,7 @@ def _GetDefaultProject() -> str:
 def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
   """Install YCSB and CBT HBase client on 'vm'."""
   vm.Install('ycsb')
-  vm.Install('hbase')
   vm.Install('google_cloud_cbt')  # we use the CLI to create and delete tables
-  vm.Install('google_cloud_bigtable_client')
-
-  vm.RemoteCommand(
-      f'echo "export JAVA_HOME=/usr" >> {hbase.HBASE_CONF_DIR}/hbase-env.sh')
 
   if _ENABLE_TRAFFIC_DIRECTOR.value and _USE_JAVA_VENEER_CLIENT.value:
     vm.RemoteCommand(
@@ -224,23 +230,34 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
           'echo "export GRPC_EXPERIMENTAL_XDS_RLS_LB=true" | sudo tee -a'
           ' /etc/environment'
       )
-  context = {
-      'google_bigtable_endpoint': gcp_bigtable.ENDPOINT.value,
-      'google_bigtable_admin_endpoint': gcp_bigtable.ADMIN_ENDPOINT.value,
-      'project': FLAGS.project or _GetDefaultProject(),
-      'instance': bigtable.name,
-      'hbase_major_version': FLAGS.hbase_version.split('.')[0],
-      'channel_count': _CHANNEL_COUNT.value,
-  }
 
-  for file_name in HBASE_CONF_FILES:
-    file_path = data.ResourcePath(file_name)
-    remote_path = posixpath.join(hbase.HBASE_CONF_DIR,
-                                 os.path.basename(file_name))
-    if file_name.endswith('.j2'):
-      vm.RenderTemplate(file_path, os.path.splitext(remote_path)[0], context)
-    else:
-      vm.RemoteCopy(file_path, remote_path)
+  if not _USE_JAVA_VENEER_CLIENT.value:
+    # Install HBase deps and the HBase client.
+    vm.Install('hbase')
+    vm.Install('google_cloud_bigtable_client')
+
+    vm.RemoteCommand(
+        f'echo "export JAVA_HOME=/usr" >> {hbase.HBASE_CONF_DIR}/hbase-env.sh'
+    )
+
+    context = {
+        'google_bigtable_endpoint': gcp_bigtable.ENDPOINT.value,
+        'google_bigtable_admin_endpoint': gcp_bigtable.ADMIN_ENDPOINT.value,
+        'project': FLAGS.project or _GetDefaultProject(),
+        'instance': bigtable.name,
+        'hbase_major_version': FLAGS.hbase_version.split('.')[0],
+        'channel_count': _CHANNEL_COUNT.value,
+    }
+
+    for file_name in HBASE_CONF_FILES:
+      file_path = data.ResourcePath(file_name)
+      remote_path = posixpath.join(
+          hbase.HBASE_CONF_DIR, os.path.basename(file_name)
+      )
+      if file_name.endswith('.j2'):
+        vm.RenderTemplate(file_path, os.path.splitext(remote_path)[0], context)
+      else:
+        vm.RemoteCopy(file_path, remote_path)
 
 
 def _GetCpuUtilizationSample(samples: List[sample.Sample],
@@ -359,7 +376,6 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 def _GetYcsbExecutor(
     vms: list[virtual_machine.VirtualMachine]) -> ycsb.YCSBExecutor:
   """Gets the YCSB executor class for loading and running the benchmark."""
-  # Add hbase conf dir to the classpath.
   ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
   jvm_args = pipes.quote(f' -Xmx{ycsb_memory}m')
 
@@ -367,6 +383,7 @@ def _GetYcsbExecutor(
     executor_flags = {'jvm-args': jvm_args, 'table': _GetTableName()}
     return ycsb.YCSBExecutor('googlebigtable', **executor_flags)
 
+  # Add hbase conf dir to the classpath.
   executor_flags = {
       'cp': hbase.HBASE_CONF_DIR,
       'jvm-args': jvm_args,
@@ -390,10 +407,6 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
       'ycsb_client_vms': len(vms),
   }
   metadata.update(instance.GetResourceMetadata())
-  run_kwargs = {
-      'columnfamily': COLUMN_FAMILY,
-      'clientbuffering': 'false'}
-  load_kwargs = run_kwargs.copy()
 
   samples = []
   load_kwargs = _GenerateLoadKwargs(instance)
@@ -414,6 +427,27 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   return samples
 
 
+def _CommonArgs(instance: _Bigtable) -> Dict[str, str]:
+  """Generates args for both run/load for YCSB.
+
+  Args:
+    instance: The instance the test will be run against.
+
+  Returns:
+    Arguments dict for YCSB.
+  """
+
+  kwargs = {'columnfamily': COLUMN_FAMILY}
+  if _USE_JAVA_VENEER_CLIENT.value:
+    kwargs['google.bigtable.instance.id'] = instance.name
+    kwargs['google.bigtable.project.id'] = FLAGS.project or _GetDefaultProject()
+    kwargs['google.bigtable.data.endpoint'] = (
+        gcp_bigtable.ENDPOINT.value + ':443'
+    )
+
+  return kwargs
+
+
 def _GenerateRunKwargs(instance: _Bigtable) -> Dict[str, str]:
   """Generates run arguments for YCSB.
 
@@ -422,20 +456,14 @@ def _GenerateRunKwargs(instance: _Bigtable) -> Dict[str, str]:
   Returns:
     Run arguments for YCSB.
   """
+
+  run_kwargs = _CommonArgs(instance)
+
   # By default YCSB uses a BufferedMutator for Puts / Deletes.
   # This leads to incorrect update latencies, since since the call returns
   # before the request is acked by the server.
   # Disable this behavior during the benchmark run.
-  run_kwargs = {'columnfamily': COLUMN_FAMILY, 'clientbuffering': 'false'}
-  if _USE_JAVA_VENEER_CLIENT.value:
-    run_kwargs['google.bigtable.instance.id'] = instance.name
-    run_kwargs['google.bigtable.project.id'] = (
-        FLAGS.project or _GetDefaultProject()
-    )
-    run_kwargs['columnfamily'] = COLUMN_FAMILY
-    run_kwargs['google.bigtable.data.endpoint'] = (
-        gcp_bigtable.ENDPOINT.value + ':443'
-    )
+  run_kwargs['clientbuffering'] = 'false'
 
   return run_kwargs
 
@@ -448,25 +476,14 @@ def _GenerateLoadKwargs(instance: _Bigtable) -> Dict[str, str]:
   Returns:
     Load arguments for YCSB.
   """
-  # By default YCSB uses a BufferedMutator for Puts / Deletes.
-  # This leads to incorrect update latencies, since since the call returns
-  # before the request is acked by the server.
-  # Disable this behavior during the benchmark run.
-  load_kwargs = {'columnfamily': COLUMN_FAMILY, 'clientbuffering': 'false'}
+
+  load_kwargs = _CommonArgs(instance)
+
   # During the load stage, use a buffered mutator with a single thread.
   # The BufferedMutator will handle multiplexing RPCs.
   load_kwargs['clientbuffering'] = 'true'
   if not FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = '1'
-  if _USE_JAVA_VENEER_CLIENT.value:
-    load_kwargs['google.bigtable.instance.id'] = instance.name
-    load_kwargs['google.bigtable.project.id'] = (
-        FLAGS.project or _GetDefaultProject()
-    )
-    load_kwargs['columnfamily'] = COLUMN_FAMILY
-    load_kwargs['google.bigtable.data.endpoint'] = (
-        gcp_bigtable.ENDPOINT.value + ':443'
-    )
 
   return load_kwargs
 

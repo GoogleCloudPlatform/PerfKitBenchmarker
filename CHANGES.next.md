@@ -361,3 +361,8 @@
 -   Fix incorrect string concatenation causing Snowflake Throughput runs to
     fail.
 -   Remove reboot after changing sysctl and load via sysctl -p instead.
+-   Clean up settings related to the Cloud Bigtable Veneer client.
+-   Don't install HBase dependencies when using the Cloud Bigtable Veneer
+    client.
+-   Require monitoring.write scope for client side metrics when using the Cloud
+    Bigtable veneer client.
