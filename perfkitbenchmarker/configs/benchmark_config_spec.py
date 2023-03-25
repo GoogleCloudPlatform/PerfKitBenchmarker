@@ -1720,7 +1720,13 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'key': (_KeyDecoder, {
             'default': None,
             'none_ok': True,
-        })
+        }),
+        # A place to hold temporary data
+        'temporary': (option_decoders.TypeVerifier, {
+            'default': None,
+            'none_ok': True,
+            'valid_types': (dict,)
+        }),
     })
     return result
 

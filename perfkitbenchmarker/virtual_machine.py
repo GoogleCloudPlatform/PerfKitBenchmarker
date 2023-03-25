@@ -116,6 +116,15 @@ _ASSIGN_EXTERNAL_IP = flags.DEFINE_boolean(
     True,
     'If True, an external (public) IP will be created for VMs. '
     'If False, --connect_via_internal_ip may also be needed.')
+flags.DEFINE_string(
+    'boot_startup_script',
+    None,
+    (
+        'Startup script to run during boot. '
+        'Requires provider support, only implemented for Linux VMs '
+        'on GCP, AWS, Azure for now.'
+    ),
+)
 
 
 @enum.unique
@@ -209,6 +218,7 @@ class BaseVmSpec(spec.BaseSpec):
         EXTERNAL) to use for generating background network workload.
     disable_interrupt_moderation: If true, disables interrupt moderation.
     disable_rss: = If true, disables rss.
+    boot_startup_script: Startup script to run during boot.
     vm_metadata: = Additional metadata for the VM.
   """
 
@@ -230,6 +240,7 @@ class BaseVmSpec(spec.BaseSpec):
     self.disable_interrupt_moderation = None
     self.disable_rss = None
     self.vm_metadata: Dict[str, Any] = None
+    self.boot_startup_script: str = None
     super(BaseVmSpec, self).__init__(*args, **kwargs)
 
   @classmethod
@@ -281,6 +292,8 @@ class BaseVmSpec(spec.BaseSpec):
       config_values['disable_rss'] = flag_values.disable_rss
     if flag_values['vm_metadata'].present:
       config_values['vm_metadata'] = flag_values.vm_metadata
+    if flag_values['boot_startup_script'].present:
+      config_values['boot_startup_script'] = flag_values.boot_startup_script
 
     if 'gpu_count' in config_values and 'gpu_type' not in config_values:
       raise errors.Config.MissingOption(
@@ -334,6 +347,8 @@ class BaseVmSpec(spec.BaseSpec):
             'valid_values': [vm_util.IpAddressSubset.EXTERNAL,
                              vm_util.IpAddressSubset.INTERNAL]}),
         'background_cpu_threads': (option_decoders.IntDecoder, {
+            'none_ok': True, 'default': None}),
+        'boot_startup_script': (option_decoders.StringDecoder, {
             'none_ok': True, 'default': None}),
         'vm_metadata': (option_decoders.ListDecoder, {
             'item_decoder': option_decoders.StringDecoder(),
@@ -1188,6 +1203,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.create_operation_name = None
     self.create_return_time = None
     self.is_running_time = None
+    self.boot_startup_script = vm_spec.boot_startup_script
 
   @property
   @classmethod

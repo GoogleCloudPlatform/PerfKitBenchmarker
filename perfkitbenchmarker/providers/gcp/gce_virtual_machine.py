@@ -469,6 +469,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     super(GceVirtualMachine, self).__init__(vm_spec)
     self.boot_metadata = {}
+    self.boot_metadata_from_file = {}
+    if self.boot_startup_script:
+      self.boot_metadata_from_file['startup-script'] = self.boot_startup_script
     self.ssd_interface = vm_spec.ssd_interface
     self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
@@ -649,6 +652,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       )
 
     metadata_from_file = {'sshKeys': ssh_keys_path}
+    if self.boot_metadata_from_file:
+      metadata_from_file.update(self.boot_metadata_from_file)
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
         FLAGS.gcp_instance_metadata_from_file
     )
