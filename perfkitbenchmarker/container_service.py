@@ -828,15 +828,21 @@ class KubernetesCluster(BaseContainerCluster):
       rendered_template.close()
       RunKubectlCommand(['apply', '-f', rendered_template.name])
 
-  def WaitForResource(self, resource_name, condition_name, namespace=None):
+  def WaitForResource(
+      self,
+      resource_name,
+      condition_name,
+      namespace=None,
+      timeout=vm_util.DEFAULT_TIMEOUT,
+  ):
     """Waits for a condition on a Kubernetes resource (eg: deployment, pod)."""
     run_cmd = [
         'wait', f'--for=condition={condition_name}',
-        f'--timeout={vm_util.DEFAULT_TIMEOUT}s', resource_name
+        f'--timeout={timeout}s', resource_name
     ]
     if namespace:
       run_cmd.append(f'--namespace={namespace}')
-    RunKubectlCommand(run_cmd)
+    RunKubectlCommand(run_cmd, timeout=timeout + 10)
 
   def WaitForRollout(self, resource_name):
     """Blocks until a Kubernetes rollout is completed."""
