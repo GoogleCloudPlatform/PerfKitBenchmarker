@@ -1666,9 +1666,10 @@ def _CreateGccSamples(vms):
         'versioninfo': build_tools.GetVersionInfo(vm, 'gcc')
     }
 
+  linux_vms = [vm for vm in vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES]
   return [
       sample.Sample('gcc_version', 0, '', metadata)
-      for metadata in background_tasks.RunThreaded(_GetGccMetadata, vms)
+      for metadata in background_tasks.RunThreaded(_GetGccMetadata, linux_vms)
   ]
 
 
@@ -1687,9 +1688,10 @@ def _CreateGlibcSamples(vms):
         'versioninfo': _GetGlibcVersionInfo(vm)
     }
 
+  linux_vms = [vm for vm in vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES]
   return [
       sample.Sample('glibc_version', 0, '', metadata)
-      for metadata in background_tasks.RunThreaded(_GetGlibcMetadata, vms)
+      for metadata in background_tasks.RunThreaded(_GetGlibcMetadata, linux_vms)
   ]
 
 
