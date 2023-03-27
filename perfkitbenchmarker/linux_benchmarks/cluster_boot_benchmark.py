@@ -11,7 +11,54 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Records the time required to boot a cluster of VMs."""
+"""Records the time required to boot a cluster of VMs.
+
+  This benchmark collects several provisioning time metrics, some of which are
+  conditional based on the type of VMs that the benchmark is being run on.
+
+  The metrics that are recorded are captured along the following timeline
+  and under the following conditions:
+
+  create_start_time recorded: this is the time that all metrics are measured
+    against. Every metric mentioned below involves capturing a timestamp and
+    calculating the difference between it and create_start_time.
+  create command invoked: cloud-specific VM instance create command is invoked
+    immediately following the recording of create_start_time. Some clouds
+    invoke a synchronous command, where the command waits until the instance
+    is created before returning to PKB. Meanwhile, other clouds invoke
+    their create command asynchronously, where the command returns to PKB
+    immediately and instance creation is verified through a separate process.
+
+  The metrics and steps below apply only to asynchronous creates:
+  - Metric: time-to-create-async-return
+    create_async_return_time recorded:
+      The timestamp is captured immediately after an asynchronous create command
+      returns to PKB.
+  - VM describe polling process:
+      After the asynchronous create returns, the instance is polled via the use
+      of a cloud-specific 'describe' command. The command runs in 1 second
+      intervals and has its output parsed to see when the VM enters the
+      cloud-specific 'running' state.
+  - Metric: time-to-running
+    is_running_time recorded:
+      This timestamp is captured once the polling process above determines that
+      the VM is running.
+  Network reachability polling process:
+    PKB uses a retryable WaitForSSH function that invokes a command to determine
+    whether or not the VM is ready to respond to SSH commands.
+  Metric: time-to-ssh-internal
+    ssh_internal_time recorded:
+      This timestamp is captured once the VM responds to the network
+      reachability polling command via its internal IP address.
+  Metric: time-to-ssh-external
+    ssh_external_time recorded:
+      This timestamp is captured once the VM responds to the network
+      reachability polling command via its public IP address.
+  Metric: cluster-boot-time
+    bootable_time recorded:
+      This timestamp is captured once all times are captured. The maximum
+      vm.bootable_time in a cluster of VMs is reported as the cluster boot time.
+"""
 
 import logging
 import time
@@ -81,6 +128,13 @@ def Prepare(unused_benchmark_spec):
 def GetTimeToBoot(vms):
   """Creates Samples for the boot time of a list of VMs.
 
+  The time to create async return is the time difference from before the VM is
+  created to when the asynchronous create call returns.
+
+  The time to running is the time difference from before the VM is created to
+  when the VM is in the 'running' state as determined by the response to a
+  'describe' command.
+
   The boot time is the time difference from before the VM is created to when
   the VM is responsive to SSH commands.
 
@@ -88,23 +142,28 @@ def GetTimeToBoot(vms):
     vms: List of BaseVirtualMachine subclasses.
 
   Returns:
-    List of Samples containing the boot times and an overall cluster boot time.
+    List of Samples containing each of the provisioning metrics listed above,
+    along with an overall cluster boot time.
   """
   if not vms:
     return []
 
+  # Time that metrics are measured against.
   min_create_start_time = min(vm.create_start_time for vm in vms)
 
+  # Vars used to store max values for whole-cluster boot metrics.
   max_create_delay_sec = 0
   max_boot_time_sec = 0
   max_port_listening_time_sec = 0
   max_rdp_port_listening_time_sec = 0
+
   samples = []
   os_types = set()
   for i, vm in enumerate(vms):
-    assert vm.bootable_time
     assert vm.create_start_time
+    assert vm.bootable_time
     assert vm.bootable_time >= vm.create_start_time
+
     os_types.add(vm.OS_TYPE)
     create_delay_sec = vm.create_start_time - min_create_start_time
     max_create_delay_sec = max(max_create_delay_sec, create_delay_sec)
@@ -114,6 +173,22 @@ def GetTimeToBoot(vms):
         'os_type': vm.OS_TYPE,
         'create_delay_sec': '%0.1f' % create_delay_sec
     }
+
+    # TIME TO CREATE ASYNC RETURN
+    if vm.create_return_time:
+      time_to_create_sec = vm.create_return_time - min_create_start_time
+      samples.append(
+          sample.Sample('Time to Create Async Return', time_to_create_sec,
+                        'seconds', metadata))
+
+    # TIME TO RUNNING
+    if vm.is_running_time:
+      time_to_running_sec = vm.is_running_time - vm.create_start_time
+      samples.append(
+          sample.Sample('Time to Running', time_to_running_sec, 'seconds',
+                        metadata))
+
+    # TIME TO SSH
     boot_time_sec = vm.bootable_time - min_create_start_time
     if isinstance(vm, linux_virtual_machine.BaseLinuxMixin):
       # TODO(pclay): Remove when Windows refactor below is complete.
@@ -128,6 +203,7 @@ def GetTimeToBoot(vms):
                           vm.ssh_internal_time - min_create_start_time,
                           'seconds', metadata))
 
+    # TIME TO PORT LISTENING
     max_boot_time_sec = max(max_boot_time_sec, boot_time_sec)
     samples.append(
         sample.Sample('Boot Time', boot_time_sec, 'seconds', metadata))
@@ -140,6 +216,8 @@ def GetTimeToBoot(vms):
       samples.append(
           sample.Sample('Port Listening Time', port_listening_time_sec,
                         'seconds', metadata))
+
+    # TIME TO RDP LISTENING
     # TODO(pclay): refactor so Windows specifics aren't in linux_benchmarks
     if FLAGS.cluster_boot_test_rdp_port_listening:
       assert vm.rdp_port_listening_time

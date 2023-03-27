@@ -1137,6 +1137,8 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     background_network_ip_type: Type of IP address to use for generating
       background network workload
     vm_group: The VM group this VM is associated with, if applicable.
+    create_return_time: The time at which a VM's create command returns.
+    is_running_time: The time at which the VM entered the running state.
   """
 
   is_static = False
@@ -1199,6 +1201,8 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.vm_group = None
     self.id = None
     self.is_aarch64 = False
+    self.create_return_time = None
+    self.is_running_time = None
 
   @property
   @classmethod

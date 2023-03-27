@@ -217,6 +217,15 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     """
     raise NotImplementedError()
 
+  def _WaitUntilRunning(self):
+    """Waits until the resource is (or was) running.
+
+    Supplying this method is optional. Use it when a resource is created using
+    an asynchronous create command and its status is verified as running via
+    repeatedly polling the resource with 'describe' commands.
+    """
+    pass
+
   def _IsReady(self):
     """Return true if the underlying resource is ready.
 
@@ -294,6 +303,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
             'Creation of %s failed.' % type(self).__name__)
     except NotImplementedError:
       pass
+    self._WaitUntilRunning()
     self.created = True
     self.create_end_time = time.time()
 
