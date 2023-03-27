@@ -1,0 +1,13 @@
+{
+    "EndpointGroup": {
+        "EndpointGroupArn": "arn:aws:globalaccelerator::320929487545:accelerator/6f7f1af6-75b4-4b18-8317-47f47506730d/listener/74c6a423/endpoint-group/c4d0f12e7002",
+        "EndpointGroupRegion": "us-east-1",
+        "EndpointDescriptions": [],
+        "TrafficDialPercentage": 100.0,
+        "HealthCheckPort": 10,
+        "HealthCheckProtocol": "TCP",
+        "HealthCheckIntervalSeconds": 30,
+        "ThresholdCount": 3
+    }
+}
+

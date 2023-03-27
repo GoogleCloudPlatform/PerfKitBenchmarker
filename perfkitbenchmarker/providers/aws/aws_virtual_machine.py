@@ -43,6 +43,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker.providers.aws import aws_elastic_ip
 from six.moves import range
 
 
@@ -561,7 +562,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             if self.placement_group else 0,
         'aws_credit_specification':
             FLAGS.aws_credit_specification
-            if FLAGS.aws_credit_specification else 'none'
+            if FLAGS.aws_credit_specification else 'none',
+        'aws_global_accelerator': 
+            FLAGS.aws_global_accelerator
     })
     self.spot_early_termination = False
     self.spot_status_code = None
@@ -582,8 +585,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.use_dedicated_host and self.use_spot_instance:
       raise ValueError(
           'Tenancy=host is not supported for Spot Instances')
-    self.allocation_id = None
-    self.association_id = None
+    self.elastic_ip = None
     self.aws_tags = {}
     # this maps the deterministic order
     # of this device in the VM's disk_spec to the device name
@@ -729,6 +731,20 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.LogDeviceByName(device_name, volume_id, device_name)
         util.AddDefaultTags(volume_id, self.region)
 
+    if FLAGS.aws_global_accelerator:
+      # Associate elastic IPs
+      logging.warn("adding global acclerator stuff here")
+      self.network.elastic_ip.AssociateAddress(self.id)
+      self.ip_address = self.network.elastic_ip.public_ip
+      logging.warning(self.network.global_accelerator.Status())
+      status = self.network.global_accelerator.Status()
+      while(status == 'In Progress'):
+        status = self.network.global_accelerator.Status()
+        logging.warning(status)
+
+      self.ip_address = self.network.global_accelerator.ip_addresses[0]
+
+  
   def _ConfigureEfa(self, instance):
     """Configuare EFA and associate Elastic IP.
 
@@ -764,23 +780,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         break
     assert network_interface_id is not None
 
-    stdout, _, _ = vm_util.IssueCommand(util.AWS_PREFIX +
-                                        ['ec2', 'allocate-address',
-                                         f'--region={self.region}',
-                                         '--domain=vpc'])
-    response = json.loads(stdout)
-    self.ip_address = response['PublicIp']
-    self.allocation_id = response['AllocationId']
-
-    util.AddDefaultTags(self.allocation_id, self.region)
-
-    stdout, _, _ = vm_util.IssueCommand(
-        util.AWS_PREFIX + ['ec2', 'associate-address',
-                           f'--region={self.region}',
-                           f'--allocation-id={self.allocation_id}',
-                           f'--network-interface-id={network_interface_id}'])
-    response = json.loads(stdout)
-    self.association_id = response['AssociationId']
+    self.elastic_ip = aws_elastic_ip.AwsElasticIP(self.region, domain='vpc')
+    self.elastic_ip.Create()
+    self.ip_address = self.elastic_ip.public_ip
+    util.AddDefaultTags(self.elastic_ip.allocation_id, self.region)
+    self.elastic_ip.AssociateAddress(network_interface_id, 
+                                     is_network_interface=True)
 
   def _InstallEfa(self):
     """Installs AWS EFA packages.
@@ -1085,17 +1090,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
     if FLAGS.aws_efa:
-      if self.association_id:
-        vm_util.IssueCommand(util.AWS_PREFIX +
-                             ['ec2', 'disassociate-address',
-                              f'--region={self.region}',
-                              f'--association-id={self.association_id}'])
-
-      if self.allocation_id:
-        vm_util.IssueCommand(util.AWS_PREFIX +
-                             ['ec2', 'release-address',
-                              f'--region={self.region}',
-                              f'--allocation-id={self.allocation_id}'])
+      if self.elastic_ip:
+        self.elastic_ip.DisassociateAddress()
+        self.elastic_ip.Delete()
 
   #  _Start or _Stop not yet implemented for AWS
   def _Start(self):

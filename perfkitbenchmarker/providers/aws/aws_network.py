@@ -24,6 +24,7 @@ for more information about AWS Virtual Private Clouds.
 import json
 import logging
 import threading
+import string
 
 from absl import flags
 from perfkitbenchmarker import context
@@ -35,6 +36,8 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_placement_group
 from perfkitbenchmarker.providers.aws import aws_vpc_endpoint
+from perfkitbenchmarker.providers.aws import aws_elastic_ip
+from perfkitbenchmarker.providers.aws import aws_global_accelerator
 from perfkitbenchmarker.providers.aws import util
 
 _AWS_VPC = flags.DEFINE_string(
@@ -878,6 +881,12 @@ class AwsNetwork(network.BaseNetwork):
           spec.vpc_id,
           cidr_block=self.regional_network.cidr_block,
           subnet_id=spec.subnet_id)
+    self.elastic_ip = None
+    self.global_accelerator = None
+    if FLAGS.aws_global_accelerator:
+      logging.warn("using aws global accelerator")
+      self.elastic_ip = aws_elastic_ip.AwsElasticIP(self.region)
+      self.global_accelerator = aws_global_accelerator.AwsGlobalAccelerator()
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
@@ -901,9 +910,21 @@ class AwsNetwork(network.BaseNetwork):
       self.subnet.Create()
     if self.placement_group:
       self.placement_group.Create()
+    if FLAGS.aws_global_accelerator:
+      logging.warn("using aws global accelerator")
+      self.elastic_ip.Create()
+      self.global_accelerator.Create()
+      self.global_accelerator.AddListener('TCP', '10', '60000')
+      self.global_accelerator.listeners[-1].AddEndpointGroup(
+                                            self.region,
+                                            self.elastic_ip.allocation_id, 128)
+    print("back in aws_network create")
 
   def Delete(self):
     """Deletes the network."""
+    if FLAGS.aws_global_accelerator:
+      self.global_accelerator.Delete()
+      self.elastic_ip.Delete()
     if self.subnet:
       self.subnet.Delete()
     if self.placement_group:
