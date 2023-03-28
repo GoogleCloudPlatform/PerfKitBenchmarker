@@ -665,17 +665,20 @@ Note: Amazon ElasticSearch service currently does not support transport on port
 # Using InfluxDB Publisher
 
 No additional packages need to be installed in order to publish Perfkit data to
-an InfluxDB server.
+an InfluxDB server. The [influxdb](https://github.com/influxdata/influxdb-python) library is used,
+and thus versions 1.x are supported only.
 
 InfluxDB Publisher takes in the flags for the Influx uri and the Influx DB name.
 The publisher will default to the pre-set defaults, identified below, if no uri
 or DB name is set. However, the user is required to at the very least call the
 `--influx_uri` flag to publish data to Influx.
 
-| Flag               | Notes                                                                | Default        |
-|--------------------|----------------------------------------------------------------------|----------------|
-| `--influx_uri`     | The Influx DB address and port. Expects the format hostname:port     | localhost:8086 |
-| `--influx_db_name` | The name of Influx DB database that you wish to publish to or create | perfkit        |
+| Flag                | Notes                                                                | Default        |
+|---------------------|----------------------------------------------------------------------|----------------|
+| `--influx_uri`      | The Influx DB address and port. Expects the format hostname:port     | localhost:8086 |
+| `--influx_db_name`  | The name of Influx DB database that you wish to publish to or create | perfkit        |
+| `--influx_username` | Basic auth username. Requires influx_password to be specified.       | None           |
+| `--influx_password` | Basic auth password. Requires influx_username to be specified.       | None           |
 
 # How to Extend PerfKit Benchmarker
 

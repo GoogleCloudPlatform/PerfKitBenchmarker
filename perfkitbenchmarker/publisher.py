@@ -41,6 +41,7 @@ from perfkitbenchmarker import log_util
 from perfkitbenchmarker import sample as pkb_sample
 from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
+from influxdb import InfluxDBClient
 import pytz
 import six
 from six.moves import urllib
@@ -140,6 +141,14 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'influx_db_name', 'perfkit',
     'Name of Influx DB database that you wish to publish to or create')
+
+flags.DEFINE_string(
+    'influx_username', 'perfkit',
+    'Username for influxdb using basic auth')
+
+flags.DEFINE_string(
+    'influx_password', 'perfkit',
+    'Password for influxdb using basic auth')
 
 flags.DEFINE_boolean(
     'record_log_publisher', True,
@@ -813,98 +822,93 @@ class InfluxDBPublisher(SamplePublisher):
     influx_db_name: Takes in tupe string.
       Consists of the name of Influx DB database that you wish to publish to or
       create.
+    influx_username: Basic auth username. Requires influx_password to be specified.
+    influx_password: Basic auth password. Requires influx_username to be specified.
   """
 
-  def __init__(self, influx_uri=None, influx_db_name=None):
+  def __init__(self, influx_uri=None, influx_db_name=None, influx_username=None, influx_password=None):
     super().__init__()
     # set to default above in flags unless changed
     self.influx_uri = influx_uri
     self.influx_db_name = influx_db_name
+    self.influx_username = influx_username
+    self.influx_password = influx_password
 
   def PublishSamples(self, samples):
-    formated_samples = []
+    formatted_samples = []
     for sample in samples:
-      formated_samples.append(self._ConstructSample(sample))
-    self._Publish(formated_samples)
+      formatted_samples.append(self._ConstructSample(sample))
+    self._Publish(formatted_samples)
 
-  def _Publish(self, formated_samples):
+  def _ParseHost(self, s, default_port=None):
+    if s[-1] == ']':
+        # ipv6 literal (with no port)
+        return (s, default_port)
+
+    out = s.rsplit(":", 1)
+    if len(out) == 1:
+        # No port
+        port = default_port
+    else:
+        try:
+            port = int(out[1])
+        except ValueError:
+            raise ValueError("Invalid host:port '%s'" % s)
+
+    return (out[0], port)
+
+  def _Publish(self, formatted_samples):
     try:
-      self._CreateDB()
-      body = '\n'.join(formated_samples)
-      self._WriteData(body)
-    except (IOError, httplib.HTTPException) as http_exception:
-      logging.error('Error connecting to the database:  %s', http_exception)
+      h, p = self._ParseHost(self.influx_uri, 8086)
+    except Exception as e:
+      logging.error('Could not parse influxdb host/port: %s', str(e))
+      raise
+
+    if self.influx_username and self.influx_password:
+      client = InfluxDBClient(host=h, port=p, username=self.influx_username, password=self.influx_password)
+    else:
+      client = InfluxDBClient(host=h, port=p)
+
+    dbs = client.get_list_database()
+    if self.influx_db_name in [x['name'] for x in dbs]:
+      logging.debug('DB %s already exists', self.influx_db_name)
+    else:
+      try:
+        client.create_database(self.influx_db_name)
+      except Exception as e:
+        logging.error('Influxdb create database request could not be completed due to: %s', str(e))
+        raise
+
+      logging.debug('Success! %s DB Created', self.influx_db_name)
+
+    try:
+      client.write_points(formatted_samples, database=self.influx_db_name)
+    except Exception as e:
+      logging.error('Influxdb write data request could not be completed due to: %s', str(e))
+      raise
+
+    logging.debug('Success! Data written to influx db %s', self.influx_db_name)
 
   def _ConstructSample(self, sample):
     sample['product_name'] = FLAGS.product_name
-    timestamp = str(int((10 ** 9) * sample['timestamp']))
     measurement = 'perfkitbenchmarker'
 
-    tag_set_metadata = ''
-    if 'metadata' in sample:
-      if sample['metadata']:
-        tag_set_metadata = ','.join(self._FormatToKeyValue(sample['metadata']))
     tag_keys = ('test', 'official', 'owner', 'run_uri', 'sample_uri',
                 'metric', 'unit', 'product_name')
     ordered_tags = collections.OrderedDict([(k, sample[k]) for k in tag_keys])
-    tag_set = ','.join(self._FormatToKeyValue(ordered_tags))
-    if tag_set_metadata:
-      tag_set += ',' + tag_set_metadata
+    if 'metadata' in sample:
+      if sample['metadata']:
+        ordered_tags.update(sample['metadata'])
 
-    field_set = '%s=%s' % ('value', sample['value'])
-
-    sample_constructed_body = '%s,%s %s %s' % (measurement, tag_set,
-                                               field_set, timestamp)
+    sample_constructed_body = {
+      "measurement": measurement,
+      "tags": ordered_tags,
+      "time": datetime.datetime.fromtimestamp(sample['timestamp']),
+      "fields": {
+        "value": sample['value']
+      }
+    }
     return sample_constructed_body
-
-  def _FormatToKeyValue(self, sample):
-    key_value_pairs = []
-    for k, v in six.iteritems(sample):
-      if v == '':
-        v = '\\"\\"'
-      v = str(v)
-      v = v.replace(',', '\,')
-      v = v.replace(' ', '\ ')
-      key_value_pairs.append('%s=%s' % (k, v))
-    return key_value_pairs
-
-  def _CreateDB(self):
-    """Creates a database.
-
-    This method is idempotent. If the DB already exists it will simply
-    return a 200 code without re-creating it.
-    """
-    successful_http_request_codes = [200, 202, 204]
-    header = {'Content-type': 'application/x-www-form-urlencoded',
-              'Accept': 'text/plain'}
-    params = urllib.parse.urlencode(
-        {'q': 'CREATE DATABASE ' + self.influx_db_name})
-    conn = httplib.HTTPConnection(self.influx_uri)
-    conn.request('POST', '/query?' + params, headers=header)
-    response = conn.getresponse()
-    conn.close()
-    if response.status in successful_http_request_codes:
-      logging.debug('Success! %s DB Created', self.influx_db_name)
-    else:
-      logging.error('%d Request could not be completed due to: %s',
-                    response.status, response.reason)
-      raise httplib.HTTPException
-
-  def _WriteData(self, data):
-    successful_http_request_codes = [200, 202, 204]
-    params = data
-    header = {'Content-type': 'application/octet-stream'}
-    conn = httplib.HTTPConnection(self.influx_uri)
-    conn.request('POST', '/write?' + 'db=' + self.influx_db_name, params,
-                 headers=header)
-    response = conn.getresponse()
-    conn.close()
-    if response.status in successful_http_request_codes:
-      logging.debug('Writing samples to publisher: writing samples.')
-    else:
-      logging.error('%d Request could not be completed due to: %s %s',
-                    response.status, response.reason, data)
-      raise httplib.HTTPException
 
 
 class SampleCollector(object):
@@ -1003,7 +1007,9 @@ class SampleCollector(object):
                                                es_type=FLAGS.es_type))
     if FLAGS.influx_uri:
       publishers.append(InfluxDBPublisher(influx_uri=FLAGS.influx_uri,
-                                          influx_db_name=FLAGS.influx_db_name))
+                                          influx_db_name=FLAGS.influx_db_name,
+                                          influx_username=FLAGS.influx_username,
+                                          influx_password=FLAGS.influx_password))
 
     return publishers
 
