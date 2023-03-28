@@ -53,7 +53,7 @@ def CheckPrerequisites(benchmark_config):
   Args:
     benchmark_config: benchmark_config
   """
-  _GetManagedMemoryStoreClass().CheckPrerequisites(benchmark_config)
+  _GetManagedMemoryStoreClass().CheckPrerequisites(benchmark_config)  # pytype: disable=attribute-error
 
 
 def _GetManagedMemoryStoreClass():
