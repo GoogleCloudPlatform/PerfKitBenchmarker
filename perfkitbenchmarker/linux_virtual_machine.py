@@ -198,6 +198,10 @@ flags.DEFINE_bool(
 _DISABLE_YUM_CRON = flags.DEFINE_boolean(
     'disable_yum_cron', True, 'Whether to disable the cron-run yum service.')
 
+# RHEL package managers
+YUM = 'yum'
+DNF = 'dnf'
+
 RETRYABLE_SSH_RETCODE = 255
 
 
@@ -1846,6 +1850,13 @@ class BaseContainerLinuxMixin(BaseLinuxMixin):
 class BaseRhelMixin(BaseLinuxMixin):
   """Class holding RHEL/CentOS specific VM methods and attributes."""
 
+  # In all RHEL 8+ based distros yum is an alias to dnf.
+  # dnf is backwards compatibile with yum, but has some additional capabilities
+  # For CentOS and RHEL 7 we override this to yum and do not pass dnf-only flags
+  # The commands are similar enough that forking whole methods seemed necessary.
+  # This can be removed when CentOS and RHEL 7 are no longer supported by PKB.
+  PACKAGE_MANAGER = DNF
+
   # OS_TYPE = os_types.RHEL
   BASE_OS_TYPE = os_types.RHEL
 
@@ -1857,10 +1868,14 @@ class BaseRhelMixin(BaseLinuxMixin):
                            login_shell=True)
     if FLAGS.gce_hpc_tools:
       self.InstallGcpHpcTools()
+    # yum cron can stall causing yum commands to hang
     if _DISABLE_YUM_CRON.value:
-      # yum cron can stall causing yum commands to hang
-      self.RemoteHostCommand('sudo systemctl disable yum-cron.service',
-                             ignore_failure=True)
+      if self.PACKAGE_MANAGER == YUM:
+        self.RemoteHostCommand('sudo systemctl disable yum-cron.service',
+                               ignore_failure=True)
+      elif self.PACKAGE_MANAGER == DNF:
+        self.RemoteHostCommand('sudo systemctl disable dnf-automatic.timer',
+                               ignore_failure=True)
 
   def InstallGcpHpcTools(self):
     """Installs the GCP HPC tools."""
@@ -1890,19 +1905,25 @@ class BaseRhelMixin(BaseLinuxMixin):
 
   def HasPackage(self, package):
     """Returns True iff the package is available for installation."""
-    return self.TryRemoteCommand('sudo yum info %s' % package)
+    return self.TryRemoteCommand(f'sudo {self.PACKAGE_MANAGER} info {package}')
 
   # yum talks to the network on each request so transient issues may fix
   # themselves on retry
   @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def InstallPackages(self, packages):
-    """Installs packages using the yum package manager."""
-    self.RemoteCommand('sudo yum install -y %s' % packages)
+    """Installs packages using the yum or dnf package managers."""
+    cmd = f'sudo {self.PACKAGE_MANAGER} install -y {packages}'
+    if self.PACKAGE_MANAGER == DNF:
+      cmd += ' --allowerasing'
+    self.RemoteCommand(cmd)
 
-  @vm_util.Retry()
+  @vm_util.Retry(max_retries=UPDATE_RETRIES)
   def InstallPackageGroup(self, package_group):
     """Installs a 'package group' using the yum package manager."""
-    self.RemoteCommand('sudo yum groupinstall -y "%s"' % package_group)
+    cmd = f'sudo {self.PACKAGE_MANAGER} groupinstall -y "{package_group}"'
+    if self.PACKAGE_MANAGER == DNF:
+      cmd += ' --allowerasing'
+    self.RemoteCommand(cmd)
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
@@ -1950,7 +1971,10 @@ class BaseRhelMixin(BaseLinuxMixin):
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
     super(BaseRhelMixin, self).SetupProxy()
-    yum_proxy_file = '/etc/yum.conf'
+    if self.PACKAGE_MANAGER == YUM:
+      yum_proxy_file = '/etc/yum.conf'
+    elif self.PACKAGE_MANAGER == DNF:
+      yum_proxy_file = '/etc/dnf/dnf.conf'
 
     if FLAGS.http_proxy:
       self.RemoteCommand("echo -e 'proxy= %s' | sudo tee -a %s" % (
@@ -1970,6 +1994,7 @@ class BaseRhelMixin(BaseLinuxMixin):
 class AmazonLinux2Mixin(BaseRhelMixin):
   """Class holding Amazon Linux 2 VM methods and attributes."""
   OS_TYPE = os_types.AMAZONLINUX2
+  PACKAGE_MANAGER = YUM
 
   def SetupPackageManager(self):
     """Install EPEL."""
@@ -1985,6 +2010,7 @@ class AmazonNeuronMixin(AmazonLinux2Mixin):
 class Rhel7Mixin(BaseRhelMixin):
   """Class holding RHEL 7 specific VM methods and attributes."""
   OS_TYPE = os_types.RHEL7
+  PACKAGE_MANAGER = YUM
 
   def SetupPackageManager(self):
     """Install EPEL."""
@@ -2018,6 +2044,7 @@ class Rhel9Mixin(BaseRhelMixin):
 class CentOs7Mixin(BaseRhelMixin):
   """Class holding CentOS 7 specific VM methods and attributes."""
   OS_TYPE = os_types.CENTOS7
+  PACKAGE_MANAGER = YUM
 
   def SetupPackageManager(self):
     """Install EPEL."""
