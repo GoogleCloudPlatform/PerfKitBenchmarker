@@ -1,0 +1,10 @@
+steps:
+- name: gcr.io/cloud-builders/gsutil
+  args: ['cp', {{ dpb_job_jarfile }}, 'job.jar']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build',
+         '--build-arg',
+         'base_image={{ base_image }}',
+         '-t', {{ full_tag }}, '.']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', {{ full_tag }}]

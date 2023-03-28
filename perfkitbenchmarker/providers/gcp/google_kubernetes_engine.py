@@ -33,6 +33,10 @@ import six
 
 FLAGS = flags.FLAGS
 
+_CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
+    'container_remote_build_config', None,
+    'The YAML or JSON file to use as the build configuration file.')
+
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
@@ -67,7 +71,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
     region = util.GetMultiRegionFromRegion(util.GetRegionFromZone(self.zone))
     hostname = '{region}.gcr.io'.format(region=region)
     full_tag = '{hostname}/{project}/{name}'.format(
-        hostname=hostname, project=self.project, name=image)
+        hostname=hostname, project=self.project.replace(':', '/'), name=image)
     return full_tag
 
   def Login(self):
@@ -79,9 +83,20 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
 
   def RemoteBuild(self, image):
     """Build the image remotely."""
-    full_tag = self.GetFullRegistryTag(image.name)
-    build_cmd = util.GcloudCommand(self, 'builds', 'submit', '--tag', full_tag,
-                                   image.directory)
+    if not _CONTAINER_REMOTE_BUILD_CONFIG.value:
+      full_tag = self.GetFullRegistryTag(image.name)
+      build_cmd = util.GcloudCommand(
+          self, 'builds', 'submit', '--tag', full_tag, image.directory
+      )
+    else:
+      build_cmd = util.GcloudCommand(
+          self,
+          'builds',
+          'submit',
+          '--config',
+          _CONTAINER_REMOTE_BUILD_CONFIG.value,
+          image.directory,
+      )
     del build_cmd.flags['zone']
     build_cmd.Issue(timeout=BUILD_TIMEOUT)
 
