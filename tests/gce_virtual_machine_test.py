@@ -69,6 +69,23 @@ _FAKE_DISK_METADATA = {
 }
 
 
+_COMPUTE_DESCRIBE_RUNNING = r"""{
+  "id": "758013403901965936",
+  "networkInterfaces": [
+    {
+      "accessConfigs": [
+        {
+          "natIP": "35.227.176.232"
+        }
+      ],
+      "networkIP": "10.138.0.113"
+    }
+  ],
+  "status": "RUNNING"
+}
+"""
+
+
 @contextlib.contextmanager
 def PatchCriticalObjects(retvals=None):
   """A context manager that patches a few critical objects with mocks."""
@@ -283,6 +300,25 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
                        fr' targetLink.scope\(\):{vm.name} --format json '
                        f'--project p --quiet --zones {vm.zone}')
       self.assertTrue(vm.spot_early_termination)
+
+  @parameterized.named_parameters((
+      'is_deleted',
+      '',
+      """ERROR: (gcloud.compute.instances.describe) Could not fetch resource:
+ - The resource 'projects/p3rf-cluster-boot/zones/us-west1-a/instances/pkb-c322006c78-0' was not found)]""",
+      1, False
+  ), ('exists', _COMPUTE_DESCRIBE_RUNNING, '', 0, True))
+  def test_exists(self, stdout, stderr, return_code, expected):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='test_machine_type',
+        preemptible=True,
+        project='p',
+    )
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+    fake_rets = [(stdout, stderr, return_code)]
+    with PatchCriticalObjects(fake_rets):
+      self.assertEqual(vm._Exists(), expected)
 
 
 def _CreateFakeDiskMetadata(image):

@@ -52,13 +52,19 @@ HVM = 'hvm'
 PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
 DRIVE_START_LETTER = 'b'
+
+# AWS EC2 Instance life cycle:
+# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html
+RUNNING = 'running'
 TERMINATED = 'terminated'
 SHUTTING_DOWN = 'shutting-down'
-INSTANCE_EXISTS_STATUSES = frozenset(['running', 'stopping', 'stopped'])
-INSTANCE_DELETED_STATUSES = frozenset([SHUTTING_DOWN, TERMINATED])
 INSTANCE_TRANSITIONAL_STATUSES = frozenset(['pending'])
-INSTANCE_KNOWN_STATUSES = (INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
-                           | INSTANCE_TRANSITIONAL_STATUSES)
+INSTANCE_EXISTS_STATUSES = (INSTANCE_TRANSITIONAL_STATUSES |
+                            frozenset(['pending', 'running',
+                                       'stopping', 'stopped']))
+INSTANCE_DELETED_STATUSES = frozenset([SHUTTING_DOWN, TERMINATED])
+INSTANCE_KNOWN_STATUSES = (INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES)
+
 HOST_EXISTS_STATES = frozenset(
     ['available', 'under-assessment', 'permanent-failure'])
 HOST_RELEASED_STATES = frozenset(['released', 'released-permanent-failure'])
@@ -157,6 +163,10 @@ class AwsUnexpectedWindowsAdapterOutputError(Exception):
 
 class AwsUnknownStatusError(Exception):
   """Error indicating an unknown status was encountered."""
+
+
+class AwsVmNotCreatedError(Exception):
+  """Error indicating that VM does not have a create_start_time."""
 
 
 class AwsImageNotFoundError(Exception):
@@ -969,6 +979,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if retcode:
       raise errors.Resource.CreationError(
           'Failed to create VM: %s return code: %s' % (retcode, stderr))
+    if not self.create_return_time:
+      self.create_return_time = time.time()
 
   @vm_util.Retry(
       poll_interval=0.5,
@@ -1141,21 +1153,62 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.spot_early_termination = (
           self.spot_status_code in AWS_INITIATED_SPOT_TERMINAL_STATUSES)
 
+  @vm_util.Retry(poll_interval=1,
+                 log_errors=False,
+                 retryable_exceptions=(AwsTransitionalVmRetryableError,
+                                       LookupError))
+  def _Exists(self):
+    """Returns whether the VM exists."""
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-instances',
+        '--region=%s' % self.region,
+        '--filter=Name=client-token,Values=%s' % self.client_token]
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
+    response = json.loads(stdout)
+    reservations = response['Reservations']
+    if not reservations or len(reservations) != 1:
+      logging.info('describe-instances did not return exactly one reservation. '
+                   'This sometimes shows up immediately after a successful '
+                   'run-instances command. Retrying describe-instances '
+                   'command.')
+      raise AwsTransitionalVmRetryableError()
+    instances = reservations[0]['Instances']
+    if instances:
+      status = instances[0]['State']['Name']
+      # In this path run-instances succeeded, a pending instance was created,
+      # but not fulfilled so it moved to terminated.
+      if (status == TERMINATED and
+          instances[0]['StateReason']['Code'] ==
+          'Server.InsufficientInstanceCapacity'):
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+            instances[0]['StateReason']['Message'])
+      # In this path run-instances succeeded, a pending instance was created,
+      # but instance is shutting down due to internal server error. This is a
+      # retryable command for run-instance.
+      # Client token needs to be refreshed for idempotency.
+      elif (status == SHUTTING_DOWN and
+            instances[0]['StateReason']['Code'] == 'Server.InternalError'):
+        self.client_token = str(uuid.uuid4())
+      return status in INSTANCE_EXISTS_STATUSES
+    else:
+      return False
+
   @vm_util.Retry(
       poll_interval=1,
       log_errors=False,
-      retryable_exceptions=(AwsTransitionalVmRetryableError,))
-  def _Exists(self):
-    """Returns whether the VM exists.
+      retryable_exceptions=(AwsUnknownStatusError,
+                            AwsTransitionalVmRetryableError,))
+  def _WaitUntilRunning(self):
+    """Waits until the VM is running.
 
     This method waits until the VM is no longer pending.
-
-    Returns:
-      Whether the VM exists.
 
     Raises:
       AwsUnknownStatusError: If an unknown status is returned from AWS.
       AwsTransitionalVmRetryableError: If the VM is pending. This is retried.
+      AwsVmNotCreatedError: If the VM does not have a create_start_time by the
+        time it reaches this phase of provisioning.
     """
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
@@ -1166,43 +1219,53 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     reservations = response['Reservations']
-    assert len(reservations) < 2, 'Too many reservations.'
-    if not reservations:
+    if not reservations or len(reservations) != 1:
       if not self.create_start_time:
-        return False
-      logging.info('No reservation returned by describe-instances. This '
-                   'sometimes shows up immediately after a successful '
+        logging.info('VM does not have a create_start_time; '
+                     'provisioning failed.')
+        raise AwsVmNotCreatedError()
+      logging.info('describe-instances did not return exactly one reservation. '
+                   'This sometimes shows up immediately after a successful '
                    'run-instances command. Retrying describe-instances '
                    'command.')
       raise AwsTransitionalVmRetryableError()
     instances = reservations[0]['Instances']
-    assert len(instances) == 1, 'Wrong number of instances.'
+    if not instances or len(instances) != 1:
+      logging.info('describe-instances did not return exactly one instance. '
+                   'Retrying describe-instances command.')
+      raise AwsTransitionalVmRetryableError()
     status = instances[0]['State']['Name']
     self.id = instances[0]['InstanceId']
     if self.use_spot_instance:
       self.spot_instance_request_id = instances[0]['SpotInstanceRequestId']
 
-    if status not in INSTANCE_KNOWN_STATUSES:
-      raise AwsUnknownStatusError('Unknown status %s' % status)
     if status in INSTANCE_TRANSITIONAL_STATUSES:
       logging.info('VM has status %s; retrying describe-instances command.',
                    status)
       raise AwsTransitionalVmRetryableError()
     # In this path run-instances succeeded, a pending instance was created, but
     # not fulfilled so it moved to terminated.
-    if (status == TERMINATED and
-        instances[0]['StateReason']['Code'] ==
-        'Server.InsufficientInstanceCapacity'):
+    elif (status == TERMINATED and
+          instances[0]['StateReason']['Code'] ==
+          'Server.InsufficientInstanceCapacity'):
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(
           instances[0]['StateReason']['Message'])
     # In this path run-instances succeeded, a pending instance was created, but
     # instance is shutting down due to internal server error. This is a
     # retryable command for run-instance.
     # Client token needs to be refreshed for idempotency.
-    if (status == SHUTTING_DOWN and
-        instances[0]['StateReason']['Code'] == 'Server.InternalError'):
+    elif (status == SHUTTING_DOWN and
+          instances[0]['StateReason']['Code'] == 'Server.InternalError'):
       self.client_token = str(uuid.uuid4())
-    return status in INSTANCE_EXISTS_STATUSES
+    # Set the running time
+    elif status == RUNNING:
+      if not self.is_running_time:
+        self.is_running_time = time.time()
+    # TODO(user): Adjust this function to properly handle ALL potential
+    #  VM statuses. In the meantime, just retry if the VM is not yet running.
+    else:
+      raise AwsUnknownStatusError(f'Unknown status: {status}; '
+                                  'retrying describe-instances command')
 
   def _GetNvmeBootIndex(self):
     if (aws_disk.LocalDriveIsNvme(self.machine_type) and
