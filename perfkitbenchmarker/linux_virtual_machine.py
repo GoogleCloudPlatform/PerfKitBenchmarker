@@ -860,6 +860,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       except regex_util.NoMatchError:
         # TODO(user): Use alternative methods to retrieve partition table.
         logging.warning('Partition table not found with "%s".', cmd)
+        return {}
     return self._partition_table
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
