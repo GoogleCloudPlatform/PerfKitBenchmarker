@@ -64,7 +64,7 @@ REDIS_SIMULATE_AOF = flags.DEFINE_bool(
     'disks on the server for aof backups. ')
 
 # Default port for Redis
-_DEFAULT_PORT = 6379
+DEFAULT_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
 FLAGS = flags.FLAGS
 REDIS_GIT = 'https://github.com/antirez/redis.git'
@@ -205,4 +205,4 @@ def GetMetadata() -> Dict[str, Any]:
 
 def GetRedisPorts() -> List[int]:
   """Returns a list of redis port(s)."""
-  return [_DEFAULT_PORT + i for i in range(_NUM_PROCESSES.value)]
+  return [DEFAULT_PORT + i for i in range(_NUM_PROCESSES.value)]
