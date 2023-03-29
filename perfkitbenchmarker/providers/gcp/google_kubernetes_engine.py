@@ -41,8 +41,6 @@ NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/Googl
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
 RELEASE_CHANNELS = ['rapid', 'regular', 'stable']
-# Time for build to complete. 10 minutes as filesystem takes ~6 minutes
-BUILD_TIMEOUT = 600
 
 
 def _CalculateCidrSize(nodes: int) -> int:
@@ -98,7 +96,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
           image.directory,
       )
     del build_cmd.flags['zone']
-    build_cmd.Issue(timeout=BUILD_TIMEOUT)
+    build_cmd.Issue(timeout=None)
 
 
 class GkeCluster(container_service.KubernetesCluster):

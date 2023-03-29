@@ -393,7 +393,7 @@ class BaseContainerRegistry(resource.BaseResource):
     if _CONTAINER_CLUSTER_ARCHITECTURE.value:
       cmd += ['--platform', ','.join(_CONTAINER_CLUSTER_ARCHITECTURE.value)]
     cmd += ['--no-cache', '--push', '-t', full_tag, image.directory]
-    vm_util.IssueCommand(cmd, timeout=600)
+    vm_util.IssueCommand(cmd, timeout=None)
     vm_util.IssueCommand(['docker', 'buildx', 'stop'])
 
   def GetOrBuild(self, image):
