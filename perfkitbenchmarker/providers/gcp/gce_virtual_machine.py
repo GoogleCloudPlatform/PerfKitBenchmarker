@@ -544,9 +544,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
-    args = ['compute', 'instances', 'create', self.name, '--async']
+    args = ['compute', 'instances', 'create', self.name]
 
     cmd = util.GcloudCommand(self, *args)
+    cmd.flags['async'] = True
 
     # Compute all flags requiring alpha first. Then if any flags are different
     # between alpha and GA, we can set the appropriate ones.
