@@ -62,11 +62,12 @@ def CheckPrerequisites(benchmark_config):
   # on the resource. Ideally, the benchmark is not responsible for this task.
   # Instead, BaseResource should check prerequisites as part of creation and
   # child resources can override CheckPrerequisites and benefit from it.
+  # The attribute-error below can be removed when this is fixed.
   cloud_redis_class = (
       managed_memory_store.GetManagedMemoryStoreClass(
           FLAGS.cloud,
           managed_memory_store.REDIS))
-  cloud_redis_class.CheckPrerequisites(benchmark_config)
+  cloud_redis_class.CheckPrerequisites(benchmark_config)  # pytype: disable=attribute-error
 
 
 def Prepare(benchmark_spec):
