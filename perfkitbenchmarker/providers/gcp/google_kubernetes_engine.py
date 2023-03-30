@@ -41,6 +41,7 @@ NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/Googl
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
 RELEASE_CHANNELS = ['rapid', 'regular', 'stable']
+ONE_HOUR = 60 * 60
 
 
 def _CalculateCidrSize(nodes: int) -> int:
@@ -217,7 +218,7 @@ class GkeCluster(container_service.KubernetesCluster):
 
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.
-    _, stderr, retcode = cmd.Issue(timeout=1200, raise_on_failure=False)
+    _, stderr, retcode = cmd.Issue(timeout=ONE_HOUR, raise_on_failure=False)
     if retcode:
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
