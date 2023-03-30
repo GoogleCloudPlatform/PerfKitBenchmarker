@@ -197,6 +197,11 @@ flags.DEFINE_bool(
 
 _DISABLE_YUM_CRON = flags.DEFINE_boolean(
     'disable_yum_cron', True, 'Whether to disable the cron-run yum service.')
+_KERNEL_MODULES_TO_ADD = flags.DEFINE_list(
+    'kernel_modules_to_add', [], 'Kernel modules to add to Linux VMs')
+_KERNEL_MODULES_TO_REMOVE = flags.DEFINE_list(
+    'kernel_modules_to_remove', [], 'Kernel modules to remove from Linux VMs')
+
 
 # RHEL package managers
 YUM = 'yum'
@@ -560,6 +565,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.SetFiles()
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
+    self.ModifyKernelModules()
     self.DoConfigureNetworkForBBR()
     self.DoConfigureTCPWindow()
     self.UpdateEnvironmentPath()
@@ -928,6 +934,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.os_metadata['kernel_command_line'] = self.kernel_command_line
       self.os_metadata[
           'append_kernel_command_line'] = FLAGS.append_kernel_command_line
+    # TODO(pclay): consider publishing full lsmod as a sample. It's probably too
+    # spammy for metadata
+    if _KERNEL_MODULES_TO_ADD.value:
+      self.os_metadata['added_kernel_modules'] = ','.join(
+          _KERNEL_MODULES_TO_ADD.value)
+    if _KERNEL_MODULES_TO_REMOVE.value:
+      self.os_metadata['removed_kernel_modules'] = ','.join(
+          _KERNEL_MODULES_TO_REMOVE.value)
 
     devices = self._get_network_device_mtus()
     all_mtus = set(devices.values())
@@ -1603,6 +1617,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self.AppendKernelCommandLine(
           FLAGS.append_kernel_command_line, reboot=False)
       self._needs_reboot = True
+
+  def ModifyKernelModules(self):
+    """Add or remove kernel modules based on flags."""
+    for module in _KERNEL_MODULES_TO_ADD.value:
+      self.RemoteCommand(f'sudo modprobe {module}')
+    for module in _KERNEL_MODULES_TO_REMOVE.value:
+      self.RemoteCommand(f'sudo modprobe -r {module}')
 
   @abc.abstractmethod
   def InstallPackages(self, packages: str) -> None:
