@@ -127,7 +127,7 @@ class App:
     client_class = self.get_client_class()
     runner_class = self.get_runner_class()
     runner_class.run_class_startup()
-    return runner_class(client_class.from_flags())
+    return runner_class(client_class.from_flags())  # pytype: disable=not-instantiable  # always-use-return-annotations
 
   def get_client_class(self) -> Type[client.BaseMessagingServiceClient]:
     """Gets the client class registered.
