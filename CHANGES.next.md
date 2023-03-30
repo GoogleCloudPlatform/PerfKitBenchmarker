@@ -127,6 +127,7 @@
 -   Add support for multi-network creation/attachment. PKB currently does not
     handle subnet creation on an existing network.
 -   Add support for GCE Confidential VM's.
+-   Add cos-dev, cos101, cos97, cos93, and cos89 OS support for GCP.
 
 ### Enhancements:
 
