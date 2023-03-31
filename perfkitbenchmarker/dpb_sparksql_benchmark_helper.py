@@ -16,6 +16,7 @@
 import json
 import os
 import re
+import typing
 from typing import Any, Optional
 
 from absl import flags
@@ -41,7 +42,8 @@ flags.DEFINE_bool('dpb_sparksql_create_hive_tables', False,
 flags.DEFINE_bool('dpb_sparksql_simultaneous', False,
                   'Run all queries simultaneously instead of one by one. '
                   'Depending on the service type and cluster shape, it might '
-                  'fail if too many queries are to be run.')
+                  'fail if too many queries are to be run. This flag and '
+                  '--dpb_sparksql_streams are mutually exclusive.')
 flags.DEFINE_string(
     'dpb_sparksql_database', None,
     'Name of preprovisioned Hive database to look for data in '
@@ -65,8 +67,16 @@ flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', BENCHMARK_NAMES.keys(),
                   'A list of query to run on dpb_sparksql_data')
 flags.DEFINE_list(
     'dpb_sparksql_order', [],
-    'The names (numbers) of the queries to run in order. '
-    'Required.')
+    'The names (numbers) of the queries to run in order in a POWER run or all '
+    'at the same time in a SIMULTANEOUS run. For DPB SparkSQL benchmarks '
+    'either this flag or --dpb_sparksql_streams must be set.')
+_STREAMS = flags.DEFINE_multi_string(
+    'dpb_sparksql_streams', [],
+    'List of all query streams to execute for a TPC-DS/H THROUGHPUT run. Each '
+    'stream should be passed in separately and the queries should be comma '
+    'separated, e.g. --dpb_sparksql_streams=1,2,3 '
+    '--dpb_sparksql_streams=3,2,1. For DPB SparkSQL benchmarks either this '
+    'flag or --dpb_sparksql_order must be set.')
 flags.DEFINE_bool(
     'dpb_sparksql_copy_to_hdfs', False,
     'Instead of reading the data directly, copy into HDFS and read from there.')
@@ -97,6 +107,23 @@ SPARK_TABLE_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_table.py')
 SPARK_SQL_RUNNER_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_sql_runner.py')
 SPARK_SQL_PERF_GIT = 'https://github.com/databricks/spark-sql-perf.git'
 SPARK_SQL_PERF_GIT_COMMIT = '6b2bf9f9ad6f6c2f620062fda78cded203f619c8'
+
+
+def GetStreams() -> list[list[str]]:
+  """Gets a list of query number streams to run. Respects order in flags."""
+  if _STREAMS.value:
+    return [stream.split(',') for stream in _STREAMS.value]
+  return [FLAGS.dpb_sparksql_order]
+
+
+def GetQueryIdsToStage() -> list[str]:
+  """Gets all the query IDs to stage according to the flags passed."""
+  if _STREAMS.value:
+    queries = set()
+    for stream in GetStreams():
+      queries.update(stream)
+    return sorted(queries)
+  return FLAGS.dpb_sparksql_order
 
 
 def GetTableMetadata(benchmark_spec):
@@ -138,7 +165,7 @@ def StageMetadata(
 
 def GetQueryId(filename: str) -> Optional[str]:
   """Extract query id from file name."""
-  match = re.match(r'(.*/)?q?([0-9]+[ab]?)\.sql$', filename)
+  match = re.match(r'(.*/)?q?([0-9]+[ab]?)(\.sql)?$', filename)
   if match:
     return match.group(2)
 
@@ -147,8 +174,9 @@ def Prepare(benchmark_spec):
   """Copies scripts and all the queries to cloud."""
   cluster = benchmark_spec.dpb_service
   storage_service = cluster.storage_service
-  benchmark_spec.staged_queries = LoadAndStageQueries(storage_service,
-                                                      cluster.base_dir)
+  benchmark_spec.query_dir = LoadAndStageQueries(
+      storage_service, cluster.base_dir)
+  benchmark_spec.query_streams = GetStreams()
 
   scripts_to_upload = [
       SPARK_SQL_DISTCP_SCRIPT, SPARK_TABLE_SCRIPT, SPARK_SQL_RUNNER_SCRIPT
@@ -172,7 +200,7 @@ def Prepare(benchmark_spec):
 
 def LoadAndStageQueries(
     storage_service: object_storage_service.ObjectStorageService,
-    base_dir: str) -> list[str]:
+    base_dir: str) -> str:
   """Loads queries stages them in object storage if needed.
 
   Queries are selected using --dpb_sparksql_query and --dpb_sparksql_order.
@@ -182,55 +210,52 @@ def LoadAndStageQueries(
     base_dir: object storage directory to stage queries into.
 
   Returns:
-    The paths to the stage queries.
+    The object storage path where the queries are staged into.
 
   Raises:
     PrepareException if a requested query is not found.
   """
 
   if _QUERIES_URL.value:
-    return _GetQueryFilesFromUrl(storage_service, _QUERIES_URL.value)
-  return _StageQueriesFromRepo(storage_service, base_dir)
+    _GetQueryFilesFromUrl(storage_service, _QUERIES_URL.value)
+    # casting it, so it doesn't complain about being Optional[str]
+    return typing.cast(str, _QUERIES_URL.value)
+  _StageQueriesFromRepo(storage_service, base_dir)
+  return base_dir
 
 
 def _GetQueryFilesFromUrl(
     storage_service: object_storage_service.ObjectStorageService,
-    queries_url: str) -> list[str]:
-  """Gets relevant query files from queries_url.
+    queries_url: str) -> None:
+  """Checks if relevant query files from queries_url exist.
 
   Args:
     storage_service: object_storage_service to list query files.
     queries_url: Object Storage directory URL where the benchmark queries are
       contained.
-
-  Returns:
-    A list of object store paths to the queries.
   """
-  query_paths = [
-      os.path.join(queries_url, f'q{q}.sql') for q in FLAGS.dpb_sparksql_order]
+  query_paths = {
+      q: os.path.join(queries_url, q) for q in GetQueryIdsToStage()
+  }
   queries_missing = set()
-  for path in query_paths:
+  for q in query_paths:
     try:
-      storage_service.List(path)
+      storage_service.List(query_paths[q])
     except errors.VmUtil.IssueCommandError:  # Handling query not found
-      queries_missing.add(GetQueryId(path))
+      queries_missing.add(q)
   if queries_missing:
     raise errors.Benchmarks.PrepareException(
         'Could not find queries {}'.format(', '.join(sorted(queries_missing))))
-  return query_paths
 
 
 def _StageQueriesFromRepo(
     storage_service: object_storage_service.ObjectStorageService,
-    base_dir: str) -> list[str]:
+    base_dir: str) -> None:
   """Copies queries from default Github repo to object storage.
 
   Args:
     storage_service: object_storage_service to stage queries into.
     base_dir: object storage directory to stage queries into.
-
-  Returns:
-    A list of object store paths to the queries.
   """
   temp_run_dir = temp_dir.GetRunDirPath()
   spark_sql_perf_dir = os.path.join(temp_run_dir, 'spark_sql_perf_dir')
@@ -244,22 +269,21 @@ def _StageQueriesFromRepo(
 
   # Search repo for queries
   query_file = {}  # map query -> staged file
+  queries_to_stage = GetQueryIdsToStage()
   for dir_name, _, files in os.walk(query_dir):
     for filename in files:
       query_id = GetQueryId(filename)
       if query_id:
         # only upload specified queries
-        if query_id in FLAGS.dpb_sparksql_order:
+        if query_id in queries_to_stage:
           src_file = os.path.join(dir_name, filename)
-          staged_file = '{}/{}'.format(base_dir, filename)
+          staged_filename = query_id
+          staged_file = '{}/{}'.format(base_dir, staged_filename)
           storage_service.Copy(src_file, staged_file)
           query_file[query_id] = staged_file
 
   # Validate all requested queries are present.
-  missing_queries = set(FLAGS.dpb_sparksql_order) - set(query_file.keys())
+  missing_queries = set(queries_to_stage) - set(query_file.keys())
   if missing_queries:
     raise errors.Benchmarks.PrepareException(
         'Could not find queries {}'.format(missing_queries))
-
-  # Return staged queries in proper order
-  return [query_file[query] for query in FLAGS.dpb_sparksql_order]

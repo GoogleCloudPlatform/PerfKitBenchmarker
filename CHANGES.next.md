@@ -246,6 +246,7 @@
 -   Add 'Time to Create' and 'Time to Running' samples on cluster_boot for
     GCEVirtualMachine and AWSVirtualMachine instances that are provisioned
     with asynchronous 'create' invocations.
+-   Add `--dpb_sparksql_streams` to run TPC-DS/H throughput runs.
 
 ### Bug fixes and maintenance updates:
 

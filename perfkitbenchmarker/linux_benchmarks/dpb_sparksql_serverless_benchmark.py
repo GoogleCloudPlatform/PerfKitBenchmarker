@@ -95,6 +95,10 @@ def CheckPrerequisites(benchmark_config):
     raise errors.Config.InvalidValue(
         '--dpb_sparksql_simultaneous not supported in SparkSQL Serverless '
         'benchmark.')
+  if FLAGS.dpb_sparksql_streams:
+    raise errors.Config.InvalidValue(
+        '--dpb_sparksql_streams not supported in SparkSQL Serverless '
+        'benchmark.')
   # TODO(odiego): DRY out
   if not FLAGS.dpb_sparksql_order:
     raise errors.Config.InvalidValue(
@@ -140,10 +144,13 @@ def Run(benchmark_spec):
   # Run PySpark Spark SQL Runner
   report_dir = '/'.join([cluster.base_dir, f'report-{int(time.time()*1000)}'])
   run_times = {}
-  for query in benchmark_spec.staged_queries:
+  for query in benchmark_spec.query_streams[0]:
     # TODO(odiego): DRY out the SubmitJob logic (too similar to
     # dpb_sparksql_benchmark).
-    args = ['--sql-scripts', query, '--report-dir', report_dir]
+    args = [
+        '--sql-scripts-dir', benchmark_spec.query_dir,
+        '--sql-scripts', query,
+        '--report-dir', report_dir]
     table_metadata = dpb_sparksql_benchmark_helper.GetTableMetadata(
         benchmark_spec)
     table_metadata_file = '/'.join([cluster.base_dir, 'metadata.json'])
