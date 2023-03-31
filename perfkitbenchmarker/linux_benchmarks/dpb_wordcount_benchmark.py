@@ -151,6 +151,8 @@ def Run(benchmark_spec):
       dpb_service_instance.SERVICE_TYPE)
   if FLAGS.dpb_job_classname:
     classname = FLAGS.dpb_job_classname
+  if FLAGS.dpb_job_type:
+    job_type = FLAGS.dpb_job_type
   if dpb_service_instance.SERVICE_TYPE in [
       dpb_service.DATAFLOW, dpb_service.DATAPROC_FLINK,
       dpb_service.KUBERNETES_FLINK_CLUSTER
@@ -187,11 +189,16 @@ def Run(benchmark_spec):
 
   # Update metadata after job run to get job id
   metadata = copy.copy(dpb_service_instance.GetMetadata())
-  metadata.update({'input_location': input_location,
-                   'dpb_wordcount_additional_args': ','.join(
-                       FLAGS.dpb_wordcount_additional_args),
-                   'dpb_wordcount_force_beam_style_job_args':
-                       FLAGS.dpb_wordcount_force_beam_style_job_args})
+  metadata.update({
+      'input_location': input_location,
+      'dpb_wordcount_additional_args': ','.join(
+          FLAGS.dpb_wordcount_additional_args
+      ),
+      'dpb_wordcount_force_beam_style_job_args': (
+          FLAGS.dpb_wordcount_force_beam_style_job_args
+      ),
+      'dpb_job_type': job_type,
+  })
 
   run_time = (end_time - start_time).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))

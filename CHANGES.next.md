@@ -372,3 +372,5 @@
     client.
 -   Require monitoring.write scope for client side metrics when using the Cloud
     Bigtable veneer client.
+-   Add flag dpb_job_type and support running native flink pipeline on
+    dataproc_flink.

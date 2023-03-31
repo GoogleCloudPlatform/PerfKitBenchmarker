@@ -46,6 +46,15 @@ from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 import yaml
 
+# Job types that are supported on the dpb service backends
+_PYSPARK_JOB_TYPE = 'pyspark'
+_SPARKSQL_JOB_TYPE = 'spark-sql'
+_SPARK_JOB_TYPE = 'spark'
+_HADOOP_JOB_TYPE = 'hadoop'
+_DATAFLOW_JOB_TYPE = 'dataflow'
+_BEAM_JOB_TYPE = 'beam'
+_FLINK_JOB_TYPE = 'flink'
+
 flags.DEFINE_string(
     'static_dpb_service_instance', None,
     'If set, the name of the pre created dpb implementation,'
@@ -86,6 +95,20 @@ flags.DEFINE_bool(
     'dpb_export_job_stats', False,
     'Exports job stats such as CPU usage and cost. Enabled by default, but not '
     'necessarily implemented on all services.')
+flags.DEFINE_enum(
+    'dpb_job_type',
+    None,
+    [
+        _PYSPARK_JOB_TYPE,
+        _SPARKSQL_JOB_TYPE,
+        _SPARK_JOB_TYPE,
+        _HADOOP_JOB_TYPE,
+        _BEAM_JOB_TYPE,
+        _DATAFLOW_JOB_TYPE,
+        _FLINK_JOB_TYPE,
+    ],
+    'The type of the job to be run on the backends.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -158,13 +181,13 @@ class BaseDpbService(resource.BaseResource):
   S3_FS = 's3'
 
   # Job types that are supported on the dpb service backends
-  PYSPARK_JOB_TYPE = 'pyspark'
-  SPARKSQL_JOB_TYPE = 'spark-sql'
-  SPARK_JOB_TYPE = 'spark'
-  HADOOP_JOB_TYPE = 'hadoop'
-  DATAFLOW_JOB_TYPE = 'dataflow'
-  BEAM_JOB_TYPE = 'beam'
-  FLINK_JOB_TYPE = 'flink'
+  PYSPARK_JOB_TYPE = _PYSPARK_JOB_TYPE
+  SPARKSQL_JOB_TYPE = _SPARKSQL_JOB_TYPE
+  SPARK_JOB_TYPE = _SPARK_JOB_TYPE
+  HADOOP_JOB_TYPE = _HADOOP_JOB_TYPE
+  DATAFLOW_JOB_TYPE = _DATAFLOW_JOB_TYPE
+  BEAM_JOB_TYPE = _BEAM_JOB_TYPE
+  FLINK_JOB_TYPE = _FLINK_JOB_TYPE
 
   def _JobJars(self) -> Dict[str, Dict[str, str]]:
     """Known mappings of jars in the cluster used by GetExecutionJar."""
