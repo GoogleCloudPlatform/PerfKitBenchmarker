@@ -14,14 +14,31 @@
 """Tests for perfkitbenchmarker.packages.aerospike_client."""
 
 import collections
+import os
 import unittest
+from unittest import mock
 
 from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import aerospike_client
 from tests import pkb_common_test_case
 
+
 FLAGS = flags.FLAGS
+
+
+def _ReadFileToString(filename):
+  """Helper function to read a file into a string."""
+  with open(filename) as f:
+    return f.read()
+
+
+TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'data', 'asbench')
+
+ASBENCH_HISTOGRAM_DATA = _ReadFileToString(
+    os.path.join(TEST_DATA_DIR, 'histogram_data').strip()
+)
+
 ASBENCH_OUTPUT_HEADER = """
 hosts:                  10.128.0.99
 port:                   3000
@@ -80,6 +97,7 @@ class AerospikeClientTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testParseAsbenchStdout(self):
     actual_samples = aerospike_client.ParseAsbenchStdout(
         ASBENCH_OUTPUT_HEADER + ASBENCH_OUTPUT_RESULT_1)
+
     self.assertEqual(actual_samples, [
         sample.Sample(
             metric='throughput',
@@ -161,67 +179,279 @@ class AerospikeClientTestCase(pkb_common_test_case.PkbCommonTestCase):
             timestamp=actual_samples[2].timestamp)
     ])
 
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testAggregateAsbenchSamples(self):
     agg_samples = aerospike_client.AggregateAsbenchSamples(
         aerospike_client.ParseAsbenchStdout(ASBENCH_OUTPUT_HEADER +
                                             ASBENCH_OUTPUT_RESULT_1) +
         aerospike_client.ParseAsbenchStdout(ASBENCH_OUTPUT_HEADER +
                                             ASBENCH_OUTPUT_RESULT_2))
-    self.assertEqual(agg_samples, [
-        sample.Sample(
-            metric='throughput',
-            value=314922.0,
-            unit='transaction_per_second',
-            metadata={
-                'tps': 314922.0,
-                'timeouts': 2.0,
-                'errors': 1.0,
-                'start_timestamp': 1658945954.0,
-                'window': 1,
-                'write_min': 70.0,
-                'write_max': 16735.0,
-                'read_min': 61.0,
-                'read_max': 68863.0,
-            },
-            timestamp=agg_samples[0].timestamp),
-        sample.Sample(
-            metric='throughput',
-            value=313327.0,
-            unit='transaction_per_second',
-            metadata={
-                'tps': 313327.0,
-                'timeouts': 0.0,
-                'errors': 0.0,
-                'start_timestamp': 1658945954.0,
-                'window': 2,
-                'write_min': 70.0,
-                'write_max': 16735.0,
-                'read_min': 61.0,
-                'read_max': 68863.0,
-            },
-            timestamp=agg_samples[1].timestamp),
-        sample.Sample(
-            metric='throughput',
-            value=313365.0,
-            unit='transaction_per_second',
-            metadata={
-                'tps': 313365.0,
-                'timeouts': 0.0,
-                'errors': 0.0,
-                'start_timestamp': 1658945954.0,
-                'window': 3,
-                'write_min': 70.0,
-                'write_max': 16735.0,
-                'read_min': 61.0,
-                'read_max': 68863.0,
-            },
-            timestamp=agg_samples[2].timestamp)
-    ])
+    self.assertEqual(
+        agg_samples,
+        [
+            sample.Sample(
+                metric='throughput',
+                value=314922.0,
+                unit='transaction_per_second',
+                metadata={
+                    'start_timestamp': 1658945954.0,
+                    'tps': 314922.0,
+                    'timeouts': 2.0,
+                    'errors': 1.0,
+                    'window': 1,
+                    'write_min': 70.0,
+                    'write_max': 16735.0,
+                    'read_min': 61.0,
+                    'read_max': 68863.0,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='throughput',
+                value=313327.0,
+                unit='transaction_per_second',
+                metadata={
+                    'start_timestamp': 1658945954.0,
+                    'tps': 313327.0,
+                    'timeouts': 0.0,
+                    'errors': 0.0,
+                    'window': 2,
+                    'write_min': 70.0,
+                    'write_max': 16735.0,
+                    'read_min': 61.0,
+                    'read_max': 68863.0,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='throughput',
+                value=313365.0,
+                unit='transaction_per_second',
+                metadata={
+                    'start_timestamp': 1658945954.0,
+                    'tps': 313365.0,
+                    'timeouts': 0.0,
+                    'errors': 0.0,
+                    'window': 3,
+                    'write_min': 70.0,
+                    'write_max': 16735.0,
+                    'read_min': 61.0,
+                    'read_max': 68863.0,
+                },
+                timestamp=0,
+            ),
+        ],
+    )
+
+  def testCalculatePercentileFromHistogram(self):
+    histogram = collections.OrderedDict({0: 10, 100: 20, 200: 30, 400: 40})
+    percentiles = [5, 10, 50, 90, 99, 99.9, 100]
+    expected_results = [100, 100, 300, 500, 500, 500, 500]
+    for i in range(len(percentiles)):
+      latency = aerospike_client.CalculatePercentileFromHistogram(
+          histogram, percentiles[i]
+      )
+      self.assertEqual(latency, expected_results[i])
+
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  def testPublishPercentileSamplesFromRun(self):
+    histograms = collections.OrderedDict({})
+    timestamps = {}
+    percentiles = ['99.9']
+    aerospike_client.ParseHistogramFile(
+        ASBENCH_HISTOGRAM_DATA, histograms, timestamps
+    )
+
+    samples = aerospike_client.GeneratePercentileTimeSeriesSamples(
+        histograms, percentiles, timestamps
+    )
+    self.assertListEqual(
+        samples,
+        [
+            sample.Sample(
+                metric='write_99.9_percentile_latency_time_series',
+                value=0.0,
+                unit='ms',
+                metadata={
+                    'values': [2.0, 0.9, 2.5, 0.9],
+                    'timestamps': [
+                        1679618806000.0,
+                        1679618807000.0,
+                        1679618808000.0,
+                        1679618809000.0,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='read_99.9_percentile_latency_time_series',
+                value=0.0,
+                unit='ms',
+                metadata={
+                    'values': [1.4, 0.9, 5.0, 2.6],
+                    'timestamps': [
+                        1679618806000.0,
+                        1679618807000.0,
+                        1679618808000.0,
+                        1679618809000.0,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+        ],
+    )
+
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  def testPublishPercentileSamples(self):
+    histograms = collections.OrderedDict({})
+    timestamps = {}
+    percentiles = ['50', '90', '99', '99.9']
+    aerospike_client.ParseHistogramFile(
+        HISTOGRAM_OUTPUT_1, histograms, timestamps
+    )
+    aerospike_client.ParseHistogramFile(
+        HISTOGRAM_OUTPUT_2, histograms, timestamps
+    )
+    samples = aerospike_client.GeneratePercentileTimeSeriesSamples(
+        histograms, percentiles, timestamps
+    )
+    self.assertListEqual(
+        samples,
+        [
+            sample.Sample(
+                metric='write_50_percentile_latency_time_series',
+                value=0.0,
+                unit='ms',
+                metadata={
+                    'values': [0.1, 0.4, 0.5],
+                    'timestamps': [
+                        1658945953000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='write_90_percentile_latency_time_series',
+                value=0.0,
+                unit='ms',
+                metadata={
+                    'values': [0.2, 0.4, 0.5],
+                    'timestamps': [
+                        1658945953000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='write_99_percentile_latency_time_series',
+                value=0.0,
+                unit='ms',
+                metadata={
+                    'values': [0.3, 0.4, 0.5],
+                    'timestamps': [
+                        1658945953000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='write_99.9_percentile_latency_time_series',
+                value=0.0,
+                unit='ms',
+                metadata={
+                    'values': [0.3, 0.4, 0.5],
+                    'timestamps': [
+                        1658945953000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='read_50_percentile_latency_time_series',
+                value=0.0,
+                unit='ms',
+                metadata={
+                    'values': [0.2, 0.4, 0.4],
+                    'timestamps': [
+                        1658945953000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='read_90_percentile_latency_time_series',
+                value=0.0,
+                unit='ms',
+                metadata={
+                    'values': [0.3, 0.4, 0.4],
+                    'timestamps': [
+                        1658945953000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='read_99_percentile_latency_time_series',
+                value=0.0,
+                unit='ms',
+                metadata={
+                    'values': [0.3, 0.4, 0.4],
+                    'timestamps': [
+                        1658945953000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='read_99.9_percentile_latency_time_series',
+                value=0.0,
+                unit='ms',
+                metadata={
+                    'values': [0.3, 0.4, 0.4],
+                    'timestamps': [
+                        1658945953000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+        ],
+    )
 
   def testParseHistogramFile(self):
-    histograms = {}
-    aerospike_client.ParseHistogramFile(HISTOGRAM_OUTPUT_1, histograms)
-    aerospike_client.ParseHistogramFile(HISTOGRAM_OUTPUT_2, histograms)
+    histograms = collections.OrderedDict({})
+    timestamps = {}
+    aerospike_client.ParseHistogramFile(
+        HISTOGRAM_OUTPUT_1, histograms, timestamps
+    )
+    aerospike_client.ParseHistogramFile(
+        HISTOGRAM_OUTPUT_2, histograms, timestamps
+    )
     self.assertEqual(
         histograms, {
             (1, 'read'):
