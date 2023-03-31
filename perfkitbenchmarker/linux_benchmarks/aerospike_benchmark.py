@@ -299,8 +299,12 @@ def Run(benchmark_spec):
         'replication_factor': FLAGS.aerospike_replication_factor,
         'client_threads': threads,
         'read_percent': FLAGS.aerospike_read_percent,
-        'aerospike_edition': FLAGS.aerospike_edition,
     })
+    if FLAGS.aerospike_edition == aerospike_server.AerospikeEdition.ENTERPRISE:
+      metadata.update({
+          'aerospike_version': FLAGS.aerospike_enterprise_version,
+          'aerospike_package': FLAGS.aerospike_enterprise_package
+      })
     for s in temp_samples:
       s.metadata.update(metadata)
     samples.extend(temp_samples)
