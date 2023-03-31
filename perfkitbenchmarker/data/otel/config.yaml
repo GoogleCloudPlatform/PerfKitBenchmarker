@@ -16,12 +16,11 @@ processors:
         metric_names:
         - system.cpu.time
         - system.disk.operation_time
-        - system.disk.io_time
         - system.disk.merged
-        - system.disk.weighted_io_time
         - system.network.errors
         - system.network.connections
         - system.network.dropped
+        - system.filesystem.inodes.usage
   metricstransform/default__pipeline_hostmetrics_2:
     transforms:
     - action: update
@@ -79,6 +78,20 @@ processors:
       operations:
       - action: toggle_scalar_data_type
     - action: update
+      include: system.disk.io_time
+      new_name: disk_io_time
+      operations:
+      - action: experimental_scale_value
+        experimental_scale: 1000.0
+      - action: toggle_scalar_data_type
+    - action: update
+      include: system.disk.weighted_io_time
+      new_name: disk_weighted_io_time
+      operations:
+      - action: experimental_scale_value
+        experimental_scale: 1000.0
+      - action: toggle_scalar_data_type
+    - action: update
       include: system.memory.usage
       new_name: memory_bytes_used
       operations:
@@ -130,6 +143,25 @@ processors:
       - action: update_label
         label: interface
         new_label: device
+    - action: update
+      include: system.filesystem.usage
+      new_name: disk_bytes_used
+      operations:
+      - action: toggle_scalar_data_type
+      - action: aggregate_labels
+        aggregation_type: max
+        label_set:
+        - device
+        - state
+    - action: update
+      include: system.filesystem.utilization
+      new_name: disk_percent_used
+      operations:
+      - action: aggregate_labels
+        aggregation_type: max
+        label_set:
+        - device
+        - state
 receivers:
   hostmetrics/default__pipeline_hostmetrics:
     collection_interval: {{INTERVAL}}s
@@ -138,6 +170,7 @@ receivers:
       disk: {}
       memory: {}
       network: {}
+      filesystem: {}
 service:
   pipelines:
     metrics/default__pipeline_hostmetrics:
