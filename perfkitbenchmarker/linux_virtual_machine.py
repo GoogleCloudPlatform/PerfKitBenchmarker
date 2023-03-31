@@ -2007,6 +2007,13 @@ class AmazonNeuronMixin(AmazonLinux2Mixin):
   OS_TYPE = os_types.AMAZON_NEURON
 
 
+class AmazonLinux2023Mixin(BaseRhelMixin):
+  """Class holding Amazon Linux 2023 VM methods and attributes."""
+  OS_TYPE = os_types.AMAZONLINUX2023
+  # Note no EPEL support
+  # https://docs.aws.amazon.com/linux/al2023/ug/compare-with-al2.html#epel
+
+
 class Rhel7Mixin(BaseRhelMixin):
   """Class holding RHEL 7 specific VM methods and attributes."""
   OS_TYPE = os_types.RHEL7
