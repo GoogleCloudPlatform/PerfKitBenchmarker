@@ -89,11 +89,12 @@ flags.DEFINE_enum(
     "populate it's cache.")
 _QUERIES_URL = flags.DEFINE_string(
     'dpb_sparksql_queries_url', None,
-    'Object Storage (e.g. GCS or S3) directory URL where the benchmark queries '
-    'are contained. They must be named like "q<number>.sql", e.g: "q1.sql", '
-    '"q14a.sql", etc. If omitted, queries will be fetched from '
-    'databricks/spark-sql-perf Github repo and use the --dpb_sparksql_query '
-    'flag to decide whether to get TPC-DS or TPC-H queries.')
+    'Object Storage (e.g. GCS or S3) directory URL where the benchmark query '
+    'files are contained. Their name must be their query number alone (e.g: '
+    '"1" or "14a") without any prefix or extension. If omitted, queries will '
+    'be fetched from databricks/spark-sql-perf Github repo and use the '
+    '--dpb_sparksql_query flag to decide whether to get TPC-DS or TPC-H '
+    'queries.')
 
 FLAGS = flags.FLAGS
 
