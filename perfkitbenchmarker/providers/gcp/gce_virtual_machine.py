@@ -557,7 +557,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       )
       cmd.flags['network-performance-configs'] = network_performance_configs
 
-    if self.on_host_maintenance:
+    if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
+      # TODO(pclay): remove when on-host-maintenance gets promoted to GA
+      cmd.use_alpha_gcloud = True
+      cmd.flags.update({
+          'confidential-compute': True,
+          'on-host-maintenance': 'TERMINATE'
+      })
+
+    elif self.on_host_maintenance:
       # TODO(pclay): remove when on-host-maintenance gets promoted to GA
       maintenance_flag = 'maintenance-policy'
       if cmd.use_alpha_gcloud:
@@ -1201,6 +1209,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['threads_per_core'] = self.threads_per_core
     if self.network.mtu:
       result['mtu'] = self.network.mtu
+    if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
+      result['confidential_compute'] = True
     return result
 
   def SimulateMaintenanceWithLog(self):

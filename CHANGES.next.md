@@ -125,6 +125,7 @@
 -   Add support for Amazon Linux 2023.
 -   Add support for multi-network creation/attachment. PKB currently does not
     handle subnet creation on an existing network.
+-   Add support for GCE Confidential VM's.
 
 ### Enhancements:
 

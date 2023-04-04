@@ -43,6 +43,9 @@ flags.DEFINE_string(
     'image_project', None, 'The project against which all image references will'
     ' be resolved. See: '
     'https://cloud.google.com/sdk/gcloud/reference/compute/disks/create')
+GCE_CONFIDENTIAL_COMPUTE = flags.DEFINE_boolean(
+    'gce_confidential_compute', False,
+    'Whether or not we create a Confidential VM Instance')
 GCE_NETWORK_NAMES = flags.DEFINE_list(
     'gce_network_name', [], 'The name of an already created '
     'network to use instead of creating a new one.')
