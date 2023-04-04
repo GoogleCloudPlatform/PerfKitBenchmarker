@@ -29,12 +29,13 @@ MVN_URL = 'https://archive.apache.org/dist/maven/maven-{0}/{1}/binaries/apache-m
 MVN_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'maven')
 MVN_ENV_PATH = '/etc/profile.d/maven.sh'
 
-MVN_ENV = '''
+MVN_ENV = """
 export JAVA_HOME={java_home}
 export M2_HOME={maven_home}
 export MAVEN_HOME={maven_home}
 export PATH={maven_home}/bin:$PATH
-'''
+export MVN_CLI_OPTS='{maven_cli_opts}'
+"""
 
 PACKAGE_NAME = 'maven'
 PREPROVISIONED_DATA = {
@@ -94,7 +95,9 @@ def _Install(vm):
 
   # Download and extract maven
   maven_full_ver = FLAGS.maven_version
-  maven_major_ver = maven_full_ver[:maven_full_ver.index('.')]
+  maven_major_ver, maven_minor_ver, maven_patch_ver = map(
+      int, maven_full_ver.split('.')
+  )
   maven_url = MVN_URL.format(maven_major_ver, maven_full_ver)
   maven_tar = maven_url.split('/')[-1]
   # will only work with preprovision_ignore_checksum
@@ -110,8 +113,17 @@ def _Install(vm):
 
   java_home = _GetJavaHome(vm)
 
+  # Don't output download progress.
+  if (maven_major_ver, maven_minor_ver, maven_patch_ver) >= (3, 6, 1):
+    maven_cli_opts = '--no-transfer-progress'
+  else:
+    maven_cli_opts = '--batch-mode'
+
   # Set env variables for maven
-  maven_env = MVN_ENV.format(java_home=java_home, maven_home=MVN_DIR)
+  maven_env = MVN_ENV.format(
+      java_home=java_home, maven_home=MVN_DIR, maven_cli_opts=maven_cli_opts
+  )
+
   cmd = 'echo "{0}" | sudo tee -a {1}'.format(maven_env, MVN_ENV_PATH)
   vm.RemoteCommand(cmd)
 
