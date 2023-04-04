@@ -83,7 +83,10 @@ class MavenTest(pkb_common_test_case.PkbCommonTestCase):
     expected = ('source {} && mvn install'.format(maven.MVN_ENV_PATH))
     self.assertEqual(expected, cmd)
 
-  def testAptInstall(self):
+  def testAptInstallNewMaven(self):
+    # mvn >= 3.6.1 supports the --no-transfer-progress flag.
+    FLAGS['maven_version'].parse('3.6.1')
+
     maven.AptInstall(self.vm)
     maven_full_ver = maven.FLAGS.maven_version
     maven_major_ver = maven_full_ver[:maven_full_ver.index('.')]
@@ -91,14 +94,54 @@ class MavenTest(pkb_common_test_case.PkbCommonTestCase):
     maven_tar = maven_url.split('/')[-1]
     maven_remote_path = posixpath.join(linux_packages.INSTALL_DIR, maven_tar)
     self.assertRemoteCommandsEqual([
-        'mkdir -p {0} && '
-        'tar -C {0} --strip-components=1 -xzf {1}'.format(maven.MVN_DIR,
-                                                          maven_remote_path),
-        'java -XshowSettings:properties 2>&1 > /dev/null '
-        '| awk \'/java.home/{print $3}\'',
+        'mkdir -p {0} && tar -C {0} --strip-components=1 -xzf {1}'.format(
+            maven.MVN_DIR, maven_remote_path
+        ),
+        (
+            'java -XshowSettings:properties 2>&1 > /dev/null '
+            "| awk '/java.home/{print $3}'"
+        ),
         'echo "{0}" | sudo tee -a {1}'.format(
-            maven.MVN_ENV.format(java_home='/home', maven_home=maven.MVN_DIR),
-            maven.MVN_ENV_PATH)
+            maven.MVN_ENV.format(
+                java_home='/home',
+                maven_home=maven.MVN_DIR,
+                maven_cli_opts='--no-transfer-progress',
+            ),
+            maven.MVN_ENV_PATH,
+        ),
+    ])
+    self.assertVmInstallCommandsEqual(['openjdk', 'curl'])
+    self.assertOnlyKnownMethodsCalled(
+        'RemoteCommand', 'InstallPreprovisionedPackageData', 'Install'
+    )
+
+  def testAptInstallOldMaven(self):
+    # For mvn < 3.6.1, we use --batch-mode instead of the --no-transfer-progress
+    # flag.
+    FLAGS['maven_version'].parse('3.6.0')
+
+    maven.AptInstall(self.vm)
+    maven_full_ver = maven.FLAGS.maven_version
+    maven_major_ver = maven_full_ver[: maven_full_ver.index('.')]
+    maven_url = maven.MVN_URL.format(maven_major_ver, maven_full_ver)
+    maven_tar = maven_url.split('/')[-1]
+    maven_remote_path = posixpath.join(linux_packages.INSTALL_DIR, maven_tar)
+    self.assertRemoteCommandsEqual([
+        'mkdir -p {0} && tar -C {0} --strip-components=1 -xzf {1}'.format(
+            maven.MVN_DIR, maven_remote_path
+        ),
+        (
+            'java -XshowSettings:properties 2>&1 > /dev/null '
+            "| awk '/java.home/{print $3}'"
+        ),
+        'echo "{0}" | sudo tee -a {1}'.format(
+            maven.MVN_ENV.format(
+                java_home='/home',
+                maven_home=maven.MVN_DIR,
+                maven_cli_opts='--batch-mode',
+            ),
+            maven.MVN_ENV_PATH,
+        ),
     ])
     self.assertVmInstallCommandsEqual(['openjdk', 'curl'])
     self.assertOnlyKnownMethodsCalled('RemoteCommand',
