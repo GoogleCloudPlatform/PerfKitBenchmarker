@@ -970,11 +970,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self, 'compute', 'instances', 'describe', self.name
     )
     stdout, stderr, return_code = getinstance_cmd.Issue(raise_on_failure=False)
-    if (
-        return_code
-        and 'ERROR: (gcloud.compute.instances.describe) Could not fetch resource:'
-        in stderr
-    ):
+    if return_code and re.search(r"The resource \'.*'\ was not found", stderr):
       return False
     response = json.loads(stdout)
     # The VM may exist before we can fully parse the describe response for the
