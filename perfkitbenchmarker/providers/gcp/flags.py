@@ -43,13 +43,13 @@ flags.DEFINE_string(
     'image_project', None, 'The project against which all image references will'
     ' be resolved. See: '
     'https://cloud.google.com/sdk/gcloud/reference/compute/disks/create')
-GCE_NETWORK_NAME = flags.DEFINE_string(
-    'gce_network_name', None, 'The name of an already created '
+GCE_NETWORK_NAMES = flags.DEFINE_list(
+    'gce_network_name', [], 'The name of an already created '
     'network to use instead of creating a new one.')
 GCE_NETWORK_TYPE = flags.DEFINE_string(
     'gce_network_type', None, 'The network type or mode (i.e. auto, custom)')
-flags.DEFINE_string(
-    'gce_subnet_name', None, 'The name of an already created '
+GCE_SUBNET_NAMES = flags.DEFINE_list(
+    'gce_subnet_name', [], 'The name of an already created '
     'subnet to use instead of creating a new one.')
 flags.DEFINE_string(
     'gce_subnet_region', None, 'Region to create subnet in '

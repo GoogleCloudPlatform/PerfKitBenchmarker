@@ -348,7 +348,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     self.assertRegexpMatches(net_name, _REGEX_GCE_NET_NAMES)
 
   @flagsaver.flagsaver(
-      gce_network_name='my-network', gce_subnet_name='my-subnet'
+      gce_network_name='my-network'
   )
   def testSpecifyNetworkName(self):
     vm = mock.Mock(
@@ -376,7 +376,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     )
     net = gce_network.GceNetwork.GetNetwork(vm)
     self.assertTrue(net.is_existing_network)
-    self.assertEqual('my-network', net.network_resource.name)
+    self.assertEqual('my-subnet', net.network_resource.name)
     self.assertEqual('my-subnet', net.subnet_resource.name)
 
   @flagsaver.flagsaver(

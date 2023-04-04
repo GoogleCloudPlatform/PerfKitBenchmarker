@@ -123,6 +123,8 @@
     benchmarks in parallel using the first 2 VM's in benchmark_spec.
 -   Add Google Kubernetes Engine based DPB service to run flink benchmarks.
 -   Add support for Amazon Linux 2023.
+-   Add support for multi-network creation/attachment. PKB currently does not
+    handle subnet creation on an existing network.
 
 ### Enhancements:
 

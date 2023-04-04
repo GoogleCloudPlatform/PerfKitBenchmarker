@@ -568,16 +568,24 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # This flag is mutually exclusive with any of these flags:
     # --address, --network, --network-tier, --subnet, --private-network-ip.
     # gcloud compute instances create ... --network-interface=
-    ni_args = []
-    if self.network.subnet_resource is not None:
-      ni_args.append(f'subnet={self.network.subnet_resource.name}')
-    else:
-      ni_args.append(f'network={self.network.network_resource.name}')
-    ni_args.append(f'network-tier={self.gce_network_tier.upper()}')
-    ni_args.append(f'nic-type={self.gce_nic_type.upper()}')
+    common_ni_args = [
+        f'network-tier={self.gce_network_tier.upper()}',
+        f'nic-type={self.gce_nic_type.upper()}',
+    ]
     if not self.assign_external_ip:
-      ni_args.append('no-address')
-    cmd.flags['network-interface'] = ','.join(ni_args)
+      common_ni_args.append('no-address')
+    if self.network.subnet_resources:
+      for subnet_resource in self.network.subnet_resources:
+        cmd.additional_flags += [
+            '--network-interface',
+            ','.join([f'subnet={subnet_resource.name}'] + common_ni_args),
+        ]
+    else:
+      for network_resource in self.network.network_resources:
+        cmd.additional_flags += [
+            '--network-interface',
+            ','.join([f'network={network_resource.name}'] + common_ni_args),
+        ]
 
     if self.image:
       cmd.flags['image'] = self.image
@@ -1178,7 +1186,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.max_local_disks:
       result['gce_local_ssd_count'] = self.max_local_disks
       result['gce_local_ssd_interface'] = self.ssd_interface
-    result['gce_network_name'] = self.network.network_resource.name
+    result['gce_network_name'] = ','.join(
+        network_resource.name
+        for network_resource in self.network.network_resources
+    )
+    result['gce_subnet_name'] = ','.join(
+        subnet_resource.name
+        for subnet_resource in self.network.subnet_resources
+    )
     result['gce_network_tier'] = self.gce_network_tier
     result['gce_nic_type'] = self.gce_nic_type
     if self.gce_egress_bandwidth_tier:
