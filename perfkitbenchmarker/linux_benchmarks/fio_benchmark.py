@@ -19,7 +19,6 @@ Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 """
 
 
-import collections
 import json
 import logging
 import posixpath
@@ -176,10 +175,6 @@ flags.DEFINE_integer('fio_log_hist_msec', 1000,
                      'Same as fio_log_avg_msec, but logs entries for '
                      'completion latency histograms. If set to 0, histogram '
                      'logging is disabled.')
-flags.DEFINE_boolean(  # TODO(user): Add support for simultaneous read.
-    'fio_write_against_multiple_clients', False,
-    'Whether to run fio against multiple clients. Only applicable '
-    'when running fio against network mounts and rw=write.')
 flags.DEFINE_integer('fio_command_timeout_sec', None,
                      'Timeout for fio commands in seconds.')
 flags.DEFINE_enum('fio_rng', 'tausworthe64',
@@ -665,9 +660,6 @@ def PrepareWithExec(vm, exec_path):
     vm.FormatDisk(disk.GetDevicePath(), disk_spec.disk_type)
     vm.MountDisk(disk.GetDevicePath(), disk.mount_point,
                  disk_spec.disk_type, disk.mount_options, disk.fstab_options)
-  if FLAGS.fio_write_against_multiple_clients:
-    vm.RemoteCommand('sudo rm -rf %s/%s' % (disk.mount_point, vm.name))
-    vm.RemoteCommand('sudo mkdir -p %s/%s' % (disk.mount_point, vm.name))
 
 
 def Run(benchmark_spec):
@@ -698,29 +690,6 @@ def RunFioOnVMs(vms):
       item.metadata['machine_instance'] = i
     samples.extend(samples_list[i])
 
-  if FLAGS.fio_write_against_multiple_clients and samples:
-    metrics = collections.defaultdict(list)
-    for item in samples:
-      # example metric: 'filestore-bandwidth:write:bandwidth'
-      metrics[item.metric.split(':', 1)[-1]].append(item.value)
-
-    samples.append(
-        sample.Sample('Total_write_throughput', sum(metrics['write:bandwidth']),
-                      'KB/s'))
-    samples.append(
-        sample.Sample('Total_write_iops', sum(metrics['write:iops']), 'ops'))
-    earliest_start = min(metrics['start_time'])
-    latest_start = max(metrics['start_time'])
-    earliest_end = min(metrics['end_time'])
-    latest_end = max(metrics['end_time'])
-    # Invalid run if the start and end times don't overlap 95%.
-    nonoverlap_percent = (latest_end - earliest_end + latest_start -
-                          earliest_start) / (
-                              earliest_end - latest_start)
-    valid_run = (nonoverlap_percent < 0.05)
-    for item in samples:
-      item.metadata['valid_run'] = valid_run
-      item.metadata['nonoverlap_percentage'] = nonoverlap_percent
   for item in samples:
     item.metadata['fio_target_mode'] = FLAGS.fio_target_mode
     item.metadata['fio_fill_size'] = FLAGS.fio_fill_size
@@ -745,9 +714,6 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
 
   disk = vm.scratch_disks[0]
   mount_point = disk.mount_point
-  if FLAGS.fio_write_against_multiple_clients:
-    mount_point = '%s/%s' % (disk.mount_point, vm.name)
-    logging.info('FIO mount point changed to %s', mount_point)
 
   job_file_string = GetOrGenerateJobFileString(
       FLAGS.fio_jobfile,

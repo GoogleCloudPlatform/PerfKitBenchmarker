@@ -43,6 +43,7 @@
 -   Remove Dataflow parameter --maxNumWorkers by default and add
     dataflow_max_worker_count in spec to allow users to set this parameter on
     their own.
+-   Remove flag fio_write_against_multiple_clients from FIO.
 
 ### New features:
 
