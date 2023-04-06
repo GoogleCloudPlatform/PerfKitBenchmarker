@@ -690,16 +690,11 @@ def RunFioOnVMs(vms):
       item.metadata['machine_instance'] = i
     samples.extend(samples_list[i])
 
-  for item in samples:
-    item.metadata['fio_target_mode'] = FLAGS.fio_target_mode
-    item.metadata['fio_fill_size'] = FLAGS.fio_fill_size
-    item.metadata['fio_rng'] = FLAGS.fio_rng
-
   return samples
 
 
 def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
-  """Spawn fio and gather the results.
+  """Spawn fio and gather the results. Used by Windows FIO as well.
 
   Args:
     vm: vm to run the benchmark on.
@@ -780,6 +775,11 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
       sample.Sample('start_time', start_time, 'sec', samples[0].metadata))
   samples.append(
       sample.Sample('end_time', end_time, 'sec', samples[0].metadata))
+
+  for item in samples:
+    item.metadata['fio_target_mode'] = FLAGS.fio_target_mode
+    item.metadata['fio_fill_size'] = FLAGS.fio_fill_size
+    item.metadata['fio_rng'] = FLAGS.fio_rng
 
   return samples
 
