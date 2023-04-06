@@ -655,7 +655,16 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise ValueError(
             '--aws_image_name_filter is not supported for AWS OS Mixins that '
             'use SSM to select AMIs. You can still pass --image.')
-      return f'resolve:ssm:{cls.IMAGE_SSM_PATTERN}'.format(**format_dict)
+      stdout, _, _ = vm_util.IssueCommand(util.AWS_PREFIX + [
+          'ssm', 'get-parameters',
+          '--region', region,
+          '--names', cls.IMAGE_SSM_PATTERN.format(**format_dict)])
+      response = json.loads(stdout)
+      if response['InvalidParameters']:
+        raise AwsImageNotFoundError('Invalid SSM parameters:\n' + stdout)
+      parameters = response['Parameters']
+      assert len(parameters) == 1
+      return parameters[0]['Value']
 
     # These cannot be REQUIRED_ATTRS, because nesting REQUIRED_ATTRS breaks.
     if not cls.IMAGE_OWNER:
