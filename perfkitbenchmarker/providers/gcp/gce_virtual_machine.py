@@ -1657,12 +1657,51 @@ class CentOsStream9BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
-class ContainerOptimizedOsBasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.ContainerOptimizedOsMixin
-):
+class BaseCosBasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.BaseContainerLinuxMixin):
+  BASE_OS_TYPE = os_types.CORE_OS
+  DEFAULT_IMAGE_PROJECT = 'cos-cloud'
+
+  def PrepareVMEnvironment(self):
+    super().PrepareVMEnvironment()
+    # COS mounts /home and /tmp with -o noexec, which blocks running benchmark
+    # binaries.
+    # TODO(user): Support reboots
+    self.RemoteCommand('sudo mount -o remount,exec /home')
+    self.RemoteCommand('sudo mount -o remount,exec /tmp')
+
+
+class CosStableBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS
   DEFAULT_IMAGE_FAMILY = 'cos-stable'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-stable'
-  DEFAULT_IMAGE_PROJECT = 'cos-cloud'
+
+
+class CosDevBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS_DEV
+  DEFAULT_IMAGE_FAMILY = 'cos-dev'
+  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-dev'
+
+
+class Cos101BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS101
+  DEFAULT_IMAGE_FAMILY = 'cos-101-lts'
+  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-101-lts'
+
+
+class Cos97BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS97
+  DEFAULT_IMAGE_FAMILY = 'cos-97-lts'
+
+
+class Cos93BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS93
+  DEFAULT_IMAGE_FAMILY = 'cos-93-lts'
+
+
+class Cos89BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS89
+  DEFAULT_IMAGE_FAMILY = 'cos-89-lts'
 
 
 class CoreOsBasedGceVirtualMachine(

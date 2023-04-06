@@ -2145,20 +2145,6 @@ class RockyLinux9Mixin(BaseRhelMixin):
         'sudo dnf install -y epel-release')
 
 
-class ContainerOptimizedOsMixin(BaseContainerLinuxMixin):
-  """Class holding COS specific VM methods and attributes."""
-  OS_TYPE = os_types.COS
-  BASE_OS_TYPE = os_types.CORE_OS
-
-  def PrepareVMEnvironment(self):
-    super(ContainerOptimizedOsMixin, self).PrepareVMEnvironment()
-    # COS mounts /home and /tmp with -o noexec, which blocks running benchmark
-    # binaries.
-    # TODO(user): Support reboots
-    self.RemoteCommand('sudo mount -o remount,exec /home')
-    self.RemoteCommand('sudo mount -o remount,exec /tmp')
-
-
 class CoreOsMixin(BaseContainerLinuxMixin):
   """Class holding CoreOS Container Linux specific VM methods and attributes."""
   OS_TYPE = os_types.CORE_OS

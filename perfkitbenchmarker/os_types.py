@@ -23,7 +23,12 @@ CENTOS8 = 'centos8'  # deprecated
 CENTOS_STREAM8 = 'centos_stream8'
 CENTOS_STREAM9 = 'centos_stream9'
 CLEAR = 'clear'
-COS = 'cos'
+COS = 'cos'  # stable
+COS101 = 'cos101'
+COS97 = 'cos97'
+COS93 = 'cos93'
+COS89 = 'cos89'
+COS_DEV = 'cos_dev'
 CORE_OS = 'core_os'
 DEBIAN9 = 'debian9'
 DEBIAN10 = 'debian10'
@@ -73,6 +78,11 @@ WINDOWS = 'windows'
 CONTAINER_OS_TYPES = [
     CORE_OS,
     COS,
+    COS101,
+    COS97,
+    COS93,
+    COS89,
+    COS_DEV,
 ]
 
 LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
