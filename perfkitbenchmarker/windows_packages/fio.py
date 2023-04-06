@@ -16,9 +16,9 @@
 
 import ntpath
 
-WINDOWS_FIO_DIR = 'fio-3.1-x86'
+WINDOWS_FIO_DIR = 'fio-3.27-x86'
 FIO_ZIP = WINDOWS_FIO_DIR + '.zip'
-FIO_URL = 'https://bluestop.org/files/fio/releases/' + FIO_ZIP
+FIO_URL = 'https://bsdio.com/fio/releases/' + FIO_ZIP
 
 
 def GetFioExec(vm):

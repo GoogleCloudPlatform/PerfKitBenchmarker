@@ -180,6 +180,8 @@ flags.DEFINE_integer('fio_command_timeout_sec', None,
 flags.DEFINE_enum('fio_rng', 'tausworthe64',
                   ['tausworthe', 'lfsr', 'tausworthe64'],
                   'Which RNG to use for 4k Random IOPS.')
+flags.DEFINE_enum('fio_ioengine', 'libaio', ['libaio', 'windowsaio'],
+                  'Defines how the job issues I/O to the file')
 _DIRECT_IO = flags.DEFINE_boolean(
     'fio_direct', True,
     'Whether to use O_DIRECT to bypass OS cache. This is strongly '
@@ -219,10 +221,11 @@ def FillDevice(vm, disk, fill_size, exec_path):
     exec_path: string path to the fio executable
   """
 
-  command = (('%s --filename=%s --ioengine=libaio '
-              '--name=fill-device --blocksize=512k --iodepth=64 '
-              '--rw=write --direct=1 --size=%s') %
-             (exec_path, disk.GetDevicePath(), fill_size))
+  command = (
+      f'{exec_path} --filename={disk.GetDevicePath()} '
+      f'--ioengine={FLAGS.fio_ioengine} --name=fill-device '
+      f'--blocksize=512k --iodepth=64 --rw=write --direct=1 --size={fill_size}'
+  )
 
   vm.RobustRemoteCommand(command)
 
@@ -241,7 +244,7 @@ fio:
 
 JOB_FILE_TEMPLATE = """
 [global]
-ioengine=libaio
+ioengine={{ioengine}}
 invalidate=1
 direct={{direct}}
 runtime={{runtime}}
@@ -492,6 +495,7 @@ def GenerateJobFileString(filename, scenario_strings,
                                       undefined=jinja2.StrictUndefined)
 
   return str(job_file_template.render(
+      ioengine=FLAGS.fio_ioengine,
       runtime=runtime,
       filename=filename,
       scenarios=jinja_scenarios,
