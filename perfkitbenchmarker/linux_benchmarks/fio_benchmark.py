@@ -254,10 +254,8 @@ group_reporting=1
 {{parameter}}
 {%- endfor %}
 {%- for scenario in scenarios %}
-{%- for numjob in numjobs %}
-{%- for iodepth in iodepths %}
 
-[{{scenario['name']}}-io-depth-{{iodepth}}-num-jobs-{{numjob}}]
+[{{scenario['name']}}-io-depth-{{scenario['iodepth']}}-num-jobs-{{scenario['numjobs']}}]
 stonewall
 rw={{scenario['rwkind']}}
 {%- if scenario['rwmixread'] is defined %}
@@ -274,11 +272,9 @@ blocksize={{scenario['blocksize']}}
 {%- elif scenario['bssplit'] is defined %}
 bssplit={{scenario['bssplit']}}
 {%- endif%}
-iodepth={{iodepth}}
+iodepth={{scenario['iodepth']}}
 size={{scenario['size']}}
-numjobs={{numjob}}
-{%- endfor %}
-{%- endfor %}
+numjobs={{scenario['numjobs']}}
 {%- endfor %}
 """
 
@@ -324,6 +320,8 @@ FIO_KNOWN_FIELDS_IN_JINJA = [
     'rwmixread',
     'rwmixwrite',
     'fsync',
+    'iodepth',  # overrides --fio_io_depths
+    'numjobs',  # overrides --fio_num_jobs
 ]
 
 
@@ -451,6 +449,7 @@ def GenerateJobFileString(filename, scenario_strings,
                          if working_set_size else '100%')
   blocksize_override = (str(int(block_size.m_as(units.byte))) + 'B'
                         if block_size else None)
+  should_use_scenario_iodepth_numjobs = True
 
   for scenario in scenarios:
     # per legacy behavior, the block size parameter
@@ -463,18 +462,39 @@ def GenerateJobFileString(filename, scenario_strings,
     if 'size' not in scenario:
       scenario['size'] = default_size_string
 
+    if 'iodepth' not in scenario or 'numjobs' not in scenario:
+      should_use_scenario_iodepth_numjobs = False
+
+  jinja_scenarios = []
+  if should_use_scenario_iodepth_numjobs:
+    # All scenarios supply iodepth and numjobs.
+    # Remove iodepth and numjobs from scenario name to prevent redundancy.
+    for scenario in scenarios:
+      scenario['name'] = scenario['name'].replace(
+          f'_iodepth-{scenario["iodepth"]}', '')
+      scenario['name'] = scenario['name'].replace(
+          f'_numjobs-{scenario["numjobs"]}', '')
+
+    jinja_scenarios = scenarios  # scenarios already includes iodepth, numjobs
+  else:
+    # preserve functionality of creating a cross product of all
+    # (scenario X io_depths X num_jobs)
+    # which allows a single run to produce all of these metrics
+    for scenario in scenarios:
+      for num_job in num_jobs:
+        for io_depth in io_depths:
+          scenario_copy = scenario.copy()
+          scenario_copy['iodepth'] = io_depth
+          scenario_copy['numjobs'] = num_job
+          jinja_scenarios.append(scenario_copy)
+
   job_file_template = jinja2.Template(JOB_FILE_TEMPLATE,
                                       undefined=jinja2.StrictUndefined)
 
-  # the template creates a cross product of all
-  # (scenario X io_depths X num_jobs)
-  # which allows a single run to produce all of these metrics
   return str(job_file_template.render(
       runtime=runtime,
       filename=filename,
-      scenarios=scenarios,
-      iodepths=io_depths,
-      numjobs=num_jobs,
+      scenarios=jinja_scenarios,
       direct=int(direct),
       parameters=parameters))
 
