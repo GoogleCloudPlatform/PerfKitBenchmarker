@@ -237,6 +237,8 @@ def ParseHistogramFile(
   window_count_for_operation = collections.defaultdict(int)
   for line in result_lines:
     histogram_line = ParseHistogramLine(line)
+    if not histogram_line.counts:
+      continue
     op = histogram_line.operation
     # Index starts at 1
     window_count_for_operation[op] += 1
