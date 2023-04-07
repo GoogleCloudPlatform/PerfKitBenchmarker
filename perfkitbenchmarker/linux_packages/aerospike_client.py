@@ -54,6 +54,7 @@ class HistogramLine:
   buckets: List[int]
   counts: List[int]
   time: datetime.datetime
+  duration: float = 0
   windows: int = 0
 
 
@@ -211,6 +212,7 @@ def ParseHistogramLine(line: str) -> HistogramLine:
   values = line.split()
   op = values[0].split('_')[0]
   time = ParseDate(values[1][:-1])
+  duration = float(values[2][:-2])
   latency_histograms = values[4:]
   buckets = []
   counts = []
@@ -218,7 +220,7 @@ def ParseHistogramLine(line: str) -> HistogramLine:
     bucket, count = latency.split(':')
     buckets.append(int(bucket))
     counts.append(int(count.split(',')[0]))
-  return HistogramLine(op, buckets, counts, time)
+  return HistogramLine(op, buckets, counts, time, duration, 0)
 
 
 def ParseHistogramFile(
@@ -237,7 +239,7 @@ def ParseHistogramFile(
   window_count_for_operation = collections.defaultdict(int)
   for line in result_lines:
     histogram_line = ParseHistogramLine(line)
-    if not histogram_line.counts:
+    if not histogram_line.counts or histogram_line.duration < 0.01:
       continue
     op = histogram_line.operation
     # Index starts at 1
