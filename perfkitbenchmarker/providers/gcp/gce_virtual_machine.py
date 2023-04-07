@@ -1195,9 +1195,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.max_local_disks:
       result['gce_local_ssd_count'] = self.max_local_disks
       result['gce_local_ssd_interface'] = self.ssd_interface
+    # self.network.network_resources can be None when subnet_names are populated
+    network_resources = (
+        self.network.network_resources or self.network.subnet_resources
+    )
     result['gce_network_name'] = ','.join(
-        network_resource.name
-        for network_resource in self.network.network_resources
+        network_resource.name for network_resource in network_resources
     )
     result['gce_subnet_name'] = ','.join(
         subnet_resource.name
