@@ -38,6 +38,8 @@ ntttcp:
     default:
       vm_spec: *default_single_core
       vm_count: 2
+  flags:
+    placement_group_style: closest_supported
 """
 
 
