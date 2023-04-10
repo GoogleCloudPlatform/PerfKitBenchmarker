@@ -1686,6 +1686,12 @@ class CosDevBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-dev'
 
 
+class Cos105BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS105
+  DEFAULT_IMAGE_FAMILY = 'cos-105-lts'
+  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-105-lts'
+
+
 class Cos101BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS101
   DEFAULT_IMAGE_FAMILY = 'cos-101-lts'
@@ -1697,14 +1703,13 @@ class Cos97BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   DEFAULT_IMAGE_FAMILY = 'cos-97-lts'
 
 
-class Cos93BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+class Cos93BasedGceVirtualMachine(
+    BaseCosBasedGceVirtualMachine, virtual_machine.DeprecatedOsMixin):
   OS_TYPE = os_types.COS93
   DEFAULT_IMAGE_FAMILY = 'cos-93-lts'
-
-
-class Cos89BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
-  OS_TYPE = os_types.COS89
-  DEFAULT_IMAGE_FAMILY = 'cos-89-lts'
+  # Not sure if it's beginning or end of October
+  END_OF_LIFE = '2023-10-01'
+  ALTERNATIVE_OS = os_types.COS97
 
 
 class CoreOsBasedGceVirtualMachine(
