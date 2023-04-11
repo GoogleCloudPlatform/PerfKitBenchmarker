@@ -77,7 +77,7 @@ INSTANCE_TRANSITIONAL_STATUSES = frozenset([
 INSTANCE_EXISTS_STATUSES = INSTANCE_TRANSITIONAL_STATUSES | frozenset(
     [RUNNING, 'SUSPENDED', 'STOPPED']
 )
-INSTANCE_KNOWN_STATUSES = (INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES)
+INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 
 # 2h timeout for LM notificaiton
 LM_NOTIFICATION_TIMEOUT_SECONDS = 60 * 60 * 2
@@ -528,8 +528,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       # Assign host_arch to avoid running detect_host on ARM
       self.host_arch = arm_arch
       self.is_aarch64 = True
-    self.image_family = (
-        vm_spec.image_family or self.GetDefaultImageFamily(self.is_aarch64))
+    self.image_family = vm_spec.image_family or self.GetDefaultImageFamily(
+        self.is_aarch64
+    )
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
@@ -565,10 +566,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
       # TODO(pclay): remove when on-host-maintenance gets promoted to GA
       cmd.use_alpha_gcloud = True
-      cmd.flags.update({
-          'confidential-compute': True,
-          'on-host-maintenance': 'TERMINATE'
-      })
+      if gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value == 'sev':
+        cmd.flags.update({'confidential-compute': True})
+      cmd.flags.update({'on-host-maintenance': 'TERMINATE'})
 
     elif self.on_host_maintenance:
       # TODO(pclay): remove when on-host-maintenance gets promoted to GA
@@ -999,7 +999,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry(
       poll_interval=1,
       log_errors=False,
-      retryable_exceptions=(GceTransitionalVmRetryableError,))
+      retryable_exceptions=(GceTransitionalVmRetryableError,),
+  )
   def _WaitUntilRunning(self):
     """Waits until the VM has reached the RUNNING state."""
     getinstance_cmd = util.GcloudCommand(
@@ -1009,8 +1010,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     response = json.loads(stdout)
     status = response['status']
     if status in INSTANCE_TRANSITIONAL_STATUSES:
-      logging.info('VM has status %s; retrying instances describe command.',
-                   status)
+      logging.info(
+          'VM has status %s; retrying instances describe command.', status
+      )
       raise GceTransitionalVmRetryableError()
     elif status == TERMINATED:
       logging.info('VM has been terminated; Provisioning failed.')
@@ -1219,6 +1221,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['mtu'] = self.network.mtu
     if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
       result['confidential_compute'] = True
+      result['confidential_compute_type'] = (
+          gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value
+      )
     return result
 
   def SimulateMaintenanceWithLog(self):

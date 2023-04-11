@@ -46,6 +46,11 @@ flags.DEFINE_string(
 GCE_CONFIDENTIAL_COMPUTE = flags.DEFINE_boolean(
     'gce_confidential_compute', False,
     'Whether or not we create a Confidential VM Instance')
+GCE_CONFIDENTIAL_COMPUTE_TYPE = flags.DEFINE_string(
+    'gce_confidential_compute_type',
+    'sev',
+    'Type of Confidential VM Instance'
+)
 GCE_NETWORK_NAMES = flags.DEFINE_list(
     'gce_network_name', [], 'The name of an already created '
     'network to use instead of creating a new one.')
