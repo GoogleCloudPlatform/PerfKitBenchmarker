@@ -129,6 +129,7 @@
 -   Add support for GCE Confidential VM's.
 -   Add cos-dev, cos105, cos101, cos97, and cos93 OS support for GCP.
 
+-   Add --object_ttl_days flag for lifecycle management of created buckets.
 ### Enhancements:
 
 -   Added delay_time support for delete operations in object storage service.

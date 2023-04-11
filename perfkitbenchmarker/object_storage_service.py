@@ -29,6 +29,9 @@ flags.DEFINE_string('object_storage_credential_file', None,
                     'Directory of credential file.')
 flags.DEFINE_string('boto_file_location', None,
                     'The location of the boto file.')
+OBJECT_TTL_DAYS = flags.DEFINE_integer(
+    'object_ttl_days', None,
+    'The object TTL in days to set on any bucket created.')
 
 FLAGS = flags.FLAGS
 
