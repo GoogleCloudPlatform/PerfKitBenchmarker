@@ -68,16 +68,6 @@ STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
     encoded_command=six.ensure_str(
         base64.b64encode(_STARTUP_SCRIPT.encode('utf-16-le'))))
 
-# Cygwin constants for installing and running commands through Cygwin.
-# _CYGWIN_FORMAT provides a format string to transform a bash command into one
-# that runs under Cygwin.
-_CYGWIN32_URL = 'https://cygwin.com/setup-x86.exe'
-_CYGWIN64_URL = 'https://cygwin.com/setup-x86_64.exe'
-_CYGWIN_MIRROR = 'https://mirrors.kernel.org/sourceware/cygwin/'
-_CYGWIN_ROOT = r'%PROGRAMFILES%\cygwinx86\cygwin'
-_CYGWIN_FORMAT = (r"%s\bin\bash.exe -c 'export PATH=$PATH:/usr/bin && "
-                  "{command}'" % _CYGWIN_ROOT)
-
 
 class WaitTimeoutError(Exception):
   """Exception thrown if a wait operation takes too long."""
@@ -100,7 +90,6 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     self.home_dir = None
     self.system_drive = None
     self.assigned_disk_letter = ATTACHED_DISK_LETTER
-    self._send_remote_commands_to_cygwin = False
 
   def RobustRemoteCommand(
       self,
@@ -234,51 +223,6 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
     return stdout, stderr
-
-  def InstallCygwin(self, bit64=True, packages=None):
-    """Downloads and installs cygwin on the Windows instance.
-
-    TODO(deitz): Support installing packages via vm.Install calls where the VM
-    would look in Linux packages and try to find a CygwinInstall function to
-    call. Alternatively, consider using cyg-apt as an installation method. With
-    this additional change, we could use similar code to run benchmarks under
-    both Windows and Linux (if necessary and useful).
-
-    Args:
-      bit64: Whether to use 64-bit Cygwin (default) or 32-bit Cygwin.
-      packages: List of packages to install on Cygwin.
-    """
-    url = _CYGWIN64_URL if bit64 else _CYGWIN32_URL
-    setup_exe = url.split('/')[-1]
-    self.DownloadFile(url, setup_exe)
-    self.RemoteCommand(
-        r'.\{setup_exe} --quiet-mode --site {mirror} --root "{cygwin_root}" '
-        '--packages {packages}'.format(
-            setup_exe=setup_exe,
-            mirror=_CYGWIN_MIRROR,
-            cygwin_root=_CYGWIN_ROOT,
-            packages=','.join(packages)))
-
-  def RemoteCommandCygwin(self, command, *args, **kwargs):
-    """Runs a Cygwin command on the VM.
-
-    Args:
-      command: A valid bash command to run under Cygwin.
-      *args: Arguments passed directly to RemoteCommandWithReturnCode.
-      **kwargs: Keyword arguments passed directly to
-          RemoteCommandWithReturnCode.
-
-    Returns:
-      A tuple of stdout and stderr from running the command.
-
-    Raises:
-      RemoteCommandError: If there was a problem issuing the command or the
-          command timed out.
-    """
-    # Wrap the command to be executed via bash.exe under Cygwin. Escape quotes
-    # since they are executed in a string.
-    cygwin_command = _CYGWIN_FORMAT.format(command=command.replace('"', r'\"'))
-    return self.RemoteCommand(cygwin_command, *args, **kwargs)
 
   def RemoteCopy(self, local_path, remote_path='', copy_to=True):
     """Copies a file to or from the VM.

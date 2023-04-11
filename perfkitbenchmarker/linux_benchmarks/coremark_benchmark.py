@@ -105,8 +105,9 @@ def RunCoremark(remote_command, thread_count):
     A list of sample.Sample objects with the performance results.
   """
   remote_command(
-      'cd %s;make PORT_DIR=linux64 clean; make PORT_DIR=linux64 ITERATIONS=%s XCFLAGS="-g -O2 '
-      '-DMULTITHREAD=%d -DUSE_%s -DPERFORMANCE_RUN=1"' %
+      'cd %s;make PORT_DIR=linux64 clean; '
+      'make PORT_DIR=linux64 ITERATIONS=%s '
+      'XCFLAGS="-DMULTITHREAD=%d -DUSE_%s -DPERFORMANCE_RUN=1"' %
       (COREMARK_DIR, ITERATIONS_PER_CPU, thread_count,
        _COREMARK_PARALLELISM_METHOD.value))
   output, _ = remote_command('cat %s/run1.log' % COREMARK_DIR)

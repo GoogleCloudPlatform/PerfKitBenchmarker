@@ -44,6 +44,7 @@
     dataflow_max_worker_count in spec to allow users to set this parameter on
     their own.
 -   Remove flag fio_write_against_multiple_clients from FIO.
+-   Drop windows coremark benchmark.
 
 ### New features:
 
@@ -377,3 +378,5 @@
     Bigtable veneer client.
 -   Add flag dpb_job_type and support running native flink pipeline on
     dataproc_flink.
+-   Cleanup Coremark compiling flags.
+-   Remove cygwin codepath.
