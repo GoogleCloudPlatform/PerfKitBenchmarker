@@ -95,6 +95,11 @@ _QUERIES_URL = flags.DEFINE_string(
     'be fetched from databricks/spark-sql-perf Github repo and use the '
     '--dpb_sparksql_query flag to decide whether to get TPC-DS or TPC-H '
     'queries.')
+DUMP_SPARK_CONF = flags.DEFINE_bool(
+    'dpb_sparksql_dump_spark_conf', False,
+    "Dump job's spark configuration properties to the DPB service's bucket. "
+    'For debugging purposes.'
+)
 
 FLAGS = flags.FLAGS
 

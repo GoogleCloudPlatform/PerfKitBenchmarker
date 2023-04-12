@@ -291,6 +291,8 @@ def _RunQueries(benchmark_spec) -> tuple[str, dpb_service.JobResult]:
     args += ['--enable-hive', 'True']
   if FLAGS.dpb_sparksql_table_cache:
     args += ['--table-cache', FLAGS.dpb_sparksql_table_cache]
+  if dpb_sparksql_benchmark_helper.DUMP_SPARK_CONF.value:
+    args += ['--dump-spark-conf', os.path.join(cluster.base_dir, 'spark-conf')]
   jars = []
   if FLAGS.spark_bigquery_connector:
     jars.append(FLAGS.spark_bigquery_connector)
