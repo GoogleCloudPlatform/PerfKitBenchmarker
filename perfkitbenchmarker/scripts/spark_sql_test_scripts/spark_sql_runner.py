@@ -72,6 +72,11 @@ dataframe reader. e.g.:
            'instead of continuing and not reporting that query run time (the '
            'default).'
   )
+  parser.add_argument(
+      '--dump-spark-conf',
+      help='Directory to dump the spark conf props for this job. For debugging '
+           'purposes.'
+  )
   if args is None:
     return parser.parse_args()
   return parser.parse_args(args)
@@ -105,6 +110,14 @@ def main(args):
       spark.sql('CACHE {lazy} TABLE {name}'.format(
           lazy='LAZY' if args.table_cache == 'lazy' else '',
           name=table.name))
+  if args.dump_spark_conf:
+    logging.info('Dumping the spark conf properties to %s',
+                 args.dump_spark_conf)
+    props = [
+        sql.Row(key=key, val=val)
+        for key, val in spark.sparkContext.getConf().getAll()]
+    spark.createDataFrame(props).coalesce(1).write.mode('append').json(
+        args.dump_spark_conf)
 
   results = []
 
