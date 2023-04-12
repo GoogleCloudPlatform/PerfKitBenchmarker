@@ -104,24 +104,19 @@ class T4x4HighAccuracyTriton(T4x4HighAccuracy):
 )
 class L4x1(ServerGPUBaseConfig):
   system = KnownSystem.L4x1
-  enable_interleaved = True
-  active_sms = 100
   gpu_batch_size = 16
-  graphs_max_seqlen = 240
-  server_num_issue_query_threads = 0
-  server_target_qps = 360
-  soft_drop = 0.993
-  gemm_plugin_fairshare_cache_size = None
-  use_small_tile_gemm_plugin = None
+  graphs_max_seqlen = 200
+  server_num_issue_query_threads = 1
+  server_target_qps = 900
+  soft_drop = 1.0
+  use_small_tile_gemm_plugin = True
 
 
 @ConfigRegistry.register(
     HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
 )
 class L4x1HighAccuracy(L4x1):
-  gpu_inference_streams = 1
   precision = "fp16"
-  gpu_batch_size = 8
 
 
 @ConfigRegistry.register(
@@ -143,21 +138,13 @@ class L4x1HighAccuracyTriton(L4x1HighAccuracy):
 )
 class L4x2(L4x1):
   system = KnownSystem.L4x2
-  gpu_batch_size = 14
-  graphs_max_seqlen = 260
-  server_num_issue_query_threads = 4
-  soft_drop = 0.992
 
 
 @ConfigRegistry.register(
     HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
 )
 class L4x2HighAccuracy(L4x2):
-  gpu_inference_streams = 1
   precision = "fp16"
-  gpu_batch_size = 8
-  server_num_issue_query_threads = 2
-  soft_drop = 0.992
 
 
 @ConfigRegistry.register(
@@ -179,21 +166,13 @@ class L4x2HighAccuracyTriton(L4x2HighAccuracy):
 )
 class L4x4(L4x1):
   system = KnownSystem.L4x4
-  gpu_batch_size = 14
-  graphs_max_seqlen = 260
-  server_num_issue_query_threads = 8
-  soft_drop = 0.992
 
 
 @ConfigRegistry.register(
     HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
 )
 class L4x4HighAccuracy(L4x4):
-  gpu_inference_streams = 1
   precision = "fp16"
-  gpu_batch_size = 8
-  server_num_issue_query_threads = 4
-  soft_drop = 0.992
 
 
 @ConfigRegistry.register(
@@ -215,21 +194,13 @@ class L4x4HighAccuracyTriton(L4x4HighAccuracy):
 )
 class L4x8(L4x1):
   system = KnownSystem.L4x8
-  gpu_batch_size = 14
-  graphs_max_seqlen = 260
-  server_num_issue_query_threads = 16
-  soft_drop = 0.992
 
 
 @ConfigRegistry.register(
     HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
 )
 class L4x8HighAccuracy(L4x8):
-  gpu_inference_streams = 1
   precision = "fp16"
-  gpu_batch_size = 8
-  server_num_issue_query_threads = 8
-  soft_drop = 0.992
 
 
 @ConfigRegistry.register(

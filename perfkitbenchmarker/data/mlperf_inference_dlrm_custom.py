@@ -95,15 +95,14 @@ class T4x4HighAccuracyTriton(T4x4Triton):
 )
 class L4x1(ServerGPUBaseConfig):
   system = KnownSystem.L4x1
-  enable_interleaved_top_mlp = True
-  deque_timeout_usec = 1
-  embedding_weights_on_gpu_part = 0.5
-  gpu_batch_size = 65500
-  gpu_num_bundles = 2
+  embedding_weights_on_gpu_part = 0.8
   num_staging_batches = 2
-  num_staging_threads = 4
-  server_target_qps = 24000
-  use_jemalloc = True
+  num_staging_threads = 2
+  gpu_num_bundles = 2
+  gpu_batch_size = 14000
+  server_target_qps = 89000
+  use_jemalloc = False
+  use_small_tile_gemm_plugin = True
 
 
 @ConfigRegistry.register(
@@ -133,10 +132,6 @@ class L4x1HighAccuracyTriton(L4x1Triton):
 )
 class L4x2(L4x1):
   system = KnownSystem.L4x2
-  gpu_num_bundles = 1
-  num_staging_batches = 2
-  num_staging_threads = 4
-  use_jemalloc = True
 
 
 @ConfigRegistry.register(
@@ -165,10 +160,6 @@ class L4x2HighAccuracyTriton(L4x2Triton):
 )
 class L4x4(L4x1):
   system = KnownSystem.L4x4
-  gpu_num_bundles = 1
-  num_staging_batches = 4
-  num_staging_threads = 4
-  use_jemalloc = True
 
 
 @ConfigRegistry.register(
@@ -197,10 +188,6 @@ class L4x4HighAccuracyTriton(L4x4Triton):
 )
 class L4x8(L4x1):
   system = KnownSystem.L4x8
-  gpu_num_bundles = 1
-  num_staging_batches = 8
-  num_staging_threads = 4
-  use_jemalloc = True
 
 
 @ConfigRegistry.register(
