@@ -45,7 +45,6 @@ hammerdbcli:
         zone: us-west-1a
       Azure:
         machine_type:
-          tier: Premium
           compute_units: 500
         zone: eastus
     db_disk_spec:

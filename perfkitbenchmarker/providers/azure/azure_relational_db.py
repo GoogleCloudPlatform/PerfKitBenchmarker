@@ -135,7 +135,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
           'Unsupported engine {0}'.format(engine))
 
   def GetAzCommandForEngine(self):
-    engine = self.spec.engine
+    engine = self.engine_type
     if engine == sql_engine_utils.POSTGRES:
       return 'postgres'
     elif engine == sql_engine_utils.MYSQL:
@@ -143,7 +143,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     elif engine == sql_engine_utils.SQLSERVER:
       return 'sql'
     raise relational_db.RelationalDbEngineNotFoundError(
-        'Unsupported engine {0}'.format(engine))
+        'Unsupported engine {0}'.format(engine)
+    )
 
   def GetConfigFromMachineType(self, machine_type):
     """Returns a tuple of (edition, family, vcore) from Azure machine type.
@@ -173,17 +174,23 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     vcore = machine_type[2]
     return (edition, family, vcore)
 
+  def GetServerType(self):
+    return 'server'
+
   def SetDbConfiguration(self, name, value):
     """Set configuration for the database instance.
 
     Args:
         name: string, the name of the settings to change
         value: value, string the value to set
+
+    Returns:
+      Tuple of standand output and standard error
     """
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        'server',
+        self.GetServerType(),
         'configuration',
         'set',
         '--name',
@@ -195,7 +202,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         '--server',
         self.instance_id
     ]
-    vm_util.IssueCommand(cmd)
+    return vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def RenameDatabase(self, new_name):
     """Renames an the database instace."""
@@ -225,14 +232,8 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     """Applies the MySqlFlags to a managed instance."""
     for flag in FLAGS.db_flags:
       name_and_value = flag.split('=')
-      cmd = [
-          azure.AZURE_PATH,
-          self.GetAzCommandForEngine(), 'server', 'configuration', 'set',
-          '--name', name_and_value[0], '--resource-group',
-          self.resource_group.name, '--server', self.instance_id, '--value',
-          name_and_value[1]
-      ]
-      _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
+      _, stderr, _ = self.SetDbConfiguration(
+          name_and_value[0], name_and_value[1])
       if stderr:
         raise Exception('Invalid MySQL flags: {0}.  Error {1}'.format(
             name_and_value, stderr))
@@ -266,7 +267,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        'server',
+        self.GetServerType(),
         'create',
         '--resource-group',
         self.resource_group.name,
@@ -331,11 +332,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
           '--name',
           DEFAULT_DATABASE_NAME,
           '--edition',
-          self.spec.db_spec.tier,
+          self.spec.db_tier,
           '--capacity',
           str(self.spec.db_spec.compute_units),
           '--zone-redundant',
-          'true' if self.spec.high_availability else 'false'
+          'true' if self.spec.high_availability else 'false',
       ]
     else:
       # Sample machine_type: GP_Gen5_2
@@ -366,15 +367,15 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
   def _CreateAzureManagedSqlInstance(self):
     """Creates an Azure Sql Instance from a managed service."""
-    if self.spec.engine == sql_engine_utils.POSTGRES:
+    if self.engine_type == sql_engine_utils.POSTGRES:
       self._CreateMySqlOrPostgresInstance()
-    elif self.spec.engine == sql_engine_utils.MYSQL:
+    elif self.engine_type == sql_engine_utils.MYSQL:
       self._CreateMySqlOrPostgresInstance()
-    elif self.spec.engine == sql_engine_utils.SQLSERVER:
+    elif self.engine_type == sql_engine_utils.SQLSERVER:
       self._CreateSqlServerInstance()
     else:
       raise NotImplementedError('Unknown how to create Azure data base '
-                                'engine {0}'.format(self.spec.engine))
+                                'engine {0}'.format(self.engine_type))
 
   def _Create(self):
     """Creates the Azure RDS instance.
@@ -396,7 +397,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        'server',
+        self.GetServerType(),
         'delete',
         '--resource-group', self.resource_group.name,
         '--name', self.instance_id,
@@ -440,10 +441,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
     cmd = [
         azure.AZURE_PATH,
-        self.GetAzCommandForEngine(), 'server', 'firewall-rule', 'create',
-        '--resource-group', self.resource_group.name, '--server',
-        self.instance_id, '--name', 'AllowAllIps', '--start-ip-address',
-        '0.0.0.0', '--end-ip-address', '255.255.255.255'
+        self.GetAzCommandForEngine(),
+        self.GetServerType(), 'firewall-rule', 'create', '--resource-group',
+        self.resource_group.name, '--server', self.instance_id, '--name',
+        'AllowAllIps', '--start-ip-address', '0.0.0.0', '--end-ip-address',
+        '255.255.255.255'
     ]
     vm_util.IssueCommand(cmd)
     self._AssignEndpointForWriterInstance()
@@ -493,7 +495,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
       server_show_json = self._AzServerShow()
       if server_show_json is not None:
-        engine = self.spec.engine
+        engine = self.engine_type
         if engine == sql_engine_utils.POSTGRES:
           state = server_show_json['userVisibleState']
         elif engine == sql_engine_utils.MYSQL:
@@ -521,7 +523,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        'server',
+        self.GetServerType(),
         'show',
         '--resource-group', self.resource_group.name,
         '--name', self.instance_id
