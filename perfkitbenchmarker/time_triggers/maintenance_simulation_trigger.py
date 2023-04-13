@@ -166,17 +166,18 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
       if time >= ramp_up_ends and time <= ramp_down_starts:
         interval_values = []
         # If more than 1 sequential value is missing from the time series.
-        # Assume the worst case value (0.0) for the metric during those entries.
-        # Gaps of length 1 are expected due to normal time drift.
+        # Distrubute the ops throughout the time series
         if i > 0:
           time_gap_in_seconds = ((time - time_series[i - 1]) / 1000)
           missing_entry_count = int((time_gap_in_seconds / interval) - 1)
           if missing_entry_count > 1:
             interval_values.extend(
-                [0.0 for second in range(missing_entry_count)]
+                [int(values[i] / float(missing_entry_count + 1))]
+                * (missing_entry_count + 1)
             )
 
-        interval_values.append(values[i])
+          else:
+            interval_values.append(values[i])
         if time <= lm_start:
           base_line_values.extend(interval_values)
         else:
