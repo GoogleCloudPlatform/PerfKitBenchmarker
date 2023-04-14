@@ -427,7 +427,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """Create and mount Ram disk."""
     raise NotImplementedError()
 
-  @abc.abstractmethod
   def RemoteCommand(
       self,
       command: str,
@@ -567,17 +566,14 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     return time.time() - before_resume_timestamp
 
-  @abc.abstractmethod
   def _Reboot(self):
     """OS-specific implementation of reboot command."""
     raise NotImplementedError()
 
-  @abc.abstractmethod
   def _Suspend(self):
     """Provider specific implementation of a VM suspend command."""
     raise NotImplementedError()
 
-  @abc.abstractmethod
   def _Resume(self):
     """Provider specific implementation of a VM resume command."""
     raise NotImplementedError()
@@ -627,7 +623,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     stop_duration_sec = time.time() - before_stop_timestamp
     return stop_duration_sec
 
-  @abc.abstractmethod
   def _Stop(self):
     """Provider-specific implementation of stop command."""
     raise NotImplementedError()
@@ -636,7 +631,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """Provider-specific checks after stop command."""
     pass
 
-  @abc.abstractmethod
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     """Copies a file to or from the VM.
 
@@ -650,7 +644,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     raise NotImplementedError()
 
-  @abc.abstractmethod
   def WaitForBootCompletion(self):
     """Waits until VM is has booted.
 
@@ -659,7 +652,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     raise NotImplementedError()
 
-  @abc.abstractmethod
   def _WaitForSSH(self, ip_address: Union[str, None] = None):
     """Waits until VM is ready.
 
@@ -671,7 +663,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     raise NotImplementedError()
 
-  @abc.abstractmethod
   def VMLastBootTime(self):
     """Returns the time the VM was last rebooted as reported by the VM.
     """
@@ -706,17 +697,14 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """Disables RSS on the VM."""
     raise NotImplementedError()
 
-  @abc.abstractmethod
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
     raise NotImplementedError()
 
-  @abc.abstractmethod
   def Uninstall(self, package_name):
     """Uninstalls a PerfKit package on the VM."""
     raise NotImplementedError()
 
-  @abc.abstractmethod
   def PackageCleanup(self):
     """Cleans up all installed packages.
 
@@ -833,7 +821,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     return scratch_disk
 
-  @abc.abstractmethod
   def _PrepareScratchDisk(self, scratch_disk, disk_spec):
     """Helper method to format and mount scratch disk.
 
@@ -881,7 +868,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       return self.num_cpus - self.num_disable_cpus
     return self.num_cpus
 
-  @abc.abstractmethod
   def _GetNumCpus(self):
     """Returns the number of logical CPUs on the VM.
 
@@ -909,12 +895,10 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       self._total_memory_kb = self._GetTotalMemoryKb()
     return self._total_memory_kb
 
-  @abc.abstractmethod
   def _GetTotalFreeMemoryKb(self):
     """Returns the amount of free physical memory on the VM in Kilobytes."""
     raise NotImplementedError()
 
-  @abc.abstractmethod
   def _GetTotalMemoryKb(self):
     """Returns the amount of physical memory on the VM in Kilobytes.
 
@@ -939,7 +923,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
         self._reachable[target_vm] = False
     return self._reachable[target_vm]
 
-  @abc.abstractmethod
   def _TestReachable(self, ip):
     """Returns True if the VM can reach the ip address and False otherwise."""
     raise NotImplementedError()
@@ -968,7 +951,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           raise NotImplementedError()
         workload.Prepare(self)
 
-  @abc.abstractmethod
   def SetReadAhead(self, num_sectors, devices):
     """Set read-ahead value for block devices.
 
@@ -1046,9 +1028,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       self._is_smt_enabled = self._IsSmtEnabled()
     return self._is_smt_enabled
 
-  @abc.abstractmethod
   def _IsSmtEnabled(self):
     """Whether SMT is enabled on the vm."""
+    raise NotImplementedError()
 
   def _GetNfsService(self):
     """Returns the NfsService created in the benchmark spec.
