@@ -548,7 +548,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
-    self.max_local_disks = self._GetMaxLocalDisk()
+    if azure_disk.HasTempDrive(self.machine_type):
+      self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type, 1)
+    else:
+      self.max_local_disks = 0
     self._lun_counter = itertools.count()
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
@@ -818,17 +821,6 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.public_ip:
       self.ip_address = self.public_ip.GetIPAddress()
 
-  def _GetMaxLocalDisk(self):
-    """Get the maximum local disk in this machine."""
-    max_local_disk = 1
-    if azure_disk.HasTempDrive(self.machine_type):
-      max_local_disk += 1
-    local_disk = NUM_LOCAL_VOLUMES.get(self.machine_type)
-    if local_disk:
-      max_local_disk += local_disk
-
-    return max_local_disk
-
   def CreateScratchDisk(self, _, disk_spec):
     """Create a VM's scratch disk.
 
@@ -856,9 +848,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
       else:
-        # Remote disk numbers start at max_local disks, Azure does not separate
-        # local disk and system disk.
-        disk_number = self.remote_disk_counter + self.max_local_disks
+        # Remote disk numbers start at 1 + max_local disks (0 is the system disk
+        # and local disks occupy [1, max_local_disks]).
+        disk_number = self.remote_disk_counter + 1 + self.max_local_disks
         self.remote_disk_counter += 1
       lun = next(self._lun_counter)
       data_disk = azure_disk.AzureDisk(disk_spec, self, lun)
