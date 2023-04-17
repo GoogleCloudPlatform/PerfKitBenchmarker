@@ -28,17 +28,25 @@ FLAGS = flags.FLAGS
 
 class Failover(object):
   """Enum for redis failover options."""
+
   FAILOVER_NONE = 'failover_none'
   FAILOVER_SAME_ZONE = 'failover_same_zone'
   FAILOVER_SAME_REGION = 'failover_same_region'
 
 
 flags.DEFINE_enum(
-    'redis_failover_style', Failover.FAILOVER_NONE, [
-        Failover.FAILOVER_NONE, Failover.FAILOVER_SAME_ZONE,
-        Failover.FAILOVER_SAME_REGION
-    ], 'Failover behavior of cloud redis cluster. Acceptable values are:'
-    'failover_none, failover_same_zone, and failover_same_region')
+    'redis_failover_style',
+    Failover.FAILOVER_NONE,
+    [
+        Failover.FAILOVER_NONE,
+        Failover.FAILOVER_SAME_ZONE,
+        Failover.FAILOVER_SAME_REGION,
+    ],
+    (
+        'Failover behavior of cloud redis cluster. Acceptable values are:'
+        'failover_none, failover_same_zone, and failover_same_region'
+    ),
+)
 
 # List of redis versions
 REDIS_3_2 = 'redis_3_2'
@@ -48,14 +56,23 @@ REDIS_6_X = 'redis_6_x'
 REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X]
 
 flags.DEFINE_string(
-    'managed_memory_store_version', None,
-    'The version of managed memory store to use. This flag '
-    'overrides Redis or Memcached version defaults that is set '
-    'in benchmark config. Defaults to None so that benchmark '
-    'config defaults are used.')
+    'managed_memory_store_version',
+    None,
+    (
+        'The version of managed memory store to use. This flag '
+        'overrides Redis or Memcached version defaults that is set '
+        'in benchmark config. Defaults to None so that benchmark '
+        'config defaults are used.'
+    ),
+)
 flags.DEFINE_string(
-    'cloud_redis_region', 'us-central1', 'The region to spin up cloud redis in.'
-    'Defaults to the GCP region of us-central1.')
+    'cloud_redis_region',
+    'us-central1',
+    (
+        'The region to spin up cloud redis in.'
+        'Defaults to the GCP region of us-central1.'
+    ),
+)
 
 MEMCACHED_NODE_COUNT = 1
 
@@ -74,7 +91,8 @@ def GetManagedMemoryStoreClass(cloud, memory_store):
     Exception: An invalid cloud was provided
   """
   return resource.GetResourceClass(
-      BaseManagedMemoryStore, CLOUD=cloud, MEMORY_STORE=memory_store)
+      BaseManagedMemoryStore, CLOUD=cloud, MEMORY_STORE=memory_store
+  )
 
 
 def ParseReadableVersion(version: str) -> str:
@@ -90,8 +108,12 @@ def ParseReadableVersion(version: str) -> str:
   """
   if version.count('.') < 1:
     logging.info(
-        'Could not parse version string correctly,'
-        'full Redis version returned: %s', version)
+        (
+            'Could not parse version string correctly,'
+            'full Redis version returned: %s'
+        ),
+        version,
+    )
     return version
   return '.'.join(version.split('.', 2)[:2])
 

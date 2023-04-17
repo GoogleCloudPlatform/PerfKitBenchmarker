@@ -58,8 +58,9 @@ def CheckPrerequisites(benchmark_config):
 
 def _GetManagedMemoryStoreClass():
   """Gets the cloud-specific redis memory store class."""
-  return (managed_memory_store.GetManagedMemoryStoreClass(
-      FLAGS.cloud, managed_memory_store.REDIS))
+  return managed_memory_store.GetManagedMemoryStoreClass(
+      FLAGS.cloud, managed_memory_store.REDIS
+  )
 
 
 def _GetManagedMemoryStore(benchmark_spec):
@@ -102,22 +103,28 @@ def Run(benchmark_spec):
   memtier_vms = benchmark_spec.vm_groups['clients']
   samples = []
   if memtier.MEMTIER_RUN_MODE.value == memtier.MemtierMode.MEASURE_CPU_LATENCY:
-    samples = memtier.RunGetLatencyAtCpu(benchmark_spec.cloud_redis_instance,
-                                         memtier_vms)
+    samples = memtier.RunGetLatencyAtCpu(
+        benchmark_spec.cloud_redis_instance, memtier_vms
+    )
   elif memtier.MEMTIER_LATENCY_CAPPED_THROUGHPUT.value:
     samples = memtier.MeasureLatencyCappedThroughput(
-        memtier_vms[0], benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
+        memtier_vms[0],
+        benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
         benchmark_spec.cloud_redis_instance.GetMemoryStorePort(),
-        benchmark_spec.cloud_redis_instance.GetMemoryStorePassword())
+        benchmark_spec.cloud_redis_instance.GetMemoryStorePassword(),
+    )
   else:
     samples = memtier.RunOverAllThreadsPipelinesAndClients(
-        memtier_vms, benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
+        memtier_vms,
+        benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
         [benchmark_spec.cloud_redis_instance.GetMemoryStorePort()],
-        benchmark_spec.cloud_redis_instance.GetMemoryStorePassword())
+        benchmark_spec.cloud_redis_instance.GetMemoryStorePassword(),
+    )
 
   for sample in samples:
     sample.metadata.update(
-        benchmark_spec.cloud_redis_instance.GetResourceMetadata())
+        benchmark_spec.cloud_redis_instance.GetResourceMetadata()
+    )
 
   return samples
 
