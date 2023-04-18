@@ -50,6 +50,8 @@ flags.DEFINE_enum(
         '11.6',
         '11.7',
         '11.8',
+        '12.0',
+        '12.1',
         'None',
         '',
     ],
@@ -68,6 +70,8 @@ FLAGS = flags.FLAGS
 
 CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/{cpu_arch}/cuda-{os}.pin'
 
+CUDA_12_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda-repo-{os}-12-1-local_12.1.0-530.30.02-1_{cpu_arch}.deb'
+CUDA_12_0_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.0.0/local_installers/cuda-repo-{os}-12-0-local_12.0.0-525.60.13-1_{cpu_arch}.deb'
 CUDA_11_8_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda-repo-{os}-11-8-local_11.8.0-520.61.05-1_{cpu_arch}.deb'
 CUDA_11_7_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.7.1/local_installers/cuda-repo-{os}-11-7-local_11.7.1-515.65.01-1_{cpu_arch}.deb'
 CUDA_11_6_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.6.2/local_installers/cuda-repo-{os}-11-6-local_11.6.2-510.47.03-1_{cpu_arch}.deb'
@@ -170,7 +174,7 @@ def GetCudaToolkitVersion(vm):
 
 
 def EnrollSigningKey(vm):
-  if FLAGS.cuda_toolkit_version in ('11.7', '11.8'):
+  if FLAGS.cuda_toolkit_version in ('11.7', '11.8', '12.0', '12.1'):
     version = FLAGS.cuda_toolkit_version.replace('.', '-')
     vm.RemoteCommand(
         'sudo cp'
@@ -291,6 +295,36 @@ def _InstallCuda10Point2(vm):
                      'cuda-libraries-dev-10-2')
 
 
+def _InstallCuda12Generic(vm, toolkit_fmt, version_dash):
+  """Installs CUDA Toolkit 12.x from NVIDIA.
+
+  Args:
+    vm: VM to install CUDA on
+    toolkit_fmt: format string to use for the toolkit name
+    version_dash: Version (ie 12-1) to install
+  """
+  toolkit = toolkit_fmt.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm))
+  basename = posixpath.basename(toolkit)
+  vm.RemoteCommand(
+      'wget -q'
+      f' {CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=GetCpuArchPath(vm))}'
+  )
+  vm.RemoteCommand(
+      f'sudo mv cuda-{_CudaOs(vm.OS_TYPE)}.pin '
+      '/etc/apt/preferences.d/cuda-repository-pin-600'
+  )
+  vm.RemoteCommand(f'wget -q {toolkit}')
+  vm.RemoteCommand(f'sudo dpkg -i {basename}')
+  EnrollSigningKey(vm)
+  vm.AptUpdate()
+  vm.InstallPackages(
+      f'cuda-toolkit-{version_dash} '
+      f'cuda-tools-{version_dash} '
+      f'cuda-libraries-{version_dash} '
+      f'cuda-libraries-dev-{version_dash}'
+  )
+
+
 def _InstallCuda11Generic(vm, toolkit_fmt, version_dash):
   """Installs CUDA Toolkit 11.x from NVIDIA.
 
@@ -314,6 +348,14 @@ def _InstallCuda11Generic(vm, toolkit_fmt, version_dash):
                      f'cuda-tools-{version_dash} '
                      f'cuda-libraries-{version_dash} '
                      f'cuda-libraries-dev-{version_dash}')
+
+
+def _InstallCuda12Point0(vm):
+  _InstallCuda12Generic(vm, CUDA_12_0_TOOLKIT, '12-0')
+
+
+def _InstallCuda12Point1(vm):
+  _InstallCuda12Generic(vm, CUDA_12_1_TOOLKIT, '12-1')
 
 
 def _InstallCuda11Point0(vm):
@@ -397,6 +439,10 @@ def AptInstall(vm):
     _InstallCuda11Point7(vm)
   elif version_to_install == '11.8':
     _InstallCuda11Point8(vm)
+  elif version_to_install == '12.0':
+    _InstallCuda12Point0(vm)
+  elif version_to_install == '12.1':
+    _InstallCuda12Point1(vm)
   else:
     raise UnsupportedCudaVersionError()
   DoPostInstallActions(vm)
