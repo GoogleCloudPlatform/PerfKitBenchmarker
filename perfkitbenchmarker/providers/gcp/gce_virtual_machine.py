@@ -792,10 +792,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       stdout, stderr, retcode = create_cmd.Issue(
           timeout=_GCE_VM_CREATE_TIMEOUT, raise_on_failure=False
       )
-      # Save the create operation link for use in _WaitUntilRunning
-      if 'selfLink' in stdout:
+      # Save the create operation name for use in _WaitUntilRunning
+      if 'name' in stdout:
         response = json.loads(stdout)
-        self.create_operation_link = response[0]['selfLink']
+        self.create_operation_name = response[0]['name']
     self._ParseCreateErrors(create_cmd.rate_limited, stderr, retcode)
     if not self.create_return_time:
       self.create_return_time = time.time()
@@ -1015,7 +1015,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _WaitUntilRunning(self):
     """Waits until the VM instances create command completes."""
     getoperation_cmd = util.GcloudCommand(
-        self, 'compute', 'operations', 'describe', self.create_operation_link
+        self, 'compute', 'operations', 'describe', self.create_operation_name
     )
     stdout, _, retcode = getoperation_cmd.Issue(raise_on_failure=False)
     if retcode != 0:
