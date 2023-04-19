@@ -72,6 +72,125 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         s, [Sample('LM Total Time', 10, 'seconds', time_dic, timestamp=0)])
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))
+  def testAppendLossFunctionWithDegradationPercent(self):
+    FLAGS.maintenance_degradation_percent = 90
+    vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
+    trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
+    trigger.trigger_time = datetime.datetime.fromtimestamp(2)
+    trigger.capture_live_migration_timestamps = False
+    s = [
+        sample.CreateTimeSeriesSample(
+            [100, 100, 100, 90, 90, 90],
+            [1000, 2000, 3000, 4000, 5000, 6000],
+            sample.TPM_TIME_SERIES,
+            'TPM',
+            1,
+        )
+    ]
+
+    trigger.AppendSamples(None, vm_spec, s)
+    self.assertEqual(
+        s,
+        [
+            sample.Sample(
+                metric='TPM_time_series',
+                value=0.0,
+                unit='TPM',
+                metadata={
+                    'values': [100, 100, 100, 90, 90, 90],
+                    'timestamps': [1000, 2000, 3000, 4000, 5000, 6000],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_0_percent',
+                value=0.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_10_percent',
+                value=0.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_20_percent',
+                value=0.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_30_percent',
+                value=0.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_40_percent',
+                value=0.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_50_percent',
+                value=0.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_60_percent',
+                value=0.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_70_percent',
+                value=0.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_80_percent',
+                value=0.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_90_percent',
+                value=3.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='unresponsive_metric',
+                value=0.0,
+                unit='metric',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_loss_seconds',
+                value=0.0,
+                unit='seconds',
+                metadata={},
+                timestamp=0,
+            ),
+        ],
+    )
+
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionWithMissingTimeStampsWithRegression(self):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()

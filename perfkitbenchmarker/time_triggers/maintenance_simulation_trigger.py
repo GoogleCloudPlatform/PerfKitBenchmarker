@@ -30,6 +30,16 @@ TIME_SERIES_SAMPLES_FOR_AGGREGATION = [
 ]
 PERCENTILES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
+DEGRADATION_PERCENT = flags.DEFINE_float(
+    'maintenance_degradation_percent',
+    95.0,
+    (
+        'Percentage to consider a given second is a degradation. This should'
+        ' set to (1 - max variance) of the benchmark. I.e if the benchmark have'
+        ' max variance of 5%, this should be set to 95.'
+    ),
+)
+
 SIMULATE_MAINTENANCE = flags.DEFINE_boolean(
     'simulate_maintenance',
     False,
@@ -268,7 +278,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     total_loss_seconds = 0
     unresponsive_metric = 0
     for value in values_after_lm:
-      if value < median * 0.95:
+      if value < median * DEGRADATION_PERCENT.value / 100.0:
         total_loss_seconds += (median - value) / median * interval
         unresponsive_metric += (((median - value) / median) ** (3.0)) * interval
 
