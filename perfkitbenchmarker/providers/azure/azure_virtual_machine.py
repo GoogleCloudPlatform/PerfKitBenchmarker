@@ -674,6 +674,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         + self.nic.args
         + tag_args
     )
+    if self.boot_startup_script:
+      create_cmd.extend(['--custom-data', self.boot_startup_script])
 
     if self._RequiresUltraDisk():
       self.ultra_ssd_enabled = True

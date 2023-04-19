@@ -551,7 +551,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.user_name = FLAGS.aws_user_name or self.DEFAULT_USER_NAME
     if self.machine_type in aws_disk.NUM_LOCAL_VOLUMES:
       self.max_local_disks = aws_disk.NUM_LOCAL_VOLUMES[self.machine_type]
-    self.user_data = None
+    if self.boot_startup_script:
+      self.user_data = f'file://{self.boot_startup_script}'
+    else:
+      self.user_data = None
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.placement_group = self.network.placement_group
     self.firewall = aws_network.AwsFirewall.GetFirewall()

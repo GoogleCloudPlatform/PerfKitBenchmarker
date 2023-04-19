@@ -1,0 +1,84 @@
+#!/bin/bash
+(
+port={{ port }}
+ip_addresses=({{ ips }})
+
+{% raw %}
+cat <<EOT > /tmp/net_test.py
+import socket
+import sys
+import errno
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.settimeout(1)
+# Attempt connecting to runner ip, port
+r = s.connect_ex((sys.argv[1], int(sys.argv[2])))
+print("errno %s", s);
+if r == errno.ECONNREFUSED or r == 0:
+  print("Route Found")
+EOT
+
+timestamp() {
+  date +%s.%N
+}
+
+try_connect() {
+  while true; do
+    echo "try $1 $2 at $(timestamp)"
+    python3 /tmp/net_test.py $1 $2 | grep "Route Found" > /dev/null
+    if [[ $? -eq 0 ]]; then
+      echo Connection refused by $1 at $(timestamp)
+      break;
+    fi
+  done
+}
+
+probe_network() {
+  echo "Probe network"
+  for ip in ${ip_addresses[@]}; do
+    try_connect $ip $port &
+  done
+  wait
+}
+
+clock_offset() {
+    echo "Before hwclock $(timestamp)"
+    echo "Read hwclock $(hwclock)"
+    echo "After hwclock $(timestamp)"
+}
+
+suspend_resume_loop() {
+  command -v acpi_listen || {
+    echo "acpi_listen is not present. skipping suspend/resume metrics"
+    return
+  }
+  resume_count=1
+  while true; do
+    echo "Wait for suspend/resume."
+    acpi_listen -c 2 && date +%s.%N
+    echo Resume ${{resume_count}} $(timestamp)
+    (( resume_count++ ))
+    clock_offset&
+    probe_network
+    wait
+  done
+}
+
+echo Startup script running $(date +%s.%N) aka $(date)
+# Subtract uptime from current time to get kernel start time. Bash can't do
+# floating point math, so we use awk, which is present on all images (including
+# container-os).
+start_time=$(
+  awk "
+    BEGIN {{
+      OFMT=\"%.3f\"
+      print $(date +%s.%N) - $(cat /proc/uptime | cut -d' ' -f1)
+    }}
+  "
+)
+echo Kernel start time ${start_time}
+
+probe_network
+( suspend_resume_loop ; ) >> /tmp/boot.output 2>&1 < /dev/null &
+
+) >> /tmp/boot.output
+{% endraw %}

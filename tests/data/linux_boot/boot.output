@@ -1,0 +1,6 @@
+Startup script running 1680741777.685234619 aka Thu Apr 6 00:42:57 UTC 2023
+Kernel start time 1680741773.698
+Probe network
+try 10.128.0.2 8080
+Connection refused by 10.128.0.2 at 1680741777.778102944
+acpi_listen is not present. skipping suspend/resume metrics

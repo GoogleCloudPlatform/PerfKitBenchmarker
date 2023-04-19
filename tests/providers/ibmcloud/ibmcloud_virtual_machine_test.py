@@ -81,6 +81,7 @@ class IbmCloudVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     spec.background_cpu_threads = 'None'
     spec.background_network_mbits_per_sec = '1'
     spec.background_network_ip_type = 'None'
+    spec.boot_startup_script = 'None'
     spec.vm_metadata = {}
     return spec
 

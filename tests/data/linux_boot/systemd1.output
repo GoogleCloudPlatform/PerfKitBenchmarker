@@ -1,0 +1,15 @@
+The time when unit became active or started is printed after the "@" character.
+The time the unit took to start is printed after the "+" character.
+
+graphical.target @2.741s
+  multi-user.target @2.739s
+    cron.service @2.666s
+      basic.target @1.706s
+        sockets.target @1.646s
+          uuidd.socket @1.634s
+            sysinit.target @1.574s
+              haveged.service @1.563s
+                apparmor.service @1.310s +239ms
+                  local-fs.target @1.297s
+                    boot-efi.mount @1.261s +29ms
+                      dev-sda15.device @1.258s

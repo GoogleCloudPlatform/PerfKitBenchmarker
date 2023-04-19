@@ -60,15 +60,25 @@
       vm.bootable_time in a cluster of VMs is reported as the cluster boot time.
 """
 
+import datetime
 import logging
+import os
+import shlex
+import signal
+import socket
+import subprocess
 import time
-from typing import List
+from typing import List, Tuple, Optional
+
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import linux_boot
+import pytz
 
 BENCHMARK_NAME = 'cluster_boot'
 BENCHMARK_CONFIG = """
@@ -114,15 +124,90 @@ flags.DEFINE_boolean(
     'cluster_boot_test_port_listening', False,
     'Test the time it takes to successfully connect to the port that is used '
     'to run the remote command.')
+_LINUX_BOOT_METRICS = flags.DEFINE_boolean(
+    'cluster_boot_linux_boot_metrics',
+    False,
+    'Collect detailed linux boot metrics.',
+)
+_CALLBACK_INTERNAL = flags.DEFINE_string(
+    'cluster_boot_callback_internal_ip',
+    '',
+    'Internal ip address to use for collecting first egress/ingress packet, '
+    'requires installation of tcpdump on the runner and tcpdump port is '
+    'reachable from the VMs.'
+)
+_CALLBACK_EXTERNAL = flags.DEFINE_string(
+    'cluster_boot_callback_external_ip',
+    '',
+    'External ip address to use for collecting first egress/ingress packet, '
+    'requires installation of tcpdump on the runner and tcpdump port is '
+    'reachable from the VMs.'
+)
+_TCPDUMP_PORT = flags.DEFINE_integer(
+    'cluster_boot_tcpdump_port',
+    0,
+    'Port the runner uses to test VM network connectivity. By default, pick '
+    'a random unused port.'
+)
 FLAGS = flags.FLAGS
 
 
+def GetCallbackIPs() -> Tuple[str, str]:
+  """Get internal/external IP of runner."""
+  return (_CALLBACK_INTERNAL.value, _CALLBACK_EXTERNAL.value)
+
+
+def CollectNetworkSamples() -> bool:
+  """Whether or not network samples should be collected."""
+  return bool(_CALLBACK_EXTERNAL.value or _CALLBACK_INTERNAL.value)
+
+
+def PrepareStartupScript() -> Tuple[str, Optional[int]]:
+  """Prepare startup script which will be ran as part of VM booting process."""
+  port = _TCPDUMP_PORT.value
+  if CollectNetworkSamples():
+    if not port:
+      # If not specified, find a free port and close so it can be used by
+      # tcpdump.
+      sock = socket.socket()
+      sock.bind(('', 0))
+      port = sock.getsockname()[1]
+      sock.close()
+    tcpdump_output = open(
+        vm_util.PrependTempDir(linux_boot.TCPDUMP_OUTPUT), 'w'
+    )
+    tcpdump_cmd = subprocess.Popen(
+        shlex.split(f'tcpdump -tt -n -l tcp dst port {port}'),
+        stdout=tcpdump_output,
+        stderr=tcpdump_output,
+    )
+    pid = tcpdump_cmd.pid
+  else:
+    pid = None
+
+  startup_script = linux_boot.PrepareBootScriptVM(
+      ' '.join(GetCallbackIPs()), port
+  )
+  startup_script_path = vm_util.PrependTempDir(linux_boot.BOOT_STARTUP_SCRIPT)
+  with open(startup_script_path, 'w') as f:
+    f.write(startup_script)
+
+  return startup_script_path, pid
+
+
 def GetConfig(user_config):
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  benchmark_config = configs.LoadConfig(
+      BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
+    startup_script_path, pid = PrepareStartupScript()
+    benchmark_config['flags']['boot_startup_script'] = startup_script_path
+    benchmark_config['temporary'] = {'tcpdump_pid': pid}
+  return benchmark_config
 
 
-def Prepare(unused_benchmark_spec):
-  pass
+def Prepare(benchmark_spec):
+  # In case tcpdump is launched, always cleanup
+  benchmark_spec.always_call_cleanup = True
 
 
 def GetTimeToBoot(vms):
@@ -336,10 +421,25 @@ def Run(benchmark_spec):
     An empty list (all boot samples will be added later).
   """
   samples = []
+  if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
+    for vm in benchmark_spec.vms:
+      samples.extend(
+          linux_boot.CollectBootSamples(
+              vm,
+              GetCallbackIPs(),
+              datetime.datetime.fromtimestamp(
+                  vm.create_start_time, pytz.timezone('UTC')
+              ),
+              include_networking_samples=CollectNetworkSamples()
+          )
+      )
   if FLAGS.cluster_boot_time_reboot:
     samples.extend(_MeasureReboot(benchmark_spec.vms))
   return samples
 
 
-def Cleanup(unused_benchmark_spec):
-  pass
+def Cleanup(benchmark_spec):
+  if CollectNetworkSamples():
+    pid = benchmark_spec.config.temporary['tcpdump_pid']
+    logging.info('Terminating tcpdump process %s', pid)
+    os.kill(pid, signal.SIGTERM)
