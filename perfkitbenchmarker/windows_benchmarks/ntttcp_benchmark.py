@@ -53,10 +53,11 @@ def Prepare(benchmark_spec):
 
   for vm in vms:
     vm.Install('ntttcp')
-    vm.AllowPort(ntttcp.CONTROL_PORT)
-    # get the number of ports needed based on the flags
-    num_ports = max([c.threads for c in ntttcp.ParseConfigList()])
-    vm.AllowPort(ntttcp.BASE_DATA_PORT, ntttcp.BASE_DATA_PORT + num_ports)
+    if vm_util.ShouldRunOnExternalIpAddress():
+      vm.AllowPort(ntttcp.CONTROL_PORT)
+      # get the number of ports needed based on the flags
+      num_ports = max([c.threads for c in ntttcp.ParseConfigList()])
+      vm.AllowPort(ntttcp.BASE_DATA_PORT, ntttcp.BASE_DATA_PORT + num_ports)
 
 
 def _RunTest(benchmark_spec, sender, receiver, dest_ip, ip_type, conf,
