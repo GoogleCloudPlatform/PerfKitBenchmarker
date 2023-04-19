@@ -79,6 +79,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
   """
   CLOUD = provider_info.AZURE
+  SERVER_TYPE = 'server'
 
   database_name: str
 
@@ -135,7 +136,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
           'Unsupported engine {0}'.format(engine))
 
   def GetAzCommandForEngine(self):
-    engine = self.engine_type
+    engine = self.spec.engine
     if engine == sql_engine_utils.POSTGRES:
       return 'postgres'
     elif engine == sql_engine_utils.MYSQL:
@@ -174,9 +175,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     vcore = machine_type[2]
     return (edition, family, vcore)
 
-  def GetServerType(self):
-    return 'server'
-
   def SetDbConfiguration(self, name, value):
     """Set configuration for the database instance.
 
@@ -190,7 +188,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        self.GetServerType(),
+        self.SERVER_TYPE,
         'configuration',
         'set',
         '--name',
@@ -200,7 +198,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         '--resource-group',
         self.resource_group.name,
         '--server',
-        self.instance_id
+        self.instance_id,
     ]
     return vm_util.IssueCommand(cmd, raise_on_failure=False)
 
@@ -235,17 +233,22 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       _, stderr, _ = self.SetDbConfiguration(
           name_and_value[0], name_and_value[1])
       if stderr:
-        raise Exception('Invalid MySQL flags: {0}.  Error {1}'.format(
-            name_and_value, stderr))
+        raise KeyError(
+            'Invalid MySQL flags: {0}.  Error {1}'.format(
+                name_and_value, stderr
+            )
+        )
 
     self._Reboot()
 
   def _CreateMySqlOrPostgresInstance(self):
     """Creates a managed MySql or Postgres instance."""
     if not self.spec.high_availability:
-      raise Exception('Azure databases can only be used in high '
-                      'availability. Please rerurn with flag '
-                      '--db_high_availability=True')
+      raise KeyError(
+          'Azure databases can only be used in high '
+          'availability. Please rerurn with flag '
+          '--db_high_availability=True'
+      )
 
     # Valid storage sizes range from minimum of 5120 MB
     # and additional increments of 1024 MB up to maximum of 16777216 MB.
@@ -267,7 +270,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        self.GetServerType(),
+        self.SERVER_TYPE,
         'create',
         '--resource-group',
         self.resource_group.name,
@@ -397,11 +400,13 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        self.GetServerType(),
+        self.SERVER_TYPE,
         'delete',
-        '--resource-group', self.resource_group.name,
-        '--name', self.instance_id,
-        '--yes'
+        '--resource-group',
+        self.resource_group.name,
+        '--name',
+        self.instance_id,
+        '--yes',
     ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
@@ -442,10 +447,19 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        self.GetServerType(), 'firewall-rule', 'create', '--resource-group',
-        self.resource_group.name, '--server', self.instance_id, '--name',
-        'AllowAllIps', '--start-ip-address', '0.0.0.0', '--end-ip-address',
-        '255.255.255.255'
+        self.SERVER_TYPE,
+        'firewall-rule',
+        'create',
+        '--resource-group',
+        self.resource_group.name,
+        '--server',
+        self.instance_id,
+        '--name',
+        'AllowAllIps',
+        '--start-ip-address',
+        '0.0.0.0',
+        '--end-ip-address',
+        '255.255.255.255',
     ]
     vm_util.IssueCommand(cmd)
     self._AssignEndpointForWriterInstance()
@@ -470,8 +484,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     vm_util.IssueCommand(cmd)
 
     if not self._IsInstanceReady():
-      raise Exception('Instance could not be set to ready after '
-                      'reboot')
+      raise RuntimeError('Instance could not be set to ready after reboot')
 
   def _IsInstanceReady(self, timeout=IS_READY_TIMEOUT):
     """Return true if the instance is ready.
@@ -523,10 +536,12 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        self.GetServerType(),
+        self.SERVER_TYPE,
         'show',
-        '--resource-group', self.resource_group.name,
-        '--name', self.instance_id
+        '--resource-group',
+        self.resource_group.name,
+        '--name',
+        self.instance_id,
     ]
     stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
