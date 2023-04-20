@@ -55,18 +55,18 @@ def gpu(
       compute_sm=compute_cm,
   )
 
-T4 = gpu("Tesla T4", 15, 70.0, "0x1EB810DE", 75)
-L4 = gpu("Tesla L4", 22, 75.0, "0x27B810DE", 89)
+CloudT4 = gpu("Tesla T4", 15, 70.0, "0x1EB810DE", 75)
+CloudL4 = gpu("Tesla L4", 22, 75.0, "0x27B810DE", 89)
 A10G = gpu("NVIDIA A10G", 22, 300.0, "0x223710DE", 86)
 A10 = gpu("NVIDIA A10-4Q", 24, None, "0x223610DE", 86)
 
 custom_systems = {
-    "T4x1": system_configuration(T4, 1, "T4x1"),
-    "T4x4": system_configuration(T4, 4, "T4x4"),
-    "L4x1": system_configuration(L4, 1, "L4x1"),
-    "L4x2": system_configuration(L4, 2, "L4x2"),
-    "L4x4": system_configuration(L4, 4, "L4x4"),
-    "L4x8": system_configuration(L4, 8, "L4x8"),
+    "CloudT4x1": system_configuration(CloudT4, 1, "CloudT4x1"),
+    "CloudT4x4": system_configuration(CloudT4, 4, "CloudT4x4"),
+    "CloudL4x1": system_configuration(CloudL4, 1, "CloudL4x1"),
+    "CloudL4x2": system_configuration(CloudL4, 2, "CloudL4x2"),
+    "CloudL4x4": system_configuration(CloudL4, 4, "CloudL4x4"),
+    "CloudL4x8": system_configuration(CloudL4, 8, "CloudL4x8"),
     "A10Gx1": system_configuration(A10G, 1, "A10Gx1"),
     "A10Gx4": system_configuration(A10G, 4, "A10Gx4"),
     "A10Gx8": system_configuration(A10G, 8, "A10Gx8"),
