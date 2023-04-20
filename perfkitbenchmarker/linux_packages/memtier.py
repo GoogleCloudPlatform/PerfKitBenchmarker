@@ -13,6 +13,7 @@
 # limitations under the License.
 """Module containing memtier installation, utilization and cleanup functions."""
 
+import collections
 import copy
 import dataclasses
 import json
@@ -474,7 +475,9 @@ def MeasureLatencyCappedThroughput(
     parameters = MemtierBinarySearchParameters(
         lower_bound=0, upper_bound=math.inf, pipelines=1, threads=1, clients=1
     )
-    current_max_result = MemtierResult(0, 0, 0, 0, 0, 0, [], [], [], [], [], {})
+    current_max_result = MemtierResult(
+        0, 0, 0, {'90': 0, '95': 0, '99': 0}, [], [], [], [], {}, {}
+    )
     current_metadata = None
     while parameters.lower_bound < (parameters.upper_bound - 1):
       result = _Run(
@@ -495,13 +498,13 @@ def MeasureLatencyCappedThroughput(
               '\tupper bound: %s'
           ),
           result.ops_per_sec,
-          result.p95_latency,
+          result.latency_dic['95'],
           parameters.lower_bound,
           parameters.upper_bound,
       )
       if (
           result.ops_per_sec > current_max_result.ops_per_sec
-          and result.p95_latency <= MEMTIER_LATENCY_CAP.value
+          and result.latency_dic['95'] <= MEMTIER_LATENCY_CAP.value
       ):
         current_max_result = result
         current_metadata = GetMetadata(
@@ -510,7 +513,7 @@ def MeasureLatencyCappedThroughput(
             pipeline=parameters.pipelines,
         )
       # 95 percentile used to decide latency cap
-      parameters = modify_load_func(parameters, result.p95_latency)
+      parameters = modify_load_func(parameters, result.latency_dic['95'])
     samples.extend(current_max_result.GetSamples(current_metadata))
   return samples
 
@@ -845,14 +848,12 @@ class MemtierResult:
   ops_per_sec: float
   kb_per_sec: float
   latency_ms: float
-  p90_latency: float
-  p95_latency: float
-  p99_latency: float
+  latency_dic: Dict[str, float]
   get_latency_histogram: MemtierHistogram
   set_latency_histogram: MemtierHistogram
   timestamps: List[int]
   ops_series: List[int]
-  max_latency_series: List[int]
+  latency_series: Dict[str, List[int]]
   runtime_info: Dict[Text, Text]
 
   @classmethod
@@ -898,34 +899,31 @@ class MemtierResult:
     set_histogram, get_histogram = _ParseHistogram(memtier_results)
     runtime_info = {}
     ops_series = []
-    max_latency_series = []
+    latency_series = {}
     timestamps = []
     if time_series_json:
       runtime_info = _GetRuntimeInfo(time_series_json)
-      timestamps, ops_series, max_latency_series = _ParseTimeSeries(
+      timestamps, ops_series, latency_series = _ParseTimeSeries(
           time_series_json
       )
     return cls(
         ops_per_sec=aggregated_result.ops_per_sec,
         kb_per_sec=aggregated_result.kb_per_sec,
         latency_ms=aggregated_result.latency_ms,
-        p90_latency=aggregated_result.p90_latency,
-        p95_latency=aggregated_result.p95_latency,
-        p99_latency=aggregated_result.p99_latency,
+        latency_dic=aggregated_result.latency_dic,
         get_latency_histogram=get_histogram,
         set_latency_histogram=set_histogram,
         timestamps=timestamps,
         ops_series=ops_series,
-        max_latency_series=max_latency_series,
+        latency_series=latency_series,
         runtime_info=runtime_info,
     )
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Return this result as a list of samples."""
     metadata['avg_latency'] = self.latency_ms
-    metadata['p90_latency'] = self.p90_latency
-    metadata['p95_latency'] = self.p95_latency
-    metadata['p99_latency'] = self.p99_latency
+    for key, value in self.latency_dic.items():
+      metadata[f'p{key}_latency'] = value
     samples = [
         sample.Sample('Ops Throughput', self.ops_per_sec, 'ops/s', metadata),
         sample.Sample('KB Throughput', self.kb_per_sec, 'KB/s', metadata),
@@ -981,9 +979,10 @@ def AlignTimeDiffMemtierResults(
     ]
     empty_results = [0 for i in range(diff_in_seconds)]
     result.timestamps = extra_timestamps + result.timestamps[:-diff_in_seconds]
-    result.max_latency_series = (
-        empty_results + result.max_latency_series[:-diff_in_seconds]
-    )
+    for key in result.latency_series:
+      result.latency_series[key] = (
+          empty_results + result.latency_series[key][:-diff_in_seconds]
+      )
 
     result.ops_series = empty_results + result.ops_series[:-diff_in_seconds]
 
@@ -1048,16 +1047,24 @@ def AggregateMemtierResults(
       new_timestamps = [timestamps[0] + 1000 * i for i in range(series_length)]
       timestamps = new_timestamps
   ops_series = [0] * series_length
-  max_latency_series = [0] * series_length
+  latency_series = collections.defaultdict(list)
 
   for memtier_result in non_empty_results:
     for i in range(len(memtier_result.ops_series)):
       ops_series[i] += memtier_result.ops_series[i]
-      max_latency_series[i] = max(
-          max_latency_series[i], memtier_result.max_latency_series[i]
-      )
 
-  return samples + [
+    for key, latencies in memtier_result.latency_series.items():
+      for i, latency in enumerate(latencies):
+        if len(latency_series[key]) <= i:
+          latency_series[key].append([])
+        latency_series[key][i].append(latency)
+
+  aggregate_latency_series = {
+      key: [max(latencies) for latencies in value]
+      for key, value in latency_series.items()
+  }
+
+  samples.append(
       sample.CreateTimeSeriesSample(
           ops_series,
           timestamps,
@@ -1065,16 +1072,20 @@ def AggregateMemtierResults(
           'ops',
           1,
           additional_metadata=metadata,
-      ),
-      sample.CreateTimeSeriesSample(
-          max_latency_series,
-          timestamps,
-          sample.LATENCY_TIME_SERIES,
-          'ms',
-          1,
-          additional_metadata=metadata,
-      ),
-  ]
+      )
+  )
+  for key, value in aggregate_latency_series.items():
+    samples.append(
+        sample.CreateTimeSeriesSample(
+            value,
+            timestamps[0 : len(value)],
+            f'{key}_time_series',
+            'ms',
+            1,
+            additional_metadata=metadata,
+        )
+    )
+  return samples
 
 
 def _ParseHistogram(
@@ -1108,9 +1119,7 @@ class MemtierAggregateResult:
   ops_per_sec: float
   kb_per_sec: float
   latency_ms: float
-  p90_latency: float
-  p95_latency: float
-  p99_latency: float
+  latency_dic: Dict[str, float]
 
 
 def _ParseTotalThroughputAndLatency(
@@ -1146,9 +1155,10 @@ def _ParseTotalThroughputAndLatency(
           ops_per_sec=_FetchStat('Ops/sec'),
           kb_per_sec=_FetchStat('KB/sec'),
           latency_ms=_FetchStat('Avg. Latency'),
-          p90_latency=_FetchStat('p90 Latency'),
-          p95_latency=_FetchStat('p95 Latency'),
-          p99_latency=_FetchStat('p99 Latency'),
+          latency_dic={
+              percentile: _FetchStat(f'p{percentile} Latency')
+              for percentile in ('90', '95', '99')
+          },
       )
   raise errors.Benchmarks.RunError('No "Totals" line in memtier output.')
 
@@ -1179,11 +1189,11 @@ def _ConvertPercentToAbsolute(total_value: int, percent: float) -> float:
 
 def _ParseTimeSeries(
     time_series_json: Optional[Dict[Any, Any]]
-) -> Tuple[List[int], List[int], List[int]]:
+) -> Tuple[List[int], List[int], Dict[str, List[int]]]:
   """Parse time series ops throughput from json output."""
   timestamps = []
   ops_series = []
-  max_latency_series = []
+  latency_series = collections.defaultdict(list)
   if time_series_json:
     time_series = time_series_json['ALL STATS']['Totals']['Time-Serie']
     start_time = int(time_series_json['ALL STATS']['Runtime']['Start time'])
@@ -1193,11 +1203,43 @@ def _ParseTimeSeries(
       timestamps.append(current_time)
       ops_series.append(data_dict['Count'])
       if int(data_dict['Count']) == 0:
-        # When there is no throughput, max latency does not exists
-        max_latency_series.append(0)
+        # When there is no throughput, max latency does not exist
+        # data_dict sample
+        # {
+        #     'Count': 67,
+        #     'Average Latency': 0.155,
+        #     'Min Latency': 0.104,
+        #     'Max Latency': 0.319,
+        #     'p50.00': 0.151,
+        #     'p90.00': 0.183,
+        #     'p95.00': 0.247,
+        #     'p99.00': 0.319,
+        #     'p99.90': 0.319,
+        # }
+        for key, value in data_dict.items():
+          if key == 'Count':
+            continue
+          latency_series[key].append(0)
       else:
-        max_latency_series.append(data_dict['Max Latency'])
-  return timestamps, ops_series, max_latency_series
+        for key, value in data_dict.items():
+          if key not in (
+              'Average Latency',
+              'Min Latency',
+              'Max Latency',
+              'p50.00',
+              'p90.00',
+              'p95.00',
+              'p99.00',
+              'p99.90',
+          ):
+            continue
+
+          latency_series[key].append(value)
+  return (
+      timestamps,
+      ops_series,
+      latency_series,
+  )
 
 
 def _GetRuntimeInfo(time_series_json: Optional[Dict[Any, Any]]):
