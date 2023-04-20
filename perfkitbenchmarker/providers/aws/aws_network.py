@@ -44,6 +44,9 @@ _AWS_SUBNET = flags.DEFINE_string(
     'aws_subnet', None,
     'The static AWS subnet id to use.  Set value to "default" to use '
     'default subnet. If unset, creates a new subnet.')
+AWS_ENI_COUNT = flags.DEFINE_integer(
+    'aws_eni_count', 1,
+    'The number of ENIs per instance.')
 flags.DEFINE_bool('aws_efa', False, 'Whether to use an Elastic Fiber Adapter.')
 flags.DEFINE_string('aws_efa_version', '1.12.1',
                     'Version of AWS EFA to use (must also pass in --aws_efa).')
@@ -835,6 +838,7 @@ class AwsNetwork(network.BaseNetwork):
     self.regional_network = _AwsRegionalNetwork.GetForRegion(
         self.region, spec.vpc_id)
     self.subnet = None
+    self.subnets = []
     self.vpc_peering = None
 
     # Placement Group
@@ -895,10 +899,12 @@ class AwsNetwork(network.BaseNetwork):
     self.regional_network.Create()
 
     if self.subnet is None:
-      cidr = self.regional_network.vpc.NextSubnetCidrBlock()
-      self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
-                              cidr_block=cidr)
-      self.subnet.Create()
+      for _ in range(AWS_ENI_COUNT.value):
+        cidr = self.regional_network.vpc.NextSubnetCidrBlock()
+        self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
+                                cidr_block=cidr)
+        self.subnet.Create()
+        self.subnets.append(self.subnet)
     if self.placement_group:
       self.placement_group.Create()
 

@@ -125,14 +125,19 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'x2g': 'graviton2',
 }
 
-# Parameters for use with Elastic Fiber Adapter
-_EFA_PARAMS = {
-    'InterfaceType': 'efa',
+# Parameters for use with Elastic Network Interface
+_ENI_PARAMS = {
+    'InterfaceType': 'interface',
     'DeviceIndex': 0,
     'NetworkCardIndex': 0,
     'Groups': '',
     'SubnetId': ''
 }
+
+# Parameters for use with Elastic Fiber Adapter
+_EFA_PARAMS = _ENI_PARAMS
+_EFA_PARAMS['InterfaceType'] = 'efa'
+
 # Location of EFA installer
 _EFA_URL = ('https://s3-us-west-2.amazonaws.com/aws-efa-installer/'
             'aws-efa-installer-{version}.tar.gz')
@@ -751,6 +756,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     response = json.loads(stdout)
     instance = response['Reservations'][0]['Instances'][0]
     self.internal_ip = instance['PrivateIpAddress']
+    for network_interface in instance.get('NetworkInterfaces', []):
+      self.internal_ips.append(network_interface['PrivateIpAddress'])
     if util.IsRegion(self.zone):
       self.zone = str(instance['Placement']['AvailabilityZone'])
 
@@ -758,6 +765,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.group_id, instance['SecurityGroups'][0]['GroupId'])
     if FLAGS.aws_efa:
       self._ConfigureEfa(instance)
+    elif aws_network.AWS_ENI_COUNT.value > 1:
+      self._ConfigureElasticIp(instance)
     elif 'PublicIpAddress' in instance:
       self.ip_address = instance['PublicIpAddress']
     else:
@@ -931,6 +940,19 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         efas.append(','.join(f'{key}={value}' for key, value in
                              sorted(efa_params.items())))
       create_cmd.extend(efas)
+    elif aws_network.AWS_ENI_COUNT.value > 1:
+      enis = ['--network-interfaces']
+      for device_index in range(aws_network.AWS_ENI_COUNT.value):
+        eni_params = _ENI_PARAMS.copy()
+        eni_params.update({
+            'NetworkCardIndex': device_index,
+            'DeviceIndex': device_index,
+            'Groups': self.group_id,
+            'SubnetId': self.network.subnets[device_index].id,
+        })
+        enis.append(','.join(f'{key}={value}' for key, value in
+                             sorted(eni_params.items())))
+      create_cmd.extend(enis)
     else:
       if self.assign_external_ip:
         create_cmd.append('--associate-public-ip-address')
@@ -1526,6 +1548,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     result['boot_disk_size'] = self.boot_disk_size
     if self.use_dedicated_host:
       result['num_vms_per_host'] = self.num_vms_per_host
+    result['nic_count'] = aws_network.AWS_ENI_COUNT.value
     result['efa'] = FLAGS.aws_efa
     if FLAGS.aws_efa:
       result['efa_version'] = FLAGS.aws_efa_version

@@ -1174,6 +1174,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.assign_external_ip = vm_spec.assign_external_ip
     self.ip_address = None
     self.internal_ip = None
+    self.internal_ips = []
     self.user_name = DEFAULT_USERNAME
     self.password = None
     self.ssh_public_key = vm_util.GetPublicKeyPath()
@@ -1230,6 +1231,14 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
           ' specify --connect_via_internal_ip?'
       )
     return self.ip_address
+
+  def GetInternalIPs(self):
+    """Gets the Internal IP's for the VM."""
+    if self.internal_ips:
+      return self.internal_ips
+    elif self.internal_ip:
+      return [self.internal_ip]
+    return []
 
   def CreateScratchDisk(self, disk_spec_id, disk_spec):
     """Create a VM's scratch disk.

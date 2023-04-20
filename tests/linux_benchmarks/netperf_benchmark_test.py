@@ -78,7 +78,7 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     vm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
     vm_spec.vms[0].RobustRemoteCommand.side_effect = [
         (i, '') for i in self.expected_stdout]
-
+    vm_spec.vms[1].GetInternalIPs.return_value = ['test_ip']
     run_result = netperf_benchmark.Run(vm_spec)
     result = []
     for sample in run_result:
