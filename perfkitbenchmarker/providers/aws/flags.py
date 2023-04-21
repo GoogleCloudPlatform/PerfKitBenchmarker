@@ -56,12 +56,22 @@ flags.DEFINE_string('aws_image_name_regex', None,
                     'IMAGE_NAME_REGEX.')
 flags.DEFINE_string('aws_preprovisioned_data_bucket', None,
                     'AWS bucket where pre-provisioned data has been copied.')
-flags.DEFINE_string('cache_node_type',
-                    'cache.m4.large',
-                    'The AWS cache node type to use for elasticache clusters.')
-flags.DEFINE_string('aws_elasticache_failover_zone',
-                    None,
-                    'AWS elasticache failover zone')
+flags.DEFINE_string(
+    'elasticache_node_type',
+    'cache.m4.large',
+    'The AWS cache node type to use for elasticache clusters.',
+)
+flags.DEFINE_integer(
+    'elasticache_node_count',
+    1,
+    (
+        'Number of cache nodes (shards) to use. Only used if '
+        'managed_memory_store_cluster is True.'
+    ),
+)
+flags.DEFINE_string(
+    'elasticache_failover_zone', None, 'AWS elasticache failover zone'
+)
 flags.DEFINE_string('aws_efs_token', None,
                     'The creation token used to create the EFS resource. '
                     'If the file system already exists, it will use that '

@@ -85,14 +85,14 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     Returns:
       dict mapping string property key to value.
     """
-    result = {
+    self.metadata.update({
         'cloud_redis_failover_style': self.failover_style,
         'cloud_redis_size': self.size,
         'cloud_redis_tier': self.tier,
         'cloud_redis_region': self.redis_region,
         'cloud_redis_version': self.ParseReadableVersion(self.redis_version),
-    }
-    return result
+    })
+    return self.metadata
 
   @staticmethod
   def ParseReadableVersion(version):

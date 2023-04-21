@@ -53,7 +53,8 @@ REDIS_3_2 = 'redis_3_2'
 REDIS_4_0 = 'redis_4_0'
 REDIS_5_0 = 'redis_5_0'
 REDIS_6_X = 'redis_6_x'
-REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X]
+REDIS_7_X = 'redis_7_x'
+REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X, REDIS_7_X]
 
 flags.DEFINE_string(
     'managed_memory_store_version',
@@ -64,6 +65,11 @@ flags.DEFINE_string(
         'in benchmark config. Defaults to None so that benchmark '
         'config defaults are used.'
     ),
+)
+_MANAGED_MEMORY_STORE_CLUSTER = flags.DEFINE_bool(
+    'managed_memory_store_cluster',
+    False,
+    'If True, provisions a cluster instead of a standalone instance.',
 )
 flags.DEFINE_string(
     'cloud_redis_region',
@@ -136,6 +142,9 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self._ip: str = None
     self._port: int = None
     self._password: str = None
+    self._clustered: bool = _MANAGED_MEMORY_STORE_CLUSTER.value
+
+    self.metadata['clustered'] = self._clustered
 
   def GetMemoryStoreIp(self) -> str:
     """Returns the Ip address of the managed memory store."""

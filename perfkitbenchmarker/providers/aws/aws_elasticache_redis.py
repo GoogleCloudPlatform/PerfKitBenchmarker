@@ -32,6 +32,7 @@ REDIS_VERSION_MAPPING = {
     'redis_4_0': '4.0.10',
     'redis_5_0': '5.0.6',
     'redis_6_x': '6.x',
+    'redis_7_x': '7.0',
 }
 
 
@@ -45,9 +46,12 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     super(ElastiCacheRedis, self).__init__(spec)
     self.subnet_group_name = 'subnet-%s' % self.name
     self.version = REDIS_VERSION_MAPPING[spec.config.cloud_redis.redis_version]
-    self.node_type = FLAGS.cache_node_type
+    self.node_type = FLAGS.elasticache_node_type
+    self.node_count = (
+        FLAGS.elasticache_node_count if self._clustered else None
+    )
     self.redis_region = FLAGS.cloud_redis_region
-    self.failover_zone = FLAGS.aws_elasticache_failover_zone
+    self.failover_zone = FLAGS.elasticache_failover_zone
     self.failover_subnet = None
     self.failover_style = FLAGS.redis_failover_style
 
@@ -63,7 +67,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
         managed_memory_store.Failover.FAILOVER_NONE,
         managed_memory_store.Failover.FAILOVER_SAME_ZONE,
     ]:
-      if FLAGS.aws_elasticache_failover_zone:
+      if FLAGS.elasticache_failover_zone:
         raise errors.Config.InvalidValue(
             'The aws_elasticache_failover_zone flag is ignored. '
             'There is no need for a failover zone when there is no failover. '
@@ -71,8 +75,8 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
         )
     else:
       if (
-          not FLAGS.aws_elasticache_failover_zone
-          or FLAGS.aws_elasticache_failover_zone[:-1]
+          not FLAGS.elasticache_failover_zone
+          or FLAGS.elasticache_failover_zone[:-1]
           != FLAGS.cloud_redis_region
       ):
         raise errors.Config.InvalidValue(
@@ -86,7 +90,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     Returns:
       dict mapping string property key to value.
     """
-    result = {
+    self.metadata.update({
         'cloud_redis_failover_style': self.failover_style,
         'cloud_redis_version': managed_memory_store.ParseReadableVersion(
             self.version
@@ -95,8 +99,8 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
         'cloud_redis_region': self.redis_region,
         'cloud_redis_primary_zone': self.spec.vms[0].zone,
         'cloud_redis_failover_zone': self.failover_zone,
-    }
-    return result
+    })
+    return self.metadata
 
   def _CreateDependencies(self):
     """Create the subnet dependencies."""
@@ -163,23 +167,24 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
         self.node_type,
         '--cache-subnet-group-name',
         self.subnet_group_name,
-        '--preferred-cache-cluster-a-zs',
-        self.spec.vms[0].zone,
     ]
 
-    if (
-        self.failover_style
-        == managed_memory_store.Failover.FAILOVER_SAME_REGION
-    ):
-      cmd += [self.failover_zone]
-
-    elif (
-        self.failover_style == managed_memory_store.Failover.FAILOVER_SAME_ZONE
-    ):
-      cmd += [self.spec.vms[0].zone]
-
-    if self.failover_style != managed_memory_store.Failover.FAILOVER_NONE:
-      cmd += ['--automatic-failover-enabled', '--num-cache-clusters', '2']
+    if not self._clustered:
+      cmd += ['--preferred-cache-cluster-a-zs', self.spec.vms[0].zone]
+      if (
+          self.failover_style
+          == managed_memory_store.Failover.FAILOVER_SAME_REGION
+      ):
+        cmd += [self.failover_zone]
+      elif (
+          self.failover_style
+          == managed_memory_store.Failover.FAILOVER_SAME_ZONE
+      ):
+        cmd += [self.spec.vms[0].zone]
+      if self.failover_style != managed_memory_store.Failover.FAILOVER_NONE:
+        cmd += ['--automatic-failover-enabled', '--num-cache-clusters', '2']
+    else:
+      cmd += ['--num-node-groups', str(self.node_count)]
 
     cmd += ['--tags']
     cmd += util.MakeFormattedDefaultTags()
@@ -254,9 +259,11 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     cluster_info = self.DescribeInstance()
     if not cluster_info:
       raise errors.Resource.RetryableGetError(
-          'Failed to retrieve information on %s', self.name
+          f'Failed to retrieve information on {self.name}'
       )
-
-    primary_endpoint = cluster_info['NodeGroups'][0]['PrimaryEndpoint']
+    if self._clustered:
+      primary_endpoint = cluster_info['ConfigurationEndpoint']
+    else:
+      primary_endpoint = cluster_info['NodeGroups'][0]['PrimaryEndpoint']
     self._ip = primary_endpoint['Address']
     self._port = primary_endpoint['Port']
