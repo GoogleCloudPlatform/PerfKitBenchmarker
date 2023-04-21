@@ -45,6 +45,7 @@
     their own.
 -   Remove flag fio_write_against_multiple_clients from FIO.
 -   Drop windows coremark benchmark.
+-   Remove cudnn linux package.
 
 ### New features:
 
