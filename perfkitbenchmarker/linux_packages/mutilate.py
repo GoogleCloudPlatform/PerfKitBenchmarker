@@ -65,13 +65,13 @@ flags.DEFINE_list(
 # We will test following threads:connections:depths:
 #   1,3,5; 1,3,6; 1,4,5; 1,4,6; 2,3,5; 2,3,6; 2,4,5; 2,4,6;
 flags.DEFINE_list(
-    'mutilate_threads', [1],
+    'mutilate_threads', ['1'],
     'Number of total client threads to spawn per client VM.')
 flags.DEFINE_list(
-    'mutilate_connections', [1],
+    'mutilate_connections', ['1'],
     'Number of connections to establish per client thread.')
 flags.DEFINE_list(
-    'mutilate_depths', [1],
+    'mutilate_depths', ['1'],
     'Maximum depth to pipeline requests.')
 
 # Agent mode options.
