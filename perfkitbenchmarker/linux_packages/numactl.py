@@ -13,14 +13,14 @@
 # limitations under the License.
 """Module containing numactl installation and cleanup functions."""
 
-from typing import Dict, Pattern
+from typing import Dict, Pattern, Union
 from perfkitbenchmarker import regex_util
 
 NUMA_CPUS_REGEX = r'node (\d+) cpus: ([\d ]*)'
 NUMA_MEMORY_REGEX = r'node (\d+) size: (\d+) MB'
 
 
-def _ParseNuma(vm, regex: Pattern[str]) -> Dict[int, str]:
+def _ParseNuma(vm, regex: Union[str, Pattern[str]]) -> Dict[int, str]:
   """Parses the numactl --hardware output with the supplied regex."""
   out, _ = vm.RemoteCommand('numactl --hardware')
   matches = regex_util.ExtractAllMatches(regex, out)
