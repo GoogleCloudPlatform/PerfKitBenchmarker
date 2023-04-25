@@ -155,6 +155,7 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
     ]
     vm_util.IssueCommand(cmd)
     self._AssignEndpointForWriterInstance()
+    self.client_vm_query_tools.InstallPackages()
 
   def SetDbConfiguration(self, name: str, value: str) -> Tuple[str, str, int]:
     """Set configuration for the database instance.
