@@ -70,78 +70,62 @@ class MavenTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['https_proxy'].parse('https://some-proxy.com:888')
     cmd = maven.GetRunCommand('install')
     expected = (
-        'source {} && mvn install'
+        f'source {maven.MVN_ENV_PATH} && mvn install'
         ' -Dhttp.proxyHost=some-proxy.com -Dhttp.proxyPort=888'
-        ' -Dhttps.proxyHost=some-proxy.com -Dhttps.proxyPort=888'.format(
-            maven.MVN_ENV_PATH))
+        ' -Dhttps.proxyHost=some-proxy.com -Dhttps.proxyPort=888'
+        ' --no-transfer-progress'
+    )
     self.assertEqual(expected, cmd)
 
   def testGetRunCommandNoProxy(self):
     FLAGS['http_proxy'].present = 0
     FLAGS['https_proxy'].present = 0
     cmd = maven.GetRunCommand('install')
-    expected = ('source {} && mvn install'.format(maven.MVN_ENV_PATH))
+    expected = (
+        f'source {maven.MVN_ENV_PATH} && mvn install --no-transfer-progress'
+    )
     self.assertEqual(expected, cmd)
 
-  def testAptInstallNewMaven(self):
+  def testGetRunCommandWithNewMaven(self):
     # mvn >= 3.6.1 supports the --no-transfer-progress flag.
     FLAGS['maven_version'].parse('3.6.1')
 
-    maven.AptInstall(self.vm)
-    maven_full_ver = maven.FLAGS.maven_version
-    maven_major_ver = maven_full_ver[:maven_full_ver.index('.')]
-    maven_url = maven.MVN_URL.format(maven_major_ver, maven_full_ver)
-    maven_tar = maven_url.split('/')[-1]
-    maven_remote_path = posixpath.join(linux_packages.INSTALL_DIR, maven_tar)
-    self.assertRemoteCommandsEqual([
-        'mkdir -p {0} && tar -C {0} --strip-components=1 -xzf {1}'.format(
-            maven.MVN_DIR, maven_remote_path
-        ),
-        (
-            'java -XshowSettings:properties 2>&1 > /dev/null '
-            "| awk '/java.home/{print $3}'"
-        ),
-        'echo "{0}" | sudo tee -a {1}'.format(
-            maven.MVN_ENV.format(
-                java_home='/home',
-                maven_home=maven.MVN_DIR,
-                maven_cli_opts='--no-transfer-progress',
-            ),
-            maven.MVN_ENV_PATH,
-        ),
-    ])
-    self.assertVmInstallCommandsEqual(['openjdk', 'curl'])
-    self.assertOnlyKnownMethodsCalled(
-        'RemoteCommand', 'InstallPreprovisionedPackageData', 'Install'
+    cmd = maven.GetRunCommand('install')
+    expected = (
+        f'source {maven.MVN_ENV_PATH} && mvn install --no-transfer-progress'
     )
+    self.assertEqual(expected, cmd)
 
-  def testAptInstallOldMaven(self):
+  def testGetRunCommandWithOldMaven(self):
     # For mvn < 3.6.1, we use --batch-mode instead of the --no-transfer-progress
     # flag.
     FLAGS['maven_version'].parse('3.6.0')
 
+    cmd = maven.GetRunCommand('install')
+    expected = f'source {maven.MVN_ENV_PATH} && mvn install --batch-mode'
+    self.assertEqual(expected, cmd)
+
+  def testAptInstall(self):
     maven.AptInstall(self.vm)
     maven_full_ver = maven.FLAGS.maven_version
     maven_major_ver = maven_full_ver[: maven_full_ver.index('.')]
     maven_url = maven.MVN_URL.format(maven_major_ver, maven_full_ver)
     maven_tar = maven_url.split('/')[-1]
     maven_remote_path = posixpath.join(linux_packages.INSTALL_DIR, maven_tar)
+    maven_env = maven.MavenEnvContents(
+        java_home='/home', maven_home=maven.MVN_DIR
+    )
     self.assertRemoteCommandsEqual([
-        'mkdir -p {0} && tar -C {0} --strip-components=1 -xzf {1}'.format(
-            maven.MVN_DIR, maven_remote_path
+        (
+            f'mkdir -p {maven.MVN_DIR} && tar -C'
+            f' {maven.MVN_DIR} --strip-components=1 -xzf'
+            f' {maven_remote_path}'
         ),
         (
-            'java -XshowSettings:properties 2>&1 > /dev/null '
-            "| awk '/java.home/{print $3}'"
+            'java -XshowSettings:properties 2>&1 >'
+            " /dev/null | awk '/java.home/{print $3}'"
         ),
-        'echo "{0}" | sudo tee -a {1}'.format(
-            maven.MVN_ENV.format(
-                java_home='/home',
-                maven_home=maven.MVN_DIR,
-                maven_cli_opts='--batch-mode',
-            ),
-            maven.MVN_ENV_PATH,
-        ),
+        f'echo "{maven_env}" | sudo tee -a {maven.MVN_ENV_PATH}',
     ])
     self.assertVmInstallCommandsEqual(['openjdk', 'curl'])
     self.assertOnlyKnownMethodsCalled('RemoteCommand',
