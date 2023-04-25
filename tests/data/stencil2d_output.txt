@@ -92,7 +92,7 @@ SP_Sten2D(median)	1000:20480x20480:8x256	GFLOPS	753.795	754.187	0.89327	753.268	
 SP_Sten2D(min)	1000:20480x20480:8x256	GFLOPS	735.214	735.517	0.824177	734.892	737.452	
 SP_Sten2D(stddev)	1000:20480x20480:8x256	GFLOPS	9.13922	9.14991	0.588605	8.13804	10.3033	
 
-Note: results marked with (*) had missing values such as
+Note - had missing values such as
 might occur with a mixture of architectural capabilities.
 
 Detecting outliers based on per-process mean values.

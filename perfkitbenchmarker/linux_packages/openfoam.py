@@ -20,7 +20,7 @@ OpenFOAM foundation: https://openfoam.org/.
 
 Instructions for installing OpenFOAM: https://openfoam.org/download/7-ubuntu/.
 
-NOTE: .bashrc will be overwritten by AptInstall()
+NOTE -
 """
 
 import posixpath
