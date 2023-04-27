@@ -323,7 +323,7 @@ def BuildMemtierCommand(
       'test-time': test_time,
       'out-file': outfile,
       'json-out-file': json_out_file,
-      'print-percentile': '50,90,95,99,99.9',
+      'print-percentile': '50,90,95,99,99.5,99.9,99.95,99.99',
   }
   # Arguments passed without a parameter
   no_param_args = {'random-data': random_data, 'cluster-mode': cluster_mode}
@@ -1130,7 +1130,7 @@ def _ParseTotalThroughputAndLatency(
   for raw_line in memtier_results.splitlines():
     line = raw_line.strip()
     if re.match(r'^Type', line):
-      columns = re.split(r' \s+', line)
+      columns = re.split(r' \s+', line.replace('Latency', 'Latency '))
     if re.match(r'^Totals', line):
       if not columns:
         raise errors.Benchmarks.RunError(
@@ -1230,7 +1230,10 @@ def _ParseTimeSeries(
               'p90.00',
               'p95.00',
               'p99.00',
+              'p99.50',
               'p99.90',
+              'p99.95',
+              'p99.99',
           ):
             continue
 
