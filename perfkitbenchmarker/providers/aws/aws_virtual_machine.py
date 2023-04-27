@@ -757,7 +757,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     instance = response['Reservations'][0]['Instances'][0]
     self.internal_ip = instance['PrivateIpAddress']
     for network_interface in instance.get('NetworkInterfaces', []):
-      self.internal_ips.append(network_interface['PrivateIpAddress'])
+      # Ensures primary NIC is first
+      if network_interface['Attachment']['DeviceIndex'] == 0:
+        self.internal_ips = ([network_interface['PrivateIpAddress']] +
+                             self.internal_ips)
+      else:
+        self.internal_ips.append(network_interface['PrivateIpAddress'])
     if util.IsRegion(self.zone):
       self.zone = str(instance['Placement']['AvailabilityZone'])
 
@@ -928,6 +933,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if FLAGS.aws_efa:
       efas = ['--network-interfaces']
       for device_index in range(FLAGS.aws_efa_count):
+        # You can assign up to one EFA per network card.
         efa_params = _EFA_PARAMS.copy()
         efa_params.update({
             'NetworkCardIndex': device_index,
@@ -942,10 +948,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.extend(efas)
     elif aws_network.AWS_ENI_COUNT.value > 1:
       enis = ['--network-interfaces']
+      enis_per_network_card = (
+          aws_network.AWS_ENI_COUNT.value //
+          aws_network.AWS_NETWORK_CARD_COUNT.value
+          )
       for device_index in range(aws_network.AWS_ENI_COUNT.value):
         eni_params = _ENI_PARAMS.copy()
         eni_params.update({
-            'NetworkCardIndex': device_index,
+            'NetworkCardIndex': device_index // enis_per_network_card,
             'DeviceIndex': device_index,
             'Groups': self.group_id,
             'SubnetId': self.network.subnets[device_index].id,

@@ -47,6 +47,9 @@ _AWS_SUBNET = flags.DEFINE_string(
 AWS_ENI_COUNT = flags.DEFINE_integer(
     'aws_eni_count', 1,
     'The number of ENIs per instance.')
+AWS_NETWORK_CARD_COUNT = flags.DEFINE_integer(
+    'aws_network_card_count', 1,
+    'The number of network cards per instance.')
 flags.DEFINE_bool('aws_efa', False, 'Whether to use an Elastic Fiber Adapter.')
 flags.DEFINE_string('aws_efa_version', '1.12.1',
                     'Version of AWS EFA to use (must also pass in --aws_efa).')
@@ -882,6 +885,7 @@ class AwsNetwork(network.BaseNetwork):
           spec.vpc_id,
           cidr_block=self.regional_network.cidr_block,
           subnet_id=spec.subnet_id)
+      self.subnets = [self.subnet]
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
@@ -910,8 +914,8 @@ class AwsNetwork(network.BaseNetwork):
 
   def Delete(self):
     """Deletes the network."""
-    if self.subnet:
-      self.subnet.Delete()
+    for subnet in self.subnets:
+      subnet.Delete()
     if self.placement_group:
       self.placement_group.Delete()
     if hasattr(self, 'vpc_peering') and self.vpc_peering:

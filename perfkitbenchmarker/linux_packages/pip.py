@@ -32,7 +32,7 @@ from perfkitbenchmarker.linux_packages import python
 
 import requests
 
-# NOTE - URL is in root directory and versions have their
+# NOTE: versionless (latest) URL is in root directory and versions have their
 # own subdirectories.
 GET_PIP_URL = 'https://bootstrap.pypa.io/pip/get-pip.py'
 GET_PIP_VERSIONED_URL = 'https://bootstrap.pypa.io/pip/{python_version}/get-pip.py'
