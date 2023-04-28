@@ -24,7 +24,11 @@ timestamp() {
 try_connect() {
   while true; do
     echo "try $1 $2 at $(timestamp)"
-    python3 /tmp/net_test.py $1 $2 | grep "Route Found" > /dev/null
+    {
+      python3 /tmp/net_test.py $1 $2 | grep "Route Found" > /dev/null
+    } || {
+      python /tmp/net_test.py $1 $2 | grep "Route Found" > /dev/null
+    }
     if [[ $? -eq 0 ]]; then
       echo Connection refused by $1 at $(timestamp)
       break;
