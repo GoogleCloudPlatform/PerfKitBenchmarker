@@ -135,7 +135,7 @@ _ENI_PARAMS = {
 }
 
 # Parameters for use with Elastic Fiber Adapter
-_EFA_PARAMS = _ENI_PARAMS
+_EFA_PARAMS = _ENI_PARAMS.copy()
 _EFA_PARAMS['InterfaceType'] = 'efa'
 
 # Location of EFA installer
