@@ -584,7 +584,6 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'os_info': self.os_info,
         'cpu_arch': self.cpu_arch,
         'threads_per_core': 1,
-        'has_dpdk': False
     }
     self.assertEqual(expected_os_metadata, vm.os_metadata)
 

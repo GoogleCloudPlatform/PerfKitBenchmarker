@@ -190,11 +190,6 @@ flags.DEFINE_boolean('disable_smt', False,
                      'Whether to disable SMT (Simultaneous Multithreading) '
                      'in BIOS.')
 
-flags.DEFINE_bool(
-    'install_dpdk', False,
-    'Determines whether to install Data Plane Development Kit (DPDK) for '
-    'faster network packet processing.')
-
 _DISABLE_YUM_CRON = flags.DEFINE_boolean(
     'disable_yum_cron', True, 'Whether to disable the cron-run yum service.')
 _KERNEL_MODULES_TO_ADD = flags.DEFINE_list(
@@ -354,7 +349,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.remote_access_ports = [self.ssh_port]
     self.primary_remote_access_port = self.ssh_port
     self.has_private_key = False
-    self.has_dpdk = False
     self.ssh_external_time = None
     self.ssh_internal_time = None
 
@@ -558,10 +552,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       # Call SetupPackageManager lazily from HasPackage/InstallPackages like
       # ShouldDownloadPreprovisionedData sets up object storage CLIs.
       self.SetupPackageManager()
-    # Install DPDK for better networking performance.
-    if FLAGS.install_dpdk:
-      self.InstallPackages('dpdk')
-      self.has_dpdk = True
     self.SetFiles()
     self.DoSysctls()
     self._DoAppendKernelCommandLine()
@@ -928,7 +918,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.os_metadata['os_info'] = self.os_info
     self.os_metadata['kernel_release'] = str(self.kernel_release)
     self.os_metadata['cpu_arch'] = self.cpu_arch
-    self.os_metadata['has_dpdk'] = self.has_dpdk
     self.os_metadata.update(self.partition_table)
     if FLAGS.append_kernel_command_line:
       self.os_metadata['kernel_command_line'] = self.kernel_command_line

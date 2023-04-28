@@ -108,8 +108,6 @@
 -   Add Intel MPI benchmark.
 -   Add support for Azure ARM VMs.
 -   Add an HTTP endpoint polling utility & incorporate it into app_service.
--   Added support for Data Plane Development Kit (DPDK) on Linux VM's to improve
-    networking performance.
 -   Added support for dynamic provisioning of Bigquery flat rate slots at
     benchmark runtime
 -   Create a new subdirectory of linux_benchmarks called provisioning_benchmarks
@@ -132,6 +130,8 @@
 -   Add cos-dev, cos105, cos101, cos97, and cos93 OS support for GCP.
 -   Add --object_ttl_days flag for lifecycle management of created buckets.
 -   Add support for multi-NIC netperf throughput on AWS.
+-   Added support for Data Plane Development Kit (DPDK) on Linux VM's to improve
+    networking performance, as well as a DPDK benchmark for testpmd.
 
 ### Enhancements:
 

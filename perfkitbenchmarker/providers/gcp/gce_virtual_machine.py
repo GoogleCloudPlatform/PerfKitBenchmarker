@@ -930,6 +930,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if 'accessConfigs' in network_interface:
       self.ip_address = network_interface['accessConfigs'][0]['natIP']
 
+    for network_interface in describe_response['networkInterfaces']:
+      self.internal_ips.append(network_interface['networkIP'])
+
   @property
   def HasIpAddress(self):
     """Returns True when the IP has been retrieved from a describe response."""
@@ -939,7 +942,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Returns whether the ID and IP addresses still need to be set."""
     return (
         not self.id
-        or not self.internal_ip
+        or not self.GetInternalIPs()
         or (self.assign_external_ip and not self.ip_address)
     )
 

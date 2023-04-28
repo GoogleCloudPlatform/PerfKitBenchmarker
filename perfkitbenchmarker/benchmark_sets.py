@@ -141,6 +141,7 @@ BENCHMARK_SETS = {
             'cassandra_ycsb',
             'cluster_boot',
             'copy_throughput',
+            'dpdk',
             'fio',
             'gpu_pcie_bandwidth',
             'hadoop_terasort',
