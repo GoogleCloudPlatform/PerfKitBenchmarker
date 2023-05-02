@@ -188,7 +188,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   client_cmd = (
       'sudo dpdk-testpmd'
       f' -a 00:0{secondary_nic_num}.0'
-      f' -l 0-{_DPDK_NB_CORES.value} --'
+      f' -l 0-{_DPDK_NB_CORES.value*2} --'
       f' --forward-mode={_DPDK_FORWARD_MODE.value[0]}'
       f' --tx-ip={client_vm.internal_ips[1]},{server_vm.internal_ips[1]}'
       f' --txpkts={_DPDK_TXPKTS.value}'
@@ -205,7 +205,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   server_cmd = (
       'sudo dpdk-testpmd'
       f' -a 00:0{secondary_nic_num}.0'
-      f' -l 0-{_DPDK_NB_CORES.value} --'
+      f' -l 0-{_DPDK_NB_CORES.value*2} --'
       f' --txq={_DPDK_TXQ.value}'
       f' --rxq={_DPDK_RXQ.value}'
       f' --nb-cores={_DPDK_NB_CORES.value}'

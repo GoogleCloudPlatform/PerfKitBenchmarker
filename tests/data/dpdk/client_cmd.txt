@@ -1,1 +1,1 @@
-sudo dpdk-testpmd -a 00:06.0 -l 0-2 -- --forward-mode=txonly --tx-ip=10.0.0.214,10.0.0.215 --txpkts=64 --txq=2 --rxq=2 --nb-cores=2 --stats-period=5
+sudo dpdk-testpmd -a 00:06.0 -l 0-4 -- --forward-mode=txonly --tx-ip=10.0.0.214,10.0.0.215 --txpkts=64 --txq=2 --rxq=2 --nb-cores=2 --stats-period=5

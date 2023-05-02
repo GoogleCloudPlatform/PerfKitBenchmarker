@@ -1,1 +1,1 @@
-sudo dpdk-testpmd -a 00:06.0 -l 0-2 -- --txq=2 --rxq=2 --nb-cores=2 --forward-mode=rxonly --stats-period=5
+sudo dpdk-testpmd -a 00:06.0 -l 0-4 -- --txq=2 --rxq=2 --nb-cores=2 --forward-mode=rxonly --stats-period=5
