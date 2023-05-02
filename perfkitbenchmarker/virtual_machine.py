@@ -375,9 +375,11 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   # container can have side effects in certain situations.
   IS_REBOOTABLE = True
 
+  password: str = None
   install_packages: bool  # mixed from BaseVirtualMachine
   is_static: bool  # mixed from BaseVirtualMachine
   scratch_disks: List[disk.BaseDisk]  # mixed from BaseVirtualMachine
+  name: str  # mixed from BaseVirtualMachine
   ssh_private_key: str  # mixed from BaseVirtualMachine
   user_name: str  # mixed from BaseVirtualMachine
   disable_interrupt_moderation: str  # mixed from BaseVirtualMachine
@@ -413,7 +415,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     self._is_smt_enabled = None
     # Update to Json type if ever available:
     # https://github.com/python/typing/issues/182
-    self.os_metadata: Dict[str, Union[str, int]] = {}
+    self.os_metadata: Dict[str, Union[str, int, list[str]]] = {}
     assert type(
         self).BASE_OS_TYPE in os_types.BASE_OS_TYPES, '%s is not in %s' % (
             type(self).BASE_OS_TYPE, os_types.BASE_OS_TYPES)
@@ -430,7 +432,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   def BASE_OS_TYPE(cls):
     raise NotImplementedError()
 
-  def GetOSResourceMetadata(self) -> Dict[str, Union[str, int]]:
+  def GetOSResourceMetadata(self) -> Dict[str, Union[str, int, list[str]]]:
     """Returns a dict containing VM OS metadata.
 
     Returns:
@@ -1176,7 +1178,6 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.internal_ip = None
     self.internal_ips = []
     self.user_name = DEFAULT_USERNAME
-    self.password = None
     self.ssh_public_key = vm_util.GetPublicKeyPath()
     self.ssh_private_key = vm_util.GetPrivateKeyPath()
     self.disk_specs = []

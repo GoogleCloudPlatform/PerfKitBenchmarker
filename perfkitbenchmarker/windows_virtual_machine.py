@@ -18,7 +18,7 @@ import logging
 import ntpath
 import os
 import time
-from typing import Optional, Tuple
+from typing import cast, Optional, Tuple
 import uuid
 
 from absl import flags
@@ -86,9 +86,9 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     self.remote_access_ports = [self.winrm_port, self.smb_port, RDP_PORT]
     self.primary_remote_access_port = self.winrm_port
     self.rdp_port_listening_time = None
-    self.temp_dir = None
-    self.home_dir = None
-    self.system_drive = None
+    self.temp_dir: str = None
+    self.home_dir: str = None
+    self.system_drive: str = None
     self.assigned_disk_letter = ATTACHED_DISK_LETTER
 
   def RobustRemoteCommand(
@@ -625,7 +625,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     """
     raise NotImplementedError()
 
-  def SetProcessPriorityToHighByFlag(self, executable_name):
+  def SetProcessPriorityToHighByFlag(self, executable_name: str):
     """Sets the CPU priority for a given executable name.
 
     Note this only sets the CPU priority if FLAGS.set_cpu_priority_high is set.
@@ -644,7 +644,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand(command)
     executables = self.os_metadata.get('high_cpu_priority')
     if executables:
-      executables.append(executable_name)
+      cast(list[str], executables).append(executable_name)
     else:
       self.os_metadata['high_cpu_priority'] = [executable_name]
 
