@@ -357,7 +357,7 @@ class TestUnitsParser(unittest.TestCase):
     up = flag_util.UnitsParser(convertible_to=units.percent)
     self.assertEqual(up.parse('100%'), 100 * units.percent)
     with self.assertRaises(ValueError):
-      up.parse('10KiB')
+      up.parse('10s')
 
 
 class TestStringToBytes(unittest.TestCase):
