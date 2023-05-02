@@ -18,9 +18,7 @@ import re
 from perfkitbenchmarker import errors
 
 DPDK_GIT_REPO = 'https://github.com/DPDK/dpdk.git'
-DPDK_DRIVER_GIT_REPO = (
-    'https://github.com/google/compute-virtual-ethernet-dpdk'
-)
+DPDK_DRIVER_GIT_REPO = 'https://github.com/google/compute-virtual-ethernet-dpdk'
 
 
 # TODO(andytzhu) Add YumInstall
@@ -82,13 +80,13 @@ def _InstallDPDK(vm):
   vm.RobustRemoteCommand(f'git clone {DPDK_DRIVER_GIT_REPO}')
 
   # copy out of tree driver to dpdk
-  vm.RemoteCommand(
-      'cp -r compute-virtual-ethernet-dpdk/* dpdk/drivers/net/gve'
-    )
+  vm.RemoteCommand('cp -r compute-virtual-ethernet-dpdk/* dpdk/drivers/net/gve')
 
   # Build and Install
   vm.RobustRemoteCommand('cd dpdk && sudo meson setup -Dexamples=all build')
-  vm.RobustRemoteCommand('cd dpdk && sudo ninja install -C build')
+  vm.RobustRemoteCommand(
+      'cd dpdk && sudo ninja install -C build && sudo ldconfig'
+  )
 
   # Disable IOMMU for VFIO
   vm.RemoteCommand(

@@ -48,6 +48,7 @@ dpdk:
     gce_subnet_name: default,dpdk0
     gce_network_type: custom
     ip_addresses: INTERNAL
+    gce_egress_bandwidth_tier: TIER_1
 """
 
 FLAGS = flags.FLAGS
