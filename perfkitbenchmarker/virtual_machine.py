@@ -1206,6 +1206,9 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.create_return_time = None
     self.is_running_time = None
     self.boot_startup_script = vm_spec.boot_startup_script
+    if self.OS_TYPE == os_types.CORE_OS and self.boot_startup_script:
+      raise errors.Setup.InvalidConfigurationError(
+          'Startup script are not supported on CoreOS.')
 
   @property
   @classmethod
