@@ -133,7 +133,7 @@ PORT_START = 20000
 REMOTE_SCRIPTS_DIR = 'netperf_test_scripts'
 REMOTE_SCRIPT = 'netperf_test.py'
 
-PERCENTILES = [50, 90, 99]
+PERCENTILES = [50, 90, 95, 99]
 
 # By default, Container-Optimized OS (COS) host firewall allows only
 # outgoing connections and incoming SSH connections. To allow incoming
@@ -345,6 +345,7 @@ def ParseNetperfOutput(stdout, metadata, benchmark_name,
     for metric_key, metric_name in [
         ('50th Percentile Latency Microseconds', 'p50'),
         ('90th Percentile Latency Microseconds', 'p90'),
+        ('95th Percentile Latency Microseconds', 'p95'),
         ('99th Percentile Latency Microseconds', 'p99'),
         ('Minimum Latency Microseconds', 'min'),
         ('Maximum Latency Microseconds', 'max'),
@@ -469,7 +470,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     # Extract the throughput values from the samples
     throughputs = [s.value for s in throughput_samples]
     # Compute some stats on the throughput values
-    throughput_stats = sample.PercentileCalculator(throughputs, [50, 90, 99])
+    throughput_stats = sample.PercentileCalculator(throughputs, [50, 90, 95, 99])
     throughput_stats['min'] = min(throughputs)
     throughput_stats['max'] = max(throughputs)
     # Calculate aggregate throughput
