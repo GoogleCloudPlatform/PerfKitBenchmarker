@@ -32,6 +32,7 @@ import uuid
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
@@ -60,8 +61,7 @@ TERMINATED = 'terminated'
 SHUTTING_DOWN = 'shutting-down'
 INSTANCE_TRANSITIONAL_STATUSES = frozenset(['pending'])
 INSTANCE_EXISTS_STATUSES = (INSTANCE_TRANSITIONAL_STATUSES |
-                            frozenset(['pending', 'running',
-                                       'stopping', 'stopped']))
+                            frozenset([RUNNING, 'stopping', 'stopped']))
 INSTANCE_DELETED_STATUSES = frozenset([SHUTTING_DOWN, TERMINATED])
 INSTANCE_KNOWN_STATUSES = (INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES)
 
@@ -1255,6 +1255,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       elif (status == SHUTTING_DOWN and
             instances[0]['StateReason']['Code'] == 'Server.InternalError'):
         self.client_token = str(uuid.uuid4())
+      # When measuring time-to-delete, we want Exists() to retry until the
+      # VM is in the TERMINATED state. Otherwise, it is fine to say that
+      # the VM no longer exists when it is SHUTTING_DOWN.
+      elif pkb_flags.MEASURE_DELETE.value and status == SHUTTING_DOWN:
+        logging.info('VM has status %s, retrying describe-instances command',
+                     status)
+        raise AwsTransitionalVmRetryableError()
       return status in INSTANCE_EXISTS_STATUSES
     else:
       return False

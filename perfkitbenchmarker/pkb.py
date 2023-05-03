@@ -87,6 +87,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import log_util
@@ -315,9 +316,6 @@ _SMART_CAPACITY_RETRY = flags.DEFINE_bool(
 flags.DEFINE_boolean(
     'boot_samples', False,
     'Whether to publish boot time samples for all tests.')
-_MEASURE_DELETE = flags.DEFINE_boolean(
-    'delete_samples', False,
-    'Whether to publish delete time samples for all tests.')
 flags.DEFINE_boolean(
     'gpu_samples', False,
     'Whether to publish GPU memcpy bandwidth samples for GPU tests.')
@@ -959,7 +957,7 @@ def DoTeardownPhase(spec, collector, timer):
   logging.info('Tearing down resources for benchmark %s', spec.name)
   events.before_phase.send(stages.TEARDOWN, benchmark_spec=spec)
   # Add delete time metrics after metadeta collected
-  if _MEASURE_DELETE.value:
+  if pkb_flags.MEASURE_DELETE.value:
     samples = cluster_boot_benchmark.MeasureDelete(spec.vms)
     collector.AddSamples(samples, spec.name, spec)
 
