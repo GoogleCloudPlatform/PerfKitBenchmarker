@@ -79,7 +79,13 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
   """
   CLOUD = provider_info.AZURE
+  ENGINE = [
+      sql_engine_utils.POSTGRES,
+      sql_engine_utils.MYSQL,
+      sql_engine_utils.SQLSERVER,
+  ]
   SERVER_TYPE = 'server'
+  REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
 
   database_name: str
 
