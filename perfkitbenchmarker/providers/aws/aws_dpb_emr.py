@@ -408,7 +408,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     step_id = result['StepIds'][0]
     return self._WaitForJob(step_id, EMR_TIMEOUT, job_poll_interval)
 
-  def DistributedCopy(self, source, destination):
+  def DistributedCopy(self, source, destination, properties=None):
     """Method to copy data using a distributed job on the cluster."""
     job_arguments = ['s3-dist-cp']
     job_arguments.append('--src={}'.format(source))
