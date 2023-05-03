@@ -20,12 +20,12 @@ TEST_OUTPUT = """
   4         Threads
   50        Connections per thread
   20        Seconds
-  Type        Ops/sec     Hits/sec   Misses/sec    Avg. Latency      p50 Latency     p90 Latency     p95 Latency     p99 Latency   p99.9 Latency   KB/sec
-  -------------------------------------------------------------------------------------------------------------------------------------------------------
-  Sets        4005.50          ---          ---         1.50600         1.21500         2.29500         2.31900         2.39900         3.93500    308.00
-  Gets       40001.05     40001.05         0.00         1.54300         1.21500         2.28700         2.31900         2.39100         3.84700   1519.00
-  Waits          0.00          ---          ---             ---             ---             ---             ---             ---             ---       ---
-  Totals     44006.55     40001.05         0.00         1.54000         1.21500         2.29500         2.31900         2.39900         3.87100   1828.00
+  Type        Ops/sec     Hits/sec   Misses/sec    Avg. Latency      p50 Latency     p90 Latency     p95 Latency     p99 Latency   p99.5 Latency p99.9 Latency p99.950 Latency p99.990 Latency   KB/sec
+  -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Sets        4005.50          ---          ---         1.50600         1.21500         2.29500         2.31900         2.39900         3.93500       3.93600         3.93700         3.93800    308.00
+  Gets       40001.05     40001.05         0.00         1.54300         1.21500         2.28700         2.31900         2.39100         3.84700       3.84800         3.84900         3.85000   1519.00
+  Waits          0.00          ---          ---             ---             ---             ---             ---             ---             ---           ---             ---           ---       ---
+  Totals     44006.55     40001.05         0.00         1.54000         1.21500         2.29500         2.31900         2.39900         3.87100       3.87200         3.87300         3.87400   1828.00
 
   Request Latency Distribution
 Type        <= msec      Percent
@@ -178,8 +178,13 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
             unit='ops/s',
             metadata={
                 'test': 'foobar',
+                'p50_latency': 1.215,
                 'p90_latency': 2.295,
                 'p95_latency': 2.319,
+                'p99.5_latency': 3.871,
+                'p99.950_latency': 3.873,
+                'p99.990_latency': 3.874,
+                'p99.9_latency': 3.872,
                 'p99_latency': 2.399,
                 'avg_latency': 1.54,
             },
@@ -191,8 +196,13 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
             unit='KB/s',
             metadata={
                 'test': 'foobar',
+                'p50_latency': 1.215,
                 'p90_latency': 2.295,
                 'p95_latency': 2.319,
+                'p99.5_latency': 3.871,
+                'p99.950_latency': 3.873,
+                'p99.990_latency': 3.874,
+                'p99.9_latency': 3.872,
                 'p99_latency': 2.399,
                 'avg_latency': 1.54,
             },
@@ -204,8 +214,13 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
             unit='ms',
             metadata={
                 'test': 'foobar',
+                'p50_latency': 1.215,
                 'p90_latency': 2.295,
                 'p95_latency': 2.319,
+                'p99.5_latency': 3.871,
+                'p99.950_latency': 3.873,
+                'p99.990_latency': 3.874,
+                'p99.9_latency': 3.872,
                 'p99_latency': 2.399,
                 'avg_latency': 1.54,
             },
@@ -217,8 +232,13 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
             unit='',
             metadata={
                 'test': 'foobar',
+                'p50_latency': 1.215,
                 'p90_latency': 2.295,
                 'p95_latency': 2.319,
+                'p99.5_latency': 3.871,
+                'p99.950_latency': 3.873,
+                'p99.990_latency': 3.874,
+                'p99.9_latency': 3.872,
                 'p99_latency': 2.399,
                 'avg_latency': 1.54,
                 'histogram': (
@@ -234,8 +254,13 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
             unit='',
             metadata={
                 'test': 'foobar',
+                'p50_latency': 1.215,
                 'p90_latency': 2.295,
                 'p95_latency': 2.319,
+                'p99.5_latency': 3.871,
+                'p99.950_latency': 3.873,
+                'p99.990_latency': 3.874,
+                'p99.9_latency': 3.872,
                 'p99_latency': 2.399,
                 'avg_latency': 1.54,
                 'histogram': (

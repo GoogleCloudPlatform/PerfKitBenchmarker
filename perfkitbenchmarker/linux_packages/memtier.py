@@ -476,8 +476,8 @@ def MeasureLatencyCappedThroughput(
         lower_bound=0, upper_bound=math.inf, pipelines=1, threads=1, clients=1
     )
     current_max_result = MemtierResult(
-        0, 0, 0, {'90': 0, '95': 0, '99': 0}, [], [], [], [], {}, {}
-    )
+        0, 0, 0, {'50': 0, '90': 0, '95': 0, '99': 0, '99.5': 0, '99.9': 0,
+                  '99.950': 0, '99.990': 0}, [], [], [], [], {}, {})
     current_metadata = None
     while parameters.lower_bound < (parameters.upper_bound - 1):
       result = _Run(
@@ -1151,14 +1151,23 @@ def _ParseTotalThroughputAndLatency(
           )
         return float(totals[columns.index(key)])  # pylint: disable=cell-var-from-loop
 
+      latency_dic = {}
+      for percentile in (
+          '50',
+          '90',
+          '95',
+          '99',
+          '99.5',
+          '99.9',
+          '99.950',
+          '99.990',
+      ):
+        latency_dic[percentile] = _FetchStat(f'p{percentile} Latency')
       return MemtierAggregateResult(
           ops_per_sec=_FetchStat('Ops/sec'),
           kb_per_sec=_FetchStat('KB/sec'),
           latency_ms=_FetchStat('Avg. Latency'),
-          latency_dic={
-              percentile: _FetchStat(f'p{percentile} Latency')
-              for percentile in ('90', '95', '99')
-          },
+          latency_dic=latency_dic,
       )
   raise errors.Benchmarks.RunError('No "Totals" line in memtier output.')
 
