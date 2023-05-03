@@ -9,6 +9,7 @@ import datetime
 import os
 import unittest
 
+from absl.testing import parameterized
 import datetime_tz
 import mock
 from perfkitbenchmarker import sample
@@ -97,15 +98,23 @@ class LinuxBootTest(pkb_common_test_case.PkbCommonTestCase,
     self.assertEqual(linux_boot.GetKernelStartTimestamp(self.mock_vm),
                      1680650777.1411774)
 
-  def testParseSeconds(self):
-    self.assertEqual(linux_boot._ParseSeconds('1min 3.02s'), 63.02)
-    self.assertEqual(linux_boot._ParseSeconds('203ms'), 0.203)
+  @parameterized.named_parameters(
+      ('HourLong', '1h 19min 20.378s', 4760.378),
+      ('MinuteLong', '1min 3.02s', 63.02),
+      ('MSecLong', '203ms', 0.203),
+  )
+  def testParseSeconds(self, raw_str, sec):
+    self.assertEqual(linux_boot._ParseSeconds(raw_str), sec)
 
-  def testParseKernelUserTimes(self):
-    """Test kernel time, user time parsing."""
-    self.assertEqual(linux_boot.ParseKernelUserTimes(
+  def testParseUserTotalTimes(self):
+    """Test kernel time, total time parsing."""
+    self.assertEqual(linux_boot.ParseUserTotalTimes(
         'Startup finished in 2.2s (kernel) + 1min 12.5s (userspace) '
-        '= 1min 14.774s'), (2.2, 72.5))
+        '= 1min 14.774s'), (2.2, 74.7))
+    self.assertEqual(linux_boot.ParseUserTotalTimes(
+        'Startup finished in 448ms (firmware) + 1.913s (loader) + '
+        '1.183s (kernel) + 52.438s (initrd) + 30.413s (userspace) '
+        '= 1min 26.398s'), (53.621, 84.034))
 
   def testParseSystemDCriticalChain(self):
     """Test systemd critical-chain output parsing."""

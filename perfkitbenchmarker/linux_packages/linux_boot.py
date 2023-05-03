@@ -192,6 +192,12 @@ def CollectGuestSamples(vm: virtual_machine.VirtualMachine,
                         metric_start_time: float) -> List[sample.Sample]:
   """Collect guest metrics.
 
+  All metrics published are normalized against VM creation timestamp, including:
+  - kernel_start: Time guest kernel starts since vm create.
+  - user_start: Time userspace starts since vm create.
+  - guest_boot_complete: Time systemd-analyze finishes since vm create.
+  - Various boot services reported from systemd-analyze critical-chain.
+
   Args:
     vm: The vm to extract metrics from.
     metric_start_time: The start time to measure from, in utc seconds.
@@ -207,12 +213,16 @@ def CollectGuestSamples(vm: virtual_machine.VirtualMachine,
   # preventative measure dealing with startups stuck on user data fetch
   vm.RemoteCommand('sudo pkill -f wait_for_user_data.sh', ignore_failure=True)
 
-  kernel_time, total_time = WaitForReady(vm, 300)
+  # user_start and total_time are normalized against guest kernel start time,
+  # calculated from /proc/uptime.
+  # When publishing, all metrics are normalized against vm creation time, thus
+  # need to add kernel_start.
+  user_start, total_time = WaitForReady(vm, 300)
 
   samples.append(
       sample.Sample(
           'guest_boot_complete',
-          total_time + kernel_time + kernel_start,
+          kernel_start + total_time,
           'second',
           {},
       )
@@ -221,7 +231,7 @@ def CollectGuestSamples(vm: virtual_machine.VirtualMachine,
   samples.append(sample.Sample('kernel_start', kernel_start, 'second', {}))
 
   samples.append(
-      sample.Sample('user_start', kernel_start + kernel_time, 'second', {})
+      sample.Sample('user_start', kernel_start + user_start, 'second', {})
   )
 
   for metric_name, parser in SYSTEMD_CRITICAL_CHAIN_METRICS:
@@ -233,7 +243,7 @@ def CollectGuestSamples(vm: virtual_machine.VirtualMachine,
       samples.append(
           sample.Sample(
               metric_name,
-              metric_val + kernel_start + kernel_time,
+              metric_val + kernel_start + user_start,
               'second',
               {},
           )
@@ -308,7 +318,9 @@ def _ParseSeconds(formatted_time: str) -> float:
   formatted_time = formatted_time.strip()
   secs = 0.0
   for part in formatted_time.split(' '):
-    if part.endswith('min'):
+    if part.endswith('h'):
+      secs += float(part[0 : len(part) - 1]) * 3600
+    elif part.endswith('min'):
       secs += float(part[0 : len(part) - 3]) * 60
     elif part.endswith('ms'):
       secs += float(part[0 : len(part) - 2]) / 1000
@@ -319,38 +331,58 @@ def _ParseSeconds(formatted_time: str) -> float:
   return secs
 
 
-PATTERN_KERNEL_TIME = re.compile(r' in (.*?)s \(kernel\)')
+PATTERN_KERNEL_TIME = re.compile(r' \+ ([^\+]*?)s \(kernel\)')
+ALT_PATTERN_KERNEL_TIME = re.compile(r' in (.*?)s \(kernel\)')
+PATTERN_INITRD_TIME = re.compile(r' \+ ([^\+]*?)s \(initrd\)')
 PATTERN_USER_TIME = re.compile(r' \+ ([^\+]*?)s \(userspace\)')
 
 
-def ParseKernelUserTimes(system_d_string: str) -> Tuple[float, float]:
+def ParseUserTotalTimes(system_d_string: str) -> Tuple[float, float]:
   """Takes a string from systemd-analyze command and parses it.
 
   Args:
     system_d_string: the string output from systemd-analyze string output. i.e.
       "Startup finished in 2.2s (kernel) + 1min 12.5s (userspace) = 1min
       14.774s"
+      "Startup finished in 448ms (firmware) + 1.913s (loader) +
+       1.182s (kernel) + 52.438s (initrd) + 30.413s (userspace) = 1min 26.397s"
 
   Returns:
-    A tuple of kernel_time and user_time, both in seconds.
+    A tuple of user_start and total_time, both in seconds.
   """
   kernel_time = -1
   user_time = -1
+  # how long takes for initrd, which isn't reported in some OSes.
+  initrd_time = 0
 
   for match in PATTERN_KERNEL_TIME.finditer(system_d_string):
-    kernel_time = _ParseSeconds(match.group()[4:-9])
+    kernel_time = _ParseSeconds(match.group()[3:-9])
+    break
+  else:
+    for match in ALT_PATTERN_KERNEL_TIME.finditer(system_d_string):
+      kernel_time = _ParseSeconds(match.group()[4:-9])
+      break
+
+  for match in PATTERN_INITRD_TIME.finditer(system_d_string):
+    initrd_time = _ParseSeconds(match.group()[3:-9])
     break
 
   for match in PATTERN_USER_TIME.finditer(system_d_string):
     user_time = _ParseSeconds(match.group()[3:-12])
     break
+
+  # some OS reports firmware and loader time, but these are not counted
+  # in /proc/uptime, since we uses /proc/uptime as kernel_start, these should
+  # not be counted.
+  user_start = kernel_time + initrd_time
+  total_time = user_start + user_time
   logging.info(
-      'systemd: %s, kernel_time: %s sec, user_time: %s sec',
+      'systemd: %s, user_start : %s sec, total_time: %s sec',
       system_d_string,
-      kernel_time,
-      user_time,
+      user_start,
+      total_time,
   )
-  return kernel_time, user_time
+  return user_start, total_time
 
 
 PATTERN_SYSTEMD_LINE1 = re.compile(r'\+(.*?)s')
@@ -459,7 +491,7 @@ def WaitForReady(
     timeout: The max additional amount of time to block for after boot.
 
   Returns:
-    The amount of (kernel, user) time it took for waiting for boot
+    The amount of (user_start, total) time it took for waiting for boot
     metrics ready.
 
   Raises:
@@ -471,7 +503,7 @@ def WaitForReady(
         'sudo systemd-analyze', ignore_failure=True
     )
     if code == 0:
-      return ParseKernelUserTimes(stdout)
+      return ParseUserTotalTimes(stdout)
     time.sleep(1)
 
   stdout, _ = vm.RemoteCommand('sudo systemctl list-jobs')
