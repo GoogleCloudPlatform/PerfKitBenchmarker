@@ -165,7 +165,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     self._ip = json.loads(stdout)['host']
     self._port = json.loads(stdout)['port']
 
-  def MeasureCpuUtilization(self, interval_length):
+  def MeasureCpuUtilization(self, interval_length):  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Measure the average CPU utilization on GCP instance in percentage."""
     now = time.time()
     seconds = int(now)

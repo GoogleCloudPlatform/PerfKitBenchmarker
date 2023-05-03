@@ -370,7 +370,7 @@ class InstanceManager(BaseManager):
 
   _type = 'instance'
 
-  def Create(self, name, imageid, profile, vpcid, zone=None, key=None,
+  def Create(self, name, imageid, profile, vpcid, zone=None, key=None,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
              subnet=None, networks=None, resource_group=None,
              iops=None, capacity=None, user_data=None,
              session=None, **kwargs) -> Dict[str, Any]:
@@ -559,7 +559,7 @@ class VolumeManager(BaseManager):
 
   _type = 'volume'
 
-  def Create(self, zone, **kwargs) -> Dict[str, Any]:
+  def Create(self, zone, **kwargs) -> Dict[str, Any]:  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Construct and send a vm create request.
 
     Args:
@@ -620,7 +620,7 @@ class VPCManager(BaseManager):
 
   _type = 'vpc'
 
-  def Create(self, name) -> Dict[str, Any]:
+  def Create(self, name) -> Dict[str, Any]:  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Construct and send a vm create request.
 
     Args:
@@ -749,7 +749,7 @@ class SGManager(BaseManager):
 
   _type = 'security_groups'
 
-  def Create(self, resource_group, vpcid, **kwargs) -> Dict[str, Any]:
+  def Create(self, resource_group, vpcid, **kwargs) -> Dict[str, Any]:  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Construct and send a security group create request.
 
     Args:
@@ -847,7 +847,7 @@ class PGManager(BaseManager):
 
   _type = 'public_gateways'
 
-  def Create(self, resource_group, vpcid, zone, **kwargs) -> Dict[str, Any]:
+  def Create(self, resource_group, vpcid, zone, **kwargs) -> Dict[str, Any]:  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Construct and send a vm create request.
 
     Args:
@@ -902,7 +902,7 @@ class KeyManager(BaseManager):
 
   _type = 'keys'
 
-  def Create(self, key, key_type, **kwargs) -> Dict[str, Any]:
+  def Create(self, key, key_type, **kwargs) -> Dict[str, Any]:  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Construct and send a ssh key create request.
 
     Args:
@@ -942,7 +942,7 @@ class NetworkAclManager(BaseManager):
 
   _type = 'network_acls'
 
-  def Create(self, name) -> Dict[str, Any]:
+  def Create(self, name) -> Dict[str, Any]:  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Construct and send a vm create request.
 
     Args:
@@ -974,7 +974,7 @@ class SubnetManager(BaseManager):
 
   _type = 'subnet'
 
-  def Create(self, subnet, vpcid, **kwargs) -> Dict[str, Any]:
+  def Create(self, subnet, vpcid, **kwargs) -> Dict[str, Any]:  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Construct and send a vm create request.
 
     Args:
@@ -1039,7 +1039,7 @@ class ImageManager(BaseManager):
 
   _type = 'image'
 
-  def Create(self, href, osname, name=None) -> Dict[str, Any]:
+  def Create(self, href, osname, name=None) -> Dict[str, Any]:  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Construct and send a vm create request.
 
     Args:
@@ -1073,7 +1073,7 @@ class FipManager(BaseManager):
 
   _type = 'floating_ips'
 
-  def Create(self, resource_group, target, **kwargs) -> Dict[str, Any]:
+  def Create(self, resource_group, target, **kwargs) -> Dict[str, Any]:  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Construct and send a vm create request.
 
     Args:
