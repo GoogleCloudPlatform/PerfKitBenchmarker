@@ -107,7 +107,7 @@ class StaticDisk(disk.BaseDisk):
     """StaticDisks don't implement _Delete()."""
     pass
 
-  def Attach(self):
+  def Attach(self, vm):
     """StaticDisks don't implement Attach()."""
     pass
 
