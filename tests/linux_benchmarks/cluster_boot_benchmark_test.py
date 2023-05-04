@@ -66,10 +66,6 @@ class ClusterBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
         sample.Sample('Cluster Delete Time', expected_cluster_delete_time,
                       'seconds', expected_cluster_delete_metadata))
 
-    # assert the delete function is called on vms
-    for vm in vms_to_test:
-      vm.Delete.assert_called()
-
     # assert actual and expected samples are equal
     self.assertSampleListsEqualUpToTimestamp(actual_samples, expected_samples)
 

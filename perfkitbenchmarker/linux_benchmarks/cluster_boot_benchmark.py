@@ -368,11 +368,13 @@ def MeasureDelete(
     List of Samples containing the delete times and an overall cluster delete
     time.
   """
-  before_delete_timestamp = time.time()
-  background_tasks.RunThreaded(lambda vm: vm.Delete(), vms)
+  # Collect a delete time from each VM.
   delete_times = [vm.delete_end_time - vm.delete_start_time for vm in vms]
+  # Get the cluster delete time.
+  min_delete_start_time = min([vm.delete_start_time for vm in vms])
   max_delete_end_time = max([vm.delete_end_time for vm in vms])
-  cluster_delete_time = max_delete_end_time - before_delete_timestamp
+  cluster_delete_time = max_delete_end_time - min_delete_start_time
+  # Record the delete metrics as samples.
   return _GetVmOperationDataSamples(delete_times, cluster_delete_time, 'Delete',
                                     vms)
 

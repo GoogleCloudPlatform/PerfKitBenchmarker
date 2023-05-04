@@ -446,7 +446,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     util.IssueRetryableCommand.side_effect = [(json.dumps(response), None)]
     self.assertFalse(self.vm._Exists())
 
-  @flagsaver.flagsaver(delete_samples='true')
+  @flagsaver.flagsaver(collect_delete_samples='true')
   def testInstanceExistsRetryWithFlag(self):
     shutting_down_response = json.loads(self.response)
     shutting_down_response['Reservations'][0]['Instances'][0]['State'][

@@ -956,13 +956,15 @@ def DoTeardownPhase(spec, collector, timer):
   """
   logging.info('Tearing down resources for benchmark %s', spec.name)
   events.before_phase.send(stages.TEARDOWN, benchmark_spec=spec)
-  # Add delete time metrics after metadeta collected
+
+  with timer.Measure('Resource Teardown'):
+    spec.Delete()
+
+  # Add delete time metrics after metadata collected
   if pkb_flags.MEASURE_DELETE.value:
     samples = cluster_boot_benchmark.MeasureDelete(spec.vms)
     collector.AddSamples(samples, spec.name, spec)
 
-  with timer.Measure('Resource Teardown'):
-    spec.Delete()
   events.after_phase.send(stages.TEARDOWN, benchmark_spec=spec)
 
 

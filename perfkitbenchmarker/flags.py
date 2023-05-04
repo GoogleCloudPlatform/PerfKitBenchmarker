@@ -19,5 +19,5 @@ FLAGS = flags.FLAGS
 
 # TODO(user): migrate other flags.
 MEASURE_DELETE = flags.DEFINE_boolean(
-    'delete_samples', False,
+    'collect_delete_samples', False,
     'Whether to publish delete time samples for all tests.')
