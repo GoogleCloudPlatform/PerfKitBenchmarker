@@ -197,6 +197,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       f' --nb-cores={_DPDK_NB_CORES.value}'
       f' --stats-period={_DPDK_STATS_PERIOD.value}'
   )
+  if client_vm.CLOUD == 'AWS':
+    client_cmd += f' --eth-peer=0,{server_vm.secondary_mac_addr}'
 
   # --txonly-multi-flow only works with patch
   if _DPDK_TXONLY_MULTI_FLOW.value:
@@ -289,7 +291,7 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """
   client_vm, server_vm = benchmark_spec.vms[:2]
   dpdk_git_repo_dir = _GetDirFromRepo(dpdk.DPDK_GIT_REPO)
-  dpdk_driver_git_repo_dir = _GetDirFromRepo(dpdk.DPDK_DRIVER_GIT_REPO)
+  dpdk_driver_git_repo_dir = _GetDirFromRepo(dpdk.DPDK_GCP_DRIVER_GIT_REPO)
   background_tasks.RunThreaded(
       lambda vm_: vm_.RemoteCommand(f'rm -rf {dpdk_git_repo_dir}'),
       [client_vm, server_vm],

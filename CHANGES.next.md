@@ -113,9 +113,9 @@
     benchmark runtime
 -   Create a new subdirectory of linux_benchmarks called provisioning_benchmarks
     for benchmarking lifecycle management timings of cloud resources. Including:
-    - Kubernetes Clusters
-    - KMS cryptographic keys
-    - Object storage buckets
+    -   Kubernetes Clusters
+    -   KMS cryptographic keys
+    -   Object storage buckets
 -   Add support for using the hbase2 binding in the Cloud Bigtable YCSB
     benchmark.
 -   Add iPerf interval reporting.
@@ -131,8 +131,8 @@
 -   Add cos-dev, cos105, cos101, cos97, and cos93 OS support for GCP.
 -   Add --object_ttl_days flag for lifecycle management of created buckets.
 -   Add support for multi-NIC netperf throughput on AWS.
--   Added support for Data Plane Development Kit (DPDK) on Linux VM's to improve
-    networking performance, as well as a DPDK benchmark for testpmd.
+-   Added AWS/GCP support for Data Plane Development Kit (DPDK) on Linux VM's to
+    improve networking performance, as well as a DPDK benchmark for testpmd.
 
 ### Enhancements:
 
@@ -251,8 +251,8 @@
 -   Add `--gke_node_system_config` flag to the GKE provider for passing kubelet
     and linux parameters.
 -   Add 'Time to Create' and 'Time to Running' samples on cluster_boot for
-    GCEVirtualMachine and AWSVirtualMachine instances that are provisioned
-    with asynchronous 'create' invocations.
+    GCEVirtualMachine and AWSVirtualMachine instances that are provisioned with
+    asynchronous 'create' invocations.
 -   Add `--dpb_sparksql_streams` to run TPC-DS/H throughput runs.
 
 ### Bug fixes and maintenance updates:

@@ -18,14 +18,16 @@ import re
 from perfkitbenchmarker import errors
 
 DPDK_GIT_REPO = 'https://github.com/DPDK/dpdk.git'
-DPDK_DRIVER_GIT_REPO = 'https://github.com/google/compute-virtual-ethernet-dpdk'
+DPDK_GCP_DRIVER_GIT_REPO = 'https://github.com/google/compute-virtual-ethernet-dpdk'
+DPDK_AWS_DRIVER_GIT_REPO = 'https://github.com/amzn/amzn-drivers'
+DPDK_AWS_VFIO_DRIVER_DIR = 'amzn-drivers/userspace/dpdk/enav2-vfio-patch'
 
 
 # TODO(andytzhu) Add YumInstall
 def AptInstall(vm):
   """Install DPDK on GCP VM's."""
-  _AllocateHugePages(vm)
   _InstallDPDK(vm)
+  _AllocateHugePages(vm)
   _BindNICToDPDKDriver(vm)
   vm.has_dpdk = True
 
@@ -71,16 +73,44 @@ def _InstallDPDK(vm):
   vm.Install('pip3')
   vm.InstallPackages(
       'build-essential ninja-build meson git pciutils pkg-config'
-      ' python3-pyelftools dpdk-igb-uio-dkms'
+      ' python3-pyelftools libnuma-dev'
   )
 
   # Get git repo
   vm.RobustRemoteCommand(f'git clone {DPDK_GIT_REPO}')
-  # Get out of tree driver
-  vm.RobustRemoteCommand(f'git clone {DPDK_DRIVER_GIT_REPO}')
 
-  # copy out of tree driver to dpdk
-  vm.RemoteCommand('cp -r compute-virtual-ethernet-dpdk/* dpdk/drivers/net/gve')
+  if vm.CLOUD == 'GCP':
+    # Get out of tree driver
+    vm.RobustRemoteCommand(f'git clone {DPDK_GCP_DRIVER_GIT_REPO}')
+    vm.RemoteCommand(
+        'cp -r compute-virtual-ethernet-dpdk/* dpdk/drivers/net/gve'
+    )
+  # https://github.com/amzn/amzn-drivers/tree/master/userspace/dpdk#6-vfio-pci-and-igb_uio
+  # Downgrade the kernel to the version where vfio-pci is distributed as a
+  # module so the AWS vfio patch can be applied.
+  elif vm.CLOUD == 'AWS':
+    vm.InstallPackages(
+        'linux-image-5.4.0-1060-aws linux-headers-5.4.0-1060-aws'
+        ' linux-tools-5.4.0-1060-aws'
+    )
+    vm.RemoteCommand(
+        """sudo sed -i 's/GRUB_DEFAULT=0/GRUB_DEFAULT="1>2"/g' /etc/default/grub"""
+    )
+    vm.RemoteCommand('sudo update-grub')
+    vm.Reboot()
+    vm.WaitForBootCompletion()
+    vm.RemoteCommand(f'git clone {DPDK_AWS_DRIVER_GIT_REPO}')
+    vm.RemoteCommand(
+        'sudo sed -i "s/# deb-src/deb-src/g" /etc/apt/sources.list'
+    )
+    vm.RemoteCommand('sudo apt update')
+    vm.RemoteCommand(
+        'sudo sed -i "s/linux-image-unsigned-/linux-image-/g"'
+        f' {DPDK_AWS_VFIO_DRIVER_DIR}/get-vfio-with-wc.sh'
+    )
+    vm.RobustRemoteCommand(
+        f'cd {DPDK_AWS_VFIO_DRIVER_DIR} && sudo ./get-vfio-with-wc.sh'
+    )
 
   # Build and Install
   vm.RobustRemoteCommand('cd dpdk && sudo meson setup -Dexamples=all build')
@@ -88,6 +118,8 @@ def _InstallDPDK(vm):
       'cd dpdk && sudo ninja install -C build && sudo ldconfig'
   )
 
+  # Insert vfio-pci kernel module
+  vm.RemoteCommand('sudo modprobe vfio-pci')
   # Disable IOMMU for VFIO
   vm.RemoteCommand(
       'echo 1 | sudo tee /sys/module/vfio/parameters/enable_unsafe_noiommu_mode'
@@ -107,6 +139,12 @@ def _BindNICToDPDKDriver(vm):
         'No secondary network interface. Make sure the VM has at least 2 NICs.'
     )
   secondary_nic = match.group(1)
+
+  # Get non-primary MAC Address
+  match = re.findall(r'link/ether ([a-z0-9:]*)', stdout)[1]
+  if not match:
+    raise errors.VirtualMachine.VmStateError('No secondary MAC address.')
+  vm.secondary_mac_addr = match
 
   # Set secondary interface down
   vm.RemoteCommand(f'sudo ip link set {secondary_nic} down')
