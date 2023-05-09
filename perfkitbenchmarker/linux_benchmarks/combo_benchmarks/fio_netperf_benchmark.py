@@ -47,6 +47,7 @@ fio_netperf:
   flags:
     netperf_test_length: 300
     fio_runtime: 300
+    placement_group_style: closest_supported
 """
 
 FLAGS = flags.FLAGS
@@ -74,8 +75,14 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   Args:
     benchmark_spec: The benchmark specification.
   """
-  min_test_length = min(FLAGS.netperf_test_length, FLAGS.fio_runtime)
-  max_test_length = max(FLAGS.netperf_test_length, FLAGS.fio_runtime)
+  min_test_length = min(
+      FLAGS.netperf_test_length * len(FLAGS.netperf_num_streams),
+      FLAGS.fio_runtime,
+  )
+  max_test_length = max(
+      FLAGS.netperf_test_length * len(FLAGS.netperf_num_streams),
+      FLAGS.fio_runtime,
+  )
   if min_test_length < MIN_RUN_STAGE_DURATION:
     raise errors.Setup.InvalidFlagConfigurationError(
         'Combo benchmark run stages must run for at least'
@@ -136,6 +143,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 
   # Both FIO and netperf benchmarks are guaranteed to have samples for
   # 'start time' and 'end time'.
+  # FIO samples collected from client/server VM.
   fio_sample_start_times = []
   fio_sample_end_times = []
   for fio_sample in output_samples_list[0]:
@@ -143,24 +151,46 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
       fio_sample_start_times.append(fio_sample[1])
     elif fio_sample[0] == 'end_time':
       fio_sample_end_times.append(fio_sample[1])
-
+  # Netperf samples collected from client/server VM for each of num_streams.
+  netperf_sample_start_times = []
+  netperf_sample_end_times = []
   for netperf_sample in output_samples_list[1]:
     if netperf_sample[0] == 'start_time':
-      netperf_sample_start_time = netperf_sample[1]
+      netperf_sample_start_times.append(netperf_sample[1])
     elif netperf_sample[0] == 'end_time':
-      netperf_sample_end_time = netperf_sample[1]
+      netperf_sample_end_times.append(netperf_sample[1])
 
   min_test_length = min(FLAGS.netperf_test_length, FLAGS.fio_runtime)
-  if (float(max(abs(min(fio_sample_start_times) - netperf_sample_start_time),
-                abs(max(fio_sample_start_times) - netperf_sample_start_time),
-                )) / min_test_length - 1 > RUN_STAGE_DELAY_THRESHOLD):
+  if (
+      float(
+          max(
+              abs(
+                  min(fio_sample_start_times) - min(netperf_sample_start_times)
+              ),
+              abs(
+                  max(fio_sample_start_times) - min(netperf_sample_start_times)
+              ),
+          )
+      )
+      / min_test_length
+      - 1
+      > RUN_STAGE_DELAY_THRESHOLD
+  ):
     raise errors.Benchmarks.RunError(
         'Run stage start delay threshold exceeded.'
     )
 
-  if (float(max(abs(min(fio_sample_end_times) - netperf_sample_end_time),
-                abs(max(fio_sample_end_times) - netperf_sample_end_time),
-                )) / min_test_length - 1 > RUN_STAGE_DELAY_THRESHOLD):
+  if (
+      float(
+          max(
+              abs(min(fio_sample_end_times) - max(netperf_sample_end_times)),
+              abs(max(fio_sample_end_times) - max(netperf_sample_end_times)),
+          )
+      )
+      / min_test_length
+      - 1
+      > RUN_STAGE_DELAY_THRESHOLD
+  ):
     raise errors.Benchmarks.RunError('Run stage end delay threshold exceeded.')
 
   return output_samples_list[0] + output_samples_list[1]
