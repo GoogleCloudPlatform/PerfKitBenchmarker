@@ -199,7 +199,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       f' --stats-period={_DPDK_STATS_PERIOD.value}'
   )
 
-  # --txonly-multi-flow not working
+  # --txonly-multi-flow only works with patch
   if _DPDK_TXONLY_MULTI_FLOW.value:
     client_cmd += ' --txonly-multi-flow'
 
