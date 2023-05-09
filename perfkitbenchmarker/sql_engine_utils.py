@@ -37,6 +37,7 @@ SQLSERVER_ENTERPRISE = 'sqlserver-ee'
 SQLSERVER_STANDARD = 'sqlserver-se'
 SPANNER_GOOGLESQL = 'spanner-googlesql'
 SPANNER_POSTGRES = 'spanner-postgres'
+ALLOYDB = 'alloydb-postgresql'
 
 ALL_ENGINES = [
     MYSQL,
@@ -51,6 +52,7 @@ ALL_ENGINES = [
     SPANNER_POSTGRES,
     FLEXIBLE_SERVER_MYSQL,
     FLEXIBLE_SERVER_POSTGRES,
+    ALLOYDB,
 ]
 
 ENGINE_TYPES = [
@@ -450,6 +452,8 @@ def GetDbEngineType(db_engine: str) -> str:
   elif (db_engine == AWS_AURORA_MYSQL_ENGINE or
         db_engine == FLEXIBLE_SERVER_MYSQL):
     return MYSQL
+  elif db_engine == ALLOYDB:
+    return POSTGRES
   elif db_engine == SPANNER_POSTGRES:
     return SPANNER_POSTGRES
   elif db_engine == SPANNER_GOOGLESQL:
