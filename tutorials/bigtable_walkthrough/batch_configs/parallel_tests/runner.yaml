@@ -33,7 +33,6 @@ runner:
     hadoop_bin_url: https://storage.googleapis.com/cbt_ycsb_client_jar/hadoop-3.3.1.tar.gz
     google_bigtable_client_version: 2.5.0
     ycsb_version: 0.17.0
-    ycsb_log_remote_command_output: false
 
     #################################
     # YCSB result settings

@@ -215,10 +215,6 @@ flags.DEFINE_integer(
     'if we have already reached sustained throughput.')
 flags.DEFINE_integer('ycsb_sleep_after_load_in_sec', 0,
                      'Sleep duration in seconds between load and run stage.')
-flags.DEFINE_boolean(
-    'ycsb_log_remote_command_output', True,
-    'Whether to log the remote command\'s output at the info '
-    'level.')
 _BURST_LOAD_MULTIPLIER = flags.DEFINE_integer(
     'ycsb_burst_load', None,
     'If set, applies burst load to the system, by running YCSB once, and then '
