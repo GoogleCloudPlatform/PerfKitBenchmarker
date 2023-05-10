@@ -168,35 +168,6 @@ def CheckPrerequisites(benchmark_config: Dict[str, Any]) -> None:
       raise ValueError('Scope {0} required.'.format(scope))
 
 
-def _GetInstanceDescription(project: str, instance_name: str) -> Dict[str, Any]:
-  """Gets the description for a Cloud Bigtable instance.
-
-  Args:
-    project: str. Name of the project in which the instance was created.
-    instance_name: str. ID of the desired Bigtable instance.
-
-  Returns:
-    A dictionary containing an instance description.
-
-  Raises:
-    KeyError: when the instance was not found.
-    IOError: when the list bigtable command fails.
-  """
-  env = {'CLOUDSDK_CORE_DISABLE_PROMPTS': '1'}
-  env.update(os.environ)
-
-  cmd = [FLAGS.gcloud_path, 'beta', 'bigtable', 'instances', 'describe',
-         instance_name,
-         '--format', 'json',
-         '--project', project]
-  stdout, stderr, returncode = vm_util.IssueCommand(cmd, env=env)
-  if returncode:
-    cmd_str = ' '.join(cmd)
-    raise IOError(f'Command "{cmd_str}" failed:\n'
-                  f'STDOUT:\n{stdout}\nSTDERR:\n{stderr}')
-  return json.loads(stdout)
-
-
 def _GetTableName() -> str:
   return _STATIC_TABLE_NAME.value or 'ycsb{0}'.format(FLAGS.run_uri)
 
