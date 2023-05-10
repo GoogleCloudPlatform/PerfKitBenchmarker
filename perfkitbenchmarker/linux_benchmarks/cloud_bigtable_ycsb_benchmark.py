@@ -232,6 +232,7 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
         vm.RemoteCopy(file_path, remote_path)
 
 
+@vm_util.Retry()
 def _GetCpuUtilizationSample(samples: List[sample.Sample],
                              instance_id: str) -> List[sample.Sample]:
   """Gets a list of cpu utilization samples - one per cluster per workload.
