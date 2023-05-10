@@ -1,0 +1,68 @@
+[mysqld]
+# General
+datadir                         = /scratch/mysql/
+port                            = 3306
+performance_schema              = OFF
+max_prepared_stmt_count         = 128000
+character_set_server            = latin1
+collation_server                = latin1_swedish_ci
+transaction_isolation           = REPEATABLE-READ
+default_storage_engine          = InnoDB
+skip_external_locking
+skip_name_resolve
+default-authentication-plugin=mysql_native_password
+
+# InnoDB Settings
+innodb_buffer_pool_instances    = 64
+innodb_buffer_pool_size         = {{INNODB_BUFFER_POOL_SIZE}}G
+innodb_file_per_table           = 1
+innodb_flush_method             = O_DIRECT
+innodb_log_buffer_size          = 1G
+innodb_log_file_size            = 4G
+innodb_log_files_in_group       = 32
+innodb_open_files               = 2000
+innodb_stats_on_metadata        = 0
+innodb_thread_concurrency       = 14
+innodb_max_dirty_pages_pct      = 90
+innodb_max_dirty_pages_pct_lwm  = 10
+innodb_use_native_aio           = 1
+innodb_stats_persistent         = 1
+innodb_spin_wait_delay          = 6
+innodb_max_purge_lag_delay      = 300000
+innodb_checksum_algorithm       = none
+innodb_io_capacity              = 12000
+innodb_io_capacity_max          = 20000
+innodb_lru_scan_depth           = 9000
+innodb_change_buffering         = none
+innodb_read_only                = 0
+innodb_page_cleaners            = 4
+innodb_undo_log_truncate        = off
+innodb_read_io_threads          = 64
+innodb_write_io_threads         = 64
+innodb_adaptive_flushing        = 1
+innodb_flush_neighbors          = 0
+innodb_purge_threads            = 4
+innodb_adaptive_hash_index      = 0
+
+# Connection Settings
+max_connections                 = 4000
+table_open_cache                = 8000
+table_open_cache_instances      = 16
+back_log                        = 1500
+thread_cache_size               = 100
+thread_stack                    = 192K
+
+# Buffer Settings
+join_buffer_size                = 64M
+read_buffer_size                = 48M
+read_rnd_buffer_size            = 64M
+sort_buffer_size                = 64M
+
+# Search Settings
+ft_min_word_len                 = 3
+
+# Logging
+# log_error                       = /log/mysql_error.log
+
+# Monitoring
+innodb_monitor_enable='%'
