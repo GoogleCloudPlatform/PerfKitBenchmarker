@@ -87,6 +87,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import log_util
@@ -315,9 +316,6 @@ _SMART_CAPACITY_RETRY = flags.DEFINE_bool(
 flags.DEFINE_boolean(
     'boot_samples', False,
     'Whether to publish boot time samples for all tests.')
-_MEASURE_DELETE = flags.DEFINE_boolean(
-    'delete_samples', False,
-    'Whether to publish delete time samples for all tests.')
 flags.DEFINE_boolean(
     'gpu_samples', False,
     'Whether to publish GPU memcpy bandwidth samples for GPU tests.')
@@ -958,13 +956,15 @@ def DoTeardownPhase(spec, collector, timer):
   """
   logging.info('Tearing down resources for benchmark %s', spec.name)
   events.before_phase.send(stages.TEARDOWN, benchmark_spec=spec)
-  # Add delete time metrics after metadeta collected
-  if _MEASURE_DELETE.value:
-    samples = cluster_boot_benchmark.MeasureDelete(spec.vms)
-    collector.AddSamples(samples, spec.name, spec)
 
   with timer.Measure('Resource Teardown'):
     spec.Delete()
+
+  # Add delete time metrics after metadata collected
+  if pkb_flags.MEASURE_DELETE.value:
+    samples = cluster_boot_benchmark.MeasureDelete(spec.vms)
+    collector.AddSamples(samples, spec.name, spec)
+
   events.after_phase.send(stages.TEARDOWN, benchmark_spec=spec)
 
 
@@ -1666,9 +1666,10 @@ def _CreateGccSamples(vms):
         'versioninfo': build_tools.GetVersionInfo(vm, 'gcc')
     }
 
+  linux_vms = [vm for vm in vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES]
   return [
       sample.Sample('gcc_version', 0, '', metadata)
-      for metadata in background_tasks.RunThreaded(_GetGccMetadata, vms)
+      for metadata in background_tasks.RunThreaded(_GetGccMetadata, linux_vms)
   ]
 
 
@@ -1687,9 +1688,10 @@ def _CreateGlibcSamples(vms):
         'versioninfo': _GetGlibcVersionInfo(vm)
     }
 
+  linux_vms = [vm for vm in vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES]
   return [
       sample.Sample('glibc_version', 0, '', metadata)
-      for metadata in background_tasks.RunThreaded(_GetGlibcMetadata, vms)
+      for metadata in background_tasks.RunThreaded(_GetGlibcMetadata, linux_vms)
   ]
 
 

@@ -12,6 +12,7 @@ import argparse
 from concurrent import futures
 import json
 import logging
+import os
 import time
 
 import py4j
@@ -24,9 +25,19 @@ def parse_args(args=None):
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument(
       '--sql-scripts',
+      action='append',
       type=lambda csv: csv.split(','),
       required=True,
-      help='List of SQL scripts staged in object storage to run')
+      help='Comma-separated list of SQL files to run located inside the object '
+           'storage directory specified with --sql-scripts-dir. If you pass '
+           'argument many times then it will run each SQL script list/stream '
+           'in parallel.',
+  )
+  parser.add_argument(
+      '--sql-scripts-dir',
+      required=True,
+      help='Object storage path where the SQL queries are located.',
+  )
   parser.add_argument('--database', help='Hive database to look for data in.')
   parser.add_argument(
       '--table-metadata',
@@ -53,19 +64,18 @@ dataframe reader. e.g.:
       '--report-dir',
       required=True,
       help='Directory to write out query timings to.')
-  group = parser.add_mutually_exclusive_group()
-  group.add_argument(
-      '--simultaneous',
-      type=bool,
-      default=False,
-      help='Run all queries simultaneously instead of one by one.')
-  group.add_argument(
+  parser.add_argument(
       '--fail-on-query-execution-errors',
       type=bool,
       default=False,
       help='Fail the whole script on an error while executing the queries, '
            'instead of continuing and not reporting that query run time (the '
-           'default). Mutually exclusive with --simultaneous.'
+           'default).'
+  )
+  parser.add_argument(
+      '--dump-spark-conf',
+      help='Directory to dump the spark conf props for this job. For debugging '
+           'purposes.'
   )
   if args is None:
     return parser.parse_args()
@@ -81,7 +91,9 @@ def main(args):
   builder = sql.SparkSession.builder.appName('Spark SQL Query')
   if args.enable_hive:
     builder = builder.enableHiveSupport()
-  if args.simultaneous:
+  script_streams = get_script_streams(args)
+  if len(script_streams) > 1:
+    # this guarantees all query streams will use more or less the same resources
     builder = builder.config('spark.scheduler.mode', 'FAIR')
   spark = builder.getOrCreate()
   if args.database:
@@ -98,54 +110,80 @@ def main(args):
       spark.sql('CACHE {lazy} TABLE {name}'.format(
           lazy='LAZY' if args.table_cache == 'lazy' else '',
           name=table.name))
+  if args.dump_spark_conf:
+    logging.info('Dumping the spark conf properties to %s',
+                 args.dump_spark_conf)
+    props = [
+        sql.Row(key=key, val=val)
+        for key, val in spark.sparkContext.getConf().getAll()]
+    spark.createDataFrame(props).coalesce(1).write.mode('append').json(
+        args.dump_spark_conf)
 
   results = []
 
-  if args.simultaneous:
-    threads = len(args.sql_scripts)
-    executor = futures.ThreadPoolExecutor(max_workers=threads)
-    result_futures = [
-        executor.submit(run_sql_script, spark, script)
-        for script in args.sql_scripts
-    ]
-    futures.wait(result_futures)
-    results = [f.result() for f in result_futures]
-  else:
-    results = [
-        run_sql_script(spark, script, args.fail_on_query_execution_errors)
-        for script in args.sql_scripts]
-  results = [r for r in results if r is not None]
+  threads = len(script_streams)
+  executor = futures.ThreadPoolExecutor(max_workers=threads)
+  result_futures = [
+      executor.submit(
+          run_sql_script, spark, stream, i, args.fail_on_query_execution_errors)
+      for i, stream in enumerate(script_streams)
+  ]
+  futures.wait(result_futures)
+  results = []
+  for f in result_futures:
+    results += f.result()
   logging.info('Writing results to %s', args.report_dir)
   spark.createDataFrame(results).coalesce(1).write.mode('append').json(
       args.report_dir)
 
 
-def run_sql_script(spark_session, script, raise_query_execution_errors=False):
-  """Runs a SQL script, returns a pyspark.sql.Row with its duration."""
+def get_script_streams(args):
+  """Gets the script streams to run.
 
-  # Read script from object storage using rdd API
-  query = load_file(spark_session, script)
+  Args:
+    args: Argument object as returned by ArgumentParser.parse_args().
 
-  try:
-    logging.info('Running %s', script)
-    start = time.time()
-    # spark-sql does not limit its output. Replicate that here by setting
-    # limit to max Java Integer. Hopefully you limited the output in SQL or
-    # you are going to have a bad time. Note this is not true of all TPC-DS or
-    # TPC-H queries and they may crash with small JVMs.
-    # pylint: disable=protected-access
-    df = spark_session.sql(query)
-    df.show(spark_session._jvm.java.lang.Integer.MAX_VALUE)
-    # pylint: enable=protected-access
-    duration = time.time() - start
-    return sql.Row(script=script, duration=duration)
-  # These correspond to errors in low level Spark Excecution.
-  # Let ParseException and AnalysisException fail the job.
-  except (sql.utils.QueryExecutionException,
-          py4j.protocol.Py4JJavaError) as e:
-    logging.error('Script %s failed', script, exc_info=e)
-    if raise_query_execution_errors:
-      raise
+  Returns:
+    A list of list of str. Each list of str represents a sequence of full object
+    storage paths to SQL files that will be executed in order.
+  """
+  return [
+      [os.path.join(args.sql_scripts_dir, q) for q in stream]
+      for stream in args.sql_scripts
+  ]
+
+
+def run_sql_script(
+    spark_session, script_stream, stream_id, raise_query_execution_errors):
+  """Runs a SQL script stream, returns list[pyspark.sql.Row] with durations."""
+
+  results = []
+  for script in script_stream:
+    # Read script from object storage using rdd API
+    query = load_file(spark_session, script)
+
+    try:
+      logging.info('Running %s', script)
+      start = time.time()
+      # spark-sql does not limit its output. Replicate that here by setting
+      # limit to max Java Integer. Hopefully you limited the output in SQL or
+      # you are going to have a bad time. Note this is not true of all TPC-DS or
+      # TPC-H queries and they may crash with small JVMs.
+      # pylint: disable=protected-access
+      df = spark_session.sql(query)
+      df.show(spark_session._jvm.java.lang.Integer.MAX_VALUE)
+      # pylint: enable=protected-access
+      duration = time.time() - start
+      results.append(
+          sql.Row(stream=stream_id, script=script, duration=duration))
+    # These correspond to errors in low level Spark Excecution.
+    # Let ParseException and AnalysisException fail the job.
+    except (sql.utils.QueryExecutionException,
+            py4j.protocol.Py4JJavaError) as e:
+      logging.error('Script %s failed', script, exc_info=e)
+      if raise_query_execution_errors:
+        raise
+  return results
 
 
 if __name__ == '__main__':

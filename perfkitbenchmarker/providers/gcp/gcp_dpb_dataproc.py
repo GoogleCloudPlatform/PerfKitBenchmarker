@@ -668,8 +668,10 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
                 job_type=None,
                 properties=None):
     """See base class."""
-    assert job_type == dpb_service.BaseDpbService.FLINK_JOB_TYPE, (
-        'Unsupported job type {}'.format(job_type))
+    assert job_type in [
+        dpb_service.BaseDpbService.FLINK_JOB_TYPE,
+        dpb_service.BaseDpbService.BEAM_JOB_TYPE,
+    ], 'Unsupported job type {}'.format(job_type)
     logging.info('Running presubmit script...')
     start_time = datetime.datetime.now()
     self.ExecuteOnMaster(data.ResourcePath(DATAPROC_FLINK_PRESUBMIT_SCRIPT),
@@ -679,7 +681,11 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
     job_script_args = []
     job_script_args.append('-c {}'.format(classname))
     job_script_args.append('--')
-    job_script_args.extend(job_arguments)
+    if job_type == dpb_service.BaseDpbService.BEAM_JOB_TYPE:
+      job_script_args.append('--runner=FlinkRunner')
+      job_script_args.extend(job_arguments)
+    else:
+      job_script_args.extend([arg.replace('=', ' ') for arg in job_arguments])
     self.ExecuteOnMaster(data.ResourcePath(DATAPROC_FLINK_TRIGGER_SCRIPT),
                          job_script_args)
     done_time = datetime.datetime.now()

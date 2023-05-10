@@ -474,7 +474,7 @@ class Bigquery(edw_service.EdwService):
     cmd.append(project_dataset)
     vm_util.IssueCommand(cmd)
 
-  def LoadDataset(self,
+  def LoadDataset(self,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
                   source_bucket,
                   tables,
                   schema_dir,

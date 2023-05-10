@@ -16,13 +16,19 @@
 from absl import flags
 
 AMAZONLINUX2 = 'amazonlinux2'
+AMAZONLINUX2023 = 'amazonlinux2023'
 AMAZON_NEURON = 'amazon_neuron'
 CENTOS7 = 'centos7'
 CENTOS8 = 'centos8'  # deprecated
 CENTOS_STREAM8 = 'centos_stream8'
 CENTOS_STREAM9 = 'centos_stream9'
 CLEAR = 'clear'
-COS = 'cos'
+COS = 'cos'  # stable
+COS105 = 'cos105'
+COS101 = 'cos101'
+COS97 = 'cos97'
+COS93 = 'cos93'
+COS_DEV = 'cos_dev'
 CORE_OS = 'core_os'
 DEBIAN9 = 'debian9'
 DEBIAN10 = 'debian10'
@@ -74,10 +80,16 @@ WINDOWS = 'windows'
 CONTAINER_OS_TYPES = [
     CORE_OS,
     COS,
+    COS105,
+    COS101,
+    COS97,
+    COS93,
+    COS_DEV,
 ]
 
 LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     AMAZONLINUX2,
+    AMAZONLINUX2023,
     AMAZON_NEURON,
     CENTOS7,
     CENTOS8,

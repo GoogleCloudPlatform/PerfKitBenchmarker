@@ -333,8 +333,6 @@ def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
                     '--report-interval=%d' % FLAGS.sysbench_report_interval,
                     '--max-requests=0',
                     '--time=%d' % duration]
-  if FLAGS.sysbench_testname == 'tpcc':
-    run_cmd_tokens.append('--use_fk=%d' % (1 if FLAGS.sysbench_use_fk else 0))
   run_cmd = ' '.join(run_cmd_tokens +
                      _GetCommonSysbenchOptions(benchmark_spec) +
                      ['run'])
@@ -496,6 +494,10 @@ def _PrepareSysbench(client_vm, benchmark_spec):
                           ('--scale=%d' % FLAGS.sysbench_scale
                            if _IsValidFlag('scale') else ''),
                           '--threads=%d' % num_threads]
+  if FLAGS.sysbench_testname == 'tpcc':
+    data_load_cmd_tokens.append(
+        '--use_fk=%d' % (1 if FLAGS.sysbench_use_fk else 0)
+    )
   data_load_cmd = ' '.join(data_load_cmd_tokens +
                            _GetCommonSysbenchOptions(benchmark_spec) +
                            ['prepare'])

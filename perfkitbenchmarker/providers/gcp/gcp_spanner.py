@@ -104,12 +104,6 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
                flag_values: Optional[flags.FlagValues] = None,
                **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
-    if (self.spanner_instance_id is None) ^ (self.spanner_database_id is None):
-      raise errors.Config.InvalidValue(
-          'Please set both spanner_instance_id and database_name '
-          'to denote a user managed instance. Got '
-          f'spanner_instance_id={self.spanner_instance_id} and '
-          f'spanner_database_id={self.spanner_database_id}.')
 
   @classmethod
   def _GetOptionDecoderConstructions(cls) -> dict[str, Any]:
@@ -182,13 +176,12 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
   def __init__(self, db_spec: SpannerSpec, **kwargs):
     super(GcpSpannerInstance, self).__init__(db_spec, **kwargs)
-    self.user_managed = True if db_spec.spanner_instance_id else False
-    if self.user_managed:
-      self.instance_id = db_spec.spanner_instance_id
-      self.database = db_spec.spanner_database_id
-    else:
-      self.instance_id = f'pkb-instance-{FLAGS.run_uri}'
-      self.database = f'pkb-database-{FLAGS.run_uri}'
+    self.instance_id = (
+        db_spec.spanner_instance_id or f'pkb-instance-{FLAGS.run_uri}'
+    )
+    self.database = (
+        db_spec.spanner_database_id or f'pkb-database-{FLAGS.run_uri}'
+    )
     self._description = db_spec.spanner_description or _DEFAULT_DESCRIPTION
     self._config = db_spec.spanner_config or self._GetDefaultConfig()
     self.nodes = db_spec.spanner_nodes or _DEFAULT_NODES
@@ -212,15 +205,25 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
   def _Create(self) -> None:
     """Creates the instance, the database, and update the schema."""
-    cmd = util.GcloudCommand(self, 'spanner', 'instances', 'create',
-                             self.instance_id)
+    cmd = util.GcloudCommand(
+        self, 'spanner', 'instances', 'create', self.instance_id
+    )
     cmd.flags['description'] = self._description
     cmd.flags['nodes'] = self.nodes
     cmd.flags['config'] = self._config
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
-      logging.error('Create GCP Spanner instance failed.')
-      return
+      # TODO(user) Currently loops if the database doesn't exist. To fix
+      # this we should move waiting for the database to be ready from Exists
+      # to this function.
+      if self._Exists():
+        logging.info(
+            'Found an existing instance, setting user_managed to True.'
+        )
+        self.user_managed = True
+      else:
+        logging.error('Create GCP Spanner instance failed.')
+        return
 
     self._UpdateLabels(util.GetDefaultTags())
 
@@ -380,46 +383,60 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     # It takes up to 3 minutes for CPU metrics to appear.
     end_timestamp = time.time() - CPU_API_DELAY_SECONDS
     cpu_query = query.Query(
-        client, project=self.project,
-        metric_type='spanner.googleapis.com/instance/cpu/utilization_by_priority',
+        client,
+        project=self.project,
+        metric_type=(
+            'spanner.googleapis.com/instance/cpu/utilization_by_priority'
+        ),
         end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
-        minutes=duration_minutes)
+        minutes=duration_minutes,
+    )
     # Filter by high priority
     cpu_query = cpu_query.select_metrics(
-        database=self.database, priority='high')
+        database=self.database, priority='high'
+    )
     # Filter by the Spanner instance
     cpu_query = cpu_query.select_resources(
-        instance_id=self.instance_id, project_id=self.project)
+        instance_id=self.instance_id, project_id=self.project
+    )
     # Aggregate user and system high priority by the minute
     time_series = list(cpu_query)
     # Expect 2 metrics: user and system high-priority CPU
     if len(time_series) != 2:
       raise errors.Benchmarks.RunError(
           'Expected 2 metrics (user and system) for Spanner high-priority CPU '
-          f'utilization query, got {len(time_series)}')
+          f'utilization query, got {len(time_series)}'
+      )
     cpu_aggregated = [
         user.value.double_value + system.value.double_value
         for user, system in zip(time_series[0].points, time_series[1].points)
     ]
     average_cpu = statistics.mean(cpu_aggregated)
     logging.info('CPU aggregated: %s', cpu_aggregated)
-    logging.info('Average CPU for the %s minutes ending at %s: %s',
-                 duration_minutes,
-                 datetime.datetime.fromtimestamp(end_timestamp), average_cpu)
+    logging.info(
+        'Average CPU for the %s minutes ending at %s: %s',
+        duration_minutes,
+        datetime.datetime.fromtimestamp(end_timestamp),
+        average_cpu,
+    )
     return average_cpu
 
-  def CalculateRecommendedThroughput(self, read_proportion: float,
-                                     write_proportion: float) -> int:
+  def CalculateRecommendedThroughput(
+      self, read_proportion: float, write_proportion: float
+  ) -> int:
     """Returns the recommended throughput based on the workload and nodes."""
     if read_proportion + write_proportion != 1:
       raise errors.Benchmarks.RunError(
           'Unrecognized workload, read + write proportion must be equal to 1, '
-          f'got {read_proportion} + {write_proportion}.')
+          f'got {read_proportion} + {write_proportion}.'
+      )
     # Calculates the starting throughput based off of each node being able to
     # handle 10k QPS of reads or 2k QPS of writes. For example, for a 50/50
     # workload, run at a QPS target of 1666 reads + 1666 writes = 3333 (round).
-    a = np.array([[1 / _READ_OPS_PER_NODE, 1 / _WRITE_OPS_PER_NODE],
-                  [write_proportion, -(1 - write_proportion)]])
+    a = np.array([
+        [1 / _READ_OPS_PER_NODE, 1 / _WRITE_OPS_PER_NODE],
+        [write_proportion, -(1 - write_proportion)],
+    ])
     b = np.array([1, 0])
     result = np.linalg.solve(a, b)
     return int(sum(result) * self.nodes)

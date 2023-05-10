@@ -157,4 +157,4 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  redis_server.Cleanup(benchmark_spec.vm_groups['workers'][0])
+  del benchmark_spec  # unused

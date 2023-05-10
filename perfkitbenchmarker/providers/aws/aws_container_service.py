@@ -483,7 +483,7 @@ class FargateCluster(container_service.BaseContainerCluster):
     self.containers[name].append(task)
     task.Create()
 
-  def DeployContainerService(self, name, container_spec):
+  def DeployContainerService(self, name, container_spec, unused_num_containers):
     """Deploys the container service according to the spec."""
     if name not in self.task_defs:
       task_def = TaskDefinition(name, container_spec, self)

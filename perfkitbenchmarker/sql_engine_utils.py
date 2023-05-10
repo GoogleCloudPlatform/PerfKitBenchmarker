@@ -24,6 +24,9 @@ from perfkitbenchmarker import virtual_machine
 
 SECOND = 'seconds'
 
+FLEXIBLE_SERVER_MYSQL = 'flexible-server-mysql'
+FLEXIBLE_SERVER_POSTGRES = 'flexible-server-postgres'
+
 MYSQL = 'mysql'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
@@ -34,6 +37,7 @@ SQLSERVER_ENTERPRISE = 'sqlserver-ee'
 SQLSERVER_STANDARD = 'sqlserver-se'
 SPANNER_GOOGLESQL = 'spanner-googlesql'
 SPANNER_POSTGRES = 'spanner-postgres'
+ALLOYDB = 'alloydb-postgresql'
 
 ALL_ENGINES = [
     MYSQL,
@@ -46,6 +50,9 @@ ALL_ENGINES = [
     SQLSERVER_STANDARD,
     SPANNER_GOOGLESQL,
     SPANNER_POSTGRES,
+    FLEXIBLE_SERVER_MYSQL,
+    FLEXIBLE_SERVER_POSTGRES,
+    ALLOYDB,
 ]
 
 ENGINE_TYPES = [
@@ -439,10 +446,14 @@ def GetDbEngineType(db_engine: str) -> str:
   # AWS uses sqlserver-se and sqlserver-ex as db_egine for sql server
   if db_engine in AWS_SQLSERVER_ENGINES:
     return SQLSERVER
-  elif db_engine == AWS_AURORA_POSTGRES_ENGINE:
+  elif (db_engine == AWS_AURORA_POSTGRES_ENGINE or
+        db_engine == FLEXIBLE_SERVER_POSTGRES):
     return POSTGRES
-  elif db_engine == AWS_AURORA_MYSQL_ENGINE:
+  elif (db_engine == AWS_AURORA_MYSQL_ENGINE or
+        db_engine == FLEXIBLE_SERVER_MYSQL):
     return MYSQL
+  elif db_engine == ALLOYDB:
+    return POSTGRES
   elif db_engine == SPANNER_POSTGRES:
     return SPANNER_POSTGRES
   elif db_engine == SPANNER_GOOGLESQL:

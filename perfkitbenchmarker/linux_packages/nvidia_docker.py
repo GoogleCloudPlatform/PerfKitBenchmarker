@@ -18,7 +18,7 @@
 Installation: https://github.com/NVIDIA/nvidia-docker
 """
 from absl import flags
-_VERSION = flags.DEFINE_string('nvidia_docker_version', '2.11.0-1',
+_VERSION = flags.DEFINE_string('nvidia_docker_version', '2.13.0-1',
                                'The version of nvidia docker to install.')
 
 

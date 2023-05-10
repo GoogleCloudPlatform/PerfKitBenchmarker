@@ -166,6 +166,6 @@ class AciCluster(container_service.BaseContainerCluster):
     self.containers[base_name].append(container)
     container.Create()
 
-  def DeployContainerService(self, name, container_spec):
+  def DeployContainerService(self, name, container_spec, num_containers):
     """Deploys a ContainerSerivice according to the ContainerSpec."""
     raise NotImplementedError()

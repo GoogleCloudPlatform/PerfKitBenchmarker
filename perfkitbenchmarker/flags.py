@@ -1,4 +1,4 @@
-# Copyright 2020 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2023 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,13 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""File used for the management of PKB flags."""
 
+from absl import flags
 
-"""Module containing coremark installation and cleanup functions."""
+FLAGS = flags.FLAGS
 
-from perfkitbenchmarker.linux_packages import coremark
-
-
-def Install(vm):
-  """Installs the coremark package on the VM."""
-  coremark.InstallCoremark(vm.RemoteCommandCygwin)
+# TODO(user): migrate other flags.
+MEASURE_DELETE = flags.DEFINE_boolean(
+    'collect_delete_samples', False,
+    'Whether to publish delete time samples for all tests.')

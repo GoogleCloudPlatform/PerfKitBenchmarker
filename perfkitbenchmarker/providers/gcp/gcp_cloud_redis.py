@@ -53,20 +53,30 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     self.failover_style = FLAGS.redis_failover_style
     if self.failover_style == managed_memory_store.Failover.FAILOVER_NONE:
       self.tier = BASIC_TIER
-    elif self.failover_style == managed_memory_store.Failover.FAILOVER_SAME_REGION:
+    elif (
+        self.failover_style
+        == managed_memory_store.Failover.FAILOVER_SAME_REGION
+    ):
       self.tier = STANDARD_TIER
     # Update the environment for gcloud commands:
     os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_REDIS'] = (
-        gcp_flags.CLOUD_REDIS_API_OVERRIDE.value)
+        gcp_flags.CLOUD_REDIS_API_OVERRIDE.value
+    )
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
-    if FLAGS.redis_failover_style == managed_memory_store.Failover.FAILOVER_SAME_ZONE:
+    if (
+        FLAGS.redis_failover_style
+        == managed_memory_store.Failover.FAILOVER_SAME_ZONE
+    ):
       raise errors.Config.InvalidValue(
-          'GCP cloud redis does not support same zone failover')
-    if (FLAGS.managed_memory_store_version and
+          'GCP cloud redis does not support same zone failover'
+      )
+    if (
         FLAGS.managed_memory_store_version
-        not in managed_memory_store.REDIS_VERSIONS):
+        and FLAGS.managed_memory_store_version
+        not in managed_memory_store.REDIS_VERSIONS
+    ):
       raise errors.Config.InvalidValue('Invalid Redis version.')
 
   def GetResourceMetadata(self):
@@ -75,22 +85,26 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     Returns:
       dict mapping string property key to value.
     """
-    result = {
+    self.metadata.update({
         'cloud_redis_failover_style': self.failover_style,
         'cloud_redis_size': self.size,
         'cloud_redis_tier': self.tier,
         'cloud_redis_region': self.redis_region,
         'cloud_redis_version': self.ParseReadableVersion(self.redis_version),
-    }
-    return result
+    })
+    return self.metadata
 
   @staticmethod
   def ParseReadableVersion(version):
     """Parses Redis major and minor version number."""
     if version.count('_') < 2:
       logging.info(
-          'Could not parse version string correctly, '
-          'full Redis version returned: %s', version)
+          (
+              'Could not parse version string correctly, '
+              'full Redis version returned: %s'
+          ),
+          version,
+      )
       return version
     return '.'.join(version.split('_')[1:])
 
@@ -146,11 +160,12 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     stdout, _, retcode = self.DescribeInstance()
     if retcode != 0:
       raise errors.Resource.RetryableGetError(
-          'Failed to retrieve information on {}'.format(self.name))
+          'Failed to retrieve information on {}'.format(self.name)
+      )
     self._ip = json.loads(stdout)['host']
     self._port = json.loads(stdout)['port']
 
-  def MeasureCpuUtilization(self, interval_length):
+  def MeasureCpuUtilization(self, interval_length):  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
     """Measure the average CPU utilization on GCP instance in percentage."""
     now = time.time()
     seconds = int(now)
@@ -162,13 +177,20 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     api_filter = (
         'metric.type = "redis.googleapis.com/stats/cpu_utilization" '
         'AND resource.labels.instance_id = "projects/'
-    ) + self.project + '/locations/' + self.redis_region + '/instances/' + self.name + '"'
+        + self.project
+        + '/locations/'
+        + self.redis_region
+        + '/instances/'
+        + self.name
+        + '"'
+    )
 
     time_series = client.list_time_series(
         name='projects/' + self.project,
         filter_=api_filter,
         interval=interval,
-        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL)
+        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+    )
 
     return self._ParseMonitoringTimeSeries(time_series)
 

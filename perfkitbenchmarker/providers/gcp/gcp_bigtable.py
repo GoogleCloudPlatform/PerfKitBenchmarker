@@ -45,10 +45,13 @@ flags.DEFINE_string('google_bigtable_instance_name', None,
                     'the instance is considered user managed and will not '
                     'created/deleted by PKB.')
 flags.DEFINE_integer(
-    'bigtable_node_count', None,
-    'Number of nodes to create in the bigtable cluster. '
-    'Ignored if --bigtable_autoscaling_min_nodes is set.'
-    'TODO: Consider merging the two flags for better user-friendliness.')
+    'bigtable_node_count',
+    None,
+    (
+        'Number of nodes to create in the bigtable cluster. '
+        'Ignored if --bigtable_autoscaling_min_nodes is set.'
+    ),
+)
 _AUTOSCALING_MIN_NODES = flags.DEFINE_integer(
     'bigtable_autoscaling_min_nodes', None,
     'Minimum number of nodes for autoscaling.')

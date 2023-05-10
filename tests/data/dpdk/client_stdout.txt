@@ -1,0 +1,205 @@
+STDOUT: Set txonly packet forwarding mode
+Configuring Port 0 (socket 0)
+Port 0: 42:01:0A:00:00:D6
+Checking link statuses...
+Done
+No commandline core given, start packet forwarding
+txonly packet forwarding - ports=1 - cores=2 - streams=2 - NUMA support enabled, MP allocation mode: native
+Logical Core 1 (socket 0) forwards packets on 1 streams:
+  RX P=0/Q=0 (socket 0) -> TX P=0/Q=0 (socket 0) peer=02:00:00:00:00:00
+Logical Core 2 (socket 0) forwards packets on 1 streams:
+  RX P=0/Q=1 (socket 0) -> TX P=0/Q=1 (socket 0) peer=02:00:00:00:00:00
+
+  txonly packet forwarding packets/burst=32
+  packet len=64 - nb packet segments=1
+  nb forwarding cores=2 - nb forwarding ports=1
+  port 0: RX queue number: 2 Tx queue number: 2
+    Rx offloads=0x0 Tx offloads=0x0
+    RX queue: 0
+      RX desc=0 - RX free threshold=512
+      RX threshold registers: pthresh=0 hthresh=0  wthresh=0
+      RX Offloads=0x0
+    TX queue: 0
+      TX desc=0 - TX free threshold=32
+      TX threshold registers: pthresh=0 hthresh=0  wthresh=0
+      TX offloads=0x0 - TX RS bit threshold=32
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 480        TX-errors: 0          TX-bytes:  30720
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:            0          Tx-bps:            0
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 147794900  TX-errors: 2003308    TX-bytes:  9458873600
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     36945592          Tx-bps:  18916143336
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 312844552  TX-errors: 2154712    TX-bytes:  20022051328
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     41258673          Tx-bps:  21124440904
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 465116588  TX-errors: 2477780    TX-bytes:  29767461632
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     38064627          Tx-bps:  19489089408
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 643022590  TX-errors: 2486242    TX-bytes:  41153445760
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     44472623          Tx-bps:  22769982992
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 820928154  TX-errors: 2495494    TX-bytes:  52539401856
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     44472608          Tx-bps:  22769975320
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 998835808  TX-errors: 2503232    TX-bytes:  63925491712
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     44472629          Tx-bps:  22769986200
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 1169045508 TX-errors: 2578780    TX-bytes:  74818912512
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     42548737          Tx-bps:  21784953672
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 1346951176 TX-errors: 2584984    TX-bytes:  86204875264
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     44472628          Tx-bps:  22769985864
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 1524857070 TX-errors: 2592658    TX-bytes:  97590852480
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     44472627          Tx-bps:  22769985280
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 1702762656 TX-errors: 2601088    TX-bytes:  108976809984
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     44472618          Tx-bps:  22769980720
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 1880669036 TX-errors: 2611220    TX-bytes:  120362818304
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     44472648          Tx-bps:  22769996224
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 2058575404 TX-errors: 2622996    TX-bytes:  131748825856
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     44472627          Tx-bps:  22769985144
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 2236481408 TX-errors: 2629824    TX-bytes:  143134810112
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     44472623          Tx-bps:  22769983424
+  ############################################################################
+
+Port statistics ====================================
+  ######################## NIC statistics for port 0  ########################
+  RX-packets: 0          RX-missed: 0          RX-bytes:  0
+  RX-errors: 0
+  RX-nombuf:  0
+  TX-packets: 2414387378 TX-errors: 2635918    TX-bytes:  154520792192
+
+  Throughput (since last show)
+  Rx-pps:            0          Rx-bps:            0
+  Tx-pps:     44472621          Tx-bps:  22769982440
+  ############################################################################

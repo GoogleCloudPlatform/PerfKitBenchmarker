@@ -27,6 +27,10 @@ _VERSION = flags.DEFINE_enum('cuda_samples_version', None, [
     '11.4',
     '11.5',
     '11.6',
+    '11.7',
+    '11.8',
+    '12.0',
+    '12.1',
 ], 'Version of CUDA samples to install.')
 
 FLAGS = flags.FLAGS

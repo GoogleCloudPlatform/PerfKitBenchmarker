@@ -29,12 +29,12 @@ MVN_URL = 'https://archive.apache.org/dist/maven/maven-{0}/{1}/binaries/apache-m
 MVN_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'maven')
 MVN_ENV_PATH = '/etc/profile.d/maven.sh'
 
-MVN_ENV = '''
+MVN_ENV = """
 export JAVA_HOME={java_home}
 export M2_HOME={maven_home}
 export MAVEN_HOME={maven_home}
 export PATH={maven_home}/bin:$PATH
-'''
+"""
 
 PACKAGE_NAME = 'maven'
 PREPROVISIONED_DATA = {
@@ -47,6 +47,19 @@ PACKAGE_DATA_URL = {
     'apache-maven-{0}-bin.tar.gz'.format('3.6.1'): MVN_URL.format('3', '3.6.1'),
     'apache-maven-{0}-bin.tar.gz'.format('3.6.3'): MVN_URL.format('3', '3.6.3')
 }
+
+
+def _MavenVersionParts():
+  """Return (major, minor, patch) versions of the --maven_version flag."""
+  maven_major_ver, maven_minor_ver, maven_patch_ver = map(
+      int, FLAGS.maven_version.split('.')
+  )
+  return maven_major_ver, maven_minor_ver, maven_patch_ver
+
+
+def MavenEnvContents(java_home, maven_home):
+  """Generate the contents for the mvn env file."""
+  return MVN_ENV.format(java_home=java_home, maven_home=maven_home)
 
 
 def GetRunCommand(arguments):
@@ -64,6 +77,13 @@ def GetRunCommand(arguments):
     https_proxy_params = ' -Dhttps.proxyHost={host} -Dhttps.proxyPort={port}'
     command += https_proxy_params.format(
         host=parsed_url.hostname, port=parsed_url.port)
+
+  maven_major_ver, maven_minor_ver, maven_patch_ver = _MavenVersionParts()
+  # Don't output download progress.
+  if (maven_major_ver, maven_minor_ver, maven_patch_ver) >= (3, 6, 1):
+    command += ' --no-transfer-progress'
+  else:
+    command += ' --batch-mode'
 
   return command
 
@@ -93,9 +113,8 @@ def _Install(vm):
   vm.Install('curl')
 
   # Download and extract maven
-  maven_full_ver = FLAGS.maven_version
-  maven_major_ver = maven_full_ver[:maven_full_ver.index('.')]
-  maven_url = MVN_URL.format(maven_major_ver, maven_full_ver)
+  maven_major_ver, _, _ = _MavenVersionParts()
+  maven_url = MVN_URL.format(maven_major_ver, FLAGS.maven_version)
   maven_tar = maven_url.split('/')[-1]
   # will only work with preprovision_ignore_checksum
   if maven_tar not in PREPROVISIONED_DATA:
@@ -111,8 +130,8 @@ def _Install(vm):
   java_home = _GetJavaHome(vm)
 
   # Set env variables for maven
-  maven_env = MVN_ENV.format(java_home=java_home, maven_home=MVN_DIR)
-  cmd = 'echo "{0}" | sudo tee -a {1}'.format(maven_env, MVN_ENV_PATH)
+  maven_env = MavenEnvContents(java_home, MVN_DIR)
+  cmd = f'echo "{maven_env}" | sudo tee -a {MVN_ENV_PATH}'
   vm.RemoteCommand(cmd)
 
   if FLAGS.maven_mirror_url:
@@ -128,5 +147,5 @@ def _Install(vm):
 
 def Uninstall(vm):
   vm.Uninstall('openjdk')
-  vm.RemoteCommand('rm -rf {0}'.format(MVN_DIR), ignore_failure=True)
-  vm.RemoteCommand('sudo rm -f {0}'.format(MVN_ENV_PATH), ignore_failure=True)
+  vm.RemoteCommand(f'rm -rf {MVN_DIR}', ignore_failure=True)
+  vm.RemoteCommand(f'sudo rm -f {MVN_ENV_PATH}', ignore_failure=True)

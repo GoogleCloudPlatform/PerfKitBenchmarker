@@ -115,6 +115,41 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
         use_existing=not try_to_create_storage_account_and_resource_group,
         raise_on_create_failure=raise_on_create_failure)
     self.storage_account.Create()
+    if object_storage_service.OBJECT_TTL_DAYS.value:
+      if try_to_create_storage_account_and_resource_group:
+        ttl_days = object_storage_service.OBJECT_TTL_DAYS.value
+        policy = json.dumps(
+            {
+                'rules': [{
+                    'enabled': True,
+                    'name': 'PKB_BLOB_TTL',
+                    'type': 'Lifecycle',
+                    'definition': {
+                        'actions': {
+                            'version': {
+                                'delete': {
+                                    'daysAfterCreationGreaterThan': ttl_days
+                                }
+                            }
+                        },
+                        # A blobtype filter is required. Matches all objects.
+                        'filters': {
+                            'blobTypes': ['appendBlob', 'blockBlob']
+                        },
+                    },
+                }]
+            }
+        )
+        vm_util.IssueCommand([
+            azure.AZURE_PATH,
+            'storage', 'account', 'management-policy', 'create',
+            '--account-name', self.storage_account.name,
+            '--policy', policy,
+            '--resource-group', self.resource_group.name])
+      else:
+        logging.warning(
+            'Not setting object TTL, because of existing storage account.'
+        )
 
   def CleanupService(self):
     if hasattr(self, 'storage_account') and self.storage_account:

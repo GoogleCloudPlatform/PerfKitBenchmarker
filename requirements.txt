@@ -30,6 +30,7 @@ google-cloud-datastore
 google-cloud-monitoring==0.31.1
 beautifulsoup4
 requests
+python-datetime-tz
 
 # unlike setup.py requirements.txt cannot require a Python version AFAICT
 # this hack requires a non-existent package when Python is less than 3.9

@@ -66,15 +66,11 @@ class ClusterBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
         sample.Sample('Cluster Delete Time', expected_cluster_delete_time,
                       'seconds', expected_cluster_delete_metadata))
 
-    # assert the delete function is called on vms
-    for vm in vms_to_test:
-      vm.Delete.assert_called()
-
     # assert actual and expected samples are equal
     self.assertSampleListsEqualUpToTimestamp(actual_samples, expected_samples)
 
   @freezegun.freeze_time('2023-03-07')
-  def testPublishTimeToSshExternalSample(self):
+  def testGetTimeToBoot(self):
     context.SetThreadBenchmarkSpec(
         pkb_common_test_case.CreateBenchmarkSpecFromYaml()
     )
@@ -82,15 +78,19 @@ class ClusterBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     vm_spec = gce_virtual_machine.GceVmSpec('cluster_boot_benchmark_test')
     vm = gce_virtual_machine.Ubuntu2204BasedGceVirtualMachine(vm_spec)
     vm.create_start_time = 1
-    vm.ssh_internal_time = 2
-    vm.ssh_external_time = 4
+    vm.create_return_time = 2
+    vm.is_running_time = 3
+    vm.ssh_internal_time = 4
+    vm.ssh_external_time = 5
     vm.bootable_time = 7
 
     actuals = cluster_boot_benchmark.GetTimeToBoot([vm])
 
     metrics = {
-        'Time to SSH - External': 3.0,
-        'Time to SSH - Internal': 1.0,
+        'Time to Create Async Return': 1.0,
+        'Time to Running': 2.0,
+        'Time to SSH - External': 4.0,
+        'Time to SSH - Internal': 3.0,
         'Boot Time': 6.0,
     }
     expecteds = []

@@ -16,12 +16,10 @@ import json
 import logging
 import math
 import posixpath
-import re
 from typing import Any, Dict, List, Tuple
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import mlperf_benchmark
@@ -30,7 +28,7 @@ from perfkitbenchmarker.linux_packages import docker
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
 FLAGS = flags.FLAGS
-MLPERF_INFERENCE_VERSION = 'v2.1'
+MLPERF_INFERENCE_VERSION = 'v3.0'
 
 _MLPERF_SCRATCH_PATH = '/scratch'
 _DLRM_DATA_MODULE = 'criteo'
@@ -59,48 +57,34 @@ mlperf_inference:
           zone: westus2
           boot_disk_size: 200
 """
-_SERVER = 'server'
-_SINGLESTREAM = 'singlestream'
-_OFFLINE = 'offline'
-_SCENARIOS = flags.DEFINE_enum('mlperf_inference_scenarios', _SERVER,
-                               [_SERVER, _SINGLESTREAM, _OFFLINE],
-                               'MLPerf has defined three different scenarios')
-_SERVER_TARGET_QPS = flags.DEFINE_float('mlperf_server_target_qps', None,
-                                        'server target qps')
-
-_ACCURACY_METADATA = [
-    'benchmark',
-    'coalesced_tensor',
-    'gpu_batch_size',
-    'gpu_copy_streams',
-    'gpu_inference_streams',
-    'input_dtype',
-    'input_format',
-    'precision',
-    'scenario',
-    'server_target_qps',
-    'system',
-    'tensor_path',
-    'use_graphs',
-    'config_name',
-    'config_ver',
-    'accuracy_level',
-    'optimization_level',
-    'inference_server',
-    'system_id',
-    'use_cpu',
-    'power_limit',
-    'cpu_freq',
-    'test_mode',
-    'log_dir',
-]
-_PERFORMANCE_METRIC = 'result_completed_samples_per_sec'
+_SERVER = 'Server'
+_OFFLINE = 'Offline'
+_SCENARIOS = flags.DEFINE_enum(
+    'mlperf_inference_scenarios',
+    _SERVER,
+    [_SERVER, _OFFLINE],
+    'MLPerf has defined two different scenarios',
+)
+_INFERENCE_QPS = flags.DEFINE_integer(
+    'mlperf_inference_qps', None, 'server target qps or offline expected qps'
+)
+_BATCH_SIZE = flags.DEFINE_integer(
+    'mlperf_inference_batch_size', None, 'The GPU batch size to use.'
+)
+_SERVER_METRIC = 'result_scheduled_samples_per_sec'
+_OFFLINE_METRIC = 'result_samples_per_second'
+_SERVER_QPS = 'server_target_qps'
+_OFFLINE_QPS = 'offline_expected_qps'
 _VALID = 'Result is : VALID'
 _INVALID = 'Result is : INVALID'
-_CUSTOM_CONFIG = 'mlperf_inference_{benchmark}_custom.py'
-_CUSTOM_CONFIG_PATH = 'closed/NVIDIA/configs/{benchmark}/Server/custom.py'
+_CUSTOM_CONFIG = 'mlperf_inference_{benchmark}_{scenario}_custom.py'
+_CUSTOM_CONFIG_PATH = 'closed/NVIDIA/configs/{benchmark}/{scenario}/custom.py'
 _CUSTOM_CONFIG_LIST = 'mlperf_inference_custom_list.py'
 _CUSTOM_CONFIG_LIST_PATH = 'closed/NVIDIA/code/common/systems/custom_list.py'
+_INCREASE_QPS_INFO = (
+    'Increase expected QPS so the loadgen pre-generates a larger (coalesced)'
+    ' query.'
+)
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -135,23 +119,36 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
 
   benchmark = FLAGS.mlperf_benchmark
 
-  custom_config = _CUSTOM_CONFIG.format(benchmark=benchmark)
+  custom_config = _CUSTOM_CONFIG.format(
+      benchmark=benchmark, scenario=_SCENARIOS.value.lower()
+  )
   custom_config_path = posixpath.join(
-      repository, _CUSTOM_CONFIG_PATH.format(benchmark=benchmark)
+      repository,
+      _CUSTOM_CONFIG_PATH.format(
+          benchmark=benchmark, scenario=_SCENARIOS.value
+      ),
   )
   vm.PushDataFile(custom_config, custom_config_path)
 
   custom_config_list_path = posixpath.join(repository, _CUSTOM_CONFIG_LIST_PATH)
   vm.PushDataFile(_CUSTOM_CONFIG_LIST, custom_config_list_path)
 
-  if _SERVER_TARGET_QPS.value:
-    config = (
-        f'{repository}/closed/NVIDIA/configs/{benchmark}/Server/__init__.py'
-    )
+  config = (
+      f'{repository}/closed/NVIDIA/configs/{benchmark}/{_SCENARIOS.value}/*.py'
+  )
+  if _INFERENCE_QPS.value:
     vm_util.ReplaceText(
         vm,
-        'server_target_qps = .*',
-        f'server_target_qps = {_SERVER_TARGET_QPS.value}',
+        f'{bm_spec.metric} = .*',
+        f'{bm_spec.metric} = {_INFERENCE_QPS.value}',
+        config,
+    )
+
+  if _BATCH_SIZE.value:
+    vm_util.ReplaceText(
+        vm,
+        'gpu_batch_size = .*',
+        f'gpu_batch_size = {_BATCH_SIZE.value}',
         config,
     )
 
@@ -264,6 +261,8 @@ def _CreateMetadataDict(
   total_gpus = gpus_per_node * num_vms
   metadata.update(cuda_toolkit.GetMetadata(vm))
   metadata['total_gpus'] = total_gpus
+  if _BATCH_SIZE.value:
+    metadata['batch_size'] = _BATCH_SIZE.value
   return metadata
 
 
@@ -280,40 +279,19 @@ def MakePerformanceSamplesFromOutput(base_metadata: Dict[str, Any],
   Returns:
     Samples containing training metrics.
   """
-  metadata = {}
-  for result in regex_util.ExtractAllMatches(r':::MLLOG (.*)', output):
-    metric = json.loads(result)
-    metadata[metric['key']] = metric['value']
+  metadata = json.loads(output)
   metadata.update(base_metadata)
+
+  if _SCENARIOS.value == _SERVER:
+    metric = _SERVER_METRIC
+  elif _SCENARIOS.value == _OFFLINE:
+    metric = _OFFLINE_METRIC
+
   return [
-      sample.Sample('throughput', metadata[_PERFORMANCE_METRIC],
-                    'samples per second', metadata)
+      sample.Sample(
+          'throughput', metadata[metric], 'samples per second', metadata
+      )
   ]
-
-
-def MakeAccuracySamplesFromOutput(base_metadata: Dict[str, Any],
-                                  output: str) -> List[sample.Sample]:
-  """Creates accuracy samples containing metrics.
-
-  Args:
-    base_metadata: dict contains all the metadata that reports.
-    output: string, command output
-
-  Returns:
-    Samples containing training metrics.
-  """
-  metadata = {}
-  for column_name in _ACCURACY_METADATA:
-    metadata[f'mlperf {column_name}'] = regex_util.ExtractExactlyOneMatch(
-        fr'{re.escape(column_name)} *: *(.*)', output)
-  accuracy = regex_util.ExtractFloat(
-      r': Accuracy = (\d+\.\d+), Threshold = \d+\.\d+\. Accuracy test PASSED',
-      output)
-  metadata['Threshold'] = regex_util.ExtractFloat(
-      r': Accuracy = \d+\.\d+, Threshold = (\d+\.\d+)\. Accuracy test PASSED',
-      output)
-  metadata.update(base_metadata)
-  return [sample.Sample('accuracy', float(accuracy), '%', metadata)]
 
 
 def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
@@ -328,13 +306,16 @@ def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
     Whether the system under test passes under the serer target QPS.
   """
   vm = bm_spec.vms[0]
-  config = f'configs/{FLAGS.mlperf_benchmark}/Server/*.py'
+  config = f'configs/{FLAGS.mlperf_benchmark}/{_SCENARIOS.value}/*.py'
+
+  if _SCENARIOS.value == _SERVER:
+    metric = _SERVER_QPS
+  elif _SCENARIOS.value == _OFFLINE:
+    metric = _OFFLINE_QPS
+
   vm.RobustRemoteCommand(
-      (
-          f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND="sed -i'
-          f" 's/server_target_qps = .*/server_target_qps = {target_qps}/g'"
-          f' {config}"'
-      ),
+      f"{bm_spec.env_cmd} && sed -i 's/{metric} = .*/{metric} = {target_qps}/g'"
+      f' {config}'
   )
   # For valid log, result_validity is VALID
   # For invalid log, result_validity is INVALID
@@ -343,7 +324,10 @@ def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
       'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
       f'--scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly --fast\'"')
-  return _VALID in stdout
+  if _SCENARIOS.value == _SERVER:
+    return _VALID in stdout
+  elif _SCENARIOS.value == _OFFLINE:
+    return _INVALID in stdout
 
 
 def _LastRunResults(bm_spec: benchmark_spec.BenchmarkSpec) -> str:
@@ -358,9 +342,9 @@ def _LastRunResults(bm_spec: benchmark_spec.BenchmarkSpec) -> str:
   """
   vm = bm_spec.vms[0]
   stdout, _ = vm.RobustRemoteCommand(
-      f'{bm_spec.env_cmd} && make launch_docker DOCKER_COMMAND='
-      '"grep -l \'\\"VALID\\"\' build/logs/*/*/*/*/mlperf_log_detail.txt | '
-      'xargs ls -t | head -n 1 | xargs cat"')
+      f'{bm_spec.env_cmd} && grep -l \'\\"result_validity\\": \\"VALID\\"\''
+      ' build/logs/*/*/*/*/metadata.json | xargs ls -t | head -n 1 | xargs cat'
+  )
   return stdout
 
 
@@ -422,17 +406,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   _BinarySearch(bm_spec)
 
   metadata = _CreateMetadataDict(bm_spec)
-  performance_samples = MakePerformanceSamplesFromOutput(
-      metadata, _LastRunResults(bm_spec))
-
-  vm = bm_spec.vms[0]
-  stdout, _ = vm.RobustRemoteCommand(
-      f'{bm_spec.env_cmd} && '
-      'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
-      f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} --test_mode=AccuracyOnly --fast\'"')
-  accuracy_samples = MakeAccuracySamplesFromOutput(metadata, stdout)
-  return performance_samples + accuracy_samples
+  return MakePerformanceSamplesFromOutput(metadata, _LastRunResults(bm_spec))
 
 
 def Cleanup(unused_bm_spec: benchmark_spec.BenchmarkSpec) -> None:
