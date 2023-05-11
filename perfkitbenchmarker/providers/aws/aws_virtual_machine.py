@@ -1161,7 +1161,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
-    if FLAGS.aws_efa:
+    if FLAGS.aws_efa or aws_network.AWS_ENI_COUNT.value > 1:
       if self.association_id:
         vm_util.IssueCommand(util.AWS_PREFIX +
                              ['ec2', 'disassociate-address',
