@@ -50,6 +50,7 @@ _LOAD_NUM_PIPELINES = 100  # Arbitrarily high for loading
 _WRITE_ONLY = '1:0'
 CPU_TOLERANCE = 0.05
 WARM_UP_SECONDS = 360
+RAMP_DOWN_TIME = 10
 JSON_OUT_FILE = 'json_data'
 # upper limit to pipelines when binary searching for latency-capped throughput.
 # arbitrarily chosen for large latency.
@@ -1064,6 +1065,11 @@ def AggregateMemtierResults(
       for key, value in latency_series.items()
   }
 
+  ramp_down_starts = timestamps[-1]
+  # Gives 10s for ramp down
+  if len(timestamps) > RAMP_DOWN_TIME:
+    ramp_down_starts = timestamps[-RAMP_DOWN_TIME]
+
   samples.append(
       sample.CreateTimeSeriesSample(
           ops_series,
@@ -1071,6 +1077,7 @@ def AggregateMemtierResults(
           sample.OPS_TIME_SERIES,
           'ops',
           1,
+          ramp_down_starts=ramp_down_starts,
           additional_metadata=metadata,
       )
   )
