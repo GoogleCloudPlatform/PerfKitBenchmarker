@@ -176,6 +176,237 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
+# TODO(chunla) Move this to engine specific module
+def _GetSysbenchConnectionParameter(client_vm_query_tools):
+  """Get Sysbench connection parameter."""
+  connection_string = ''
+  if client_vm_query_tools.ENGINE_TYPE == sql_engine_utils.MYSQL:
+    connection_string = (
+        '--mysql-host={0} --mysql-user={1} --mysql-password="{2}" ').format(
+            client_vm_query_tools.connection_properties.endpoint,
+            client_vm_query_tools.connection_properties.database_username,
+            client_vm_query_tools.connection_properties.database_password)
+  elif client_vm_query_tools.ENGINE_TYPE == sql_engine_utils.POSTGRES:
+    connection_string = (
+        '--pgsql-host={0} --pgsql-user={1} --pgsql-password="{2}" '
+        '--pgsql-port=5432').format(
+            client_vm_query_tools.connection_properties.endpoint,
+            client_vm_query_tools.connection_properties.database_username,
+            client_vm_query_tools.connection_properties.database_password)
+  return connection_string
+
+
+# TODO(chunla) Move this to engine specific module
+def _GetCommonSysbenchOptions(benchmark_spec):
+  """Get Sysbench options."""
+  db = benchmark_spec.relational_db
+  engine_type = db.engine_type
+  result = []
+
+  # Ignore possible mysql errors
+  # https://github.com/actiontech/dble/issues/458
+  # https://callisto.digital/posts/tools/using-sysbench-to-benchmark-mysql-5-7/
+  if engine_type == sql_engine_utils.MYSQL:
+    result += [
+        '--db-ps-mode=%s' % DISABLE,
+        # Error 1205: Lock wait timeout exceeded
+        # Could happen when we overload the database
+        '--mysql-ignore-errors=1213,1205,1020,2013',
+        '--db-driver=mysql'
+    ]
+  elif engine_type in [
+      sql_engine_utils.POSTGRES, sql_engine_utils.SPANNER_POSTGRES
+  ]:
+    result += [
+        '--db-driver=pgsql',
+    ]
+
+  result += [db.client_vm_query_tools.GetSysbenchConnectionString()]
+  return result
+
+
+def CreateMetadataFromFlags():
+  """Create meta data with all flags for sysbench."""
+  metadata = {
+      'sysbench_testname': FLAGS.sysbench_testname,
+      'sysbench_tables': FLAGS.sysbench_tables,
+      'sysbench_table_size': FLAGS.sysbench_table_size,
+      'sysbench_scale': FLAGS.sysbench_scale,
+      'sysbench_warmup_seconds': FLAGS.sysbench_warmup_seconds,
+      'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
+      'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
+      'sysbench_report_interval': FLAGS.sysbench_report_interval,
+  }
+  if FLAGS.sysbench_testname == 'tpcc':
+    metadata['sysbench_use_fk'] = FLAGS.sysbench_use_fk
+  return metadata
+
+
+def _InstallLuaScriptsIfNecessary(vm, db):
+  if FLAGS.sysbench_testname == 'tpcc':
+    vm.InstallPreprovisionedBenchmarkData(
+        BENCHMARK_NAME, ['sysbench-tpcc.tar.gz'], '~')
+    vm.RemoteCommand('tar -zxvf sysbench-tpcc.tar.gz')
+    if db.spec.engine == sql_engine_utils.SPANNER_POSTGRES:
+      vm.PushDataFile('spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
+      vm.PushDataFile('spanner_pg_tpcc_run.lua', '~/tpcc_run.lua')
+      vm.PushDataFile('spanner_pg_tpcc.lua', '~/tpcc.lua')
+
+
+def _IsValidFlag(flag):
+  return (flag in
+          _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS[FLAGS.sysbench_testname])
+
+
+def UpdateBenchmarkSpecWithFlags(benchmark_spec):
+  """Updates benchmark_spec with flags that are used in the run stage."""
+  benchmark_spec.tables = FLAGS.sysbench_tables
+  benchmark_spec.sysbench_table_size = FLAGS.sysbench_table_size
+
+
+def _PrepareSysbench(client_vm, benchmark_spec):
+  """Prepare the Sysbench OLTP test with data loading stage.
+
+  Args:
+    client_vm: The client VM that will issue the sysbench test.
+    benchmark_spec: The benchmark specification. Contains all data that is
+                    required to run the benchmark.
+  Returns:
+    results: A list of results of the data loading step.
+  """
+
+  _InstallLuaScriptsIfNecessary(client_vm, benchmark_spec.relational_db)
+
+  results = []
+
+  db = benchmark_spec.relational_db
+
+  # Some databases install these query tools during _PostCreate, which is
+  # skipped if the database is user managed / restored.
+  if db.user_managed or db.restored:
+    db.client_vm_query_tools.InstallPackages()
+
+  if _SKIP_LOAD_STAGE.value or db.restored:
+    logging.info('Skipping the load stage')
+    return results
+
+  stdout, stderr = db.client_vm_query_tools.IssueSqlCommand(
+      'create database sbtest;')
+
+  logging.info('sbtest db created, stdout is %s, stderr is %s', stdout, stderr)
+  # Provision the Sysbench test based on the input flags (load data into DB)
+  # Could take a long time if the data to be loaded is large.
+  data_load_start_time = time.time()
+  # Data loading is write only so need num_threads less than or equal to the
+  # amount of tables - capped at 64 threads for when number of tables
+  # gets very large. For TPCC, parallelize with threads as long as scale > 1.
+  num_threads = (
+      min(FLAGS.sysbench_scale, 64)
+      if FLAGS.sysbench_testname == 'tpcc' else min(FLAGS.sysbench_tables, 64))
+
+  data_load_cmd_tokens = ['nice',  # run with a niceness of lower priority
+                          '-15',   # to encourage cpu time for ssh commands
+                          'sysbench',
+                          FLAGS.sysbench_testname,
+                          '--tables=%d' % FLAGS.sysbench_tables,
+                          ('--table_size=%d' % FLAGS.sysbench_table_size
+                           if _IsValidFlag('table_size') else ''),
+                          ('--scale=%d' % FLAGS.sysbench_scale
+                           if _IsValidFlag('scale') else ''),
+                          '--threads=%d' % num_threads]
+  if FLAGS.sysbench_testname == 'tpcc':
+    data_load_cmd_tokens.append(
+        '--use_fk=%d' % (1 if FLAGS.sysbench_use_fk else 0)
+    )
+  data_load_cmd = ' '.join(data_load_cmd_tokens +
+                           _GetCommonSysbenchOptions(benchmark_spec) +
+                           ['prepare'])
+
+  # Sysbench output is in stdout, but we also get stderr just in case
+  # something went wrong.
+  stdout, stderr = client_vm.RobustRemoteCommand(data_load_cmd)
+  load_duration = time.time() - data_load_start_time
+  logging.info('It took %d seconds to finish the data loading step',
+               load_duration)
+  logging.info('data loading results: \n stdout is:\n%s\nstderr is\n%s',
+               stdout, stderr)
+
+  metadata = CreateMetadataFromFlags()
+
+  results.append(sample.Sample(
+      'sysbench data load time',
+      load_duration,
+      SECONDS_UNIT,
+      metadata))
+
+  return results
+
+
+def Prepare(benchmark_spec):
+  """Prepare the MySQL DB Instances, configures it.
+
+     Prepare the client test VM, installs SysBench, configures it.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+        required to run the benchmark.
+  """
+  # We would like to always cleanup server side states.
+  # If we don't set this, our cleanup function will only be called when the VM
+  # is static VM, but we have server side states to cleanup regardless of the
+  # VM type.
+
+  benchmark_spec.always_call_cleanup = True
+
+  client_vm = benchmark_spec.vm_groups['clients'][0]
+
+  UpdateBenchmarkSpecWithFlags(benchmark_spec)
+
+  # Setup common test tools required on the client VM
+  client_vm.Install('sysbench')
+
+  _PrepareSysbench(client_vm, benchmark_spec)
+
+
+def _GetDatabaseSize(db):
+  """Get the size of the database in MB."""
+  db_engine_type = db.engine_type
+  stdout = None
+  if db_engine_type == sql_engine_utils.MYSQL:
+    stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
+        'SELECT table_schema AS \'Database\', '
+        'ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) '
+        'AS \'Size (MB)\' '
+        'FROM information_schema.TABLES '
+        'GROUP BY table_schema; ')
+    logging.info('Query database size results: \n%s', stdout)
+    # example stdout is tab delimited but shown here with spaces:
+    # Database  Size (MB)
+    # information_schema  0.16
+    # mysql 5.53
+    # performance_schema  0.00
+    # sbtest  0.33
+    size_mb = 0
+    for line in stdout.splitlines()[1:]:
+      _, word_size_mb = line.split()
+      size_mb += float(word_size_mb)
+
+  elif db_engine_type == sql_engine_utils.POSTGRES:
+    stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
+        r'SELECT pg_database_size('
+        '\'sbtest\''
+        ')/1024/1024')
+    size_mb = int(stdout.split()[2])
+
+  # Spanner doesn't yet support pg_database_size.
+  # See https://cloud.google.com/spanner/quotas#instance_limits. Spanner
+  # supports 4TB per node, so use that number for now.
+  elif db_engine_type == sql_engine_utils.SPANNER_POSTGRES:
+    size_mb = 4096000 * db.nodes
+
+  return size_mb
+
+
 def _ParseSysbenchTransactions(sysbench_output,
                                metadata) -> List[sample.Sample]:
   """Parse sysbench transaction results."""
@@ -262,55 +493,6 @@ def _ParseSysbenchTimeSeries(sysbench_output, metadata) -> List[sample.Sample]:
   qps_sample = sample.Sample('qps_array', -1, 'qps', qps_metadata)
 
   return [tps_sample, latency_sample, qps_sample]
-
-
-# TODO(chunla) Move this to engine specific module
-def _GetSysbenchConnectionParameter(client_vm_query_tools):
-  """Get Sysbench connection parameter."""
-  connection_string = ''
-  if client_vm_query_tools.ENGINE_TYPE == sql_engine_utils.MYSQL:
-    connection_string = (
-        '--mysql-host={0} --mysql-user={1} --mysql-password="{2}" ').format(
-            client_vm_query_tools.connection_properties.endpoint,
-            client_vm_query_tools.connection_properties.database_username,
-            client_vm_query_tools.connection_properties.database_password)
-  elif client_vm_query_tools.ENGINE_TYPE == sql_engine_utils.POSTGRES:
-    connection_string = (
-        '--pgsql-host={0} --pgsql-user={1} --pgsql-password="{2}" '
-        '--pgsql-port=5432').format(
-            client_vm_query_tools.connection_properties.endpoint,
-            client_vm_query_tools.connection_properties.database_username,
-            client_vm_query_tools.connection_properties.database_password)
-  return connection_string
-
-
-# TODO(chunla) Move this to engine specific module
-def _GetCommonSysbenchOptions(benchmark_spec):
-  """Get Sysbench options."""
-  db = benchmark_spec.relational_db
-  engine_type = db.engine_type
-  result = []
-
-  # Ignore possible mysql errors
-  # https://github.com/actiontech/dble/issues/458
-  # https://callisto.digital/posts/tools/using-sysbench-to-benchmark-mysql-5-7/
-  if engine_type == sql_engine_utils.MYSQL:
-    result += [
-        '--db-ps-mode=%s' % DISABLE,
-        # Error 1205: Lock wait timeout exceeded
-        # Could happen when we overload the database
-        '--mysql-ignore-errors=1213,1205,1020,2013',
-        '--db-driver=mysql'
-    ]
-  elif engine_type in [
-      sql_engine_utils.POSTGRES, sql_engine_utils.SPANNER_POSTGRES
-  ]:
-    result += [
-        '--db-driver=pgsql',
-    ]
-
-  result += [db.client_vm_query_tools.GetSysbenchConnectionString()]
-  return result
 
 
 def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
@@ -403,188 +585,6 @@ def _RunSysbench(
 
   return _ParseSysbenchTimeSeries(stdout, metadata) + _ParseSysbenchLatency(
       stdout, metadata) + _ParseSysbenchTransactions(stdout, metadata)
-
-
-def _GetDatabaseSize(db):
-  """Get the size of the database in MB."""
-  db_engine_type = db.engine_type
-  stdout = None
-  if db_engine_type == sql_engine_utils.MYSQL:
-    stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
-        'SELECT table_schema AS \'Database\', '
-        'ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) '
-        'AS \'Size (MB)\' '
-        'FROM information_schema.TABLES '
-        'GROUP BY table_schema; ')
-    logging.info('Query database size results: \n%s', stdout)
-    # example stdout is tab delimited but shown here with spaces:
-    # Database  Size (MB)
-    # information_schema  0.16
-    # mysql 5.53
-    # performance_schema  0.00
-    # sbtest  0.33
-    size_mb = 0
-    for line in stdout.splitlines()[1:]:
-      _, word_size_mb = line.split()
-      size_mb += float(word_size_mb)
-
-  elif db_engine_type == sql_engine_utils.POSTGRES:
-    stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
-        r'SELECT pg_database_size('
-        '\'sbtest\''
-        ')/1024/1024')
-    size_mb = int(stdout.split()[2])
-
-  # Spanner doesn't yet support pg_database_size.
-  # See https://cloud.google.com/spanner/quotas#instance_limits. Spanner
-  # supports 4TB per node, so use that number for now.
-  elif db_engine_type == sql_engine_utils.SPANNER_POSTGRES:
-    size_mb = 4096000 * db.nodes
-
-  return size_mb
-
-
-def _PrepareSysbench(client_vm, benchmark_spec):
-  """Prepare the Sysbench OLTP test with data loading stage.
-
-  Args:
-    client_vm: The client VM that will issue the sysbench test.
-    benchmark_spec: The benchmark specification. Contains all data that is
-                    required to run the benchmark.
-  Returns:
-    results: A list of results of the data loading step.
-  """
-
-  _InstallLuaScriptsIfNecessary(client_vm, benchmark_spec.relational_db)
-
-  results = []
-
-  db = benchmark_spec.relational_db
-
-  # Some databases install these query tools during _PostCreate, which is
-  # skipped if the database is user managed / restored.
-  if db.user_managed or db.restored:
-    db.client_vm_query_tools.InstallPackages()
-
-  if _SKIP_LOAD_STAGE.value or db.restored:
-    logging.info('Skipping the load stage')
-    return results
-
-  stdout, stderr = db.client_vm_query_tools.IssueSqlCommand(
-      'create database sbtest;')
-
-  logging.info('sbtest db created, stdout is %s, stderr is %s', stdout, stderr)
-  # Provision the Sysbench test based on the input flags (load data into DB)
-  # Could take a long time if the data to be loaded is large.
-  data_load_start_time = time.time()
-  # Data loading is write only so need num_threads less than or equal to the
-  # amount of tables - capped at 64 threads for when number of tables
-  # gets very large. For TPCC, parallelize with threads as long as scale > 1.
-  num_threads = (
-      min(FLAGS.sysbench_scale, 64)
-      if FLAGS.sysbench_testname == 'tpcc' else min(FLAGS.sysbench_tables, 64))
-
-  data_load_cmd_tokens = ['nice',  # run with a niceness of lower priority
-                          '-15',   # to encourage cpu time for ssh commands
-                          'sysbench',
-                          FLAGS.sysbench_testname,
-                          '--tables=%d' % FLAGS.sysbench_tables,
-                          ('--table_size=%d' % FLAGS.sysbench_table_size
-                           if _IsValidFlag('table_size') else ''),
-                          ('--scale=%d' % FLAGS.sysbench_scale
-                           if _IsValidFlag('scale') else ''),
-                          '--threads=%d' % num_threads]
-  if FLAGS.sysbench_testname == 'tpcc':
-    data_load_cmd_tokens.append(
-        '--use_fk=%d' % (1 if FLAGS.sysbench_use_fk else 0)
-    )
-  data_load_cmd = ' '.join(data_load_cmd_tokens +
-                           _GetCommonSysbenchOptions(benchmark_spec) +
-                           ['prepare'])
-
-  # Sysbench output is in stdout, but we also get stderr just in case
-  # something went wrong.
-  stdout, stderr = client_vm.RobustRemoteCommand(data_load_cmd)
-  load_duration = time.time() - data_load_start_time
-  logging.info('It took %d seconds to finish the data loading step',
-               load_duration)
-  logging.info('data loading results: \n stdout is:\n%s\nstderr is\n%s',
-               stdout, stderr)
-
-  metadata = CreateMetadataFromFlags()
-
-  results.append(sample.Sample(
-      'sysbench data load time',
-      load_duration,
-      SECONDS_UNIT,
-      metadata))
-
-  return results
-
-
-def _InstallLuaScriptsIfNecessary(vm, db):
-  if FLAGS.sysbench_testname == 'tpcc':
-    vm.InstallPreprovisionedBenchmarkData(
-        BENCHMARK_NAME, ['sysbench-tpcc.tar.gz'], '~')
-    vm.RemoteCommand('tar -zxvf sysbench-tpcc.tar.gz')
-    if db.spec.engine == sql_engine_utils.SPANNER_POSTGRES:
-      vm.PushDataFile('spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
-      vm.PushDataFile('spanner_pg_tpcc_run.lua', '~/tpcc_run.lua')
-      vm.PushDataFile('spanner_pg_tpcc.lua', '~/tpcc.lua')
-
-
-def _IsValidFlag(flag):
-  return (flag in
-          _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS[FLAGS.sysbench_testname])
-
-
-def CreateMetadataFromFlags():
-  """Create meta data with all flags for sysbench."""
-  metadata = {
-      'sysbench_testname': FLAGS.sysbench_testname,
-      'sysbench_tables': FLAGS.sysbench_tables,
-      'sysbench_table_size': FLAGS.sysbench_table_size,
-      'sysbench_scale': FLAGS.sysbench_scale,
-      'sysbench_warmup_seconds': FLAGS.sysbench_warmup_seconds,
-      'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
-      'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
-      'sysbench_report_interval': FLAGS.sysbench_report_interval,
-  }
-  if FLAGS.sysbench_testname == 'tpcc':
-    metadata['sysbench_use_fk'] = FLAGS.sysbench_use_fk
-  return metadata
-
-
-def UpdateBenchmarkSpecWithFlags(benchmark_spec):
-  """Updates benchmark_spec with flags that are used in the run stage."""
-  benchmark_spec.tables = FLAGS.sysbench_tables
-  benchmark_spec.sysbench_table_size = FLAGS.sysbench_table_size
-
-
-def Prepare(benchmark_spec):
-  """Prepare the MySQL DB Instances, configures it.
-
-     Prepare the client test VM, installs SysBench, configures it.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-  """
-  # We would like to always cleanup server side states.
-  # If we don't set this, our cleanup function will only be called when the VM
-  # is static VM, but we have server side states to cleanup regardless of the
-  # VM type.
-
-  benchmark_spec.always_call_cleanup = True
-
-  client_vm = benchmark_spec.vm_groups['clients'][0]
-
-  UpdateBenchmarkSpecWithFlags(benchmark_spec)
-
-  # Setup common test tools required on the client VM
-  client_vm.Install('sysbench')
-
-  _PrepareSysbench(client_vm, benchmark_spec)
 
 
 def Run(benchmark_spec):
