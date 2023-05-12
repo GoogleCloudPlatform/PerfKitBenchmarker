@@ -28,6 +28,7 @@ from typing import List
 
 from absl import flags
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import relational_db
@@ -344,12 +345,16 @@ def _PrepareSysbench(client_vm, benchmark_spec):
 
   # Sysbench output is in stdout, but we also get stderr just in case
   # something went wrong.
-  stdout, stderr = client_vm.RobustRemoteCommand(_GetSysbenchPrepareCommand(db))
+  prepare_command = _GetSysbenchPrepareCommand(db)
+  stdout, stderr = client_vm.RobustRemoteCommand(prepare_command)
   load_duration = time.time() - data_load_start_time
   logging.info('It took %d seconds to finish the data loading step',
                load_duration)
-  logging.info('data loading results: \n stdout is:\n%s\nstderr is\n%s',
-               stdout, stderr)
+  for output in (stdout, stderr):
+    if 'FATAL' in output:
+      raise errors.Benchmarks.RunError(
+          f'Error while running prepare command: {prepare_command}\n{output}'
+      )
 
   metadata = CreateMetadataFromFlags()
 
