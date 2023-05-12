@@ -30,6 +30,7 @@ from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 
@@ -78,14 +79,16 @@ BENCHMARK_DATA = {
         'a116f0a6f58212b568bd339e65223eaf5ed59437503700002f016302d8a9c6ed',
 }
 
+SPANNER_TPCC = 'spanner-tpcc'
 
 # Parameters are defined in oltp_common.lua file
 # https://github.com/akopytov/sysbench
 _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
     'tpcc': set(['scale']),
+    SPANNER_TPCC: set(['scale']),
     'oltp_write_only': set(['table_size']),
     'oltp_read_only': set(['table_size']),
-    'oltp_read_write': set(['table_size'])
+    'oltp_read_write': set(['table_size']),
 }
 
 
@@ -197,9 +200,8 @@ def _GetSysbenchConnectionParameter(client_vm_query_tools):
 
 
 # TODO(chunla) Move this to engine specific module
-def _GetCommonSysbenchOptions(benchmark_spec):
+def _GetCommonSysbenchOptions(db: relational_db.BaseRelationalDb):
   """Get Sysbench options."""
-  db = benchmark_spec.relational_db
   engine_type = db.engine_type
   result = []
 
@@ -237,20 +239,28 @@ def CreateMetadataFromFlags():
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval,
   }
-  if FLAGS.sysbench_testname == 'tpcc':
+  if FLAGS.sysbench_testname == SPANNER_TPCC:
     metadata['sysbench_use_fk'] = FLAGS.sysbench_use_fk
   return metadata
 
 
-def _InstallLuaScriptsIfNecessary(vm, db):
-  if FLAGS.sysbench_testname == 'tpcc':
+def _GetSysbenchTestParameter() -> str:
+  return (
+      'tpcc'
+      if FLAGS.sysbench_testname == SPANNER_TPCC
+      else FLAGS.sysbench_testname
+  )
+
+
+def _InstallLuaScriptsIfNecessary(vm):
+  if _GetSysbenchTestParameter() == 'tpcc':
     vm.InstallPreprovisionedBenchmarkData(
         BENCHMARK_NAME, ['sysbench-tpcc.tar.gz'], '~')
     vm.RemoteCommand('tar -zxvf sysbench-tpcc.tar.gz')
-    if db.spec.engine == sql_engine_utils.SPANNER_POSTGRES:
-      vm.PushDataFile('spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
-      vm.PushDataFile('spanner_pg_tpcc_run.lua', '~/tpcc_run.lua')
-      vm.PushDataFile('spanner_pg_tpcc.lua', '~/tpcc.lua')
+  if FLAGS.sysbench_testname == SPANNER_TPCC:
+    vm.PushDataFile('spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
+    vm.PushDataFile('spanner_pg_tpcc_run.lua', '~/tpcc_run.lua')
+    vm.PushDataFile('spanner_pg_tpcc.lua', '~/tpcc.lua')
 
 
 def _IsValidFlag(flag):
@@ -264,6 +274,40 @@ def UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.sysbench_table_size = FLAGS.sysbench_table_size
 
 
+def _GetSysbenchPrepareCommand(db: relational_db.BaseRelationalDb):
+  """Returns the sysbench command used to load the database."""
+  # Data loading is write only so need num_threads less than or equal to the
+  # amount of tables - capped at 64 threads for when number of tables
+  # gets very large. For TPCC, parallelize with threads as long as scale > 1.
+  num_threads = (
+      min(FLAGS.sysbench_scale, 64)
+      if FLAGS.sysbench_testname == 'tpcc'
+      else min(FLAGS.sysbench_tables, 64)
+  )
+
+  data_load_cmd_tokens = [
+      'nice',  # run with a niceness of lower priority
+      '-15',  # to encourage cpu time for ssh commands
+      'sysbench',
+      _GetSysbenchTestParameter(),
+      '--tables=%d' % FLAGS.sysbench_tables,
+      (
+          '--table_size=%d' % FLAGS.sysbench_table_size
+          if _IsValidFlag('table_size')
+          else ''
+      ),
+      ('--scale=%d' % FLAGS.sysbench_scale if _IsValidFlag('scale') else ''),
+      '--threads=%d' % num_threads,
+  ]
+  if FLAGS.sysbench_testname == SPANNER_TPCC:
+    data_load_cmd_tokens.append(
+        '--use_fk=%d' % (1 if FLAGS.sysbench_use_fk else 0)
+    )
+  return ' '.join(
+      data_load_cmd_tokens + _GetCommonSysbenchOptions(db) + ['prepare']
+  )
+
+
 def _PrepareSysbench(client_vm, benchmark_spec):
   """Prepare the Sysbench OLTP test with data loading stage.
 
@@ -275,7 +319,7 @@ def _PrepareSysbench(client_vm, benchmark_spec):
     results: A list of results of the data loading step.
   """
 
-  _InstallLuaScriptsIfNecessary(client_vm, benchmark_spec.relational_db)
+  _InstallLuaScriptsIfNecessary(client_vm)
 
   results = []
 
@@ -297,34 +341,10 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
-  # Data loading is write only so need num_threads less than or equal to the
-  # amount of tables - capped at 64 threads for when number of tables
-  # gets very large. For TPCC, parallelize with threads as long as scale > 1.
-  num_threads = (
-      min(FLAGS.sysbench_scale, 64)
-      if FLAGS.sysbench_testname == 'tpcc' else min(FLAGS.sysbench_tables, 64))
-
-  data_load_cmd_tokens = ['nice',  # run with a niceness of lower priority
-                          '-15',   # to encourage cpu time for ssh commands
-                          'sysbench',
-                          FLAGS.sysbench_testname,
-                          '--tables=%d' % FLAGS.sysbench_tables,
-                          ('--table_size=%d' % FLAGS.sysbench_table_size
-                           if _IsValidFlag('table_size') else ''),
-                          ('--scale=%d' % FLAGS.sysbench_scale
-                           if _IsValidFlag('scale') else ''),
-                          '--threads=%d' % num_threads]
-  if FLAGS.sysbench_testname == 'tpcc':
-    data_load_cmd_tokens.append(
-        '--use_fk=%d' % (1 if FLAGS.sysbench_use_fk else 0)
-    )
-  data_load_cmd = ' '.join(data_load_cmd_tokens +
-                           _GetCommonSysbenchOptions(benchmark_spec) +
-                           ['prepare'])
 
   # Sysbench output is in stdout, but we also get stderr just in case
   # something went wrong.
-  stdout, stderr = client_vm.RobustRemoteCommand(data_load_cmd)
+  stdout, stderr = client_vm.RobustRemoteCommand(_GetSysbenchPrepareCommand(db))
   load_duration = time.time() - data_load_start_time
   logging.info('It took %d seconds to finish the data loading step',
                load_duration)
@@ -495,29 +515,35 @@ def _ParseSysbenchTimeSeries(sysbench_output, metadata) -> List[sample.Sample]:
   return [tps_sample, latency_sample, qps_sample]
 
 
-def _GetSysbenchCommand(duration, benchmark_spec, sysbench_thread_count):
+def _GetSysbenchRunCommand(
+    duration: int,
+    db: relational_db.BaseRelationalDb,
+    sysbench_thread_count: int,
+):
   """Returns the sysbench command as a string."""
   if duration <= 0:
     raise ValueError('Duration must be greater than zero.')
 
-  run_cmd_tokens = ['nice',  # run with a niceness of lower priority
-                    '-15',   # to encourage cpu time for ssh commands
-                    'sysbench',
-                    FLAGS.sysbench_testname,
-                    '--tables=%d' % FLAGS.sysbench_tables,
-                    ('--table_size=%d' % FLAGS.sysbench_table_size
-                     if _IsValidFlag('table_size') else ''),
-                    ('--scale=%d' % FLAGS.sysbench_scale
-                     if _IsValidFlag('scale') else ''),
-                    '--rand-type=%s' % UNIFORM,
-                    '--threads=%d' % sysbench_thread_count,
-                    '--percentile=%d' % FLAGS.sysbench_latency_percentile,
-                    '--report-interval=%d' % FLAGS.sysbench_report_interval,
-                    '--max-requests=0',
-                    '--time=%d' % duration]
-  run_cmd = ' '.join(run_cmd_tokens +
-                     _GetCommonSysbenchOptions(benchmark_spec) +
-                     ['run'])
+  run_cmd_tokens = [
+      'nice',  # run with a niceness of lower priority
+      '-15',  # to encourage cpu time for ssh commands
+      'sysbench',
+      _GetSysbenchTestParameter(),
+      '--tables=%d' % FLAGS.sysbench_tables,
+      (
+          '--table_size=%d' % FLAGS.sysbench_table_size
+          if _IsValidFlag('table_size')
+          else ''
+      ),
+      ('--scale=%d' % FLAGS.sysbench_scale if _IsValidFlag('scale') else ''),
+      '--rand-type=%s' % UNIFORM,
+      '--threads=%d' % sysbench_thread_count,
+      '--percentile=%d' % FLAGS.sysbench_latency_percentile,
+      '--report-interval=%d' % FLAGS.sysbench_report_interval,
+      '--max-requests=0',
+      '--time=%d' % duration,
+  ]
+  run_cmd = ' '.join(run_cmd_tokens + _GetCommonSysbenchOptions(db) + ['run'])
   return run_cmd
 
 
@@ -540,10 +566,9 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
   stdout = ''
   stderr = ''
   if duration > 0:
-    run_cmd = _GetSysbenchCommand(
-        duration,
-        benchmark_spec,
-        sysbench_thread_count)
+    run_cmd = _GetSysbenchRunCommand(
+        duration, benchmark_spec.relational_db, sysbench_thread_count
+    )
     stdout, stderr = vm.RobustRemoteCommand(run_cmd, timeout=duration + 60)
     logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
                  stdout, stderr)
