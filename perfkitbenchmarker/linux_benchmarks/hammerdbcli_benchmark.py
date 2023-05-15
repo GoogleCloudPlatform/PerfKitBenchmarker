@@ -212,7 +212,7 @@ def SetMysqlOptimizedServerConfiguration(
       f'hammerdb_optimized_{optimized_server_config}_')
   config = file_name_prefix + 'mysqld.cnf'
   server_vm.PushFile(
-      data.ResourcePath(posixpath.join('data/relational_db_configs', config)),
+      data.ResourcePath(posixpath.join('relational_db_configs', config)),
       '',
   )
   hammerdb.SearchAndReplaceGuestFile(server_vm, '~/', config,
@@ -259,7 +259,7 @@ def SetPostgresOptimizedServerConfiguration(
   config = (
       f'hammerdb_optimized_{optimized_server_config}_') + 'postgresql.conf'
   server_vm.PushFile(
-      data.ResourcePath(posixpath.join('data/relational_db_configs', config)),
+      data.ResourcePath(posixpath.join('relational_db_configs', config)),
       '',
   )
   hammerdb.SearchAndReplaceGuestFile(server_vm, '~/', config, MAX_CONNECTIONS,
