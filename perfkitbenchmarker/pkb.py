@@ -96,7 +96,6 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import time_triggers
@@ -113,15 +112,13 @@ import six
 from six.moves import zip
 
 # Add additional flags to ./flags.py
-# Keeping these flags here rather than flags.py to avoid circular dependencies.
+# Keeping this flag here rather than flags.py to avoid a circular dependency
+# on benchmark_status.
 _RETRY_SUBSTATUSES = flags.DEFINE_multi_enum(
     'retry_substatuses', benchmark_status.FailedSubstatus.RETRYABLE_SUBSTATUSES,
     benchmark_status.FailedSubstatus.RETRYABLE_SUBSTATUSES,
     'The failure substatuses to retry on. By default, failed runs are run with '
     'the same previous config.')
-flags.DEFINE_enum('spark_service_type', None,
-                  [spark_service.PKB_MANAGED, spark_service.PROVIDER_MANAGED],
-                  'Type of spark service to use')
 
 COMPLETION_STATUS_FILE_NAME = 'completion_statuses.json'
 REQUIRED_INFO = ['scratch_disk', 'num_machines']
