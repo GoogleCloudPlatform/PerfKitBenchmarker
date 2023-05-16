@@ -36,6 +36,7 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import windows_virtual_machine
 
 FLAGS = flags.FLAGS
 
@@ -392,4 +393,11 @@ class Debian10BasedStaticVirtualMachine(StaticVirtualMachine,
 
 class Debian11BasedStaticVirtualMachine(StaticVirtualMachine,
                                         linux_virtual_machine.Debian11Mixin):
+  pass
+
+
+class Windows2019SQLServer2019StandardStaticVirtualMachine(
+    StaticVirtualMachine,
+    windows_virtual_machine.Windows2019SQLServer2019Standard,
+):
   pass
