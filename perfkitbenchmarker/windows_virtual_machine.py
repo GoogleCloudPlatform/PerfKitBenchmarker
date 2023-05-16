@@ -401,7 +401,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     self.home_dir = stdout.strip()
     stdout, _ = self.RemoteCommand('echo $env:SystemDrive')
     self.system_drive = stdout.strip()
-    self.RemoteCommand('mkdir %s' % self.temp_dir)
+    self.RemoteCommand('mkdir %s -Force' % self.temp_dir)
     self.DisableGuestFirewall()
 
   def _Reboot(self):
