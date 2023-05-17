@@ -93,7 +93,7 @@ def PdDriveIsNvme(vm):
   # such as confidential VMs on Milan.
   # this is not robust, but can get refactored when
   # there is more clarity on what groups of VMs are NVMe.
-  if family in ['n2d', 'c2d'] and gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
+  if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
     return True
   return False
 
