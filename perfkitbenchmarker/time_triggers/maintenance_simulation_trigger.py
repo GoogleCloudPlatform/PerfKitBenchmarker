@@ -15,6 +15,7 @@
 
 import collections
 import copy
+import logging
 import statistics
 from typing import Any, List, Dict
 
@@ -114,7 +115,10 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
       for vm in self.vms:
         vm.WaitLMNotificationRelease()
         lm_events_dict = vm.CollectLMNotificationsTime()
-        lm_ends = max(lm_ends, float(lm_events_dict['Host_maintenance_end']))
+        # Host maintenance is in s
+        lm_ends = max(
+            lm_ends, float(lm_events_dict['Host_maintenance_end']) * 1000
+        )
         samples.append(
             sample.Sample(
                 'LM Total Time',
@@ -199,6 +203,9 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     median = statistics.median(base_line_values)
     mean = statistics.mean(base_line_values)
 
+    logging.info('LM Baseline median: %s', median)
+    logging.info('LM Baseline mean: %s', mean)
+
     # Keep the metadata from the original sample except time series metadata
     for field in sample.TIME_SERIES_METADATA:
       if field in metadata:
@@ -213,6 +220,10 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     if values_after_lm_ends:
       mean_after_lm_ends = statistics.mean(values_after_lm_ends)
       samples += self._ComputeDegradation(mean, mean_after_lm_ends, metadata)
+      logging.info('Mean after LM ends: %s', mean_after_lm_ends)
+      logging.info(
+          'Number of samples after LM ends: %s', len(values_after_lm_ends)
+      )
     return samples
 
   def _ComputeLossPercentile(
