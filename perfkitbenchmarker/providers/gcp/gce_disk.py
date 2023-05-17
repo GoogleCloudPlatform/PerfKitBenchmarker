@@ -26,6 +26,7 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -92,7 +93,7 @@ def PdDriveIsNvme(vm):
   # such as confidential VMs on Milan.
   # this is not robust, but can get refactored when
   # there is more clarity on what groups of VMs are NVMe.
-  if family in ['n2d', 'c2d'] and 'confidential' in vm.OS_TYPE:
+  if family in ['n2d', 'c2d'] and gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
     return True
   return False
 
@@ -296,10 +297,7 @@ class GceDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    if self.disk_type == disk.LOCAL and self.interface == NVME:
-      return '/dev/%s' % self.name
-    else:
-      if self.disk_type in GCE_REMOTE_DISK_TYPES and self.interface == NVME:
-        return self.name
-      # by default, returns this name id.
-      return '/dev/disk/by-id/google-%s' % self.name
+    if self.disk_type in GCE_REMOTE_DISK_TYPES and self.interface == NVME:
+      return self.name
+    # by default, returns this name id.
+    return f'/dev/disk/by-id/google-{self.name}'
