@@ -118,6 +118,10 @@ class GceRetryDescribeOperationsError(Exception):
   """
 
 
+class GceWaitUntilRunningTimeoutError(Exception):
+  """Exception that is raised when WaitUntilRunning times out."""
+
+
 class GceServiceUnavailableError(Exception):
   """Error for retrying _Exists when the describe output indicates that 'The service is currently unavailable'."""
 
@@ -1019,6 +1023,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       poll_interval=1,
       log_errors=False,
       retryable_exceptions=(GceRetryDescribeOperationsError,),
+      timeout_exception=GceWaitUntilRunningTimeoutError
   )
   def _WaitUntilRunning(self):
     """Waits until the VM instances create command completes."""

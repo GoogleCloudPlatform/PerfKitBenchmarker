@@ -228,7 +228,7 @@ def GetSshOptions(ssh_key_filename, connect_timeout=None):
 
 def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
           timeout=None, fuzz=FUZZ, log_errors=True,
-          retryable_exceptions=None):
+          retryable_exceptions=None, timeout_exception=None):
   """A function decorator that will retry when exceptions are thrown.
 
   Args:
@@ -248,6 +248,8 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
     retryable_exceptions: A tuple of exceptions that should be retried. By
         default, this is None, which indicates that all exceptions should
         be retried.
+    timeout_exception: Optional exception that can be passed in and raised
+        in the event that the retry timeout is reached.
 
   Returns:
     A function that wraps functions in retry logic. It can be
@@ -276,8 +278,10 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
         except retryable_exceptions as e:
           fuzz_multiplier = 1 - fuzz + random.random() * fuzz
           sleep_time = poll_interval * fuzz_multiplier
-          if ((time.time() + sleep_time) >= deadline or
-              (max_retries >= 0 and tries > max_retries)):
+          timed_out = (time.time() + sleep_time) >= deadline
+          if timeout_exception and timed_out:
+            raise timeout_exception from e
+          elif timed_out or (max_retries >= 0 and tries > max_retries):
             raise
           else:
             if log_errors:
