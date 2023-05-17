@@ -34,6 +34,14 @@ flags.DEFINE_boolean('otel', False, 'Run otel on VMs.')
 flags.DEFINE_integer(
     'otel_interval_secs', 60, 'Interval of the metrics to collect.'
 )
+
+_HIDE_LOGGING = flags.DEFINE_boolean(
+    'otel_hide_logging',
+    True,
+    'Hide logging to console for otel metrics.',
+)
+
+
 flags.DEFINE_string(
     'otel_config_file',
     './otel/config.yaml',
@@ -209,6 +217,8 @@ class _OTELCollector(base_collector.BaseCollector):
                 parsed_metrics[name]['vm_role'] = role
 
       for key, value in parsed_metrics.items():
+        if _HIDE_LOGGING.value:
+          value[sample.DISABLE_CONSOLE_LOG] = True
         samples.append(
             sample.Sample(
                 metric=key, value=-1, unit=value['unit'], metadata=value
