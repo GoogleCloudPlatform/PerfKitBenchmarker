@@ -1092,6 +1092,30 @@ def AggregateMemtierResults(
             additional_metadata=metadata,
         )
     )
+  individual_latencies = collections.defaultdict(list)
+  for metric, latency_at_timestamp in latency_series.items():
+    for client_latency in latency_at_timestamp:
+      for client, latency in enumerate(client_latency):
+        if len(individual_latencies[metric]) <= client:
+          individual_latencies[metric].append([])
+        individual_latencies[metric][client].append(latency)
+
+  for metric, client_latencies in individual_latencies.items():
+    for client, latencies in enumerate(client_latencies):
+      additional_metadata = {}
+      additional_metadata.update(metadata)
+      additional_metadata['client'] = client
+      additional_metadata[sample.DISABLE_CONSOLE_LOG] = True
+      samples.append(
+          sample.CreateTimeSeriesSample(
+              latencies,
+              timestamps[0 : len(latencies)],
+              f'{metric}_time_series',
+              'ms',
+              1,
+              additional_metadata=additional_metadata,
+          )
+      )
   return samples
 
 
