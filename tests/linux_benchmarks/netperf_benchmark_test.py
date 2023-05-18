@@ -20,9 +20,9 @@ from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
 
@@ -165,6 +165,54 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
       netperf_benchmark.ParseNetperfOutput(output, {}, 'fake_benchmark_name',
                                            False)
     self.assertIn('Failed to parse stdout', str(e.exception))
+
+  @flagsaver.flagsaver(netperf_benchmarks=[netperf_benchmark.TCP_STREAM])
+  def testMultiStreams(self):
+    self._ConfigureIpTypes()
+    num_streams = 2
+    FLAGS.netperf_num_streams = flag_util.IntegerList([num_streams])
+    self.should_run_external.return_value = True
+    self.should_run_internal.return_value = False
+    # Read netperf mock results for multiple streams
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '..',
+        'data',
+        'netperf_results_multistreams.json',
+    )
+    with open(path) as fp:
+      stdouts = ['\n'.join(i) for i in json.load(fp)]
+      self.expected_stdout = []
+      for i in range(0, len(stdouts), num_streams):
+        self.expected_stdout.append(
+            json.dumps((stdouts[i : i + num_streams], [''], [0]))
+        )
+
+    vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
+    vm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
+    vm_spec.vms[0].RobustRemoteCommand.side_effect = [
+        (i, '') for i in self.expected_stdout
+    ]
+    vm_spec.vms[1].GetInternalIPs.return_value = ['test_ip']
+    run_result = netperf_benchmark.Run(vm_spec)
+    result = []
+    for sample in run_result:
+      if sample[0] not in ['start_time', 'end_time']:
+        result.append(sample)
+
+    self.assertListEqual(
+        [
+            ('TCP_STREAM_Throughput_p50', 2000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_p90', 2000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_p99', 2000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_average', 1500.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_stddev', 707.1067811865476, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_min', 1000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_max', 2000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_total', 3000.0, 'Mbits/sec'),
+        ],
+        [i[:3] for i in result],
+    )
 
 
 if __name__ == '__main__':
