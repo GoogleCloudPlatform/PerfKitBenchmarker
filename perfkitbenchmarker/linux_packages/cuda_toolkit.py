@@ -70,8 +70,8 @@ FLAGS = flags.FLAGS
 
 CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/{cpu_arch}/cuda-{os}.pin'
 
-CUDA_12_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.1.0/local_installers/cuda-repo-{os}-12-1-local_12.1.0-530.30.02-1_{cpu_arch}.deb'
-CUDA_12_0_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.0.0/local_installers/cuda-repo-{os}-12-0-local_12.0.0-525.60.13-1_{cpu_arch}.deb'
+CUDA_12_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-{os}-12-1-local_12.1.1-530.30.02-1_{cpu_arch}.deb'
+CUDA_12_0_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.0.1/local_installers/cuda-repo-{os}-12-0-local_12.0.1-525.85.12-1_{cpu_arch}.deb'
 CUDA_11_8_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda-repo-{os}-11-8-local_11.8.0-520.61.05-1_{cpu_arch}.deb'
 CUDA_11_7_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.7.1/local_installers/cuda-repo-{os}-11-7-local_11.7.1-515.65.01-1_{cpu_arch}.deb'
 CUDA_11_6_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.6.2/local_installers/cuda-repo-{os}-11-6-local_11.6.2-510.47.03-1_{cpu_arch}.deb'

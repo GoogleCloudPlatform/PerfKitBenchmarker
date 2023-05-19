@@ -20,8 +20,10 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 flags.DEFINE_string(
-    'nccl_version', 'v2.12.12-1', 'NCCL version to install. '
-    'Input "None" to bypass installation.')
+    'nccl_version',
+    'v2.18.1-1',
+    'NCCL version to install. Input "None" to bypass installation.',
+)
 flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin name')
 flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
 flags.DEFINE_string('nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi',
