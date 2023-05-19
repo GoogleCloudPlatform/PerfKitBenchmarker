@@ -46,6 +46,7 @@
 -   Remove flag fio_write_against_multiple_clients from FIO.
 -   Drop windows coremark benchmark.
 -   Remove cudnn linux package.
+-   Make Ubuntu 20 the default os_type.
 
 ### New features:
 

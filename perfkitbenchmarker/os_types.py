@@ -48,7 +48,7 @@ ROCKY_LINUX9_OPTIMIZED = 'rocky_linux9_optimized'
 UBUNTU_CONTAINER = 'ubuntu_container'
 UBUNTU1604 = 'ubuntu1604'  # deprecated
 UBUNTU1604_CUDA9 = 'ubuntu1604_cuda9'
-UBUNTU1804 = 'ubuntu1804'
+UBUNTU1804 = 'ubuntu1804'  # deprecated
 UBUNTU1804_EFA = 'ubuntu1804_efa'
 UBUNTU2004 = 'ubuntu2004'
 UBUNTU2004_EFA = 'ubuntu2004_efa'
@@ -114,7 +114,7 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     UBUNTU_CONTAINER,
     UBUNTU1604,  # deprecated
     UBUNTU1604_CUDA9,
-    UBUNTU1804,
+    UBUNTU1804,  # deprecated
     UBUNTU1804_EFA,
     UBUNTU2004,
     UBUNTU2004_EFA,
@@ -153,6 +153,6 @@ ALL = LINUX_OS_TYPES + WINDOWS_OS_TYPES
 BASE_OS_TYPES = [CLEAR, CORE_OS, DEBIAN, RHEL, WINDOWS]
 
 # May change from time to time.
-DEFAULT = UBUNTU1804
+DEFAULT = UBUNTU2004
 
 flags.DEFINE_enum('os_type', DEFAULT, ALL, 'The VM\'s OS type.')

@@ -206,7 +206,7 @@ RETRYABLE_SSH_RETCODE = 255
 
 
 class CpuVulnerabilities:
-  """The 3 different vulnerablity statuses from vm.cpu_vulernabilities.
+  """The 3 different vulnerability statuses from vm.cpu_vulernabilities.
 
   Example input:
     /sys/devices/system/cpu/vulnerabilities/itlb_multihit:KVM: Vulnerable
@@ -1861,7 +1861,7 @@ class BaseRhelMixin(BaseLinuxMixin):
   """Class holding RHEL/CentOS specific VM methods and attributes."""
 
   # In all RHEL 8+ based distros yum is an alias to dnf.
-  # dnf is backwards compatibile with yum, but has some additional capabilities
+  # dnf is backwards compatible with yum, but has some additional capabilities
   # For CentOS and RHEL 7 we override this to yum and do not pass dnf-only flags
   # The commands are similar enough that forking whole methods seemed necessary.
   # This can be removed when CentOS and RHEL 7 are no longer supported by PKB.
@@ -2387,11 +2387,13 @@ class Ubuntu1604Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
   ALTERNATIVE_OS = os_types.UBUNTU1804
 
 
-class Ubuntu1804Mixin(BaseUbuntuMixin):
+class Ubuntu1804Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
   """Class holding Ubuntu1804 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU1804
   # https://packages.ubuntu.com/bionic/python
   PYTHON_2_PACKAGE = 'python'
+  END_OF_LIFE = '2023-05-31'
+  ALTERNATIVE_OS = os_types.UBUNTU2004
 
   def UpdateEnvironmentPath(self):
     """Add /snap/bin to default search path for Ubuntu1804.

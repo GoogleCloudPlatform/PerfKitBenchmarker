@@ -87,7 +87,7 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
 
     vm_spec = aws_virtual_machine.AwsVmSpec(
         'test_vm_spec.AWS', zone='us-east-1a', machine_type=machine_type)
-    vm = aws_virtual_machine.Ubuntu1804BasedAwsVirtualMachine(vm_spec)
+    vm = aws_virtual_machine.Ubuntu2004BasedAwsVirtualMachine(vm_spec)
     vm.GetNVMEDeviceInfo = mock.Mock()
     vm.GetNVMEDeviceInfo.return_value = [
         {
@@ -134,7 +134,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
 
     vm_spec = azure_virtual_machine.AzureVmSpec(
         'test_vm_spec.AZURE', zone='eastus2', machine_type=machine_type)
-    vm = azure_virtual_machine.Ubuntu1604BasedAzureVirtualMachine(vm_spec)
+    vm = azure_virtual_machine.Ubuntu2004BasedAzureVirtualMachine(vm_spec)
 
     azure_disk.AzureDisk.Create = mock.Mock()
     azure_disk.AzureDisk.Attach = mock.Mock()
