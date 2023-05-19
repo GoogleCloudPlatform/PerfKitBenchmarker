@@ -94,7 +94,8 @@ _FAILED_TO_START_DUE_TO_PREEMPTION = (
     'Instance failed to start due to preemption.'
 )
 _GCE_VM_CREATE_TIMEOUT = 1200
-_GCE_NVIDIA_GPU_PREFIX = 'nvidia-tesla-'
+_GCE_NVIDIA_GPU_PREFIX = 'nvidia-'
+_GCE_NVIDIA_TESLA_GPU_PREFIX = 'nvidia-tesla-'
 _SHUTDOWN_SCRIPT = 'su "{user}" -c "echo | gsutil cp - {preempt_marker}"'
 METADATA_PREEMPT_URI = (
     'http://metadata.google.internal/computeMetadata/v1/instance/preempted'
@@ -423,9 +424,13 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
     String to be used by gcloud to attach accelerators to a VM.
     Must be prepended by the flag '--accelerator'.
   """
-  gce_accelerator_type = (
-      FLAGS.gce_accelerator_type_override
-      or _GCE_NVIDIA_GPU_PREFIX + accelerator_type
+  gce_accelerator_type = FLAGS.gce_accelerator_type_override or (
+      (
+          _GCE_NVIDIA_TESLA_GPU_PREFIX
+          if accelerator_type in virtual_machine.TESLA_GPU_TYPES
+          else _GCE_NVIDIA_GPU_PREFIX
+      )
+      + accelerator_type
   )
   return 'type={0},count={1}'.format(gce_accelerator_type, accelerator_count)
 
