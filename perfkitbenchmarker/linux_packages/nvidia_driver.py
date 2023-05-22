@@ -200,7 +200,7 @@ def GetGpuType(vm):
     return NVIDIA_TESLA_V100
   elif 'T4' in gpu_types[0]:
     return NVIDIA_TESLA_T4
-  elif 'Graphics' in gpu_types[0]:
+  elif 'L4' in gpu_types[0]:
     return NVIDIA_L4
   elif 'A100' in gpu_types[0]:
     return NVIDIA_TESLA_A100
