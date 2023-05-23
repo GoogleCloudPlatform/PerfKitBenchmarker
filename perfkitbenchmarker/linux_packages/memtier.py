@@ -870,6 +870,7 @@ class MemtierResult:
   latency_series: Dict[str, List[int]] = dataclasses.field(default_factory=dict)
 
   runtime_info: Dict[Text, Text] = dataclasses.field(default_factory=dict)
+  metadata: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
   @classmethod
   def Parse(
@@ -934,21 +935,27 @@ class MemtierResult:
         runtime_info=runtime_info,
     )
 
-  def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
+  def GetSamples(
+      self, metadata: Optional[Dict[str, Any]] = None
+  ) -> List[sample.Sample]:
     """Return this result as a list of samples."""
-    metadata['avg_latency'] = self.latency_ms
+    if metadata:
+      self.metadata.update(copy.deepcopy(metadata))
+    self.metadata['avg_latency'] = self.latency_ms
     for key, value in self.latency_dic.items():
-      metadata[f'p{key}_latency'] = value
+      self.metadata[f'p{key}_latency'] = value
     samples = [
-        sample.Sample('Ops Throughput', self.ops_per_sec, 'ops/s', metadata),
-        sample.Sample('KB Throughput', self.kb_per_sec, 'KB/s', metadata),
-        sample.Sample('Latency', self.latency_ms, 'ms', metadata),
+        sample.Sample(
+            'Ops Throughput', self.ops_per_sec, 'ops/s', self.metadata
+        ),
+        sample.Sample('KB Throughput', self.kb_per_sec, 'KB/s', self.metadata),
+        sample.Sample('Latency', self.latency_ms, 'ms', self.metadata),
     ]
     for name, histogram in [
         ('get', self.get_latency_histogram),
         ('set', self.set_latency_histogram),
     ]:
-      hist_meta = copy.deepcopy(metadata)
+      hist_meta = copy.deepcopy(self.metadata)
       hist_meta.update({'histogram': json.dumps(histogram)})
       samples.append(
           sample.Sample(f'{name} latency histogram', 0, '', hist_meta)
