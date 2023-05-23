@@ -119,7 +119,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db = FakeRelationalDb(self.postgres_spec)
     db.endpoint = '1.1.1.1'
     db.port = db.GetDefaultPort()
-    db.client_vm = CreateTestLinuxVm()
+    db.SetVms({'default': [CreateTestLinuxVm()]})
     db.server_vm = CreateTestLinuxVm()
     self.assertEqual(
         db.client_vm_query_tools.MakeSqlCommand(
@@ -132,7 +132,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db = FakeRelationalDb(self.postgres_spec)
     db.endpoint = '1.1.1.1'
     db.port = db.GetDefaultPort()
-    db.client_vm = CreateTestLinuxVm()
+    db.SetVms({'default': [CreateTestLinuxVm()]})
     db.server_vm = CreateTestLinuxVm()
     with mock.patch.object(db.client_vm, 'RemoteCommand') as remote_command:
       db.client_vm_query_tools.IssueSqlCommand('Select 1', database_name='abc')
@@ -152,7 +152,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db = FakeRelationalDb(self.postgres_spec)
     db.endpoint = '1.1.1.1'
     db.port = db.GetDefaultPort()
-    db.client_vm = CreateTestLinuxVm()
+    db.SetVms({'default': [CreateTestLinuxVm()]})
     db.server_vm = CreateTestLinuxVm()
     with mock.patch.object(db.client_vm, 'RemoteCommand') as remote_command:
       db.client_vm_query_tools.IssueSqlCommand(
@@ -174,7 +174,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testMakePostgresServerCommand(self):
     FLAGS['use_managed_db'].parse(False)
     db = FakeRelationalDb(self.postgres_spec)
-    db.client_vm = CreateTestLinuxVm()
+    db.SetVms({'default': [CreateTestLinuxVm()]})
     db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
     db.port = db.GetDefaultPort()
@@ -187,7 +187,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testMakeMysqlCientCommand(self):
     FLAGS['use_managed_db'].parse(False)
     db = FakeRelationalDb(self.mysql_spec)
-    db.client_vm = CreateTestLinuxVm()
+    db.SetVms({'default': [CreateTestLinuxVm()]})
     db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
     db.port = db.GetDefaultPort()
@@ -199,7 +199,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testMakeMysqlCommandWithLocalHost(self):
     FLAGS['use_managed_db'].parse(False)
     db = FakeRelationalDb(self.mysql_spec)
-    db.client_vm = CreateTestLinuxVm()
+    db.SetVms({'default': [CreateTestLinuxVm()]})
     db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
     db.port = db.GetDefaultPort()
@@ -211,7 +211,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testMakeSqlserverCommand(self):
     FLAGS['use_managed_db'].parse(False)
     db = FakeRelationalDb(self.sqlserver_spec)
-    db.client_vm = CreateTestLinuxVm()
+    db.SetVms({'default': [CreateTestLinuxVm()]})
     db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
     db.port = db.GetDefaultPort()
@@ -223,7 +223,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testMakeSqlserverCommandWithLocalHost(self):
     FLAGS['use_managed_db'].parse(False)
     db = FakeRelationalDb(self.sqlserver_spec)
-    db.client_vm = CreateTestLinuxVm()
+    db.SetVms({'default': [CreateTestLinuxVm()]})
     db.server_vm = CreateTestLinuxVm()
     db.endpoint = '1.1.1.1'
     db.port = db.GetDefaultPort()
@@ -238,7 +238,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db = FakeRelationalDb(self.mysql_spec)
     db.endpoint = '1.1.1.1'
     db.port = db.GetDefaultPort()
-    db.client_vm = CreateTestLinuxVm()
+    db.SetVms({'default': [CreateTestLinuxVm()]})
     db.server_vm = CreateTestLinuxVm()
     db.server_vm.IS_REBOOTABLE = False
     db.client_vm.IS_REBOOTABLE = False

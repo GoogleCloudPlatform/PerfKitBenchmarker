@@ -30,6 +30,7 @@ from absl import flags
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import query
 import numpy as np
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
@@ -468,15 +469,23 @@ class PostgresGcpSpannerInstance(GcpSpannerInstance):
 
   def _PostCreate(self):
     super()._PostCreate()
-    self.client_vm_query_tools.InstallPackages()
+    # TODO(user) move to superclass.
+    background_tasks.RunThreaded(
+        lambda client_query_tools: client_query_tools.InstallPackages(),
+        self.client_vms_query_tools,
+    )
 
-  @property
-  def client_vm_query_tools(self):
-    if not hasattr(self, '_client_vm_query_tools'):
-      connection_properties = sql_engine_utils.DbConnectionProperties(
-          self.spec.engine, self.spec.engine_version, self.endpoint, self.port,
-          self.spec.database_username, self.spec.database_password,
-          self.instance_id, self.database, self.project)
-      self._client_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
-          self.client_vm, connection_properties)
-    return self._client_vm_query_tools
+  def _GetDbConnectionProperties(
+      self,
+  ) -> sql_engine_utils.DbConnectionProperties:
+    return sql_engine_utils.DbConnectionProperties(
+        self.spec.engine,
+        self.spec.engine_version,
+        self.endpoint,
+        self.port,
+        self.spec.database_username,
+        self.spec.database_password,
+        self.instance_id,
+        self.database,
+        self.project,
+    )

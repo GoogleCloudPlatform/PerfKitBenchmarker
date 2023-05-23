@@ -27,6 +27,7 @@ import time
 from typing import List
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
@@ -329,7 +330,10 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   # Some databases install these query tools during _PostCreate, which is
   # skipped if the database is user managed / restored.
   if db.user_managed or db.restored:
-    db.client_vm_query_tools.InstallPackages()
+    background_tasks.RunThreaded(
+        lambda client_query_tools: client_query_tools.InstallPackages,
+        db.client_vms_query_tools,
+    )
 
   if _SKIP_LOAD_STAGE.value or db.restored:
     logging.info('Skipping the load stage')

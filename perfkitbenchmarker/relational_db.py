@@ -230,19 +230,39 @@ class BaseRelationalDb(resource.BaseResource):
       raise RelationalDbPropertyNotSetError('client_vm is not set')
     return self._client_vm
 
+  # TODO(user): add support for multiple client VMs
   @client_vm.setter
   def client_vm(self, client_vm):
     self._client_vm = client_vm
 
+  def _GetDbConnectionProperties(
+      self,
+  ) -> sql_engine_utils.DbConnectionProperties:
+    return sql_engine_utils.DbConnectionProperties(
+        self.spec.engine,
+        self.spec.engine_version,
+        self.endpoint,
+        self.port,
+        self.spec.database_username,
+        self.spec.database_password,
+    )
+
+  # TODO(user): Deprecate in favor of client_vms_query_tools
   @property
   def client_vm_query_tools(self):
     if not hasattr(self, '_client_vm_query_tools'):
-      connection_properties = sql_engine_utils.DbConnectionProperties(
-          self.spec.engine, self.spec.engine_version, self.endpoint, self.port,
-          self.spec.database_username, self.spec.database_password)
-      self._client_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
-          self.client_vm, connection_properties)
+      self._client_vm_query_tools = self.client_vms_query_tools[0]
     return self._client_vm_query_tools
+
+  @property
+  def client_vms_query_tools(self) -> list[sql_engine_utils.ISQLQueryTools]:
+    if not hasattr(self, '_client_vms_query_tools'):
+      connection_properties = self._GetDbConnectionProperties()
+      self._client_vms_query_tools = [
+          sql_engine_utils.GetQueryToolsByEngine(vm, connection_properties)
+          for vm in self.client_vms
+      ]
+    return self._client_vms_query_tools
 
   @property
   def client_vm_query_tools_for_replica(self):
@@ -258,8 +278,11 @@ class BaseRelationalDb(resource.BaseResource):
     return self._client_vm_query_tools_for_replica
 
   def SetVms(self, vm_groups):
-    self.client_vm = vm_groups['clients' if 'clients' in
-                               vm_groups else 'default'][0]
+    self.client_vms = vm_groups[
+        'clients' if 'clients' in vm_groups else 'default'
+    ]
+    # TODO(user): Remove this after moving to multiple client VMs.
+    self.client_vm = self.client_vms[0]
 
   @property
   def endpoint(self):
