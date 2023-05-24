@@ -324,6 +324,8 @@ def _ParseSeconds(formatted_time: str) -> float:
       secs += float(part[0 : len(part) - 3]) * 60
     elif part.endswith('ms'):
       secs += float(part[0 : len(part) - 2]) / 1000
+    elif part.endswith('us'):
+      secs += float(part[0 : len(part) - 2]) / 1000 / 1000
     elif part.endswith('s'):
       secs += float(part[0 : len(part) - 1])
     else:

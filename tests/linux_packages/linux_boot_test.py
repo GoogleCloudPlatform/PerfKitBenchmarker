@@ -124,9 +124,9 @@ class LinuxBootTest(pkb_common_test_case.PkbCommonTestCase,
     with open(os.path.join(self.data_dir, 'systemd2.output')) as f:
       output = f.read()
       self.assertEqual(linux_boot.ParseSystemDCriticalChainOutput(output),
-                       0.774)
+                       0.671103)
       self.assertEqual(linux_boot.ParseSystemDCriticalChainServiceTime(output),
-                       0.103)
+                       0.000103)
 
   def testCollectVmToVmSamples(self):
     """Test vm to vm networking result parsing."""
