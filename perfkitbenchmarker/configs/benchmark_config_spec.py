@@ -190,6 +190,14 @@ class _DpbServiceSpec(spec.BaseSpec):
             'default': None,
             'none_ok': True
         }),
+        'dataproc_serverless_memory': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
+        'dataproc_serverless_memory_overhead': (option_decoders.IntDecoder, {
+            'default': None,
+            'none_ok': True
+        }),
         'emr_serverless_executor_count': (option_decoders.IntDecoder, {
             'default': None,
             'none_ok': True
