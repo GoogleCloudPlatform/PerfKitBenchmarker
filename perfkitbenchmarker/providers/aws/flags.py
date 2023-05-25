@@ -61,14 +61,6 @@ ELASTICACHE_NODE_TYPE = flags.DEFINE_string(
     'cache.m4.large',
     'The AWS cache node type to use for elasticache clusters.',
 )
-flags.DEFINE_integer(
-    'elasticache_node_count',
-    1,
-    (
-        'Number of cache nodes (shards) to use. Only used if '
-        'managed_memory_store_cluster is True.'
-    ),
-)
 flags.DEFINE_string(
     'elasticache_failover_zone', None, 'AWS elasticache failover zone'
 )

@@ -71,6 +71,14 @@ _MANAGED_MEMORY_STORE_CLUSTER = flags.DEFINE_bool(
     False,
     'If True, provisions a cluster instead of a standalone instance.',
 )
+_NODE_COUNT = flags.DEFINE_integer(
+    'managed_memory_store_node_count',
+    1,
+    (
+        'Number of cache nodes (shards) to use. Only used if '
+        'managed_memory_store_cluster is True.'
+    ),
+)
 flags.DEFINE_string(
     'cloud_redis_region',
     'us-central1',
@@ -143,8 +151,10 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self._port: int = None
     self._password: str = None
     self._clustered: bool = _MANAGED_MEMORY_STORE_CLUSTER.value
+    self.node_count = _NODE_COUNT.value if self._clustered else 1
 
     self.metadata['clustered'] = self._clustered
+    self.metadata['node_count'] = self.node_count
 
   def GetMemoryStoreIp(self) -> str:
     """Returns the Ip address of the managed memory store."""
