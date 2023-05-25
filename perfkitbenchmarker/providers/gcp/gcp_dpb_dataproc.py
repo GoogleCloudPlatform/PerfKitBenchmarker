@@ -425,6 +425,7 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
     super().__init__(dpb_service_spec)
     self._job_counter = 0
     self.batch_name = f'{self.cluster_id}-{self._job_counter}'
+    self.dpb_hdfs_type = 'HDD'
 
   def SubmitJob(self,
                 jarfile=None,
@@ -548,11 +549,22 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
       result['spark.dynamicAllocation.maxExecutors'] = (
           self.spec.dataproc_serverless_max_executors)
     if self.spec.worker_group.disk_spec.disk_size:
-      result['spark.dataproc.driver.disk_size'] = (
+      result['spark.dataproc.driver.disk.size'] = (
           f'{self.spec.worker_group.disk_spec.disk_size}g'
       )
-      result['spark.dataproc.executor.disk_size'] = (
+      result['spark.dataproc.executor.disk.size'] = (
           f'{self.spec.worker_group.disk_spec.disk_size}g'
+      )
+    if self.spec.dataproc_serverless_memory:
+      result['spark.driver.memory'] = f'{self.spec.dataproc_serverless_memory}m'
+      result['spark.executor.memory'] = (
+          f'{self.spec.dataproc_serverless_memory}m')
+    if self.spec.dataproc_serverless_memory_overhead:
+      result['spark.driver.memoryOverhead'] = (
+          f'{self.spec.dataproc_serverless_memory_overhead}m'
+      )
+      result['spark.executor.memoryOverhead'] = (
+          f'{self.spec.dataproc_serverless_memory_overhead}m'
       )
     result.update(super().GetJobProperties())
     return result
@@ -585,7 +597,11 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
         'dpb_cluster_max_executors': max_executors,
         'dpb_cluster_initial_executors': initial_executors,
         'dpb_cores_per_node': self.spec.dataproc_serverless_core_count,
-        'dpb_hdfs_type': 'default-disk',
+        'dpb_memory_per_node':
+            self.spec.dataproc_serverless_memory or 'default',
+        'dpb_memory_overhead_per_node':
+            self.spec.dataproc_serverless_memory_overhead or 'default',
+        'dpb_hdfs_type': basic_data['dpb_hdfs_type'],
         'dpb_disk_size': basic_data['dpb_disk_size'],
         'dpb_service_zone': basic_data['dpb_service_zone'],
         'dpb_job_properties': basic_data['dpb_job_properties'],
