@@ -47,9 +47,14 @@ GET               2       100.00
 
 METADATA = {
     'test': 'foobar',
+    'p50_latency': 1.215,
     'p90_latency': 2.295,
     'p95_latency': 2.319,
     'p99_latency': 2.399,
+    'p99.5_latency': 3.871,
+    'p99.9_latency': 3.872,
+    'p99.950_latency': 3.873,
+    'p99.990_latency': 3.874,
     'avg_latency': 1.54,
 }
 
