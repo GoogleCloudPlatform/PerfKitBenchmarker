@@ -125,6 +125,14 @@ class GkeCluster(container_service.KubernetesCluster):
       os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER'] = (
           gcp_flags.GKE_API_OVERRIDE.value)
 
+    self.enable_nccl_fast_socket = False
+    if gcp_flags.GKE_NCCL_FAST_SOCKET.value:
+      if self.nodepools:
+        self.enable_nccl_fast_socket = True
+      else:
+        raise errors.Config.InvalidValue(
+            'NCCL fast socket is only supported on secondary node pools.')
+
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
 
@@ -143,6 +151,7 @@ class GkeCluster(container_service.KubernetesCluster):
       # TODO(pclay): support NVME when it leaves alpha
       # Also consider moving FLAGS.gce_ssd_interface into the vm_spec.
       result['gce_local_ssd_interface'] = gce_virtual_machine.SCSI
+    result['gke_nccl_fast_socket'] = self.enable_nccl_fast_socket
     return result
 
   def _GcloudCommand(self, *args, **kwargs):
@@ -230,10 +239,10 @@ class GkeCluster(container_service.KubernetesCluster):
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if vm_config.gpu_count:
-      cmd.flags['accelerator'] = (
-          gce_virtual_machine.GenerateAcceleratorSpecString(
-              vm_config.gpu_type,
-              vm_config.gpu_count))
+      if 'a2-' not in vm_config.machine_type:
+        cmd.flags['accelerator'] = (
+            gce_virtual_machine.GenerateAcceleratorSpecString(
+                vm_config.gpu_type, vm_config.gpu_count))
     if vm_config.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = vm_config.min_cpu_platform
 
@@ -268,6 +277,11 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.args.append('--enable-gvnic')
     else:
       cmd.args.append('--no-enable-gvnic')
+    if (
+        self.enable_nccl_fast_socket
+        and name != container_service.DEFAULT_NODEPOOL
+    ):
+      cmd.args.append('--enable-fast-socket')
 
     if FLAGS.gke_node_system_config is not None:
       cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
@@ -290,7 +304,10 @@ class GkeCluster(container_service.KubernetesCluster):
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
 
-    if self.vm_config.gpu_count:
+    should_install_nvidia_drivers = (
+        self.vm_config.gpu_count or
+        any(pool.vm_config.gpu_count for pool in self.nodepools.values()))
+    if should_install_nvidia_drivers:
       kubernetes_helper.CreateFromFile(NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
       kubernetes_helper.CreateFromFile(
           data.ResourcePath(NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET))

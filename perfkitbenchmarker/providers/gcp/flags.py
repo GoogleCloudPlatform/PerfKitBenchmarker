@@ -133,7 +133,11 @@ flags.DEFINE_list('gce_tags', None, 'List of --tags when creating a VM')
 flags.DEFINE_boolean('gke_enable_alpha', False,
                      'Whether to enable alpha kubernetes clusters.')
 flags.DEFINE_boolean('gke_enable_gvnic', True,
-                     'Whether to use google vitrual interface on GKE nodes.')
+                     'Whether to use google virtual network interface on GKE '
+                     'nodes.')
+GKE_NCCL_FAST_SOCKET = flags.DEFINE_boolean(
+    'gke_enable_nccl_fast_socket', False,
+    'Whether to enable NCCL fast socket on GKE.')
 flags.DEFINE_string('gcp_dataproc_subnet', None,
                     'Specifies the subnet that the cluster will be part of.')
 flags.DEFINE_multi_string('gcp_dataproc_property', [],
