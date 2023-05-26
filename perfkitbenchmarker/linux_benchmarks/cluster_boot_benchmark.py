@@ -368,6 +368,10 @@ def MeasureDelete(
     List of Samples containing the delete times and an overall cluster delete
     time.
   """
+  # Only measure VMs that have a delete time.
+  vms = [vm for vm in vms if vm.delete_start_time and vm.delete_end_time]
+  if not vms:
+    return []
   # Collect a delete time from each VM.
   delete_times = [vm.delete_end_time - vm.delete_start_time for vm in vms]
   # Get the cluster delete time.
