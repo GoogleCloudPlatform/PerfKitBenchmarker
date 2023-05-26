@@ -118,7 +118,9 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
             ('TCP_CRR_Latency_max', 2500.0, 'us'),
             ('TCP_CRR_Latency_stddev', 551.07, 'us'),
             ('TCP_STREAM_Throughput', 1187.94, mbps),
+            ('TCP_STREAM_Throughput_1stream', 1187.94, mbps),
             ('TCP_STREAM_Throughput', 1973.37, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_1stream', 1973.37, 'Mbits/sec'),
             ('UDP_RR_Transaction_Rate', 1359.71, tps),
             ('UDP_RR_Latency_p50', 700.0, 'us'),
             ('UDP_RR_Latency_p90', 757.0, 'us'),
@@ -136,14 +138,17 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
             ('UDP_STREAM_Throughput', 1102.42, mbps),
             ('UDP_STREAM_Throughput', 1802.72, 'Mbits/sec'),
         ],
-        [i[:3] for i in result])
+        [i[:3] for i in result],
+    )
 
     external_meta = {'ip_type': 'external'}
     internal_meta = {'ip_type': 'internal'}
-    expected_meta = (([external_meta] * 7 + [internal_meta] * 7) * 2 +
-                     [external_meta, internal_meta] +
-                     [external_meta] * 7 +
-                     [internal_meta] * 7)
+    expected_meta = (
+        ([external_meta] * 7 + [internal_meta] * 7) * 2
+        + [external_meta, external_meta, internal_meta, internal_meta]
+        + [external_meta] * 7
+        + [internal_meta] * 7
+    )
 
     for i, meta in enumerate(expected_meta):
       self.assertIsInstance(result[i][3], dict)
@@ -169,7 +174,7 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
   @flagsaver.flagsaver(netperf_benchmarks=[netperf_benchmark.TCP_STREAM])
   def testMultiStreams(self):
     self._ConfigureIpTypes()
-    num_streams = 2
+    num_streams = 4
     FLAGS.netperf_num_streams = flag_util.IntegerList([num_streams])
     self.should_run_external.return_value = True
     self.should_run_internal.return_value = False
@@ -202,14 +207,15 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
 
     self.assertListEqual(
         [
-            ('TCP_STREAM_Throughput_p50', 2000.0, 'Mbits/sec'),
-            ('TCP_STREAM_Throughput_p90', 2000.0, 'Mbits/sec'),
-            ('TCP_STREAM_Throughput_p99', 2000.0, 'Mbits/sec'),
-            ('TCP_STREAM_Throughput_average', 1500.0, 'Mbits/sec'),
-            ('TCP_STREAM_Throughput_stddev', 707.1067811865476, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_p50', 3000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_p90', 4000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_p99', 4000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_average', 2500.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_stddev', 1290.9944487358057, 'Mbits/sec'),
             ('TCP_STREAM_Throughput_min', 1000.0, 'Mbits/sec'),
-            ('TCP_STREAM_Throughput_max', 2000.0, 'Mbits/sec'),
-            ('TCP_STREAM_Throughput_total', 3000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_max', 4000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_total', 10000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_4streams', 10000.0, 'Mbits/sec'),
         ],
         [i[:3] for i in result],
     )

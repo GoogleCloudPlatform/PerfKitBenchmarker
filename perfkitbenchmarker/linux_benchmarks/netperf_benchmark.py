@@ -503,7 +503,18 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams):
   if len(parsed_output) == 1:
     # Only 1 netperf thread
     throughput_sample, latency_samples, histogram = parsed_output[0]
-    return samples + [throughput_sample] + latency_samples
+    output_samples = samples + [throughput_sample] + latency_samples
+    # Create formatted output for TCP stream throughput metrics
+    if benchmark_name.upper() == 'TCP_STREAM':
+      output_samples.append(
+          sample.Sample(
+              throughput_sample.metric + '_1stream',
+              throughput_sample.value,
+              throughput_sample.unit,
+              throughput_sample.metadata,
+          )
+      )
+    return output_samples
   else:
     # Multiple netperf threads
     # Unzip parsed output
@@ -527,6 +538,17 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams):
       samples.append(
           sample.Sample(f'{benchmark_name}_Throughput_{stat}', float(value),
                         throughput_unit, metadata))
+    # Create formatted output, following {benchmark_name}_Throughput_Xstream(s)
+    # for TCP stream throughput metrics
+    if benchmark_name.upper() == 'TCP_STREAM':
+      samples.append(
+          sample.Sample(
+              f'{benchmark_name}_Throughput_{len(parsed_output)}streams',
+              throughput_stats['total'],
+              throughput_unit,
+              metadata,
+          )
+      )
     if enable_latency_histograms:
       # Combine all of the latency histogram dictionaries
       latency_histogram = collections.Counter()
