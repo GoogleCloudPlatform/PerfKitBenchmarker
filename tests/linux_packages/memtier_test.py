@@ -43,6 +43,7 @@ SET               9       100.00
 ---
 GET               0         50.0
 GET               2       100.00
+GET
 """
 
 METADATA = {

@@ -1300,7 +1300,11 @@ def _ParseLine(
   if not re.match(pattern, line):
     return last_total
 
-  _, msec, percent = line.split()
+  # Skip cases where we have an incomplete line (not enough values to unpack).
+  try:
+    _, msec, percent = line.split()
+  except ValueError:
+    return last_total
   counts = _ConvertPercentToAbsolute(approx_total, float(percent))
   bucket_counts = int(round(counts - last_total))
   if bucket_counts > 0:
