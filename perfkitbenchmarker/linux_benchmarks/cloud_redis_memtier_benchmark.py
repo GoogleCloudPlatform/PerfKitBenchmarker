@@ -109,6 +109,7 @@ def Run(benchmark_spec):
   elif memtier.MEMTIER_LATENCY_CAPPED_THROUGHPUT.value:
     samples = memtier.MeasureLatencyCappedThroughput(
         memtier_vms[0],
+        benchmark_spec.cloud_redis_instance.node_count,
         benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
         benchmark_spec.cloud_redis_instance.GetMemoryStorePort(),
         benchmark_spec.cloud_redis_instance.GetMemoryStorePassword(),

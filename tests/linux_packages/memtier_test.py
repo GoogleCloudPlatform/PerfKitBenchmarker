@@ -1445,45 +1445,45 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
     samples.extend(results.GetSamples(METADATA))
     self.assertSampleListsEqualUpToTimestamp(samples, expected_result)
 
+  @flagsaver.flagsaver(num_cpus_override=16)
   def testMeasureLatencyCappedThroughput(self):
     mock_run_results = [
         # Multi-pipeline
-        GetMemtierResult(7270, 0.175),
-        GetMemtierResult(386941, 6.751),
-        GetMemtierResult(424626, 3.247),
-        GetMemtierResult(408957, 1.591),
-        GetMemtierResult(398920, 0.839),
-        GetMemtierResult(408290, 1.207),
-        GetMemtierResult(405672, 1.015),
-        GetMemtierResult(408808, 0.951),
-        GetMemtierResult(405209, 0.967),
-        GetMemtierResult(398249, 1.015),
-        GetMemtierResult(409221, 0.967),
-        GetMemtierResult(413240, 0.975),
-        GetMemtierResult(412573, 0.975),
+        GetMemtierResult(10, 10.0),
+        GetMemtierResult(20, 5.0),
+        GetMemtierResult(30, 2.0),
+        GetMemtierResult(8, 1.5),
+        GetMemtierResult(9, 0.7),
+        GetMemtierResult(3, 1.4),
+        GetMemtierResult(2, 0.8),
+        GetMemtierResult(4, 1.3),
+        GetMemtierResult(15, 0.9),
+        GetMemtierResult(7, 1.2),
+        GetMemtierResult(10, 0.9),
+        GetMemtierResult(1, 1.1),
+        GetMemtierResult(9, 0.9),
+        GetMemtierResult(30, 1.2),
         # Multi-client
-        GetMemtierResult(7433, 0.159),
-        GetMemtierResult(218505, 2.975),
-        GetMemtierResult(79875, 4.447),
-        GetMemtierResult(323469, 0.519),
-        GetMemtierResult(321503, 0.743),
-        GetMemtierResult(324469, 0.855),
-        GetMemtierResult(308853, 1.007),
-        GetMemtierResult(322717, 0.903),
-        GetMemtierResult(321258, 0.919),
-        GetMemtierResult(323695, 0.927),
-        GetMemtierResult(310044, 0.983),
+        GetMemtierResult(10, 10.0),
+        GetMemtierResult(20, 5.0),
+        GetMemtierResult(30, 2.0),
+        GetMemtierResult(8, 1.5),
+        GetMemtierResult(9, 0.7),
+        GetMemtierResult(3, 1.4),
     ]
     self.enter_context(
         mock.patch.object(memtier, '_Run', side_effect=mock_run_results))
 
-    results = memtier.MeasureLatencyCappedThroughput(None, 'unused', 0)
+    mock_vm = pkb_common_test_case.TestLinuxVirtualMachine(
+        pkb_common_test_case.CreateTestVmSpec()
+    )
+    results = memtier.MeasureLatencyCappedThroughput(mock_vm, 1, 'unused', 0)
 
     actual_throughputs = []
     for s in results:
       if s.metric == 'Ops Throughput':
         actual_throughputs.append(s.value)
-    self.assertEqual(actual_throughputs, [413240, 324469])
+    self.assertEqual(actual_throughputs, [15.0, 9.0])
 
 
 if __name__ == '__main__':

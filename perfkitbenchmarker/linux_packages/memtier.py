@@ -13,11 +13,11 @@
 # limitations under the License.
 """Module containing memtier installation, utilization and cleanup functions."""
 
+import abc
 import collections
 import copy
 import dataclasses
 import json
-import logging
 import math
 import os
 import pathlib
@@ -27,11 +27,13 @@ import time
 from typing import Any, Dict, List, Optional, Text, Tuple, Union
 
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
@@ -55,9 +57,7 @@ JSON_OUT_FILE = 'json_data'
 # upper limit to pipelines when binary searching for latency-capped throughput.
 # arbitrarily chosen for large latency.
 MAX_PIPELINES_COUNT = 5000
-# upper limit to clients when binary searching for latency-capped throughput
-# arbitrarily chosen for large latency.
-MAX_CLIENTS_COUNT = 1000
+MAX_CLIENTS_COUNT = 30
 
 MemtierHistogram = List[Dict[str, Union[float, int]]]
 
@@ -455,6 +455,7 @@ def RunOverAllThreadsPipelinesAndClients(
 @dataclasses.dataclass(frozen=True)
 class MemtierBinarySearchParameters:
   """Parameters to aid binary search of memtier."""
+
   lower_bound: float = 0
   upper_bound: float = math.inf
   pipelines: int = 1
@@ -462,19 +463,105 @@ class MemtierBinarySearchParameters:
   clients: int = 1
 
 
-def MeasureLatencyCappedThroughput(
+class _LoadModifier(abc.ABC):
+  """Base class for load modification in binary search."""
+
+  @abc.abstractmethod
+  def GetInitialParameters(self) -> MemtierBinarySearchParameters:
+    """Returns the initial parameters used in the binary search."""
+
+  @abc.abstractmethod
+  def ModifyLoad(
+      self, parameters: MemtierBinarySearchParameters, latency: float
+  ) -> MemtierBinarySearchParameters:
+    """Returns new search parameters."""
+
+
+class _PipelineModifier(_LoadModifier):
+  """Modifies pipelines in single-client binary search."""
+
+  def GetInitialParameters(self) -> MemtierBinarySearchParameters:
+    return MemtierBinarySearchParameters(
+        upper_bound=MAX_PIPELINES_COUNT, pipelines=MAX_PIPELINES_COUNT // 2
+    )
+
+  def ModifyLoad(
+      self, parameters: MemtierBinarySearchParameters, latency: float
+  ) -> MemtierBinarySearchParameters:
+    if latency <= MEMTIER_LATENCY_CAP.value:
+      lower_bound = parameters.pipelines
+      upper_bound = min(parameters.upper_bound, MAX_PIPELINES_COUNT)
+    else:
+      lower_bound = parameters.lower_bound
+      upper_bound = parameters.pipelines
+
+    pipelines = lower_bound + math.ceil((upper_bound - lower_bound) / 2)
+    return MemtierBinarySearchParameters(
+        lower_bound=lower_bound,
+        upper_bound=upper_bound,
+        pipelines=pipelines,
+        threads=1,
+        clients=1,
+    )
+
+
+def _FindFactor(number: int, max_threads: int, max_clients: int) -> int:
+  """Find a factor of the given number (or close to it if it's prime)."""
+  for i in reversed(range(1, max_threads + 1)):
+    if number % i == 0 and number // i <= max_clients:
+      return i
+  return _FindFactor(number - 1, max_threads, max_clients)
+
+
+@dataclasses.dataclass
+class _ClientModifier(_LoadModifier):
+  """Modifies clines in single-pipeline binary search."""
+
+  max_clients: int
+  max_threads: int
+
+  def GetInitialParameters(self) -> MemtierBinarySearchParameters:
+    return MemtierBinarySearchParameters(
+        upper_bound=self.max_clients * self.max_threads,
+        threads=max(self.max_threads // 2, 1),
+        clients=self.max_clients,
+    )
+
+  def ModifyLoad(
+      self, parameters: MemtierBinarySearchParameters, latency: float
+  ) -> MemtierBinarySearchParameters:
+    if latency <= MEMTIER_LATENCY_CAP.value:
+      lower_bound = parameters.clients * parameters.threads + 1
+      upper_bound = min(
+          parameters.upper_bound, self.max_clients * self.max_threads
+      )
+    else:
+      lower_bound = parameters.lower_bound
+      upper_bound = parameters.clients * parameters.threads - 1
+
+    total_clients = lower_bound + math.ceil((upper_bound - lower_bound) / 2)
+    threads = _FindFactor(total_clients, self.max_threads, self.max_clients)
+    clients = total_clients // threads
+    return MemtierBinarySearchParameters(
+        lower_bound=lower_bound,
+        upper_bound=upper_bound,
+        pipelines=1,
+        threads=threads,
+        clients=clients,
+    )
+
+
+def _BinarySearchForLatencyCappedThroughput(
     client_vm,
+    load_modifiers: list[_LoadModifier],
     server_ip: str,
     server_port: int,
     password: Optional[str] = None,
-) -> List[sample.Sample]:
+) -> list['MemtierResult']:
   """Runs memtier to find the maximum throughput under a latency cap."""
-  samples = []
-
-  for modify_load_func in [_ModifyPipelines, _ModifyClients]:
-    parameters = MemtierBinarySearchParameters(
-        lower_bound=0, upper_bound=math.inf, pipelines=1, threads=1, clients=1
-    )
+  results = []
+  for modifier in load_modifiers:
+    parameters = modifier.GetInitialParameters()
     current_max_result = MemtierResult(
         latency_dic={
             '50': 0,
@@ -499,84 +586,60 @@ def MeasureLatencyCappedThroughput(
       )
       logging.info(
           (
-              'Binary search for latency capped throughput.\n'
-              '\tMemtier ops throughput: %s'
-              '\tmemtier 95th percentile latency: %s'
-              '\tlower bound: %s'
-              '\tupper bound: %s'
+              'Binary search for latency capped throughput.'
+              '\nMemtier ops throughput: %s qps'
+              '\nmemtier 95th percentile latency: %s ms'
+              '\n%s'
           ),
           result.ops_per_sec,
           result.latency_dic['95'],
-          parameters.lower_bound,
-          parameters.upper_bound,
+          parameters,
       )
       if (
           result.ops_per_sec > current_max_result.ops_per_sec
           and result.latency_dic['95'] <= MEMTIER_LATENCY_CAP.value
       ):
         current_max_result = result
-        current_metadata = GetMetadata(
-            clients=parameters.clients,
-            threads=parameters.threads,
-            pipeline=parameters.pipelines,
+        current_max_result.parameters = parameters
+        current_max_result.metadata.update(
+            GetMetadata(
+                clients=parameters.clients,
+                threads=parameters.threads,
+                pipeline=parameters.pipelines,
+            )
         )
       # 95 percentile used to decide latency cap
-      parameters = modify_load_func(parameters, result.latency_dic['95'])
-    samples.extend(current_max_result.GetSamples(current_metadata))
+      parameters = modifier.ModifyLoad(parameters, result.latency_dic['95'])
+    results.append(current_max_result)
+    logging.info(
+        'Found optimal parameters %s for throughput %s and p95 latency %s',
+        current_max_result.parameters,
+        current_max_result.ops_per_sec,
+        current_max_result.latency_dic['95'],
+    )
+  return results
+
+
+def MeasureLatencyCappedThroughput(
+    client_vm: virtual_machine.VirtualMachine,
+    server_shard_count: int,
+    server_ip: str,
+    server_port: int,
+    password: Optional[str] = None,
+) -> List[sample.Sample]:
+  """Runs memtier to find the maximum throughput under a latency cap."""
+  max_threads = client_vm.NumCpusForBenchmark(report_only_physical_cpus=True)
+  max_clients = MAX_CLIENTS_COUNT // server_shard_count
+  samples = []
+  for result in _BinarySearchForLatencyCappedThroughput(
+      client_vm,
+      [_PipelineModifier(), _ClientModifier(max_clients, max_threads)],
+      server_ip,
+      server_port,
+      password,
+  ):
+    samples.extend(result.GetSamples())
   return samples
-
-
-def _ModifyPipelines(
-    current_parameters: 'MemtierBinarySearchParameters', latency: float
-) -> 'MemtierBinarySearchParameters':
-  """Modify pipelines count for next iteration of binary search."""
-  if latency <= MEMTIER_LATENCY_CAP.value:
-    lower_bound = current_parameters.pipelines
-    upper_bound = min(current_parameters.upper_bound, MAX_PIPELINES_COUNT)
-  else:
-    lower_bound = current_parameters.lower_bound
-    upper_bound = current_parameters.pipelines
-
-  pipelines = lower_bound + math.ceil((upper_bound - lower_bound) / 2)
-  return MemtierBinarySearchParameters(
-      lower_bound=lower_bound,
-      upper_bound=upper_bound,
-      pipelines=pipelines,
-      threads=1,
-      clients=1,
-  )
-
-
-def _ModifyClients(
-    current_parameters: 'MemtierBinarySearchParameters', latency: float
-) -> 'MemtierBinarySearchParameters':
-  """Modify clients count for next iteration of binary search."""
-  if latency <= MEMTIER_LATENCY_CAP.value:
-    lower_bound = current_parameters.clients * current_parameters.threads
-    upper_bound = min(current_parameters.upper_bound, MAX_CLIENTS_COUNT)
-  else:
-    lower_bound = current_parameters.lower_bound
-    upper_bound = current_parameters.clients * current_parameters.threads
-
-  total_clients = lower_bound + math.ceil((upper_bound - lower_bound) / 2)
-  threads = _FindFactor(total_clients)
-  clients = total_clients // threads
-  return MemtierBinarySearchParameters(
-      lower_bound=lower_bound,
-      upper_bound=upper_bound,
-      pipelines=1,
-      threads=threads,
-      clients=clients,
-  )
-
-
-def _FindFactor(number):
-  """Find any factor of the given number. Returns 1 for primes."""
-  i = round(math.sqrt(number))
-  while i > 0:
-    if number % i == 0:
-      return i
-    i -= 1
 
 
 def RunGetLatencyAtCpu(cloud_instance, client_vms):
@@ -871,6 +934,7 @@ class MemtierResult:
 
   runtime_info: Dict[Text, Text] = dataclasses.field(default_factory=dict)
   metadata: Dict[str, Any] = dataclasses.field(default_factory=dict)
+  parameters: MemtierBinarySearchParameters = MemtierBinarySearchParameters()
 
   @classmethod
   def Parse(
