@@ -1481,6 +1481,13 @@ def Main():
   if FLAGS.helpmatchmd:
     _PrintHelpMD(FLAGS.helpmatchmd)
     return 0
+
+  if not FLAGS.accept_licenses:
+    logging.warning(
+        'Please run with the --accept_licenses flag to '
+        'acknowledge PKB may install software on your behalf.'
+    )
+
   CheckVersionFlag()
   SetUpPKB()
   return RunBenchmarks()

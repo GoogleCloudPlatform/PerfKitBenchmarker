@@ -36,6 +36,13 @@ def GetCurrentUser():
   except KeyError:
     return 'user_unknown'
 
+
+flags.DEFINE_boolean(
+    'accept_licenses',
+    False,
+    'Acknowledge that PKB may install software thereby accepting license'
+    ' agreements on the users behalf.',
+)
 flags.DEFINE_list('ssh_options', [], 'Additional options to pass to ssh.')
 flags.DEFINE_boolean('use_ipv6', False, 'Whether to use ipv6 for ssh/scp.')
 flags.DEFINE_list('benchmarks', ['cluster_boot'],

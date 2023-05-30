@@ -1,5 +1,7 @@
 ### Breaking changes:
-
+-   Added --accept_licenses flag. User have to turn this flag on to acknowledge
+    that PKB may install software thereby accepting license agreements on the
+    user's behalf.
 -   Renamed Database-related flags from managed_db* to db* Added alias for
     backwards compatibility, might not be supported in the future release.
 -   Require Python 3.9+
