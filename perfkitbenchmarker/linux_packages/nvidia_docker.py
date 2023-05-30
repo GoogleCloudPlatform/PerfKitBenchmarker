@@ -22,8 +22,17 @@ _VERSION = flags.DEFINE_string('nvidia_docker_version', '2.13.0-1',
                                'The version of nvidia docker to install.')
 
 
+def CheckNvidiaDockerExists(vm):
+  resp, _ = vm.RemoteHostCommand(
+      'command -v nvidia-docker', ignore_failure=True
+  )
+  return bool(resp.rstrip())
+
+
 def AptInstall(vm):
   """Installs the nvidia-docker package on the VM."""
+  if CheckNvidiaDockerExists(vm):
+    return
   vm.Install('docker')
   vm.RemoteCommand('curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey '
                    '| sudo apt-key add -')
@@ -39,6 +48,8 @@ def AptInstall(vm):
 
 def YumInstall(vm):
   """Installs the nvidia-docker package on the VM."""
+  if CheckNvidiaDockerExists(vm):
+    return
   vm.Install('docker')
   vm.RemoteCommand('curl -s -L https://nvidia.github.io/'
                    'nvidia-container-runtime/'
