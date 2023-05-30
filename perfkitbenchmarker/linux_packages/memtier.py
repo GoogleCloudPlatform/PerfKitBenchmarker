@@ -882,6 +882,7 @@ def _Run(
 
   with open(output_path, 'r') as output:
     summary_data = output.read()
+    logging.info(summary_data)
   return MemtierResult.Parse(summary_data, time_series_json)
 
 
