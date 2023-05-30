@@ -141,4 +141,6 @@ def Cleanup(benchmark_spec):
 
 
 def _Install(vm):
+  """Installs necessary client packages."""
   vm.Install('memtier')
+  vm.Install('redis_cli')
