@@ -320,6 +320,10 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
           if waiting_param:
             logging.info('Applying parameter')
 
+          if state == 'insufficient-capacity':
+            raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+                'Insufficient capacity to provision this db.'
+            )
           if state == 'available' and not pending_values and not waiting_param:
             break
 
