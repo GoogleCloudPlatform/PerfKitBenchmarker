@@ -8,8 +8,10 @@ from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_dynamodb
 from perfkitbenchmarker.providers.aws import util
+from tests import matchers
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -50,6 +52,7 @@ aws_dynamodb_ycsb:
   description: >
       Run YCSB against AWS DynamoDB.
   non_relational_db:
+    billing_mode: PROVISIONED
     service_type: dynamodb
     enable_freeze_restore: True
     table_name: test_instance
@@ -98,17 +101,24 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
   def testInitFromSpec(self):
     instance = GetTestDynamoDBInstance()
 
-    self.assertEqual(instance.zone, 'us-east-1a')
-    self.assertEqual(instance.region, 'us-east-1')
-    self.assertEqual(instance.table_name, 'test_instance')
-    self.assertEqual(instance.rcu, 5)
-    self.assertEqual(instance.wcu, 25)
-    self.assertEqual(instance.primary_key, 'test_primary_key')
-    self.assertEqual(instance.sort_key, 'test_sort_key')
-    self.assertEqual(instance.attribute_type, 'S')
-    self.assertEqual(instance.lsi_count, 5)
-    self.assertEqual(instance.gsi_count, 5)
-    self.assertEqual(instance.use_sort, True)
+    with self.subTest('location'):
+      self.assertEqual(instance.zone, 'us-east-1a')
+      self.assertEqual(instance.region, 'us-east-1')
+    with self.subTest('name'):
+      self.assertEqual(instance.table_name, 'test_instance')
+    with self.subTest('billing'):
+      self.assertEqual(instance.billing_mode, 'PROVISIONED')
+    with self.subTest('capacity'):
+      self.assertEqual(instance.rcu, 5)
+      self.assertEqual(instance.wcu, 25)
+    with self.subTest('schema'):
+      self.assertEqual(instance.primary_key, 'test_primary_key')
+      self.assertEqual(instance.sort_key, 'test_sort_key')
+      self.assertEqual(instance.attribute_type, 'S')
+    with self.subTest('indexes'):
+      self.assertEqual(instance.lsi_count, 5)
+      self.assertEqual(instance.gsi_count, 5)
+      self.assertEqual(instance.use_sort, True)
 
   @flagsaver.flagsaver
   def testInitLocation(self):
@@ -145,6 +155,14 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(test_instance.throughput,
                      'ReadCapacityUnits=1,WriteCapacityUnits=2')
 
+  def testInitThroughputWithOnDemandRaises(self):
+    FLAGS['aws_dynamodb_read_capacity'].parse(1)
+    FLAGS['aws_dynamodb_write_capacity'].parse(2)
+    FLAGS['aws_dynamodb_billing_mode'].parse(aws_dynamodb._ON_DEMAND)
+
+    with self.assertRaises(errors.Config.InvalidValue):
+      GetTestDynamoDBInstance()
+
   @flagsaver.flagsaver
   def testGetResourceMetadata(self):
     FLAGS['zone'].parse(['us-east-1a'])
@@ -156,6 +174,7 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['aws_dynamodb_write_capacity'].parse(2)
     FLAGS['aws_dynamodb_lsi_count'].parse(3)
     FLAGS['aws_dynamodb_gsi_count'].parse(4)
+    FLAGS['aws_dynamodb_billing_mode'].parse(aws_dynamodb._PROVISIONED)
     test_instance = GetTestDynamoDBInstance()
 
     actual_metadata = test_instance.GetResourceMetadata()
@@ -169,8 +188,48 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
         'aws_dynamodb_write_capacity': 2,
         'aws_dynamodb_lsi_count': 3,
         'aws_dynamodb_gsi_count': 4,
+        'aws_dynamodb_billing_mode': aws_dynamodb._PROVISIONED,
     }
     self.assertEqual(actual_metadata, expected_metadata)
+
+  def testCreateProvisionedThroughput(self):
+    test_instance = GetTestDynamoDBInstance()
+    mock_issue = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand', return_value=['', '', 0])
+    )
+
+    test_instance._Create()
+
+    mock_issue.assert_has_calls(
+        [
+            mock.call(
+                matchers.HAS('--provisioned-throughput'),
+                raise_on_failure=mock.ANY,
+            )
+        ],
+    )
+
+  def testCreateOnDemand(self):
+    test_instance = GetTestDynamoDBInstance()
+    test_instance.billing_mode = aws_dynamodb._ON_DEMAND
+    mock_issue = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand', return_value=['', '', 0])
+    )
+
+    test_instance._Create()
+
+    self.assertIn('PAY_PER_REQUEST', mock_issue.call_args[0][0])
+    self.assertNotIn('--provisioned-throughput', mock_issue.call_args[0][0])
+
+  @flagsaver.flagsaver(aws_dynamodb_autoscaling_target=50)
+  def testIsServerless(self):
+    test_instance = GetTestDynamoDBInstance()
+    test_instance.billing_mode = aws_dynamodb._ON_DEMAND
+    self.assertTrue(test_instance.IsServerless())
+
+  def testIsServerlessDefault(self):
+    test_instance = GetTestDynamoDBInstance()
+    self.assertFalse(test_instance.IsServerless())
 
   @parameterized.named_parameters(
       {
@@ -389,6 +448,30 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     test_instance._PostCreate()
 
     mock_create_policy.assert_not_called()
+
+  def testFreezeOnDemandIsNoOp(self):
+    test_instance = GetTestDynamoDBInstance()
+    test_instance.billing_mode = aws_dynamodb._ON_DEMAND
+    self._MockHasAutoscalingPolicies(test_instance, False)
+    mock_set_throughput = self.enter_context(
+        mock.patch.object(test_instance, 'SetThroughput')
+    )
+
+    test_instance._Freeze()
+
+    mock_set_throughput.assert_not_called()
+
+  def testRestoreOnDemandIsNoOp(self):
+    test_instance = GetTestDynamoDBInstance()
+    test_instance.billing_mode = aws_dynamodb._ON_DEMAND
+    self._MockHasAutoscalingPolicies(test_instance, False)
+    mock_set_throughput = self.enter_context(
+        mock.patch.object(test_instance, 'SetThroughput')
+    )
+
+    test_instance._Restore()
+
+    mock_set_throughput.assert_not_called()
 
 
 if __name__ == '__main__':

@@ -19,7 +19,7 @@ from absl import flags
 from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
@@ -58,14 +58,13 @@ class GceWindowsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
        os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE, True,
        'sql-ent-2019-win-2022', 'windows-sql-cloud'))
   def testWindowsConfig(self, os_type, gvnic, family, project):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_type)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_type)
     vm = vm_class(self.spec)
     self.assertEqual(vm.OS_TYPE, os_type)
     self.assertEqual(vm.SupportGVNIC(), gvnic)
-    self.assertEqual(vm.GetDefaultImageFamily(), family)
+    self.assertEqual(vm.GetDefaultImageFamily(False), family)
     self.assertEqual(vm.GetDefaultImageProject(), project)
 
 
 if __name__ == '__main__':
   unittest.main()
-

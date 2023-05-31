@@ -14,7 +14,7 @@
 
 """Contains code related Kubernetes pod spec decoding."""
 
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.kubernetes import kubernetes_resources_spec
 
@@ -23,7 +23,7 @@ class KubernetesPodSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a Kubernetes Pod.
   """
 
-  CLOUD = providers.KUBERNETES
+  CLOUD = provider_info.KUBERNETES
 
   def __init__(self, *args, **kwargs):
     self.resource_limits = None

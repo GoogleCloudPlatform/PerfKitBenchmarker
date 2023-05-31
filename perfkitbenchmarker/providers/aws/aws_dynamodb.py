@@ -18,7 +18,7 @@ Tables can be created and deleted.
 
 import json
 import logging
-from typing import Any, Collection, Dict, List, Optional, Tuple, Sequence
+from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -26,6 +26,11 @@ from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import util
+
+
+# Billing Modes
+_ON_DEMAND = 'PAY_PER_REQUEST'
+_PROVISIONED = 'PROVISIONED'
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -46,6 +51,19 @@ flags.DEFINE_enum(
     'The type of attribute, default to S (String).'
     'Alternates are N (Number) and B (Binary).'
     'Defaults to S.')
+_BILLING_MODE = flags.DEFINE_enum(
+    'aws_dynamodb_billing_mode',
+    None,
+    [_ON_DEMAND, _PROVISIONED],
+    (
+        'DynamoDB billing mode. "provisioned": Uses'
+        ' --aws_dynamodb_read_capacity and --aws_dynamodb_write_capacity to'
+        ' determine provisioned throughput. "ondemand": DynamoDB will autoscale'
+        ' capacity and disregard provisioned capacity flags for RCU and WCU.'
+        ' Note that this is different from using provisioned capacity with an'
+        ' autoscaling policy.'
+    ),
+)
 flags.DEFINE_integer('aws_dynamodb_read_capacity', None,
                      'Set RCU for dynamodb table. Defaults to 25.')
 flags.DEFINE_integer('aws_dynamodb_write_capacity', None,
@@ -91,6 +109,7 @@ class DynamoDbSpec(non_relational_db.BaseNonRelationalDbSpec):
   SERVICE_TYPE = non_relational_db.DYNAMODB
 
   table_name: str
+  billing_mode: str
   zone: str
   rcu: int
   wcu: int
@@ -111,6 +130,7 @@ class DynamoDbSpec(non_relational_db.BaseNonRelationalDbSpec):
     none_ok = {'default': None, 'none_ok': False}
     result.update({
         'table_name': (option_decoders.StringDecoder, none_ok),
+        'billing_mode': (option_decoders.StringDecoder, none_ok),
         'zone': (option_decoders.StringDecoder, none_ok),
         'rcu': (option_decoders.IntDecoder, none_ok),
         'wcu': (option_decoders.IntDecoder, none_ok),
@@ -133,6 +153,15 @@ class DynamoDbSpec(non_relational_db.BaseNonRelationalDbSpec):
         raise errors.Config.InvalidValue('lsi_count requires use_sort=True')
     if not -1 < config_values.get('gsi_count', 0) < 6:
       raise errors.Config.InvalidValue('gsi_count must be from 0-5')
+    if (
+        any(x in config_values for x in ['rcu', 'wcu'])
+        and config_values.get('billing_mode') == _ON_DEMAND
+    ):
+      raise errors.Config.InvalidValue(
+          'Billing mode set to ON_DEMAND but read capacity and/or write'
+          ' capacity were set. Please set mode to "provisioned" or unset the'
+          ' provisioned capacity flags.'
+      )
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values) -> None:
@@ -148,6 +177,7 @@ class DynamoDbSpec(non_relational_db.BaseNonRelationalDbSpec):
     """
     super()._ApplyFlags(config_values, flag_values)
     option_name_from_flag = {
+        'aws_dynamodb_billing_mode': 'billing_mode',
         'aws_dynamodb_read_capacity': 'rcu',
         'aws_dynamodb_write_capacity': 'wcu',
         'aws_dynamodb_primarykey': 'primary_key',
@@ -176,21 +206,25 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
   """Class for working with DynamoDB."""
   SERVICE_TYPE = non_relational_db.DYNAMODB
 
-  def __init__(self,
-               table_name: Optional[str] = None,
-               zone: Optional[str] = None,
-               rcu: Optional[int] = None,
-               wcu: Optional[int] = None,
-               primary_key: Optional[str] = None,
-               sort_key: Optional[str] = None,
-               attribute_type: Optional[str] = None,
-               lsi_count: Optional[int] = None,
-               gsi_count: Optional[int] = None,
-               use_sort: Optional[bool] = None,
-               **kwargs):
+  def __init__(
+      self,
+      table_name: Optional[str] = None,
+      billing_mode: Optional[str] = None,
+      zone: Optional[str] = None,
+      rcu: Optional[int] = None,
+      wcu: Optional[int] = None,
+      primary_key: Optional[str] = None,
+      sort_key: Optional[str] = None,
+      attribute_type: Optional[str] = None,
+      lsi_count: Optional[int] = None,
+      gsi_count: Optional[int] = None,
+      use_sort: Optional[bool] = None,
+      **kwargs,
+  ):
     super(AwsDynamoDBInstance, self).__init__(**kwargs)
     self.table_name = table_name or f'pkb-{FLAGS.run_uri}'
     self._resource_id = f'table/{self.table_name}'
+    self.billing_mode = billing_mode or _PROVISIONED
     self.zone = zone or _DEFAULT_ZONE
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_arn: str = None  # Set during the _Exists() call.
@@ -214,6 +248,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
   def FromSpec(cls, spec: DynamoDbSpec) -> 'AwsDynamoDBInstance':
     return cls(
         table_name=spec.table_name,
+        billing_mode=spec.billing_mode,
         zone=spec.zone,
         rcu=spec.rcu,
         wcu=spec.wcu,
@@ -225,7 +260,8 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         use_sort=spec.use_sort,
         enable_freeze_restore=spec.enable_freeze_restore,
         create_on_restore_error=spec.create_on_restore_error,
-        delete_on_freeze_error=spec.delete_on_freeze_error)
+        delete_on_freeze_error=spec.delete_on_freeze_error,
+    )
 
   def _CreateLocalSecondaryIndex(self) -> List[str]:
     """Used to create local secondary indexes."""
@@ -331,9 +367,11 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         '--table-name', self.table_name,
         '--attribute-definitions', self._PrimaryAttrsJson(),
         '--key-schema', self._PrimaryKeyJson(),
-        '--provisioned-throughput', self.throughput,
+        '--billing-mode', self.billing_mode,
         '--tags'
-    ] + util.MakeFormattedDefaultTags()
+    ] + util.MakeFormattedDefaultTags()  # pyformat: disable
+    if self.billing_mode == _PROVISIONED:
+      cmd.extend(['--provisioned-throughput', self.throughput])
     if self.lsi_count > 0 and self.use_sort:
       self._SetAttrDefnArgs(cmd, [
           self._PrimaryAttrsJson(),
@@ -360,13 +398,18 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     if retcode != 0:
       logging.warning('Failed to create table! %s', stderror)
 
-  def ShouldAutoscale(self) -> bool:
+  def IsAutoscaling(self) -> bool:
+    """Returns whether this instance uses (or should use) an autoscaling policy."""
     return all([_AUTOSCALING_CPU_TARGET.value,
                 _AUTOSCALING_MAX_RCU.value,
                 _AUTOSCALING_MAX_WCU.value])
 
+  def IsServerless(self) -> bool:
+    """Returns whether this instance uses autoscaling or on-demand."""
+    return self.IsAutoscaling() or self.billing_mode == _ON_DEMAND
+
   def _PostCreate(self):
-    if not self.ShouldAutoscale():
+    if not self.IsAutoscaling():
       return
     self._CreateAutoscalingPolicy(_RCU_SCALABLE_DIMENSION,
                                   _RCU_SCALING_METRIC,
@@ -490,6 +533,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
       dict mapping string property key to value.
     """
     metadata = {
+        'aws_dynamodb_billing_mode': self.billing_mode,
         'aws_dynamodb_primarykey': self.primary_key,
         'aws_dynamodb_use_sort': self.use_sort,
         'aws_dynamodb_sortkey': self.sort_key,
@@ -499,7 +543,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         'aws_dynamodb_lsi_count': self.lsi_count,
         'aws_dynamodb_gsi_count': self.gsi_count,
     }
-    if self.ShouldAutoscale():
+    if self.IsAutoscaling():
       metadata.update({
           'aws_dynamodb_autoscaling':
               True,
@@ -605,6 +649,8 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
                                  _FREE_TIER_WCU,
                                  _AUTOSCALING_MAX_WCU.value)
       return
+    if self.billing_mode == _ON_DEMAND:
+      return
     # Check that we actually need to lower before issuing command.
     rcu, wcu = self._GetThroughput()
     if rcu > _FREE_TIER_RCU or wcu > _FREE_TIER_WCU:
@@ -629,6 +675,8 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
       self._CreateScalableTarget(_WCU_SCALABLE_DIMENSION,
                                  self.wcu,
                                  _AUTOSCALING_MAX_WCU.value)
+      return
+    if self.billing_mode == _ON_DEMAND:
       return
     self.SetThroughput(self.rcu, self.wcu)
 

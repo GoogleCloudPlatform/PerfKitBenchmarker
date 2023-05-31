@@ -254,6 +254,7 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
         used as a decorator.
   """
   if retryable_exceptions is None:
+    # TODO(user) Make retries less aggressive.
     retryable_exceptions = Exception
 
   def Wrap(f):

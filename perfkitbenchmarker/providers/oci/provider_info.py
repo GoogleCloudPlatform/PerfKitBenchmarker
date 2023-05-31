@@ -6,4 +6,4 @@ from perfkitbenchmarker import providers
 
 class OCIProviderInfo(provider_info.BaseProviderInfo):
     UNSUPPORTED_BENCHMARKS = ['mysql_service']
-    CLOUD = providers.OCI
+    CLOUD = provider_info.OCI

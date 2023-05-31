@@ -118,6 +118,8 @@
 -   Add support for using the hbase2 binding in the Cloud Bigtable YCSB
     benchmark.
 -   Add iPerf interval reporting.
+-   Add support for DynamoDB on demand instances.
+-   Add support for Debian 10 & 11 with backported kernels on AWS.
 
 ### Enhancements:
 
@@ -222,6 +224,15 @@
 -   Add Key Management Service (KMS) resource for cloud cryptographic keys.
 -   Add support for using java veneer client with google bigtable
     `google_bigtable_use_java_veneer_client`.
+-   Allow configuring the number of channels used per VM for the Cloud Bigtable
+    YCSB benchmark with `--google_bigtable_channel_count`.
+-   Add `--pkb_log_bucket` flag, allowing users to route PKB logs to a GCS
+    bucket and clean up space on their machines.
+-   Add support for rls routing with direct path with new flag
+    `google_bigtable_enable_rls_routing`.
+-   Set default YAML config vm_spec.GCP_network_name to null, and added the
+    corresponding attribute to GCEVMSpec, GCENetworkSpec and GCEVirtualMachine.
+    vm_spec overrides FLAGS.gce_network_name.
 
 ### Bug fixes and maintenance updates:
 
@@ -329,6 +340,8 @@
     external (public) IPs for better security and reduced costs on AWS, Azure,
     and GCP. The `--connect_via_internal_ip` flag should also be used in this
     case.
+-   Add `--boot_completion_ip_subset` flag to determine how to measure Boot
+    Completion
 -   Add `--azure_subnet_id` flag to use an existing subnet instead of creating a
     new one.
 -   Remove `--google_bigtable_enable_table_object_sharing`. Use
@@ -336,3 +349,4 @@
     to retain the previous behavior.
 -   Remove `--google_bigtable_hbase_jar_url`. Rely on
     `--google_bigtable_client_version` instead.
+-   Fix how environment variable is set for direct path

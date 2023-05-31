@@ -69,16 +69,22 @@ _MONITORING_ADDRESS = flags.DEFINE_string(
     'Google API endpoint for monitoring requests. Used when '
     '--get_bigtable_cluster_cpu_utilization is enabled.')
 _USE_JAVA_VENEER_CLIENT = flags.DEFINE_boolean(
-    'google_bigtable_use_java_veneer_client',
-    False,
-    'If true, will use the googlebigtableclient with ycsb.',
-)
+    'google_bigtable_use_java_veneer_client', False,
+    'If true, will use the googlebigtableclient with ycsb.')
 _ENABLE_TRAFFIC_DIRECTOR = flags.DEFINE_boolean(
-    'google_bigtable_enable_traffic_director',
-    False,
+    'google_bigtable_enable_traffic_director', False,
+    'If true, will use the googlebigtable'
+    'client with ycsb to enable traffic through traffic director.')
+_ENABLE_RLS_ROUTING = flags.DEFINE_boolean(
+    'google_bigtable_enable_rls_routing', False,
+    'If true, will use the googlebigtableclient with ycsb to enable traffic'
+    'through RLS with direct path')
+_CHANNEL_COUNT = flags.DEFINE_integer(
+    'google_bigtable_channel_count',
+    None,
     (
-        'If true, will use the googlebigtable'
-        'client with ycsb to enable traffic through traffic director.'
+        'If specified, will use this many channels (i.e. connections) for '
+        'Bigtable RPCs instead of the default number.'
     ),
 )
 
@@ -209,13 +215,22 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
       f'echo "export JAVA_HOME=/usr" >> {hbase.HBASE_CONF_DIR}/hbase-env.sh')
 
   if _ENABLE_TRAFFIC_DIRECTOR.value and _USE_JAVA_VENEER_CLIENT.value:
-    vm.RemoteCommand('export GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true')
+    vm.RemoteCommand(
+        'echo "export GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true" | sudo tee -a'
+        ' /etc/environment'
+    )
+    if _ENABLE_RLS_ROUTING.value:
+      vm.RemoteCommand(
+          'echo "export GRPC_EXPERIMENTAL_XDS_RLS_LB=true" | sudo tee -a'
+          ' /etc/environment'
+      )
   context = {
       'google_bigtable_endpoint': gcp_bigtable.ENDPOINT.value,
       'google_bigtable_admin_endpoint': gcp_bigtable.ADMIN_ENDPOINT.value,
       'project': FLAGS.project or _GetDefaultProject(),
       'instance': bigtable.name,
       'hbase_major_version': FLAGS.hbase_version.split('.')[0],
+      'channel_count': _CHANNEL_COUNT.value,
   }
 
   for file_name in HBASE_CONF_FILES:

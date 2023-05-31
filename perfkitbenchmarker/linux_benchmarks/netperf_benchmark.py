@@ -153,53 +153,76 @@ def PrepareNetperf(vm):
 
 
 def Prepare(benchmark_spec):
-  """Install netperf on the target vm.
+  """Extracts the first two VM's from benchmark_spec and prepares the VMs for executing netperf.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vms = vms[:2]
-  background_tasks.RunThreaded(PrepareNetperf, vms)
+  client_vm, server_vm = benchmark_spec.vms[:2]
+  background_tasks.RunThreaded(PrepareNetperf, [client_vm, server_vm])
+  background_tasks.RunParallelThreads(
+      [
+          (PrepareClientVM, [client_vm], {}),
+          (
+              PrepareServerVM,
+              [server_vm, client_vm.internal_ip, client_vm.ip_address],
+              {},
+          ),
+      ],
+      2,
+  )
 
+
+def PrepareClientVM(client_vm):
+  """Install netperf and copy remote test script to client_vm.
+
+  Args:
+    client_vm: The VM that runs the netperf binary.
+  """
+  # Copy remote test script to client
+  path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
+  logging.info('Uploading %s to %s', path, client_vm)
+  client_vm.PushFile(path, REMOTE_SCRIPT)
+  client_vm.RemoteCommand(f'sudo chmod 755 {REMOTE_SCRIPT}')
+
+
+def PrepareServerVM(server_vm, client_vm_internal_ip, client_vm_ip_address):
+  """Install netperf and start netserver processes on server_vm.
+
+  Args:
+    server_vm: The VM that runs the netserver binary.
+    client_vm_internal_ip: Internal IP address of client_vm.
+    client_vm_ip_address: All IP addresses of client_vm.
+  """
   num_streams = max(FLAGS.netperf_num_streams)
 
   # See comments where _COS_RE is defined.
-  if vms[1].image and re.search(_COS_RE, vms[1].image):
-    _SetupHostFirewall(benchmark_spec)
+  if server_vm.image and re.search(_COS_RE, server_vm.image):
+    _SetupHostFirewall(server_vm, client_vm_internal_ip, client_vm_ip_address)
 
   # Start the netserver processes
   if vm_util.ShouldRunOnExternalIpAddress():
     # Open all of the command and data ports
-    vms[1].AllowPort(PORT_START, PORT_START + num_streams * 2 - 1)
+    server_vm.AllowPort(PORT_START, PORT_START + num_streams * 2 - 1)
 
   port_end = PORT_START + num_streams * 2 - 1
   netserver_cmd = (f'for i in $(seq {PORT_START} 2 {port_end}); do '
                    f'{netperf.NETSERVER_PATH} -p $i & done')
-  vms[1].RemoteCommand(netserver_cmd)
-
-  # Copy remote test script to client
-  path = data.ResourcePath(os.path.join(REMOTE_SCRIPTS_DIR, REMOTE_SCRIPT))
-  logging.info('Uploading %s to %s', path, vms[0])
-  vms[0].PushFile(path, REMOTE_SCRIPT)
-  vms[0].RemoteCommand(f'sudo chmod 755 {REMOTE_SCRIPT}')
+  server_vm.RemoteCommand(netserver_cmd)
 
 
-def _SetupHostFirewall(benchmark_spec):
+def _SetupHostFirewall(server_vm, client_vm_internal_ip, client_vm_ip_address):
   """Set up host firewall to allow incoming traffic.
 
   Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-      required to run the benchmark.
+    server_vm: The VM that runs the netserver binary.
+    client_vm_internal_ip: Internal IP address of client_vm.
+    client_vm_ip_address: All IP addresses of client_vm.
   """
-
-  client_vm = benchmark_spec.vms[0]
-  server_vm = benchmark_spec.vms[1]
-
-  ip_addrs = [client_vm.internal_ip]
+  ip_addrs = [client_vm_internal_ip]
   if vm_util.ShouldRunOnExternalIpAddress():
-    ip_addrs.append(client_vm.ip_address)
+    ip_addrs.append(client_vm_ip_address)
 
   logging.info('setting up host firewall on %s running %s for client at %s',
                server_vm.name, server_vm.image, ip_addrs)
@@ -502,7 +525,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
 
 
 def Run(benchmark_spec):
-  """Run netperf TCP_RR on the target vm.
+  """Extracts the first two VM's from benchmark_spec and runs netperf.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -511,9 +534,20 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  vms = benchmark_spec.vms
-  client_vm = vms[0]  # Client aka "sending vm"
-  server_vm = vms[1]  # Server aka "receiving vm"
+  client_vm, server_vm = benchmark_spec.vms[:2]
+  return RunClientServerVMs(client_vm, server_vm)
+
+
+def RunClientServerVMs(client_vm, server_vm):
+  """Runs a netperf process between client_vm and server_vm.
+
+  Args:
+    client_vm: The VM that runs the netperf binary.
+    server_vm: The VM that runs the netserver binary.
+
+  Returns:
+    A list of sample.Sample objects.
+  """
   logging.info('netperf running on %s', client_vm)
   results = []
   metadata = {
@@ -549,12 +583,22 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
-  """Cleanup netperf on the target vm (by uninstalling).
+  """Extracts the first two VM's from benchmark_spec and calls RunVM(vms).
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  vms = benchmark_spec.vms
-  vms[1].RemoteCommand('sudo killall netserver')
-  vms[0].RemoteCommand(f'sudo rm -rf {REMOTE_SCRIPT}')
+  client_vm, server_vm = benchmark_spec.vms[:2]
+  CleanupClientServerVMs(client_vm, server_vm)
+
+
+def CleanupClientServerVMs(client_vm, server_vm):
+  """Cleanup netperf on the target vm (by uninstalling).
+
+  Args:
+    client_vm: The VM that runs the netperf binary.
+    server_vm: The VM that runs the netserver binary.
+  """
+  server_vm.RemoteCommand('sudo killall netserver')
+  client_vm.RemoteCommand(f'sudo rm -rf {REMOTE_SCRIPT}')

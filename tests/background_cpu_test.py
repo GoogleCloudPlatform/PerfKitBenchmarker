@@ -25,7 +25,7 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 from tests import pkb_common_test_case
@@ -62,7 +62,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(TestBackgroundWorkload, self).setUp()
     FLAGS.run_uri = 'fake_run_uri'
-    FLAGS.cloud = providers.GCP
+    FLAGS.cloud = provider_info.GCP
     FLAGS.temp_dir = 'tmp'
 
     self.addCleanup(context.SetThreadBenchmarkSpec, None)

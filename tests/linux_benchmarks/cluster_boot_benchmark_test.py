@@ -5,9 +5,11 @@ import unittest
 
 import freezegun
 import mock
+from perfkitbenchmarker import context
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import pkb_common_test_case
 
 
@@ -70,6 +72,58 @@ class ClusterBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
 
     # assert actual and expected samples are equal
     self.assertSampleListsEqualUpToTimestamp(actual_samples, expected_samples)
+
+  @freezegun.freeze_time('2023-03-07')
+  def testPublishTimeToSshExternalSample(self):
+    context.SetThreadBenchmarkSpec(
+        pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    )
+
+    vm_spec = gce_virtual_machine.GceVmSpec('cluster_boot_benchmark_test')
+    vm = gce_virtual_machine.Ubuntu2204BasedGceVirtualMachine(vm_spec)
+    vm.create_start_time = 1
+    vm.ssh_internal_time = 2
+    vm.ssh_external_time = 4
+    vm.bootable_time = 7
+
+    actuals = cluster_boot_benchmark.GetTimeToBoot([vm])
+
+    metrics = {
+        'Time to SSH - External': 3.0,
+        'Time to SSH - Internal': 1.0,
+        'Boot Time': 6.0,
+    }
+    expecteds = []
+    for metric, value in metrics.items():
+      expecteds.append(
+          sample.Sample(
+              metric=metric,
+              value=value,
+              unit='seconds',
+              metadata={
+                  'machine_instance': 0,
+                  'num_vms': 1,
+                  'os_type': 'ubuntu2204',
+                  'create_delay_sec': '0.0',
+              },
+              timestamp=1678147200.0,
+          )
+      )
+    expecteds.append(
+        sample.Sample(
+            metric='Cluster Boot Time',
+            value=6.0,
+            unit='seconds',
+            metadata={
+                'num_vms': 1,
+                'os_type': 'ubuntu2204',
+                'max_create_delay_sec': '0.0',
+            },
+            timestamp=1678147200.0,
+        )
+    )
+
+    self.assertCountEqual(actuals, expecteds)
 
 
 if __name__ == '__main__':

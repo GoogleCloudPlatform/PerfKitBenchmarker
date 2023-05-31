@@ -19,7 +19,7 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -103,7 +103,7 @@ class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
                                gcp_dataproc.GcpDataproc))
 
   def testEMRConfig(self):
-    FLAGS.cloud = providers.AWS
+    FLAGS.cloud = provider_info.AWS
     FLAGS.zones = 'us-west-2'
     spec = self._CreateBenchmarkSpecFromYaml(SERVICE_CONFIG)
     spec.ConstructSparkService()

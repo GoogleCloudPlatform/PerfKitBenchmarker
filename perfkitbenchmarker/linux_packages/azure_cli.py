@@ -82,7 +82,7 @@ def AptInstall(vm):
   Args:
     vm: Virtual Machine to install on.
   """
-  if hasattr(vm, 'is_aarch64') and vm.is_aarch64:
+  if vm.is_aarch64:
     _PipInstall(vm)
     return
   vm.Install('python')

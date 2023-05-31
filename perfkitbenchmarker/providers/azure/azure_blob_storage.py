@@ -21,7 +21,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -42,7 +42,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     self.storage_account = None
     self.resource_group = None
 
-  STORAGE_NAME = providers.AZURE
+  STORAGE_NAME = provider_info.AZURE
 
   def PrepareService(self,
                      region,

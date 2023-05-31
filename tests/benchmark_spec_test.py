@@ -24,6 +24,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -120,7 +121,7 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(_BenchmarkSpecTestCase, self).setUp()
-    FLAGS.cloud = providers.GCP
+    FLAGS.cloud = provider_info.GCP
     FLAGS.temp_dir = 'tmp'
     FLAGS.ignore_package_requirements = True
     self.addCleanup(context.SetThreadBenchmarkSpec, None)

@@ -31,7 +31,7 @@ class BaseKeySpec(spec.BaseSpec):
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
             # Uncomment when there are other cloud implementations
-            # 'valid_values': providers.VALID_CLOUDS
+            # 'valid_values': provider_info.VALID_CLOUDS
             'valid_values': ['GCP']
         }),
     })
@@ -52,5 +52,3 @@ def GetKeySpecClass(cloud: str) -> Optional[spec.BaseSpecMetaClass]:
 def GetKeyClass(cloud: str) -> Optional[resource.AutoRegisterResourceMeta]:
   """Gets the key class corresponding to 'cloud'."""
   return resource.GetResourceClass(BaseKey, CLOUD=cloud)
-
-

@@ -197,7 +197,7 @@ def _InstallCudaPatch(vm, patch_url):
   vm.RemoteCommand('wget -q %s -O %s' % (patch_url,
                                          basename))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
-  vm.RemoteCommand('sudo apt-get update')
+  vm.AptUpdate()
   # Need to be extra careful on the command below because without these
   # precautions, it was brining up a menu option about grub's menu.lst
   # on AWS Ubuntu16.04 and thus causing the RemoteCommand to hang and fail.
@@ -218,7 +218,7 @@ def _InstallCuda9Point0(vm):
       os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)), basename))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   EnrollSigningKey(vm)
-  vm.RemoteCommand('sudo apt-get update')
+  vm.AptUpdate()
   vm.InstallPackages('cuda-toolkit-9-0 cuda-tools-9-0 cuda-libraries-9-0 '
                      'cuda-libraries-dev-9-0')
   _InstallCudaPatch(
@@ -240,7 +240,7 @@ def _InstallCuda10Point0(vm):
       f'{basename}')
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   EnrollSigningKey(vm)
-  vm.RemoteCommand('sudo apt-get update')
+  vm.AptUpdate()
   vm.InstallPackages('cuda-toolkit-10-0 cuda-tools-10-0 cuda-libraries-10-0 '
                      'cuda-libraries-dev-10-0')
 
@@ -263,7 +263,7 @@ def _InstallCuda10Point1(vm):
       os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   EnrollSigningKey(vm)
-  vm.RemoteCommand('sudo apt-get update')
+  vm.AptUpdate()
   vm.InstallPackages('cuda-toolkit-10-1 cuda-tools-10-1 cuda-libraries-10-1 '
                      'cuda-libraries-dev-10-1')
 
@@ -286,7 +286,7 @@ def _InstallCuda10Point2(vm):
       os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm)))
   vm.RemoteCommand('sudo dpkg -i %s' % basename)
   EnrollSigningKey(vm)
-  vm.RemoteCommand('sudo apt-get update')
+  vm.AptUpdate()
   vm.InstallPackages('cuda-toolkit-10-2 cuda-tools-10-2 cuda-libraries-10-2 '
                      'cuda-libraries-dev-10-2')
 
@@ -309,7 +309,7 @@ def _InstallCuda11Generic(vm, toolkit_fmt, version_dash):
   vm.RemoteCommand(f'wget -q {toolkit}')
   vm.RemoteCommand(f'sudo dpkg -i {basename}')
   EnrollSigningKey(vm)
-  vm.RemoteCommand('sudo apt-get update')
+  vm.AptUpdate()
   vm.InstallPackages(f'cuda-toolkit-{version_dash} '
                      f'cuda-tools-{version_dash} '
                      f'cuda-libraries-{version_dash} '

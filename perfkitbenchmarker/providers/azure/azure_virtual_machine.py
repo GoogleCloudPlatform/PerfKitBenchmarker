@@ -41,7 +41,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -127,7 +127,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     low_priority: boolean. True if the VM should be low-priority, else False.
   """
 
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   def __init__(self, *args, **kwargs):
     super(AzureVmSpec, self).__init__(*args, **kwargs)
@@ -323,7 +323,13 @@ class AzureNIC(resource.BaseResource):
     ] + self.resource_group.args)
 
     response = json.loads(stdout)
-    return response['ipConfigurations'][0]['privateIpAddress']
+    ip_config = response['ipConfigurations'][0]
+    # Azure CLI used privateIpAddress between versions 1.2.0 and 2.45.0
+    # https://learn.microsoft.com/en-us/cli/azure/release-notes-azure-cli?toc=%2Fcli%2Fazure%2Ftoc.json&bc=%2Fcli%2Fazure%2Fbreadcrumb%2Ftoc.json#network
+    for key in ('privateIPAddress', 'privateIpAddress'):
+      if key in ip_config:
+        return ip_config[key]
+    raise KeyError('No known private IP address key found.')
 
   def _Delete(self):
     self._deleted = True
@@ -517,7 +523,7 @@ def _MachineTypeIsArm(machine_type):
 
 class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an Azure Virtual Machine."""
-  CLOUD = providers.AZURE
+  CLOUD = provider_info.AZURE
 
   _lock = threading.Lock()
   # TODO(user): remove host groups & hosts as globals -> create new spec

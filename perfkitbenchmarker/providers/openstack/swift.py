@@ -18,7 +18,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 
 flags.DEFINE_boolean('openstack_swift_insecure', False,
@@ -33,7 +33,7 @@ SWIFTCLIENT_LIB_VERSION = 'python-swiftclient_lib_version'
 class SwiftStorageService(object_storage_service.ObjectStorageService):
   """Interface to OpenStack Swift."""
 
-  STORAGE_NAME = providers.OPENSTACK
+  STORAGE_NAME = provider_info.OPENSTACK
 
   def __init__(self):
     self.swift_command_prefix = ''

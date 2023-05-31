@@ -19,7 +19,7 @@ import threading
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.providers.openstack import utils
 
 
@@ -53,7 +53,7 @@ class OpenStackFirewall(network.BaseFirewall):
   An object representing OpenStack Firewall based on Secure Groups.
   """
 
-  CLOUD = providers.OPENSTACK
+  CLOUD = provider_info.OPENSTACK
 
   def __init__(self):
     self._lock = threading.Lock()  # Guards security-group rule set

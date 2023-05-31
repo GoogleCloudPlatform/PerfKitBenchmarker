@@ -22,7 +22,7 @@ from absl import flags
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import iaas_relational_db
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
@@ -41,7 +41,7 @@ POSTGRES_SUPPORTED_MAJOR_VERSIONS = ['9.6', '10', '11', '12', '13']
 
 class AwsIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
   """A AWS IAAS database resource."""
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
 
 
 class AwsRelationalDbParameterError(Exception):
@@ -429,4 +429,3 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
 
     for current_instance_id in self.all_instance_ids:
       WaitUntilInstanceDeleted(current_instance_id)
-

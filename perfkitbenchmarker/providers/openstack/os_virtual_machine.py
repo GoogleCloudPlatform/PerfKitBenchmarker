@@ -28,8 +28,9 @@ import logging
 import threading
 from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
-from perfkitbenchmarker import virtual_machine, linux_virtual_machine
+from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import os_disk
 from perfkitbenchmarker.providers.openstack import os_network
@@ -46,7 +47,7 @@ FLAGS = flags.FLAGS
 class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an OpenStack Virtual Machine"""
 
-  CLOUD = providers.OPENSTACK
+  CLOUD = provider_info.OPENSTACK
   DEFAULT_IMAGE = None
 
   _lock = threading.Lock()  # _lock guards the following:

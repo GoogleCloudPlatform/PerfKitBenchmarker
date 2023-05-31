@@ -22,7 +22,7 @@ import json
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -74,7 +74,7 @@ DISK_METADATA = {
 SCSI = 'SCSI'
 NVME = 'NVME'
 
-disk.RegisterDiskTypeMap(providers.GCP, DISK_TYPE)
+disk.RegisterDiskTypeMap(provider_info.GCP, DISK_TYPE)
 
 
 NVME_PD_MACHINE_FAMILIES = [
@@ -115,7 +115,7 @@ def AddLabels(gcp_resource: resource.BaseResource, disk_name: str):
 class GceDiskSpec(disk.BaseDiskSpec):
   """Object holding the information needed to create an GCPDisk."""
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):

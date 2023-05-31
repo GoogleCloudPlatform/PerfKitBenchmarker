@@ -25,6 +25,7 @@ import logging
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker.linux_packages import memcached_server
 from perfkitbenchmarker.linux_packages import ycsb
@@ -32,8 +33,8 @@ from perfkitbenchmarker.providers.aws import aws_network
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('memcached_managed', providers.GCP,
-                  [providers.GCP, providers.AWS],
+flags.DEFINE_enum('memcached_managed', provider_info.GCP,
+                  [provider_info.GCP, provider_info.AWS],
                   'Managed memcached provider (GCP/AWS) to use.')
 
 flags.DEFINE_enum('memcached_scenario', 'custom',
@@ -115,10 +116,10 @@ def Prepare(benchmark_spec):
     # We need to delete the managed memcached backend when we're done
     benchmark_spec.always_call_cleanup = True
 
-    if FLAGS.memcached_managed == providers.GCP:
+    if FLAGS.memcached_managed == provider_info.GCP:
       raise NotImplementedError("GCP managed memcached backend not implemented "
                                 "yet")
-    elif FLAGS.memcached_managed == providers.AWS:
+    elif FLAGS.memcached_managed == provider_info.AWS:
       cluster_id = 'pkb%s' % FLAGS.run_uri
       service = providers.aws.elasticache.ElastiCacheMemcacheService(
           aws_network.AwsNetwork.GetNetwork(clients[0]),

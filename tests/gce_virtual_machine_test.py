@@ -30,7 +30,7 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -327,7 +327,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     return fake_rets
 
   def testCreateUbuntu1804(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP,
+                                          os_types.UBUNTU1804)
     fake_image = 'fake-ubuntu1804'
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)) as issue_command:
@@ -337,7 +338,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 1)
-      self.assertEqual(vm.GetDefaultImageFamily(), 'ubuntu-1804-lts')
+      self.assertEqual(vm.GetDefaultImageFamily(False), 'ubuntu-1804-lts')
+      self.assertEqual(vm.GetDefaultImageFamily(True), 'ubuntu-1804-lts-arm64')
       self.assertEqual(vm.GetDefaultImageProject(), 'ubuntu-os-cloud')
       self.assertTrue(vm.SupportGVNIC())
       self.assertIn('gcloud compute instances create', command_string)
@@ -357,7 +359,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateUbuntuInCustomProject(self):
     """Test simulating passing --image and --image_project."""
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP,
+                                          os_types.UBUNTU1804)
     fake_image = 'fake-ubuntu1804'
     fake_image_project = 'fake-project'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
@@ -387,7 +390,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateUbuntuInCustomDisk(self):
     """Test simulating passing --image and --image_project."""
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.UBUNTU1804)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP,
+                                          os_types.UBUNTU1804)
     fake_image = 'fake-ubuntu1804'
     fake_image_project = 'fake-project'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
@@ -418,7 +422,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertNotIn('image_family', vm_metadata)
 
   def testCreateRhel7CustomImage(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.RHEL7)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.RHEL7)
     fake_image = 'fake-custom-rhel-image'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type',
@@ -443,7 +447,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertNotIn('image_family', vm_metadata)
 
   def testCreateCentOs7CustomImage(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.CENTOS7)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.CENTOS7)
     fake_image = 'fake-custom-centos7-image'
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type',
@@ -468,7 +472,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertNotIn('image_family', vm_metadata)
 
   def testCosVm(self):
-    vm_class = virtual_machine.GetVmClass(providers.GCP, os_types.COS)
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.COS)
     spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
                                          machine_type='fake-machine-type')
     fake_image = 'fake_cos_image'
@@ -496,7 +500,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(GCEVMFlagsTestCase, self).setUp()
-    FLAGS.cloud = providers.GCP
+    FLAGS.cloud = provider_info.GCP
     FLAGS.gcloud_path = 'test_gcloud'
     FLAGS.run_uri = 'aaaaaa'
     FLAGS.gcp_instance_metadata = []

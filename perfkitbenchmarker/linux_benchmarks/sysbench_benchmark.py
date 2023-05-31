@@ -528,6 +528,7 @@ def _InstallLuaScriptsIfNecessary(vm, db):
     if db.spec.engine == sql_engine_utils.SPANNER_POSTGRES:
       vm.PushDataFile('spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
       vm.PushDataFile('spanner_pg_tpcc_run.lua', '~/tpcc_run.lua')
+      vm.PushDataFile('spanner_pg_tpcc.lua', '~/tpcc.lua')
 
 
 def _IsValidFlag(flag):

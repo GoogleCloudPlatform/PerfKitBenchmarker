@@ -21,6 +21,7 @@ import mock
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
@@ -55,13 +56,15 @@ class PerCloudConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testDefaults(self):
     spec = self._spec_class(_COMPONENT)
-    for cloud in providers.VALID_CLOUDS:
+    for cloud in provider_info.VALID_CLOUDS:
       self.assertIsNone(getattr(spec, cloud))
 
   def testDict(self):
     spec = self._spec_class(_COMPONENT, GCP={})
     self.assertEqual(spec.GCP, {})
-    for cloud in frozenset(providers.VALID_CLOUDS).difference([providers.GCP]):
+    for cloud in frozenset(provider_info.VALID_CLOUDS).difference(
+        [provider_info.GCP]
+    ):
       self.assertIsNone(getattr(spec, cloud))
 
   def testNonDict(self):
@@ -97,12 +100,12 @@ class PerCloudConfigDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
     result = self._decoder.Decode({}, _COMPONENT, {})
     self.assertIsInstance(result, option_decoders._PerCloudConfigSpec)
     self.assertEqual(result.__dict__, {
-        cloud: None for cloud in providers.VALID_CLOUDS})
+        cloud: None for cloud in provider_info.VALID_CLOUDS})
 
   def testNonEmptyDict(self):
     result = self._decoder.Decode(_GCP_ONLY_VM_CONFIG, _COMPONENT, {})
     self.assertIsInstance(result, option_decoders._PerCloudConfigSpec)
-    expected_attributes = {cloud: None for cloud in providers.VALID_CLOUDS}
+    expected_attributes = {cloud: None for cloud in provider_info.VALID_CLOUDS}
     expected_attributes['GCP'] = {'machine_type': 'n1-standard-1'}
     self.assertEqual(result.__dict__, expected_attributes)
 
@@ -168,7 +171,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(VmGroupSpecTestCase, self).setUp()
     self._spec_class = vm_group_decoders.VmGroupSpec
-    self._kwargs = {'cloud': providers.GCP, 'os_type': os_types.UBUNTU1804,
+    self._kwargs = {'cloud': provider_info.GCP, 'os_type': os_types.UBUNTU1804,
                     'vm_spec': _GCP_AWS_VM_CONFIG}
 
   def testMissingValues(self):
@@ -193,9 +196,13 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self._kwargs['cloud'] = 'fake_provider'
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._spec_class(_COMPONENT, **self._kwargs)
-    self.assertEqual(str(cm.exception), (
+    self.assertEqual(
+        str(cm.exception),
         'Invalid test_component.cloud value: "fake_provider". Value must be '
-        'one of the following: {0}.'.format(', '.join(providers.VALID_CLOUDS))))
+        'one of the following: {0}.'.format(
+            ', '.join(provider_info.VALID_CLOUDS)
+        ),
+    )
 
   def testInvalidDiskCount(self):
     self._kwargs['disk_count'] = -1
@@ -253,7 +260,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testValidInput(self):
     result = self._spec_class(
-        _COMPONENT, cloud=providers.AWS, disk_count=0,
+        _COMPONENT, cloud=provider_info.AWS, disk_count=0,
         disk_spec=_GCP_AWS_DISK_CONFIG, os_type=os_types.AMAZONLINUX2,
         static_vms=[{}], vm_count=0, vm_spec=_GCP_AWS_VM_CONFIG)
     self.assertIsInstance(result, vm_group_decoders.VmGroupSpec)
@@ -272,7 +279,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Config.MissingOption) as cm:
       self._spec_class(
           _COMPONENT,
-          cloud=providers.GCP,
+          cloud=provider_info.GCP,
           os_type=os_types.UBUNTU1804,
           disk_spec={},
           vm_spec=_GCP_AWS_VM_CONFIG)
@@ -285,7 +292,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Config.MissingOption) as cm:
       self._spec_class(
           _COMPONENT,
-          cloud=providers.GCP,
+          cloud=provider_info.GCP,
           os_type=os_types.UBUNTU1804,
           vm_spec={})
     self.assertEqual(
@@ -294,7 +301,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
          'contain a configuration for "GCP".'))
 
   def createNonPresentFlags(self):
-    FLAGS.cloud = providers.AWS
+    FLAGS.cloud = provider_info.AWS
     FLAGS.num_vms = 3
     FLAGS.os_type = os_types.WINDOWS2019_CORE
 
@@ -362,7 +369,7 @@ class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testValidInput(self):
     result = self._decoder.Decode({
-        'default': {'cloud': providers.GCP, 'os_type': os_types.UBUNTU1804,
+        'default': {'cloud': provider_info.GCP, 'os_type': os_types.UBUNTU1804,
                     'vm_spec': _GCP_AWS_VM_CONFIG}}, _COMPONENT, {})
     self.assertIsInstance(result, dict)
     self.assertEqual(len(result), 1)
@@ -375,10 +382,17 @@ class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testInvalidInput(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
       self._decoder.Decode(
-          {'default': {'cloud': providers.GCP, 'os_type': os_types.UBUNTU1804,
-                       'static_vms': [{}, {'fake_option': 1.2}],
-                       'vm_spec': _GCP_AWS_VM_CONFIG}},
-          _COMPONENT, {})
+          {
+              'default': {
+                  'cloud': provider_info.GCP,
+                  'os_type': os_types.UBUNTU1804,
+                  'static_vms': [{}, {'fake_option': 1.2}],
+                  'vm_spec': _GCP_AWS_VM_CONFIG,
+              }
+          },
+          _COMPONENT,
+          {},
+      )
     self.assertEqual(str(cm.exception), (
         'Unrecognized options were found in '
         'test_component.default.static_vms[1]: fake_option.'))
@@ -389,7 +403,7 @@ class CloudRedisDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(CloudRedisDecoderTestCase, self).setUp()
     self._decoder = benchmark_config_spec._CloudRedisDecoder()
-    FLAGS.cloud = providers.GCP
+    FLAGS.cloud = provider_info.GCP
     FLAGS.run_uri = 'test'
 
   def testNone(self):
@@ -436,7 +450,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     self._spec_class = benchmark_config_spec.BenchmarkConfigSpec
     self._description = 'Test description.'
-    self._vm_groups = {'default': {'cloud': providers.GCP,
+    self._vm_groups = {'default': {'cloud': provider_info.GCP,
                                    'os_type': os_types.UBUNTU1804,
                                    'vm_spec': _GCP_AWS_VM_CONFIG}}
     self._kwargs = {'description': self._description,
@@ -487,7 +501,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         .format(sep=os.linesep)))
 
   def testFlagOverridesPropagate(self):
-    self._kwargs['flags'] = {'cloud': providers.AWS,
+    self._kwargs['flags'] = {'cloud': provider_info.AWS,
                              'ignore_package_requirements': True}
     result = self._spec_class(_COMPONENT, flag_values=FLAGS, **self._kwargs)
     self.assertIsInstance(result, benchmark_config_spec.BenchmarkConfigSpec)

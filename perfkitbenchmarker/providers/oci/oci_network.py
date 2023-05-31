@@ -6,7 +6,7 @@ import uuid
 
 from absl import flags
 from perfkitbenchmarker import network
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.oci import util
@@ -311,7 +311,7 @@ class OciVcn(resource.BaseResource):
 class OciNetwork(network.BaseNetwork):
     """Object representing a AliCloud Network."""
 
-    CLOUD = providers.OCI
+    CLOUD = provider_info.OCI
 
     def __init__(self, spec):
         super(OciNetwork, self).__init__(spec)

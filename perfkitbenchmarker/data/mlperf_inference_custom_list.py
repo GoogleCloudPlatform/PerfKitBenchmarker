@@ -230,7 +230,7 @@ custom_systems["A10x8"] = SystemConfiguration(
                 max_power_limit=300.0,
                 pci_id="0x223710DE",
                 compute_sm=86,
-            ): 7
+            ): 8
         }
     ),
     numa_conf=None,

@@ -8,7 +8,7 @@ from perfkitbenchmarker import benchmark_spec  # pylint: disable=unused-import
 from perfkitbenchmarker import cloud_harmony_util
 # Imported for machine_type and zones flag
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from tests import pkb_common_test_case
 
 
@@ -16,7 +16,7 @@ class CloudHarmonyTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
-    flags.FLAGS['cloud'].parse(providers.GCP)
+    flags.FLAGS['cloud'].parse(provider_info.GCP)
     flags.FLAGS['zone'].parse(['us-east3'])
     flags.FLAGS['machine_type'].parse('n1-standard-2')
     flags.FLAGS.run_uri = None

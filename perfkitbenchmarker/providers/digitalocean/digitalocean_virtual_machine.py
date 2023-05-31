@@ -16,7 +16,7 @@
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.digitalocean import digitalocean_disk
@@ -51,7 +51,7 @@ runcmd:
 class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a DigitalOcean Virtual Machine (Droplet)."""
 
-  CLOUD = providers.DIGITALOCEAN
+  CLOUD = provider_info.DIGITALOCEAN
   # Subclasses should override the default image.
   DEFAULT_IMAGE = None
 

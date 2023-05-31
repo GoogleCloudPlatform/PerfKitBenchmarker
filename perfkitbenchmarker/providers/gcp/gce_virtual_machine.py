@@ -44,7 +44,7 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -85,6 +85,7 @@ _METADATA_PREEMPT_CMD = (
 _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     't2a': 'neoverse-n1',
 }
+
 FIVE_MINUTE_TIMEOUT = 300
 
 
@@ -106,7 +107,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     boot_disk_type: string or None. The type of the boot disk.
   """
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   def __init__(self, *args, **kwargs):
     self.num_local_ssds: int = None
@@ -121,6 +122,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     self.threads_per_core: int = None
     self.gce_tags: List[str] = None
     self.min_node_cpus: int = None
+    self.subnet_name: str = None
     super(GceVmSpec, self).__init__(*args, **kwargs)
 
     if isinstance(
@@ -216,47 +218,49 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
           arguments to construct in order to decode the named option.
     """
     result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
-    result.update(
-        {
-            'machine_type': (
-                custom_virtual_machine_spec.MachineTypeDecoder,
-                {'default': None},
-            ),
-            'ssd_interface': (
-                option_decoders.StringDecoder,
-                {'default': 'SCSI'},
-            ),
-            'num_local_ssds': (
-                option_decoders.IntDecoder,
-                {'default': 0, 'min': 0},
-            ),
-            'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
-            'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
-            'boot_disk_type': (
-                option_decoders.StringDecoder,
-                {'default': None},
-            ),
-            'project': (option_decoders.StringDecoder, {'default': None}),
-            'image_family': (option_decoders.StringDecoder, {'default': None}),
-            'image_project': (option_decoders.StringDecoder, {'default': None}),
-            'node_type': (
-                option_decoders.StringDecoder,
-                {'default': 'n1-node-96-624'},
-            ),
-            'min_cpu_platform': (
-                option_decoders.StringDecoder,
-                {'default': None},
-            ),
-            'threads_per_core': (option_decoders.IntDecoder, {'default': None}),
-            'gce_tags': (
-                option_decoders.ListDecoder,
-                {
-                    'item_decoder': option_decoders.StringDecoder(),
-                    'default': None,
-                },
-            ),
-        }
-    )
+    result.update({
+        'machine_type': (
+            custom_virtual_machine_spec.MachineTypeDecoder,
+            {'default': None},
+        ),
+        'ssd_interface': (
+            option_decoders.StringDecoder,
+            {'default': 'SCSI'},
+        ),
+        'num_local_ssds': (
+            option_decoders.IntDecoder,
+            {'default': 0, 'min': 0},
+        ),
+        'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
+        'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
+        'boot_disk_type': (
+            option_decoders.StringDecoder,
+            {'default': None},
+        ),
+        'project': (option_decoders.StringDecoder, {'default': None}),
+        'image_family': (option_decoders.StringDecoder, {'default': None}),
+        'image_project': (option_decoders.StringDecoder, {'default': None}),
+        'node_type': (
+            option_decoders.StringDecoder,
+            {'default': 'n1-node-96-624'},
+        ),
+        'min_cpu_platform': (
+            option_decoders.StringDecoder,
+            {'default': None},
+        ),
+        'threads_per_core': (option_decoders.IntDecoder, {'default': None}),
+        'gce_tags': (
+            option_decoders.ListDecoder,
+            {
+                'item_decoder': option_decoders.StringDecoder(),
+                'default': None,
+            },
+        ),
+        'subnet_name': (
+            option_decoders.StringDecoder,
+            {'none_ok': True, 'default': None},
+        ),
+    })
     return result
 
 
@@ -401,7 +405,7 @@ def GetArmArchitecture(machine_type):
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
 
   DEFAULT_IMAGE = None
   BOOT_DISK_SIZE_GB = None
@@ -441,10 +445,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.spot_early_termination = False
     self.preemptible_status_code = None
     self.project = vm_spec.project or util.GetDefaultProject()
-    self.image_family = vm_spec.image_family or self.GetDefaultImageFamily()
     self.image_project = vm_spec.image_project or self.GetDefaultImageProject()
     self.backfill_image = False
     self.mtu: Optional[int] = FLAGS.mtu
+    self.subnet_name = vm_spec.subnet_name
     self.network = self._GetNetwork()
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk_size = vm_spec.boot_disk_size or self.BOOT_DISK_SIZE_GB
@@ -494,20 +498,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       # Assign host_arch to avoid running detect_host on ARM
       self.host_arch = arm_arch
       self.is_aarch64 = True
-
-      if 'arm64' not in self.image_family:
-        arm_image_family = f'{self.image_family}-arm64'
-        logging.warning(
-            'ARM image must be used; changing image to %s',
-            arm_image_family,
-        )
-        self.image_family = arm_image_family
-
-    # Reset image when running client-server benchmarks where client must be x86
-    if not arm_arch and self.image_family and 'arm64' in self.image_family:
-      logging.warning('Using default image and project for non-ARM VM')
-      self.image_family = self.GetDefaultImageFamily()  # pylint: disable=assignment-from-none
-      self.image_project = self.GetDefaultImageProject()  # pylint: disable=assignment-from-none
+    self.image_family = (
+        vm_spec.image_family or self.GetDefaultImageFamily(self.is_aarch64))
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
@@ -1128,6 +1120,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.max_local_disks:
       result['gce_local_ssd_count'] = self.max_local_disks
       result['gce_local_ssd_interface'] = self.ssd_interface
+    result['gce_network_name'] = self.network.network_resource.name
     result['gce_network_tier'] = self.gce_network_tier
     result['gce_nic_type'] = self.gce_nic_type
     if self.gce_egress_bandwidth_tier:
@@ -1178,10 +1171,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _GetLMNotificationCommand(self):
     """Return Remote python execution command for LM notify script."""
-    vm_name = self.name
     vm_path = posixpath.join(vm_util.VM_TMP_DIR, self._LM_NOTICE_SCRIPT)
     server_log = self._LM_NOTICE_LOG
-    return f'python3 {vm_path} {vm_name} > {server_log} 2>&1'
+    return (
+        f'python3 {vm_path} {gcp_flags.LM_NOTIFICATION_METADATA_NAME.value} >'
+        f' {server_log} 2>&1'
+    )
+
+  def _PullLMNoticeLog(self):
+    """Pull the LM Notice Log onto the local VM."""
+    self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
 
   def StartLMNotification(self):
     """Start meta-data server notification subscription."""
@@ -1192,7 +1191,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           timeout=LM_NOTIFICATION_TIMEOUT_SECONDS,
           ignore_failure=True,
       )
-      self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
+      self._PullLMNoticeLog()
       logging.info('[LM Notify] Release live migration lock.')
       self._LM_TIMES_SEMAPHORE.release()
 
@@ -1205,6 +1204,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info('[LM Notify] Wait for live migration to finish.')
     self._LM_TIMES_SEMAPHORE.acquire()
     logging.info('[LM Notify] Live migration is done.')
+
+  def _ReadLMNoticeContents(self):
+    """Read the contents of the LM Notice Log into a string."""
+    return self.RemoteCommand(f'cat {self._LM_NOTICE_LOG}')[0]
 
   def CollectLMNotificationsTime(self):
     """Extract LM notifications from log file.
@@ -1225,7 +1228,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         lm_end_time_key: 0,
         lm_total_time_key: 0,
     }
-    lm_times, _ = self.RemoteCommand(f'cat {self._LM_NOTICE_LOG}')
+    lm_times = self._ReadLMNoticeContents()
     if not lm_times:
       return events_dict
 
@@ -1362,7 +1365,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def SupportGVNIC(self) -> bool:
     return True
 
-  def GetDefaultImageFamily(self) -> Optional[str]:
+  def GetDefaultImageFamily(self, is_arm: bool) -> Optional[str]:
     return None
 
   def GetDefaultImageProject(self) -> Optional[str]:
@@ -1384,6 +1387,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   # Subclasses should override the default image OR
   # both the image family and image_project.
   DEFAULT_IMAGE_FAMILY = None
+  DEFAULT_ARM_IMAGE_FAMILY = None
   DEFAULT_IMAGE_PROJECT = None
   SUPPORTS_GVNIC = True
 
@@ -1449,9 +1453,20 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   def SupportGVNIC(self) -> bool:
     return self.SUPPORTS_GVNIC
 
-  def GetDefaultImageFamily(self) -> str:
+  # Use an explicit is_arm parameter to not accidentally assume a default
+  def GetDefaultImageFamily(self, is_arm: bool) -> str:
     if not self.DEFAULT_IMAGE_FAMILY:
       raise ValueError('DEFAULT_IMAGE_FAMILY can not be None')
+    if is_arm:
+      if self.DEFAULT_ARM_IMAGE_FAMILY:
+        return self.DEFAULT_ARM_IMAGE_FAMILY
+      if 'arm64' not in self.DEFAULT_IMAGE_FAMILY:
+        arm_image_family = self.DEFAULT_IMAGE_FAMILY + '-arm64'
+        logging.info(
+            'ARM image must be used; changing image to %s',
+            arm_image_family,
+        )
+        return arm_image_family
     return self.DEFAULT_IMAGE_FAMILY
 
   def GetDefaultImageProject(self) -> str:
@@ -1562,6 +1577,7 @@ class ContainerOptimizedOsBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.ContainerOptimizedOsMixin
 ):
   DEFAULT_IMAGE_FAMILY = 'cos-stable'
+  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-stable'
   DEFAULT_IMAGE_PROJECT = 'cos-cloud'
 
 

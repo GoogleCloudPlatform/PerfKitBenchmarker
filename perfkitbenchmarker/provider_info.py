@@ -21,6 +21,25 @@ used for IsBenchmarkSupported
 
 import six
 
+GCP = 'GCP'
+AZURE = 'Azure'
+AWS = 'AWS'
+IBMCLOUD = 'IBMCloud'
+ALICLOUD = 'AliCloud'
+KUBERNETES = 'Kubernetes'
+DIGITALOCEAN = 'DigitalOcean'
+OPENSTACK = 'OpenStack'
+CLOUDSTACK = 'CloudStack'
+RACKSPACE = 'Rackspace'
+MESOS = 'Mesos'
+PROFITBRICKS = 'ProfitBricks'
+# Though Docker is not a cloud provider, it's inclusion is useful
+# for performing on premise to cloud benchmarks
+DOCKER = 'Docker'
+OCI = 'OCI'
+
+VALID_CLOUDS = (GCP, AZURE, AWS, IBMCLOUD, DIGITALOCEAN, KUBERNETES, OPENSTACK,
+                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS, PROFITBRICKS, DOCKER, OCI)
 
 _PROVIDER_INFO_REGISTRY = {}
 

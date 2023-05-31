@@ -30,7 +30,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import placement_group
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_placement_group
@@ -64,7 +64,7 @@ NON_PLACEMENT_GROUP_PREFIXES = frozenset(
 class AwsFirewall(network.BaseFirewall):
   """An object representing the AWS Firewall."""
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
 
   def __init__(self):
     self.firewall_set = set()
@@ -616,7 +616,7 @@ class _AwsRegionalNetwork(network.BaseNetwork):
   _regional_network_count = 0
   _regional_network_lock = threading.Lock()
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
 
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)
@@ -819,7 +819,7 @@ class AwsNetwork(network.BaseNetwork):
     placement_group: An AwsPlacementGroup instance.
   """
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
 
   def __repr__(self):
     return '%s(%r)' % (self.__class__, self.__dict__)

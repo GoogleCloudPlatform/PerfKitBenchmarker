@@ -15,10 +15,9 @@
 """Provider info for Google Cloud Platform."""
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
 
 
 class GCPProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = []
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP

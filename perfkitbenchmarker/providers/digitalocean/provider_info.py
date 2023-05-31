@@ -18,10 +18,9 @@
 
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
 
 
 class DigitalOceanProviderInfo(provider_info.BaseProviderInfo):
 
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
-  CLOUD = providers.DIGITALOCEAN
+  CLOUD = provider_info.DIGITALOCEAN

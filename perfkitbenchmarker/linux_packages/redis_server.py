@@ -14,10 +14,11 @@
 """Module containing redis installation and cleanup functions."""
 
 import logging
-
 from typing import Any, Dict, List
+
 from absl import flags
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import os_types
 
 
 class RedisEvictionPolicy():
@@ -89,16 +90,25 @@ def _Install(vm) -> None:
 
 def YumInstall(vm) -> None:
   """Installs the redis package on the VM."""
-  vm.InstallPackages('tcl-devel')
-  vm.InstallPackages('scl-utils centos-release-scl')
-  vm.InstallPackages('devtoolset-7 libuuid-devel')
-  vm.InstallPackages('openssl openssl-devel curl-devel '
-                     'devtoolset-7-libatomic-devel tcl '
-                     'tcl-devel git wget epel-release')
-  vm.InstallPackages('tcltls libzstd procps-ng')
-  vm.RemoteCommand(
-      'echo "source scl_source enable devtoolset-7" | sudo tee -a $HOME/.bashrc'
-  )
+  if vm.OS_TYPE in os_types.CENTOS_TYPES:
+    vm.InstallPackages('tcl-devel')
+    vm.InstallPackages('scl-utils centos-release-scl')
+    vm.InstallPackages('devtoolset-7 libuuid-devel')
+    vm.InstallPackages(
+        'openssl openssl-devel curl-devel '
+        'devtoolset-7-libatomic-devel tcl '
+        'tcl-devel git wget epel-release'
+    )
+    vm.InstallPackages('tcltls libzstd procps-ng')
+    vm.RemoteCommand(
+        'echo "source scl_source enable devtoolset-7" | sudo tee -a'
+        ' $HOME/.bashrc'
+    )
+
+  elif vm.BASE_OS_TYPE == os_types.RHEL:
+    vm.RemoteCommand('sudo yum group install -y "Development Tools"')
+  else:
+    raise NotImplementedError()
   _Install(vm)
 
 

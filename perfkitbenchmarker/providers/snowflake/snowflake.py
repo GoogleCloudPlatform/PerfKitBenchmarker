@@ -23,14 +23,14 @@ import json
 from typing import Dict, List, Text, Tuple
 from absl import flags
 from perfkitbenchmarker import edw_service
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 
 FLAGS = flags.FLAGS
 
 # TODO(jguertin): Update these jdbc client names to reflect their function
 JdbcClientDict = {
-    providers.AWS: 'snowflake-jdbc-client-2.0.jar',
-    providers.AZURE: 'snowflake-jdbc-client-azure-external-2.0.jar'
+    provider_info.AWS: 'snowflake-jdbc-client-2.0.jar',
+    provider_info.AZURE: 'snowflake-jdbc-client-azure-external-2.0.jar'
 }
 
 

@@ -15,7 +15,7 @@ from absl import flags
 
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_dpb_glue_prices
 from perfkitbenchmarker.providers.aws import s3
@@ -33,7 +33,7 @@ def _ModuleFromPyFilename(py_filename):
 class AwsDpbGlue(dpb_service.BaseDpbService):
   """Resource that allows spawning serverless AWS Glue Jobs."""
 
-  CLOUD = providers.AWS
+  CLOUD = provider_info.AWS
   SERVICE_TYPE = 'glue'
   SPARK_SQL_GLUE_WRAPPER_SCRIPT = (
       'spark_sql_test_scripts/spark_sql_glue_wrapper.py'

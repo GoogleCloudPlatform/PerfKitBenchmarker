@@ -37,17 +37,19 @@ import posixpath
 import re
 import threading
 import time
-from typing import Dict, Optional, Tuple, Set
+from typing import Dict, Optional, Set, Tuple, Union
 import uuid
 
 from absl import flags
 from packaging import version as packaging_version
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -58,6 +60,7 @@ FLAGS = flags.FLAGS
 
 OS_PRETTY_NAME_REGEXP = r'PRETTY_NAME="(.*)"'
 _EPEL_URL = 'https://dl.fedoraproject.org/pub/epel/epel-release-latest-{}.noarch.rpm'
+_ORACLE_EPEL_URL = 'oracle-epel-release-el{}'
 CLEAR_BUILD_REGEXP = r'Installed version:\s*(.*)\s*'
 UPDATE_RETRIES = 5
 DEFAULT_SSH_PORT = 22
@@ -345,6 +348,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.primary_remote_access_port = self.ssh_port
     self.has_private_key = False
     self.has_dpdk = False
+    self.ssh_external_time = None
+    self.ssh_internal_time = None
 
     self._remote_command_script_upload_lock = threading.Lock()
     self._has_remote_command_script = False
@@ -866,18 +871,40 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         self.port_listening_time is None):
       self.TestConnectRemoteAccessPort()
       self.port_listening_time = time.time()
-
-    self._WaitForSSH()
+    connect_threads = [
+        (self._WaitForSshExternal, [], {}),
+        (self._WaitForSshInternal, [], {}),
+        ]
+    background_tasks.RunParallelThreads(connect_threads, len(connect_threads))
 
     if self.bootable_time is None:
       self.bootable_time = time.time()
 
+  def _WaitForSshExternal(self):
+    if self.boot_completion_ip_subset not in (
+        virtual_machine.BootCompletionIpSubset.EXTERNAL,
+        virtual_machine.BootCompletionIpSubset.BOTH,
+    ):
+      return
+    self._WaitForSSH(self.ip_address)
+    self.ssh_external_time = time.time()
+
+  def _WaitForSshInternal(self):
+    if self.boot_completion_ip_subset not in (
+        virtual_machine.BootCompletionIpSubset.INTERNAL,
+        virtual_machine.BootCompletionIpSubset.BOTH,
+    ):
+      return
+    self._WaitForSSH(self.internal_ip)
+    self.ssh_internal_time = time.time()
+
   @vm_util.Retry(log_errors=False, poll_interval=1)
-  def _WaitForSSH(self):
+  def _WaitForSSH(self, ip_address: Union[str, None] = None):
     """Waits until the VM is ready."""
     # Always wait for remote host command to succeed, because it is necessary to
     # run benchmarks
-    resp, _ = self.RemoteHostCommand('hostname', retries=1)
+    resp, _ = self.RemoteHostCommand('hostname', retries=1,
+                                     ip_address=ip_address)
     if self.hostname is None:
       self.hostname = resp[:-1]
 
@@ -1126,6 +1153,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       ignore_failure: bool = False,
       login_shell: bool = False,
       timeout: Optional[float] = None,
+      ip_address: Optional[str] = None,
   ) -> Tuple[str, str, int]:
     """Runs a command on the VM.
 
@@ -1140,6 +1168,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       ignore_failure: Ignore any failure if set to true.
       login_shell: Run command in a login shell.
       timeout: The timeout for IssueCommand.
+      ip_address: The ip address to use to connect to host.  If None, uses
+        self.GetConnectionIp()
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -1153,7 +1183,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       # Multi-line commands passed to ssh won't work on Windows unless the
       # newlines are escaped.
       command = command.replace('\n', '\\n')
-    ip_address = self.GetConnectionIp()
+
+    if ip_address is None:
+      ip_address = self.GetConnectionIp()
     user_host = '%s@%s' % (self.user_name, ip_address)
     ssh_cmd = ['ssh', '-A', '-p', str(self.ssh_port), user_host]
     ssh_private_key = (self.ssh_private_key if self.is_static else
@@ -1957,6 +1989,23 @@ class Rhel9Mixin(BaseRhelMixin):
     # https://docs.fedoraproject.org/en-US/epel/#_rhel_9
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(9)}')
 
+class Oracle8Mixin(BaseRhelMixin):
+    """Class holding Oracle Linux 8 specific VM methods and attributes."""
+    OS_TYPE = os_types.ORACLE8
+    PYTHON_2_PACKAGE = None
+
+    def SetupPackageManager(self):
+        """Install EPEL."""
+        self.RemoteCommand(f'sudo dnf install -y {_ORACLE_EPEL_URL.format(8)}')
+
+class Oracle9Mixin(BaseRhelMixin):
+    """Class holding Oracle Linux 9 specific VM methods and attributes."""
+    OS_TYPE = os_types.ORACLE9
+    PYTHON_2_PACKAGE = None
+
+    def SetupPackageManager(self):
+        """Install EPEL."""
+        self.RemoteCommand(f'sudo dnf install -y {_ORACLE_EPEL_URL.format(9)}')
 
 class CentOs7Mixin(BaseRhelMixin):
   """Class holding CentOS 7 specific VM methods and attributes."""
@@ -2237,6 +2286,11 @@ class Debian10Mixin(BaseDebianMixin):
   OS_TYPE = os_types.DEBIAN10
 
 
+class Debian10BackportsMixin(Debian10Mixin):
+  """Debian 10 with backported kernel."""
+  OS_TYPE = os_types.DEBIAN10_BACKPORTS
+
+
 class Debian11Mixin(BaseDebianMixin):
   """Class holding Debian 11 specific VM methods and attributes."""
   OS_TYPE = os_types.DEBIAN11
@@ -2246,6 +2300,11 @@ class Debian11Mixin(BaseDebianMixin):
     # partitioning.
     self.InstallPackages('fdisk')
     super().PrepareVMEnvironment()
+
+
+class Debian11BackportsMixin(Debian11Mixin):
+  """Debian 11 with backported kernel."""
+  OS_TYPE = os_types.DEBIAN11_BACKPORTS
 
 
 class BaseUbuntuMixin(BaseDebianMixin):
@@ -2506,6 +2565,17 @@ def _ParseTextProperties(text):
     yield current_data
 
 
+def CreateLscpuSamples(vms):
+  """Creates samples from linux VMs of lscpu output."""
+  samples = []
+  for vm in vms:
+    if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
+      metadata = {'node_name': vm.name}
+      metadata.update(vm.CheckLsCpu().data)
+      samples.append(sample.Sample('lscpu', 0, '', metadata))
+  return samples
+
+
 class LsCpuResults(object):
   """Holds the contents of the command lscpu."""
 
@@ -2558,6 +2628,24 @@ class LsCpuResults(object):
     self.cores_per_socket = GetInt('Core(s) per socket')
     self.socket_count = GetInt('Socket(s)')
     self.threads_per_core = GetInt('Thread(s) per core')
+
+
+def CreateProcCpuSamples(vms):
+  """Creates samples from linux VMs of lscpu output."""
+  samples = []
+  for vm in vms:
+    if vm.OS_TYPE not in os_types.LINUX_OS_TYPES:
+      continue
+    data = vm.CheckProcCpu()
+    metadata = {'node_name': vm.name}
+    metadata.update(data.GetValues())
+    samples.append(sample.Sample('proccpu', 0, '', metadata))
+    metadata = {'node_name': vm.name}
+    for processor_id, raw_values in data.mappings.items():
+      values = ['%s=%s' % item for item in raw_values.items()]
+      metadata['proc_{}'.format(processor_id)] = ';'.join(sorted(values))
+    samples.append(sample.Sample('proccpu_mapping', 0, '', metadata))
+  return samples
 
 
 class ProcCpuResults(object):

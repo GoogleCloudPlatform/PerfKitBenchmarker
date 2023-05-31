@@ -26,7 +26,6 @@ import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import pkb
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from tests import pkb_common_test_case
@@ -134,7 +133,7 @@ class TestSysctl(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(vm, 'RemoteCommand') as remote_command:
       vm.DoSysctls()
 
-    self.assertEqual(sorted(remote_command.call_args_list), sorted(calls))
+    self.assertCountEqual(remote_command.call_args_list, calls)
 
   def testSysctl(self):
     self.runTest(
@@ -258,7 +257,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
 
   def testRecordLscpuOutputLinux(self):
     vm = self.CreateVm(os_types.DEFAULT, self.LsCpuText(self.LSCPU_DATA))
-    samples = pkb._CreateLscpuSamples([vm])
+    samples = linux_virtual_machine.CreateLscpuSamples([vm])
     vm.RemoteCommand.assert_called_with('lscpu')
     self.assertEqual(1, len(samples))
     metadata = {'node_name': vm.name}
@@ -268,7 +267,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
 
   def testRecordLscpuOutputNonLinux(self):
     vm = self.CreateVm(os_types.WINDOWS, '')
-    samples = pkb._CreateLscpuSamples([vm])
+    samples = linux_virtual_machine.CreateLscpuSamples([vm])
     self.assertEqual(0, len(samples))
     vm.RemoteCommand.assert_not_called()
 
@@ -310,7 +309,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
 
   def testProcCpuSamples(self):
     vm = self.CreateVm(os_types.DEFAULT, self.PROC_CPU_TEXT)
-    samples = pkb._CreateProcCpuSamples([vm])
+    samples = linux_virtual_machine.CreateProcCpuSamples([vm])
     proccpu_metadata = {
         'cpu family': '6',
         'node_name': 'pkb-test',
@@ -421,14 +420,23 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def CreateVm(self, run_cmd_response: Union[str, Dict[str, str]]):
     vm = CreateTestLinuxVm()
+
     def FakeRemoteHostCommandWithReturnCode(cmd, **_):
       if isinstance(run_cmd_response, str):
         stdout = run_cmd_response
       elif isinstance(run_cmd_response, dict):
-        # NOTE: unfortunately @vm_util.Retry will infinitely retry a key error
-        # on this map, which can be tricky to diagnose.
+        # NOTE: @vm_util.Retry would infinitely retry a KeyError on this map so
+        # we raise SystemExit which does not inherit from Exception.
+        # Unfortunately other issues, like a typo can raise
+        # AttributeError which is retried until the test times out.
+        # See b/271465182 for more discussion.
+        if cmd not in run_cmd_response:
+          raise SystemExit(f'Define response for {cmd}')
         stdout = run_cmd_response[cmd]
-      return stdout, ''  # pytype: disable=name-error  # py310-upgrade
+      else:
+        raise NotImplementedError()
+      return stdout, '', 0
+
     vm.RemoteHostCommandWithReturnCode = mock.Mock(
         side_effect=FakeRemoteHostCommandWithReturnCode)
     vm.CheckLsCpu = mock.Mock(

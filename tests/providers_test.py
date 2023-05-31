@@ -19,6 +19,7 @@ import unittest
 
 from absl import flags
 import mock
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import requirements
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -45,7 +46,7 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
     # Test that all modules can be imported successfully, but mock out the
     # import of CloudStack's csapi.
     with mock.patch.dict('sys.modules', csapi=mock.Mock()):
-      for cloud in providers.VALID_CLOUDS:
+      for cloud in provider_info.VALID_CLOUDS:
         providers.LoadProvider(cloud)
 
   def testLoadInvalidProvider(self):
@@ -85,7 +86,7 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
                 providers.LoadProvider).assert_called_with('AWS', True)
 
   def testLoadProviderUtils(self):
-    test_cloud = providers.GCP
+    test_cloud = provider_info.GCP
 
     actual_utils_module = providers.LoadProviderUtils(test_cloud)
 

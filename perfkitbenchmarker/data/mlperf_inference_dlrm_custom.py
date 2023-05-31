@@ -272,7 +272,6 @@ class A10x2(A10x1):
   num_staging_batches = 2
   num_staging_threads = 8
   use_jemalloc = False
-  numa_config = "0-3:0-27,56-83&4-7:28-55,84-111"
 
 
 @ConfigRegistry.register(
@@ -308,7 +307,6 @@ class A10x4(A10x1):
   num_staging_batches = 4
   num_staging_threads = 8
   use_jemalloc = False
-  numa_config = "0-3:0-27,56-83&4-7:28-55,84-111"
 
 
 @ConfigRegistry.register(
@@ -344,7 +342,6 @@ class A10x8(A10x1):
   num_staging_batches = 8
   num_staging_threads = 8
   use_jemalloc = False
-  numa_config = "0-3:0-27,56-83&4-7:28-55,84-111"
 
 
 @ConfigRegistry.register(

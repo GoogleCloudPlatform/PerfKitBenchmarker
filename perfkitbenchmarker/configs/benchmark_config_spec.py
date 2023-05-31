@@ -31,6 +31,7 @@ from perfkitbenchmarker import key
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import placement_group
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import spark_service
@@ -256,7 +257,7 @@ class _TpuGroupSpec(spec.BaseSpec):
     result = super(_TpuGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS
+            'valid_values': provider_info.VALID_CLOUDS
         }),
         'tpu_cidr_range': (option_decoders.StringDecoder, {
             'default': None
@@ -929,7 +930,7 @@ class _ContainerClusterSpec(spec.BaseSpec):
             'none_ok': True
         }),
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS
+            'valid_values': provider_info.VALID_CLOUDS
         }),
         'type': (option_decoders.StringDecoder, {
             'default': container_service.KUBERNETES,
@@ -1152,7 +1153,7 @@ class _CloudRedisSpec(spec.BaseSpec):
     result = super(_CloudRedisSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS
+            'valid_values': provider_info.VALID_CLOUDS
         }),
         'redis_name': (option_decoders.StringDecoder, {
             'default': None,
@@ -1444,7 +1445,7 @@ class _MessagingServiceSpec(spec.BaseSpec):
     result = super()._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS}),
+            'valid_values': provider_info.VALID_CLOUDS}),
         # TODO(odiego): Add support for push delivery mechanism
         'delivery': (option_decoders.EnumDecoder, {
             'valid_values': ('pull',)}),
@@ -1513,7 +1514,7 @@ class _DataDiscoveryServiceSpec(spec.BaseSpec):
     result = super()._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': providers.VALID_CLOUDS
+            'valid_values': provider_info.VALID_CLOUDS
         }),
         'service_type': (
             option_decoders.EnumDecoder,

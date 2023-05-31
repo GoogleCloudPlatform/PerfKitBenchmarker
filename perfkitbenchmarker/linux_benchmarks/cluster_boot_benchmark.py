@@ -19,6 +19,7 @@ from typing import List
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 
@@ -64,8 +65,8 @@ flags.DEFINE_boolean(
     'reboot performance.')
 flags.DEFINE_boolean(
     'cluster_boot_test_port_listening', False,
-    'Test the time it takes to successfully connect to the port that is used to run the remote command.'
-)
+    'Test the time it takes to successfully connect to the port that is used '
+    'to run the remote command.')
 FLAGS = flags.FLAGS
 
 
@@ -114,6 +115,19 @@ def GetTimeToBoot(vms):
         'create_delay_sec': '%0.1f' % create_delay_sec
     }
     boot_time_sec = vm.bootable_time - min_create_start_time
+    if isinstance(vm, linux_virtual_machine.BaseLinuxMixin):
+      # TODO(pclay): Remove when Windows refactor below is complete.
+      if vm.ssh_external_time:
+        samples.append(
+            sample.Sample('Time to SSH - External',
+                          vm.ssh_external_time - min_create_start_time,
+                          'seconds', metadata))
+      if vm.ssh_internal_time:
+        samples.append(
+            sample.Sample('Time to SSH - Internal',
+                          vm.ssh_internal_time - min_create_start_time,
+                          'seconds', metadata))
+
     max_boot_time_sec = max(max_boot_time_sec, boot_time_sec)
     samples.append(
         sample.Sample('Boot Time', boot_time_sec, 'seconds', metadata))
@@ -126,7 +140,7 @@ def GetTimeToBoot(vms):
       samples.append(
           sample.Sample('Port Listening Time', port_listening_time_sec,
                         'seconds', metadata))
-    # TODO(user): refactor so Windows specifics aren't in linux_benchmarks
+    # TODO(pclay): refactor so Windows specifics aren't in linux_benchmarks
     if FLAGS.cluster_boot_test_rdp_port_listening:
       assert vm.rdp_port_listening_time
       assert vm.rdp_port_listening_time >= vm.create_start_time

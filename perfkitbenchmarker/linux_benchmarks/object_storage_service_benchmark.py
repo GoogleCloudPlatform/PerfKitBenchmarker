@@ -48,6 +48,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import object_storage_service
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
@@ -71,9 +72,16 @@ NAMING_SCHEMES = [
 ]
 
 flags.DEFINE_enum(
-    'storage', providers.GCP,
-    [providers.GCP, providers.AWS, providers.AZURE, providers.OPENSTACK],
-    'storage provider (GCP/AZURE/AWS/OPENSTACK) to use.')
+    'storage',
+    provider_info.GCP,
+    [
+        provider_info.GCP,
+        provider_info.AWS,
+        provider_info.AZURE,
+        provider_info.OPENSTACK,
+    ],
+    'storage provider (GCP/AZURE/AWS/OPENSTACK) to use.',
+)
 
 flags.DEFINE_string('object_storage_region', None,
                     'Storage region for object storage benchmark.')
@@ -329,9 +337,9 @@ MULTISTREAM_STREAM_GAP_THRESHOLD = 0.2
 # The API test script uses different names for providers than this
 # script :(
 STORAGE_TO_API_SCRIPT_DICT = {
-    providers.GCP: 'GCS',
-    providers.AWS: 'S3',
-    providers.AZURE: 'AZURE'
+    provider_info.GCP: 'GCS',
+    provider_info.AWS: 'S3',
+    provider_info.AZURE: 'AZURE'
 }
 
 _SECONDS_PER_HOUR = 60 * 60
@@ -1343,7 +1351,7 @@ def CLIThroughputBenchmark(output_results, metadata, vm, command_builder,
   # The real solution to the iteration count issue is dynamically
   # choosing the number of iterations based on how long they
   # take. This will work for now, though.
-  if FLAGS.storage == providers.AZURE:
+  if FLAGS.storage == provider_info.AZURE:
     iteration_count = CLI_TEST_ITERATION_COUNT_AZURE
   elif FLAGS.cli_test_size == 'normal':
     iteration_count = CLI_TEST_ITERATION_COUNT

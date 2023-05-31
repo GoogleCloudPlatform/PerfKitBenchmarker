@@ -27,7 +27,7 @@ import logging
 
 from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataflow
 from perfkitbenchmarker.providers.gcp import util
 
@@ -38,7 +38,7 @@ FLAGS = flags.FLAGS
 class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
   """Object representing GCP Dataflow service for running job templates."""
 
-  CLOUD = providers.GCP
+  CLOUD = provider_info.GCP
   SERVICE_TYPE = 'dataflow_template'
 
   def __init__(self, dpb_service_spec):

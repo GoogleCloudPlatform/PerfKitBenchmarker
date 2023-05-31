@@ -20,7 +20,7 @@ the instances come with directly integrated storage.
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 
 from perfkitbenchmarker.providers.digitalocean import util
 
@@ -42,7 +42,7 @@ BLOCK_STORAGE_METADATA = {
 DISK_TYPE_MAP = {
     disk.REMOTE_SSD: BLOCK_STORAGE
 }
-disk.RegisterDiskTypeMap(providers.DIGITALOCEAN, DISK_TYPE_MAP)
+disk.RegisterDiskTypeMap(provider_info.DIGITALOCEAN, DISK_TYPE_MAP)
 
 
 class DigitalOceanLocalDisk(disk.BaseDisk):

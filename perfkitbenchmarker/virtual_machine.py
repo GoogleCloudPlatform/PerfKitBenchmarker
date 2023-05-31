@@ -21,6 +21,7 @@ operate on the VM: boot, shutdown, etc.
 
 import abc
 import contextlib
+import enum
 import logging
 import os.path
 import socket
@@ -116,6 +117,24 @@ _ASSIGN_EXTERNAL_IP = flags.DEFINE_boolean(
     'If True, an external (public) IP will be created for VMs. '
     'If False, --connect_via_internal_ip may also be needed.')
 
+
+@enum.unique
+class BootCompletionIpSubset(enum.Enum):
+  DEFAULT = enum.auto()
+  EXTERNAL = enum.auto()
+  INTERNAL = enum.auto()
+  BOTH = enum.auto()
+
+
+_BOOT_COMPLETION_IP_SUBSET = flags.DEFINE_enum_class(
+    'boot_completion_ip_subset',
+    BootCompletionIpSubset.DEFAULT,
+    BootCompletionIpSubset,
+    (
+        'The ip(s) to use to measure BootCompletion.  If DEFAULT, determined'
+        ' based on --connect_via_internal_ip.'
+    ),
+)
 # Deprecated. Use connect_via_internal_ip.
 flags.DEFINE_boolean(
     'ssh_via_internal_ip', False,
@@ -350,6 +369,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   disable_rss: str  # mixed from BaseVirtualMachine
   num_disable_cpus: str  # mixed from BaseVirtualMachine
   ip_address: str  # mixed from BaseVirtualMachine
+  internal_ip: str  # mixed from BaseVirtualMachine
+  can_connect_via_internal_ip: bool  # mixed from BaseVirtualMachine
+  boot_completion_ip_subset: bool  # mixed from BaseVirtualMachine
 
   @abc.abstractmethod
   def GetConnectionIp(self):
@@ -638,10 +660,14 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def _WaitForSSH(self):
+  def _WaitForSSH(self, ip_address: Union[str, None] = None):
     """Waits until VM is ready.
 
     Implementations of this method should set the 'hostname' attribute.
+
+    Args:
+      ip_address: The IP address to use for SSH, if None an implementation
+        default is used.
     """
     raise NotImplementedError()
 
@@ -1068,6 +1094,16 @@ class DeprecatedOsMixin(BaseOsMixin):
     logging.warning(warning)
 
 
+def GetBootCompletionIpSubset():
+  if _BOOT_COMPLETION_IP_SUBSET.value == BootCompletionIpSubset.DEFAULT:
+    if FLAGS.connect_via_internal_ip:
+      return BootCompletionIpSubset.INTERNAL
+    else:
+      return BootCompletionIpSubset.EXTERNAL
+  else:
+    return _BOOT_COMPLETION_IP_SUBSET.value
+
+
 class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   """Base class for Virtual Machines.
 
@@ -1131,6 +1167,9 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.gpu_type = vm_spec.gpu_type
     self.image = vm_spec.image
     self.install_packages = vm_spec.install_packages
+    self.can_connect_via_internal_ip = (FLAGS.ssh_via_internal_ip
+                                        or FLAGS.connect_via_internal_ip)
+    self.boot_completion_ip_subset = GetBootCompletionIpSubset()
     self.assign_external_ip = vm_spec.assign_external_ip
     self.ip_address = None
     self.internal_ip = None
@@ -1159,6 +1198,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
     self.vm_group = None
     self.id = None
+    self.is_aarch64 = False
 
   @property
   @classmethod
@@ -1177,7 +1217,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
 
   def GetConnectionIp(self):
     """Gets the IP to use for connecting to the VM."""
-    if FLAGS.ssh_via_internal_ip or FLAGS.connect_via_internal_ip:
+    if self.can_connect_via_internal_ip:
       return self.internal_ip
     if not self.ip_address:
       raise errors.VirtualMachine.VirtualMachineError(
