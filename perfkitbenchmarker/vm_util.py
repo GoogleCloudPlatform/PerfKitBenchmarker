@@ -110,6 +110,18 @@ flags.DEFINE_integer('ssh_server_alive_count_max', 10,
                      'wait for unresponsive servers.')
 
 
+class RetryError(Exception):
+  """Base class for retry errors."""
+
+
+class TimeoutExceededRetryError(RetryError):
+  """Exception that is raised when a retryable function times out."""
+
+
+class RetriesExceededRetryError(RetryError):
+  """Exception that is raised when a retryable function hits its retry limit."""
+
+
 class IpAddressSubset(object):
   """Enum of options for --ip_addresses."""
   REACHABLE = 'REACHABLE'
@@ -228,7 +240,7 @@ def GetSshOptions(ssh_key_filename, connect_timeout=None):
 
 def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
           timeout=None, fuzz=FUZZ, log_errors=True,
-          retryable_exceptions=None, timeout_exception=None):
+          retryable_exceptions=None):
   """A function decorator that will retry when exceptions are thrown.
 
   Args:
@@ -248,12 +260,16 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
     retryable_exceptions: A tuple of exceptions that should be retried. By
         default, this is None, which indicates that all exceptions should
         be retried.
-    timeout_exception: Optional exception that can be passed in and raised
-        in the event that the retry timeout is reached.
 
   Returns:
     A function that wraps functions in retry logic. It can be
         used as a decorator.
+
+  Raises:
+    TimeoutExceededRetryError - if the provided (or default) timeout is exceeded
+      while retrying the wrapped function.
+    RetriesExceededRetryError - if the provided (or default) limit on the number
+      of retry attempts is exceeded while retrying the wrapped function.
   """
   if retryable_exceptions is None:
     # TODO(user) Make retries less aggressive.
@@ -278,11 +294,10 @@ def Retry(poll_interval=POLL_INTERVAL, max_retries=MAX_RETRIES,
         except retryable_exceptions as e:
           fuzz_multiplier = 1 - fuzz + random.random() * fuzz
           sleep_time = poll_interval * fuzz_multiplier
-          timed_out = (time.time() + sleep_time) >= deadline
-          if timeout_exception and timed_out:
-            raise timeout_exception from e
-          elif timed_out or (max_retries >= 0 and tries > max_retries):
-            raise
+          if (time.time() + sleep_time) >= deadline:
+            raise TimeoutExceededRetryError() from e
+          elif max_retries >= 0 and tries > max_retries:
+            raise RetriesExceededRetryError() from e
           else:
             if log_errors:
               logging.info('Retrying exception running %s: %s', f.__name__, e)

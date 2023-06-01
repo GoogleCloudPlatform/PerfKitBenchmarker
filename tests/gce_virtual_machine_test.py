@@ -746,9 +746,10 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
               'memory': '1.0GiB',
           })
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
-      with self.assertRaises(
-          errors.Benchmarks.QuotaFailure.RateLimitExceededError):
+      with self.assertRaises(vm_util.RetriesExceededRetryError) as e:
         vm._Create()
+      self.assertIs(type(e.exception.__cause__),
+                    errors.Benchmarks.QuotaFailure.RateLimitExceededError)
       self.assertEqual(issue_command.call_count,
                        util.RATE_LIMITED_MAX_RETRIES + 1)
 

@@ -299,8 +299,9 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(
         mock.patch.object(test_instance, '_Exists', return_value=False))
 
-    with self.assertRaises(errors.Resource.CreationError):
+    with self.assertRaises(vm_util.RetriesExceededRetryError) as e:
       test_instance._GetTagResourceCommand(['test', 'tag'])
+    self.assertIs(type(e.exception.__cause__), errors.Resource.CreationError)
 
   def testUpdateWithDefaultTags(self):
     test_instance = GetTestDynamoDBInstance()
