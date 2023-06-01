@@ -13,15 +13,46 @@
 # limitations under the License.
 """Tests for cloud_redis_memtier_benchmark."""
 
+import pathlib
 import unittest
 from absl import flags
+from absl.testing import flagsaver
 import mock
-
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cloud_redis_memtier_benchmark
 from perfkitbenchmarker.linux_packages import memtier
+from perfkitbenchmarker.providers.aws import aws_elasticache_redis  # pylint:disable=unused-import
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
+
+_CLUSTER_SHARDS_OUTPUT = 'redis_cluster_shards.txt'
+_DESCRIBE_CLUSTER_OUTPUT = 'elasticache_describe_cluster.txt'
+
+
+def _ReadFile(filename):
+  path = pathlib.Path(__file__).parents[1] / 'data' / filename
+  with open(path) as f:
+    return f.read()
+
+
+def _GetTestRedisSpec():
+  spec_args = {'cloud': 'AWS', 'redis_version': 'redis_6_x'}
+  return benchmark_config_spec._CloudRedisSpec(
+      'test_component', flag_values=FLAGS, **spec_args
+  )
+
+
+def _GetTestRedisInstance():
+  test_spec = _GetTestRedisSpec()
+  mock_bm_spec = mock.Mock()
+  mock_bm_spec.config.cloud_redis = test_spec
+  redis_class = cloud_redis_memtier_benchmark._GetManagedMemoryStoreClass()
+  instance = redis_class(mock_bm_spec)
+  instance._ip = '0.0.0.0'
+  instance._port = 1234
+  return instance
 
 
 class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
@@ -88,6 +119,83 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     benchmark_spec.cloud_redis_instance = redis_instance
     cloud_redis_memtier_benchmark.Cleanup(benchmark_spec)
     redis_instance.Delete.assert_called_once_with()
+
+  @flagsaver.flagsaver(cloud='AWS')
+  def testGetConnectionsMultiVm(self):
+    test_redis_instance = _GetTestRedisInstance()
+    test_redis_instance.name = 'pkb-cbf06969'
+    vm1 = pkb_common_test_case.TestLinuxVirtualMachine(
+        pkb_common_test_case.CreateTestVmSpec()
+    )
+    vm1.ip_address = 'vm1'
+    vm2 = pkb_common_test_case.TestLinuxVirtualMachine(
+        pkb_common_test_case.CreateTestVmSpec()
+    )
+    vm2.ip_address = 'vm2'
+    self.enter_context(
+        mock.patch.object(
+            vm1,
+            'RemoteCommand',
+            return_value=(_ReadFile(_CLUSTER_SHARDS_OUTPUT), ''),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueCommand',
+            return_value=(_ReadFile(_DESCRIBE_CLUSTER_OUTPUT), '', 0),
+        )
+    )
+
+    connections = cloud_redis_memtier_benchmark._GetConnections(
+        [vm1, vm2], test_redis_instance
+    )
+
+    self.assertCountEqual(
+        connections,
+        [
+            memtier.MemtierConnection(vm1, '10.0.1.117', 6379),
+            memtier.MemtierConnection(vm1, '10.0.2.104', 6379),
+            memtier.MemtierConnection(vm1, '10.0.3.217', 6379),
+            memtier.MemtierConnection(vm2, '10.0.2.177', 6379),
+            memtier.MemtierConnection(vm2, '10.0.1.174', 6379),
+            memtier.MemtierConnection(vm2, '10.0.3.6', 6379),
+        ],
+    )
+
+  @flagsaver.flagsaver(cloud='AWS')
+  def testGetConnectionsSingleVm(self):
+    test_redis_instance = _GetTestRedisInstance()
+    test_redis_instance.name = 'pkb-cbf06969'
+    vm1 = pkb_common_test_case.TestLinuxVirtualMachine(
+        pkb_common_test_case.CreateTestVmSpec()
+    )
+    vm1.ip_address = 'vm1'
+    self.enter_context(
+        mock.patch.object(
+            vm1,
+            'RemoteCommand',
+            return_value=(_ReadFile(_CLUSTER_SHARDS_OUTPUT), ''),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueCommand',
+            return_value=(_ReadFile(_DESCRIBE_CLUSTER_OUTPUT), '', 0),
+        )
+    )
+
+    connections = cloud_redis_memtier_benchmark._GetConnections(
+        [vm1], test_redis_instance
+    )
+
+    self.assertCountEqual(
+        connections,
+        [
+            memtier.MemtierConnection(vm1, '0.0.0.0', 1234),
+        ],
+    )
 
 
 if __name__ == '__main__':

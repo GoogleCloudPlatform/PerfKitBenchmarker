@@ -23,11 +23,14 @@ import os
 import pathlib
 import random
 import re
+import statistics
 import time
 from typing import Any, Dict, List, Optional, Text, Tuple, Union
 
 from absl import flags
 from absl import logging
+import matplotlib.pyplot as plt
+import numpy as np
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
@@ -35,6 +38,7 @@ from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+import seaborn as sns
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
 GIT_TAG = '1.4.0'
@@ -155,6 +159,28 @@ MEMTIER_LATENCY_CAPPED_THROUGHPUT = flags.DEFINE_bool(
     (
         'Measure latency capped throughput. Use in conjunction with'
         ' memtier_latency_cap. Defaults to False. '
+    ),
+)
+MEMTIER_DISTRIBUTION_ITERATIONS = flags.DEFINE_integer(
+    'memtier_distribution_iterations',
+    None,
+    (
+        'If set, measures the distribution of latency capped throughput across'
+        ' multiple iterations. Will run a set number of iterations for the'
+        ' benchmark test and  calculate mean/stddev for metrics. Note that this'
+        ' is different from memtier_run_count which is a passthrough to the'
+        ' actual memtier benchmark tool which reports different aggregate'
+        ' stats.'
+    ),
+)
+MEMTIER_DISTRIBUTION_BINARY_SEARCH = flags.DEFINE_bool(
+    'memtier_distribution_binary_search',
+    True,
+    (
+        'If true, uses a binary search to measure the optimal client and thread'
+        ' count needed for max throughput under latency cap. Else, uses'
+        ' --memtier_clients, --memtier_threads, and --memtier_pipelines for the'
+        ' iterations.'
     ),
 )
 MEMTIER_LATENCY_CAP = flags.DEFINE_float(
@@ -302,6 +328,7 @@ def BuildMemtierCommand(
     outfile: Optional[pathlib.PosixPath] = None,
     password: Optional[str] = None,
     cluster_mode: Optional[bool] = None,
+    shard_addresses: Optional[str] = None,
     json_out_file: Optional[pathlib.PosixPath] = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
@@ -325,11 +352,15 @@ def BuildMemtierCommand(
       'out-file': outfile,
       'json-out-file': json_out_file,
       'print-percentile': '50,90,95,99,99.5,99.9,99.95,99.99',
+      'shard-addresses': shard_addresses,
   }
   # Arguments passed without a parameter
   no_param_args = {'random-data': random_data, 'cluster-mode': cluster_mode}
   # Build the command
-  cmd = ['memtier_benchmark']
+  cmd = []
+  if cluster_mode:
+    cmd += ['ulimit -n 32758 &&']
+  cmd += ['memtier_benchmark']
   for arg, value in args.items():
     if value is not None:
       cmd.extend([f'--{arg}', str(value)])
@@ -463,6 +494,64 @@ class MemtierBinarySearchParameters:
   clients: int = 1
 
 
+@dataclasses.dataclass(frozen=True)
+class MemtierConnection:
+  """Parameters mapping client to server endpoint."""
+
+  client_vm: virtual_machine.BaseVirtualMachine
+  address: str
+  port: int
+
+
+def _RunParallelConnections(
+    connections: list[MemtierConnection],
+    server_ip: str,
+    server_port: int,
+    threads: int,
+    clients: int,
+    pipelines: int,
+    password: Optional[str] = None,
+) -> list['MemtierResult']:
+  """Runs memtier in parallel with the given connections."""
+  run_args = []
+  base_args = {
+      'server_ip': server_ip,
+      'server_port': server_port,
+      'threads': threads,
+      'clients': clients,
+      'pipeline': pipelines,
+      'password': password,
+  }
+
+  connections_by_vm = collections.defaultdict(list)
+  for conn in connections:
+    connections_by_vm[conn.client_vm].append(conn)
+
+  # Currently more than one client VM will cause shards to be distributed
+  # evenly between them. This behavior could be customized later with a flag.
+  if len(connections_by_vm) > 1:
+    for vm, conns in connections_by_vm.items():
+      shard_addresses = ','.join(
+          f'{conn.address}:{conn.port}' for conn in conns
+      )
+      args = copy.deepcopy(base_args)
+      args.update({
+          'vm': vm,
+          'shard_addresses': shard_addresses,
+      })
+      run_args.append(((), args))
+  else:
+    for connection in connections:
+      args = copy.deepcopy(base_args)
+      args.update({
+          'vm': connection.client_vm,
+      })
+      run_args.append(((), args))
+  logging.info('Connections: %s', connections_by_vm)
+  logging.info('Running with args: %s', run_args)
+  return background_tasks.RunThreaded(_Run, run_args)
+
+
 class _LoadModifier(abc.ABC):
   """Base class for load modification in binary search."""
 
@@ -551,8 +640,29 @@ class _ClientModifier(_LoadModifier):
     )
 
 
+def _CombineResults(results: list['MemtierResult']) -> 'MemtierResult':
+  """Combines multiple MemtierResults into a single aggregate."""
+  ops_per_sec = sum([result.ops_per_sec for result in results])
+  kb_per_sec = sum([result.kb_per_sec for result in results])
+  latency_ms = sum([result.latency_ms for result in results]) / len(results)
+  latency_dic = collections.defaultdict(int)
+  for result in results:
+    for k, v in result.latency_dic.items():
+      latency_dic[k] += v
+  for k in latency_dic:
+    latency_dic[k] /= len(results)
+  return MemtierResult(
+      ops_per_sec=ops_per_sec,
+      kb_per_sec=kb_per_sec,
+      latency_ms=latency_ms,
+      latency_dic=latency_dic,
+      metadata=results[0].metadata,
+      parameters=results[0].parameters,
+  )
+
+
 def _BinarySearchForLatencyCappedThroughput(
-    client_vm,
+    connections: list[MemtierConnection],
     load_modifiers: list[_LoadModifier],
     server_ip: str,
     server_port: int,
@@ -575,15 +685,16 @@ def _BinarySearchForLatencyCappedThroughput(
         },
     )
     while parameters.lower_bound < (parameters.upper_bound - 1):
-      result = _Run(
-          vm=client_vm,
-          server_ip=server_ip,
-          server_port=server_port,
-          threads=parameters.threads,
-          pipeline=parameters.pipelines,
-          clients=parameters.clients,
-          password=password,
+      parallel_results = _RunParallelConnections(
+          connections,
+          server_ip,
+          server_port,
+          parameters.threads,
+          parameters.clients,
+          parameters.pipelines,
+          password,
       )
+      result = _CombineResults(parallel_results)
       logging.info(
           (
               'Binary search for latency capped throughput.'
@@ -632,13 +743,132 @@ def MeasureLatencyCappedThroughput(
   max_clients = MAX_CLIENTS_COUNT // server_shard_count
   samples = []
   for result in _BinarySearchForLatencyCappedThroughput(
-      client_vm,
+      [MemtierConnection(client_vm, server_ip, server_port)],
       [_PipelineModifier(), _ClientModifier(max_clients, max_threads)],
       server_ip,
       server_port,
       password,
   ):
     samples.extend(result.GetSamples())
+  return samples
+
+
+def _CalculateMode(values: list[float]) -> float:
+  """Calculates the mode of a distribution using kernel density estimation."""
+  plt.clf()
+  ax = sns.histplot(values, kde=True)
+  kdeline = ax.lines[0]
+  xs = kdeline.get_xdata()
+  ys = kdeline.get_ydata()
+  mode_idx = np.argmax(ys)
+  mode = xs[mode_idx]
+  return mode
+
+
+def MeasureLatencyCappedThroughputDistribution(
+    connections: list[MemtierConnection],
+    server_ip: str,
+    server_port: int,
+    client_vms: list[virtual_machine.VirtualMachine],
+    server_shard_count: int,
+    password: Optional[str] = None,
+) -> list[sample.Sample]:
+  """Measures distribution of throughput across several iterations.
+
+  In particular, this function will first find the optimal number of threads and
+  clients per thread, and then run the test with those parameters for the
+  specified number of iterations. The reported samples will include mean and
+  stdev of QPS and latency across the series of runs.
+
+  Args:
+    connections: list of connections from client to server.
+    server_ip: Ip address of the server.
+    server_port: Port of the server.
+    client_vms: A list of client vms.
+    server_shard_count: Number of shards in the redis cluster.
+    password: Password of the server.
+
+  Returns:
+    A list of throughput and latency samples.
+  """
+  parameters_for_test = MemtierBinarySearchParameters(
+      pipelines=FLAGS.memtier_pipeline[0],
+      clients=FLAGS.memtier_clients[0],
+      threads=FLAGS.memtier_threads[0],
+  )
+  if MEMTIER_DISTRIBUTION_BINARY_SEARCH.value:
+    max_threads = client_vms[0].NumCpusForBenchmark(
+        report_only_physical_cpus=True
+    )
+    shards_per_client = server_shard_count / len(client_vms)
+    max_clients = int(MAX_CLIENTS_COUNT // shards_per_client)
+    result = _BinarySearchForLatencyCappedThroughput(
+        connections,
+        [_ClientModifier(max_clients, max_threads)],
+        server_ip,
+        server_port,
+        password,
+    )[0]
+    parameters_for_test = result.parameters
+
+  logging.info(
+      'Starting test iterations with parameters %s', parameters_for_test
+  )
+  results = []
+  for _ in range(MEMTIER_DISTRIBUTION_ITERATIONS.value):
+    results_for_run = _RunParallelConnections(
+        connections,
+        server_ip,
+        server_port,
+        parameters_for_test.threads,
+        parameters_for_test.clients,
+        parameters_for_test.pipelines,
+        password,
+    )
+    results.extend(results_for_run)
+
+  samples = []
+  metrics = {
+      'ops_per_sec': 'ops/s',
+      'kb_per_sec': 'KB/s',
+      'latency_ms': 'ms',
+      '90': 'ms',
+      '95': 'ms',
+      '99': 'ms',
+  }
+  metadata = {
+      'distribution_iterations': MEMTIER_DISTRIBUTION_ITERATIONS.value,
+      'threads': parameters_for_test.threads,
+      'clients': parameters_for_test.clients,
+      'pipelines': parameters_for_test.pipelines,
+  }
+  for metric, units in metrics.items():
+    is_latency = metric.replace('.', '', 1).isdigit()
+    values = (
+        [result.latency_dic[metric] for result in results]
+        if is_latency
+        else [getattr(result, metric) for result in results]
+    )
+    if is_latency:
+      metric = f'p{metric} latency'
+    samples.extend([
+        sample.Sample(
+            f'Mean {metric}', statistics.mean(values), units, metadata
+        ),
+        sample.Sample(
+            f'Stdev {metric}',
+            statistics.stdev(values),
+            units,
+            metadata,
+        ),
+        sample.Sample(
+            f'Mode {metric}',
+            _CalculateMode(values),
+            units,
+            metadata,
+        ),
+    ])
+
   return samples
 
 
@@ -792,6 +1022,7 @@ def _Run(
     clients: int,
     password: Optional[str] = None,
     unique_id: Optional[str] = None,
+    shard_addresses: Optional[str] = None,
 ) -> 'MemtierResult':
   """Runs the memtier benchmark on the vm."""
   logging.info(
@@ -850,6 +1081,7 @@ def _Run(
       password=password,
       outfile=memtier_results_file,
       cluster_mode=MEMTIER_CLUSTER_MODE.value,
+      shard_addresses=shard_addresses,
       json_out_file=json_results_file,
   )
   _IssueRetryableCommand(vm, cmd)

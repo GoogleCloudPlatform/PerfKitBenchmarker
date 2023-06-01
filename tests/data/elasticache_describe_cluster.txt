@@ -1,0 +1,111 @@
+{
+    "ReplicationGroups": [
+        {
+            "ReplicationGroupId": "pkb-cbf06969",
+            "Description": "pkb-cbf06969",
+            "GlobalReplicationGroupInfo": {},
+            "Status": "available",
+            "PendingModifiedValues": {},
+            "MemberClusters": [
+                "pkb-cbf06969-0001-001",
+                "pkb-cbf06969-0002-001",
+                "pkb-cbf06969-0003-001",
+                "pkb-cbf06969-0004-001",
+                "pkb-cbf06969-0005-001",
+                "pkb-cbf06969-0006-001"
+            ],
+            "NodeGroups": [
+                {
+                    "NodeGroupId": "0001",
+                    "Status": "available",
+                    "Slots": "0-2730",
+                    "NodeGroupMembers": [
+                        {
+                            "CacheClusterId": "pkb-cbf06969-0001-001",
+                            "CacheNodeId": "0001",
+                            "PreferredAvailabilityZone": "us-east-1c"
+                        }
+                    ]
+                },
+                {
+                    "NodeGroupId": "0002",
+                    "Status": "available",
+                    "Slots": "2731-5461",
+                    "NodeGroupMembers": [
+                        {
+                            "CacheClusterId": "pkb-cbf06969-0002-001",
+                            "CacheNodeId": "0001",
+                            "PreferredAvailabilityZone": "us-east-1a"
+                        }
+                    ]
+                },
+                {
+                    "NodeGroupId": "0003",
+                    "Status": "available",
+                    "Slots": "5462-8192",
+                    "NodeGroupMembers": [
+                        {
+                            "CacheClusterId": "pkb-cbf06969-0003-001",
+                            "CacheNodeId": "0001",
+                            "PreferredAvailabilityZone": "us-east-1b"
+                        }
+                    ]
+                },
+                {
+                    "NodeGroupId": "0004",
+                    "Status": "available",
+                    "Slots": "8193-10923",
+                    "NodeGroupMembers": [
+                        {
+                            "CacheClusterId": "pkb-cbf06969-0004-001",
+                            "CacheNodeId": "0001",
+                            "PreferredAvailabilityZone": "us-east-1a"
+                        }
+                    ]
+                },
+                {
+                    "NodeGroupId": "0005",
+                    "Status": "available",
+                    "Slots": "10924-13653",
+                    "NodeGroupMembers": [
+                        {
+                            "CacheClusterId": "pkb-cbf06969-0005-001",
+                            "CacheNodeId": "0001",
+                            "PreferredAvailabilityZone": "us-east-1b"
+                        }
+                    ]
+                },
+                {
+                    "NodeGroupId": "0006",
+                    "Status": "available",
+                    "Slots": "13654-16383",
+                    "NodeGroupMembers": [
+                        {
+                            "CacheClusterId": "pkb-cbf06969-0006-001",
+                            "CacheNodeId": "0001",
+                            "PreferredAvailabilityZone": "us-east-1c"
+                        }
+                    ]
+                }
+            ],
+            "AutomaticFailover": "enabled",
+            "MultiAZ": "disabled",
+            "ConfigurationEndpoint": {
+                "Address": "pkb-cbf06969.t88vpu.clustercfg.use1.cache.amazonaws.com",
+                "Port": 6379
+            },
+            "SnapshotRetentionLimit": 0,
+            "SnapshotWindow": "03:00-04:00",
+            "ClusterEnabled": true,
+            "CacheNodeType": "cache.m5.large",
+            "AuthTokenEnabled": false,
+            "TransitEncryptionEnabled": false,
+            "AtRestEncryptionEnabled": false,
+            "ARN": "arn:aws:elasticache:us-east-1:835761027970:replicationgroup:pkb-cbf06969",
+            "LogDeliveryConfigurations": [],
+            "ReplicationGroupCreateTime": "2023-05-24T02:58:42.581Z",
+            "DataTiering": "disabled",
+            "AutoMinorVersionUpgrade": true
+        }
+    ]
+}

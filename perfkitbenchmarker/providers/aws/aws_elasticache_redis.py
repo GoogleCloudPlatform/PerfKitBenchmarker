@@ -22,6 +22,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
@@ -279,3 +280,22 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
       primary_endpoint = cluster_info['NodeGroups'][0]['PrimaryEndpoint']
     self._ip = primary_endpoint['Address']
     self._port = primary_endpoint['Port']
+
+  def GetShardEndpoints(
+      self, client: virtual_machine.BaseVirtualMachine
+  ) -> list[managed_memory_store.RedisShard]:
+    """See base class."""
+    shards = super().GetShardEndpoints(client)
+    shards_by_slots = {shard.slots: shard for shard in shards}
+
+    cluster_info = self.DescribeInstance()
+    # See data/elasticache_describe_cluster.txt for an example
+    node_groups = cluster_info['NodeGroups']
+    zones_by_slots = {
+        node['Slots']: node['NodeGroupMembers'][0]['PreferredAvailabilityZone']
+        for node in node_groups
+    }
+    for slot in zones_by_slots:
+      shards_by_slots[slot].zone = zones_by_slots[slot]
+
+    return list(shards_by_slots.values())

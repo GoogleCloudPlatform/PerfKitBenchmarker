@@ -8,6 +8,7 @@ from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import memtier
@@ -1485,6 +1486,333 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
       if s.metric == 'Ops Throughput':
         actual_throughputs.append(s.value)
     self.assertEqual(actual_throughputs, [15.0, 9.0])
+
+  def testRunParallelSingleVm(self):
+    vm1 = pkb_common_test_case.TestLinuxVirtualMachine(
+        pkb_common_test_case.CreateTestVmSpec()
+    )
+    connections = [
+        memtier.MemtierConnection(vm1, '10.0.1.117', 6379),
+    ]
+    mock_run_threaded = self.enter_context(
+        mock.patch.object(background_tasks, 'RunThreaded')
+    )
+
+    memtier._RunParallelConnections(connections, '0.0.0.0', 1234, 1, 2, 3)
+
+    mock_run_threaded.assert_called_once_with(
+        memtier._Run,
+        [
+            (
+                (),
+                {
+                    'vm': vm1,
+                    'server_ip': '0.0.0.0',
+                    'server_port': 1234,
+                    'threads': 1,
+                    'clients': 2,
+                    'pipeline': 3,
+                    'password': None,
+                },
+            ),
+        ],
+    )
+
+  def testRunParallelMultipleVms(self):
+    vm1 = pkb_common_test_case.TestLinuxVirtualMachine(
+        pkb_common_test_case.CreateTestVmSpec()
+    )
+    vm1.ip_address = 'vm1'
+    vm2 = pkb_common_test_case.TestLinuxVirtualMachine(
+        pkb_common_test_case.CreateTestVmSpec()
+    )
+    vm2.ip_address = 'vm2'
+    connections = [
+        memtier.MemtierConnection(vm1, '10.0.1.117', 6379),
+        memtier.MemtierConnection(vm1, '10.0.2.104', 6379),
+        memtier.MemtierConnection(vm1, '10.0.3.217', 6379),
+        memtier.MemtierConnection(vm2, '10.0.2.177', 6379),
+        memtier.MemtierConnection(vm2, '10.0.1.174', 6379),
+        memtier.MemtierConnection(vm2, '10.0.3.6', 6379),
+    ]
+    mock_run_threaded = self.enter_context(
+        mock.patch.object(background_tasks, 'RunThreaded')
+    )
+
+    memtier._RunParallelConnections(connections, '0.0.0.0', 1234, 1, 2, 3)
+
+    mock_run_threaded.assert_called_once_with(
+        memtier._Run,
+        [
+            (
+                (),
+                {
+                    'vm': vm1,
+                    'server_ip': '0.0.0.0',
+                    'server_port': 1234,
+                    'threads': 1,
+                    'clients': 2,
+                    'pipeline': 3,
+                    'password': None,
+                    'shard_addresses': (
+                        '10.0.1.117:6379,10.0.2.104:6379,10.0.3.217:6379'
+                    ),
+                },
+            ),
+            (
+                (),
+                {
+                    'vm': vm2,
+                    'server_ip': '0.0.0.0',
+                    'server_port': 1234,
+                    'threads': 1,
+                    'clients': 2,
+                    'pipeline': 3,
+                    'password': None,
+                    'shard_addresses': (
+                        '10.0.2.177:6379,10.0.1.174:6379,10.0.3.6:6379'
+                    ),
+                },
+            ),
+        ],
+    )
+
+  @flagsaver.flagsaver(memtier_distribution_iterations=1, num_cpus_override=16)
+  def testMeasureLatencyCappedThroughputDistribution(self):
+    vm1 = pkb_common_test_case.TestLinuxVirtualMachine(
+        pkb_common_test_case.CreateTestVmSpec()
+    )
+    vm1.ip_address = 'vm1'
+    vm2 = pkb_common_test_case.TestLinuxVirtualMachine(
+        pkb_common_test_case.CreateTestVmSpec()
+    )
+    vm2.ip_address = 'vm2'
+    connections = [
+        memtier.MemtierConnection(vm1, '10.0.1.117', 6379),
+        memtier.MemtierConnection(vm1, '10.0.2.104', 6379),
+        memtier.MemtierConnection(vm1, '10.0.3.217', 6379),
+        memtier.MemtierConnection(vm2, '10.0.2.177', 6379),
+        memtier.MemtierConnection(vm2, '10.0.1.174', 6379),
+        memtier.MemtierConnection(vm2, '10.0.3.6', 6379),
+    ]
+
+    mock_binary_search = self.enter_context(
+        mock.patch.object(
+            memtier,
+            '_BinarySearchForLatencyCappedThroughput',
+            return_value=[
+                memtier.MemtierResult(
+                    parameters=memtier.MemtierBinarySearchParameters(
+                        pipelines=1, threads=2, clients=3
+                    )
+                )
+            ],
+        )
+    )
+    mock_results = [
+        memtier.MemtierResult(
+            ops_per_sec=0,
+            kb_per_sec=0,
+            latency_ms=0,
+            latency_dic={'90': 0, '95': 50, '99': 1.0},
+        ),
+        memtier.MemtierResult(
+            ops_per_sec=200,
+            kb_per_sec=2,
+            latency_ms=0.2,
+            latency_dic={'90': 10, '95': 40, '99': 0.8},
+        ),
+        memtier.MemtierResult(
+            ops_per_sec=400,
+            kb_per_sec=4,
+            latency_ms=0.4,
+            latency_dic={'90': 20, '95': 30, '99': 0.6},
+        ),
+        memtier.MemtierResult(
+            ops_per_sec=600,
+            kb_per_sec=6,
+            latency_ms=0.6,
+            latency_dic={'90': 30, '95': 20, '99': 0.4},
+        ),
+        memtier.MemtierResult(
+            ops_per_sec=800,
+            kb_per_sec=8,
+            latency_ms=0.8,
+            latency_dic={'90': 40, '95': 10, '99': 0.2},
+        ),
+        memtier.MemtierResult(
+            ops_per_sec=1000,
+            kb_per_sec=10,
+            latency_ms=1.0,
+            latency_dic={'90': 50, '95': 0, '99': 0.0},
+        ),
+    ]
+    mock_run = self.enter_context(
+        mock.patch.object(
+            memtier,
+            '_RunParallelConnections',
+            return_value=mock_results,
+        )
+    )
+
+    results = memtier.MeasureLatencyCappedThroughputDistribution(
+        connections, '0.0.0.0', 1234, [vm1, vm2], 6
+    )
+
+    expected_metadata = {
+        'distribution_iterations': 1,
+        'threads': 2,
+        'clients': 3,
+        'pipelines': 1,
+    }
+    expected_samples = [
+        sample.Sample(
+            metric='Mean ops_per_sec',
+            value=500.0,
+            unit='ops/s',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Stdev ops_per_sec',
+            value=374.16573867739413,
+            unit='ops/s',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mode ops_per_sec',
+            value=497.4874371859297,
+            unit='ops/s',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mean kb_per_sec',
+            value=5.0,
+            unit='KB/s',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Stdev kb_per_sec',
+            value=3.7416573867739413,
+            unit='KB/s',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mode kb_per_sec',
+            value=4.974874371859297,
+            unit='KB/s',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mean latency_ms',
+            value=0.5,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Stdev latency_ms',
+            value=0.37416573867739417,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mode latency_ms',
+            value=0.49748743718592964,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mean p90 latency',
+            value=25.0,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Stdev p90 latency',
+            value=18.708286933869708,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mode p90 latency',
+            value=25.125628140703515,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mean p95 latency',
+            value=25.0,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Stdev p95 latency',
+            value=18.708286933869708,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mode p95 latency',
+            value=24.87437185929648,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mean p99 latency',
+            value=0.5,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Stdev p99 latency',
+            value=0.37416573867739417,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+        sample.Sample(
+            metric='Mode p99 latency',
+            value=0.49748743718592964,
+            unit='ms',
+            metadata=expected_metadata,
+        ),
+    ]
+
+    with self.subTest('SamplesAreCorrect'):
+      self.assertSampleListsEqualUpToTimestamp(results, expected_samples)
+    with self.subTest('BinarySearchHasCorrectArgs'):
+      mock_binary_search.assert_called_once_with(
+          connections, [memtier._ClientModifier(10, 16)], '0.0.0.0', 1234, None
+      )
+    with self.subTest('RunHasCorrectArgs'):
+      mock_run.assert_has_calls(
+          [mock.call(connections, '0.0.0.0', 1234, 2, 3, 1, None)]
+      )
+
+  def testCombineResults(self):
+    result1 = memtier.MemtierResult(
+        ops_per_sec=800,
+        kb_per_sec=8,
+        latency_ms=0.8,
+        latency_dic={'90': 40, '95': 10, '99': 0.2},
+        metadata={'test_metadata': True},
+        parameters=memtier.MemtierBinarySearchParameters(lower_bound=1),
+    )
+    result2 = memtier.MemtierResult(
+        ops_per_sec=1000,
+        kb_per_sec=10,
+        latency_ms=1.0,
+        latency_dic={'90': 50, '95': 0, '99': 0.0},
+    )
+    expected_result = memtier.MemtierResult(
+        ops_per_sec=1800,
+        kb_per_sec=18,
+        latency_ms=0.9,
+        latency_dic={'90': 45, '95': 5, '99': 0.1},
+        metadata={'test_metadata': True},
+        parameters=memtier.MemtierBinarySearchParameters(lower_bound=1),
+    )
+    self.assertEqual(
+        expected_result, memtier._CombineResults([result1, result2])
+    )
 
 
 if __name__ == '__main__':
