@@ -52,6 +52,8 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     self.failover_subnet = None
     self.failover_style = FLAGS.redis_failover_style
 
+    self.subnets = []
+
   @staticmethod
   def CheckPrerequisites(benchmark_config):
     if (
@@ -128,6 +130,16 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
       self.failover_subnet.Create()
       cmd += [self.failover_subnet.id]
 
+    # Subnets determine where shards can be placed.
+    regional_network = self.spec.vms[0].network.regional_network
+    vpc_id = regional_network.vpc.id
+    for zone in self.zones:
+      cidr = regional_network.vpc.NextSubnetCidrBlock()
+      subnet = aws_network.AwsSubnet(zone, vpc_id, cidr_block=cidr)
+      subnet.Create()
+      cmd += [subnet.id]
+      self.subnets.append(subnet)
+
     vm_util.IssueCommand(cmd)
 
   def _DeleteDependencies(self):
@@ -143,6 +155,9 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
 
     if self.failover_subnet:
       self.failover_subnet.Delete()
+
+    for subnet in self.subnets:
+      subnet.Delete()
 
   def _Create(self):
     """Creates the cluster."""

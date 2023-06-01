@@ -79,6 +79,11 @@ _NODE_COUNT = flags.DEFINE_integer(
         'managed_memory_store_cluster is True.'
     ),
 )
+_ZONES = flags.DEFINE_list(
+    'cloud_redis_zones',
+    None,
+    'If using cluster mode, the zones to distribute shards between.',
+)
 flags.DEFINE_string(
     'cloud_redis_region',
     'us-central1',
@@ -152,6 +157,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self._password: str = None
     self._clustered: bool = _MANAGED_MEMORY_STORE_CLUSTER.value
     self.node_count = _NODE_COUNT.value if self._clustered else 1
+    self.zones = _ZONES.value if self._clustered else []
 
     self.metadata['clustered'] = self._clustered
     self.metadata['node_count'] = self.node_count
