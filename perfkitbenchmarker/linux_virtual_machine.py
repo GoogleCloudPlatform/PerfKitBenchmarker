@@ -2411,14 +2411,21 @@ class Ubuntu1804EfaMixin(Ubuntu1804Mixin):
   OS_TYPE = os_types.UBUNTU1804_EFA
 
 
-# Inherit Ubuntu 18's idiosyncracies.
-# Note https://bugs.launchpad.net/snappy/+bug/1659719 is also marked not fix in
-# focal.
-class Ubuntu2004Mixin(Ubuntu1804Mixin):
+class Ubuntu2004Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu2004 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU2004
   # https://packages.ubuntu.com/focal/python2
   PYTHON_2_PACKAGE = 'python2'
+
+  def UpdateEnvironmentPath(self):
+    """Add /snap/bin to default search path for Ubuntu2004.
+
+    See https://bugs.launchpad.net/snappy/+bug/1659719.
+    """
+    self.RemoteCommand(
+        r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" ~/.bashrc')
+    self.RemoteCommand(
+        r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" /etc/bash.bashrc')
 
 
 class Ubuntu2004EfaMixin(Ubuntu2004Mixin):
