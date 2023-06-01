@@ -122,12 +122,6 @@ flags.register_validator(
     'stress_ng_thread_workloads',
     lambda workloads: workloads and set(workloads).issubset(ALL_WORKLOADS))
 
-ALL_VERSIONS = ['0.05.23', '0.09.25']
-flags.DEFINE_enum(
-    'stress_ng_version', '0.09.25', ALL_VERSIONS,
-    'Stress-ng version to use. Default is 0.09.25 which '
-    'is the default package on Ubuntu 1804.')
-
 
 def _GeoMeanOverflow(iterable):
   """Returns the geometric mean.
@@ -171,7 +165,7 @@ def Prepare(benchmark_spec):
       required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
-  vm.Install('stress_ng')
+  vm.InstallPackages('stress_ng')
 
 
 def _ParseStressngResult(metadata,
@@ -231,7 +225,6 @@ def _RunWorkload(vm, num_threads):
   metadata = {
       'duration_sec': FLAGS.stress_ng_duration,
       'threads': num_threads,
-      'version': FLAGS.stress_ng_version,
   }
 
   samples = []
@@ -245,10 +238,7 @@ def _RunWorkload(vm, num_threads):
                numthreads=num_threads,
                duration=FLAGS.stress_ng_duration))
     stdout, stderr = vm.RemoteCommand(cmd)
-    # TODO(user): Find the actual stress-ng version that changes output to
-    # stderr instead of stdout
-    if FLAGS.stress_ng_version > '0.05.23':
-      stdout = stderr
+    stdout = stderr
     stressng_sample = _ParseStressngResult(metadata, stdout)
     if stressng_sample:
       samples.append(stressng_sample)
