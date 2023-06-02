@@ -1345,7 +1345,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     }
     lm_times = self._ReadLMNoticeContents()
     if not lm_times:
-      return events_dict
+      raise ValueError('Cannot collect lm times. Live Migration might failed.')
 
     # Result may contain errors captured, so we need to skip them
     for event_info in lm_times.splitlines():
