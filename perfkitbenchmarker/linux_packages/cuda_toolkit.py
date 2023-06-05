@@ -295,6 +295,13 @@ def _InstallCuda10Point2(vm):
                      'cuda-libraries-dev-10-2')
 
 
+def _DownloadCuda(vm, toolkit_fmt):
+  toolkit = toolkit_fmt.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm))
+  basename = posixpath.basename(toolkit)
+  vm.RemoteCommand(f'wget --tries=3 {toolkit}')
+  vm.RemoteCommand(f'sudo apt -o DPkg::Lock::Timeout=60 install ./{basename}')
+
+
 def _InstallCuda12Generic(vm, toolkit_fmt, version_dash):
   """Installs CUDA Toolkit 12.x from NVIDIA.
 
@@ -303,8 +310,6 @@ def _InstallCuda12Generic(vm, toolkit_fmt, version_dash):
     toolkit_fmt: format string to use for the toolkit name
     version_dash: Version (ie 12-1) to install
   """
-  toolkit = toolkit_fmt.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm))
-  basename = posixpath.basename(toolkit)
   vm.RemoteCommand(
       'wget -q'
       f' {CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=GetCpuArchPath(vm))}'
@@ -313,8 +318,7 @@ def _InstallCuda12Generic(vm, toolkit_fmt, version_dash):
       f'sudo mv cuda-{_CudaOs(vm.OS_TYPE)}.pin '
       '/etc/apt/preferences.d/cuda-repository-pin-600'
   )
-  vm.RemoteCommand(f'wget -q {toolkit}')
-  vm.RemoteCommand(f'sudo dpkg -i {basename}')
+  _DownloadCuda(vm, toolkit_fmt)
   EnrollSigningKey(vm)
   vm.AptUpdate()
   vm.InstallPackages(
@@ -333,15 +337,12 @@ def _InstallCuda11Generic(vm, toolkit_fmt, version_dash):
     toolkit_fmt: format string to use for the toolkit name
     version_dash: Version (ie 11-1) to install
   """
-  toolkit = toolkit_fmt.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm))
-  basename = posixpath.basename(toolkit)
   vm.RemoteCommand(
       f'wget -q {CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=GetCpuArchPath(vm))}'
   )
   vm.RemoteCommand(f'sudo mv cuda-{_CudaOs(vm.OS_TYPE)}.pin '
                    '/etc/apt/preferences.d/cuda-repository-pin-600')
-  vm.RemoteCommand(f'wget -q {toolkit}')
-  vm.RemoteCommand(f'sudo dpkg -i {basename}')
+  _DownloadCuda(vm, toolkit_fmt)
   EnrollSigningKey(vm)
   vm.AptUpdate()
   vm.InstallPackages(f'cuda-toolkit-{version_dash} '
