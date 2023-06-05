@@ -14,14 +14,19 @@
 """Module containing class for cloud managed memory stores."""
 
 import abc
-import logging
+import dataclasses
+import re
 from typing import Optional
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import virtual_machine
 
 # List of memory store types
 REDIS = 'REDIS'
 MEMCACHED = 'MEMCACHED'
+
+_REDIS_SHARDS_REGEX = r'(?s)slots\n(\d+)\n(\d+).+?port\n(\d+)\nip\n(\S+)'
 
 FLAGS = flags.FLAGS
 
@@ -81,7 +86,7 @@ _NODE_COUNT = flags.DEFINE_integer(
 )
 _ZONES = flags.DEFINE_list(
     'cloud_redis_zones',
-    None,
+    [],
     'If using cluster mode, the zones to distribute shards between.',
 )
 flags.DEFINE_string(
@@ -137,6 +142,23 @@ def ParseReadableVersion(version: str) -> str:
   return '.'.join(version.split('.', 2)[:2])
 
 
+@dataclasses.dataclass
+class RedisShard:
+  """An object representing a Redis shard.
+
+  Attributes:
+    slots: formatted like 2731-5461
+    ip: address of the redis shard
+    port: port of the redis shard
+    zone: location where the shard is located
+  """
+
+  slots: str
+  ip: str
+  port: int
+  zone: Optional[str] = None
+
+
 class BaseManagedMemoryStore(resource.BaseResource):
   """Object representing a cloud managed memory store."""
 
@@ -173,6 +195,30 @@ class BaseManagedMemoryStore(resource.BaseResource):
     if not self._port:
       self._PopulateEndpoint()
     return self._port
+
+  def GetShardEndpoints(
+      self, client: virtual_machine.BaseVirtualMachine
+  ) -> list[RedisShard]:
+    """Returns shard endpoints for the cluster.
+
+    The format of the `cluster shards` command can be found here:
+    https://redis.io/commands/cluster-shards/.
+
+    Args:
+      client: VM that has access to the redis cluster.
+
+    Returns:
+      A list of redis shards.
+    """
+    result, _ = client.RemoteCommand(
+        f'redis-cli -h {self.GetMemoryStoreIp()} -p'
+        f' {self.GetMemoryStorePort()} cluster shards'
+    )
+    shards = re.findall(_REDIS_SHARDS_REGEX, result)
+    return [
+        RedisShard(slots=f'{slot_begin}-{slot_end}', ip=ip, port=int(port))
+        for slot_begin, slot_end, port, ip in shards
+    ]
 
   @abc.abstractmethod
   def _PopulateEndpoint(self) -> None:
