@@ -113,7 +113,9 @@ def _InstallDPDK(vm):
     )
 
   # Build and Install
-  vm.RobustRemoteCommand('cd dpdk && sudo meson setup -Dexamples=all build')
+  vm.RobustRemoteCommand(
+      'cd dpdk && sudo meson setup -Dexamples=l3fwd,l2fwd build'
+  )
   vm.RobustRemoteCommand(
       'cd dpdk && sudo ninja install -C build && sudo ldconfig'
   )
