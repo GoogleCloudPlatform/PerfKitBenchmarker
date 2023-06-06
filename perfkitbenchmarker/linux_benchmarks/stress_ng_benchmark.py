@@ -165,7 +165,7 @@ def Prepare(benchmark_spec):
       required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
-  vm.InstallPackages('stress_ng')
+  vm.InstallPackages('stress-ng')
 
 
 def _ParseStressngResult(metadata,
@@ -308,4 +308,4 @@ def Cleanup(benchmark_spec):
       required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
-  vm.Uninstall('stress_ng')
+  vm.Uninstall('stress-ng')
