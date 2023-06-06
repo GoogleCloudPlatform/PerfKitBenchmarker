@@ -24,6 +24,7 @@ from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import ycsb
+from perfkitbenchmarker.linux_packages import ycsb_stats
 from tests import matchers
 from tests import pkb_common_test_case
 
@@ -38,7 +39,7 @@ def open_data_file(filename):
 
 def _parse_and_return_time_series(filename):
   content = open_data_file(filename)
-  return ycsb.ParseResults(content, 'timeseries')
+  return ycsb_stats.ParseResults(content, 'timeseries')
 
 
 class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -46,7 +47,7 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(SimpleResultParserTestCase, self).setUp()
     self.contents = open_data_file('ycsb-test-run.dat')
-    self.results = ycsb.ParseResults(self.contents, 'histogram')
+    self.results = ycsb_stats.ParseResults(self.contents, 'histogram')
 
   def testCommandLineSet(self):
     self.assertEqual(
@@ -59,7 +60,7 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testUpdateStatisticsParsed(self):
     self.assertEqual(
-        ycsb._OpResult(
+        ycsb_stats._OpResult(
             group='update',
             statistics={
                 'Operations': 531,
@@ -70,7 +71,7 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
                 '95thPercentileLatency(ms)': 0,
                 '99thPercentileLatency(ms)': 0,
             },
-            data_type=ycsb.HISTOGRAM,
+            data_type=ycsb_stats.HISTOGRAM,
             data=[(0, 530), (19, 1)],
         ),
         self.results.groups['update'],
@@ -78,7 +79,7 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testReadStatisticsParsed(self):
     self.assertEqual(
-        ycsb._OpResult(
+        ycsb_stats._OpResult(
             group='read',
             statistics={
                 'Operations': 469,
@@ -89,7 +90,7 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
                 '95thPercentileLatency(ms)': 0,
                 '99thPercentileLatency(ms)': 0,
             },
-            data_type=ycsb.HISTOGRAM,
+            data_type=ycsb_stats.HISTOGRAM,
             data=[(0, 469)],
         ),
         self.results.groups['read'],
@@ -97,7 +98,7 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testOverallStatisticsParsed(self):
     self.assertEqual(
-        ycsb._OpResult(
+        ycsb_stats._OpResult(
             group='overall',
             statistics={'RunTime(ms)': 80.0, 'Throughput(ops/sec)': 12500.0},
             data_type='histogram',
@@ -112,17 +113,17 @@ class DetailedResultParserTestCase(unittest.TestCase):
   def setUp(self):
     super(DetailedResultParserTestCase, self).setUp()
     self.contents = open_data_file('ycsb-test-run-2.dat')
-    self.results = ycsb.ParseResults(self.contents, 'histogram')
+    self.results = ycsb_stats.ParseResults(self.contents, 'histogram')
 
   def testPercentilesFromHistogram_read(self):
     hist = self.results.groups['read'].data
-    percentiles = ycsb._PercentilesFromHistogram(hist)
+    percentiles = ycsb_stats._PercentilesFromHistogram(hist)
     self.assertEqual(1, percentiles['p50'])
     self.assertEqual(7, percentiles['p99'])
 
   def testPercentilesFromHistogram_update(self):
     hist = self.results.groups['update'].data
-    percentiles = ycsb._PercentilesFromHistogram(hist)
+    percentiles = ycsb_stats._PercentilesFromHistogram(hist)
     self.assertEqual(1, percentiles['p50'])
     self.assertEqual(7, percentiles['p99'])
 
@@ -153,9 +154,9 @@ class ThroughputTimeSeriesParserTestCase(
     results_1 = _parse_and_return_time_series('ycsb-time-series.dat')
     results_2 = _parse_and_return_time_series('ycsb-time-series-2.dat')
 
-    combined = ycsb._CombineResults(
+    combined = ycsb_stats.CombineResults(
         result_list=[results_1, results_2],
-        measurement_type=ycsb.TIMESERIES,
+        measurement_type=ycsb_stats.TIMESERIES,
         combined_hdr={},
     )
 
@@ -176,16 +177,19 @@ class BadResultParserTestCase(unittest.TestCase):
     contents = open_data_file('ycsb-test-run-3.dat')
     self.assertRaises(
         errors.Benchmarks.KnownIntermittentError,
-        ycsb.ParseResults,
+        ycsb_stats.ParseResults,
         contents,
         'histogram',
     )
 
-  @flagsaver.flagsaver(ycsb_max_error_rate=0.95)
   def testErrorRate(self):
     contents = open_data_file('ycsb-test-run-4.dat')
     self.assertRaises(
-        errors.Benchmarks.RunError, ycsb.ParseResults, contents, 'hdrhistogram'
+        errors.Benchmarks.RunError,
+        ycsb_stats.ParseResults,
+        contents,
+        'hdrhistogram',
+        0.95,
     )
 
 
@@ -194,26 +198,28 @@ class WeightedQuantileTestCase(unittest.TestCase):
   def testEvenlyWeightedSamples(self):
     x = list(range(1, 101))  # 1-100
     weights = [1 for _ in x]
-    self.assertEqual(50, ycsb._WeightedQuantile(x, weights, 0.50))
-    self.assertEqual(75, ycsb._WeightedQuantile(x, weights, 0.75))
-    self.assertEqual(90, ycsb._WeightedQuantile(x, weights, 0.90))
-    self.assertEqual(95, ycsb._WeightedQuantile(x, weights, 0.95))
-    self.assertEqual(99, ycsb._WeightedQuantile(x, weights, 0.99))
-    self.assertEqual(100, ycsb._WeightedQuantile(x, weights, 1))
+    self.assertEqual(50, ycsb_stats._WeightedQuantile(x, weights, 0.50))
+    self.assertEqual(75, ycsb_stats._WeightedQuantile(x, weights, 0.75))
+    self.assertEqual(90, ycsb_stats._WeightedQuantile(x, weights, 0.90))
+    self.assertEqual(95, ycsb_stats._WeightedQuantile(x, weights, 0.95))
+    self.assertEqual(99, ycsb_stats._WeightedQuantile(x, weights, 0.99))
+    self.assertEqual(100, ycsb_stats._WeightedQuantile(x, weights, 1))
 
   def testLowWeight(self):
     x = [1, 4]
     weights = [99, 1]
     for i in range(100):
-      self.assertEqual(1, ycsb._WeightedQuantile(x, weights, i / 100.0))
-    self.assertEqual(4, ycsb._WeightedQuantile(x, weights, 0.995))
+      self.assertEqual(1, ycsb_stats._WeightedQuantile(x, weights, i / 100.0))
+    self.assertEqual(4, ycsb_stats._WeightedQuantile(x, weights, 0.995))
 
   def testMidWeight(self):
     x = [0, 1.2, 4]
     weights = [1, 98, 1]
     for i in range(2, 99):
-      self.assertAlmostEqual(1.2, ycsb._WeightedQuantile(x, weights, i / 100.0))
-    self.assertEqual(4, ycsb._WeightedQuantile(x, weights, 0.995))
+      self.assertAlmostEqual(
+          1.2, ycsb_stats._WeightedQuantile(x, weights, i / 100.0)
+      )
+    self.assertEqual(4, ycsb_stats._WeightedQuantile(x, weights, 0.995))
 
 
 class ParseWorkloadTestCase(unittest.TestCase):
@@ -227,7 +233,8 @@ class ParseWorkloadTestCase(unittest.TestCase):
         {}, ycsb.ParseWorkload('#recordcount = 10\n# columnfamily=cf')
     )
     self.assertDictEqual(
-        {'recordcount': '10'}, ycsb.ParseWorkload('#Sample!\nrecordcount = 10')
+        {'recordcount': '10'},
+        ycsb.ParseWorkload('#Sample!\nrecordcount = 10'),
     )
 
   def testParsesSampleWorkload(self):
@@ -252,30 +259,30 @@ class ParseWorkloadTestCase(unittest.TestCase):
 class CombineResultsTestCase(unittest.TestCase):
 
   def testGroupMissing(self):
-    r1 = ycsb.YcsbResult(
+    r1 = ycsb_stats.YcsbResult(
         groups={
-            'read': ycsb._OpResult(
+            'read': ycsb_stats._OpResult(
                 group='read',
                 statistics={'Operations': 100, 'Return=0': 100},
-                data_type=ycsb.HISTOGRAM,
+                data_type=ycsb_stats.HISTOGRAM,
             )
         }
     )
-    r2 = ycsb.YcsbResult(
+    r2 = ycsb_stats.YcsbResult(
         groups={
-            'read': ycsb._OpResult(
+            'read': ycsb_stats._OpResult(
                 group='read',
                 statistics={'Operations': 96, 'Return=0': 94, 'Return=-1': 2},
-                data_type=ycsb.HISTOGRAM,
+                data_type=ycsb_stats.HISTOGRAM,
             ),
-            'update': ycsb._OpResult(
+            'update': ycsb_stats._OpResult(
                 group='update',
                 statistics={'Operations': 100, 'AverageLatency(ms)': 25},
-                data_type=ycsb.HISTOGRAM,
+                data_type=ycsb_stats.HISTOGRAM,
             ),
         }
     )
-    combined = ycsb._CombineResults([r1, r2], 'histogram', {})
+    combined = ycsb_stats.CombineResults([r1, r2], 'histogram', {})
     self.assertCountEqual(['read', 'update'], combined.groups)
     self.assertCountEqual(
         ['Operations', 'Return=0', 'Return=-1'],
@@ -287,21 +294,21 @@ class CombineResultsTestCase(unittest.TestCase):
     )
 
   def testDropUnaggregatedFromSingleResult(self):
-    r = ycsb.YcsbResult(
+    r = ycsb_stats.YcsbResult(
         client='',
         command_line='',
         groups={
-            'read': ycsb._OpResult(
+            'read': ycsb_stats._OpResult(
                 group='read',
                 statistics={'AverageLatency(ms)': 21},
-                data_type=ycsb.HISTOGRAM,
+                data_type=ycsb_stats.HISTOGRAM,
             )
         },
     )
 
     r_copy = copy.deepcopy(r)
     self.assertEqual(r, r_copy)
-    combined = ycsb._CombineResults([r], 'histogram', {})
+    combined = ycsb_stats.CombineResults([r], 'histogram', {})
     self.assertEqual(r, r_copy)
     r.groups['read'].statistics = {}
     self.assertEqual(r, combined)
@@ -323,7 +330,7 @@ class HdrLogsParserTestCase(unittest.TestCase):
       #[Max     =   203903.000, Total count    =       499019]
       #[Buckets =            8, SubBuckets     =         2048]
     """
-    actual = ycsb.ParseHdrLogFile(rawlog)
+    actual = ycsb_stats.ParseHdrLogFile(rawlog)
     expected = [
         (0.0, 0.314, 2),
         (10.0, 0.853, 49953),
@@ -373,7 +380,7 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.ycsb_workload_files = ['workloadc']
     self.test_executor = ycsb.YCSBExecutor('test_database')
     # Result parsing is already handled elsewhere
-    self.enter_context(mock.patch.object(ycsb, 'ParseResults'))
+    self.enter_context(mock.patch.object(ycsb_stats, 'ParseResults'))
     # Test VM with mocked command
     self.test_vm = mock.Mock()
     self.test_cmd = self.test_vm.RobustRemoteCommand
