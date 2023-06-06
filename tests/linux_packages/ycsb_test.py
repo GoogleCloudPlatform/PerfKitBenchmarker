@@ -50,8 +50,9 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCommandLineSet(self):
     self.assertEqual(
-        'Command line: -db com.yahoo.ycsb.BasicDB '
-        '-P workloads/workloada -t', self.results.command_line)
+        'Command line: -db com.yahoo.ycsb.BasicDB -P workloads/workloada -t',
+        self.results.command_line,
+    )
 
   def testClientSet(self):
     self.assertEqual('YCSB Client 0.1', self.results.client)
@@ -63,15 +64,17 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
             statistics={
                 'Operations': 531,
                 'Return=0': 531,
-                'AverageLatency(ms)': .0659774011299435,
+                'AverageLatency(ms)': 0.0659774011299435,
                 'MinLatency(ms)': 0.042,
-                'MaxLatency(ms)': .345,
+                'MaxLatency(ms)': 0.345,
                 '95thPercentileLatency(ms)': 0,
-                '99thPercentileLatency(ms)': 0
+                '99thPercentileLatency(ms)': 0,
             },
             data_type=ycsb.HISTOGRAM,
-            data=[(0, 530), (19, 1)]),
-        self.results.groups['update'])
+            data=[(0, 530), (19, 1)],
+        ),
+        self.results.groups['update'],
+    )
 
   def testReadStatisticsParsed(self):
     self.assertEqual(
@@ -84,23 +87,24 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
                 'MinLatency(ms)': 0.034,
                 'MaxLatency(ms)': 0.102,
                 '95thPercentileLatency(ms)': 0,
-                '99thPercentileLatency(ms)': 0
+                '99thPercentileLatency(ms)': 0,
             },
             data_type=ycsb.HISTOGRAM,
-            data=[(0, 469)]),
-        self.results.groups['read'])
+            data=[(0, 469)],
+        ),
+        self.results.groups['read'],
+    )
 
   def testOverallStatisticsParsed(self):
     self.assertEqual(
         ycsb._OpResult(
             group='overall',
-            statistics={
-                'RunTime(ms)': 80.0,
-                'Throughput(ops/sec)': 12500.0
-            },
+            statistics={'RunTime(ms)': 80.0, 'Throughput(ops/sec)': 12500.0},
             data_type='histogram',
-            data=[]),
-        self.results.groups['overall'])
+            data=[],
+        ),
+        self.results.groups['overall'],
+    )
 
 
 class DetailedResultParserTestCase(unittest.TestCase):
@@ -123,8 +127,9 @@ class DetailedResultParserTestCase(unittest.TestCase):
     self.assertEqual(7, percentiles['p99'])
 
 
-class ThroughputTimeSeriesParserTestCase(pkb_common_test_case.PkbCommonTestCase
-                                        ):
+class ThroughputTimeSeriesParserTestCase(
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   def setUp(self):
     super().setUp()
@@ -139,7 +144,7 @@ class ThroughputTimeSeriesParserTestCase(pkb_common_test_case.PkbCommonTestCase
         30: 2496.8,
         40: 2509.6,
         50: 2487.2,
-        60: 2513.2
+        60: 2513.2,
     }
     self.assertEqual(results.throughput_time_series, expected)
 
@@ -151,7 +156,8 @@ class ThroughputTimeSeriesParserTestCase(pkb_common_test_case.PkbCommonTestCase
     combined = ycsb._CombineResults(
         result_list=[results_1, results_2],
         measurement_type=ycsb.TIMESERIES,
-        combined_hdr={})
+        combined_hdr={},
+    )
 
     expected = {
         10: 4187.5,
@@ -168,14 +174,19 @@ class BadResultParserTestCase(unittest.TestCase):
 
   def testBadTestRun(self):
     contents = open_data_file('ycsb-test-run-3.dat')
-    self.assertRaises(errors.Benchmarks.KnownIntermittentError,
-                      ycsb.ParseResults, contents, 'histogram')
+    self.assertRaises(
+        errors.Benchmarks.KnownIntermittentError,
+        ycsb.ParseResults,
+        contents,
+        'histogram',
+    )
 
   @flagsaver.flagsaver(ycsb_max_error_rate=0.95)
   def testErrorRate(self):
     contents = open_data_file('ycsb-test-run-4.dat')
-    self.assertRaises(errors.Benchmarks.RunError, ycsb.ParseResults, contents,
-                      'hdrhistogram')
+    self.assertRaises(
+        errors.Benchmarks.RunError, ycsb.ParseResults, contents, 'hdrhistogram'
+    )
 
 
 class WeightedQuantileTestCase(unittest.TestCase):
@@ -212,11 +223,12 @@ class ParseWorkloadTestCase(unittest.TestCase):
 
   def testIgnoresComment(self):
     self.assertDictEqual({}, ycsb.ParseWorkload('#\n'))
-    self.assertDictEqual({},
-                         ycsb.ParseWorkload('#recordcount = 10\n'
-                                            '# columnfamily=cf'))
-    self.assertDictEqual({'recordcount': '10'},
-                         ycsb.ParseWorkload('#Sample!\nrecordcount = 10'))
+    self.assertDictEqual(
+        {}, ycsb.ParseWorkload('#recordcount = 10\n# columnfamily=cf')
+    )
+    self.assertDictEqual(
+        {'recordcount': '10'}, ycsb.ParseWorkload('#Sample!\nrecordcount = 10')
+    )
 
   def testParsesSampleWorkload(self):
     contents = open_data_file('ycsb_workloada')
@@ -231,7 +243,7 @@ class ParseWorkloadTestCase(unittest.TestCase):
         'updateproportion': '0.5',
         'scanproportion': '0',
         'insertproportion': '0',
-        'requestdistribution': 'zipfian'
+        'requestdistribution': 'zipfian',
     }
 
     self.assertDictEqual(expected, actual)
@@ -244,55 +256,48 @@ class CombineResultsTestCase(unittest.TestCase):
         groups={
             'read': ycsb._OpResult(
                 group='read',
-                statistics={
-                    'Operations': 100,
-                    'Return=0': 100
-                },
+                statistics={'Operations': 100, 'Return=0': 100},
                 data_type=ycsb.HISTOGRAM,
             )
-        })
+        }
+    )
     r2 = ycsb.YcsbResult(
         groups={
             'read': ycsb._OpResult(
                 group='read',
-                statistics={
-                    'Operations': 96,
-                    'Return=0': 94,
-                    'Return=-1': 2
-                },
+                statistics={'Operations': 96, 'Return=0': 94, 'Return=-1': 2},
                 data_type=ycsb.HISTOGRAM,
             ),
             'update': ycsb._OpResult(
                 group='update',
-                statistics={
-                    'Operations': 100,
-                    'AverageLatency(ms)': 25
-                },
+                statistics={'Operations': 100, 'AverageLatency(ms)': 25},
                 data_type=ycsb.HISTOGRAM,
-            )
-        })
+            ),
+        }
+    )
     combined = ycsb._CombineResults([r1, r2], 'histogram', {})
     self.assertCountEqual(['read', 'update'], combined.groups)
-    self.assertCountEqual(['Operations', 'Return=0', 'Return=-1'],
-                          combined.groups['read'].statistics)
+    self.assertCountEqual(
+        ['Operations', 'Return=0', 'Return=-1'],
+        combined.groups['read'].statistics,
+    )
     read_stats = combined.groups['read'].statistics
-    self.assertEqual({
-        'Operations': 196,
-        'Return=0': 194,
-        'Return=-1': 2
-    }, read_stats)
+    self.assertEqual(
+        {'Operations': 196, 'Return=0': 194, 'Return=-1': 2}, read_stats
+    )
 
   def testDropUnaggregatedFromSingleResult(self):
     r = ycsb.YcsbResult(
         client='',
         command_line='',
         groups={
-            'read':
-                ycsb._OpResult(
-                    group='read',
-                    statistics={'AverageLatency(ms)': 21},
-                    data_type=ycsb.HISTOGRAM)
-        })
+            'read': ycsb._OpResult(
+                group='read',
+                statistics={'AverageLatency(ms)': 21},
+                data_type=ycsb.HISTOGRAM,
+            )
+        },
+    )
 
     r_copy = copy.deepcopy(r)
     self.assertEqual(r, r_copy)
@@ -319,8 +324,12 @@ class HdrLogsParserTestCase(unittest.TestCase):
       #[Buckets =            8, SubBuckets     =         2048]
     """
     actual = ycsb.ParseHdrLogFile(rawlog)
-    expected = [(0.0, 0.314, 2), (10.0, 0.853, 49953),
-                (20.0, 0.949, 50396), (30.0, 1.033, 49759)]
+    expected = [
+        (0.0, 0.314, 2),
+        (10.0, 0.853, 49953),
+        (20.0, 0.949, 50396),
+        (30.0, 1.033, 49759),
+    ]
     self.assertEqual(actual, expected)
 
 
@@ -328,24 +337,21 @@ class PrerequisitesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @parameterized.named_parameters(
       {
-          'testcase_name':
-              'SnapshotVersion',
-          'url':
-              'https://storage.googleapis.com/externally_shared_files/ycsb-0.18.0-SNAPSHOT.tar.gz',
-          'expected_version':
-              18,
-      }, {
+          'testcase_name': 'SnapshotVersion',
+          'url': 'https://storage.googleapis.com/externally_shared_files/ycsb-0.18.0-SNAPSHOT.tar.gz',
+          'expected_version': 18,
+      },
+      {
           'testcase_name': 'StandardVersion',
           'url': 'https://storage.googleapis.com/ycsbclient/ycsb-0.17.0.tar.gz',
           'expected_version': 17,
-      }, {
-          'testcase_name':
-              'GitHubVersion',
-          'url':
-              'https://github.com/brianfrankcooper/YCSB/releases/download/0.17.0/ycsb-0.17.0.tar.gz',
-          'expected_version':
-              17,
-      })
+      },
+      {
+          'testcase_name': 'GitHubVersion',
+          'url': 'https://github.com/brianfrankcooper/YCSB/releases/download/0.17.0/ycsb-0.17.0.tar.gz',
+          'expected_version': 17,
+      },
+  )
   def testGetVersionIndexFromUrl(self, url, expected_version):
     actual_version = ycsb._GetVersionFromUrl(url)
     self.assertEqual(actual_version, expected_version)
@@ -429,7 +435,7 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
             mock.call(matchers.HAS('-target 8542')),
             mock.call(matchers.HAS('-target 10000')),
         ],
-        self.test_cmd.mock_calls
+        self.test_cmd.mock_calls,
     )
 
   @flagsaver.flagsaver
@@ -438,8 +444,9 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.ycsb_incremental_load = 2500
     FLAGS.ycsb_client_vms = 1
     FLAGS['ycsb_threads_per_client'].parse(['1000'])
-    mock_set_thread_count = self.enter_context(mock.patch.object(
-        self.test_executor, '_SetClientThreadCount'))
+    mock_set_thread_count = self.enter_context(
+        mock.patch.object(self.test_executor, '_SetClientThreadCount')
+    )
 
     # Act
     self.test_executor.Run([self.test_vm])
@@ -453,7 +460,7 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
             mock.call(1000),
             mock.call(1000),
         ],
-        mock_set_thread_count.mock_calls
+        mock_set_thread_count.mock_calls,
     )
 
   @flagsaver.flagsaver
@@ -467,8 +474,7 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     # Assert
     self.assertSequenceEqual(
-        [mock.call(matchers.HAS('-target 200'))],
-        self.test_cmd.mock_calls
+        [mock.call(matchers.HAS('-target 200'))], self.test_cmd.mock_calls
     )
 
 

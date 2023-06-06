@@ -65,13 +65,17 @@ from perfkitbenchmarker.linux_packages import maven
 
 FLAGS = flags.FLAGS
 
-YCSB_URL_TEMPLATE = ('https://github.com/brianfrankcooper/YCSB/releases/'
-                     'download/{0}/ycsb-{0}.tar.gz')
+YCSB_URL_TEMPLATE = (
+    'https://github.com/brianfrankcooper/YCSB/releases/'
+    'download/{0}/ycsb-{0}.tar.gz'
+)
 YCSB_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 HDRHISTOGRAM_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'hdrhistogram')
-HDRHISTOGRAM_TAR_URL = ('https://github.com/HdrHistogram/HdrHistogram/archive/'
-                        'HdrHistogram-2.1.10.tar.gz')
+HDRHISTOGRAM_TAR_URL = (
+    'https://github.com/HdrHistogram/HdrHistogram/archive/'
+    'HdrHistogram-2.1.10.tar.gz'
+)
 HDRHISTOGRAM_GROUPS = ['READ', 'UPDATE']
 
 _DEFAULT_PERCENTILES = 50, 75, 90, 95, 99, 99.9
@@ -99,153 +103,237 @@ AGGREGATE_OPERATORS = {
     '95thPercentileLatency(ms)': None,  # Calculated across clients.
     '99thPercentileLatency(ms)': None,  # Calculated across clients.
     'MinLatency(ms)': min,
-    'MaxLatency(ms)': max
+    'MaxLatency(ms)': max,
 }
 
-flags.DEFINE_string('ycsb_version', '0.17.0',
-                    'YCSB version to use. Defaults to version 0.17.0.')
 flags.DEFINE_string(
-    'ycsb_tar_url', None, 'URL to a YCSB tarball to use '
-    'instead of the releases located on github.')
-flags.DEFINE_enum('ycsb_measurement_type', HISTOGRAM, YCSB_MEASUREMENT_TYPES,
-                  'Measurement type to use for ycsb. Defaults to histogram.')
-flags.DEFINE_enum('ycsb_measurement_interval', 'op', ['op', 'intended', 'both'],
-                  'Measurement interval to use for ycsb. Defaults to op.')
+    'ycsb_version', '0.17.0', 'YCSB version to use. Defaults to version 0.17.0.'
+)
+flags.DEFINE_string(
+    'ycsb_tar_url',
+    None,
+    'URL to a YCSB tarball to use instead of the releases located on github.',
+)
+flags.DEFINE_enum(
+    'ycsb_measurement_type',
+    HISTOGRAM,
+    YCSB_MEASUREMENT_TYPES,
+    'Measurement type to use for ycsb. Defaults to histogram.',
+)
+flags.DEFINE_enum(
+    'ycsb_measurement_interval',
+    'op',
+    ['op', 'intended', 'both'],
+    'Measurement interval to use for ycsb. Defaults to op.',
+)
 flags.DEFINE_boolean(
-    'ycsb_histogram', False, 'Include individual '
+    'ycsb_histogram',
+    False,
+    'Include individual '
     'histogram results from YCSB (will increase sample '
-    'count).')
-flags.DEFINE_boolean('ycsb_load_samples', True, 'Include samples '
-                     'from pre-populating database.')
+    'count).',
+)
 flags.DEFINE_boolean(
-    'ycsb_skip_load_stage', False, 'If True, skip the data '
+    'ycsb_load_samples', True, 'Include samples from pre-populating database.'
+)
+flags.DEFINE_boolean(
+    'ycsb_skip_load_stage',
+    False,
+    'If True, skip the data '
     'loading stage. It can be used when the database target '
-    'already exists with pre-populated data.')
+    'already exists with pre-populated data.',
+)
 flags.DEFINE_boolean(
-    'ycsb_skip_run_stage', False, 'If True, skip the workload '
+    'ycsb_skip_run_stage',
+    False,
+    'If True, skip the workload '
     'running stage. It can be used when you want to '
-    'pre-populate a database target.')
+    'pre-populate a database target.',
+)
 flags.DEFINE_boolean(
-    'ycsb_include_individual_results', False,
-    'Include results from each client VM, rather than just '
-    'combined results.')
+    'ycsb_include_individual_results',
+    False,
+    'Include results from each client VM, rather than just combined results.',
+)
 flags.DEFINE_boolean(
-    'ycsb_reload_database', True, 'Reload database, otherwise skip load stage. '
+    'ycsb_reload_database',
+    True,
+    'Reload database, otherwise skip load stage. '
     'Note, this flag is only used if the database '
-    'is already loaded.')
+    'is already loaded.',
+)
 flags.DEFINE_integer('ycsb_client_vms', 1, 'Number of YCSB client VMs.')
 flags.DEFINE_list(
-    'ycsb_workload_files', ['workloada', 'workloadb'],
+    'ycsb_workload_files',
+    ['workloada', 'workloadb'],
     'Path to YCSB workload file to use during *run* '
-    'stage only. Comma-separated list')
+    'stage only. Comma-separated list',
+)
 flags.DEFINE_list(
-    'ycsb_load_parameters', [],
+    'ycsb_load_parameters',
+    [],
     'Passed to YCSB during the load stage. Comma-separated list '
-    'of "key=value" pairs.')
+    'of "key=value" pairs.',
+)
 flags.DEFINE_list(
-    'ycsb_run_parameters', [],
+    'ycsb_run_parameters',
+    [],
     'Passed to YCSB during the run stage. Comma-separated list '
-    'of "key=value" pairs.')
+    'of "key=value" pairs.',
+)
 _THROUGHPUT_TIME_SERIES = flags.DEFINE_bool(
-    'ycsb_throughput_time_series', False,
+    'ycsb_throughput_time_series',
+    False,
     'If true, run prints status which includes a throughput time series (1s '
-    'granularity), and includes the results in the samples.')
+    'granularity), and includes the results in the samples.',
+)
 flags.DEFINE_list(
-    'ycsb_threads_per_client', ['32'], 'Number of threads per '
+    'ycsb_threads_per_client',
+    ['32'],
+    'Number of threads per '
     'loader during the benchmark run. Specify a list to vary the '
     'number of clients. For each thread count, optionally supply '
-    'target qps per client, which cause ycsb to self-throttle.')
+    'target qps per client, which cause ycsb to self-throttle.',
+)
 flags.DEFINE_integer(
-    'ycsb_preload_threads', None, 'Number of threads per '
+    'ycsb_preload_threads',
+    None,
+    'Number of threads per '
     'loader during the initial data population stage. '
-    'Default value depends on the target DB.')
+    'Default value depends on the target DB.',
+)
 flags.DEFINE_integer(
-    'ycsb_record_count', None, 'Pre-load with a total '
+    'ycsb_record_count',
+    None,
+    'Pre-load with a total '
     'dataset of records total. Overrides recordcount value in '
     'all workloads of this run. Defaults to None, where '
     'recordcount value in each workload is used. If neither '
-    'is not set, ycsb default of 0 is used.')
-flags.DEFINE_integer('ycsb_operation_count', None, 'Number of operations '
-                     '*per client VM*.')
+    'is not set, ycsb default of 0 is used.',
+)
 flags.DEFINE_integer(
-    'ycsb_timelimit', 1800, 'Maximum amount of time to run '
+    'ycsb_operation_count', None, 'Number of operations *per client VM*.'
+)
+flags.DEFINE_integer(
+    'ycsb_timelimit',
+    1800,
+    'Maximum amount of time to run '
     'each workload / client count combination in seconds. '
-    'Set to 0 for unlimited time.')
+    'Set to 0 for unlimited time.',
+)
 flags.DEFINE_integer(
-    'ycsb_field_count', 10, 'Number of fields in a record. '
-    'Defaults to 10, which is the default in ycsb v0.17.0.')
+    'ycsb_field_count',
+    10,
+    'Number of fields in a record. '
+    'Defaults to 10, which is the default in ycsb v0.17.0.',
+)
 flags.DEFINE_integer(
-    'ycsb_field_length', None, 'Size of each field. Defaults '
-    'to None which uses the ycsb default of 100.')
+    'ycsb_field_length',
+    None,
+    'Size of each field. Defaults to None which uses the ycsb default of 100.',
+)
 flags.DEFINE_enum(
-    'ycsb_requestdistribution', None, ['uniform', 'zipfian', 'latest'],
+    'ycsb_requestdistribution',
+    None,
+    ['uniform', 'zipfian', 'latest'],
     'Type of request distribution.  '
-    'This will overwrite workload file parameter')
+    'This will overwrite workload file parameter',
+)
 flags.DEFINE_float(
-    'ycsb_readproportion', None, 'The read proportion, '
-    'Default is 0.5 in workloada and 0.95 in YCSB.')
+    'ycsb_readproportion',
+    None,
+    'The read proportion, Default is 0.5 in workloada and 0.95 in YCSB.',
+)
 flags.DEFINE_float(
-    'ycsb_updateproportion', None, 'The update proportion, '
-    'Default is 0.5 in workloada and 0.05 in YCSB.')
+    'ycsb_updateproportion',
+    None,
+    'The update proportion, Default is 0.5 in workloada and 0.05 in YCSB.',
+)
 flags.DEFINE_float(
-    'ycsb_scanproportion', None, 'The scan proportion, '
-    'Default is 0 in workloada and 0 in YCSB.')
+    'ycsb_scanproportion',
+    None,
+    'The scan proportion, Default is 0 in workloada and 0 in YCSB.',
+)
 flags.DEFINE_boolean(
-    'ycsb_dynamic_load', False,
+    'ycsb_dynamic_load',
+    False,
     'Apply dynamic load to system under test and find out '
     'maximum sustained throughput (test length controlled by '
     'ycsb_operation_count and ycsb_timelimit) the '
-    'system capable of handling. ')
+    'system capable of handling. ',
+)
 flags.DEFINE_integer(
-    'ycsb_dynamic_load_throughput_lower_bound', None,
+    'ycsb_dynamic_load_throughput_lower_bound',
+    None,
     'Apply dynamic load to system under test. '
     'If not supplied, test will halt once reaching '
     'sustained load, otherwise, will keep running until '
-    'reaching lower bound.')
+    'reaching lower bound.',
+)
 flags.DEFINE_float(
-    'ycsb_dynamic_load_sustain_throughput_ratio', 0.95,
+    'ycsb_dynamic_load_sustain_throughput_ratio',
+    0.95,
     'To consider throughput sustainable when applying '
     'dynamic load, the actual overall throughput measured '
     'divided by target throughput applied should exceed '
     'this ratio. If not, we will lower target throughput and '
-    'retry.')
+    'retry.',
+)
 flags.DEFINE_integer(
-    'ycsb_dynamic_load_sustain_timelimit', 300,
+    'ycsb_dynamic_load_sustain_timelimit',
+    300,
     'Run duration in seconds for each throughput target '
-    'if we have already reached sustained throughput.')
-flags.DEFINE_integer('ycsb_sleep_after_load_in_sec', 0,
-                     'Sleep duration in seconds between load and run stage.')
+    'if we have already reached sustained throughput.',
+)
+flags.DEFINE_integer(
+    'ycsb_sleep_after_load_in_sec',
+    0,
+    'Sleep duration in seconds between load and run stage.',
+)
 _BURST_LOAD_MULTIPLIER = flags.DEFINE_integer(
-    'ycsb_burst_load', None,
+    'ycsb_burst_load',
+    None,
     'If set, applies burst load to the system, by running YCSB once, and then '
     'immediately running again with --ycsb_burst_load times the '
     'amount of load specified by the `target` parameter. Set to -1 for '
-    'the max throughput from the client.')
+    'the max throughput from the client.',
+)
 _INCREMENTAL_TARGET_QPS = flags.DEFINE_integer(
-    'ycsb_incremental_load', None,
+    'ycsb_incremental_load',
+    None,
     'If set, applies an incrementally increasing load until the target QPS is '
     'reached. This should be the aggregate load for all VMs. Running with '
     'this flag requires that there is not a QPS target passed in through '
-    '--ycsb_run_parameters.')
+    '--ycsb_run_parameters.',
+)
 _SHOULD_RECORD_COMMAND_LINE = flags.DEFINE_boolean(
-    'ycsb_record_command_line', True,
+    'ycsb_record_command_line',
+    True,
     'Whether to record the command line used for kicking off the runs as part '
     'of metadata. When there are many VMs, this can get long and clutter the '
-    'PKB log.')
+    'PKB log.',
+)
 _SHOULD_FAIL_ON_INCOMPLETE_LOADING = flags.DEFINE_boolean(
-    'ycsb_fail_on_incomplete_loading', False,
+    'ycsb_fail_on_incomplete_loading',
+    False,
     'Whether to fail the benchmarking if loading is not complete, '
-    'e.g., there are insert failures.')
+    'e.g., there are insert failures.',
+)
 _INCOMPLETE_LOADING_METRIC = flags.DEFINE_string(
-    'ycsb_insert_error_metric', 'insert Return=ERROR',
+    'ycsb_insert_error_metric',
+    'insert Return=ERROR',
     'Used with --ycsb_fail_on_incomplete_loading. Will fail the benchmark if '
-    'this metric\'s value is non-zero. This metric should be an indicator of '
+    "this metric's value is non-zero. This metric should be an indicator of "
     'incomplete table loading. If insertion retries are enabled via '
     'core_workload_insertion_retry_limit, then the default metric may be '
-    'non-zero even though the retried insertion eventually succeeded.')
+    'non-zero even though the retried insertion eventually succeeded.',
+)
 _ERROR_RATE_THRESHOLD = flags.DEFINE_float(
-    'ycsb_max_error_rate', 1.00, 'The maximum error rate allowed for the run. '
-    'By default, this allows any number of errors.')
+    'ycsb_max_error_rate',
+    1.00,
+    'The maximum error rate allowed for the run. '
+    'By default, this allows any number of errors.',
+)
 
 # Status line pattern
 _STATUS_PATTERN = r'(\d+) sec: \d+ operations; (\d+.\d+) current ops\/sec'
@@ -364,28 +452,33 @@ def CheckPrerequisites():
   # Following flags are mutully exclusive.
   run_target = 'target' in run_params
   per_thread_target = any(
-      [':' in thread_qps for thread_qps in FLAGS.ycsb_threads_per_client])
+      [':' in thread_qps for thread_qps in FLAGS.ycsb_threads_per_client]
+  )
   dynamic_load = FLAGS.ycsb_dynamic_load
 
   if run_target + per_thread_target + dynamic_load > 1:
     raise errors.Config.InvalidValue(
         'Setting YCSB target in ycsb_threads_per_client '
         'or ycsb_run_parameters or applying ycsb_dynamic_load_* flags'
-        ' are mutally exclusive.')
+        ' are mutally exclusive.'
+    )
 
   if FLAGS.ycsb_dynamic_load_throughput_lower_bound and not dynamic_load:
     raise errors.Config.InvalidValue(
-        'To apply dynamic load, set --ycsb_dynamic_load.')
+        'To apply dynamic load, set --ycsb_dynamic_load.'
+    )
 
   if _BURST_LOAD_MULTIPLIER.value and not run_target:
     raise errors.Config.InvalidValue(
         'Running in burst mode requires setting a target QPS using '
-        '--ycsb_run_parameters=target=qps. Got None.')
+        '--ycsb_run_parameters=target=qps. Got None.'
+    )
 
   if _INCREMENTAL_TARGET_QPS.value and run_target:
     raise errors.Config.InvalidValue(
         'Running in incremental mode requires setting a target QPS using '
-        '--ycsb_incremental_load=target and not --ycsb_run_parameters.')
+        '--ycsb_incremental_load=target and not --ycsb_run_parameters.'
+    )
 
 
 @vm_util.Retry(poll_interval=1)
@@ -397,8 +490,10 @@ def Install(vm):
   vm.Install('python')
   vm.InstallPackages('curl')
   ycsb_url = (
-      _ycsb_tar_url or FLAGS.ycsb_tar_url or
-      YCSB_URL_TEMPLATE.format(FLAGS.ycsb_version))
+      _ycsb_tar_url
+      or FLAGS.ycsb_tar_url
+      or YCSB_URL_TEMPLATE.format(FLAGS.ycsb_version)
+  )
   install_cmd = (
       'mkdir -p {0} && curl -L {1} | '
       'tar -C {0} --strip-components=1 -xzf - '
@@ -409,7 +504,8 @@ def Install(vm):
       # After https://github.com/brianfrankcooper/YCSB/pull/1583 is merged and
       # released, this will not be necessary.
       # TODO(user): Update minimum YCSB version and remove.
-      "--exclude='**/log4j-core-2*.jar' ")
+      "--exclude='**/log4j-core-2*.jar' "
+  )
   vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
   if _GetVersion(FLAGS.ycsb_version) >= 11:
     vm.Install('maven')
@@ -434,12 +530,12 @@ class _OpResult:
     group: group name (e.g., update, insert, overall)
     statistics: dict mapping from statistic name to value
     data_type: Corresponds to --ycsb_measurement_type.
-    data:
-      For HISTOGRAM/HDRHISTOGRAM: list of (ms_lower_bound, count) tuples, e.g.
-      [(0, 530), (19, 1)] indicates that 530 ops took between 0ms and 1ms,
-      and 1 took between 19ms and 20ms. Empty bins are not reported.
-      For TIMESERIES: list of (time, latency us) tuples.
+    data: For HISTOGRAM/HDRHISTOGRAM: list of (ms_lower_bound, count) tuples,
+      e.g. [(0, 530), (19, 1)] indicates that 530 ops took between 0ms and 1ms,
+      and 1 took between 19ms and 20ms. Empty bins are not reported. For
+      TIMESERIES: list of (time, latency us) tuples.
   """
+
   group: str = ''
   data_type: str = ''
   data: list[tuple[int, float]] = dataclasses.field(default_factory=list)
@@ -456,15 +552,18 @@ class YcsbResult:
     throughput_time_series: Time series of throughputs (interval, QPS).
     groups: dict of operation group name to results for that operation.
   """
+
   client: str = ''
   command_line: str = ''
   throughput_time_series: _ThroughputTimeSeries = dataclasses.field(
-      default_factory=dict)
+      default_factory=dict
+  )
   groups: dict[str, _OpResult] = dataclasses.field(default_factory=dict)
 
 
-def ParseResults(ycsb_result_string: str,
-                 data_type: str = 'histogram') -> 'YcsbResult':
+def ParseResults(
+    ycsb_result_string: str, data_type: str = 'histogram'
+) -> 'YcsbResult':
   """Parse YCSB results.
 
   Example input for histogram datatype:
@@ -550,12 +649,15 @@ def ParseResults(ycsb_result_string: str,
   Raises:
     IOError: If the results contained unexpected lines.
   """
-  if ('redis.clients.jedis.exceptions.JedisConnectionException'
-      in ycsb_result_string):
+  if (
+      'redis.clients.jedis.exceptions.JedisConnectionException'
+      in ycsb_result_string
+  ):
     # This error is cause by ycsb using an old version of redis client 2.9.0
     # https://github.com/xetorthio/jedis/issues/1977
     raise errors.Benchmarks.KnownIntermittentError(
-        'errors.Benchmarks.KnownIntermittentError')
+        'errors.Benchmarks.KnownIntermittentError'
+    )
 
   lines = []
   client_string = 'YCSB'
@@ -583,7 +685,8 @@ def ParseResults(ycsb_result_string: str,
       result_string = next(fp).strip()
     except StopIteration:
       raise IOError(
-          f'Could not parse YCSB output: {ycsb_result_string}') from None
+          f'Could not parse YCSB output: {ycsb_result_string}'
+      ) from None
 
   if result_string.startswith('[OVERALL]'):  # YCSB > 0.7.0.
     lines.append(result_string)
@@ -603,9 +706,11 @@ def ParseResults(ycsb_result_string: str,
 
   by_operation = itertools.groupby(r, operator.itemgetter(0))
 
-  result = YcsbResult(client=client_string,
-                      command_line=command_line,
-                      throughput_time_series=throughput_time_series)
+  result = YcsbResult(
+      client=client_string,
+      command_line=command_line,
+      throughput_time_series=throughput_time_series,
+  )
 
   for operation, lines in by_operation:
     operation = operation[1:-1].lower()
@@ -613,8 +718,7 @@ def ParseResults(ycsb_result_string: str,
     if operation == 'cleanup':
       continue
 
-    op_result = _OpResult(group=operation,
-                          data_type=data_type)
+    op_result = _OpResult(group=operation, data_type=data_type)
     latency_unit = 'ms'
     for _, name, val in lines:
       name = name.strip()
@@ -674,7 +778,8 @@ def _ValidateErrorRate(result: YcsbResult) -> None:
     if error_rate > _ERROR_RATE_THRESHOLD.value:
       raise errors.Benchmarks.RunError(
           f'YCSB had a {error_rate} error rate for {name}, higher than '
-          f'threshold {_ERROR_RATE_THRESHOLD.value}')
+          f'threshold {_ERROR_RATE_THRESHOLD.value}'
+      )
 
 
 def ParseHdrLogFile(logfile: str) -> list[_HdrHistogramTuple]:
@@ -715,8 +820,10 @@ def ParseHdrLogFile(logfile: str) -> list[_HdrHistogramTuple]:
       # convert percentile to 100 based and round up to 3 decimal places
       percentile = math.floor(float(row_vals[1]) * 100000) / 1000.0
       current_total_count = int(row_vals[2])
-      if (percentile > last_percent_value and
-          current_total_count > prev_total_count):
+      if (
+          percentile > last_percent_value
+          and current_total_count > prev_total_count
+      ):
         # convert latency to millisec based and percentile to 100 based.
         latency = float(row_vals[0]) / 1000
         count = current_total_count - prev_total_count
@@ -727,7 +834,8 @@ def ParseHdrLogFile(logfile: str) -> list[_HdrHistogramTuple]:
 
 
 def ParseHdrLogs(
-    hdrlogs: Mapping[str, str]) -> dict[str, list[_HdrHistogramTuple]]:
+    hdrlogs: Mapping[str, str]
+) -> dict[str, list[_HdrHistogramTuple]]:
   """Parse a dict of group to hdr logs into a dict of group to histogram tuples.
 
   Args:
@@ -769,8 +877,9 @@ def _WeightedQuantile(x, weights, p):
       the interval [0, 1].
   """
   if len(x) != len(weights):
-    raise ValueError('Lengths do not match: {0} != {1}'.format(
-        len(x), len(weights)))
+    raise ValueError(
+        'Lengths do not match: {0} != {1}'.format(len(x), len(weights))
+    )
   if p < 0 or p > 1:
     raise ValueError('Invalid quantile: {0}'.format(p))
   n = sum(weights)
@@ -811,9 +920,11 @@ def _PercentilesFromHistogram(ycsb_histogram, percentiles=_DEFAULT_PERCENTILES):
   return result
 
 
-def _CombineResults(result_list: Iterable[YcsbResult],
-                    measurement_type: str,
-                    combined_hdr: Mapping[str, list[_HdrHistogramTuple]]):
+def _CombineResults(
+    result_list: Iterable[YcsbResult],
+    measurement_type: str,
+    combined_hdr: Mapping[str, list[_HdrHistogramTuple]],
+):
   """Combine results from multiple YCSB clients.
 
   Reduces a list of YCSB results (the output of ParseResults)
@@ -851,7 +962,8 @@ def _CombineResults(result_list: Iterable[YcsbResult],
 
   def _CombineLatencyTimeSeries(
       combined_series: list[tuple[int, float]],
-      individual_series: list[tuple[int, float]]) -> list[tuple[int, float]]:
+      individual_series: list[tuple[int, float]],
+  ) -> list[tuple[int, float]]:
     """Combines two timeseries of average latencies.
 
     Args:
@@ -892,15 +1004,16 @@ def _CombineResults(result_list: Iterable[YcsbResult],
       # combined_weight * 1 / average latency.
       combined_weight = combined_weights[timestamp]
       average_latency = (combined_weight + 1.0) / (
-          (combined_weight / combined_series[timestamp]) +
-          (1.0 / individual_series[timestamp]))
+          (combined_weight / combined_series[timestamp])
+          + (1.0 / individual_series[timestamp])
+      )
       result.append((timestamp, average_latency))
       combined_weights[timestamp] += 1.0
     return result
 
   def _CombineThroughputTimeSeries(
-      series1: _ThroughputTimeSeries,
-      series2: _ThroughputTimeSeries) -> _ThroughputTimeSeries:
+      series1: _ThroughputTimeSeries, series2: _ThroughputTimeSeries
+  ) -> _ThroughputTimeSeries:
     """Returns a combined dict of [timestamp, total QPS] from the two series."""
     timestamps1 = set(series1)
     timestamps2 = set(series2)
@@ -911,12 +1024,12 @@ def _CombineResults(result_list: Iterable[YcsbResult],
       # instead of raising an exception.
       logging.warning(
           'Expected combined timestamps to be the same, got different '
-          'timestamps: %s', diff_timestamps)
+          'timestamps: %s',
+          diff_timestamps,
+      )
     result = {}
     for timestamp in all_timestamps:
-      result[timestamp] = (
-          series1.get(timestamp, 0) +
-          series2.get(timestamp, 0))
+      result[timestamp] = series1.get(timestamp, 0) + series2.get(timestamp, 0)
     return result
 
   result_list = list(result_list)
@@ -928,7 +1041,9 @@ def _CombineResults(result_list: Iterable[YcsbResult],
       if group_name not in result.groups:
         logging.warning(
             'Found result group "%s" in individual YCSB result, '
-            'but not in accumulator.', group_name)
+            'but not in accumulator.',
+            group_name,
+        )
         result.groups[group_name] = copy.deepcopy(group)
         continue
 
@@ -947,27 +1062,33 @@ def _CombineResults(result_list: Iterable[YcsbResult],
         elif k not in result.groups[group_name].statistics:
           logging.warning(
               'Found statistic "%s.%s" in individual YCSB result, '
-              'but not in accumulator.', group_name, k)
+              'but not in accumulator.',
+              group_name,
+              k,
+          )
           result.groups[group_name].statistics[k] = copy.deepcopy(v)
           continue
 
         op = AGGREGATE_OPERATORS[k]
-        result.groups[group_name].statistics[k] = (
-            op(result.groups[group_name].statistics[k], v))
+        result.groups[group_name].statistics[k] = op(
+            result.groups[group_name].statistics[k], v
+        )
 
       if measurement_type == HISTOGRAM:
         result.groups[group_name].data = CombineHistograms(
-            result.groups[group_name].data, group.data)
+            result.groups[group_name].data, group.data
+        )
       elif measurement_type == TIMESERIES:
         result.groups[group_name].data = _CombineLatencyTimeSeries(
-            result.groups[group_name].data, group.data)
+            result.groups[group_name].data, group.data
+        )
     result.client = ' '.join((result.client, indiv.client))
-    result.command_line = ';'.join(
-        (result.command_line, indiv.command_line))
+    result.command_line = ';'.join((result.command_line, indiv.command_line))
 
     if _THROUGHPUT_TIME_SERIES.value:
       result.throughput_time_series = _CombineThroughputTimeSeries(
-          result.throughput_time_series, indiv.throughput_time_series)
+          result.throughput_time_series, indiv.throughput_time_series
+      )
 
   if measurement_type == HDRHISTOGRAM:
     for group_name in combined_hdr:
@@ -995,8 +1116,11 @@ def ParseWorkload(contents):
   fp = io.StringIO(contents)
   result = {}
   for line in fp:
-    if (line.strip() and not line.lstrip().startswith('#') and
-        not line.lstrip().startswith('!')):
+    if (
+        line.strip()
+        and not line.lstrip().startswith('#')
+        and not line.lstrip().startswith('!')
+    ):
       k, v = re.split(r'\s*[:=]\s*', line, maxsplit=1)
       result[k] = v.strip()
   return result
@@ -1010,9 +1134,9 @@ def PushWorkload(vm, workload_file, remote_path):
   vm.PushFile(workload_file, remote_path)
 
 
-def _CreateSamples(ycsb_result: YcsbResult,
-                   include_histogram: bool = False,
-                   **kwargs) -> list[sample.Sample]:
+def _CreateSamples(
+    ycsb_result: YcsbResult, include_histogram: bool = False, **kwargs
+) -> list[sample.Sample]:
   """Create PKB samples from a YCSB result.
 
   Args:
@@ -1029,7 +1153,7 @@ def _CreateSamples(ycsb_result: YcsbResult,
   base_metadata = {
       'stage': stage,
       'ycsb_tar_url': _ycsb_tar_url,
-      'ycsb_version': FLAGS.ycsb_version
+      'ycsb_version': FLAGS.ycsb_version,
   }
   if _SHOULD_RECORD_COMMAND_LINE.value:
     base_metadata['command_line'] = command_line
@@ -1038,8 +1162,11 @@ def _CreateSamples(ycsb_result: YcsbResult,
   throughput_time_series = ycsb_result.throughput_time_series
   if throughput_time_series:
     yield sample.Sample(
-        'Throughput Time Series', 0, '',
-        {'throughput_time_series': sorted(throughput_time_series.items())})
+        'Throughput Time Series',
+        0,
+        '',
+        {'throughput_time_series': sorted(throughput_time_series.items())},
+    )
 
   for group_name, group in ycsb_result.groups.items():
     meta = base_metadata.copy()
@@ -1058,32 +1185,37 @@ def _CreateSamples(ycsb_result: YcsbResult,
     if group.data and group.data_type == HISTOGRAM:
       percentiles = _PercentilesFromHistogram(group.data)
       for label, value in percentiles.items():
-        yield sample.Sample(' '.join([group_name, label, 'latency']), value,
-                            'ms', meta)
+        yield sample.Sample(
+            ' '.join([group_name, label, 'latency']), value, 'ms', meta
+        )
       if include_histogram:
         for time_ms, count in group.data:
           yield sample.Sample(
-              '{0}_latency_histogram_{1}_ms'.format(group_name, time_ms), count,
-              'count', meta)
+              '{0}_latency_histogram_{1}_ms'.format(group_name, time_ms),
+              count,
+              'count',
+              meta,
+          )
 
     if group.data and group.data_type == HDRHISTOGRAM:
       # Strip percentile from the three-element tuples.
       histogram = [value_count[-2:] for value_count in group.data]
       percentiles = _PercentilesFromHistogram(histogram)
       for label, value in percentiles.items():
-        yield sample.Sample(' '.join([group_name, label, 'latency']), value,
-                            'ms', meta)
+        yield sample.Sample(
+            ' '.join([group_name, label, 'latency']), value, 'ms', meta
+        )
       if include_histogram:
         histogram = []
         for _, value, bucket_count in group.data:
-          histogram.append({
-              'microsec_latency': int(value * 1000),
-              'count': bucket_count
-          })
+          histogram.append(
+              {'microsec_latency': int(value * 1000), 'count': bucket_count}
+          )
         hist_meta = meta.copy()
         hist_meta.update({'histogram': json.dumps(histogram)})
-        yield sample.Sample('{0} latency histogram'.format(group_name), 0, '',
-                            hist_meta)
+        yield sample.Sample(
+            '{0} latency histogram'.format(group_name), 0, '', hist_meta
+        )
 
     if group.data and group.data_type == TIMESERIES:
       for sample_time, average_latency in group.data:
@@ -1091,10 +1223,16 @@ def _CreateSamples(ycsb_result: YcsbResult,
         timeseries_meta['sample_time'] = sample_time
         yield sample.Sample(
             ' '.join([group_name, 'AverageLatency (timeseries)']),
-            average_latency, 'ms', timeseries_meta)
-      yield sample.Sample('Average Latency Time Series', 0, '', {
-          'latency_time_series': group.data
-      })
+            average_latency,
+            'ms',
+            timeseries_meta,
+        )
+      yield sample.Sample(
+          'Average Latency Time Series',
+          0,
+          '',
+          {'latency_time_series': group.data},
+      )
 
 
 class YCSBExecutor:
@@ -1222,7 +1360,8 @@ class YCSBExecutor:
           stage='load',
           clients=len(vms) * kwargs['threads'],
           threads_per_client_vm=kwargs['threads'],
-          workload_name=os.path.basename(workload_file))
+          workload_name=os.path.basename(workload_file),
+      )
       self.workload_meta = workload_meta
     record_count = int(workload_meta.get('recordcount', '1000'))
     n_per_client = int(record_count) // len(vms)
@@ -1231,8 +1370,9 @@ class YCSBExecutor:
         for i in range(len(vms))
     ]
 
-    remote_path = posixpath.join(linux_packages.INSTALL_DIR,
-                                 os.path.basename(workload_file))
+    remote_path = posixpath.join(
+        linux_packages.INSTALL_DIR, os.path.basename(workload_file)
+    )
 
     args = [((vm, workload_file, remote_path), {}) for vm in dict.fromkeys(vms)]
     background_tasks.RunThreaded(PushWorkload, args)
@@ -1255,11 +1395,15 @@ class YCSBExecutor:
         event='load',
         start_timestamp=start,
         end_timestamp=time.time(),
-        metadata=copy.deepcopy(kwargs))
+        metadata=copy.deepcopy(kwargs),
+    )
 
     if len(results) != len(vms):
-      raise IOError('Missing results: only {0}/{1} reported\n{2}'.format(
-          len(results), len(vms), results))
+      raise IOError(
+          'Missing results: only {0}/{1} reported\n{2}'.format(
+              len(results), len(vms), results
+          )
+      )
 
     samples = []
     if FLAGS.ycsb_include_individual_results and len(results) > 1:
@@ -1270,7 +1414,9 @@ class YCSBExecutor:
                 result_type='individual',
                 result_index=i,
                 include_histogram=FLAGS.ycsb_histogram,
-                **workload_meta))
+                **workload_meta,
+            )
+        )
 
     # hdr histograms not collected upon load, only upon run
     combined = _CombineResults(results, self.measurement_type, {})
@@ -1279,7 +1425,9 @@ class YCSBExecutor:
             combined,
             result_type='combined',
             include_histogram=FLAGS.ycsb_histogram,
-            **workload_meta))
+            **workload_meta,
+        )
+    )
 
     return samples
 
@@ -1337,8 +1485,11 @@ class YCSBExecutor:
     background_tasks.RunThreaded(_Run, list(range(len(vms))))
 
     if len(results) != len(vms):
-      raise IOError('Missing results: only {0}/{1} reported\n{2}'.format(
-          len(results), len(vms), results))
+      raise IOError(
+          'Missing results: only {0}/{1} reported\n{2}'.format(
+              len(results), len(vms), results
+          )
+      )
 
     return results
 
@@ -1364,9 +1515,11 @@ class YCSBExecutor:
     lower_bound = FLAGS.ycsb_dynamic_load_throughput_lower_bound
     step = (1 - FLAGS.ycsb_dynamic_load_sustain_throughput_ratio) * 2
 
-    if (not bool(lower_bound) and
-        is_sustained) or (lower_bound and
-                          current_load < lower_bound) or (current_load is None):
+    if (
+        (not bool(lower_bound) and is_sustained)
+        or (lower_bound and current_load < lower_bound)
+        or (current_load is None)
+    ):
       return None
     elif is_sustained:
       return current_load * (1 - step)
@@ -1414,8 +1567,9 @@ class YCSBExecutor:
       if FLAGS.ycsb_scanproportion is not None:
         parameters['scanproportion'] = FLAGS.ycsb_scanproportion
       parameters.update(kwargs)
-      remote_path = posixpath.join(linux_packages.INSTALL_DIR,
-                                   os.path.basename(workload_file))
+      remote_path = posixpath.join(
+          linux_packages.INSTALL_DIR, os.path.basename(workload_file)
+      )
 
       with open(workload_file) as fp:
         workload_meta = ParseWorkload(fp.read())
@@ -1423,7 +1577,8 @@ class YCSBExecutor:
         workload_meta.update(
             workload_name=os.path.basename(workload_file),
             workload_index=workload_index,
-            stage='run')
+            stage='run',
+        )
 
       args = [
           ((vm, workload_file, remote_path), {}) for vm in dict.fromkeys(vms)
@@ -1436,16 +1591,16 @@ class YCSBExecutor:
       # if no target is passed via flags.
       for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList():
 
-        def _DoRunStairCaseLoad(client_count,
-                                target_qps_per_vm,
-                                workload_meta,
-                                is_sustained=False):
+        def _DoRunStairCaseLoad(
+            client_count, target_qps_per_vm, workload_meta, is_sustained=False
+        ):
           parameters['threads'] = client_count
           if target_qps_per_vm:
             parameters['target'] = int(target_qps_per_vm * len(vms))
           if is_sustained:
             parameters['maxexecutiontime'] = (
-                FLAGS.ycsb_dynamic_load_sustain_timelimit)
+                FLAGS.ycsb_dynamic_load_sustain_timelimit
+            )
           start = time.time()
           results = self._RunThreaded(vms, **parameters)
           events.record_event.send(
@@ -1453,12 +1608,14 @@ class YCSBExecutor:
               event='run',
               start_timestamp=start,
               end_timestamp=time.time(),
-              metadata=copy.deepcopy(parameters))
+              metadata=copy.deepcopy(parameters),
+          )
           client_meta = workload_meta.copy()
           client_meta.update(parameters)
           client_meta.update(
               clients=len(vms) * client_count,
-              threads_per_client_vm=client_count)
+              threads_per_client_vm=client_count,
+          )
           # Values passed in via this flag do not get recorded in metadata.
           # The target passed in is applied to each client VM, so multiply by
           # len(vms).
@@ -1476,14 +1633,18 @@ class YCSBExecutor:
                       result_type='individual',
                       result_index=i,
                       include_histogram=FLAGS.ycsb_histogram,
-                      **client_meta))
+                      **client_meta,
+                  )
+              )
 
           if self.measurement_type == HDRHISTOGRAM:
             combined_log = self.CombineHdrHistogramLogFiles(
-                parameters['hdrhistogram.output.path'], vms)
+                parameters['hdrhistogram.output.path'], vms
+            )
             parsed_hdr = ParseHdrLogs(combined_log)
-            combined = _CombineResults(results, self.measurement_type,
-                                       parsed_hdr)
+            combined = _CombineResults(
+                results, self.measurement_type, parsed_hdr
+            )
           else:
             combined = _CombineResults(results, self.measurement_type, {})
           run_samples = list(
@@ -1491,7 +1652,9 @@ class YCSBExecutor:
                   combined,
                   result_type='combined',
                   include_histogram=FLAGS.ycsb_histogram,
-                  **client_meta))
+                  **client_meta,
+              )
+          )
 
           overall_throughput = 0
           for s in run_samples:
@@ -1500,7 +1663,8 @@ class YCSBExecutor:
           return overall_throughput, run_samples
 
         target_throughput, run_samples = _DoRunStairCaseLoad(
-            client_count, target_qps_per_vm, workload_meta)
+            client_count, target_qps_per_vm, workload_meta
+        )
 
         # Uses 5 * unthrottled throughput as starting point.
         target_throughput *= 5
@@ -1508,24 +1672,28 @@ class YCSBExecutor:
         is_sustained = False
         while FLAGS.ycsb_dynamic_load:
           actual_throughput, run_samples = _DoRunStairCaseLoad(
-              client_count, target_throughput // len(vms), workload_meta,
-              is_sustained)
+              client_count,
+              target_throughput // len(vms),
+              workload_meta,
+              is_sustained,
+          )
           is_sustained = FLAGS.ycsb_dynamic_load_sustain_throughput_ratio < (
-              actual_throughput / target_throughput)
+              actual_throughput / target_throughput
+          )
           for s in run_samples:
             s.metadata['sustained'] = is_sustained
           all_results.extend(run_samples)
-          target_throughput = self._GetRunLoadTarget(actual_throughput,
-                                                     is_sustained)
+          target_throughput = self._GetRunLoadTarget(
+              actual_throughput, is_sustained
+          )
           if target_throughput is None:
             break
 
     return all_results
 
-  def CombineHdrHistogramLogFiles(self,
-                                  hdr_files_dir: str,
-                                  vms: Iterable[virtual_machine.VirtualMachine]
-                                  ) -> dict[str, str]:
+  def CombineHdrHistogramLogFiles(
+      self, hdr_files_dir: str, vms: Iterable[virtual_machine.VirtualMachine]
+  ) -> dict[str, str]:
     """Combine multiple hdr histograms by group type.
 
     Combine multiple hdr histograms in hdr log files format into 1 human
@@ -1563,7 +1731,9 @@ class YCSBExecutor:
       for hdr in results[1:]:
         worker_vm.RemoteCommand(
             'sudo chmod 755 {1}{2}.hdr && echo "{0}" >> {1}{2}.hdr'.format(
-                hdr[:-1], hdr_files_dir, grouptype))
+                hdr[:-1], hdr_files_dir, grouptype
+            )
+        )
       hdrhistogram, _ = worker_vm.RemoteCommand(
           'cd {0} && ./HistogramLogProcessor -i {1}{2}.hdr'
           ' -outputValueUnitRatio 1'.format(
@@ -1590,16 +1760,21 @@ class YCSBExecutor:
 
     if FLAGS.ycsb_reload_database or not self.loaded:
       load_samples += list(
-          self._LoadThreaded(vms, workloads[0], **(load_kwargs or {})))
-      if (_SHOULD_FAIL_ON_INCOMPLETE_LOADING.value and
-          _HasInsertFailures(load_samples)):
+          self._LoadThreaded(vms, workloads[0], **(load_kwargs or {}))
+      )
+      if _SHOULD_FAIL_ON_INCOMPLETE_LOADING.value and _HasInsertFailures(
+          load_samples
+      ):
         raise errors.Benchmarks.RunError(
-            'There are insert failures, so the table loading is incomplete')
+            'There are insert failures, so the table loading is incomplete'
+        )
 
       self.loaded = True
     if FLAGS.ycsb_sleep_after_load_in_sec > 0:
-      logging.info('Sleeping %s seconds after load stage.',
-                   FLAGS.ycsb_sleep_after_load_in_sec)
+      logging.info(
+          'Sleeping %s seconds after load stage.',
+          FLAGS.ycsb_sleep_after_load_in_sec,
+      )
       time.sleep(FLAGS.ycsb_sleep_after_load_in_sec)
     if FLAGS.ycsb_load_samples:
       return load_samples
@@ -1620,11 +1795,14 @@ class YCSBExecutor:
       samples = self._RunIncrementalMode(vms, workloads, run_kwargs)
     else:
       samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
-    if (FLAGS.ycsb_sleep_after_load_in_sec > 0 and
-        not FLAGS.ycsb_skip_load_stage):
+    if (
+        FLAGS.ycsb_sleep_after_load_in_sec > 0
+        and not FLAGS.ycsb_skip_load_stage
+    ):
       for s in samples:
-        s.metadata[
-            'sleep_after_load_in_sec'] = FLAGS.ycsb_sleep_after_load_in_sec
+        s.metadata['sleep_after_load_in_sec'] = (
+            FLAGS.ycsb_sleep_after_load_in_sec
+        )
     return samples
 
   def _SetRunParameters(self, params: Mapping[str, Any]) -> None:
@@ -1632,8 +1810,7 @@ class YCSBExecutor:
     # Ideally YCSB should be refactored to include a function that just takes
     # commands for a run, but that will be a large refactor.
     FLAGS['ycsb_run_parameters'].unparse()
-    FLAGS['ycsb_run_parameters'].parse(
-        [f'{k}={v}' for k, v in params.items()])
+    FLAGS['ycsb_run_parameters'].parse([f'{k}={v}' for k, v in params.items()])
 
   def _RunBurstMode(self, vms, workloads, run_kwargs=None):
     """Runs YCSB in burst mode, where the second run has increased QPS."""
@@ -1736,7 +1913,8 @@ class YCSBExecutor:
     load_samples = []
     if not FLAGS.ycsb_skip_load_stage:
       load_samples = self.Load(
-          vms, workloads=workloads, load_kwargs=load_kwargs)
+          vms, workloads=workloads, load_kwargs=load_kwargs
+      )
     run_samples = []
     if not FLAGS.ycsb_skip_run_stage:
       run_samples = self.Run(vms, workloads=workloads, run_kwargs=run_kwargs)
