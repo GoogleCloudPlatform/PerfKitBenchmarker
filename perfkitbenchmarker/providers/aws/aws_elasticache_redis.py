@@ -199,6 +199,13 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     else:
       cmd += ['--num-node-groups', str(self.node_count)]
 
+    if self.enable_tls:
+      cmd += [
+          '--transit-encryption-enabled',
+          '--transit-encryption-mode',
+          'required',
+      ]
+
     cmd += ['--tags']
     cmd += util.MakeFormattedDefaultTags()
     _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)

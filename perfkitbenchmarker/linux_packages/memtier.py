@@ -253,6 +253,7 @@ MEMTIER_SERVER_SELECTION = flags.DEFINE_enum(
         ' uniform.'
     ),
 )
+MEMTIER_TLS = flags.DEFINE_bool('memtier_tls', False, 'Whether to enable TLS.')
 
 
 class BuildFailureError(Exception):
@@ -329,6 +330,7 @@ def BuildMemtierCommand(
     password: Optional[str] = None,
     cluster_mode: Optional[bool] = None,
     shard_addresses: Optional[str] = None,
+    tls: Optional[bool] = None,
     json_out_file: Optional[pathlib.PosixPath] = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
@@ -355,7 +357,12 @@ def BuildMemtierCommand(
       'shard-addresses': shard_addresses,
   }
   # Arguments passed without a parameter
-  no_param_args = {'random-data': random_data, 'cluster-mode': cluster_mode}
+  no_param_args = {
+      'random-data': random_data,
+      'cluster-mode': cluster_mode,
+      'tls': tls,
+      'tls-skip-verify': tls,
+  }
   # Build the command
   cmd = []
   if cluster_mode:
@@ -396,6 +403,7 @@ def Load(
       requests='allkeys',
       cluster_mode=MEMTIER_CLUSTER_MODE.value,
       password=server_password,
+      tls=MEMTIER_TLS.value,
   )
   _IssueRetryableCommand(client_vm, cmd)
 
@@ -1083,6 +1091,7 @@ def _Run(
       cluster_mode=MEMTIER_CLUSTER_MODE.value,
       shard_addresses=shard_addresses,
       json_out_file=json_results_file,
+      tls=MEMTIER_TLS.value,
   )
   _IssueRetryableCommand(vm, cmd)
 

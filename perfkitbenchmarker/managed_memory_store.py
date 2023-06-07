@@ -97,6 +97,9 @@ flags.DEFINE_string(
         'Defaults to the GCP region of us-central1.'
     ),
 )
+_TLS = flags.DEFINE_bool(
+    'cloud_redis_tls', False, 'Whether to enable TLS on the instance.'
+)
 
 MEMCACHED_NODE_COUNT = 1
 
@@ -180,9 +183,11 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self._clustered: bool = _MANAGED_MEMORY_STORE_CLUSTER.value
     self.node_count = _NODE_COUNT.value if self._clustered else 1
     self.zones = _ZONES.value if self._clustered else []
+    self.enable_tls = _TLS.value
 
     self.metadata['clustered'] = self._clustered
     self.metadata['node_count'] = self.node_count
+    self.metadata['enable_tls'] = self.enable_tls
 
   def GetMemoryStoreIp(self) -> str:
     """Returns the Ip address of the managed memory store."""
