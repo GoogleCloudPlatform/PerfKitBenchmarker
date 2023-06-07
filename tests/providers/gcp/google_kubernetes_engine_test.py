@@ -70,6 +70,10 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
             util.__name__ + '.GetDefaultUser', return_value='fakeuser'))
     stack.enter_context(
         mock.patch(
+            util.__name__ + '.MakeFormattedDefaultTags',
+            return_value='foo=bar,timeout=yesterday'))
+    stack.enter_context(
+        mock.patch(
             gce_network.__name__ + '.GceFirewall.GetFirewall',
             return_value='fakefirewall'))
     stack.enter_context(
@@ -157,6 +161,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--disk-type foo', command_string)
       self.assertIn('--local-ssd-count 2', command_string)
       self.assertIn('--no-enable-shielded-nodes', command_string)
+      self.assertIn('--labels foo=bar,timeout=yesterday', command_string)
 
   def testCreateQuotaExceeded(self):
     spec = self.create_kubernetes_engine_spec()
@@ -563,6 +568,8 @@ class GoogleKubernetesEngineRegionalTestCase(
       self.assertContainsSubsequence(create_cluster, ['--region', 'us-west1'])
       self.assertContainsSubsequence(create_cluster,
                                      ['--machine-type', 'fake-machine-type'])
+      self.assertContainsSubsequence(
+          create_cluster, ['--labels', 'foo=bar,timeout=yesterday'])
 
       self.assertContainsSubsequence(
           create_nodepool1,
@@ -573,6 +580,8 @@ class GoogleKubernetesEngineRegionalTestCase(
                                      ['--machine-type', 'machine-type-1'])
       self.assertContainsSubsequence(
           create_nodepool1, ['--node-labels', 'pkb_nodepool=nodepool1'])
+      self.assertContainsSubsequence(
+          create_nodepool1, ['--labels', 'foo=bar,timeout=yesterday'])
       self.assertNotIn('--node-locations', create_nodepool1)
       self.assertNotIn('--sandbox', create_nodepool1)
       self.assertContainsSubsequence(create_nodepool1, ['--region', 'us-west1'])

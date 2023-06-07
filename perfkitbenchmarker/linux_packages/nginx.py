@@ -29,7 +29,7 @@ def YumInstall(vm):
                    'sudo tee /etc/yum.repos.d/nginx.repo' % RHEL_REPO)
   try:
     vm.InstallPackages('nginx')
-  except errors.VmUtil.SshConnectionError:
+  except errors.VmUtil.IssueCommandError:
     # Amazon Linux does not have a releasever configured.
     vm.RemoteCommand('sudo sed -i -e "s/\\$releasever/6/" '
                      '/etc/yum.repos.d/nginx.repo')

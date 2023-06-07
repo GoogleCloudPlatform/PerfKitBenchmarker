@@ -22,6 +22,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import util
 
 
@@ -40,7 +41,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     self.subnet_group_name = 'subnet-%s' % self.name
     self.zone = self.spec.vms[0].zone
     self.region = util.GetRegionFromZone(self.zone)
-    self.node_type = FLAGS.cache_node_type
+    self.node_type = aws_flags.ELASTICACHE_NODE_TYPE.value
     self.version = FLAGS.managed_memory_store_version
 
   @staticmethod

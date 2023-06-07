@@ -23,12 +23,17 @@ import abc
 import dataclasses
 import datetime
 import logging
+import os
+import shutil
+import tempfile
 from typing import Dict, List, Optional, Type
 
 from absl import flags
+import jinja2
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import units
@@ -39,6 +44,16 @@ from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util as aws_util
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util as gcp_util
+import yaml
+
+# Job types that are supported on the dpb service backends
+_PYSPARK_JOB_TYPE = 'pyspark'
+_SPARKSQL_JOB_TYPE = 'spark-sql'
+_SPARK_JOB_TYPE = 'spark'
+_HADOOP_JOB_TYPE = 'hadoop'
+_DATAFLOW_JOB_TYPE = 'dataflow'
+_BEAM_JOB_TYPE = 'beam'
+_FLINK_JOB_TYPE = 'flink'
 
 flags.DEFINE_string(
     'static_dpb_service_instance', None,
@@ -80,6 +95,20 @@ flags.DEFINE_bool(
     'dpb_export_job_stats', False,
     'Exports job stats such as CPU usage and cost. Enabled by default, but not '
     'necessarily implemented on all services.')
+flags.DEFINE_enum(
+    'dpb_job_type',
+    None,
+    [
+        _PYSPARK_JOB_TYPE,
+        _SPARKSQL_JOB_TYPE,
+        _SPARK_JOB_TYPE,
+        _HADOOP_JOB_TYPE,
+        _BEAM_JOB_TYPE,
+        _DATAFLOW_JOB_TYPE,
+        _FLINK_JOB_TYPE,
+    ],
+    'The type of the job to be run on the backends.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -96,6 +125,7 @@ GLUE = 'glue'
 UNMANAGED_DPB_SVC_YARN_CLUSTER = 'unmanaged_dpb_svc_yarn_cluster'
 UNMANAGED_SPARK_CLUSTER = 'unmanaged_spark_cluster'
 KUBERNETES_SPARK_CLUSTER = 'kubernetes_spark_cluster'
+KUBERNETES_FLINK_CLUSTER = 'kubernetes_flink_cluster'
 UNMANAGED_SERVICES = [
     UNMANAGED_DPB_SVC_YARN_CLUSTER,
     UNMANAGED_SPARK_CLUSTER,
@@ -151,13 +181,13 @@ class BaseDpbService(resource.BaseResource):
   S3_FS = 's3'
 
   # Job types that are supported on the dpb service backends
-  PYSPARK_JOB_TYPE = 'pyspark'
-  SPARKSQL_JOB_TYPE = 'spark-sql'
-  SPARK_JOB_TYPE = 'spark'
-  HADOOP_JOB_TYPE = 'hadoop'
-  DATAFLOW_JOB_TYPE = 'dataflow'
-  BEAM_JOB_TYPE = 'beam'
-  FLINK_JOB_TYPE = 'flink'
+  PYSPARK_JOB_TYPE = _PYSPARK_JOB_TYPE
+  SPARKSQL_JOB_TYPE = _SPARKSQL_JOB_TYPE
+  SPARK_JOB_TYPE = _SPARK_JOB_TYPE
+  HADOOP_JOB_TYPE = _HADOOP_JOB_TYPE
+  DATAFLOW_JOB_TYPE = _DATAFLOW_JOB_TYPE
+  BEAM_JOB_TYPE = _BEAM_JOB_TYPE
+  FLINK_JOB_TYPE = _FLINK_JOB_TYPE
 
   def _JobJars(self) -> Dict[str, Dict[str, str]]:
     """Known mappings of jars in the cluster used by GetExecutionJar."""
@@ -900,6 +930,199 @@ class KubernetesSparkCluster(BaseDpbService):
     raise NotImplementedError('container.WaitForExit is a blocking command.')
 
 
+class KubernetesFlinkCluster(BaseDpbService):
+  """Object representing a Kubernetes dpb service flink cluster."""
+
+  CLOUD = container_service.KUBERNETES
+  SERVICE_TYPE = KUBERNETES_FLINK_CLUSTER
+
+  FLINK_JOB_MANAGER_SERVICE = 'flink-jobmanager'
+  DEFAULT_FLINK_IMAGE = 'flink'
+
+  def __init__(self, dpb_service_spec):
+    super().__init__(dpb_service_spec)
+    self.dpb_service_type = self.SERVICE_TYPE
+    self.dpb_version = dpb_service_spec.version or self.DEFAULT_FLINK_IMAGE
+
+    benchmark_spec = context.GetThreadBenchmarkSpec()
+    self.k8s_cluster = benchmark_spec.container_cluster
+    assert self.k8s_cluster
+    assert self.k8s_cluster.CLUSTER_TYPE == container_service.KUBERNETES
+    self.cloud = self.k8s_cluster.CLOUD
+    self.container_registry = benchmark_spec.container_registry
+    assert self.container_registry
+
+    self.flink_jobmanagers = []
+    self.image = self.DEFAULT_FLINK_IMAGE
+
+    if self.cloud == 'GCP':
+      self.region = gcp_util.GetRegionFromZone(self.k8s_cluster.zone)
+      self.storage_service = gcs.GoogleCloudStorageService()
+      self.persistent_fs_prefix = 'gs://'
+    else:
+      raise errors.Config.InvalidValue(
+          f'Unsupported Cloud provider {self.cloud}')
+
+    self.storage_service.PrepareService(location=self.region)
+
+    if self.k8s_cluster.num_nodes < 2:
+      raise errors.Config.InvalidValue(
+          f'Cluster type {KUBERNETES_FLINK_CLUSTER} requires at least 2 nodes.'
+          f'Found {self.k8s_cluster.num_nodes}.')
+
+  def _CreateConfigMapDir(self):
+    """Returns a TemporaryDirectory containing files in the ConfigMap."""
+    temp_directory = tempfile.TemporaryDirectory()
+    # Create flink-conf.yaml to configure flink.
+    flink_conf_filename = os.path.join(temp_directory.name, 'flink-conf.yaml')
+    with open(flink_conf_filename, 'w') as flink_conf_file:
+      yaml.dump(
+          self.GetJobProperties(), flink_conf_file, default_flow_style=False
+      )
+      flink_conf_file.close()
+    # Create log4j-console.properties for logging configuration.
+    logging_property_file = data.ResourcePath(
+        'container/flink/log4j-console.properties'
+    )
+    logging_property_filename = os.path.join(
+        temp_directory.name, 'log4j-console.properties'
+    )
+    shutil.copyfile(logging_property_file, logging_property_filename)
+    return temp_directory
+
+  def _GenerateConfig(self, config_file, **kwargs):
+    """Returns a temporary config file."""
+    filename = data.ResourcePath(config_file)
+    environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+    with open(filename) as template_file, vm_util.NamedTemporaryFile(
+        mode='w', suffix='.yaml', dir=vm_util.GetTempDir(), delete=False
+    ) as rendered_template:
+      config = environment.from_string(template_file.read()).render(kwargs)
+      rendered_template.write(config)
+      rendered_template.close()
+      logging.info('Finish generating config file %s', rendered_template.name)
+      return rendered_template.name
+
+  def _Create(self):
+    logging.info('Should have created k8s cluster by now.')
+    # Create docker image for containers
+    assert self.k8s_cluster.resource_ready_time
+    assert self.container_registry.resource_ready_time
+    logging.info(self.k8s_cluster)
+    logging.info(self.container_registry)
+
+    logging.info('Building Flink image.')
+    if FLAGS.container_remote_build_config is None:
+      FLAGS.container_remote_build_config = self._GenerateConfig(
+          'docker/flink/cloudbuild.yaml.j2',
+          dpb_job_jarfile=FLAGS.dpb_job_jarfile,
+          base_image=self.dpb_version,
+          full_tag=self.container_registry.GetFullRegistryTag(self.image),
+      )
+    self.image = self.container_registry.GetOrBuild(self.image)
+
+    logging.info('Configuring Kubernetes Flink Cluster.')
+    with self._CreateConfigMapDir() as config_dir:
+      self.k8s_cluster.CreateConfigMap('default-config', config_dir)
+
+  def _GetJobManagerName(self):
+    return f'flink-jobmanager-{len(self.flink_jobmanagers)}'
+
+  def GetJobProperties(self) -> Dict[str, str]:
+    node_cpu = self.k8s_cluster.node_num_cpu
+    node_memory_mb = self.k8s_cluster.node_memory_allocatable.m_as(
+        units.mebibyte)
+    # Reserve 512 MB for system daemons
+    node_memory_mb -= 512
+    node_memory_mb = int(node_memory_mb)
+
+    # Common flink properties
+    properties = {
+        'jobmanager.rpc.address': self.FLINK_JOB_MANAGER_SERVICE,
+        'blob.server.port': 6124,
+        'jobmanager.rpc.port': 6123,
+        'taskmanager.rpc.port': 6122,
+        'queryable-state.proxy.ports': 6125,
+        'jobmanager.memory.process.size': f'{node_memory_mb}m',
+        'taskmanager.memory.process.size': f'{node_memory_mb}m',
+        'taskmanager.numberOfTaskSlots': node_cpu,
+        'parallelism.default': node_cpu * (self.k8s_cluster.num_nodes - 1),
+        'execution.attached': True,
+    }
+    # User specified properties
+    properties.update(super().GetJobProperties())
+    return properties
+
+  def SubmitJob(
+      self,
+      jarfile=None,
+      classname=None,
+      pyspark_file=None,
+      query_file=None,
+      job_poll_interval=None,
+      job_stdout_file=None,
+      job_arguments=None,
+      job_files=None,
+      job_jars=None,
+      job_py_files=None,
+      job_type=None,
+      properties=None,
+  ):
+    """Submit a data processing job to the backend."""
+    job_manager_name = self._GetJobManagerName()
+    job_properties = self.GetJobProperties()
+    start_time = datetime.datetime.now()
+    self.k8s_cluster.ApplyManifest(
+        'container/flink/flink-job-and-deployment.yaml.j2',
+        job_manager_name=job_manager_name,
+        job_manager_service=self.FLINK_JOB_MANAGER_SERVICE,
+        classname=classname,
+        job_arguments=','.join(job_arguments),
+        image=self.image,
+        task_manager_replicas=self.k8s_cluster.num_nodes - 1,
+        task_manager_rpc_port=job_properties.get('taskmanager.rpc.port'),
+        job_manager_rpc_port=job_properties.get('jobmanager.rpc.port'),
+        blob_server_port=job_properties.get('blob.server.port'),
+        queryable_state_proxy_ports=job_properties.get(
+            'queryable-state.proxy.ports'
+        ),
+    )
+    stdout, _, _ = container_service.RunKubectlCommand(
+        ['get', 'pod', f'--selector=job-name={job_manager_name}', '-o', 'yaml']
+    )
+    pods = yaml.safe_load(stdout)['items']
+    if len(pods) <= 0:
+      raise JobSubmissionError('No pod was created for the job.')
+    container = container_service.KubernetesPod(pods[0]['metadata']['name'])
+    self.flink_jobmanagers.append(container)
+    try:
+      container.WaitForExit()
+    except container_service.ContainerException as e:
+      raise JobSubmissionError() from e
+    end_time = datetime.datetime.now()
+
+    if job_stdout_file:
+      with open(job_stdout_file, 'w') as f:
+        f.write(container.GetLogs())
+
+    return JobResult(run_time=(end_time - start_time).total_seconds())
+
+  @staticmethod
+  def CheckPrerequisites(benchmark_config):
+    del benchmark_config  # Unused
+    # Make sure dpb_job_jarfile is provided when using flink
+    assert FLAGS.dpb_job_jarfile
+    # dpb_cluster_properties is to be supported
+    assert not FLAGS.dpb_cluster_properties
+
+  def _GetCompletedJob(self, job_id: str) -> Optional[JobResult]:
+    """container.WaitForExit is blocking so this is not meaningful."""
+    raise NotImplementedError('container.WaitForExit is a blocking command.')
+
+  def _Delete(self):
+    pass
+
+
 def GetDpbServiceClass(cloud: str,
                        dpb_service_type: str) -> Optional[Type[BaseDpbService]]:
   """Gets the Data Processing Backend class corresponding to 'service_type'.
@@ -916,7 +1139,7 @@ def GetDpbServiceClass(cloud: str,
   """
   if dpb_service_type in UNMANAGED_SERVICES:
     cloud = 'Unmanaged'
-  elif dpb_service_type == KUBERNETES_SPARK_CLUSTER:
+  elif dpb_service_type in [KUBERNETES_SPARK_CLUSTER, KUBERNETES_FLINK_CLUSTER]:
     cloud = container_service.KUBERNETES
   return resource.GetResourceClass(
       BaseDpbService, CLOUD=cloud, SERVICE_TYPE=dpb_service_type)

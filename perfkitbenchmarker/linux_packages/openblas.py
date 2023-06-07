@@ -20,7 +20,7 @@ from perfkitbenchmarker import linux_packages
 
 OPENBLAS_DIR = '%s/OpenBLAS' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/xianyi/OpenBLAS'
-GIT_TAG = 'v0.3.3'
+GIT_TAG = 'v0.3.21'
 
 
 def _Install(vm):
@@ -29,15 +29,16 @@ def _Install(vm):
   vm.Install('fortran')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, OPENBLAS_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(OPENBLAS_DIR, GIT_TAG))
+  # TODO(user): By specifying TARGET= for the first compilation attempt we may
+  # achieve better performance. A list of targets is available at
+  # https://github.com/xianyi/OpenBLAS/blob/develop/TargetList.txt
   try:
     vm.RemoteCommand('cd {0} && make USE_THREAD=0'.format(OPENBLAS_DIR))
-  except errors.VirtualMachine.RemoteCommandError as error:
-    if 'detecting cpu failed' in str(error).lower():
-      logging.info('Attempting to recompile OpenBLAS with TARGET=SKYLAKEX')
-      vm.RemoteCommand(
-          'cd {0} && make TARGET=SKYLAKEX USE_THREAD=0'.format(OPENBLAS_DIR))
-    else:
-      raise error
+  except errors.VirtualMachine.RemoteCommandError:
+    logging.info('Attempting to recompile OpenBLAS with TARGET=SAPPHIRERAPIDS')
+    vm.RemoteCommand(
+        'cd {0} && make TARGET=SAPPHIRERAPIDS USE_THREAD=0'.format(OPENBLAS_DIR)
+    )
 
 
 def YumInstall(vm):

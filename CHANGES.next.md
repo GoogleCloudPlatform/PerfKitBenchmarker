@@ -1,5 +1,7 @@
 ### Breaking changes:
-
+-   Added --accept_licenses flag. User have to turn this flag on to acknowledge
+    that PKB may install software thereby accepting license agreements on the
+    user's behalf.
 -   Renamed Database-related flags from managed_db* to db* Added alias for
     backwards compatibility, might not be supported in the future release.
 -   Require Python 3.9+
@@ -35,15 +37,23 @@
     benchmarks was defined many years ago. It's not a reasonable introduction to
     PKB or something that most people should run by default.
 -   --dpb_export_job_stats is now False by default.
--   Validate arguments to IssueCommand. Replaced force_info_log &
-    suppress_warning parameters with vm_command_log_mode flag, added
-    should_pre_log parameter.
+-   Validate arguments to IssueCommand & RobustRemoteCommand. Replaced
+    force_info_log & suppress_warning parameters with vm_command_log_mode flag,
+    added should_pre_log parameter. Passed stacklevel variable to logging to
+    better distinguish between RemoteCommand call sites. See stacklevel docs:
+    https://docs.python.org/3/library/logging.html#logging.Logger.debug
 -   Remove Dataflow parameter --maxNumWorkers by default and add
     dataflow_max_worker_count in spec to allow users to set this parameter on
     their own.
+-   Remove flag fio_write_against_multiple_clients from FIO.
+-   Drop windows coremark benchmark.
+-   Remove cudnn linux package.
+-   Make Ubuntu 20 the default os_type.
 
 ### New features:
 
+-   Add support for systems running fedora36 and fedora37
+-   Add support for AlloyDB on GCP
 -   Add support for static systems running debian11
 -   Add ibmcloud as a new provider.
 -   Add prefix/directory support for object storage service runs.
@@ -100,26 +110,33 @@
 -   Add GCP optimized Rocky Linux 8 and 9 OSes.
 -   Add mtu to os_metadata in linux_virtual_machine.
 -   Add support for TPC-DS/H benchmarks on AWS EMR Serverless.
--   Add dpb_sparksql_serverless_benchmark, which submits one job for each
-    TPC-DS/H query and measures the whole job execution time, instead of only
-    the query run time.
 -   Add Intel MPI benchmark.
 -   Add support for Azure ARM VMs.
 -   Add an HTTP endpoint polling utility & incorporate it into app_service.
--   Added support for Data Plane Development Kit (DPDK) on Linux VM's to improve
-    networking performance.
 -   Added support for dynamic provisioning of Bigquery flat rate slots at
     benchmark runtime
 -   Create a new subdirectory of linux_benchmarks called provisioning_benchmarks
     for benchmarking lifecycle management timings of cloud resources. Including:
-    - Kubernetes Clusters
-    - KMS cryptographic keys
-    - Object storage buckets
+    -   Kubernetes Clusters
+    -   KMS cryptographic keys
+    -   Object storage buckets
 -   Add support for using the hbase2 binding in the Cloud Bigtable YCSB
     benchmark.
 -   Add iPerf interval reporting.
 -   Add support for DynamoDB on demand instances.
 -   Add support for Debian 10 & 11 with backported kernels on AWS.
+-   Add fio_netperf benchmark, which executes the run stages of fio and netperf
+    benchmarks in parallel using the first 2 VM's in benchmark_spec.
+-   Add Google Kubernetes Engine based DPB service to run flink benchmarks.
+-   Add support for Amazon Linux 2023.
+-   Add support for multi-network creation/attachment. PKB currently does not
+    handle subnet creation on an existing network.
+-   Add support for GCE Confidential VM's.
+-   Add cos-dev, cos105, cos101, cos97, and cos93 OS support for GCP.
+-   Add --object_ttl_days flag for lifecycle management of created buckets.
+-   Add support for multi-NIC netperf throughput on AWS.
+-   Added AWS/GCP support for Data Plane Development Kit (DPDK) on Linux VM's to
+    improve networking performance, as well as a DPDK benchmark for testpmd.
 
 ### Enhancements:
 
@@ -167,8 +184,6 @@
 -   Add additional customization options to SPEC CPU 2017.
 -   Add average utilization to the metadata of cpu metrics for Cloud Bigtable
     benchmark.
--   Add flag --ycsb_log_remote_command_output to allow enabling/disabling the
-    logging of stdout & stderr from wait_for_command.
 -   Add support for NFS `nconnect` mount option.
 -   Add support for custom compilation of OpenJDK.
 -   Add support for configuring the HBase binding to use with `--hbase_binding`.
@@ -233,6 +248,14 @@
 -   Set default YAML config vm_spec.GCP_network_name to null, and added the
     corresponding attribute to GCEVMSpec, GCENetworkSpec and GCEVirtualMachine.
     vm_spec overrides FLAGS.gce_network_name.
+-   Add `--dpb_sparksql_queries_url` flag to provide custom object store path
+    (i.e. GCS/S3) where the queries will be used for `dpb_sparksql_benchmark`.
+-   Add `--gke_node_system_config` flag to the GKE provider for passing kubelet
+    and linux parameters.
+-   Add 'Time to Create' and 'Time to Running' samples on cluster_boot for
+    GCEVirtualMachine and AWSVirtualMachine instances that are provisioned with
+    asynchronous 'create' invocations.
+-   Add `--dpb_sparksql_streams` to run TPC-DS/H throughput runs.
 
 ### Bug fixes and maintenance updates:
 
@@ -350,3 +373,16 @@
 -   Remove `--google_bigtable_hbase_jar_url`. Rely on
     `--google_bigtable_client_version` instead.
 -   Fix how environment variable is set for direct path
+-   Fix incorrect string concatenation causing Snowflake Throughput runs to
+    fail.
+-   Remove reboot after changing sysctl and load via sysctl -p instead.
+-   Clean up settings related to the Cloud Bigtable Veneer client.
+-   Don't install HBase dependencies when using the Cloud Bigtable Veneer
+    client.
+-   Require monitoring.write scope for client side metrics when using the Cloud
+    Bigtable veneer client.
+-   Add flag dpb_job_type and support running native flink pipeline on
+    dataproc_flink.
+-   Cleanup Coremark compiling flags.
+-   Remove cygwin codepath.
+-   Moved flags from `pkb.py` to `flags.py` to help avoid circular dependencies.

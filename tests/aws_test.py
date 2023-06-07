@@ -18,6 +18,7 @@ import json
 import os.path
 import unittest
 from absl import flags
+from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 
@@ -443,6 +444,37 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     state_reason = {'Code': 'shutting-down-test'}
     response['Reservations'][0]['Instances'][0]['StateReason'] = state_reason
     util.IssueRetryableCommand.side_effect = [(json.dumps(response), None)]
+    self.assertFalse(self.vm._Exists())
+
+  @flagsaver.flagsaver(collect_delete_samples='true')
+  def testInstanceExistsRetryWithFlag(self):
+    shutting_down_response = json.loads(self.response)
+    shutting_down_response['Reservations'][0]['Instances'][0]['State'][
+        'Name'
+    ] = 'shutting-down'
+    shutting_down_response['Reservations'][0]['Instances'][0]['StateReason'] = {
+        'Code': 'shutting-down-retry-test'
+    }
+
+    # Update the response to mock the VM moving from 'shutting-down' to
+    # 'terminated'
+    terminated_response = json.loads(self.response)
+    terminated_response['Reservations'][0]['Instances'][0]['State'][
+        'Name'
+    ] = 'terminated'
+    terminated_response['Reservations'][0]['Instances'][0]['StateReason'] = {
+        'Code': 'terminated-test'
+    }
+
+    # The first response should prompt a retry of Exists, leading to the
+    # second response.
+    util.IssueRetryableCommand.side_effect = [
+        (json.dumps(shutting_down_response), None),
+        (json.dumps(terminated_response), None),
+    ]
+
+    # When measuring time to delete, Exists should return False upon seeing the
+    # second response, indicating that the VM is terminated.
     self.assertFalse(self.vm._Exists())
 
   @mock.patch.object(util, 'FormatTagSpecifications')

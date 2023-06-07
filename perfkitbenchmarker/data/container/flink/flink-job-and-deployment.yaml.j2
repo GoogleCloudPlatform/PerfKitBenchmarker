@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ job_manager_service }}
+spec:
+  type: ClusterIP
+  ports:
+  - name: rpc
+    port: 6123
+  - name: blob-server
+    port: 6124
+  - name: webui
+    port: 8081
+  selector:
+    app: flink
+    component: jobmanager
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ job_manager_name }}
+spec:
+  template:
+    metadata:
+      labels:
+        app: flink
+        component: jobmanager
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: jobmanager
+          image: {{ image }}
+          env:
+          args: ["standalone-job", "--job-classname", {{ classname }}, {{ job_arguments }}]
+          ports:
+            - containerPort: {{ job_manager_rpc_port }}
+              name: rpc
+            - containerPort: {{ blob_server_port }}
+              name: blob-server
+            - containerPort: 8081
+              name: webui
+          livenessProbe:
+            tcpSocket:
+              port: {{ job_manager_rpc_port }}
+            initialDelaySeconds: 30
+            periodSeconds: 60
+          volumeMounts:
+            - name: flink-config-volume
+              mountPath: /opt/flink/conf
+          securityContext:
+            runAsUser: 9999  # refers to user _flink_ from official flink image, change if necessary
+      volumes:
+        - name: flink-config-volume
+          configMap:
+            name: default-config
+            items:
+            - key: flink-conf.yaml
+              path: flink-conf.yaml
+            - key: log4j-console.properties
+              path: log4j-console.properties
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-taskmanager
+spec:
+  replicas: {{ task_manager_replicas }}
+  selector:
+    matchLabels:
+      app: flink
+      component: taskmanager
+  template:
+    metadata:
+      labels:
+        app: flink
+        component: taskmanager
+    spec:
+      containers:
+      - name: taskmanager
+        image: {{ image }}
+        env:
+        args: ["taskmanager"]
+        ports:
+        - containerPort: {{ task_manager_rpc_port }}
+          name: rpc
+        - containerPort: {{ queryable_state_proxy_ports }}
+          name: query-state
+        livenessProbe:
+          tcpSocket:
+            port: {{ task_manager_rpc_port }}
+          initialDelaySeconds: 30
+          periodSeconds: 60
+        volumeMounts:
+        - name: flink-config-volume
+          mountPath: /opt/flink/conf/
+        securityContext:
+          runAsUser: 9999  # refers to user _flink_ from official flink image, change if necessary
+      volumes:
+      - name: flink-config-volume
+        configMap:
+          name: default-config
+          items:
+          - key: flink-conf.yaml
+            path: flink-conf.yaml
+          - key: log4j-console.properties
+            path: log4j-console.properties

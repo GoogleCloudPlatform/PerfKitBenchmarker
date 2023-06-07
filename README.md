@@ -35,6 +35,8 @@ as part of a benchmark run. Therefore you must accept the license of each of the
 benchmarks individually, and take responsibility for using them before you use
 the PerfKit Benchmarker.
 
+Moving forward, you will need to run PKB with the explicit flag --accept-licenses.
+
 In its current release these are the benchmarks that are executed:
 
 -   `aerospike`:

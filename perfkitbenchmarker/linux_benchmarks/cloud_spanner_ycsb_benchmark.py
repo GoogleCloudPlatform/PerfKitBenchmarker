@@ -30,7 +30,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.gcp import gcp_spanner
-from perfkitbenchmarker.providers.gcp import util
 
 BENCHMARK_NAME = 'cloud_spanner_ycsb'
 
@@ -62,14 +61,7 @@ cloud_spanner_ycsb:
     gcloud_scopes: >
       {' '.join(REQUIRED_SCOPES)}"""
 
-CLIENT_TAR_URL = {
-    'go': 'https://storage.googleapis.com/cloud-spanner-client-packages/'
-          'ycsb-go-20180531_f0afaf5fad3c46ae392ebab6b7553d37d65d07ac.tar.gz',
-}
-
 FLAGS = flags.FLAGS
-flags.DEFINE_enum('cloud_spanner_ycsb_client_type', 'java', ['java', 'go'],
-                  'The type of the client.')
 flags.DEFINE_integer('cloud_spanner_ycsb_batchinserts',
                      1,
                      'The Cloud Spanner batch inserts used in the YCSB '
@@ -179,9 +171,6 @@ def Prepare(benchmark_spec):
   """
   benchmark_spec.always_call_cleanup = True
 
-  if FLAGS.cloud_spanner_ycsb_client_type != 'java':
-    ycsb.SetYcsbTarUrl(CLIENT_TAR_URL[FLAGS.cloud_spanner_ycsb_client_type])
-
   vms = benchmark_spec.vms
 
   # Install required packages and copy credential files
@@ -236,12 +225,9 @@ def Run(benchmark_spec):
   if end_point:
     run_kwargs['cloudspanner.host'] = end_point
 
-  if FLAGS.cloud_spanner_ycsb_client_type == 'go':
-    run_kwargs['cloudspanner.project'] = util.GetDefaultProject()
-
   load_kwargs = run_kwargs.copy()
   samples = []
-  metadata = {'ycsb_client_type': FLAGS.cloud_spanner_ycsb_client_type}
+  metadata = {'ycsb_client_type': 'java'}
   if not spanner.restored:
     samples += list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
   if _CPU_OPTIMIZATION.value:
@@ -345,10 +331,6 @@ def _BuildSchema():
 
 
 def _Install(vm):
-  if FLAGS.cloud_spanner_ycsb_client_type == 'go':
-    logging.info('Installing go packages.')
-    vm.Install('go_lang')
-    vm.Install('google_cloud_go')
   vm.Install('ycsb')
 
   # Run custom VM installation commands.

@@ -45,7 +45,8 @@ NETWORK_RANGE = '10.0.0.0/8'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
 _PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['c2', 'c3', 'n2', 'n2d', 'c2d', 'a2'])
+    ['c2', 'c3', 'n2', 'n2d', 'c2d', 'c3d', 'a2', 'g2']
+)
 
 
 class GceVpnGateway(network.BaseVpnGateway):
@@ -784,29 +785,50 @@ class GceNetwork(network.BaseNetwork):
       self.cidr = network_spec.cidr
     self.mtu = network_spec.mtu
 
-    self.is_existing_network = False
+    # TODO(user): Create separate Network objects for each network name.
+    self.is_existing_network = True
+    self.subnet_names = []
+    self.primary_subnet_name = None
     if network_spec.subnet_name:
-      name = network_spec.subnet_name
-      self.is_existing_network = True
-    elif gcp_flags.GCE_NETWORK_NAME.value:
-      name = gcp_flags.GCE_NETWORK_NAME.value
-      self.is_existing_network = True
+      self.subnet_names = network_spec.subnet_name.split(',')
+    elif gcp_flags.GCE_SUBNET_NAMES.value:
+      self.subnet_names = gcp_flags.GCE_SUBNET_NAMES.value
+    elif gcp_flags.GCE_NETWORK_NAMES.value:
+      self.subnet_names = gcp_flags.GCE_NETWORK_NAMES.value
     else:
-      name = self._MakeGceNetworkName()
+      self.subnet_names = self._MakeGceNetworkName()
+      self.is_existing_network = False
+    if not isinstance(self.subnet_names, list):
+      self.subnet_names = [self.subnet_names]
+    self.primary_subnet_name = self.subnet_names[0]
 
+    self.network_resources = []
+    self.subnet_resources = []
     mode = gcp_flags.GCE_NETWORK_TYPE.value
-    if mode is None:
+    self.subnet_resource = None
+    if mode != 'custom':
       mode = 'auto'
-    self.network_resource = GceNetworkResource(name, mode, self.project,
-                                               self.mtu)
-    if mode == 'custom':
-      subnet_region = util.GetRegionFromZone(network_spec.zone)
-      self.subnet_resource = GceSubnetResource(FLAGS.gce_subnet_name or name,
-                                               name, subnet_region,
-                                               self.cidr, self.project)
+      for name in self.subnet_names:
+        self.network_resources.append(
+            GceNetworkResource(name, mode, self.project, self.mtu)
+        )
     else:
-      self.subnet_resource = None
-
+      subnet_region = util.GetRegionFromZone(network_spec.zone)
+      for name in self.subnet_names:
+        self.subnet_resources.append(
+            GceSubnetResource(
+                name, name, subnet_region, self.cidr, self.project
+            )
+        )
+      self.subnet_resource = GceSubnetResource(
+          self.primary_subnet_name,
+          self.primary_subnet_name,
+          subnet_region,
+          self.cidr,
+          self.project,
+      )
+    self.network_resource = GceNetworkResource(self.primary_subnet_name, mode,
+                                               self.project, self.mtu)
     # Stage FW rules.
     self.all_nets = self._GetNetworksFromSpec(
         network_spec)  # Holds the different networks in this run.
@@ -816,17 +838,21 @@ class GceNetwork(network.BaseNetwork):
     #  Set the default rule to allow all traffic within this network's subnet.
     firewall_name = self._MakeGceFWRuleName()
     self.default_firewall_rule = GceFirewallRule(
-        firewall_name, self.project, ALLOW_ALL, name, self.cidr)
+        firewall_name,
+        self.project,
+        ALLOW_ALL,
+        self.primary_subnet_name,
+        self.cidr,
+    )
 
     # Set external rules to allow traffic from other subnets in this benchmark.
     for ext_net in self.all_nets:
       if ext_net == self.cidr:
         continue  # We've already added our own network to the default rule.
       rule_name = self._MakeGceFWRuleName(dst_cidr=ext_net)
-      self.external_nets_rules[rule_name] = GceFirewallRule(rule_name,
-                                                            self.project,
-                                                            ALLOW_ALL, name,
-                                                            ext_net)
+      self.external_nets_rules[rule_name] = GceFirewallRule(
+          rule_name, self.project, ALLOW_ALL, self.primary_subnet_name, ext_net
+      )
 
     # Add VpnGateways to the network.
     if FLAGS.use_vpn:
@@ -835,7 +861,8 @@ class GceNetwork(network.BaseNetwork):
             util.GetRegionFromZone(network_spec.zone), gatewaynum,
             FLAGS.run_uri)
         self.vpn_gateway[vpn_gateway_name] = GceVpnGateway(
-            vpn_gateway_name, name, util.GetRegionFromZone(network_spec.zone),
+            vpn_gateway_name, self.primary_subnet_name,
+            util.GetRegionFromZone(network_spec.zone),
             network_spec.cidr, self.project)
 
     # Placement Group
@@ -1012,7 +1039,7 @@ class GceNetwork(network.BaseNetwork):
 
   def Create(self):
     """Creates the actual network."""
-    if not (gcp_flags.GCE_NETWORK_NAME.value or self.is_existing_network):
+    if not self.is_existing_network:
       self.network_resource.Create()
       if self.subnet_resource:
         self.subnet_resource.Create()
@@ -1035,7 +1062,7 @@ class GceNetwork(network.BaseNetwork):
     """Deletes the actual network."""
     if self.placement_group:
       self.placement_group.Delete()
-    if not (gcp_flags.GCE_NETWORK_NAME.value or self.is_existing_network):
+    if not self.is_existing_network:
       if getattr(self, 'vpn_gateway', False):
         background_tasks.RunThreaded(
             lambda gateway: self.vpn_gateway[gateway].Delete(),

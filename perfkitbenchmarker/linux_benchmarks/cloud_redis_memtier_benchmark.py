@@ -16,10 +16,14 @@
 Spins up a cloud redis instance, runs memtier against it, then spins it down.
 """
 
+import collections
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import managed_memory_store
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import memtier
 
 FLAGS = flags.FLAGS
@@ -35,6 +39,9 @@ cloud_redis_memtier:
       vm_spec: *default_single_core
       vm_count: 1
 """
+
+_LinuxVm = linux_virtual_machine.BaseLinuxVirtualMachine
+_ManagedRedis = managed_memory_store.BaseManagedMemoryStore
 
 
 def GetConfig(user_config):
@@ -53,13 +60,14 @@ def CheckPrerequisites(benchmark_config):
   Args:
     benchmark_config: benchmark_config
   """
-  _GetManagedMemoryStoreClass().CheckPrerequisites(benchmark_config)
+  _GetManagedMemoryStoreClass().CheckPrerequisites(benchmark_config)  # pytype: disable=attribute-error
 
 
 def _GetManagedMemoryStoreClass():
   """Gets the cloud-specific redis memory store class."""
-  return (managed_memory_store.GetManagedMemoryStoreClass(
-      FLAGS.cloud, managed_memory_store.REDIS))
+  return managed_memory_store.GetManagedMemoryStoreClass(
+      FLAGS.cloud, managed_memory_store.REDIS
+  )
 
 
 def _GetManagedMemoryStore(benchmark_spec):
@@ -89,6 +97,74 @@ def Prepare(benchmark_spec):
     memtier.Load(vm, memory_store_ip, memory_store_port, password)
 
 
+def _GetConnections(
+    vms: list[_LinuxVm], redis_instance: _ManagedRedis
+) -> list[memtier.MemtierConnection]:
+  """Gets a list of connections mapping client VMs to shards."""
+  if len(vms) == 1:
+    return [
+        memtier.MemtierConnection(
+            vms[0],
+            redis_instance.GetMemoryStoreIp(),
+            redis_instance.GetMemoryStorePort(),
+        )
+    ]
+  # Spread shards by client VM (evenly distributed by zone) such that each
+  # client VM gets an equal number of shards in each zone.
+  connections = []
+  shards = redis_instance.GetShardEndpoints(vms[0])
+  shards_by_zone = collections.defaultdict(list)
+  for shard in shards:
+    shards_by_zone[shard.zone].append(shard)
+  shards_by_vm = collections.defaultdict(list)
+  for shards_list in shards_by_zone.values():
+    for shard_index, shard in enumerate(shards_list):
+      vm_index = shard_index % len(vms)
+      vm = vms[vm_index]
+      connections.append(memtier.MemtierConnection(vm, shard.ip, shard.port))
+      shards_by_vm[vm].append(shard)
+  logging.info('Shards by VM: %s', shards_by_vm)
+  return connections
+
+
+def _MeasureMemtierDistribution(
+    redis_instance: _ManagedRedis,
+    vms: list[_LinuxVm],
+) -> list[sample.Sample]:
+  """Runs and reports stats across a series of memtier runs."""
+  connections = _GetConnections(vms, redis_instance)
+  return memtier.MeasureLatencyCappedThroughputDistribution(
+      connections,
+      redis_instance.GetMemoryStoreIp(),
+      redis_instance.GetMemoryStorePort(),
+      vms,
+      redis_instance.node_count,
+      redis_instance.GetMemoryStorePassword(),
+  )
+
+
+def _Run(vms: list[_LinuxVm], redis_instance: _ManagedRedis):
+  """Runs memtier based on provided flags."""
+  if memtier.MEMTIER_RUN_MODE.value == memtier.MemtierMode.MEASURE_CPU_LATENCY:
+    return memtier.RunGetLatencyAtCpu(redis_instance, vms)
+  if memtier.MEMTIER_LATENCY_CAPPED_THROUGHPUT.value:
+    if memtier.MEMTIER_DISTRIBUTION_ITERATIONS.value:
+      return _MeasureMemtierDistribution(redis_instance, vms)
+    return memtier.MeasureLatencyCappedThroughput(
+        vms[0],
+        redis_instance.node_count,
+        redis_instance.GetMemoryStoreIp(),
+        redis_instance.GetMemoryStorePort(),
+        redis_instance.GetMemoryStorePassword(),
+    )
+  return memtier.RunOverAllThreadsPipelinesAndClients(
+      vms,
+      redis_instance.GetMemoryStoreIp(),
+      [redis_instance.GetMemoryStorePort()],
+      redis_instance.GetMemoryStorePassword(),
+  )
+
+
 def Run(benchmark_spec):
   """Run benchmark and collect samples.
 
@@ -100,24 +176,10 @@ def Run(benchmark_spec):
     A list of sample.Sample instances.
   """
   memtier_vms = benchmark_spec.vm_groups['clients']
-  samples = []
-  if memtier.MEMTIER_RUN_MODE.value == memtier.MemtierMode.MEASURE_CPU_LATENCY:
-    samples = memtier.RunGetLatencyAtCpu(benchmark_spec.cloud_redis_instance,
-                                         memtier_vms)
-  elif memtier.MEMTIER_LATENCY_CAPPED_THROUGHPUT.value:
-    samples = memtier.MeasureLatencyCappedThroughput(
-        memtier_vms[0], benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
-        benchmark_spec.cloud_redis_instance.GetMemoryStorePort(),
-        benchmark_spec.cloud_redis_instance.GetMemoryStorePassword())
-  else:
-    samples = memtier.RunOverAllThreadsPipelinesAndClients(
-        memtier_vms, benchmark_spec.cloud_redis_instance.GetMemoryStoreIp(),
-        [benchmark_spec.cloud_redis_instance.GetMemoryStorePort()],
-        benchmark_spec.cloud_redis_instance.GetMemoryStorePassword())
-
-  for sample in samples:
-    sample.metadata.update(
-        benchmark_spec.cloud_redis_instance.GetResourceMetadata())
+  redis_instance: _ManagedRedis = benchmark_spec.cloud_redis_instance
+  samples = _Run(memtier_vms, redis_instance)
+  for s in samples:
+    s.metadata.update(benchmark_spec.cloud_redis_instance.GetResourceMetadata())
 
   return samples
 
@@ -133,4 +195,6 @@ def Cleanup(benchmark_spec):
 
 
 def _Install(vm):
+  """Installs necessary client packages."""
   vm.Install('memtier')
+  vm.Install('redis_cli')

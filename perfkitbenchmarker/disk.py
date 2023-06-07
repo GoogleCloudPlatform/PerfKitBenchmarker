@@ -487,7 +487,7 @@ class NetworkDisk(BaseDisk):
     return self.mount_options
 
   @abc.abstractmethod
-  def Attach(self):
+  def Attach(self, vm):
     """Attached NetworkDisk to a VM.  Must set self.vm."""
     raise NotImplementedError()
 

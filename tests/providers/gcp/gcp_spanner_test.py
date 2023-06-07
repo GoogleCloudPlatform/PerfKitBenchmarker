@@ -160,5 +160,52 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     # Assert
     self.assertEqual(expected_qps, actual_qps)
 
+
+class CreateTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    saved_flag_values = flagsaver.save_flag_values()
+    FLAGS.run_uri = 'test_uri'
+    self.addCleanup(flagsaver.restore_flag_values, saved_flag_values)
+
+    self.test_instance = GetTestSpannerInstance()
+    self.enter_context(mock.patch.object(self.test_instance, '_UpdateLabels'))
+
+  def testCreateOnExistingInstance(self):
+    self.assertFalse(self.test_instance.created)
+    self.enter_context(
+        mock.patch.object(self.test_instance, '_Exists', return_value=True)
+    )
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueCommand',
+            side_effect=[('', 'error', -1), ('', 'success', 0)],
+        )
+    )
+
+    self.test_instance.Create()
+
+    self.assertTrue(self.test_instance.created)
+    self.assertTrue(self.test_instance.user_managed)
+
+  def testCreate(self):
+    self.assertFalse(self.test_instance.created)
+    self.enter_context(
+        mock.patch.object(
+            self.test_instance, '_Exists', side_effect=[False, True]
+        )
+    )
+    self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand', return_value=('', '', 0))
+    )
+
+    self.test_instance.Create()
+
+    self.assertTrue(self.test_instance.created)
+    self.assertFalse(self.test_instance.user_managed)
+
+
 if __name__ == '__main__':
   unittest.main()

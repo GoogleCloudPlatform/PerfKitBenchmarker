@@ -303,7 +303,7 @@ class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase,
     vm = mock.Mock()
     vm.RemoteCommand.return_value = 'b: 100\na: 10\nbadline', ''
     vm.name = 'pkb-1234-0'
-    vm.OS_TYPE = 'ubuntu1804'
+    vm.OS_TYPE = 'ubuntu2004'
     vm.machine_type = 'n1-standard-2'
     benchmark_spec = mock.Mock(vms=[vm])
     samples = []
@@ -316,7 +316,7 @@ class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase,
         'meminfo_keys': 'a,b',
         'meminfo_malformed': 'badline',
         'meminfo_machine_type': 'n1-standard-2',
-        'meminfo_os_type': 'ubuntu1804',
+        'meminfo_os_type': 'ubuntu2004',
         'meminfo_vmname': 'pkb-1234-0',
     }
     expected_sample = sample.Sample('meminfo', 0, '', expected_metadata)

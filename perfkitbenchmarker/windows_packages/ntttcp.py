@@ -190,11 +190,12 @@ def _RemoveXml(vm):
   vm.RemoteCommand(rm_command, ignore_failure=True)
 
 
+@vm_util.Retry(max_retries=NTTTCP_RETRIES)
 def _CatXml(vm):
   ntttcp_exe_dir = vm.temp_dir
   cat_command = 'cd {ntttcp_exe_dir}; cat xml.txt'.format(
       ntttcp_exe_dir=ntttcp_exe_dir)
-  ntttcp_xml, _ = vm.RemoteCommand(cat_command)
+  ntttcp_xml, _ = vm.RemoteCommand(cat_command, timeout=10)
   return ntttcp_xml
 
 
@@ -242,10 +243,13 @@ def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type, udp,
   _RemoveXml(sending_vm)
   _RemoveXml(receiving_vm)
 
-  process_args = [(_RunNtttcp, (sending_vm, sending_options), {}),
-                  (_RunNtttcp, (receiving_vm, receiving_options), {})]
+  # Start receiver/server first.
+  process_args = [
+      (_RunNtttcp, (receiving_vm, receiving_options), {}),
+      (_RunNtttcp, (sending_vm, sending_options), {}),
+  ]
 
-  background_tasks.RunParallelProcesses(process_args, 200)
+  background_tasks.RunParallelProcesses(process_args, 200, 1)
 
   sender_xml = _CatXml(sending_vm)
   receiver_xml = _CatXml(receiving_vm)

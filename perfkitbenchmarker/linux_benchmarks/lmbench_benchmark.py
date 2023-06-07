@@ -219,9 +219,10 @@ def _AddProcessorMetricSamples(lmbench_output, processor_metric_list, metadata,
     regex = '%s: (.*)' % metric
     value_unit = regex_util.ExtractGroup(regex, lmbench_output)
     [value, unit] = value_unit.split(' ')
-    results.append(
-        sample.Sample('%s' % metric.replace('\\', ''), float(value), unit,
-                      metadata))
+    if unit == 'microseconds':
+      results.append(
+          sample.Sample('%s' % metric.replace('\\', ''), float(value), unit,
+                        metadata))
 
 
 def _ParseOutput(lmbench_output):

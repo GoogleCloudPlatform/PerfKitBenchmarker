@@ -255,8 +255,8 @@ class BaseAppService(resource.BaseResource):
     if self.builder:
       self.metadata.update(self.builder.GetResourceMetadata())
 
-  def Create(self):
-    super(BaseAppService, self).Create()
+  def Create(self, restore=False):
+    super(BaseAppService, self).Create(restore)
     self.samples.append(
         sample.Sample('create latency',
                       self.create_end_time - self.create_start_time, 'seconds',

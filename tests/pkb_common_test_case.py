@@ -57,10 +57,12 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
   def PackageCleanup(self):
     pass
 
-  def RemoteCommand(self, command, ignore_failure, timeout, **kwargs):
+  def RemoteCommand(
+      self, command, ignore_failure=False, timeout=None, **kwargs
+  ):
     pass
 
-  def RemoteCopy(self, file_path, remote_path, copy_to):
+  def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     pass
 
   def SetReadAhead(self, num_sectors, devices):
@@ -81,7 +83,7 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
   def WaitForBootCompletion(self):
     pass
 
-  def _WaitForSSH(self):
+  def _WaitForSSH(self, ip_address=None):
     pass
 
   def _Start(self):

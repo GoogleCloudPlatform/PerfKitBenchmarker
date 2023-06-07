@@ -173,7 +173,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
     stdout, _, retcode = self.DescribeCache()
     if retcode != 0:
       raise errors.Resource.RetryableGetError(
-          'Failed to retrieve information on %s.', self.name)
+          f'Failed to retrieve information on {self.name}.')
     response = json.loads(stdout)
     self._ip = response['hostName']
     self._port = response['port']
@@ -185,6 +185,6 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
     ], raise_on_failure=False)
     if retcode != 0:
       raise errors.Resource.RetryableGetError(
-          'Failed to retrieve information on %s.', self.name)
+          f'Failed to retrieve information on {self.name}.')
     response = json.loads(stdout)
     self._password = response['primaryKey']

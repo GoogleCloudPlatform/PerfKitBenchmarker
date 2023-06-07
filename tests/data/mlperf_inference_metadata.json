@@ -1,0 +1,16 @@
+{
+  "benchmark_full": "bert-99",
+  "benchmark_short": "bert",
+  "config_name": "CloudL4x1_TRT-custom_k_99_MaxP-Offline",
+  "detected_system": "SystemConfiguration(host_cpu_conf=CPUConfiguration(layout={CPU(name=\"Intel(R) Xeon(R) CPU @ 2.20GHz\", architecture=CPUArchitecture.x86_64, core_count=8, threads_per_core=2): 1}), host_mem_conf=MemoryConfiguration(host_memory_capacity=Memory(quantity=65.858964, byte_suffix=ByteSuffix.GB), comparison_tolerance=0.05), accelerator_conf=AcceleratorConfiguration(layout={GPU(name=\"NVIDIA L4\", accelerator_type=AcceleratorType.Discrete, vram=Memory(quantity=22.494140625, byte_suffix=ByteSuffix.GiB), max_power_limit=75.0, pci_id=\"0x27B810DE\", compute_sm=89): 1}), numa_conf=None, system_id=\"CloudL4x1\")",
+  "early_stopping_met": true,
+  "result_scheduled_samples_per_sec": 858.759,
+  "result_validity": "VALID",
+  "satisfies_query_constraint": false,
+  "scenario": "Offline",
+  "scenario_key": "result_samples_per_second",
+  "summary_string": "result_samples_per_second: 858.759, Result is VALID",
+  "system_name": "CloudL4x1_TRT",
+  "tensorrt_version": "8.6.0",
+  "test_mode": "PerformanceOnly"
+}

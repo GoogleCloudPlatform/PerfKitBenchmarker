@@ -11,17 +11,74 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Records the time required to boot a cluster of VMs."""
+"""Records the time required to boot a cluster of VMs.
 
+  This benchmark collects several provisioning time metrics, some of which are
+  conditional based on the type of VMs that the benchmark is being run on.
+
+  The metrics that are recorded are captured along the following timeline
+  and under the following conditions:
+
+  create_start_time recorded: this is the time that all metrics are measured
+    against. Every metric mentioned below involves capturing a timestamp and
+    calculating the difference between it and create_start_time.
+  create command invoked: cloud-specific VM instance create command is invoked
+    immediately following the recording of create_start_time. Some clouds
+    invoke a synchronous command, where the command waits until the instance
+    is created before returning to PKB. Meanwhile, other clouds invoke
+    their create command asynchronously, where the command returns to PKB
+    immediately and instance creation is verified through a separate process.
+
+  The metrics and steps below apply only to asynchronous creates:
+  - Metric: time-to-create-async-return
+    create_async_return_time recorded:
+      The timestamp is captured immediately after an asynchronous create command
+      returns to PKB.
+  - VM describe polling process:
+      After the asynchronous create returns, the instance is polled via the use
+      of a cloud-specific 'describe' command. The command runs in 1 second
+      intervals and has its output parsed to see when the VM enters the
+      cloud-specific 'running' state.
+  - Metric: time-to-running
+    is_running_time recorded:
+      This timestamp is captured once the polling process above determines that
+      the VM is running.
+  Network reachability polling process:
+    PKB uses a retryable WaitForSSH function that invokes a command to determine
+    whether or not the VM is ready to respond to SSH commands.
+  Metric: time-to-ssh-internal
+    ssh_internal_time recorded:
+      This timestamp is captured once the VM responds to the network
+      reachability polling command via its internal IP address.
+  Metric: time-to-ssh-external
+    ssh_external_time recorded:
+      This timestamp is captured once the VM responds to the network
+      reachability polling command via its public IP address.
+  Metric: cluster-boot-time
+    bootable_time recorded:
+      This timestamp is captured once all times are captured. The maximum
+      vm.bootable_time in a cluster of VMs is reported as the cluster boot time.
+"""
+
+import datetime
 import logging
+import os
+import shlex
+import signal
+import socket
+import subprocess
 import time
-from typing import List
+from typing import List, Tuple, Optional
+
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import linux_boot
+import pytz
 
 BENCHMARK_NAME = 'cluster_boot'
 BENCHMARK_CONFIG = """
@@ -67,19 +124,101 @@ flags.DEFINE_boolean(
     'cluster_boot_test_port_listening', False,
     'Test the time it takes to successfully connect to the port that is used '
     'to run the remote command.')
+_LINUX_BOOT_METRICS = flags.DEFINE_boolean(
+    'cluster_boot_linux_boot_metrics',
+    False,
+    'Collect detailed linux boot metrics.',
+)
+_CALLBACK_INTERNAL = flags.DEFINE_string(
+    'cluster_boot_callback_internal_ip',
+    '',
+    'Internal ip address to use for collecting first egress/ingress packet, '
+    'requires installation of tcpdump on the runner and tcpdump port is '
+    'reachable from the VMs.'
+)
+_CALLBACK_EXTERNAL = flags.DEFINE_string(
+    'cluster_boot_callback_external_ip',
+    '',
+    'External ip address to use for collecting first egress/ingress packet, '
+    'requires installation of tcpdump on the runner and tcpdump port is '
+    'reachable from the VMs.'
+)
+_TCPDUMP_PORT = flags.DEFINE_integer(
+    'cluster_boot_tcpdump_port',
+    0,
+    'Port the runner uses to test VM network connectivity. By default, pick '
+    'a random unused port.'
+)
 FLAGS = flags.FLAGS
 
 
+def GetCallbackIPs() -> Tuple[str, str]:
+  """Get internal/external IP of runner."""
+  return (_CALLBACK_INTERNAL.value, _CALLBACK_EXTERNAL.value)
+
+
+def CollectNetworkSamples() -> bool:
+  """Whether or not network samples should be collected."""
+  return bool(_CALLBACK_EXTERNAL.value or _CALLBACK_INTERNAL.value)
+
+
+def PrepareStartupScript() -> Tuple[str, Optional[int]]:
+  """Prepare startup script which will be ran as part of VM booting process."""
+  port = _TCPDUMP_PORT.value
+  if CollectNetworkSamples():
+    if not port:
+      # If not specified, find a free port and close so it can be used by
+      # tcpdump.
+      sock = socket.socket()
+      sock.bind(('', 0))
+      port = sock.getsockname()[1]
+      sock.close()
+    tcpdump_output = open(
+        vm_util.PrependTempDir(linux_boot.TCPDUMP_OUTPUT), 'w'
+    )
+    tcpdump_cmd = subprocess.Popen(
+        shlex.split(f'tcpdump -tt -n -l tcp dst port {port}'),
+        stdout=tcpdump_output,
+        stderr=tcpdump_output,
+    )
+    pid = tcpdump_cmd.pid
+  else:
+    pid = None
+
+  startup_script = linux_boot.PrepareBootScriptVM(
+      ' '.join(GetCallbackIPs()), port
+  )
+  startup_script_path = vm_util.PrependTempDir(linux_boot.BOOT_STARTUP_SCRIPT)
+  with open(startup_script_path, 'w') as f:
+    f.write(startup_script)
+
+  return startup_script_path, pid
+
+
 def GetConfig(user_config):
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  benchmark_config = configs.LoadConfig(
+      BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
+    startup_script_path, pid = PrepareStartupScript()
+    benchmark_config['flags']['boot_startup_script'] = startup_script_path
+    benchmark_config['temporary'] = {'tcpdump_pid': pid}
+  return benchmark_config
 
 
-def Prepare(unused_benchmark_spec):
-  pass
+def Prepare(benchmark_spec):
+  # In case tcpdump is launched, always cleanup
+  benchmark_spec.always_call_cleanup = True
 
 
 def GetTimeToBoot(vms):
   """Creates Samples for the boot time of a list of VMs.
+
+  The time to create async return is the time difference from before the VM is
+  created to when the asynchronous create call returns.
+
+  The time to running is the time difference from before the VM is created to
+  when the VM is in the 'running' state as determined by the response to a
+  'describe' command.
 
   The boot time is the time difference from before the VM is created to when
   the VM is responsive to SSH commands.
@@ -88,23 +227,28 @@ def GetTimeToBoot(vms):
     vms: List of BaseVirtualMachine subclasses.
 
   Returns:
-    List of Samples containing the boot times and an overall cluster boot time.
+    List of Samples containing each of the provisioning metrics listed above,
+    along with an overall cluster boot time.
   """
   if not vms:
     return []
 
+  # Time that metrics are measured against.
   min_create_start_time = min(vm.create_start_time for vm in vms)
 
+  # Vars used to store max values for whole-cluster boot metrics.
   max_create_delay_sec = 0
   max_boot_time_sec = 0
   max_port_listening_time_sec = 0
   max_rdp_port_listening_time_sec = 0
+
   samples = []
   os_types = set()
   for i, vm in enumerate(vms):
-    assert vm.bootable_time
     assert vm.create_start_time
+    assert vm.bootable_time
     assert vm.bootable_time >= vm.create_start_time
+
     os_types.add(vm.OS_TYPE)
     create_delay_sec = vm.create_start_time - min_create_start_time
     max_create_delay_sec = max(max_create_delay_sec, create_delay_sec)
@@ -114,6 +258,22 @@ def GetTimeToBoot(vms):
         'os_type': vm.OS_TYPE,
         'create_delay_sec': '%0.1f' % create_delay_sec
     }
+
+    # TIME TO CREATE ASYNC RETURN
+    if vm.create_return_time:
+      time_to_create_sec = vm.create_return_time - min_create_start_time
+      samples.append(
+          sample.Sample('Time to Create Async Return', time_to_create_sec,
+                        'seconds', metadata))
+
+    # TIME TO RUNNING
+    if vm.is_running_time:
+      time_to_running_sec = vm.is_running_time - vm.create_start_time
+      samples.append(
+          sample.Sample('Time to Running', time_to_running_sec, 'seconds',
+                        metadata))
+
+    # TIME TO SSH
     boot_time_sec = vm.bootable_time - min_create_start_time
     if isinstance(vm, linux_virtual_machine.BaseLinuxMixin):
       # TODO(pclay): Remove when Windows refactor below is complete.
@@ -128,6 +288,7 @@ def GetTimeToBoot(vms):
                           vm.ssh_internal_time - min_create_start_time,
                           'seconds', metadata))
 
+    # TIME TO PORT LISTENING
     max_boot_time_sec = max(max_boot_time_sec, boot_time_sec)
     samples.append(
         sample.Sample('Boot Time', boot_time_sec, 'seconds', metadata))
@@ -140,6 +301,8 @@ def GetTimeToBoot(vms):
       samples.append(
           sample.Sample('Port Listening Time', port_listening_time_sec,
                         'seconds', metadata))
+
+    # TIME TO RDP LISTENING
     # TODO(pclay): refactor so Windows specifics aren't in linux_benchmarks
     if FLAGS.cluster_boot_test_rdp_port_listening:
       assert vm.rdp_port_listening_time
@@ -205,11 +368,17 @@ def MeasureDelete(
     List of Samples containing the delete times and an overall cluster delete
     time.
   """
-  before_delete_timestamp = time.time()
-  background_tasks.RunThreaded(lambda vm: vm.Delete(), vms)
+  # Only measure VMs that have a delete time.
+  vms = [vm for vm in vms if vm.delete_start_time and vm.delete_end_time]
+  if not vms:
+    return []
+  # Collect a delete time from each VM.
   delete_times = [vm.delete_end_time - vm.delete_start_time for vm in vms]
+  # Get the cluster delete time.
+  min_delete_start_time = min([vm.delete_start_time for vm in vms])
   max_delete_end_time = max([vm.delete_end_time for vm in vms])
-  cluster_delete_time = max_delete_end_time - before_delete_timestamp
+  cluster_delete_time = max_delete_end_time - min_delete_start_time
+  # Record the delete metrics as samples.
   return _GetVmOperationDataSamples(delete_times, cluster_delete_time, 'Delete',
                                     vms)
 
@@ -258,10 +427,25 @@ def Run(benchmark_spec):
     An empty list (all boot samples will be added later).
   """
   samples = []
+  if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
+    for vm in benchmark_spec.vms:
+      samples.extend(
+          linux_boot.CollectBootSamples(
+              vm,
+              GetCallbackIPs(),
+              datetime.datetime.fromtimestamp(
+                  vm.create_start_time, pytz.timezone('UTC')
+              ),
+              include_networking_samples=CollectNetworkSamples()
+          )
+      )
   if FLAGS.cluster_boot_time_reboot:
     samples.extend(_MeasureReboot(benchmark_spec.vms))
   return samples
 
 
-def Cleanup(unused_benchmark_spec):
-  pass
+def Cleanup(benchmark_spec):
+  if CollectNetworkSamples():
+    pid = benchmark_spec.config.temporary['tcpdump_pid']
+    logging.info('Terminating tcpdump process %s', pid)
+    os.kill(pid, signal.SIGTERM)

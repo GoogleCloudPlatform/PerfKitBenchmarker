@@ -33,12 +33,15 @@ import six
 
 FLAGS = flags.FLAGS
 
+_CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
+    'container_remote_build_config', None,
+    'The YAML or JSON file to use as the build configuration file.')
+
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
 RELEASE_CHANNELS = ['rapid', 'regular', 'stable']
-# Time for build to complete. 10 minutes as filesystem takes ~6 minutes
-BUILD_TIMEOUT = 600
+ONE_HOUR = 60 * 60
 
 
 def _CalculateCidrSize(nodes: int) -> int:
@@ -67,7 +70,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
     region = util.GetMultiRegionFromRegion(util.GetRegionFromZone(self.zone))
     hostname = '{region}.gcr.io'.format(region=region)
     full_tag = '{hostname}/{project}/{name}'.format(
-        hostname=hostname, project=self.project, name=image)
+        hostname=hostname, project=self.project.replace(':', '/'), name=image)
     return full_tag
 
   def Login(self):
@@ -79,11 +82,22 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
 
   def RemoteBuild(self, image):
     """Build the image remotely."""
-    full_tag = self.GetFullRegistryTag(image.name)
-    build_cmd = util.GcloudCommand(self, 'builds', 'submit', '--tag', full_tag,
-                                   image.directory)
+    if not _CONTAINER_REMOTE_BUILD_CONFIG.value:
+      full_tag = self.GetFullRegistryTag(image.name)
+      build_cmd = util.GcloudCommand(
+          self, 'builds', 'submit', '--tag', full_tag, image.directory
+      )
+    else:
+      build_cmd = util.GcloudCommand(
+          self,
+          'builds',
+          'submit',
+          '--config',
+          _CONTAINER_REMOTE_BUILD_CONFIG.value,
+          image.directory,
+      )
     del build_cmd.flags['zone']
-    build_cmd.Issue(timeout=BUILD_TIMEOUT)
+    build_cmd.Issue(timeout=None)
 
 
 class GkeCluster(container_service.KubernetesCluster):
@@ -111,6 +125,14 @@ class GkeCluster(container_service.KubernetesCluster):
       os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER'] = (
           gcp_flags.GKE_API_OVERRIDE.value)
 
+    self.enable_nccl_fast_socket = False
+    if gcp_flags.GKE_NCCL_FAST_SOCKET.value:
+      if self.nodepools:
+        self.enable_nccl_fast_socket = True
+      else:
+        raise errors.Config.InvalidValue(
+            'NCCL fast socket is only supported on secondary node pools.')
+
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
 
@@ -129,6 +151,7 @@ class GkeCluster(container_service.KubernetesCluster):
       # TODO(pclay): support NVME when it leaves alpha
       # Also consider moving FLAGS.gce_ssd_interface into the vm_spec.
       result['gce_local_ssd_interface'] = gce_virtual_machine.SCSI
+    result['gke_nccl_fast_socket'] = self.enable_nccl_fast_socket
     return result
 
   def _GcloudCommand(self, *args, **kwargs):
@@ -184,7 +207,6 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.flags['network'] = self.vm_config.network.network_resource.name
 
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
-    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     cmd.args.append('--no-enable-shielded-nodes')
     self._IssueResourceCreationCommand(cmd)
 
@@ -205,7 +227,7 @@ class GkeCluster(container_service.KubernetesCluster):
 
     # This command needs a long timeout due to the many minutes it
     # can take to provision a large GPU-accelerated GKE cluster.
-    _, stderr, retcode = cmd.Issue(timeout=1200, raise_on_failure=False)
+    _, stderr, retcode = cmd.Issue(timeout=ONE_HOUR, raise_on_failure=False)
     if retcode:
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
@@ -213,12 +235,14 @@ class GkeCluster(container_service.KubernetesCluster):
   def _AddNodeParamsToCmd(
       self, vm_config, num_nodes, sandbox_config, name, cmd):
     """Modifies cmd to include node specific command arguments."""
+    # Apply labels to all nodepools.
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if vm_config.gpu_count:
-      cmd.flags['accelerator'] = (
-          gce_virtual_machine.GenerateAcceleratorSpecString(
-              vm_config.gpu_type,
-              vm_config.gpu_count))
+      if 'a2-' not in vm_config.machine_type:
+        cmd.flags['accelerator'] = (
+            gce_virtual_machine.GenerateAcceleratorSpecString(
+                vm_config.gpu_type, vm_config.gpu_count))
     if vm_config.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = vm_config.min_cpu_platform
 
@@ -253,6 +277,14 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.args.append('--enable-gvnic')
     else:
       cmd.args.append('--no-enable-gvnic')
+    if (
+        self.enable_nccl_fast_socket
+        and name != container_service.DEFAULT_NODEPOOL
+    ):
+      cmd.args.append('--enable-fast-socket')
+
+    if FLAGS.gke_node_system_config is not None:
+      cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
 
     if sandbox_config is not None:
       cmd.flags['sandbox'] = sandbox_config.ToSandboxFlag()
@@ -272,7 +304,10 @@ class GkeCluster(container_service.KubernetesCluster):
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
 
-    if self.vm_config.gpu_count:
+    should_install_nvidia_drivers = (
+        self.vm_config.gpu_count or
+        any(pool.vm_config.gpu_count for pool in self.nodepools.values()))
+    if should_install_nvidia_drivers:
       kubernetes_helper.CreateFromFile(NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
       kubernetes_helper.CreateFromFile(
           data.ResourcePath(NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET))

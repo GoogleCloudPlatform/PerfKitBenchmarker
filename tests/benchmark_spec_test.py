@@ -196,28 +196,6 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
     self.assertFalse(spanner_instance.user_managed)
 
   @flagsaver.flagsaver(run_uri='test_uri')
-  def testInitializationUserManaged(self):
-    test_spec = inspect.cleandoc("""
-    cloud_spanner_ycsb:
-      description: Sample spanner benchmark
-      relational_db:
-        spanner_instance_id: test_instance
-        spanner_database_id: test_database
-        engine: spanner-googlesql
-    """)
-    self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        yaml_string=test_spec, benchmark_name='cloud_spanner_ycsb')
-
-    self.test_bm_spec.ConstructRelationalDb()
-
-    spanner_instance = self.test_bm_spec.relational_db
-    self.assertIsInstance(spanner_instance,
-                          gcp_spanner.GoogleSqlGcpSpannerInstance)
-    self.assertEqual(spanner_instance.instance_id, 'test_instance')
-    self.assertEqual(spanner_instance.database, 'test_database')
-    self.assertTrue(spanner_instance.user_managed)
-
-  @flagsaver.flagsaver(run_uri='test_uri')
   def testRestoreInstanceCopiedFromPreviousSpec(self):
     restore_spanner_spec = inspect.cleandoc("""
     cloud_spanner_ycsb:

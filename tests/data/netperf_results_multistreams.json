@@ -1,0 +1,22 @@
+[
+  [
+  "MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 104.154.50.86 () port 20001 AF_INET : +/-2.500% @ 99% conf.",
+  "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds,Minimum Latency Microseconds,Maximum Latency Microseconds,Local Transport Retransmissions,Remote Transport Retransmissions,Transport MSS bytes",
+  "1000.00,10^6bits/s,10.100,20,1084.37,2,6,3374,1,3500,0,0,1408"
+  ],
+  [
+    "MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 104.154.50.86 () port 20001 AF_INET : +/-2.500% @ 99% conf.",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds,Minimum Latency Microseconds,Maximum Latency Microseconds,Local Transport Retransmissions,Remote Transport Retransmissions,Transport MSS bytes",
+    "2000.00,10^6bits/s,10.100,20,2084.37,2,6,3374,1,3500,0,0,1408"
+  ],
+  [
+    "MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 104.154.50.86 () port 20001 AF_INET : +/-2.500% @ 99% conf.",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds,Minimum Latency Microseconds,Maximum Latency Microseconds,Local Transport Retransmissions,Remote Transport Retransmissions,Transport MSS bytes",
+    "3000.00,10^6bits/s,10.100,20,1084.37,2,6,3374,1,3500,0,0,1408"
+  ],
+  [
+    "MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 20001 AF_INET to 104.154.50.86 () port 20001 AF_INET : +/-2.500% @ 99% conf.",
+    "Throughput,Throughput Units,Throughput Confidence Width (%),Confidence Iterations Run,Stddev Latency Microseconds,50th Percentile Latency Microseconds,90th Percentile Latency Microseconds,99th Percentile Latency Microseconds,Minimum Latency Microseconds,Maximum Latency Microseconds,Local Transport Retransmissions,Remote Transport Retransmissions,Transport MSS bytes",
+    "4000.00,10^6bits/s,10.100,20,1084.37,2,6,3374,1,3500,0,0,1408"
+  ]
+]

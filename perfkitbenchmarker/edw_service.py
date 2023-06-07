@@ -50,6 +50,8 @@ flags.DEFINE_string('snowflake_connection', None,
                     'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections')  # pylint: disable=line-too-long
 flags.DEFINE_integer('edw_suite_iterations', 1,
                      'Number of suite iterations to perform.')
+flags.DEFINE_integer('edw_suite_warmup_iterations', None,
+                     'Number of suite warmup iterations to perform.')
 # TODO(user): Revisit flags for accepting query lists.
 flags.DEFINE_string('edw_simultaneous_queries', None,
                     'CSV list of simultaneous queries to benchmark.')

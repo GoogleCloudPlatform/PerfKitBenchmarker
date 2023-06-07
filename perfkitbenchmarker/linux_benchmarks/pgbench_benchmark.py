@@ -80,7 +80,6 @@ pgbench:
         zone: us-west-1c
       Azure:
         machine_type:
-          tier: Standard
           compute_units: 800
         zone: eastus
     db_disk_spec:

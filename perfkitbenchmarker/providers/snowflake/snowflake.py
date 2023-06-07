@@ -29,7 +29,7 @@ FLAGS = flags.FLAGS
 
 # TODO(jguertin): Update these jdbc client names to reflect their function
 JdbcClientDict = {
-    provider_info.AWS: 'snowflake-jdbc-client-2.0.jar',
+    provider_info.AWS: 'snowflake-jdbc-client-2.3-standard.jar',
     provider_info.AZURE: 'snowflake-jdbc-client-azure-external-2.0.jar'
 }
 
@@ -156,7 +156,8 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--warehouse {self.warehouse} '
         f'--database {self.database} '
         f'--schema {self.schema} '
-        f'--query_streams {"".join([",".join(stream) for stream in concurrency_streams])}'
+        '--query_streams '
+        f'{" ".join([",".join(stream) for stream in concurrency_streams])}'
     )
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     return stdout

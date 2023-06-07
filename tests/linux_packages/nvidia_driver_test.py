@@ -45,7 +45,7 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
         return_value=('clocks.applications.graphics [MHz], '
                       'clocks.applications.memory [Mhz]\n'
                       '324 MHz, 527 MHz', None))
-    self.assertEqual((324, 527), nvidia_driver.QueryGpuClockSpeed(vm, 3))
+    self.assertEqual(('324', '527'), nvidia_driver.QueryGpuClockSpeed(vm, 3))
     vm.RemoteCommand.assert_called_with(
         'sudo nvidia-smi '
         '--query-gpu=clocks.applications.memory,'

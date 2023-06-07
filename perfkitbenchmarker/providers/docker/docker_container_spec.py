@@ -16,7 +16,7 @@
 
 import logging
 from perfkitbenchmarker import custom_virtual_machine_spec
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 import yaml
@@ -30,7 +30,7 @@ class DockerContainerSpec(virtual_machine.BaseVmSpec):
         should be run in privileged mode.
   """
 
-  CLOUD = providers.DOCKER
+  CLOUD = provider_info.DOCKER
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):

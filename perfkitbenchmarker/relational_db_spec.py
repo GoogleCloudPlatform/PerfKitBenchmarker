@@ -49,6 +49,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     database_password: Admin password for the database.
     is_managed_db: Specifies whether or not this is a managed DB service as
       opposed to unmanaged (installed on infrastructure).
+    db_tier: Specifies what tier the database is in.
     db_disk_spec: disk.BaseDiskSpec: Configurable disk options.
     db_spec: virtual_machine.BaseVmSpec: Configurable VM options.
   """
@@ -62,6 +63,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   database_username: str
   database_password: str
   is_managed_db: bool
+  db_tier: str
   db_disk_spec: disk.BaseDiskSpec
   db_spec: virtual_machine.BaseVmSpec
 
@@ -120,49 +122,42 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     """
     result = super(RelationalDbSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': provider_info.VALID_CLOUDS
-        }),
-        'engine': (option_decoders.EnumDecoder, {
-            'valid_values': sql_engine_utils.ALL_ENGINES,
-        }),
-        'zones': (option_decoders.ListDecoder, {
-            'item_decoder': option_decoders.StringDecoder(),
-            'default': None
-        }),
-        'engine_version': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'database_name': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'database_password': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'database_username': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'high_availability': (option_decoders.BooleanDecoder, {
-            'default': False
-        }),
-        'backup_enabled': (option_decoders.BooleanDecoder, {
-            'default': True
-        }),
-        'backup_start_time': (option_decoders.StringDecoder, {
-            'default': '07:00'
-        }),
-        'is_managed_db': (option_decoders.BooleanDecoder, {
-            'default': True
-        }),
+        'cloud': (
+            option_decoders.EnumDecoder,
+            {'valid_values': provider_info.VALID_CLOUDS},
+        ),
+        'engine': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': sql_engine_utils.ALL_ENGINES,
+            },
+        ),
+        'zones': (
+            option_decoders.ListDecoder,
+            {'item_decoder': option_decoders.StringDecoder(), 'default': None},
+        ),
+        'engine_version': (option_decoders.StringDecoder, {'default': None}),
+        'database_name': (option_decoders.StringDecoder, {'default': None}),
+        'database_password': (option_decoders.StringDecoder, {'default': None}),
+        'database_username': (option_decoders.StringDecoder, {'default': None}),
+        'high_availability': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
+        ),
+        'backup_enabled': (option_decoders.BooleanDecoder, {'default': True}),
+        'backup_start_time': (
+            option_decoders.StringDecoder,
+            {'default': '07:00'},
+        ),
+        'is_managed_db': (option_decoders.BooleanDecoder, {'default': True}),
+        'db_tier': (option_decoders.StringDecoder, {'default': None}),
         'db_spec': (option_decoders.PerCloudConfigDecoder, {}),
         'db_disk_spec': (option_decoders.PerCloudConfigDecoder, {}),
-        'vm_groups': (vm_group_decoders.VmGroupsDecoder, {
-            'default': {}
-        }),
-        'db_flags': (option_decoders.ListDecoder, {
-            'item_decoder': option_decoders.StringDecoder(),
-            'default': None
-        }),
+        'vm_groups': (vm_group_decoders.VmGroupsDecoder, {'default': {}}),
+        'db_flags': (
+            option_decoders.ListDecoder,
+            {'item_decoder': option_decoders.StringDecoder(), 'default': None},
+        ),
     })
     return result
 
@@ -281,8 +276,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       config_values['db_spec'][cloud]['machine_type']['compute_units'] = (
           flag_values.managed_db_azure_compute_units)
     if flag_values['managed_db_tier'].present:
-      config_values['db_spec'][cloud]['machine_type']['tier'] = (
-          flag_values.managed_db_tier)
+      config_values['db_tier'] = flag_values.managed_db_tier
     if has_client_machine_type:
       config_values['vm_groups']['clients']['vm_spec'][cloud][
           'machine_type'] = (

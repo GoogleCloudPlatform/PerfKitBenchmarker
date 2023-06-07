@@ -27,15 +27,21 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 import six
 
 FLAGS = flags.FLAGS
 
 _TRACE_VM_GROUPS = flags.DEFINE_list(
-    'trace_vm_groups', None, 'Run traces on all vms in the vm groups.'
-    'By default traces runs on all VMs, for client and server achitecture,'
-    'specify trace vm groups to servers to only collect metrics on server vms.')
+    'trace_vm_groups',
+    None,
+    (
+        'Run traces on all vms in the vm groups.By default traces runs on all'
+        ' VMs, for client and server architecture, specify trace vm groups to'
+        ' servers to only collect metrics on server vms.'
+    ),
+)
 
 
 def Register(parsed_flags):
@@ -65,6 +71,7 @@ class BaseCollector(object):
     Args:
       interval: Optional int. Interval in seconds in which to collect samples.
       output_directory: Optional directory where to save collection output.
+
     Raises:
       IOError: for when the output directory doesn't exist.
     """
@@ -77,8 +84,11 @@ class BaseCollector(object):
     self.vm_groups = {}
 
     if not os.path.isdir(self.output_directory):
-      raise IOError('collector output directory does not exist: {0}'.format(
-          self.output_directory))
+      raise IOError(
+          'collector output directory does not exist: {0}'.format(
+              self.output_directory
+          )
+      )
 
   @abc.abstractmethod
   def _CollectorName(self):
@@ -92,16 +102,25 @@ class BaseCollector(object):
   def _CollectorRunCommand(self, vm, collector_file):
     pass
 
-  def _KillCommand(self, pid):
+  def _KillCommand(self, vm, pid):
     """Command to kill off the collector."""
-    return 'kill {0}'.format(pid)
+    if vm.BASE_OS_TYPE == os_types.WINDOWS:
+      return 'taskkill /PID {0} /F'.format(pid)
+    else:
+      return 'kill {0}'.format(pid)
 
   def _StartOnVm(self, vm, suffix=''):
     """Start collector, having it write to an output file."""
     self._InstallCollector(vm)
     suffix = '{0}-{1}'.format(suffix, self._CollectorName())
-    collector_file = posixpath.join(
-        vm_util.VM_TMP_DIR, '{0}{1}.stdout'.format(vm.name, suffix))
+    if vm.BASE_OS_TYPE == os_types.WINDOWS:
+      collector_file = os.path.join(
+          vm.temp_dir, '{0}{1}.stdout'.format(vm.name, suffix)
+      )
+    else:
+      collector_file = posixpath.join(
+          vm_util.VM_TMP_DIR, '{0}{1}.stdout'.format(vm.name, suffix)
+      )
 
     cmd = self._CollectorRunCommand(vm, collector_file)
 
@@ -117,10 +136,13 @@ class BaseCollector(object):
     else:
       with self._lock:
         pid, file_name = self._pid_files.pop(vm.name)
-    vm.RemoteCommand(self._KillCommand(pid), ignore_failure=True)
+    vm.RemoteCommand(self._KillCommand(vm, pid), ignore_failure=True)
 
     try:
-      vm.PullFile(self.output_directory, file_name)
+      vm.PullFile(
+          os.path.join(self.output_directory, os.path.basename(file_name)),
+          file_name,
+      )
       self._role_mapping[vm_role] = file_name
     except errors.VirtualMachine.RemoteCommandError as ex:
       logging.exception('Failed fetching collector result from %s.', vm.name)
@@ -165,14 +187,18 @@ class BaseCollector(object):
       sender: sender of the event to stop the collector.
       name: name of event to be stopped.
     """
-    events.record_event.send(sender, event=name,
-                             start_timestamp=self._start_time,
-                             end_timestamp=time.time(),
-                             metadata={})
+    events.record_event.send(
+        sender,
+        event=name,
+        start_timestamp=self._start_time,
+        end_timestamp=time.time(),
+        metadata={},
+    )
     args = []
     for role, vms in six.iteritems(self.vm_groups):
-      args.extend([((
-          vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)])
+      args.extend(
+          [((vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)]
+      )
     background_tasks.RunThreaded(self._StopOnVm, args)
     return
 

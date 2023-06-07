@@ -25,7 +25,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import providers
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.docker import docker_container_spec
@@ -41,7 +41,7 @@ DOCKERFILE_DIRECTORY = 'perfkitbenchmarker/data/docker'
 class DockerContainer(virtual_machine.BaseVirtualMachine):
   """Object representing a Docker Container instance."""
 
-  CLOUD = providers.DOCKER
+  CLOUD = provider_info.DOCKER
   DEFAULT_IMAGE = None
   CONTAINER_COMMAND = None
   docker_build_lock = threading.Lock()

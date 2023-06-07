@@ -43,13 +43,21 @@ flags.DEFINE_string(
     'image_project', None, 'The project against which all image references will'
     ' be resolved. See: '
     'https://cloud.google.com/sdk/gcloud/reference/compute/disks/create')
-GCE_NETWORK_NAME = flags.DEFINE_string(
-    'gce_network_name', None, 'The name of an already created '
+GCE_CONFIDENTIAL_COMPUTE = flags.DEFINE_boolean(
+    'gce_confidential_compute', False,
+    'Whether or not we create a Confidential VM Instance')
+GCE_CONFIDENTIAL_COMPUTE_TYPE = flags.DEFINE_string(
+    'gce_confidential_compute_type',
+    'sev',
+    'Type of Confidential VM Instance'
+)
+GCE_NETWORK_NAMES = flags.DEFINE_list(
+    'gce_network_name', [], 'The name of an already created '
     'network to use instead of creating a new one.')
 GCE_NETWORK_TYPE = flags.DEFINE_string(
     'gce_network_type', None, 'The network type or mode (i.e. auto, custom)')
-flags.DEFINE_string(
-    'gce_subnet_name', None, 'The name of an already created '
+GCE_SUBNET_NAMES = flags.DEFINE_list(
+    'gce_subnet_name', [], 'The name of an already created '
     'subnet to use instead of creating a new one.')
 flags.DEFINE_string(
     'gce_subnet_region', None, 'Region to create subnet in '
@@ -116,11 +124,20 @@ flags.DEFINE_string(
     'gcp_service_account_key_file', None,
     'Local path to file that contains a private authorization '
     'key, used to activate gcloud.')
+flags.DEFINE_string(
+    'gke_node_system_config',
+    None,
+    'Local path to yaml file that contains node system configuration.',
+)
 flags.DEFINE_list('gce_tags', None, 'List of --tags when creating a VM')
 flags.DEFINE_boolean('gke_enable_alpha', False,
                      'Whether to enable alpha kubernetes clusters.')
 flags.DEFINE_boolean('gke_enable_gvnic', True,
-                     'Whether to use google vitrual interface on GKE nodes.')
+                     'Whether to use google virtual network interface on GKE '
+                     'nodes.')
+GKE_NCCL_FAST_SOCKET = flags.DEFINE_boolean(
+    'gke_enable_nccl_fast_socket', False,
+    'Whether to enable NCCL fast socket on GKE.')
 flags.DEFINE_string('gcp_dataproc_subnet', None,
                     'Specifies the subnet that the cluster will be part of.')
 flags.DEFINE_multi_string('gcp_dataproc_property', [],

@@ -1,0 +1,8 @@
+The time when unit became active or started is printed after the "@" character.
+The time the unit took to start is printed after the "+" character.
+
+systemd-sysctl.service +103us
+systemd-modules-load.service @671ms +150ms
+  systemd-journald.socket @530ms
+    -.mount @300ms
+      -.slice @300ms

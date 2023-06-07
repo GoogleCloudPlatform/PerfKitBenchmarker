@@ -8,7 +8,7 @@ do
     esac
 done
 echo "Executing $0"
-command="flink run -c ${classname} job.jar --runner=FlinkRunner"
+command="flink run -c ${classname} job.jar"
 space=" "
 for arg in ${*:4}
 do

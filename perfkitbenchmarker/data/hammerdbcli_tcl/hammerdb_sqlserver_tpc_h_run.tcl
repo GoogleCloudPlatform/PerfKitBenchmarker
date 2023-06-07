@@ -31,7 +31,7 @@ diset connection mssqls_authentication sql
 diset tpch mssqls_driver timed
 diset tpch mssqls_refresh_on 1
 diset tpch mssqls_scale_fact {{SCALE_FACTOR_TPC_H}}
-diset tpch mssqls_maxdop 1
+diset tpch mssqls_maxdop 0
 diset tpch mssqls_num_tpch_threads {{VIRTUAL_USERS_TPC_H}}
 diset tpch mssqls_total_querysets 1
 diset tpch mssqls_colstore false

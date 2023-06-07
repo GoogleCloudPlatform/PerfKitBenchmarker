@@ -20,9 +20,9 @@ from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
 
@@ -78,8 +78,12 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     vm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
     vm_spec.vms[0].RobustRemoteCommand.side_effect = [
         (i, '') for i in self.expected_stdout]
-
-    result = netperf_benchmark.Run(vm_spec)
+    vm_spec.vms[1].GetInternalIPs.return_value = ['test_ip']
+    run_result = netperf_benchmark.Run(vm_spec)
+    result = []
+    for sample in run_result:
+      if sample[0] not in ['start_time', 'end_time']:
+        result.append(sample)
 
     tps = 'transactions_per_second'
     mbps = 'Mbits/sec'
@@ -114,7 +118,9 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
             ('TCP_CRR_Latency_max', 2500.0, 'us'),
             ('TCP_CRR_Latency_stddev', 551.07, 'us'),
             ('TCP_STREAM_Throughput', 1187.94, mbps),
+            ('TCP_STREAM_Throughput_1stream', 1187.94, mbps),
             ('TCP_STREAM_Throughput', 1973.37, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_1stream', 1973.37, 'Mbits/sec'),
             ('UDP_RR_Transaction_Rate', 1359.71, tps),
             ('UDP_RR_Latency_p50', 700.0, 'us'),
             ('UDP_RR_Latency_p90', 757.0, 'us'),
@@ -132,14 +138,17 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
             ('UDP_STREAM_Throughput', 1102.42, mbps),
             ('UDP_STREAM_Throughput', 1802.72, 'Mbits/sec'),
         ],
-        [i[:3] for i in result])
+        [i[:3] for i in result],
+    )
 
     external_meta = {'ip_type': 'external'}
     internal_meta = {'ip_type': 'internal'}
-    expected_meta = (([external_meta] * 7 + [internal_meta] * 7) * 2 +
-                     [external_meta, internal_meta] +
-                     [external_meta] * 7 +
-                     [internal_meta] * 7)
+    expected_meta = (
+        ([external_meta] * 7 + [internal_meta] * 7) * 2
+        + [external_meta, external_meta, internal_meta, internal_meta]
+        + [external_meta] * 7
+        + [internal_meta] * 7
+    )
 
     for i, meta in enumerate(expected_meta):
       self.assertIsInstance(result[i][3], dict)
@@ -161,6 +170,55 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
       netperf_benchmark.ParseNetperfOutput(output, {}, 'fake_benchmark_name',
                                            False)
     self.assertIn('Failed to parse stdout', str(e.exception))
+
+  @flagsaver.flagsaver(netperf_benchmarks=[netperf_benchmark.TCP_STREAM])
+  def testMultiStreams(self):
+    self._ConfigureIpTypes()
+    num_streams = 4
+    FLAGS.netperf_num_streams = flag_util.IntegerList([num_streams])
+    self.should_run_external.return_value = True
+    self.should_run_internal.return_value = False
+    # Read netperf mock results for multiple streams
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '..',
+        'data',
+        'netperf_results_multistreams.json',
+    )
+    with open(path) as fp:
+      stdouts = ['\n'.join(i) for i in json.load(fp)]
+      self.expected_stdout = []
+      for i in range(0, len(stdouts), num_streams):
+        self.expected_stdout.append(
+            json.dumps((stdouts[i : i + num_streams], [''], [0]))
+        )
+
+    vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
+    vm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
+    vm_spec.vms[0].RobustRemoteCommand.side_effect = [
+        (i, '') for i in self.expected_stdout
+    ]
+    vm_spec.vms[1].GetInternalIPs.return_value = ['test_ip']
+    run_result = netperf_benchmark.Run(vm_spec)
+    result = []
+    for sample in run_result:
+      if sample[0] not in ['start_time', 'end_time']:
+        result.append(sample)
+
+    self.assertListEqual(
+        [
+            ('TCP_STREAM_Throughput_p50', 3000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_p90', 4000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_p99', 4000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_average', 2500.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_stddev', 1290.9944487358057, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_min', 1000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_max', 4000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_total', 10000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_4streams', 10000.0, 'Mbits/sec'),
+        ],
+        [i[:3] for i in result],
+    )
 
 
 if __name__ == '__main__':

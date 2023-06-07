@@ -15,10 +15,13 @@
 import logging
 import os
 import unittest
+from unittest import mock
+from absl.testing import flagsaver
 
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import sysbench_benchmark
+from tests import pkb_common_test_case
 
 
 class MySQLServiceBenchmarkTestCase(unittest.TestCase,
@@ -48,6 +51,36 @@ class MySQLServiceBenchmarkTestCase(unittest.TestCase,
             20207.00, 20348.96, 20047.11, 19972.86, 19203.97, 18221.83,
             18689.14, 18409.68, 19155.63]})]
     self.assertSampleListsEqualUpToTimestamp(results, expected_results)
+
+
+class SysbenchBenchmarkTestCase(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
+
+  @flagsaver.flagsaver(sysbench_testname=sysbench_benchmark.SPANNER_TPCC)
+  def testSpannerLoadCommandHasCorrectTest(self):
+    self.enter_context(
+        mock.patch.object(
+            sysbench_benchmark, '_GetCommonSysbenchOptions', return_value=[]
+        )
+    )
+    command = sysbench_benchmark._GetSysbenchPrepareCommand(mock.Mock())
+    self.assertIn('sysbench tpcc', command)
+
+  @flagsaver.flagsaver(sysbench_testname=sysbench_benchmark.SPANNER_TPCC)
+  def testSpannerRunCommandHasCorrectTest(self):
+    self.enter_context(
+        mock.patch.object(
+            sysbench_benchmark, '_GetCommonSysbenchOptions', return_value=[]
+        )
+    )
+    command = sysbench_benchmark._GetSysbenchRunCommand(1, mock.Mock(), 1)
+    self.assertIn('sysbench tpcc', command)
+
+  @flagsaver.flagsaver(sysbench_testname=sysbench_benchmark.SPANNER_TPCC)
+  def testSpannerMetadataHasForeignKey(self):
+    metadata = sysbench_benchmark.CreateMetadataFromFlags()
+    self.assertIn('sysbench_use_fk', metadata)
 
 
 if __name__ == '__main__':

@@ -19,7 +19,7 @@ from perfkitbenchmarker import linux_packages
 
 LMBENCH_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'lmbench')
 GIT = 'https://github.com/intel/lmbench.git'
-COMMIT = '4e4efa113b244b70a1faafd13744578b4edeaeb3'
+COMMIT = '701c6c35b0270d4634fb1dc5272721340322b8ed'
 
 
 def _Install(vm):

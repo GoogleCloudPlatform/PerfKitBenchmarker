@@ -85,6 +85,19 @@ class SamplesTestMixin(object):
         ex.args = (ex.message,)
         raise ex
 
+  def assertSampleInList(self, a, b, msg=None):  # pylint:disable=invalid-name
+    """Assert that sample a is in list b (up to timestamp)."""
+    found = False
+    for s in b:
+      try:
+        self.assertSamplesEqualUpToTimestamp(a, s, msg=msg)
+      except self.failureException:
+        continue
+      found = True
+    if not found:
+      msg = msg or f'{a} not found in {b}.'
+      raise AssertionError(msg)
+
 
 def assertDiskMounts(benchmark_config, mount_point):
   """Test whether a disk mounts in a given configuration.
