@@ -300,7 +300,8 @@ _ERROR_RATE_THRESHOLD = flags.DEFINE_float(
 )
 
 # Status line pattern
-_STATUS_PATTERN = r'(\d+) sec: \d+ operations; (\d+.\d+) current ops\/sec'
+_STATUS_PATTERN = r'(\d+) sec: \d+ operations; (\d+(\.\d+)?) current ops\/sec'
+_STATUS_GROUPS_PATTERN = r'\[(.+?): (.+?)\]'
 # Status interval default is 10 sec, change to 1 sec.
 _STATUS_INTERVAL_SEC = 1
 
@@ -444,6 +445,18 @@ def CheckPrerequisites():
         '--ycsb_incremental_load=target and not --ycsb_run_parameters.'
     )
 
+  # Both HISTOGRAM and TIMESERIES do not output latencies on a per-interval
+  # basis, so we use the more-detailed HDRHISTOGRAM.
+  if (
+      _THROUGHPUT_TIME_SERIES.value
+      and FLAGS.ycsb_measurement_type != ycsb_stats.HDRHISTOGRAM
+  ):
+    raise errors.Config.InvalidValue(
+        'Measuring a throughput histogram requires running with '
+        '--ycsb_measurement_type=HDRHISTOGRAM. Other measurement types are '
+        'unsupported unless additional parsing is added.'
+    )
+
 
 @vm_util.Retry(poll_interval=1)
 def Install(vm):
@@ -551,6 +564,8 @@ class YCSBExecutor:
       perclientparam: list.
       shardkeyspace: boolean. Default to False, indicates if clients should have
         their own keyspace.
+    burst_time_offset_sec: When running with --ycsb_burst_load, the amount of
+      seconds to offset time series measurements during the increased load.
   """
 
   FLAG_ATTRIBUTES = 'cp', 'jvm-args', 'target', 'threads'
@@ -570,6 +585,8 @@ class YCSBExecutor:
     # are not passed to ycsb commands
     self.perclientparam = self.parameters.pop('perclientparam', None)
     self.shardkeyspace = self.parameters.pop('shardkeyspace', False)
+
+    self.burst_time_offset_sec = 0
 
   def _BuildCommand(self, command_name, parameter_files=None, **kwargs):
     """Builds the YCSB command line."""
@@ -737,7 +754,10 @@ class YCSBExecutor:
       vm.RemoteCommand('mkdir -p {0}'.format(hdr_files_dir))
     stdout, stderr = vm.RobustRemoteCommand(command)
     return ycsb_stats.ParseResults(
-        str(stderr + stdout), self.measurement_type, _ERROR_RATE_THRESHOLD.value
+        str(stderr + stdout),
+        self.measurement_type,
+        _ERROR_RATE_THRESHOLD.value,
+        self.burst_time_offset_sec,
     )
 
   def _RunThreaded(self, vms, **kwargs):
@@ -1066,14 +1086,22 @@ class YCSBExecutor:
     initial_qps = int(run_params.get('target', 0))
 
     samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
+    # Attach metadata for identifying pre burst load.
+    for s in samples:
+      s.metadata['ycsb_burst_multiplier'] = 1
+
+    self.burst_time_offset_sec = FLAGS.ycsb_timelimit
 
     if _BURST_LOAD_MULTIPLIER.value == -1:
       run_params.pop('target')  # Set to unlimited
     else:
       run_params['target'] = initial_qps * _BURST_LOAD_MULTIPLIER.value
     self._SetRunParameters(run_params)
-    samples += list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
-    return samples
+    burst_samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
+    for s in burst_samples:
+      s.metadata['ycsb_burst_multiplier'] = _BURST_LOAD_MULTIPLIER.value
+
+    return samples + burst_samples
 
   def _GetIncrementalQpsTargets(self, target_qps: int) -> list[int]:
     """Returns incremental QPS targets."""

@@ -134,8 +134,13 @@ class LinuxBootTest(pkb_common_test_case.PkbCommonTestCase,
     with open(os.path.join(self.data_dir, 'boot.output')) as f:
       boot_output = f.read()
     # Load tcpdump output, which contains egress timestamps.
-    vm_util.PrependTempDir = mock.Mock(
-        return_value=os.path.join(self.data_dir, 'tcpdump.output'))
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'PrependTempDir',
+            return_value=os.path.join(self.data_dir, 'tcpdump.output'),
+        )
+    )
     self.mock_vm.RemoteCommand = mock.Mock(return_value=(boot_output, ''))
     self.mock_vm.internal_ip = '10.128.0.11'
     # Compare golden samples with calculated egress/ingress samples.

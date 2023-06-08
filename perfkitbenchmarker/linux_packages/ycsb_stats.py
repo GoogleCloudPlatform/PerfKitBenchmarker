@@ -15,7 +15,7 @@
 
 import bisect
 import collections
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 import copy
 import csv
 import dataclasses
@@ -33,6 +33,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
@@ -60,6 +61,7 @@ YCSB_MEASUREMENT_TYPES = [HISTOGRAM, HDRHISTOGRAM, TIMESERIES]
 # Statistics with operator 'None' will be dropped.
 AGGREGATE_OPERATORS = {
     'Operations': operator.add,
+    'Count': operator.add,
     'RunTime(ms)': max,
     'Return=0': operator.add,
     'Return=-1': operator.add,
@@ -75,10 +77,19 @@ AGGREGATE_OPERATORS = {
     '99thPercentileLatency(ms)': None,  # Calculated across clients.
     'MinLatency(ms)': min,
     'MaxLatency(ms)': max,
+    'Max': max,
+    'Min': min,
 }
 
+_STATUS_LATENCIES = [
+    'Avg',
+    'Max',
+    'Min',
+]
+
 # Status line pattern
-_STATUS_PATTERN = r'(\d+) sec: \d+ operations; (\d+.\d+) current ops\/sec'
+_STATUS_PATTERN = r'(\d+) sec: \d+ operations; (\d+(\.\d+)?) current ops\/sec'
+_STATUS_GROUPS_PATTERN = r'\[(.+?): (.+?)\]'
 # Status interval default is 10 sec, change to 1 sec.
 _STATUS_INTERVAL_SEC = 1
 
@@ -97,14 +108,25 @@ _ThroughputTimeSeries = dict[int, float]
 _HdrHistogramTuple = tuple[float, float, int]
 
 
+def _IsStatusLatencyStatistic(stat_name: str) -> bool:
+  """Returns whether a name is a latency statistic (i.e. "99.9")."""
+  return (
+      stat_name.replace('.', '', 1).isdigit() or stat_name in _STATUS_LATENCIES
+  )
+
+
 @dataclasses.dataclass
 class _OpResult:
   """Individual results for a single operation.
 
+  YCSB results are either aggregated per operation (read/update) at the end of
+  the run or output on a per-interval (i.e. second) basis during the run.
+
   Attributes:
-    group: group name (e.g., update, insert, overall)
-    statistics: dict mapping from statistic name to value
-    data_type: Corresponds to --ycsb_measurement_type.
+    group: group name (e.g. update, insert, overall)
+    statistics: dict mapping from statistic name to value (e.g. {'Count': 33})
+    data_type: Corresponds to --ycsb_measurement_type (e.g. histogram,
+      hdrhistogram, or timeseries).
     data: For HISTOGRAM/HDRHISTOGRAM: list of (ms_lower_bound, count) tuples,
       e.g. [(0, 530), (19, 1)] indicates that 530 ops took between 0ms and 1ms,
       and 1 took between 19ms and 20ms. Empty bins are not reported. For
@@ -116,6 +138,100 @@ class _OpResult:
   data: list[tuple[int, float]] = dataclasses.field(default_factory=list)
   statistics: dict[str, float] = dataclasses.field(default_factory=dict)
 
+  @classmethod
+  def FromSummaryLines(
+      cls, lines: Iterable[str], operation: str, data_type: str
+  ) -> '_OpResult':
+    """Returns an _OpResult parsed from YCSB summary lines.
+
+    Example format:
+      [UPDATE], Operations, 2468054
+      [UPDATE], AverageLatency(us), 2218.8513395574005
+      [UPDATE], MinLatency(us), 554
+      [UPDATE], MaxLatency(us), 352634
+      [UPDATE], 95thPercentileLatency(ms), 4
+      [UPDATE], 99thPercentileLatency(ms), 7
+      [UPDATE], Return=0, 2468054
+
+    Args:
+      lines: An iterable of lines parsed from the YCSB summary, groouped by
+        operation type.
+      operation: The operation type that corresponds to `lines`.
+      data_type: Corresponds to --ycsb_measurement_type.
+
+    Returns:
+      An _OpResult with the parsed data.
+    """
+    result = cls(group=operation, data_type=data_type)
+    latency_unit = 'ms'
+    for _, name, val in lines:
+      name = name.strip()
+      val = val.strip()
+      # Drop ">" from ">1000"
+      if name.startswith('>'):
+        name = name[1:]
+      val = float(val) if '.' in val or 'nan' in val.lower() else int(val)
+      if name.isdigit():
+        if val:
+          if data_type == TIMESERIES and latency_unit == 'us':
+            val /= 1000.0
+          result.data.append((int(name), val))
+      else:
+        if '(us)' in name:
+          name = name.replace('(us)', '(ms)')
+          val /= 1000.0
+          latency_unit = 'us'
+        result.statistics[name] = val
+    return result
+
+  @classmethod
+  def FromStatusLine(cls, match: re.Match[str]) -> '_OpResult':
+    """Returns an _OpResult from a _STATUS_GROUPS_PATTERN match.
+
+    Example format:
+    [READ: Count=33, Max=11487, Min=2658, Avg=4987.36,
+    90=8271, 99=11487, 99.9=11487, 99.99=11487]
+
+    Args:
+      match: Match object that matches _STATUS_GROUPS_PATTERN.
+
+    Returns:
+      An _OpResult object with group and statistics.
+    """
+    operation_name = match.group(1).lower()
+    statistics = {}
+    for pair in match.group(2).split(', '):
+      k, v = pair.split('=')
+      # Sometimes output can look like "Avg=".
+      v = 0 if not v else float(v)
+      if _IsStatusLatencyStatistic(k):
+        v /= 1000.0
+      statistics[k] = float(v)
+    return cls(group=operation_name, statistics=statistics)
+
+
+@dataclasses.dataclass
+class _StatusResult:
+  """Represents YCSB results at a given timestamp.
+
+  Example format:
+
+  254 sec: 6149469 operations; 5897 current ops/sec; est completion in 11 hours
+  24 minutes [READ: Count=5887, Max=4259839, Min=2514, Avg=63504.23, 90=3863,
+  99=3848191, 99.9=4161535, 99.99=4243455] [READ-FAILED: Count=11, Max=4040703,
+  Min=3696640, Avg=3836369.45, 90=4005887, 99=4040703, 99.9=4040703,
+  99.99=4040703]
+
+   Attributes:
+     timestamp: The time (in seconds) since the start of the test.
+     overall_throughput: Average QPS.
+     op_results: list of _OpResult.
+  """
+
+  timestamp: int
+  overall_throughput: float
+  op_results: list[_OpResult] = dataclasses.field(default_factory=list)
+
 
 @dataclasses.dataclass
 class YcsbResult:
@@ -124,16 +240,74 @@ class YcsbResult:
   Attributes:
     client: Contains YCSB version information.
     command_line: Command line executed.
-    throughput_time_series: Time series of throughputs (interval, QPS).
-    groups: dict of operation group name to results for that operation.
+    status_time_series: Granular time series (see _StatusResult).
+    groups: Summary dict of operation group name to results for that operation.
   """
 
   client: str = ''
   command_line: str = ''
-  throughput_time_series: _ThroughputTimeSeries = dataclasses.field(
+  status_time_series: dict[int, _StatusResult] = dataclasses.field(
       default_factory=dict
   )
   groups: dict[str, _OpResult] = dataclasses.field(default_factory=dict)
+
+  def SplitStatusTimeSeriesForSamples(
+      self,
+  ) -> dict[str, dict[str, list[tuple[int, float]]]]:
+    """Yields individual time series by operation type (i.e. read/update)."""
+    time_series_by_op_and_stat = collections.defaultdict(
+        lambda: collections.defaultdict(list)
+    )
+    status_results = sorted(self.status_time_series.items())
+    for timestamp, status_result in status_results:
+      for op_result in status_result.op_results:
+        for stat, value in op_result.statistics.items():
+          time_series_by_op_and_stat[op_result.group][stat].append(
+              (timestamp, value)
+          )
+
+    return time_series_by_op_and_stat
+
+  def _GetStatsToWrite(self) -> list[str]:
+    stats_to_write = set()
+    for _, status_result in sorted(self.status_time_series.items()):
+      for op_result in status_result.op_results:
+        stats_to_write.update(
+            [
+                stat
+                for stat in op_result.statistics.keys()
+                if _IsStatusLatencyStatistic(stat) or stat == 'Count'
+            ]
+        )
+    return list(stats_to_write)
+
+  def WriteStatusTimeSeriesToFile(self) -> None:
+    """Writes time series for each operation to separate file in tempdir."""
+    stats_to_write = ['time'] + sorted(self._GetStatsToWrite())
+    written_headers = []
+    for timestamp, status_result in sorted(self.status_time_series.items()):
+      for op_result in status_result.op_results:
+        output_file = vm_util.PrependTempDir(
+            f'ycsb_status_output_{op_result.group}.csv'
+        )
+        filtered_dict = {
+            k: v
+            for (k, v) in op_result.statistics.items()
+            if k in stats_to_write
+        }
+        filtered_dict['time'] = timestamp
+        with open(output_file, 'a+', newline='') as f:
+          writer = csv.DictWriter(f, fieldnames=stats_to_write)
+          if op_result.group not in written_headers:
+            writer.writeheader()
+            written_headers.append(op_result.group)
+          writer.writerow(filtered_dict)
+
+
+def _ParseStatusLine(line: str) -> Iterator[_OpResult]:
+  """Returns a list of _OpResults from granular YCSB status output."""
+  matches = re.finditer(_STATUS_GROUPS_PATTERN, line)
+  return (_OpResult.FromStatusLine(match) for match in matches)
 
 
 def _ValidateErrorRate(result: YcsbResult, threshold: float) -> None:
@@ -180,6 +354,7 @@ def ParseResults(
     ycsb_result_string: str,
     data_type: str = 'histogram',
     error_rate_threshold: float = 1.0,
+    timestamp_offset_sec: int = 0,
 ) -> 'YcsbResult':
   """Parse YCSB results.
 
@@ -262,6 +437,9 @@ def ParseResults(
       similarly.
     error_rate_threshold: Error statistics in the output should not exceed this
       ratio.
+    timestamp_offset_sec: The number of seconds to offset the timestamp by for
+      runs measuring the status time series. Useful for if there are multiple
+      runs back-to-back.
 
   Returns:
     A YcsbResult object that contains the results from parsing YCSB output.
@@ -281,7 +459,7 @@ def ParseResults(
   lines = []
   client_string = 'YCSB'
   command_line = 'unknown'
-  throughput_time_series = {}
+  status_time_series = {}
   fp = io.StringIO(ycsb_result_string)
   result_string = next(fp).strip()
 
@@ -297,9 +475,12 @@ def ParseResults(
     match = re.search(_STATUS_PATTERN, result_string)
     if match is not None:
       timestamp, qps = int(match.group(1)), float(match.group(2))
+      timestamp += timestamp_offset_sec
       # Repeats in the printed status are erroneous, ignore.
-      if timestamp not in throughput_time_series:
-        throughput_time_series[timestamp] = qps
+      if timestamp not in status_time_series:
+        status_time_series[timestamp] = _StatusResult(
+            timestamp, qps, list(_ParseStatusLine(result_string))
+        )
     try:
       result_string = next(fp).strip()
     except StopIteration:
@@ -328,37 +509,16 @@ def ParseResults(
   result = YcsbResult(
       client=client_string,
       command_line=command_line,
-      throughput_time_series=throughput_time_series,
+      status_time_series=status_time_series,
   )
 
   for operation, lines in by_operation:
     operation = operation[1:-1].lower()
-
     if operation == 'cleanup':
       continue
-
-    op_result = _OpResult(group=operation, data_type=data_type)
-    latency_unit = 'ms'
-    for _, name, val in lines:
-      name = name.strip()
-      val = val.strip()
-      # Drop ">" from ">1000"
-      if name.startswith('>'):
-        name = name[1:]
-      val = float(val) if '.' in val or 'nan' in val.lower() else int(val)
-      if name.isdigit():
-        if val:
-          if data_type == TIMESERIES and latency_unit == 'us':
-            val /= 1000.0
-          op_result.data.append((int(name), val))
-      else:
-        if '(us)' in name:
-          name = name.replace('(us)', '(ms)')
-          val /= 1000.0
-          latency_unit = 'us'
-        op_result.statistics[name] = val
-
-    result.groups[operation] = op_result
+    result.groups[operation] = _OpResult.FromSummaryLines(
+        lines, operation, data_type
+    )
   _ValidateErrorRate(result, error_rate_threshold)
   return result
 
@@ -592,10 +752,79 @@ def CombineResults(
       combined_weights[timestamp] += 1.0
     return result
 
-  def _CombineThroughputTimeSeries(
-      series1: _ThroughputTimeSeries, series2: _ThroughputTimeSeries
-  ) -> _ThroughputTimeSeries:
-    """Returns a combined dict of [timestamp, total QPS] from the two series."""
+  def _CombineStatistics(result1: _OpResult, result2: _OpResult) -> _OpResult:
+    """Combines reported statistics.
+
+    If no combining operator is defined, the statistic is skipped.
+    Otherwise, the aggregated value is either:
+    * The value in 'indiv', if the statistic is not present in 'result' or
+    * AGGREGATE_OPERATORS[statistic](result_value, indiv_value)
+
+    Args:
+      result1: First _OpResult to combine.
+      result2: Second _OpResult to combine.
+
+    Returns:
+      A combined _OpResult.
+    """
+    combined = copy.deepcopy(result1)
+    for k, v in result2.statistics.items():
+      # Numeric keys are latencies
+      if k not in AGGREGATE_OPERATORS and not _IsStatusLatencyStatistic(k):
+        continue
+      # Drop if not an aggregated statistic.
+      elif not _IsStatusLatencyStatistic(k) and AGGREGATE_OPERATORS[k] is None:
+        combined.statistics.pop(k, None)
+        continue
+      # Copy over if not already in aggregate.
+      elif k not in combined.statistics:
+        combined.statistics[k] = copy.deepcopy(v)
+        continue
+
+      # Different cases for average latency and numeric latency when reporting a
+      # status time series. Provide the average of percentile latencies since we
+      # can't accurately calculate it.
+      if k == 'Avg':
+        s1, s2 = result1.statistics, result2.statistics
+        count = s1['Count'] + s2['Count']
+        new_avg = (
+            (s2['Count'] * s2['Avg'] + s1['Count'] * s1['Avg']) / count
+            if count
+            else 0
+        )
+        combined.statistics['Avg'] = new_avg
+        continue
+      # Cases where the stat is a latency i.e. 99, 99.9, 99.99.
+      elif k.replace('.', '', 1).isdigit():
+        s1, s2 = result1.statistics, result2.statistics
+        new_avg = (s1[k] + s2[k]) / 2
+        combined.statistics[k] = new_avg
+        continue
+
+      op = AGGREGATE_OPERATORS[k]
+      combined.statistics[k] = op(combined.statistics[k], v)
+    return combined
+
+  def _CombineOpResultLists(
+      list1: Iterable[_OpResult], list2: Iterable[_OpResult]
+  ) -> list[_OpResult]:
+    """Combines two lists of _OpResult into a single list."""
+    list1_by_operation = {result.group: result for result in list1}
+    list2_by_operation = {result.group: result for result in list2}
+    result = copy.deepcopy(list1_by_operation)
+    for operation in list2_by_operation:
+      if operation not in result:
+        result[operation] = copy.deepcopy(list2_by_operation[operation])
+      else:
+        result[operation] = _CombineStatistics(
+            result[operation], list2_by_operation[operation]
+        )
+    return list(result.values())
+
+  def _CombineStatusTimeSeries(
+      series1: Mapping[int, _StatusResult], series2: Mapping[int, _StatusResult]
+  ) -> dict[int, _StatusResult]:
+    """Returns a combined dict of [timestamp, result] from the two series."""
     timestamps1 = set(series1)
     timestamps2 = set(series2)
     all_timestamps = timestamps1 | timestamps2
@@ -610,7 +839,18 @@ def CombineResults(
       )
     result = {}
     for timestamp in all_timestamps:
-      result[timestamp] = series1.get(timestamp, 0) + series2.get(timestamp, 0)
+      combined_status_result = _StatusResult(timestamp, 0)
+      status1 = series1.get(timestamp, _StatusResult(timestamp, 0))
+      status2 = series2.get(timestamp, _StatusResult(timestamp, 0))
+      # Add overall throughputs
+      combined_status_result.overall_throughput = (
+          status1.overall_throughput + status2.overall_throughput
+      )
+      # Combine statistics via operators.
+      combined_status_result.op_results = _CombineOpResultLists(
+          status1.op_results, status2.op_results
+      )
+      result[timestamp] = combined_status_result
     return result
 
   result_list = list(result_list)
@@ -665,10 +905,8 @@ def CombineResults(
         )
     result.client = ' '.join((result.client, indiv.client))
     result.command_line = ';'.join((result.command_line, indiv.command_line))
-
-    # if _THROUGHPUT_TIME_SERIES.value:
-    result.throughput_time_series = _CombineThroughputTimeSeries(
-        result.throughput_time_series, indiv.throughput_time_series
+    result.status_time_series = _CombineStatusTimeSeries(
+        result.status_time_series, indiv.status_time_series
     )
 
   if measurement_type == HDRHISTOGRAM:
@@ -767,14 +1005,21 @@ def CreateSamples(
     base_metadata['command_line'] = command_line
   base_metadata.update(kwargs)
 
-  throughput_time_series = ycsb_result.throughput_time_series
-  if throughput_time_series:
-    yield sample.Sample(
-        'Throughput Time Series',
-        0,
-        '',
-        {'throughput_time_series': sorted(throughput_time_series.items())},
-    )
+  if ycsb_result.status_time_series:
+    for (
+        operation,
+        time_series_by_stat,
+    ) in ycsb_result.SplitStatusTimeSeriesForSamples().items():
+      for stat, time_series in time_series_by_stat.items():
+        timestamps, values = zip(*time_series)
+        yield sample.CreateTimeSeriesSample(
+            values=values,
+            timestamps=timestamps,
+            metric=f'{operation} {stat} time series',
+            units='ms' if _IsStatusLatencyStatistic(stat) else 'ops/sec',
+            interval=1.0,
+        )
+    ycsb_result.WriteStatusTimeSeriesToFile()
 
   for group_name, group in ycsb_result.groups.items():
     meta = base_metadata.copy()
