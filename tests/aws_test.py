@@ -378,6 +378,15 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
           ),
           'expected_error': errors.Resource.CreationInternalError,
       },
+      {
+          'testcase_name': 'instance_invalid_keypair_notfound_error',
+          'stderr': (
+              'An error occurred (InvalidKeyPair.NotFound) when calling the '
+              'RunInstances operation: The key pair "perfkit-key-test_run_uri" '
+              'does not exist'
+          ),
+          'expected_error': errors.Benchmarks.KnownIntermittentError,
+      }
   )
   def testVMCreationError(self, stderr, expected_error):
     vm_util.IssueCommand.side_effect = [(None, stderr, None)]
