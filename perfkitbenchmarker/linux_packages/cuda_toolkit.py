@@ -298,8 +298,8 @@ def _InstallCuda10Point2(vm):
 def _DownloadCuda(vm, toolkit_fmt):
   toolkit = toolkit_fmt.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm))
   basename = posixpath.basename(toolkit)
-  vm.RemoteCommand(f'wget --tries=3 {toolkit}')
-  vm.RemoteCommand(f'sudo apt -o DPkg::Lock::Timeout=60 install ./{basename}')
+  vm.RemoteCommand(f'wget --tries=10 {toolkit}')
+  vm.InstallPackages(f'./{basename}')
 
 
 def _InstallCuda12Generic(vm, toolkit_fmt, version_dash):

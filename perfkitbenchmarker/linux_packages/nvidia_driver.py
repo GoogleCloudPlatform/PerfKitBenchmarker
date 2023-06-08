@@ -475,11 +475,11 @@ def Install(vm):
   tokens = re.split('/', location)
   filename = tokens[-1]
   vm.RemoteCommand(
-      'wget --tries=3 {location} && chmod 755 {filename} '.format(
+      'wget --tries=10 {location} && chmod 755 {filename} '.format(
           location=location, filename=filename
       )
   )
-  vm.RemoteCommand(
+  vm.RobustRemoteCommand(
       'sudo ./{filename} -q -x-module-path={x_module_path} '
       '--ui=none -x-library-path={x_library_path}'.format(
           filename=filename,
