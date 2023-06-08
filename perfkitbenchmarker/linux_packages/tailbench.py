@@ -65,7 +65,7 @@ JDK_PATH=/usr/lib/jvm/java-8-openjdk-amd64
 HEADER_LINES = 3
 
 
-class _TestResult():
+class _TestResult:
 
   def __init__(self, values: List[float], name: str, subname: str):
     self.histogram: sample._Histogram = sample.MakeHistogram(values, 0.95, 2)
@@ -77,16 +77,17 @@ def Install(vm):
   """Installs the tailbench dependencies and sets up the package on the VM."""
   # TODO(user): Rework all of this to use vm.Install to make more robust
   vm.InstallPackages(
-      'libopencv-dev autoconf ant libtcmalloc-minimal4 swig google-perftools '
-      'bzip2 libnuma-dev libjemalloc-dev libgoogle-perftools-dev '
-      'libdb5.3++-dev libmysqld-dev libaio-dev uuid-dev libbz2-dev '
-      'python-numpy python-scipy libgtop2-dev make g++ zlib1g-dev pkg-config '
-      'pocketsphinx libboost-all-dev'
+      'libopencv-dev autoconf ant libtcmalloc-minimal4 swig google-perftools'
+      ' bzip2 libnuma-dev libjemalloc-dev libgoogle-perftools-dev'
+      ' libdb5.3++-dev libmysqlclient-dev libaio-dev uuid-dev libbz2-dev'
+      ' python-numpy python3-scipy libgtop2-dev make g++ zlib1g-dev pkg-config'
+      ' pocketsphinx libboost-all-dev'
   )
   vm.Install('openjdk')
 
-  vm.InstallPreprovisionedPackageData(PACKAGE_NAME,
-                                      PREPROVISIONED_DATA.keys(), INSTALL_DIR)
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), INSTALL_DIR
+  )
 
   vm.RemoteCommand(f'cd {INSTALL_DIR} && tar xf {TAILBENCH_TAR}')
   vm.RemoteCommand(f'cd {INSTALL_DIR} && tar xf {TAILBENCH_INPUT_TAR}')
@@ -100,10 +101,19 @@ def PrepareTailBench(vm):
   Args:
     vm: The VM in which we are setting up the TailBench config.
   """
-  vm.RemoteCommand(f'echo "{CONFIGS_SH_CONTENTS}" > '
-                   f'"{INSTALL_DIR}"/{TAILBENCH}/configs.sh')
-  vm.RemoteCommand(f'echo "{MAKEFILE_CONFIG_CONTENTS}" > '
-                   f'"{INSTALL_DIR}"/{TAILBENCH}/Makefile.config')
+  vm.RemoteCommand(
+      f'echo "{CONFIGS_SH_CONTENTS}" > "{INSTALL_DIR}"/{TAILBENCH}/configs.sh'
+  )
+  vm.RemoteCommand(
+      f'echo "{MAKEFILE_CONFIG_CONTENTS}" > '
+      f'"{INSTALL_DIR}"/{TAILBENCH}/Makefile.config'
+  )
+  vm.PushDataFile(
+      'tailbench.patch', f'{INSTALL_DIR}/{TAILBENCH}/tailbench.patch'
+  )
+  vm.RemoteCommand(
+      f'cd {INSTALL_DIR}/{TAILBENCH} && patch -l -p1 < tailbench.patch'
+  )
 
 
 def _ParseResultsFile(input_file, name='') -> List[_TestResult]:
@@ -180,7 +190,7 @@ def RunTailbench(vm, tailbench_tests):
     vm.RemoteCommand(f'cd {INSTALL_DIR}/{TAILBENCH}/{test} && sudo ./run.sh')
     vm.RemoteCommand(
         f'cd {INSTALL_DIR} && '
-        f'sudo python2 {INSTALL_DIR}/{TAILBENCH}/utilities/parselats.py '
+        f'sudo python3 {INSTALL_DIR}/{TAILBENCH}/utilities/parselats.py '
         f'{INSTALL_DIR}/{TAILBENCH}/{test}/lats.bin')
     vm.RemoteCommand(f'sudo mv {INSTALL_DIR}/lats.txt '
                      f'{INSTALL_DIR}/results/{test}.txt')

@@ -1,0 +1,60 @@
+diff --git a/img-dnn/Makefile b/img-dnn/Makefile
+index d022b0b..fce3d9e 100644
+--- a/img-dnn/Makefile
++++ b/img-dnn/Makefile
+@@ -1,6 +1,6 @@
+ CXX = g++
+-CXXFLAGS += -g -O3 $(shell pkg-config --cflags opencv) -std=c++0x
+-LDFLAGS = $(shell pkg-config --libs opencv)
++CXXFLAGS += -g -O3 $(shell pkg-config --cflags opencv4) -std=c++0x
++LDFLAGS = $(shell pkg-config --libs opencv4)
+ 
+ TBENCH_PATH = ../harness
+ TBENCH_SERVER_OBJ = $(TBENCH_PATH)/tbench_server_networked.o
+diff --git a/img-dnn/img-dnn.cpp b/img-dnn/img-dnn.cpp
+index bcb66ce..8d120a6 100644
+--- a/img-dnn/img-dnn.cpp
++++ b/img-dnn/img-dnn.cpp
+@@ -11,6 +11,7 @@
+ #include "tbench_server.h"
+ 
+ #include "opencv2/core/core.hpp"
++#include <opencv2/core/core_c.h>
+ #include "opencv2/imgproc/imgproc.hpp"
+ #include "opencv2/highgui/highgui.hpp"
+ 
+diff --git a/img-dnn/train.cpp b/img-dnn/train.cpp
+index c1c4bc6..61327f6 100644
+--- a/img-dnn/train.cpp
++++ b/img-dnn/train.cpp
+@@ -1,5 +1,6 @@
+ #include "common.h"
+ 
++#include <opencv2/core/core_c.h>
+ #include <unistd.h>
+ 
+ #include <iostream>
+diff --git a/utilities/parselats.py b/utilities/parselats.py
+index 7bd1949..78700cb 100755
+--- a/utilities/parselats.py
++++ b/utilities/parselats.py
+@@ -9,7 +9,7 @@ class Lat(object):
+     def __init__(self, fileName):
+         f = open(fileName, 'rb')
+         a = np.fromfile(f, dtype=np.uint64)
+-        self.reqTimes = a.reshape((a.shape[0]/3, 3))
++        self.reqTimes = a.reshape((int(a.shape[0]/3), 3))
+         f.close()
+ 
+     def parseQueueTimes(self):
+@@ -41,8 +41,8 @@ if __name__ == '__main__':
+         f.close()
+         p95 = stats.scoreatpercentile(sjrnTimes, 95)
+         maxLat = max(sjrnTimes)
+-        print "95th percentile latency %.3f ms | max latency %.3f ms" \
+-                % (p95, maxLat)
++        print("95th percentile latency %.3f ms | max latency %.3f ms" \
++              % (p95, maxLat))
+ 
+     latsFile = sys.argv[1]
+     getLatPct(latsFile)
