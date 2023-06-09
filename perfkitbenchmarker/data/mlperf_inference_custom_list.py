@@ -56,7 +56,7 @@ def gpu(
   )
 
 CloudT4 = gpu("Tesla T4", 15, 70.0, "0x1EB810DE", 75)
-CloudL4 = gpu("Tesla L4", 22, 75.0, "0x27B810DE", 89)
+CloudL4 = gpu("NVIDIA L4", 22, 72.0, "0x27B810DE", 89)
 A10G = gpu("NVIDIA A10G", 22, 300.0, "0x223710DE", 86)
 A10 = gpu("NVIDIA A10-4Q", 24, None, "0x223610DE", 86)
 
