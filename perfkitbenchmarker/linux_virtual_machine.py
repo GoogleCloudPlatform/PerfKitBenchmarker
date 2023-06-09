@@ -190,6 +190,14 @@ flags.DEFINE_boolean('disable_smt', False,
                      'Whether to disable SMT (Simultaneous Multithreading) '
                      'in BIOS.')
 
+flags.DEFINE_boolean(
+    'use_numcpu_multi_files',
+    False,
+    'Whether to use /sys/fs/cgroup/cpuset.cpus.effective, '
+    '/dev/cgroup/cpuset.cpus.effective, /proc/self/status, '
+    '/proc/cpuinfo to extract the number of CPUs.',
+)
+
 _DISABLE_YUM_CRON = flags.DEFINE_boolean(
     'disable_yum_cron', True, 'Whether to disable the cron-run yum service.')
 _KERNEL_MODULES_TO_ADD = flags.DEFINE_list(
@@ -1385,11 +1393,100 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     drop_caches_command = 'sudo /sbin/sysctl vm.drop_caches=3'
     self.RemoteCommand(drop_caches_command)
 
+  def _ParseNumCpus(self, cpu_list: str) -> int:
+    """Parses the cpu list string and returns the number of CPUs.
+
+    Args:
+      cpu_list: The CPU list string, e.g. 1-2,4-5
+
+    Returns:
+      The number of logical CPUs.
+      For the example with input '1-2,4-5', it returns 4.
+    """
+    if ',' in cpu_list:
+      num_cpus = 0
+      for sub_cpu_list in cpu_list.split(','):
+        num_cpus += self._ParseNumCpus(sub_cpu_list)
+      return num_cpus
+
+    if '-' in cpu_list:
+      lhs, rhs = cpu_list.split('-')
+      try:
+        lhs = int(lhs)
+        rhs = int(rhs)
+      except ValueError as exc:
+        raise ValueError(f'Invalid CPU range: [{cpu_list}]') from exc
+      if lhs > rhs:
+        raise ValueError(f'Invalid range found while parsing: [{lhs}-{rhs}]')
+
+      return rhs - lhs + 1
+
+    try:
+      int(cpu_list)
+    except ValueError as exc:
+      raise ValueError(f'Invalid cpu specified: [{cpu_list}]') from exc
+
+    return 1
+
+  def _RemoteFileExists(self, file_path: str) -> bool:
+    """Returns true if the file exists on the VM."""
+    stdout, _ = self.RemoteCommand(
+        f'ls {file_path} >> /dev/null 2>&1 || echo file_not_exist'
+    )
+    return not stdout
+
+  def _GetNumCpusFromMultiFiles(self):
+    """Extracts the number of logical CPUs from multiple files.
+
+    Extracts the number of CPUs from /sys/fs/cgroup/cpuset.cpus.effective,
+    /dev/cgroup/cpuset.cpus.effective, /proc/self/status, or /proc/cpuinfo.
+    Below are the example of their returns:
+    $ cat XX/cpuset.cpus.effective :
+          0-23
+    $ cat /proc/self/status | grep Cpus_allowed_list :
+          Cpus_allowed_list:    0-23
+    $ cat /proc/cpuinfo | grep processor | wc -l :
+          24
+
+    Returns:
+      The number of logical CPUs.
+    """
+
+    if self._RemoteFileExists('/sys/fs/cgroup/cpuset.cpus.effective'):
+      stdout, _ = self.RemoteCommand('cat /sys/fs/cgroup/cpuset.cpus.effective')
+      return self._ParseNumCpus(stdout)
+    elif self._RemoteFileExists('/proc/self/status'):
+      stdout, _ = self.RemoteCommand(
+          'cat /proc/self/status | grep Cpus_allowed_list'
+      )
+      return self._ParseNumCpus(stdout.split(':\t')[-1])
+    elif self._RemoteFileExists('/proc/cpuinfo'):
+      stdout, _ = self.RemoteCommand(
+          'cat /proc/cpuinfo | grep processor | wc -l'
+      )
+      try:
+        int(stdout)
+      except ValueError as exc:
+        raise ValueError(f'Invalid cpu specified: [{stdout}]') from exc
+      return int(stdout)
+
+    raise ValueError(
+        '_GetNumCpus failed, '
+        'cannot read /sys/fs/cgroup/cpuset.cpus.effective, '
+        '/dev/cgroup/cpuset.cpus.effective, /proc/self/status, /proc/cpuinfo.'
+    )
+
   def _GetNumCpus(self):
     """Returns the number of logical CPUs on the VM.
 
+    If the flag `use_numcpu_multi_files` is true,
+    call _GetNumCpusFromMultiFiles function to get the number of CPUs.
+    Otherwise, extracts the value from `/proc/cpuinfo` file.
     This method does not cache results (unlike "num_cpus").
     """
+    if FLAGS.use_numcpu_multi_files:
+      return self._GetNumCpusFromMultiFiles()
+
     stdout, _ = self.RemoteCommand(
         'cat /proc/cpuinfo | grep processor | wc -l')
     return int(stdout)

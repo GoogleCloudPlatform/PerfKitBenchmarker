@@ -558,8 +558,12 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   )
   def testNumCpusForBenchmarkNoSmt(self, vcpus, kernel_command_line,
                                    expected_num_cpus):
+    FLAGS['use_numcpu_multi_files'].parse(True)
     responses = {
-        'cat /proc/cpuinfo | grep processor | wc -l': str(vcpus),
+        'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
+            ''
+        ),
+        'cat /sys/fs/cgroup/cpuset.cpus.effective': f'0-{vcpus-1}',
         'cat /proc/cmdline': kernel_command_line,
     }
     vm = self.CreateVm(responses)
@@ -567,12 +571,60 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testNumCpusForBenchmarkDefaultCall(self):
     # shows that IsSmtEnabled is not called unless new optional parameter used
-    vm = self.CreateVm('32')
+    FLAGS['use_numcpu_multi_files'].parse(True)
+    responses = {
+        'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
+            ''
+        ),
+        'cat /sys/fs/cgroup/cpuset.cpus.effective': '0-31',
+    }
+    vm = self.CreateVm(responses)
     vm.IsSmtEnabled = mock.Mock()
     self.assertEqual(32, vm.NumCpusForBenchmark())
     vm.IsSmtEnabled.assert_not_called()
     self.assertEqual(32, vm.NumCpusForBenchmark(False))
     vm.IsSmtEnabled.assert_not_called()
+
+  def testNumCpusFromDifferentSources(self):
+    # Shows the extraction of number of CPUs from different sources.
+    FLAGS['use_numcpu_multi_files'].parse(True)
+    responses = {
+        'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
+            ''
+        ),
+        'cat /sys/fs/cgroup/cpuset.cpus.effective': '0-15,17-32',
+    }
+    vm = self.CreateVm(responses)
+    self.assertEqual(32, vm.NumCpusForBenchmark())
+    responses = {
+        'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
+            'file_not_exist'
+        ),
+        'ls /dev/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
+            'file_not_exist'
+        ),
+        'ls /proc/self/status >> /dev/null 2>&1 || echo file_not_exist': '',
+        'cat /proc/self/status | grep Cpus_allowed_list': (
+            'Cpus_allowed_list:\t0-3,7-8'
+        ),
+    }
+    vm = self.CreateVm(responses)
+    self.assertEqual(6, vm.NumCpusForBenchmark())
+    responses = {
+        'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
+            'file_not_exist'
+        ),
+        'ls /dev/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
+            'file_not_exist'
+        ),
+        'ls /proc/self/status >> /dev/null 2>&1 || echo file_not_exist': (
+            'file_not_exist'
+        ),
+        'ls /proc/cpuinfo >> /dev/null 2>&1 || echo file_not_exist': '',
+        'cat /proc/cpuinfo | grep processor | wc -l': '16',
+    }
+    vm = self.CreateVm(responses)
+    self.assertEqual(16, vm.NumCpusForBenchmark())
 
   def testBoot(self):
     vm = self.CreateVm(self.normal_boot_responses)
