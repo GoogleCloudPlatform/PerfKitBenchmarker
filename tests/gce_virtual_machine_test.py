@@ -832,6 +832,14 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
               ('ERROR: (gcloud.compute.instances.create) Could not fetch'
                'resource:\n - The service is currently unavailable.'),
           'expected_error': errors.Benchmarks.KnownIntermittentError
+      }, {
+          'testcase_name':
+              'duplicate_create_request',
+          'fake_stderr':
+              ('ERROR: (gcloud.compute.instances.create) HTTPError 409: '
+               'The resource "projects/control-plane-tests/zones/europe-west6-b/'
+               'instances/pkb-5b778a551293-0" already exists'),
+          'expected_error': errors.Benchmarks.KnownIntermittentError
       })
   def testCreateVMErrorCases(self, fake_stderr, expected_error):
     fake_rets = [('stdout', fake_stderr, 1)]

@@ -889,6 +889,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if 'The service is currently unavailable' in stderr:
         raise errors.Benchmarks.KnownIntermittentError(stderr)
+      # The initial request failed, prompting a retry, but the instance was
+      # still successfully created, which results in
+      # '409: The resource X already exists'
+      if '(gcloud.compute.instances.create) HTTPError 409' in stderr:
+        raise errors.Benchmarks.KnownIntermittentError(stderr)
       raise errors.Resource.CreationError(
           f'Failed to create VM {self.name}:\n{stderr}\nreturn code: {retcode}'
       )
