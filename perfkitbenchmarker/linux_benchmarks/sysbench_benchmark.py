@@ -44,41 +44,65 @@ FLAGS = flags.FLAGS
 # are set to provide a quick way to verify functionality is working.
 # A broader set covering different permuations on much larger data sets
 # is prefereable for comparison.
-flags.DEFINE_string('sysbench_testname', 'oltp_read_write',
-                    'The built in oltp lua script to run')
-flags.DEFINE_integer('sysbench_tables', 4,
-                     'The number of tables used in sysbench oltp.lua tests')
-flags.DEFINE_integer('sysbench_table_size', 100000,
-                     'The number of rows of each table used in the oltp tests')
-flags.DEFINE_integer('sysbench_scale', 100,
-                     'Scale parameter as used by TPCC benchmark.')
-flags.DEFINE_integer('sysbench_warmup_seconds', 10,
-                     'The duration of the warmup run in which results are '
-                     'discarded, in seconds.')
-flags.DEFINE_integer('sysbench_run_seconds', 10,
-                     'The duration of the actual run in which results are '
-                     'collected, in seconds.')
+flags.DEFINE_string(
+    'sysbench_testname',
+    'oltp_read_write',
+    'The built in oltp lua script to run',
+)
+flags.DEFINE_integer(
+    'sysbench_tables', 4, 'The number of tables used in sysbench oltp.lua tests'
+)
+flags.DEFINE_integer(
+    'sysbench_table_size',
+    100000,
+    'The number of rows of each table used in the oltp tests',
+)
+flags.DEFINE_integer(
+    'sysbench_scale', 100, 'Scale parameter as used by TPCC benchmark.'
+)
+flags.DEFINE_integer(
+    'sysbench_warmup_seconds',
+    10,
+    'The duration of the warmup run in which results are '
+    'discarded, in seconds.',
+)
+flags.DEFINE_integer(
+    'sysbench_run_seconds',
+    10,
+    'The duration of the actual run in which results are '
+    'collected, in seconds.',
+)
 flag_util.DEFINE_integerlist(
     'sysbench_thread_counts',
     flag_util.IntegerList([64]),
     'array of thread counts passed to sysbench, one at a time',
-    module_name=__name__)
-flags.DEFINE_integer('sysbench_latency_percentile', 100,
-                     'The latency percentile we ask sysbench to compute.')
-flags.DEFINE_integer('sysbench_report_interval', 2,
-                     'The interval, in seconds, we ask sysbench to report '
-                     'results.')
-flags.DEFINE_boolean('sysbench_use_fk', True,
-                     'Use foreign keys. This is used by TPCC benchmark.')
+    module_name=__name__,
+)
+flags.DEFINE_integer(
+    'sysbench_latency_percentile',
+    100,
+    'The latency percentile we ask sysbench to compute.',
+)
+flags.DEFINE_integer(
+    'sysbench_report_interval',
+    2,
+    'The interval, in seconds, we ask sysbench to report results.',
+)
+flags.DEFINE_boolean(
+    'sysbench_use_fk', True, 'Use foreign keys. This is used by TPCC benchmark.'
+)
 _SKIP_LOAD_STAGE = flags.DEFINE_boolean(
-    'sysbench_skip_load_stage', False,
+    'sysbench_skip_load_stage',
+    False,
     'If true, skips the loading stage of the benchmark. Useful for when '
     'testing on a long-lived or static instance where the database has already '
-    'been loaded on a previous run.')
+    'been loaded on a previous run.',
+)
 
 BENCHMARK_DATA = {
-    'sysbench-tpcc.tar.gz':
-        'a116f0a6f58212b568bd339e65223eaf5ed59437503700002f016302d8a9c6ed',
+    'sysbench-tpcc.tar.gz': (
+        'a116f0a6f58212b568bd339e65223eaf5ed59437503700002f016302d8a9c6ed'
+    ),
 }
 
 SPANNER_TPCC = 'spanner-tpcc'
@@ -187,17 +211,21 @@ def _GetSysbenchConnectionParameter(client_vm_query_tools):
   connection_string = ''
   if client_vm_query_tools.ENGINE_TYPE == sql_engine_utils.MYSQL:
     connection_string = (
-        '--mysql-host={0} --mysql-user={1} --mysql-password="{2}" ').format(
-            client_vm_query_tools.connection_properties.endpoint,
-            client_vm_query_tools.connection_properties.database_username,
-            client_vm_query_tools.connection_properties.database_password)
+        '--mysql-host={0} --mysql-user={1} --mysql-password="{2}" '
+    ).format(
+        client_vm_query_tools.connection_properties.endpoint,
+        client_vm_query_tools.connection_properties.database_username,
+        client_vm_query_tools.connection_properties.database_password,
+    )
   elif client_vm_query_tools.ENGINE_TYPE == sql_engine_utils.POSTGRES:
     connection_string = (
         '--pgsql-host={0} --pgsql-user={1} --pgsql-password="{2}" '
-        '--pgsql-port=5432').format(
-            client_vm_query_tools.connection_properties.endpoint,
-            client_vm_query_tools.connection_properties.database_username,
-            client_vm_query_tools.connection_properties.database_password)
+        '--pgsql-port=5432'
+    ).format(
+        client_vm_query_tools.connection_properties.endpoint,
+        client_vm_query_tools.connection_properties.database_username,
+        client_vm_query_tools.connection_properties.database_password,
+    )
   return connection_string
 
 
@@ -216,10 +244,11 @@ def _GetCommonSysbenchOptions(db: relational_db.BaseRelationalDb):
         # Error 1205: Lock wait timeout exceeded
         # Could happen when we overload the database
         '--mysql-ignore-errors=1213,1205,1020,2013',
-        '--db-driver=mysql'
+        '--db-driver=mysql',
     ]
   elif engine_type in [
-      sql_engine_utils.POSTGRES, sql_engine_utils.SPANNER_POSTGRES
+      sql_engine_utils.POSTGRES,
+      sql_engine_utils.SPANNER_POSTGRES,
   ]:
     result += [
         '--db-driver=pgsql',
@@ -257,7 +286,8 @@ def _GetSysbenchTestParameter() -> str:
 def _InstallLuaScriptsIfNecessary(vm):
   if _GetSysbenchTestParameter() == 'tpcc':
     vm.InstallPreprovisionedBenchmarkData(
-        BENCHMARK_NAME, ['sysbench-tpcc.tar.gz'], '~')
+        BENCHMARK_NAME, ['sysbench-tpcc.tar.gz'], '~'
+    )
     vm.RemoteCommand('tar -zxvf sysbench-tpcc.tar.gz')
   if FLAGS.sysbench_testname == SPANNER_TPCC:
     vm.PushDataFile('spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
@@ -266,8 +296,9 @@ def _InstallLuaScriptsIfNecessary(vm):
 
 
 def _IsValidFlag(flag):
-  return (flag in
-          _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS[FLAGS.sysbench_testname])
+  return (
+      flag in _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS[FLAGS.sysbench_testname]
+  )
 
 
 def UpdateBenchmarkSpecWithFlags(benchmark_spec):
@@ -316,7 +347,8 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   Args:
     client_vm: The client VM that will issue the sysbench test.
     benchmark_spec: The benchmark specification. Contains all data that is
-                    required to run the benchmark.
+      required to run the benchmark.
+
   Returns:
     results: A list of results of the data loading step.
   """
@@ -340,7 +372,8 @@ def _PrepareSysbench(client_vm, benchmark_spec):
     return results
 
   stdout, stderr = db.client_vm_query_tools.IssueSqlCommand(
-      'create database sbtest;')
+      'create database sbtest;'
+  )
 
   logging.info('sbtest db created, stdout is %s, stderr is %s', stdout, stderr)
   # Provision the Sysbench test based on the input flags (load data into DB)
@@ -352,8 +385,9 @@ def _PrepareSysbench(client_vm, benchmark_spec):
   prepare_command = _GetSysbenchPrepareCommand(db)
   stdout, stderr = client_vm.RobustRemoteCommand(prepare_command)
   load_duration = time.time() - data_load_start_time
-  logging.info('It took %d seconds to finish the data loading step',
-               load_duration)
+  logging.info(
+      'It took %d seconds to finish the data loading step', load_duration
+  )
   for output in (stdout, stderr):
     if 'FATAL' in output:
       raise errors.Benchmarks.RunError(
@@ -362,11 +396,11 @@ def _PrepareSysbench(client_vm, benchmark_spec):
 
   metadata = CreateMetadataFromFlags()
 
-  results.append(sample.Sample(
-      'sysbench data load time',
-      load_duration,
-      SECONDS_UNIT,
-      metadata))
+  results.append(
+      sample.Sample(
+          'sysbench data load time', load_duration, SECONDS_UNIT, metadata
+      )
+  )
 
   return results
 
@@ -378,7 +412,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   # We would like to always cleanup server side states.
   # If we don't set this, our cleanup function will only be called when the VM
@@ -403,11 +437,12 @@ def _GetDatabaseSize(db):
   stdout = None
   if db_engine_type == sql_engine_utils.MYSQL:
     stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
-        'SELECT table_schema AS \'Database\', '
+        "SELECT table_schema AS 'Database', "
         'ROUND(SUM(data_length + index_length) / 1024 / 1024, 2) '
-        'AS \'Size (MB)\' '
+        "AS 'Size (MB)' "
         'FROM information_schema.TABLES '
-        'GROUP BY table_schema; ')
+        'GROUP BY table_schema; '
+    )
     logging.info('Query database size results: \n%s', stdout)
     # example stdout is tab delimited but shown here with spaces:
     # Database  Size (MB)
@@ -422,9 +457,8 @@ def _GetDatabaseSize(db):
 
   elif db_engine_type == sql_engine_utils.POSTGRES:
     stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
-        r'SELECT pg_database_size('
-        '\'sbtest\''
-        ')/1024/1024')
+        r'SELECT pg_database_size(' "'sbtest'" ')/1024/1024'
+    )
     size_mb = int(stdout.split()[2])
 
   # Spanner doesn't yet support pg_database_size.
@@ -436,14 +470,16 @@ def _GetDatabaseSize(db):
   return size_mb
 
 
-def _ParseSysbenchTransactions(sysbench_output,
-                               metadata) -> List[sample.Sample]:
+def _ParseSysbenchTransactions(
+    sysbench_output, metadata
+) -> List[sample.Sample]:
   """Parse sysbench transaction results."""
   transactions_per_second = regex_util.ExtractFloat(
-      r'transactions: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)',
-      sysbench_output)
+      r'transactions: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output
+  )
   queries_per_second = regex_util.ExtractFloat(
-      r'queries: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output)
+      r'queries: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output
+  )
   return [
       sample.Sample('tps', transactions_per_second, 'tps', metadata),
       sample.Sample('qps', queries_per_second, 'qps', metadata),
@@ -452,20 +488,24 @@ def _ParseSysbenchTransactions(sysbench_output,
 
 def _ParseSysbenchLatency(sysbench_output, metadata) -> List[sample.Sample]:
   """Parse sysbench latency results."""
-  min_latency = regex_util.ExtractFloat('min: *([0-9]*[.]?[0-9]+)',
-                                        sysbench_output)
+  min_latency = regex_util.ExtractFloat(
+      'min: *([0-9]*[.]?[0-9]+)', sysbench_output
+  )
 
-  average_latency = regex_util.ExtractFloat('avg: *([0-9]*[.]?[0-9]+)',
-                                            sysbench_output)
-  max_latency = regex_util.ExtractFloat('max: *([0-9]*[.]?[0-9]+)',
-                                        sysbench_output)
-  total_latency = regex_util.ExtractFloat('sum: *([0-9]*[.]?[0-9]+)',
-                                          sysbench_output)
+  average_latency = regex_util.ExtractFloat(
+      'avg: *([0-9]*[.]?[0-9]+)', sysbench_output
+  )
+  max_latency = regex_util.ExtractFloat(
+      'max: *([0-9]*[.]?[0-9]+)', sysbench_output
+  )
+  total_latency = regex_util.ExtractFloat(
+      'sum: *([0-9]*[.]?[0-9]+)', sysbench_output
+  )
   return [
       sample.Sample('min_latency', min_latency, 'ms', metadata),
       sample.Sample('average_latency', average_latency, 'ms', metadata),
       sample.Sample('max_latency', max_latency, 'ms', metadata),
-      sample.Sample('total_latency', total_latency, 'ms', metadata)
+      sample.Sample('total_latency', total_latency, 'ms', metadata),
   ]
 
 
@@ -484,7 +524,6 @@ def _ParseSysbenchTimeSeries(sysbench_output, metadata) -> List[sample.Sample]:
 
   Returns:
     Three arrays, the tps, latency and qps numbers and average latency.
-
   """
   tps_numbers = []
   latency_numbers = []
@@ -565,9 +604,9 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
     vm: The test VM to issue command to.
     duration: the duration of the sysbench run.
     benchmark_spec: The benchmark specification. Contains all data that is
-                    required to run the benchmark.
+      required to run the benchmark.
     sysbench_thread_count: count of number of threads to use in --threads
-                           parameter to sysbench.
+      parameter to sysbench.
 
   Returns:
     stdout, stderr: the result of the command.
@@ -579,21 +618,21 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
         duration, benchmark_spec.relational_db, sysbench_thread_count
     )
     stdout, stderr = vm.RobustRemoteCommand(run_cmd, timeout=duration + 60)
-    logging.info('Sysbench results: \n stdout is:\n%s\nstderr is\n%s',
-                 stdout, stderr)
+    logging.info(
+        'Sysbench results: \n stdout is:\n%s\nstderr is\n%s', stdout, stderr
+    )
 
   return stdout, stderr
 
 
-def _RunSysbench(
-    vm, metadata, benchmark_spec, sysbench_thread_count):
+def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
   """Runs the Sysbench OLTP test.
 
   Args:
     vm: The VM that will issue the sysbench test.
     metadata: The PKB metadata to be passed along to the final results.
     benchmark_spec: The benchmark specification. Contains all data that is
-                    required to run the benchmark.
+      required to run the benchmark.
     sysbench_thread_count: The number of client threads that will connect.
 
   Returns:
@@ -607,18 +646,23 @@ def _RunSysbench(
   warmup_seconds = FLAGS.sysbench_warmup_seconds
   if warmup_seconds > 0:
     logging.info('Sysbench warm-up run, duration is %d', warmup_seconds)
-    _IssueSysbenchCommand(vm, warmup_seconds, benchmark_spec,
-                          sysbench_thread_count)
+    _IssueSysbenchCommand(
+        vm, warmup_seconds, benchmark_spec, sysbench_thread_count
+    )
 
   run_seconds = FLAGS.sysbench_run_seconds
   logging.info('Sysbench real run, duration is %d', run_seconds)
-  stdout, _ = _IssueSysbenchCommand(vm, run_seconds, benchmark_spec,
-                                    sysbench_thread_count)
+  stdout, _ = _IssueSysbenchCommand(
+      vm, run_seconds, benchmark_spec, sysbench_thread_count
+  )
 
   logging.info('\n Parsing Sysbench Results...\n')
 
-  return _ParseSysbenchTimeSeries(stdout, metadata) + _ParseSysbenchLatency(
-      stdout, metadata) + _ParseSysbenchTransactions(stdout, metadata)
+  return (
+      _ParseSysbenchTimeSeries(stdout, metadata)
+      + _ParseSysbenchLatency(stdout, metadata)
+      + _ParseSysbenchTransactions(stdout, metadata)
+  )
 
 
 def Run(benchmark_spec):
@@ -626,13 +670,12 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     Results.
   """
-  logging.info('Start benchmarking, '
-               'Cloud Provider is %s.', FLAGS.cloud)
+  logging.info('Start benchmarking, Cloud Provider is %s.', FLAGS.cloud)
   results = []
   client_vm = benchmark_spec.vms[0]
   db = benchmark_spec.relational_db
@@ -652,6 +695,6 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   del benchmark_spec
