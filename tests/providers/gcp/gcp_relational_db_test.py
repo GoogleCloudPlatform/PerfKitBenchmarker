@@ -134,6 +134,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     db_disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     return {
         'engine': MYSQL,
+        'db_tier': None,
         'engine_version': '5.7',
         'run_uri': '123',
         'database_name': 'fakedbname',
@@ -299,6 +300,7 @@ class GcpPostgresRelationlDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     db_disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     return {
         'engine': POSTGRES,
+        'db_tier': None,
         'engine_version': '5.7',
         'run_uri': '123',
         'database_name': 'fakedbname',

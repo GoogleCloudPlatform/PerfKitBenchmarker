@@ -37,6 +37,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 from six.moves import range
 
+
 FLAGS = flags.FLAGS
 
 GCP_DATABASE_VERSION_MAPPING = {
@@ -44,21 +45,22 @@ GCP_DATABASE_VERSION_MAPPING = {
         '5.5': 'MYSQL_5_5',
         '5.6': 'MYSQL_5_6',
         '5.7': 'MYSQL_5_7',
-        '8.0': 'MYSQL_8_0'
+        '8.0': 'MYSQL_8_0',
+        '8.0.31': 'MYSQL_8_0_31',
     },
     sql_engine_utils.POSTGRES: {
         '9.6': 'POSTGRES_9_6',
         '10': 'POSTGRES_10',
         '11': 'POSTGRES_11',
         '12': 'POSTGRES_12',
-        '13': 'POSTGRES_13'
+        '13': 'POSTGRES_13',
     },
     sql_engine_utils.SQLSERVER: {
         '2017_Standard': 'SQLSERVER_2017_Standard',
         '2017_Enterprise': 'SQLSERVER_2017_ENTERPRISE',
         '2017_Express': 'SQLSERVER_2017_EXPRESS',
-        '2017_Web': 'SQLSERVER_2017_WEB'
-    }
+        '2017_Web': 'SQLSERVER_2017_WEB',
+    },
 }
 
 
@@ -135,7 +137,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
     cmd_string = [
         self,
-        'beta',
         'sql',
         'instances',
         'create',
@@ -182,6 +183,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       cmd_string.append('--no-backup')
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
+    cmd.use_beta_gcloud = True
 
     _, stderr, retcode = cmd.Issue(timeout=CREATION_TIMEOUT)
 

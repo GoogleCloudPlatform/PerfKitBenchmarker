@@ -345,8 +345,9 @@ class BaseRelationalDb(resource.BaseResource):
       metadata.update({
           'memory': self.spec.db_spec.memory,
       })
-    elif hasattr(self.spec.db_spec, 'tier') and (hasattr(
-        self.spec.db_spec, 'compute_units')):
+    elif hasattr(self.spec.db_spec, 'tier') and (
+        hasattr(self.spec.db_spec, 'compute_units')
+    ):
       metadata.update({
           'tier': self.spec.db_spec.tier,
       })
@@ -378,6 +379,11 @@ class BaseRelationalDb(resource.BaseResource):
     if FLAGS.db_flags:
       metadata.update({
           'db_flags': FLAGS.db_flags,
+      })
+
+    if hasattr(self.spec, 'db_tier'):
+      metadata.update({
+          'db_tier': self.spec.db_tier,
       })
 
     return metadata
