@@ -152,6 +152,9 @@ class GkeCluster(container_service.KubernetesCluster):
       # Also consider moving FLAGS.gce_ssd_interface into the vm_spec.
       result['gce_local_ssd_interface'] = gce_virtual_machine.SCSI
     result['gke_nccl_fast_socket'] = self.enable_nccl_fast_socket
+    if 'nccl' in self.nodepools:
+      result['gpu_type'] = self.nodepools['nccl'].vm_config.gpu_type
+      result['gpu_count'] = self.nodepools['nccl'].vm_config.gpu_count
     return result
 
   def _GcloudCommand(self, *args, **kwargs):
