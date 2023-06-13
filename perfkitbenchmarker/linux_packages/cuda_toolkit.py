@@ -298,7 +298,7 @@ def _InstallCuda10Point2(vm):
 def _DownloadCuda(vm, toolkit_fmt):
   toolkit = toolkit_fmt.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=_GetCpuArch(vm))
   basename = posixpath.basename(toolkit)
-  vm.RemoteCommand(f'wget --tries=10 {toolkit}')
+  vm.RemoteCommand(f'wget --tries=10 {toolkit} -O {basename}')
   vm.InstallPackages(f'./{basename}')
 
 

@@ -475,15 +475,12 @@ def Install(vm):
   tokens = re.split('/', location)
   filename = tokens[-1]
   vm.RemoteCommand(
-      'wget --tries=10 {location} && chmod 755 {filename} '.format(
-          location=location, filename=filename
-      )
+      f'wget --tries=10 {location} -O {filename} && chmod 755 {filename}'
   )
   vm.RobustRemoteCommand(
-      'sudo ./{filename} -q -x-module-path={x_module_path} '
-      '--ui=none -x-library-path={x_library_path}'.format(
-          filename=filename,
-          x_module_path=FLAGS.nvidia_driver_x_module_path,
-          x_library_path=FLAGS.nvidia_driver_x_library_path))
+      f'sudo ./{filename} -q'
+      f' -x-module-path={FLAGS.nvidia_driver_x_module_path} --ui=none'
+      f' -x-library-path={FLAGS.nvidia_driver_x_library_path}'
+  )
   if FLAGS.nvidia_driver_persistence_mode:
     EnablePersistenceMode(vm)
