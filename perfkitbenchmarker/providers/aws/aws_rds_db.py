@@ -62,28 +62,47 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
       Exception: if unknown how to create self.spec.engine.
     """
     self.all_instance_ids.append(self.instance_id)
-    cmd = util.AWS_PREFIX + [
-        'rds', 'create-db-instance',
-        '--db-instance-identifier=%s' % self.instance_id,
-        '--engine=%s' % self.spec.engine,
-        '--master-username=%s' % self.spec.database_username,
-        '--master-user-password=%s' % self.spec.database_password,
-        '--allocated-storage=%s' % self.spec.db_disk_spec.disk_size,
-        '--storage-type=%s' % self.spec.db_disk_spec.disk_type,
-        '--db-instance-class=%s' % self.spec.db_spec.machine_type,
-        '--no-auto-minor-version-upgrade',
-        '--region=%s' % self.region,
-        '--engine-version=%s' % self.spec.engine_version,
-        '--db-subnet-group-name=%s' % self.db_subnet_group_name,
-        '--vpc-security-group-ids=%s' % self.security_group_id,
-        '--availability-zone=%s' % self.spec.db_spec.zone, '--tags'
-    ] + util.MakeFormattedDefaultTags()
+    multi_az = [
+        '--no-multi-az',
+        '--availability-zone=%s' % self.spec.db_spec.zone,
+    ]
+    if self.spec.high_availability:
+      multi_az = ['--multi-az']
+
+    cmd = (
+        util.AWS_PREFIX
+        + [
+            'rds',
+            'create-db-instance',
+            '--db-instance-identifier=%s' % self.instance_id,
+            '--engine=%s' % self.spec.engine,
+        ]
+        + multi_az
+        + [
+            '--master-username=%s' % self.spec.database_username,
+            '--master-user-password=%s' % self.spec.database_password,
+            '--allocated-storage=%s' % self.spec.db_disk_spec.disk_size,
+            '--storage-type=%s' % self.spec.db_disk_spec.disk_type,
+            '--db-instance-class=%s' % self.spec.db_spec.machine_type,
+            '--no-auto-minor-version-upgrade',
+            '--region=%s' % self.region,
+            '--engine-version=%s' % self.spec.engine_version,
+            '--db-subnet-group-name=%s' % self.db_subnet_group_name,
+            '--vpc-security-group-ids=%s' % self.security_group_id,
+            '--tags',
+        ]
+        + util.MakeFormattedDefaultTags()
+    )
 
     if self.spec.engine in _SQL_SERVER_ENGINES:
       cmd = cmd + ['--license-model=license-included']
 
-    if self.spec.db_disk_spec.disk_type == aws_disk.IO1:
-      cmd.append('--iops=%s' % self.spec.db_disk_spec.iops)
+    if (
+        self.spec.db_disk_spec.disk_type == aws_disk.IO1
+        or self.spec.db_disk_spec.disk_type == aws_disk.GP3
+    ):
+      if self.spec.db_disk_spec.iops:
+        cmd.append('--iops=%s' % self.spec.db_disk_spec.iops)
 
     vm_util.IssueCommand(cmd)
 
@@ -95,20 +114,6 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
                    multi-az.
     """
     super()._PostCreate()
-    if self.spec.high_availability:
-      # When extending the database to be multi-az, the second region
-      # is picked by where the second subnet has been created.
-      cmd = util.AWS_PREFIX + [
-          'rds', 'modify-db-instance',
-          '--db-instance-identifier=%s' % self.instance_id, '--multi-az',
-          '--apply-immediately',
-          '--region=%s' % self.region
-      ]
-      vm_util.IssueCommand(cmd)
-
-      if not self._IsInstanceReady(self.instance_id, timeout=IS_READY_TIMEOUT):
-        raise Exception('Instance could not be set to ready after '
-                        'modification for high availability')
 
     self._SetPrimaryAndSecondaryZones()
     self._SetEndpoint()
