@@ -170,14 +170,22 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(mock.patch(gce_disk.__name__ + '.GceDisk'))
 
   def _CreateVm(self):
-    vm_spec = gce_virtual_machine.GceVmSpec('test_vm_spec.GCP',
-                                            machine_type='test_machine_type')
+    vm_spec = gce_virtual_machine.GceVmSpec(
+        'test_vm_spec.GCP', machine_type='test_machine_type'
+    )
     vm = gce_virtual_machine.Ubuntu2004BasedGceVirtualMachine(vm_spec)
     vm.GetNVMEDeviceInfo = mock.Mock()
+    # This is modeled after N2 with Local SSDs.
+    # TODO(user): Add tests for Confidential/M3's and C3-lssd.
     vm.GetNVMEDeviceInfo.return_value = [
         {
-            'DevicePath': '/dev/nvme1n2',
-        }
+            'ModelNumber': 'nvme_card',
+            'DevicePath': '/dev/nvme0n1',
+        },
+        {
+            'ModelNumber': 'nvme_card',
+            'DevicePath': '/dev/nvme0n2',
+        },
     ]
     return vm
 

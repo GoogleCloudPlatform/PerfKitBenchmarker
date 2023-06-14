@@ -1081,7 +1081,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           disk_number = self.local_disk_counter + 1
         elif self.ssd_interface == NVME:
           name = f'local-nvme-ssd-{self.local_disk_counter}'
-          disk_number = self.local_disk_counter + self.NVME_START_INDEX
+          # TODO(user): Apply for new Gen 3 VMs (barring M3)
+          if self.machine_type.startswith('c3'):
+            # TODO(user): Also consider removing disk_number
+            disk_number = self.local_disk_counter
+          else:  # includes N2D CVM
+            disk_number = self.local_disk_counter + self.NVME_START_INDEX
         else:
           raise errors.Error('Unknown Local SSD Interface.')
         # This is a local ssd, it does not need the regional pd flag.
@@ -1123,25 +1128,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def FindRemoteNVMEDevices(self, _, nvme_devices):
     """Find the paths for all remote NVME devices inside the VM."""
-    local_disks = []
-    if self.ssd_interface == NVME:
-      for local_disk_count in range(self.max_local_disks):
-        name, _ = self.RemoteCommand(f'find /dev/nvme*n{local_disk_count + 1}')
-        name = name.strip().split('/')[-1]
-        local_disk_name = '/dev/%s' % name
-        local_disks.append(local_disk_name)
-    # filter out local nvme devices from all nvme devices
     remote_nvme_devices = [
         device['DevicePath']
         for device in nvme_devices
-        if device['DevicePath'] not in local_disks
+        if device['ModelNumber'] == 'nvme_card-pd'
     ]
-    # if boot disk is nvme,
-    # remove the boot disk, which is the disk with the lowest index
-    if gce_disk.PdDriveIsNvme(self):
-      return sorted(remote_nvme_devices)[1:]
-    else:
-      return sorted(remote_nvme_devices)
+
+    return sorted(remote_nvme_devices)
 
   def UpdateDevicePath(self, scratch_disk, remote_nvme_devices):
     """Updates the paths for all remote NVME devices inside the VM."""
