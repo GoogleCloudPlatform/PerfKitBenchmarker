@@ -39,6 +39,7 @@ HAMMERDB_URL = 'https://github.com/TPC-Council/HammerDB/releases/download/v{0}/'
 HAMMERDB_SCRIPT = linux_hammerdb.HAMMERDB_SCRIPT
 HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION = linux_hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION
 NON_OPTIMIZED = linux_hammerdb.NON_OPTIMIZED
+MINIMUM_RECOVERY = linux_hammerdb.MINIMUM_RECOVERY
 
 # Default run timeout
 EIGHT_HOURS = 60*60*8

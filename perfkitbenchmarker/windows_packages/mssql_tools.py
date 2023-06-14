@@ -39,11 +39,13 @@ def Install(vm):
   download_path = ntpath.join(vm.temp_dir, ODBC_17_INSTALLER)
   vm.DownloadFile(ODBC_17_DOWNLOAD_LINK, download_path)
   vm.RemoteCommand(
-      f'msiexec /i {download_path} IACCEPTMSODBCSQLLICENSETERMS=YES /passive')
+      f'msiexec /i {download_path} IACCEPTMSODBCSQLLICENSETERMS=YES /passive'
+  )
 
   # Downloading and installing MSSQL.
   download_path = ntpath.join(vm.temp_dir, SQLCMD_INSTALLER)
   vm.DownloadFile(SQLCMD_DOWNLOAD_LINK, download_path)
   vm.RemoteCommand(
-      f'msiexec /i {download_path} IACCEPTMSODBCSQLLICENSETERMS=YES /passive')
-
+      f'msiexec /i {download_path} IACCEPTMSSQLCMDLNUTILSLICENSETERMS=YES'
+      ' /passive'
+  )

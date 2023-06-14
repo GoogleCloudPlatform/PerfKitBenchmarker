@@ -143,7 +143,10 @@ def GetConfig(user_config):
 
 def CheckPrerequisites(_):
   """Verifies that benchmark flags is correct."""
-  if hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value != hammerdb.NON_OPTIMIZED:
+  if hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value not in [
+      hammerdb.NON_OPTIMIZED,
+      hammerdb.MINIMUM_RECOVERY,
+  ]:
     raise errors.Setup.InvalidFlagConfigurationError(
         'Non-optimized hammerdbcli_optimized_server_configuration'
         ' is not implemented.')
@@ -166,6 +169,44 @@ def Prepare(benchmark_spec):
                        relational_db.spec.database_username, False)
 
 
+def SetMinimumRecover(relational_db):
+  """Change sql server settings to make TPM nubmers stable."""
+  # https://www.mssqltips.com/sqlservertip/4541/adjust-targetrecoverytime-to-reduce-sql-server-io-spikes/
+  relational_db.client_vm_query_tools.IssueSqlCommand(
+      'ALTER DATABASE tpcc SET TARGET_RECOVERY_TIME = 12000 SECONDS;'
+  )
+  relational_db.client_vm_query_tools.IssueSqlCommand(
+      'ALTER DATABASE tpcc SET AUTO_UPDATE_STATISTICS OFF;'
+  )
+
+  relational_db.client_vm_query_tools.IssueSqlCommand(
+      'ALTER DATABASE SCOPED CONFIGURATION SET MAXDOP = 1;'
+  )
+
+  relational_db.client_vm_query_tools.IssueSqlCommand(
+      'ALTER DATABASE [tpcc] SET DELAYED_DURABILITY = DISABLED WITH NO_WAIT;'
+  )
+
+  relational_db.client_vm_query_tools.IssueSqlCommand(
+      "ALTER DATABASE [tpcc] MODIFY FILE ( NAME = N'tpcc', SIZE = 500 GB,"
+      ' FILEGROWTH = 10%);'
+  )
+
+  relational_db.client_vm_query_tools.IssueSqlCommand(
+      "dbcc shrinkfile('tpcc_log',truncateonly)"
+  )
+
+  relational_db.client_vm_query_tools.IssueSqlCommand(
+      "alter database tpcc modify file (name='tpcc_log', size=64000)"
+  )
+
+  # Verify the setting changed
+  relational_db.client_vm_query_tools.IssueSqlCommand("dbcc loginfo('tpcc')")
+  relational_db.client_vm_query_tools.IssueSqlCommand(
+      'SELECT name,target_recovery_time_in_seconds FROM sys.databases;'
+  )
+
+
 def Run(benchmark_spec):
   """Run the benchmark.
 
@@ -177,10 +218,20 @@ def Run(benchmark_spec):
     A list of sample.Sample instances.
   """
   client_vms = benchmark_spec.vm_groups['clients']
+  relational_db = benchmark_spec.relational_db
 
-  samples = hammerdb.Run(client_vms[0], sql_engine_utils.SQLSERVER,
-                         hammerdb.HAMMERDB_SCRIPT.value,
-                         timeout=None)
+  if (
+      hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value
+      == hammerdb.MINIMUM_RECOVERY
+  ):
+    SetMinimumRecover(relational_db)
+
+  samples = hammerdb.Run(
+      client_vms[0],
+      sql_engine_utils.SQLSERVER,
+      hammerdb.HAMMERDB_SCRIPT.value,
+      timeout=None,
+  )
 
   metadata = GetMetadata()
   for sample in samples:

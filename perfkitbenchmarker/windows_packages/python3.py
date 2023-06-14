@@ -36,4 +36,4 @@ def AddtoPath(vm):
   python_exe_path = ntpath.join(vm.temp_dir, "python")
   # Include scripts path to enable usage of pip
   scripts_path = ntpath.join(python_exe_path, "scripts")
-  vm.RemoteCommand(f'setx PATH "$env:path;{python_exe_path};{scripts_path}" -m')
+  vm.RemoteCommand(f'setx PATH "%PATH%;{python_exe_path};{scripts_path}"')
