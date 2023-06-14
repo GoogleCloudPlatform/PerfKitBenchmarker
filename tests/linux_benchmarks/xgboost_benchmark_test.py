@@ -54,34 +54,25 @@ class XgboostBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     vm = self.MockVm()
     xgboost_benchmark.Run(mock.Mock(vms=[vm]))
     vm.RemoteCommandWithReturnCode.assert_called_with(
-        'PATH=/opt/conda/bin:$PATH python3 '
-        '/opt/pkb/xgboost/tests/benchmark/benchmark_tree.py '
-        '--tree_method=gpu_hist '
-        '--sparsity=0.0 '
-        '--rows=1000000 '
-        '--columns=50 '
-        '--iterations=500 '
-        '--test_size=0.25', ignore_failure=True)
+        'PATH=/opt/conda/bin:$PATH python3'
+        ' xgboost_ray/xgboost_ray/tests/release/benchmark_cpu_gpu.py 1 10 20'
+        ' --gpu --file /tmp/classification.parquet',
+        ignore_failure=True,
+    )
 
   def testSample(self) -> None:
     samples = xgboost_benchmark.Run(mock.Mock(vms=[self.MockVm()]))
     expected = sample.Sample(
-        'training_time', 31.197044849395752, 'seconds',
+        'training_time',
+        8.0,
+        'seconds',
         {
-            'tree_method': 'gpu_hist',
-            'sparsity': 0.0,
-            'rows': 1000000,
-            'columns': 50,
-            'iterations': 500,
-            'test_size': 0.25,
-            'params': None,
-            'xgboost_version': '1.4.2',
-            'command':
-                'PATH=/opt/conda/bin:$PATH python3 '
-                '/opt/pkb/xgboost/tests/benchmark/benchmark_tree.py '
-                '--tree_method=gpu_hist --sparsity=0.0 --rows=1000000 '
-                '--columns=50 --iterations=500 --test_size=0.25'
-        }
+            'command': (
+                'PATH=/opt/conda/bin:$PATH python3'
+                ' xgboost_ray/xgboost_ray/tests/release/benchmark_cpu_gpu.py'
+                ' 1 10 20 --gpu --file /tmp/classification.parquet'
+            ),
+        },
     )
     self.assertSamplesEqualUpToTimestamp(expected, samples[0])
 
