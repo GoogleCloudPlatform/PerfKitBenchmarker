@@ -29,6 +29,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import resource
 
+FLAGS = flags.FLAGS
 
 flags.DEFINE_integer('mtu', None,
                      'Network MTU to set, if any.  Only enabled for GCP.')
@@ -260,6 +261,22 @@ class BaseNetwork(object):
   def Delete(self):
     """Deletes the actual network."""
     pass
+
+  def UpdateTimeout(self, timeout_minutes: int) -> None:
+    """Updates the timeout on the instance."""
+    pass
+
+  def Restore(self) -> None:
+    """Reuses an old network."""
+    # Note that this is different from the freeze/restore interface since
+    # BaseNetwork is not a BaseResource.
+    self.UpdateTimeout(FLAGS.timeout_minutes)
+
+  def Freeze(self) -> None:
+    """Keeps a network around for use on a subsequent run."""
+    # Note that this is different from the freeze/restore interface since
+    # BaseNetwork is not a BaseResource.
+    self.UpdateTimeout(FLAGS.persistent_timeout_minutes)
 
   def Peer(self, peering_network):
     """Peers the network with the peering_network.

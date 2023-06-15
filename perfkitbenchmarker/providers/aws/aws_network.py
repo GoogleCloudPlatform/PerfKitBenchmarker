@@ -357,6 +357,10 @@ class AwsVpc(resource.BaseResource):
     ]
     vm_util.IssueRetryableCommand(cmd)
 
+  def _UpdateTimeout(self, timeout_minutes: int) -> None:
+    """See base class."""
+    util.AddTags(self.id, self.region, **util.MakeDefaultTags(timeout_minutes))
+
 
 class AwsSubnet(resource.BaseResource):
   """An object representing an Aws subnet."""
@@ -397,6 +401,10 @@ class AwsSubnet(resource.BaseResource):
         '--region=%s' % self.region,
         '--subnet-id=%s' % self.id]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
+
+  def _UpdateTimeout(self, timeout_minutes: int) -> None:
+    """See base class."""
+    util.AddTags(self.id, self.region, **util.MakeDefaultTags(timeout_minutes))
 
   def _Exists(self):
     """Returns true if the subnet exists."""
@@ -463,6 +471,10 @@ class AwsInternetGateway(resource.BaseResource):
   def _Exists(self):
     """Returns true if the internet gateway exists."""
     return bool(self.GetDict())
+
+  def _UpdateTimeout(self, timeout_minutes: int) -> None:
+    """See base class."""
+    util.AddTags(self.id, self.region, **util.MakeDefaultTags(timeout_minutes))
 
   def GetDict(self):
     """The 'aws ec2 describe-internet-gateways' for this VPC / gateway id.
@@ -715,6 +727,11 @@ class _AwsRegionalNetwork(network.BaseNetwork):
       self.internet_gateway.Delete()
       self.vpc.Delete()
 
+  def UpdateTimeout(self, timeout_minutes: int) -> None:
+    """Updates the timeout on the instance."""
+    self.vpc.UpdateTimeout(timeout_minutes)
+    self.internet_gateway.UpdateTimeout(timeout_minutes)
+
 
 class AwsNetworkSpec(network.BaseNetworkSpec):
   """Configuration for creating an AWS network."""
@@ -838,10 +855,11 @@ class AwsNetwork(network.BaseNetwork):
     """
     super(AwsNetwork, self).__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
-    self.regional_network = _AwsRegionalNetwork.GetForRegion(
-        self.region, spec.vpc_id)
+    self.regional_network: _AwsRegionalNetwork = (
+        _AwsRegionalNetwork.GetForRegion(self.region, spec.vpc_id)
+    )
     self.subnet = None
-    self.subnets = []
+    self.subnets: list[AwsSubnet] = []
     self.vpc_peering = None
 
     # Placement Group
@@ -921,6 +939,12 @@ class AwsNetwork(network.BaseNetwork):
     if hasattr(self, 'vpc_peering') and self.vpc_peering:
       self.vpc_peering.Delete()
     self.regional_network.Delete()
+
+  def UpdateTimeout(self, timeout_minutes) -> None:
+    """Updates the timeout on the instance."""
+    self.regional_network.UpdateTimeout(timeout_minutes)
+    for subnet in self.subnets:
+      subnet.UpdateTimeout(timeout_minutes)
 
   def Peer(self, peering_network):
     """Peers the network with the peering_network.

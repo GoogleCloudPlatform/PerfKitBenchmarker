@@ -86,6 +86,7 @@ cluster_boot:
   description: >
       Create a cluster, record all times to boot.
       Specify the cluster size with --num_vms.
+  network: True
   vm_groups:
     default:
       vm_spec:

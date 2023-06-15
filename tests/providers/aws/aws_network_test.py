@@ -13,11 +13,13 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.aws.aws_network."""
 
+import inspect
 import json
 from typing import List
 import unittest
 
 from absl import flags
+from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -293,6 +295,122 @@ class AwsFirewallTest(BaseAwsTest):
     self.SetExpectedCommands(DESCRIBE_FW_NONE, CREATE_FW, CREATE_FW)
     fw.AllowPortInSecurityGroup(REGION, SG_DEFAULT, 22, source_range=['a', 'b'])
     self.assertCommandsCalled()
+
+
+class AWSNetworkTest(pkb_common_test_case.PkbCommonTestCase):
+
+  # def testNetworkUpdateTimeout(self):
+  #   test_network = aws_network.AwsNetwork(
+  #       aws_network.AwsNetworkSpec(zone='us-east-1a')
+  #   )
+  #   mock_subnet = mock.Mock()
+  #   test_network.subnets.append(mock_subnet)
+
+  #   test_network.UpdateTimeout(1)
+
+  def setUp(self):
+    super().setUp()
+    self.freeze_restore_spec = inspect.cleandoc("""
+    cluster_boot:
+      network: True
+      vm_groups:
+        default:
+          vm_spec:
+            GCP:
+              machine_type: n1-standard-4
+              zone: us-central1-c
+              project: my-project
+    """)
+    self.non_freeze_restore_spec = inspect.cleandoc("""
+    cluster_boot:
+      vm_groups:
+        default:
+          vm_spec:
+            GCP:
+              machine_type: n1-standard-4
+              zone: us-central1-c
+              project: my-project
+    """)
+
+  @flagsaver.flagsaver(timeout_minutes=90)
+  def testRestoreNetworks(self):
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        self.freeze_restore_spec
+    )
+    test_bm_spec.restore_spec = 'test_spec'
+    test_network = aws_network.AwsNetwork(
+        aws_network.AwsNetworkSpec(zone='us-east-1a')
+    )
+    test_bm_spec.networks = {'test_key': test_network}
+    mock_timeout = self.enter_context(
+        mock.patch.object(test_network, 'UpdateTimeout')
+    )
+    mock_create = self.enter_context(mock.patch.object(test_network, 'Create'))
+
+    test_bm_spec.Provision()
+
+    mock_timeout.assert_called_once_with(90)
+    mock_create.assert_not_called()
+
+  def testCreateNetworks(self):
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        self.non_freeze_restore_spec
+    )
+    test_bm_spec.restore_spec = 'test_spec'
+    test_network = aws_network.AwsNetwork(
+        aws_network.AwsNetworkSpec(zone='us-east-1a')
+    )
+    test_bm_spec.networks = {'test_key': test_network}
+    mock_create = self.enter_context(
+        mock.patch.object(test_network, 'Create')
+    )
+    mock_restore = self.enter_context(
+        mock.patch.object(test_network, 'Restore')
+    )
+
+    test_bm_spec.Provision()
+
+    mock_create.assert_called_once()
+    mock_restore.assert_not_called()
+
+  def testDeleteNetworks(self):
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        self.non_freeze_restore_spec
+    )
+    test_bm_spec.freeze_path = 'test_path'
+    self.enter_context(mock.patch.object(test_bm_spec, 'Freeze'))
+    test_network = aws_network.AwsNetwork(
+        aws_network.AwsNetworkSpec(zone='us-east-1a')
+    )
+    test_bm_spec.networks = {'test_key': test_network}
+    mock_freeze = self.enter_context(mock.patch.object(test_network, 'Freeze'))
+    mock_delete = self.enter_context(mock.patch.object(test_network, 'Delete'))
+
+    test_bm_spec.Delete()
+
+    mock_freeze.assert_not_called()
+    mock_delete.assert_called_once()
+
+  @flagsaver.flagsaver(persistent_timeout_minutes=1000)
+  def testFreezeNetworks(self):
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        self.freeze_restore_spec
+    )
+    test_bm_spec.freeze_path = 'test_path'
+    self.enter_context(mock.patch.object(test_bm_spec, 'Freeze'))
+    test_network = aws_network.AwsNetwork(
+        aws_network.AwsNetworkSpec(zone='us-east-1a')
+    )
+    test_bm_spec.networks = {'test_key': test_network}
+    mock_timeout = self.enter_context(
+        mock.patch.object(test_network, 'UpdateTimeout')
+    )
+    mock_delete = self.enter_context(mock.patch.object(test_network, 'Delete'))
+
+    test_bm_spec.Delete()
+
+    mock_delete.assert_not_called()
+    mock_timeout.assert_called_once_with(1000)
 
 
 if __name__ == '__main__':

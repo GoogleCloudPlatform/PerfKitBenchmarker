@@ -14,6 +14,7 @@
 
 """Tests for pkb.py."""
 
+import inspect
 import json
 import textwrap
 import unittest
@@ -634,6 +635,48 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
     test_bm_spec.Delete()
 
     test_bm_spec.relational_db.Delete.assert_called_with(freeze=True)
+
+  def testRestoreNetworks(self):
+    spec_yaml = inspect.cleandoc("""
+    cluster_boot:
+      network: True
+      vm_groups:
+        default:
+          vm_spec:
+            GCP:
+              machine_type: n1-standard-4
+              zone: us-central1-c
+              project: my-project
+    """)
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(spec_yaml)
+    test_bm_spec.restore_spec = 'test_spec'
+    test_bm_spec.networks = {'test_key': mock.Mock()}
+
+    test_bm_spec.Provision()
+
+    test_bm_spec.networks['test_key'].Restore.assert_called_once()
+    test_bm_spec.networks['test_key'].Create.assert_not_called()
+
+  def testCreateNetworks(self):
+    spec_yaml = inspect.cleandoc("""
+    cluster_boot:
+      vm_groups:
+        default:
+          vm_spec:
+            GCP:
+              machine_type: n1-standard-4
+              zone: us-central1-c
+              project: my-project
+    """)
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(spec_yaml)
+    test_bm_spec.restore_spec = 'test_spec'
+    test_bm_spec.networks = {'test_key': mock.Mock()}
+
+    test_bm_spec.Provision()
+
+    test_bm_spec.networks['test_key'].Create.assert_called_once()
+    test_bm_spec.networks['test_key'].Restore.assert_not_called()
+
 
 if __name__ == '__main__':
   unittest.main()

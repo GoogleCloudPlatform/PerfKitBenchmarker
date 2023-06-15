@@ -419,6 +419,7 @@ def DoProvisionPhase(spec, timer):
   """
   logging.info('Provisioning resources for benchmark %s', spec.name)
   events.before_phase.send(stages.PROVISION, benchmark_spec=spec)
+  spec.ConstructNetwork()
   spec.ConstructContainerCluster()
   spec.ConstructContainerRegistry()
   # spark service needs to go first, because it adds some vms.

@@ -1729,6 +1729,13 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             'default': None,
             'none_ok': True,
         }),
+        # Does not actually provision the network, but allows freeze/restore
+        # to specify whether to include networks. Networks are a special case
+        # because they do not inherit from BaseResource.
+        'network': (option_decoders.BooleanDecoder, {
+            'default': None,
+            'none_ok': True,
+        }),
         # A place to hold temporary data
         'temporary': (option_decoders.TypeVerifier, {
             'default': None,

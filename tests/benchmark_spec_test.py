@@ -29,7 +29,9 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
+from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine as aws_vm
+from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.providers.gcp import gcp_spanner
 from tests import pkb_common_test_case
@@ -211,6 +213,55 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
     self.test_bm_spec.ConstructRelationalDb()
 
     self.assertEqual(self.test_bm_spec.relational_db.nodes, 10)
+
+
+class ConstructNetworksTestCase(_BenchmarkSpecTestCase):
+
+  def testInitializeNetworks(self):
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
+
+    # Same order as called in pkb.py
+    spec.ConstructNetwork()
+    spec.ConstructVirtualMachines()
+
+    aws_net = spec.networks[('AWS', 'zone', 'us-east-1a')]
+    self.assertIsInstance(aws_net, aws_network.AwsNetwork)
+    self.assertEqual(aws_net.region, 'us-east-1')
+
+    gcp_net = spec.networks[('GCP', 'my-project')]
+    self.assertIsInstance(gcp_net, gce_network.GceNetwork)
+    self.assertEqual(gcp_net.project, 'my-project')
+
+  def testInitializeFromRestoreSpec(self):
+    spec_yaml = inspect.cleandoc("""
+    cluster_boot:
+      network: True
+      vm_groups:
+        default:
+          vm_spec:
+            GCP:
+              machine_type: n1-standard-4
+              zone: us-central1-c
+              project: my-project
+    """)
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(spec_yaml)
+    spec.restore_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    spec.restore_spec.networks = {
+        ('GCP', 'my-restore-project'): gce_network.GceNetwork(
+            gce_network.GceNetworkSpec(
+                project='my-restore-project', zone='us-west1-c'
+            )
+        )
+    }
+
+    # Same order as called in pkb.py
+    spec.ConstructNetwork()
+    spec.ConstructVirtualMachines()
+
+    actual_net = spec.networks[('GCP', 'my-restore-project')]
+    self.assertLen(spec.networks, 1)
+    self.assertEqual(actual_net.project, 'my-restore-project')
+    self.assertEqual(actual_net.zone, 'us-west1-c')
 
 
 class ConstructVmsTestCase(_BenchmarkSpecTestCase):

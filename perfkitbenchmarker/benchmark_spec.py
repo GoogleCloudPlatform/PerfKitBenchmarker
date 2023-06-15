@@ -22,7 +22,7 @@ import logging
 import os
 import pickle
 import threading
-from typing import List
+from typing import List, Optional
 import uuid
 
 from absl import flags
@@ -41,6 +41,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import key as cloud_key
 from perfkitbenchmarker import messaging_service
+from perfkitbenchmarker import network
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import os_types
@@ -211,8 +212,10 @@ class BenchmarkSpec(object):
       yield
 
   def _InitializeFromSpec(
-      self, attribute_name: str,
-      resource_spec: freeze_restore_spec.FreezeRestoreSpec) -> bool:
+      self,
+      attribute_name: str,
+      resource_spec: Optional[freeze_restore_spec.FreezeRestoreSpec] = None,
+  ) -> bool:
     """Initializes the BenchmarkSpec attribute from the restore_spec.
 
     Args:
@@ -227,12 +230,20 @@ class BenchmarkSpec(object):
       return False
     if not self.restore_spec or not hasattr(self.restore_spec, attribute_name):
       return False
-    if not resource_spec.enable_freeze_restore:
+    if resource_spec is not None and not resource_spec.enable_freeze_restore:
       return False
     logging.info('Getting %s instance from restore_spec', attribute_name)
     frozen_resource = copy.copy(getattr(self.restore_spec, attribute_name))
     setattr(self, attribute_name, frozen_resource)
     return True
+
+  def ConstructNetwork(self) -> None:
+    """Creates the container cluster from a restore spec."""
+    # If not using a restore spec, the networks are actually initialized
+    # along with VMs using GetNetwork().
+    if self.config.network is None:
+      return
+    self._InitializeFromSpec('networks')
 
   def ConstructContainerCluster(self):
     """Create the container cluster."""
@@ -675,6 +686,26 @@ class BenchmarkSpec(object):
     targets = [(vm.PrepareBackgroundWorkload, (), {}) for vm in self.vms]
     background_tasks.RunParallelThreads(targets, len(targets))
 
+  def _ProvisionNetworks(
+      self, should_restore: bool
+  ) -> list[network.BaseNetwork]:
+    """Creates or Restores networks."""
+    # Sort networks into a guaranteed order of creation based on dict key.
+    # There is a finite limit on the number of threads that are created to
+    # provision networks. Until support is added to provision resources in an
+    # order based on dependencies, this key ordering can be used to avoid
+    # deadlock by placing dependent networks later and their dependencies
+    # earlier.
+    networks = [
+        self.networks[key] for key in sorted(six.iterkeys(self.networks))
+    ]
+    # Networks currently do not inherit from BaseResource.
+    if self.config.network and should_restore:
+      background_tasks.RunThreaded(lambda net: net.Restore(), networks)
+    else:
+      background_tasks.RunThreaded(lambda net: net.Create(), networks)
+    return networks
+
   def Provision(self):
     """Prepares the VMs and networks necessary for the benchmark to run."""
     should_restore = (hasattr(self, 'restore_spec')
@@ -692,17 +723,7 @@ class BenchmarkSpec(object):
           lambda res: res.Create(), self.capacity_reservations
       )
 
-    # Sort networks into a guaranteed order of creation based on dict key.
-    # There is a finite limit on the number of threads that are created to
-    # provision networks. Until support is added to provision resources in an
-    # order based on dependencies, this key ordering can be used to avoid
-    # deadlock by placing dependent networks later and their dependencies
-    # earlier.
-    networks = [
-        self.networks[key] for key in sorted(six.iterkeys(self.networks))
-    ]
-
-    background_tasks.RunThreaded(lambda net: net.Create(), networks)
+    networks = self._ProvisionNetworks(should_restore)
 
     # VPC peering is currently only supported for connecting 2 VPC networks
     if self.vpc_peering:
@@ -776,9 +797,9 @@ class BenchmarkSpec(object):
           self.edw_service.SERVICE_TYPE == 'redshift'):
         # The benchmark creates the Redshift cluster's subnet group in the
         # already provisioned virtual private cloud (vpc).
-        for network in networks:
-          if network.__class__.__name__ == 'AwsNetwork':
-            self.edw_service.cluster_subnet_group.subnet_id = network.subnet.id
+        for net in networks:
+          if net.__class__.__name__ == 'AwsNetwork':
+            self.edw_service.cluster_subnet_group.subnet_id = net.subnet.id
       self.edw_service.Create()
     if self.edw_compute_resource:
       self.edw_compute_resource.Create()
@@ -860,10 +881,15 @@ class BenchmarkSpec(object):
 
     for net in six.itervalues(self.networks):
       try:
-        net.Delete()
+        if should_freeze and self.config.network:
+          net.Freeze()
+        else:
+          net.Delete()
       except Exception:
-        logging.exception('Got an exception deleting networks. '
-                          'Attempting to continue tearing down.')
+        logging.exception(
+            'Got an exception freezing/deleting networks. '
+            'Attempting to continue tearing down.'
+        )
 
     if hasattr(self, 'vpn_service') and self.vpn_service:
       self.vpn_service.Delete()
