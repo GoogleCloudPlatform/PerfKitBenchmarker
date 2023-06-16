@@ -35,6 +35,7 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
+from perfkitbenchmarker import virtual_machine
 
 
 FLAGS = flags.FLAGS
@@ -202,7 +203,15 @@ SECONDS_UNIT = 'seconds'
 
 
 def GetConfig(user_config):
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  vm_count = config['relational_db']['vm_groups']['clients'].get('vm_count', 1)
+  if vm_count > 1 and FLAGS.sysbench_testname != SPANNER_TPCC:
+    raise errors.Setup.InvalidConfigurationError(
+        f'Test --sysbench_testname={FLAGS.sysbench_testname} only supports 1'
+        f' client VM, got {vm_count}. Currently only {SPANNER_TPCC} is'
+        ' supported.'
+    )
+  return config
 
 
 # TODO(chunla) Move this to engine specific module
@@ -307,14 +316,16 @@ def UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.sysbench_table_size = FLAGS.sysbench_table_size
 
 
-def _GetSysbenchPrepareCommand(db: relational_db.BaseRelationalDb):
+def _GetSysbenchPrepareCommand(
+    db: relational_db.BaseRelationalDb, num_vms: int, vm_index: int
+) -> str:
   """Returns the sysbench command used to load the database."""
   # Data loading is write only so need num_threads less than or equal to the
   # amount of tables - capped at 64 threads for when number of tables
   # gets very large. For TPCC, parallelize with threads as long as scale > 1.
   num_threads = (
       min(FLAGS.sysbench_scale, 64)
-      if FLAGS.sysbench_testname == 'tpcc'
+      if _GetSysbenchTestParameter() == 'tpcc'
       else min(FLAGS.sysbench_tables, 64)
   )
 
@@ -333,31 +344,40 @@ def _GetSysbenchPrepareCommand(db: relational_db.BaseRelationalDb):
       '--threads=%d' % num_threads,
   ]
   if FLAGS.sysbench_testname == SPANNER_TPCC:
-    data_load_cmd_tokens.append(
-        '--use_fk=%d' % (1 if FLAGS.sysbench_use_fk else 0)
-    )
+    # Supports loading through multiple VMs
+    scale = FLAGS.sysbench_scale
+    start_scale = (scale / num_vms) * vm_index + 1
+    end_scale = (scale / num_vms) * (vm_index + 1)
+    data_load_cmd_tokens.extend([
+        '--use_fk=%d' % (1 if FLAGS.sysbench_use_fk else 0),
+        '--enable_cluster=%d' % (0 if num_vms == 1 else 1),
+        '--start_scale=%d' % start_scale,
+        '--end_scale=%d' % end_scale,
+    ])
   return ' '.join(
       data_load_cmd_tokens + _GetCommonSysbenchOptions(db) + ['prepare']
   )
 
 
-def _PrepareSysbench(client_vm, benchmark_spec):
-  """Prepare the Sysbench OLTP test with data loading stage.
+def _LoadDatabase(
+    command: str, vm: virtual_machine.BaseVirtualMachine
+) -> tuple[str, str]:
+  stdout, stderr = vm.RobustRemoteCommand(command)
+  for output in (stdout, stderr):
+    if 'FATAL' in output:
+      raise errors.Benchmarks.RunError(
+          f'Error while running prepare command: {command}\n{output}'
+      )
+  return stdout, stderr
 
-  Args:
-    client_vm: The client VM that will issue the sysbench test.
-    benchmark_spec: The benchmark specification. Contains all data that is
-      required to run the benchmark.
 
-  Returns:
-    results: A list of results of the data loading step.
-  """
+def _PrepareSysbench(benchmark_spec):
+  """Prepare the Sysbench OLTP test with data loading stage."""
+  client_vms = benchmark_spec.vm_groups['clients']
+  db: relational_db.BaseRelationalDb = benchmark_spec.relational_db
 
-  _InstallLuaScriptsIfNecessary(client_vm)
-
-  results = []
-
-  db = benchmark_spec.relational_db
+  if FLAGS.sysbench_testname != SPANNER_TPCC:
+    client_vms = [client_vms[0]]
 
   # Some databases install these query tools during _PostCreate, which is
   # skipped if the database is user managed / restored.
@@ -369,7 +389,7 @@ def _PrepareSysbench(client_vm, benchmark_spec):
 
   if _SKIP_LOAD_STAGE.value or db.restored:
     logging.info('Skipping the load stage')
-    return results
+    return []
 
   stdout, stderr = db.client_vm_query_tools.IssueSqlCommand(
       'create database sbtest;'
@@ -382,27 +402,28 @@ def _PrepareSysbench(client_vm, benchmark_spec):
 
   # Sysbench output is in stdout, but we also get stderr just in case
   # something went wrong.
-  prepare_command = _GetSysbenchPrepareCommand(db)
-  stdout, stderr = client_vm.RobustRemoteCommand(prepare_command)
+  command_vm_pairs = [
+      (_GetSysbenchPrepareCommand(db, len(client_vms), index), vm)
+      for index, vm in enumerate(client_vms)
+  ]
+  args = [(command_vm_pair, {}) for command_vm_pair in command_vm_pairs]
+  results = background_tasks.RunThreaded(_LoadDatabase, args)
   load_duration = time.time() - data_load_start_time
   logging.info(
       'It took %d seconds to finish the data loading step', load_duration
   )
-  for output in (stdout, stderr):
-    if 'FATAL' in output:
-      raise errors.Benchmarks.RunError(
-          f'Error while running prepare command: {prepare_command}\n{output}'
-      )
+  for _, stderr in results:
+    if 'FATAL' in stderr:
+      raise errors.Benchmarks.RunError('Error while running prepare phase')
 
-  metadata = CreateMetadataFromFlags()
-
-  results.append(
+  return [
       sample.Sample(
-          'sysbench data load time', load_duration, SECONDS_UNIT, metadata
+          'sysbench data load time',
+          load_duration,
+          SECONDS_UNIT,
+          CreateMetadataFromFlags(),
       )
-  )
-
-  return results
+  ]
 
 
 def Prepare(benchmark_spec):
@@ -421,14 +442,15 @@ def Prepare(benchmark_spec):
 
   benchmark_spec.always_call_cleanup = True
 
-  client_vm = benchmark_spec.vm_groups['clients'][0]
+  client_vms = benchmark_spec.vm_groups['clients']
 
   UpdateBenchmarkSpecWithFlags(benchmark_spec)
 
   # Setup common test tools required on the client VM
-  client_vm.Install('sysbench')
+  background_tasks.RunThreaded(lambda vm: vm.Install('sysbench'), client_vms)
+  background_tasks.RunThreaded(_InstallLuaScriptsIfNecessary, client_vms)
 
-  _PrepareSysbench(client_vm, benchmark_spec)
+  _PrepareSysbench(benchmark_spec)
 
 
 def _GetDatabaseSize(db):

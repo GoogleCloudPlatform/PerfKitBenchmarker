@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2023 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,18 +16,22 @@ import logging
 import os
 import unittest
 from unittest import mock
+from absl import flags
 from absl.testing import flagsaver
-
+from absl.testing import parameterized
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import sysbench_benchmark
 from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 
 class MySQLServiceBenchmarkTestCase(unittest.TestCase,
                                     test_util.SamplesTestMixin):
 
   def setUp(self):
+    super().setUp()
     path = os.path.join(os.path.dirname(__file__), '..', 'data',
                         'sysbench-output-sample.txt')
     with open(path) as fp:
@@ -53,31 +57,67 @@ class MySQLServiceBenchmarkTestCase(unittest.TestCase,
     self.assertSampleListsEqualUpToTimestamp(results, expected_results)
 
 
-class SysbenchBenchmarkTestCase(
+class SpannerBenchmarkTestCase(
     pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
 ):
 
-  @flagsaver.flagsaver(sysbench_testname=sysbench_benchmark.SPANNER_TPCC)
-  def testSpannerLoadCommandHasCorrectTest(self):
+  def setUp(self):
+    super().setUp()
     self.enter_context(
         mock.patch.object(
             sysbench_benchmark, '_GetCommonSysbenchOptions', return_value=[]
         )
     )
-    command = sysbench_benchmark._GetSysbenchPrepareCommand(mock.Mock())
+    FLAGS.sysbench_testname = sysbench_benchmark.SPANNER_TPCC
+
+  def testSpannerLoadCommandHasCorrectTest(self):
+    command = sysbench_benchmark._GetSysbenchPrepareCommand(mock.Mock(), 1, 0)
     self.assertIn('sysbench tpcc', command)
 
-  @flagsaver.flagsaver(sysbench_testname=sysbench_benchmark.SPANNER_TPCC)
-  def testSpannerRunCommandHasCorrectTest(self):
-    self.enter_context(
-        mock.patch.object(
-            sysbench_benchmark, '_GetCommonSysbenchOptions', return_value=[]
-        )
+  @parameterized.named_parameters([
+      {
+          'testcase_name': 'SingleVM',
+          'num_vms': 1,
+          'expected_cluster': 0,
+      },
+      {
+          'testcase_name': 'MultiVM',
+          'num_vms': 2,
+          'expected_cluster': 1,
+      },
+  ])
+  def testSpannerLoadCommandHasCorrectClusterSetting(
+      self, num_vms, expected_cluster
+  ):
+    command = sysbench_benchmark._GetSysbenchPrepareCommand(
+        mock.Mock(), num_vms, 0
     )
+    self.assertIn(f'--enable_cluster={expected_cluster}', command)
+
+  @flagsaver.flagsaver(sysbench_scale=1000)
+  def testSpannerLoadCommandHasCorrectScales(self):
+    command = sysbench_benchmark._GetSysbenchPrepareCommand(mock.Mock(), 1, 0)
+    with self.subTest('scale'):
+      self.assertIn('--scale=1000', command)
+    with self.subTest('start_scale'):
+      self.assertIn('--start_scale=1', command)
+    with self.subTest('end_scale'):
+      self.assertIn('--end_scale=1000', command)
+
+  @flagsaver.flagsaver(sysbench_scale=1000)
+  def testSpannerLoadCommandHasCorrectScalesMultiVM(self):
+    command = sysbench_benchmark._GetSysbenchPrepareCommand(mock.Mock(), 5, 2)
+    with self.subTest('scale'):
+      self.assertIn('--scale=1000', command)
+    with self.subTest('start_scale'):
+      self.assertIn('--start_scale=401', command)
+    with self.subTest('end_scale'):
+      self.assertIn('--end_scale=600', command)
+
+  def testSpannerRunCommandHasCorrectTest(self):
     command = sysbench_benchmark._GetSysbenchRunCommand(1, mock.Mock(), 1)
     self.assertIn('sysbench tpcc', command)
 
-  @flagsaver.flagsaver(sysbench_testname=sysbench_benchmark.SPANNER_TPCC)
   def testSpannerMetadataHasForeignKey(self):
     metadata = sysbench_benchmark.CreateMetadataFromFlags()
     self.assertIn('sysbench_use_fk', metadata)
