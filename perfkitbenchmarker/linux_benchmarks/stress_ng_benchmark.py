@@ -192,6 +192,8 @@ def _ParseStressngResult(metadata,
   if len(output_matrix) < 5:
     logging.error('output is missing')
     return None
+  while output_matrix[-1][-1] == 'stressor)':
+    output_matrix.pop()
   assert output_matrix[-3][-4] == 'bogo' and output_matrix[-3][-3] == 'ops/s'
   assert output_matrix[-2][-4] == '(real' and output_matrix[-2][-3] == 'time)'
   line = output_matrix[-1]
