@@ -23,7 +23,7 @@ from perfkitbenchmarker.providers.snowflake import snowflake
 
 FLAGS = flags.FLAGS
 # Filename for JDBC client associated with this provider:
-# snowflake-jdbc-client-2.3-standard.jar
+# snowflake-jdbc-client-2.5-standard.jar
 
 
 class Snowflake(snowflake.Snowflake):

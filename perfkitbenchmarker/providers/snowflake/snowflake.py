@@ -29,7 +29,7 @@ FLAGS = flags.FLAGS
 
 # TODO(jguertin): Update these jdbc client names to reflect their function
 JdbcClientDict = {
-    provider_info.AWS: 'snowflake-jdbc-client-2.3-standard.jar',
+    provider_info.AWS: 'snowflake-jdbc-client-2.5-standard.jar',
     provider_info.AZURE: 'snowflake-jdbc-client-azure-external-2.0.jar'
 }
 
