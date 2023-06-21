@@ -567,6 +567,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     cmd = util.GcloudCommand(self, *args)
     cmd.flags['async'] = True
+    if gcp_flags.GCE_CREATE_LOG_HTTP.value:
+      cmd.flags['log-http'] = True
 
     # Compute all flags requiring alpha first. Then if any flags are different
     # between alpha and GA, we can set the appropriate ones.

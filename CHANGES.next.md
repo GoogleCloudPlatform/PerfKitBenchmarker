@@ -256,6 +256,8 @@
     GCEVirtualMachine and AWSVirtualMachine instances that are provisioned with
     asynchronous 'create' invocations.
 -   Add `--dpb_sparksql_streams` to run TPC-DS/H throughput runs.
+-   Add `--gce_create_log_http` for pass --log-http to gcloud compute instance
+    create.
 
 ### Bug fixes and maintenance updates:
 

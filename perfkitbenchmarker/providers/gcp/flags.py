@@ -102,6 +102,11 @@ GCE_NIC_RECORD_VERSION = flags.DEFINE_boolean(
 EGRESS_BANDWIDTH_TIER = flags.DEFINE_enum(
     'gce_egress_bandwidth_tier', None, ['TIER_1'],
     'Egress bandwidth tier of the GCE VMs.')
+GCE_CREATE_LOG_HTTP = flags.DEFINE_boolean(
+    'gce_create_log_http',
+    False,
+    'If True, pass --log-http to gcloud compute instance create.',
+)
 
 flags.DEFINE_string('gcp_node_type', None,
                     'The node type of all sole tenant hosts that get created.')
