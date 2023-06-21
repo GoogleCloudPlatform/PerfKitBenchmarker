@@ -1039,6 +1039,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     getoperation_cmd = util.GcloudCommand(
         self, 'compute', 'operations', 'describe', self.create_operation_name
     )
+    if gcp_flags.GCE_CREATE_LOG_HTTP.value:
+      getoperation_cmd.flags['log-http'] = True
+
     stdout, _, retcode = getoperation_cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.info('operations describe command failed, retrying.')
