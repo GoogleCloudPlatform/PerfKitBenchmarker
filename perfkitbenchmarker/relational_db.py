@@ -211,6 +211,7 @@ class BaseRelationalDb(resource.BaseResource):
     self.port = self.GetDefaultPort()
     self.is_managed_db = self.IS_MANAGED
     self.replica_endpoint = ''
+    self.client_vms = []
 
   @property
   def client_vm(self):
@@ -414,6 +415,14 @@ class BaseRelationalDb(resource.BaseResource):
       raise NotImplementedError('Default port not specified for '
                                 'engine {0}'.format(engine))
     return DEFAULT_PORTS[engine]
+
+  def CreateDatabase(self, database_name: str) -> tuple[str, str]:
+    """Creates the database."""
+    return self.client_vms_query_tools[0].CreateDatabase(database_name)
+
+  def DeleteDatabase(self, database_name: str) -> tuple[str, str]:
+    """Deletes the database."""
+    return self.client_vms_query_tools[0].DeleteDatabase(database_name)
 
   def Failover(self):
     """Fail over the database.  Throws exception if not high available."""

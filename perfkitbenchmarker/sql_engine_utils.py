@@ -18,9 +18,12 @@ import dataclasses
 import logging
 import timeit
 from typing import Any, Dict, List, Optional, Tuple, Union
-
+from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
+
+FLAGS = flags.FLAGS
 
 SECOND = 'seconds'
 
@@ -252,6 +255,14 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
     """
     raise NotImplementedError('Running from a file is not currently supported.')
 
+  def CreateDatabase(self, database_name: str) -> tuple[str, str]:
+    """Creates the specified database."""
+    raise NotImplementedError()
+
+  def DeleteDatabase(self, database_name: str) -> tuple[str, str]:
+    """Deletes the specified database."""
+    raise NotImplementedError()
+
 
 class PostgresCliQueryTools(ISQLQueryTools):
   """SQL Query class to issue postgres related query."""
@@ -312,6 +323,14 @@ class PostgresCliQueryTools(ISQLQueryTools):
     """Adding hints to increase the verboseness of the explain."""
     return 'EXPLAIN (ANALYZE, BUFFERS, TIMING, SUMMARY, VERBOSE) '
 
+  def CreateDatabase(self, database_name: str) -> tuple[str, str]:
+    """See base class."""
+    return self.IssueSqlCommand(f'create database {database_name}')
+
+  def DeleteDatabase(self, database_name: str) -> tuple[str, str]:
+    """See base class."""
+    return self.IssueSqlCommand(f'drop database {database_name}')
+
 
 class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
   """SQL Query class to issue Spanner postgres queries (subset of postgres)."""
@@ -321,9 +340,8 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
   # The default database in postgres
   DEFAULT_DATABASE = POSTGRES
 
-  def InstallPackages(self):
-    """Installs packages required for making queries."""
-    self.vm.Install('pgadapter')
+  def Connect(self) -> None:
+    """Connects to the DB using PGAdapter."""
     properties = self.connection_properties
     self.vm.RemoteCommand(
         'java -jar pgadapter.jar '
@@ -332,6 +350,21 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
         f'-i {properties.instance_name} '
         f'-d {properties.database_name} &> /dev/null &'
     )
+
+  def Reconnect(self) -> None:
+    """Restarts PGAdapter."""
+    try:
+      # PGAdapter is started by a java process, see
+      # https://cloud.google.com/spanner/docs/pgadapter-start.
+      self.vm.RemoteCommand('pkill java')
+    except errors.VirtualMachine.RemoteCommandError:
+      pass
+    self.Connect()
+
+  def InstallPackages(self) -> None:
+    """Installs packages required for making queries."""
+    self.vm.Install('pgadapter')
+    self.Connect()
     self.vm.Install('postgres_client')
 
   def MakeSqlCommand(
@@ -406,6 +439,14 @@ class MysqlCliQueryTools(ISQLQueryTools):
         self.connection_properties.database_username,
         self.connection_properties.database_password,
     )
+
+  def CreateDatabase(self, database_name: str) -> tuple[str, str]:
+    """See base class."""
+    return self.IssueSqlCommand(f'create database {database_name}')
+
+  def DeleteDatabase(self, database_name: str) -> tuple[str, str]:
+    """See base class."""
+    return self.IssueSqlCommand(f'drop database {database_name}')
 
 
 class SqlServerCliQueryTools(ISQLQueryTools):

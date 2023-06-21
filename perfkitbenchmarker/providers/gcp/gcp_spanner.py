@@ -228,13 +228,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
     self._UpdateLabels(util.GetDefaultTags())
 
-    cmd = util.GcloudCommand(self, 'spanner', 'databases', 'create',
-                             self.database)
-    cmd.flags['instance'] = self.instance_id
-    cmd.flags['database-dialect'] = self.dialect
-    _, _, retcode = cmd.Issue(raise_on_failure=False)
-    if retcode != 0:
-      logging.error('Create GCP Spanner database failed.')
+    self.CreateDatabase(self.database)
 
   def CreateTables(self, ddl: str) -> None:
     """Creates the tables specified by the DDL.
@@ -267,6 +261,27 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
       logging.error('Delete GCP Spanner instance failed.')
     else:
       logging.info('Deleted GCP Spanner instance.')
+
+  def CreateDatabase(self, database_name: str) -> tuple[str, str]:
+    """Creates the database."""
+    cmd = util.GcloudCommand(
+        self, 'spanner', 'databases', 'create', database_name
+    )
+    cmd.flags['instance'] = self.instance_id
+    cmd.flags['database-dialect'] = self.dialect
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    if retcode != 0:
+      logging.error('Create GCP Spanner database failed.')
+    return stdout, stderr
+
+  def DeleteDatabase(self, database_name: str) -> tuple[str, str]:
+    """Deletes the database."""
+    cmd = util.GcloudCommand(
+        self, 'spanner', 'databases', 'delete', database_name
+    )
+    cmd.flags['instance'] = self.instance_id
+    stdout, stderr, _ = cmd.Issue(raise_on_failure=False)
+    return stdout, stderr
 
   def _Exists(self, instance_only: bool = False) -> bool:
     """Returns true if the instance and the database exists."""
@@ -489,3 +504,13 @@ class PostgresGcpSpannerInstance(GcpSpannerInstance):
         self.database,
         self.project,
     )
+
+  def DeleteDatabase(self, database_name: str) -> tuple[str, str]:
+    stdout, stderr = super().DeleteDatabase(database_name)
+    query_tools: list[sql_engine_utils.SpannerPostgresCliQueryTools] = (
+        self.client_vms_query_tools
+    )
+    # Restart PGAdapter since it's running in the background.
+    for client in query_tools:
+      client.Reconnect()
+    return stdout, stderr

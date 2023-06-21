@@ -292,6 +292,11 @@ def _GetSysbenchTestParameter() -> str:
   )
 
 
+def _GetDatabaseName(db: relational_db.BaseRelationalDb) -> str:
+  """Returns the database name to use in this test."""
+  return db.database if hasattr(db, 'database') else 'sbtest'
+
+
 def _InstallLuaScriptsIfNecessary(vm):
   if _GetSysbenchTestParameter() == 'tpcc':
     vm.InstallPreprovisionedBenchmarkData(
@@ -391,9 +396,19 @@ def _PrepareSysbench(benchmark_spec):
     logging.info('Skipping the load stage')
     return []
 
-  stdout, stderr = db.client_vm_query_tools.IssueSqlCommand(
-      'create database sbtest;'
-  )
+  db_name = _GetDatabaseName(db)
+
+  # Recreate the DB if needed. Not applicable on a fresh run, but helps with
+  # manual development.
+  try:
+    db.DeleteDatabase(db_name)
+  except (
+      errors.VirtualMachine.RemoteCommandError,
+      errors.VmUtil.IssueCommandError,
+  ):
+    logging.warning('Error dropping database, it may not exist.')
+
+  stdout, stderr = db.CreateDatabase(db_name)
 
   logging.info('sbtest db created, stdout is %s, stderr is %s', stdout, stderr)
   # Provision the Sysbench test based on the input flags (load data into DB)
