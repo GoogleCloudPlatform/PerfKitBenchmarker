@@ -35,14 +35,19 @@ PD_STANDARD = 'pd-standard'
 PD_SSD = 'pd-ssd'
 PD_BALANCED = 'pd-balanced'
 PD_EXTREME = 'pd-extreme'
+HYPERDISK_THROUGHPUT = 'hyperdisk-throughput'
+HYPERDISK_EXTREME = 'hyperdisk-extreme'
 GCE_REMOTE_DISK_TYPES = [
     PD_STANDARD,
     PD_SSD,
     PD_BALANCED,
     PD_EXTREME,
+    HYPERDISK_THROUGHPUT,
+    HYPERDISK_EXTREME,
 ]
 GCE_REMOTE_EXTREME_DISK_TYPES = [
     PD_EXTREME,
+    HYPERDISK_EXTREME,
 ]
 
 DISK_TYPE = {disk.STANDARD: PD_STANDARD, disk.REMOTE_SSD: PD_SSD}
@@ -63,6 +68,14 @@ DISK_METADATA = {
         disk.REPLICATION: disk.ZONE,
     },
     PD_EXTREME: {
+        disk.MEDIA: disk.SSD,
+        disk.REPLICATION: disk.ZONE,
+    },
+    HYPERDISK_THROUGHPUT: {
+        disk.MEDIA: disk.HDD,
+        disk.REPLICATION: disk.ZONE,
+    },
+    HYPERDISK_EXTREME: {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
     },
