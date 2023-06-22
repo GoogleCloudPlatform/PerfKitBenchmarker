@@ -61,6 +61,9 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'sysbench_scale', 100, 'Scale parameter as used by TPCC benchmark.'
 )
+_SLEEP_SEC = flags.DEFINE_integer(
+    'sysbench_sleep_after_load_sec', 0, 'The time to sleep after loading data.'
+)
 flags.DEFINE_integer(
     'sysbench_warmup_seconds',
     10,
@@ -73,8 +76,13 @@ flags.DEFINE_integer(
     'The duration of the actual run in which results are '
     'collected, in seconds.',
 )
+_LOAD_THREADS = flags.DEFINE_integer(
+    'sysbench_load_threads',
+    64,
+    'Number of threads (per client VM) to use for loading.',
+)
 flag_util.DEFINE_integerlist(
-    'sysbench_thread_counts',
+    'sysbench_run_threads',
     flag_util.IntegerList([64]),
     'array of thread counts passed to sysbench, one at a time',
     module_name=__name__,
@@ -91,6 +99,19 @@ flags.DEFINE_integer(
 )
 flags.DEFINE_boolean(
     'sysbench_use_fk', True, 'Use foreign keys. This is used by TPCC benchmark.'
+)
+_SPANNER_PG_COMPAT_MODE = flags.DEFINE_boolean(
+    'sysbench_spanner_pg_compat_mode',
+    True,
+    'If true, uses postgres-compatible benchmark script. Only used if'
+    ' --sysbench_testname=spanner_tpcc.',
+)
+_TXN_ISOLATION_LEVEL = flags.DEFINE_enum(
+    'sysbench_txn_isolation_level',
+    'SER',
+    ['SER', 'RR', 'RC'],
+    'If true, uses postgres-compatible benchmark script. Only used if'
+    ' --sysbench_testname=spanner_tpcc.',
 )
 _SKIP_LOAD_STAGE = flags.DEFINE_boolean(
     'sysbench_skip_load_stage',
@@ -321,19 +342,22 @@ def UpdateBenchmarkSpecWithFlags(benchmark_spec):
   benchmark_spec.sysbench_table_size = FLAGS.sysbench_table_size
 
 
+def _GetLoadThreads() -> int:
+  # Data loading is write only so need num_threads less than or equal to the
+  # amount of tables - capped at 64 threads for when number of tables
+  # gets very large. For TPCC, parallelize with threads as long as scale > 1.
+  if FLAGS.sysbench_testname == SPANNER_TPCC:
+    return _LOAD_THREADS.value
+  if _GetSysbenchTestParameter() == 'tpcc':
+    return min(FLAGS.sysbench_scale, 64)
+  return min(FLAGS.sysbench_tables, 64)
+
+
 def _GetSysbenchPrepareCommand(
     db: relational_db.BaseRelationalDb, num_vms: int, vm_index: int
 ) -> str:
   """Returns the sysbench command used to load the database."""
-  # Data loading is write only so need num_threads less than or equal to the
-  # amount of tables - capped at 64 threads for when number of tables
-  # gets very large. For TPCC, parallelize with threads as long as scale > 1.
-  num_threads = (
-      min(FLAGS.sysbench_scale, 64)
-      if _GetSysbenchTestParameter() == 'tpcc'
-      else min(FLAGS.sysbench_tables, 64)
-  )
-
+  num_threads = _GetLoadThreads()
   data_load_cmd_tokens = [
       'nice',  # run with a niceness of lower priority
       '-15',  # to encourage cpu time for ssh commands
@@ -347,6 +371,7 @@ def _GetSysbenchPrepareCommand(
       ),
       ('--scale=%d' % FLAGS.sysbench_scale if _IsValidFlag('scale') else ''),
       '--threads=%d' % num_threads,
+      '--trx_level=%s' % _TXN_ISOLATION_LEVEL.value,
   ]
   if FLAGS.sysbench_testname == SPANNER_TPCC:
     # Supports loading through multiple VMs
@@ -358,6 +383,8 @@ def _GetSysbenchPrepareCommand(
         '--enable_cluster=%d' % (0 if num_vms == 1 else 1),
         '--start_scale=%d' % start_scale,
         '--end_scale=%d' % end_scale,
+        '--enable_pg_compat_mode=%d'
+        % (1 if _SPANNER_PG_COMPAT_MODE.value else 0),
     ])
   return ' '.join(
       data_load_cmd_tokens + _GetCommonSysbenchOptions(db) + ['prepare']
@@ -466,6 +493,12 @@ def Prepare(benchmark_spec):
   background_tasks.RunThreaded(_InstallLuaScriptsIfNecessary, client_vms)
 
   _PrepareSysbench(benchmark_spec)
+
+  if _SLEEP_SEC.value:
+    logging.info(
+        'Sleeping for %d seconds now that loading has finished.',
+        _SLEEP_SEC.value,
+    )
 
 
 def _GetDatabaseSize(db):
@@ -627,6 +660,7 @@ def _GetSysbenchRunCommand(
       '--report-interval=%d' % FLAGS.sysbench_report_interval,
       '--max-requests=0',
       '--time=%d' % duration,
+      '--trx_level=%s' % _TXN_ISOLATION_LEVEL.value,
   ]
   run_cmd = ' '.join(run_cmd_tokens + _GetCommonSysbenchOptions(db) + ['run'])
   return run_cmd
@@ -717,7 +751,7 @@ def Run(benchmark_spec):
   client_vm = benchmark_spec.vms[0]
   db = benchmark_spec.relational_db
 
-  for thread_count in FLAGS.sysbench_thread_counts:
+  for thread_count in FLAGS.sysbench_run_threads:
     metadata = CreateMetadataFromFlags()
     metadata['sysbench_db_size_MB'] = _GetDatabaseSize(db)
     metadata['sysbench_thread_count'] = thread_count

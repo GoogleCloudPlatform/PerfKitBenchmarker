@@ -38,7 +38,6 @@ class MySQLServiceBenchmarkTestCase(unittest.TestCase,
       self.contents = fp.read()
 
   def testParseSysbenchResult(self):
-    results = []
     metadata = {}
     results = sysbench_benchmark._ParseSysbenchTimeSeries(
         self.contents, metadata)
@@ -121,6 +120,23 @@ class SpannerBenchmarkTestCase(
   def testSpannerMetadataHasForeignKey(self):
     metadata = sysbench_benchmark.CreateMetadataFromFlags()
     self.assertIn('sysbench_use_fk', metadata)
+
+  class SysbenchBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
+
+    @parameterized.parameters(
+        ('spanner-tpcc', 16, 400, 1),
+        ('tpcc', 10, 10, 1),
+        ('oltp_read_only', 10, 400, 10),
+    )
+    def testGetLoadThreads(self, test_name, expected_threads, scale, tables):
+      with flagsaver.flagsaver(
+          sysbench_load_threads=16,
+          sysbench_testname=test_name,
+          sysbench_scale=scale,
+          sysbench_tables=tables,
+      ):
+        actual_threads = sysbench_benchmark._GetLoadThreads()
+      self.assertEqual(expected_threads, actual_threads)
 
 
 if __name__ == '__main__':
