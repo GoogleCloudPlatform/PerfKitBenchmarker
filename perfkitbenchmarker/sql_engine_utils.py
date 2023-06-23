@@ -19,7 +19,6 @@ import logging
 import timeit
 from typing import Any, Dict, List, Optional, Tuple, Union
 from absl import flags
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 
@@ -340,7 +339,7 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
   # The default database in postgres
   DEFAULT_DATABASE = POSTGRES
 
-  def Connect(self) -> None:
+  def _Connect(self) -> None:
     """Connects to the DB using PGAdapter."""
     properties = self.connection_properties
     self.vm.RemoteCommand(
@@ -351,20 +350,10 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
         f'-d {properties.database_name} &> /dev/null &'
     )
 
-  def Reconnect(self) -> None:
-    """Restarts PGAdapter."""
-    try:
-      # PGAdapter is started by a java process, see
-      # https://cloud.google.com/spanner/docs/pgadapter-start.
-      self.vm.RemoteCommand('pkill java')
-    except errors.VirtualMachine.RemoteCommandError:
-      pass
-    self.Connect()
-
   def InstallPackages(self) -> None:
     """Installs packages required for making queries."""
     self.vm.Install('pgadapter')
-    self.Connect()
+    self._Connect()
     self.vm.Install('postgres_client')
 
   def MakeSqlCommand(

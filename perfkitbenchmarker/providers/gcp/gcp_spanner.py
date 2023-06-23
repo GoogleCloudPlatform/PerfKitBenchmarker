@@ -531,13 +531,3 @@ class PostgresGcpSpannerInstance(GcpSpannerInstance):
         self.database,
         self.project,
     )
-
-  def DeleteDatabase(self, database_name: str) -> tuple[str, str]:
-    stdout, stderr = super().DeleteDatabase(database_name)
-    query_tools: list[sql_engine_utils.SpannerPostgresCliQueryTools] = (
-        self.client_vms_query_tools
-    )
-    # Restart PGAdapter since it's running in the background.
-    for client in query_tools:
-      client.Reconnect()
-    return stdout, stderr
