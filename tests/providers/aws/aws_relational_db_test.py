@@ -244,11 +244,39 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateAurora(self):
     command_strings = self.CreateAurora()
-    self.assertListEqual(command_strings, [
-        'aws --output json rds create-db-cluster --db-cluster-identifier=pkb-db-cluster-123 --engine=aurora-postgresql --engine-version=9.6.2 --master-username=fakeusername --master-user-password=fakepassword --region=us-east-1 --db-subnet-group-name=fake_db_subnet --vpc-security-group-ids=fake_security_group_id --availability-zones=us-east-1a --tags',
-        'aws --output json rds create-db-instance --db-instance-identifier=pkb-db-instance-123 --db-cluster-identifier=pkb-db-cluster-123 --engine=aurora-postgresql --engine-version=9.6.2 --no-auto-minor-version-upgrade --db-instance-class=db.t1.micro --region=us-east-1 --availability-zone=us-east-1a --tags',
-        'aws --output json rds create-db-instance --db-instance-identifier=pkb-db-instance-123-us-east-1d --db-cluster-identifier=pkb-db-cluster-123 --engine=aurora-postgresql --engine-version=9.6.2 --no-auto-minor-version-upgrade --db-instance-class=db.t1.micro --region=us-east-1 --availability-zone=us-east-1d --tags'
-    ])
+    self.assertListEqual(
+        command_strings,
+        [
+            (
+                'aws --output json rds create-db-cluster'
+                ' --db-cluster-identifier=pkb-db-cluster-123'
+                ' --engine=aurora-postgresql --engine-version=9.6.2'
+                ' --master-username=fakeusername'
+                ' --master-user-password=fakepassword --region=us-east-1'
+                ' --db-subnet-group-name=fake_db_subnet'
+                ' --vpc-security-group-ids=fake_security_group_id'
+                ' --availability-zones=us-east-1a --storage-type=aurora --tags'
+            ),
+            (
+                'aws --output json rds create-db-instance'
+                ' --db-instance-identifier=pkb-db-instance-123'
+                ' --db-cluster-identifier=pkb-db-cluster-123'
+                ' --engine=aurora-postgresql --engine-version=9.6.2'
+                ' --no-auto-minor-version-upgrade'
+                ' --db-instance-class=db.t1.micro --region=us-east-1'
+                ' --availability-zone=us-east-1a --tags'
+            ),
+            (
+                'aws --output json rds create-db-instance'
+                ' --db-instance-identifier=pkb-db-instance-123-us-east-1d'
+                ' --db-cluster-identifier=pkb-db-cluster-123'
+                ' --engine=aurora-postgresql --engine-version=9.6.2'
+                ' --no-auto-minor-version-upgrade'
+                ' --db-instance-class=db.t1.micro --region=us-east-1'
+                ' --availability-zone=us-east-1d --tags'
+            ),
+        ],
+    )
 
   def testNoHighAvailability(self):
     spec_dict = {

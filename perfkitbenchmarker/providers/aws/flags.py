@@ -125,3 +125,11 @@ flags.DEFINE_integer(
     'unset, all the files will be crawled. May range from 1 to 249.',
     1, 249
 )
+# TODO(user): Create a spec for aurora.
+AURORA_STORAGE_TYPE = flags.DEFINE_enum(
+    'aws_aurora_storage_type',
+    'aurora',
+    ['aurora', 'aurora-iopt1'],
+    'Aurora storage type to use, corresponds to different modes of billing. See'
+    ' https://aws.amazon.com/rds/aurora/pricing/.',
+)
