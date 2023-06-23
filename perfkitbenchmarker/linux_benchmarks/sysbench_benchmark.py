@@ -371,7 +371,6 @@ def _GetSysbenchPrepareCommand(
       ),
       ('--scale=%d' % FLAGS.sysbench_scale if _IsValidFlag('scale') else ''),
       '--threads=%d' % num_threads,
-      '--trx_level=%s' % _TXN_ISOLATION_LEVEL.value,
   ]
   if FLAGS.sysbench_testname == SPANNER_TPCC:
     # Supports loading through multiple VMs
@@ -504,7 +503,6 @@ def Prepare(benchmark_spec):
 def _GetDatabaseSize(db):
   """Get the size of the database in MB."""
   db_engine_type = db.engine_type
-  stdout = None
   if db_engine_type == sql_engine_utils.MYSQL:
     stdout, _ = db.client_vm_query_tools.IssueSqlCommand(
         "SELECT table_schema AS 'Database', "
@@ -536,7 +534,11 @@ def _GetDatabaseSize(db):
   # supports 4TB per node, so use that number for now.
   elif db_engine_type == sql_engine_utils.SPANNER_POSTGRES:
     size_mb = 4096000 * db.nodes
-
+  else:
+    raise errors.Benchmarks.RunError(
+        'Unsupported engine type, please update'
+        ' sysbench_benchmark._GetDatabaseSize.'
+    )
   return size_mb
 
 
@@ -660,8 +662,9 @@ def _GetSysbenchRunCommand(
       '--report-interval=%d' % FLAGS.sysbench_report_interval,
       '--max-requests=0',
       '--time=%d' % duration,
-      '--trx_level=%s' % _TXN_ISOLATION_LEVEL.value,
   ]
+  if _GetSysbenchTestParameter() == 'tpcc':
+    run_cmd_tokens.append('--trx_level=%s' % _TXN_ISOLATION_LEVEL.value)
   run_cmd = ' '.join(run_cmd_tokens + _GetCommonSysbenchOptions(db) + ['run'])
   return run_cmd
 
