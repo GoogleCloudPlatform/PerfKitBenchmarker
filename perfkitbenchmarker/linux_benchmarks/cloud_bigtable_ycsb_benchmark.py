@@ -80,6 +80,10 @@ _ENABLE_RLS_ROUTING = flags.DEFINE_boolean(
     'google_bigtable_enable_rls_routing', False,
     'If true, will use the googlebigtableclient with ycsb to enable traffic'
     'through RLS with direct path')
+_ENABLE_EXPERIMENTAL_LB_POLICY = flags.DEFINE_boolean(
+    'google_bigtable_enable_experimental_lb_policy', False,
+    'If true, will use the googlebigtableclient with ycsb to enable beta LB'
+    'policy.')
 _CHANNEL_COUNT = flags.DEFINE_integer(
     'google_bigtable_channel_count',
     None,
@@ -201,6 +205,11 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
       vm.RemoteCommand(
           'echo "export GRPC_EXPERIMENTAL_XDS_RLS_LB=true" | sudo tee -a'
           ' /etc/environment'
+      )
+    if _ENABLE_EXPERIMENTAL_LB_POLICY.value:
+      vm.RemoteCommand(
+          'echo "export GRPC_EXPERIMENTAL_PICKFIRST_LB_CONFIG=true" | sudo tee'
+          ' -a /etc/environment'
       )
 
   if not _USE_JAVA_VENEER_CLIENT.value:
