@@ -111,10 +111,6 @@ def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
   Returns:
     loaded benchmark configuration
   """
-  if FLAGS.db_engine and 'sqlserver' in FLAGS.db_engine:
-    raise ValueError(
-        'Please use Windows Client for SQL server benchmarking on Hammerdb.'
-    )
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 

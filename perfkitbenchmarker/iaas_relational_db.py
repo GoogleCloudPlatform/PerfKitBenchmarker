@@ -25,10 +25,12 @@ from perfkitbenchmarker import db_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
 IS_READY_TIMEOUT = 600  # 10 minutes
+MSSQL_PID = 'developer'  # Edition of SQL server on Linux
 
 POSTGRES_RESOURCE_PATH = 'database_configurations/postgres'
 POSTGRES_13_VERSION = '13'
@@ -157,8 +159,9 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
             self.spec.engine_version.startswith('8.0.')):
         mysql_name = 'mysql80'
       else:
-        raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
-                        'and 8.0 are supported.' % self.spec.engine_version)
+        raise NotImplementedError('Invalid database engine version: %s. '
+                                  'Only 5.6 and 5.7 and 8.0 are supported.'
+                                  % self.spec.engine_version)
       stdout, stderr = self.server_vm.RemoteCommand(
           'sudo service %s status' % self.server_vm.GetServiceName(mysql_name))
       return stdout and not stderr
@@ -190,7 +193,7 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
         _, stderr, _ = self.client_vm_query_tools.IssueSqlCommand(
             'SET %s;' % flag, ignore_failure=True)
         if stderr:
-          raise Exception('Invalid MySQL flags: %s' % stderr)
+          raise NotImplementedError('Invalid MySQL flags: %s' % stderr)
 
   def _ApplyPostgresFlags(self):
     """Add postgres flags to postgres config file."""
@@ -248,8 +251,10 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
       self._InstallMySQLServer()
     elif db_engine == 'postgres':
       self._InstallPostgresServer()
+    elif db_engine == 'sqlserver':
+      self._InstallMSSQLServer()
     else:
-      raise Exception(
+      raise NotImplementedError(
           'Engine {0} not supported for unmanaged databases.'.format(
               self.spec.engine))
 
@@ -277,7 +282,8 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
           '"s|# Allow data files dir access|'
           '  /scratch/mysql/ r, /scratch/mysql/** rwk, /scratch/tmp/ r, '
           '/scratch/tmp/** rwk, /proc/*/status r, '
-          '/sys/devices/system/node/ r, /sys/devices/system/node/node*/meminfo r,'
+          '/sys/devices/system/node/ r, '
+          '/sys/devices/system/node/node*/meminfo r,'
           ' /sys/devices/system/node/*/* r, /sys/devices/system/node/* r, '
           '# Allow data files dir access|g" /etc/apparmor.d/usr.sbin.mysqld')
       self.server_vm.RemoteCommand(
@@ -346,6 +352,52 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
     self.server_vm.RemoteCommand('sudo cat {}'.format(postgres_hba_conf_file))
     vm.RemoteCommand('sudo systemctl restart postgresql')
 
+  def _InstallMSSQLServer(self):
+    if (self.spec.engine_version == '2022'):
+      mssql_name = 'mssql2022'
+    elif (self.spec.engine_version == '2019'):
+      mssql_name = 'mssql2019'
+    else:
+      raise NotImplementedError('Invalid database engine version: {}. '
+                                'Only 2019 and 2022 are supported.'
+                                .format(self.spec.engine_version))
+
+    self.spec.database_username = 'sa'
+    self.spec.database_password = vm_util.GenerateRandomWindowsPassword()
+
+    self.server_vm.Install(mssql_name)
+    self.server_vm.RemoteCommand('sudo MSSQL_SA_PASSWORD={} '
+                                 'MSSQL_PID={} /opt/mssql/bin/mssql-conf -n '
+                                 'setup accept-eula'.format(
+                                     self.spec.database_password, MSSQL_PID))
+    self.server_vm.RemoteCommand('sudo firewall-cmd --zone=public '
+                                 '--add-port=1433/tcp --permanent')
+    self.server_vm.RemoteCommand('sudo firewall-cmd --reload')
+    self.server_vm.RemoteCommand('sudo systemctl restart mssql-server')
+
+    self.server_vm.RemoteCommand('sudo mkdir -p /scratch/mssqldata')
+    self.server_vm.RemoteCommand('sudo mkdir -p /scratch/mssqllog')
+    self.server_vm.RemoteCommand('sudo mkdir -p /scratch/mssqltemp')
+
+    self.server_vm.RemoteCommand('sudo chown mssql /scratch/mssqldata')
+    self.server_vm.RemoteCommand('sudo chown mssql /scratch/mssqllog')
+    self.server_vm.RemoteCommand('sudo chown mssql /scratch/mssqltemp')
+
+    self.server_vm.RemoteCommand('sudo chgrp mssql /scratch/mssqldata')
+    self.server_vm.RemoteCommand('sudo chgrp mssql /scratch/mssqllog')
+    self.server_vm.RemoteCommand('sudo chgrp mssql /scratch/mssqltemp')
+
+    self.server_vm.RemoteCommand('sudo /opt/mssql/bin/mssql-conf set '
+                                 'filelocation.defaultdatadir '
+                                 '/scratch/mssqldata')
+    self.server_vm.RemoteCommand('sudo /opt/mssql/bin/mssql-conf set '
+                                 'filelocation.defaultlogdir '
+                                 '/scratch/mssqllog')
+    self.server_vm.RemoteCommand('sudo systemctl restart mssql-server')
+
+    if self.server_vm.OS_TYPE == os_types.RHEL8:
+      _TuneForSQL(self.server_vm)
+
   def _InstallMySQLServer(self):
     """Installs MySQL Server on the server vm.
 
@@ -366,8 +418,9 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
           self.spec.engine_version.startswith('8.0.')):
       mysql_name = 'mysql80'
     else:
-      raise Exception('Invalid database engine version: %s. Only 5.6 and 5.7 '
-                      'and 8.0 are supported.' % self.spec.engine_version)
+      raise NotImplementedError('Invalid database engine version: %s. '
+                                'Only 5.6 and 5.7 and 8.0 are supported.'
+                                % self.spec.engine_version)
     self.server_vm.Install(mysql_name)
     self.server_vm.RemoteCommand('chmod 755 %s' %
                                  self.server_vm.GetScratchDir())
@@ -541,3 +594,22 @@ def ConfigureSQLServer(vm, username: str, password: str):
       f'N\'DefaultLog\', REG_SZ, N\'{vm.assigned_disk_letter}:\\\'"')
   vm.RemoteCommand('net stop mssqlserver /y')
   vm.RemoteCommand('net start mssqlserver')
+
+
+def _TuneForSQL(vm):
+  """Set TuneD settings specific to SQL Server on RedHat."""
+  tune_settings = ('# A TuneD configuration for SQL Server on Linux \n'
+                   '[main] \n'
+                   'summary=Optimize for Microsoft SQL Server \n'
+                   'include=throughput-performance \n')
+  vm.RemoteCommand('echo {}'.format(tune_settings))
+
+
+def ConfigureSQLServerLinux(vm, username: str, password: str):
+  """Update the username and password on a SQL Server."""
+  vm.RemoteCommand('/opt/mssql-tools/bin/sqlcmd -Q '
+                   f'"ALTER LOGIN {username} ENABLE;"')
+  vm.RemoteCommand(
+      '/opt/mssql-tools/bin/sqlcmd -Q '
+      f'"ALTER LOGIN sa WITH PASSWORD = \'{password}\' ;"')
+  vm.RemoteCommand('sudo systemctl restart mssql-server')
