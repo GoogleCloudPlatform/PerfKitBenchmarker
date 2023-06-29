@@ -122,7 +122,11 @@ flags.DEFINE_string(
     'compute instance create command.')
 flags.DEFINE_string('gcp_preprovisioned_data_bucket', None,
                     'GCS bucket where pre-provisioned data has been copied.')
-flags.DEFINE_integer('gcp_redis_gb', 5, 'Size of redis cluster in gb')
+REDIS_GB = flags.DEFINE_integer(
+    'gcp_redis_gb',
+    5,
+    'Size of redis instance in gb.'
+)
 flags.DEFINE_string('gcp_service_account', None, 'Service account to use for '
                     'authorization.')
 flags.DEFINE_string(

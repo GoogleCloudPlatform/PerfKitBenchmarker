@@ -86,6 +86,18 @@
                             "PreferredAvailabilityZone": "us-east-1c"
                         }
                     ]
+                },
+                {
+                    "NodeGroupId": "0007",
+                    "Status": "available",
+                    "Slots": "16383-19113",
+                    "NodeGroupMembers": [
+                        {
+                            "CacheClusterId": "pkb-cbf06969-0007-001",
+                            "CacheNodeId": "0001",
+                            "PreferredAvailabilityZone": "us-east-1c"
+                        }
+                    ]
                 }
             ],
             "AutomaticFailover": "enabled",

@@ -612,7 +612,7 @@ def _FindFactor(number: int, max_threads: int, max_clients: int) -> int:
 
 @dataclasses.dataclass
 class _ClientModifier(_LoadModifier):
-  """Modifies clines in single-pipeline binary search."""
+  """Modifies clients in single-pipeline binary search."""
 
   max_clients: int
   max_threads: int
@@ -728,7 +728,10 @@ def _BinarySearchForLatencyCappedThroughput(
             )
         )
       # 95 percentile used to decide latency cap
-      parameters = modifier.ModifyLoad(parameters, result.latency_dic['95'])
+      new_parameters = modifier.ModifyLoad(parameters, result.latency_dic['95'])
+      if new_parameters == parameters:
+        break
+      parameters = new_parameters
     results.append(current_max_result)
     logging.info(
         'Found optimal parameters %s for throughput %s and p95 latency %s',
@@ -1045,7 +1048,9 @@ def _Run(
       pipeline,
   )
 
-  file_name_suffix = '_'.join(filter(None, [str(server_port), unique_id]))
+  file_name_suffix = '_'.join(
+      filter(None, [str(server_port), unique_id, shard_addresses])
+  )
   memtier_results_file_name = (
       '_'.join([MEMTIER_RESULTS, file_name_suffix]) + '.log'
   )

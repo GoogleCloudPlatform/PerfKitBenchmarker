@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import time
+from typing import Any, Optional
 
 from absl import flags
 from google.cloud import monitoring_v3
@@ -47,24 +48,25 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
   def __init__(self, spec):
     super(CloudRedis, self).__init__(spec)
     self.project = FLAGS.project
-    self.size = FLAGS.gcp_redis_gb
+    self.size = gcp_flags.REDIS_GB.value
     self.redis_region = FLAGS.cloud_redis_region
     self.redis_version = spec.config.cloud_redis.redis_version
     self.failover_style = FLAGS.redis_failover_style
-    if self.failover_style == managed_memory_store.Failover.FAILOVER_NONE:
-      self.tier = BASIC_TIER
-    elif (
-        self.failover_style
-        == managed_memory_store.Failover.FAILOVER_SAME_REGION
-    ):
-      self.tier = STANDARD_TIER
+    self.tier = self._GetTier()
     # Update the environment for gcloud commands:
     os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_REDIS'] = (
         gcp_flags.CLOUD_REDIS_API_OVERRIDE.value
     )
 
+  def _GetTier(self) -> Optional[str]:
+    """Returns the tier of the instance."""
+    # See https://cloud.google.com/memorystore/docs/redis/redis-tiers."""
+    if self.failover_style == managed_memory_store.Failover.FAILOVER_NONE:
+      return BASIC_TIER
+    return STANDARD_TIER
+
   @staticmethod
-  def CheckPrerequisites(benchmark_config):
+  def CheckPrerequisites(_):
     if (
         FLAGS.redis_failover_style
         == managed_memory_store.Failover.FAILOVER_SAME_ZONE
@@ -79,7 +81,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     ):
       raise errors.Config.InvalidValue('Invalid Redis version.')
 
-  def GetResourceMetadata(self):
+  def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the instance.
 
     Returns:
@@ -88,10 +90,11 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     self.metadata.update({
         'cloud_redis_failover_style': self.failover_style,
         'cloud_redis_size': self.size,
-        'cloud_redis_tier': self.tier,
         'cloud_redis_region': self.redis_region,
         'cloud_redis_version': self.ParseReadableVersion(self.redis_version),
     })
+    if self.tier is not None:
+      self.metadata['cloud_redis_tier'] = self.tier
     return self.metadata
 
   @staticmethod
@@ -108,16 +111,21 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
       return version
     return '.'.join(version.split('_')[1:])
 
-  def _Create(self):
-    """Creates the instance."""
+  def _GetCreateCommand(self) -> util.GcloudCommand:
+    """Returns the command used to create the instance."""
     cmd = util.GcloudCommand(self, 'redis', 'instances', 'create', self.name)
-    cmd.flags['region'] = self.redis_region
     cmd.flags['zone'] = FLAGS.zone[0]
     cmd.flags['network'] = FLAGS.gce_network_name
     cmd.flags['tier'] = self.tier
     cmd.flags['size'] = self.size
     cmd.flags['redis-version'] = self.redis_version
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+    return cmd
+
+  def _Create(self):
+    """Creates the instance."""
+    cmd = self._GetCreateCommand()
+    cmd.flags['region'] = self.redis_region
     cmd.Issue(timeout=COMMAND_TIMEOUT)
 
   def _IsReady(self):

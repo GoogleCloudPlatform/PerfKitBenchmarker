@@ -157,6 +157,7 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             memtier.MemtierConnection(vm1, '10.0.1.117', 6379),
             memtier.MemtierConnection(vm1, '10.0.2.104', 6379),
             memtier.MemtierConnection(vm1, '10.0.3.217', 6379),
+            memtier.MemtierConnection(vm1, '10.0.1.09', 6379),
             memtier.MemtierConnection(vm2, '10.0.2.177', 6379),
             memtier.MemtierConnection(vm2, '10.0.1.174', 6379),
             memtier.MemtierConnection(vm2, '10.0.3.6', 6379),
