@@ -16,12 +16,10 @@
 import logging
 from typing import Any, Dict, List
 from absl import flags
-from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 
@@ -36,8 +34,6 @@ xgboost:
       vm_spec:
         GCP:
           machine_type: n1-standard-4
-          gpu_type: t4
-          gpu_count: 1
           zone: us-east1-c
           image_family: common-cu113
           image_project: deeplearning-platform-release
@@ -53,6 +49,9 @@ xgboost:
           boot_disk_size: 200
 """
 
+_USE_GPU = flags.DEFINE_boolean(
+    'xgboost_use_gpu', True, 'Run XGBoost using GPU.'
+)
 CODE_PATH = '/scratch/xgboost_ray'
 
 
@@ -75,7 +74,8 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     bm_spec: The benchmark specification
   """
   vm = bm_spec.vms[0]
-  vm.Install('cuda_toolkit')
+  if _USE_GPU.value:
+    vm.Install('cuda_toolkit')
   vm.RemoteCommand('git clone https://github.com/ray-project/xgboost_ray.git')
   vm.RemoteCommand(
       f'{FLAGS.xgboost_env} python3 -m pip install -r'
@@ -96,16 +96,16 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   )
 
 
-def _CollectGpuSamples(
-    vm: virtual_machine.BaseVirtualMachine) -> List[sample.Sample]:
+def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Run XGBoost on the cluster.
 
   Args:
-    vm: The virtual machine to run the benchmark.
+    bm_spec: The benchmark specification
 
   Returns:
     A list of sample.Sample objects.
   """
+  vm = bm_spec.vms[0]
   cmd = [
       FLAGS.xgboost_env,
       'python3',
@@ -113,12 +113,13 @@ def _CollectGpuSamples(
       '1',
       '10',
       '20',
-      '--gpu',
+      '--gpu' if _USE_GPU.value else '',
       '--file',
       '/tmp/classification.parquet',
   ]
   metadata = {}
-  metadata.update(cuda_toolkit.GetMetadata(vm))
+  if _USE_GPU.value:
+    metadata.update(cuda_toolkit.GetMetadata(vm))
   metadata['command'] = ' '.join(cmd)
 
   stdout, stderr, exit_code = vm.RemoteCommandWithReturnCode(
@@ -128,11 +129,7 @@ def _CollectGpuSamples(
   training_time = regex_util.ExtractFloat(
       r'TRAIN TIME TAKEN: ([\d\.]+) seconds', stdout
   )
-  return sample.Sample('training_time', training_time, 'seconds', metadata)
-
-
-def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
-  return background_tasks.RunThreaded(_CollectGpuSamples, bm_spec.vms)
+  return [sample.Sample('training_time', training_time, 'seconds', metadata)]
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
