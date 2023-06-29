@@ -45,10 +45,15 @@ RELATIONAL_DB_FLAGS_TO_TRANSLATE = {
 
 LIST_TO_MULTISTRING_TRANSLATIONS = {'zones': 'zone', 'extra_zones': 'zone'}
 
+SYSBENCH_TRANSLATIONS = {
+    'sysbench_thread_counts': 'sysbench_run_threads'
+}
+
 ALL_TRANSLATIONS = [
     DISK_FLAGS_TO_TRANSLATE,
     RELATIONAL_DB_FLAGS_TO_TRANSLATE,
     LIST_TO_MULTISTRING_TRANSLATIONS,
+    SYSBENCH_TRANSLATIONS
 ]
 
 # Make sure the regex only matches the argument instead of value
