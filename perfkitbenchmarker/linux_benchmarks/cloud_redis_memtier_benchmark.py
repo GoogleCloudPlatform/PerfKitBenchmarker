@@ -17,6 +17,7 @@ Spins up a cloud redis instance, runs memtier against it, then spins it down.
 """
 
 import collections
+import itertools
 from absl import flags
 from absl import logging
 from perfkitbenchmarker import background_tasks
@@ -117,12 +118,19 @@ def _GetConnections(
   for shard in shards:
     shards_by_zone[shard.zone].append(shard)
   shards_by_vm = collections.defaultdict(list)
-  for shards_list in shards_by_zone.values():
-    for shard_index, shard in enumerate(shards_list):
-      vm_index = shard_index % len(vms)
-      vm = vms[vm_index]
-      connections.append(memtier.MemtierConnection(vm, shard.ip, shard.port))
-      shards_by_vm[vm].append(shard)
+  # List shards alternating by zone and then distribute them to VMs. Example:
+  # shards_by_zone = {
+  #   'zone_a': [1, 2, 3]
+  #   'zone_b': [4, 5, 6, 7]
+  # } -> shards_list = [1, 2, 3, 4, 5, 6, 7]
+  # vm1 gets [1, 3, 5, 7], vm2 gets [2, 4, 6]
+  for shard_index, shard in enumerate(
+      itertools.chain(*shards_by_zone.values())
+  ):
+    vm_index = shard_index % len(vms)
+    vm = vms[vm_index]
+    connections.append(memtier.MemtierConnection(vm, shard.ip, shard.port))
+    shards_by_vm[vm].append(shard)
   logging.info('Shards by VM: %s', shards_by_vm)
   return connections
 

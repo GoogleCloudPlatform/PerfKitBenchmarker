@@ -18,11 +18,13 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
+from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cloud_redis_memtier_benchmark
 from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.providers.aws import aws_elasticache_redis  # pylint:disable=unused-import
+from perfkitbenchmarker.providers.gcp import gcp_cloud_redis  # pylint:disable=unused-import
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -53,6 +55,14 @@ def _GetTestRedisInstance():
   instance._ip = '0.0.0.0'
   instance._port = 1234
   return instance
+
+
+def _GetTestVm(ip_address):
+  vm = pkb_common_test_case.TestLinuxVirtualMachine(
+      pkb_common_test_case.CreateTestVmSpec()
+  )
+  vm.ip_address = ip_address
+  return vm
 
 
 class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
@@ -195,6 +205,82 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         connections,
         [
             memtier.MemtierConnection(vm1, '0.0.0.0', 1234),
+        ],
+    )
+
+  def testShardConnections(self):
+    test_redis_instance = _GetTestRedisInstance()
+    test_redis_instance.name = 'test-instance'
+    vm1 = _GetTestVm('vm1')
+    vm2 = _GetTestVm('vm2')
+    vm3 = _GetTestVm('vm3')
+
+    shards = [
+        managed_memory_store.RedisShard('', 'shard0', 0, 'zone_a'),
+        managed_memory_store.RedisShard('', 'shard1', 0, 'zone_a'),
+        managed_memory_store.RedisShard('', 'shard2', 0, 'zone_a'),
+        managed_memory_store.RedisShard('', 'shard3', 0, 'zone_b'),
+        managed_memory_store.RedisShard('', 'shard4', 0, 'zone_b'),
+        managed_memory_store.RedisShard('', 'shard5', 0, 'zone_b'),
+        managed_memory_store.RedisShard('', 'shard6', 0, 'zone_c'),
+        managed_memory_store.RedisShard('', 'shard7', 0, 'zone_c'),
+        managed_memory_store.RedisShard('', 'shard8', 0, 'zone_c'),
+        managed_memory_store.RedisShard('', 'shard9', 0, 'zone_c'),
+    ]
+    self.enter_context(
+        mock.patch.object(
+            test_redis_instance, 'GetShardEndpoints', return_value=shards
+        )
+    )
+
+    connections = cloud_redis_memtier_benchmark._GetConnections(
+        [vm1, vm2, vm3], test_redis_instance
+    )
+
+    self.assertCountEqual(
+        connections,
+        [
+            memtier.MemtierConnection(vm1, 'shard0', 0),
+            memtier.MemtierConnection(vm1, 'shard3', 0),
+            memtier.MemtierConnection(vm1, 'shard6', 0),
+            memtier.MemtierConnection(vm1, 'shard9', 0),
+            memtier.MemtierConnection(vm2, 'shard1', 0),
+            memtier.MemtierConnection(vm2, 'shard4', 0),
+            memtier.MemtierConnection(vm2, 'shard7', 0),
+            memtier.MemtierConnection(vm3, 'shard2', 0),
+            memtier.MemtierConnection(vm3, 'shard5', 0),
+            memtier.MemtierConnection(vm3, 'shard8', 0),
+        ],
+    )
+
+  def testShardConnectionsOnePerVm(self):
+    test_redis_instance = _GetTestRedisInstance()
+    test_redis_instance.name = 'test-instance'
+    vm1 = _GetTestVm('vm1')
+    vm2 = _GetTestVm('vm2')
+    vm3 = _GetTestVm('vm3')
+
+    shards = [
+        managed_memory_store.RedisShard('', 'shard0', 0, 'zone_a'),
+        managed_memory_store.RedisShard('', 'shard1', 0, 'zone_b'),
+        managed_memory_store.RedisShard('', 'shard2', 0, 'zone_c'),
+    ]
+    self.enter_context(
+        mock.patch.object(
+            test_redis_instance, 'GetShardEndpoints', return_value=shards
+        )
+    )
+
+    connections = cloud_redis_memtier_benchmark._GetConnections(
+        [vm1, vm2, vm3], test_redis_instance
+    )
+
+    self.assertCountEqual(
+        connections,
+        [
+            memtier.MemtierConnection(vm1, 'shard0', 0),
+            memtier.MemtierConnection(vm2, 'shard1', 0),
+            memtier.MemtierConnection(vm3, 'shard2', 0),
         ],
     )
 
