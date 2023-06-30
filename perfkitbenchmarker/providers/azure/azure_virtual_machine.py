@@ -112,6 +112,11 @@ AZURE_ARM_TYPES = [
     r'(Standard_E[0-9]+pd?s_v5)',
 ]
 
+CONFIDENTIAL_MILAN_TYPES = [
+    r'(Standard_DC[0-9]+as?d?s_v5)',
+    r'(Standard_EC[0-9]+as?d?s_v5)'
+]
+
 FIVE_MINUTE_TIMEOUT = 300
 
 
@@ -559,15 +564,24 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Configure NIC
     if self.assign_external_ip:
       public_ip_name = self.name + '-public-ip'
-      self.public_ip = AzurePublicIPAddress(self.region, self.availability_zone,
-                                            public_ip_name)
+      self.public_ip = AzurePublicIPAddress(
+          self.region, self.availability_zone, public_ip_name
+      )
     else:
       public_ip_name = None
       self.public_ip = None
-    self.nic = AzureNIC(self.network, self.name + '-nic',
-                        public_ip_name, vm_spec.accelerated_networking)
+    self.nic = AzureNIC(
+        self.network,
+        self.name + '-nic',
+        public_ip_name,
+        vm_spec.accelerated_networking,
+    )
 
     self.storage_account = self.network.storage_account
+    self.machine_type_is_confidential = any(
+        re.search(machine_series, self.machine_type)
+        for machine_series in CONFIDENTIAL_MILAN_TYPES
+    )
     arm_arch = 'neoverse-n1' if _MachineTypeIsArm(self.machine_type) else None
     if arm_arch:
       self.host_arch = arm_arch
@@ -584,6 +598,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.image = type(self).ARM_IMAGE_URN
       else:
         raise errors.Benchmarks.UnsupportedConfigError('No Azure ARM image.')
+    elif self.machine_type_is_confidential:
+      self.image = type(self).CONFIDENTIAL_IMAGE_URN
     else:
       self.image = type(self).IMAGE_URN
 
@@ -641,10 +657,18 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """See base class."""
+    disk_size_args = []
     if self.os_disk.disk_size:
       disk_size_args = ['--os-disk-size-gb', str(self.os_disk.disk_size)]
-    else:
-      disk_size_args = []
+
+    confidential_args = []
+    if self.machine_type_is_confidential:
+      confidential_args = [
+          '--enable-vtpm', 'true',
+          '--enable-secure-boot', 'true',
+          '--security-type', 'ConfidentialVM',
+          '--os-disk-security-encryption-type', 'VMGuestStateOnly',
+      ]
 
     tags = {}
     tags.update(self.vm_metadata)
@@ -670,6 +694,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
             self.name,
         ]  # pyformat: disable
         + disk_size_args
+        + confidential_args
         + self.resource_group.args
         + self.nic.args
         + tag_args
@@ -990,6 +1015,7 @@ class Ubuntu2004BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu2004Mixin):
   GEN2_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest'
   IMAGE_URN = 'Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest'
+  CONFIDENTIAL_IMAGE_URN = 'Canonical:0001-com-ubuntu-confidential-vm-focal:20_04-lts-cvm:latest'
   ARM_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-focal:20_04-lts-arm64:latest'
 
 
@@ -997,6 +1023,7 @@ class Ubuntu2204BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu2204Mixin):
   GEN2_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest'
   IMAGE_URN = 'Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest'
+  CONFIDENTIAL_IMAGE_URN = 'Canonical:0001-com-ubuntu-confidential-vm-jammy:22_04-lts-cvm:latest'
   ARM_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-jammy:22_04-lts-arm64:latest'
 
 
