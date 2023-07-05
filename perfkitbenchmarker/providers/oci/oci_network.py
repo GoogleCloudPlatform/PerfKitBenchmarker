@@ -269,6 +269,8 @@ class OciVcn(resource.BaseResource):
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
 
     def UpdateSecurityList(self):
+        # UNUSED / DEPRECIATED
+
         """Updates the Route Table to allow all ports traffic on internal ip and 22 on Internet"""
         logging.info("Update Routing Table with Internet Gateway")
         create_cmd = util.OCI_PREFIX + [
@@ -282,6 +284,24 @@ class OciVcn(resource.BaseResource):
             '\"destinationPortRange\": {\"max\": 22, \"min\": 22}}}]\'' % self.cidr_block]
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
+
+    def AddSecurityListIngressRule(self, start_port=22, end_port=None):
+        if not end_port:
+            end_port = start_port
+
+        """Updates security list to allow traffic on a specific port"""
+        logging.info(f"Add ingress rule for ports {start_port} : {end_port}")
+        cmd = util.OCI_PREFIX + [
+            'network',
+            'security-list',
+            'update',
+            f'--security-list-id {self.security_list_id}',
+            '--force',
+            '--ingress-security-rules \'[{\"source\": \"%s\", \"protocol\": \"all\", \"isStateless\": false},'
+            '{\"source\": "0.0.0.0/0", \"protocol\": \"6\", \"isStateless\": false, \"tcpOptions\": {'
+            '\"destinationPortRange\": {\"max\": \"%i\", \"min\": \"%i\"}}}]\'' % (self.cidr_block, end_port, start_port)]
+        cmd = util.GetEncodedCmd(cmd)
+        stdout, _, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
 
     def GetDefaultRouteTableId(self):
         """Get Default Route Table OCI Id."""
@@ -343,7 +363,9 @@ class OciNetwork(network.BaseNetwork):
             self.vcn.WaitForInternetGatewayStatus(["AVAILABLE"])
             self.vcn.UpdateRouteTable()
             self.vcn.WaitForRouteTableStatus(["AVAILABLE"])
-            self.vcn.UpdateSecurityList()
+
+            # Add opening in VCN for SSH
+            self.vcn.AddSecurityListIngressRule(start_port=22)
             self.vcn.WaitForSecurityListStatus(["AVAILABLE"])
         else:
             self.vcn.GetVcnIDFromName()
@@ -357,3 +379,31 @@ class OciNetwork(network.BaseNetwork):
             self.vcn.DeleteInternetGateway()
             self.vcn.DeleteSubnet()
             self.vcn.Delete()
+
+
+class OCIFirewall(network.BaseFirewall):
+
+    def __init__(self):
+        super(OCIFirewall, self).__init__()
+
+
+
+    def AllowPort(self, vm, start_port, end_port=None):
+        """
+        Open a port range on a specific vm. This seems to normally be called by the vm object.
+
+        :param vm:
+        :param start_port:
+        :param end_port:
+        :return:
+        """
+
+        if not vm.network.vcn:
+            # TODO: What happens when we do not have a vcn? Is that possible?
+            logging.error('Opening ports with OCI cloud only supported when using a VCN for now!')
+
+        else:
+            vm.network.vcn.AddSecurityListIngressRule(start_port, end_port=end_port)
+
+
+
