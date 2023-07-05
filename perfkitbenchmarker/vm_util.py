@@ -383,8 +383,6 @@ def IssueCommand(
     raise ValueError(
         f'Command must be a list of strings, but string {cmd} was received')
   full_cmd = ' '.join(str(w) for w in cmd)
-  if should_pre_log:
-    logging.info('Running: %s', full_cmd, stacklevel=stack_level)
   if '; ' in full_cmd:
     logging.warning(
         (
@@ -413,6 +411,8 @@ def IssueCommand(
           ',  WallTime:%Es,  CPU:%Us,  MaxMemory:%Mkb '
       ] + list(cmd)
 
+    if should_pre_log:
+      logging.info('Running: %s', full_cmd, stacklevel=stack_level)
     try:
       process = subprocess.Popen(cmd_to_use, env=env, shell=shell_value,
                                  stdin=subprocess.PIPE, stdout=tf_out,
