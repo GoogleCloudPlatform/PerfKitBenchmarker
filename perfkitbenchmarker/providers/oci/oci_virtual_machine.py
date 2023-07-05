@@ -273,6 +273,12 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point,
                        disk.LOCAL, data_disk.mount_options,
                        data_disk.fstab_options)
+        
+    def AllowPort(self, start_port, end_port=None, source_range=None):
+
+        # TODO: Potentially replace for case where firewall skip flag is in place
+        super(OciVirtualMachine, self).AllowPort(start_port, end_port, source_range)
+
 
 class Ubuntu2204BasedOCIVirtualMachine(OciVirtualMachine,
                                        linux_virtual_machine.Ubuntu2204Mixin):
