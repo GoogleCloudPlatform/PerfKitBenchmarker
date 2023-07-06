@@ -83,13 +83,13 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs the fio package on the VM."""
-  vm.InstallPackages('libaio-devel libaio bc zlib-devel')
+  vm.InstallPackages('libaio-devel numactl-devel libaio bc zlib-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the fio package on the VM."""
-  vm.InstallPackages('libaio-dev libaio1 bc zlib1g-dev')
+  vm.InstallPackages('libaio-dev libnuma-dev libaio1 bc zlib1g-dev')
   _Install(vm)
 
 
