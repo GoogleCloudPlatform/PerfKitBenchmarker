@@ -146,6 +146,7 @@ sysbench:
   description: Sysbench OLTP benchmarks.
   relational_db:
     engine: mysql
+    enable_freeze_restore: True
     db_spec:
       GCP:
         machine_type: db-n1-standard-16
