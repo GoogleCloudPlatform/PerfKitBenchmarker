@@ -1513,6 +1513,7 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
                     'clients': 2,
                     'pipeline': 3,
                     'password': None,
+                    'unique_id': vm1.ip_address,
                 },
             ),
         ],
@@ -1557,6 +1558,7 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
                     'shard_addresses': (
                         '10.0.1.117:6379,10.0.2.104:6379,10.0.3.217:6379'
                     ),
+                    'unique_id': 'vm1',
                 },
             ),
             (
@@ -1572,6 +1574,7 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
                     'shard_addresses': (
                         '10.0.2.177:6379,10.0.1.174:6379,10.0.3.6:6379'
                     ),
+                    'unique_id': 'vm2',
                 },
             ),
         ],

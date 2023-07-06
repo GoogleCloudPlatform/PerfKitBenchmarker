@@ -546,6 +546,7 @@ def _RunParallelConnections(
       args.update({
           'vm': vm,
           'shard_addresses': shard_addresses,
+          'unique_id': vm.ip_address,
       })
       run_args.append(((), args))
   else:
@@ -553,6 +554,7 @@ def _RunParallelConnections(
       args = copy.deepcopy(base_args)
       args.update({
           'vm': connection.client_vm,
+          'unique_id': connection.client_vm.ip_address,
       })
       run_args.append(((), args))
   logging.info('Connections: %s', connections_by_vm)
@@ -1049,7 +1051,7 @@ def _Run(
   )
 
   file_name_suffix = '_'.join(
-      filter(None, [str(server_port), unique_id, shard_addresses])
+      filter(None, [str(server_port), unique_id])
   )
   memtier_results_file_name = (
       '_'.join([MEMTIER_RESULTS, file_name_suffix]) + '.log'
