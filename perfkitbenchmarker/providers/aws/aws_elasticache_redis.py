@@ -43,6 +43,9 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
   CLOUD = provider_info.AWS
   MEMORY_STORE = managed_memory_store.REDIS
 
+  # AWS Clusters can take up to 2 hours to create
+  READY_TIMEOUT = 120 * 60
+
   def __init__(self, spec):
     super(ElastiCacheRedis, self).__init__(spec)
     self.subnet_group_name = 'subnet-%s' % self.name
