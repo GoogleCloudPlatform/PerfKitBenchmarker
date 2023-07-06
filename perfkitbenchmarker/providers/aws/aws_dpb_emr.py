@@ -19,7 +19,7 @@ Clusters can be created and deleted.
 import collections
 import json
 import logging
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from absl import flags
 from perfkitbenchmarker import disk
@@ -120,7 +120,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.persistent_fs_prefix = 's3://'
     self.bucket_to_delete = None
     self.dpb_version = FLAGS.dpb_emr_release_label or self.dpb_version
-    self._cluster_create_time = None
+    self._cluster_create_time: Optional[float] = None
+    self._cluster_ready_time: Optional[float] = None
+    self._cluster_delete_time: Optional[float] = None
     if not self.dpb_version:
       raise errors.Setup.InvalidSetupError(
           'dpb_service.version must be provided.')
@@ -135,7 +137,15 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     Returns:
       A float representing the creation time in seconds or None.
     """
-    return self._cluster_create_time
+    return self._cluster_ready_time - self._cluster_create_time
+
+  def GetClusterDuration(self) -> Optional[float]:
+    if (
+        self._cluster_create_time is not None
+        and self._cluster_delete_time is not None
+    ):
+      return self._cluster_delete_time - self._cluster_create_time
+    return None
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
@@ -257,6 +267,11 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     if retcode != 0:
       return False
     result = json.loads(stdout)
+    end_datetime = (
+        result.get('Status', {}).get('Timeline', {}).get('EndDateTime')
+    )
+    if end_datetime is not None:
+      self._cluster_delete_time = end_datetime
     if result['Cluster']['Status']['State'] in INVALID_STATES:
       return False
     else:
@@ -273,20 +288,22 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     # TODO(saksena): Handle error outcomees when spinning up emr clusters
     is_ready = result['Cluster']['Status']['State'] == READY_STATE
     if is_ready:
-      self._cluster_create_time = self._ParseClusterCreateTime(result)
+      self._cluster_create_time, self._cluster_ready_time = (
+          self._ParseClusterCreateTime(result)
+      )
     return is_ready
 
   @classmethod
-  def _ParseClusterCreateTime(cls, data) -> Optional[float]:
-    """Parses the cluster create time from an API response dict."""
-    creation_ts = None
-    ready_ts = None
+  def _ParseClusterCreateTime(
+      cls, data: dict[str, Any]
+  ) -> tuple[Optional[float], Optional[float]]:
+    """Parses the cluster create & ready time from an API response dict."""
     try:
       creation_ts = data['Cluster']['Status']['Timeline']['CreationDateTime']
       ready_ts = data['Cluster']['Status']['Timeline']['ReadyDateTime']
-      return ready_ts - creation_ts
+      return creation_ts, ready_ts
     except (LookupError, TypeError):
-      return None
+      return None, None
 
   def _GetCompletedJob(self, job_id):
     """See base class."""
