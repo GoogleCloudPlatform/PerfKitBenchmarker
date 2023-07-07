@@ -110,6 +110,17 @@ flags.DEFINE_enum(
     ],
     'The type of the job to be run on the backends.',
 )
+_HARDWARE_HOURLY_COST = flags.DEFINE_float(
+    'dpb_hardware_hourly_cost', None,
+    'Hardware hourly USD cost of running the DPB cluster. Set it along with '
+    '--dpb_service_premium_hourly_cost to publish cost estimate metrics.'
+)
+_SERVICE_PREMIUM_HOURLY_COST = flags.DEFINE_float(
+    'dpb_service_premium_hourly_cost', None,
+    'Hardware hourly USD cost of running the DPB cluster. Set it along with '
+    '--dpb_hardware_hourly_cost to publish cost estimate metrics.'
+)
+
 
 FLAGS = flags.FLAGS
 
@@ -494,19 +505,89 @@ class BaseDpbService(resource.BaseResource):
     """
     return None
 
+  def GetClusterDuration(self) -> Optional[float]:
+    """Gets how much time the cluster has been running in seconds.
+
+    This default implementation just returns None. Override in subclasses if
+    needed.
+
+    Returns:
+      A float representing the number of seconds the cluster has been running or
+      None if it cannot be obtained.
+    """
+    return None
+
+  def GetClusterCost(self) -> Optional[float]:
+    """Gets the cost of running the cluster if applicable.
+
+    Default implementation returns the sum of cluster hardware cost and service
+    premium cost.
+
+    Guaranteed to be called after the cluster has been shut down if applicable.
+
+    Returns:
+      A float representing the cost in dollars or None if not implemented.
+    """
+    hardware_cost = self.GetClusterHardwareCost()
+    premium_cost = self.GetClusterPremiumCost()
+    if hardware_cost is None or premium_cost is None:
+      return None
+    return hardware_cost + premium_cost
+
+  def GetClusterHardwareCost(self) -> Optional[float]:
+    """Computes the hardware cost with --dpb_hardware_hourly_cost value.
+
+    Default implementation multiplies --dpb_hardware_hourly_cost with the value
+    returned by GetClusterDuration().
+
+    Returns:
+      A float representing the cost in dollars or None if not implemented.
+    """
+    # pylint: disable-next=assignment-from-none
+    cluster_duration = self.GetClusterDuration()
+    if cluster_duration is None or _HARDWARE_HOURLY_COST.value is None:
+      return None
+    return cluster_duration / 3600 * _HARDWARE_HOURLY_COST.value
+
+  def GetClusterPremiumCost(self) -> Optional[float]:
+    """Computes the premium cost with --dpb_service_premium_hourly_cost value.
+
+    Default implementation multiplies --dpb_service_premium_hourly_cost with the
+    value returned by GetClusterDuration().
+
+    Returns:
+      A float representing the cost in dollars or None if not implemented.
+    """
+    # pylint: disable-next=assignment-from-none
+    cluster_duration = self.GetClusterDuration()
+    if cluster_duration is None or _SERVICE_PREMIUM_HOURLY_COST.value is None:
+      return None
+    return cluster_duration / 3600 * _SERVICE_PREMIUM_HOURLY_COST.value
+
   def GetSamples(self) -> list[sample.Sample]:
     """Gets samples with service statistics."""
     samples = []
-    cluster_create_time = self.GetClusterCreateTime()
-    if cluster_create_time is not None:
-      samples.append(
-          sample.Sample(
-              'dpb_cluster_create_time',
-              cluster_create_time,
-              'seconds',
-              self.GetResourceMetadata(),
-          )
-      )
+    metrics: dict[str, tuple[Optional[float], str]] = {
+        'dpb_cluster_create_time': (self.GetClusterCreateTime(), 'seconds'),
+        'dpb_cluster_duration': (self.GetClusterDuration(), 'seconds'),
+        'dpb_cluster_hardware_cost': (self.GetClusterHardwareCost(), '$'),
+        'dpb_cluster_premium_cost': (self.GetClusterPremiumCost(), '$'),
+        'dpb_cluster_total_cost': (self.GetClusterCost(), '$'),
+        'dpb_cluster_hardware_hourly_cost': (
+            _HARDWARE_HOURLY_COST.value,
+            '$/hour',
+        ),
+        'dpb_cluster_premium_hourly_cost': (
+            _SERVICE_PREMIUM_HOURLY_COST.value,
+            '$/hour',
+        ),
+    }
+    for metric, value_unit_tuple in metrics.items():
+      value, unit = value_unit_tuple
+      if value is not None:
+        samples.append(
+            sample.Sample(metric, value, unit, self.GetResourceMetadata())
+        )
     return samples
 
 
@@ -520,6 +601,18 @@ class DpbServiceServerlessMixin:
     pass
 
   def GetClusterCreateTime(self) -> Optional[float]:
+    return None
+
+  def GetClusterDuration(self) -> Optional[float]:
+    return None
+
+  def GetClusterCost(self) -> Optional[float]:
+    return None
+
+  def GetClusterHardwareCost(self) -> Optional[float]:
+    return None
+
+  def GetClusterPremiumCost(self) -> Optional[float]:
     return None
 
 
