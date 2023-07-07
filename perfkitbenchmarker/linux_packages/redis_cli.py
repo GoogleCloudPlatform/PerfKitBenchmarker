@@ -17,8 +17,8 @@
 def _Install(vm) -> None:
   """Installs the redis package on the VM."""
   vm.RemoteCommand(
-      'curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o'
-      ' /usr/share/keyrings/redis-archive-keyring.gpg'
+      'curl -fsSL https://packages.redis.io/gpg | sudo gpg --batch --yes'
+      ' --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg'
   )
   vm.RemoteCommand(
       'echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg]'
@@ -38,4 +38,3 @@ def YumInstall(vm) -> None:
   """Installs the redis package on the VM."""
   del vm  # unused
   raise NotImplementedError()
-

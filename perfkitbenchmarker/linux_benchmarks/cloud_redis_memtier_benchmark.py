@@ -25,6 +25,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import memtier
 
 FLAGS = flags.FLAGS
@@ -201,6 +202,7 @@ def Cleanup(benchmark_spec):
   benchmark_spec.cloud_redis_instance.Delete()
 
 
+@vm_util.Retry(poll_interval=1)
 def _Install(vm):
   """Installs necessary client packages."""
   vm.Install('memtier')
