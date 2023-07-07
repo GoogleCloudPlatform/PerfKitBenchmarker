@@ -96,9 +96,10 @@ def Run(benchmark_spec):
 
   metadata = {}
   cluster = benchmark_spec.dpb_service
-  metadata.update(cluster.GetMetadata())
+  metadata.update(cluster.GetResourceMetadata())
   num_partitions = str(FLAGS.dpb_spark_pi_partitions)
   metadata.update({'spark_pi_partitions': num_partitions})
+  cluster.metadata.update(metadata)
 
   results = []
 

@@ -130,7 +130,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """
   cluster = benchmark_spec.dpb_service
   storage_service = cluster.storage_service
-  metadata = benchmark_spec.dpb_service.GetMetadata()
+  metadata = benchmark_spec.dpb_service.GetResourceMetadata()
 
   # Run PySpark Spark SQL Runner
   report_dir = '/'.join([cluster.base_dir, f'report-{int(time.time()*1000)}'])
@@ -172,11 +172,6 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   results.append(
       sample.Sample('sparksql_total_wall_time', job_result.wall_time, 'seconds',
                     metadata))
-  cluster_create_time = cluster.GetClusterCreateTime()
-  if cluster_create_time is not None:
-    results.append(
-        sample.Sample('dpb_cluster_create_time', cluster_create_time, 'seconds',
-                      metadata))
   results.append(
       sample.Sample('dpb_sparksql_job_pending', job_result.pending_time,
                     'seconds', metadata))

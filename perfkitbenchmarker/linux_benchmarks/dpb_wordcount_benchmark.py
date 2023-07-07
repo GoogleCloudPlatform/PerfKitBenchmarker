@@ -188,7 +188,7 @@ def Run(benchmark_spec):
   end_time = datetime.datetime.now()
 
   # Update metadata after job run to get job id
-  metadata = copy.copy(dpb_service_instance.GetMetadata())
+  metadata = copy.copy(dpb_service_instance.GetResourceMetadata())
   metadata.update({
       'input_location': input_location,
       'dpb_wordcount_additional_args': ','.join(
@@ -199,6 +199,7 @@ def Run(benchmark_spec):
       ),
       'dpb_job_type': job_type,
   })
+  dpb_service_instance.metadata.update(metadata)
 
   run_time = (end_time - start_time).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))

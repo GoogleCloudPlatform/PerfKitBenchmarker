@@ -190,6 +190,11 @@ class GcpDpbDPGKETestCase(pkb_common_test_case.PkbCommonTestCase):
         spec=[
             'version',
         ],
+        worker_group=mock.Mock(
+            vm_spec=mock.Mock(machine_type='e2-standard-4'),
+            disk_spec=mock.Mock(disk_size=200),
+        ),
+        worker_count=1,
         static_dpb_service_instance=None,
         gke_cluster_nodepools='',
     )

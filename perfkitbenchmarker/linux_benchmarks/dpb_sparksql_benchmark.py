@@ -239,7 +239,7 @@ def Run(benchmark_spec):
 
 def _GetSampleMetadata(benchmark_spec):
   """Gets metadata dict to be attached to exported benchmark samples/metrics."""
-  metadata = benchmark_spec.dpb_service.GetMetadata()
+  metadata = benchmark_spec.dpb_service.GetResourceMetadata()
   metadata['benchmark'] = dpb_sparksql_benchmark_helper.BENCHMARK_NAMES[
       FLAGS.dpb_sparksql_query]
   if FLAGS.bigquery_record_format:
@@ -372,6 +372,8 @@ def _GetGlobalSamples(
     metadata['failing_queries'] = ','.join(
         sorted(set(FLAGS.dpb_sparksql_order) - all_passing_queries))
 
+  cluster.metadata.update(metadata)
+
   # TODO(user): Compute aggregated time for each query across streams and
   # iterations.
   samples.append(
@@ -380,11 +382,6 @@ def _GetGlobalSamples(
   samples.append(
       sample.Sample('sparksql_geomean_run_time',
                     sample.GeoMean(run_times.values()), 'seconds', metadata))
-  cluster_create_time = cluster.GetClusterCreateTime()
-  if cluster_create_time is not None:
-    samples.append(
-        sample.Sample('dpb_cluster_create_time', cluster_create_time, 'seconds',
-                      metadata))
   samples.append(sample.Sample('dpb_sparksql_job_pending',
                                job_result.pending_time, 'seconds', metadata))
   if FLAGS.dpb_export_job_stats:

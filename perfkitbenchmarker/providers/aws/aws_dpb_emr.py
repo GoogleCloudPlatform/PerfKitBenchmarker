@@ -419,7 +419,9 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         job_type=dpb_service.BaseDpbService.HADOOP_JOB_TYPE)
 
 
-class AwsDpbEmrServerless(dpb_service.BaseDpbService):
+class AwsDpbEmrServerless(
+    dpb_service.DpbServiceServerlessMixin, dpb_service.BaseDpbService
+):
   """Resource that allows spawning EMR Serverless Jobs.
 
   Pre-initialization capacity is not supported yet.
@@ -458,14 +460,6 @@ class AwsDpbEmrServerless(dpb_service.BaseDpbService):
 
     # Last job run cost
     self._run_cost = None
-
-  def _Create(self):
-    # Since there's no managed infrastructure, this is a no-op.
-    pass
-
-  def _Delete(self):
-    # Since there's no managed infrastructure, this is a no-op.
-    pass
 
   def SubmitJob(self,
                 jarfile=None,

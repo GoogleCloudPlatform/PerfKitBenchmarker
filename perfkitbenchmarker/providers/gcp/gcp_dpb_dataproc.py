@@ -262,14 +262,14 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     cmd.Issue(raise_on_failure=False)
 
   def _GetCluster(self) -> Optional[Dict[str, Any]]:
-    """Get the cluster resource in a dict."""
+    """Gets the cluster resource in a dict."""
     cmd = self.DataprocGcloudCommand('clusters', 'describe', self.cluster_id)
     stdout, _, retcode = cmd.Issue(raise_on_failure=False)
     if not retcode:
       return json.loads(stdout)
 
   def _Exists(self):
-    """Check to see whether the cluster exists."""
+    """Checks to see whether the cluster exists."""
     return self._GetCluster() is not None
 
   def SubmitJob(self,
@@ -415,7 +415,9 @@ class GcpDpbDpgke(GcpDpbDataproc):
       raise errors.Resource.CreationError(stderr)
 
 
-class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
+class GcpDpbDataprocServerless(
+    dpb_service.DpbServiceServerlessMixin, GcpDpbBaseDataproc
+):
   """Resource that allows spawning serverless Dataproc Jobs."""
 
   CLOUD = provider_info.GCP
@@ -426,6 +428,7 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
     self._job_counter = 0
     self.batch_name = f'{self.cluster_id}-{self._job_counter}'
     self.dpb_hdfs_type = 'HDD'
+    self._FillMetadata()
 
   def SubmitJob(self,
                 jarfile=None,
@@ -523,17 +526,6 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
         run_time=(done_time - start_time).total_seconds(),
         pending_time=(start_time - pending_time).total_seconds())
 
-  def _Create(self):
-    # Since there's no managed infrastructure, this is a no-op.
-    pass
-
-  def _Delete(self):
-    # Since there's no managed infrastructure, this is a no-op.
-    pass
-
-  def GetClusterCreateTime(self) -> Optional[float]:
-    return None
-
   def GetJobProperties(self) -> Dict[str, str]:
     result = {}
     if self.spec.dataproc_serverless_core_count:
@@ -569,9 +561,7 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
     result.update(super().GetJobProperties())
     return result
 
-  def GetMetadata(self):
-    basic_data = super().GetMetadata()
-
+  def _FillMetadata(self) -> None:
     if self.spec.dataproc_serverless_core_count:
       cluster_shape = (
           f'dataproc-serverless-{self.spec.dataproc_serverless_core_count}')
@@ -586,11 +576,11 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
     if initial_executors == min_executors == max_executors:
       cluster_size = initial_executors
 
-    return {
-        'dpb_service': basic_data['dpb_service'],
-        'dpb_version': basic_data['dpb_version'],
-        'dpb_service_version': basic_data['dpb_service_version'],
-        'dpb_batch_id': basic_data['dpb_cluster_id'],
+    self.metadata = {
+        'dpb_service': self.metadata['dpb_service'],
+        'dpb_version': self.metadata['dpb_version'],
+        'dpb_service_version': self.metadata['dpb_service_version'],
+        'dpb_batch_id': self.metadata['dpb_cluster_id'],
         'dpb_cluster_shape': cluster_shape,
         'dpb_cluster_size': cluster_size,
         'dpb_cluster_min_executors': min_executors,
@@ -601,10 +591,10 @@ class GcpDpbDataprocServerless(GcpDpbBaseDataproc):
             self.spec.dataproc_serverless_memory or 'default',
         'dpb_memory_overhead_per_node':
             self.spec.dataproc_serverless_memory_overhead or 'default',
-        'dpb_hdfs_type': basic_data['dpb_hdfs_type'],
-        'dpb_disk_size': basic_data['dpb_disk_size'],
-        'dpb_service_zone': basic_data['dpb_service_zone'],
-        'dpb_job_properties': basic_data['dpb_job_properties'],
+        'dpb_hdfs_type': self.metadata['dpb_hdfs_type'],
+        'dpb_disk_size': self.metadata['dpb_disk_size'],
+        'dpb_service_zone': self.metadata['dpb_service_zone'],
+        'dpb_job_properties': self.metadata['dpb_job_properties'],
     }
 
   def CalculateCost(self):

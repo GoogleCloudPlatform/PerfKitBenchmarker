@@ -123,7 +123,7 @@ def Run(benchmark_spec):
   for file_size in FLAGS.dfsio_file_sizes_list:
     for num_files in FLAGS.dfsio_num_files_list:
 
-      metadata = copy.copy(service.GetMetadata())
+      metadata = copy.copy(service.GetResourceMetadata())
       metadata.update({'dfsio_fs': FLAGS.dfsio_fs})
       metadata.update({'dfsio_num_files': num_files})
       metadata.update({'dfsio_file_size_mbs': file_size})
@@ -135,6 +135,8 @@ def Run(benchmark_spec):
       elif FLAGS.cloud == 'AWS':
         metadata.update({'regional': True})
         metadata.update({'region': 'aws_default'})
+
+      service.metadata.update(metadata)
 
       # This order is important. Write generates the data for read and clean
       # deletes it for the next write.

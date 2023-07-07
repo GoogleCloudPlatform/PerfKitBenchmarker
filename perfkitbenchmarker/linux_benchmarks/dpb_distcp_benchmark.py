@@ -148,7 +148,7 @@ def Run(benchmark_spec):
       source_data_dir, destination_dir)
 
   results = []
-  metadata = copy.copy(benchmark_spec.dpb_service.GetMetadata())
+  metadata = copy.copy(benchmark_spec.dpb_service.GetResourceMetadata())
   metadata.update({'source_fs': FLAGS.distcp_source_fs})
   metadata.update({'destination_fs': FLAGS.distcp_dest_fs})
   metadata.update({'distcp_num_files': FLAGS.distcp_num_files})
@@ -161,6 +161,7 @@ def Run(benchmark_spec):
   elif FLAGS.cloud == 'AWS':
     metadata.update({'regional': True})
     metadata.update({'region': 'aws_default'})
+  service.metadata.update(metadata)
 
   results.append(sample.Sample(
       'run_time', result.run_time, 'seconds', metadata))

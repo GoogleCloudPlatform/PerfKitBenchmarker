@@ -122,6 +122,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
     self.persistent_fs_prefix = 'gs://'
+    self._FillMetadata()
 
   def _GetTempLocation(self) -> str:
     if FLAGS.dpb_dataflow_temp_location is None:
@@ -240,14 +241,12 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     self.job_id = match.group(1)
     logging.info('Dataflow job ID: %s', self.job_id)
 
-  def GetMetadata(self):
-    """Return a dictionary of the metadata for this cluster."""
-    basic_data = super(GcpDpbDataflow, self).GetMetadata()
-    basic_data['dpb_dataflow_runner'] = FLAGS.dpb_dataflow_runner
-    basic_data['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
-    basic_data['dpb_job_id'] = self.job_id
-    basic_data['dpb_dataflow_enable_prime'] = FLAGS.dpb_dataflow_enable_prime
-    return basic_data
+  def _FillMetadata(self) -> None:
+    """Get a dict to initialize this DPB service instance's metadata."""
+    self.metadata['dpb_dataflow_runner'] = FLAGS.dpb_dataflow_runner
+    self.metadata['dpb_dataflow_sdk'] = FLAGS.dpb_dataflow_sdk
+    self.metadata['dpb_job_id'] = self.job_id
+    self.metadata['dpb_dataflow_enable_prime'] = FLAGS.dpb_dataflow_enable_prime
 
   def GetJobStatus(self):
     cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'show', self.job_id)

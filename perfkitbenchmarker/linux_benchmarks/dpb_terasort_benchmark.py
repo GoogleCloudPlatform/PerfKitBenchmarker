@@ -155,7 +155,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
     base_dir = '/'
 
   metadata = {}
-  metadata.update(spec.dpb_service.GetMetadata())
+  metadata.update(spec.dpb_service.GetResourceMetadata())
   logging.info('metadata %s ', str(metadata))
 
   results = []
@@ -184,6 +184,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
     # TODO(pclay): calculate default blocksize using configuration class?
     metadata.update(
         {'terasort_block_size_mb': FLAGS.dpb_terasort_block_size_mb})
+  service.metadata.update(metadata)
 
   unsorted_dir = base_dir + 'unsorted'
   sorted_dir = base_dir + 'sorted'

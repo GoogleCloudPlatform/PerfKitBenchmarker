@@ -149,7 +149,7 @@ def Run(benchmark_spec):
   results = []
   dpb_service_instance = benchmark_spec.dpb_service
   run_uri = benchmark_spec.uuid.split('-')[0]
-  metadata = copy.copy(dpb_service_instance.GetMetadata())
+  metadata = copy.copy(dpb_service_instance.GetResourceMetadata())
   query_script_folder = '{}_query_script'.format(run_uri)
   query_script_folder_uri = '{}{}'.format(
       dpb_service_instance.PERSISTENT_FS_PREFIX, query_script_folder)

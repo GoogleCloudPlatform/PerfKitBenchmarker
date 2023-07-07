@@ -294,6 +294,7 @@ class BenchmarkSpec(object):
       master_group_spec = copy.copy(base_vm_spec)
       master_group_spec.vm_count = 1
       self.vms_to_boot['master_group'] = master_group_spec
+    self.resources.append(self.dpb_service)
 
   def ConstructRelationalDb(self):
     """Creates the relational db and create groups for its vms."""

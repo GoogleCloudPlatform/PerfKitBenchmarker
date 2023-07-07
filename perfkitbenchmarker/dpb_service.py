@@ -36,6 +36,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
@@ -224,6 +225,7 @@ class BaseDpbService(resource.BaseResource):
     self.dpb_version = dpb_service_spec.version
     self.dpb_service_type = 'unknown'
     self.storage_service = None
+    self._InitializeMetadata()
 
   @property
   def base_dir(self):
@@ -374,10 +376,9 @@ class BaseDpbService(resource.BaseResource):
         job_type=BaseDpbService.HADOOP_JOB_TYPE,
         properties=properties)
 
-  def GetMetadata(self):
-    """Return a dictionary of the metadata for this cluster."""
+  def _InitializeMetadata(self) -> None:
     pretty_version = self.dpb_version or 'default'
-    basic_data = {
+    self.metadata = {
         'dpb_service':
             self.dpb_service_type,
         'dpb_version':
@@ -402,7 +403,6 @@ class BaseDpbService(resource.BaseResource):
         'dpb_cluster_properties':
             ','.join(FLAGS.dpb_cluster_properties),
     }
-    return basic_data
 
   def _CreateDependencies(self):
     """Creates a bucket to use with the cluster."""
@@ -492,6 +492,34 @@ class BaseDpbService(resource.BaseResource):
     Returns:
       A float representing the cost in dollars or None if not implemented.
     """
+    return None
+
+  def GetSamples(self) -> list[sample.Sample]:
+    """Gets samples with service statistics."""
+    samples = []
+    cluster_create_time = self.GetClusterCreateTime()
+    if cluster_create_time is not None:
+      samples.append(
+          sample.Sample(
+              'dpb_cluster_create_time',
+              cluster_create_time,
+              'seconds',
+              self.GetResourceMetadata(),
+          )
+      )
+    return samples
+
+
+class DpbServiceServerlessMixin:
+  """Mixin with default methods dpb services without managed infrastructure."""
+
+  def _Create(self) -> None:
+    pass
+
+  def _Delete(self) -> None:
+    pass
+
+  def GetClusterCreateTime(self) -> Optional[float]:
     return None
 
 
