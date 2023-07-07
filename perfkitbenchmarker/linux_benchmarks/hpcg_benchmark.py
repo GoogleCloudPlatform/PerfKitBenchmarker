@@ -27,6 +27,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import hpcg
 from perfkitbenchmarker.linux_packages import nvidia_driver
@@ -165,6 +166,7 @@ def _CopyAndUpdateRunScripts(vm, benchmark_spec):
   vm.RemoteCommand('chmod +x %s' % os.path.join(hpcg.HPCG_DIR, RUN_SCRIPT))
 
 
+@vm_util.Retry()
 def _PrepareHpcg(vm):
   """Install HPCG on a single vm.
 
