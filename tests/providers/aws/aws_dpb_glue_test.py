@@ -89,7 +89,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.issue_cmd_mock = self.enter_context(
         mock.patch.object(vm_util, 'IssueCommand', autospec=True))
 
-  def testGlueCalculateCost(self):
+  def testGlueCalculateLastJobCost(self):
     dpb_glue = aws_dpb_glue.AwsDpbGlue(GLUE_SPEC)
 
     create_job_response = {'Name': 'pkb-deadbeef-0'}
@@ -111,7 +111,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
           job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE,
           job_arguments=[])
 
-    self.assertEqual(dpb_glue.CalculateCost(), 10.45048888888889)
+    self.assertEqual(dpb_glue.CalculateLastJobCost(), 10.45048888888889)
 
   def testGluePricesSchema(self):
     for region, price in aws_dpb_glue_prices.GLUE_PRICES.items():

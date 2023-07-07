@@ -385,7 +385,7 @@ def _GetGlobalSamples(
   samples.append(sample.Sample('dpb_sparksql_job_pending',
                                job_result.pending_time, 'seconds', metadata))
   if FLAGS.dpb_export_job_stats:
-    run_cost = cluster.CalculateCost()
+    run_cost = cluster.CalculateLastJobCost()
     if run_cost is not None:
       samples.append(
           sample.Sample('sparksql_run_cost', run_cost, '$', metadata))

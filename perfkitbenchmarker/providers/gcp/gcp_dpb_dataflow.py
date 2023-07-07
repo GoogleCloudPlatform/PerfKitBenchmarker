@@ -270,10 +270,11 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # and/or BillableStreamingDataProcessed when applicable
     return stats
 
-  def CalculateCost(self, pricing_type=DATAFLOW_TYPE_BATCH):
+  def CalculateLastJobCost(self, pricing_type=DATAFLOW_TYPE_BATCH):
     if pricing_type not in (DATAFLOW_TYPE_BATCH, DATAFLOW_TYPE_STREAMING):
       raise ValueError(
-          f'Invalid type provided to CalculateCost(): {pricing_type}')
+          f'Invalid type provided to CalculateLastJobCost(): {pricing_type}'
+      )
 
     # For some reason, pytype doesn't play well with functools.cached_property
     # pytype: disable=unsupported-operands

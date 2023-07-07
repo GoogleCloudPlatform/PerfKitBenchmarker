@@ -222,7 +222,7 @@ def Run(benchmark_spec):
       for name, value in stats.items():
         results.append(sample.Sample(name, value, 'number', metadata))
 
-    total_cost = dpb_service_instance.CalculateCost()
+    total_cost = dpb_service_instance.CalculateLastJobCost()
     if total_cost is not None:
       results.append(sample.Sample('total_cost', total_cost, '$', metadata))
   else:

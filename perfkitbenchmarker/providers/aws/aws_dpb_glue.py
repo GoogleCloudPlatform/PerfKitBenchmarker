@@ -198,7 +198,7 @@ class AwsDpbGlue(
     """Gets service wrapper scripts to upload alongside benchmark scripts."""
     return [self.SPARK_SQL_GLUE_WRAPPER_SCRIPT]
 
-  def CalculateCost(self) -> Optional[float]:
+  def CalculateLastJobCost(self) -> Optional[float]:
     return self._run_cost
 
   def _ComputeJobRunCost(

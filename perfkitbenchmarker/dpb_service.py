@@ -486,7 +486,7 @@ class BaseDpbService(resource.BaseResource):
     """Gets service wrapper scripts to upload alongside benchmark scripts."""
     return []
 
-  def CalculateCost(self) -> Optional[float]:
+  def CalculateLastJobCost(self) -> Optional[float]:
     """Returns the cost of last job submitted.
 
     Returns:

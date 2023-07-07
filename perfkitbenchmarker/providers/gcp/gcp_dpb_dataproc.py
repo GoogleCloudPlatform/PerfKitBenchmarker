@@ -597,7 +597,7 @@ class GcpDpbDataprocServerless(
         'dpb_job_properties': self.metadata['dpb_job_properties'],
     }
 
-  def CalculateCost(self):
+  def CalculateLastJobCost(self):
     fetch_batch_cmd = self.DataprocGcloudCommand('batches', 'describe',
                                                  self.batch_name)
     @vm_util.Retry(

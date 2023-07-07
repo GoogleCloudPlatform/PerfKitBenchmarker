@@ -114,7 +114,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.issue_cmd_mock = self.enter_context(
         mock.patch.object(vm_util, 'IssueCommand', autospec=True))
 
-  def testEmrServerlessCalculateCost(self):
+  def testEmrServerlessCalculateLastJobCost(self):
     emr_serverless = aws_dpb_emr.AwsDpbEmrServerless(SERVERLESS_SPEC)
 
     create_application_response = {'applicationId': 'foobar'}
@@ -150,7 +150,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
           pyspark_file='s3://test/hello.py',
           job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE)
 
-    self.assertEqual(emr_serverless.CalculateCost(), 4.711576935499999)
+    self.assertEqual(emr_serverless.CalculateLastJobCost(), 4.711576935499999)
 
   def testEmrServerlessPricesSchema(self):
     # Checking schema of EMR_SERVERLESS_PRICES

@@ -533,7 +533,7 @@ class AwsDpbEmrServerless(
     return self._WaitForJob(
         (application_id, job_run_id), EMR_TIMEOUT, job_poll_interval)
 
-  def CalculateCost(self) -> Optional[float]:
+  def CalculateLastJobCost(self) -> Optional[float]:
     return self._run_cost
 
   def GetJobProperties(self) -> Dict[str, str]:
