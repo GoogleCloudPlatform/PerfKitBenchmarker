@@ -12,6 +12,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import memtier
+from tests import matchers
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -1725,6 +1726,20 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
         expected_result, memtier._CombineResults([result1, result2])
     )
 
+  @flagsaver.flagsaver(memtier_key_maximum=1000)
+  def testLoad(self):
+    vm1 = mock.Mock()
+    vm2 = mock.Mock()
+    test_vms = [vm1, vm2]
+
+    memtier.Load(test_vms, 'test_ip', 9999)
+
+    vm1.RemoteCommand.assert_called_once_with(
+        matchers.HAS('--key-minimum 1 --key-maximum 500')
+    )
+    vm2.RemoteCommand.assert_called_once_with(
+        matchers.HAS('--key-minimum 500 --key-maximum 1000')
+    )
 
 if __name__ == '__main__':
   unittest.main()

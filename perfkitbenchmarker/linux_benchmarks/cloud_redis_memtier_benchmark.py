@@ -94,8 +94,7 @@ def Prepare(benchmark_spec):
   memory_store_port = benchmark_spec.cloud_redis_instance.GetMemoryStorePort()
   password = benchmark_spec.cloud_redis_instance.GetMemoryStorePassword()
 
-  for vm in memtier_vms:
-    memtier.Load(vm, memory_store_ip, memory_store_port, password)
+  memtier.Load(memtier_vms, memory_store_ip, memory_store_port, password)
 
 
 def _GetConnections(

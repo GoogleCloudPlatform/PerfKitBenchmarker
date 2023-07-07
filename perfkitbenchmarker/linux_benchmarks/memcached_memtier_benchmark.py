@@ -95,13 +95,13 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
         required to run the benchmark.
   """
-  client = benchmark_spec.vm_groups['client'][0]
+  clients = benchmark_spec.vm_groups['client']
   server = benchmark_spec.vm_groups['server'][0]
 
-  _InstallMemtier(client)
+  _InstallMemtier(clients[0])
   _InstallMemcached(server)
   memcached_server.ConfigureAndStart(server)
-  memtier.Load(client, server.internal_ip, memcached_server.MEMCACHED_PORT)
+  memtier.Load(clients, server.internal_ip, memcached_server.MEMCACHED_PORT)
 
 
 def Run(benchmark_spec):

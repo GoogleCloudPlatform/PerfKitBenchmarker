@@ -377,35 +377,67 @@ def BuildMemtierCommand(
   return ' '.join(cmd)
 
 
-def Load(
-    client_vm,
-    server_ip: str,
-    server_port: int,
-    server_password: Optional[str] = None,
+@dataclasses.dataclass(frozen=True)
+class LoadRequest:
+  key_minimum: int
+  key_maximum: int
+  server_port: int
+  server_ip: str
+  server_password: str
+
+
+def _LoadSingleVM(
+    load_vm: virtual_machine.VirtualMachine, request: LoadRequest
 ) -> None:
-  """Preload the server with data."""
-  load_key_maximum = (
-      MEMTIER_LOAD_KEY_MAXIMUM.value
-      if MEMTIER_LOAD_KEY_MAXIMUM.value
-      else MEMTIER_KEY_MAXIMUM.value
-  )
+  """Loads the DB from a single VM."""
   cmd = BuildMemtierCommand(
-      server=server_ip,
-      port=server_port,
+      server=request.server_ip,
+      port=request.server_port,
       protocol=MEMTIER_PROTOCOL.value,
       clients=1,
       threads=1,
       ratio=_WRITE_ONLY,
       data_size=MEMTIER_DATA_SIZE.value,
       pipeline=_LOAD_NUM_PIPELINES,
-      key_minimum=1,
-      key_maximum=load_key_maximum,
+      key_minimum=request.key_minimum,
+      key_maximum=request.key_maximum,
       requests='allkeys',
       cluster_mode=MEMTIER_CLUSTER_MODE.value,
-      password=server_password,
+      password=request.server_password,
       tls=MEMTIER_TLS.value,
   )
-  _IssueRetryableCommand(client_vm, cmd)
+  load_vm.RemoteCommand(cmd)
+
+
+def Load(
+    vms: list[virtual_machine.VirtualMachine],
+    server_ip: str,
+    server_port: int,
+    server_password: Optional[str] = None,
+) -> None:
+  """Loads the database before performing tests."""
+  load_requests = []
+  load_key_maximum = (
+      MEMTIER_LOAD_KEY_MAXIMUM.value
+      if MEMTIER_LOAD_KEY_MAXIMUM.value
+      else MEMTIER_KEY_MAXIMUM.value
+  )
+  load_records_per_vm = load_key_maximum // len(vms)
+  for i, _ in enumerate(vms):
+    load_requests.append((
+        vms[i],
+        LoadRequest(
+            key_minimum=max(i * load_records_per_vm, 1),
+            key_maximum=(i + 1) * load_records_per_vm,
+            server_port=server_port,
+            server_ip=server_ip,
+            server_password=server_password,
+        ),
+    ))
+
+  background_tasks.RunThreaded(
+      _LoadSingleVM, [(arg, {}) for arg in load_requests]
+  )
 
 
 def RunOverAllClientVMs(

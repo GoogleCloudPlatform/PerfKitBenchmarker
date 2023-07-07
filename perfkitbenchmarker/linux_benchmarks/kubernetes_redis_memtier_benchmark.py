@@ -130,7 +130,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
   # Load Redis database
-  memtier.Load(client_vms[0], bm_spec.redis_endpoint_ip,
+  memtier.Load(client_vms, bm_spec.redis_endpoint_ip,
                redis_server.GetRedisPorts()[0])
 
 

@@ -101,7 +101,7 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
     cloud_redis_memtier_benchmark.Prepare(benchmark_spec)
     redis_instance.Create.assert_called_once_with()
-    load_patch.assert_called_once_with(vm, '0.0.0', '1234', 'password')
+    load_patch.assert_called_once_with([vm], '0.0.0', '1234', 'password')
 
   def testRun(self):
     vm = mock.Mock()
