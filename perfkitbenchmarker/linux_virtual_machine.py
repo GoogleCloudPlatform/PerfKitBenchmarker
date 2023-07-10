@@ -880,30 +880,44 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         self.port_listening_time is None):
       self.TestConnectRemoteAccessPort()
       self.port_listening_time = time.time()
-    connect_threads = [
-        (self._WaitForSshExternal, [], {}),
-        (self._WaitForSshInternal, [], {}),
-        ]
-    background_tasks.RunParallelThreads(connect_threads, len(connect_threads))
+    boot_methods = self.boot_completion_ip_subset
+    if boot_methods == virtual_machine.BootCompletionIpSubset.DEFAULT:
+      # By default let GetConnectionIp decide which IP to use for SSH.
+      # Omitting ip_address falls back to GetConnectionIp in RemoteHostCommand.
+      self._WaitForSSH()
+      # We don't know if GetConnectionIP returned an internal or external IP,
+      # so we can set neither self.ssh_external_time nor self.ssh_internal_time.
+      # It will still set self.bootable_time below.
+    elif boot_methods == virtual_machine.BootCompletionIpSubset.EXTERNAL:
+      self._WaitForSshExternal()
+    elif boot_methods == virtual_machine.BootCompletionIpSubset.INTERNAL:
+      self._WaitForSshInternal()
+    elif boot_methods == virtual_machine.BootCompletionIpSubset.BOTH:
+      connect_threads = [
+          (self._WaitForSshExternal, [], {}),
+          (self._WaitForSshInternal, [], {}),
+          ]
+      background_tasks.RunParallelThreads(connect_threads, len(connect_threads))
+    else:
+      raise ValueError('Unknown --boot_completion_ip_subset: '
+                       + self.boot_completion_ip_subset)
 
     if self.bootable_time is None:
       self.bootable_time = time.time()
 
   def _WaitForSshExternal(self):
-    if self.boot_completion_ip_subset not in (
+    assert self.boot_completion_ip_subset in (
         virtual_machine.BootCompletionIpSubset.EXTERNAL,
         virtual_machine.BootCompletionIpSubset.BOTH,
-    ):
-      return
+    )
     self._WaitForSSH(self.ip_address)
     self.ssh_external_time = time.time()
 
   def _WaitForSshInternal(self):
-    if self.boot_completion_ip_subset not in (
+    assert self.boot_completion_ip_subset in (
         virtual_machine.BootCompletionIpSubset.INTERNAL,
         virtual_machine.BootCompletionIpSubset.BOTH,
-    ):
-      return
+    )
     self._WaitForSSH(self.internal_ip)
     self.ssh_internal_time = time.time()
 

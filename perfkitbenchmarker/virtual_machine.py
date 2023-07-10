@@ -1093,16 +1093,6 @@ class DeprecatedOsMixin(BaseOsMixin):
     logging.warning(warning)
 
 
-def GetBootCompletionIpSubset():
-  if _BOOT_COMPLETION_IP_SUBSET.value == BootCompletionIpSubset.DEFAULT:
-    if FLAGS.connect_via_internal_ip:
-      return BootCompletionIpSubset.INTERNAL
-    else:
-      return BootCompletionIpSubset.EXTERNAL
-  else:
-    return _BOOT_COMPLETION_IP_SUBSET.value
-
-
 class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   """Base class for Virtual Machines.
 
@@ -1172,7 +1162,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.install_packages = vm_spec.install_packages
     self.can_connect_via_internal_ip = (FLAGS.ssh_via_internal_ip
                                         or FLAGS.connect_via_internal_ip)
-    self.boot_completion_ip_subset = GetBootCompletionIpSubset()
+    self.boot_completion_ip_subset = _BOOT_COMPLETION_IP_SUBSET.value
     self.assign_external_ip = vm_spec.assign_external_ip
     self.ip_address = None
     self.internal_ip = None
@@ -1227,6 +1217,10 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
 
   def GetConnectionIp(self):
     """Gets the IP to use for connecting to the VM."""
+    if not self.created:
+      raise errors.VirtualMachine.VirtualMachineError(
+          'VM was not properly created, but PKB is attempting to connect to '
+          'it anyways. Caller should guard against VM not being created.')
     if self.can_connect_via_internal_ip:
       return self.internal_ip
     if not self.ip_address:

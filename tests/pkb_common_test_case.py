@@ -121,6 +121,10 @@ class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
   """Test class that has dummy methods for a base virtual machine."""
   CLOUD = 'test_vm_cloud'
 
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.created = True
+
   def _Create(self):
     pass
 
