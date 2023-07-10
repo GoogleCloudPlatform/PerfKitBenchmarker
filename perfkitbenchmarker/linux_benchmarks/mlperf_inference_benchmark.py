@@ -138,6 +138,10 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   config = (
       f'{repository}/closed/NVIDIA/configs/{benchmark}/{_SCENARIOS.value}/*.py'
   )
+  if _SCENARIOS.value == SERVER:
+    bm_spec.metric = _SERVER_QPS
+  elif _SCENARIOS.value == OFFLINE:
+    bm_spec.metric = _OFFLINE_QPS
   if _TARGET_QPS.value:
     vm_util.ReplaceText(
         vm,
@@ -310,14 +314,9 @@ def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
   vm = bm_spec.vms[0]
   config = f'configs/{FLAGS.mlperf_benchmark}/{_SCENARIOS.value}/*.py'
 
-  if _SCENARIOS.value == SERVER:
-    metric = _SERVER_QPS
-  elif _SCENARIOS.value == OFFLINE:
-    metric = _OFFLINE_QPS
-
   vm.RobustRemoteCommand(
-      f"{bm_spec.env_cmd} && sed -i 's/{metric} = .*/{metric} = {target_qps}/g'"
-      f' {config}'
+      f"{bm_spec.env_cmd} && sed -i 's/{bm_spec.metric} = .*/{bm_spec.metric} ="
+      f" {target_qps}/g' {config}"
   )
   # For valid log, result_validity is VALID
   # For invalid log, result_validity is INVALID

@@ -96,7 +96,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   )
 
 
-def _MetadataFromFlags() -> [str, Any]:
+def _MetadataFromFlags() -> Dict[str, Any]:
   """Returns metadata dictionary from flag settings."""
   return {
       'memory': _MEMORY.value,
