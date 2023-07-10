@@ -30,6 +30,7 @@ import collections
 import itertools
 import json
 import logging
+import ntpath
 import posixpath
 import re
 import threading
@@ -1111,6 +1112,47 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
         event.get('EventType') == 'Preempt' for event in events)
     if self.spot_early_termination:
       logging.info('Spotted early termination on %s', self)
+
+  def DownloadPreprovisionedData(
+      self, install_path, module_name, filename,
+      timeout=FIVE_MINUTE_TIMEOUT
+  ):
+    """Downloads a data file from Azure blob storage with pre-provisioned data.
+
+    Use --azure_preprovisioned_data_bucket to specify the name of the account.
+
+    Note: Azure blob storage does not allow underscores in the container name,
+    so this method replaces any underscores in module_name with dashes.
+    Make sure that the same convention is used when uploading the data
+    to Azure blob storage. For example: when uploading data for
+    'module_name' to Azure, create a container named 'benchmark-name'.
+
+    Args:
+      install_path: The install path on this VM.
+      module_name: Name of the module associated with this data file.
+      filename: The name of the file that was downloaded.
+      timeout: Timeout value for downloading preprovisionedData, Five minutes
+      by default.
+    """
+    # TODO(deitz): Add retry logic.
+    temp_local_path = vm_util.GetTempDir()
+    vm_util.IssueCommand(
+        GenerateDownloadPreprovisionedDataCommand(
+            temp_local_path, module_name, filename
+        ).split('&')[-1].split(),
+        timeout=timeout,
+    )
+    self.PushFile(
+        vm_util.PrependTempDir(filename),
+        ntpath.join(install_path, filename)
+    )
+    vm_util.IssueCommand(['rm', vm_util.PrependTempDir(filename)])
+
+  def ShouldDownloadPreprovisionedData(self, module_name, filename):
+    """Returns whether or not preprovisioned data is available."""
+    return FLAGS.azure_preprovisioned_data_bucket and vm_util.IssueCommand(
+        GenerateStatPreprovisionedDataCommand(
+            module_name, filename).split(' '), raise_on_failure=False)[-1] == 0
 
 
 # Azure seems to have dropped support for 2012 Server Core. It is neither here:

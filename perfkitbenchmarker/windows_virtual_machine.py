@@ -457,6 +457,20 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     self.RemoteCommand('rm -recurse -force %s' % self.temp_dir)
     self.EnableGuestFirewall()
 
+  def GetSha256sum(self, path, filename):
+    """Gets the sha256sum hash for a filename in a path on the VM.
+
+    Args:
+      path: string; Path on the VM.
+      filename: string; Name of the file in the path.
+
+    Returns:
+      string; The sha256sum hash.
+    """
+    file_path = ntpath.join(path, filename)
+    stdout, _ = self.RemoteCommand(f'certUtil -hashfile {file_path} SHA256')
+    return stdout.splitlines()[1]
+
   def WaitForProcessRunning(self, process, timeout):
     """Blocks until either the timeout passes or the process is running.
 
