@@ -219,12 +219,12 @@ def ParseResults(job_file, fio_json_result, base_metadata=None,
           else:
             return value
 
-        percentiles = clat_section['percentile']
         lat_statistics = [('min', _ConvertClat(clat_section['min'])),
                           ('max', _ConvertClat(clat_section['max'])),
                           ('mean', _ConvertClat(clat_section['mean'])),
                           ('stddev', _ConvertClat(clat_section['stddev']))]
         if not skip_latency_individual_stats:
+          percentiles = clat_section['percentile']
           lat_statistics += [('p1', _ConvertClat(percentiles['1.000000'])),
                              ('p5', _ConvertClat(percentiles['5.000000'])),
                              ('p10', _ConvertClat(percentiles['10.000000'])),

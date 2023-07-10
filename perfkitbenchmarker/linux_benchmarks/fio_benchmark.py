@@ -186,6 +186,17 @@ flags.DEFINE_enum('fio_rng', 'tausworthe64',
                   'Which RNG to use for 4k Random IOPS.')
 flags.DEFINE_enum('fio_ioengine', 'libaio', ['libaio', 'windowsaio'],
                   'Defines how the job issues I/O to the file')
+_FIO_RATE_BANDWIDTH_LIMIT = flags.DEFINE_string(
+    'fio_rate_bandwidth_limit',
+    None,
+    'The bandwidth cap in bytes/sec. For example, using '
+    'rate=1m caps bandwidth to 1MiB/sec.',
+)
+_FIO_INCLUDE_LATENCY_PERCENTILES = flags.DEFINE_boolean(
+    'fio_include_latency_percentiles',
+    True,
+    'Whether to include FIO latency stats.',
+)
 _DIRECT_IO = flags.DEFINE_boolean(
     'fio_direct', True,
     'Whether to use O_DIRECT to bypass OS cache. This is strongly '
@@ -283,6 +294,9 @@ bssplit={{scenario['bssplit']}}
 iodepth={{scenario['iodepth']}}
 size={{scenario['size']}}
 numjobs={{scenario['numjobs']}}
+{%- if scenario['rate'] is defined %}
+rate={{scenario['rate']}}
+{%- endif%}
 {%- if scenario['iodepth_batch_submit'] is defined %}
 iodepth_batch_submit={{scenario['iodepth_batch_submit']}}
 {%- endif%}
@@ -515,6 +529,8 @@ def GenerateJobFileString(filename, scenario_strings,
   # The following ensures proper use of NUMA locality. HdX NVME-to-CPU not
   # used in the 1-NUMA case.
   for scenario in jinja_scenarios:
+    if _FIO_RATE_BANDWIDTH_LIMIT.value:
+      scenario['rate'] = _FIO_RATE_BANDWIDTH_LIMIT.value
     if numa_node_count > 1:
       scenario['iodepth_batch_submit'] = scenario['iodepth']
       scenario['iodepth_batch_complete_max'] = scenario['iodepth']
@@ -836,8 +852,15 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
       bin_vals += [fio.ComputeHistogramBinVals(
           vm, '%s_clat_hist.%s.log' % (
               log_file_base, idx + 1)) for idx in range(num_logs)]
-  samples = fio.ParseResults(job_file_string, json.loads(stdout),
-                             log_file_base=log_file_base, bin_vals=bin_vals)
+  samples = fio.ParseResults(
+      job_file_string,
+      json.loads(stdout),
+      log_file_base=log_file_base,
+      bin_vals=bin_vals,
+      skip_latency_individual_stats=(
+          not _FIO_INCLUDE_LATENCY_PERCENTILES.value
+          ),
+  )
 
   samples.append(
       sample.Sample('start_time', start_time, 'sec', samples[0].metadata))
