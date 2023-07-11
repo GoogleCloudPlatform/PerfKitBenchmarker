@@ -66,6 +66,20 @@ flags.DEFINE_string(
     'gce_subnet_addr', '10.128.0.0/20', 'Address range to the '
     'subnet, given in CDR notation. Not used unless '
     '--gce_subnet_region is given.')
+GCE_AVAILABILITY_DOMAIN_COUNT = flags.DEFINE_integer(
+    'gce_availability_domain_count',
+    0,
+    'Number of fault domains to create for availability-domain placement group',
+    lower_bound=0,
+    upper_bound=8
+)
+
+GCE_PLACEMENT_GROUP_MAX_DISTANCE = flags.DEFINE_integer(
+    'gce_placement_group_max_distance',
+    None,
+    'Number of max logical switches between VMs.',
+    lower_bound=0
+)
 flags.DEFINE_string(
     'gce_remote_access_firewall_rule', None, 'The name of an '
     'already created firewall rule which allows remote access '
