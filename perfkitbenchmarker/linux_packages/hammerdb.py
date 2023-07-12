@@ -47,10 +47,27 @@ HAMMERDB_4_0 = '4.0'
 HAMMERDB_4_3 = '4.3'
 HAMMERDB_4_5 = '4.5'
 
+TAR_4_0 = f'HammerDB-{HAMMERDB_4_0}-Linux.tar.gz'
+TAR_4_3 = f'HammerDB-{HAMMERDB_4_3}-Linux.tar.gz'
+TAR_4_5 = f'HammerDB-{HAMMERDB_4_5}-Linux.tar.gz'
+
 TPCH_TABLES = [
     'customer', 'lineitem', 'nation', 'orders', 'part', 'partsupp',
     'region', 'supplier'
 ]
+
+PACKAGE_NAME = 'hammerdb'
+PREPROVISIONED_DATA = {
+    TAR_4_0: '9274d8158ba0830e5aafa9263fd865cf61163a0b2c190dfad4d4bf1b61bd6c90',
+    TAR_4_3: '2ac41b83427e5aeb4bfa081de5d4d9a68aa4ecb75949214306d0436aea7ae9e0',
+    TAR_4_5: 'af9fd885afa15c6bcff8c81d8ca05485992f6519ee714f923466382447e2c754',
+}
+BASE_URL = 'https://github.com/TPC-Council/HammerDB/releases/download/'
+PACKAGE_DATA_URL = {
+    TAR_4_0: f'{BASE_URL}v{HAMMERDB_4_0}/{TAR_4_0}',
+    TAR_4_3: f'{BASE_URL}v{HAMMERDB_4_3}/{TAR_4_3}',
+    TAR_4_5: f'{BASE_URL}v{HAMMERDB_4_5}/{TAR_4_5}',
+}
 
 
 MAP_VERSION_TO_INSTALL_FILE_NAME = {
@@ -660,21 +677,26 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
   vm.InstallPackages('patch')
   vm.RemoteCommand('mkdir -p {0}'.format(LocalWorkingDirectory()))
   vm.RemoteCommand('sudo mkdir -p {0}'.format(HAMMERDB_RUN_LOCATION))
+  vm.RemoteCommand(f'sudo chmod ugo+rwx {HAMMERDB_RUN_LOCATION}')
 
-  install_file = MAP_VERSION_TO_INSTALL_FILE_NAME[HAMMERDB_VERSION.value]
-
-  files_required = [install_file]
+  tar_file = f'HammerDB-{HAMMERDB_VERSION.value}-Linux.tar.gz'
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, [tar_file], HAMMERDB_RUN_LOCATION)
+  vm.RemoteCommand(
+      f'cd {HAMMERDB_RUN_LOCATION}; tar xzvf {tar_file}; '
+      f'mv HammerDB-{HAMMERDB_VERSION.value}/* ./')
   # Push Hammerdb install files
   if HAMMERDB_VERSION.value == HAMMERDB_4_0:
+    install_file = 'install_hammerdb_4_0.sh'
     # Patches hammerdb 4.0 for Postgres on Azure and time profile frequency
-    files_required += ['pgolap.tcl.patch', 'pgoltp.tcl.patch',
-                       'postgresql.xml.patch', 'etprof-1.1.tm.patch']
+    files_required = ['pgolap.tcl.patch', 'pgoltp.tcl.patch',
+                      'postgresql.xml.patch', 'etprof-1.1.tm.patch',
+                      install_file]
 
-  for file in files_required:
-    PushCloudSqlTestFile(vm, file, P3RF_CLOUD_SQL_TEST_DIR)
-
-  vm.RemoteCommand(InLocalDir(f'chmod +x {install_file}'))
-  vm.RemoteCommand(InLocalDir(f'sudo ./{install_file}'))
+    for file in files_required:
+      PushCloudSqlTestFile(vm, file, P3RF_CLOUD_SQL_TEST_DIR)
+    vm.RemoteCommand(InLocalDir(f'chmod +x {install_file}'))
+    vm.RemoteCommand(InLocalDir(f'sudo ./{install_file}'))
 
   db_engine = sql_engine_utils.GetDbEngineType(FLAGS.db_engine)
   if db_engine == sql_engine_utils.MYSQL:

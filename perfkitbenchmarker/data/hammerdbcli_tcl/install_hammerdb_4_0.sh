@@ -1,18 +1,5 @@
 #!/bin/bash
 
-curl -LO 'https://github.com/TPC-Council/HammerDB/releases/download/v4.0/HammerDB-4.0-Linux.tar.gz'
-echo 'fa9c4e2654a49f856cecf63c8ca9be5b  HammerDB-4.0-Linux.tar.gz'  > hammerdb.md5
-
-if ! md5sum -c hammerdb.md5
-then
-    echo ERROR: Checksum failed. Please verify the checksum working with the new Hammerdb version
-    exit 1
-fi
-
-sudo tar -zxvf HammerDB-4.0-Linux.tar.gz -C /var/lib/google
-
-sudo mv /var/lib/google/HammerDB-4.0/* /var/lib/google/HammerDB
-
 # Here are the patch on Hammerdb on version 4.0 so it works on Azure Postgres
 #
 # Patch is necessary because Hammerdb release version is not in sync
