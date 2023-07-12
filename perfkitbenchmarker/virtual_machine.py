@@ -1025,9 +1025,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
           may fail after a time that a new connection would succeed).
           Defaults to 500ms.
     """
-    if not self.ip_address:
-      raise errors.VirtualMachine.VirtualMachineError(
-          'Trying to connect to a VM without an external IP address')
     if not port:
       port = self.primary_remote_access_port
     # TODO(user): refactor to reuse sockets?
@@ -1036,7 +1033,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       # Before the IP is reachable the socket times out (and throws). After that
       # it throws immediately.
       sock.settimeout(socket_timeout)  # seconds
-      sock.connect((self.ip_address, port))
+      sock.connect((self.GetConnectionIp(), port))
     logging.info('Connected to port %s on %s', port, self)
 
   def IsSmtEnabled(self):
