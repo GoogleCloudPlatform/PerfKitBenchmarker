@@ -221,7 +221,7 @@ def Run(benchmark_spec):
       'cloudspanner.batchinserts': FLAGS.cloud_spanner_ycsb_batchinserts,
   }
   # Uses overridden cloud spanner endpoint in gcloud configuration
-  end_point = spanner.GetEndPoint()
+  end_point = spanner.GetApiEndPoint()
   if end_point:
     run_kwargs['cloudspanner.host'] = end_point
 

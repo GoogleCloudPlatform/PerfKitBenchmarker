@@ -71,7 +71,6 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
       raise relational_db.UnsupportedError('High availability is unsupported '
                                            'for unmanaged '
                                            'databases.')
-    self.endpoint = ''
     self.spec.database_username = 'root'
     self.spec.database_password = 'perfkitbenchmarker'
     self.innodb_buffer_pool_size = FLAGS.innodb_buffer_pool_size

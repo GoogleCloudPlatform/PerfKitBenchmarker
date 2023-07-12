@@ -154,7 +154,6 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         '255.255.255.255',
     ]
     vm_util.IssueCommand(cmd)
-    self._AssignEndpointForWriterInstance()
     self.client_vm_query_tools.InstallPackages()
 
   def SetDbConfiguration(self, name: str, value: str) -> Tuple[str, str, int]:

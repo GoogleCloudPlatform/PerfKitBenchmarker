@@ -390,9 +390,6 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
 
     return metadata
 
-  def _SetEndpoint(self):
-    raise NotImplementedError('Set endpoint is not implemented')
-
   def _InstanceExists(self, instance_id) -> bool:
     """Returns true if the underlying instance."""
     json_output = self._DescribeInstance(instance_id)

@@ -116,7 +116,6 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     super()._PostCreate()
 
     self._SetPrimaryAndSecondaryZones()
-    self._SetEndpoint()
 
     self.client_vm_query_tools.InstallPackages()
 

@@ -201,7 +201,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     self._description = db_spec.spanner_description or _DEFAULT_DESCRIPTION
     self._config = db_spec.spanner_config or self._GetDefaultConfig()
     self.nodes = db_spec.spanner_nodes or _DEFAULT_NODES
-    self._end_point = None
+    self._api_endpoint = None
 
     # Cloud Spanner may not explicitly set the following common flags.
     self.project = (
@@ -332,10 +332,10 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
     return True
 
-  def GetEndPoint(self) -> str:
-    """Returns the end point for Cloud Spanner."""
-    if self._end_point:
-      return self._end_point
+  def GetApiEndPoint(self) -> str:
+    """Returns the API endpoint override for Cloud Spanner."""
+    if self._api_endpoint:
+      return self._api_endpoint
 
     cmd = util.GcloudCommand(
         self, 'config', 'get-value', 'api_endpoint_overrides/spanner'
@@ -343,8 +343,8 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     stdout, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.warning('Fail to retrieve cloud spanner end point.')
-    self._end_point = json.loads(stdout) or _DEFAULT_ENDPOINT
-    return self._end_point
+    self._api_endpoint = json.loads(stdout) or _DEFAULT_ENDPOINT
+    return self._api_endpoint
 
   def _SetNodes(self, nodes: int) -> None:
     """Sets the number of nodes on the Spanner instance."""
@@ -383,7 +383,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     """Updates the labels of the current instance."""
     header = {'Authorization': f'Bearer {util.GetAccessToken()}'}
     url = (
-        f'{self.GetEndPoint()}/v1/projects/'
+        f'{self.GetApiEndPoint()}/v1/projects/'
         f'{self.project}/instances/{self.instance_id}'
     )
     # Keep any existing labels
@@ -415,7 +415,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
         'gcp_spanner_database_dialect': self.dialect,
         'gcp_spanner_node_count': self.nodes,
         'gcp_spanner_config': self._config,
-        'gcp_spanner_endpoint': self.GetEndPoint(),
+        'gcp_spanner_endpoint': self.GetApiEndPoint(),
     }
 
   def GetAverageCpuUsage(self, duration_minutes: int) -> float:

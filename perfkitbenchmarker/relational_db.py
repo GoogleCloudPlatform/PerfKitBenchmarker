@@ -210,6 +210,7 @@ class BaseRelationalDb(resource.BaseResource):
     self.instance_id = 'pkb-db-instance-' + FLAGS.run_uri
     self.port = self.GetDefaultPort()
     self.is_managed_db = self.IS_MANAGED
+    self.endpoint = ''
     self.replica_endpoint = ''
     self.client_vms = []
 
@@ -284,17 +285,6 @@ class BaseRelationalDb(resource.BaseResource):
     ]
     # TODO(user): Remove this after moving to multiple client VMs.
     self.client_vm = self.client_vms[0]
-
-  @property
-  def endpoint(self):
-    """Endpoint of the database server (exclusing port)."""
-    if not hasattr(self, '_endpoint'):
-      raise RelationalDbPropertyNotSetError('endpoint not set')
-    return self._endpoint
-
-  @endpoint.setter
-  def endpoint(self, endpoint):
-    self._endpoint = endpoint
 
   @property
   def port(self):
@@ -399,9 +389,14 @@ class BaseRelationalDb(resource.BaseResource):
     Returns: default version as a string for the given engine.
     """
 
+  def _SetEndpoint(self):
+    """Set the DB endpoint for this instance during _PostCreate."""
+    pass
+
   def _PostCreate(self):
     if self.spec.db_flags:
       self._ApplyDbFlags()
+    self._SetEndpoint()
 
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""

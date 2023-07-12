@@ -468,7 +468,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         '255.255.255.255',
     ]
     vm_util.IssueCommand(cmd)
-    self._AssignEndpointForWriterInstance()
 
     if self.spec.engine == 'mysql' or self.spec.engine == 'postgres':
       # Azure will add @domainname after the database username
@@ -555,10 +554,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     json_output = json.loads(stdout)
     return json_output
 
-  def _AssignEndpointForWriterInstance(self):
+  def _SetEndpoint(self):
     """Assigns the ports and endpoints from the instance_id to self.
 
-    These will be used to communicate with the data base
+    These will be used to communicate with the database. Called during
+    _PostCreate().
     """
     server_show_json = self._AzServerShow()
     self.endpoint = server_show_json['fullyQualifiedDomainName']
