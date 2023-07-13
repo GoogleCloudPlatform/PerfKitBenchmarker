@@ -252,33 +252,33 @@ class BaseRelationalDb(resource.BaseResource):
   # TODO(user): Deprecate in favor of client_vms_query_tools
   @property
   def client_vm_query_tools(self):
-    if not hasattr(self, '_client_vm_query_tools'):
-      self._client_vm_query_tools = self.client_vms_query_tools[0]
-    return self._client_vm_query_tools
+    return self.client_vms_query_tools[0]
 
   @property
   def client_vms_query_tools(self) -> list[sql_engine_utils.ISQLQueryTools]:
-    if not hasattr(self, '_client_vms_query_tools'):
-      connection_properties = self._GetDbConnectionProperties()
-      tools = [
-          sql_engine_utils.GetQueryToolsByEngine(vm, connection_properties)
-          for vm in self.client_vms
-      ]
-      self._client_vms_query_tools = [t for t in tools if t is not None]
-    return self._client_vms_query_tools
+    connection_properties = self._GetDbConnectionProperties()
+    tools = [
+        sql_engine_utils.GetQueryToolsByEngine(vm, connection_properties)
+        for vm in self.client_vms
+    ]
+    return [t for t in tools if t is not None]
 
   @property
   def client_vm_query_tools_for_replica(self):
     """Query tools to make custom queries on replica."""
-    if not hasattr(self, '_client_vm_query_tools_for_replica'):
-      if not self.replica_endpoint:
-        raise ValueError('Database does not have replica.')
-      connection_properties = sql_engine_utils.DbConnectionProperties(
-          self.spec.engine, self.spec.engine_version, self.replica_endpoint,
-          self.port, self.spec.database_username, self.spec.database_password)
-      self._client_vm_query_tools_for_replica = sql_engine_utils.GetQueryToolsByEngine(
-          self.client_vm, connection_properties)
-    return self._client_vm_query_tools_for_replica
+    if not self.replica_endpoint:
+      raise ValueError('Database does not have replica.')
+    connection_properties = sql_engine_utils.DbConnectionProperties(
+        self.spec.engine,
+        self.spec.engine_version,
+        self.replica_endpoint,
+        self.port,
+        self.spec.database_username,
+        self.spec.database_password,
+    )
+    return sql_engine_utils.GetQueryToolsByEngine(
+        self.client_vm, connection_properties
+    )
 
   def SetVms(self, vm_groups):
     self.client_vms = vm_groups[

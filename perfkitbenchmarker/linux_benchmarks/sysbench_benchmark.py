@@ -415,7 +415,7 @@ def _PrepareSysbench(benchmark_spec):
   # skipped if the database is user managed / restored.
   if db.user_managed or db.restored:
     background_tasks.RunThreaded(
-        lambda client_query_tools: client_query_tools.InstallPackages,
+        lambda client_query_tools: client_query_tools.InstallPackages(),
         db.client_vms_query_tools,
     )
 
