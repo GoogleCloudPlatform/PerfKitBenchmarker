@@ -700,6 +700,20 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
   return stdout, stderr
 
 
+def _UpdateSessions(
+    db: relational_db.BaseRelationalDb, thread_count: int
+) -> None:
+  """Updates the sessions used for more connection parallelism."""
+  if (
+      db.client_vms_query_tools[0].ENGINE_TYPE
+      == sql_engine_utils.SPANNER_POSTGRES
+  ):
+    background_tasks.RunThreaded(
+        lambda client: client.Connect(thread_count * 2),
+        db.client_vms_query_tools,
+    )
+
+
 def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
   """Runs the Sysbench OLTP test.
 
@@ -717,6 +731,7 @@ def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
   # First step is to run the test long enough to cover the warmup period
   # as requested by the caller. Second step is the 'real' run where the results
   # are parsed and reported.
+  _UpdateSessions(benchmark_spec.relational_db, sysbench_thread_count)
 
   warmup_seconds = FLAGS.sysbench_warmup_seconds
   if warmup_seconds > 0:

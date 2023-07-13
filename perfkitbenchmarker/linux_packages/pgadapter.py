@@ -22,6 +22,7 @@ PGADAPTER_URL = 'https://storage.googleapis.com/pgadapter-jar-releases/pgadapter
 
 def AptInstall(vm):
   """Installs the pgadapter package on the VM."""
-  vm.InstallPackages('default-jre')
+  # psmisc helps with restarting PGAdapter.
+  vm.InstallPackages('default-jre psmisc')
   vm.RemoteCommand(f'wget {PGADAPTER_URL}')
   vm.RemoteCommand('tar -xzvf pgadapter.tar.gz')

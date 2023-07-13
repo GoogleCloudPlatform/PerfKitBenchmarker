@@ -16,6 +16,7 @@
 import abc
 import dataclasses
 import logging
+import time
 import timeit
 from typing import Any, Dict, List, Optional, Tuple, Union
 from absl import flags
@@ -70,6 +71,9 @@ AWS_AURORA_POSTGRES_ENGINE = 'aurora-postgresql'
 AWS_AURORA_MYSQL_ENGINE = 'aurora-mysql'
 
 DEFAULT_COMMAND = 'default'
+
+_PGADAPTER_MAX_SESSIONS = 5000
+_PGADAPTER_CONNECT_WAIT_SEC = 10
 
 
 # Query Related tools
@@ -339,21 +343,40 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
   # The default database in postgres
   DEFAULT_DATABASE = POSTGRES
 
-  def _Connect(self) -> None:
-    """Connects to the DB using PGAdapter."""
+  def Connect(self, sessions: Optional[int] = None) -> None:
+    """Connects to the DB using PGAdapter.
+
+    See https://cloud.google.com/spanner/docs/sessions for a description
+    of how session count affects performance.
+
+    Args:
+      sessions: The number of Spanner minSessions to set for the client.
+    """
+    self.vm.RemoteCommand('fuser -k 5432/tcp', ignore_failure=True)
+    sessions_arg = ''
+    if sessions:
+      sessions_arg = (
+          f'-r "minSessions={sessions};'
+          f'maxSessions={_PGADAPTER_MAX_SESSIONS};'
+          f'numChannels={int(_PGADAPTER_MAX_SESSIONS/100)}"'
+      )
     properties = self.connection_properties
     self.vm.RemoteCommand(
         'java -jar pgadapter.jar '
         '-dir /tmp '
         f'-p {properties.project} '
         f'-i {properties.instance_name} '
-        f'-d {properties.database_name} &> /dev/null &'
+        f'-d {properties.database_name} '
+        f'{sessions_arg} '
+        '&> /dev/null &'
     )
+    # Connections need some time to startup, or the run command fails.
+    time.sleep(_PGADAPTER_CONNECT_WAIT_SEC)
 
   def InstallPackages(self) -> None:
     """Installs packages required for making queries."""
     self.vm.Install('pgadapter')
-    self._Connect()
+    self.Connect()
     self.vm.Install('postgres_client')
 
   def MakeSqlCommand(
