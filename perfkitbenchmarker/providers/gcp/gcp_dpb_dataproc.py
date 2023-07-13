@@ -61,10 +61,7 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super().__init__(dpb_service_spec)
-    self.dpb_service_type = self.SERVICE_TYPE
     self.project = FLAGS.project
-    if FLAGS.dpb_dataproc_image_version:
-      self.dpb_version = FLAGS.dpb_dataproc_image_version
     if not self.dpb_service_zone:
       raise errors.Setup.InvalidSetupError(
           'dpb_service_zone must be provided, for provisioning.')
@@ -75,6 +72,9 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
     self._cluster_create_time: Optional[float] = None
     self._cluster_ready_time: Optional[float] = None
     self._cluster_delete_time: Optional[float] = None
+
+  def GetDpbVersion(self) -> Optional[str]:
+    return FLAGS.dpb_dataproc_image_version or super().GetDpbVersion()
 
   @staticmethod
   def _ParseTime(state_time: str) -> datetime.datetime:
@@ -214,8 +214,8 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
         self.dpb_hdfs_type = 'Local SSD'
     # Set zone
     cmd.flags['zone'] = self.dpb_service_zone
-    if self.dpb_version:
-      cmd.flags['image-version'] = self.dpb_version
+    if self.GetDpbVersion():
+      cmd.flags['image-version'] = self.GetDpbVersion()
 
     if FLAGS.gcp_dataproc_image:
       cmd.flags['image'] = FLAGS.gcp_dataproc_image
@@ -517,8 +517,8 @@ class GcpDpbDataprocServerless(
     if FLAGS.gce_network_name:
       cmd.flags['network'] = FLAGS.gce_network_name
 
-    if self.dpb_version:
-      cmd.flags['version'] = self.dpb_version
+    if self.GetDpbVersion():
+      cmd.flags['version'] = self.GetDpbVersion()
     if FLAGS.gcp_dataproc_image:
       cmd.flags['container-image'] = FLAGS.gcp_dataproc_image
 

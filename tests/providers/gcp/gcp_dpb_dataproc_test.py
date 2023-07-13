@@ -147,6 +147,12 @@ class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):
       cluster._Create()
     self.assertEqual(mock_issue.call_count, 1)
 
+  def testGetMetadata(self):
+    cluster = LocalGcpDpbDataproc()
+    metadata = cluster.GetResourceMetadata()
+    self.assertEqual(metadata['dpb_service'], 'dataproc')
+    self.assertEqual(metadata['dpb_version'], 'fake-version')
+
 
 class LocalGcpDpbDPGKE(gcp_dpb_dataproc.GcpDpbDpgke):
 

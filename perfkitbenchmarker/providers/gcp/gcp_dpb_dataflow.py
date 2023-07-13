@@ -111,7 +111,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(GcpDpbDataflow, self).__init__(dpb_service_spec)
-    self.dpb_service_type = self.SERVICE_TYPE
     self.project = FLAGS.project
     self.job_id = None
     self.job_metrics = None

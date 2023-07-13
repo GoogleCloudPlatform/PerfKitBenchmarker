@@ -104,7 +104,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super(AwsDpbEmr, self).__init__(dpb_service_spec)
-    self.dpb_service_type = AwsDpbEmr.SERVICE_TYPE
     self.project = None
     self.cmd_prefix = list(util.AWS_PREFIX)
     if self.dpb_service_zone:
@@ -119,13 +118,15 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.storage_service.PrepareService(self.region)
     self.persistent_fs_prefix = 's3://'
     self.bucket_to_delete = None
-    self.dpb_version = FLAGS.dpb_emr_release_label or self.dpb_version
     self._cluster_create_time: Optional[float] = None
     self._cluster_ready_time: Optional[float] = None
     self._cluster_delete_time: Optional[float] = None
-    if not self.dpb_version:
+    if not self.GetDpbVersion():
       raise errors.Setup.InvalidSetupError(
           'dpb_service.version must be provided.')
+
+  def GetDpbVersion(self) -> Optional[str]:
+    return FLAGS.dpb_emr_release_label or super().GetDpbVersion()
 
   def GetClusterCreateTime(self) -> Optional[float]:
     """Returns the cluster creation time.
@@ -202,7 +203,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
     # Spark SQL needs to access Hive
     cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
-                             '--release-label', self.dpb_version,
+                             '--release-label', self.GetDpbVersion(),
                              '--use-default-roles',
                              '--instance-groups',
                              json.dumps(instance_groups),
@@ -454,7 +455,6 @@ class AwsDpbEmrServerless(
     # TODO(odiego): Refactor the AwsDpbEmr and AwsDpbEmrServerless into a
     # hierarchy or move common code to a parent class.
     super().__init__(dpb_service_spec)
-    self.dpb_service_type = self.SERVICE_TYPE
     self.project = None
     self.cmd_prefix = list(util.AWS_PREFIX)
     if self.dpb_service_zone:
@@ -467,7 +467,7 @@ class AwsDpbEmrServerless(
     self.storage_service.PrepareService(self.region)
     self.persistent_fs_prefix = 's3://'
     self._cluster_create_time = None
-    if not self.dpb_version:
+    if not self.GetDpbVersion():
       raise errors.Setup.InvalidSetupError(
           'dpb_service.version must be provided. Versions follow the format: '
           '"emr-x.y.z" and are listed at '
@@ -516,7 +516,7 @@ class AwsDpbEmrServerless(
     # Create the application.
     stdout, _, _ = vm_util.IssueCommand(self.cmd_prefix + [
         'emr-serverless', 'create-application',
-        '--release-label', self.dpb_version,
+        '--release-label', self.GetDpbVersion(),
         '--name', self.cluster_id,
         '--type', application_type,
         '--tags', json.dumps(util.MakeDefaultTags()),

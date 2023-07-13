@@ -233,10 +233,12 @@ class BaseDpbService(resource.BaseResource):
       self.bucket = 'pkb-' + FLAGS.run_uri
       self.manage_bucket = True
     self.dpb_service_zone = FLAGS.dpb_service_zone
-    self.dpb_version = dpb_service_spec.version
-    self.dpb_service_type = 'unknown'
+    self.dpb_service_type = self.SERVICE_TYPE
     self.storage_service = None
     self._InitializeMetadata()
+
+  def GetDpbVersion(self) -> Optional[str]:
+    return self.spec.version
 
   @property
   def base_dir(self):
@@ -388,7 +390,7 @@ class BaseDpbService(resource.BaseResource):
         properties=properties)
 
   def _InitializeMetadata(self) -> None:
-    pretty_version = self.dpb_version or 'default'
+    pretty_version = self.GetDpbVersion()
     self.metadata = {
         'dpb_service':
             self.dpb_service_type,
@@ -695,11 +697,10 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
 
   def __init__(self, dpb_service_spec):
     super(UnmanagedDpbServiceYarnCluster, self).__init__(dpb_service_spec)
-    #  Dictionary to hold the cluster vms.
-    self.dpb_service_type = UNMANAGED_DPB_SVC_YARN_CLUSTER
-    # Set DPB version as Hadoop version for metadata
-    self.dpb_version = hadoop.HadoopVersion()
     self.cloud = dpb_service_spec.worker_group.cloud
+
+  def GetDpbVersion(self) -> Optional[str]:
+    return str(hadoop.HadoopVersion())
 
   def _Create(self):
     """Create an un-managed yarn cluster."""
@@ -786,10 +787,10 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
     super(UnmanagedDpbSparkCluster, self).__init__(dpb_service_spec)
     #  Dictionary to hold the cluster vms.
     self.vms = {}
-    self.dpb_service_type = UNMANAGED_SPARK_CLUSTER
-    # Set DPB version as Spark version for metadata
-    self.dpb_version = f'spark_{spark.SparkVersion()}'
     self.cloud = dpb_service_spec.worker_group.cloud
+
+  def GetDpbVersion(self) -> Optional[str]:
+    return f'spark_{spark.SparkVersion()}'
 
   def _Create(self):
     """Create an un-managed yarn cluster."""
@@ -876,9 +877,6 @@ class KubernetesSparkCluster(BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super().__init__(dpb_service_spec)
-    self.dpb_service_type = self.SERVICE_TYPE
-    # Set DPB version as Spark version for metadata
-    self.dpb_version = 'spark_' + FLAGS.spark_version
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
     self.k8s_cluster = benchmark_spec.container_cluster
@@ -915,6 +913,9 @@ class KubernetesSparkCluster(BaseDpbService):
       raise errors.Config.InvalidValue(
           f'Cluster type {KUBERNETES_SPARK_CLUSTER} requires at least 2 nodes.'
           f'Found {self.k8s_cluster.num_nodes}.')
+
+  def GetDpbVersion(self) -> Optional[str]:
+    return 'spark_' + FLAGS.spark_version
 
   def _Create(self):
     """Create docker image for cluster."""
@@ -1062,8 +1063,6 @@ class KubernetesFlinkCluster(BaseDpbService):
 
   def __init__(self, dpb_service_spec):
     super().__init__(dpb_service_spec)
-    self.dpb_service_type = self.SERVICE_TYPE
-    self.dpb_version = dpb_service_spec.version or self.DEFAULT_FLINK_IMAGE
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
     self.k8s_cluster = benchmark_spec.container_cluster
@@ -1090,6 +1089,9 @@ class KubernetesFlinkCluster(BaseDpbService):
       raise errors.Config.InvalidValue(
           f'Cluster type {KUBERNETES_FLINK_CLUSTER} requires at least 2 nodes.'
           f'Found {self.k8s_cluster.num_nodes}.')
+
+  def GetDpbVersion(self) -> Optional[str]:
+    return self.spec.version or self.DEFAULT_FLINK_IMAGE
 
   def _CreateConfigMapDir(self):
     """Returns a TemporaryDirectory containing files in the ConfigMap."""
@@ -1137,7 +1139,7 @@ class KubernetesFlinkCluster(BaseDpbService):
       FLAGS.container_remote_build_config = self._GenerateConfig(
           'docker/flink/cloudbuild.yaml.j2',
           dpb_job_jarfile=FLAGS.dpb_job_jarfile,
-          base_image=self.dpb_version,
+          base_image=self.GetDpbVersion(),
           full_tag=self.container_registry.GetFullRegistryTag(self.image),
       )
     self.image = self.container_registry.GetOrBuild(self.image)

@@ -43,7 +43,6 @@ class AwsDpbGlue(
 
   def __init__(self, dpb_service_spec):
     super().__init__(dpb_service_spec)
-    self.dpb_service_type = self.SERVICE_TYPE
     self.project = None
     self.cmd_prefix = list(util.AWS_PREFIX)
     if not self.dpb_service_zone:
@@ -140,7 +139,7 @@ class AwsDpbGlue(
         '--role', self.role,
         '--command', json.dumps(glue_command),
         '--default-arguments', json.dumps(glue_default_args),
-        '--glue-version', self.dpb_version,
+        '--glue-version', self.GetDpbVersion(),
         '--number-of-workers', str(self.spec.worker_count),
         '--worker-type', self.spec.worker_group.vm_spec.machine_type,
 
