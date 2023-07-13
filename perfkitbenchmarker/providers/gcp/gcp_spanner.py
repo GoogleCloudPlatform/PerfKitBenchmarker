@@ -30,7 +30,6 @@ from absl import flags
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import query
 import numpy as np
-from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
@@ -492,6 +491,13 @@ class GoogleSqlGcpSpannerInstance(GcpSpannerInstance):
     super().__init__(db_spec, **kwargs)
     self.dialect = GOOGLESQL
 
+  def _PostCreate(self):
+    # Overrides BaseRelationalDB _PostCreate since client utils are
+    # not yet implemented.
+    if self.spec.db_flags:
+      self._ApplyDbFlags()
+    self._SetEndpoint()
+
   def GetDefaultPort(self) -> int:
     return 0  # Port is unused
 
@@ -508,14 +514,6 @@ class PostgresGcpSpannerInstance(GcpSpannerInstance):
 
   def GetDefaultPort(self) -> int:
     return relational_db.DEFAULT_POSTGRES_PORT
-
-  def _PostCreate(self):
-    super()._PostCreate()
-    # TODO(user) move to superclass.
-    background_tasks.RunThreaded(
-        lambda client_query_tools: client_query_tools.InstallPackages(),
-        self.client_vms_query_tools,
-    )
 
   def _GetDbConnectionProperties(
       self,

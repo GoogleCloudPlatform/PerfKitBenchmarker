@@ -388,8 +388,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     super()._PostCreate()
     self.SetManagedDatabasePassword()
 
-    self.client_vm_query_tools.InstallPackages()
-
   def _ApplyDbFlags(self):
     cmd_string = [
         self, 'sql', 'instances', 'patch', self.instance_id,

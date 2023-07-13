@@ -117,8 +117,6 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
     self._SetPrimaryAndSecondaryZones()
 
-    self.client_vm_query_tools.InstallPackages()
-
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.
 

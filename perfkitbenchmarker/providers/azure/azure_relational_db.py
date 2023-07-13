@@ -474,8 +474,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       self.spec.database_username = (self.spec.database_username + '@' +
                                      self.endpoint.split('.')[0])
 
-    self.client_vm_query_tools.InstallPackages()
-
   def _Reboot(self):
     """Reboot the managed db."""
     cmd = [

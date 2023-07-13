@@ -124,8 +124,6 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     super()._PostCreate()
     self._SetPrimaryAndSecondaryZones()
 
-    self.client_vm_query_tools.InstallPackages()
-
   def _DescribeCluster(self):
     cmd = util.AWS_PREFIX + [
         'rds', 'describe-db-clusters',

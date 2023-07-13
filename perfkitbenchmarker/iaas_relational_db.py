@@ -563,11 +563,6 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
     """
     return self._IsReadyUnmanaged()
 
-  def _PostCreate(self):
-    """Creates the PKB user and sets the password."""
-    super()._PostCreate()
-    self.client_vm_query_tools.InstallPackages()
-
 
 def ConfigureSQLServer(vm, username: str, password: str):
   """Update the username and password on a SQL Server."""

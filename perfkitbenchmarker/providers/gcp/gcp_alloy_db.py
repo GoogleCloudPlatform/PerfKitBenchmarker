@@ -160,7 +160,6 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
   def _PostCreate(self) -> None:
     """Creates the PKB user and sets the password."""
     super()._PostCreate()
-    self.client_vm_query_tools.InstallPackages()
     columnar_engine_size = None
     if _COLUMNAR_ENGINE.value:
       columnar_engine_size = _COLUMNAR_ENGINE_SIZE.value

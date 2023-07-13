@@ -15,8 +15,8 @@
 
 import abc
 import re
-
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sql_engine_utils
@@ -260,10 +260,11 @@ class BaseRelationalDb(resource.BaseResource):
   def client_vms_query_tools(self) -> list[sql_engine_utils.ISQLQueryTools]:
     if not hasattr(self, '_client_vms_query_tools'):
       connection_properties = self._GetDbConnectionProperties()
-      self._client_vms_query_tools = [
+      tools = [
           sql_engine_utils.GetQueryToolsByEngine(vm, connection_properties)
           for vm in self.client_vms
       ]
+      self._client_vms_query_tools = [t for t in tools if t is not None]
     return self._client_vms_query_tools
 
   @property
@@ -397,6 +398,10 @@ class BaseRelationalDb(resource.BaseResource):
     if self.spec.db_flags:
       self._ApplyDbFlags()
     self._SetEndpoint()
+    background_tasks.RunThreaded(
+        lambda client_query_tools: client_query_tools.InstallPackages(),
+        self.client_vms_query_tools,
+    )
 
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""
