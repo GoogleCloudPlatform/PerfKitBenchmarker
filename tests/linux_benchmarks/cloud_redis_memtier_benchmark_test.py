@@ -253,6 +253,43 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
+  def testShardConnectionsNoZone(self):
+    test_redis_instance = _GetTestRedisInstance()
+    test_redis_instance.name = 'test-instance'
+    vm1 = _GetTestVm('vm1')
+    vm2 = _GetTestVm('vm2')
+    vm3 = _GetTestVm('vm3')
+
+    shards = [
+        managed_memory_store.RedisShard('', 'shard0', 0, None),
+        managed_memory_store.RedisShard('', 'shard1', 0, None),
+        managed_memory_store.RedisShard('', 'shard2', 0, None),
+        managed_memory_store.RedisShard('', 'shard3', 0, None),
+        managed_memory_store.RedisShard('', 'shard4', 0, None),
+        managed_memory_store.RedisShard('', 'shard5', 0, None),
+    ]
+    self.enter_context(
+        mock.patch.object(
+            test_redis_instance, 'GetShardEndpoints', return_value=shards
+        )
+    )
+
+    connections = cloud_redis_memtier_benchmark._GetConnections(
+        [vm1, vm2, vm3], test_redis_instance
+    )
+
+    self.assertCountEqual(
+        connections,
+        [
+            memtier.MemtierConnection(vm1, 'shard0', 0),
+            memtier.MemtierConnection(vm1, 'shard3', 0),
+            memtier.MemtierConnection(vm2, 'shard1', 0),
+            memtier.MemtierConnection(vm2, 'shard4', 0),
+            memtier.MemtierConnection(vm3, 'shard2', 0),
+            memtier.MemtierConnection(vm3, 'shard5', 0),
+        ],
+    )
+
   def testShardConnectionsOnePerVm(self):
     test_redis_instance = _GetTestRedisInstance()
     test_redis_instance.name = 'test-instance'
