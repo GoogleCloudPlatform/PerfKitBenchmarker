@@ -36,3 +36,19 @@ def YumInstall(vm):
   vm.RemoteCommand(
       r'echo export PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bashrc')
   vm.RemoteCommand('source ~/.bashrc')
+  vm.RemoteCommand('sudo firewall-cmd --zone=public '
+                   '--add-port=1433/tcp --permanent')
+  vm.RemoteCommand('sudo firewall-cmd --reload')
+
+
+def AptInstall(vm):
+  vm.RemoteCommand('wget -qO- https://packages.microsoft.com/keys/microsoft.asc'
+                   ' | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc')
+  vm.RemoteCommand('sudo add-apt-repository "$(wget -qO- '
+                   'https://packages.microsoft.com/config/ubuntu/20.04/'
+                   'mssql-server-2022.list)"')
+
+  vm.RemoteCommand('sudo apt-get update')
+  vm.InstallPackages('mssql-server')
+
+  vm.RemoteCommand('sudo ufw allow in 1433')

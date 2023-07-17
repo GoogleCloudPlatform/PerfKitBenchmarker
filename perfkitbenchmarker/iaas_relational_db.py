@@ -369,9 +369,7 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
                                  'MSSQL_PID={} /opt/mssql/bin/mssql-conf -n '
                                  'setup accept-eula'.format(
                                      self.spec.database_password, MSSQL_PID))
-    self.server_vm.RemoteCommand('sudo firewall-cmd --zone=public '
-                                 '--add-port=1433/tcp --permanent')
-    self.server_vm.RemoteCommand('sudo firewall-cmd --reload')
+
     self.server_vm.RemoteCommand('sudo systemctl restart mssql-server')
 
     self.server_vm.RemoteCommand('sudo mkdir -p /scratch/mssqldata')
@@ -595,8 +593,29 @@ def _TuneForSQL(vm):
   tune_settings = ('# A TuneD configuration for SQL Server on Linux \n'
                    '[main] \n'
                    'summary=Optimize for Microsoft SQL Server \n'
-                   'include=throughput-performance \n')
-  vm.RemoteCommand('echo {}'.format(tune_settings))
+                   'include=throughput-performance \n\n'
+                   '[cpu] \n'
+                   'force_latency=5\n\n'
+                   '[sysctl]\n'
+                   'vm.swappiness = 1\n'
+                   'vm.dirty_background_ratio = 3\n'
+                   'vm.dirty_ratio = 80\n'
+                   'vm.dirty_expire_centisecs = 500\n'
+                   'vm.dirty_writeback_centisecs = 100\n'
+                   'vm.transparent_hugepages=always\n'
+                   'vm.max_map_count=1600000\n'
+                   'net.core.rmem_default = 262144\n'
+                   'net.core.rmem_max = 4194304\n'
+                   'net.core.wmem_default = 262144\n'
+                   'net.core.wmem_max = 1048576\n'
+                   'kernel.numa_balancing=0')
+  vm.RemoteCommand('sudo mkdir -p /usr/lib/tuned/mssql')
+  vm.RemoteCommand('echo "{}" | sudo tee /usr/lib/tuned/mssql/tuned.conf'
+                   .format(tune_settings))
+
+  vm.RemoteCommand('sudo chmod +x /usr/lib/tuned/mssql/tuned.conf')
+  vm.RemoteCommand('sudo tuned-adm profile mssql')
+  vm.RemoteCommand('sudo tuned-adm list')
 
 
 def ConfigureSQLServerLinux(vm, username: str, password: str):

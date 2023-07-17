@@ -621,10 +621,16 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     # mounted, format the volume, and assign the mount point to the volume.
     if disk_spec.mount_point:
       self.RemoteCommand('mkdir %s' % disk_spec.mount_point)
-      script += ('format quick\n'
+      format_command = 'format quick'
+
+      if self.OS_TYPE in os_types.WINDOWS_SQLSERVER_OS_TYPES:
+        format_command = 'format fs=ntfs quick unit=64k'
+
+      script += ('%s\n'
                  'assign letter=%s\n'
                  'assign mount=%s\n' %
-                 (ATTACHED_DISK_LETTER.lower(), disk_spec.mount_point))
+                 (format_command, ATTACHED_DISK_LETTER.lower(),
+                  disk_spec.mount_point))
 
     self._RunDiskpartScript(script)
 
