@@ -67,6 +67,19 @@ MemtierHistogram = List[Dict[str, Union[float, int]]]
 
 FLAGS = flags.FLAGS
 
+PACKAGE_NAME = 'memtier'
+_LARGE_CLUSTER_TAR = 'memtier_large_cluster.tar.gz'
+PREPROVISIONED_DATA = {
+    _LARGE_CLUSTER_TAR: (
+        '4b7364c484001a94e4b8bcd61602c8fbdc8a75d84c751f9c4cfb694942b64052'
+    )
+}
+MEMTIER_LARGE_CLUSTER = flags.DEFINE_bool(
+    'memtier_large_cluster',
+    False,
+    'If true, uses the large cluster binary for memtier.',
+)
+
 
 class MemtierMode(object):
   """Enum of options for --memtier_run_mode."""
@@ -288,6 +301,14 @@ def AptInstall(vm):
   vm.InstallPackages(APT_PACKAGES)
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(MEMTIER_DIR, GIT_TAG))
+  if MEMTIER_LARGE_CLUSTER.value:
+    vm.RemoteCommand(f'rm -rf {MEMTIER_DIR}')
+    vm.InstallPreprovisionedPackageData(
+        PACKAGE_NAME, [_LARGE_CLUSTER_TAR], MEMTIER_DIR
+    )
+    vm.RemoteCommand(
+        f'tar -C {MEMTIER_DIR} -xvzf {MEMTIER_DIR}/{_LARGE_CLUSTER_TAR}'
+    )
   vm.RemoteCommand(
       'cd {0} && autoreconf -ivf && ./configure && sudo make install'.format(
           MEMTIER_DIR
