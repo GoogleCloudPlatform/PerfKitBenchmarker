@@ -94,7 +94,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_bool(
     'dpb_export_job_stats', False,
-    'Exports job stats such as CPU usage and cost. Enabled by default, but not '
+    'Exports job stats such as CPU usage and cost. Disabled by default and not '
     'necessarily implemented on all services.')
 flags.DEFINE_enum(
     'dpb_job_type',
@@ -119,6 +119,12 @@ _SERVICE_PREMIUM_HOURLY_COST = flags.DEFINE_float(
     'dpb_service_premium_hourly_cost', None,
     'Hardware hourly USD cost of running the DPB cluster. Set it along with '
     '--dpb_hardware_hourly_cost to publish cost estimate metrics.'
+)
+_DYNAMIC_ALLOCATION = flags.DEFINE_bool(
+    'dpb_dynamic_allocation', True,
+    'True by default. Set it to False to disable dynamic allocation and assign '
+    'all cluster executors to an incoming job. Setting this off is only '
+    'supported by Dataproc and EMR (non-serverless versions).'
 )
 
 
@@ -192,6 +198,8 @@ class BaseDpbService(resource.BaseResource):
   GCS_FS = 'gs'
   S3_FS = 's3'
 
+  SUPPORTS_NO_DYNALLOC = False
+
   # Job types that are supported on the dpb service backends
   PYSPARK_JOB_TYPE = _PYSPARK_JOB_TYPE
   SPARKSQL_JOB_TYPE = _SPARKSQL_JOB_TYPE
@@ -235,6 +243,11 @@ class BaseDpbService(resource.BaseResource):
     self.dpb_service_zone = FLAGS.dpb_service_zone
     self.dpb_service_type = self.SERVICE_TYPE
     self.storage_service = None
+    if not self.SUPPORTS_NO_DYNALLOC and not _DYNAMIC_ALLOCATION.value:
+      raise errors.Setup.InvalidFlagConfigurationError(
+          'Dynamic allocation off is not supported for the current DPB '
+          f'Service: {type(self).__name__}.'
+      )
     self._InitializeMetadata()
 
   def GetDpbVersion(self) -> Optional[str]:
@@ -413,8 +426,8 @@ class BaseDpbService(resource.BaseResource):
         'dpb_job_properties':
             ','.join('{}={}'.format(k, v)
                      for k, v in self.GetJobProperties().items()),
-        'dpb_cluster_properties':
-            ','.join(FLAGS.dpb_cluster_properties),
+        'dpb_cluster_properties': ','.join(self.GetClusterProperties()),
+        'dpb_dynamic_allocation': _DYNAMIC_ALLOCATION.value,
     }
 
   def _CreateDependencies(self):
@@ -456,6 +469,25 @@ class BaseDpbService(resource.BaseResource):
     if start_time > end_time:
       raise ValueError('start_time cannot be later than the end_time')
     return (end_time - start_time).total_seconds()
+
+  def GetClusterProperties(self) -> list[str]:
+    """Gets cluster props in the format of the dpb_cluster_properties flag.
+
+    Note that this might return an empty list if both --dpb_dynamic_allocation
+    and --dpb_cluster_properties are unset.
+
+    Returns:
+      A list of cluster properties, with each element being in the same format
+      the --dpb_cluster_properties flag uses.
+    """
+    properties = []
+    if not _DYNAMIC_ALLOCATION.value:
+      properties.extend([
+          'spark:spark.executor.instances=9999',
+          'spark:spark.dynamicAllocation.enabled=false',
+      ])
+    properties.extend(FLAGS.dpb_cluster_properties)
+    return properties
 
   def GetJobProperties(self) -> Dict[str, str]:
     """Parse the dpb_job_properties_flag."""

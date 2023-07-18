@@ -60,10 +60,10 @@ DATAPROC_TO_EMR_CONF_FILES = {
 }
 
 
-def _GetClusterConfiguration():
+def _GetClusterConfiguration(cluster_properties: list[str]) -> str:
   """Return a JSON string containing dpb_cluster_properties."""
   properties = collections.defaultdict(lambda: {})
-  for entry in FLAGS.dpb_cluster_properties:
+  for entry in cluster_properties:
     file, kv = entry.split(':')
     key, value = kv.split('=')
     if file not in DATAPROC_TO_EMR_CONF_FILES:
@@ -101,6 +101,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   CLOUD = provider_info.AWS
   SERVICE_TYPE = 'emr'
+  SUPPORTS_NO_DYNALLOC = True
 
   def __init__(self, dpb_service_spec):
     super(AwsDpbEmr, self).__init__(dpb_service_spec)
@@ -221,8 +222,11 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     ]
     cmd += ['--ec2-attributes', ','.join(ec2_attributes)]
 
-    if FLAGS.dpb_cluster_properties:
-      cmd += ['--configurations', _GetClusterConfiguration()]
+    if self.GetClusterProperties():
+      cmd += [
+          '--configurations',
+          _GetClusterConfiguration(self.GetClusterProperties()),
+      ]
 
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)

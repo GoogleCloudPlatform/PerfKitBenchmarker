@@ -140,6 +140,7 @@
 -   Add --dpb_hardware_hourly_cost and --dpb_service_premium_hourly_cost to
 -   Add support for Spanner Postgres benchmarking with TPCC.
     estimate cost of DPB service in benchmark runs.
+-   Add --dpb_dynamic_allocation flag to disable dynamic allocation in Spark benchmarks.
 
 ### Enhancements:
 

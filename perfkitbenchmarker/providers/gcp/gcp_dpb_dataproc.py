@@ -142,6 +142,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
 
   CLOUD = provider_info.GCP
   SERVICE_TYPE = 'dataproc'
+  SUPPORTS_NO_DYNALLOC = True
 
   def __init__(self, dpb_service_spec):
     super().__init__(dpb_service_spec)
@@ -224,8 +225,8 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     if FLAGS.gcloud_scopes:
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
 
-    if FLAGS.dpb_cluster_properties:
-      cmd.flags['properties'] = ','.join(FLAGS.dpb_cluster_properties)
+    if self.GetClusterProperties():
+      cmd.flags['properties'] = ','.join(self.GetClusterProperties())
 
     if FLAGS.dpb_initialization_actions:
       cmd.flags['initialization-actions'] = FLAGS.dpb_initialization_actions
@@ -437,8 +438,8 @@ class GcpDpbDpgke(GcpDpbDataproc):
     if self.project is not None:
       cmd.flags['project'] = self.project
     cmd.flags['image-version'] = self.spec.version
-    if FLAGS.dpb_cluster_properties:
-      cmd.flags['properties'] = ','.join(FLAGS.dpb_cluster_properties)
+    if self.GetClusterProperties():
+      cmd.flags['properties'] = ','.join(self.GetClusterProperties())
     timeout = 900  # 15 min
     logging.info('Issuing command to create dpgke cluster. Flags %s, Args %s',
                  cmd.flags, cmd.args)

@@ -7,6 +7,8 @@ from unittest import mock
 from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import resource
 from tests import pkb_common_test_case
 
 CLUSTER_SPEC = mock.Mock(
@@ -30,7 +32,7 @@ class MockDpbService(dpb_service.BaseDpbService):
       cluster_create_time: Optional[float] = None,
       cluster_duration: Optional[float] = None,
   ):
-    self.dpb_service_spec = None
+    super().__init__(dpb_service_spec)
     self._cluster_create_time = cluster_create_time
     self._cluster_duration = cluster_duration
     self.metadata = {'foo': 42}
@@ -45,11 +47,18 @@ class MockDpbService(dpb_service.BaseDpbService):
     return dpb_service.JobResult(run_time=1)
 
 
+class NoDynallocSupportingMockDpbService(MockDpbService):
+  SUPPORTS_NO_DYNALLOC = True
+
+
 class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
     self.enter_context(flagsaver.flagsaver(run_uri=TEST_RUN_URI))
+    self.enter_context(
+        mock.patch.object(resource.BaseResource, '__init__', return_value=None)
+    )
     self.dpb_service = MockDpbService(CLUSTER_SPEC, cluster_duration=1800)
 
   @parameterized.named_parameters(
@@ -223,6 +232,27 @@ class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
     actual_metrics = [s.metric for s in samples]
     self.assertContainsSubset(expected_datapoints, actual_datapoints)
     self.assertNoCommonElements(unexpected_metrics, actual_metrics)
+
+  @flagsaver.flagsaver((dpb_service._DYNAMIC_ALLOCATION, False))
+  def testDynamicAllocationNotSupported(self):
+    with self.assertRaises(errors.Setup.InvalidFlagConfigurationError):
+      MockDpbService(CLUSTER_SPEC)
+
+  @parameterized.named_parameters(
+      dict(testcase_name='DynallocOn', dynalloc=True, expected=[]),
+      dict(
+          testcase_name='DynallocOff',
+          dynalloc=False,
+          expected=[
+              'spark:spark.executor.instances=9999',
+              'spark:spark.dynamicAllocation.enabled=false',
+          ],
+      ),
+  )
+  def testGetClusterProperties(self, dynalloc, expected):
+    mock_dpb_service = NoDynallocSupportingMockDpbService(CLUSTER_SPEC)
+    with flagsaver.flagsaver((dpb_service._DYNAMIC_ALLOCATION, dynalloc)):
+      self.assertEqual(mock_dpb_service.GetClusterProperties(), expected)
 
 
 if __name__ == '__main__':
