@@ -121,9 +121,12 @@ _SKIP_LOAD_STAGE = flags.DEFINE_boolean(
     'been loaded on a previous run.',
 )
 
+# See https://github.com/Percona-Lab/sysbench-tpcc/releases for the most
+# up to date version.
+_SYSBENCH_TPCC_TAR = 'sysbench-tpcc-2.2.tar.gz'
 BENCHMARK_DATA = {
-    'sysbench-tpcc.tar.gz': (
-        'a116f0a6f58212b568bd339e65223eaf5ed59437503700002f016302d8a9c6ed'
+    _SYSBENCH_TPCC_TAR: (
+        '27e818734e9e8140a8bbca902c068877e861bdd7040b99e1333b43f6e5a64bdc'
     ),
 }
 
@@ -322,9 +325,9 @@ def _GetDatabaseName(db: relational_db.BaseRelationalDb) -> str:
 def _InstallLuaScriptsIfNecessary(vm):
   if _GetSysbenchTestParameter() == 'tpcc':
     vm.InstallPreprovisionedBenchmarkData(
-        BENCHMARK_NAME, ['sysbench-tpcc.tar.gz'], '~'
+        BENCHMARK_NAME, [_SYSBENCH_TPCC_TAR], '~'
     )
-    vm.RemoteCommand('tar -zxvf sysbench-tpcc.tar.gz')
+    vm.RemoteCommand(f'tar -zxvf {_SYSBENCH_TPCC_TAR} --strip-components 1')
   if FLAGS.sysbench_testname == SPANNER_TPCC:
     vm.PushDataFile('spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
     vm.PushDataFile('spanner_pg_tpcc_run.lua', '~/tpcc_run.lua')
