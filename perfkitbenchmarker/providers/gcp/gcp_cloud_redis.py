@@ -145,6 +145,8 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd.flags['network'] = (
         f'projects/{self.project}/global/networks/{FLAGS.gce_network_name}'
     )
+    if self.enable_tls:
+      cmd.flags['transit-encryption-mode'] = 'server-authentication'
     return cmd
 
   def _GetCreateCommand(self) -> util.GcloudCommand:
