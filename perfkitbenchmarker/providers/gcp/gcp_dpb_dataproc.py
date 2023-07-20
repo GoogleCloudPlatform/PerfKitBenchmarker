@@ -236,7 +236,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     # generally happy using pre-existing networks for Dataproc. Just use the
     # underlying flag instead.
     if FLAGS.gce_network_name:
-      cmd.flags['network'] = FLAGS.gce_network_name
+      cmd.flags['network'] = FLAGS.gce_network_name[0]
 
     metadata = util.GetDefaultTags()
     metadata.update(flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata))
@@ -516,7 +516,7 @@ class GcpDpbDataprocServerless(
       cmd.flags['py-files'] = ','.join(job_py_files)
 
     if FLAGS.gce_network_name:
-      cmd.flags['network'] = FLAGS.gce_network_name
+      cmd.flags['network'] = FLAGS.gce_network_name[0]
 
     if self.GetDpbVersion():
       cmd.flags['version'] = self.GetDpbVersion()

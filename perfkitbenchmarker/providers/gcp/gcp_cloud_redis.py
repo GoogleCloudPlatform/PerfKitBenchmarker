@@ -57,6 +57,11 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     self.redis_version = spec.config.cloud_redis.redis_version
     self.failover_style = FLAGS.redis_failover_style
     self.tier = self._GetTier()
+    self.network = (
+        'default'
+        if not gcp_flags.GCE_NETWORK_NAMES.value
+        else gcp_flags.GCE_NETWORK_NAMES.value[0]
+    )
     # Update the environment for gcloud commands:
     os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_REDIS'] = (
         gcp_flags.CLOUD_REDIS_API_OVERRIDE.value
@@ -127,7 +132,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
         f'pkb-{FLAGS.run_uri}-policy',
     )
     cmd.flags['service-class'] = 'gcp-memorystore-redis'
-    cmd.flags['network'] = FLAGS.gce_network_name
+    cmd.flags['network'] = self.network
     cmd.flags['region'] = self.redis_region
     cmd.flags['subnets'] = (
         'https://www.googleapis.com/compute/v1'
@@ -143,7 +148,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     # Add labels when supported
     cmd.flags['shard-count'] = self.node_count
     cmd.flags['network'] = (
-        f'projects/{self.project}/global/networks/{FLAGS.gce_network_name}'
+        f'projects/{self.project}/global/networks/{self.network}'
     )
     if self.enable_tls:
       cmd.flags['transit-encryption-mode'] = 'server-authentication'
@@ -153,7 +158,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     """Returns the command used to create the instance."""
     cmd = util.GcloudCommand(self, 'redis', 'instances', 'create', self.name)
     cmd.flags['zone'] = FLAGS.zone[0]
-    cmd.flags['network'] = FLAGS.gce_network_name
+    cmd.flags['network'] = self.network
     cmd.flags['tier'] = self.tier
     cmd.flags['size'] = self.size
     cmd.flags['redis-version'] = self.redis_version
