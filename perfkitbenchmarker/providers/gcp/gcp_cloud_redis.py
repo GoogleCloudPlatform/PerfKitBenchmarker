@@ -62,6 +62,11 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
         if not gcp_flags.GCE_NETWORK_NAMES.value
         else gcp_flags.GCE_NETWORK_NAMES.value[0]
     )
+    self.subnet = (
+        'default'
+        if not gcp_flags.GCE_SUBNET_NAMES.value
+        else gcp_flags.GCE_SUBNET_NAMES.value[0]
+    )
     # Update the environment for gcloud commands:
     os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_REDIS'] = (
         gcp_flags.CLOUD_REDIS_API_OVERRIDE.value
@@ -137,7 +142,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd.flags['subnets'] = (
         'https://www.googleapis.com/compute/v1'
         f'/projects/{self.project}'
-        f'/regions/{self.redis_region}/subnetworks/default'
+        f'/regions/{self.redis_region}/subnetworks/{self.subnet}'
     )
     cmd.Issue(raise_on_failure=False)
 
