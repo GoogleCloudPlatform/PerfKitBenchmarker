@@ -818,7 +818,7 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
   if AgainstDevice():
     fio_command = (f'{exec_path} --output-format=json '
                    f'--random_generator={FLAGS.fio_rng} '
-                   f'--filename={disk.GetDevicePath()} {remote_job_file_path}')
+                   f'{remote_job_file_path}')
   else:
     fio_command = (f'{exec_path} --output-format=json '
                    f'--random_generator={FLAGS.fio_rng} '
