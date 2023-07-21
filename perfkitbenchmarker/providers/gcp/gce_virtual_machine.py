@@ -507,6 +507,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       }
       self.gpu_count = a2_lookup[self.machine_type]
       self.gpu_type = virtual_machine.GPU_A100
+    if self.machine_type and self.machine_type.startswith('a3-'):
+      a3_lookup = {
+          'a3-highgpu-1g': 1,
+          'a3-highgpu-2g': 2,
+          'a3-highgpu-4g': 4,
+          'a3-highgpu-8g': 8,
+      }
+      self.gpu_count = a3_lookup[self.machine_type]
+      self.gpu_type = virtual_machine.GPU_H100
 
     if not self.SupportGVNIC():
       logging.warning('Changing gce_nic_type to VIRTIO_NET')
