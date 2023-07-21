@@ -273,7 +273,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       return False
     result = json.loads(stdout)
     end_datetime = (
-        result.get('Status', {}).get('Timeline', {}).get('EndDateTime')
+        result.get('Cluster', {})
+        .get('Status', {})
+        .get('Timeline', {})
+        .get('EndDateTime')
     )
     if end_datetime is not None:
       self._cluster_delete_time = end_datetime
