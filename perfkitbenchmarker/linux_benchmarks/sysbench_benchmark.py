@@ -140,6 +140,7 @@ _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
     'oltp_write_only': set(['table_size']),
     'oltp_read_only': set(['table_size']),
     'oltp_read_write': set(['table_size']),
+    'oltp_insert': set(['table_size']),
 }
 
 
