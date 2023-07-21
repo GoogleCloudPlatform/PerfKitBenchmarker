@@ -241,6 +241,8 @@ class _DpbServiceSpec(spec.BaseSpec):
 class _TpuGroupSpec(spec.BaseSpec):
   """Configurable options of a TPU."""
 
+  tpu_name: str
+
   def __init__(self,
                component_full_name,
                group_name,
@@ -625,6 +627,8 @@ class _SparkServiceSpec(spec.BaseSpec):
 class _PlacementGroupSpecsDecoder(option_decoders.TypeVerifier):
   """Validates the placement_group_specs dictionary of a benchmark config object."""
 
+  cloud: str
+
   def __init__(self, **kwargs):
     super(_PlacementGroupSpecsDecoder, self).__init__(
         valid_types=(dict,), **kwargs)
@@ -735,6 +739,8 @@ class _ContainerSpecsDecoder(option_decoders.TypeVerifier):
 
 class _NodepoolSpec(spec.BaseSpec):
   """Configurable options of a Nodepool."""
+
+  vm_spec: option_decoders.PerCloudConfigSpec
 
   def __init__(self,
                component_full_name,
@@ -885,6 +891,10 @@ class _SandboxDecoder(option_decoders.TypeVerifier):
 
 class _ContainerClusterSpec(spec.BaseSpec):
   """Spec containing info needed to create a container cluster."""
+
+  cloud: str
+  vm_spec: option_decoders.PerCloudConfigSpec
+  nodepools: dict[str, _NodepoolSpec]
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_ContainerClusterSpec, self).__init__(
@@ -1144,6 +1154,8 @@ class _TpuGroupsDecoder(option_decoders.TypeVerifier):
 class _CloudRedisSpec(spec.BaseSpec):
   """Specs needed to configure a cloud redis instance."""
 
+  redis_name: str
+
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_CloudRedisSpec, self).__init__(
         component_full_name, flag_values=flag_values, **kwargs)
@@ -1227,6 +1239,8 @@ class _VPNServiceSpec(spec.BaseSpec):
     Since vpn_gateway may be across cloud providers we only create tunnel when
     vpn_gateway's are up and known
   """
+
+  name: str
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_VPNServiceSpec, self).__init__(
@@ -1614,6 +1628,8 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     vm_groups: dict mapping VM group name string to _VmGroupSpec. Configurable
       options for each VM group used by the benchmark.
   """
+
+  vm_groups: dict[str, vm_group_decoders.VmGroupSpec]
 
   def __init__(self, component_full_name, expected_os_types=None, **kwargs):
     """Initializes a BenchmarkConfigSpec.

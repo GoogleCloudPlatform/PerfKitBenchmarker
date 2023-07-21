@@ -325,7 +325,7 @@ class ListDecoder(TypeVerifier):
     return result
 
 
-class _PerCloudConfigSpec(spec.BaseSpec):
+class PerCloudConfigSpec(spec.BaseSpec):
   """Contains one config dict attribute per cloud provider.
 
   The name of each attribute is the name of the cloud provider.
@@ -340,7 +340,7 @@ class _PerCloudConfigSpec(spec.BaseSpec):
       The pair specifies a decoder class and its __init__() keyword arguments
       to construct in order to decode the named option.
     """
-    result = super(_PerCloudConfigSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     for cloud in provider_info.VALID_CLOUDS:
       result[cloud] = TypeVerifier, {
           'default': None,
@@ -370,7 +370,9 @@ class PerCloudConfigDecoder(TypeVerifier):
     """
     input_dict = super(PerCloudConfigDecoder, self).Decode(
         value, component_full_name, flag_values)
-    return None if input_dict is None else _PerCloudConfigSpec(
+    if input_dict is None:
+      return None
+    return PerCloudConfigSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
         **input_dict)

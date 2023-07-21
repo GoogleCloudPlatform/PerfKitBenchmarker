@@ -52,7 +52,7 @@ class PerCloudConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(PerCloudConfigSpecTestCase, self).setUp()
-    self._spec_class = option_decoders._PerCloudConfigSpec
+    self._spec_class = option_decoders.PerCloudConfigSpec
 
   def testDefaults(self):
     spec = self._spec_class(_COMPONENT)
@@ -98,13 +98,13 @@ class PerCloudConfigDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testEmptyDict(self):
     result = self._decoder.Decode({}, _COMPONENT, {})
-    self.assertIsInstance(result, option_decoders._PerCloudConfigSpec)
+    self.assertIsInstance(result, option_decoders.PerCloudConfigSpec)
     self.assertEqual(result.__dict__, {
         cloud: None for cloud in provider_info.VALID_CLOUDS})
 
   def testNonEmptyDict(self):
     result = self._decoder.Decode(_GCP_ONLY_VM_CONFIG, _COMPONENT, {})
-    self.assertIsInstance(result, option_decoders._PerCloudConfigSpec)
+    self.assertIsInstance(result, option_decoders.PerCloudConfigSpec)
     expected_attributes = {cloud: None for cloud in provider_info.VALID_CLOUDS}
     expected_attributes['GCP'] = {'machine_type': 'n1-standard-1'}
     self.assertEqual(result.__dict__, expected_attributes)
