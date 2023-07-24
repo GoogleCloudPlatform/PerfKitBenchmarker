@@ -816,9 +816,13 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
   vm.PushFile(job_file_path, remote_job_file_path)
 
   if AgainstDevice():
+    if 'filename' in job_file_string:
+      filename_parameter = ''
+    else:
+      filename_parameter = f'--filename={disk.GetDevicePath()}'
     fio_command = (f'{exec_path} --output-format=json '
                    f'--random_generator={FLAGS.fio_rng} '
-                   f'{remote_job_file_path}')
+                   f'{filename_parameter} {remote_job_file_path}')
   else:
     fio_command = (f'{exec_path} --output-format=json '
                    f'--random_generator={FLAGS.fio_rng} '
