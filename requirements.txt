@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-rsa==4.7.2
+rsa>=4.7.2
 absl-py
 jinja2>=2.10.2
 setuptools>=40.3.0
@@ -19,7 +19,7 @@ colorlog[windows]==2.6.0
 blinker>=1.3
 packaging
 pandas>=1.1.5
-PyYAML==5.4.1
+PyYAML>=5.4.1
 pint
 numpy>=1.16.5
 contextlib2>=0.5.1
@@ -27,7 +27,7 @@ six>=1.13.0
 pywinrm
 timeout-decorator
 google-cloud-datastore
-google-cloud-monitoring==0.31.1
+google-cloud-monitoring>=0.31.1
 beautifulsoup4
 requests
 python-datetime-tz
