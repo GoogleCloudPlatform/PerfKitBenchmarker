@@ -1342,8 +1342,20 @@ class _VPNServiceDecoder(option_decoders.TypeVerifier):
     return result
 
 
-class _AppGroupSpec(spec.BaseSpec):
-  """Configurable options of a AppService group."""
+class AppGroupSpec(spec.BaseSpec):
+  """Configurable options of a AppService group.
+
+    Attributes:
+    SPEC_TYPE: The class / spec name.
+    app_runtime: The runtime environment (e.g. java).
+    app_type: The type / workload of the app (e.g. echo).
+    appservice_count: The number of app services in the group.
+  """
+
+  SPEC_TYPE = 'AppGroupSpec'
+  app_runtime: str
+  app_type: str
+  appservice_count: int
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -1354,7 +1366,7 @@ class _AppGroupSpec(spec.BaseSpec):
       The pair specifies a decoder class and its __init__() keyword arguments
       to construct in order to decode the named option.
     """
-    result = super(_AppGroupSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'app_runtime': (option_decoders.StringDecoder, {
             'default': None,
@@ -1373,7 +1385,7 @@ class _AppGroupSpec(spec.BaseSpec):
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
-    super(_AppGroupSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['appservice_count'].present:
       config_values['appservice_count'] = flag_values.appservice_count
     if flag_values['app_runtime'].present:
@@ -1399,7 +1411,7 @@ class _AppGroupsDecoder(option_decoders.TypeVerifier):
         BaseSpec constructors.
 
     Returns:
-     dict mapping app group name string to _AppGroupSpec.
+     dict mapping app group name string to AppGroupSpec.
 
     Raises:
       errors.Config.InvalidValue upon invalid input value.
@@ -1409,7 +1421,7 @@ class _AppGroupsDecoder(option_decoders.TypeVerifier):
                                            flag_values)
     result = {}
     for app_group_name, app_group_config in six.iteritems(app_group_configs):
-      result[app_group_name] = _AppGroupSpec(
+      result[app_group_name] = AppGroupSpec(
           '{0}.{1}'.format(
               self._GetOptionFullName(component_full_name), app_group_name),
           flag_values=flag_values,
