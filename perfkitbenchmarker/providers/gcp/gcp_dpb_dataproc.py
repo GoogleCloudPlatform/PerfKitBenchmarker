@@ -213,6 +213,12 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
                        self.spec.worker_group.vm_spec.num_local_ssds)
         # This will actually be used for storage
         self.dpb_hdfs_type = 'Local SSD'
+      # Set SSD interface
+      if self.spec.worker_group.vm_spec.ssd_interface:
+        self._AddToCmd(cmd, '{0}-local-ssd-interface'.format(role),
+                       self.spec.worker_group.vm_spec.ssd_interface)
+        # This will actually be used for storage
+        self.dpb_hdfs_type = 'Local SSD'
     # Set zone
     cmd.flags['zone'] = self.dpb_service_zone
     if self.GetDpbVersion():
