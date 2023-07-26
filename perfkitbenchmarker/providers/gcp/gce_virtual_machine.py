@@ -127,6 +127,16 @@ _FIXED_GPU_MACHINE_TYPES = {
     'a3-highgpu-2g': (virtual_machine.GPU_H100, 2),
     'a3-highgpu-4g': (virtual_machine.GPU_H100, 4),
     'a3-highgpu-8g': (virtual_machine.GPU_H100, 8),
+    # L4 GPUs
+    # https://cloud.google.com/compute/docs/accelerator-optimized-machines#g2-vms
+    'g2-standard-4': (virtual_machine.GPU_L4, 1),
+    'g2-standard-8': (virtual_machine.GPU_L4, 1),
+    'g2-standard-12': (virtual_machine.GPU_L4, 1),
+    'g2-standard-16': (virtual_machine.GPU_L4, 1),
+    'g2-standard-24': (virtual_machine.GPU_L4, 2),
+    'g2-standard-32': (virtual_machine.GPU_L4, 1),
+    'g2-standard-48': (virtual_machine.GPU_L4, 4),
+    'g2-standard-96': (virtual_machine.GPU_L4, 8),
 }
 
 FIVE_MINUTE_TIMEOUT = 300
