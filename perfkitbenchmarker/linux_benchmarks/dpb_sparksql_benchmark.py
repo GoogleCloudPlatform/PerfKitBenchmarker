@@ -162,7 +162,11 @@ def Prepare(benchmark_spec):
   """
   cluster = benchmark_spec.dpb_service
   storage_service = cluster.storage_service
+
+  start_time = time.time()
   dpb_sparksql_benchmark_helper.Prepare(benchmark_spec)
+  end_time = time.time()
+  benchmark_spec.queries_and_script_upload_time = end_time - start_time
 
   # Copy to HDFS
   if FLAGS.dpb_sparksql_data and FLAGS.dpb_sparksql_copy_to_hdfs:
@@ -196,7 +200,9 @@ def Prepare(benchmark_spec):
           'Copying tables into HDFS failed') from e
 
   # Create external Hive tables
+  benchmark_spec.hive_tables_creation_time = None
   if FLAGS.dpb_sparksql_create_hive_tables:
+    start_time = time.time()
     try:
       result = cluster.SubmitJob(
           pyspark_file='/'.join([
@@ -211,6 +217,8 @@ def Prepare(benchmark_spec):
       raise errors.Benchmarks.PrepareException(
           'Creating tables from {}/* failed'.format(
               benchmark_spec.data_dir)) from e
+    end_time = time.time()
+    benchmark_spec.hive_tables_creation_time = end_time - start_time
 
 
 def Run(benchmark_spec):
@@ -234,6 +242,7 @@ def Run(benchmark_spec):
 
   results = _GetQuerySamples(storage_service, report_dir, metadata)
   results += _GetGlobalSamples(results, cluster, job_result, metadata)
+  results += _GetPrepareSamples(benchmark_spec, metadata)
   return results
 
 
@@ -389,6 +398,32 @@ def _GetGlobalSamples(
     if run_cost is not None:
       samples.append(
           sample.Sample('sparksql_run_cost', run_cost, '$', metadata))
+  return samples
+
+
+def _GetPrepareSamples(
+    benchmark_spec, metadata: MutableMapping[str, str]
+) -> list[sample.Sample]:
+  """Gets samples for Prepare stage statistics."""
+  samples = []
+  if benchmark_spec.queries_and_script_upload_time is not None:
+    samples.append(
+        sample.Sample(
+            'queries_and_script_upload_time',
+            benchmark_spec.queries_and_script_upload_time,
+            'seconds',
+            metadata,
+        )
+    )
+  if benchmark_spec.hive_tables_creation_time is not None:
+    samples.append(
+        sample.Sample(
+            'hive_tables_creation_time',
+            benchmark_spec.hive_tables_creation_time,
+            'seconds',
+            metadata,
+        )
+    )
   return samples
 
 
