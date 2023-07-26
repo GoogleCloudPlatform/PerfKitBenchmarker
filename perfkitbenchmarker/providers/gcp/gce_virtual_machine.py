@@ -107,6 +107,27 @@ _METADATA_PREEMPT_CMD = (
 _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     't2a': 'neoverse-n1',
 }
+# The A2 and A3 machine families, unlike some other GCP offerings, have a
+# preset type and number of GPUs, so we set those attributes directly from the
+# machine_type.
+_FIXED_GPU_MACHINE_TYPES = {
+    # A100 GPUs
+    # https://cloud.google.com/blog/products/compute/announcing-google-cloud-a2-vm-family-based-on-nvidia-a100-gpu
+    'a2-highgpu-1g': (virtual_machine.GPU_A100, 1),
+    'a2-highgpu-2g': (virtual_machine.GPU_A100, 2),
+    'a2-highgpu-4g': (virtual_machine.GPU_A100, 4),
+    'a2-highgpu-8g': (virtual_machine.GPU_A100, 8),
+    'a2-megagpu-16g': (virtual_machine.GPU_A100, 16),
+    'a2-ultragpu-1g': (virtual_machine.GPU_A100, 1),
+    'a2-ultragpu-2g': (virtual_machine.GPU_A100, 2),
+    'a2-ultragpu-4g': (virtual_machine.GPU_A100, 4),
+    'a2-ultragpu-8g': (virtual_machine.GPU_A100, 8),
+    # H100 GPUs
+    'a3-highgpu-1g': (virtual_machine.GPU_H100, 1),
+    'a3-highgpu-2g': (virtual_machine.GPU_H100, 2),
+    'a3-highgpu-4g': (virtual_machine.GPU_H100, 4),
+    'a3-highgpu-8g': (virtual_machine.GPU_H100, 8),
+}
 
 FIVE_MINUTE_TIMEOUT = 300
 
@@ -489,33 +510,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_nic_type = FLAGS.gce_nic_type
 
-    # The A2 machine family, unlike other GCP offerings has a preset number of
-    # GPUs, so we set them directly from the machine_type
-    # https://cloud.google.com/blog/products/compute/announcing-google-cloud-a2-vm-family-based-on-nvidia-a100-gpu
-    # machine_type is always defined when running, but not in unit tests.
-    if self.machine_type and self.machine_type.startswith('a2-'):
-      a2_lookup = {
-          'a2-highgpu-1g': 1,
-          'a2-highgpu-2g': 2,
-          'a2-highgpu-4g': 4,
-          'a2-highgpu-8g': 8,
-          'a2-megagpu-16g': 16,
-          'a2-ultragpu-1g': 1,
-          'a2-ultragpu-2g': 2,
-          'a2-ultragpu-4g': 4,
-          'a2-ultragpu-8g': 8,
-      }
-      self.gpu_count = a2_lookup[self.machine_type]
-      self.gpu_type = virtual_machine.GPU_A100
-    if self.machine_type and self.machine_type.startswith('a3-'):
-      a3_lookup = {
-          'a3-highgpu-1g': 1,
-          'a3-highgpu-2g': 2,
-          'a3-highgpu-4g': 4,
-          'a3-highgpu-8g': 8,
-      }
-      self.gpu_count = a3_lookup[self.machine_type]
-      self.gpu_type = virtual_machine.GPU_H100
+    # For certain machine families, we need to explicitly set the GPU type
+    # and counts. See the _FIXED_GPU_MACHINE_TYPES dictionary for more details.
+    if self.machine_type and self.machine_type in _FIXED_GPU_MACHINE_TYPES:
+      self.gpu_type = _FIXED_GPU_MACHINE_TYPES[self.machine_type][0]
+      self.gpu_count = _FIXED_GPU_MACHINE_TYPES[self.machine_type][1]
 
     if not self.SupportGVNIC():
       logging.warning('Changing gce_nic_type to VIRTIO_NET')
@@ -647,8 +646,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.threads_per_core:
       cmd.flags['threads-per-core'] = self.threads_per_core
 
-    if self.gpu_count and self.machine_type and 'a2-' not in self.machine_type:
-      # A2 machine type already has predefined GPU type and count.
+    if (
+        self.gpu_count
+        and self.machine_type
+        and self.machine_type not in _FIXED_GPU_MACHINE_TYPES
+    ):
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(
           self.gpu_type, self.gpu_count
       )
