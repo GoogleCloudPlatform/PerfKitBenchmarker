@@ -13,6 +13,7 @@
 # limitations under the License.
 """A performance sample class."""
 
+import calendar
 import collections
 import datetime
 import math
@@ -21,6 +22,7 @@ from typing import Any, Dict, List, NewType
 
 import numpy as np
 from perfkitbenchmarker import errors
+import pytz
 
 PERCENTILES_LIST = 0.1, 1, 5, 10, 50, 90, 95, 99, 99.9
 
@@ -298,4 +300,7 @@ def CreateTimeSeriesSample(values: List[Any],
 
 
 def ConvertDateTimeToUnixMs(date: datetime.datetime):
-  return time.mktime(date.timetuple()) * 1000
+  # calendar.timegm assumes the time is from UTC.
+  # Convert the datetime to UTC timezone first.
+  date_utc = date.astimezone(pytz.utc)
+  return calendar.timegm(date_utc.timetuple()) * 1000
