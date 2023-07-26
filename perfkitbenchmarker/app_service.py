@@ -15,6 +15,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.linux_packages import http_poller
 
+
 FLAGS = flags.FLAGS
 flags.DEFINE_string('appservice', None, 'Type of app service. e.g. AppEngine')
 flags.DEFINE_string(
@@ -32,6 +33,12 @@ flags.DEFINE_string(
     'app_type', None, 'Type of app packages builders should built.'
 )
 flags.DEFINE_integer('appservice_count', 1, 'Copies of applications to launch.')
+APPSERVICE_NAME = flags.DEFINE_string(
+    'appservice_name',
+    '',
+    'Hardcode the name of the serverless app. If set, overrides an otherwise'
+    ' run_uri based name, usually especially for cold starts.',
+)
 
 
 def GetAppServiceSpecClass(service) -> Type['BaseAppServiceSpec']:
@@ -141,7 +148,11 @@ class BaseAppService(resource.BaseResource):
     super().__init__()
     with self._appservice_counter_lock:
       self.appservice_number: int = self._appservice_counter
-      self.name: str = 'pkb-%s-%s' % (FLAGS.run_uri, self.appservice_number)
+      if APPSERVICE_NAME.value:
+        self.name = APPSERVICE_NAME.value
+      else:
+        self.name: str = f'pkb-{FLAGS.run_uri}'
+      self.name += f'-{self.appservice_number}'
       BaseAppService._appservice_counter += 1
     self.region: str = base_app_service_spec.appservice_region
     self.backend: str = base_app_service_spec.appservice_backend
