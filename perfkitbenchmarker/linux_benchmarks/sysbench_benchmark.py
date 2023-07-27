@@ -270,17 +270,18 @@ def _GetCommonSysbenchOptions(db: relational_db.BaseRelationalDb):
   engine_type = db.engine_type
   result = []
 
-  # Ignore possible mysql errors
-  # https://github.com/actiontech/dble/issues/458
-  # https://callisto.digital/posts/tools/using-sysbench-to-benchmark-mysql-5-7/
   if engine_type == sql_engine_utils.MYSQL:
-    result += [
-        '--db-ps-mode=%s' % DISABLE,
-        # Error 1205: Lock wait timeout exceeded
-        # Could happen when we overload the database
-        '--mysql-ignore-errors=1213,1205,1020,2013',
-        '--db-driver=mysql',
-    ]
+    result.append('--db-driver=mysql')
+    # Ignore possible mysql errors when running OLTP
+    # https://github.com/actiontech/dble/issues/458
+    # https://callisto.digital/posts/tools/using-sysbench-to-benchmark-mysql-5-7/
+    if _GetSysbenchTestParameter() != 'tpcc':
+      result += [
+          '--db-ps-mode=%s' % DISABLE,
+          # Error 1205: Lock wait timeout exceeded
+          # Could happen when we overload the database
+          '--mysql-ignore-errors=1213,1205,1020,2013',
+      ]
   elif engine_type in [
       sql_engine_utils.POSTGRES,
       sql_engine_utils.SPANNER_POSTGRES,
