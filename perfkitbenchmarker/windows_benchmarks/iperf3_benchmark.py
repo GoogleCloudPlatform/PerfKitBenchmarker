@@ -17,7 +17,6 @@
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
-
 from perfkitbenchmarker.windows_packages import iperf3
 
 FLAGS = flags.FLAGS
@@ -48,7 +47,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects with the benchmark results.
@@ -68,25 +67,33 @@ def Run(benchmark_spec):
       if FLAGS.run_udp:
         results.extend(
             iperf3.RunIperf3UDPStream(
-                sending_vm, receiving_vm, use_internal_ip=False))
+                sending_vm, receiving_vm, use_internal_ip=False
+            )
+        )
 
       if FLAGS.run_tcp:
         for num_streams in FLAGS.tcp_number_of_streams:
           results.extend(
               iperf3.RunIperf3TCPMultiStream(
-                  sending_vm, receiving_vm, num_streams, use_internal_ip=False))
+                  sending_vm, receiving_vm, num_streams, use_internal_ip=False
+              )
+          )
 
     if vm_util.ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
       if FLAGS.run_udp:
         results.extend(
             iperf3.RunIperf3UDPStream(
-                sending_vm, receiving_vm, use_internal_ip=True))
+                sending_vm, receiving_vm, use_internal_ip=True
+            )
+        )
 
       if FLAGS.run_tcp:
         for num_streams in FLAGS.tcp_number_of_streams:
           results.extend(
               iperf3.RunIperf3TCPMultiStream(
-                  sending_vm, receiving_vm, num_streams, use_internal_ip=True))
+                  sending_vm, receiving_vm, num_streams, use_internal_ip=True
+              )
+          )
 
   _RunTest(vms[0], vms[1])
   _RunTest(vms[1], vms[0])
