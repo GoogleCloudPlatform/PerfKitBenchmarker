@@ -123,10 +123,10 @@ _SKIP_LOAD_STAGE = flags.DEFINE_boolean(
 
 # See https://github.com/Percona-Lab/sysbench-tpcc/releases for the most
 # up to date version.
-_SYSBENCH_TPCC_TAR = 'sysbench-tpcc-2.2.tar.gz'
+_SYSBENCH_TPCC_TAR = 'sysbench-tpcc.tar.gz'
 BENCHMARK_DATA = {
     _SYSBENCH_TPCC_TAR: (
-        '27e818734e9e8140a8bbca902c068877e861bdd7040b99e1333b43f6e5a64bdc'
+        '564600d6c296ef1cd88a07eeaf40bbc58688dbdc7c58fc1a0d28bb2b41c30611'
     ),
 }
 
