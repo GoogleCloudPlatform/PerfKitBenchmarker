@@ -122,8 +122,10 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     """Get CIDR connections for list of VM specs that need to access the db."""
     for vm in vms:
       if not vm.HasIpAddress:
-        raise Exception('Client vm needs to be initialized before database can '
-                        'discover authorized network.')
+        raise RuntimeError(
+            'Client vm needs to be initialized before database can '
+            'discover authorized network.'
+        )
     # create the CIDR of the client VM that is configured to access
     # the database
     return ','.join('{0}/32'.format(vm.ip_address) for vm in vms)
@@ -172,7 +174,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       machine_type_flag = '--tier=%s' % self.spec.db_spec.machine_type
       cmd_string.append(machine_type_flag)
     else:
-      raise Exception('Unspecified machine type')
+      raise RuntimeError('Unspecified machine type')
 
     if self.spec.high_availability:
       cmd_string.append(self._GetHighAvailabilityFlag())
@@ -293,7 +295,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     try:
       json_output = json.loads(stdout)
       return json_output['kind'] == 'sql#instance'
-    except:
+    except:  # pylint: disable=bare-except
       return False
 
   def _IsDBInstanceReady(self, instance_id, timeout=IS_READY_TIMEOUT):
@@ -313,7 +315,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         logging.info('Instance %s state: %s', instance_id, state)
         if state == 'RUNNABLE':
           break
-      except:
+      except:  # pylint: disable=bare-except
         logging.exception('Error attempting to read stdout. Creation failure.')
         return False
       time.sleep(5)
@@ -358,7 +360,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       return ''
     try:
       selflink = describe_instance_json['ipAddresses'][0]['ipAddress']
-    except:
+    except:  # pylint: disable=bare-except
       selflink = ''
       logging.exception('Error attempting to read stdout. Creation failure.')
     return selflink
@@ -403,7 +405,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       # Updated [https://sqladmin.googleapis.com/].
       if 'Updated' in stderr:
         return
-      raise Exception('Invalid flags: %s' % stderr)
+      raise RuntimeError('Invalid flags: %s' % stderr)
 
     self._Reboot()
 
@@ -415,8 +417,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     cmd.Issue()
 
     if not self._IsReady():
-      raise Exception('Instance could not be set to ready after '
-                      'reboot')
+      raise RuntimeError('Instance could not be set to ready after reboot')
 
   @staticmethod
   def GetDefaultEngineVersion(engine):

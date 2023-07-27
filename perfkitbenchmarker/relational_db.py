@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Relational DB class.
+
+This is the base implementation of all relational db.
+"""
 
 import abc
 import re
@@ -124,7 +128,7 @@ SERVER_GCE_SSD_INTERFACE = flags.DEFINE_enum(
     'The ssd interface for GCE local SSD.')
 
 
-BACKUP_TIME_REGULAR_EXPRESSION = '^\d\d\:\d\d$'
+BACKUP_TIME_REGULAR_EXPRESSION = r'^\d\d\:\d\d$'
 flags.register_validator(
     'db_backup_start_time',
     lambda value: re.search(BACKUP_TIME_REGULAR_EXPRESSION, value) is not None,
@@ -427,8 +431,9 @@ class BaseRelationalDb(resource.BaseResource):
   def Failover(self):
     """Fail over the database.  Throws exception if not high available."""
     if not self.spec.high_availability:
-      raise Exception('Attempt to fail over a database that isn\'t marked '
-                      'as high available')
+      raise RuntimeError(
+          "Attempt to fail over a database that isn't marked as high available"
+      )
     self._FailoverHA()
 
   def _FailoverHA(self):
