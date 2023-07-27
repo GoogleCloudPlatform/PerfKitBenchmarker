@@ -71,9 +71,10 @@ def Run(benchmark_spec):
                 sending_vm, receiving_vm, use_internal_ip=False))
 
       if FLAGS.run_tcp:
-        results.extend(
-            iperf3.RunIperf3TCPMultiStream(
-                sending_vm, receiving_vm, use_internal_ip=False))
+        for num_streams in FLAGS.tcp_number_of_streams:
+          results.extend(
+              iperf3.RunIperf3TCPMultiStream(
+                  sending_vm, receiving_vm, num_streams, use_internal_ip=False))
 
     if vm_util.ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
       if FLAGS.run_udp:
@@ -82,9 +83,10 @@ def Run(benchmark_spec):
                 sending_vm, receiving_vm, use_internal_ip=True))
 
       if FLAGS.run_tcp:
-        results.extend(
-            iperf3.RunIperf3TCPMultiStream(
-                sending_vm, receiving_vm, use_internal_ip=True))
+        for num_streams in FLAGS.tcp_number_of_streams:
+          results.extend(
+              iperf3.RunIperf3TCPMultiStream(
+                  sending_vm, receiving_vm, num_streams, use_internal_ip=True))
 
   _RunTest(vms[0], vms[1])
   _RunTest(vms[1], vms[0])

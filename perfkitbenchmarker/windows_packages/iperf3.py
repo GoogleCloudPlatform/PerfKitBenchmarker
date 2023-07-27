@@ -19,6 +19,7 @@ import multiprocessing
 import ntpath
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from six.moves import range
@@ -49,8 +50,12 @@ flags.DEFINE_integer('udp_buffer_len', 100,
 flags.DEFINE_integer('tcp_stream_seconds', 3,
                      'The amount of time to run the TCP stream test.')
 
-flags.DEFINE_integer('tcp_number_of_streams', 10,
-                     'The number of parrallel streams to run in the TCP test.')
+flag_util.DEFINE_integerlist(
+    'tcp_number_of_streams',
+    flag_util.IntegerList([16]),
+    'The number of parrallel streams to run in the TCP test.',
+    module_name=__name__,
+)
 
 flags.DEFINE_float(
     'socket_buffer_size', None,
@@ -79,12 +84,15 @@ def Install(vm):
   vm.UnzipFile(zip_path, vm.temp_dir)
 
 
-def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
+def RunIperf3TCPMultiStream(
+    sending_vm, receiving_vm, num_streams, use_internal_ip=True
+):
   """Run a multi-stream TCP bandwidth between two VMs.
 
   Args:
     sending_vm: The client VM that will send the TCP packets.
     receiving_vm: The server VM that will receive the UDP packets.
+    num_streams: Number of TCP streams.
     use_internal_ip: if true, the private network will be used for the test.
                      if false, the external network will be used for the test.
 
@@ -100,19 +108,23 @@ def RunIperf3TCPMultiStream(sending_vm, receiving_vm, use_internal_ip=True):
     socket_buffer_string = ' -w {socket_buffer}M '.format(
         socket_buffer=FLAGS.socket_buffer_size)
 
-  sender_args = ('--client {ip} --port {port} -t {time} -P {num_streams} -f m '
-                 ' {socket_buffer_arg} > {out_file}').format(
-                     ip=receiver_ip,
-                     port=IPERF3_TCP_PORT,
-                     time=FLAGS.tcp_stream_seconds,
-                     num_streams=FLAGS.tcp_number_of_streams,
-                     socket_buffer_arg=socket_buffer_string,
-                     out_file=IPERF3_OUT_FILE)
+  sender_args = (
+      '--client {ip} --port {port} -t {time} -P {num_streams} -f m '
+      ' {socket_buffer_arg} > {out_file}'
+  ).format(
+      ip=receiver_ip,
+      port=IPERF3_TCP_PORT,
+      time=FLAGS.tcp_stream_seconds,
+      num_streams=num_streams,
+      socket_buffer_arg=socket_buffer_string,
+      out_file=IPERF3_OUT_FILE,
+  )
 
   output = _RunIperf3ServerClientPair(sending_vm, sender_args, receiving_vm)
 
-  return ParseTCPMultiStreamOutput(output, sending_vm, receiving_vm,
-                                   FLAGS.tcp_number_of_streams, use_internal_ip)
+  return ParseTCPMultiStreamOutput(
+      output, sending_vm, receiving_vm, num_streams, use_internal_ip
+  )
 
 
 def _RunIperf3(vm, options):
