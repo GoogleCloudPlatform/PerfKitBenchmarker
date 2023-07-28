@@ -138,6 +138,7 @@ class CloudL4x1HighAccuracyTriton(CloudL4x1HighAccuracy):
 )
 class CloudL4x2(CloudL4x1):
   system = KnownSystem.CloudL4x2
+  server_num_issue_query_threads = 4
 
 
 @ConfigRegistry.register(
@@ -166,6 +167,7 @@ class CloudL4x2HighAccuracyTriton(CloudL4x2HighAccuracy):
 )
 class CloudL4x4(CloudL4x1):
   system = KnownSystem.CloudL4x4
+  server_num_issue_query_threads = 8
 
 
 @ConfigRegistry.register(
@@ -194,6 +196,7 @@ class CloudL4x4HighAccuracyTriton(CloudL4x4HighAccuracy):
 )
 class CloudL4x8(CloudL4x1):
   system = KnownSystem.CloudL4x8
+  server_num_issue_query_threads = 16
 
 
 @ConfigRegistry.register(

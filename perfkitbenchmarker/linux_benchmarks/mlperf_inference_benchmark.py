@@ -361,10 +361,10 @@ def _FindStartingQps(
     A tuple of passing QPS and failing QPS.
   """
   # T4 QPS is greater than 256 samples per second.
-  passing_qps = falling_qps = 128
+  passing_qps = falling_qps = 100
   while True:
     if _Run(bm_spec, falling_qps):
-      passing_qps, falling_qps = falling_qps, falling_qps * 2
+      passing_qps, falling_qps = falling_qps, falling_qps * 10
     else:
       logging.info('Lower QPS is %s and upper QPS is %s', passing_qps,
                    falling_qps)
@@ -384,7 +384,7 @@ def _BinarySearch(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   """
   passing_qps, falling_qps = _FindStartingQps(bm_spec)
   # Set absolute tolerance to 1
-  while not math.isclose(passing_qps, falling_qps, abs_tol=1):
+  while not math.isclose(passing_qps, falling_qps, rel_tol=0.01):
     target_qps = (passing_qps + falling_qps) / 2
     if _Run(bm_spec, target_qps):
       passing_qps = target_qps

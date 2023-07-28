@@ -132,6 +132,9 @@ class CloudL4x1HighAccuracyTriton(CloudL4x1Triton):
 )
 class CloudL4x2(CloudL4x1):
   system = KnownSystem.CloudL4x2
+  gpu_batch_size = 14000 * 2
+  num_staging_batches = 2
+  num_staging_threads = 2
 
 
 @ConfigRegistry.register(
@@ -160,6 +163,9 @@ class CloudL4x2HighAccuracyTriton(CloudL4x2Triton):
 )
 class CloudL4x4(CloudL4x1):
   system = KnownSystem.CloudL4x4
+  gpu_batch_size = 14000 * 4
+  num_staging_batches = 4
+  num_staging_threads = 4
 
 
 @ConfigRegistry.register(
@@ -188,6 +194,9 @@ class CloudL4x4HighAccuracyTriton(CloudL4x4Triton):
 )
 class CloudL4x8(CloudL4x1):
   system = KnownSystem.CloudL4x8
+  gpu_batch_size = 14000 * 8
+  num_staging_batches = 8
+  num_staging_threads = 4
 
 
 @ConfigRegistry.register(
