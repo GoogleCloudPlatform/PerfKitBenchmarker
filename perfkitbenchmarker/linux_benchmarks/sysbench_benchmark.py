@@ -342,12 +342,6 @@ def _IsValidFlag(flag):
   )
 
 
-def UpdateBenchmarkSpecWithFlags(benchmark_spec):
-  """Updates benchmark_spec with flags that are used in the run stage."""
-  benchmark_spec.tables = FLAGS.sysbench_tables
-  benchmark_spec.sysbench_table_size = FLAGS.sysbench_table_size
-
-
 def _GetLoadThreads() -> int:
   # Data loading is write only so need num_threads less than or equal to the
   # amount of tables - capped at 64 threads for when number of tables
@@ -482,16 +476,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  # We would like to always cleanup server side states.
-  # If we don't set this, our cleanup function will only be called when the VM
-  # is static VM, but we have server side states to cleanup regardless of the
-  # VM type.
-
-  benchmark_spec.always_call_cleanup = True
-
   client_vms = benchmark_spec.vm_groups['clients']
-
-  UpdateBenchmarkSpecWithFlags(benchmark_spec)
 
   # Setup common test tools required on the client VM
   background_tasks.RunThreaded(lambda vm: vm.Install('sysbench'), client_vms)
