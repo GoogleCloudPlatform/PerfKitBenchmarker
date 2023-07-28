@@ -331,9 +331,9 @@ def _InstallLuaScriptsIfNecessary(vm):
     )
     vm.RemoteCommand(f'tar -zxvf {_SYSBENCH_TPCC_TAR} --strip-components 1')
   if FLAGS.sysbench_testname == SPANNER_TPCC:
-    vm.PushDataFile('spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
-    vm.PushDataFile('spanner_pg_tpcc_run.lua', '~/tpcc_run.lua')
-    vm.PushDataFile('spanner_pg_tpcc.lua', '~/tpcc.lua')
+    vm.PushDataFile('sysbench/spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
+    vm.PushDataFile('sysbench/spanner_pg_tpcc_run.lua', '~/tpcc_run.lua')
+    vm.PushDataFile('sysbench/spanner_pg_tpcc.lua', '~/tpcc.lua')
 
 
 def _IsValidFlag(flag):
