@@ -286,7 +286,7 @@ def _RunSpecSfs(benchmark_spec):
     A list of sample.Sample objects.
   """
   prime_client = benchmark_spec.vm_groups['clients'][0]
-  run_cmd = 'cd {0} && ./sfsmanager -r sfs_rc {1}'.format(
+  run_cmd = 'cd {0} && python3 sfsmanager -r sfs_rc {1}'.format(
       _SPEC_DIR, '-a' if FLAGS.specsfs2014_auto_mode else '')
   prime_client.RobustRemoteCommand(run_cmd, ignore_failure=True)
   results_file = posixpath.join(_SPEC_DIR, 'results', 'sfssum_sfs2014_SP2.xml')
