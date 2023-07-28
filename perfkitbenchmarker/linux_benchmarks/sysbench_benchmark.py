@@ -402,41 +402,11 @@ def _LoadDatabase(
   return stdout, stderr
 
 
-def _PrepareSysbench(benchmark_spec):
-  """Prepare the Sysbench OLTP test with data loading stage."""
-  client_vms = benchmark_spec.vm_groups['clients']
-  db: relational_db.BaseRelationalDb = benchmark_spec.relational_db
-
-  if FLAGS.sysbench_testname != SPANNER_TPCC:
-    client_vms = [client_vms[0]]
-
-  # Some databases install these query tools during _PostCreate, which is
-  # skipped if the database is user managed / restored.
-  if db.user_managed or db.restored:
-    background_tasks.RunThreaded(
-        lambda client_query_tools: client_query_tools.InstallPackages(),
-        db.client_vms_query_tools,
-    )
-
-  if _SKIP_LOAD_STAGE.value or db.restored:
-    logging.info('Skipping the load stage')
-    return []
-
-  db_name = _GetDatabaseName(db)
-
-  # Recreate the DB if needed. Not applicable on a fresh run, but helps with
-  # manual development.
-  try:
-    db.DeleteDatabase(db_name)
-  except (
-      errors.VirtualMachine.RemoteCommandError,
-      errors.VmUtil.IssueCommandError,
-  ):
-    logging.warning('Error dropping database, it may not exist.')
-
-  stdout, stderr = db.CreateDatabase(db_name)
-
-  logging.info('sbtest db created, stdout is %s, stderr is %s', stdout, stderr)
+def _LoadDatabaseInParallel(
+    db: relational_db.BaseRelationalDb,
+    client_vms: list[virtual_machine.VirtualMachine],
+) -> list[sample.Sample]:
+  """Loads the database using the sysbench prepare command."""
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
@@ -467,28 +437,71 @@ def _PrepareSysbench(benchmark_spec):
   ]
 
 
-def Prepare(benchmark_spec):
-  """Prepare the MySQL DB Instances, configures it.
-
-     Prepare the client test VM, installs SysBench, configures it.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-      required to run the benchmark.
-  """
-  client_vms = benchmark_spec.vm_groups['clients']
-
+def _PrepareClients(
+    db: relational_db.BaseRelationalDb,
+    client_vms: list[virtual_machine.VirtualMachine],
+) -> None:
+  """Installs the relevant packages on the clients."""
   # Setup common test tools required on the client VM
   background_tasks.RunThreaded(lambda vm: vm.Install('sysbench'), client_vms)
   background_tasks.RunThreaded(_InstallLuaScriptsIfNecessary, client_vms)
 
-  _PrepareSysbench(benchmark_spec)
+  # Some databases install these query tools during _PostCreate, which is
+  # skipped if the database is user managed / restored.
+  if db.user_managed or db.restored:
+    background_tasks.RunThreaded(
+        lambda client_query_tools: client_query_tools.InstallPackages(),
+        db.client_vms_query_tools,
+    )
 
+
+def _PrepareDatabase(db: relational_db.BaseRelationalDb) -> None:
+  """Creates the actual database used for the test, sbtest by default."""
+  db_name = _GetDatabaseName(db)
+
+  # Recreate the DB if needed. Not applicable on a fresh run, but helps with
+  # manual development.
+  try:
+    db.DeleteDatabase(db_name)
+  except (
+      errors.VirtualMachine.RemoteCommandError,
+      errors.VmUtil.IssueCommandError,
+  ):
+    logging.warning('Error dropping database, it may not exist.')
+
+  stdout, stderr = db.CreateDatabase(db_name)
+  logging.info(
+      '%s db created, stdout is %s, stderr is %s', db_name, stdout, stderr
+  )
+
+
+def Prepare(benchmark_spec) -> List[sample.Sample]:
+  """Prepares the DB instance and configures it.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+      required to run the benchmark.
+
+  Returns:
+    A list of load samples.
+  """
+  client_vms = benchmark_spec.vm_groups['clients']
+  db: relational_db.BaseRelationalDb = benchmark_spec.relational_db
+
+  _PrepareClients(db, client_vms)
+
+  if _SKIP_LOAD_STAGE.value or db.restored:
+    logging.info('Skipping the load stage')
+    return []
+
+  _PrepareDatabase(db)
+  load_samples = _LoadDatabaseInParallel(db, client_vms)
   if _SLEEP_SEC.value:
     logging.info(
         'Sleeping for %d seconds now that loading has finished.',
         _SLEEP_SEC.value,
     )
+  return load_samples
 
 
 def _GetDatabaseSize(db):
