@@ -20,10 +20,12 @@ import time
 
 from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import iaas_relational_db
+from perfkitbenchmarker import mysql_iaas_relational_db
+from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
+from perfkitbenchmarker import sqlserver_iaas_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -54,8 +56,27 @@ IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (might take some time to prepare)
 CREATE_AZURE_DB_TIMEOUT = 60 * 30
 
 
-class AzureIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
-  """An Azure IAAS database resource."""
+class AzureSQLServerIAASRelationalDb(
+    sqlserver_iaas_relational_db.SQLServerIAASRelationalDb
+):
+  """A AWS IAAS database resource."""
+
+  CLOUD = provider_info.AZURE
+
+
+class AzurePostgresIAASRelationalDb(
+    postgres_iaas_relational_db.PostgresIAASRelationalDb
+):
+  """A AWS IAAS database resource."""
+
+  CLOUD = provider_info.AZURE
+
+
+class AzureMysqlIAASRelationalDb(
+    mysql_iaas_relational_db.MysqlIAASRelationalDb
+):
+  """A AWS IAAS database resource."""
+
   CLOUD = provider_info.AZURE
 
 

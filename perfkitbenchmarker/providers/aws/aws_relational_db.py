@@ -19,11 +19,12 @@ import logging
 import time
 
 from absl import flags
-
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import iaas_relational_db
+from perfkitbenchmarker import mysql_iaas_relational_db
+from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import sqlserver_iaas_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
@@ -39,8 +40,25 @@ MYSQL_SUPPORTED_MAJOR_VERSIONS = ['5.7', '8.0']
 POSTGRES_SUPPORTED_MAJOR_VERSIONS = ['9.6', '10', '11', '12', '13']
 
 
-class AwsIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
+class AWSSQLServerIAASRelationalDb(
+    sqlserver_iaas_relational_db.SQLServerIAASRelationalDb
+):
   """A AWS IAAS database resource."""
+
+  CLOUD = provider_info.AWS
+
+
+class AWSPostgresIAASRelationalDb(
+    postgres_iaas_relational_db.PostgresIAASRelationalDb
+):
+  """A AWS IAAS database resource."""
+
+  CLOUD = provider_info.AWS
+
+
+class AWSMysqlIAASRelationalDb(mysql_iaas_relational_db.MysqlIAASRelationalDb):
+  """A AWS IAAS database resource."""
+
   CLOUD = provider_info.AWS
 
 

@@ -29,10 +29,12 @@ import time
 
 from absl import flags
 from perfkitbenchmarker import data
-from perfkitbenchmarker import iaas_relational_db
+from perfkitbenchmarker import mysql_iaas_relational_db
+from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
+from perfkitbenchmarker import sqlserver_iaas_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 from six.moves import range
@@ -98,8 +100,25 @@ class UnsupportedDatabaseEngineError(Exception):
   pass
 
 
-class GCPIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
+class GCPSQLServerIAASRelationalDb(
+    sqlserver_iaas_relational_db.SQLServerIAASRelationalDb
+):
   """A GCP IAAS database resource."""
+
+  CLOUD = provider_info.GCP
+
+
+class GCPPostgresIAASRelationalDb(
+    postgres_iaas_relational_db.PostgresIAASRelationalDb
+):
+  """A GCP IAAS database resource."""
+
+  CLOUD = provider_info.GCP
+
+
+class GCPMysqlIAASRelationalDb(mysql_iaas_relational_db.MysqlIAASRelationalDb):
+  """A GCP IAAS database resource."""
+
   CLOUD = provider_info.GCP
 
 

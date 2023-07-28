@@ -67,7 +67,7 @@ def CreateDbFromSpec(spec_dict):
 def CreateIAASDbFromSpec(spec_dict):
   mock_db_spec = mock.Mock(spec=relational_db_spec.RelationalDbSpec)
   mock_db_spec.configure_mock(**spec_dict)
-  db_class = gcp_relational_db.GCPIAASRelationalDb(mock_db_spec)
+  db_class = gcp_relational_db.GCPMysqlIAASRelationalDb(mock_db_spec)
   CreateMockClientVM(db_class)
   CreateMockServerVM(db_class)
   return db_class

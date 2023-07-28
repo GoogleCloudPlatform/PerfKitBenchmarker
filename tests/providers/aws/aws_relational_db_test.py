@@ -153,7 +153,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def CreateIAASDbFromSpec(self):
     mock_spec = self.CreateMockSpec()
-    aws_db = aws_relational_db.AwsIAASRelationalDb(mock_spec)
+    aws_db = aws_relational_db.AWSMysqlIAASRelationalDb(mock_spec)
     self.CreateMockClientVM(aws_db)
     self.CreateMockServerVM(aws_db)
     return aws_db
