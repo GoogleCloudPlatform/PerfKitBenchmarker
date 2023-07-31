@@ -1154,6 +1154,14 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
         GenerateStatPreprovisionedDataCommand(
             module_name, filename).split(' '), raise_on_failure=False)[-1] == 0
 
+  def _DiskDriveIsLocal(self, device, model):
+    """Helper method to determine if a disk drive is a local ssd to stripe."""
+    # NVME Striped disks applies to Azure's L series
+    # https://learn.microsoft.com/en-us/azure/virtual-machines/lsv3-series
+    if 'Microsoft NVMe Direct Disk' in model:
+      return True
+    return False
+
 
 # Azure seems to have dropped support for 2012 Server Core. It is neither here:
 # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/cli-ps-findimage#table-of-commonly-used-windows-images

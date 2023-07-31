@@ -35,6 +35,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
@@ -1399,12 +1400,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       disks.append(data_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
-    # here, all disks are created (either at vm creation or in line above).
-    # But we don't have all the raw device paths,
-    # which are necessary for preparing the scratch disk.
-    nvme_devices = self.GetNVMEDeviceInfo()
-    self.PopulateNVMEDevicePath(scratch_disk, nvme_devices)
-    self.UpdateDevicePath(scratch_disk)
+    if self.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+      # here, all disks are created (either at vm creation or in line above).
+      # But we don't have all the raw device paths,
+      # which are necessary for preparing the scratch disk.
+      nvme_devices = self.GetNVMEDeviceInfo()
+      self.PopulateNVMEDevicePath(scratch_disk, nvme_devices)
+      self.UpdateDevicePath(scratch_disk)
     self._PrepareScratchDisk(scratch_disk, disk_spec)
 
   def PopulateNVMEDevicePath(self, scratch_disk, nvme_devices):
@@ -1933,6 +1935,12 @@ class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
     if registry_query_result[2] != '0':
       raise AwsUnexpectedWindowsAdapterOutputError(
           'InterruptModeration failed to disable')
+
+  def _DiskDriveIsLocal(self, device, model):
+    """Helper method to determine if a disk drive is a local ssd to stripe."""
+    if 'Amazon Elastic B' in model:
+      return False
+    return True
 
 
 class Windows2012CoreAwsVirtualMachine(

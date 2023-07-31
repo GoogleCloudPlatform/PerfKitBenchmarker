@@ -1147,9 +1147,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       disks.append(data_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
-    nvme_devices = self.GetNVMEDeviceInfo()
-    remote_nvme_devices = self.FindRemoteNVMEDevices(scratch_disk, nvme_devices)
-    self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
+    if self.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+      nvme_devices = self.GetNVMEDeviceInfo()
+      remote_nvme_devices = self.FindRemoteNVMEDevices(
+          scratch_disk, nvme_devices
+      )
+      self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
     self._PrepareScratchDisk(scratch_disk, disk_spec)
 
   def FindRemoteNVMEDevices(self, _, nvme_devices):
