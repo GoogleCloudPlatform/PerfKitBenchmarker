@@ -27,7 +27,7 @@ diset connection pg_azure {{IS_AZURE}}
 diset tpcc pg_superuserpass {{DATABASE_PASSWORD}}
 diset tpcc pg_superuser {{DATABASE_USER}}
 diset tpcc pg_pass {{DATABASE_PASSWORD}}
-diset tpcc pg_user temp
+diset tpcc pg_user {{DATABASE_USER}}
 diset tpcc pg_count_ware {{NUM_WAREHOUSE_TPC_C}}
 diset tpcc pg_allwarehouse {{ALL_WAREHOUSE_TPC_C}}
 diset tpcc pg_num_vu {{BUILD_VIRTUAL_USERS_TPC_C}}
