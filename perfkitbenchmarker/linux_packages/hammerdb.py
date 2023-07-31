@@ -278,7 +278,7 @@ class HammerDbTclScript(object):
     stdout, _ = vm.RemoteCommand(
         InDir(
             HAMMERDB_RUN_LOCATION, 'PATH="$PATH:/opt/mssql-tools/bin" &&'
-            + cmd + 'sudo ./hammerdbcli auto {0}'.format(script_location)),
+            + cmd + 'sudo -E ./hammerdbcli auto {0}'.format(script_location)),
         timeout=timeout)
 
     self.CheckErrorFromHammerdb(stdout)
@@ -349,7 +349,6 @@ class TclScriptParameters(object):
     if hammerdb_script == HAMMERDB_SCRIPT_TPC_H:
       # If the script is TPCH and in build phase,
       # uses HAMMERDB_BUILD_TPCH_NUM_VU.value as TPCH_USERS
-      tpch_user_param = None
       if script_type == BUILD_SCRIPT_TYPE:
         tpch_user_param = HAMMERDB_BUILD_TPCH_NUM_VU.value
       else:
@@ -390,7 +389,7 @@ class TclScriptParameters(object):
           SCRIPT_PARAMETER_WAIT_TO_COMPLETE: wait_to_complete_seconds
       })
     else:
-      raise Exception('Unknown hammerdb_script')
+      raise ValueError('Unknown hammerdb_script')
 
   def SearchAndReplaceInScript(self, vm: virtual_machine.BaseVirtualMachine,
                                script_name: str, parameter: str):
@@ -703,7 +702,7 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
     # Install specific mysql library for hammerdb
     vm.Install('libmysqlclient21')
 
-  vm.RemoteCommand('export LD_LIBRARY_PATH=\'/usr/lib/x86_64-linux-gnu/\'')
+  vm.RemoteCommand('export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/')
 
 
 def SetupConfig(vm: virtual_machine.BaseVirtualMachine, db_engine: str,
@@ -724,8 +723,13 @@ def SetupConfig(vm: virtual_machine.BaseVirtualMachine, db_engine: str,
 
   for script in scripts:
     script_parameters = TclScriptParameters(
-        ip, port, password, user, is_managed_azure,
-        hammerdb_script, script.script_type)
+        ip=ip,
+        port=port,
+        password=password,
+        user=user,
+        is_managed_azure=is_managed_azure,
+        hammerdb_script=hammerdb_script,
+        script_type=script.script_type)
     script.Install(vm, script_parameters)
 
   # Run all the build script or scripts before actual run phase
