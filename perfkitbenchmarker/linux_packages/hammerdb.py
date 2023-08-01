@@ -468,7 +468,7 @@ SCRIPT_MAPPING = {
                                 TPC_H_POSTGRES_RUN_SCRIPT],
         HAMMERDB_SCRIPT_TPC_C: [TPC_C_POSTGRES_BUILD_SCRIPT,
                                 TPC_C_POSTGRES_RUN_SCRIPT]
-    }
+    },
 }
 
 # TPCC queries are defined in the tpcc spec
