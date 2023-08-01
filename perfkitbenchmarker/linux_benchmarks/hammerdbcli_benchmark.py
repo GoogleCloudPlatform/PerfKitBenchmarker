@@ -1,4 +1,4 @@
-"""Runs Hammerdb cli using scripts provided by CloudSQL team."""
+"""Runs the HammerDB relational database benchmark."""
 import posixpath
 from typing import Any, Dict, List
 
@@ -146,14 +146,14 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
     )
 
   hammerdb.SetupConfig(
-      vm,
-      db_engine,
-      hammerdb.HAMMERDB_SCRIPT.value,
-      relational_db.endpoint,
-      relational_db.port,
-      relational_db.spec.database_password,
-      relational_db.spec.database_username,
-      FLAGS.cloud == 'Azure' and FLAGS.use_managed_db,
+      vm=vm,
+      db_engine=db_engine,
+      hammerdb_script=hammerdb.HAMMERDB_SCRIPT.value,
+      ip=relational_db.endpoint,
+      port=relational_db.port,
+      password=relational_db.spec.database_password,
+      user=relational_db.spec.database_username,
+      is_managed_azure=(FLAGS.cloud == 'Azure' and FLAGS.use_managed_db),
   )
 
   if (
