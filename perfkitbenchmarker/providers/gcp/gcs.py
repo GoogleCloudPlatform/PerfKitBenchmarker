@@ -42,9 +42,9 @@ WRITER = 'objectCreator'
 flags.DEFINE_string('google_cloud_sdk_version', None,
                     'Use a particular version of the Google Cloud SDK, e.g.: '
                     '103.0.0')
-flags.DEFINE_enum('gcs_client', GCS_CLIENT_BOTO,
+flags.DEFINE_enum('gcs_client', GCS_CLIENT_PYTHON,
                   [GCS_CLIENT_PYTHON, GCS_CLIENT_BOTO],
-                  'The GCS client library to use (default boto).')
+                  'The GCS client library to use (default python).')
 
 FLAGS = flags.FLAGS
 
