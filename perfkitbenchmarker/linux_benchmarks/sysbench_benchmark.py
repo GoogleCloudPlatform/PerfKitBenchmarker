@@ -407,6 +407,10 @@ def _LoadDatabaseInParallel(
     client_vms: list[virtual_machine.VirtualMachine],
 ) -> list[sample.Sample]:
   """Loads the database using the sysbench prepare command."""
+
+  db.UpdateCapacityForLoad()
+
+  _UpdateSessions(db, _LOAD_THREADS.value)
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
   data_load_start_time = time.time()
@@ -426,6 +430,8 @@ def _LoadDatabaseInParallel(
   for _, stderr in results:
     if 'FATAL' in stderr:
       raise errors.Benchmarks.RunError('Error while running prepare phase')
+
+  db.UpdateCapacityForRun()
 
   return [
       sample.Sample(

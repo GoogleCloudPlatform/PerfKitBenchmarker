@@ -50,6 +50,13 @@ flags.DEFINE_integer(
     None,
     'The number of nodes for the Cloud Spanner instance.',
 )
+_LOAD_NODES = flags.DEFINE_integer(
+    'cloud_spanner_load_nodes',
+    None,
+    'The number of nodes for the Cloud Spanner instance to use for the load'
+    ' phase. Assumes that the benchmark calls UpdateRunCapacity to set the '
+    ' correct node count manually before the run phase.',
+)
 flags.DEFINE_string(
     'cloud_spanner_project',
     None,
@@ -108,6 +115,7 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
   spanner_description: str
   spanner_config: str
   spanner_nodes: int
+  spanner_load_nodes: int
   spanner_project: str
 
   def __init__(
@@ -135,6 +143,7 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
         'spanner_description': (option_decoders.StringDecoder, _NONE_OK),
         'spanner_config': (option_decoders.StringDecoder, _NONE_OK),
         'spanner_nodes': (option_decoders.IntDecoder, _NONE_OK),
+        'spanner_load_nodes': (option_decoders.IntDecoder, _NONE_OK),
         'spanner_project': (option_decoders.StringDecoder, _NONE_OK),
         'db_spec': (option_decoders.PerCloudConfigDecoder, _NONE_OK),
         'db_disk_spec': (option_decoders.PerCloudConfigDecoder, _NONE_OK),
@@ -164,6 +173,8 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
       config_values['spanner_config'] = flag_values.cloud_spanner_config
     if flag_values['cloud_spanner_nodes'].present:
       config_values['spanner_nodes'] = flag_values.cloud_spanner_nodes
+    if flag_values['cloud_spanner_load_nodes'].present:
+      config_values['spanner_load_nodes'] = flag_values.cloud_spanner_load_nodes
     if flag_values['cloud_spanner_project'].present:
       config_values['spanner_project'] = flag_values.cloud_spanner_project
 
@@ -200,6 +211,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     self._description = db_spec.spanner_description or _DEFAULT_DESCRIPTION
     self._config = db_spec.spanner_config or self._GetDefaultConfig()
     self.nodes = db_spec.spanner_nodes or _DEFAULT_NODES
+    self._load_nodes = db_spec.spanner_load_nodes or self.nodes
     self._api_endpoint = None
 
     # Cloud Spanner may not explicitly set the following common flags.
@@ -302,12 +314,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
   def _Exists(self, instance_only: bool = False) -> bool:
     """Returns true if the instance and the database exists."""
-    cmd = util.GcloudCommand(
-        self, 'spanner', 'instances', 'describe', self.instance_id
-    )
-
-    # Do not log error or warning when checking existence.
-    _, _, retcode = cmd.Issue(raise_on_failure=False)
+    _, retcode = self._DescribeInstance(raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not find GCP Spanner instance %s.', self.instance_id)
       return False
@@ -345,13 +352,34 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     self._api_endpoint = json.loads(stdout) or _DEFAULT_ENDPOINT
     return self._api_endpoint
 
+  def _WaitUntilInstanceReady(self) -> None:
+    """Waits until the instance is ready."""
+    # TODO(user): Refactor Spanner instance to use this method in Create
+    while True:
+      instance, _ = self._DescribeInstance()
+      if json.loads(instance)['state'] == 'READY':
+        break
+
   def _SetNodes(self, nodes: int) -> None:
     """Sets the number of nodes on the Spanner instance."""
+    current_nodes = self._GetNodes()
+    if nodes == current_nodes:
+      return
+    logging.info('Updating node count from %s to %s.', current_nodes, nodes)
     cmd = util.GcloudCommand(
         self, 'spanner', 'instances', 'update', self.instance_id
     )
     cmd.flags['nodes'] = nodes
     cmd.Issue(raise_on_failure=True)
+    self._WaitUntilInstanceReady()
+
+  def UpdateCapacityForLoad(self) -> None:
+    """See base class."""
+    self._SetNodes(self._load_nodes)
+
+  def UpdateCapacityForRun(self) -> None:
+    """See base class."""
+    self._SetNodes(self.nodes)
 
   def _Restore(self) -> None:
     """See base class.
@@ -370,13 +398,21 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     """
     self._SetNodes(_FROZEN_NODE_COUNT)
 
-  def _GetLabels(self) -> Dict[str, Any]:
-    """Gets labels from the current instance."""
+  def _DescribeInstance(self, raise_on_failure=True) -> tuple[str, int]:
+    """Returns `spanner instances describe` output for this instance."""
     cmd = util.GcloudCommand(
         self, 'spanner', 'instances', 'describe', self.instance_id
     )
-    stdout, _, _ = cmd.Issue(raise_on_failure=True)
-    return json.loads(stdout).get('labels', {})
+    stdout, _, retcode = cmd.Issue(raise_on_failure=raise_on_failure)
+    return stdout, retcode
+
+  def _GetLabels(self) -> dict[str, Any]:
+    """Gets labels from the current instance."""
+    return json.loads(self._DescribeInstance()[0]).get('labels', {})
+
+  def _GetNodes(self) -> int:
+    """Gets node count from the current instance."""
+    return json.loads(self._DescribeInstance()[0])['nodeCount']
 
   def _UpdateLabels(self, labels: Dict[str, Any]) -> None:
     """Updates the labels of the current instance."""
@@ -415,6 +451,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
         'gcp_spanner_node_count': self.nodes,
         'gcp_spanner_config': self._config,
         'gcp_spanner_endpoint': self.GetApiEndPoint(),
+        'gcp_spanner_load_node_cont': self._load_nodes,
     }
 
   def GetAverageCpuUsage(self, duration_minutes: int) -> float:

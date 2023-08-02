@@ -407,6 +407,14 @@ class BaseRelationalDb(resource.BaseResource):
         self.client_vms_query_tools,
     )
 
+  def UpdateCapacityForLoad(self) -> None:
+    """Updates infrastructure to the correct capacity for loading."""
+    pass
+
+  def UpdateCapacityForRun(self) -> None:
+    """Updates infrastructure to the correct capacity for running."""
+    pass
+
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""
     raise NotImplementedError('Managed Db flags is not supported for %s' %

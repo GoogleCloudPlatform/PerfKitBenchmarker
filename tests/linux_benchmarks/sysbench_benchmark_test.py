@@ -14,6 +14,7 @@
 """Tests for sysbench."""
 import logging
 import os
+import textwrap
 import unittest
 from unittest import mock
 from absl import flags
@@ -137,6 +138,78 @@ class SpannerBenchmarkTestCase(
       ):
         actual_threads = sysbench_benchmark._GetLoadThreads()
       self.assertEqual(expected_threads, actual_threads)
+
+    def testLoadPhaseIncreasedCapacityAurora(self):
+      mock_spec = textwrap.dedent("""
+      sysbench:
+        relational_db:
+          engine: aurora-postgres
+          db_spec:
+            AWS:
+              machine_type: db.m4.4xlarge
+              load_machine_type: db.r7g.16xlarge
+      """)
+      mock_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+          mock_spec, 'sysbench'
+      )
+      mock_bm_spec.ConstructRelationalDb()
+      mock_update_instance = self.enter_context(
+          mock.patch.object(
+              mock_bm_spec.relational_db, '_UpdateWriterInstanceClass'
+          )
+      )
+
+      sysbench_benchmark._LoadDatabaseInParallel(mock_bm_spec.relational_db, [])
+
+      mock_update_instance.assert_has_calls(
+          [mock.call('db.r7g.16xlarge'), mock.call('db.m4.4xlarge')]
+      )
+
+    def testLoadPhaseIncreasedCapacitySpanner(self):
+      mock_spec = textwrap.dedent("""
+      sysbench:
+        relational_db:
+          engine: spanner-postgres
+          spanner_nodes: 3
+          spanner_load_nodes: 6
+      """)
+      mock_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+          mock_spec, 'sysbench'
+      )
+      mock_bm_spec.ConstructRelationalDb()
+      mock_set_nodes = self.enter_context(
+          mock.patch.object(mock_bm_spec.relational_db, '_SetNodes')
+      )
+
+      sysbench_benchmark._LoadDatabaseInParallel(mock_bm_spec.relational_db, [])
+
+      mock_set_nodes.assert_has_calls([mock.call(6), mock.call(3)])
+
+    def testIncreasedCapacityNotImplemented(self):
+      mock_spec = textwrap.dedent("""
+      sysbench:
+        relational_db:
+          engine: aurora-postgres
+          load_machine_type: db.r7g.16xlarge
+          db_spec:
+            AWS:
+              machine_type: db.m4.4xlarge
+      """)
+      mock_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+          mock_spec, 'sysbench'
+      )
+      mock_bm_spec.ConstructRelationalDb()
+      mock_update_instance = self.enter_context(
+          mock.patch.object(
+              mock_bm_spec.relational_db, '_UpdateWriterInstanceClass'
+          )
+      )
+
+      sysbench_benchmark._LoadDatabaseInParallel(mock_bm_spec.relational_db, [])
+
+      mock_update_instance.assert_has_calls(
+          [mock.call('db.r7g.16xlarge'), mock.call('db.m4.4xlarge')]
+      )
 
 
 if __name__ == '__main__':

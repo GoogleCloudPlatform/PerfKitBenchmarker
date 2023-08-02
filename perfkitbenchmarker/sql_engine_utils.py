@@ -353,6 +353,8 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
       sessions: The number of Spanner minSessions to set for the client.
     """
     self.vm.RemoteCommand('fuser -k 5432/tcp', ignore_failure=True)
+    # Connections need some time to cleanup, or the run command fails.
+    time.sleep(_PGADAPTER_CONNECT_WAIT_SEC)
     sessions_arg = ''
     if sessions:
       sessions_arg = (

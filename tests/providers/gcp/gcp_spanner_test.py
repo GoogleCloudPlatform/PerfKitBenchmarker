@@ -50,6 +50,12 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
   def testSetNodes(self):
     test_instance = GetTestSpannerInstance()
     # Don't actually issue a command.
+    self.enter_context(
+        mock.patch.object(test_instance, '_GetNodes', return_value=1)
+    )
+    self.enter_context(
+        mock.patch.object(test_instance, '_WaitUntilInstanceReady')
+    )
     cmd = self.enter_context(
         mock.patch.object(
             vm_util, 'IssueCommand', return_value=[None, None, 0]))

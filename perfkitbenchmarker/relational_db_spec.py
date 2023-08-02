@@ -66,6 +66,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   db_tier: str
   db_disk_spec: disk.BaseDiskSpec
   db_spec: virtual_machine.BaseVmSpec
+  load_machine_type: str
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(RelationalDbSpec, self).__init__(
@@ -158,6 +159,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
             option_decoders.ListDecoder,
             {'item_decoder': option_decoders.StringDecoder(), 'default': None},
         ),
+        'load_machine_type': (option_decoders.StringDecoder, {'default': None}),
     })
     return result
 

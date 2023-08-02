@@ -14,9 +14,11 @@
 """Managed relational database provisioning and teardown for AWS Aurora."""
 
 import json
+import time
 from typing import Any
 
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
@@ -50,6 +52,9 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     super(AwsAuroraRelationalDb, self).__init__(relational_db_spec)
     self.cluster_id = 'pkb-db-cluster-' + FLAGS.run_uri
     self.storage_type = aws_flags.AURORA_STORAGE_TYPE.value
+    self._load_machine_type = self.spec.db_spec.machine_type
+    if self.spec.load_machine_type is not None:
+      self._load_machine_type = self.spec.load_machine_type
 
   def _Create(self):
     """Creates the AWS RDS instance.
@@ -123,6 +128,38 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     """
     super()._PostCreate()
     self._SetPrimaryAndSecondaryZones()
+
+  def _UpdateWriterInstanceClass(self, instance_class: str) -> None:
+    """Updates DBInstanceClass for the writer instance."""
+    writer_instance = self.all_instance_ids[0]
+    current_instance_class = self._DescribeInstance(writer_instance)[
+        'DBInstances'
+    ][0]['DBInstanceClass']
+    if current_instance_class != instance_class:
+      logging.info(
+          'Updating capacity from %s to %s',
+          current_instance_class,
+          instance_class,
+      )
+      cmd = util.AWS_PREFIX + [
+          'rds',
+          'modify-db-instance',
+          '--db-instance-identifier=%s' % writer_instance,
+          '--region=%s' % self.region,
+          '--db-instance-class=%s' % instance_class,
+          '--apply-immediately',
+      ]
+      vm_util.IssueCommand(cmd, raise_on_failure=True)
+      while not self._IsInstanceReady(instance_id=writer_instance):
+        time.sleep(5)
+
+  def UpdateCapacityForLoad(self) -> None:
+    """See base class."""
+    self._UpdateWriterInstanceClass(self._load_machine_type)
+
+  def UpdateCapacityForRun(self) -> None:
+    """See base class."""
+    self._UpdateWriterInstanceClass(self.spec.db_spec.machine_type)
 
   def _DescribeCluster(self):
     cmd = util.AWS_PREFIX + [
