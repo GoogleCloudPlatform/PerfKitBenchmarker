@@ -129,10 +129,14 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     super()._PostCreate()
     self._SetPrimaryAndSecondaryZones()
 
-  def _UpdateWriterInstanceClass(self, instance_class: str) -> None:
+  def _UpdateClusterClass(self, instance_class: str) -> None:
+    """Updates DBInstanceClass for all instances in the cluster."""
+    for db_instance in self.all_instance_ids:
+      self._UpdateInstanceClass(db_instance, instance_class)
+
+  def _UpdateInstanceClass(self, instance_id: str, instance_class: str) -> None:
     """Updates DBInstanceClass for the writer instance."""
-    writer_instance = self.all_instance_ids[0]
-    current_instance_class = self._DescribeInstance(writer_instance)[
+    current_instance_class = self._DescribeInstance(instance_id)[
         'DBInstances'
     ][0]['DBInstanceClass']
     if current_instance_class != instance_class:
@@ -144,22 +148,22 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
       cmd = util.AWS_PREFIX + [
           'rds',
           'modify-db-instance',
-          '--db-instance-identifier=%s' % writer_instance,
+          '--db-instance-identifier=%s' % instance_id,
           '--region=%s' % self.region,
           '--db-instance-class=%s' % instance_class,
           '--apply-immediately',
       ]
       vm_util.IssueCommand(cmd, raise_on_failure=True)
-      while not self._IsInstanceReady(instance_id=writer_instance):
+      while not self._IsInstanceReady(instance_id=instance_id):
         time.sleep(5)
 
   def UpdateCapacityForLoad(self) -> None:
     """See base class."""
-    self._UpdateWriterInstanceClass(self._load_machine_type)
+    self._UpdateClusterClass(self._load_machine_type)
 
   def UpdateCapacityForRun(self) -> None:
     """See base class."""
-    self._UpdateWriterInstanceClass(self.spec.db_spec.machine_type)
+    self._UpdateClusterClass(self.spec.db_spec.machine_type)
 
   def _DescribeCluster(self):
     cmd = util.AWS_PREFIX + [

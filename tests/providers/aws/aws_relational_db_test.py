@@ -382,7 +382,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(db.spec.database_password, 'perfkitbenchmarker')
       self.assertIsNone(issue_command.call_args)
 
-  def testUpdateWriterInstanceClass(self):
+  def testUpdateClusterClass(self):
     fake_describe_output = textwrap.dedent("""
     {
         "DBInstances": [
@@ -417,14 +417,14 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         )
     )
 
-    db._UpdateWriterInstanceClass('db.m5.large')
+    db._UpdateClusterClass('db.m5.large')
 
     mock_issue_command.assert_called_once_with(
         matchers.HAS('--db-instance-class=db.m5.large'),
         raise_on_failure=mock.ANY,
     )
 
-  def testUpdateWriterInstanceClassNotChanged(self):
+  def testUpdateClusterClassNotChanged(self):
     fake_describe_output = textwrap.dedent("""
     {
         "DBInstances": [
@@ -456,7 +456,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         )
     )
 
-    db._UpdateWriterInstanceClass('db.t3.small')
+    db._UpdateClusterClass('db.t3.small')
 
     mock_issue_command.assert_not_called()
 
