@@ -690,7 +690,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
             '--admin-username',
             self.user_name,
             '--storage-sku',
-            self.os_disk.disk_type,
+            f'os={self.os_disk.disk_type}',
             '--name',
             self.name,
         ]  # pyformat: disable

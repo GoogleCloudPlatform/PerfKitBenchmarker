@@ -252,6 +252,11 @@ LM_NOTIFICATION_METADATA_NAME = flags.DEFINE_string(
     'instance/maintenance-event',
     'Lm notification metadata name to listen on.',
 )
+flags.DEFINE_list(
+    'data_disk_zones', [],
+    'The zone of the GCP data disk. This is used to provision regional pd with '
+    'multiple zones.'
+    )
 
 
 def _ValidatePreemptFlags(flags_dict):

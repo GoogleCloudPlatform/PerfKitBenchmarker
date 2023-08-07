@@ -128,11 +128,6 @@ flags.DEFINE_string(
     'user data on separate disks, this only affects the user data disk(s).'
     'If the provider has OS and user data on the same disk, this flag affects'
     'that disk.')
-flags.DEFINE_list(
-    'data_disk_zones', [],
-    'The zone of the data disk. This is only used to provision regional pd with'
-    ' multiple zones on GCP.'
-    )
 flags.DEFINE_integer('data_disk_size', None, 'Size, in gb, for all data disks.')
 flags.DEFINE_integer('num_striped_disks', None,
                      'The number of data disks to stripe together to form one '
