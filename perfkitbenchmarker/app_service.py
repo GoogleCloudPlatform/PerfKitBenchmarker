@@ -146,14 +146,7 @@ class BaseAppService(resource.BaseResource):
 
   def __init__(self, base_app_service_spec: BaseAppServiceSpec):
     super().__init__()
-    with self._appservice_counter_lock:
-      self.appservice_number: int = self._appservice_counter
-      if APPSERVICE_NAME.value:
-        self.name = APPSERVICE_NAME.value
-      else:
-        self.name: str = f'pkb-{FLAGS.run_uri}'
-      self.name += f'-{self.appservice_number}'
-      BaseAppService._appservice_counter += 1
+    self.name: str = self._GenerateName()
     self.region: str = base_app_service_spec.appservice_region
     self.backend: str = base_app_service_spec.appservice_backend
     self.builder: Any = None
@@ -167,6 +160,25 @@ class BaseAppService(resource.BaseResource):
         'concurrency': 'default',
     })
     self.samples: List[sample.Sample] = []
+
+  def _GenerateName(self) -> str:
+    """Generates a unique name for the AppService.
+
+    Locking the counter variable allows for each created app service name to be
+    unique within the python process.
+
+    Returns:
+      The newly generated name.
+    """
+    with self._appservice_counter_lock:
+      self.appservice_number: int = self._appservice_counter
+      if APPSERVICE_NAME.value:
+        name = APPSERVICE_NAME.value
+      else:
+        name: str = f'pkb-{FLAGS.run_uri}'
+      name += f'-{self.appservice_number}'
+      BaseAppService._appservice_counter += 1
+      return name
 
   def _UpdateDependencies(self):
     """Update dependencies for AppService."""
