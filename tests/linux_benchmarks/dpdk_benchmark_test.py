@@ -91,6 +91,8 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     )
     self.bm_spec.vms[0].internal_ips = ['', '10.0.0.214']
     self.bm_spec.vms[1].internal_ips = ['', '10.0.0.215']
+    self.bm_spec.vms[0].secondary_nic_bus_info = '00:06.0'
+    self.bm_spec.vms[1].secondary_nic_bus_info = '00:06.0'
 
   def testClientServerRemoteCmd(self):
     self.bm_spec.vms[0].RobustRemoteCommand.return_value = (

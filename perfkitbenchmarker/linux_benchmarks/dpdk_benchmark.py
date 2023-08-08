@@ -167,13 +167,6 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     RunError: A run-stage error raised by an individual benchmark.
   """
   client_vm, server_vm = benchmark_spec.vms[:2]
-  stdout, _ = client_vm.RemoteCommand('dpdk-devbind.py --status')
-  match = re.search('0000:00:0([0-9]).0.*drv=vfio-pci', stdout)
-  if not match:
-    raise errors.VirtualMachine.VmStateError(
-        'No secondary network interface. Make sure the VM has at least 2 NICs.'
-    )
-  secondary_nic_num = match.group(1)
 
   metadata = {
       'dpdk_num_forwarding_cores': _DPDK_NB_CORES.value,
@@ -187,7 +180,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   client_cmd = (
       'sudo dpdk-testpmd'
-      f' -a 00:0{secondary_nic_num}.0'
+      f' -a {client_vm.secondary_nic_bus_info}'
       f' -l 0-{_DPDK_NB_CORES.value} --'
       f' --forward-mode={_DPDK_FORWARD_MODE.value[0]}'
       f' --tx-ip={client_vm.internal_ips[1]},{server_vm.internal_ips[1]}'
@@ -206,7 +199,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   server_cmd = (
       'sudo dpdk-testpmd'
-      f' -a 00:0{secondary_nic_num}.0'
+      f' -a {server_vm.secondary_nic_bus_info}'
       f' -l 0-{_DPDK_NB_CORES.value} --'
       f' --txq={_DPDK_TXQ.value}'
       f' --rxq={_DPDK_RXQ.value}'

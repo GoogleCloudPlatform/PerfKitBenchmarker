@@ -97,8 +97,6 @@ def _InstallDPDK(vm):
         """sudo sed -i 's/GRUB_DEFAULT=0/GRUB_DEFAULT="1>2"/g' /etc/default/grub"""
     )
     vm.RemoteCommand('sudo update-grub')
-    vm.Reboot()
-    vm.WaitForBootCompletion()
     vm.RemoteCommand(f'git clone {DPDK_AWS_DRIVER_GIT_REPO}')
     vm.RemoteCommand(
         'sudo sed -i "s/# deb-src/deb-src/g" /etc/apt/sources.list'
@@ -109,7 +107,8 @@ def _InstallDPDK(vm):
         f' {DPDK_AWS_VFIO_DRIVER_DIR}/get-vfio-with-wc.sh'
     )
     vm.RobustRemoteCommand(
-        f'cd {DPDK_AWS_VFIO_DRIVER_DIR} && sudo ./get-vfio-with-wc.sh'
+        f'cd {DPDK_AWS_VFIO_DRIVER_DIR} && sudo ./get-vfio-with-wc.sh',
+        ignore_failure=True
     )
 
   # Build and Install
@@ -135,31 +134,38 @@ def _BindNICToDPDKDriver(vm):
     vm: The VM on which to install DPDK.
   """
   stdout, _ = vm.RemoteCommand('ip addr')
-  match = re.search('3: (ens[0-9])', stdout)
-  if not match:
+  nic_match = re.search('3: (ens[0-9]+)', stdout)
+  if not nic_match:
     raise errors.VirtualMachine.VmStateError(
         'No secondary network interface. Make sure the VM has at least 2 NICs.'
     )
-  secondary_nic = match.group(1)
+  secondary_nic = nic_match.group(1)
 
   # Get non-primary MAC Address
-  match = re.findall(r'link/ether ([a-z0-9:]*)', stdout)[1]
-  if not match:
+  mac_match = re.findall(r'link/ether ([a-z0-9:]*)', stdout)[1]
+  if not mac_match:
     raise errors.VirtualMachine.VmStateError('No secondary MAC address.')
-  vm.secondary_mac_addr = match
+  vm.secondary_mac_addr = mac_match
+
+  # Find bus info for secondary nic
+  stdout, _ = vm.RemoteCommand(f'ethtool -i {secondary_nic}')
+  bus_match = re.search('bus-info: (0000:[0-9]+:[0-9]+.0)', stdout)
+  if not bus_match:
+    raise errors.VirtualMachine.VmStateError('No bus info for secondary NIC.')
+  vm.secondary_nic_bus_info = bus_match.group(1)
 
   # Set secondary interface down
   vm.RemoteCommand(f'sudo ip link set {secondary_nic} down')
 
   # Bind secondary device to VFIO kernel module
   vm.RobustRemoteCommand(
-      f'sudo dpdk-devbind.py -b vfio-pci 0000:00:0{secondary_nic[-1]}.0'
+      f'sudo dpdk-devbind.py -b vfio-pci {vm.secondary_nic_bus_info}'
   )
 
   # Show bind status of NICs
   # Should see 1 NIC using kernel driver and 1 NIC using DPDK-compatible driver
   stdout, _ = vm.RemoteCommand('dpdk-devbind.py --status')
-  match = re.search(f'0000:00:0{secondary_nic[-1]}.0.*drv=vfio-pci', stdout)
+  match = re.search(f'{vm.secondary_nic_bus_info}.*drv=vfio-pci', stdout)
   if not match:
     raise errors.VirtualMachine.VmStateError(
         'No network device is using a DPDK-compatible driver.'
