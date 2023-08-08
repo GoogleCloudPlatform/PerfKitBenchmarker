@@ -263,7 +263,7 @@
 -   Add `--gce_create_log_http` to pass `--log-http` to `gcloud compute instance
     create` and `gcloud compute operations describe`.
 -   Update AWS/Azure/GCP data disks to use cheap ssds rather than hdds.
--   Support Azure ZRS disks.
+-   Support Azure ZRS disks and hyperdisk balanced.
 
 ### Bug fixes and maintenance updates:
 
