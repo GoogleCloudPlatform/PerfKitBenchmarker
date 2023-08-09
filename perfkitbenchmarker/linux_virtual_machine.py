@@ -1981,6 +1981,9 @@ class BaseRhelMixin(BaseLinuxMixin):
   # OS_TYPE = os_types.RHEL
   BASE_OS_TYPE = os_types.RHEL
 
+  # RHEL's command to create a initramfs image.
+  INIT_RAM_FS_CMD = 'sudo dracut --regenerate-all -f'
+
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
     super(BaseRhelMixin, self).OnStartup()
