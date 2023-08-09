@@ -69,22 +69,21 @@ class _DStatCollector(base_collector.BaseCollector):
     vm.Install('dstat')
 
   def _CollectorRunCommand(self, vm, collector_file):
-    num_cpus = vm.num_cpus
 
     # List block devices so that I/O to each block device can be recorded.
     block_devices, _ = vm.RemoteCommand(
-        'lsblk --nodeps --output NAME --noheadings')
+        'lsblk --nodeps --output NAME --noheadings'
+    )
     block_devices = block_devices.splitlines()
-    cmd = ('dstat --epoch -C total,0-{max_cpu} '
-           '-D total,{block_devices} '
-           '-clrdngyi -pms --fs --ipc --tcp '
-           '--udp --raw --socket --unix --vm --rpc '
-           '--noheaders --output {output} {dstat_interval} > /dev/null 2>&1 & '
-           'echo $!').format(
-               max_cpu=num_cpus - 1,
-               block_devices=','.join(block_devices),
-               output=collector_file,
-               dstat_interval=self.interval or '')
+    cmd = (
+        'pcp dstat --epoch -D total,{block_devices}'
+        ' -clrdngy -pms --noheaders --output {output} {dstat_interval} >'
+        ' /dev/null 2>&1 & echo $!'
+    ).format(
+        block_devices=','.join(block_devices),
+        output=collector_file,
+        dstat_interval=self.interval or '',
+    )
     return cmd
 
   def Analyze(self, unused_sender, benchmark_spec, samples):

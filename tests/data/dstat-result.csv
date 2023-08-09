@@ -1,6 +1,6 @@
-"Dstat 0.7.2 CSV output"
-"Author:","Dag Wieers <dag@wieers.com>",,,,"URL:","http://dag.wieers.com/home-made/dstat/"
-"Host:","pkb-b50daf1e-1",,,,"User:","perfkit"
+"pcp-dstat 5.0.3 CSV Output"
+"Author:","PCP team <pcp@groups.io> and Dag Wieers <dag@wieers.com>,,,,"URL:","http://dag.wieers.com/home-made/dstat/"
+"Host:","pkb-d43f64f0-0",,,,"User:","perfkit"
 "Cmdline:","dstat --epoch -C total,0-0 -D total,sda -clrdngyi -pms --fs --ipc --tcp --udp --raw --socket --unix --vm --rpc --noheaders --output /tmp/pkb/pkb-b50daf1e-1-redis_ycsb0-6b6e4776-dstat.csv",,,,"Date:","05 Oct 2016 23:04:53 UTC"
 
 "epoch","total cpu usage",,,,,,"load avg",,,"io/total",,"io/sda",,"dsk/total",,"dsk/sda",,"net/total",,"paging",,"system",,"interrupts",,,"procs",,,"memory usage",,,,"swap",,"filesystem",,"sysv ipc",,,"tcp sockets",,,,,"udp",,"raw","sockets",,,,,"unix sockets",,,,"virtual memory",,,

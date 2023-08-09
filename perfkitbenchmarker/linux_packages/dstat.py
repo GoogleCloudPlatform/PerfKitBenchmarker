@@ -27,18 +27,17 @@ import numpy as np
 
 
 def ParseCsvFile(fp: TextIO) -> Tuple[List[str], np.ndarray]:
-  """Parse dstat results file in csv format.
+  """Parse pcp dstat results file in csv format.
 
-  This is an example of a Dstat CSV output:
-      "Dstat 0.7.2 CSV output"
-      "Author:","Dag Wieers <dag@wieers.com>",,,,"URL:","http://dag.wieers.co...
-      "Host:","pc-ubu",,,,"User:","pclay"
-      "Cmdline:","dstat -Tcmno bar",,,,"Date:","09 Jun 2021 18:59:00 UTC"
-
-      "epoch","total cpu usage",,,,,,"memory usage",,,,"net/total",
-      "epoch","usr","sys","idl","wai","hiq","siq","used","buff","cach","free"...
-      1623265140.892,0.054,0.035,99.883,0.029,0.0,0.000,216711168.0,108556288...
-      1623265141.893,0.0,0.0,100.0,0.0,0.0,0.0,216707072.0,108556288.0,467206...
+  This is an example of a pcp dstat CSV output:
+      "pcp-dstat 5.0.3 CSV Output"
+      "Author:","PCP team <pcp@groups.io> and Dag Wieers <dag@wieers.com>"...
+      "Host:","pkb-d43f64f0-0",,,,"User:","perfkit"
+      "Cmdline:","pcp-dstat --epoch ... ,,,,"Date:","04 Aug 2023 01:14:42 UTC"
+      "epoch","total usage","load avg",,,"io/total",,,,"dsk/total",,"net/total",
+      "epoch",,"1m","5m","15m","read","writ","dsk/total:read"...,
+      1691111682,0.080,0.240,0.120,,,,,,,,,,,,,0,0,,224164,6772060...
+      1691111702,0.060,0.220,0.120,0,0.200,0,2.000,0,2.000,41...
 
    There is always 4 lines of headers.
    Then comes a newline in some versions (not in 0.7.3).
@@ -60,9 +59,9 @@ def ParseCsvFile(fp: TextIO) -> Tuple[List[str], np.ndarray]:
   headers = list(itertools.islice(reader, 4))
   if len(headers) < 4:
     raise ValueError(f'Expected 4 header lines got {len(headers)}\n{headers}')
-  if not headers[0] or 'Dstat' not in headers[0][0]:
+  if not headers[0] or 'pcp-dstat' not in headers[0][0]:
     raise ValueError(
-        f'Expected first header cell to contain "Dstat"\n{headers[0]}')
+        f'Expected first header cell to contain "pcp-dstat"\n{headers[0]}')
   if not headers[2] or 'Host:' not in headers[2][0]:
     raise ValueError(
         f'Expected first cell in third line to be "Host:"\n{headers[2]}')
@@ -102,6 +101,8 @@ def ParseCsvFile(fp: TextIO) -> Tuple[List[str], np.ndarray]:
       row = row[:-1]
 
     if len(labels) != len(row):
+      if i == 0:
+        continue
       raise ValueError(
           f'Number of labels ({len(labels)}) does not match number of '
           f'columns ({len(row)}) in row {i}:\n{row}')
@@ -111,7 +112,7 @@ def ParseCsvFile(fp: TextIO) -> Tuple[List[str], np.ndarray]:
 
 def _Install(vm):
   """Installs the dstat package on the VM."""
-  vm.InstallPackages('dstat')
+  vm.InstallPackages('pcp')
 
 
 def YumInstall(vm):
