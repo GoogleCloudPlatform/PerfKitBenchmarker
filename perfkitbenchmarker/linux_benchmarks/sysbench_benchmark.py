@@ -782,6 +782,7 @@ def Run(benchmark_spec):
 
   for thread_count in FLAGS.sysbench_run_threads:
     metadata = CreateMetadataFromFlags()
+    metadata.update(db.GetResourceMetadata())
     metadata['sysbench_db_size_MB'] = _GetDatabaseSize(db)
     metadata['sysbench_thread_count'] = thread_count
     # The run phase is common across providers. The VMs[0] object contains all
