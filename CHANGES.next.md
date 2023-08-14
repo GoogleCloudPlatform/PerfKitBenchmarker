@@ -138,9 +138,11 @@
 -   Added AWS/GCP support for Data Plane Development Kit (DPDK) on Linux VM's to
     improve networking performance, as well as a DPDK benchmark for testpmd.
 -   Add --dpb_hardware_hourly_cost and --dpb_service_premium_hourly_cost to
--   Add support for Spanner Postgres benchmarking with TPCC.
-    estimate cost of DPB service in benchmark runs.
--   Add --dpb_dynamic_allocation flag to disable dynamic allocation in Spark benchmarks.
+-   Add support for Spanner Postgres benchmarking with TPCC. estimate cost of
+    DPB service in benchmark runs.
+-   Add --dpb_dynamic_allocation flag to disable dynamic allocation in Spark
+    benchmarks.
+-   Add support for benchmarking VMs with Local SSD on Windows on GCE/AWS/Azure.
 
 ### Enhancements:
 

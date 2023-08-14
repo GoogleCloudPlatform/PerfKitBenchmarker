@@ -245,6 +245,12 @@ class WindowsGceVirtualMachine(
   def _MetadataPreemptCmd(self) -> str:
     return _METADATA_PREEMPT_CMD_WIN
 
+  def _DiskDriveIsLocal(self, device, model):
+    """Helper method to determine if a disk drive is a local ssd to stripe."""
+    if 'nvme_card' in model and 'nvme_card-pd' not in model:
+      return True
+    return False
+
 
 class WindowsGceSqlServerVirtualMachine(WindowsGceVirtualMachine):
   """Class supporting Windows GCE sql server virtual machines."""

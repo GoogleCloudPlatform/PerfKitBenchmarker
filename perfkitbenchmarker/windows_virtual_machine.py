@@ -17,8 +17,9 @@ import base64
 import logging
 import ntpath
 import os
+import re
 import time
-from typing import cast, Optional, Tuple
+from typing import Optional, Tuple, cast
 import uuid
 
 from absl import flags
@@ -28,7 +29,6 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
-
 import six
 import timeout_decorator
 import winrm
@@ -584,6 +584,9 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand('diskpart /s {script_path}'.format(
           script_path=script_path))
 
+  def _DiskDriveIsLocal(self, device, model):
+    """Helper method to determine if a disk drive is a local ssd to stripe."""
+
   def _PrepareScratchDisk(self, scratch_disk, disk_spec):
     """Helper method to format and mount scratch disk.
 
@@ -596,7 +599,28 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     script = ''
 
     if scratch_disk.is_striped:
-      disk_numbers = [str(d.disk_number) for d in scratch_disk.disks]
+      stdout, _ = self.RemoteCommand(
+          'Get-WmiObject -class Win32_DiskDrive | Select-Object DeviceID,Model'
+      )
+
+      # Find the disk drives that map to local ssds.
+      if disk_spec.disk_type == 'local':
+        disk_numbers = []
+        lines = stdout.splitlines()
+        whitespace_pattern = re.compile(r'\s+')
+        for line in lines:
+          if line:
+            # split line by first whitespaces
+            device, model = whitespace_pattern.split(line, 1)
+
+            if device == 'DeviceID' or device == '--------':
+              continue
+
+            if self._DiskDriveIsLocal(device, model):
+              disk_numbers.append(device.split('PHYSICALDRIVE')[-1])
+      else:
+        # We want to stripe remote disks
+        disk_numbers = [str(d.disk_number) for d in scratch_disk.disks]
     else:
       disk_numbers = [scratch_disk.disk_number]
 
@@ -604,6 +628,9 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       # For each disk, set the status to online (if it is not already),
       # remove any formatting or partitioning on the disks, and convert
       # it to a dynamic disk so it can be used to create a volume.
+      # TODO(user): Fix on Azure machines with temp disk, e.g.
+      # Ebdsv5 which have 1 local disk with partitions. Perhaps this means
+      # removing the clean and convert gpt lines.
       script += ('select disk %s\n'
                  'online disk noerr\n'
                  'attributes disk clear readonly\n'
@@ -632,6 +659,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
                  (format_command, ATTACHED_DISK_LETTER.lower(),
                   disk_spec.mount_point))
 
+    # No-op, useful for understanding the state of the disks
+    self._RunDiskpartScript('list disk')
     self._RunDiskpartScript(script)
 
     # Grant user permissions on the drive
