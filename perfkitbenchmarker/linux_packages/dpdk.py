@@ -18,7 +18,9 @@ import re
 from perfkitbenchmarker import errors
 
 DPDK_GIT_REPO = 'https://github.com/DPDK/dpdk.git'
-DPDK_GCP_DRIVER_GIT_REPO = 'https://github.com/google/compute-virtual-ethernet-dpdk'
+DPDK_GCP_DRIVER_GIT_REPO = (
+    'https://github.com/google/compute-virtual-ethernet-dpdk'
+)
 DPDK_AWS_DRIVER_GIT_REPO = 'https://github.com/amzn/amzn-drivers'
 DPDK_AWS_VFIO_DRIVER_DIR = 'amzn-drivers/userspace/dpdk/enav2-vfio-patch'
 
@@ -97,6 +99,8 @@ def _InstallDPDK(vm):
         """sudo sed -i 's/GRUB_DEFAULT=0/GRUB_DEFAULT="1>2"/g' /etc/default/grub"""
     )
     vm.RemoteCommand('sudo update-grub')
+    vm.Reboot()
+    vm.WaitForBootCompletion()
     vm.RemoteCommand(f'git clone {DPDK_AWS_DRIVER_GIT_REPO}')
     vm.RemoteCommand(
         'sudo sed -i "s/# deb-src/deb-src/g" /etc/apt/sources.list'
@@ -107,8 +111,7 @@ def _InstallDPDK(vm):
         f' {DPDK_AWS_VFIO_DRIVER_DIR}/get-vfio-with-wc.sh'
     )
     vm.RobustRemoteCommand(
-        f'cd {DPDK_AWS_VFIO_DRIVER_DIR} && sudo ./get-vfio-with-wc.sh',
-        ignore_failure=True
+        f'cd {DPDK_AWS_VFIO_DRIVER_DIR} && sudo ./get-vfio-with-wc.sh'
     )
 
   # Build and Install
