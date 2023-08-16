@@ -140,9 +140,25 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   )
 
 
+def ParseFromOutput(output: str) -> Dict[str, str]:
+  """Creates samples containing metrics.
+
+  Args:
+    output: string, command output
+
+  Example output:
+    perfkitbenchmarker/tests/linux_benchmarks/mlperf_inference_cpu_benchmark_test.py
+
+  Returns:
+    Samples containing training metrics.
+  """
+  result = regex_util.ExtractAllMatches(r'(.*):(.*)', output)
+  return {key.strip(): value.strip() for key, value in result}
+
+
 def MakeSamplesFromOutput(
     base_metadata: Dict[str, Any], output: str
-) -> List[sample.Sample]:
+) -> sample.Sample:
   """Creates samples containing metrics.
 
   Args:
@@ -153,19 +169,77 @@ def MakeSamplesFromOutput(
     perfkitbenchmarker/tests/linux_benchmarks/mlperf_inference_cpu_benchmark_test.py
 
   Returns:
-    Samples containing training metrics.
+    Sample containing training metrics.
   """
-  result = regex_util.ExtractAllMatches(r'(.*):(.*)', output)
-  for key, value in result:
-    base_metadata[key.strip()] = value.strip()
-  return [
-      sample.Sample(
-          'throughput',
-          base_metadata['Completed samples per second'],
-          'samples per second',
-          base_metadata,
-      )
-  ]
+  metadata = ParseFromOutput(output)
+  metadata.update(base_metadata)
+  return sample.Sample(
+      'throughput',
+      metadata['Samples per second'],
+      'samples per second',
+      metadata,
+  )
+
+
+def _IsValid(output: str) -> List[sample.Sample]:
+  """Creates samples containing metrics.
+
+  Args:
+    output: string, command output
+
+  Returns:
+    whether the result is valid or invalid.
+  """
+  results = regex_util.ExtractAllMatches(r'Result is : (\S+)', output)
+  return results[0] == 'VALID'
+
+
+def _Run(
+    bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float = 1.01
+) -> str:
+  """Runs MLPerf Inference on the cluster.
+
+  Args:
+    bm_spec: The benchmark specification. Contains all data that is required to
+      run the benchmark.
+    target_qps: float, the scheduled samples per second.
+
+  Returns:
+    mlperf inference output.
+  """
+  # TODO(tohaowu) Add a full Run function test.
+  vm = bm_spec.vms[0]
+  stdout, _ = vm.RemoteCommand(
+      f'{bm_spec.cm} run script'
+      ' --tags=run,mlperf,inference,generate-run-cmds,_find-performance'
+      ' --adr.python.name=mlperf --adr.python.version_min=3.8'
+      ' --submitter="Community" --hw_name=default --quiet --clean'
+      ' --results_dir=$HOME/logs --execution-mode=valid --test_query_count=5'
+      f' --implementation={_IMPLEMENTATION.value} --model={_MODEL.value}'
+      f' --backend={_BACKEND.value} --device={_DEVICE.value}'
+      f' --scenario={FLAGS.mlperf_inference_scenarios} --mode={_MODE.value}'
+      f' --category={_CATEGORY.value} --target_qps={target_qps} --count=1'
+      f' {"--adr.tvm.tags=_pip-install" if _TVM_PIP_INSTALL.value else ""}'
+  )
+  return stdout
+
+
+def _SearchQps(bm_spec: benchmark_spec.BenchmarkSpec) -> str:
+  """Finds the system under test QPS.
+
+  Uses binary search between to find the max GPU QPS while meet the latency
+  constraint. Stops searching when the absolute difference is less 1 samples
+  per second.
+
+  Args:
+    bm_spec: The benchmark specification. Contains all data that is required to
+      run the benchmark.
+
+  Returns:
+    The best performance test result.
+  """
+  target_qps = float(ParseFromOutput(_Run(bm_spec))['Samples per second'])
+  return _Run(bm_spec, target_qps)
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -178,21 +252,10 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
-  # TODO(tohaowu) Add a full Run function test.
   vm = bm_spec.vms[0]
   vm.RemoteCommand(f'{bm_spec.cm} rm cache -f')
-  stdout, _ = vm.RemoteCommand(
-      f'{bm_spec.cm} run script'
-      ' --tags=run,mlperf,inference,generate-run-cmds,_find-performance'
-      ' --adr.python.name=mlperf --adr.python.version_min=3.8'
-      ' --submitter="Community" --hw_name=default --quiet --clean'
-      ' --results_dir=$HOME/logs --execution-mode=valid --test_query_count=5'
-      f' --implementation={_IMPLEMENTATION.value} --model={_MODEL.value}'
-      f' --backend={_BACKEND.value} --device={_DEVICE.value}'
-      f' --scenario={FLAGS.mlperf_inference_scenarios} --mode={_MODE.value}'
-      f' --category={_CATEGORY.value}'
-      f' {"--adr.tvm.tags=_pip-install" if _TVM_PIP_INSTALL.value else ""}'
-  )
+  stdout = _SearchQps(bm_spec)
+
   metadata = {
       'implementation': _IMPLEMENTATION.value,
       'model': _MODEL.value,
@@ -202,7 +265,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       'mode': _MODE.value,
       'category': _CATEGORY.value,
   }
-  return MakeSamplesFromOutput(metadata, stdout)
+  return [MakeSamplesFromOutput(metadata, stdout)]
 
 
 def Cleanup(unused_bm_spec: benchmark_spec.BenchmarkSpec) -> None:

@@ -4,7 +4,7 @@ MLPerf Results Summary
 SUT name : PySUT
 Scenario : Server
 Mode     : PerformanceOnly
-Scheduled samples per second : 0.98
+Samples per second : 0.98
 Result is : INVALID
   Performance constraints satisfied : NO
   Min duration satisfied : Yes
