@@ -2469,23 +2469,6 @@ class Rhel9Mixin(BaseRhelMixin):
     # https://docs.fedoraproject.org/en-US/epel/#_rhel_9
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(9)}')
 
-class Oracle8Mixin(BaseRhelMixin):
-    """Class holding Oracle Linux 8 specific VM methods and attributes."""
-    OS_TYPE = os_types.ORACLE8
-    PYTHON_2_PACKAGE = None
-
-    def SetupPackageManager(self):
-        """Install EPEL."""
-        self.RemoteCommand(f'sudo dnf install -y {_ORACLE_EPEL_URL.format(8)}')
-
-class Oracle9Mixin(BaseRhelMixin):
-    """Class holding Oracle Linux 9 specific VM methods and attributes."""
-    OS_TYPE = os_types.ORACLE9
-    PYTHON_2_PACKAGE = None
-
-    def SetupPackageManager(self):
-        """Install EPEL."""
-        self.RemoteCommand(f'sudo dnf install -y {_ORACLE_EPEL_URL.format(9)}')
 
 class Fedora36Mixin(BaseRhelMixin):
   """Class holding Fedora36 specific methods and attributes."""

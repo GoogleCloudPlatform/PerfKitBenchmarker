@@ -39,8 +39,6 @@ DEBIAN12 = 'debian12'
 FEDORA36 = 'fedora36'
 FEDORA37 = 'fedora37'
 JUJU = 'juju'
-ORACLE8 = 'oracle8'
-ORACLE9 = 'oracle9'
 RHEL7 = 'rhel7'
 RHEL8 = 'rhel8'
 RHEL9 = 'rhel9'
@@ -128,8 +126,6 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     FEDORA36,
     FEDORA37,
     JUJU,
-    ORACLE8,
-    ORACLE9,
     RHEL7,
     RHEL8,
     RHEL9,
