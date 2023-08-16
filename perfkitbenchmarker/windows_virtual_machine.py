@@ -598,31 +598,34 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     # create a volume, and then format and mount the volume.
     script = ''
 
+    # Get DeviceId and Model (FriendlyNam) for all disks
+    # attached to the VM except boot disk.
+    stdout, _ = self.RemoteCommand(
+        'Get-PhysicalDisk | Where-Object {($_.CanPool -eq $true)} | '
+        'Select  DeviceId,FriendlyName'
+    )
+    query_disk_numbers = []
+    lines = stdout.splitlines()
+    whitespace_pattern = re.compile(r'\s+')
+    for line in lines:
+      if line:
+        # split line by first whitespaces
+        device, model = whitespace_pattern.split(line, 1)
+
+        if device == 'DeviceId' or device == '--------':
+          continue
+
+        if disk_spec.disk_type == 'local':
+          if self._DiskDriveIsLocal(device, model):
+            query_disk_numbers.append(device)
+        else:
+          if not self._DiskDriveIsLocal(device, model):
+            query_disk_numbers.append(device)
+
     if scratch_disk.is_striped:
-      stdout, _ = self.RemoteCommand(
-          'Get-WmiObject -class Win32_DiskDrive | Select-Object DeviceID,Model'
-      )
-
-      # Find the disk drives that map to local ssds.
-      if disk_spec.disk_type == 'local':
-        disk_numbers = []
-        lines = stdout.splitlines()
-        whitespace_pattern = re.compile(r'\s+')
-        for line in lines:
-          if line:
-            # split line by first whitespaces
-            device, model = whitespace_pattern.split(line, 1)
-
-            if device == 'DeviceID' or device == '--------':
-              continue
-
-            if self._DiskDriveIsLocal(device, model):
-              disk_numbers.append(device.split('PHYSICALDRIVE')[-1])
-      else:
-        # We want to stripe remote disks
-        disk_numbers = [str(d.disk_number) for d in scratch_disk.disks]
+      disk_numbers = query_disk_numbers
     else:
-      disk_numbers = [scratch_disk.disk_number]
+      disk_numbers = query_disk_numbers[0]
 
     for disk_number in disk_numbers:
       # For each disk, set the status to online (if it is not already),
@@ -670,6 +673,12 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
         'icacls {}: --% /grant Users:(OI)(CI)F /L'.format(ATTACHED_DISK_LETTER))
 
     self.scratch_disks.append(scratch_disk)
+
+    if(FLAGS.gce_num_local_ssds > 0 and FLAGS.db_disk_type != 'local'):
+      self._PrepareTempDbDisk()
+
+  def _PrepareTempDbDisk(self):
+    """Helper method to format and setup disk for SQL Server TempDB."""
 
   def SetReadAhead(self, num_sectors, devices):
     """Set read-ahead value for block devices.

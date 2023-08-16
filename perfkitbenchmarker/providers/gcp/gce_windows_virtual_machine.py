@@ -36,7 +36,8 @@ _METADATA_PREEMPT_CMD_WIN = (
 )
 
 FLAGS = flags.FLAGS
-
+ATTACHED_DISK_LETTER = 'F'
+TEMPDB_DISK_LETTER = 'T'
 BAT_SCRIPT = """
 :WAIT
 echo waiting for MSSQLSERVER
@@ -93,9 +94,61 @@ class WindowsGceVirtualMachine(
         windows_virtual_machine.STARTUP_SCRIPT
     )
 
+  def _PrepareTempDbDisk(self):
+    """Helper method to format and setup disk for SQL Server TempDB."""
+    # Create and then run a Diskpart script that will initialize the disks,
+    # create a volume, and then format and mount the volume.
+    script = ''
+    stdout, _ = self.RemoteCommand(
+        'Get-PhysicalDisk | where-object '
+        '{($_.FriendlyName -eq "Google EphemeralDisk") -or '
+        '($_.FriendlyName -eq "nvme_card")} | Select -exp DeviceID'
+    )
+    local_ssd_disks = [
+        int(device_id) for device_id in stdout.split('\n') if device_id
+    ]
+    local_ssd_disks_str = [str(d) for d in local_ssd_disks]
+
+    for disk_number in local_ssd_disks_str:
+      # For local SSD disk, set the status to online (if it is not already),
+      # remove any formatting or partitioning on the disks, and convert
+      # it to a dynamic disk so it can be used to create a volume.
+      script += (
+          'select disk %s\n'
+          'online disk noerr\n'
+          'attributes disk clear readonly\n'
+          'clean\n'
+          'convert gpt\n'
+          'convert dynamic\n' % disk_number
+      )
+
+    if local_ssd_disks:
+      if len(local_ssd_disks_str) > 1:
+        script += 'create volume stripe disk=%s\n' % ','.join(
+            local_ssd_disks_str)
+      else:
+        script += 'create volume simple\n'
+      script += 'format fs=ntfs quick unit=64k\nassign letter={}\n'.format(
+          TEMPDB_DISK_LETTER.lower()
+      )
+    self._RunDiskpartScript(script)
+
+    # Grant user permissions on the drive
+    if local_ssd_disks:
+      self.RemoteCommand(
+          'icacls {}: /grant Users:F /L'.format(TEMPDB_DISK_LETTER)
+      )
+      self.RemoteCommand(
+          'icacls {}: --% /grant Users:(OI)(CI)F /L'.format(TEMPDB_DISK_LETTER)
+      )
+      self.RemoteCommand('mkdir {}:\\TEMPDB'.format(TEMPDB_DISK_LETTER))
+
   def DownloadPreprovisionedData(
-      self, install_path, module_name, filename,
-      timeout=gce_virtual_machine.FIVE_MINUTE_TIMEOUT
+      self,
+      install_path,
+      module_name,
+      filename,
+      timeout=gce_virtual_machine.FIVE_MINUTE_TIMEOUT,
   ):
     """Downloads a data file from a GCS bucket with pre-provisioned data.
 
@@ -117,16 +170,22 @@ class WindowsGceVirtualMachine(
         timeout=timeout,
     )
     self.PushFile(
-        vm_util.PrependTempDir(filename),
-        ntpath.join(install_path, filename)
+        vm_util.PrependTempDir(filename), ntpath.join(install_path, filename)
     )
     vm_util.IssueCommand(['rm', vm_util.PrependTempDir(filename)])
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""
-    return FLAGS.gcp_preprovisioned_data_bucket and vm_util.IssueCommand(
-        gce_virtual_machine.GenerateStatPreprovisionedDataCommand(
-            module_name, filename).split(' '), raise_on_failure=False)[-1] == 0
+    return (
+        FLAGS.gcp_preprovisioned_data_bucket
+        and vm_util.IssueCommand(
+            gce_virtual_machine.GenerateStatPreprovisionedDataCommand(
+                module_name, filename
+            ).split(' '),
+            raise_on_failure=False,
+        )[-1]
+        == 0
+    )
 
   def _GetWindowsPassword(self):
     """Generates a command to get a VM user's password.
@@ -247,7 +306,8 @@ class WindowsGceVirtualMachine(
 
   def _DiskDriveIsLocal(self, device, model):
     """Helper method to determine if a disk drive is a local ssd to stripe."""
-    if 'nvme_card' in model and 'nvme_card-pd' not in model:
+    if (model.lower().strip() == 'nvme_card' or
+        model.lower().strip() == 'google ephemeraldisk'):
       return True
     return False
 

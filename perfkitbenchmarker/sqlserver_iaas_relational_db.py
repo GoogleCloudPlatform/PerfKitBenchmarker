@@ -45,6 +45,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         self.spec.database_username,
         self.spec.database_password,
     )
+    self.MoveSQLServerTempDb()
 
   def _SetupLinuxUnmanagedDatabase(self):
     if self.spec.engine_version == "2022":
@@ -138,6 +139,10 @@ def ConfigureSQLServer(vm, username: str, password: str):
   )
   vm.RemoteCommand("net stop mssqlserver /y")
   vm.RemoteCommand("net start mssqlserver")
+
+
+def MoveSQLServerTempDb():
+  """Moves the SQL Server temporary database to LocalSSD."""
 
 
 def _TuneForSQL(vm):

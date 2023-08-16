@@ -1610,9 +1610,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
            'sudo tee -a /etc/mdadm/mdadm.conf')
     self.RemoteHostCommand(cmd)
 
-    # Make the disk available during reboot
-    init_ram_fs_cmd = self.INIT_RAM_FS_CMD
-    self.RemoteHostCommand(init_ram_fs_cmd)
+    # Make the disk available during reboot for VMs running Debian based Linux
+    if self.OS_TYPE != os_types.RHEL8:
+      init_ram_fs_cmd = self.INIT_RAM_FS_CMD
+      self.RemoteHostCommand(init_ram_fs_cmd)
 
     # Automatically mount the disk after reboot
     cmd = ('echo \'/dev/md0  /mnt/md0  ext4 defaults,nofail'

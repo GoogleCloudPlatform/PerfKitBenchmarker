@@ -42,6 +42,8 @@ from six.moves import range
 
 FLAGS = flags.FLAGS
 
+TEMPDB_DISK_LETTER = 'T'
+
 GCP_DATABASE_VERSION_MAPPING = {
     sql_engine_utils.MYSQL: {
         '5.5': 'MYSQL_5_5',
@@ -106,6 +108,36 @@ class GCPSQLServerIAASRelationalDb(
   """A GCP IAAS database resource."""
 
   CLOUD = provider_info.GCP
+
+  def MoveSQLServerTempDb(self):
+    """Moves the SQL Server temporary database to LocalSSD."""
+    stdout, _ = self.server_vm.RemoteCommand('Get-PSDrive -PSProvider '
+                                             'FileSystem | Select Name')
+
+    drive_list = [str(drive.strip().replace('\r', '')) for drive
+                  in stdout.split('\n') if drive]
+
+    if TEMPDB_DISK_LETTER in drive_list:
+      stdout, _ = self.server_vm.RemoteCommand('sqlcmd -h -1 -Q "SET NOCOUNT '
+                                               ' ON; select f.name + CASE WHEN '
+                                               'f.type = 1 THEN \'.ldf\' '
+                                               'ELSE \'.mdf\' END '
+                                               'FROM sys.master_files '
+                                               'f WHERE f.database_id'
+                                               ' = DB_ID(\'tempdb\');"')
+      tmp_db_files_list = [str(tmp_file.strip().replace('\r', '')) for tmp_file
+                           in stdout.split('\n') if tmp_file]
+
+      for tmp_db_file in tmp_db_files_list:
+        tmp_db_name = tmp_db_file.split('.')[0]
+        self.server_vm.RemoteCommand('sqlcmd -Q "ALTER DATABASE tempdb '
+                                     'MODIFY FILE (NAME = [{}], '
+                                     'FILENAME = \'{}:\\TEMPDB\\{}\');"'
+                                     .format(tmp_db_name,
+                                             TEMPDB_DISK_LETTER, tmp_db_file))
+
+      self.server_vm.RemoteCommand('net stop mssqlserver /y')
+      self.server_vm.RemoteCommand('net start mssqlserver')
 
 
 class GCPPostgresIAASRelationalDb(
