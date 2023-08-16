@@ -111,7 +111,6 @@ def RunPgBench(benchmark_spec,
   if file and path:
     metadata['pgbench_file'] = file
 
-  samples = []
   if job_counts and len(client_counts) != len(job_counts):
     raise ValueError('Length of clients and jobs must be the same.')
   for i in range(len(client_counts)):
@@ -121,9 +120,11 @@ def RunPgBench(benchmark_spec,
       jobs = job_counts[i]
     else:
       jobs = min(client, 16)
-    command = (f'pgbench {connection_string} --client={client} '
-               f'--jobs={jobs} --time={seconds_per_test} --progress=1 '
-               '-r')
+    command = (
+        f'ulimit -n 10000 && pgbench {connection_string} --client={client} '
+        f'--jobs={jobs} --time={seconds_per_test} --progress=1 '
+        '-r'
+    )
     if file and path:
       command = f'cd {path} && {command} --file={file}'
     _, stderr = vm.RobustRemoteCommand(command)
