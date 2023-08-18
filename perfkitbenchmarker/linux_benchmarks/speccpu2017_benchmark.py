@@ -149,6 +149,8 @@ def Prepare(benchmark_spec):
 def _Prepare(vm):
   CheckVmPrerequisites(vm)
   vm.Install('speccpu2017')
+  if 'ampere' in FLAGS.runspec_config:
+    vm.Install('jemalloc')
   # Set attribute outside of the install function, so benchmark will work
   # even with --install_packages=False.
   config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
