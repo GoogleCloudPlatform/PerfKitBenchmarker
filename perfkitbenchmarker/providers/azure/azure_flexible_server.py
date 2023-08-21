@@ -216,25 +216,25 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
       name_and_value = flag.split('=')
       cmd = [
           azure.AZURE_PATH,
+          self.GetAzCommandForEngine(),
           self.SERVER_TYPE,
-          'server',
-          'configuration',
+          'parameter',
           'set',
           '--name',
           name_and_value[0],
           '--resource-group',
           self.resource_group.name,
-          '--server',
+          '--server-name',
           self.instance_id,
           '--value',
           name_and_value[1],
       ]
       _, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
-      if stderr:
+      if stderr and 'WARNING' not in stderr:
+        # Azure might raise warning
+        # WARNING: configuration_name is not a known attribute of class
         raise NotImplementedError(
-            'Invalid MySQL flags: {0}.  Error {1}'.format(
-                name_and_value, stderr
-            )
+            'Invalid flags: {0}.  Error {1}'.format(name_and_value, stderr)
         )
 
     self._Reboot()

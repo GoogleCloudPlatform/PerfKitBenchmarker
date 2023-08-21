@@ -500,10 +500,12 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        'server',
+        self.SERVER_TYPE,
         'restart',
-        '--resource-group', self.resource_group.name,
-        '--name', self.instance_id
+        '--resource-group',
+        self.resource_group.name,
+        '--name',
+        self.instance_id,
     ]
     vm_util.IssueCommand(cmd)
 
