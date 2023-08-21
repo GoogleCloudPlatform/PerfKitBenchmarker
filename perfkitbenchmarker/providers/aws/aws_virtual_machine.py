@@ -1683,6 +1683,14 @@ class Ubuntu2204BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
   IMAGE_NAME_FILTER_PATTERN = 'ubuntu/images/*/ubuntu-jammy-22.04-{alternate_architecture}-server-20*'
 
 
+class Ubuntu2304BasedAwsVirtualMachine(
+    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2304Mixin
+):
+  IMAGE_NAME_FILTER_PATTERN = (
+      'ubuntu/images/*/ubuntu-lunar-23.04-{alternate_architecture}-server-20*'
+  )
+
+
 class JujuBasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                  linux_virtual_machine.JujuMixin):
   """Class with configuration for AWS Juju virtual machines."""

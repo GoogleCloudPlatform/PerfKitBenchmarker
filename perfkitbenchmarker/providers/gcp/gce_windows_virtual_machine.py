@@ -64,7 +64,7 @@ class WindowsGceVirtualMachine(
 ):
   """Class supporting Windows GCE virtual machines."""
 
-  DEFAULT_IMAGE_FAMILY = {
+  DEFAULT_X86_IMAGE_FAMILY = {
       os_types.WINDOWS2012_CORE: 'windows-2012-r2-core',
       os_types.WINDOWS2016_CORE: 'windows-2016-core',
       os_types.WINDOWS2019_CORE: 'windows-2019-core',
@@ -266,7 +266,7 @@ class WindowsGceVirtualMachine(
 
   def GetDefaultImageFamily(self, is_arm: bool) -> str:
     assert not is_arm
-    return self.DEFAULT_IMAGE_FAMILY[self.OS_TYPE]
+    return self.DEFAULT_X86_IMAGE_FAMILY[self.OS_TYPE]
 
   def GetDefaultImageProject(self) -> str:
     if self.OS_TYPE in os_types.WINDOWS_SQLSERVER_OS_TYPES:
@@ -315,7 +315,7 @@ class WindowsGceVirtualMachine(
 class WindowsGceSqlServerVirtualMachine(WindowsGceVirtualMachine):
   """Class supporting Windows GCE sql server virtual machines."""
 
-  DEFAULT_IMAGE_FAMILY = {
+  DEFAULT_X86_IMAGE_FAMILY = {
       os_types.WINDOWS2019_SQLSERVER_2017_STANDARD: 'sql-std-2017-win-2019',
       os_types.WINDOWS2019_SQLSERVER_2017_ENTERPRISE: 'sql-ent-2017-win-2019',
       os_types.WINDOWS2019_SQLSERVER_2019_STANDARD: 'sql-std-2019-win-2019',

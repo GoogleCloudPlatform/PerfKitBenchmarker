@@ -85,7 +85,6 @@ def AptInstall(vm):
   if vm.is_aarch64:
     _PipInstall(vm)
     return
-  vm.Install('python')
   vm.Install('lsb_release')
   vm.Install('curl')
   vm.InstallPackages('apt-transport-https')

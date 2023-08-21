@@ -1028,6 +1028,17 @@ class Ubuntu2204BasedAzureVirtualMachine(AzureVirtualMachine,
   ARM_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-jammy:22_04-lts-arm64:latest'
 
 
+class Ubuntu2304BasedAzureVirtualMachine(
+    AzureVirtualMachine, linux_virtual_machine.Ubuntu2304Mixin
+):
+  GEN2_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-lunar:23_04-gen2:latest'
+  IMAGE_URN = 'Canonical:0001-com-ubuntu-server-lunar:23_04:latest'
+  CONFIDENTIAL_IMAGE_URN = (
+      'Canonical:0001-com-ubuntu-confidential-vm-lunar:23_04-cvm:latest'
+  )
+  ARM_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-lunar:23_04-arm64:latest'
+
+
 class Rhel7BasedAzureVirtualMachine(AzureVirtualMachine,
                                     linux_virtual_machine.Rhel7Mixin):
   GEN2_IMAGE_URN = 'RedHat:RHEL:7lvm-gen2:latest'

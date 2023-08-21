@@ -1528,7 +1528,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
 
   # Subclasses should override the default image OR
   # both the image family and image_project.
-  DEFAULT_IMAGE_FAMILY = None
+  DEFAULT_X86_IMAGE_FAMILY = None
   DEFAULT_ARM_IMAGE_FAMILY = None
   DEFAULT_IMAGE_PROJECT = None
   SUPPORTS_GVNIC = True
@@ -1597,19 +1597,29 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
 
   # Use an explicit is_arm parameter to not accidentally assume a default
   def GetDefaultImageFamily(self, is_arm: bool) -> str:
-    if not self.DEFAULT_IMAGE_FAMILY:
-      raise ValueError('DEFAULT_IMAGE_FAMILY can not be None')
     if is_arm:
       if self.DEFAULT_ARM_IMAGE_FAMILY:
         return self.DEFAULT_ARM_IMAGE_FAMILY
-      if 'arm64' not in self.DEFAULT_IMAGE_FAMILY:
-        arm_image_family = self.DEFAULT_IMAGE_FAMILY + '-arm64'
-        logging.info(
-            'ARM image must be used; changing image to %s',
-            arm_image_family,
+
+      assert 'arm64' not in self.DEFAULT_X86_IMAGE_FAMILY
+      if 'amd64' in self.DEFAULT_X86_IMAGE_FAMILY:
+        # New convention as of Ubuntu 23
+        arm_image_family = self.DEFAULT_X86_IMAGE_FAMILY.replace(
+            'amd64', 'arm64'
         )
-        return arm_image_family
-    return self.DEFAULT_IMAGE_FAMILY
+      else:
+        # Older convention
+        arm_image_family = self.DEFAULT_X86_IMAGE_FAMILY + '-arm64'
+      logging.info(
+          'ARM image must be used; changing image to %s',
+          arm_image_family,
+      )
+      return arm_image_family
+    if not self.DEFAULT_X86_IMAGE_FAMILY:
+      raise ValueError(
+          'DEFAULT_X86_IMAGE_FAMILY can not be None for non-ARM vms.'
+      )
+    return self.DEFAULT_X86_IMAGE_FAMILY
 
   def GetDefaultImageProject(self) -> str:
     if not self.DEFAULT_IMAGE_PROJECT:
@@ -1620,7 +1630,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
 class Debian9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian9Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'debian-9'
+  DEFAULT_X86_IMAGE_FAMILY = 'debian-9'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
   SUPPORTS_GVNIC = False
 
@@ -1632,7 +1642,7 @@ class Debian9BasedGceVirtualMachine(
 class Debian10BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian10Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'debian-10'
+  DEFAULT_X86_IMAGE_FAMILY = 'debian-10'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
   SUPPORTS_GVNIC = False
 
@@ -1640,49 +1650,49 @@ class Debian10BasedGceVirtualMachine(
 class Debian11BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian11Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'debian-11'
+  DEFAULT_X86_IMAGE_FAMILY = 'debian-11'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
 class Rhel7BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel7Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'rhel-7'
+  DEFAULT_X86_IMAGE_FAMILY = 'rhel-7'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
 class Rhel8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel8Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'rhel-8'
+  DEFAULT_X86_IMAGE_FAMILY = 'rhel-8'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
 class Rhel9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel9Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'rhel-9'
+  DEFAULT_X86_IMAGE_FAMILY = 'rhel-9'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
 class CentOs7BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CentOs7Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'centos-7'
+  DEFAULT_X86_IMAGE_FAMILY = 'centos-7'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
 class CentOsStream8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CentOsStream8Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'centos-stream-8'
+  DEFAULT_X86_IMAGE_FAMILY = 'centos-stream-8'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
 class RockyLinux8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.RockyLinux8Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'rocky-linux-8'
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-8'
   DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
 
 
@@ -1691,13 +1701,13 @@ class RockyLinux8OptimizedBasedGceVirtualMachine(
     RockyLinux8BasedGceVirtualMachine
 ):
   OS_TYPE = os_types.ROCKY_LINUX8_OPTIMIZED
-  DEFAULT_IMAGE_FAMILY = 'rocky-linux-8-optimized-gcp'
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-8-optimized-gcp'
 
 
 class RockyLinux9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.RockyLinux9Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'rocky-linux-9'
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-9'
   DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
 
 
@@ -1705,13 +1715,13 @@ class RockyLinux9OptimizedBasedGceVirtualMachine(
     RockyLinux9BasedGceVirtualMachine
 ):
   OS_TYPE = os_types.ROCKY_LINUX9_OPTIMIZED
-  DEFAULT_IMAGE_FAMILY = 'rocky-linux-9-optimized-gcp'
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-9-optimized-gcp'
 
 
 class CentOsStream9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CentOsStream9Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'centos-stream-9'
+  DEFAULT_X86_IMAGE_FAMILY = 'centos-stream-9'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
@@ -1731,37 +1741,37 @@ class BaseCosBasedGceVirtualMachine(
 
 class CosStableBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS
-  DEFAULT_IMAGE_FAMILY = 'cos-stable'
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-stable'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-stable'
 
 
 class CosDevBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS_DEV
-  DEFAULT_IMAGE_FAMILY = 'cos-dev'
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-dev'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-dev'
 
 
 class Cos105BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS105
-  DEFAULT_IMAGE_FAMILY = 'cos-105-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-105-lts'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-105-lts'
 
 
 class Cos101BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS101
-  DEFAULT_IMAGE_FAMILY = 'cos-101-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-101-lts'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-101-lts'
 
 
 class Cos97BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS97
-  DEFAULT_IMAGE_FAMILY = 'cos-97-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-97-lts'
 
 
 class Cos93BasedGceVirtualMachine(
     BaseCosBasedGceVirtualMachine, virtual_machine.DeprecatedOsMixin):
   OS_TYPE = os_types.COS93
-  DEFAULT_IMAGE_FAMILY = 'cos-93-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-93-lts'
   # Not sure if it's beginning or end of October
   END_OF_LIFE = '2023-10-01'
   ALTERNATIVE_OS = os_types.COS97
@@ -1770,7 +1780,7 @@ class Cos93BasedGceVirtualMachine(
 class CoreOsBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CoreOsMixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'fedora-coreos-stable'
+  DEFAULT_X86_IMAGE_FAMILY = 'fedora-coreos-stable'
   DEFAULT_IMAGE_PROJECT = 'fedora-coreos-cloud'
   SUPPORTS_GVNIC = False
 
@@ -1783,21 +1793,28 @@ class CoreOsBasedGceVirtualMachine(
 class Ubuntu1804BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu1804Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-1804-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-1804-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
 class Ubuntu2004BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2004Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-2004-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2004-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
 class Ubuntu2204BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2204Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-2204-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2204-lts'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
+
+class Ubuntu2304BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2304Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2304-amd64'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 

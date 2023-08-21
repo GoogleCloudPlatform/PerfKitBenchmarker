@@ -22,6 +22,14 @@ from perfkitbenchmarker.linux_packages import pip
 
 def Install(vm):
   """Install pip3 on the VM."""
+  # Python 3.11 added https://peps.python.org/pep-0668/, which allows the OS to
+  # disable any pip installation outside of a virtual env. This is good in
+  # long-lived systems, but counter-productive in short lived test
+  # environmements (it is possible a system command or daemon does fail,
+  # because PKB installs a root pip module, but relatively unlikely).
+  # Delete the file so that pip will continue to install root packages.
+  # https://discuss.python.org/t/pep-668-marking-python-base-environments-as-externally-managed/10302/80
+  vm.RemoteCommand('sudo rm -f /usr/lib/python3*/EXTERNALLY-MANAGED')
   # Work around Ubuntu distutils weirdness.
   # https://github.com/pypa/get-pip/issues/44
   if vm.HasPackage('python3-distutils'):
