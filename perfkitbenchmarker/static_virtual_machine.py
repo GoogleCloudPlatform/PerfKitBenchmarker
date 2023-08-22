@@ -402,6 +402,11 @@ class Debian11BasedStaticVirtualMachine(StaticVirtualMachine,
   pass
 
 
+class Debian12BasedStaticVirtualMachine(StaticVirtualMachine,
+                                        linux_virtual_machine.Debian12Mixin):
+  pass
+
+
 class Windows2019SQLServer2019StandardStaticVirtualMachine(
     StaticVirtualMachine,
     windows_virtual_machine.Windows2019SQLServer2019Standard,

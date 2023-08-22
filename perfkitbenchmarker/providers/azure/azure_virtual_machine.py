@@ -996,6 +996,14 @@ class Debian11BasedAzureVirtualMachine(AzureVirtualMachine,
   ARM_IMAGE_URN = 'Debian:debian-11:11-backports-arm64:latest'
 
 
+class Debian12BasedAzureVirtualMachine(AzureVirtualMachine,
+                                       linux_virtual_machine.Debian12Mixin):
+  # From https://wiki.debian.org/Cloud/MicrosoftAzure
+  GEN2_IMAGE_URN = 'Debian:debian-12:12-gen2:latest'
+  IMAGE_URN = 'Debian:debian-12:12:latest'
+  ARM_IMAGE_URN = 'Debian:debian-12:12-arm64:latest'
+
+
 class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1604Mixin):
   GEN2_IMAGE_URN = 'Canonical:UbuntuServer:16_04-lts-gen2:latest'

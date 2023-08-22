@@ -2475,6 +2475,17 @@ class Debian11Mixin(BaseDebianMixin):
     super().PrepareVMEnvironment()
 
 
+class Debian12Mixin(BaseDebianMixin):
+  """Class holding Debian 12 specific VM methods and attributes."""
+  OS_TYPE = os_types.DEBIAN12
+
+  def PrepareVMEnvironment(self):
+    # Missing in some images. Required by PrepareVMEnvironment to determine
+    # partitioning.
+    self.InstallPackages('fdisk')
+    super().PrepareVMEnvironment()
+
+
 class Debian11BackportsMixin(Debian11Mixin):
   """Debian 11 with backported kernel."""
   OS_TYPE = os_types.DEBIAN11_BACKPORTS

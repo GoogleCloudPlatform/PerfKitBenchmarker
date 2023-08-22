@@ -35,6 +35,7 @@ DEBIAN10 = 'debian10'
 DEBIAN10_BACKPORTS = 'debian10_backports'
 DEBIAN11 = 'debian11'
 DEBIAN11_BACKPORTS = 'debian11_backports'
+DEBIAN12 = 'debian12'
 FEDORA36 = 'fedora36'
 FEDORA37 = 'fedora37'
 JUJU = 'juju'
@@ -102,6 +103,7 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     DEBIAN10_BACKPORTS,
     DEBIAN11,
     DEBIAN11_BACKPORTS,
+    DEBIAN12,
     FEDORA36,
     FEDORA37,
     JUJU,
