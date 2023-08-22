@@ -159,6 +159,9 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
 
   Attributes:
     id: A unique string id for the iteration.
+    start_time: The start time of the iteration in milliseconds since epoch.
+    end_time: The end time of the iteration in milliseconds since epoch.
+    wall_time: The wall time in seconds as a double value.
     performance: A dictionary of query name to its execution performance which
       is a EdwQueryPerformance instance.
     successful_count: An integer count of the successful queries in the
@@ -172,6 +175,9 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
     self.performance = {}
     self.total_count = total_queries
     self.successful_count = 0
+    self.start_time = 0
+    self.end_time = -1
+    self.wall_time: float = 0.0
 
   def add_query_performance(self, query_name: Text, performance: float,
                             metadata: Dict[str, str]):
@@ -180,6 +186,8 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
     Updates the iteration's performance map with the query performance.
     The method also increaments the success and failure query counts for the
     iteration.
+
+    Also updates the wall time of the iteration based on the query time.
 
     Args:
       query_name: A string name of the query that was executed
@@ -202,6 +210,7 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
     self.performance[query_performance.name] = query_performance
     if query_performance.is_successful():
       self.successful_count += 1
+    self.wall_time = self.wall_time + performance
 
   def has_query_performance(self, query_name: Text) -> bool:
     """Returns whether the query was run at least once in the iteration.
@@ -276,6 +285,51 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
         query_performance.get_performance_sample(metadata)
         for query_performance in self.performance.values()
     ]
+
+  def add_start_time(self, start_time: int):
+    """Sets the start time of the iteration.
+
+    Args:
+      start_time: The UNIX timestamp, in milliseconds, at which the iteration
+      was started
+    """
+    self.start_time = start_time
+
+  def add_end_time(self, end_time: int):
+    """Sets the end time of the iteration.
+
+    Args:
+      end_time: The UNIX timestamp, in milliseconds, at which the iteration
+      completed
+    """
+    self.end_time = end_time
+
+  def get_wall_time(self) -> float:
+    """Gets the total wall time, in seconds, for the iteration.
+
+    The wall time is the sum of the wall time of all individual queries.
+
+    Returns:
+      The wall time in seconds.
+    """
+    return self.wall_time
+
+  def get_wall_time_performance_sample(self, metadata: Dict[
+      str, str]) -> sample.Sample:
+    """Gets a sample for wall time performance of the iteration.
+
+    Args:
+      metadata: A dictionary of execution attributes to be merged with the query
+        execution attributes, for eg. tpc suite, scale of dataset, etc.
+
+    Returns:
+      A sample of iteration wall time performance
+    """
+    wall_time_metadata = copy.copy(metadata)
+    wall_time_metadata['iteration_start_time'] = self.start_time
+    wall_time_metadata['iteration_end_time'] = self.end_time
+    return sample.Sample('edw_iteration_wall_time', self.wall_time, 'seconds',
+                         wall_time_metadata)
 
   def is_successful(self, expected_queries: List[Text]) -> bool:
     """Check if all the expected queries ran and all succeeded."""
