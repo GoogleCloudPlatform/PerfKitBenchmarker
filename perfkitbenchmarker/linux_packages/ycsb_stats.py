@@ -315,7 +315,7 @@ def _ValidateErrorRate(result: YcsbResult, threshold: float) -> None:
 
   Computes the error rate for each operation, example output looks like:
 
-    [INSERT], Operations, 100
+    [INSERT], Operations, 90
     [INSERT], AverageLatency(us), 74.92
     [INSERT], MinLatency(us), 5
     [INSERT], MaxLatency(us), 98495
@@ -337,12 +337,14 @@ def _ValidateErrorRate(result: YcsbResult, threshold: float) -> None:
   """
   for operation in result.groups.values():
     name, stats = operation.group, operation.statistics
-    # The operation count can be 0
-    count = stats.get('Operations', 0)
+    # The operation count can be 0 or keys may be missing from the output
+    ok_count = stats.get('Return=OK', 0.0)
+    error_count = stats.get('Return=ERROR', 0.0)
+    count = ok_count + error_count
     if count == 0:
       continue
     # These keys may be missing from the output.
-    error_rate = stats.get('Return=ERROR', 0) / count
+    error_rate = error_count / count
     if error_rate > threshold:
       raise errors.Benchmarks.RunError(
           f'YCSB had a {error_rate} error rate for {name}, higher than '
