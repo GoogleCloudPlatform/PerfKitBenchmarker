@@ -269,17 +269,18 @@ def TestVmSpec():
       spot_price=123.45)
 
 
+def OpenJSONData(filename):
+  path = os.path.join(os.path.dirname(__file__),
+                      'data', filename)
+  with open(path) as f:
+    return f.read()
+
+
 def CreateTestAwsVm():
   return TestAwsVirtualMachine(vm_spec=TestVmSpec())
 
 
 class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
-
-  def open_json_data(self, filename):
-    path = os.path.join(os.path.dirname(__file__),
-                        'data', filename)
-    with open(path) as f:
-      return f.read()
 
   def setUp(self):
     super(AwsVirtualMachineTestCase, self).setUp()
@@ -315,8 +316,8 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.vm.network = network_mock
     self.vm.placement_group = placement_group
 
-    self.response = self.open_json_data('aws-describe-instance.json')
-    self.sir_response = self.open_json_data(
+    self.response = OpenJSONData('aws-describe-instance.json')
+    self.sir_response = OpenJSONData(
         'aws-describe-spot-instance-requests.json')
     self.vm.network.is_static = False
     self.vm.network.regional_network.vpc.default_security_group_id = 'sg-1234'
@@ -421,7 +422,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     The instance then is not fulfilled and transitions to terminated.
     """
-    response = self.open_json_data('aws-describe-instance-stockout.json')
+    response = OpenJSONData('aws-describe-instance-stockout.json')
     util.IssueRetryableCommand.side_effect = [(response, None)]
     with self.assertRaises(
         errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
