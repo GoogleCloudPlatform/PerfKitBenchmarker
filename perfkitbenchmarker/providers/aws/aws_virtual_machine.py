@@ -744,18 +744,22 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return max(images, key=lambda image: image['CreationDate'])['ImageId']
 
-  @vm_util.Retry(max_retries=2)
-  def _PostCreate(self):
-    """Get the instance's data and tag it."""
+  def _RunDescribeInstancesCommand(self):
+    """Runs the describe-instances command and return the response as JSON."""
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-instances',
         '--region=%s' % self.region,
-        '--instance-ids=%s' % self.id]
+        '--filter=Name=client-token,Values=%s' % self.client_token]
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
+    return json.loads(stdout)
+
+  @vm_util.Retry(max_retries=2)
+  def _PostCreate(self):
+    """Get the instance's data and tag it."""
     logging.info('Getting instance %s public IP. This will fail until '
                  'a public IP is available, but will be retried.', self.id)
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
+    response = self._RunDescribeInstancesCommand()
     instance = response['Reservations'][0]['Instances'][0]
     self.internal_ip = instance['PrivateIpAddress']
     for network_interface in instance.get('NetworkInterfaces', []):
@@ -1121,12 +1125,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Raises:
       AwsTransitionalVmRetryableError: If VM is pending. This is retried.
     """
-    status_cmd = util.AWS_PREFIX + [
-        'ec2', 'describe-instances', f'--region={self.region}',
-        f'--instance-ids={self.id}'
-    ]
-    stdout, _, _ = vm_util.IssueCommand(status_cmd)
-    response = json.loads(stdout)
+    response = self._RunDescribeInstancesCommand()
     instance = response['Reservations'][0]['Instances'][0]
     if 'PublicIpAddress' in instance:
       self.ip_address = instance['PublicIpAddress']
@@ -1228,13 +1227,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                                        LookupError))
   def _Exists(self):
     """Returns whether the VM exists."""
-    describe_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'describe-instances',
-        '--region=%s' % self.region,
-        '--filter=Name=client-token,Values=%s' % self.client_token]
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
+    response = self._RunDescribeInstancesCommand()
     reservations = response['Reservations']
     if not reservations or len(reservations) != 1:
       logging.info('describe-instances did not return exactly one reservation. '
@@ -1286,14 +1279,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       AwsVmNotCreatedError: If the VM does not have a create_start_time by the
         time it reaches this phase of provisioning.
     """
-    describe_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'describe-instances',
-        '--region=%s' % self.region,
-        '--filter=Name=client-token,Values=%s' % self.client_token]
-
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
+    response = self._RunDescribeInstancesCommand()
     reservations = response['Reservations']
     if not reservations or len(reservations) != 1:
       if not self.create_start_time:
