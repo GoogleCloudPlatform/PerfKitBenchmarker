@@ -17,7 +17,6 @@ import base64
 import logging
 import ntpath
 import os
-import re
 import time
 from typing import Optional, Tuple, cast
 import uuid
@@ -600,19 +599,21 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     # Get DeviceId and Model (FriendlyNam) for all disks
     # attached to the VM except boot disk.
+    # Using Get-Disk has option to query for disks with no partition
+    # (partitionstyle -eq 'raw'). Returned Number and FriendlyName represent
+    # DeviceID and model of the disk. Device ID is used for Diskpart cleanup.
+    # https://learn.microsoft.com/en-us/powershell/module/
+    # storage/get-disk?view=windowsserver2022-ps
     stdout, _ = self.RemoteCommand(
-        'Get-PhysicalDisk | Where-Object {($_.CanPool -eq $true)} | '
-        'Select  DeviceId,FriendlyName'
+        'Get-Disk | Where partitionstyle -eq \'raw\' | '
+        'Select  Number,FriendlyName'
     )
     query_disk_numbers = []
     lines = stdout.splitlines()
-    whitespace_pattern = re.compile(r'\s+')
     for line in lines:
       if line:
-        # split line by first whitespaces
-        device, model = whitespace_pattern.split(line, 1)
-
-        if device == 'DeviceId' or device == '--------':
+        device, model = line.strip().split(' ', 1)
+        if 'Number' in device or '-----' in device:
           continue
 
         if disk_spec.disk_type == 'local':
