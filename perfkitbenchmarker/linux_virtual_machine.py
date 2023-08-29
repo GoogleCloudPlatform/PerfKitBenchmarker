@@ -2258,6 +2258,7 @@ class BaseRhelMixin(BaseLinuxMixin):
   # The commands are similar enough that forking whole methods seemed necessary.
   # This can be removed when CentOS and RHEL 7 are no longer supported by PKB.
   PACKAGE_MANAGER = DNF
+  ORACLE_EPEL_URL = 'oracle-epel-release-el{}'
 
   # OS_TYPE = os_types.RHEL
   BASE_OS_TYPE = os_types.RHEL
@@ -2405,6 +2406,23 @@ class BaseRhelMixin(BaseLinuxMixin):
     if reboot:
       self.Reboot()
 
+class Oracle8Mixin(BaseRhelMixin):
+    """Class holding Oracle Linux 8 specific VM methods and attributes."""
+    OS_TYPE = os_types.ORACLE8
+    PYTHON_2_PACKAGE = None
+
+    def SetupPackageManager(self):
+        """Install EPEL."""
+        self.RemoteCommand(f'sudo dnf install -y {_ORACLE_EPEL_URL.format(8)}')
+
+class Oracle9Mixin(BaseRhelMixin):
+    """Class holding Oracle Linux 9 specific VM methods and attributes."""
+    OS_TYPE = os_types.ORACLE9
+    PYTHON_2_PACKAGE = None
+
+    def SetupPackageManager(self):
+        """Install EPEL."""
+        self.RemoteCommand(f'sudo dnf install -y {_ORACLE_EPEL_URL.format(9)}')
 
 class AmazonLinux2Mixin(BaseRhelMixin):
   """Class holding Amazon Linux 2 VM methods and attributes."""
