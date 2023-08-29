@@ -268,40 +268,52 @@ class OciVcn(resource.BaseResource):
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
 
-    def UpdateSecurityList(self):
-        # UNUSED / DEPRECIATED
-
-        """Updates the Route Table to allow all ports traffic on internal ip and 22 on Internet"""
-        logging.info("Update Routing Table with Internet Gateway")
-        create_cmd = util.OCI_PREFIX + [
-            'network',
-            'security-list',
-            'update',
-            f'--security-list-id {self.security_list_id}',
-            '--force',
-            '--ingress-security-rules \'[{\"source\": \"%s\", \"protocol\": \"all\", \"isStateless\": false},'
-            '{\"source\": "0.0.0.0/0", \"protocol\": \"6\", \"isStateless\": false, \"tcpOptions\": {'
-            '\"destinationPortRange\": {\"max\": 22, \"min\": 22}}}]\'' % self.cidr_block]
-        create_cmd = util.GetEncodedCmd(create_cmd)
-        stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
-
-    def AddSecurityListIngressRule(self, start_port=22, end_port=None):
+    def AddSecurityListIngressRule(self, start_port=22, end_port=None, source_range=None):
         if not end_port:
             end_port = start_port
+        end_port = end_port or start_port
+        source_range = source_range or '0.0.0.0/0'
 
+        current_security_rules = self.GetSecurityListFromId()
+        print("Type")
+        print(type(current_security_rules))
+        print("Length: ")
+        print(str(len(current_security_rules)))
+        for i in range(0, (len(current_security_rules))):
+            print(current_security_rules[i])
+        #tcp =6 #udp=17
         """Updates security list to allow traffic on a specific port"""
         logging.info(f"Add ingress rule for ports {start_port} : {end_port}")
+        rule_json_string = '{"source": "' + source_range + '","protocol":"6","isStateless": false, "tcpOptions":{\
+"destinationPortRange": {"max": ' + str(end_port) + ',"min": ' + str(start_port) + '}}}'
+        current_security_rules.append(json.loads(rule_json_string))
+
+        current_security_rules_str = json.dumps(current_security_rules)
+        current_security_rules_str = "'" + current_security_rules_str + "'"
         cmd = util.OCI_PREFIX + [
             'network',
             'security-list',
             'update',
             f'--security-list-id {self.security_list_id}',
             '--force',
-            '--ingress-security-rules \'[{\"source\": \"%s\", \"protocol\": \"all\", \"isStateless\": false},'
-            '{\"source\": "0.0.0.0/0", \"protocol\": \"6\", \"isStateless\": false, \"tcpOptions\": {'
-            '\"destinationPortRange\": {\"max\": \"%i\", \"min\": \"%i\"}}}]\'' % (self.cidr_block, end_port, start_port)]
+            f'--ingress-security-rules {current_security_rules_str}']
+        print(cmd)
         cmd = util.GetEncodedCmd(cmd)
         stdout, _, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
+
+    def GetSecurityListFromId(self):
+        cmd = util.OCI_PREFIX + [
+            'network',
+            'security-list',
+            'get',
+            f'--security-list-id {self.security_list_id}']
+        get_cmd = util.GetEncodedCmd(cmd)
+        logging.info(get_cmd)
+        stdout, _, _ = vm_util.IssueCommand(get_cmd, raise_on_failure=False)
+        response = json.loads(stdout)
+        ingress_rules = response['data']['ingress-security-rules']
+        logging.info(ingress_rules)
+        return ingress_rules
 
     def GetDefaultRouteTableId(self):
         """Get Default Route Table OCI Id."""
@@ -344,16 +356,17 @@ class OciNetwork(network.BaseNetwork):
         if self.use_vcn:
             self.vcn = OciVcn(self.name, self.region)
             self.security_group = None
-#        else:
-#            self.vcn = OciVcn(self.name, self.region)
-#            self.security_group = None
+
+    #        else:
+    #            self.vcn = OciVcn(self.name, self.region)
+    #            self.security_group = None
 
     @vm_util.Retry()
     def Create(self):
         """Creates the network."""
         if self.use_vcn:
             self.vcn.Create()
-            self.vcn.WaitForVcnStatus(["AVAILABLE"])#AVAILABLE
+            self.vcn.WaitForVcnStatus(["AVAILABLE"])
             self.vcn.GetDefaultRouteTableId()
             self.vcn.GetDefaultSecurityListId()
             self.vcn.CreateSubnet()
@@ -363,7 +376,6 @@ class OciNetwork(network.BaseNetwork):
             self.vcn.WaitForInternetGatewayStatus(["AVAILABLE"])
             self.vcn.UpdateRouteTable()
             self.vcn.WaitForRouteTableStatus(["AVAILABLE"])
-
             # Add opening in VCN for SSH
             self.vcn.AddSecurityListIngressRule(start_port=22)
             self.vcn.WaitForSecurityListStatus(["AVAILABLE"])
@@ -383,12 +395,12 @@ class OciNetwork(network.BaseNetwork):
 
 class OCIFirewall(network.BaseFirewall):
 
+    CLOUD = provider_info.OCI
+
     def __init__(self):
         super(OCIFirewall, self).__init__()
 
-
-
-    def AllowPort(self, vm, start_port, end_port=None):
+    def AllowPort(self, vm, start_port, end_port=None, source_range=None):
         """
         Open a port range on a specific vm. This seems to normally be called by the vm object.
 
@@ -403,7 +415,5 @@ class OCIFirewall(network.BaseFirewall):
             logging.error('Opening ports with OCI cloud only supported when using a VCN for now!')
 
         else:
-            vm.network.vcn.AddSecurityListIngressRule(start_port, end_port=end_port)
-
-
-
+            vm.network.vcn.AddSecurityListIngressRule(start_port, end_port=end_port, source_range=source_range)
+            vm.network.vcn.WaitForRouteTableStatus(["AVAILABLE"])
