@@ -24,7 +24,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.oci import util, oci_disk, oci_network
 
 FLAGS = flags.FLAGS
-
+SSH_PORT = 22
 INSTANCE_EXISTS_STATUSES = frozenset(
     ['CREATING_IMAGE', 'MOVING', 'PROVISIONING', 'RUNNING', 'STARTING', 'STOPPED', 'STOPPING', 'TERMINATED',
      'TERMINATING'
@@ -120,6 +120,7 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.num_local_ssds = vm_spec.num_local_ssds
         self.max_local_disks = MAX_LOCAL_DISKS
         self.tags = util.MakeFormattedDefaultTags()
+        self.firewall = oci_network.OCIFirewall.GetFirewall()
 
     @vm_util.Retry(poll_interval=60, log_errors=False)
     def _WaitForInstanceStatus(self, status_list):
@@ -279,6 +280,8 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
         # TODO: Potentially replace for case where firewall skip flag is in place
         super(OciVirtualMachine, self).AllowPort(start_port, end_port, source_range)
 
+    #def _PostCreate(self):
+    #    self.firewall.AllowPort(self, SSH_PORT, SSH_PORT)
 
 class Ubuntu2204BasedOCIVirtualMachine(OciVirtualMachine,
                                        linux_virtual_machine.Ubuntu2204Mixin):
