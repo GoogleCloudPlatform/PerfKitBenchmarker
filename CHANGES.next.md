@@ -323,7 +323,7 @@
 -   Updated required numpy and six versions.
 -   Added `--hadoop_bin_url` flag to allow overrides for Hadoop downloads.
 -   Make RunBenchmark handle KeyboardInterrupt so that benchmark specific
-    resources can be cleaned up on cancellation.
+    resources can be cleaned up on cancellation. Expose these errors via status.
 -   Added --ycsb_fail_on_incomplete_loading flag to allow the test to fail fast
     in the case of table loading failures. --ycsb_insert_error_metric can be
     used to determine which metric indicates that loading failed (defaults to

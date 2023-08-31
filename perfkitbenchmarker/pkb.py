@@ -867,6 +867,9 @@ def RunBenchmark(spec, collector):
         elif _IsException(e, errors.Resource.FreezeError):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.FREEZE_FAILED)
+        elif isinstance(e, KeyboardInterrupt):
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.PROCESS_KILLED)
         else:
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.UNCATEGORIZED)
