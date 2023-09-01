@@ -38,14 +38,12 @@ DEFAULT_POSTGRES_VERSION = '13'
 
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (might take some time to prepare)
 
-# Longest time recorded is 20 minutes when
-# creating STANDARD_D64_V3 - 12/02/2020
 # The Azure command timeout with the following error message:
 #
 # Deployment failed. Correlation ID: fcdc3c76-33cc-4eb1-986c-fbc30ce7d820.
 # The operation timed out and automatically rolled back.
 # Please retry the operation.
-CREATE_AZURE_DB_TIMEOUT = 60 * 30
+CREATE_AZURE_DB_TIMEOUT = 60 * 120
 
 
 class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
