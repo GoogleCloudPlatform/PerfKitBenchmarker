@@ -268,28 +268,50 @@ class OciVcn(resource.BaseResource):
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
 
-    def AddSecurityListIngressRule(self, start_port=22, end_port=None, source_range=None):
+    def AddSecurityListIngressRule(self, protocol="6", start_port=22, end_port=None, source_range=None, protocol_type=None, protocol_code=None):
         if not end_port:
             end_port = start_port
         end_port = end_port or start_port
         source_range = source_range or '0.0.0.0/0'
 
         current_security_rules = self.GetSecurityListFromId()
-        print("Type")
-        print(type(current_security_rules))
-        print("Length: ")
         print(str(len(current_security_rules)))
         for i in range(0, (len(current_security_rules))):
             print(current_security_rules[i])
         #tcp =6 #udp=17
+
         """Updates security list to allow traffic on a specific port"""
         logging.info(f"Add ingress rule for ports {start_port} : {end_port}")
-        rule_json_string = '{"source": "' + source_range + '","protocol":"6","isStateless": false, "tcpOptions":{\
-"destinationPortRange": {"max": ' + str(end_port) + ',"min": ' + str(start_port) + '}}}'
+        print(f'protocol========{protocol}') 
+        #start_port=22, end_port=None, source_range=None, protocol_type=None, protocol_code=None
+        source = "\"source\":\"%s\" ," % source_range
+
+        protocol_str = "\"protocol\": \"%s\" ," % protocol
+        if protocol == "1":
+            if protocol_type is None and protocol_code is None:
+                icmp_options = "\"icmp-options\": null,"
+            else:
+                icmp_options = "\"icmp-options\": { \"code\": %s, \"type\": %s}," % (str(protocol_code), str(protocol_type))
+            start_port = None
+        else:
+            icmp_options = "\"icmp-options\": null,"
+
+        if start_port:
+            tcpOptions = "\"tcp-options\":{\"destinationPortRange\": {\"max\": %s, \"min\": %s }}," % (str(end_port), str(start_port))
+        else:
+            tcpOptions = "\"tcp-options\": null,"
+
+        udp_options = "\"udp-options\": null"
+
+        rule_json_string = "{%s %s %s \"is-stateless\": false, %s %s }" % (source, icmp_options, protocol_str, tcpOptions, udp_options)
+
+        print('rule_json_string=======', rule_json_string)
+
         current_security_rules.append(json.loads(rule_json_string))
 
         current_security_rules_str = json.dumps(current_security_rules)
-        current_security_rules_str = "'" + current_security_rules_str + "'"
+        current_security_rules_str = "'%s'" % current_security_rules_str
+        print('current_security_rules_str =======', current_security_rules_str)
         cmd = util.OCI_PREFIX + [
             'network',
             'security-list',
@@ -297,7 +319,8 @@ class OciVcn(resource.BaseResource):
             f'--security-list-id {self.security_list_id}',
             '--force',
             f'--ingress-security-rules {current_security_rules_str}']
-        print(cmd)
+
+        print('cmd===========', cmd)
         cmd = util.GetEncodedCmd(cmd)
         stdout, _, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
 
@@ -376,9 +399,14 @@ class OciNetwork(network.BaseNetwork):
             self.vcn.WaitForInternetGatewayStatus(["AVAILABLE"])
             self.vcn.UpdateRouteTable()
             self.vcn.WaitForRouteTableStatus(["AVAILABLE"])
+            print("After Update Route Table")
+            print("In Allowed Port 22")
             # Add opening in VCN for SSH
-            self.vcn.AddSecurityListIngressRule(start_port=22)
+            self.vcn.AddSecurityListIngressRule(protocol="6",start_port=22)
             self.vcn.WaitForSecurityListStatus(["AVAILABLE"])
+            self.vcn.AddSecurityListIngressRule(protocol="1")
+            self.vcn.WaitForSecurityListStatus(["AVAILABLE"])
+
         else:
             self.vcn.GetVcnIDFromName()
             self.vcn.GetSubnetIdFromVCNId()
@@ -415,5 +443,23 @@ class OCIFirewall(network.BaseFirewall):
             logging.error('Opening ports with OCI cloud only supported when using a VCN for now!')
 
         else:
-            vm.network.vcn.AddSecurityListIngressRule(start_port, end_port=end_port, source_range=source_range)
+            print("In Allow Port")
+            vm.network.vcn.AddSecurityListIngressRule(protocol="6", start_port=start_port, end_port=end_port, source_range=source_range)
             vm.network.vcn.WaitForRouteTableStatus(["AVAILABLE"])
+
+    def AllowIcmp(self, vm, protocol_type=None, protocol_code=None, source_range=None):
+        """Opens the ICMP protocol on the firewall.
+        
+        Args:
+        vm: The BaseVirtualMachine object to open the ICMP protocol for.
+        """
+        if not vm.network.vcn:
+            logging.error('Allow ICMP with OCI cloud only supported when using a VCN for now!')
+        else:
+            print("In AllowICMP")
+            vm.network.vcn.AddSecurityListIngressRule(protocol="1",protocol_type=protocol_type,protocol_code=protocol_code,source_range=source_range)
+            vm.network.vcn.WaitForRouteTableStatus(["AVAILABLE"])
+            #protocol="6", start_port=22, end_port=None, source_range=None, protocol_type=None, protocol_code=None
+
+
+
