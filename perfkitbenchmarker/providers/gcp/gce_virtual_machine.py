@@ -753,10 +753,18 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             'boot=no',
             'mode=rw',
         ]
-        if disk_spec.disk_type in [
-            gce_disk.PD_EXTREME,
-        ]:
+        if (
+            FLAGS.gcp_provisioned_iops and
+            disk_spec.disk_type in gce_disk.GCE_DYNAMIC_IOPS_DISK_TYPES
+        ):
           pd_args += [f'provisioned-iops={FLAGS.gcp_provisioned_iops}']
+        if (
+            FLAGS.gcp_provisioned_throughput and
+            disk_spec.disk_type in gce_disk.GCE_DYNAMIC_THROUGHPUT_DISK_TYPES
+        ):
+          pd_args += [
+              f'provisioned-throughput={FLAGS.gcp_provisioned_throughput}'
+          ]
         create_disks.append(','.join(pd_args))
     if create_disks:
       cmd.flags['create-disk'] = create_disks

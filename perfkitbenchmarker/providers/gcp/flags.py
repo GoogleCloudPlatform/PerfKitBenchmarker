@@ -200,9 +200,13 @@ flags.DEFINE_string('gcp_preemptible_status_bucket', None,
                     'The GCS bucket to store the preemptible status when '
                     'running on GCP.')
 flags.DEFINE_integer(
-    'gcp_provisioned_iops', 100000,
-    'Iops to provision for pd-extreme. Defaults to the gcloud '
-    'default of 100000.')
+    'gcp_provisioned_iops', None,
+    'Iops to provision for pd-extreme, hyperdisk-extreme, and '
+    'hyperdisk-balanced.')
+flags.DEFINE_integer('gcp_provisioned_throughput', None,
+                     'Provisioned throughput (MB/s) for hyperdisk-throughput '
+                     'and hyperdisk-balanced volumes in GCP. Leave as None to '
+                     'use GCP defaults.')
 flags.DEFINE_boolean('gcp_create_disks_with_vm', True,
                      'Whether to create PD disks at VM creation time. Defaults '
                      'to True.')
