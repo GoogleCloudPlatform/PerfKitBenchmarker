@@ -35,6 +35,18 @@ FLAGS = flags.FLAGS
 BQ_CLIENT_FILE = 'bq-java-client-2.6.jar'
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
+BQ_JDBC_INTERFACES = [
+    'SIMBA_JDBC_1_2_4_1007', 'SIMBA_JDBC_1_3_3_1004',
+]
+BQ_JDBC_CLIENT_FILE = {
+    'SIMBA_JDBC_1_2_4_1007': 'bq-jdbc-client-1.0.jar',
+    'SIMBA_JDBC_1_3_3_1004': 'bq-jdbc-client-2.0.jar',
+}
+BQ_JDBC_JAR_FILE = {
+    'SIMBA_JDBC_1_2_4_1007': 'GoogleBigQueryJDBC42.jar',
+    'SIMBA_JDBC_1_3_3_1004': 'GoogleBigQueryJDBC42-1.3.3.1004.jar',
+}
+
 
 def GetBigQueryClientInterface(
     project_id: str, dataset_id: str) -> edw_service.EdwClientInterface:
@@ -54,7 +66,7 @@ def GetBigQueryClientInterface(
     return CliClientInterface(project_id, dataset_id)
   if FLAGS.bq_client_interface == 'JAVA':
     return JavaClientInterface(project_id, dataset_id)
-  if FLAGS.bq_client_interface == 'SIMBA_JDBC_1_2_4_1007':
+  if FLAGS.bq_client_interface in BQ_JDBC_INTERFACES:
     return JdbcClientInterface(project_id, dataset_id)
   raise RuntimeError('Unknown BigQuery Client Interface requested.')
 
@@ -180,12 +192,18 @@ class JdbcClientInterface(GenericClientInterface):
 
     # Push the service account file to the working directory on client vm
     self.client_vm.InstallPreprovisionedPackageData(
-        package_name, [FLAGS.gcp_service_account_key_file], '')
+        package_name, [FLAGS.gcp_service_account_key_file], ''
+    )
 
     # Push the executable jars to the working directory on client vm
     self.client_vm.InstallPreprovisionedPackageData(
-        package_name, ['bq-jdbc-client-1.0.jar', 'GoogleBigQueryJDBC42.jar'],
-        '')
+        package_name,
+        [
+            BQ_JDBC_CLIENT_FILE[FLAGS.bq_client_interface],
+            BQ_JDBC_JAR_FILE[FLAGS.bq_client_interface],
+        ],
+        '',
+    )
 
   def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
@@ -201,9 +219,11 @@ class JdbcClientInterface(GenericClientInterface):
       performance_details: A dictionary of query execution attributes eg. job_id
     """
     query_command = (
-        'java -cp bq-jdbc-client-1.0.jar:GoogleBigQueryJDBC42.jar '
+        'java -cp {}:{} '
         'com.google.cloud.performance.edw.App --project {} --service_account '
         '{} --credentials_file {} --dataset {} --query_file {}'.format(
+            BQ_JDBC_CLIENT_FILE[FLAGS.bq_client_interface],
+            BQ_JDBC_JAR_FILE[FLAGS.bq_client_interface],
             self.project_id, FLAGS.gcp_service_account,
             FLAGS.gcp_service_account_key_file, self.dataset_id, query_name))
     stdout, _ = self.client_vm.RemoteCommand(query_command)
