@@ -272,13 +272,8 @@ def _Run(vm):
     cmd += '--rebuild '
 
   version_specific_parameters = []
-  # rate runs require 2 GB minimum system main memory per copy,
-  # not including os overhead. Refer to:
-  # https://www.spec.org/cpu2017/Docs/system-requirements.html#memory
-  copies = min(vm.NumCpusForBenchmark(),
-               vm.total_free_memory_kb // (2 * KB_TO_GB_MULTIPLIER))
-  version_specific_parameters.append(' --copies=%s ' %
-                                     (FLAGS.spec17_copies or copies))
+  copies = FLAGS.spec17_copies or vm.NumCpusForBenchmark()
+  version_specific_parameters.append(f' --copies={copies} ')
   version_specific_parameters.append(
       ' --threads=%s ' % (FLAGS.spec17_threads or vm.NumCpusForBenchmark()))
   version_specific_parameters.append(
@@ -336,6 +331,7 @@ def _Run(vm):
     item.metadata['vm_name'] = vm.name
     item.metadata['spec17_gcc_flags'] = FLAGS.spec17_gcc_flags
     item.metadata['spec17_numa_bind_config'] = FLAGS.spec17_numa_bind_config
+    item.metadata['spec17_copies'] = copies
 
   return samples
 
