@@ -100,7 +100,7 @@ flags.DEFINE_boolean(
 flags.DEFINE_boolean(
     'ycsb_load_samples', True, 'Include samples from pre-populating database.'
 )
-flags.DEFINE_boolean(
+SKIP_LOAD_STAGE = flags.DEFINE_boolean(
     'ycsb_skip_load_stage',
     False,
     'If True, skip the data '
@@ -1013,7 +1013,7 @@ class YCSBExecutor:
 
   def Load(self, vms, workloads=None, load_kwargs=None):
     """Load data using YCSB."""
-    if FLAGS.ycsb_skip_load_stage:
+    if SKIP_LOAD_STAGE.value:
       return []
 
     workloads = workloads or GetWorkloadFileList()
@@ -1065,7 +1065,7 @@ class YCSBExecutor:
       samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
     if (
         FLAGS.ycsb_sleep_after_load_in_sec > 0
-        and not FLAGS.ycsb_skip_load_stage
+        and not SKIP_LOAD_STAGE.value
     ):
       for s in samples:
         s.metadata['sleep_after_load_in_sec'] = (
@@ -1187,7 +1187,7 @@ class YCSBExecutor:
       List of sample.Sample objects.
     """
     load_samples = []
-    if not FLAGS.ycsb_skip_load_stage:
+    if not SKIP_LOAD_STAGE.value:
       load_samples = self.Load(
           vms, workloads=workloads, load_kwargs=load_kwargs
       )
