@@ -197,6 +197,19 @@ def _GetCpuOptimizationMetadata() -> Dict[str, Any]:
   }
 
 
+def _LoadDatabase(executor: ycsb.YCSBExecutor,
+                  spanner: gcp_spanner.GcpSpannerInstance,
+                  vms: list[virtual_machine.VirtualMachine],
+                  load_kwargs: dict[str, Any]) -> list[sample.Sample]:
+  """Loads the database with the specified infrastructure capacity."""
+  if spanner.restored or ycsb.SKIP_LOAD_STAGE.value:
+    return []
+  spanner.UpdateCapacityForLoad()
+  results = list(executor.Load(vms, load_kwargs=load_kwargs))
+  spanner.UpdateCapacityForRun()
+  return results
+
+
 def Run(benchmark_spec):
   """Spawn YCSB and gather the results.
 
@@ -228,8 +241,9 @@ def Run(benchmark_spec):
   load_kwargs = run_kwargs.copy()
   samples = []
   metadata = {'ycsb_client_type': 'java'}
-  if not spanner.restored:
-    samples += list(benchmark_spec.executor.Load(vms, load_kwargs=load_kwargs))
+
+  samples += _LoadDatabase(benchmark_spec.executor, spanner, vms, load_kwargs)
+
   if _CPU_OPTIMIZATION.value:
     samples += CpuUtilizationRun(benchmark_spec.executor, spanner, vms,
                                  run_kwargs)

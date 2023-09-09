@@ -64,6 +64,22 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertIn('--nodes 3', ' '.join(cmd.call_args[0][0]))
 
+  def testSetNodesSkipsIfCountAlreadyCorrect(self):
+    test_instance = GetTestSpannerInstance()
+    self.enter_context(
+        mock.patch.object(test_instance, '_GetNodes', return_value=1)
+    )
+    self.enter_context(
+        mock.patch.object(test_instance, '_WaitUntilInstanceReady')
+    )
+    cmd = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand', return_value=[None, None, 0])
+    )
+
+    test_instance._SetNodes(1)
+
+    cmd.assert_not_called()
+
   def testFreezeUsesCorrectNodeCount(self):
     instance = GetTestSpannerInstance()
     mock_set_nodes = self.enter_context(

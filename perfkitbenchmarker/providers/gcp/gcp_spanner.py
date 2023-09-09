@@ -451,7 +451,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
         'gcp_spanner_node_count': self.nodes,
         'gcp_spanner_config': self._config,
         'gcp_spanner_endpoint': self.GetApiEndPoint(),
-        'gcp_spanner_load_node_cont': self._load_nodes,
+        'gcp_spanner_load_node_count': self._load_nodes,
     }
 
   def GetAverageCpuUsage(self, duration_minutes: int) -> float:
