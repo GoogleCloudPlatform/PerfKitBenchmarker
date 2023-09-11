@@ -18,6 +18,7 @@ Clusters can be created and deleted.
 
 import json
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 from absl import flags
@@ -51,6 +52,13 @@ flags.DEFINE_integer(
         'Number of nodes to create in the bigtable cluster. '
         'Ignored if --bigtable_autoscaling_min_nodes is set.'
     ),
+)
+_LOAD_NODES = flags.DEFINE_integer(
+    'bigtable_load_node_count',
+    None,
+    'The number of nodes for the Bigtable instance to use for the load'
+    ' phase. Assumes that the benchmark calls UpdateRunCapacity to set the '
+    ' correct node count manually before the run phase.',
 )
 _AUTOSCALING_MIN_NODES = flags.DEFINE_integer(
     'bigtable_autoscaling_min_nodes', None,
@@ -89,6 +97,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
   zone: str
   project: str
   node_count: int
+  load_node_count: int
   storage_type: str
   replication_cluster: bool
   replication_cluster_zone: str
@@ -110,6 +119,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
         'zone': (option_decoders.StringDecoder, none_ok),
         'project': (option_decoders.StringDecoder, none_ok),
         'node_count': (option_decoders.IntDecoder, none_ok),
+        'load_node_count': (option_decoders.IntDecoder, none_ok),
         'storage_type': (option_decoders.StringDecoder, none_ok),
         'replication_cluster': (option_decoders.BooleanDecoder, none_ok),
         'replication_cluster_zone': (option_decoders.StringDecoder, none_ok),
@@ -147,6 +157,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
         'google_bigtable_zone': 'zone',
         'bigtable_storage_type': 'storage_type',
         'bigtable_node_count': 'node_count',
+        'bigtable_load_node_count': 'load_node_count',
         'bigtable_replication_cluster': 'replication_cluster',
         'bigtable_replication_cluster_zone': 'replication_cluster_zone',
         'bigtable_multicluster_routing': 'multicluster_routing',
@@ -195,6 +206,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
                project: Optional[str],
                zone: Optional[str],
                node_count: Optional[int],
+               load_node_count: Optional[int],
                storage_type: Optional[str],
                replication_cluster: Optional[bool],
                replication_cluster_zone: Optional[str],
@@ -210,6 +222,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     self.zone: str = zone or FLAGS.google_bigtable_zone
     self.project: str = project or FLAGS.project or util.GetDefaultProject()
     self.node_count: int = node_count or _DEFAULT_NODE_COUNT
+    self._load_node_count = load_node_count or self.node_count
     self.storage_type: str = storage_type or _DEFAULT_STORAGE_TYPE
     self.replication_cluster: bool = replication_cluster or False
     self.replication_cluster_zone: Optional[str] = (
@@ -227,6 +240,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
         zone=spec.zone,
         project=spec.project,
         node_count=spec.node_count,
+        load_node_count=spec.load_node_count,
         storage_type=spec.storage_type,
         replication_cluster=spec.replication_cluster,
         replication_cluster_zone=spec.replication_cluster_zone,
@@ -387,13 +401,29 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     return json.loads(stdout)
 
   def _UpdateNodes(self, nodes: int) -> None:
+    """Updates clusters to the specified node count and waits until ready."""
     clusters = self._GetClusters()
     for i in range(len(clusters)):
+      # Do nothing if the node count is already equal to what we want.
+      if clusters[i]['serveNodes'] == nodes:
+        continue
       cmd = _GetBigtableGcloudCommand(self, 'bigtable', 'clusters', 'update',
                                       f'{self.name}-{i}')
       cmd.flags['instance'] = self.name
       cmd.flags['num-nodes'] = nodes or self.node_count
       cmd.Issue()
+    # Note that Exists is implemented like IsReady, but should likely be
+    # refactored.
+    while not self._Exists():
+      time.sleep(10)
+
+  def UpdateCapacityForLoad(self) -> None:
+    """See base class."""
+    self._UpdateNodes(self._load_node_count)
+
+  def UpdateCapacityForRun(self) -> None:
+    """See base class."""
+    self._UpdateNodes(self.node_count)
 
   def _Freeze(self) -> None:
     self._UpdateNodes(_FROZEN_NODE_COUNT)
