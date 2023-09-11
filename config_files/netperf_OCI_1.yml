@@ -1,0 +1,32 @@
+netperf:
+  description: Run one or more of TCP_RR, TCP_CRR, UDP_RR, TCP_STREAM and
+               UDP_STREAM
+  vpc_peering: True
+  vm_groups:
+    vm_1:
+      cloud: OCI
+      vm_spec: 
+        OCI:
+          machine_type: VM.Standard.A1.Flex
+                #machine_type: VM.Standard.E4.Flex
+                #          machine_type: VM.Standard3.Flex
+          oci_compute_units: 1
+          oci_compute_memory: 4
+          zone: us-ashburn-1
+          oci_availability_domain: MBWR:US-ASHBURN-AD-1
+          oci_fault_domain: FAULT-DOMAIN-1
+          oci_boot_disk_size: 100      
+    vm_2:
+      cloud: OCI
+      vm_spec: 
+        OCI:
+          machine_type: VM.Standard.A1.Flex
+                #          machine_type: VM.Standard.E4.Flex
+          oci_compute_units: 1
+          oci_compute_memory: 4
+          zone: us-ashburn-1
+          oci_availability_domain: MBWR:US-ASHBURN-AD-1
+          oci_fault_domain: FAULT-DOMAIN-1
+          oci_boot_disk_size: 100
+  flags:
+    placement_group_style: closest_supported
