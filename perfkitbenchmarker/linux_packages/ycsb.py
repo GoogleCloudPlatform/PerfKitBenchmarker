@@ -50,6 +50,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -298,6 +299,88 @@ _ERROR_RATE_THRESHOLD = flags.DEFINE_float(
     'The maximum error rate allowed for the run. '
     'By default, this allows any number of errors.',
 )
+CPU_OPTIMIZATION = flags.DEFINE_bool(
+    'ycsb_cpu_optimization',
+    False,
+    'Whether to run in CPU-optimized mode. The test will increase QPS until '
+    'CPU is between --ycsb_cpu_optimization_target and '
+    '--ycsb_cpu_optimization_target_max.',
+)
+CPU_OPTIMIZATION_TARGET = flags.DEFINE_float(
+    'ycsb_cpu_optimization_target',
+    0.70,
+    'CPU-optimized mode: minimum target CPU utilization at which to stop the'
+    ' test. The test will continue to increment until the utilization level is'
+    ' reached, and then return relevant metrics for that usage level.',
+)
+CPU_OPTIMIZATION_TARGET_MAX = flags.DEFINE_float(
+    'ycsb_cpu_optimization_target_max',
+    0.80,
+    'CPU-optimized mode: maximum target CPU utilization after which the'
+    ' benchmark will throw an exception. This is needed so the increase in QPS'
+    ' does not overshoot the target CPU percentage by too much.',
+)
+_CPU_OPTIMIZATION_SLEEP_MINS = flags.DEFINE_integer(
+    'ycsb_cpu_optimization_sleep_mins',
+    0,
+    'CPU-optimized mode: time in minutes to sleep between run steps when'
+    ' increasing target QPS.',
+)
+CPU_OPTIMIZATION_INCREMENT_MINS = flags.DEFINE_integer(
+    'ycsb_cpu_optimization_workload_mins',
+    30,
+    'CPU-optimized mode: length of time to run YCSB until incrementing QPS.',
+)
+CPU_OPTIMIZATION_MEASUREMENT_MINS = flags.DEFINE_integer(
+    'ycsb_cpu_optimization_measurement_mins',
+    5,
+    'CPU-optimized mode: length of time to measure average CPU at the end of'
+    ' each step. For example, the default 5 means that only the last 5 minutes'
+    ' of the test will be used for representative CPU utilization. Must be '
+    ' less than or equal to --ycsb_cpu_optimization_workload_mins. Note that '
+    ' some APIs can have a delay in reporting results, so increase this'
+    ' accordingly.',
+)
+_CPU_OPTIMIZATION_STARTING_QPS = flags.DEFINE_integer(
+    'ycsb_cpu_optimization_starting_qps',
+    None,
+    'CPU-optimized mode: starting QPS to set as YCSB target.',
+)
+CPU_OPTIMIZATION_QPS_INCREMENT = flags.DEFINE_integer(
+    'ycsb_cpu_optimization_target_qps_increment',
+    1000,
+    'CPU-optimized mode: the amount to increase target QPS by.',
+)
+
+
+def _ValidateCpuTargetFlags(flags_dict):
+  return (
+      flags_dict['ycsb_cpu_optimization_target_max']
+      > flags_dict['ycsb_cpu_optimization_target']
+  )
+
+
+def _ValidateCpuMeasurementFlag(flags_dict):
+  return (
+      flags_dict['ycsb_cpu_optimization_measurement_mins']
+      <= flags_dict['ycsb_cpu_optimization_workload_mins']
+  )
+
+
+flags.register_multi_flags_validator(
+    ['ycsb_cpu_optimization_target', 'ycsb_cpu_optimization_target_max'],
+    _ValidateCpuTargetFlags,
+    'CPU optimization max target must be greater than target.',
+)
+flags.register_multi_flags_validator(
+    [
+        'ycsb_cpu_optimization_measurement_mins',
+        'ycsb_cpu_optimization_workload_mins',
+    ],
+    _ValidateCpuMeasurementFlag,
+    'CPU measurement minutes must be shorter than or equal to workload'
+    ' duration.',
+)
 
 # Status line pattern
 _STATUS_PATTERN = r'(\d+) sec: \d+ operations; (\d+(\.\d+)?) current ops\/sec'
@@ -455,6 +538,17 @@ def CheckPrerequisites():
         'Measuring a throughput histogram requires running with '
         '--ycsb_measurement_type=HDRHISTOGRAM. Other measurement types are '
         'unsupported unless additional parsing is added.'
+    )
+
+  if [
+      dynamic_load,
+      _BURST_LOAD_MULTIPLIER.value is not None,
+      _INCREMENTAL_TARGET_QPS.value is not None,
+      CPU_OPTIMIZATION.value,
+  ].count(True) > 1:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        '--ycsb_dynamic_load, --ycsb_burst_load, --ycsb_incremental_load, and'
+        ' --ycsb_cpu_optimization are mutually exclusive.'
     )
 
 
@@ -1049,7 +1143,9 @@ class YCSBExecutor:
     else:
       return []
 
-  def Run(self, vms, workloads=None, run_kwargs=None) -> list[sample.Sample]:
+  def Run(
+      self, vms, workloads=None, run_kwargs=None, database=None
+  ) -> list[sample.Sample]:
     """Runs each workload/client count combination."""
     if FLAGS.ycsb_skip_run_stage:
       return []
@@ -1061,6 +1157,8 @@ class YCSBExecutor:
       samples = self._RunBurstMode(vms, workloads, run_kwargs)
     elif _INCREMENTAL_TARGET_QPS.value:
       samples = self._RunIncrementalMode(vms, workloads, run_kwargs)
+    elif CPU_OPTIMIZATION.value:
+      samples = self._RunCpuMode(vms, workloads, run_kwargs, database)
     else:
       samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
     if (
@@ -1165,6 +1263,116 @@ class YCSBExecutor:
     self._SetClientThreadCount(ending_threadcount)
     self._SetRunParameters(run_params)
     return list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
+
+  def _RunCpuMode(
+      self,
+      vms: list[virtual_machine.VirtualMachine],
+      workloads: Sequence[str],
+      run_kwargs: Mapping[str, Any],
+      database: resource.BaseResource,
+  ) -> list[sample.Sample]:
+    """Runs YCSB until the CPU utilization is over the recommended amount.
+
+    Args:
+      vms: The client VMs that will be used to push the load.
+      workloads: List of workloads to run.
+      run_kwargs: A mapping of additional YCSB run args to pass to the test.
+      database: This class must implement CalculateTheoreticalMaxThroughput and
+        GetAverageCpuUsage.
+
+    Returns:
+      A list of samples from the YCSB test at the specified CPU utilization.
+    """
+
+    def _ExtractThroughput(samples: list[sample.Sample]) -> float:
+      """Gets the throughput recorded in the samples."""
+      for result in samples:
+        if result.metric == 'overall Throughput':
+          return result.value
+      return 0.0
+
+    def _GetStartingThroughput(workload: str) -> int:
+      """Gets the starting throughput to start the test with."""
+      with open(workload) as f:
+        workload_args = ParseWorkload(f.read())
+      read_proportion = float(workload_args['readproportion'])
+      write_proportion = float(workload_args['updateproportion'])
+      # Multiply by half to leave space for increment.
+      return _CPU_OPTIMIZATION_STARTING_QPS.value or int(
+          database.CalculateTheoreticalMaxThroughput(
+              read_proportion, write_proportion
+          )
+          * 0.5
+      )
+
+    def _RunCpuModeSingleWorkload(workload: str) -> list[sample.Sample]:
+      """Runs the CPU utilization test for a single workload."""
+      qps = _GetStartingThroughput(workload)
+      first_run = True
+      while True:
+        run_kwargs['target'] = qps
+        run_kwargs['maxexecutiontime'] = (
+            CPU_OPTIMIZATION_INCREMENT_MINS.value * 60
+        )
+        run_samples = self.RunStaircaseLoads(
+            vms, workloads=workloads, **run_kwargs
+        )
+        throughput = _ExtractThroughput(run_samples)
+        cpu_utilization = database.GetAverageCpuUsage(
+            CPU_OPTIMIZATION_MEASUREMENT_MINS.value
+        )
+        logging.info(
+            'Run had throughput target %s and measured throughput %s, with CPU'
+            ' utilization %s.',
+            qps,
+            throughput,
+            cpu_utilization,
+        )
+        if cpu_utilization > CPU_OPTIMIZATION_TARGET.value:
+          logging.info(
+              'CPU utilization is higher than cap %s, stopping test',
+              CPU_OPTIMIZATION_TARGET.value,
+          )
+          if first_run:
+            raise errors.Benchmarks.RunError(
+                f'Initial QPS {qps} already above cpu utilization cap. '
+                'Please lower the starting QPS.'
+            )
+          if cpu_utilization > CPU_OPTIMIZATION_TARGET_MAX.value:
+            raise errors.Benchmarks.RunError(
+                f'CPU utilization measured was {cpu_utilization}, over the '
+                f'{CPU_OPTIMIZATION_TARGET_MAX.value} threshold. '
+                'Decrease step size to avoid overshooting.'
+            )
+          for s in run_samples:
+            s.metadata.update({
+                'ycsb_cpu_optimization': True,
+                'ycsb_cpu_utilization': cpu_utilization,
+                'ycsb_cpu_target': CPU_OPTIMIZATION_TARGET.value,
+                'ycsb_cpu_target_max': CPU_OPTIMIZATION_TARGET_MAX.value,
+                'ycsb_cpu_increment_minutes': (
+                    CPU_OPTIMIZATION_INCREMENT_MINS.value
+                ),
+                'ycsb_cpu_qps_increment': CPU_OPTIMIZATION_QPS_INCREMENT.value,
+            })
+          return run_samples
+
+        # Sleep between steps for some workloads.
+        if _CPU_OPTIMIZATION_SLEEP_MINS.value:
+          logging.info(
+              'Run phase finished, sleeping for %s minutes before starting the '
+              'next run.',
+              _CPU_OPTIMIZATION_SLEEP_MINS.value,
+          )
+          time.sleep(_CPU_OPTIMIZATION_SLEEP_MINS.value * 60)
+
+        qps += CPU_OPTIMIZATION_QPS_INCREMENT.value
+        first_run = False
+
+    results = []
+    for workload in workloads:
+      results += _RunCpuModeSingleWorkload(workload)
+    return results
 
   def LoadAndRun(self, vms, workloads=None, load_kwargs=None, run_kwargs=None):
     """Load data using YCSB, then run each workload/client count combination.

@@ -176,7 +176,7 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     test_spanner.nodes = 3
 
     # Act
-    actual_qps = test_spanner.CalculateRecommendedThroughput(
+    actual_qps = test_spanner.CalculateTheoreticalMaxThroughput(
         read_proportion, write_proportion)
 
     # Assert
