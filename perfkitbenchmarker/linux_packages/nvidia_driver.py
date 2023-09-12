@@ -49,7 +49,7 @@ flags.DEFINE_boolean('gpu_autoboost_enabled', None,
 
 flags.DEFINE_string(
     'nvidia_driver_version',
-    '525.105.17',
+    '535.104.05',
     (
         'The version of nvidia driver to install. '
         'For example, "418.67" or "418.87.01."'

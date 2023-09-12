@@ -52,6 +52,7 @@ flags.DEFINE_enum(
         '11.8',
         '12.0',
         '12.1',
+        '12.2',
         'None',
         '',
     ],
@@ -70,6 +71,7 @@ FLAGS = flags.FLAGS
 
 CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/{cpu_arch}/cuda-{os}.pin'
 
+CUDA_12_2_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.2.2/local_installers/cuda-repo-{os}-12-2-local_12.2.2-535.104.05-1_{cpu_arch}.deb'
 CUDA_12_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-{os}-12-1-local_12.1.1-530.30.02-1_{cpu_arch}.deb'
 CUDA_12_0_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.0.1/local_installers/cuda-repo-{os}-12-0-local_12.0.1-525.85.12-1_{cpu_arch}.deb'
 CUDA_11_8_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda-repo-{os}-11-8-local_11.8.0-520.61.05-1_{cpu_arch}.deb'
@@ -174,7 +176,7 @@ def GetCudaToolkitVersion(vm):
 
 
 def EnrollSigningKey(vm):
-  if FLAGS.cuda_toolkit_version in ('11.7', '11.8', '12.0', '12.1'):
+  if FLAGS.cuda_toolkit_version in ('11.7', '11.8', '12.0', '12.1', '12.2'):
     version = FLAGS.cuda_toolkit_version.replace('.', '-')
     vm.RemoteCommand(
         'sudo cp'
@@ -359,6 +361,10 @@ def _InstallCuda12Point1(vm):
   _InstallCuda12Generic(vm, CUDA_12_1_TOOLKIT, '12-1')
 
 
+def _InstallCuda12Point2(vm):
+  _InstallCuda12Generic(vm, CUDA_12_2_TOOLKIT, '12-2')
+
+
 def _InstallCuda11Point0(vm):
   _InstallCuda11Generic(vm, CUDA_11_0_TOOLKIT, '11-0')
 
@@ -444,6 +450,8 @@ def AptInstall(vm):
     _InstallCuda12Point0(vm)
   elif version_to_install == '12.1':
     _InstallCuda12Point1(vm)
+  elif version_to_install == '12.2':
+    _InstallCuda12Point2(vm)
   else:
     raise UnsupportedCudaVersionError()
   DoPostInstallActions(vm)
