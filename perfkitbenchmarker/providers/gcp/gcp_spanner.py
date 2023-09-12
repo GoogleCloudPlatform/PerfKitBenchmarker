@@ -362,6 +362,10 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
   def _SetNodes(self, nodes: int) -> None:
     """Sets the number of nodes on the Spanner instance."""
+    # Not yet supported for user managed instances since instance attributes
+    # are not discovered.
+    if self.user_managed:
+      return
     current_nodes = self._GetNodes()
     if nodes == current_nodes:
       return
