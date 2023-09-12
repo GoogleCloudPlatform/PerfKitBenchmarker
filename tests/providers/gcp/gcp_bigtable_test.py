@@ -18,11 +18,10 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
+
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_bigtable
 from perfkitbenchmarker.providers.gcp import util
-from tests import matchers
 from tests import pkb_common_test_case
 import requests
 
@@ -39,23 +38,6 @@ VALID_JSON_BASE = """
       "state": "READY"
     }}
 """
-
-_TEST_LIST_CLUSTERS_OUTPUT = [
-    {
-        'defaultStorageType': 'SSD',
-        'location': 'projects/pkb-test/locations/us-west1-a',
-        'name': 'projects/pkb-test/instances/pkb-bigtable-730b1e6b/clusters/pkb-bigtable-730b1e6b-1',
-        'serveNodes': 3,
-        'state': 'READY',
-    },
-    {
-        'defaultStorageType': 'SSD',
-        'location': 'projects/pkb-test/locations/us-west1-c',
-        'name': 'projects/pkb-test/instances/pkb-bigtable-730b1e6b/clusters/pkb-bigtable-730b1e6b-0',
-        'serveNodes': 3,
-        'state': 'READY',
-    },
-]
 
 
 OUT_OF_QUOTA_STDERR = """
@@ -299,52 +281,6 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(cmd.args, ['instances', 'test'])
     self.assertEqual(cmd.flags['project'], PROJECT)
     self.assertEmpty(cmd.flags['zone'])
-
-  def testSetNodes(self):
-    test_instance = GetTestBigtableInstance()
-    self.enter_context(
-        mock.patch.object(
-            test_instance,
-            '_GetClusters',
-            return_value=_TEST_LIST_CLUSTERS_OUTPUT,
-        )
-    )
-    self.enter_context(
-        mock.patch.object(test_instance, '_Exists', return_value=True)
-    )
-    cmd = self.enter_context(
-        mock.patch.object(vm_util, 'IssueCommand', return_value=[None, None, 0])
-    )
-
-    test_instance._UpdateNodes(6)
-
-    self.assertSequenceEqual(
-        [
-            mock.call(matchers.HASALLOF('--num-nodes', '6')),
-            mock.call(matchers.HASALLOF('--num-nodes', '6')),
-        ],
-        cmd.mock_calls,
-    )
-
-  def testSetNodesSkipsIfCountAlreadyCorrect(self):
-    test_instance = GetTestBigtableInstance()
-    self.enter_context(
-        mock.patch.object(
-            test_instance,
-            '_GetClusters',
-            return_value=_TEST_LIST_CLUSTERS_OUTPUT,
-        )
-    )
-    self.enter_context(
-        mock.patch.object(test_instance, '_Exists', return_value=True)
-    )
-    cmd = self.enter_context(
-        mock.patch.object(vm_util, 'IssueCommand', return_value=[None, None, 0])
-    )
-
-    test_instance._UpdateNodes(3)
-
-    cmd.assert_not_called()
 
 
 if __name__ == '__main__':

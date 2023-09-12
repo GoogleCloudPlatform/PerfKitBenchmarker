@@ -357,19 +357,6 @@ def _GetYcsbExecutor(
   return ycsb.YCSBExecutor(FLAGS.hbase_binding, **executor_flags)
 
 
-def _LoadDatabase(executor: ycsb.YCSBExecutor,
-                  bigtable: gcp_bigtable.GcpBigtableInstance,
-                  vms: list[virtual_machine.VirtualMachine],
-                  load_kwargs: dict[str, Any]) -> list[sample.Sample]:
-  """Loads the database with the specified infrastructure capacity."""
-  if bigtable.restored or ycsb.SKIP_LOAD_STAGE.value:
-    return []
-  bigtable.UpdateCapacityForLoad()
-  results = list(executor.Load(vms, load_kwargs=load_kwargs))
-  bigtable.UpdateCapacityForRun()
-  return results
-
-
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Spawn YCSB and gather the results.
 
@@ -391,7 +378,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   load_kwargs = _GenerateLoadKwargs(instance)
   run_kwargs = _GenerateRunKwargs(instance)
   executor: ycsb.YCSBExecutor = _GetYcsbExecutor(vms)
-  samples += _LoadDatabase(executor, instance, vms, load_kwargs)
+  if not instance.restored:
+    samples += list(executor.Load(vms, load_kwargs=load_kwargs))
   samples += list(executor.Run(vms, run_kwargs=run_kwargs))
 
   # Optionally add new samples for cluster cpu utilization.
