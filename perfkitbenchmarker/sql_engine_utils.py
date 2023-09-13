@@ -293,11 +293,13 @@ class PostgresCliQueryTools(ISQLQueryTools):
     sql_command += '-c "%s"' % command
     return sql_command
 
-  def GetConnectionString(self, database_name=''):
+  def GetConnectionString(self, database_name='', endpoint=''):
     if not database_name:
       database_name = self.DEFAULT_DATABASE
+    if not endpoint:
+      endpoint = self.connection_properties.endpoint
     return "'host={0} user={1} password={2} dbname={3}'".format(
-        self.connection_properties.endpoint,
+        endpoint,
         self.connection_properties.database_username,
         self.connection_properties.database_password,
         database_name,
@@ -392,8 +394,10 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
     sql_command += '-c "%s"' % command
     return sql_command
 
-  def GetConnectionString(self, database_name: str = '') -> str:
-    return f'-h {self.connection_properties.endpoint}'
+  def GetConnectionString(self, database_name: str = '', endpoint='') -> str:
+    if not endpoint:
+      endpoint = self.connection_properties.endpoint
+    return f'-h {endpoint}'
 
   def GetSysbenchConnectionString(self) -> str:
     return '--pgsql-host=/tmp'
@@ -440,7 +444,9 @@ class MysqlCliQueryTools(ISQLQueryTools):
 
     return mysql_command + '-e "%s"' % command
 
-  def GetConnectionString(self):
+  def GetConnectionString(self, endpoint=''):
+    if not endpoint:
+      endpoint = self.connection_properties.endpoint
     return '-h {0} -P 3306 -u {1} -p{2}'.format(
         self.connection_properties.endpoint,
         self.connection_properties.database_username,
@@ -491,7 +497,7 @@ class SqlServerCliQueryTools(ISQLQueryTools):
     sqlserver_command = sqlserver_command + '-Q "%s"' % command
     return sqlserver_command
 
-  def GetConnectionString(self, database_name=''):
+  def GetConnectionString(self, database_name='', endpoint=''):
     raise NotImplementedError('Connection string currently not supported')
 
   def RunSqlScript(

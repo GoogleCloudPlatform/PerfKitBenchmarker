@@ -13,6 +13,7 @@
 # limitations under the License.
 """Module containing pgbench installation, cleanup and run functions."""
 
+import socket
 import time
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
@@ -105,8 +106,17 @@ def RunPgBench(benchmark_spec,
     file: Filename of the benchmark
     path: File path of the benchmar.
   """
+  # AWS DNS sometimes timeout when running the benchmark
+  # https://stackoverflow.com/questions/58179080/occasional-temporary-failure-in-name-resolution-while-connecting-to-aws-aurora
+  # Resolve the address to ip address first to avoid DNS failure
+  endpoint = socket.getaddrinfo(
+      relational_db.client_vm_query_tools.connection_properties.endpoint,
+      relational_db.client_vm_query_tools.connection_properties.port,
+  )[0][4][0]
+
   connection_string = relational_db.client_vm_query_tools.GetConnectionString(
-      database_name=test_db_name)
+      database_name=test_db_name, endpoint=endpoint
+  )
 
   if file and path:
     metadata['pgbench_file'] = file
