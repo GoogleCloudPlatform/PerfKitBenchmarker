@@ -401,3 +401,84 @@ class A10x2Triton(A10x2):
 )
 class A10x2HighAccuracyTriton(A10x2Triton):
   pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class H100x1(ServerGPUBaseConfig):
+  """Base DLRM H100 config."""
+  system = KnownSystem.H100x1
+  use_small_tile_gemm_plugin = False
+  use_jemalloc = True
+  gpu_batch_size = 350000
+  gpu_num_bundles = 4
+  num_staging_batches = 2
+  num_staging_threads = 4
+  gpu_inference_streams = 1
+  max_pairs_per_staging_thread = 180000
+  complete_threads = 4
+  server_target_qps = 735000
+  compress_categorical_inputs = False
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class H100x8(H100x1):
+  system = KnownSystem.H100x8
+  server_target_qps = 720000 * 8
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class H100x1HighAccuracy(H100x1):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class H100x1Triton(H100x1):
+  gpu_batch_size = 200000
+  server_target_qps = 120000
+  batch_triton_requests = True
+  gather_kernel_buffer_threshold = 32
+  max_queue_delay_usec = 1000
+  use_triton = True
+  numa_config = None
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class H100x1HighAccuracyTriton(H100x1Triton):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class H100x8HighAccuracy(H100x8):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class H100x8Triton(H100x8):
+  gpu_batch_size = 200000
+  server_target_qps = 120000 * 8
+  batch_triton_requests = True
+  gather_kernel_buffer_threshold = 32
+  max_queue_delay_usec = 1000
+  use_triton = True
+  numa_config = None
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class H100x8HighAccuracyTriton(H100x8Triton):
+  pass

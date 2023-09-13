@@ -101,3 +101,79 @@ class CloudL4x1Triton(CloudL4x1):
 )
 class CloudL4x1HighAccuracyTriton(CloudL4x1Triton):
   pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class H100x1(OfflineGPUBaseConfig):
+  system = KnownSystem.H100x1
+  use_small_tile_gemm_plugin = False
+  use_jemalloc = True
+  gpu_batch_size = 350000
+  num_staging_batches = 8
+  num_staging_threads = 8
+  complete_threads = 1
+  deque_timeout_usec = 1
+  offline_expected_qps = 740000
+  max_pairs_per_staging_thread = 262100
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class H100x1HighAccuracy(H100x1):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class H100x1Triton(H100x1):
+  batch_triton_requests = True
+  buffer_manager_thread_count = 8
+  use_triton = True
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class H100x1HighAccuracyTriton(H100x1Triton):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class H100x8(H100x1):
+  system = KnownSystem.H100x8
+  use_jemalloc = False
+  gpu_batch_size = 350000 * 4
+  gpu_num_bundles = 4
+  num_staging_batches = 2
+  num_staging_threads = 4
+  complete_threads = 4
+  offline_expected_qps = 740000 * 8
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class H100x8HighAccuracy(H100x8):
+  pass
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class H100x8Triton(H100x8):
+  batch_triton_requests = True
+  buffer_manager_thread_count = 8
+  use_triton = True
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class H100x8HighAccuracyTriton(H100x8Triton):
+  pass
