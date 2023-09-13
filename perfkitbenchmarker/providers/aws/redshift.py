@@ -41,7 +41,7 @@ READY_STATUSES = ['available']
 ELIMINATE_AUTOMATED_SNAPSHOT_RETENTION = '--automated-snapshot-retention-period=0'
 DEFAULT_DATABASE_NAME = 'dev'
 BOOTSTRAP_DB = 'sample'
-REDSHIFT_JDBC_JAR = 'redshift-jdbc-client-1.0.jar'
+REDSHIFT_JDBC_JAR = 'redshift-jdbc-client-1.1.jar'
 
 
 def AddTags(resource_arn, region):
