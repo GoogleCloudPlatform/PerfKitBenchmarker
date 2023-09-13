@@ -16,12 +16,16 @@
 Clusters can be created and deleted.
 """
 
+import datetime
 import json
 import logging
 import time
 from typing import Any, Dict, List, Optional
 
 from absl import flags
+from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3 import query
+import numpy as np
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker.configs import option_decoders
@@ -86,6 +90,16 @@ _DEFAULT_ZONE = 'us-central1-b'
 _DEFAULT_REPLICATION_ZONE = 'us-central1-c'
 
 _FROZEN_NODE_COUNT = 1
+
+# Bigtable CPU Monitoring API has a 3 minute delay. See
+# https://cloud.google.com/monitoring/api/metrics_gcp#gcp-bigtable
+CPU_API_DELAY_MINUTES = 3
+CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
+
+# For more information on QPS expectations, see
+# https://cloud.google.com/bigtable/docs/performance#typical-workloads
+_READ_OPS_PER_NODE = 10000
+_WRITE_OPS_PER_NODE = 10000
 
 
 class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
@@ -436,6 +450,100 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
 
   def _Restore(self) -> None:
     self._UpdateNodes(self.node_count)
+
+  def GetAverageCpuUsage(self, duration_minutes: int) -> float:
+    """Gets the average CPU usage for the cluster.
+
+    Note that there is a delay for the API to get data, so this returns the
+    average CPU usage in the period ending at the current time with missing data
+    in the last _CPU_API_DELAY_SECONDS.
+
+    Args:
+      duration_minutes: The time duration for which to measure the average CPU
+        usage.
+
+    Returns:
+      The average CPU usage during the time period, offset from the current time
+      by _CPU_API_DELAY_SECONDS, specifically:
+      `time.time() - _CPU_API_DELAY_SECONDS` and
+      `time.time() - duration_minutes`.
+    """
+    if duration_minutes * 60 <= CPU_API_DELAY_SECONDS:
+      raise ValueError(
+          f'Bigtable API has a {CPU_API_DELAY_SECONDS} sec. delay in receiving'
+          ' data, choose a longer duration to get CPU usage.'
+      )
+    client = monitoring_v3.MetricServiceClient()
+
+    # It takes up to 3 minutes for CPU metrics to appear,
+    # see https://cloud.google.com/bigtable/docs/metrics.
+    cpu_query = query.Query(
+        client,
+        project=self.project,
+        metric_type='bigtable.googleapis.com/cluster/cpu_load',
+        end_time=datetime.datetime.fromtimestamp(
+            time.time(), tz=datetime.timezone.utc
+        ),
+        minutes=duration_minutes,
+    )
+
+    # Filter by the Bigtable instance
+    cpu_query = cpu_query.select_resources(instance=self.name)
+    time_series = list(cpu_query)
+
+    instance_total_utilization = 0.0
+    for cluster_time_series in time_series:
+      cluster_total_utilization = 0.0
+      cluster_name = cluster_time_series.resource.labels['cluster']
+      logging.info('Cluster %s utilization by minute:', cluster_name)
+      for point in cluster_time_series.points:
+        point_utilization = round(point.value.double_value, 3)
+        point_time = datetime.datetime.fromtimestamp(
+            point.interval.start_time.seconds
+        )
+        logging.info('%s: %s', point_time, point_utilization)
+        cluster_total_utilization += point_utilization
+      cluster_average_utilization = round(
+          cluster_total_utilization / len(cluster_time_series.points), 3
+      )
+      logging.info(
+          'Cluster %s average CPU utilization: %s',
+          cluster_name,
+          cluster_average_utilization,
+      )
+      instance_total_utilization += cluster_average_utilization
+
+    average_utilization = instance_total_utilization / len(time_series)
+    logging.info('Instance average CPU utilization: %s', average_utilization)
+    return average_utilization
+
+  def CalculateTheoreticalMaxThroughput(
+      self, read_proportion: float, write_proportion: float
+  ) -> int:
+    """Returns the theoretical max throughput based on the workload and nodes.
+
+    Args:
+      read_proportion: The proportion of reads between 0 and 1.
+      write_proportion: The proportion of writes between 0 and 1.
+
+    Returns:
+      The theoretical max throughput for the instance.
+    """
+    if read_proportion + write_proportion != 1:
+      raise errors.Benchmarks.RunError(
+          'Unrecognized workload, read + write proportion must be equal to 1, '
+          f'got {read_proportion} + {write_proportion}.'
+      )
+    # Calculates the starting throughput based off of each node being able to
+    # handle 10k QPS of reads or 10k QPS of writes. For example, for a 50/50
+    # workload, run at a QPS target of 5000 reads + 5000 writes = 10000.
+    a = np.array([
+        [1 / _READ_OPS_PER_NODE, 1 / _WRITE_OPS_PER_NODE],
+        [write_proportion, -(1 - write_proportion)],
+    ])
+    b = np.array([1, 0])
+    result = np.linalg.solve(a, b)
+    return int(sum(result) * self.node_count)
 
 
 def _GetBigtableGcloudCommand(instance, *args) -> util.GcloudCommand:

@@ -171,6 +171,16 @@ def CheckPrerequisites(benchmark_config: Dict[str, Any]) -> None:
         continue
       raise ValueError('Scope {0} required.'.format(scope))
 
+  if ycsb.CPU_OPTIMIZATION.value and (
+      ycsb.CPU_OPTIMIZATION_MEASUREMENT_MINS.value
+      <= gcp_bigtable.CPU_API_DELAY_MINUTES
+  ):
+    raise errors.Setup.InvalidFlagConfigurationError(
+        f'measurement_mins {ycsb.CPU_OPTIMIZATION_MEASUREMENT_MINS.value} must'
+        ' be greater than CPU_API_DELAY_MINUTES'
+        f' {gcp_bigtable.CPU_API_DELAY_MINUTES}.'
+    )
+
 
 def _GetTableName() -> str:
   return _STATIC_TABLE_NAME.value or 'ycsb{0}'.format(FLAGS.run_uri)
@@ -392,7 +402,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   run_kwargs = _GenerateRunKwargs(instance)
   executor: ycsb.YCSBExecutor = _GetYcsbExecutor(vms)
   samples += _LoadDatabase(executor, instance, vms, load_kwargs)
-  samples += list(executor.Run(vms, run_kwargs=run_kwargs))
+  samples += list(executor.Run(vms, run_kwargs=run_kwargs, database=instance))
 
   # Optionally add new samples for cluster cpu utilization.
   if _GET_CPU_UTILIZATION.value:
