@@ -414,15 +414,25 @@ def _GetGlobalSamples(
         sorted(set(FLAGS.dpb_sparksql_order) - all_passing_queries)
     )
 
+  cumulative_run_time = sum(run_times.values())
+  cluster.cluster_duration = (
+      cumulative_run_time + cluster.GetClusterCreateTime()
+  )
   cluster.metadata.update(metadata)
 
   # TODO(user): Compute aggregated time for each query across streams and
   # iterations.
+
+  # Wall time of the DPB service job submitted as reported by the DPB service.
+  # Should include sparksql_cumulative_run_time. Doesn't include
+  # dpb_sparksql_job_pending.
   samples.append(
       sample.Sample(
           'sparksql_total_wall_time', job_result.wall_time, 'seconds', metadata
       )
   )
+
+  # Geomean of all the passing queries' run time.
   samples.append(
       sample.Sample(
           'sparksql_geomean_run_time',
@@ -431,6 +441,19 @@ def _GetGlobalSamples(
           metadata,
       )
   )
+
+  # Sum of all the passing queries' run time.
+  samples.append(
+      sample.Sample(
+          'sparksql_cumulative_run_time',
+          cumulative_run_time,
+          'seconds',
+          metadata,
+      )
+  )
+
+  # Time the DPB service job (AKA Spark application) was queued before running,
+  # as reported by the DPB service.
   samples.append(
       sample.Sample(
           'dpb_sparksql_job_pending',
@@ -439,9 +462,12 @@ def _GetGlobalSamples(
           metadata,
       )
   )
+
   if FLAGS.dpb_export_job_stats:
     run_cost = cluster.CalculateLastJobCost()
     if run_cost is not None:
+      # Run cost of the job last DPB service job (valid for Serverless DPB
+      # services implementations only).
       samples.append(
           sample.Sample('sparksql_run_cost', run_cost, '$', metadata)
       )

@@ -34,14 +34,11 @@ class MockDpbService(dpb_service.BaseDpbService):
   ):
     super().__init__(dpb_service_spec)
     self._cluster_create_time = cluster_create_time
-    self._cluster_duration = cluster_duration
+    self.cluster_duration = cluster_duration
     self.metadata = {'foo': 42}
 
   def GetClusterCreateTime(self) -> Optional[float]:
     return self._cluster_create_time
-
-  def GetClusterDuration(self) -> Optional[float]:
-    return self._cluster_duration
 
   def SubmitJob(self, *args, **kwargs) -> dpb_service.JobResult:
     return dpb_service.JobResult(run_time=1)

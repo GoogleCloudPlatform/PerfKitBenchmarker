@@ -141,14 +141,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     """
     return self._cluster_ready_time - self._cluster_create_time
 
-  def GetClusterDuration(self) -> Optional[float]:
-    if (
-        self._cluster_create_time is not None
-        and self._cluster_delete_time is not None
-    ):
-      return self._cluster_delete_time - self._cluster_create_time
-    return None
-
   @staticmethod
   def CheckPrerequisites(benchmark_config):
     del benchmark_config  # Unused
