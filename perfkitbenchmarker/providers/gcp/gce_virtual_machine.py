@@ -106,6 +106,7 @@ _METADATA_PREEMPT_CMD = (
 # Machine type to ARM architecture.
 _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     't2a': 'neoverse-n1',
+    'c3a': 'ampere1',
 }
 # The A2 and A3 machine families, unlike some other GCP offerings, have a
 # preset type and number of GPUs, so we set those attributes directly from the
