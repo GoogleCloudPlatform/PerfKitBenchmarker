@@ -395,7 +395,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
           '--zone-redundant',
           'true' if self.spec.high_availability else 'false'
       ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, timeout=CREATE_AZURE_DB_TIMEOUT)
     self.database_name = DEFAULT_DATABASE_NAME
 
   def _CreateAzureManagedSqlInstance(self):
