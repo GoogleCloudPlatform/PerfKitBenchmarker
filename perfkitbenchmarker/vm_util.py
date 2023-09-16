@@ -745,3 +745,10 @@ def CreateRemoteFile(vm, file_contents, file_path):
     parent_dir = posixpath.dirname(file_path)
     vm.RemoteCommand(f'[ -d {parent_dir} ] || mkdir -p {parent_dir}')
     vm.PushFile(tf.name, file_path)
+
+
+def ReadLocalFile(filename: str) -> str:
+  """Read the local file."""
+  file_path = posixpath.join(GetTempDir(), filename)
+  stdout, _, _ = IssueCommand(['cat', file_path])
+  return stdout
