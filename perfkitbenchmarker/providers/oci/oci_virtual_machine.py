@@ -59,6 +59,8 @@ class OciVmSpec(virtual_machine.BaseVmSpec):
             config_values['machine_type'] = flag_values.machine_type
         if flag_values['oci_network_name'].present:
             config_values['oci_network_name'] = flag_values.oci_network_name
+        if flag_values['oci_profile'].present:
+            config_values['oci_profile'] = flag_values.oci_profile
 
     @classmethod
     def _GetOptionDecoderConstructions(cls):
@@ -81,6 +83,7 @@ class OciVmSpec(virtual_machine.BaseVmSpec):
             'machine_type': (option_decoders.StringDecoder, {'default': 'VM.Standard.A1.Flex'}),
             'region': (option_decoders.StringDecoder, {'default': None}),
             'oci_network_name': (option_decoders.StringDecoder, {'default': None}),
+            'oci_profile': (option_decoders.StringDecoder, {'default': 'DEFAULT'}),
         })
         return result
 
@@ -103,6 +106,9 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.operating_system = None
         self.operating_system_version = None
         self.key_pair_name = ""
+        #self.profile = vm_spec.oci_profile
+        #profiles are maintained in ~/.oci/oci_cli_rc file
+        self.profile = vm_spec.zone #profiles are maintained in ~/.oci/oci_cli_rc file
         self.region = vm_spec.zone
         self.subnet = None
         self.availability_domain = vm_spec.oci_availability_domain
@@ -132,6 +138,7 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
             'instance',
             'list',
             f'--display-name {self.name}',
+            f'--profile {self.profile}',
             '--sort-order DESC']
         status_cmd = util.GetEncodedCmd(status_cmd)
         out, _ = vm_util.IssueRetryableCommand(status_cmd)
@@ -149,7 +156,8 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
             'compute',
             'instance',
             'list-vnics',
-            f'--instance-id {self.ocid}']
+            f'--instance-id {self.ocid}',
+            f'--profile {self.profile}']
         ipstatus_cmd = util.GetEncodedCmd(ipstatus_cmd)
         out, _ = vm_util.IssueRetryableCommand(ipstatus_cmd)
         state = json.loads(out)
@@ -167,15 +175,15 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
             ad_list = util.GetAvailabilityDomainFromRegion(self.region)
             self.availability_domain = ad_list[0]
         if self.fault_domain is None:
-            fd_list = util.GetFaultDomainFromAvailabilityDomain(self.availability_domain)
+            fd_list = util.GetFaultDomainFromAvailabilityDomain(self.availability_domain, self.profile)
             self.fault_domain = fd_list[0]
 
         if self.image is not None:
-            oci_image, oci_os_name, oci_os_version = util.GetOciImageIdFromName(self.image, self.machine_type)
+            oci_image, oci_os_name, oci_os_version = util.GetOciImageIdFromName(self.image, self.machine_type, self.profile)
         else:
             oci_os_name = util.GetOsFromImageFamily(self.DEFAULT_IMAGE_FAMILY)
             oci_os_version = util.GetOsVersionFromOs(self.DEFAULT_IMAGE_PROJECT, oci_os_name)
-            oci_image = util.GetOciImageIdFromImage(oci_os_name, oci_os_version, self.machine_type)
+            oci_image = util.GetOciImageIdFromImage(oci_os_name, oci_os_version, self.machine_type, self.profile)
         self.image = oci_image
 
         shape_config = "'{\"memoryInGBs\":%s,\"ocpus\":%s}'" % (self.compute_memory, self.compute_units)
@@ -212,7 +220,8 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
             f' --boot-volume-size-in-gbs {self.bv_size}',
             f'--freeform-tags {self.tags}',
             f'--ssh-authorized-keys-file {key_file_path}',
-            '--assign-public-ip true']
+            '--assign-public-ip true',
+            f'--profile {self.profile}']
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, ret = vm_util.IssueCommand(create_cmd)
         ociid = json.loads(stdout)
@@ -221,12 +230,13 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
         self._GetPublicIP()
 
     def _GetPublicIP(self):
-        self._WaitForIPStatus(['AVAILABLE'])
+        self._WaitForIPStatus(['AVAILABLE', 'RUNNING'])
         ip_cmd = util.OCI_PREFIX + [
             'compute',
             'instance',
             'list-vnics',
-            f'--instance-id {self.ocid}']
+            f'--instance-id {self.ocid}',
+            f'--profile {self.profile}']
         ip_cmd = util.GetEncodedCmd(ip_cmd)
         out, _, _ = vm_util.IssueCommand(ip_cmd)
         ips = json.loads(out)
@@ -241,6 +251,7 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
                 'terminate',
                 f'--instance-id {self.ocid}',
                 '--preserve-boot-volume false',
+                f'--profile {self.profile}',
                 '--force']
             delete_cmd = util.GetEncodedCmd(delete_cmd)
             out, _ = vm_util.IssueRetryableCommand(delete_cmd)
@@ -263,7 +274,7 @@ class OciVirtualMachine(virtual_machine.BaseVirtualMachine):
         if self.local_disk_counter > self.max_local_disks:
             raise errors.Error('Not enough local disks.')
         logging.info("Now starting to create disks")
-        data_disk = oci_disk.OciDisk(disk_spec, self.name, self.availability_domain, disk_number)
+        data_disk = oci_disk.OciDisk(disk_spec, self.profile, self.name, self.availability_domain, disk_number)
         self.scratch_disks.append(data_disk)
         data_disk.Create()
         data_disk.GetFreeDeviceName(self)

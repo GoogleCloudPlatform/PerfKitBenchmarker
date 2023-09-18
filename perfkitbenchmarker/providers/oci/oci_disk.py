@@ -32,9 +32,10 @@ class OciDisk(disk.BaseDisk):
     _lock = threading.Lock()
     vm_devices = {}
 
-    def __init__(self, disk_spec, vm_name, availability_domain, disk_number):
+    def __init__(self, disk_spec, profile, vm_name, availability_domain, disk_number):
         super(OciDisk, self).__init__(disk_spec)
         self.id = None
+        self.profile = profile
         self.availability_domain = availability_domain
         self.disk_size = disk_spec.disk_size or 100
         self.vpus_per_gb: int = DEFAULT_VPUS_PER_GB
@@ -58,7 +59,8 @@ class OciDisk(disk.BaseDisk):
             f'--size-in-gbs {self.disk_size}',
             f'--display-name {self.name}',
             f'--freeform-tags {self.tags}',
-            f'--vpus-per-gb {str(self.vpus_per_gb)}']
+            f'--vpus-per-gb {str(self.vpus_per_gb)}',
+            f'--profile {self.profile}']
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
         response = json.loads(stdout)
@@ -73,6 +75,7 @@ class OciDisk(disk.BaseDisk):
             'volume ',
             'delete',
             f'--volume-id {self.id}',
+            f'--profile {self.profile}',
             '--force']
         delete_cmd = util.GetEncodedCmd(delete_cmd)
         out, _ = vm_util.IssueRetryableCommand(delete_cmd)
@@ -86,7 +89,8 @@ class OciDisk(disk.BaseDisk):
             'bv',
             'volume',
             'get',
-            f'--volume-id {self.id}']
+            f'--volume-id {self.id}',
+            f'--profile {self.profile}']
         status_cmd = util.GetEncodedCmd(status_cmd)
         out, _ = vm_util.IssueRetryableCommand(status_cmd)
         state = json.loads(out)
@@ -102,7 +106,8 @@ class OciDisk(disk.BaseDisk):
             f'--volume-id {self.id}',
             f'--instance-id {vm.ocid}',
             f'--type {self.disk_type}',
-            f'--device {self.device_name}']
+            f'--device {self.device_name}',
+            f'--profile {self.profile}']
         logging.info('Attaching Oci disk %s.' % self.id)
         attach_cmd = util.GetEncodedCmd(attach_cmd)
         stdout, _ = vm_util.IssueRetryableCommand(attach_cmd)
@@ -118,6 +123,7 @@ class OciDisk(disk.BaseDisk):
             'volume-attachment',
             'detach',
             f'--volume-attachment-id {self.attachment_id}',
+            f'--profile {self.profile}',
             '--force']
         logging.info('Detaching Oci disk %s.' % self.id)
         detach_cmd = util.GetEncodedCmd(detach_cmd)
@@ -132,7 +138,8 @@ class OciDisk(disk.BaseDisk):
             'compute',
             'volume-attachment',
             'get',
-            f'--volume-attachment-id {self.attachment_id}']
+            f'--volume-attachment-id {self.attachment_id}',
+            f'--profile {self.profile}']
         status_cmd = util.GetEncodedCmd(status_cmd)
         out, _ = vm_util.IssueRetryableCommand(status_cmd)
         state = json.loads(out)        
@@ -162,7 +169,8 @@ class OciDisk(disk.BaseDisk):
             'compute',
             'device',
             'list-instance',
-            f'--instance-id {vm.ocid}']
+            f'--instance-id {vm.ocid}',
+            f'--profile {self.profile}']
         free_device_cmd = util.GetEncodedCmd(free_device_cmd)
         out, _ = vm_util.IssueRetryableCommand(free_device_cmd)
         stdout, _ = vm_util.IssueRetryableCommand(free_device_cmd)

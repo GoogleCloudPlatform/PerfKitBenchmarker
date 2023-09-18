@@ -40,10 +40,11 @@ SECURITY_LIST_UPDATE_STATUSES = frozenset(
 class OciVcn(resource.BaseResource):
     """An object representing an Oci VCN."""
 
-    def __init__(self, name, region):
+    def __init__(self, name, region, profile):
         super(OciVcn, self).__init__()
         self.status = None
         self.region = region
+        self.profile = profile
         self.id = None
         self.name = name
         self.cidr_blocks = ["172.16.0.0/16"]
@@ -63,7 +64,8 @@ class OciVcn(resource.BaseResource):
             'network',
             'vcn',
             'get',
-            f'--vcn-id {self.vcn_id}']
+            f'--vcn-id {self.vcn_id}',
+            f'--profile {self.profile}']
         status_cmd = util.GetEncodedCmd(status_cmd)
         out, _ = vm_util.IssueRetryableCommand(status_cmd)
         state = json.loads(out)
@@ -95,7 +97,8 @@ class OciVcn(resource.BaseResource):
             f'--display-name pkb-{FLAGS.run_uri}',
             f'--dns-label vcn{FLAGS.run_uri}',
             f'--freeform-tags {self.tags}',
-            '--from-json \'{"cidr-blocks":["172.16.0.0/16"]}\'']
+            '--from-json \'{"cidr-blocks":["172.16.0.0/16"]}\'',
+            f'--profile {self.profile}']
         create_cmd = util.GetEncodedCmd(create_cmd)
         logging.info(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
@@ -109,6 +112,7 @@ class OciVcn(resource.BaseResource):
             'vcn',
             'delete',
             f'--vcn-id {self.vcn_id}',
+            f'--profile {self.profile}',
             '--force']
         delete_cmd = util.GetEncodedCmd(delete_cmd)
         stdout, _, _ = vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
@@ -119,7 +123,8 @@ class OciVcn(resource.BaseResource):
             'network',
             'subnet',
             'list',
-            f'--vcn-id {self.vcn_id}']
+            f'--vcn-id {self.vcn_id}',
+            f'--profile {self.profile}']
         get_cmd = util.GetEncodedCmd(get_cmd)
         logging.info(get_cmd)
         stdout, _, _ = vm_util.IssueCommand(get_cmd, raise_on_failure=False)
@@ -134,7 +139,8 @@ class OciVcn(resource.BaseResource):
             'network',
             'subnet',
             'get',
-            f'--subnet-id {self.subnet_id}']
+            f'--subnet-id {self.subnet_id}',
+            f'--profile {self.profile}',]
         status_cmd = util.GetEncodedCmd(status_cmd)
         out, _ = vm_util.IssueRetryableCommand(status_cmd)
         state = json.loads(out)
@@ -152,7 +158,8 @@ class OciVcn(resource.BaseResource):
             f'--display-name pkb-{FLAGS.run_uri}',
             f'--dns-label sub{FLAGS.run_uri}',
             f'--cidr-block {self.cidr_block}',
-            f'--vcn-id {self.vcn_id}']
+            f'--vcn-id {self.vcn_id}',
+            f'--profile {self.profile}']
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
         response = json.loads(stdout)
@@ -166,6 +173,7 @@ class OciVcn(resource.BaseResource):
             'subnet',
             'delete',
             f'--subnet-id {self.subnet_id}',
+            f'--profile {self.profile}',
             '--force']
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
@@ -177,7 +185,8 @@ class OciVcn(resource.BaseResource):
             'network',
             'internet-gateway',
             'get',
-            f'--ig-id {self.ig_id}']
+            f'--ig-id {self.ig_id}',
+            f'--profile {self.profile}',]
         status_cmd = util.GetEncodedCmd(status_cmd)
         out, _ = vm_util.IssueRetryableCommand(status_cmd)
         state = json.loads(out)
@@ -194,6 +203,7 @@ class OciVcn(resource.BaseResource):
             'create',
             f'--display-name pkb-{FLAGS.run_uri}',
             f'--vcn-id {self.vcn_id}',
+            f'--profile {self.profile}',
             '--is-enabled  True']
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
@@ -208,6 +218,7 @@ class OciVcn(resource.BaseResource):
             'internet-gateway',
             'delete',
             f'--ig-id {self.ig_id}',
+            f'--profile {self.profile}',
             '--force']
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
@@ -219,7 +230,8 @@ class OciVcn(resource.BaseResource):
             'network',
             'route-table',
             'get',
-            f'--rt-id {self.rt_id}']
+            f'--rt-id {self.rt_id}',
+            f'--profile {self.profile}']
         status_cmd = util.GetEncodedCmd(status_cmd)
         out, _ = vm_util.IssueRetryableCommand(status_cmd)
         state = json.loads(out)
@@ -234,7 +246,8 @@ class OciVcn(resource.BaseResource):
             'network',
             'security-list',
             'get',
-            f'--security-list-id {self.security_list_id}']
+            f'--security-list-id {self.security_list_id}',
+            f'--profile {self.profile}']
         status_cmd = util.GetEncodedCmd(status_cmd)
         out, _ = vm_util.IssueRetryableCommand(status_cmd)
         state = json.loads(out)
@@ -251,7 +264,8 @@ class OciVcn(resource.BaseResource):
             'update',
             f'--rt-id {self.rt_id}',
             '--force',
-            '--route-rules \'[{\"cidrBlock\":"0.0.0.0/0\",\"networkEntityId\":\"%s\"}]\'' % self.ig_id]
+            '--route-rules \'[{\"cidrBlock\":"0.0.0.0/0\",\"networkEntityId\":\"%s\"}]\'' % self.ig_id,
+            f'--profile {self.profile}']
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
 
@@ -264,7 +278,8 @@ class OciVcn(resource.BaseResource):
             'update',
             f'--rt-id {self.rt_id}',
             '--force',
-            '--route-rules \'[]\'']
+            '--route-rules \'[]\'',
+            f'--profile {self.profile}']
         create_cmd = util.GetEncodedCmd(create_cmd)
         stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
 
@@ -318,7 +333,8 @@ class OciVcn(resource.BaseResource):
             'update',
             f'--security-list-id {self.security_list_id}',
             '--force',
-            f'--ingress-security-rules {current_security_rules_str}']
+            f'--ingress-security-rules {current_security_rules_str}',
+            f'--profile {self.profile}']
 
         print('cmd===========', cmd)
         cmd = util.GetEncodedCmd(cmd)
@@ -329,7 +345,8 @@ class OciVcn(resource.BaseResource):
             'network',
             'security-list',
             'get',
-            f'--security-list-id {self.security_list_id}']
+            f'--security-list-id {self.security_list_id}',
+            f'--profile {self.profile}']
         get_cmd = util.GetEncodedCmd(cmd)
         logging.info(get_cmd)
         stdout, _, _ = vm_util.IssueCommand(get_cmd, raise_on_failure=False)
@@ -344,7 +361,8 @@ class OciVcn(resource.BaseResource):
             'network',
             'vcn',
             'get',
-            f'--vcn-id {self.vcn_id}']
+            f'--vcn-id {self.vcn_id}',
+            f'--profile {self.profile}']
         status_cmd = util.GetEncodedCmd(status_cmd)
         out, _, _ = vm_util.IssueCommand(status_cmd)
         state = json.loads(out)
@@ -356,7 +374,8 @@ class OciVcn(resource.BaseResource):
             'network',
             'vcn',
             'get',
-            f'--vcn-id {self.vcn_id}']
+            f'--vcn-id {self.vcn_id}',
+            f'--profile {self.profile}']
         status_cmd = util.GetEncodedCmd(status_cmd)
         out, _, _ = vm_util.IssueCommand(status_cmd)
         state = json.loads(out)
@@ -371,13 +390,14 @@ class OciNetwork(network.BaseNetwork):
     def __init__(self, spec):
         super(OciNetwork, self).__init__(spec)
         self.name = FLAGS.oci_network_name or ('perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:]))
+        self.profile = spec.zone
         self.region = spec.zone
         self.use_vcn = FLAGS.oci_use_vcn
         self.network_id = None
         self.vcn_id = None
 
         if self.use_vcn:
-            self.vcn = OciVcn(self.name, self.region)
+            self.vcn = OciVcn(self.name, self.region, self.profile)
             self.security_group = None
 
     #        else:

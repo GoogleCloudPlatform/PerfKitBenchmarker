@@ -10,6 +10,8 @@ from perfkitbenchmarker import context
 
 OCI_PREFIX = ['oci']
 
+oci_suffix = ""
+
 ADD_CLOUDINIT_TEMPLATE = """#!/bin/bash
 echo "{user_name} ALL = NOPASSWD: ALL" >> /etc/sudoers
 useradd {user_name} --home /home/{user_name} --shell /bin/bash -m
@@ -33,14 +35,21 @@ sudo systemctl stop firewalld
 sudo systemctl disable firewalld
 """
 
+def SetProfile(suffix):
+    oci_suffix = suffix
+    return suffix
 
 def GetEncodedCmd(cmd):
+#    oci_suffix1 = SetProfile(oci_suffix)
+#    cmd = cmd + [f'--profile {oci_suffix1}']
+#    print('********************************')
+#    print(cmd)
     cmd_line = ' '.join(cmd)
     cmd_args = shlex.split(cmd_line)
     return cmd_args
 
 
-def GetOciImageIdFromImage(operating_system, operating_system_version, shape):
+def GetOciImageIdFromImage(operating_system, operating_system_version, shape, profile):
     # oci compute image list --all --operating-system "Canonical Ubuntu" --operating-system-version 18.04 --shape
     # VM.Standard.A1.Flex -c ocid1.tenancy.oc1..aaaaaaaadfogwfmgjoi35onknsnu6u5zfp43gh657appkvbghhzyhfhh5oya
     create_cmd = OCI_PREFIX + [
@@ -50,7 +59,8 @@ def GetOciImageIdFromImage(operating_system, operating_system_version, shape):
         '--all',
         '--operating-system \"%s\"' % operating_system,
         '--operating-system-version \"%s\"' % operating_system_version,
-        '--shape %s' % shape]
+        '--shape %s' % shape,
+        f'--profile {profile}']
     create_cmd = GetEncodedCmd(create_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     image_names = json.loads(stdout)['data']
@@ -58,14 +68,15 @@ def GetOciImageIdFromImage(operating_system, operating_system_version, shape):
         return image_names[0]['id']
 
 
-def GetOciImageIdFromName(name, shape):
+def GetOciImageIdFromName(name, shape, profile):
     create_cmd = OCI_PREFIX + [
         'compute',
         'image',
         'list',
         '--all',
         '--display-name \"%s\"' % name,
-        '--shape %s' % shape]
+        '--shape %s' % shape,
+        f'--profile {profile}']
     create_cmd = GetEncodedCmd(create_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     image_names = json.loads(stdout)['data']
@@ -95,12 +106,13 @@ def GetAvailabilityDomainFromRegion(region):
     return availability_domains_list
 
 
-def GetFaultDomainFromAvailabilityDomain(availability_domain):
+def GetFaultDomainFromAvailabilityDomain(availability_domain, profile):
     create_cmd = OCI_PREFIX + [
         'iam',
         'fault-domain',
         'list',
-        '--availability-domain %s' % availability_domain]
+        '--availability-domain %s' % availability_domain,
+        f'--profile {profile}']
     create_cmd = GetEncodedCmd(create_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     fault_domains = json.loads(stdout)['data']

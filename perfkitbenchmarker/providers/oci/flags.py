@@ -26,3 +26,4 @@ flags.DEFINE_integer('oci_num_local_ssds', 0, 'No. of disks')
 flags.DEFINE_string(
     'oci_network_name', None, 'The name of an already created '
     'network to use instead of creating a new one.')
+flags.DEFINE_string('oci_profile', 'DEFAULT', 'default profile to use')
