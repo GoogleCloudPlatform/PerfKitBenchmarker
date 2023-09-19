@@ -279,7 +279,7 @@ def Run(benchmark_spec):
     base_metadata['numactl_options'] = FLAGS.multichase_numactl_options
 
   multichase_path = posixpath.join(vm_state.multichase_dir, 'multichase')
-  base_cmd.extend((multichase_path, '-a', '-v'))
+  base_cmd.extend((multichase_path, '-a', '-v', '-H'))
 
   chase_type = FLAGS.multichase_chase_type
   if _CHASES[chase_type]:
