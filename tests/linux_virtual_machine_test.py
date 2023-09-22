@@ -626,6 +626,29 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm = self.CreateVm(responses)
     self.assertEqual(16, vm.NumCpusForBenchmark())
 
+  def testMemCapFromDifferentSources(self):
+    # Shows the extraction of number of CPUs from different sources.
+    FLAGS['use_cgroup_memory_limits'].parse(True)
+    responses = {
+        'ls /proc/self/cgroup >> /dev/null 2>&1 || echo file_not_exist': '',
+        "grep memory /proc/self/cgroup |cut -d ':' -f 3 |sed -e 's:^/::'": (
+            'container\n'
+        ),
+        'ls /sys/fs/cgroup/memory/container/memory.limit_in_bytes >> /dev/null 2>&1 || echo file_not_exist': (
+            ''
+        ),
+        'cat /sys/fs/cgroup/memory/container/memory.limit_in_bytes': '1024',
+        "cat /proc/meminfo | grep MemTotal | awk '{print $2}'": '3',
+    }
+    vm = self.CreateVm(responses)
+    self.assertEqual(1, vm.total_memory_kb)
+    FLAGS['use_cgroup_memory_limits'].parse(False)
+    responses = {
+        "cat /proc/meminfo | grep MemTotal | awk '{print $2}'": '3',
+    }
+    vm = self.CreateVm(responses)
+    self.assertEqual(3, vm.total_memory_kb)
+
   def testBoot(self):
     vm = self.CreateVm(self.normal_boot_responses)
     vm.RecordAdditionalMetadata()

@@ -198,6 +198,14 @@ flags.DEFINE_boolean(
     '/proc/cpuinfo to extract the number of CPUs.',
 )
 
+flags.DEFINE_boolean(
+    'use_cgroup_memory_limits',
+    False,
+    'Whether to use the cgroup memory limits, read from '
+    '/sys/fs/cgroup/memory/{container_name}/memory.limit_in_bytes, '
+    'to extract the total available memory capacity in the container.',
+)
+
 _DISABLE_YUM_CRON = flags.DEFINE_boolean(
     'disable_yum_cron', True, 'Whether to disable the cron-run yum service.')
 _KERNEL_MODULES_TO_ADD = flags.DEFINE_list(
@@ -1528,14 +1536,61 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         """)
     return int(stdout)
 
-  def _GetTotalMemoryKb(self):
-    """Returns the amount of physical memory on the VM in Kilobytes.
+  def _GetTotalMemoryKbFromCgroup(self):
+    """Extracts the memory space in kibibyte (KiB) for containers.
 
+    Gets the memory capacity from
+    /sys/fs/cgroup/memory/<container>/memory.limit_in_bytes.
+    Below are the example of their returns:
+    $ cat /sys/fs/cgroup/memory/container/memory.limit_in_bytes
+      1024
+
+    Returns:
+      The memory capacity in kibibyte (KiB).
+
+    Raises:
+      ValueError: If not found /proc/self/cgroup, or
+      /sys/fs/cgroup/memory/<container>/memory.limit_in_bytes.
+    """
+    if self._RemoteFileExists('/proc/self/cgroup'):
+      container_name, _ = self.RemoteCommand(
+          "grep memory /proc/self/cgroup |cut -d ':' -f 3 |sed -e 's:^/::'"
+      )
+      container_name = container_name.replace('\n', '')
+    else:
+      raise ValueError(
+          '_GetTotalMemoryKbFromCgroup failed, cannot read /proc/self/cgroup.'
+      )
+
+    if self._RemoteFileExists(
+        f'/sys/fs/cgroup/memory/{container_name}/memory.limit_in_bytes'
+    ):
+      stdout, _ = self.RemoteCommand(
+          f'cat /sys/fs/cgroup/memory/{container_name}/memory.limit_in_bytes'
+      )
+      return int(stdout) // 1024
+
+    raise ValueError(
+        '_GetTotalMemoryKbFromCgroup failed, '
+        'cannot read /sys/fs/cgroup/memory/<container>/memory.limit_in_bytes.'
+    )
+
+  def _GetTotalMemoryKb(self):
+    """Returns the amount of physical memory on the VM in Kilobytes (KiB).
+
+    if the flag `use_cgroup_memory_limits` is true, return
+    the minimum of cgroup memory capacity and the VM capacity.
+    Otherwise, extracts the memory capacity using /proc/meminfo.
     This method does not cache results (unlike "total_memory_kb").
     """
     meminfo_command = 'cat /proc/meminfo | grep MemTotal | awk \'{print $2}\''
     stdout, _ = self.RemoteCommand(meminfo_command)
-    return int(stdout)
+    meminfo_memory_kb = int(stdout)
+
+    if FLAGS.use_cgroup_memory_limits:
+      return min(self._GetTotalMemoryKbFromCgroup(), meminfo_memory_kb)
+
+    return meminfo_memory_kb
 
   def _TestReachable(self, ip):
     """Returns True if the VM can reach the ip address and False otherwise."""
