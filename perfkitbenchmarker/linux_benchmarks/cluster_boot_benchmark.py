@@ -246,8 +246,6 @@ def GetTimeToBoot(vms):
   os_types = set()
   for i, vm in enumerate(vms):
     assert vm.create_start_time
-    assert vm.bootable_time
-    assert vm.bootable_time >= vm.create_start_time
 
     os_types.add(vm.OS_TYPE)
     create_delay_sec = vm.create_start_time - min_create_start_time
@@ -274,24 +272,28 @@ def GetTimeToBoot(vms):
                         metadata))
 
     # TIME TO SSH
-    boot_time_sec = vm.bootable_time - min_create_start_time
-    if isinstance(vm, linux_virtual_machine.BaseLinuxMixin):
-      # TODO(pclay): Remove when Windows refactor below is complete.
-      if vm.ssh_external_time:
+    # A boot time will not be present for a run that failed due to a provisioned
+    # but unreachable VM.
+    if vm.bootable_time is not None:
+      assert vm.bootable_time >= vm.create_start_time
+      boot_time_sec = vm.bootable_time - min_create_start_time
+      if isinstance(vm, linux_virtual_machine.BaseLinuxMixin):
+        # TODO(pclay): Remove when Windows refactor below is complete.
+        if vm.ssh_external_time:
+          samples.append(
+              sample.Sample('Time to SSH - External',
+                            vm.ssh_external_time - min_create_start_time,
+                            'seconds', metadata))
+        if vm.ssh_internal_time:
+          samples.append(
+              sample.Sample('Time to SSH - Internal',
+                            vm.ssh_internal_time - min_create_start_time,
+                            'seconds', metadata))
+        max_boot_time_sec = max(max_boot_time_sec, boot_time_sec)
         samples.append(
-            sample.Sample('Time to SSH - External',
-                          vm.ssh_external_time - min_create_start_time,
-                          'seconds', metadata))
-      if vm.ssh_internal_time:
-        samples.append(
-            sample.Sample('Time to SSH - Internal',
-                          vm.ssh_internal_time - min_create_start_time,
-                          'seconds', metadata))
+            sample.Sample('Boot Time', boot_time_sec, 'seconds', metadata))
 
     # TIME TO PORT LISTENING
-    max_boot_time_sec = max(max_boot_time_sec, boot_time_sec)
-    samples.append(
-        sample.Sample('Boot Time', boot_time_sec, 'seconds', metadata))
     if FLAGS.cluster_boot_test_port_listening:
       assert vm.port_listening_time
       assert vm.port_listening_time >= vm.create_start_time

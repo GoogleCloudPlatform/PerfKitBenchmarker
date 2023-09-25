@@ -892,7 +892,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if boot_methods == virtual_machine.BootCompletionIpSubset.DEFAULT:
       # By default let GetConnectionIp decide which IP to use for SSH.
       # Omitting ip_address falls back to GetConnectionIp in RemoteHostCommand.
-      self._WaitForSSH()
+      try:
+        self._WaitForSSH()
+      except vm_util.RetryError as e:
+        error_text = ('VM connection attempts failed. WaitForSSH failed due'
+                      + ' to ' + str(e.__class__))
+        raise vm_util.BootCompletionError(error_text)
       # We don't know if GetConnectionIP returned an internal or external IP,
       # so we can set neither self.ssh_external_time nor self.ssh_internal_time.
       # It will still set self.bootable_time below.
@@ -905,7 +910,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           (self._WaitForSshExternal, [], {}),
           (self._WaitForSshInternal, [], {}),
           ]
-      background_tasks.RunParallelThreads(connect_threads, len(connect_threads))
+      try:
+        background_tasks.RunParallelThreads(connect_threads,
+                                            len(connect_threads))
+      except errors.VmUtil.ThreadException as e:
+        error_text = ('VM connection attempts failed. WaitForSSH failed due'
+                      + ' to ' + str(e.__class__))
+        raise vm_util.BootCompletionError(error_text)
     else:
       raise ValueError('Unknown --boot_completion_ip_subset: '
                        + self.boot_completion_ip_subset)
@@ -918,16 +929,26 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         virtual_machine.BootCompletionIpSubset.EXTERNAL,
         virtual_machine.BootCompletionIpSubset.BOTH,
     )
-    self._WaitForSSH(self.ip_address)
-    self.ssh_external_time = time.time()
+    try:
+      self._WaitForSSH(self.ip_address)
+      self.ssh_external_time = time.time()
+    except vm_util.RetryError as e:
+      error_text = ('VM connection attempts failed. WaitForSSH failed due'
+                    + ' to ' + str(e.__class__))
+      raise vm_util.BootCompletionError(error_text)
 
   def _WaitForSshInternal(self):
     assert self.boot_completion_ip_subset in (
         virtual_machine.BootCompletionIpSubset.INTERNAL,
         virtual_machine.BootCompletionIpSubset.BOTH,
     )
-    self._WaitForSSH(self.internal_ip)
-    self.ssh_internal_time = time.time()
+    try:
+      self._WaitForSSH(self.internal_ip)
+      self.ssh_internal_time = time.time()
+    except vm_util.RetryError as e:
+      error_text = ('VM connection attempts failed. WaitForSSH failed due'
+                    + ' to ' + str(e.__class__))
+      raise vm_util.BootCompletionError(error_text)
 
   @vm_util.Retry(log_errors=False, poll_interval=1)
   def _WaitForSSH(self, ip_address: Union[str, None] = None):
@@ -941,26 +962,29 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def RecordAdditionalMetadata(self):
     """After the VM has been prepared, store metadata about the VM."""
-    self.tcp_congestion_control = self.TcpCongestionControl()
-    lscpu_results = self.CheckLsCpu()
-    self.numa_node_count = lscpu_results.numa_node_count
-    self.os_metadata['threads_per_core'] = lscpu_results.threads_per_core
-    self.os_metadata['os_info'] = self.os_info
-    self.os_metadata['kernel_release'] = str(self.kernel_release)
-    self.os_metadata['cpu_arch'] = self.cpu_arch
-    self.os_metadata.update(self.partition_table)
-    if FLAGS.append_kernel_command_line:
-      self.os_metadata['kernel_command_line'] = self.kernel_command_line
-      self.os_metadata[
-          'append_kernel_command_line'] = FLAGS.append_kernel_command_line
-    # TODO(pclay): consider publishing full lsmod as a sample. It's probably too
-    # spammy for metadata
-    if _KERNEL_MODULES_TO_ADD.value:
-      self.os_metadata['added_kernel_modules'] = ','.join(
-          _KERNEL_MODULES_TO_ADD.value)
-    if _KERNEL_MODULES_TO_REMOVE.value:
-      self.os_metadata['removed_kernel_modules'] = ','.join(
-          _KERNEL_MODULES_TO_REMOVE.value)
+    # Only record additional metadata (which requires connecting to the VM)
+    # if a prior VM connection attempt successfully captured a boot time.
+    if self.bootable_time:
+      self.tcp_congestion_control = self.TcpCongestionControl()
+      lscpu_results = self.CheckLsCpu()
+      self.numa_node_count = lscpu_results.numa_node_count
+      self.os_metadata['threads_per_core'] = lscpu_results.threads_per_core
+      self.os_metadata['os_info'] = self.os_info
+      self.os_metadata['kernel_release'] = str(self.kernel_release)
+      self.os_metadata['cpu_arch'] = self.cpu_arch
+      self.os_metadata.update(self.partition_table)
+      if FLAGS.append_kernel_command_line:
+        self.os_metadata['kernel_command_line'] = self.kernel_command_line
+        self.os_metadata[
+            'append_kernel_command_line'] = FLAGS.append_kernel_command_line
+      # TODO(pclay): consider publishing full lsmod as a sample. It's probably
+      # too spammy for metadata
+      if _KERNEL_MODULES_TO_ADD.value:
+        self.os_metadata['added_kernel_modules'] = ','.join(
+            _KERNEL_MODULES_TO_ADD.value)
+      if _KERNEL_MODULES_TO_REMOVE.value:
+        self.os_metadata['removed_kernel_modules'] = ','.join(
+            _KERNEL_MODULES_TO_REMOVE.value)
 
     devices = self._get_network_device_mtus()
     all_mtus = set(devices.values())
@@ -1174,6 +1198,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
+      UnreachableVmError: If SSH attempts in RemoteCommandWithReturnCode time
+        hit the retry threshold.
     """
     kwargs = _IncrementStackLevel(**kwargs)
     return self.RemoteCommandWithReturnCode(*args, **kwargs)[:2]
@@ -1230,6 +1256,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
+      UnreachableVmError: If SSH attempts in RemoteCommandWithReturnCode time
+        hit the retry threshold.
     """
     stack_level += 1
     if retries is None:
@@ -1276,6 +1304,14 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     if retcode:
       full_cmd = ' '.join(ssh_cmd)
+      # If the retry limit has been reached and the return code is still
+      # retryable, this indicates that the connection attempt has failed due to
+      # an Unreachable VM.
+      if retcode == RETRYABLE_SSH_RETCODE:
+        raise vm_util.UnreachableVmError(
+            'VM connection attempts failed:'
+            ' RemoteHostCommandWithReturnCode reached its retry threshold when'
+            ' running %s' % full_cmd)
       error_text = ('Got non-zero return code (%s) executing %s\n'
                     'Full command: %s\nSTDOUT: %sSTDERR: %s' %
                     (retcode, command, full_cmd, stdout, stderr))
@@ -1300,6 +1336,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
+      UnreachableVmError: If SSH attempts in RemoteCommandWithReturnCode time
+        hit the retry threshold.
     """
     kwargs = _IncrementStackLevel(**kwargs)
     return self.RemoteHostCommandWithReturnCode(*args, **kwargs)[:2]
@@ -1522,7 +1560,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     stdout, _ = self.RemoteCommand(
         'cat /proc/cpuinfo | grep processor | wc -l')
-    return int(stdout)
+    if stdout:
+      return int(stdout)
+    # Indicates an unreachable VM.
+    return -1
 
   def _GetTotalFreeMemoryKb(self):
     """Calculate amount of free memory in KB of the given vm.
@@ -2842,7 +2883,9 @@ def CreateLscpuSamples(vms):
   """Creates samples from linux VMs of lscpu output."""
   samples = []
   for vm in vms:
-    if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
+    # Only capture lscpu output if the VM has had a successful connection
+    # attempt - indicated by the presence of a VM boot time.
+    if vm.bootable_time and vm.OS_TYPE in os_types.LINUX_OS_TYPES:
       metadata = {'node_name': vm.name}
       metadata.update(vm.CheckLsCpu().data)
       samples.append(sample.Sample('lscpu', 0, '', metadata))

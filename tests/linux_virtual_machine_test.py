@@ -14,6 +14,7 @@
 
 """Tests for linux_virtual_machine.py."""
 
+import time
 from typing import Dict, Union
 import unittest
 
@@ -257,6 +258,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
     vm.RemoteCommand = mock.Mock()  # pylint: disable=invalid-name
     vm.RemoteCommand.return_value = remote_command_text, ''
     vm.name = 'pkb-test'
+    vm.bootable_time = time.time()
     return vm
 
   def testRecordLscpuOutputLinux(self):
@@ -426,7 +428,7 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
     )] * 2 + [
         ('o', '', 0),
     ]
-    with self.assertRaises(errors.VirtualMachine.RemoteCommandError):
+    with self.assertRaises(vm_util.UnreachableVmError):
       self.vm.RemoteCommand('foo', retries=2)
 
 
@@ -667,6 +669,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testBoot(self):
     vm = self.CreateVm(self.normal_boot_responses)
+    vm.bootable_time = time.time()
     vm.RecordAdditionalMetadata()
     expected_os_metadata = {
         '/dev/sda': 1073741824,

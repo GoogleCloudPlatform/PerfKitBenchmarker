@@ -979,7 +979,17 @@ class BenchmarkSpec(object):
     logging.info('VM: %s (%s)', vm.ip_address, vm.internal_ip)
     logging.info('Waiting for boot completion.')
     vm.AllowRemoteAccessPorts()
-    vm.WaitForBootCompletion()
+    # If WaitForBootCompletion produces a RetryError, this indicates that all
+    # connection attempts to the VM have failed. This is captured as an
+    # UnreachableVmError in the retries, which then gets a failed substatus of
+    # Known Intermittent.
+    try:
+      vm.WaitForBootCompletion()
+    except vm_util.RetryError as retry_error:
+      if isinstance(retry_error.__cause__, vm_util.BootCompletionError):
+        error_text = ('VM connection attempts failed.'
+                      + ' CreateAndBootVm failed due to an unreachable VM.')
+        raise vm_util.BootCompletionError(error_text) from retry_error
 
   def PrepareVmAfterBoot(self, vm):
     """Prepares a VM after it has booted.

@@ -401,3 +401,4 @@
 -   Remove cygwin codepath.
 -   Moved flags from `pkb.py` to `flags.py` to help avoid circular dependencies.
 -   Updated tracer dstat to use pcp dstat.
+-   Improved handling of unreachable VMs.

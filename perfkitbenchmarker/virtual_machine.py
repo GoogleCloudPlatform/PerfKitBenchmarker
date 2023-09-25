@@ -667,6 +667,9 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     Implementations of this method should set the 'bootable_time' attribute
     and the 'hostname' attribute.
+
+    If bootable_time is not set, this indicates a failure due to an
+    unreachable VM, and is reported as a BootCompletionError.
     """
     raise NotImplementedError()
 
@@ -857,6 +860,12 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     if self._num_cpus is None:
       self._num_cpus = self._GetNumCpus()
+    # If num_cpus is set to -1, this means the VM was unreachable, preventing
+    # any attempt to capture the CPU count.
+    if self._num_cpus == -1:
+      raise vm_util.UnreachableVmError(
+          'VM connection attempts failed.'
+          + ' num_cpus: skipping CPU count capture.')
     return self._num_cpus
 
   def NumCpusForBenchmark(self, report_only_physical_cpus=False):
@@ -1334,10 +1343,14 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       result['numa_node_count'] = self.numa_node_count
     if self.num_disable_cpus is not None:
       result['num_disable_cpus'] = self.num_disable_cpus
-    if self.num_cpus is not None:
-      result['num_cpus'] = self.num_cpus
-      if self.NumCpusForBenchmark() != self.num_cpus:
-        result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
+    try:
+      if self.num_cpus is not None:
+        result['num_cpus'] = self.num_cpus
+        if self.NumCpusForBenchmark() != self.num_cpus:
+          result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
+    except vm_util.UnreachableVmError:
+      logging.info('GetResourceMetadata: '
+                   + 'Unable to determine CPU count due to an unreachable VM.')
     # Some metadata is unique per VM.
     # Update publisher._VM_METADATA_TO_LIST to add more
     if self.id is not None:

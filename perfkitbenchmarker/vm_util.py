@@ -122,6 +122,14 @@ class RetriesExceededRetryError(RetryError):
   """Exception that is raised when a retryable function hits its retry limit."""
 
 
+class UnreachableVmError(Exception):
+  """Exception that is raised failed VM SSH attempts reach the retry limit."""
+
+
+class BootCompletionError(Exception):
+  """Raised when from WaitForBootCompletion when the VM is unreachable."""
+
+
 class IpAddressSubset(object):
   """Enum of options for --ip_addresses."""
   REACHABLE = 'REACHABLE'
