@@ -195,7 +195,7 @@ flags.DEFINE_boolean('gce_firewall_rules_clean_all', False,
                      'successfully delete the PKB-created network.')
 flags.DEFINE_enum('bq_client_interface', 'CLI',
                   ['CLI', 'JAVA', 'SIMBA_JDBC_1_2_4_1007',
-                   'SIMBA_JDBC_1_3_3_1004'],
+                   'SIMBA_JDBC_1_3_3_1004', 'SIMBA_JDBC_1_5_0_1001'],
                   'The Runtime Interface used when interacting with BigQuery.')
 flags.DEFINE_string('gcp_preemptible_status_bucket', None,
                     'The GCS bucket to store the preemptible status when '

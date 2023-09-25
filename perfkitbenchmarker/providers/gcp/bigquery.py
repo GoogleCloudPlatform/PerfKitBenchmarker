@@ -36,15 +36,19 @@ BQ_CLIENT_FILE = 'bq-java-client-2.7.jar'
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
 BQ_JDBC_INTERFACES = [
-    'SIMBA_JDBC_1_2_4_1007', 'SIMBA_JDBC_1_3_3_1004',
+    'SIMBA_JDBC_1_2_4_1007',
+    'SIMBA_JDBC_1_3_3_1004',
+    'SIMBA_JDBC_1_5_0_1001',
 ]
 BQ_JDBC_CLIENT_FILE = {
     'SIMBA_JDBC_1_2_4_1007': 'bq-jdbc-client-1.0.jar',
     'SIMBA_JDBC_1_3_3_1004': 'bq-jdbc-client-2.0.jar',
+    'SIMBA_JDBC_1_5_0_1001': 'bq-jdbc-client-2.1.jar',
 }
 BQ_JDBC_JAR_FILE = {
     'SIMBA_JDBC_1_2_4_1007': 'GoogleBigQueryJDBC42.jar',
     'SIMBA_JDBC_1_3_3_1004': 'GoogleBigQueryJDBC42-1.3.3.1004.jar',
+    'SIMBA_JDBC_1_5_0_1001': 'GoogleBigQueryJDBC42-1.5.0.1001.jar',
 }
 
 
