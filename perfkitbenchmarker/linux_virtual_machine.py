@@ -1540,7 +1540,8 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Extracts the memory space in kibibyte (KiB) for containers.
 
     Gets the memory capacity from
-    /sys/fs/cgroup/memory/<container>/memory.limit_in_bytes.
+    /sys/fs/cgroup/memory/<container>/memory.limit_in_bytes,
+    or /sys/fs/cgroup/memory/memory.limit_in_bytes.
     Below are the example of their returns:
     $ cat /sys/fs/cgroup/memory/container/memory.limit_in_bytes
       1024
@@ -1549,8 +1550,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       The memory capacity in kibibyte (KiB).
 
     Raises:
-      ValueError: If not found /proc/self/cgroup, or
-      /sys/fs/cgroup/memory/<container>/memory.limit_in_bytes.
+      ValueError: If not found /proc/self/cgroup,
+      or /sys/fs/cgroup/memory/<container>/memory.limit_in_bytes,
+      or /sys/fs/cgroup/memory/memory.limit_in_bytes.
     """
     if self._RemoteFileExists('/proc/self/cgroup'):
       container_name, _ = self.RemoteCommand(
@@ -1569,10 +1571,16 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           f'cat /sys/fs/cgroup/memory/{container_name}/memory.limit_in_bytes'
       )
       return int(stdout) // 1024
+    elif self._RemoteFileExists('/sys/fs/cgroup/memory/memory.limit_in_bytes'):
+      stdout, _ = self.RemoteCommand(
+          'cat /sys/fs/cgroup/memory/memory.limit_in_bytes'
+      )
+      return int(stdout) // 1024
 
     raise ValueError(
-        '_GetTotalMemoryKbFromCgroup failed, '
-        'cannot read /sys/fs/cgroup/memory/<container>/memory.limit_in_bytes.'
+        '_GetTotalMemoryKbFromCgroup failed, cannot read '
+        ' /sys/fs/cgroup/memory/%s/memory.limit_in_bytes or'
+        ' /sys/fs/cgroup/memory/memory.limit_in_bytes' % container_name
     )
 
   def _GetTotalMemoryKb(self):
