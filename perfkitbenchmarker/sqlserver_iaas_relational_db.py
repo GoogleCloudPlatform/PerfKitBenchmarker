@@ -17,12 +17,27 @@ This class is responsible to provide helper methods for IAAS relational
 database.
 """
 
+import ntpath
+import os
+from typing import Optional
+
 from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import db_util
 from perfkitbenchmarker import iaas_relational_db
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+
+CONTROLLER_SCRIPT_PATH = (
+    "relational_db_configs/sqlserver_ha_configs/controller.ps1"
+)
+
+FCI_CLUSTER_SCRIPT_PATH = (
+    "relational_db_configs/sqlserver_ha_configs/fci_cluster.ps1"
+)
 
 FLAGS = flags.FLAGS
 
@@ -37,15 +52,77 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
 
   ENGINE = sql_engine_utils.SQLSERVER
 
+  @property
+  def replica_vms(self):
+    """Server VM of replicas for hosting a managed database.
+
+    Raises:
+      RelationalDbPropertyNotSetError: if the server_vm is missing.
+
+    Returns:
+      The replica vms.
+    """
+    if not hasattr(self, "_replica_vms"):
+      raise relational_db.RelationalDbPropertyNotSetError(
+          "replica_vms is not set"
+      )
+    return self._replica_vms
+
+  @replica_vms.setter
+  def replica_vms(self, replica_vms):
+    self._replica_vms = replica_vms
+
+  @property
+  def controller_vm(self):
+    """Server VM of replicas for hosting a managed database.
+
+    Raises:
+      RelationalDbPropertyNotSetError: if the server_vm is missing.
+
+    Returns:
+      The replica vms.
+    """
+    if not hasattr(self, "_controller_vm"):
+      raise relational_db.RelationalDbPropertyNotSetError(
+          "controller_vm is not set"
+      )
+    return self._controller_vm
+
+  @controller_vm.setter
+  def controller_vm(self, controller_vm):
+    self._controller_vm = controller_vm
+
+  def SetVms(self, vm_groups):
+    super().SetVms(vm_groups)
+    if "servers" in vm_groups:
+      self.server_vm = vm_groups["servers"][0]
+
+    if self.spec.high_availability:
+      assert len(vm_groups["servers"]) >= 3
+      self.controller_vm = vm_groups["servers"][-1]
+      self.replica_vms = vm_groups["servers"][1:-1]
+
   def _SetupWindowsUnamangedDatabase(self):
     self.spec.database_username = "sa"
     self.spec.database_password = db_util.GenerateRandomDbPassword()
-    ConfigureSQLServer(
-        self.server_vm,
-        self.spec.database_username,
-        self.spec.database_password,
-    )
-    self.MoveSQLServerTempDb()
+
+    if self.spec.high_availability:
+      self.ConfigureSQLServerHa()
+    else:
+      ConfigureSQLServer(
+          self.server_vm,
+          self.spec.database_username,
+          self.spec.database_password,
+          )
+      self.MoveSQLServerTempDb()
+
+  def _SetEndpoint(self):
+    """Set the DB endpoint for this instance during _PostCreate."""
+    super()._SetEndpoint()
+    if self.spec.high_availability:
+      self.endpoint = "fcidnn.perflab.local"
+    else:
+      self.endpoint = self.server_vm.internal_ip
 
   def _SetupLinuxUnmanagedDatabase(self):
     if self.spec.engine_version == "2022":
@@ -108,6 +185,118 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       (string): Default version for the given database engine.
     """
     return DEFAULT_ENGINE_VERSION
+
+  def ConfigureSQLServerHa(self):
+    """Create SQL server HA deployment for performance testing."""
+    server_vm = self.server_vm
+    client_vm = self.client_vm
+    controller_vm = self.controller_vm
+    replica_vms = self.replica_vms
+    win_password = vm_util.GenerateRandomWindowsPassword(
+        vm_util.PASSWORD_LENGTH, "*!@#%^+=")
+    ip_name = "fci-ip-{}".format(FLAGS.run_uri)
+    reserved_ip = server_vm.CreateIpReservation(ip_name)
+    # Install and configure AD components.
+    self.PushAndRunPowershellScript(controller_vm,
+                                    "setup_domain_controller.ps1",
+                                    [win_password])
+    controller_vm.Reboot()
+
+    # Remove volumes and partitions created on the attached disks.
+    # Disks will be initialized by S2D.
+    self.PushAndRunPowershellScript(server_vm, "clean_disks.ps1")
+
+    self.PushAndRunPowershellScript(server_vm, "set_dns_join_domain.ps1",
+                                    [controller_vm.internal_ip, win_password])
+    server_vm.Reboot()
+
+    self.PushAndRunPowershellScript(replica_vms[0], "clean_disks.ps1")
+    self.PushAndRunPowershellScript(replica_vms[0], "set_dns_join_domain.ps1",
+                                    [controller_vm.internal_ip, win_password])
+    replica_vms[0].Reboot()
+
+    self.PushAndRunPowershellScript(client_vm, "set_dns.ps1",
+                                    [controller_vm.internal_ip])
+
+    # Install all components needed to create and configure failover cluster.
+    self.PushAndRunPowershellScript(controller_vm,
+                                    "install_cluster_components.ps1")
+    controller_vm.Reboot()
+    self.PushAndRunPowershellScript(server_vm, "install_cluster_components.ps1")
+    server_vm.Reboot()
+    self.PushAndRunPowershellScript(replica_vms[0],
+                                    "install_cluster_components.ps1")
+    replica_vms[0].Reboot()
+
+    # Setup cluster witness.
+    self.PushAndRunPowershellScript(controller_vm, "setup_witness.ps1")
+    self.PushAndRunPowershellScript(server_vm, "setup_fci_cluster.ps1",
+                                    [replica_vms[0].name, controller_vm.name,
+                                     win_password])
+
+    # Ensure all nodes in the cluster have access to the witness share
+    self.PushAndRunPowershellScript(controller_vm, "grant_witness_access.ps1")
+
+    # Uninstall existing SQL server.
+    # FCI cluster requires different installation to what comes with the image.
+    server_vm.RemoteCommand("C:\\sql_server_install\\Setup.exe "
+                            "/Action=Uninstall /FEATURES=SQL,AS,IS,RS "
+                            "/INSTANCENAME=MSSQLSERVER /Q")
+    server_vm.Reboot()
+    replica_vms[0].RemoteCommand("C:\\sql_server_install\\Setup.exe "
+                                 "/Action=Uninstall /FEATURES=SQL,AS,IS,RS "
+                                 "/INSTANCENAME=MSSQLSERVER /Q")
+    replica_vms[0].Reboot()
+
+    # Configure S2D pool and volumes.
+    # All available storage (both PD and local SSD) will be used
+    self.PushAndRunPowershellScript(server_vm, "setup_s2d_volumes.ps1",
+                                    [win_password])
+    # install SQL server into newly created cluster
+    self.PushAndRunPowershellScript(server_vm,
+                                    "setup_sql_server_first_node.ps1",
+                                    [reserved_ip.ip_address, win_password])
+    self.PushAndRunPowershellScript(replica_vms[0],
+                                    "add_sql_server_second_node.ps1",
+                                    [reserved_ip.ip_address, win_password])
+
+    # Install SQL server updates.
+    # Installation media present on the system is very outdated and it
+    # does not support DNN connection for SQL.
+    self.PushAndRunPowershellScript(server_vm, "update_sql_server.ps1")
+    self.PushAndRunPowershellScript(replica_vms[0], "update_sql_server.ps1")
+
+    # Update variables user for connection to SQL server.
+    self.spec.database_password = win_password
+    self.spec.endpoint = "fcidnn.perflab.local"
+
+  def PushAndRunPowershellScript(
+      self,
+      vm: virtual_machine.VirtualMachine,
+      script_name: str,
+      cmd_parameters: Optional[list[str]] = None,
+      source_path: str = "relational_db_configs/sqlserver_ha_configs/"
+      ) -> tuple[str, str]:
+    """Pushes a powershell script to VM and run it.
+
+    Args:
+      vm: vm where script will be uploaded and executed
+      script_name: name of the script to upload and execute
+      cmd_parameters: optional command parameters
+      source_path: script source location
+
+    Returns:
+      command execution output.
+    """
+    if cmd_parameters is None:
+      cmd_parameters = []
+    script_path_on_vm = ntpath.join(vm.temp_dir, script_name)
+    script_path = data.ResourcePath(os.path.join(source_path, script_name))
+    vm.PushFile(script_path, script_path_on_vm)
+
+    return vm.RemoteCommand("powershell {} {}"
+                            .format(script_path_on_vm,
+                                    " ".join(cmd_parameters)))
 
 
 def ConfigureSQLServer(vm, username: str, password: str):

@@ -60,6 +60,7 @@ New-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Pol
 Set-MpPreference -DisableRealtimeMonitoring $true
 Set-MpPreference -DisableBehaviorMonitoring $true
 Set-MpPreference -DisableBlockAtFirstSeen $true
+Set-ExecutionPolicy RemoteSigned
 Enable-PSRemoting -Force
 $cert = New-SelfSignedCertificate -DnsName hostname -CertStoreLocation `
     Cert:\\LocalMachine\\My\\

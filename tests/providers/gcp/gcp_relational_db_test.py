@@ -148,6 +148,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'enable_freeze_restore': False,
         'create_on_restore_error': False,
         'delete_on_freeze_error': False,
+        'db_flags': '',
     }
 
   def setUp(self):
@@ -273,14 +274,16 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCreateUnmanagedDb(self):
     FLAGS['use_managed_db'].parse(False)
     FLAGS['project'].parse('test')
+    FLAGS['db_flags'].parse('')
     with PatchCriticalObjects() as issue_command:
       db = CreateIAASDbFromSpec(self.createMySQLSpecDict())
       db._Create()
       self.assertTrue(db._Exists())
-      self.assertEqual(db.endpoint, db.server_vm.internal_ip)
       self.assertEqual(db.spec.database_username, 'root')
       self.assertEqual(db.spec.database_password, 'perfkitbenchmarker')
       self.assertIsNone(issue_command.call_args)
+      db._PostCreate()
+      self.assertEqual(db.endpoint, db.server_vm.internal_ip)
 
 
 class GcpPostgresRelationlDbTestCase(pkb_common_test_case.PkbCommonTestCase):

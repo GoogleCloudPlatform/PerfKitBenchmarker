@@ -322,6 +322,8 @@ class WindowsGceSqlServerVirtualMachine(WindowsGceVirtualMachine):
       os_types.WINDOWS2019_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2019',
       os_types.WINDOWS2022_SQLSERVER_2019_STANDARD: 'sql-std-2019-win-2022',
       os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2022',
+      os_types.WINDOWS2022_SQLSERVER_2022_ENTERPRISE: 'sql-ent-2022-win-2022',
+      os_types.WINDOWS2022_SQLSERVER_2022_STANDARD: 'sql-std-2022-win-2022',
   }
 
   OS_TYPE = os_types.WINDOWS_SQLSERVER_OS_TYPES

@@ -1164,6 +1164,33 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
     self._PrepareScratchDisk(scratch_disk, disk_spec)
 
+  def CreateIpReservation(self,
+                          ip_address_name: str) -> gce_network.GceIPAddress:
+    """Creates an IP reservation.
+
+    Args:
+      ip_address_name: name of the IP reservation to be created.
+
+    Returns:
+      Reserved IP address.
+    """
+    reserved_ip_address = gce_network.GceIPAddress(
+        self.project, util.GetRegionFromZone(self.zone),
+        ip_address_name, self.network.primary_subnet_name)
+    reserved_ip_address.Create()
+    return reserved_ip_address
+
+  def ReleaseIpReservation(self, ip_address_name: str) -> None:
+    """Releases existing IP reservation.
+
+    Args:
+      ip_address_name: name of the IP reservation to be released.
+    """
+    reserv_ip_address = gce_network.GceIPAddress(
+        self.project, util.GetRegionFromZone(self.zone),
+        ip_address_name, self.network.primary_subnet_name)
+    reserv_ip_address.Delete()
+
   def FindRemoteNVMEDevices(self, _, nvme_devices):
     """Find the paths for all remote NVME devices inside the VM."""
     remote_nvme_devices = [
