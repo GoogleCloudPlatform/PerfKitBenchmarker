@@ -28,6 +28,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
+import requests
 import six
 import timeout_decorator
 import winrm
@@ -136,11 +137,14 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     """
 
     logging.info('Running robust command on %s: %s', self, command)
-    command_id = uuid.uuid4()
-    logged_command = ('New-Item -Path %s.start -ItemType File; powershell "%s" '
-                      '2> %s.err 1> %s.out; New-Item -Path %s.done -ItemType '
-                      'File') % (command_id, command, command_id, command_id,
-                                 command_id)
+    command_path = ntpath.join(self.temp_dir, str(uuid.uuid4()))
+    logged_command = (
+        'Invoke-WmiMethod -path win32_process -name create -argumentlist'
+        f' "powershell `"New-Item -Path {command_path}.start -ItemType File;'
+        f' {command} 2> {command_path}.err 1> {command_path}.out; New-Item'
+        f' -Path {command_path}.done -ItemType File`""'
+    )
+
     start_command_time = time.time()
     try:
       self.RemoteCommand(
@@ -150,31 +154,37 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     except errors.VirtualMachine.RemoteCommandError:
       logging.exception(
           'Exception while running %s on %s, waiting for command to finish',
-          command, self)
-    start_out, _ = self.RemoteCommand('Test-Path %s.start' % (command_id,))
+          command,
+          self,
+      )
+    start_out, _ = self.RemoteCommand(f'Test-Path {command_path}.start')
     if 'True' not in start_out:
       raise errors.VirtualMachine.RemoteCommandError(
-          'RobustRemoteCommand did not start on VM.')
+          'RobustRemoteCommand did not start on VM.'
+      )
 
     def wait_for_done_file():
-      # Spin on the VM until the "done" file is created. It is better to spin
-      # on the VM rather than creating a new session for each test.
+      # It is better to sleep on the client rather than the VM
+      # as spinning on the VM have more chances of failure.
+      # i.e Full 60 seconds of connection have to be stable.
       done_out = ''
-      command_timeout = (
-          None
-          if timeout is None
-          else timeout - (time.time() - start_command_time)
-      )
       while 'True' not in done_out:
-        done_out, _ = self.RemoteCommand(
-            '$retries=0; while ((-not (Test-Path %s.done)) -and '
-            '($retries -le 60)) { Start-Sleep -Seconds 1; $retries++ }; '
-            'Test-Path %s.done' % (command_id, command_id),
-            timeout=command_timeout)
+        if timeout is not None and time.time() - start_command_time > timeout:
+          raise WaitTimeoutError()
+        try:
+          done_out, _ = self.RemoteCommand(
+              'Test-Path %s.done' % (command_path,),
+              timeout=10,
+          )
+          time.sleep(60)
+        except requests.exceptions.ConnectionError as e:
+          logging.exception(e)
+        except WaitTimeoutError as e:
+          logging.exception(e)
 
     wait_for_done_file()
-    stdout, _ = self.RemoteCommand('Get-Content %s.out' % (command_id,))
-    _, stderr = self.RemoteCommand('Get-Content %s.err' % (command_id,))
+    stdout, _ = self.RemoteCommand('Get-Content %s.out' % (command_path,))
+    stderr, _ = self.RemoteCommand('Get-Content %s.err' % (command_path,))
 
     return stdout, stderr
 
@@ -208,9 +218,11 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     encoded_command = six.ensure_str(
         base64.b64encode(command.encode('utf_16_le')))
 
-    @timeout_decorator.timeout(timeout, use_signals=False,
-                               timeout_exception=errors.VirtualMachine.
-                               RemoteCommandError)
+    @timeout_decorator.timeout(
+        timeout,
+        use_signals=False,
+        timeout_exception=WaitTimeoutError,
+    )
     def run_command():
       return s.run_cmd('powershell -encodedcommand %s' % encoded_command)
 
