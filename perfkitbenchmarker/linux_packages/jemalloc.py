@@ -17,25 +17,36 @@ import posixpath
 
 from perfkitbenchmarker import linux_packages
 
+JE_VERSION = '5.3.0'
 JE_INSTALL_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'jemalloc/install')
-JE_DIR = posixpath.join(JE_INSTALL_DIR, 'jemalloc-5.1.0')
-JE_TAR = 'jemalloc-5.1.0.tar.bz2'
+JE_DIR = posixpath.join(JE_INSTALL_DIR, f'jemalloc-{JE_VERSION}')
+JE_TAR = f'jemalloc-{JE_VERSION}.tar.bz2'
 
 
 def _Install(vm):
   """Installs Jemalloc on the VM."""
-  vm.RemoteCommand(f'mkdir -p {JE_INSTALL_DIR}')
   vm.RemoteCommand(
+      f'mkdir -p {JE_INSTALL_DIR} && '
       f'cd {JE_INSTALL_DIR} && '
-      'wget'
-      f' https://github.com/jemalloc/jemalloc/releases/download/5.1.0/{JE_TAR}'
+      'wget '
+      # The secure-protocol flag is needed to avoid a flaky
+      # `Unable to establish SSL connection` error.
+      '--secure-protocol=TLSv1_3 '
+      f'https://github.com/jemalloc/jemalloc/releases/download/{JE_VERSION}/{JE_TAR}'
   )
   vm.RemoteCommand(f'cd {JE_INSTALL_DIR} && tar xvf {JE_TAR}')
-
   vm.RemoteCommand(
-      'export CC=$GCC_INSTALL_DIR/bin/gcc && export'
-      f' CXX=$GCC_INSTALL_DIR/bin/g++ && cd {JE_DIR} && ./configure'
-      f' --with-lg-page=16 --prefix={JE_INSTALL_DIR} && make && make install'
+      f'cd {JE_DIR} && '
+      'export CC=$GCC_INSTALL_DIR/bin/gcc && '
+      'export CXX=$GCC_INSTALL_DIR/bin/g++ && '
+      './configure '
+      # 64k page size
+      '--with-lg-page=16 '
+      # 8 byte alignment
+      '--with-lg-quantum=3 '
+      f'--prefix={JE_INSTALL_DIR} && '
+      'make && '
+      'make install'
   )
 
 
