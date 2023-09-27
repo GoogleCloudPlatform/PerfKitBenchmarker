@@ -145,6 +145,8 @@
 -   Add support for benchmarking VMs with Local SSD on Windows on GCE/AWS/Azure.
 -   Add support for Ubuntu 23.04.
 -   Add support for Debian 12.
+-   Add netperf_hammerdbcli benchmark, which executes netperf and hammerdbcli
+    benchmarks in parallel.
 
 ### Enhancements:
 

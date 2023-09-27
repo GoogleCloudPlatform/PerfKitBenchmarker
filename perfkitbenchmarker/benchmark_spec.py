@@ -168,9 +168,15 @@ class BenchmarkSpec(object):
     self.capacity_reservations = []
     self.placement_group_specs = benchmark_config.placement_group_specs or {}
     self.placement_groups = {}
-    self.vms_to_boot = (
-        self.config.vm_groups if self.config.relational_db is None else
-        relational_db.VmsToBoot(self.config.relational_db.vm_groups))
+    # Benchmark configs for relational_db and vm_groups can both be included.
+    # This is currently used for combo benchmarks.
+    self.vms_to_boot = {}
+    if self.config.relational_db:
+      self.vms_to_boot.update(relational_db.VmsToBoot(
+          self.config.relational_db.vm_groups
+      ))
+    if self.config.vm_groups:
+      self.vms_to_boot.update(self.config.vm_groups)
     self.vpc_peering = self.config.vpc_peering
 
     self.vpn_service = None
