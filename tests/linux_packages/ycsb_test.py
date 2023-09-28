@@ -21,6 +21,7 @@ from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.linux_packages import ycsb_stats
 from tests import matchers
@@ -172,6 +173,42 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertSequenceEqual(
         [mock.call(matchers.HAS('-target 200'))], self.test_cmd.mock_calls
     )
+
+  @flagsaver.flagsaver(
+      ycsb_cpu_optimization=True,
+      ycsb_cpu_optimization_target_min=0.4,
+      ycsb_cpu_optimization_target=0.5,
+  )
+  def testCpuMode(self):
+    database = mock.Mock()
+    database.CalculateTheoreticalMaxThroughput = mock.Mock(return_value=1000)
+    database.GetAverageCpuUsage = mock.Mock(side_effect=[0.2, 0.4, 0.5, 0.6])
+    self.enter_context(
+        mock.patch.object(
+            self.test_executor,
+            'RunStaircaseLoads',
+            side_effect=[
+                [s] for s in _GetMockThroughputSamples([100, 150, 200, 250])
+            ],
+        )
+    )
+
+    results = self.test_executor.Run([self.test_vm], database=database)
+
+    self.assertEqual(results[0].metric, 'overall Throughput')
+    self.assertEqual(results[0].value, 200)
+    self.assertEqual(results[0].metadata['ycsb_cpu_utilization'], 0.5)
+
+
+def _GetMockThroughputSamples(throughputs):
+  result = []
+  for throughput in throughputs:
+    result.append(
+        sample.Sample(
+            metric='overall Throughput', value=throughput, unit='ops/sec'
+        )
+    )
+  return result
 
 
 if __name__ == '__main__':

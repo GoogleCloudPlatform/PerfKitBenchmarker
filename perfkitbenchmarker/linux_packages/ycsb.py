@@ -37,6 +37,7 @@ Each workload runs for at most 30 minutes.
 
 from collections.abc import Mapping, Sequence
 import copy
+import dataclasses
 import io
 import logging
 import os
@@ -303,22 +304,21 @@ CPU_OPTIMIZATION = flags.DEFINE_bool(
     'ycsb_cpu_optimization',
     False,
     'Whether to run in CPU-optimized mode. The test will increase QPS until '
-    'CPU is between --ycsb_cpu_optimization_target and '
-    '--ycsb_cpu_optimization_target_max.',
+    'CPU is over --ycsb_cpu_optimization_target.',
+)
+CPU_OPTIMIZATION_TARGET_MIN = flags.DEFINE_float(
+    'ycsb_cpu_optimization_target_min',
+    0.65,
+    'CPU-optimized mode: minimum target CPU utilization. The end sample must be'
+    ' between this number and --ycsb_cpu_optimization_target, else an exception'
+    ' will be thrown.',
 )
 CPU_OPTIMIZATION_TARGET = flags.DEFINE_float(
     'ycsb_cpu_optimization_target',
     0.70,
-    'CPU-optimized mode: minimum target CPU utilization at which to stop the'
+    'CPU-optimized mode: maximum target CPU utilization at which to stop the'
     ' test. The test will continue to increment until the utilization level is'
-    ' reached, and then return relevant metrics for that usage level.',
-)
-CPU_OPTIMIZATION_TARGET_MAX = flags.DEFINE_float(
-    'ycsb_cpu_optimization_target_max',
-    0.80,
-    'CPU-optimized mode: maximum target CPU utilization after which the'
-    ' benchmark will throw an exception. This is needed so the increase in QPS'
-    ' does not overshoot the target CPU percentage by too much.',
+    ' reached, and then return the maximum throughput for that usage level.',
 )
 _CPU_OPTIMIZATION_SLEEP_MINS = flags.DEFINE_integer(
     'ycsb_cpu_optimization_sleep_mins',
@@ -355,8 +355,8 @@ CPU_OPTIMIZATION_QPS_INCREMENT = flags.DEFINE_integer(
 
 def _ValidateCpuTargetFlags(flags_dict):
   return (
-      flags_dict['ycsb_cpu_optimization_target_max']
-      > flags_dict['ycsb_cpu_optimization_target']
+      flags_dict['ycsb_cpu_optimization_target']
+      > flags_dict['ycsb_cpu_optimization_target_min']
   )
 
 
@@ -368,9 +368,9 @@ def _ValidateCpuMeasurementFlag(flags_dict):
 
 
 flags.register_multi_flags_validator(
-    ['ycsb_cpu_optimization_target', 'ycsb_cpu_optimization_target_max'],
+    ['ycsb_cpu_optimization_target', 'ycsb_cpu_optimization_target_min'],
     _ValidateCpuTargetFlags,
-    'CPU optimization max target must be greater than target.',
+    'CPU optimization target must be greater than min target.',
 )
 flags.register_multi_flags_validator(
     [
@@ -1305,10 +1305,17 @@ class YCSBExecutor:
           * 0.5
       )
 
+    @dataclasses.dataclass
+    class _CpuResult:
+      run_samples: list[sample.Sample] = dataclasses.field(default_factory=list)
+      cpu_utilization: float = 0.0
+      throughput: float = 0.0
+
     def _RunCpuModeSingleWorkload(workload: str) -> list[sample.Sample]:
       """Runs the CPU utilization test for a single workload."""
       qps = _GetStartingThroughput(workload)
       first_run = True
+      previous_result = _CpuResult()
       while True:
         run_kwargs['target'] = qps
         run_kwargs['maxexecutiontime'] = (
@@ -1338,24 +1345,30 @@ class YCSBExecutor:
                 f'Initial QPS {qps} already above cpu utilization cap. '
                 'Please lower the starting QPS.'
             )
-          if cpu_utilization > CPU_OPTIMIZATION_TARGET_MAX.value:
+          if (
+              previous_result.cpu_utilization
+              < CPU_OPTIMIZATION_TARGET_MIN.value
+          ):
             raise errors.Benchmarks.RunError(
-                f'CPU utilization measured was {cpu_utilization}, over the '
-                f'{CPU_OPTIMIZATION_TARGET_MAX.value} threshold. '
-                'Decrease step size to avoid overshooting.'
+                f'CPU utilization measured was {cpu_utilization} which is over'
+                f' the max {CPU_OPTIMIZATION_TARGET.value} threshold, and the'
+                f' previous data point {previous_result.cpu_utilization} is'
+                ' under the minimum threshold'
+                f' {CPU_OPTIMIZATION_TARGET_MIN.value}. Decrease step size to'
+                ' avoid overshooting.'
             )
-          for s in run_samples:
+          for s in previous_result.run_samples:
             s.metadata.update({
                 'ycsb_cpu_optimization': True,
-                'ycsb_cpu_utilization': cpu_utilization,
+                'ycsb_cpu_utilization': previous_result.cpu_utilization,
                 'ycsb_cpu_target': CPU_OPTIMIZATION_TARGET.value,
-                'ycsb_cpu_target_max': CPU_OPTIMIZATION_TARGET_MAX.value,
+                'ycsb_cpu_target_min': CPU_OPTIMIZATION_TARGET_MIN.value,
                 'ycsb_cpu_increment_minutes': (
                     CPU_OPTIMIZATION_INCREMENT_MINS.value
                 ),
                 'ycsb_cpu_qps_increment': CPU_OPTIMIZATION_QPS_INCREMENT.value,
             })
-          return run_samples
+          return previous_result.run_samples
 
         # Sleep between steps for some workloads.
         if _CPU_OPTIMIZATION_SLEEP_MINS.value:
@@ -1368,6 +1381,11 @@ class YCSBExecutor:
 
         qps += CPU_OPTIMIZATION_QPS_INCREMENT.value
         first_run = False
+        previous_result = _CpuResult(
+            run_samples=run_samples,
+            cpu_utilization=cpu_utilization,
+            throughput=throughput,
+        )
 
     results = []
     for workload in workloads:
