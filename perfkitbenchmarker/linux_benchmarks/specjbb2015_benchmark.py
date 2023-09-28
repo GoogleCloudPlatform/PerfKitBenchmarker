@@ -22,6 +22,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.linux_packages import numactl
 from perfkitbenchmarker.linux_packages import openjdk
 from perfkitbenchmarker.linux_packages import openjdk_neoverse
 from perfkitbenchmarker.linux_packages import specjbb
@@ -282,12 +283,11 @@ def Run(benchmark_spec):
   vm = benchmark_spec.vms[0]
 
   if FLAGS.specjbb_run_mode == MULTIJVM_MODE:
-    numactl_stdout, _ = vm.RemoteCommand('numactl -H | grep cpus | wc -l')
-    numa_zones = int(numactl_stdout)
     if FLAGS.specjbb_multijvm_nodes:
       node_ids = FLAGS.specjbb_multijvm_nodes
     else:
-      node_ids = [numa_id for numa_id in range(0, numa_zones)]
+      numa_map = numactl.GetNuma(vm)
+      node_ids = list(numa_map.keys())
 
     # Run backends and txinjectors as background commands
     # java -jar specjbb2015.jar -m txinjector -G GRP1 -J JVM1 > grp1jvm1.log

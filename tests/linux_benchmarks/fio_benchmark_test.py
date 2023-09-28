@@ -22,6 +22,7 @@ from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import fio_benchmark
+from perfkitbenchmarker.linux_packages import numactl
 from tests import pkb_common_test_case
 from six.moves import builtins
 
@@ -57,6 +58,9 @@ blocksize=512k
 iodepth=1
 size=100%
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [sequential_read-io-depth-2-num-jobs-1]
 stonewall
@@ -64,7 +68,10 @@ rw=read
 blocksize=512k
 iodepth=2
 size=100%
-numjobs=1"""
+numjobs=1
+iodepth_batch_submit=2
+iodepth_batch_complete_max=2
+numa_cpu_nodes=0"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -78,7 +85,7 @@ numjobs=1"""
             10,
             True,
             ['randrepeat=0', 'offset_increment=1k'],
-            1,
+            [0],
         ),
         expected_jobfile,
     )
@@ -104,6 +111,9 @@ blocksize=512k
 iodepth=1
 size=100%
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [sequential_read-io-depth-1-num-jobs-1]
 stonewall
@@ -112,6 +122,9 @@ blocksize=512k
 iodepth=1
 size=100%
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [random_write-io-depth-1-num-jobs-1]
 stonewall
@@ -120,6 +133,9 @@ blocksize=4k
 iodepth=1
 size=100%
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [random_read-io-depth-1-num-jobs-1]
 stonewall
@@ -128,6 +144,9 @@ blocksize=4k
 iodepth=1
 size=100%
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [random_read_write-io-depth-1-num-jobs-1]
 stonewall
@@ -136,6 +155,9 @@ blocksize=4k
 iodepth=1
 size=100%
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [sequential_trim-io-depth-1-num-jobs-1]
 stonewall
@@ -144,6 +166,9 @@ blocksize=512k
 iodepth=1
 size=100%
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [rand_trim-io-depth-1-num-jobs-1]
 stonewall
@@ -151,14 +176,17 @@ rw=randtrim
 blocksize=4k
 iodepth=1
 size=100%
-numjobs=1"""
+numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
             self.filename,
             ['all'],
             [1], [1],
-            None, None, 600, 10, True, [], 1),
+            None, None, 600, 10, True, [], [0]),
         expected_jobfile)
 
   def testMultipleScenarios(self):
@@ -183,6 +211,9 @@ blocksize=512k
 iodepth=1
 size=100%
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [sequential_write-io-depth-1-num-jobs-1]
 stonewall
@@ -190,14 +221,17 @@ rw=write
 blocksize=512k
 iodepth=1
 size=100%
-numjobs=1"""
+numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
             self.filename,
             ['sequential_read', 'sequential_write'],
             [1], [1],
-            None, None, 600, 10, True, ['randrepeat=0'], 1),
+            None, None, 600, 10, True, ['randrepeat=0'], [0]),
         expected_jobfile)
 
   def testCustomBlocksize(self):
@@ -206,7 +240,7 @@ numjobs=1"""
     job_file = fio_benchmark.GenerateJobFileString(
         self.filename,
         ['sequential_read'],
-        [1], [1], None, units.Unit('megabyte') * 2, 600, 10, True, {}, 1)
+        [1], [1], None, units.Unit('megabyte') * 2, 600, 10, True, [], [0])
 
     self.assertIn('blocksize=2000000B', job_file)
 
@@ -219,7 +253,7 @@ numjobs=1"""
     job_file = fio_benchmark.GenerateJobFileString(
         self.filename,
         ['sequential_read'],
-        [1], [1], None, units.Unit('megabyte') * 2, 600, 10, False, {}, 1)
+        [1], [1], None, units.Unit('megabyte') * 2, 600, 10, False, [], [0])
     self.assertIn('direct=0', job_file)
 
   def testParseGenerateScenario(self):
@@ -244,6 +278,9 @@ blocksize=64M
 iodepth=1
 size=10TB
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [seq_64M_read_10TB-io-depth-2-num-jobs-1]
 stonewall
@@ -252,6 +289,9 @@ blocksize=64M
 iodepth=2
 size=10TB
 numjobs=1
+iodepth_batch_submit=2
+iodepth_batch_complete_max=2
+numa_cpu_nodes=0
 
 [seq_64M_read_10TB-io-depth-1-num-jobs-3]
 stonewall
@@ -260,6 +300,9 @@ blocksize=64M
 iodepth=1
 size=10TB
 numjobs=3
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [seq_64M_read_10TB-io-depth-2-num-jobs-3]
 stonewall
@@ -268,6 +311,9 @@ blocksize=64M
 iodepth=2
 size=10TB
 numjobs=3
+iodepth_batch_submit=2
+iodepth_batch_complete_max=2
+numa_cpu_nodes=0
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-1-num-jobs-1]
 stonewall
@@ -277,6 +323,9 @@ blocksize=16k
 iodepth=1
 size=5TB
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-2-num-jobs-1]
 stonewall
@@ -286,6 +335,9 @@ blocksize=16k
 iodepth=2
 size=5TB
 numjobs=1
+iodepth_batch_submit=2
+iodepth_batch_complete_max=2
+numa_cpu_nodes=0
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-1-num-jobs-3]
 stonewall
@@ -295,6 +347,9 @@ blocksize=16k
 iodepth=1
 size=5TB
 numjobs=3
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-2-num-jobs-3]
 stonewall
@@ -303,14 +358,17 @@ rwmixread=65
 blocksize=16k
 iodepth=2
 size=5TB
-numjobs=3"""
+numjobs=3
+iodepth_batch_submit=2
+iodepth_batch_complete_max=2
+numa_cpu_nodes=0"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
             self.filename,
             ['seq_64M_read_10TB', 'rand_16k_readwrite_5TB_rwmixread-65'],
             [1, 2], [1, 3],
-            None, None, 600, 10, True, ['randrepeat=0'], 1),
+            None, None, 600, 10, True, ['randrepeat=0'], [0]),
         expected_jobfile)
 
   def testParseGenerateScenarioWithIodepthNumjobs(self):
@@ -335,6 +393,9 @@ blocksize=64M
 iodepth=1
 size=10TB
 numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-4-num-jobs-4]
 stonewall
@@ -343,7 +404,10 @@ rwmixread=65
 blocksize=16k
 iodepth=4
 size=5TB
-numjobs=4"""
+numjobs=4
+iodepth_batch_submit=4
+iodepth_batch_complete_max=4
+numa_cpu_nodes=0"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -351,7 +415,7 @@ numjobs=4"""
             ['seq_64M_read_10TB_iodepth-1_numjobs-1',
              'rand_16k_readwrite_5TB_iodepth-4_numjobs-4_rwmixread-65'],
             [1, 2], [1, 3],
-            None, None, 600, 10, True, ['randrepeat=0'], 1),
+            None, None, 600, 10, True, ['randrepeat=0'], [0]),
         expected_jobfile)
 
 
@@ -389,7 +453,8 @@ blocksize = 8k
         mock.patch(vm_name + '.PrependTempDir', return_value='/tmp/prepend_dir'), \
         mock.patch(dir_name + '.GetRunDirPath', return_value='/tmp/run_dir'), \
         mock.patch(fio_name + '.fio.ParseResults'), \
-        mock.patch(fio_name + '.FLAGS') as mock_fio_flags:
+        mock.patch(fio_name + '.FLAGS') as mock_fio_flags, \
+        mock.patch.object(numactl, 'GetNuma', new=lambda vm: {'0': '0'}):
       mock_fio_flags.fio_target_mode = mode
       benchmark_spec = mock.MagicMock()
       benchmark_spec.vms = [mock.MagicMock()]

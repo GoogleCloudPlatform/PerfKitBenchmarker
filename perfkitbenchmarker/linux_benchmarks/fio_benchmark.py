@@ -18,15 +18,15 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 """
 
-
 import json
 import logging
 import posixpath
 import re
 import time
+from typing import Any, Optional
+
 from absl import flags
 import jinja2
-
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
@@ -36,6 +36,8 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
+from perfkitbenchmarker.linux_packages import numactl
+
 
 PKB_FIO_LOG_FILE_NAME = 'pkb_fio_avg'
 LOCAL_JOB_FILE_SUFFIX = '_fio.job'  # used with vm_util.PrependTempDir()
@@ -450,10 +452,19 @@ def GetScenarioFromScenarioString(scenario_string):
   return result
 
 
-def GenerateJobFileString(filename, scenario_strings,
-                          io_depths, num_jobs, working_set_size,
-                          block_size, runtime, ramptime, direct, parameters,
-                          numa_node_count=1):
+def GenerateJobFileString(
+    filename: str,
+    scenario_strings: list[str],
+    io_depths: Optional[list[int]],
+    num_jobs: Optional[list[int]],
+    working_set_size: Optional[int],
+    block_size: Any,
+    runtime: int,
+    ramptime: int,
+    direct: bool,
+    parameters: list[str],
+    numa_nodes: list[int],
+) -> str:
   """Make a string with our fio job file.
 
   Args:
@@ -468,7 +479,7 @@ def GenerateJobFileString(filename, scenario_strings,
       logging any performance numbers.
     direct: boolean. Whether to use direct IO.
     parameters: list. Other fio parameters to be applied to all jobs.
-    numa_node_count: int. Number of NUMA nodes.
+    numa_nodes: list. List of NUMA nodes.
 
   Returns:
     The contents of a fio job file, as a string.
@@ -531,11 +542,13 @@ def GenerateJobFileString(filename, scenario_strings,
   for scenario in jinja_scenarios:
     if _FIO_RATE_BANDWIDTH_LIMIT.value:
       scenario['rate'] = _FIO_RATE_BANDWIDTH_LIMIT.value
-    if numa_node_count > 1:
-      scenario['iodepth_batch_submit'] = scenario['iodepth']
-      scenario['iodepth_batch_complete_max'] = scenario['iodepth']
+    scenario['iodepth_batch_submit'] = scenario['iodepth']
+    scenario['iodepth_batch_complete_max'] = scenario['iodepth']
+    # This handles the case where a VM with 2 NUMA nodes only has NUMA node 1
+    # available.
+    if numa_nodes == [0]:
       scenario['numa_cpu_nodes'] = ','.join(
-          [str(numa_node) for numa_node in range(numa_node_count)]
+          [str(numa_node) for numa_node in numa_nodes]
       )
 
   job_file_template = jinja2.Template(
@@ -580,7 +593,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
                                against_device, disk, io_depths,
                                num_jobs, working_set_size, block_size,
                                runtime, ramptime, direct, parameters,
-                               job_file_contents, numa_node_count=1):
+                               job_file_contents, numa_nodes):
   """Get the contents of the fio job file we're working with.
 
   This will either read the user's job file, if given, or generate a
@@ -605,7 +618,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
     direct: boolean. Whether to use direct IO.
     parameters: list. Other fio parameters to apply to all jobs.
     job_file_contents: string contents of fio job.
-    numa_node_count: int. Number of NUMA nodes.
+    numa_nodes: list. List of NUMA nodes.
 
   Returns:
     A string containing a fio job file.
@@ -630,7 +643,7 @@ def GetOrGenerateJobFileString(job_file_path, scenario_strings,
     return GenerateJobFileString(filename, scenario_strings, io_depths,
                                  num_jobs, working_set_size, block_size,
                                  runtime, ramptime, direct, parameters,
-                                 numa_node_count)
+                                 numa_nodes)
 
 
 NEED_SIZE_MESSAGE = ('You must specify the working set size when using '
@@ -790,7 +803,8 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
 
   disk = vm.scratch_disks[0]
   mount_point = disk.mount_point
-  numa_node_count = vm.numa_node_count or 1
+  numa_map = numactl.GetNuma(vm)
+  numa_nodes = list(numa_map.keys())
 
   job_file_string = GetOrGenerateJobFileString(
       FLAGS.fio_jobfile,
@@ -806,7 +820,7 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
       _DIRECT_IO.value,
       FLAGS.fio_parameters,
       job_file_contents,
-      numa_node_count)
+      numa_nodes)
   job_file_path = vm_util.PrependTempDir(vm.name + LOCAL_JOB_FILE_SUFFIX)
   with open(job_file_path, 'w') as job_file:
     job_file.write(job_file_string)
