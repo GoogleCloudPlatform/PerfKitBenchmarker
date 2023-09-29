@@ -544,9 +544,8 @@ def GenerateJobFileString(
       scenario['rate'] = _FIO_RATE_BANDWIDTH_LIMIT.value
     scenario['iodepth_batch_submit'] = scenario['iodepth']
     scenario['iodepth_batch_complete_max'] = scenario['iodepth']
-    # This handles the case where a VM with 2 NUMA nodes only has NUMA node 1
-    # available.
-    if numa_nodes == [0]:
+
+    if numa_nodes:
       scenario['numa_cpu_nodes'] = ','.join(
           [str(numa_node) for numa_node in numa_nodes]
       )
