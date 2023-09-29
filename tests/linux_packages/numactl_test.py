@@ -30,25 +30,35 @@ node   0   1
 """
 
 
-def MockVm(text):
+def MockVm(run_cmd_response: dict[str, str]):
   vm = mock.Mock()
-  vm.RemoteCommand.return_value = text, ''
+  def FakeRemoteHostCommand(cmd, **_):
+    if isinstance(run_cmd_response, dict):
+      if cmd not in run_cmd_response:
+        raise SystemExit(f'Define response for {cmd}')
+      stdout = run_cmd_response[cmd]
+    else:
+      raise NotImplementedError()
+    return stdout, ''
+
+  vm.RemoteCommand = mock.Mock(side_effect=FakeRemoteHostCommand)
   return vm
 
 
 class NumactlTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('singlenode', SINGLE_NUMA_NODE, {
-          0: 8
-      }),
-      ('twonode', TWO_NUMA_NODES, {
-          0: 30,
-          1: 30
-      }),
+      ('singlenode', SINGLE_NUMA_NODE, {0: 8}, '0'),
+      ('twonode', TWO_NUMA_NODES, {0: 30, 1: 30}, '0-1'),
   )
-  def testGetNuma(self, numactl_text, cpus):
-    self.assertEqual(cpus, numactl.GetNuma(MockVm(numactl_text)))
+  def testGetNuma(self, numactl_text, cpus, numa_list):
+    responses = {
+        'numactl --hardware': numactl_text,
+        'cat /proc/self/status | grep Mems_allowed_list': (
+            f'Mems_allowed_list:\t{numa_list}'
+        ),
+    }
+    self.assertEqual(cpus, numactl.GetNuma(MockVm(responses)))
 
   @parameterized.named_parameters(
       ('singlenode', SINGLE_NUMA_NODE, {
@@ -60,7 +70,8 @@ class NumactlTest(parameterized.TestCase):
       }),
   )
   def testGetNumaMemory(self, numactl_text, cpus):
-    self.assertEqual(cpus, numactl.GetNumaMemory(MockVm(numactl_text)))
+    responses = {'numactl --hardware': numactl_text}
+    self.assertEqual(cpus, numactl.GetNumaMemory(MockVm(responses)))
 
 
 if __name__ == '__main__':

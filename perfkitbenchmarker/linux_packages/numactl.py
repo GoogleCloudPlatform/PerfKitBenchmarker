@@ -27,8 +27,44 @@ def _ParseNuma(vm, regex: Union[str, Pattern[str]]) -> Dict[int, str]:
   return {int(m[0]): m[1] for m in matches}
 
 
+def _ParseNodeList(node_str: str) -> list[int]:
+  """Parses the NUMA node list string and returns the list of node indices.
+
+  Args:
+    node_str: The node list string, e.g. 1-2,4-5
+
+  Returns:
+    The list of node indices.
+    For the example with input '1-2,4-5', it returns [1,2,4,5].
+  """
+  if ',' in node_str:
+    node_list = []
+    for sub_node_str in node_str.split(','):
+      node_list += _ParseNodeList(sub_node_str)
+    return node_list
+
+  if '-' in node_str:
+    lhs, rhs = node_str.split('-')
+    try:
+      lhs = int(lhs)
+      rhs = int(rhs)
+    except ValueError as exc:
+      raise ValueError(f'Invalid node range: [{node_str}]') from exc
+    if lhs > rhs:
+      raise ValueError(f'Invalid range found while parsing: [{lhs}-{rhs}]')
+
+    return list(range(lhs, rhs + 1))
+
+  try:
+    int(node_str)
+  except ValueError as exc:
+    raise ValueError(f'Invalid NUMA node specified: [{node_str}]') from exc
+
+  return [int(node_str)]
+
+
 def GetNuma(vm) -> Dict[int, int]:
-  """Get NUMA CPU topology of the VM.
+  """Get NUMA CPU topology of the VM that only includes the available nodes.
 
   Args:
     vm: VirtualMachine.
@@ -37,10 +73,19 @@ def GetNuma(vm) -> Dict[int, int]:
     A dictionary, key is the numa node, value is the
     number of vCPUs on the node.
   """
-  return {
+  all_numa_map = {
       node: len(value.split())
       for node, value in _ParseNuma(vm, NUMA_CPUS_REGEX).items()
   }
+  stdout, _ = vm.RemoteCommand('cat /proc/self/status | grep Mems_allowed_list')
+  available_numa_nodes = _ParseNodeList(stdout.split(':\t')[-1])
+
+  numa_map = {}
+  for node, num_cpus in all_numa_map.items():
+    if node in available_numa_nodes:
+      numa_map[node] = num_cpus
+
+  return numa_map
 
 
 def GetNumaMemory(vm) -> Dict[int, int]:
