@@ -32,6 +32,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
@@ -545,7 +546,7 @@ def GenerateJobFileString(
     scenario['iodepth_batch_submit'] = scenario['iodepth']
     scenario['iodepth_batch_complete_max'] = scenario['iodepth']
 
-    if numa_nodes:
+    if numa_nodes != [0]:
       scenario['numa_cpu_nodes'] = ','.join(
           [str(numa_node) for numa_node in numa_nodes]
       )
@@ -802,8 +803,13 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
 
   disk = vm.scratch_disks[0]
   mount_point = disk.mount_point
-  numa_map = numactl.GetNuma(vm)
-  numa_nodes = list(numa_map.keys())
+  # Windows does not support numactl package.
+  if vm.OS_TYPE in os_types.WINDOWS_OS_TYPES:
+    numa_node_count = vm.numa_node_count or 1
+    numa_nodes = list(range(numa_node_count))
+  else:
+    numa_map = numactl.GetNuma(vm)
+    numa_nodes = list(numa_map.keys())
 
   job_file_string = GetOrGenerateJobFileString(
       FLAGS.fio_jobfile,

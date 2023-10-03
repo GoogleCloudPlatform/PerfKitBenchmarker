@@ -60,7 +60,6 @@ size=100%
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [sequential_read-io-depth-2-num-jobs-1]
 stonewall
@@ -70,8 +69,7 @@ iodepth=2
 size=100%
 numjobs=1
 iodepth_batch_submit=2
-iodepth_batch_complete_max=2
-numa_cpu_nodes=0"""
+iodepth_batch_complete_max=2"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -113,7 +111,6 @@ size=100%
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [sequential_read-io-depth-1-num-jobs-1]
 stonewall
@@ -124,7 +121,6 @@ size=100%
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [random_write-io-depth-1-num-jobs-1]
 stonewall
@@ -135,7 +131,6 @@ size=100%
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [random_read-io-depth-1-num-jobs-1]
 stonewall
@@ -146,7 +141,6 @@ size=100%
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [random_read_write-io-depth-1-num-jobs-1]
 stonewall
@@ -157,7 +151,6 @@ size=100%
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [sequential_trim-io-depth-1-num-jobs-1]
 stonewall
@@ -168,7 +161,6 @@ size=100%
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [rand_trim-io-depth-1-num-jobs-1]
 stonewall
@@ -178,8 +170,7 @@ iodepth=1
 size=100%
 numjobs=1
 iodepth_batch_submit=1
-iodepth_batch_complete_max=1
-numa_cpu_nodes=0"""
+iodepth_batch_complete_max=1"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -213,7 +204,6 @@ size=100%
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [sequential_write-io-depth-1-num-jobs-1]
 stonewall
@@ -223,8 +213,7 @@ iodepth=1
 size=100%
 numjobs=1
 iodepth_batch_submit=1
-iodepth_batch_complete_max=1
-numa_cpu_nodes=0"""
+iodepth_batch_complete_max=1"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -280,7 +269,6 @@ size=10TB
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [seq_64M_read_10TB-io-depth-2-num-jobs-1]
 stonewall
@@ -291,7 +279,6 @@ size=10TB
 numjobs=1
 iodepth_batch_submit=2
 iodepth_batch_complete_max=2
-numa_cpu_nodes=0
 
 [seq_64M_read_10TB-io-depth-1-num-jobs-3]
 stonewall
@@ -302,7 +289,6 @@ size=10TB
 numjobs=3
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [seq_64M_read_10TB-io-depth-2-num-jobs-3]
 stonewall
@@ -313,7 +299,6 @@ size=10TB
 numjobs=3
 iodepth_batch_submit=2
 iodepth_batch_complete_max=2
-numa_cpu_nodes=0
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-1-num-jobs-1]
 stonewall
@@ -325,7 +310,6 @@ size=5TB
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-2-num-jobs-1]
 stonewall
@@ -337,7 +321,6 @@ size=5TB
 numjobs=1
 iodepth_batch_submit=2
 iodepth_batch_complete_max=2
-numa_cpu_nodes=0
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-1-num-jobs-3]
 stonewall
@@ -349,7 +332,6 @@ size=5TB
 numjobs=3
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-2-num-jobs-3]
 stonewall
@@ -360,8 +342,7 @@ iodepth=2
 size=5TB
 numjobs=3
 iodepth_batch_submit=2
-iodepth_batch_complete_max=2
-numa_cpu_nodes=0"""
+iodepth_batch_complete_max=2"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -395,7 +376,6 @@ size=10TB
 numjobs=1
 iodepth_batch_submit=1
 iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-4-num-jobs-4]
 stonewall
@@ -406,8 +386,7 @@ iodepth=4
 size=5TB
 numjobs=4
 iodepth_batch_submit=4
-iodepth_batch_complete_max=4
-numa_cpu_nodes=0"""
+iodepth_batch_complete_max=4"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
