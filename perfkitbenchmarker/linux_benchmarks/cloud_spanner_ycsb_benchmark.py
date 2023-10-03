@@ -169,6 +169,7 @@ def Run(benchmark_spec):
     run_kwargs['cloudspanner.host'] = end_point
 
   load_kwargs = run_kwargs.copy()
+  load_kwargs['core_workload_insertion_retry_limit'] = 100
   samples = []
   metadata = {'ycsb_client_type': 'java'}
 
