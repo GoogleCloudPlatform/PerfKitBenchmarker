@@ -43,44 +43,49 @@ class PollHttpEndpointTest(pkb_common_test_case.PkbCommonTestCase):
           '400 request fails',
           '< HTTP/1.1 400 Bad Request',
           'invalid_response_code',
-          400,
       ),
-      ('200 request passes', '< HTTP/1.1 200 OK'
-       , 'succeed', 200),
+      ('200 request passes', '< HTTP/1.1 200 OK', 'succeed'),
   )
   def test_call_curl_response_types(
-      self, response_stderr, expected_response_type, expected_response_code
+      self, response_stderr, expected_response_type
   ):
     self.mock_subprocess.side_effect = fake_subprocess_popen_output(
         'hello world<curl_time_total:0.5>', response_stderr
     )
-    latency, response_type, response_code, response = (
-        poll_http_endpoint.call_curl(
-            'http://site.com', expected_response_code=r'2\d\d'
-        )
+    latency, response_type, response, _ = poll_http_endpoint.call_curl(
+        'http://site.com', expected_response_code=r'2\d\d'
     )
     self.assertEqual(response_type, expected_response_type)
-    self.assertEqual(response_code, expected_response_code)
     self.assertAlmostEqual(latency, 0.5)
     self.assertEqual(response, 'hello world')
+
+  def test_call_curl_unexpected_no_response(self):
+    self.mock_subprocess.side_effect = fake_subprocess_popen_output(
+        '<curl_time_total:0.5>', '< HTTP/1.1 400 Bad Request'
+    )
+    latency, _, response, _ = poll_http_endpoint.call_curl(
+        'http://site.com', expected_response='foo'
+    )
+    self.assertAlmostEqual(latency, 0.5)
+    self.assertEqual(response, '')
 
   @parameterized.named_parameters(
       ('response match', 'succeed', 'hello world'),
       ('response not match', 'invalid_response', 'hi folks'),
   )
   def test_call_curl_matching_expected_response(
-      self, response_type, expected_response
+      self, expected_response_type, expected_response
   ):
     self.mock_subprocess.side_effect = fake_subprocess_popen_output(
         'hello world<curl_time_total:0.5>', '< HTTP/1.1 200 OK'
     )
-    _, response_type, response_code, _ = poll_http_endpoint.call_curl(
+    _, response_type, response, _ = poll_http_endpoint.call_curl(
         'http://site.com',
         expected_response_code=r'2\d\d',
         expected_response=expected_response,
     )
-    self.assertEqual(response_type, response_type)
-    self.assertEqual(response_code, 200)
+    self.assertEqual(expected_response_type, response_type)
+    self.assertEqual(response, 'hello world')
 
   @parameterized.named_parameters(
       (
@@ -108,7 +113,7 @@ class PollHttpEndpointTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_subprocess.side_effect = fake_subprocess_popen_output(
         'hello world<curl_time_total:0.5>', response_stderr
     )
-    _, latency, response_type, response = poll_http_endpoint.poll(
+    latency, response_type, response, _ = poll_http_endpoint.poll(
         'http://site.com',
         expected_response_code=r'2\d\d',
         max_retries=2,
@@ -123,7 +128,7 @@ class PollHttpEndpointTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             poll_http_endpoint,
             'call_curl',
-            return_value=(1, 'invalid_response_code', '', 'hello'),
+            return_value=('invalid_response_code', '', 'hello', ''),
         )
     )
     self.enter_context(

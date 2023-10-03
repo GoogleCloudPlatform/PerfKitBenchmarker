@@ -35,7 +35,7 @@ def AptInstall(vm):
   _Install(vm)
 
 
-_SUCCEED_RESP = 'succeed'
+_SUCCESS = 'succeed'
 _FAILURE_INVALID_RESPONSE = 'invalid_response'
 
 
@@ -105,15 +105,15 @@ class HttpPoller(object):
         endpoint, headers, retries, retry_interval, timeout,
         expected_response_code, expected_response)
     out, _ = vm.RemoteCommand(cmd)
-    _, latency, resp, ret = ast.literal_eval(out)
-    if resp == _FAILURE_INVALID_RESPONSE:
+    latency, ret, resp, _ = ast.literal_eval(out)
+    if ret == _FAILURE_INVALID_RESPONSE:
       logging.debug(
           'Failure polling endpoint %s. Received unexpected response %s != '
           'expected %s.',
-          endpoint, ret, expected_response)
-    elif float(latency) == -1 or resp != _SUCCEED_RESP:
+          endpoint, resp, expected_response)
+    elif float(latency) == -1 or ret != _SUCCESS:
       logging.debug(
           'Unexpected response or unable to reach endpoint %s, resp: %s',
           endpoint, resp)
     return PollingResponse(
-        success=resp == _SUCCEED_RESP, response=ret, latency=latency)
+        success=resp == _SUCCESS, response=resp, latency=latency)
