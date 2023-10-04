@@ -1127,27 +1127,38 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       # Replace the last instance of '\' with '/' to make scp happy.
       file_path = '/'.join(file_path.rsplit('\\', 1))
     remote_ip = '[%s]' % self.GetConnectionIp()
-    remote_location = '%s@%s:%s' % (
-        self.user_name, remote_ip, remote_path)
+    remote_location = '%s@%s:%s' % (self.user_name, remote_ip, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
     # An scp is not retried, so increase the connection timeout.
-    ssh_private_key = (self.ssh_private_key if self.is_static else
-                       vm_util.GetPrivateKeyPath())
-    scp_cmd.extend(vm_util.GetSshOptions(
-        ssh_private_key, connect_timeout=FLAGS.scp_connect_timeout))
+    ssh_private_key = (
+        self.ssh_private_key if self.is_static else vm_util.GetPrivateKeyPath()
+    )
+    scp_cmd.extend(
+        vm_util.GetSshOptions(
+            ssh_private_key, connect_timeout=FLAGS.scp_connect_timeout
+        )
+    )
+    simplified_cmd = ['scp']
     if copy_to:
+      simplified_cmd.extend([file_path, remote_location])
       scp_cmd.extend([file_path, remote_location])
     else:
+      simplified_cmd.extend([remote_location, file_path])
       scp_cmd.extend([remote_location, file_path])
 
-    stdout, stderr, retcode = vm_util.IssueCommand(scp_cmd, timeout=None,
-                                                   raise_on_failure=False)
+    logging.info(
+        'Copying file with simplified command: %s', ' '.join(simplified_cmd)
+    )
+    stdout, stderr, retcode = vm_util.IssueCommand(
+        scp_cmd, timeout=None, should_pre_log=False, raise_on_failure=False
+    )
 
     if retcode:
       full_cmd = ' '.join(scp_cmd)
-      error_text = ('Got non-zero return code (%s) executing %s\n'
-                    'STDOUT: %sSTDERR: %s' %
-                    (retcode, full_cmd, stdout, stderr))
+      error_text = (
+          'Got non-zero return code (%s) executing %s\nSTDOUT: %sSTDERR: %s'
+          % (retcode, full_cmd, stdout, stderr)
+      )
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
   def RemoteCommand(self, *args, **kwargs) -> Tuple[str, str]:
