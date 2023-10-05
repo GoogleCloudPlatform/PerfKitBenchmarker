@@ -1389,7 +1389,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
       # here, all disks are created (either at vm creation or in line above).
       # But we don't have all the raw device paths,
-      # which are necessary for preparing the scratch disk.
+      # which are necessary for striping the scratch disk on Linux,
+      # but not on Windows.
+      # The path is not updated for Windows machines.
       nvme_devices = self.GetNVMEDeviceInfo()
       self.PopulateNVMEDevicePath(scratch_disk, nvme_devices)
       self.UpdateDevicePath(scratch_disk)

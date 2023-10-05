@@ -1156,6 +1156,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       disks.append(data_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
+    # Device path is needed to stripe disks on Linux, but not on Windows.
+    # The path is not updated for Windows machines.
     if self.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
       nvme_devices = self.GetNVMEDeviceInfo()
       remote_nvme_devices = self.FindRemoteNVMEDevices(
