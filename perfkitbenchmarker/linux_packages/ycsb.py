@@ -1332,6 +1332,14 @@ class YCSBExecutor:
         cpu_utilization = database.GetAverageCpuUsage(
             CPU_OPTIMIZATION_MEASUREMENT_MINS.value, end_timestamp
         )
+        run_samples.append(
+            sample.Sample(
+                'CPU Normalized Throughput',
+                throughput / cpu_utilization * CPU_OPTIMIZATION_TARGET.value,
+                'ops/sec',
+                copy.copy(run_samples[0].metadata),
+            )
+        )
         logging.info(
             'Run had throughput target %s and measured throughput %s, with CPU'
             ' utilization %s.',
