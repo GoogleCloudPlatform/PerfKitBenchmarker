@@ -38,6 +38,7 @@ Each workload runs for at most 30 minutes.
 from collections.abc import Mapping, Sequence
 import copy
 import dataclasses
+import datetime
 import io
 import logging
 import os
@@ -1325,8 +1326,11 @@ class YCSBExecutor:
             vms, workloads=workloads, **run_kwargs
         )
         throughput = _ExtractThroughput(run_samples)
+        end_timestamp = datetime.datetime.fromtimestamp(
+            run_samples[0].timestamp, tz=datetime.timezone.utc
+        )
         cpu_utilization = database.GetAverageCpuUsage(
-            CPU_OPTIMIZATION_MEASUREMENT_MINS.value
+            CPU_OPTIMIZATION_MEASUREMENT_MINS.value, end_timestamp
         )
         logging.info(
             'Run had throughput target %s and measured throughput %s, with CPU'

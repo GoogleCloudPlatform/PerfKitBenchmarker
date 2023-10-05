@@ -451,22 +451,22 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
   def _Restore(self) -> None:
     self._UpdateNodes(self.node_count)
 
-  def GetAverageCpuUsage(self, duration_minutes: int) -> float:
+  def GetAverageCpuUsage(
+      self, duration_minutes: int, end_time: datetime.datetime
+  ) -> float:
     """Gets the average CPU usage for the cluster.
 
     Note that there is a delay for the API to get data, so this returns the
-    average CPU usage in the period ending at the current time with missing data
-    in the last _CPU_API_DELAY_SECONDS.
+    average CPU usage in the period ending at `end_time` with missing data
+    in the last CPU_API_DELAY_SECONDS.
 
     Args:
       duration_minutes: The time duration for which to measure the average CPU
         usage.
+      end_time: The ending timestamp of the workload.
 
     Returns:
-      The average CPU usage during the time period, offset from the current time
-      by _CPU_API_DELAY_SECONDS, specifically:
-      `time.time() - _CPU_API_DELAY_SECONDS` and
-      `time.time() - duration_minutes`.
+      The average CPU usage during the time period.
     """
     if duration_minutes * 60 <= CPU_API_DELAY_SECONDS:
       raise ValueError(
@@ -481,9 +481,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
         client,
         project=self.project,
         metric_type='bigtable.googleapis.com/cluster/cpu_load',
-        end_time=datetime.datetime.fromtimestamp(
-            time.time(), tz=datetime.timezone.utc
-        ),
+        end_time=end_time,
         minutes=duration_minutes,
     )
 

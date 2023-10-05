@@ -23,7 +23,6 @@ import datetime
 import json
 import logging
 import statistics
-import time
 from typing import Any, Dict, Optional
 
 from absl import flags
@@ -458,8 +457,23 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
         'gcp_spanner_load_node_count': self._load_nodes,
     }
 
-  def GetAverageCpuUsage(self, duration_minutes: int) -> float:
-    """Gets the average high priority CPU usage through the time duration."""
+  def GetAverageCpuUsage(
+      self, duration_minutes: int, end_time: datetime.datetime
+  ) -> float:
+    """Gets the average high priority CPU usage through the time duration.
+
+    Note that there is a delay for the API to get data, so this returns the
+    average CPU usage in the period ending at `end_time` with missing data
+    in the last CPU_API_DELAY_SECONDS.
+
+    Args:
+      duration_minutes: The time duration for which to measure the average CPU
+        usage.
+      end_time: The ending timestamp of the workload.
+
+    Returns:
+      The average CPU usage during the time period.
+    """
     if duration_minutes * 60 <= CPU_API_DELAY_SECONDS:
       raise ValueError(
           f'Spanner API has a {CPU_API_DELAY_SECONDS} sec. delay in receiving'
@@ -474,9 +488,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
         metric_type=(
             'spanner.googleapis.com/instance/cpu/utilization_by_priority'
         ),
-        end_time=datetime.datetime.fromtimestamp(
-            time.time(), tz=datetime.timezone.utc
-        ),
+        end_time=end_time,
         minutes=duration_minutes,
     )
     # Filter by high priority
