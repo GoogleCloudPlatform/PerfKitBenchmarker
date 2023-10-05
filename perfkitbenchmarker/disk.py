@@ -17,7 +17,6 @@ Disks can be created, deleted, attached to VMs, and detached from VMs.
 """
 
 import abc
-import logging
 
 from absl import flags
 from perfkitbenchmarker import resource
@@ -83,9 +82,6 @@ SMB = 'smb'
 # FUSE mounted object storage bucket
 OBJECT_STORAGE = 'object_storage'
 
-# Map old disk type names to new disk type names
-DISK_TYPE_MAPS = dict()
-
 # Standard metadata keys relating to disks
 MEDIA = 'media'
 REPLICATION = 'replication'
@@ -100,57 +96,9 @@ DEFAULT_MOUNT_OPTIONS = 'discard'
 DEFAULT_FSTAB_OPTIONS = 'defaults'
 
 
-# TODO(user): remove this function when we remove the deprecated
-# flags and disk type names.
-def RegisterDiskTypeMap(provider_name, type_map):
-  """Register a map from legacy disk type names to modern ones.
-
-  The translation machinery looks here to find the map corresponding
-  to the chosen provider and translates the user's flags and configs
-  to the new naming system. This function should be removed once the
-  (deprecated) legacy flags are removed.
-
-  Args:
-    provider_name: a string. The name of the provider. Must match the names we
-      give to providers in benchmark_spec.py.
-    type_map: a dict. Maps generic disk type names (STANDARD, REMOTE_SSD, PIOPS)
-      to provider-specific names.
-  """
-
-  DISK_TYPE_MAPS[provider_name] = type_map
-
-
 def GetDiskSpecClass(cloud):
   """Get the DiskSpec class corresponding to 'cloud'."""
   return spec.GetSpecClass(BaseDiskSpec, CLOUD=cloud)
-
-
-def WarnAndTranslateDiskTypes(name, cloud):
-  """Translate old disk types to new disk types, printing warnings if needed.
-
-  Args:
-    name: a string specifying a disk type, either new or old.
-    cloud: the cloud we're running on.
-
-  Returns:
-    The new-style disk type name (i.e. the provider's name for the type).
-  """
-
-  if cloud in DISK_TYPE_MAPS:
-    disk_type_map = DISK_TYPE_MAPS[cloud]
-    if name in disk_type_map and disk_type_map[name] != name:
-      new_name = disk_type_map[name]
-      logging.warning(
-          'Disk type name %s is deprecated and will be removed. '
-          'Translating to %s for now.', name, new_name)
-      return new_name
-    else:
-      return name
-  else:
-    logging.info('No legacy->new disk type map for provider %s', cloud)
-    # The provider has not been updated to use new-style names. We
-    # need to keep benchmarks working, so we pass through the name.
-    return name
 
 
 class BaseDiskSpec(spec.BaseSpec):

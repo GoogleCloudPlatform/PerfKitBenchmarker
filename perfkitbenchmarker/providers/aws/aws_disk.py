@@ -52,11 +52,6 @@ SC1 = 'sc1'
 
 AWS_REMOTE_DISK_TYPES = [STANDARD, SC1, ST1, GP2, GP3, IO1, IO2]
 
-DISK_TYPE = {
-    disk.STANDARD: STANDARD,
-    disk.REMOTE_SSD: GP2,
-    disk.PIOPS: IO1
-}
 
 # any disk types here, consider adding them to AWS_REMOTE_DISK_TYPES as well.
 DISK_METADATA = {
@@ -344,7 +339,6 @@ def EbsDriveIsNvme(machine_type):
 
 
 AWS = 'AWS'
-disk.RegisterDiskTypeMap(AWS, DISK_TYPE)
 
 
 class AwsDiskSpec(disk.BaseDiskSpec):

@@ -483,14 +483,6 @@ class BenchmarkSpec(object):
 
     if group_spec.disk_spec:
       disk_spec = group_spec.disk_spec
-      # disk_spec.disk_type may contain legacy values that were
-      # copied from FLAGS.scratch_disk_type into
-      # FLAGS.data_disk_type at the beginning of the run. We
-      # translate them here, rather than earlier, because here is
-      # where we know what cloud we're using and therefore we're
-      # able to pick the right translation table.
-      disk_spec.disk_type = disk.WarnAndTranslateDiskTypes(
-          disk_spec.disk_type, cloud)
     else:
       disk_spec = None
 
