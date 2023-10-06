@@ -54,7 +54,7 @@ mlperf_inference_cpu:
 _BACKEND = flags.DEFINE_enum(
     'mlperf_inference_cpu_backend',
     'onnxruntime',
-    ['onnxruntime', 'tvm-onnx', 'tf'],
+    ['onnxruntime', 'tvm-onnx', 'tf', 'deepsparse'],
     'backend',
 )
 _TVM_PIP_INSTALL = flags.DEFINE_bool(
