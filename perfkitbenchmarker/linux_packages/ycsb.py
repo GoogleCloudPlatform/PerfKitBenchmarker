@@ -1000,6 +1000,7 @@ class YCSBExecutor:
       # if no target is passed via flags.
       for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList():
 
+        @vm_util.Retry(retryable_exceptions=ycsb_stats.CombineHdrLogError)
         def _DoRunStairCaseLoad(
             client_count, target_qps_per_vm, workload_meta, is_sustained=False
         ):
