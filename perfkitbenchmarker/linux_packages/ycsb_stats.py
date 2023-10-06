@@ -972,7 +972,7 @@ def CombineHdrHistogramLogFiles(
       worker_vm.RemoteCommand(
           f'sudo chmod 755 {hdr_file} && echo "{hdr[:-1]}" >> {hdr_file}'
       )
-    hdrhistogram, stderr = worker_vm.RemoteCommand(
+    hdrhistogram, stderr, retcode = worker_vm.RemoteCommandWithReturnCode(
         f'cd {hdr_install_dir} && ./HistogramLogProcessor -i'
         f' {hdr_file} -outputValueUnitRatio 1 -v',
         ignore_failure=True,
@@ -983,7 +983,7 @@ def CombineHdrHistogramLogFiles(
       raise CombineHdrLogError(
           f'Error combining hdr logs using HistogramLogProcessor: {stderr}'
       )
-    elif stderr:
+    if retcode:
       raise errors.VirtualMachine.RemoteCommandError(
           f'Error while executing HistogramLogProcessor: {stderr}'
       )
