@@ -182,6 +182,42 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     # Assert
     self.assertEqual(expected_qps, actual_qps)
 
+  @parameterized.named_parameters([
+      {
+          'testcase_name': 'AllRead',
+          'write_proportion': 0.0,
+          'read_proportion': 1.0,
+          'expected_qps': 45000,
+      },
+      {
+          'testcase_name': 'AllWrite',
+          'write_proportion': 1.0,
+          'read_proportion': 0.0,
+          'expected_qps': 9000,
+      },
+      {
+          'testcase_name': 'ReadWrite',
+          'write_proportion': 0.5,
+          'read_proportion': 0.5,
+          'expected_qps': 15000,
+      },
+  ])
+  def testCalculateAdjustedStartingThroughput(
+      self, write_proportion, read_proportion, expected_qps
+  ):
+    # Arrange
+    test_spanner = GetTestSpannerInstance()
+    test_spanner._config = 'regional-us-east4'
+    test_spanner.nodes = 3
+
+    # Act
+    actual_qps = test_spanner.CalculateTheoreticalMaxThroughput(
+        read_proportion, write_proportion
+    )
+
+    # Assert
+    self.assertEqual(expected_qps, actual_qps)
+
 
 class CreateTest(pkb_common_test_case.PkbCommonTestCase):
 

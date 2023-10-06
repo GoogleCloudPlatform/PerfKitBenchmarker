@@ -101,6 +101,9 @@ CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
 # https://cloud.google.com/spanner/docs/performance#typical-workloads
 _READ_OPS_PER_NODE = 10000
 _WRITE_OPS_PER_NODE = 2000
+_ADJUSTED_READ_OPS_PER_NODE = 15000
+_ADJUSTED_WRITE_OPS_PER_NODE = 3000
+_ADJUSTED_CONFIG_REGIONS = ['regional-us-east4']
 
 
 @dataclasses.dataclass
@@ -545,11 +548,16 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
           'Unrecognized workload, read + write proportion must be equal to 1, '
           f'got {read_proportion} + {write_proportion}.'
       )
+    read_ops_per_node = _READ_OPS_PER_NODE
+    write_ops_per_node = _WRITE_OPS_PER_NODE
+    if self._config in _ADJUSTED_CONFIG_REGIONS:
+      read_ops_per_node = _ADJUSTED_READ_OPS_PER_NODE
+      write_ops_per_node = _ADJUSTED_WRITE_OPS_PER_NODE
     # Calculates the starting throughput based off of each node being able to
     # handle 10k QPS of reads or 2k QPS of writes. For example, for a 50/50
     # workload, run at a QPS target of 1666 reads + 1666 writes = 3333 (round).
     a = np.array([
-        [1 / _READ_OPS_PER_NODE, 1 / _WRITE_OPS_PER_NODE],
+        [1 / read_ops_per_node, 1 / write_ops_per_node],
         [write_proportion, -(1 - write_proportion)],
     ])
     b = np.array([1, 0])
