@@ -1796,6 +1796,12 @@ class CosDevBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-dev'
 
 
+class Cos109BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS109
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-109-lts'
+  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-109-lts'
+
+
 class Cos105BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS105
   DEFAULT_X86_IMAGE_FAMILY = 'cos-105-lts'
@@ -1808,18 +1814,14 @@ class Cos101BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-101-lts'
 
 
-class Cos97BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+class Cos97BasedGceVirtualMachine(
+    BaseCosBasedGceVirtualMachine, virtual_machine.DeprecatedOsMixin):
   OS_TYPE = os_types.COS97
   DEFAULT_X86_IMAGE_FAMILY = 'cos-97-lts'
-
-
-class Cos93BasedGceVirtualMachine(
-    BaseCosBasedGceVirtualMachine, virtual_machine.DeprecatedOsMixin):
-  OS_TYPE = os_types.COS93
-  DEFAULT_X86_IMAGE_FAMILY = 'cos-93-lts'
-  # Not sure if it's beginning or end of October
-  END_OF_LIFE = '2023-10-01'
-  ALTERNATIVE_OS = os_types.COS97
+  # https://cloud.google.com/container-optimized-os/docs/release-notes
+  # COS release page lists EOL as March 2024.
+  END_OF_LIFE = '2024-03-01'
+  ALTERNATIVE_OS = os_types.COS101
 
 
 class CoreOsBasedGceVirtualMachine(
