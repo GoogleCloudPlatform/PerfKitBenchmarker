@@ -352,6 +352,12 @@ CPU_OPTIMIZATION_QPS_INCREMENT = flags.DEFINE_integer(
     1000,
     'CPU-optimized mode: the amount to increase target QPS by.',
 )
+_LOWEST_LATENCY = flags.DEFINE_bool(
+    'ycsb_lowest_latency_load',
+    False,
+    'Finds the lowest latency the database can sustain and returns the relevant'
+    ' samples.',
+)
 
 
 def _ValidateCpuTargetFlags(flags_dict):
@@ -546,10 +552,12 @@ def CheckPrerequisites():
       _BURST_LOAD_MULTIPLIER.value is not None,
       _INCREMENTAL_TARGET_QPS.value is not None,
       CPU_OPTIMIZATION.value,
+      _LOWEST_LATENCY.value,
   ].count(True) > 1:
     raise errors.Setup.InvalidFlagConfigurationError(
-        '--ycsb_dynamic_load, --ycsb_burst_load, --ycsb_incremental_load, and'
-        ' --ycsb_cpu_optimization are mutually exclusive.'
+        '--ycsb_dynamic_load, --ycsb_burst_load, --ycsb_incremental_load,'
+        ' --ycsb_lowest_latency_load and --ycsb_cpu_optimization are mutually'
+        ' exclusive.'
     )
 
 
@@ -1161,6 +1169,8 @@ class YCSBExecutor:
       samples = self._RunIncrementalMode(vms, workloads, run_kwargs)
     elif CPU_OPTIMIZATION.value:
       samples = self._RunCpuMode(vms, workloads, run_kwargs, database)
+    elif _LOWEST_LATENCY.value:
+      samples = self._RunLowestLatencyMode(vms, workloads, run_kwargs)
     else:
       samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
     if (
@@ -1265,6 +1275,79 @@ class YCSBExecutor:
     self._SetClientThreadCount(ending_threadcount)
     self._SetRunParameters(run_params)
     return list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
+
+  def _RunLowestLatencyMode(
+      self,
+      vms: Sequence[virtual_machine.VirtualMachine],
+      workloads: Sequence[str],
+      run_kwargs: Mapping[str, str] = None,
+  ) -> list[sample.Sample]:
+    """Finds the lowest sustainable latency of the target.
+
+    Args:
+      vms: The client VMs to generate the load.
+      workloads: List of workloads to run.
+      run_kwargs: Extra run arguments.
+
+    Returns:
+      A list of samples of benchmark results.
+    """
+
+    @dataclasses.dataclass
+    class _ThroughputLatencyResult:
+      throughput: int = 0
+      read_latency: float = float('inf')
+      update_latency: float = float('inf')
+      samples: list[sample.Sample] = dataclasses.field(default_factory=list)
+
+    def _ExtractStats(samples: list[sample.Sample]) -> tuple[int, float, float]:
+      """Returns the throughput and latency recorded in the samples."""
+      throughput, read_latency, update_latency = 0, 0, 0
+      for result in samples:
+        if result.metric == 'overall Throughput':
+          throughput = result.value
+        elif result.metric == 'read p99 latency':
+          read_latency = result.value
+        elif result.metric == 'update p99 latency':
+          update_latency = result.value
+      return int(throughput), read_latency, update_latency
+
+    run_params = _GetRunParameters()
+    target = 100
+    result = _ThroughputLatencyResult()
+    while True:
+      target_per_vm = int(target / FLAGS.ycsb_client_vms)
+      run_params['target'] = target_per_vm
+      self._SetClientThreadCount(target_per_vm)
+      self._SetRunParameters(run_params)
+      samples = self.RunStaircaseLoads(vms, workloads, **run_kwargs)
+      # Currently uses p99 latencies, but could be generalized in the future.
+      throughput, read_latency, update_latency = _ExtractStats(samples)
+      logging.info(
+          'Run had throughput %s ops/s, read p99 latency %s ms, update p99'
+          ' latency %s ms',
+          throughput,
+          read_latency,
+          update_latency,
+      )
+      if (
+          read_latency > result.read_latency
+          or update_latency > result.update_latency
+      ):
+        logging.info(
+            'Found lowest latency at target %s (%s actual) ops/s. Run had'
+            ' higher read and/or update latency than previously measured p99'
+            ' read %s ms, update %s ms.',
+            target,
+            result.throughput,
+            result.read_latency,
+            result.update_latency,
+        )
+        return result.samples
+      result = _ThroughputLatencyResult(
+          throughput, read_latency, update_latency, samples
+      )
+      target += 100
 
   def _RunCpuMode(
       self,

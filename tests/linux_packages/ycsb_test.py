@@ -199,6 +199,30 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(results[0].value, 200)
     self.assertEqual(results[0].metadata['ycsb_cpu_utilization'], 0.5)
 
+  @parameterized.parameters((300, 4, 8), (300, 1, 10), (300, 2, 10))
+  @flagsaver.flagsaver(ycsb_lowest_latency_load=True)
+  def testLowestLatencyMode(self, qps, read_latency, update_latency):
+    self.enter_context(
+        mock.patch.object(
+            self.test_executor,
+            'RunStaircaseLoads',
+            side_effect=[
+                _GetMockThroughputLatencySamples(100, 3, 10),
+                _GetMockThroughputLatencySamples(150, 3, 9),
+                _GetMockThroughputLatencySamples(200, 1, 9),
+                _GetMockThroughputLatencySamples(
+                    qps, read_latency, update_latency
+                ),
+            ],
+        )
+    )
+
+    results = self.test_executor.Run([self.test_vm])
+
+    self.assertEqual(results[0].value, 200)
+    self.assertEqual(results[1].value, 1)
+    self.assertEqual(results[2].value, 9)
+
 
 def _GetMockThroughputSamples(throughputs):
   result = []
@@ -209,6 +233,14 @@ def _GetMockThroughputSamples(throughputs):
         )
     )
   return result
+
+
+def _GetMockThroughputLatencySamples(throughput, read_latency, update_latency):
+  return [
+      sample.Sample('overall Throughput', value=throughput, unit='ops/sec'),
+      sample.Sample('read p99 latency', value=read_latency, unit='ms'),
+      sample.Sample('update p99 latency', value=update_latency, unit='ms'),
+  ]
 
 
 if __name__ == '__main__':
