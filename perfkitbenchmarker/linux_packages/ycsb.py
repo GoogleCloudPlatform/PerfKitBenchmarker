@@ -1382,12 +1382,12 @@ class YCSBExecutor:
         workload_args = ParseWorkload(f.read())
       read_proportion = float(workload_args['readproportion'])
       write_proportion = float(workload_args['updateproportion'])
-      # Multiply by half to leave space for increment.
+      # Multiply by 0.65 to leave space for increment.
       return _CPU_OPTIMIZATION_STARTING_QPS.value or int(
           database.CalculateTheoreticalMaxThroughput(
               read_proportion, write_proportion
           )
-          * 0.5
+          * 0.65
       )
 
     @dataclasses.dataclass
