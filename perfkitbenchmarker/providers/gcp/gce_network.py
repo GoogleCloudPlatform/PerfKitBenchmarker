@@ -365,6 +365,15 @@ class GceIPAddress(resource.BaseResource):
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
+  def _IsReady(self) -> bool:
+    """Returns True if the IP address is reserved."""
+    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe',
+                             self.name)
+    cmd.flags['region'] = self.region
+    cmd.flags['format'] = 'value(status)'
+    stdout, _, _ = cmd.Issue()
+    return stdout.rstrip() == 'RESERVED'
+
 
 class GceStaticTunnel(resource.BaseResource):
   """An object representing a GCE Tunnel."""
