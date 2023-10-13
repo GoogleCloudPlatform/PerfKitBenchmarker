@@ -157,11 +157,11 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
 
     # Creation and deletion time information
     # that we may make use of later.
-    self.create_start_time = None
+    self.create_start_time: float = None
     self.delete_start_time = None
-    self.create_end_time = None
+    self.create_end_time: float = None
     self.delete_end_time = None
-    self.resource_ready_time = None
+    self.resource_ready_time: float = None
     self.metadata = dict()
 
   def GetResourceMetadata(self):
