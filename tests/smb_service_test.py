@@ -57,7 +57,7 @@ class SmbServiceTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['default_timeout'].parse(10)
 
   def _NewSmbResource(self):
-    return _FakeSmbService(disk.BaseDiskSpec('test_component'), 'us-west1-a')
+    return _FakeSmbService(disk.BaseSMBDiskSpec('test_component'), 'us-west1-a')
 
   def testNewSmbResource(self):
     smb = self._NewSmbResource()
@@ -78,7 +78,8 @@ class SmbServiceTest(pkb_common_test_case.PkbCommonTestCase):
   def testDefaultSmbVersion(self):
     self._SetFlags()
     smb = _FakeSmbServiceWithDefaultSmbVersion(
-        disk.BaseDiskSpec('test_component'), 'us-west1-a')
+        disk.BaseSMBDiskSpec('test_component'), 'us-west1-a'
+    )
     smb_disk = smb.CreateSmbDisk()
     self.assertEqual('3.0', smb_disk.smb_version)
 

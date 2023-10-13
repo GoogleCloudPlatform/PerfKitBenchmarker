@@ -96,9 +96,13 @@ DEFAULT_MOUNT_OPTIONS = 'discard'
 DEFAULT_FSTAB_OPTIONS = 'defaults'
 
 
-def GetDiskSpecClass(cloud):
+def GetDiskSpecClass(cloud, disk_type):
   """Get the DiskSpec class corresponding to 'cloud'."""
-  return spec.GetSpecClass(BaseDiskSpec, CLOUD=cloud)
+  spec_class = spec.GetSpecClass(BaseDiskSpec, CLOUD=cloud, DISK_TYPE=disk_type)
+  # GetSpecClass will return base spec if failed
+  if spec_class is BaseDiskSpec:
+    return spec.GetSpecClass(BaseDiskSpec, CLOUD=cloud)
+  return spec_class
 
 
 class BaseDiskSpec(spec.BaseSpec):
@@ -149,6 +153,79 @@ class BaseDiskSpec(spec.BaseSpec):
       config_values['num_striped_disks'] = flag_values.num_striped_disks
     if flag_values['scratch_dir'].present:
       config_values['mount_point'] = flag_values.scratch_dir
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Can be overridden by derived classes to add options or impose additional
+    requirements on existing options.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(BaseDiskSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'device_path': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'disk_number': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'disk_size': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'disk_type': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'mount_point': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'num_striped_disks': (
+            option_decoders.IntDecoder,
+            {'default': 1, 'min': 1},
+        ),
+    })
+    return result
+
+
+class BaseNFSDiskSpec(BaseDiskSpec):
+  """Stores the information needed to create a base NFT Disk."""
+
+  SPEC_TYPE = 'BaseDiskSpec'
+  CLOUD = None
+  DISK_TYPE = NFS
+  SPEC_ATTRS = ['CLOUD', 'DISK_TYPE']
+
+  def __init__(self, *args, **kwargs):
+    self.device_path: str = None
+    self.mount_point: str = None
+    super(BaseNFSDiskSpec, self).__init__(*args, **kwargs)
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Overrides config values with flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. Is
+        modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+        provided config values.
+
+    Returns:
+      dict mapping config option names to values derived from the config
+      values or flag values.
+    """
+    super(BaseNFSDiskSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['nfs_version'].present:
       config_values['nfs_version'] = flag_values.nfs_version
     if flag_values['nfs_timeout_hard'].present:
@@ -169,6 +246,65 @@ class BaseDiskSpec(spec.BaseSpec):
       config_values['nfs_managed'] = flag_values.nfs_managed
     if flag_values['nfs_directory'].present:
       config_values['nfs_directory'] = flag_values.nfs_directory
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Can be overridden by derived classes to add options or impose additional
+    requirements on existing options.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+          The pair specifies a decoder class and its __init__() keyword
+          arguments to construct in order to decode the named option.
+    """
+    result = super(BaseNFSDiskSpec, cls)._GetOptionDecoderConstructions()
+    result.update({
+        'nfs_version': (option_decoders.StringDecoder, {'default': None}),
+        'nfs_ip_address': (option_decoders.StringDecoder, {'default': None}),
+        'nfs_managed': (option_decoders.BooleanDecoder, {'default': True}),
+        'nfs_directory': (option_decoders.StringDecoder, {'default': None}),
+        'nfs_rsize': (option_decoders.IntDecoder, {'default': 1048576}),
+        'nfs_wsize': (option_decoders.IntDecoder, {'default': 1048576}),
+        'nfs_timeout': (option_decoders.IntDecoder, {'default': 60}),
+        'nfs_timeout_hard': (option_decoders.BooleanDecoder, {'default': True}),
+        'nfs_retries': (option_decoders.IntDecoder, {'default': 2}),
+        'nfs_nconnect': (option_decoders.IntDecoder, {'default': None}),
+    })
+    return result
+
+
+class BaseSMBDiskSpec(BaseDiskSpec):
+  """Stores the information needed to create a SMB Disk."""
+
+  SPEC_TYPE = 'BaseDiskSpec'
+  CLOUD = None
+  DISK_TYPE = SMB
+  SPEC_ATTRS = ['CLOUD', 'DISK_TYPE']
+
+  def __init__(self, *args, **kwargs):
+    self.device_path: str = None
+    self.mount_point: str = None
+    super(BaseSMBDiskSpec, self).__init__(*args, **kwargs)
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Overrides config values with flag values.
+
+    Can be overridden by derived classes to add support for specific flags.
+
+    Args:
+      config_values: dict mapping config option names to provided values. Is
+        modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+        provided config values.
+
+    Returns:
+      dict mapping config option names to values derived from the config
+      values or flag values.
+    """
+    super(BaseSMBDiskSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['smb_version'].present:
       config_values['smb_version'] = flag_values.smb_version
 
@@ -184,65 +320,9 @@ class BaseDiskSpec(spec.BaseSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(BaseDiskSpec, cls)._GetOptionDecoderConstructions()
+    result = super(BaseSMBDiskSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'device_path': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'disk_number': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'disk_size': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'disk_type': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'mount_point': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'num_striped_disks': (option_decoders.IntDecoder, {
-            'default': 1,
-            'min': 1
-        }),
-        'nfs_version': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'nfs_ip_address': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'nfs_managed': (option_decoders.BooleanDecoder, {
-            'default': True
-        }),
-        'nfs_directory': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'nfs_rsize': (option_decoders.IntDecoder, {
-            'default': 1048576
-        }),
-        'nfs_wsize': (option_decoders.IntDecoder, {
-            'default': 1048576
-        }),
-        'nfs_timeout': (option_decoders.IntDecoder, {
-            'default': 60
-        }),
-        'nfs_timeout_hard': (option_decoders.BooleanDecoder, {
-            'default': True
-        }),
-        'nfs_retries': (option_decoders.IntDecoder, {
-            'default': 2
-        }),
-        'nfs_nconnect': (option_decoders.IntDecoder, {
-            'default': None
-        }),
-        'smb_version': (option_decoders.StringDecoder, {
-            'default': '3.0'
-        }),
+        'smb_version': (option_decoders.StringDecoder, {'default': '3.0'}),
     })
     return result
 
@@ -448,9 +528,6 @@ class NetworkDisk(BaseDisk):
     pass
 
 
-# TODO(user): adds to the disk.GetDiskSpecClass registry
-# that only has the cloud as the key.  Look into using (cloud, disk_type)
-# if causes problems
 class NfsDisk(NetworkDisk):
   """Provides options for mounting NFS drives.
 

@@ -48,6 +48,7 @@ class VmGroupSpec(spec.BaseSpec):
 
   cloud: str
   disk_count: int
+  disk_type: str
   disk_spec: disk.BaseDiskSpec
   os_type: str
   static_vms: list[static_virtual_machine.StaticVmSpec]
@@ -69,7 +70,10 @@ class VmGroupSpec(spec.BaseSpec):
         raise errors.Config.MissingOption(
             '{0}.cloud is "{1}", but {0}.disk_spec does not contain a '
             'configuration for "{1}".'.format(component_full_name, self.cloud))
-      disk_spec_class = disk.GetDiskSpecClass(self.cloud)
+      disk_type = disk_config.get('disk_type', None)
+      if flag_values and flag_values['data_disk_type'].present:
+        disk_type = flag_values['data_disk_type'].value
+      disk_spec_class = disk.GetDiskSpecClass(self.cloud, disk_type)
       self.disk_spec = disk_spec_class(
           '{0}.disk_spec.{1}'.format(component_full_name, self.cloud),
           flag_values=flag_values,

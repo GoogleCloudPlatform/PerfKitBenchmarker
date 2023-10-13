@@ -142,9 +142,9 @@ class _NfsDisk(disk.NfsDisk):
 
   def __init__(self, flags=None, default_nfs_version=None):
     if flags:
-      disk_spec = disk.BaseDiskSpec(_COMPONENT, flags)
+      disk_spec = disk.BaseNFSDiskSpec(_COMPONENT, flags)
     else:
-      disk_spec = disk.BaseDiskSpec(_COMPONENT)
+      disk_spec = disk.BaseNFSDiskSpec(_COMPONENT)
     super(_NfsDisk, self).__init__(disk_spec, 'host1:/volume1',
                                    default_nfs_version)
 
@@ -226,9 +226,9 @@ class _SmbDisk(disk.SmbDisk):
 
   def __init__(self, default_smb_version=None):
     if FLAGS:
-      disk_spec = disk.BaseDiskSpec(_COMPONENT, FLAGS)
+      disk_spec = disk.BaseSMBDiskSpec(_COMPONENT, FLAGS)
     else:
-      disk_spec = disk.BaseDiskSpec(_COMPONENT)
+      disk_spec = disk.BaseSMBDiskSpec(_COMPONENT)
     super(_SmbDisk, self).__init__(disk_spec, 'host1', {
         'user': 'username',
         'pw': 'password'

@@ -61,7 +61,7 @@ class NfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _NewNfsResource(self, nfs_tier=''):
     self._SetFlags(nfs_tier=nfs_tier)
-    return _DemoNfsService(disk.BaseDiskSpec('test_component'), 'us-west1-a')
+    return _DemoNfsService(disk.BaseNFSDiskSpec('test_component'), 'us-west1-a')
 
   def testNewNfsResource(self):
     nfs = self._NewNfsResource(_DEFAULT_NFS_TIER)
@@ -89,7 +89,8 @@ class NfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
   def testDefaultNfsVersion(self):
     self._SetFlags()
     nfs = _DemoNfsServiceWithDefaultNfsVersion(
-        disk.BaseDiskSpec('test_component'), 'us-west1-a')
+        disk.BaseNFSDiskSpec('test_component'), 'us-west1-a'
+    )
     nfs_disk = nfs.CreateNfsDisk()
     self.assertEqual('4.1', nfs_disk.nfs_version)
 
@@ -97,7 +98,7 @@ class NfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _setUpDiskSpec(self):
-    disk_spec = disk.BaseDiskSpec('test_disk_spec')
+    disk_spec = disk.BaseNFSDiskSpec('test_disk_spec')
     disk_spec.device_path = '/test_dir'
     self.disk_spec = disk_spec
 

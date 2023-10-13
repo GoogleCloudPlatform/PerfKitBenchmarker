@@ -41,6 +41,7 @@ import logging
 from typing import List
 
 from absl import flags
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import provider_info
@@ -51,6 +52,10 @@ from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
+
+
+class AzureSmbDiskSpec(disk.BaseSMBDiskSpec):
+  CLOUD = provider_info.AZURE
 
 
 class AzureSmbService(smb_service.BaseSmbService):

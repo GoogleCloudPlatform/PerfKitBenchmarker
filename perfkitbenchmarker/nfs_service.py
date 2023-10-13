@@ -84,7 +84,7 @@ class BaseNfsService(resource.BaseResource):
   DEFAULT_NFS_VERSION = None
   DEFAULT_TIER = None
 
-  def __init__(self, disk_spec: disk.BaseDiskSpec, zone):
+  def __init__(self, disk_spec: disk.BaseNFSDiskSpec, zone):
     super(BaseNfsService, self).__init__()
     self.disk_spec = disk_spec
     self.zone = zone
@@ -164,11 +164,13 @@ class UnmanagedNfsService(BaseNfsService):
   }
   _NFS_RESTART_CMD = 'sudo systemctl restart {nfs_name}'
 
-  def __init__(self,
-               disk_spec: Optional[disk.BaseDiskSpec],
-               server_vm,
-               check_export_not_same_mount=True,
-               server_directory=None):
+  def __init__(
+      self,
+      disk_spec: Optional[disk.BaseNFSDiskSpec],
+      server_vm,
+      check_export_not_same_mount=True,
+      server_directory=None,
+  ):
     super(UnmanagedNfsService, self).__init__(disk_spec, None)
     self.server_vm = server_vm
     # Path on the server to export. Must be different from mount_point.

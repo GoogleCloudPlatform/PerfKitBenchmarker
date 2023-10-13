@@ -65,7 +65,7 @@ def _WaitUntilAttached(vm, dsk) -> None:
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs the benchmark."""
-  disk_spec_class = disk.GetDiskSpecClass(FLAGS.cloud)
+  disk_spec_class = disk.GetDiskSpecClass(FLAGS.cloud, None)
   disk_spec = disk_spec_class('provisioning', flag_values=FLAGS)
   vm: linux_virtual_machine.BaseLinuxVirtualMachine = bm_spec.vms[0]
 
