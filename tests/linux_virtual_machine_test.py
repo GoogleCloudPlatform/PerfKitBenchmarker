@@ -516,7 +516,8 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'uname -r': kernel_release,
       'uname -m': cpu_arch,
       'sudo fdisk -l': partition_table,
-      'PATH="${PATH}":/usr/sbin ip link show up': _IP_LINK_TEXT
+      'PATH="${PATH}":/usr/sbin ip link show up': _IP_LINK_TEXT,
+      'cat /proc/cpuinfo | grep processor | wc -l': '16'
   }
 
   def CreateVm(self, run_cmd_response: Union[str, Dict[str, str]]):
@@ -538,10 +539,15 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         raise NotImplementedError()
       return stdout, '', 0
 
+    # Re-sets the VM's boot time so TestReboot doesn't time out.
+    def FakeWaitForBootCompletion():
+      vm.bootable_time = 10
+
     vm.RemoteHostCommandWithReturnCode = mock.Mock(
         side_effect=FakeRemoteHostCommandWithReturnCode)
     vm.CheckLsCpu = mock.Mock(
         return_value=linux_virtual_machine.LsCpuResults(self.lscpu_output))
+    vm.WaitForBootCompletion = mock.Mock(side_effect=FakeWaitForBootCompletion)
     return vm
 
   @parameterized.named_parameters(
@@ -667,6 +673,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testBoot(self):
     vm = self.CreateVm(self.normal_boot_responses)
+    vm.WaitForBootCompletion()
     vm.RecordAdditionalMetadata()
     expected_os_metadata = {
         '/dev/sda': 1073741824,
@@ -692,10 +699,12 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'stat -c %z /proc/': '',
         'sudo mkdir -p /opt/pkb; sudo chmod a+rwxt /opt/pkb': '',
         'mkdir -p /tmp/pkb': '',
+        'cat /proc/cpuinfo | grep processor | wc -l': '8'
     })
     vm.Reboot()
     self.assertEqual(os_info_new, vm.os_metadata['os_info'])
     self.assertEqual(kernel_release_new, vm.os_metadata['kernel_release'])
+    self.assertEqual(8, vm.NumCpusForBenchmark())
 
   def testGetNetworkDeviceNames(self):
     responses = self.normal_boot_responses.copy()
@@ -800,6 +809,17 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
           'sudo reboot', ignore_failure=True, ignore_ssh_error=True)
     else:
       mock_remote.assert_called_with('sudo reboot', ignore_failure=True)
+
+  def testUnreachableVm(self):
+    vm = self.CreateVm(self.normal_boot_responses.copy())
+    vm.WaitForBootCompletion.side_effect = vm_util.TimeoutExceededRetryError
+
+    with self.assertRaises(vm_util.TimeoutExceededRetryError):
+      vm.WaitForBootCompletion()
+    self.assertIsNone(vm.bootable_time)
+
+    vm.RecordAdditionalMetadata()
+    self.assertEqual({}, vm.os_metadata)
 
 
 if __name__ == '__main__':

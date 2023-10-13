@@ -577,7 +577,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.UpdateEnvironmentPath()
     self._DisableCpus()
     self._RebootIfNecessary()
-    self.RecordAdditionalMetadata()
     self.BurnCpu()
     self.FillDisk()
 
@@ -941,6 +940,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def RecordAdditionalMetadata(self):
     """After the VM has been prepared, store metadata about the VM."""
+    super().RecordAdditionalMetadata()
+
+    if not self.bootable_time:
+      logging.warning('RecordAdditionalMetadata: skipping additional metadata'
+                      ' capture due to an unreachable VM.')
+      return
+
     self.tcp_congestion_control = self.TcpCongestionControl()
     lscpu_results = self.CheckLsCpu()
     self.numa_node_count = lscpu_results.numa_node_count

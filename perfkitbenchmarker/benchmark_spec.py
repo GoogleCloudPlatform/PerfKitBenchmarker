@@ -1009,6 +1009,7 @@ class BenchmarkSpec(object):
     # This must come after Scratch Disk creation to support the
     # Containerized VM case
     vm.PrepareVMEnvironment()
+    vm.RecordAdditionalMetadata()
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.
