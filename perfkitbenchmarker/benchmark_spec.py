@@ -150,7 +150,7 @@ class BenchmarkSpec(object):
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
     self.always_call_cleanup = False
     self.spark_service = None
-    self.dpb_service = None
+    self.dpb_service: dpb_service.BaseDpbService = None
     self.container_cluster = None
     self.key = None
     self.relational_db = None
