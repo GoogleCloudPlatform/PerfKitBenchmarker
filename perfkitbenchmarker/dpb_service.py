@@ -229,7 +229,6 @@ class BaseDpbService(resource.BaseResource):
     # user_managed resources in a special manner and skips creation attempt
     super(BaseDpbService, self).__init__(user_managed=is_user_managed)
     self.spec = dpb_service_spec
-    self.dpb_hdfs_type = None
     if dpb_service_spec.static_dpb_service_instance:
       self.cluster_id = dpb_service_spec.static_dpb_service_instance
     else:
@@ -253,6 +252,10 @@ class BaseDpbService(resource.BaseResource):
 
   def GetDpbVersion(self) -> Optional[str]:
     return self.spec.version
+
+  def GetHdfsType(self) -> Optional[str]:
+    """Gets human friendly disk type for metric metadata."""
+    return None
 
   @property
   def base_dir(self):
@@ -419,7 +422,7 @@ class BaseDpbService(resource.BaseResource):
         'dpb_cluster_size':
             self.spec.worker_count,
         'dpb_hdfs_type':
-            self.dpb_hdfs_type,
+            self.GetHdfsType(),
         'dpb_disk_size':
             self.spec.worker_group.disk_spec.disk_size,
         'dpb_service_zone':

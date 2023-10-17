@@ -45,6 +45,10 @@ disk_to_hdfs_map = {
     'pd-balanced': 'SSD (Balanced)',
     'pd-ssd': 'SSD',
 }
+serverless_disk_to_hdfs_map = {
+    'standard': 'HDD',
+    'premium': 'Local SSD',
+}
 
 DATAPROC_FLINK_INIT_SCRIPT = os.path.join('beam', 'flink-init.sh')
 DATAPROC_FLINK_PRESUBMIT_SCRIPT = os.path.join('beam', 'flink-presubmit.sh')
@@ -196,21 +200,14 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
       if self.spec.worker_group.disk_spec.disk_type:
         self._AddToCmd(cmd, '{0}-boot-disk-type'.format(role),
                        self.spec.worker_group.disk_spec.disk_type)
-        self.dpb_hdfs_type = disk_to_hdfs_map[
-            self.spec.worker_group.disk_spec.disk_type]
-
       # Set ssd count
       if self.spec.worker_group.vm_spec.num_local_ssds:
         self._AddToCmd(cmd, 'num-{0}-local-ssds'.format(role),
                        self.spec.worker_group.vm_spec.num_local_ssds)
-        # This will actually be used for storage
-        self.dpb_hdfs_type = 'Local SSD'
       # Set SSD interface
       if self.spec.worker_group.vm_spec.ssd_interface:
         self._AddToCmd(cmd, '{0}-local-ssd-interface'.format(role),
                        self.spec.worker_group.vm_spec.ssd_interface)
-        # This will actually be used for storage
-        self.dpb_hdfs_type = 'Local SSD'
     # Set zone
     cmd.flags['zone'] = self.dpb_service_zone
     if self.GetDpbVersion():
@@ -393,6 +390,19 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     flag_name = cmd_property
     cmd.flags[flag_name] = cmd_value
 
+  def GetHdfsType(self) -> Optional[str]:
+    """Gets human friendly disk type for metric metadata."""
+    hdfs_type = None
+
+    if self.spec.worker_group.disk_spec.disk_type:
+      hdfs_type = disk_to_hdfs_map[self.spec.worker_group.disk_spec.disk_type]
+
+    # Change to SSD if Local SSDs are specified.
+    if self.spec.worker_group.vm_spec.num_local_ssds:
+      hdfs_type = 'Local SSD'
+
+    return hdfs_type
+
 
 class GcpDpbDpgke(GcpDpbDataproc):
   """Dataproc on GKE cluster.
@@ -449,6 +459,10 @@ class GcpDpbDpgke(GcpDpbDataproc):
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
 
+  def GetHdfsType(self) -> Optional[str]:
+    """Gets human friendly disk type for metric metadata."""
+    return None
+
 
 class GcpDpbDataprocServerless(
     dpb_service.DpbServiceServerlessMixin, GcpDpbBaseDataproc
@@ -459,10 +473,16 @@ class GcpDpbDataprocServerless(
   SERVICE_TYPE = 'dataproc_serverless'
 
   def __init__(self, dpb_service_spec):
+    self._dpb_s8s_disk_type = (
+        dpb_service_spec.worker_group.disk_spec.disk_type or 'standard'
+    )
+    # This is to make it work with the default dpb_sparksql_benchmark GCP
+    # disk_type.
+    if self._dpb_s8s_disk_type == 'pd-standard':
+      self._dpb_s8s_disk_type = 'standard'
     super().__init__(dpb_service_spec)
     self._job_counter = 0
     self.batch_name = f'{self.cluster_id}-{self._job_counter}'
-    self.dpb_hdfs_type = 'HDD'
     self._FillMetadata()
 
   def SubmitJob(self,
@@ -582,6 +602,9 @@ class GcpDpbDataprocServerless(
       result['spark.dataproc.executor.disk.size'] = (
           f'{self.spec.worker_group.disk_spec.disk_size}g'
       )
+    if self.spec.worker_group.disk_spec.disk_type:
+      result['spark.dataproc.driver.disk.tier'] = self._dpb_s8s_disk_type
+      result['spark.dataproc.executor.disk.tier'] = self._dpb_s8s_disk_type
     if self.spec.dataproc_serverless_memory:
       result['spark.driver.memory'] = f'{self.spec.dataproc_serverless_memory}m'
       result['spark.executor.memory'] = (
@@ -661,6 +684,12 @@ class GcpDpbDataprocServerless(
             self.region, {}
         ).get('usd_per_shuffle_storage_gb_sec')
     )
+    if self._dpb_s8s_disk_type == 'premium':
+      # prices based on
+      # https://cloud.google.com/dataproc-serverless/pricing#data_compute_unit_dcu_pricing
+      # TODO(odiego): Get prices for all regions like it's done for standard.
+      usd_per_milli_dcu_sec = 0.089 / 1000 / 3600
+      usd_per_shuffle_storage_gb_sec = 0.1 / 730 / 3600
     if usd_per_milli_dcu_sec is None or usd_per_shuffle_storage_gb_sec is None:
       return None
     results = FetchBatchResults()
@@ -674,6 +703,14 @@ class GcpDpbDataprocServerless(
         usd_per_shuffle_storage_gb_sec * shuffle_storage_gb_seconds
     )
     return cost
+
+  def GetHdfsType(self) -> Optional[str]:
+    """Gets human friendly disk type for metric metadata."""
+    try:
+      return serverless_disk_to_hdfs_map[self._dpb_s8s_disk_type]
+    except KeyError:
+      raise errors.Setup.InvalidSetupError(
+          f'Invalid disk_type={self._dpb_s8s_disk_type!r} in spec.') from None
 
 
 class GcpDpbDataprocFlink(GcpDpbDataproc):

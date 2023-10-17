@@ -118,6 +118,21 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIsInstance(region, str)
       self.assertIsInstance(price, float)
 
+  def testMetadata(self):
+    dpb_glue = aws_dpb_glue.AwsDpbGlue(GLUE_SPEC)
+    expected_metadata = {
+        'dpb_service': 'glue',
+        'dpb_version': '3.0',
+        'dpb_service_version': 'glue_3.0',
+        'dpb_cluster_shape': 'G.2X',
+        'dpb_cluster_size': 4,
+        'dpb_hdfs_type': 'default-disk',
+        'dpb_disk_size': '128',
+        'dpb_service_zone': 'us-east-1a',
+        'dpb_job_properties': '',
+    }
+    self.assertEqual(dpb_glue.GetResourceMetadata(), expected_metadata)
+
 
 if __name__ == '__main__':
   unittest.main()

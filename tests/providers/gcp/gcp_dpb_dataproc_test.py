@@ -14,7 +14,9 @@
 """Tests for perfkitbenchmarker.providers.gcp.gcp_dpb_dataproc."""
 
 import unittest
+
 from absl import flags
+from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -48,17 +50,6 @@ SERVERLESS_MOCK_BATCH = """
 
 FLAGS = flags.FLAGS
 
-CLUSTER_SPEC = mock.Mock(
-    static_dpb_service_instance=None,
-    worker_count=2,
-    version='fake-version',
-    applications=['foo-component', 'bar-component'],
-    worker_group=mock.Mock(
-        vm_spec=mock.Mock(machine_type='fake-machine-type', num_local_ssds=2),
-        disk_spec=mock.Mock(disk_type='pd-ssd', disk_size=42),
-    ),
-)
-
 DPGKE_CLUSTER_SPEC = mock.Mock(
     static_dpb_service_instance=None,
     gke_cluster_name='gke-cluster',
@@ -67,28 +58,44 @@ DPGKE_CLUSTER_SPEC = mock.Mock(
     gke_cluster_nodepools='name:pool-name,role:driver,min:3',
 )
 
-SERVERLESS_SPEC = mock.Mock(
-    static_dpb_service_instance=None,
-    version='fake-4.2',
-    dataproc_serverless_core_count=4,
-    dataproc_serverless_initial_executors=4,
-    dataproc_serverless_min_executors=2,
-    dataproc_serverless_max_executors=10,
-    dataproc_serverless_memory=10000,
-    dataproc_serverless_memory_overhead=4000,
-    worker_group=mock.Mock(
-        disk_spec=mock.Mock(
-            disk_size=42,
-        ),
-    ),
-)
+
+def GetClusterSpec():
+  return mock.Mock(
+      static_dpb_service_instance=None,
+      worker_count=2,
+      version='fake-version',
+      applications=['foo-component', 'bar-component'],
+      worker_group=mock.Mock(
+          vm_spec=mock.Mock(machine_type='fake-machine-type', num_local_ssds=2),
+          disk_spec=mock.Mock(disk_type='pd-ssd', disk_size=42),
+      ),
+  )
+
+
+def GetServerlessSpec():
+  return mock.Mock(
+      static_dpb_service_instance=None,
+      version='fake-4.2',
+      dataproc_serverless_core_count=4,
+      dataproc_serverless_initial_executors=4,
+      dataproc_serverless_min_executors=2,
+      dataproc_serverless_max_executors=10,
+      dataproc_serverless_memory=10000,
+      dataproc_serverless_memory_overhead=4000,
+      worker_group=mock.Mock(
+          disk_spec=mock.Mock(
+              disk_size=42,
+              disk_type='standard',
+          ),
+      ),
+  )
 
 
 class LocalGcpDpbDataproc(gcp_dpb_dataproc.GcpDpbDataproc):
 
-  def __init__(self):
+  def __init__(self, dpb_service_spec):
     # Bypass GCS initialization in Dataproc's constructor
-    dpb_service.BaseDpbService.__init__(self, CLUSTER_SPEC)
+    dpb_service.BaseDpbService.__init__(self, dpb_service_spec)
     self.project = PROJECT
     self.region = self.dpb_service_zone.rsplit('-', 1)[0]
     self.storage_service = gcs.GoogleCloudStorageService()
@@ -107,7 +114,7 @@ class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm_util, 'IssueCommand', return_value=('fake_stdout', 'fake_stderr', 0)
   )
   def testCreate(self, mock_issue):
-    cluster = LocalGcpDpbDataproc()
+    cluster = LocalGcpDpbDataproc(GetClusterSpec())
     cluster._Create()
     self.assertEqual(mock_issue.call_count, 1)
     command_string = ' '.join(mock_issue.call_args[0][0])
@@ -142,16 +149,57 @@ class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):
       ),
   )
   def testCreateResourceExhausted(self, mock_issue):
-    cluster = LocalGcpDpbDataproc()
+    cluster = LocalGcpDpbDataproc(GetClusterSpec())
     with self.assertRaises(errors.Benchmarks.InsufficientCapacityCloudFailure):
       cluster._Create()
     self.assertEqual(mock_issue.call_count, 1)
 
-  def testGetMetadata(self):
-    cluster = LocalGcpDpbDataproc()
-    metadata = cluster.GetResourceMetadata()
-    self.assertEqual(metadata['dpb_service'], 'dataproc')
-    self.assertEqual(metadata['dpb_version'], 'fake-version')
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='PdStandard',
+          disk_type='pd-standard',
+          num_local_ssds=0,
+          hdfs_type='HDD',
+      ),
+      dict(
+          testcase_name='PdBalanced',
+          disk_type='pd-balanced',
+          num_local_ssds=0,
+          hdfs_type='SSD (Balanced)',
+      ),
+      dict(
+          testcase_name='PdSsd',
+          disk_type='pd-ssd',
+          num_local_ssds=0,
+          hdfs_type='SSD',
+      ),
+      dict(
+          testcase_name='LocalSsd',
+          disk_type='pd-standard',
+          num_local_ssds=2,
+          hdfs_type='Local SSD',
+      ),
+  )
+  def testGetMetadata(self, disk_type, num_local_ssds, hdfs_type):
+    spec = GetClusterSpec()
+    spec.worker_group.disk_spec.disk_type = disk_type
+    spec.worker_group.vm_spec.num_local_ssds = num_local_ssds
+    cluster = LocalGcpDpbDataproc(spec)
+    expected_metadata = {
+        'dpb_service': 'dataproc',
+        'dpb_version': 'fake-version',
+        'dpb_service_version': 'dataproc_fake-version',
+        'dpb_cluster_id': 'pkb-fakeru',
+        'dpb_cluster_shape': 'fake-machine-type',
+        'dpb_cluster_size': 2,
+        'dpb_hdfs_type': hdfs_type,
+        'dpb_disk_size': 42,
+        'dpb_service_zone': 'us-central1-a',
+        'dpb_job_properties': '',
+        'dpb_cluster_properties': '',
+        'dpb_dynamic_allocation': True,
+    }
+    self.assertEqual(cluster.GetResourceMetadata(), expected_metadata)
 
 
 class LocalGcpDpbDPGKE(gcp_dpb_dataproc.GcpDpbDpgke):
@@ -220,11 +268,39 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.run_uri = TEST_RUN_URI
     FLAGS.dpb_service_zone = GCP_ZONE_US_CENTRAL1_A
 
+  @parameterized.named_parameters(
+      dict(testcase_name='Standard', disk_type='standard', hdfs_type='HDD'),
+      dict(testcase_name='Premium', disk_type='premium', hdfs_type='Local SSD'),
+  )
+  def testMetadataStandard(self, disk_type, hdfs_type):
+    spec = GetServerlessSpec()
+    spec.worker_group.disk_spec.disk_type = disk_type
+    service = gcp_dpb_dataproc.GcpDpbDataprocServerless(spec)
+    expected_metadata = {
+        'dpb_service': 'dataproc_serverless',
+        'dpb_version': 'fake-4.2',
+        'dpb_service_version': 'dataproc_serverless_fake-4.2',
+        'dpb_batch_id': 'pkb-fakeru',
+        'dpb_cluster_shape': 'dataproc-serverless-4',
+        'dpb_cluster_size': None,
+        'dpb_cluster_min_executors': 2,
+        'dpb_cluster_max_executors': 10,
+        'dpb_cluster_initial_executors': 4,
+        'dpb_cores_per_node': 4,
+        'dpb_memory_per_node': 10000,
+        'dpb_memory_overhead_per_node': 4000,
+        'dpb_hdfs_type': hdfs_type,
+        'dpb_disk_size': 42,
+        'dpb_service_zone': 'us-central1-a',
+        'dpb_job_properties': f'spark.executor.cores=4,spark.driver.cores=4,spark.executor.instances=4,spark.dynamicAllocation.minExecutors=2,spark.dynamicAllocation.maxExecutors=10,spark.dataproc.driver.disk.size=42g,spark.dataproc.executor.disk.size=42g,spark.dataproc.driver.disk.tier={disk_type},spark.dataproc.executor.disk.tier={disk_type},spark.driver.memory=10000m,spark.executor.memory=10000m,spark.driver.memoryOverhead=4000m,spark.executor.memoryOverhead=4000m',
+    }
+    self.assertEqual(service.GetResourceMetadata(), expected_metadata)
+
   @mock.patch.object(
       vm_util, 'IssueCommand', return_value=(SERVERLESS_MOCK_BATCH, '', 0)
   )
   def testSubmitJob(self, mock_issue):
-    service = gcp_dpb_dataproc.GcpDpbDataprocServerless(SERVERLESS_SPEC)
+    service = gcp_dpb_dataproc.GcpDpbDataprocServerless(GetServerlessSpec())
     result = service.SubmitJob(
         pyspark_file=(
             'gs://pkb-fab5770b/spark_sql_test_scripts/spark_sql_runner.py'
@@ -267,6 +343,8 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
                     'spark.dynamicAllocation.maxExecutors=10@'
                     'spark.dataproc.driver.disk.size=42g@'
                     'spark.dataproc.executor.disk.size=42g@'
+                    'spark.dataproc.driver.disk.tier=standard@'
+                    'spark.dataproc.executor.disk.tier=standard@'
                     'spark.driver.memory=10000m@'
                     'spark.executor.memory=10000m@'
                     'spark.driver.memoryOverhead=4000m@'
