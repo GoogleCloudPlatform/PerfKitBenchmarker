@@ -501,7 +501,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.preemptible_status_code = None
     self.project = vm_spec.project or util.GetDefaultProject()
     self.image_project = vm_spec.image_project or self.GetDefaultImageProject()
-    self.backfill_image = False
     self.mtu: Optional[int] = FLAGS.mtu
     self.subnet_name = vm_spec.subnet_name
     self.network = self._GetNetwork()
@@ -583,7 +582,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
     args = ['compute', 'instances', 'create', self.name]
-
     cmd = util.GcloudCommand(self, *args)
     cmd.flags['async'] = True
     if gcp_flags.GCE_CREATE_LOG_HTTP.value:
@@ -596,6 +594,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           f'total-egress-bandwidth-tier={self.gce_egress_bandwidth_tier}'
       )
       cmd.flags['network-performance-configs'] = network_performance_configs
+      self.metadata['gce_egress_bandwidth_tier'] = (
+          self.gce_egress_bandwidth_tier
+      )
 
     if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
       # TODO(pclay): remove when on-host-maintenance gets promoted to GA
@@ -638,8 +639,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['image'] = self.image
     elif self.image_family:
       cmd.flags['image-family'] = self.image_family
+      self.metadata['image_family'] = self.image_family
     if self.image_project is not None:
       cmd.flags['image-project'] = self.image_project
+      self.metadata['image_project'] = self.image_project
     cmd.flags['boot-disk-auto-delete'] = True
     if self.boot_disk_size:
       cmd.flags['boot-disk-size'] = self.boot_disk_size
@@ -656,15 +659,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if self.threads_per_core:
       cmd.flags['threads-per-core'] = self.threads_per_core
+      self.metadata['threads_per_core'] = self.threads_per_core
 
-    if (
-        self.gpu_count
-        and self.machine_type
-        and self.machine_type not in _FIXED_GPU_MACHINE_TYPES
+    if self.gpu_count and (
+        self.cpus
+        or (
+            self.machine_type
+            and self.machine_type not in _FIXED_GPU_MACHINE_TYPES
+        )
     ):
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(
           self.gpu_type, self.gpu_count
       )
+
     cmd.flags['tags'] = ','.join(['perfkitbenchmarker'] + (self.gce_tags or []))
     if not self.automatic_restart:
       cmd.flags['no-restart-on-failure'] = True
@@ -1010,7 +1017,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       response = json.loads(stdout)
       if not self.image:
         self.image = response['sourceImage'].split('/')[-1]
-        self.backfill_image = True
       if not self.boot_disk_size:
         self.boot_disk_size = response['sizeGb']
       if not self.boot_disk_type:
@@ -1277,14 +1283,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       attr_value = getattr(self, attr_name)
       if attr_value:
         result[attr_name] = attr_value
-    # Only record image_family flag when it is used in vm creation command.
-    # Note, when using non-debian/ubuntu based custom images, user will need
-    # to use --os_type flag. In that case, we do not want to
-    # record image_family in metadata.
-    if self.backfill_image and self.image_family:
-      result['image_family'] = self.image_family
-    if self.image_project:
-      result['image_project'] = self.image_project
     if self.use_dedicated_host:
       result['node_type'] = self.node_type
       result['num_vms_per_host'] = self.num_vms_per_host
@@ -1311,13 +1309,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     )
     result['gce_network_tier'] = self.gce_network_tier
     result['gce_nic_type'] = self.gce_nic_type
-    if self.gce_egress_bandwidth_tier:
-      result['gce_egress_bandwidth_tier'] = self.gce_egress_bandwidth_tier
     result['gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
     result['boot_disk_type'] = self.boot_disk_type
     result['boot_disk_size'] = self.boot_disk_size
-    if self.threads_per_core:
-      result['threads_per_core'] = self.threads_per_core
     if self.network.mtu:
       result['mtu'] = self.network.mtu
     if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:

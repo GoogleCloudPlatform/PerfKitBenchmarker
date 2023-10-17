@@ -238,6 +238,7 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         gpu_type='k80',
         project='fakeproject')
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+    vm._GenerateCreateCommand('')
     vm.created = True
     self.assertDictContainsSubset({
         'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
