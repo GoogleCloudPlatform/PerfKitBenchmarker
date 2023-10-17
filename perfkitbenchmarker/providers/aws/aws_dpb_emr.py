@@ -166,8 +166,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       assert self.spec.worker_group.disk_spec.device_path is None
       assert self.spec.worker_group.disk_spec.disk_number is None
       assert self.spec.worker_group.disk_spec.iops is None
-      self.dpb_hdfs_type = disk_to_hdfs_map[
-          self.spec.worker_group.disk_spec.disk_type]
       if self.spec.worker_group.disk_spec.disk_type != disk.LOCAL:
         ebs_configuration = {'EbsBlockDeviceConfigs': [
             {'VolumeSpecification': {
@@ -435,6 +433,16 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         job_arguments=job_arguments,
         job_type=dpb_service.BaseDpbService.HADOOP_JOB_TYPE)
 
+  def GetHdfsType(self) -> Optional[str]:
+    """Gets human friendly disk type for metric metadata."""
+    try:
+      return disk_to_hdfs_map[self.spec.worker_group.disk_spec.disk_type]
+    except KeyError:
+      raise errors.Setup.InvalidSetupError(
+          f'Invalid disk_type={self.spec.worker_group.disk_spec.disk_type!r} in'
+          ' spec.'
+      ) from None
+
 
 class AwsDpbEmrServerless(
     dpb_service.DpbServiceServerlessMixin, dpb_service.BaseDpbService
@@ -476,6 +484,7 @@ class AwsDpbEmrServerless(
 
     # Last job run cost
     self._run_cost = None
+    self._FillMetadata()
 
   def SubmitJob(self,
                 jarfile=None,
@@ -557,7 +566,7 @@ class AwsDpbEmrServerless(
     if self.spec.emr_serverless_core_count:
       result['spark.executor.cores'] = self.spec.emr_serverless_core_count
       result['spark.driver.cores'] = self.spec.emr_serverless_core_count
-    if self.spec.emr_serverless_core_count:
+    if self.spec.emr_serverless_memory:
       result['spark.executor.memory'] = f'{self.spec.emr_serverless_memory}G'
     if self.spec.emr_serverless_executor_count:
       result['spark.executor.instances'] = (
@@ -631,3 +640,29 @@ class AwsDpbEmrServerless(
         self._run_cost = self._ComputeJobRunCost(
             memory_gb_hour, storage_gb_hour, vcpu_hour)
       return dpb_service.JobResult(run_time=end_time - start_time)
+
+  def _FillMetadata(self) -> None:
+    """Gets a dict to initialize this DPB service instance's metadata."""
+    basic_data = self.metadata
+
+    dpb_disk_size = self.spec.worker_group.disk_spec.disk_size or 'default'
+    core_count = str(self.spec.emr_serverless_core_count) or 'default'
+    cluster_shape = f'emr-serverless-{core_count}'
+    cluster_size = str(self.spec.emr_serverless_executor_count) or 'default'
+
+    self.metadata = {
+        'dpb_service': basic_data['dpb_service'],
+        'dpb_version': basic_data['dpb_version'],
+        'dpb_service_version': basic_data['dpb_service_version'],
+        'dpb_cluster_shape': cluster_shape,
+        'dpb_cluster_size': cluster_size,
+        'dpb_hdfs_type': basic_data['dpb_hdfs_type'],
+        'dpb_memory_per_node': self.spec.emr_serverless_memory or 'default',
+        'dpb_disk_size': dpb_disk_size,
+        'dpb_service_zone': basic_data['dpb_service_zone'],
+        'dpb_job_properties': basic_data['dpb_job_properties'],
+    }
+
+  def GetHdfsType(self) -> Optional[str]:
+    """Gets human friendly disk type for metric metadata."""
+    return 'default-disk'

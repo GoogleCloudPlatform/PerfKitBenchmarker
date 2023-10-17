@@ -20,11 +20,14 @@ import unittest
 from unittest import mock
 
 from absl import flags
-
+from absl.testing import parameterized
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
 from perfkitbenchmarker.providers.aws import aws_dpb_emr_serverless_prices
+from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
@@ -37,9 +40,7 @@ _BASE_JOB_RUN_PAYLOAD = {
     'jobRun': {
         'applicationId': 'foobar',
         'jobRunId': 'bazquux',
-        'arn': (
-            'arn:aws:emr-serverless:us-east-1:1234567:/applications/foobar/jobruns/bazquux'
-        ),
+        'arn': 'arn:aws:emr-serverless:us-east-1:1234567:/applications/foobar/jobruns/bazquux',
         'createdBy': 'arn:aws:iam::1234567:user/perfkitbenchmarker',
         'createdAt': 1675193231.789,
         'updatedAt': 1675194602.299,
@@ -59,17 +60,29 @@ _BASE_JOB_RUN_PAYLOAD = {
                     '--conf spark.executor.instances=4 '
                     '--conf spark.emr-serverless.driver.disk=42G '
                     '--conf spark.emr-serverless.executor.disk=42G'
-                )
+                ),
             }
         },
         'tags': {},
         'totalResourceUtilization': {
             'vCPUHour': 59.422,
             'memoryGBHour': 237.689,
-            'storageGBHour': 1901.511
-        }
+            'storageGBHour': 1901.511,
+        },
     }
 }
+
+
+def _GetEmrSpec():
+  return mock.Mock(
+      static_dpb_service_instance=None,
+      worker_count=2,
+      version='fake-version',
+      worker_group=mock.Mock(
+          vm_spec=mock.Mock(machine_type='fake-machine-type'),
+          disk_spec=mock.Mock(disk_type='gp2', disk_size=42),
+      ),
+  )
 
 
 def _GetJobRunMockPayload(
@@ -93,7 +106,8 @@ SERVERLESS_SPEC = mock.Mock(
     emr_serverless_core_count=4,
     emr_serverless_executor_count=4,
     emr_serverless_memory=14,
-    worker_group=mock.Mock(disk_spec=mock.Mock(disk_size=42)))
+    worker_group=mock.Mock(disk_spec=mock.Mock(disk_size=42)),
+)
 
 
 class LocalAwsDpbEmr(aws_dpb_emr.AwsDpbEmr):
@@ -101,7 +115,8 @@ class LocalAwsDpbEmr(aws_dpb_emr.AwsDpbEmr):
   def __init__(self):
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(
-        util.GetRegionFromZone(FLAGS.dpb_service_zone))
+        util.GetRegionFromZone(FLAGS.dpb_service_zone)
+    )
 
 
 class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -112,7 +127,34 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.dpb_service_zone = AWS_ZONE_US_EAST_1A
     FLAGS.zones = [AWS_ZONE_US_EAST_1A]
     self.issue_cmd_mock = self.enter_context(
-        mock.patch.object(vm_util, 'IssueCommand', autospec=True))
+        mock.patch.object(vm_util, 'IssueCommand', autospec=True)
+    )
+
+  @parameterized.named_parameters(
+      dict(testcase_name='St1', disk_type=aws_disk.ST1, hdfs_type='HDD (ST1)'),
+      dict(testcase_name='Gp2', disk_type=aws_disk.GP2, hdfs_type='SSD (GP2)'),
+      dict(testcase_name='Ssd', disk_type=disk.LOCAL, hdfs_type='Local SSD'),
+  )
+  @mock.patch.object(aws_network.AwsNetwork, 'GetNetworkFromNetworkSpec')
+  def testEmrMetadata(self, _, disk_type, hdfs_type):
+    spec = _GetEmrSpec()
+    spec.worker_group.disk_spec.disk_type = disk_type
+    cluster = aws_dpb_emr.AwsDpbEmr(spec)
+    expected_metadata = {
+        'dpb_service': 'emr',
+        'dpb_version': 'fake-version',
+        'dpb_service_version': 'emr_fake-version',
+        'dpb_cluster_id': 'pkb-fakeru',
+        'dpb_cluster_shape': 'fake-machine-type',
+        'dpb_cluster_size': 2,
+        'dpb_hdfs_type': hdfs_type,
+        'dpb_disk_size': 42,
+        'dpb_service_zone': 'us-east-1a',
+        'dpb_job_properties': '',
+        'dpb_cluster_properties': '',
+        'dpb_dynamic_allocation': True,
+    }
+    self.assertEqual(cluster.GetResourceMetadata(), expected_metadata)
 
   def testEmrServerlessCalculateLastJobCost(self):
     emr_serverless = aws_dpb_emr.AwsDpbEmrServerless(SERVERLESS_SPEC)
@@ -122,21 +164,28 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
     start_job_run_response = {
         'applicationId': 'foobar',
         'jobRunId': 'bazquux',
-        'arn': (
-            'arn:aws:emr-serverless:us-east-1:1234567:/applications/foobar/jobruns/bazquux'
-        )
+        'arn': 'arn:aws:emr-serverless:us-east-1:1234567:/applications/foobar/jobruns/bazquux',
     }
     self.issue_cmd_mock.side_effect = [
         (json.dumps(create_application_response), '', 0),
         (json.dumps(get_application_response), '', 0),
         (json.dumps(start_job_run_response), '', 0),
-        (json.dumps(
-            _GetJobRunMockPayload(vcpu_hour=59.422, memory_gb_hour=237.689,
-                                  storage_gb_hour=1901.511)), '', 0),
+        (
+            json.dumps(
+                _GetJobRunMockPayload(
+                    vcpu_hour=59.422,
+                    memory_gb_hour=237.689,
+                    storage_gb_hour=1901.511,
+                )
+            ),
+            '',
+            0,
+        ),
     ]
 
     with mock.patch.object(
-        aws_dpb_emr_serverless_prices, 'EMR_SERVERLESS_PRICES'):
+        aws_dpb_emr_serverless_prices, 'EMR_SERVERLESS_PRICES'
+    ):
       # The actual prices are expected to change over time, but we don't want to
       # update the test every time.
       aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES = {
@@ -148,7 +197,8 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
       }
       emr_serverless.SubmitJob(
           pyspark_file='s3://test/hello.py',
-          job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE)
+          job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE,
+      )
 
     self.assertEqual(emr_serverless.CalculateLastJobCost(), 4.711576935499999)
 
@@ -160,6 +210,22 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIsInstance(price_dict['vcpu_hours'], float)
       self.assertIsInstance(price_dict['memory_gb_hours'], float)
       self.assertIsInstance(price_dict['storage_gb_hours'], float)
+
+  def testEmrServerlessMetadata(self):
+    emr_serverless = aws_dpb_emr.AwsDpbEmrServerless(SERVERLESS_SPEC)
+    expected_metadata = {
+        'dpb_service': 'emr_serverless',
+        'dpb_version': 'fake-4.2',
+        'dpb_service_version': 'emr_serverless_fake-4.2',
+        'dpb_cluster_shape': 'emr-serverless-4',
+        'dpb_cluster_size': '4',
+        'dpb_hdfs_type': 'default-disk',
+        'dpb_memory_per_node': 14,
+        'dpb_disk_size': 42,
+        'dpb_service_zone': 'us-east-1a',
+        'dpb_job_properties': 'spark.dynamicAllocation.enabled=FALSE,spark.executor.cores=4,spark.driver.cores=4,spark.executor.memory=14G,spark.executor.instances=4,spark.emr-serverless.driver.disk=42G,spark.emr-serverless.executor.disk=42G',
+    }
+    self.assertEqual(emr_serverless.GetResourceMetadata(), expected_metadata)
 
 
 if __name__ == '__main__':
