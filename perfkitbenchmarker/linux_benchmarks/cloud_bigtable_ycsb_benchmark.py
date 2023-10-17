@@ -140,7 +140,10 @@ _Bigtable = gcp_bigtable.GcpBigtableInstance
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
+  return config
 
 
 def CheckPrerequisites(benchmark_config: Dict[str, Any]) -> None:
