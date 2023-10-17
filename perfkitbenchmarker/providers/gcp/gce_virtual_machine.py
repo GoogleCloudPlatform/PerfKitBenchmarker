@@ -755,13 +755,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             'mode=rw',
         ]
         if (
-            FLAGS.gcp_provisioned_iops and
-            disk_spec.disk_type in gce_disk.GCE_DYNAMIC_IOPS_DISK_TYPES
+            FLAGS.gcp_provisioned_iops
+            and disk_spec.disk_type in gce_disk.GCE_DYNAMIC_IOPS_DISK_TYPES
         ):
           pd_args += [f'provisioned-iops={FLAGS.gcp_provisioned_iops}']
         if (
-            FLAGS.gcp_provisioned_throughput and
-            disk_spec.disk_type in gce_disk.GCE_DYNAMIC_THROUGHPUT_DISK_TYPES
+            FLAGS.gcp_provisioned_throughput
+            and disk_spec.disk_type
+            in gce_disk.GCE_DYNAMIC_THROUGHPUT_DISK_TYPES
         ):
           pd_args += [
               f'provisioned-throughput={FLAGS.gcp_provisioned_throughput}'
@@ -845,7 +846,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.create_return_time = time.time()
 
   def _ParseCreateErrors(
-      self, cmd_rate_limited: bool, stderr: str, retcode: int):
+      self, cmd_rate_limited: bool, stderr: str, retcode: int
+  ):
     """Parse error messages from a command in order to classify a failure."""
     num_hosts = len(self.host_list)
     if (
@@ -1042,7 +1044,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry(
       poll_interval=1,
       log_errors=False,
-      retryable_exceptions=(GceServiceUnavailableError,)
+      retryable_exceptions=(GceServiceUnavailableError,),
   )
   def _Exists(self):
     """Returns true if the VM exists."""
@@ -1082,12 +1084,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if 'error' in response:
       create_stderr = json.dumps(response['error'])
       create_retcode = 1
-      self._ParseCreateErrors(getoperation_cmd.rate_limited,
-                              create_stderr, create_retcode)
+      self._ParseCreateErrors(
+          getoperation_cmd.rate_limited, create_stderr, create_retcode
+      )
     # Retry if the operation is not yet DONE.
     elif status != OPERATION_DONE:
-      logging.info('VM create operation has status %s; retrying operations '
-                   'describe command.', status)
+      logging.info(
+          'VM create operation has status %s; retrying operations '
+          'describe command.',
+          status,
+      )
       raise GceRetryDescribeOperationsError()
     # Collect the time-to-running timestamp once the operation completes.
     elif not self.is_running_time:
@@ -1166,8 +1172,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
     self._PrepareScratchDisk(scratch_disk, disk_spec)
 
-  def CreateIpReservation(self,
-                          ip_address_name: str) -> gce_network.GceIPAddress:
+  def CreateIpReservation(
+      self, ip_address_name: str
+  ) -> gce_network.GceIPAddress:
     """Creates an IP reservation.
 
     Args:
@@ -1177,8 +1184,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       Reserved IP address.
     """
     reserved_ip_address = gce_network.GceIPAddress(
-        self.project, util.GetRegionFromZone(self.zone),
-        ip_address_name, self.network.primary_subnet_name)
+        self.project,
+        util.GetRegionFromZone(self.zone),
+        ip_address_name,
+        self.network.primary_subnet_name,
+    )
     reserved_ip_address.Create()
     return reserved_ip_address
 
@@ -1189,8 +1199,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       ip_address_name: name of the IP reservation to be released.
     """
     reserv_ip_address = gce_network.GceIPAddress(
-        self.project, util.GetRegionFromZone(self.zone),
-        ip_address_name, self.network.primary_subnet_name)
+        self.project,
+        util.GetRegionFromZone(self.zone),
+        ip_address_name,
+        self.network.primary_subnet_name,
+    )
     reserv_ip_address.Delete()
 
   def FindRemoteNVMEDevices(self, _, nvme_devices):
@@ -1771,7 +1784,9 @@ class CentOsStream9BasedGceVirtualMachine(
 
 
 class BaseCosBasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.BaseContainerLinuxMixin):
+    BaseLinuxGceVirtualMachine, linux_vm.BaseContainerLinuxMixin
+):
+  """Base class for COS-based GCE virtual machines."""
   BASE_OS_TYPE = os_types.CORE_OS
   DEFAULT_IMAGE_PROJECT = 'cos-cloud'
 
@@ -1815,7 +1830,8 @@ class Cos101BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
 
 
 class Cos97BasedGceVirtualMachine(
-    BaseCosBasedGceVirtualMachine, virtual_machine.DeprecatedOsMixin):
+    BaseCosBasedGceVirtualMachine, virtual_machine.DeprecatedOsMixin
+):
   OS_TYPE = os_types.COS97
   DEFAULT_X86_IMAGE_FAMILY = 'cos-97-lts'
   # https://cloud.google.com/container-optimized-os/docs/release-notes
