@@ -368,7 +368,7 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
         timeout=None,
         should_pre_log=False,
         raise_on_failure=False,
-        stack_level=5,
+        stack_level=4,
     )
 
   @parameterized.parameters(
@@ -713,7 +713,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual({'eth0': '1500', 'eth1': '1500'}, names)
     mock_cmd = vm.RemoteHostCommandWithReturnCode
     mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ip link show up',
-                                stack_level=4)
+                                stack_level=3)
 
   def testCpuVulnerabilitiesEmpty(self):
     self.assertEqual({}, self.CreateVm('').cpu_vulnerabilities.asdict)

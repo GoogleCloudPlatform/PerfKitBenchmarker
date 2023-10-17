@@ -220,6 +220,11 @@ DNF = 'dnf'
 
 RETRYABLE_SSH_RETCODE = 255
 
+# Using root logger removes one function call logging.info otherwise adds to
+# the stack level. Can remove after python 11; see:
+# https://bugs.python.org/issue45171
+logger = logging.getLogger()
+
 
 class CpuVulnerabilities:
   """The 3 different vulnerability statuses from vm.cpu_vulernabilities.
@@ -495,7 +500,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     start_command = '%s 1> %s 2>&1 &' % (' '.join(start_command),
                                          wrapper_log)
-    self.RemoteCommand(start_command, stack_level=3)
+    self.RemoteCommand(start_command, stack_level=2)
 
     def _WaitForCommand():
       wait_command = ['python3', wait_path,
@@ -504,7 +509,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       stdout = ''
       while 'Command finished.' not in stdout:
         stdout, _ = self.RemoteCommand(
-            ' '.join(wait_command), timeout=1800, stack_level=4)
+            ' '.join(wait_command), timeout=1800, stack_level=3)
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
@@ -518,7 +523,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       return _WaitForCommand()
     except errors.VirtualMachine.RemoteCommandError:
       # In case the error was with the wrapper script itself, print the log.
-      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, stack_level=3)
+      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, stack_level=2)
       if stdout.strip():
         logging.warning('Exception during RobustRemoteCommand. '
                         'Wrapper script log:\n%s', stdout)
@@ -1211,7 +1216,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       login_shell: bool = False,
       timeout: Optional[float] = None,
       ip_address: Optional[str] = None,
-      stack_level: int = 2,
+      stack_level: int = 1,
   ) -> Tuple[str, str, int]:
     """Runs a command on the VM.
 
@@ -1229,7 +1234,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       ip_address: The ip address to use to connect to host.  If None, uses
         self.GetConnectionIp()
       stack_level: Number of stack frames to skip & get an "interesting" caller,
-        for logging. 2 skips this function, 3 skips this & its caller, etc..
+        for logging. 1 skips this function, 2 skips this & its caller, etc..
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -1252,7 +1257,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     ssh_private_key = (self.ssh_private_key if self.is_static else
                        vm_util.GetPrivateKeyPath())
     ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
-    logging.info(
+    logger.info(
         'Running on %s via ssh: %s',
         self.name,
         command,
@@ -1883,9 +1888,9 @@ def _IncrementStackLevel(**kwargs: Any) -> Any:
   if 'stack_level' in kwargs:
     kwargs['stack_level'] += 1
   else:
-    # Default to 3 - one for helper function this is called from, one for
-    # RemoteHostCommandWithReturnCode, & one for logging.info itself.
-    kwargs['stack_level'] = 3
+    # Default to 2 - one for helper function this is called from, & one for
+    # RemoteHostCommandWithReturnCode.
+    kwargs['stack_level'] = 2
   return kwargs
 
 
