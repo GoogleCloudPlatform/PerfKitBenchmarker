@@ -1271,7 +1271,7 @@ class YCSBExecutor:
     # Warm-up phase is shorter and doesn't need results parsing
     FLAGS['ycsb_timelimit'].parse(_INCREMENTAL_TIMELIMIT_SEC)
     for target in incremental_targets:
-      target /= FLAGS.ycsb_client_vms
+      target /= len(vms)
       run_params['target'] = int(target)
       self._SetClientThreadCount(min(ending_threadcount, int(target)))
       self._SetRunParameters(run_params)
@@ -1279,7 +1279,7 @@ class YCSBExecutor:
 
     # Reset back to the original workload args
     FLAGS['ycsb_timelimit'].parse(ending_length)
-    ending_qps /= FLAGS.ycsb_client_vms
+    ending_qps /= len(vms)
     run_params['target'] = int(ending_qps)
     self._SetClientThreadCount(ending_threadcount)
     self._SetRunParameters(run_params)
