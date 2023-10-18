@@ -163,6 +163,8 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     Returns:
       A float representing the creation time in seconds or None.
     """
+    if self._cluster_create_time is None or self._cluster_ready_time is None:
+      return None
     return self._cluster_ready_time - self._cluster_create_time
 
   def _Create(self):
