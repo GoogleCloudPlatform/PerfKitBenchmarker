@@ -1182,17 +1182,6 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
     return False
 
 
-# Azure seems to have dropped support for 2012 Server Core. It is neither here:
-# https://docs.microsoft.com/en-us/azure/virtual-machines/windows/cli-ps-findimage#table-of-commonly-used-windows-images
-# nor in `az vm image list -p MicrosoftWindowsServer -f WindowsServer -s 2012`
-# Rather than exclude this just allow 2012 to refer to the 2012 Base image.
-class Windows2012CoreAzureVirtualMachine(
-    BaseWindowsAzureVirtualMachine,
-    windows_virtual_machine.Windows2012CoreMixin):
-  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2012-r2-datacenter-gen2:latest'
-  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
-
-
 class Windows2016CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2016CoreMixin):
@@ -1211,13 +1200,6 @@ class Windows2022CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2022CoreMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2022-Datacenter-Core:latest'
-
-
-class Windows2012DesktopAzureVirtualMachine(
-    BaseWindowsAzureVirtualMachine,
-    windows_virtual_machine.Windows2012DesktopMixin):
-  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2012-r2-datacenter-gen2:latest'
-  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
 class Windows2016DesktopAzureVirtualMachine(

@@ -65,20 +65,15 @@ class WindowsGceVirtualMachine(
   """Class supporting Windows GCE virtual machines."""
 
   DEFAULT_X86_IMAGE_FAMILY = {
-      os_types.WINDOWS2012_CORE: 'windows-2012-r2-core',
       os_types.WINDOWS2016_CORE: 'windows-2016-core',
       os_types.WINDOWS2019_CORE: 'windows-2019-core',
       os_types.WINDOWS2022_CORE: 'windows-2022-core',
-      os_types.WINDOWS2012_DESKTOP: 'windows-2012-r2',
       os_types.WINDOWS2016_DESKTOP: 'windows-2016',
       os_types.WINDOWS2019_DESKTOP: 'windows-2019',
       os_types.WINDOWS2022_DESKTOP: 'windows-2022',
   }
 
-  GVNIC_DISABLED_OS_TYPES = [
-      os_types.WINDOWS2012_CORE,
-      os_types.WINDOWS2012_DESKTOP,
-  ]
+  GVNIC_DISABLED_OS_TYPES = []
 
   NVME_START_INDEX = 0
   OS_TYPE = os_types.WINDOWS_CORE_OS_TYPES + os_types.WINDOWS_DESKOP_OS_TYPES

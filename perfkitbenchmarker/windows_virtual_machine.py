@@ -732,11 +732,6 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     raise NotImplementedError('SMT detection currently not implemented')
 
 
-class Windows2012CoreMixin(BaseWindowsMixin):
-  """Class holding Windows Server 2012 Server Core VM specifics."""
-  OS_TYPE = os_types.WINDOWS2012_CORE
-
-
 class Windows2016CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2016 Server Core VM specifics."""
   OS_TYPE = os_types.WINDOWS2016_CORE
@@ -750,11 +745,6 @@ class Windows2019CoreMixin(BaseWindowsMixin):
 class Windows2022CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2022 Server Core VM specifics."""
   OS_TYPE = os_types.WINDOWS2022_CORE
-
-
-class Windows2012DesktopMixin(BaseWindowsMixin):
-  """Class holding Windows Server 2012 with Desktop Experience VM specifics."""
-  OS_TYPE = os_types.WINDOWS2012_DESKTOP
 
 
 class Windows2016DesktopMixin(BaseWindowsMixin):

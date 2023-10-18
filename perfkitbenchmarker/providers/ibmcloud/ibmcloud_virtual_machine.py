@@ -479,12 +479,6 @@ class WindowsIbmCloudVirtualMachine(
     logging.info('Password decrypted for %s, %s', self.fip_address, self.vmid)
 
 
-class Windows2012CoreIbmCloudVirtualMachine(
-    WindowsIbmCloudVirtualMachine,
-    windows_virtual_machine.Windows2012CoreMixin):
-  IMAGE_NAME_PREFIX = 'ibm-windows-server-2012-full'
-
-
 class Windows2016CoreIbmCloudVirtualMachine(
     WindowsIbmCloudVirtualMachine,
     windows_virtual_machine.Windows2016CoreMixin):

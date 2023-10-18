@@ -1947,11 +1947,6 @@ class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
     return True
 
 
-class Windows2012CoreAwsVirtualMachine(
-    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
-  IMAGE_SSM_PATTERN = '/aws/service/ami-windows-latest/Windows_Server-2012-R2_RTM-English-64Bit-Core'
-
-
 class Windows2016CoreAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2016CoreMixin):
   IMAGE_SSM_PATTERN = '/aws/service/ami-windows-latest/Windows_Server-2016-English-Core-Base'
@@ -1965,12 +1960,6 @@ class Windows2019CoreAwsVirtualMachine(
 class Windows2022CoreAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2022CoreMixin):
   IMAGE_SSM_PATTERN = '/aws/service/ami-windows-latest/Windows_Server-2022-English-Core-Base'
-
-
-class Windows2012DesktopAwsVirtualMachine(
-    BaseWindowsAwsVirtualMachine,
-    windows_virtual_machine.Windows2012DesktopMixin):
-  IMAGE_SSM_PATTERN = '/aws/service/ami-windows-latest/Windows_Server-2012-R2_RTM-English-64Bit-Base'
 
 
 class Windows2016DesktopAwsVirtualMachine(

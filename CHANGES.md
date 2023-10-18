@@ -50,7 +50,7 @@
         [the microsoft documentation](https://docs.microsoft.com/en-us/windows-server/administration/server-core/what-is-server-core)
         for more information on the differences.
 -   Remove deprecated versionless `windows` os_type.
-    -   You will have to specify `windows2012_core`.
+    -   You will have to specify `windows2016_core`.
 -   Removed deprecated versionless `rhel` os_type.
     -   You will have to specify `rhel7` on most providers or `amazonlinux1` on
         AWS.
@@ -308,7 +308,7 @@ New features:
 - Added Horovod distributed Tensorflow traning benchmark.
 - Added support for capacity reservations for VMs and added AWS implementation.
 - Added support for adding additional flags to mount and /etc/fstab.
-- Added support for Windows2012, 2016, and 2019 for AWS, Azure, and GCP.
+- Added support for Windows 2016, 2019 and 2022 for AWS, Azure, and GCP.
 - Terasort implementation on dpb backend.
 - Added cluster boot benchmark implementation on dpb backend.
 - Support multiple redis versions in cloud redis.
