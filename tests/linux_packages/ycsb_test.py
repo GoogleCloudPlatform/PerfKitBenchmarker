@@ -182,13 +182,13 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCpuMode(self):
     database = mock.Mock()
     database.CalculateTheoreticalMaxThroughput = mock.Mock(return_value=1000)
-    database.GetAverageCpuUsage = mock.Mock(side_effect=[0.2, 0.4, 0.5, 0.6])
+    database.GetAverageCpuUsage = mock.Mock(side_effect=[0.2, 0.7, 0.3, 0.45])
     self.enter_context(
         mock.patch.object(
             self.test_executor,
             'RunStaircaseLoads',
             side_effect=[
-                [s] for s in _GetMockThroughputSamples([100, 150, 200, 250])
+                [s] for s in _GetMockThroughputSamples([100, 300, 150, 250])
             ],
         )
     )
@@ -196,8 +196,8 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     results = self.test_executor.Run([self.test_vm], database=database)
 
     self.assertEqual(results[0].metric, 'overall Throughput')
-    self.assertEqual(results[0].value, 200)
-    self.assertEqual(results[0].metadata['ycsb_cpu_utilization'], 0.5)
+    self.assertEqual(results[0].value, 250)
+    self.assertEqual(results[0].metadata['ycsb_cpu_utilization'], 0.45)
 
   @parameterized.parameters((300, 5, 8), (300, 1, 12), (300, 5, 12))
   @flagsaver.flagsaver(ycsb_lowest_latency_load=True)

@@ -342,16 +342,6 @@ CPU_OPTIMIZATION_MEASUREMENT_MINS = flags.DEFINE_integer(
     ' some APIs can have a delay in reporting results, so increase this'
     ' accordingly.',
 )
-_CPU_OPTIMIZATION_STARTING_QPS = flags.DEFINE_integer(
-    'ycsb_cpu_optimization_starting_qps',
-    None,
-    'CPU-optimized mode: starting QPS to set as YCSB target.',
-)
-CPU_OPTIMIZATION_QPS_INCREMENT = flags.DEFINE_integer(
-    'ycsb_cpu_optimization_target_qps_increment',
-    1000,
-    'CPU-optimized mode: the amount to increase target QPS by.',
-)
 _LOWEST_LATENCY = flags.DEFINE_bool(
     'ycsb_lowest_latency_load',
     False,
@@ -1391,40 +1381,34 @@ class YCSBExecutor:
           return result.value
       return 0.0
 
-    def _GetStartingThroughput(workload: str) -> int:
+    def _GetReadAndUpdateProportion(workload: str) -> tuple[float, float]:
       """Gets the starting throughput to start the test with."""
       with open(workload) as f:
         workload_args = ParseWorkload(f.read())
-      read_proportion = float(workload_args['readproportion'])
-      write_proportion = float(workload_args['updateproportion'])
-      # Multiply by 0.65 to leave space for increment.
-      return _CPU_OPTIMIZATION_STARTING_QPS.value or int(
-          database.CalculateTheoreticalMaxThroughput(
-              read_proportion, write_proportion
-          )
-          * 0.65
+      return float(workload_args['readproportion']), float(
+          workload_args['updateproportion']
       )
 
-    @dataclasses.dataclass
-    class _CpuResult:
-      run_samples: list[sample.Sample] = dataclasses.field(default_factory=list)
-      cpu_utilization: float = 0.0
-      throughput: float = 0.0
+    def _ExecuteWorkload(target_qps: int) -> list[sample.Sample]:
+      """Executes the workload after setting run-specific args."""
+      run_kwargs['target'] = target_qps
+      run_kwargs['maxexecutiontime'] = (
+          CPU_OPTIMIZATION_INCREMENT_MINS.value * 60
+      )
+      return self.RunStaircaseLoads(vms, workloads=workloads, **run_kwargs)
 
     def _RunCpuModeSingleWorkload(workload: str) -> list[sample.Sample]:
       """Runs the CPU utilization test for a single workload."""
-      qps = _GetStartingThroughput(workload)
-      first_run = True
-      previous_result = _CpuResult()
-      while True:
-        run_kwargs['target'] = qps
-        run_kwargs['maxexecutiontime'] = (
-            CPU_OPTIMIZATION_INCREMENT_MINS.value * 60
-        )
-        run_samples = self.RunStaircaseLoads(
-            vms, workloads=workloads, **run_kwargs
-        )
-        throughput = _ExtractThroughput(run_samples)
+      read_percent, update_percent = _GetReadAndUpdateProportion(workload)
+      theoretical_max_qps = database.CalculateTheoreticalMaxThroughput(
+          read_percent, update_percent
+      )
+      lower_bound = 0
+      upper_bound = theoretical_max_qps * 2
+      while lower_bound <= upper_bound:
+        target_qps = int((upper_bound + lower_bound) / 2)
+        run_samples = _ExecuteWorkload(target_qps)
+        measured_qps = _ExtractThroughput(run_samples)
         end_timestamp = datetime.datetime.fromtimestamp(
             run_samples[0].timestamp, tz=datetime.timezone.utc
         )
@@ -1434,7 +1418,7 @@ class YCSBExecutor:
         run_samples.append(
             sample.Sample(
                 'CPU Normalized Throughput',
-                throughput / cpu_utilization * CPU_OPTIMIZATION_TARGET.value,
+                measured_qps / cpu_utilization * CPU_OPTIMIZATION_TARGET.value,
                 'ops/sec',
                 copy.copy(run_samples[0].metadata),
             )
@@ -1442,44 +1426,31 @@ class YCSBExecutor:
         logging.info(
             'Run had throughput target %s and measured throughput %s, with CPU'
             ' utilization %s.',
-            qps,
-            throughput,
+            target_qps,
+            measured_qps,
             cpu_utilization,
         )
-        if cpu_utilization > CPU_OPTIMIZATION_TARGET.value:
+        if cpu_utilization < CPU_OPTIMIZATION_TARGET_MIN.value:
+          lower_bound = target_qps
+        elif cpu_utilization > CPU_OPTIMIZATION_TARGET.value:
+          upper_bound = target_qps
+        else:
           logging.info(
-              'CPU utilization is higher than cap %s, stopping test',
+              'Found CPU utilization percentage between target %s and %s',
+              CPU_OPTIMIZATION_TARGET_MIN.value,
               CPU_OPTIMIZATION_TARGET.value,
           )
-          if first_run:
-            raise errors.Benchmarks.RunError(
-                f'Initial QPS {qps} already above cpu utilization cap. '
-                'Please lower the starting QPS.'
-            )
-          if (
-              previous_result.cpu_utilization
-              < CPU_OPTIMIZATION_TARGET_MIN.value
-          ):
-            raise errors.Benchmarks.RunError(
-                f'CPU utilization measured was {cpu_utilization} which is over'
-                f' the max {CPU_OPTIMIZATION_TARGET.value} threshold, and the'
-                f' previous data point {previous_result.cpu_utilization} is'
-                ' under the minimum threshold'
-                f' {CPU_OPTIMIZATION_TARGET_MIN.value}. Decrease step size to'
-                ' avoid overshooting.'
-            )
-          for s in previous_result.run_samples:
+          for s in run_samples:
             s.metadata.update({
                 'ycsb_cpu_optimization': True,
-                'ycsb_cpu_utilization': previous_result.cpu_utilization,
+                'ycsb_cpu_utilization': cpu_utilization,
                 'ycsb_cpu_target': CPU_OPTIMIZATION_TARGET.value,
                 'ycsb_cpu_target_min': CPU_OPTIMIZATION_TARGET_MIN.value,
                 'ycsb_cpu_increment_minutes': (
                     CPU_OPTIMIZATION_INCREMENT_MINS.value
                 ),
-                'ycsb_cpu_qps_increment': CPU_OPTIMIZATION_QPS_INCREMENT.value,
             })
-          return previous_result.run_samples
+          return run_samples
 
         # Sleep between steps for some workloads.
         if _CPU_OPTIMIZATION_SLEEP_MINS.value:
@@ -1489,14 +1460,6 @@ class YCSBExecutor:
               _CPU_OPTIMIZATION_SLEEP_MINS.value,
           )
           time.sleep(_CPU_OPTIMIZATION_SLEEP_MINS.value * 60)
-
-        qps += CPU_OPTIMIZATION_QPS_INCREMENT.value
-        first_run = False
-        previous_result = _CpuResult(
-            run_samples=run_samples,
-            cpu_utilization=cpu_utilization,
-            throughput=throughput,
-        )
 
     results = []
     for workload in workloads:
