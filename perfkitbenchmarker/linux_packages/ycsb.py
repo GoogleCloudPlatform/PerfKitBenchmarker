@@ -399,6 +399,7 @@ _INCREMENTAL_TIMELIMIT_SEC = 60 * 5
 # to stop the test.
 _LOWEST_LATENCY_BUFFER = 1
 _LOWEST_LATENCY_STARTING_QPS = 100
+_LOWEST_LATENCY_PERCENTILE = 'p95'
 
 _ThroughputTimeSeries = dict[int, float]
 # Tuple of (percentile, latency, count)
@@ -1305,9 +1306,9 @@ class YCSBExecutor:
       for result in samples:
         if result.metric == 'overall Throughput':
           throughput = result.value
-        elif result.metric == 'read p99 latency':
+        elif result.metric == f'read {_LOWEST_LATENCY_PERCENTILE} latency':
           read_latency = result.value
-        elif result.metric == 'update p99 latency':
+        elif result.metric == f'update {_LOWEST_LATENCY_PERCENTILE} latency':
           update_latency = result.value
       return int(throughput), read_latency, update_latency
 
@@ -1317,22 +1318,24 @@ class YCSBExecutor:
     update_latency_threshold = 0
     result = _ThroughputLatencyResult()
     while True:
-      target_per_vm = int(target / FLAGS.ycsb_client_vms)
+      target_per_vm = int(target / len(vms))
       run_params['target'] = target_per_vm
       self._SetClientThreadCount(target_per_vm)
       self._SetRunParameters(run_params)
       samples = self.RunStaircaseLoads(vms, workloads, **run_kwargs)
-      # Currently uses p99 latencies, but could be generalized in the future.
+      # Currently uses p95 latencies, but could be generalized in the future.
       throughput, read_latency, update_latency = _ExtractStats(samples)
       # Assume that we see lowest latency at the lowest starting throughput
       if target == _LOWEST_LATENCY_STARTING_QPS:
         read_latency_threshold = read_latency + _LOWEST_LATENCY_BUFFER
         update_latency_threshold = update_latency + _LOWEST_LATENCY_BUFFER
       logging.info(
-          'Run had throughput %s ops/s, read p99 latency %s ms, update p99'
+          'Run had throughput %s ops/s, read %s latency %s ms, update %s'
           ' latency %s ms',
           throughput,
+          _LOWEST_LATENCY_PERCENTILE,
           read_latency,
+          _LOWEST_LATENCY_PERCENTILE,
           update_latency,
       )
       if (
@@ -1341,13 +1344,17 @@ class YCSBExecutor:
       ):
         logging.info(
             'Found lowest latency at %s ops/s. Run had higher read and/or'
-            ' update latency than threshold p99 read %s ms, update %s ms.',
+            ' update latency than threshold %s read %s ms, update %s ms.',
             result.throughput,
+            _LOWEST_LATENCY_PERCENTILE,
             read_latency_threshold,
             update_latency_threshold,
         )
         for s in result.samples:
           s.metadata['ycsb_lowest_latency_buffer'] = _LOWEST_LATENCY_BUFFER
+          s.metadata['ycsb_lowest_latency_percentile'] = (
+              _LOWEST_LATENCY_PERCENTILE
+          )
         return result.samples
       result = _ThroughputLatencyResult(
           throughput, read_latency, update_latency, samples

@@ -238,8 +238,16 @@ def _GetMockThroughputSamples(throughputs):
 def _GetMockThroughputLatencySamples(throughput, read_latency, update_latency):
   return [
       sample.Sample('overall Throughput', value=throughput, unit='ops/sec'),
-      sample.Sample('read p99 latency', value=read_latency, unit='ms'),
-      sample.Sample('update p99 latency', value=update_latency, unit='ms'),
+      sample.Sample(
+          f'read {ycsb._LOWEST_LATENCY_PERCENTILE} latency',
+          value=read_latency,
+          unit='ms',
+      ),
+      sample.Sample(
+          f'update {ycsb._LOWEST_LATENCY_PERCENTILE} latency',
+          value=update_latency,
+          unit='ms',
+      ),
   ]
 
 
