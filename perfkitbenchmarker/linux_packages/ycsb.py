@@ -1318,11 +1318,12 @@ class YCSBExecutor:
     update_latency_threshold = 0
     result = _ThroughputLatencyResult()
     while True:
-      target_per_vm = int(target / len(vms))
-      run_params['target'] = target_per_vm
-      self._SetClientThreadCount(target_per_vm)
+      run_params['target'] = target
+      self._SetClientThreadCount(
+          min(target, int(FLAGS.ycsb_threads_per_client[0]))
+      )
       self._SetRunParameters(run_params)
-      samples = self.RunStaircaseLoads(vms, workloads, **run_kwargs)
+      samples = self.RunStaircaseLoads([vms[0]], workloads, **run_kwargs)
       # Currently uses p95 latencies, but could be generalized in the future.
       throughput, read_latency, update_latency = _ExtractStats(samples)
       # Assume that we see lowest latency at the lowest starting throughput
