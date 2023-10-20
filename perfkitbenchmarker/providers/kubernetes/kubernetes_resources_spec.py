@@ -14,6 +14,8 @@
 """Classes relating to decoding a Kubernetes resource limits or requests.
 """
 
+from typing import Optional
+
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -27,6 +29,11 @@ class KubernetesResourcesSpec(spec.BaseSpec):
     memory: string. Representation of the size of memory, expressed in MiB or
         GiB. Must be an integer number of MiB (e.g. "1280MiB", "7.5GiB").
   """
+
+  def __init__(self, *args, **kwargs):
+    self.cpus: Optional[float] = None
+    self.memory: Optional[str] = None
+    super().__init__(*args, **kwargs)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):

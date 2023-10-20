@@ -14,6 +14,8 @@
 
 """Contains code related Kubernetes pod spec decoding."""
 
+from typing import Optional
+
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.kubernetes import kubernetes_resources_spec
@@ -21,14 +23,22 @@ from perfkitbenchmarker.providers.kubernetes import kubernetes_resources_spec
 
 class KubernetesPodSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a Kubernetes Pod.
+
+  Attributes:
+    resource_limits: The max resource limits (cpu & memory).
+    resource_requests: The requested resources (cpu & memory).
   """
 
   CLOUD = provider_info.KUBERNETES
 
   def __init__(self, *args, **kwargs):
-    self.resource_limits = None
-    self.resource_requests = None
-    super(KubernetesPodSpec, self).__init__(*args, **kwargs)
+    self.resource_limits: Optional[
+        kubernetes_resources_spec.KubernetesResourcesSpec
+    ] = None
+    self.resource_requests: Optional[
+        kubernetes_resources_spec.KubernetesResourcesSpec
+    ] = None
+    super().__init__(*args, **kwargs)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -43,9 +53,11 @@ class KubernetesPodSpec(virtual_machine.BaseVmSpec):
     result.update({
         'resource_limits': (
             kubernetes_resources_spec.KubernetesResourcesDecoder,
-            {'default': None}),
+            {'default': None},
+        ),
         'resource_requests': (
             kubernetes_resources_spec.KubernetesResourcesDecoder,
-            {'default': None})
+            {'default': None},
+        ),
     })
     return result
