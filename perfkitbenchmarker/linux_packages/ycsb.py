@@ -1300,7 +1300,18 @@ class YCSBExecutor:
       update_latency: float = float('inf')
       samples: list[sample.Sample] = dataclasses.field(default_factory=list)
 
-    def _ExtractStats(samples: list[sample.Sample]) -> tuple[int, float, float]:
+    def _PrintDebugLog(result: _ThroughputLatencyResult) -> None:
+      logging.info(
+          'Run had throughput %s ops/s, read %s latency %s ms, update %s'
+          ' latency %s ms',
+          result.throughput,
+          _LOWEST_LATENCY_PERCENTILE,
+          result.read_latency,
+          _LOWEST_LATENCY_PERCENTILE,
+          result.update_latency,
+      )
+
+    def _ExtractStats(samples: list[sample.Sample]) -> _ThroughputLatencyResult:
       """Returns the throughput and latency recorded in the samples."""
       throughput, read_latency, update_latency = 0, 0, 0
       for result in samples:
@@ -1310,13 +1321,18 @@ class YCSBExecutor:
           read_latency = result.value
         elif result.metric == f'update {_LOWEST_LATENCY_PERCENTILE} latency':
           update_latency = result.value
-      return int(throughput), read_latency, update_latency
+      return _ThroughputLatencyResult(
+          throughput=int(throughput),
+          read_latency=read_latency,
+          update_latency=update_latency,
+          samples=samples,
+      )
 
     run_params = _GetRunParameters()
     target = _LOWEST_LATENCY_STARTING_QPS
-    read_latency_threshold = 0
-    update_latency_threshold = 0
-    result = _ThroughputLatencyResult()
+    min_read_latency = float('inf')
+    min_update_latency = float('inf')
+    prev_result = _ThroughputLatencyResult()
     while True:
       run_params['target'] = target
       self._SetClientThreadCount(
@@ -1324,42 +1340,29 @@ class YCSBExecutor:
       )
       self._SetRunParameters(run_params)
       samples = self.RunStaircaseLoads([vms[0]], workloads, **run_kwargs)
-      # Currently uses p95 latencies, but could be generalized in the future.
-      throughput, read_latency, update_latency = _ExtractStats(samples)
-      # Assume that we see lowest latency at the lowest starting throughput
-      if target == _LOWEST_LATENCY_STARTING_QPS:
-        read_latency_threshold = read_latency + _LOWEST_LATENCY_BUFFER
-        update_latency_threshold = update_latency + _LOWEST_LATENCY_BUFFER
-      logging.info(
-          'Run had throughput %s ops/s, read %s latency %s ms, update %s'
-          ' latency %s ms',
-          throughput,
-          _LOWEST_LATENCY_PERCENTILE,
-          read_latency,
-          _LOWEST_LATENCY_PERCENTILE,
-          update_latency,
-      )
+      result = _ExtractStats(samples)
+      _PrintDebugLog(result)
       if (
-          read_latency > read_latency_threshold
-          or update_latency > update_latency_threshold
+          result.read_latency > min_read_latency + _LOWEST_LATENCY_BUFFER
+          or result.update_latency > min_update_latency + _LOWEST_LATENCY_BUFFER
       ):
         logging.info(
             'Found lowest latency at %s ops/s. Run had higher read and/or'
             ' update latency than threshold %s read %s ms, update %s ms.',
-            result.throughput,
+            prev_result.throughput,
             _LOWEST_LATENCY_PERCENTILE,
-            read_latency_threshold,
-            update_latency_threshold,
+            prev_result.read_latency,
+            prev_result.update_latency,
         )
-        for s in result.samples:
+        for s in prev_result.samples:
           s.metadata['ycsb_lowest_latency_buffer'] = _LOWEST_LATENCY_BUFFER
           s.metadata['ycsb_lowest_latency_percentile'] = (
               _LOWEST_LATENCY_PERCENTILE
           )
-        return result.samples
-      result = _ThroughputLatencyResult(
-          throughput, read_latency, update_latency, samples
-      )
+        return prev_result.samples
+      min_read_latency = min(min_read_latency, result.read_latency)
+      min_update_latency = min(min_update_latency, result.update_latency)
+      prev_result = result
       target += 100
 
   def _RunCpuMode(

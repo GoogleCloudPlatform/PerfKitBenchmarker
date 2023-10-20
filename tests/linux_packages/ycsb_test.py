@@ -199,7 +199,7 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(results[0].value, 250)
     self.assertEqual(results[0].metadata['ycsb_cpu_utilization'], 0.45)
 
-  @parameterized.parameters((300, 5, 8), (300, 1, 12), (300, 5, 12))
+  @parameterized.parameters((300, 2.5, 8), (300, 1, 12), (300, 5, 12))
   @flagsaver.flagsaver(ycsb_lowest_latency_load=True)
   def testLowestLatencyMode(self, qps, read_latency, update_latency):
     self.enter_context(
