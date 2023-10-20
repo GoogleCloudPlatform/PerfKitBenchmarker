@@ -400,6 +400,7 @@ _INCREMENTAL_TIMELIMIT_SEC = 60 * 5
 _LOWEST_LATENCY_BUFFER = 1
 _LOWEST_LATENCY_STARTING_QPS = 100
 _LOWEST_LATENCY_PERCENTILE = 'p95'
+_LOWEST_LATENCY_CPU_MEASUREMENT_MINS = 20
 
 _ThroughputTimeSeries = dict[int, float]
 # Tuple of (percentile, latency, count)
@@ -1170,7 +1171,7 @@ class YCSBExecutor:
     elif CPU_OPTIMIZATION.value:
       samples = self._RunCpuMode(vms, workloads, run_kwargs, database)
     elif _LOWEST_LATENCY.value:
-      samples = self._RunLowestLatencyMode(vms, workloads, run_kwargs)
+      samples = self._RunLowestLatencyMode(vms, workloads, run_kwargs, database)
     else:
       samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
     if (
@@ -1281,6 +1282,7 @@ class YCSBExecutor:
       vms: Sequence[virtual_machine.VirtualMachine],
       workloads: Sequence[str],
       run_kwargs: Mapping[str, str] = None,
+      database: resource.BaseResource = None,
   ) -> list[sample.Sample]:
     """Finds the lowest sustainable latency of the target.
 
@@ -1288,6 +1290,7 @@ class YCSBExecutor:
       vms: The client VMs to generate the load.
       workloads: List of workloads to run.
       run_kwargs: Extra run arguments.
+      database: Database resource to run against.
 
     Returns:
       A list of samples of benchmark results.
@@ -1328,6 +1331,36 @@ class YCSBExecutor:
           samples=samples,
       )
 
+    def _ProcessSamples(
+        samples: list[sample.Sample], database: resource.BaseResource
+    ) -> list[sample.Sample]:
+      """Attaches useful metadata to the result samples."""
+      end_timestamp = datetime.datetime.fromtimestamp(
+          samples[0].timestamp, tz=datetime.timezone.utc
+      )
+      cpu_utilization = 0
+      try:
+        cpu_utilization = database.GetAverageCpuUsage(
+            _LOWEST_LATENCY_CPU_MEASUREMENT_MINS, end_timestamp
+        )
+      except AttributeError:
+        logging.exception(
+            'Database %s does not have GetAverageCpuUsage()'
+            ' implemented, skipping adding CPU metadata.',
+            database,
+        )
+      for s in samples:
+        s.metadata.update({
+            'ycsb_lowest_latency_buffer': _LOWEST_LATENCY_BUFFER,
+            'ycsb_lowest_latency_percentile': _LOWEST_LATENCY_PERCENTILE,
+        })
+        if cpu_utilization:
+          s.metadata['ycsb_lowest_latency_cpu_utilization'] = cpu_utilization
+          s.metadata['ycsb_lowest_latency_cpu_measurement_mins'] = (
+              _LOWEST_LATENCY_CPU_MEASUREMENT_MINS
+          )
+      return samples
+
     run_params = _GetRunParameters()
     target = _LOWEST_LATENCY_STARTING_QPS
     min_read_latency = float('inf')
@@ -1354,12 +1387,7 @@ class YCSBExecutor:
             prev_result.read_latency,
             prev_result.update_latency,
         )
-        for s in prev_result.samples:
-          s.metadata['ycsb_lowest_latency_buffer'] = _LOWEST_LATENCY_BUFFER
-          s.metadata['ycsb_lowest_latency_percentile'] = (
-              _LOWEST_LATENCY_PERCENTILE
-          )
-        return prev_result.samples
+        return _ProcessSamples(prev_result.samples, database)
       min_read_latency = min(min_read_latency, result.read_latency)
       min_update_latency = min(min_update_latency, result.update_latency)
       prev_result = result
