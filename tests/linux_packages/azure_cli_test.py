@@ -89,7 +89,9 @@ class AzureCliTest(unittest.TestCase):
     self.vm.RemoteCommand.return_value = ('wheezy', '')
     azure_cli.AptInstall(self.vm)
     if self.vm.is_aarch64:
-      self.assertRemoteCommandsEqual(['sudo pip3 install azure-cli'])
+      self.assertRemoteCommandsEqual(
+          ['sudo pip3 install --upgrade azure-cli pyOpenSSL>=23.2.0']
+      )
       return
     self.assertRemoteCommandsEqual([
         'lsb_release -cs', 'echo "deb [arch=amd64] '

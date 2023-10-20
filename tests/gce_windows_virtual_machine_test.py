@@ -52,8 +52,6 @@ class GceWindowsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   @parameterized.named_parameters(
       ('WINDOWS2022_DESKTOP', os_types.WINDOWS2022_DESKTOP, True,
        'windows-2022', 'windows-cloud'),
-      ('WINDOWS2012_CORE', os_types.WINDOWS2012_CORE, False,
-       'windows-2012-r2-core', 'windows-cloud'),
       ('WINDOWS2022_SQLSERVER_2019_ENTERPRISE',
        os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE, True,
        'sql-ent-2019-win-2022', 'windows-sql-cloud'))

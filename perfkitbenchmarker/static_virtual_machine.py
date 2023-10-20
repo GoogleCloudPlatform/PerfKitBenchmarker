@@ -341,6 +341,12 @@ class Ubuntu2204BasedStaticVirtualMachine(
   pass
 
 
+class Ubuntu2304BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Ubuntu2304Mixin
+):
+  pass
+
+
 class ClearBasedStaticVirtualMachine(StaticVirtualMachine,
                                      linux_virtual_machine.ClearMixin):
   pass
@@ -393,6 +399,11 @@ class Debian10BasedStaticVirtualMachine(StaticVirtualMachine,
 
 class Debian11BasedStaticVirtualMachine(StaticVirtualMachine,
                                         linux_virtual_machine.Debian11Mixin):
+  pass
+
+
+class Debian12BasedStaticVirtualMachine(StaticVirtualMachine,
+                                        linux_virtual_machine.Debian12Mixin):
   pass
 
 

@@ -64,6 +64,22 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertIn('--nodes 3', ' '.join(cmd.call_args[0][0]))
 
+  def testSetNodesSkipsIfCountAlreadyCorrect(self):
+    test_instance = GetTestSpannerInstance()
+    self.enter_context(
+        mock.patch.object(test_instance, '_GetNodes', return_value=1)
+    )
+    self.enter_context(
+        mock.patch.object(test_instance, '_WaitUntilInstanceReady')
+    )
+    cmd = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand', return_value=[None, None, 0])
+    )
+
+    test_instance._SetNodes(1)
+
+    cmd.assert_not_called()
+
   def testFreezeUsesCorrectNodeCount(self):
     instance = GetTestSpannerInstance()
     mock_set_nodes = self.enter_context(
@@ -160,8 +176,44 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     test_spanner.nodes = 3
 
     # Act
-    actual_qps = test_spanner.CalculateRecommendedThroughput(
+    actual_qps = test_spanner.CalculateTheoreticalMaxThroughput(
         read_proportion, write_proportion)
+
+    # Assert
+    self.assertEqual(expected_qps, actual_qps)
+
+  @parameterized.named_parameters([
+      {
+          'testcase_name': 'AllRead',
+          'write_proportion': 0.0,
+          'read_proportion': 1.0,
+          'expected_qps': 45000,
+      },
+      {
+          'testcase_name': 'AllWrite',
+          'write_proportion': 1.0,
+          'read_proportion': 0.0,
+          'expected_qps': 9000,
+      },
+      {
+          'testcase_name': 'ReadWrite',
+          'write_proportion': 0.5,
+          'read_proportion': 0.5,
+          'expected_qps': 15000,
+      },
+  ])
+  def testCalculateAdjustedStartingThroughput(
+      self, write_proportion, read_proportion, expected_qps
+  ):
+    # Arrange
+    test_spanner = GetTestSpannerInstance()
+    test_spanner._config = 'regional-us-east4'
+    test_spanner.nodes = 3
+
+    # Act
+    actual_qps = test_spanner.CalculateTheoreticalMaxThroughput(
+        read_proportion, write_proportion
+    )
 
     # Assert
     self.assertEqual(expected_qps, actual_qps)

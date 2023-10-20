@@ -45,7 +45,7 @@ NETWORK_RANGE = '10.0.0.0/8'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
 _PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['c2', 'c3', 'n2', 'n2d', 'c2d', 'c3d', 'a2', 'a3', 'g2', 'h3']
+    ['c2', 'c3', 'n2', 'n2d', 'c2d', 'c3a', 'c3d', 'a2', 'a3', 'g2', 'h3']
 )
 
 
@@ -326,17 +326,21 @@ class GceVpnGatewayResource(resource.BaseResource):
 class GceIPAddress(resource.BaseResource):
   """Object representing a GCE IP address."""
 
-  def __init__(self, project: str, region: str, name: str):
+  def __init__(self, project: str, region: str, name: str,
+               subnet: Optional[str] = None):
     super(GceIPAddress, self).__init__()
     self.project = project
     self.region = region
     self.name = name
+    self.subnet = subnet
     self.ip_address = None
 
   def _Create(self):
     """Allocates a public IP for the VPN gateway."""
     cmd = util.GcloudCommand(self, 'compute', 'addresses', 'create', self.name)
     cmd.flags['region'] = self.region
+    if self.subnet is not None:
+      cmd.flags['subnet'] = self.subnet
     cmd.Issue()
 
   def _PostCreate(self):
@@ -360,6 +364,15 @@ class GceIPAddress(resource.BaseResource):
     cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
+
+  def _IsReady(self) -> bool:
+    """Returns True if the IP address is reserved."""
+    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe',
+                             self.name)
+    cmd.flags['region'] = self.region
+    cmd.flags['format'] = 'value(status)'
+    stdout, _, _ = cmd.Issue()
+    return stdout.rstrip() == 'RESERVED'
 
 
 class GceStaticTunnel(resource.BaseResource):
@@ -732,6 +745,17 @@ class GceSubnetResource(resource.BaseResource):
     self.region = region
     self.addr_range = addr_range
     self.project = project
+
+  def UpdateProperties(self) -> None:
+    """Updates the properties of the subnet resource."""
+    cmd = util.GcloudCommand(
+        self, 'compute', 'networks', 'subnets', 'describe', self.name
+    )
+    cmd.flags['region'] = self.region
+    stdout, _, _ = cmd.Issue()
+    json_details = json.loads(stdout)
+    self.network_name = json_details['network'].split('/')[-1]
+    self.addr_range = json_details['ipCidrRange']
 
   def _Create(self):
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'create',

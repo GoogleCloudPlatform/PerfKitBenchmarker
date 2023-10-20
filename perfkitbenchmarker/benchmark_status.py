@@ -48,6 +48,13 @@ class FailedSubstatus(object):
   # the chance of success.
   UNSUPPORTED = 'UNSUPPORTED'
 
+  # Failure as process received a SIGINT or SIGTERM signal. This can be caused
+  # by manual Ctrl-C or a few forms of timeout - blaze sends it when
+  # its test_timeout flag is reached, as does artemis for timeout_sec. The
+  # reaper may (possibly, unproven) also kill VMs which have an artemis process
+  # running on them, which may also send this signal.
+  PROCESS_KILLED = 'PROCESS_KILLED'
+
   # General failure that don't fit in the above categories.
   UNCATEGORIZED = 'UNCATEGORIZED'
 

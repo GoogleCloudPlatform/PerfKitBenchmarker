@@ -138,7 +138,14 @@ def GetConfig(user_config):
   Returns:
     loaded benchmark configuration
   """
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS.db_high_availability:
+    # We need two additional vms for sql ha deployment.
+    # First vm to act as the second node in sql cluster
+    # and additional vm to act as a domain controller.
+    config['relational_db']['vm_groups']['servers']['vm_count'] = 3
+
+  return config
 
 
 def CheckPrerequisites(_):
@@ -149,7 +156,8 @@ def CheckPrerequisites(_):
   ]:
     raise errors.Setup.InvalidFlagConfigurationError(
         'Non-optimized hammerdbcli_optimized_server_configuration'
-        ' is not implemented.')
+        ' is not implemented.'
+    )
 
 
 def Prepare(benchmark_spec):
@@ -163,10 +171,21 @@ def Prepare(benchmark_spec):
   relational_db = benchmark_spec.relational_db
   vm = relational_db.client_vm
   vm.Install('hammerdb')
-  hammerdb.SetupConfig(vm, sql_engine_utils.SQLSERVER,
-                       hammerdb.HAMMERDB_SCRIPT.value, relational_db.endpoint,
-                       relational_db.port, relational_db.spec.database_password,
-                       relational_db.spec.database_username, False)
+
+  is_azure = FLAGS.cloud == 'Azure' and FLAGS.use_managed_db
+  if is_azure and hammerdb.HAMMERDB_SCRIPT.value == 'tpc_c':
+    # Create the database first only Azure requires creating the database.
+    relational_db.client_vm_query_tools.IssueSqlCommand('CREATE DATABASE tpcc;')
+  hammerdb.SetupConfig(
+      vm,
+      sql_engine_utils.SQLSERVER,
+      hammerdb.HAMMERDB_SCRIPT.value,
+      relational_db.endpoint,
+      relational_db.port,
+      relational_db.spec.database_password,
+      relational_db.spec.database_username,
+      is_azure,
+  )
 
 
 def SetMinimumRecover(relational_db):

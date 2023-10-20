@@ -36,7 +36,8 @@ _METADATA_PREEMPT_CMD_WIN = (
 )
 
 FLAGS = flags.FLAGS
-
+ATTACHED_DISK_LETTER = 'F'
+TEMPDB_DISK_LETTER = 'T'
 BAT_SCRIPT = """
 :WAIT
 echo waiting for MSSQLSERVER
@@ -63,21 +64,16 @@ class WindowsGceVirtualMachine(
 ):
   """Class supporting Windows GCE virtual machines."""
 
-  DEFAULT_IMAGE_FAMILY = {
-      os_types.WINDOWS2012_CORE: 'windows-2012-r2-core',
+  DEFAULT_X86_IMAGE_FAMILY = {
       os_types.WINDOWS2016_CORE: 'windows-2016-core',
       os_types.WINDOWS2019_CORE: 'windows-2019-core',
       os_types.WINDOWS2022_CORE: 'windows-2022-core',
-      os_types.WINDOWS2012_DESKTOP: 'windows-2012-r2',
       os_types.WINDOWS2016_DESKTOP: 'windows-2016',
       os_types.WINDOWS2019_DESKTOP: 'windows-2019',
       os_types.WINDOWS2022_DESKTOP: 'windows-2022',
   }
 
-  GVNIC_DISABLED_OS_TYPES = [
-      os_types.WINDOWS2012_CORE,
-      os_types.WINDOWS2012_DESKTOP,
-  ]
+  GVNIC_DISABLED_OS_TYPES = []
 
   NVME_START_INDEX = 0
   OS_TYPE = os_types.WINDOWS_CORE_OS_TYPES + os_types.WINDOWS_DESKOP_OS_TYPES
@@ -93,9 +89,61 @@ class WindowsGceVirtualMachine(
         windows_virtual_machine.STARTUP_SCRIPT
     )
 
+  def _PrepareTempDbDisk(self):
+    """Helper method to format and setup disk for SQL Server TempDB."""
+    # Create and then run a Diskpart script that will initialize the disks,
+    # create a volume, and then format and mount the volume.
+    script = ''
+    stdout, _ = self.RemoteCommand(
+        'Get-PhysicalDisk | where-object '
+        '{($_.FriendlyName -eq "Google EphemeralDisk") -or '
+        '($_.FriendlyName -eq "nvme_card")} | Select -exp DeviceID'
+    )
+    local_ssd_disks = [
+        int(device_id) for device_id in stdout.split('\n') if device_id
+    ]
+    local_ssd_disks_str = [str(d) for d in local_ssd_disks]
+
+    for disk_number in local_ssd_disks_str:
+      # For local SSD disk, set the status to online (if it is not already),
+      # remove any formatting or partitioning on the disks, and convert
+      # it to a dynamic disk so it can be used to create a volume.
+      script += (
+          'select disk %s\n'
+          'online disk noerr\n'
+          'attributes disk clear readonly\n'
+          'clean\n'
+          'convert gpt\n'
+          'convert dynamic\n' % disk_number
+      )
+
+    if local_ssd_disks:
+      if len(local_ssd_disks_str) > 1:
+        script += 'create volume stripe disk=%s\n' % ','.join(
+            local_ssd_disks_str)
+      else:
+        script += 'create volume simple\n'
+      script += 'format fs=ntfs quick unit=64k\nassign letter={}\n'.format(
+          TEMPDB_DISK_LETTER.lower()
+      )
+    self._RunDiskpartScript(script)
+
+    # Grant user permissions on the drive
+    if local_ssd_disks:
+      self.RemoteCommand(
+          'icacls {}: /grant Users:F /L'.format(TEMPDB_DISK_LETTER)
+      )
+      self.RemoteCommand(
+          'icacls {}: --% /grant Users:(OI)(CI)F /L'.format(TEMPDB_DISK_LETTER)
+      )
+      self.RemoteCommand('mkdir {}:\\TEMPDB'.format(TEMPDB_DISK_LETTER))
+
   def DownloadPreprovisionedData(
-      self, install_path, module_name, filename,
-      timeout=gce_virtual_machine.FIVE_MINUTE_TIMEOUT
+      self,
+      install_path,
+      module_name,
+      filename,
+      timeout=gce_virtual_machine.FIVE_MINUTE_TIMEOUT,
   ):
     """Downloads a data file from a GCS bucket with pre-provisioned data.
 
@@ -117,16 +165,22 @@ class WindowsGceVirtualMachine(
         timeout=timeout,
     )
     self.PushFile(
-        vm_util.PrependTempDir(filename),
-        ntpath.join(install_path, filename)
+        vm_util.PrependTempDir(filename), ntpath.join(install_path, filename)
     )
     vm_util.IssueCommand(['rm', vm_util.PrependTempDir(filename)])
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""
-    return FLAGS.gcp_preprovisioned_data_bucket and vm_util.IssueCommand(
-        gce_virtual_machine.GenerateStatPreprovisionedDataCommand(
-            module_name, filename).split(' '), raise_on_failure=False)[-1] == 0
+    return (
+        FLAGS.gcp_preprovisioned_data_bucket
+        and vm_util.IssueCommand(
+            gce_virtual_machine.GenerateStatPreprovisionedDataCommand(
+                module_name, filename
+            ).split(' '),
+            raise_on_failure=False,
+        )[-1]
+        == 0
+    )
 
   def _GetWindowsPassword(self):
     """Generates a command to get a VM user's password.
@@ -207,7 +261,7 @@ class WindowsGceVirtualMachine(
 
   def GetDefaultImageFamily(self, is_arm: bool) -> str:
     assert not is_arm
-    return self.DEFAULT_IMAGE_FAMILY[self.OS_TYPE]
+    return self.DEFAULT_X86_IMAGE_FAMILY[self.OS_TYPE]
 
   def GetDefaultImageProject(self) -> str:
     if self.OS_TYPE in os_types.WINDOWS_SQLSERVER_OS_TYPES:
@@ -245,17 +299,26 @@ class WindowsGceVirtualMachine(
   def _MetadataPreemptCmd(self) -> str:
     return _METADATA_PREEMPT_CMD_WIN
 
+  def _DiskDriveIsLocal(self, device, model):
+    """Helper method to determine if a disk drive is a local ssd to stripe."""
+    if (model.lower().strip() == 'nvme_card' or
+        model.lower().strip() == 'google ephemeraldisk'):
+      return True
+    return False
+
 
 class WindowsGceSqlServerVirtualMachine(WindowsGceVirtualMachine):
   """Class supporting Windows GCE sql server virtual machines."""
 
-  DEFAULT_IMAGE_FAMILY = {
+  DEFAULT_X86_IMAGE_FAMILY = {
       os_types.WINDOWS2019_SQLSERVER_2017_STANDARD: 'sql-std-2017-win-2019',
       os_types.WINDOWS2019_SQLSERVER_2017_ENTERPRISE: 'sql-ent-2017-win-2019',
       os_types.WINDOWS2019_SQLSERVER_2019_STANDARD: 'sql-std-2019-win-2019',
       os_types.WINDOWS2019_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2019',
       os_types.WINDOWS2022_SQLSERVER_2019_STANDARD: 'sql-std-2019-win-2022',
       os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2022',
+      os_types.WINDOWS2022_SQLSERVER_2022_ENTERPRISE: 'sql-ent-2022-win-2022',
+      os_types.WINDOWS2022_SQLSERVER_2022_STANDARD: 'sql-std-2022-win-2022',
   }
 
   OS_TYPE = os_types.WINDOWS_SQLSERVER_OS_TYPES

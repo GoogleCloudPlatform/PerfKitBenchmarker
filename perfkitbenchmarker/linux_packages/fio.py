@@ -90,6 +90,7 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the fio package on the VM."""
   vm.InstallPackages('libaio-dev libnuma-dev libaio1 bc zlib1g-dev')
+  vm.InstallPackages('numactl')
   _Install(vm)
 
 

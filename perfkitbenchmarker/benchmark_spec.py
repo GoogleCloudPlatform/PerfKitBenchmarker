@@ -150,7 +150,7 @@ class BenchmarkSpec(object):
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
     self.always_call_cleanup = False
     self.spark_service = None
-    self.dpb_service = None
+    self.dpb_service: dpb_service.BaseDpbService = None
     self.container_cluster = None
     self.key = None
     self.relational_db = None
@@ -168,9 +168,15 @@ class BenchmarkSpec(object):
     self.capacity_reservations = []
     self.placement_group_specs = benchmark_config.placement_group_specs or {}
     self.placement_groups = {}
-    self.vms_to_boot = (
-        self.config.vm_groups if self.config.relational_db is None else
-        relational_db.VmsToBoot(self.config.relational_db.vm_groups))
+    # Benchmark configs for relational_db and vm_groups can both be included.
+    # This is currently used for combo benchmarks.
+    self.vms_to_boot = {}
+    if self.config.relational_db:
+      self.vms_to_boot.update(relational_db.VmsToBoot(
+          self.config.relational_db.vm_groups
+      ))
+    if self.config.vm_groups:
+      self.vms_to_boot.update(self.config.vm_groups)
     self.vpc_peering = self.config.vpc_peering
 
     self.vpn_service = None
@@ -477,14 +483,6 @@ class BenchmarkSpec(object):
 
     if group_spec.disk_spec:
       disk_spec = group_spec.disk_spec
-      # disk_spec.disk_type may contain legacy values that were
-      # copied from FLAGS.scratch_disk_type into
-      # FLAGS.data_disk_type at the beginning of the run. We
-      # translate them here, rather than earlier, because here is
-      # where we know what cloud we're using and therefore we're
-      # able to pick the right translation table.
-      disk_spec.disk_type = disk.WarnAndTranslateDiskTypes(
-          disk_spec.disk_type, cloud)
     else:
       disk_spec = None
 
@@ -1011,6 +1009,7 @@ class BenchmarkSpec(object):
     # This must come after Scratch Disk creation to support the
     # Containerized VM case
     vm.PrepareVMEnvironment()
+    vm.RecordAdditionalMetadata()
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.

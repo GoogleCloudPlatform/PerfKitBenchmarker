@@ -187,7 +187,7 @@ class AwsDpbGlue(
         'dpb_service_version': basic_data['dpb_service_version'],
         'dpb_cluster_shape': basic_data['dpb_cluster_shape'],
         'dpb_cluster_size': basic_data['dpb_cluster_size'],
-        'dpb_hdfs_type': 'default-disk',
+        'dpb_hdfs_type': basic_data['dpb_hdfs_type'],
         'dpb_disk_size': dpb_disk_size,
         'dpb_service_zone': basic_data['dpb_service_zone'],
         'dpb_job_properties': basic_data['dpb_job_properties'],
@@ -231,3 +231,7 @@ class AwsDpbGlue(
     if dpu_seconds is None:
       dpu_seconds = max_capacity * execution_time
     return dpu_seconds / 3600 * dpu_hourly_price
+
+  def GetHdfsType(self) -> Optional[str]:
+    """Gets human friendly disk type for metric metadata."""
+    return 'default-disk'

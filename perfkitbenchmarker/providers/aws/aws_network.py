@@ -64,7 +64,7 @@ REGION = 'region'
 ZONE = 'zone'
 
 NON_PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['t2', 'm3', 't3', 't3a', 't4g', 'vt1'])
+    ['t2', 'm3', 't3', 't3a', 't4g', 'vt1', 'm7i-flex'])
 
 
 class AwsFirewall(network.BaseFirewall):

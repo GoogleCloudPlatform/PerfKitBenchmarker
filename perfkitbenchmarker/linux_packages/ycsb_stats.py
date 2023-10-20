@@ -108,6 +108,10 @@ _ThroughputTimeSeries = dict[int, float]
 _HdrHistogramTuple = tuple[float, float, int]
 
 
+class CombineHdrLogError(Exception):
+  """Raised when there is an error combining hdrhistogram logs."""
+
+
 def _IsStatusLatencyStatistic(stat_name: str) -> bool:
   """Returns whether a name is a latency statistic (i.e. "99.9")."""
   return (
@@ -315,7 +319,7 @@ def _ValidateErrorRate(result: YcsbResult, threshold: float) -> None:
 
   Computes the error rate for each operation, example output looks like:
 
-    [INSERT], Operations, 100
+    [INSERT], Operations, 90
     [INSERT], AverageLatency(us), 74.92
     [INSERT], MinLatency(us), 5
     [INSERT], MaxLatency(us), 98495
@@ -337,12 +341,14 @@ def _ValidateErrorRate(result: YcsbResult, threshold: float) -> None:
   """
   for operation in result.groups.values():
     name, stats = operation.group, operation.statistics
-    # The operation count can be 0
-    count = stats.get('Operations', 0)
+    # The operation count can be 0 or keys may be missing from the output
+    ok_count = stats.get('Return=OK', 0.0)
+    error_count = stats.get('Return=ERROR', 0.0)
+    count = ok_count + error_count
     if count == 0:
       continue
     # These keys may be missing from the output.
-    error_rate = stats.get('Return=ERROR', 0) / count
+    error_rate = error_count / count
     if error_rate > threshold:
       raise errors.Benchmarks.RunError(
           f'YCSB had a {error_rate} error rate for {name}, higher than '
@@ -940,6 +946,10 @@ def CombineHdrHistogramLogFiles(
 
   Returns:
     dict of hdrhistograms keyed by group type
+
+  Raises:
+    CombineHdrLogError: if there is an error while combining .hdr files
+      using HistogramLogProcessor.
   """
   vms = list(vms)
   hdrhistograms = {}
@@ -957,18 +967,26 @@ def CombineHdrHistogramLogFiles(
       continue
 
     worker_vm = vms[0]
+    hdr_file = f'{hdr_files_dir}{grouptype}.hdr'
     for hdr in results[1:]:
       worker_vm.RemoteCommand(
-          'sudo chmod 755 {1}{2}.hdr && echo "{0}" >> {1}{2}.hdr'.format(
-              hdr[:-1], hdr_files_dir, grouptype
-          )
+          f'sudo chmod 755 {hdr_file} && echo "{hdr[:-1]}" >> {hdr_file}'
       )
-    hdrhistogram, _ = worker_vm.RemoteCommand(
-        'cd {0} && ./HistogramLogProcessor -i {1}{2}.hdr'
-        ' -outputValueUnitRatio 1'.format(
-            hdr_install_dir, hdr_files_dir, grouptype
-        )
+    hdrhistogram, stderr, retcode = worker_vm.RemoteCommandWithReturnCode(
+        f'cd {hdr_install_dir} && ./HistogramLogProcessor -i'
+        f' {hdr_file} -outputValueUnitRatio 1 -v',
+        ignore_failure=True,
     )
+    # It's possible for YCSB client VMs to output a malformed/truncated .hdr
+    # log file. See https://github.com/HdrHistogram/HdrHistogram/issues/201.
+    if 'line appears to be malformed' in stderr:
+      raise CombineHdrLogError(
+          f'Error combining hdr logs using HistogramLogProcessor: {stderr}'
+      )
+    if retcode:
+      raise errors.VirtualMachine.RemoteCommandError(
+          f'Error while executing HistogramLogProcessor: {stderr}'
+      )
     hdrhistograms[grouptype.lower()] = hdrhistogram
   return hdrhistograms
 

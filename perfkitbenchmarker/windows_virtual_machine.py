@@ -18,7 +18,7 @@ import logging
 import ntpath
 import os
 import time
-from typing import cast, Optional, Tuple
+from typing import Optional, Tuple, cast
 import uuid
 
 from absl import flags
@@ -28,7 +28,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
-
+import requests
 import six
 import timeout_decorator
 import winrm
@@ -61,6 +61,7 @@ New-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Pol
 Set-MpPreference -DisableRealtimeMonitoring $true
 Set-MpPreference -DisableBehaviorMonitoring $true
 Set-MpPreference -DisableBlockAtFirstSeen $true
+Set-ExecutionPolicy RemoteSigned
 Enable-PSRemoting -Force
 $cert = New-SelfSignedCertificate -DnsName hostname -CertStoreLocation `
     Cert:\\LocalMachine\\My\\
@@ -136,11 +137,14 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     """
 
     logging.info('Running robust command on %s: %s', self, command)
-    command_id = uuid.uuid4()
-    logged_command = ('New-Item -Path %s.start -ItemType File; powershell "%s" '
-                      '2> %s.err 1> %s.out; New-Item -Path %s.done -ItemType '
-                      'File') % (command_id, command, command_id, command_id,
-                                 command_id)
+    command_path = ntpath.join(self.temp_dir, str(uuid.uuid4()))
+    logged_command = (
+        'Invoke-WmiMethod -path win32_process -name create -argumentlist'
+        f' "powershell `"New-Item -Path {command_path}.start -ItemType File;'
+        f' {command} 2> {command_path}.err 1> {command_path}.out; New-Item'
+        f' -Path {command_path}.done -ItemType File`""'
+    )
+
     start_command_time = time.time()
     try:
       self.RemoteCommand(
@@ -150,31 +154,37 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     except errors.VirtualMachine.RemoteCommandError:
       logging.exception(
           'Exception while running %s on %s, waiting for command to finish',
-          command, self)
-    start_out, _ = self.RemoteCommand('Test-Path %s.start' % (command_id,))
+          command,
+          self,
+      )
+    start_out, _ = self.RemoteCommand(f'Test-Path {command_path}.start')
     if 'True' not in start_out:
       raise errors.VirtualMachine.RemoteCommandError(
-          'RobustRemoteCommand did not start on VM.')
+          'RobustRemoteCommand did not start on VM.'
+      )
 
     def wait_for_done_file():
-      # Spin on the VM until the "done" file is created. It is better to spin
-      # on the VM rather than creating a new session for each test.
+      # It is better to sleep on the client rather than the VM
+      # as spinning on the VM have more chances of failure.
+      # i.e Full 60 seconds of connection have to be stable.
       done_out = ''
-      command_timeout = (
-          None
-          if timeout is None
-          else timeout - (time.time() - start_command_time)
-      )
       while 'True' not in done_out:
-        done_out, _ = self.RemoteCommand(
-            '$retries=0; while ((-not (Test-Path %s.done)) -and '
-            '($retries -le 60)) { Start-Sleep -Seconds 1; $retries++ }; '
-            'Test-Path %s.done' % (command_id, command_id),
-            timeout=command_timeout)
+        if timeout is not None and time.time() - start_command_time > timeout:
+          raise WaitTimeoutError()
+        try:
+          done_out, _ = self.RemoteCommand(
+              'Test-Path %s.done' % (command_path,),
+              timeout=10,
+          )
+          time.sleep(60)
+        except requests.exceptions.ConnectionError as e:
+          logging.exception(e)
+        except WaitTimeoutError as e:
+          logging.exception(e)
 
     wait_for_done_file()
-    stdout, _ = self.RemoteCommand('Get-Content %s.out' % (command_id,))
-    _, stderr = self.RemoteCommand('Get-Content %s.err' % (command_id,))
+    stdout, _ = self.RemoteCommand('Get-Content %s.out' % (command_path,))
+    stderr, _ = self.RemoteCommand('Get-Content %s.err' % (command_path,))
 
     return stdout, stderr
 
@@ -208,9 +218,11 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     encoded_command = six.ensure_str(
         base64.b64encode(command.encode('utf_16_le')))
 
-    @timeout_decorator.timeout(timeout, use_signals=False,
-                               timeout_exception=errors.VirtualMachine.
-                               RemoteCommandError)
+    @timeout_decorator.timeout(
+        timeout,
+        use_signals=False,
+        timeout_exception=WaitTimeoutError,
+    )
     def run_command():
       return s.run_cmd('powershell -encodedcommand %s' % encoded_command)
 
@@ -584,6 +596,9 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand('diskpart /s {script_path}'.format(
           script_path=script_path))
 
+  def _DiskDriveIsLocal(self, device, model):
+    """Helper method to determine if a disk drive is a local ssd to stripe."""
+
   def _PrepareScratchDisk(self, scratch_disk, disk_spec):
     """Helper method to format and mount scratch disk.
 
@@ -595,15 +610,44 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     # create a volume, and then format and mount the volume.
     script = ''
 
+    # Get DeviceId and Model (FriendlyNam) for all disks
+    # attached to the VM except boot disk.
+    # Using Get-Disk has option to query for disks with no partition
+    # (partitionstyle -eq 'raw'). Returned Number and FriendlyName represent
+    # DeviceID and model of the disk. Device ID is used for Diskpart cleanup.
+    # https://learn.microsoft.com/en-us/powershell/module/
+    # storage/get-disk?view=windowsserver2022-ps
+    stdout, _ = self.RemoteCommand(
+        'Get-Disk | Where partitionstyle -eq \'raw\' | '
+        'Select  Number,FriendlyName'
+    )
+    query_disk_numbers = []
+    lines = stdout.splitlines()
+    for line in lines:
+      if line:
+        device, model = line.strip().split(' ', 1)
+        if 'Number' in device or '-----' in device:
+          continue
+
+        if disk_spec.disk_type == 'local':
+          if self._DiskDriveIsLocal(device, model):
+            query_disk_numbers.append(device)
+        else:
+          if not self._DiskDriveIsLocal(device, model):
+            query_disk_numbers.append(device)
+
     if scratch_disk.is_striped:
-      disk_numbers = [str(d.disk_number) for d in scratch_disk.disks]
+      disk_numbers = query_disk_numbers
     else:
-      disk_numbers = [scratch_disk.disk_number]
+      disk_numbers = query_disk_numbers[0]
 
     for disk_number in disk_numbers:
       # For each disk, set the status to online (if it is not already),
       # remove any formatting or partitioning on the disks, and convert
       # it to a dynamic disk so it can be used to create a volume.
+      # TODO(user): Fix on Azure machines with temp disk, e.g.
+      # Ebdsv5 which have 1 local disk with partitions. Perhaps this means
+      # removing the clean and convert gpt lines.
       script += ('select disk %s\n'
                  'online disk noerr\n'
                  'attributes disk clear readonly\n'
@@ -632,6 +676,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
                  (format_command, ATTACHED_DISK_LETTER.lower(),
                   disk_spec.mount_point))
 
+    # No-op, useful for understanding the state of the disks
+    self._RunDiskpartScript('list disk')
     self._RunDiskpartScript(script)
 
     # Grant user permissions on the drive
@@ -641,6 +687,12 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
         'icacls {}: --% /grant Users:(OI)(CI)F /L'.format(ATTACHED_DISK_LETTER))
 
     self.scratch_disks.append(scratch_disk)
+
+    if(FLAGS.gce_num_local_ssds > 0 and FLAGS.db_disk_type != 'local'):
+      self._PrepareTempDbDisk()
+
+  def _PrepareTempDbDisk(self):
+    """Helper method to format and setup disk for SQL Server TempDB."""
 
   def SetReadAhead(self, num_sectors, devices):
     """Set read-ahead value for block devices.
@@ -680,11 +732,6 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     raise NotImplementedError('SMT detection currently not implemented')
 
 
-class Windows2012CoreMixin(BaseWindowsMixin):
-  """Class holding Windows Server 2012 Server Core VM specifics."""
-  OS_TYPE = os_types.WINDOWS2012_CORE
-
-
 class Windows2016CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2016 Server Core VM specifics."""
   OS_TYPE = os_types.WINDOWS2016_CORE
@@ -698,11 +745,6 @@ class Windows2019CoreMixin(BaseWindowsMixin):
 class Windows2022CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2022 Server Core VM specifics."""
   OS_TYPE = os_types.WINDOWS2022_CORE
-
-
-class Windows2012DesktopMixin(BaseWindowsMixin):
-  """Class holding Windows Server 2012 with Desktop Experience VM specifics."""
-  OS_TYPE = os_types.WINDOWS2012_DESKTOP
 
 
 class Windows2016DesktopMixin(BaseWindowsMixin):

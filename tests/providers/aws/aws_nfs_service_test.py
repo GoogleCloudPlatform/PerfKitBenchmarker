@@ -19,12 +19,10 @@ import json
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_nfs_service
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -144,11 +142,13 @@ class BaseTest(pkb_common_test_case.PkbCommonTestCase):
     return mock_method
 
   def _CreateDiskSpec(self, fs_type):
-    return aws_disk.AwsDiskSpec(
+    disk_spec_class = disk.GetDiskSpecClass('AWS', fs_type)
+    return disk_spec_class(
         _COMPONENT,
         num_striped_disks=1,
         disk_type=fs_type if fs_type == disk.NFS else disk.LOCAL,
-        mount_point='/scratch')
+        mount_point='/scratch',
+    )
 
   def _CreateMockNetwork(self):
     mock_network = mock.Mock()

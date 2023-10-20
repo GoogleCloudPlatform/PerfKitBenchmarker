@@ -24,6 +24,7 @@ Steps for both Apt and Yum installs:
 4. Install the azure-cli.
 """
 
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 
 # Debian info
@@ -73,7 +74,9 @@ def _PipInstall(vm):
     vm: Virtual Machine to install on.
   """
   vm.Install('pip3')
-  vm.RemoteCommand('sudo pip3 install azure-cli')
+  # azure-cli updated requirements.txt dependency, but not setupu.py:
+  # https://github.com/Azure/azure-cli/pull/26671
+  vm.RemoteCommand('sudo pip3 install --upgrade azure-cli pyOpenSSL>=23.2.0')
 
 
 def AptInstall(vm):
@@ -82,13 +85,11 @@ def AptInstall(vm):
   Args:
     vm: Virtual Machine to install on.
   """
-  if vm.is_aarch64:
+  # https://packages.microsoft.com/repos/azure-cli/dists/ does not support lunar
+  if vm.is_aarch64 or vm.OS_TYPE == os_types.UBUNTU2304:
     _PipInstall(vm)
     return
-  vm.Install('python')
-  vm.Install('lsb_release')
-  vm.Install('curl')
-  vm.InstallPackages('apt-transport-https')
+  vm.InstallPackages('lsb-release curl apt-transport-https')
   az_repo, _ = vm.RemoteCommand('lsb_release -cs')
   _CreateFile(vm, _DEB_REPO.format(az_repo=az_repo.strip()), _DEB_REPO_FILE)
   vm.RemoteCommand(

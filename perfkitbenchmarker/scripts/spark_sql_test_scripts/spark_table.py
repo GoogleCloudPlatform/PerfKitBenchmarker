@@ -48,10 +48,11 @@ def main(args):
     # the Hive Metastore. I do not believe this interoperates with Hive's own
     # statistics. See
     # https://jaceklaskowski.gitbooks.io/mastering-spark-sql/content/spark-sql-LogicalPlan-AnalyzeColumnCommand.html
-    columns = ','.join(spark.table(table).columns)
-    spark.sql(
-        'ANALYZE TABLE {} COMPUTE STATISTICS FOR COLUMNS {}'.format(
-            table, columns))
+    # Disabling to comply with the TPC spec.
+    # columns = ','.join(spark.table(table).columns)
+    # spark.sql(
+    #     'ANALYZE TABLE {} COMPUTE STATISTICS FOR COLUMNS {}'.format(
+    #         table, columns))
 
 
 if __name__ == '__main__':

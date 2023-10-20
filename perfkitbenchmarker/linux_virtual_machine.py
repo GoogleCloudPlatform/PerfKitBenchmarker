@@ -198,6 +198,14 @@ flags.DEFINE_boolean(
     '/proc/cpuinfo to extract the number of CPUs.',
 )
 
+flags.DEFINE_boolean(
+    'use_cgroup_memory_limits',
+    False,
+    'Whether to use the cgroup memory limits, read from '
+    '/sys/fs/cgroup/memory/{container_name}/memory.limit_in_bytes, '
+    'to extract the total available memory capacity in the container.',
+)
+
 _DISABLE_YUM_CRON = flags.DEFINE_boolean(
     'disable_yum_cron', True, 'Whether to disable the cron-run yum service.')
 _KERNEL_MODULES_TO_ADD = flags.DEFINE_list(
@@ -211,6 +219,11 @@ YUM = 'yum'
 DNF = 'dnf'
 
 RETRYABLE_SSH_RETCODE = 255
+
+# Using root logger removes one function call logging.info otherwise adds to
+# the stack level. Can remove after python 11; see:
+# https://bugs.python.org/issue45171
+logger = logging.getLogger()
 
 
 class CpuVulnerabilities:
@@ -487,7 +500,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
     start_command = '%s 1> %s 2>&1 &' % (' '.join(start_command),
                                          wrapper_log)
-    self.RemoteCommand(start_command, stack_level=3)
+    self.RemoteCommand(start_command, stack_level=2)
 
     def _WaitForCommand():
       wait_command = ['python3', wait_path,
@@ -496,7 +509,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       stdout = ''
       while 'Command finished.' not in stdout:
         stdout, _ = self.RemoteCommand(
-            ' '.join(wait_command), timeout=1800, stack_level=4)
+            ' '.join(wait_command), timeout=1800, stack_level=3)
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
@@ -510,7 +523,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       return _WaitForCommand()
     except errors.VirtualMachine.RemoteCommandError:
       # In case the error was with the wrapper script itself, print the log.
-      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, stack_level=3)
+      stdout, _ = self.RemoteCommand('cat %s' % wrapper_log, stack_level=2)
       if stdout.strip():
         logging.warning('Exception during RobustRemoteCommand. '
                         'Wrapper script log:\n%s', stdout)
@@ -569,7 +582,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.UpdateEnvironmentPath()
     self._DisableCpus()
     self._RebootIfNecessary()
-    self.RecordAdditionalMetadata()
     self.BurnCpu()
     self.FillDisk()
 
@@ -933,6 +945,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def RecordAdditionalMetadata(self):
     """After the VM has been prepared, store metadata about the VM."""
+    super().RecordAdditionalMetadata()
+
+    if not self.bootable_time:
+      logging.warning('RecordAdditionalMetadata: skipping additional metadata'
+                      ' capture due to an unreachable VM.')
+      return
+
     self.tcp_congestion_control = self.TcpCongestionControl()
     lscpu_results = self.CheckLsCpu()
     self.numa_node_count = lscpu_results.numa_node_count
@@ -1119,27 +1138,38 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       # Replace the last instance of '\' with '/' to make scp happy.
       file_path = '/'.join(file_path.rsplit('\\', 1))
     remote_ip = '[%s]' % self.GetConnectionIp()
-    remote_location = '%s@%s:%s' % (
-        self.user_name, remote_ip, remote_path)
+    remote_location = '%s@%s:%s' % (self.user_name, remote_ip, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
     # An scp is not retried, so increase the connection timeout.
-    ssh_private_key = (self.ssh_private_key if self.is_static else
-                       vm_util.GetPrivateKeyPath())
-    scp_cmd.extend(vm_util.GetSshOptions(
-        ssh_private_key, connect_timeout=FLAGS.scp_connect_timeout))
+    ssh_private_key = (
+        self.ssh_private_key if self.is_static else vm_util.GetPrivateKeyPath()
+    )
+    scp_cmd.extend(
+        vm_util.GetSshOptions(
+            ssh_private_key, connect_timeout=FLAGS.scp_connect_timeout
+        )
+    )
+    simplified_cmd = ['scp']
     if copy_to:
+      simplified_cmd.extend([file_path, remote_location])
       scp_cmd.extend([file_path, remote_location])
     else:
+      simplified_cmd.extend([remote_location, file_path])
       scp_cmd.extend([remote_location, file_path])
 
-    stdout, stderr, retcode = vm_util.IssueCommand(scp_cmd, timeout=None,
-                                                   raise_on_failure=False)
+    logging.info(
+        'Copying file with simplified command: %s', ' '.join(simplified_cmd)
+    )
+    stdout, stderr, retcode = vm_util.IssueCommand(
+        scp_cmd, timeout=None, should_pre_log=False, raise_on_failure=False
+    )
 
     if retcode:
       full_cmd = ' '.join(scp_cmd)
-      error_text = ('Got non-zero return code (%s) executing %s\n'
-                    'STDOUT: %sSTDERR: %s' %
-                    (retcode, full_cmd, stdout, stderr))
+      error_text = (
+          'Got non-zero return code (%s) executing %s\nSTDOUT: %sSTDERR: %s'
+          % (retcode, full_cmd, stdout, stderr)
+      )
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
   def RemoteCommand(self, *args, **kwargs) -> Tuple[str, str]:
@@ -1186,7 +1216,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       login_shell: bool = False,
       timeout: Optional[float] = None,
       ip_address: Optional[str] = None,
-      stack_level: int = 2,
+      stack_level: int = 1,
   ) -> Tuple[str, str, int]:
     """Runs a command on the VM.
 
@@ -1204,7 +1234,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       ip_address: The ip address to use to connect to host.  If None, uses
         self.GetConnectionIp()
       stack_level: Number of stack frames to skip & get an "interesting" caller,
-        for logging. 2 skips this function, 3 skips this & its caller, etc..
+        for logging. 1 skips this function, 2 skips this & its caller, etc..
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -1227,7 +1257,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     ssh_private_key = (self.ssh_private_key if self.is_static else
                        vm_util.GetPrivateKeyPath())
     ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
-    logging.info(
+    logger.info(
         'Running on %s via ssh: %s',
         self.name,
         command,
@@ -1528,14 +1558,69 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         """)
     return int(stdout)
 
-  def _GetTotalMemoryKb(self):
-    """Returns the amount of physical memory on the VM in Kilobytes.
+  def _GetTotalMemoryKbFromCgroup(self):
+    """Extracts the memory space in kibibyte (KiB) for containers.
 
+    Gets the memory capacity from
+    /sys/fs/cgroup/memory/<container>/memory.limit_in_bytes,
+    or /sys/fs/cgroup/memory/memory.limit_in_bytes.
+    Below are the example of their returns:
+    $ cat /sys/fs/cgroup/memory/container/memory.limit_in_bytes
+      1024
+
+    Returns:
+      The memory capacity in kibibyte (KiB).
+
+    Raises:
+      ValueError: If not found /proc/self/cgroup,
+      or /sys/fs/cgroup/memory/<container>/memory.limit_in_bytes,
+      or /sys/fs/cgroup/memory/memory.limit_in_bytes.
+    """
+    if self._RemoteFileExists('/proc/self/cgroup'):
+      container_name, _ = self.RemoteCommand(
+          "grep memory /proc/self/cgroup |cut -d ':' -f 3 |sed -e 's:^/::'"
+      )
+      container_name = container_name.replace('\n', '')
+    else:
+      raise ValueError(
+          '_GetTotalMemoryKbFromCgroup failed, cannot read /proc/self/cgroup.'
+      )
+
+    if self._RemoteFileExists(
+        f'/sys/fs/cgroup/memory/{container_name}/memory.limit_in_bytes'
+    ):
+      stdout, _ = self.RemoteCommand(
+          f'cat /sys/fs/cgroup/memory/{container_name}/memory.limit_in_bytes'
+      )
+      return int(stdout) // 1024
+    elif self._RemoteFileExists('/sys/fs/cgroup/memory/memory.limit_in_bytes'):
+      stdout, _ = self.RemoteCommand(
+          'cat /sys/fs/cgroup/memory/memory.limit_in_bytes'
+      )
+      return int(stdout) // 1024
+
+    raise ValueError(
+        '_GetTotalMemoryKbFromCgroup failed, cannot read '
+        ' /sys/fs/cgroup/memory/%s/memory.limit_in_bytes or'
+        ' /sys/fs/cgroup/memory/memory.limit_in_bytes' % container_name
+    )
+
+  def _GetTotalMemoryKb(self):
+    """Returns the amount of physical memory on the VM in Kilobytes (KiB).
+
+    if the flag `use_cgroup_memory_limits` is true, return
+    the minimum of cgroup memory capacity and the VM capacity.
+    Otherwise, extracts the memory capacity using /proc/meminfo.
     This method does not cache results (unlike "total_memory_kb").
     """
     meminfo_command = 'cat /proc/meminfo | grep MemTotal | awk \'{print $2}\''
     stdout, _ = self.RemoteCommand(meminfo_command)
-    return int(stdout)
+    meminfo_memory_kb = int(stdout)
+
+    if FLAGS.use_cgroup_memory_limits:
+      return min(self._GetTotalMemoryKbFromCgroup(), meminfo_memory_kb)
+
+    return meminfo_memory_kb
 
   def _TestReachable(self, ip):
     """Returns True if the VM can reach the ip address and False otherwise."""
@@ -1610,9 +1695,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
            'sudo tee -a /etc/mdadm/mdadm.conf')
     self.RemoteHostCommand(cmd)
 
-    # Make the disk available during reboot
-    init_ram_fs_cmd = self.INIT_RAM_FS_CMD
-    self.RemoteHostCommand(init_ram_fs_cmd)
+    # Make the disk available during reboot for VMs running Debian based Linux
+    if self.OS_TYPE != os_types.RHEL8:
+      init_ram_fs_cmd = self.INIT_RAM_FS_CMD
+      self.RemoteHostCommand(init_ram_fs_cmd)
 
     # Automatically mount the disk after reboot
     cmd = ('echo \'/dev/md0  /mnt/md0  ext4 defaults,nofail'
@@ -1802,9 +1888,9 @@ def _IncrementStackLevel(**kwargs: Any) -> Any:
   if 'stack_level' in kwargs:
     kwargs['stack_level'] += 1
   else:
-    # Default to 3 - one for helper function this is called from, one for
-    # RemoteHostCommandWithReturnCode, & one for logging.info itself.
-    kwargs['stack_level'] = 3
+    # Default to 2 - one for helper function this is called from, & one for
+    # RemoteHostCommandWithReturnCode.
+    kwargs['stack_level'] = 2
   return kwargs
 
 
@@ -2492,6 +2578,17 @@ class Debian11Mixin(BaseDebianMixin):
     super().PrepareVMEnvironment()
 
 
+class Debian12Mixin(BaseDebianMixin):
+  """Class holding Debian 12 specific VM methods and attributes."""
+  OS_TYPE = os_types.DEBIAN12
+
+  def PrepareVMEnvironment(self):
+    # Missing in some images. Required by PrepareVMEnvironment to determine
+    # partitioning.
+    self.InstallPackages('fdisk')
+    super().PrepareVMEnvironment()
+
+
 class Debian11BackportsMixin(Debian11Mixin):
   """Debian 11 with backported kernel."""
   OS_TYPE = os_types.DEBIAN11_BACKPORTS
@@ -2568,6 +2665,12 @@ class Ubuntu2004EfaMixin(Ubuntu2004Mixin):
 class Ubuntu2204Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu2204 specific VM methods and attributes."""
   OS_TYPE = os_types.UBUNTU2204
+
+
+class Ubuntu2304Mixin(BaseUbuntuMixin):
+  """Class holding Ubuntu2304 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.UBUNTU2304
 
 
 class Ubuntu1604Cuda9Mixin(Ubuntu1604Mixin):

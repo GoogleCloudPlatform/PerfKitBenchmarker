@@ -37,12 +37,14 @@ HAMMERDB_URL = 'https://github.com/TPC-Council/HammerDB/releases/download/v{0}/'
 
 # import linux flags
 HAMMERDB_SCRIPT = linux_hammerdb.HAMMERDB_SCRIPT
-HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION = linux_hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION
+HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION = (
+    linux_hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION
+)
 NON_OPTIMIZED = linux_hammerdb.NON_OPTIMIZED
 MINIMUM_RECOVERY = linux_hammerdb.MINIMUM_RECOVERY
 
 # Default run timeout
-EIGHT_HOURS = 60*60*8
+TIMEOUT = 60 * 60 * 20
 
 
 class WindowsHammerDbTclScript(linux_hammerdb.HammerDbTclScript):
@@ -59,10 +61,11 @@ class WindowsHammerDbTclScript(linux_hammerdb.HammerDbTclScript):
     """Run hammerdbcli script."""
     hammerdb_exe_dir = ntpath.join(
         vm.temp_dir, HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value))
-    stdout, _ = vm.RemoteCommand(
+    stdout, _ = vm.RobustRemoteCommand(
         f'cd {hammerdb_exe_dir} ; '
         f'.\\hammerdbcli.bat auto {self.tcl_script_name}',
-        timeout=timeout)
+        timeout=timeout,
+    )
 
     self.CheckErrorFromHammerdb(stdout)
     return stdout
@@ -166,13 +169,12 @@ def SetupConfig(vm, db_engine: str, hammerdb_script: str, ip: str, port: int,
   # Run all the build script or scripts before actual run phase
   for script in windows_scripts:
     if script.script_type == linux_hammerdb.BUILD_SCRIPT_TYPE:
-      script.Run(vm)
+      script.Run(vm, timeout=TIMEOUT)
 
 
-def Run(vm,
-        db_engine: str,
-        hammerdb_script: str,
-        timeout: Optional[int] = EIGHT_HOURS) -> List[sample.Sample]:
+def Run(
+    vm, db_engine: str, hammerdb_script: str, timeout: Optional[int] = TIMEOUT
+) -> List[sample.Sample]:
   """Run the HammerDB Benchmark.
 
   Runs Hammerdb TPCC or TPCH script.

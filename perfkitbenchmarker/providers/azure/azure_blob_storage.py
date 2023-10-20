@@ -39,7 +39,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   """
 
   def __init__(self):
-    self.storage_account = None
+    self.storage_account: azure_network.AzureStorageAccount = None
     self.resource_group = None
 
   STORAGE_NAME = provider_info.AZURE

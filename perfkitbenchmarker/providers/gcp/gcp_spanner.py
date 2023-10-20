@@ -23,7 +23,6 @@ import datetime
 import json
 import logging
 import statistics
-import time
 from typing import Any, Dict, Optional
 
 from absl import flags
@@ -99,9 +98,12 @@ CPU_API_DELAY_MINUTES = 3
 CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
 
 # For more information on QPS expectations, see
-# https://cloud.google.com/spanner/docs/instance-configurations#regional-performance
+# https://cloud.google.com/spanner/docs/performance#typical-workloads
 _READ_OPS_PER_NODE = 10000
 _WRITE_OPS_PER_NODE = 2000
+_ADJUSTED_READ_OPS_PER_NODE = 15000
+_ADJUSTED_WRITE_OPS_PER_NODE = 3000
+_ADJUSTED_CONFIG_REGIONS = ['regional-us-east4']
 
 
 @dataclasses.dataclass
@@ -362,6 +364,10 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
   def _SetNodes(self, nodes: int) -> None:
     """Sets the number of nodes on the Spanner instance."""
+    # Not yet supported for user managed instances since instance attributes
+    # are not discovered.
+    if self.user_managed:
+      return
     current_nodes = self._GetNodes()
     if nodes == current_nodes:
       return
@@ -451,21 +457,41 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
         'gcp_spanner_node_count': self.nodes,
         'gcp_spanner_config': self._config,
         'gcp_spanner_endpoint': self.GetApiEndPoint(),
-        'gcp_spanner_load_node_cont': self._load_nodes,
+        'gcp_spanner_load_node_count': self._load_nodes,
     }
 
-  def GetAverageCpuUsage(self, duration_minutes: int) -> float:
-    """Gets the average high priority CPU usage through the time duration."""
+  def GetAverageCpuUsage(
+      self, duration_minutes: int, end_time: datetime.datetime
+  ) -> float:
+    """Gets the average high priority CPU usage through the time duration.
+
+    Note that there is a delay for the API to get data, so this returns the
+    average CPU usage in the period ending at `end_time` with missing data
+    in the last CPU_API_DELAY_SECONDS.
+
+    Args:
+      duration_minutes: The time duration for which to measure the average CPU
+        usage.
+      end_time: The ending timestamp of the workload.
+
+    Returns:
+      The average CPU usage during the time period.
+    """
+    if duration_minutes * 60 <= CPU_API_DELAY_SECONDS:
+      raise ValueError(
+          f'Spanner API has a {CPU_API_DELAY_SECONDS} sec. delay in receiving'
+          ' data, choose a longer duration to get CPU usage.'
+      )
+
     client = monitoring_v3.MetricServiceClient()
     # It takes up to 3 minutes for CPU metrics to appear.
-    end_timestamp = time.time() - CPU_API_DELAY_SECONDS
     cpu_query = query.Query(
         client,
         project=self.project,
         metric_type=(
             'spanner.googleapis.com/instance/cpu/utilization_by_priority'
         ),
-        end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
+        end_time=end_time,
         minutes=duration_minutes,
     )
     # Filter by high priority
@@ -484,34 +510,54 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
           'Expected 2 metrics (user and system) for Spanner high-priority CPU '
           f'utilization query, got {len(time_series)}'
       )
-    cpu_aggregated = [
-        user.value.double_value + system.value.double_value
-        for user, system in zip(time_series[0].points, time_series[1].points)
-    ]
+    logging.info('Instance %s utilization by minute:', self.instance_id)
+    cpu_aggregated = []
+    for user, system in zip(time_series[0].points, time_series[1].points):
+      point_utilization = user.value.double_value + system.value.double_value
+      point_time = datetime.datetime.fromtimestamp(
+          user.interval.start_time.seconds
+      )
+      logging.info('%s: %s', point_time, point_utilization)
+      cpu_aggregated.append(point_utilization)
     average_cpu = statistics.mean(cpu_aggregated)
-    logging.info('CPU aggregated: %s', cpu_aggregated)
     logging.info(
-        'Average CPU for the %s minutes ending at %s: %s',
-        duration_minutes,
-        datetime.datetime.fromtimestamp(end_timestamp),
+        'Instance %s average CPU utilization: %s',
+        self.instance_id,
         average_cpu,
     )
     return average_cpu
 
-  def CalculateRecommendedThroughput(
+  def CalculateTheoreticalMaxThroughput(
       self, read_proportion: float, write_proportion: float
   ) -> int:
-    """Returns the recommended throughput based on the workload and nodes."""
+    """Returns the theoretical max throughput based on the workload and nodes.
+
+    This is the published theoretical max throughput of a Spanner node, see
+    https://cloud.google.com/spanner/docs/cpu-utilization#recommended-max for
+    more info.
+
+    Args:
+      read_proportion: the proportion of read requests in the workload.
+      write_proportion: the propoertion of write requests in the workload.
+
+    Returns:
+      The max total QPS taking into account the published single node limits.
+    """
     if read_proportion + write_proportion != 1:
       raise errors.Benchmarks.RunError(
           'Unrecognized workload, read + write proportion must be equal to 1, '
           f'got {read_proportion} + {write_proportion}.'
       )
+    read_ops_per_node = _READ_OPS_PER_NODE
+    write_ops_per_node = _WRITE_OPS_PER_NODE
+    if self._config in _ADJUSTED_CONFIG_REGIONS:
+      read_ops_per_node = _ADJUSTED_READ_OPS_PER_NODE
+      write_ops_per_node = _ADJUSTED_WRITE_OPS_PER_NODE
     # Calculates the starting throughput based off of each node being able to
     # handle 10k QPS of reads or 2k QPS of writes. For example, for a 50/50
     # workload, run at a QPS target of 1666 reads + 1666 writes = 3333 (round).
     a = np.array([
-        [1 / _READ_OPS_PER_NODE, 1 / _WRITE_OPS_PER_NODE],
+        [1 / read_ops_per_node, 1 / write_ops_per_node],
         [write_proportion, -(1 - write_proportion)],
     ])
     b = np.array([1, 0])

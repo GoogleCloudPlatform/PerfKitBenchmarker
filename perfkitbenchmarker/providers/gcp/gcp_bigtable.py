@@ -16,11 +16,16 @@
 Clusters can be created and deleted.
 """
 
+import datetime
 import json
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 from absl import flags
+from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3 import query
+import numpy as np
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker.configs import option_decoders
@@ -52,6 +57,13 @@ flags.DEFINE_integer(
         'Ignored if --bigtable_autoscaling_min_nodes is set.'
     ),
 )
+_LOAD_NODES = flags.DEFINE_integer(
+    'bigtable_load_node_count',
+    None,
+    'The number of nodes for the Bigtable instance to use for the load'
+    ' phase. Assumes that the benchmark calls UpdateRunCapacity to set the '
+    ' correct node count manually before the run phase.',
+)
 _AUTOSCALING_MIN_NODES = flags.DEFINE_integer(
     'bigtable_autoscaling_min_nodes', None,
     'Minimum number of nodes for autoscaling.')
@@ -79,6 +91,16 @@ _DEFAULT_REPLICATION_ZONE = 'us-central1-c'
 
 _FROZEN_NODE_COUNT = 1
 
+# Bigtable CPU Monitoring API has a 3 minute delay. See
+# https://cloud.google.com/monitoring/api/metrics_gcp#gcp-bigtable
+CPU_API_DELAY_MINUTES = 3
+CPU_API_DELAY_SECONDS = CPU_API_DELAY_MINUTES * 60
+
+# For more information on QPS expectations, see
+# https://cloud.google.com/bigtable/docs/performance#typical-workloads
+_READ_OPS_PER_NODE = 10000
+_WRITE_OPS_PER_NODE = 10000
+
 
 class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
   """Configurable options of a Bigtable instance. See below for descriptions."""
@@ -89,6 +111,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
   zone: str
   project: str
   node_count: int
+  load_node_count: int
   storage_type: str
   replication_cluster: bool
   replication_cluster_zone: str
@@ -110,6 +133,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
         'zone': (option_decoders.StringDecoder, none_ok),
         'project': (option_decoders.StringDecoder, none_ok),
         'node_count': (option_decoders.IntDecoder, none_ok),
+        'load_node_count': (option_decoders.IntDecoder, none_ok),
         'storage_type': (option_decoders.StringDecoder, none_ok),
         'replication_cluster': (option_decoders.BooleanDecoder, none_ok),
         'replication_cluster_zone': (option_decoders.StringDecoder, none_ok),
@@ -147,6 +171,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
         'google_bigtable_zone': 'zone',
         'bigtable_storage_type': 'storage_type',
         'bigtable_node_count': 'node_count',
+        'bigtable_load_node_count': 'load_node_count',
         'bigtable_replication_cluster': 'replication_cluster',
         'bigtable_replication_cluster_zone': 'replication_cluster_zone',
         'bigtable_multicluster_routing': 'multicluster_routing',
@@ -195,6 +220,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
                project: Optional[str],
                zone: Optional[str],
                node_count: Optional[int],
+               load_node_count: Optional[int],
                storage_type: Optional[str],
                replication_cluster: Optional[bool],
                replication_cluster_zone: Optional[str],
@@ -210,6 +236,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     self.zone: str = zone or FLAGS.google_bigtable_zone
     self.project: str = project or FLAGS.project or util.GetDefaultProject()
     self.node_count: int = node_count or _DEFAULT_NODE_COUNT
+    self._load_node_count = load_node_count or self.node_count
     self.storage_type: str = storage_type or _DEFAULT_STORAGE_TYPE
     self.replication_cluster: bool = replication_cluster or False
     self.replication_cluster_zone: Optional[str] = (
@@ -227,6 +254,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
         zone=spec.zone,
         project=spec.project,
         node_count=spec.node_count,
+        load_node_count=spec.load_node_count,
         storage_type=spec.storage_type,
         replication_cluster=spec.replication_cluster,
         replication_cluster_zone=spec.replication_cluster_zone,
@@ -387,19 +415,133 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     return json.loads(stdout)
 
   def _UpdateNodes(self, nodes: int) -> None:
+    """Updates clusters to the specified node count and waits until ready."""
+    # User managed instances currently aren't supported since instance
+    # attributes aren't discovered after initialization.
+    if self.user_managed:
+      return
     clusters = self._GetClusters()
     for i in range(len(clusters)):
-      cmd = _GetBigtableGcloudCommand(self, 'bigtable', 'clusters', 'update',
-                                      f'{self.name}-{i}')
+      # Do nothing if the node count is already equal to what we want.
+      if clusters[i]['serveNodes'] == nodes:
+        continue
+      cluster_name = clusters[i]['name']
+      cmd = _GetBigtableGcloudCommand(
+          self, 'bigtable', 'clusters', 'update', cluster_name
+      )
       cmd.flags['instance'] = self.name
       cmd.flags['num-nodes'] = nodes or self.node_count
       cmd.Issue()
+    # Note that Exists is implemented like IsReady, but should likely be
+    # refactored.
+    while not self._Exists():
+      time.sleep(10)
+
+  def UpdateCapacityForLoad(self) -> None:
+    """See base class."""
+    self._UpdateNodes(self._load_node_count)
+
+  def UpdateCapacityForRun(self) -> None:
+    """See base class."""
+    self._UpdateNodes(self.node_count)
 
   def _Freeze(self) -> None:
     self._UpdateNodes(_FROZEN_NODE_COUNT)
 
   def _Restore(self) -> None:
     self._UpdateNodes(self.node_count)
+
+  def GetAverageCpuUsage(
+      self, duration_minutes: int, end_time: datetime.datetime
+  ) -> float:
+    """Gets the average CPU usage for the cluster.
+
+    Note that there is a delay for the API to get data, so this returns the
+    average CPU usage in the period ending at `end_time` with missing data
+    in the last CPU_API_DELAY_SECONDS.
+
+    Args:
+      duration_minutes: The time duration for which to measure the average CPU
+        usage.
+      end_time: The ending timestamp of the workload.
+
+    Returns:
+      The average CPU usage during the time period.
+    """
+    if duration_minutes * 60 <= CPU_API_DELAY_SECONDS:
+      raise ValueError(
+          f'Bigtable API has a {CPU_API_DELAY_SECONDS} sec. delay in receiving'
+          ' data, choose a longer duration to get CPU usage.'
+      )
+    client = monitoring_v3.MetricServiceClient()
+
+    # It takes up to 3 minutes for CPU metrics to appear,
+    # see https://cloud.google.com/bigtable/docs/metrics.
+    cpu_query = query.Query(
+        client,
+        project=self.project,
+        metric_type='bigtable.googleapis.com/cluster/cpu_load',
+        end_time=end_time,
+        minutes=duration_minutes,
+    )
+
+    # Filter by the Bigtable instance
+    cpu_query = cpu_query.select_resources(instance=self.name)
+    time_series = list(cpu_query)
+
+    instance_total_utilization = 0.0
+    for cluster_time_series in time_series:
+      cluster_total_utilization = 0.0
+      cluster_name = cluster_time_series.resource.labels['cluster']
+      logging.info('Cluster %s utilization by minute:', cluster_name)
+      for point in cluster_time_series.points:
+        point_utilization = round(point.value.double_value, 3)
+        point_time = datetime.datetime.fromtimestamp(
+            point.interval.start_time.seconds
+        )
+        logging.info('%s: %s', point_time, point_utilization)
+        cluster_total_utilization += point_utilization
+      cluster_average_utilization = round(
+          cluster_total_utilization / len(cluster_time_series.points), 3
+      )
+      logging.info(
+          'Cluster %s average CPU utilization: %s',
+          cluster_name,
+          cluster_average_utilization,
+      )
+      instance_total_utilization += cluster_average_utilization
+
+    average_utilization = instance_total_utilization / len(time_series)
+    logging.info('Instance average CPU utilization: %s', average_utilization)
+    return average_utilization
+
+  def CalculateTheoreticalMaxThroughput(
+      self, read_proportion: float, write_proportion: float
+  ) -> int:
+    """Returns the theoretical max throughput based on the workload and nodes.
+
+    Args:
+      read_proportion: The proportion of reads between 0 and 1.
+      write_proportion: The proportion of writes between 0 and 1.
+
+    Returns:
+      The theoretical max throughput for the instance.
+    """
+    if read_proportion + write_proportion != 1:
+      raise errors.Benchmarks.RunError(
+          'Unrecognized workload, read + write proportion must be equal to 1, '
+          f'got {read_proportion} + {write_proportion}.'
+      )
+    # Calculates the starting throughput based off of each node being able to
+    # handle 10k QPS of reads or 10k QPS of writes. For example, for a 50/50
+    # workload, run at a QPS target of 5000 reads + 5000 writes = 10000.
+    a = np.array([
+        [1 / _READ_OPS_PER_NODE, 1 / _WRITE_OPS_PER_NODE],
+        [write_proportion, -(1 - write_proportion)],
+    ])
+    b = np.array([1, 0])
+    result = np.linalg.solve(a, b)
+    return int(sum(result) * self.node_count)
 
 
 def _GetBigtableGcloudCommand(instance, *args) -> util.GcloudCommand:

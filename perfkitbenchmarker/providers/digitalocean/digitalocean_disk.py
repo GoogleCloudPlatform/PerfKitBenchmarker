@@ -20,8 +20,6 @@ the instances come with directly integrated storage.
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import provider_info
-
 from perfkitbenchmarker.providers.digitalocean import util
 
 FLAGS = flags.FLAGS
@@ -37,12 +35,6 @@ BLOCK_STORAGE_METADATA = {
     disk.MEDIA: disk.SSD,
     disk.REPLICATION: disk.ZONE,
 }
-
-# Map legacy disk types to DigitalOcean disk types.
-DISK_TYPE_MAP = {
-    disk.REMOTE_SSD: BLOCK_STORAGE
-}
-disk.RegisterDiskTypeMap(provider_info.DIGITALOCEAN, DISK_TYPE_MAP)
 
 
 class DigitalOceanLocalDisk(disk.BaseDisk):
@@ -62,7 +54,8 @@ class DigitalOceanLocalDisk(disk.BaseDisk):
     # The local disk is always the boot disk, and it cannot be
     # partitioned or reformatted, so we don't support GetDevicePath().
     raise errors.Error(
-        'GetDevicePath not supported for DigitalOcean local disks.')
+        'GetDevicePath not supported for DigitalOcean local disks.'
+    )
 
   def _Create(self):
     pass
@@ -85,42 +78,53 @@ class DigitalOceanBlockStorageDisk(disk.BaseDisk):
     self.volume_name = 'pkb-%s-%s' % (FLAGS.run_uri, self.disk_number)
 
     response, retcode = util.DoctlAndParse(
-        ['compute', 'volume', 'create',
-         self.volume_name,
-         '--region', self.zone,
-         '--size', str(self.disk_size) + 'gb'])
+        [
+            'compute',
+            'volume',
+            'create',
+            self.volume_name,
+            '--region',
+            self.zone,
+            '--size',
+            str(self.disk_size) + 'gb',
+        ]
+    )
     if retcode:
       raise errors.Resource.RetryableCreationError(
-          'Error creating disk: %s' % (response,))
+          'Error creating disk: %s' % (response,)
+      )
 
     self.volume_id = response[0]['id']
 
   def _Delete(self):
     response, retcode = util.DoctlAndParse(
-        ['compute', 'volume', 'delete',
-         self.volume_id, '--force'])
+        ['compute', 'volume', 'delete', self.volume_id, '--force']
+    )
     if retcode:
       raise errors.Resource.RetryableDeletionError(
-          'Error deleting disk: %s' % (response,))
+          'Error deleting disk: %s' % (response,)
+      )
 
   def Attach(self, vm):
     response, retcode = util.DoctlAndParse(
-        ['compute', 'volume-action', 'attach',
-         self.volume_id, vm.droplet_id])
+        ['compute', 'volume-action', 'attach', self.volume_id, vm.droplet_id]
+    )
     if retcode:
       raise errors.VmUtil.CalledProcessException(
-          'Error attaching disk: %s' % (response,))
+          'Error attaching disk: %s' % (response,)
+      )
 
     action_id = response[0]['id']
     util.WaitForAction(action_id)
 
   def Detach(self):
     response, retcode = util.DoctlAndParse(
-        ['compute', 'volume-action', 'detach',
-         self.volume_id])
+        ['compute', 'volume-action', 'detach', self.volume_id]
+    )
     if retcode:
       raise errors.VmUtil.CalledProcessException(
-          'Error detaching disk: %s' % (response,))
+          'Error detaching disk: %s' % (response,)
+      )
 
     action_id = response[0]['id']
     util.WaitForAction(action_id)

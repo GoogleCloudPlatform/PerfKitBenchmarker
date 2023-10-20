@@ -37,6 +37,7 @@ import json
 import logging
 
 from absl import flags
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import provider_info
@@ -45,6 +46,10 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
+
+
+class AwsNFSDiskSpec(disk.BaseNFSDiskSpec):
+  CLOUD = provider_info.AWS
 
 
 class AwsNfsService(nfs_service.BaseNfsService):

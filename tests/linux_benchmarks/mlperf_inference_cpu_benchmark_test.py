@@ -37,14 +37,14 @@ class MlperfInferenceCpuBenchmarkTestCase(
       self.performance_contents = fp.read()
 
   def testTrainResults(self):
-    samples = mlperf_inference_cpu_benchmark.MakeSamplesFromOutput(
+    result = mlperf_inference_cpu_benchmark.MakeSamplesFromOutput(
         {}, self.performance_contents
     )
     metadata = {
         'SUT name': 'PySUT',
         'Scenario': 'Server',
         'Mode': 'PerformanceOnly',
-        'Scheduled samples per second': '0.98',
+        'Samples per second': '0.98',
         'Result is': 'INVALID',
         'Performance constraints satisfied': 'NO',
         'Min duration satisfied': 'Yes',
@@ -88,8 +88,13 @@ class MlperfInferenceCpuBenchmarkTestCase(
         unit='samples per second',
         metadata=metadata,
     )
-    sample = samples[0]
-    self.assertSamplesEqualUpToTimestamp(golden, sample)
+    self.assertSamplesEqualUpToTimestamp(golden, result)
+
+  def testValid(self):
+    is_valid = mlperf_inference_cpu_benchmark._IsValid(
+        self.performance_contents
+    )
+    self.assertFalse(is_valid)
 
 
 if __name__ == '__main__':

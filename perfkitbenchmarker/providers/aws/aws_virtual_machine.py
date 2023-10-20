@@ -35,6 +35,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
@@ -743,18 +744,22 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return max(images, key=lambda image: image['CreationDate'])['ImageId']
 
-  @vm_util.Retry(max_retries=2)
-  def _PostCreate(self):
-    """Get the instance's data and tag it."""
+  def _RunDescribeInstancesCommand(self):
+    """Runs the describe-instances command and return the response as JSON."""
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-instances',
         '--region=%s' % self.region,
-        '--instance-ids=%s' % self.id]
+        '--filter=Name=client-token,Values=%s' % self.client_token]
+    stdout, _ = util.IssueRetryableCommand(describe_cmd)
+    return json.loads(stdout)
+
+  @vm_util.Retry(max_retries=2)
+  def _PostCreate(self):
+    """Get the instance's data and tag it."""
     logging.info('Getting instance %s public IP. This will fail until '
                  'a public IP is available, but will be retried.', self.id)
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
+    response = self._RunDescribeInstancesCommand()
     instance = response['Reservations'][0]['Instances'][0]
     self.internal_ip = instance['PrivateIpAddress']
     for network_interface in instance.get('NetworkInterfaces', []):
@@ -1120,12 +1125,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Raises:
       AwsTransitionalVmRetryableError: If VM is pending. This is retried.
     """
-    status_cmd = util.AWS_PREFIX + [
-        'ec2', 'describe-instances', f'--region={self.region}',
-        f'--instance-ids={self.id}'
-    ]
-    stdout, _, _ = vm_util.IssueCommand(status_cmd)
-    response = json.loads(stdout)
+    response = self._RunDescribeInstancesCommand()
     instance = response['Reservations'][0]['Instances'][0]
     if 'PublicIpAddress' in instance:
       self.ip_address = instance['PublicIpAddress']
@@ -1227,13 +1227,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
                                        LookupError))
   def _Exists(self):
     """Returns whether the VM exists."""
-    describe_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'describe-instances',
-        '--region=%s' % self.region,
-        '--filter=Name=client-token,Values=%s' % self.client_token]
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
+    response = self._RunDescribeInstancesCommand()
     reservations = response['Reservations']
     if not reservations or len(reservations) != 1:
       logging.info('describe-instances did not return exactly one reservation. '
@@ -1285,14 +1279,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       AwsVmNotCreatedError: If the VM does not have a create_start_time by the
         time it reaches this phase of provisioning.
     """
-    describe_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'describe-instances',
-        '--region=%s' % self.region,
-        '--filter=Name=client-token,Values=%s' % self.client_token]
-
-    stdout, _ = util.IssueRetryableCommand(describe_cmd)
-    response = json.loads(stdout)
+    response = self._RunDescribeInstancesCommand()
     reservations = response['Reservations']
     if not reservations or len(reservations) != 1:
       if not self.create_start_time:
@@ -1399,12 +1386,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       disks.append(data_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
-    # here, all disks are created (either at vm creation or in line above).
-    # But we don't have all the raw device paths,
-    # which are necessary for preparing the scratch disk.
-    nvme_devices = self.GetNVMEDeviceInfo()
-    self.PopulateNVMEDevicePath(scratch_disk, nvme_devices)
-    self.UpdateDevicePath(scratch_disk)
+    if self.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+      # here, all disks are created (either at vm creation or in line above).
+      # But we don't have all the raw device paths,
+      # which are necessary for striping the scratch disk on Linux,
+      # but not on Windows.
+      # The path is not updated for Windows machines.
+      nvme_devices = self.GetNVMEDeviceInfo()
+      self.PopulateNVMEDevicePath(scratch_disk, nvme_devices)
+      self.UpdateDevicePath(scratch_disk)
     self._PrepareScratchDisk(scratch_disk, disk_spec)
 
   def PopulateNVMEDevicePath(self, scratch_disk, nvme_devices):
@@ -1640,6 +1630,14 @@ class Debian11BackportsBasedAwsVirtualMachine(
   IMAGE_NAME_FILTER_PATTERN = 'debian-11-backports-{alternate_architecture}-*'
 
 
+class Debian12BasedAwsVirtualMachine(AwsVirtualMachine,
+                                     linux_virtual_machine.Debian12Mixin):
+  # From https://wiki.debian.org/Cloud/AmazonEC2Image/Bookworm
+  IMAGE_NAME_FILTER_PATTERN = 'debian-12-{alternate_architecture}-*'
+  IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
+  DEFAULT_USER_NAME = 'admin'
+
+
 class UbuntuBasedAwsVirtualMachine(AwsVirtualMachine):
   IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'ubuntu'
@@ -1679,6 +1677,14 @@ class Ubuntu2004EfaBasedAwsVirtualMachine(
 class Ubuntu2204BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
                                        linux_virtual_machine.Ubuntu2204Mixin):
   IMAGE_NAME_FILTER_PATTERN = 'ubuntu/images/*/ubuntu-jammy-22.04-{alternate_architecture}-server-20*'
+
+
+class Ubuntu2304BasedAwsVirtualMachine(
+    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2304Mixin
+):
+  IMAGE_NAME_FILTER_PATTERN = (
+      'ubuntu/images/*/ubuntu-lunar-23.04-{alternate_architecture}-server-20*'
+  )
 
 
 class JujuBasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
@@ -1934,10 +1940,11 @@ class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
       raise AwsUnexpectedWindowsAdapterOutputError(
           'InterruptModeration failed to disable')
 
-
-class Windows2012CoreAwsVirtualMachine(
-    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2012CoreMixin):
-  IMAGE_SSM_PATTERN = '/aws/service/ami-windows-latest/Windows_Server-2012-R2_RTM-English-64Bit-Core'
+  def _DiskDriveIsLocal(self, device, model):
+    """Helper method to determine if a disk drive is a local ssd to stripe."""
+    if 'Amazon Elastic B' in model:
+      return False
+    return True
 
 
 class Windows2016CoreAwsVirtualMachine(
@@ -1953,12 +1960,6 @@ class Windows2019CoreAwsVirtualMachine(
 class Windows2022CoreAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2022CoreMixin):
   IMAGE_SSM_PATTERN = '/aws/service/ami-windows-latest/Windows_Server-2022-English-Core-Base'
-
-
-class Windows2012DesktopAwsVirtualMachine(
-    BaseWindowsAwsVirtualMachine,
-    windows_virtual_machine.Windows2012DesktopMixin):
-  IMAGE_SSM_PATTERN = '/aws/service/ami-windows-latest/Windows_Server-2012-R2_RTM-English-64Bit-Base'
 
 
 class Windows2016DesktopAwsVirtualMachine(

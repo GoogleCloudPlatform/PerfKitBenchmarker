@@ -140,7 +140,10 @@ _Bigtable = gcp_bigtable.GcpBigtableInstance
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
+  return config
 
 
 def CheckPrerequisites(benchmark_config: Dict[str, Any]) -> None:
@@ -170,6 +173,16 @@ def CheckPrerequisites(benchmark_config: Dict[str, Any]) -> None:
         # Client side metrics are only required with the Veneer client.
         continue
       raise ValueError('Scope {0} required.'.format(scope))
+
+  if ycsb.CPU_OPTIMIZATION.value and (
+      ycsb.CPU_OPTIMIZATION_MEASUREMENT_MINS.value
+      <= gcp_bigtable.CPU_API_DELAY_MINUTES
+  ):
+    raise errors.Setup.InvalidFlagConfigurationError(
+        f'measurement_mins {ycsb.CPU_OPTIMIZATION_MEASUREMENT_MINS.value} must'
+        ' be greater than CPU_API_DELAY_MINUTES'
+        f' {gcp_bigtable.CPU_API_DELAY_MINUTES}.'
+    )
 
 
 def _GetTableName() -> str:
@@ -357,6 +370,19 @@ def _GetYcsbExecutor(
   return ycsb.YCSBExecutor(FLAGS.hbase_binding, **executor_flags)
 
 
+def _LoadDatabase(executor: ycsb.YCSBExecutor,
+                  bigtable: gcp_bigtable.GcpBigtableInstance,
+                  vms: list[virtual_machine.VirtualMachine],
+                  load_kwargs: dict[str, Any]) -> list[sample.Sample]:
+  """Loads the database with the specified infrastructure capacity."""
+  if bigtable.restored or ycsb.SKIP_LOAD_STAGE.value:
+    return []
+  bigtable.UpdateCapacityForLoad()
+  results = list(executor.Load(vms, load_kwargs=load_kwargs))
+  bigtable.UpdateCapacityForRun()
+  return results
+
+
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Spawn YCSB and gather the results.
 
@@ -378,9 +404,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   load_kwargs = _GenerateLoadKwargs(instance)
   run_kwargs = _GenerateRunKwargs(instance)
   executor: ycsb.YCSBExecutor = _GetYcsbExecutor(vms)
-  if not instance.restored:
-    samples += list(executor.Load(vms, load_kwargs=load_kwargs))
-  samples += list(executor.Run(vms, run_kwargs=run_kwargs))
+  samples += _LoadDatabase(executor, instance, vms, load_kwargs)
+  samples += list(executor.Run(vms, run_kwargs=run_kwargs, database=instance))
 
   # Optionally add new samples for cluster cpu utilization.
   if _GET_CPU_UTILIZATION.value:

@@ -25,7 +25,7 @@ vudestroy
 dbset bm TPC-H
 diset tpch pg_tpch_superuser {{DATABASE_USER}}
 diset tpch pg_tpch_superuserpass {{DATABASE_PASSWORD}}
-diset tpch pg_user {{DATABASE_USER}}
+diset tpch pg_tpch_user {{DATABASE_USER}}
 diset tpch pg_tpch_pass {{DATABASE_PASSWORD}}
 diset connection  pg_port  {{DATABASE_PORT}}
 diset connection pg_host {{DATABASE_IP}}

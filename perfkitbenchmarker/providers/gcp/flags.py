@@ -102,7 +102,10 @@ flags.DEFINE_multi_string(
     '`gcloud help compute instances create`.')
 flags.DEFINE_integer('gce_boot_disk_size', None,
                      'The boot disk size in GB for GCP VMs.')
-flags.DEFINE_enum('gce_boot_disk_type', None, ['pd-standard', 'pd-ssd'],
+flags.DEFINE_enum('gce_boot_disk_type', None,
+                  ['pd-standard',
+                   'pd-ssd',
+                   ],
                   'The boot disk type for GCP VMs.')
 flags.DEFINE_enum('gce_ssd_interface', 'SCSI', ['SCSI', 'NVME'],
                   'The ssd interface for GCE local SSD.')
@@ -191,15 +194,20 @@ flags.DEFINE_boolean('gce_firewall_rules_clean_all', False,
                      'them. However, they must be deleted in order to '
                      'successfully delete the PKB-created network.')
 flags.DEFINE_enum('bq_client_interface', 'CLI',
-                  ['CLI', 'JAVA', 'SIMBA_JDBC_1_2_4_1007'],
+                  ['CLI', 'JAVA', 'SIMBA_JDBC_1_2_4_1007',
+                   'SIMBA_JDBC_1_3_3_1004', 'SIMBA_JDBC_1_5_0_1001'],
                   'The Runtime Interface used when interacting with BigQuery.')
 flags.DEFINE_string('gcp_preemptible_status_bucket', None,
                     'The GCS bucket to store the preemptible status when '
                     'running on GCP.')
 flags.DEFINE_integer(
-    'gcp_provisioned_iops', 100000,
-    'Iops to provision for pd-extreme. Defaults to the gcloud '
-    'default of 100000.')
+    'gcp_provisioned_iops', None,
+    'Iops to provision for pd-extreme, hyperdisk-extreme, and '
+    'hyperdisk-balanced.')
+flags.DEFINE_integer('gcp_provisioned_throughput', None,
+                     'Provisioned throughput (MB/s) for hyperdisk-throughput '
+                     'and hyperdisk-balanced volumes in GCP. Leave as None to '
+                     'use GCP defaults.')
 flags.DEFINE_boolean('gcp_create_disks_with_vm', True,
                      'Whether to create PD disks at VM creation time. Defaults '
                      'to True.')

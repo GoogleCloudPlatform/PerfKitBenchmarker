@@ -83,6 +83,10 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   )
   vm.RemoteCommand(f'{FLAGS.xgboost_env} python3 -m pip install xgboost_ray')
   vm.RemoteCommand(
+      f'{FLAGS.xgboost_env} python3 -m pip install --upgrade pandas'
+      ' "dask[complete]"'
+  )
+  vm.RemoteCommand(
       f'{FLAGS.xgboost_env} python3'
       ' xgboost_ray/xgboost_ray/tests/release/create_test_data.py'
       ' /tmp/classification.parquet --seed 1234 --num-rows 1000000 --num-cols'

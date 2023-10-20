@@ -13,6 +13,7 @@
 # limitations under the License.
 """Module containing pgbench installation, cleanup and run functions."""
 
+import socket
 import time
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
@@ -105,13 +106,21 @@ def RunPgBench(benchmark_spec,
     file: Filename of the benchmark
     path: File path of the benchmar.
   """
+  # AWS DNS sometimes timeout when running the benchmark
+  # https://stackoverflow.com/questions/58179080/occasional-temporary-failure-in-name-resolution-while-connecting-to-aws-aurora
+  # Resolve the address to ip address first to avoid DNS failure
+  endpoint = socket.getaddrinfo(
+      relational_db.client_vm_query_tools.connection_properties.endpoint,
+      relational_db.client_vm_query_tools.connection_properties.port,
+  )[0][4][0]
+
   connection_string = relational_db.client_vm_query_tools.GetConnectionString(
-      database_name=test_db_name)
+      database_name=test_db_name, endpoint=endpoint
+  )
 
   if file and path:
     metadata['pgbench_file'] = file
 
-  samples = []
   if job_counts and len(client_counts) != len(job_counts):
     raise ValueError('Length of clients and jobs must be the same.')
   for i in range(len(client_counts)):
@@ -121,9 +130,11 @@ def RunPgBench(benchmark_spec,
       jobs = job_counts[i]
     else:
       jobs = min(client, 16)
-    command = (f'pgbench {connection_string} --client={client} '
-               f'--jobs={jobs} --time={seconds_per_test} --progress=1 '
-               '-r')
+    command = (
+        f'ulimit -n 10000 && pgbench {connection_string} --client={client} '
+        f'--jobs={jobs} --time={seconds_per_test} --progress=1 '
+        '-r'
+    )
     if file and path:
       command = f'cd {path} && {command} --file={file}'
     _, stderr = vm.RobustRemoteCommand(command)

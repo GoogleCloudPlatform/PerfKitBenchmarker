@@ -378,3 +378,52 @@ class A10x2Triton(A10x2):
 )
 class A10x2HighAccuracyTriton(A10x2HighAccuracy):
   use_triton = True
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class H100x1(ServerGPUBaseConfig):
+  system = KnownSystem.H100x1
+  use_small_tile_gemm_plugin = False
+  enable_interleaved = False
+  use_graphs = False
+  gpu_batch_size = 128
+  gpu_copy_streams = 2
+  gpu_inference_streams = 2
+  server_target_qps = 7500
+  server_num_issue_query_threads = 1
+  workspace_size = 7516192768
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP
+)
+class H100x8(H100x1):
+  system = KnownSystem.H100x8
+  gpu_inference_streams = 2
+  gpu_copy_streams = 4
+  server_target_qps = 7450 * 8
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class H100x1HighAccuracy(H100x1):
+  precision = "fp16"
+  use_fp8 = True
+  use_graphs = False
+  gpu_batch_size = 512
+  server_target_qps = 6350
+
+
+@ConfigRegistry.register(
+    HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP
+)
+class H100x8HighAccuracy(H100x8):
+  precision = "fp16"
+  use_fp8 = True
+  use_graphs = False
+  gpu_batch_size = 512
+  gpu_inference_streams = 1
+  server_target_qps = 6200 * 8

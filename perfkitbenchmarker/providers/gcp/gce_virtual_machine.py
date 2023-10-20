@@ -106,6 +106,7 @@ _METADATA_PREEMPT_CMD = (
 # Machine type to ARM architecture.
 _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     't2a': 'neoverse-n1',
+    'c3a': 'ampere1',
 }
 # The A2 and A3 machine families, unlike some other GCP offerings, have a
 # preset type and number of GPUs, so we set those attributes directly from the
@@ -500,7 +501,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.preemptible_status_code = None
     self.project = vm_spec.project or util.GetDefaultProject()
     self.image_project = vm_spec.image_project or self.GetDefaultImageProject()
-    self.backfill_image = False
     self.mtu: Optional[int] = FLAGS.mtu
     self.subnet_name = vm_spec.subnet_name
     self.network = self._GetNetwork()
@@ -582,7 +582,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       GcloudCommand. gcloud command to issue in order to create the VM instance.
     """
     args = ['compute', 'instances', 'create', self.name]
-
     cmd = util.GcloudCommand(self, *args)
     cmd.flags['async'] = True
     if gcp_flags.GCE_CREATE_LOG_HTTP.value:
@@ -595,6 +594,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           f'total-egress-bandwidth-tier={self.gce_egress_bandwidth_tier}'
       )
       cmd.flags['network-performance-configs'] = network_performance_configs
+      self.metadata['gce_egress_bandwidth_tier'] = (
+          self.gce_egress_bandwidth_tier
+      )
 
     if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
       # TODO(pclay): remove when on-host-maintenance gets promoted to GA
@@ -637,8 +639,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['image'] = self.image
     elif self.image_family:
       cmd.flags['image-family'] = self.image_family
+      self.metadata['image_family'] = self.image_family
     if self.image_project is not None:
       cmd.flags['image-project'] = self.image_project
+      self.metadata['image_project'] = self.image_project
     cmd.flags['boot-disk-auto-delete'] = True
     if self.boot_disk_size:
       cmd.flags['boot-disk-size'] = self.boot_disk_size
@@ -655,15 +659,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if self.threads_per_core:
       cmd.flags['threads-per-core'] = self.threads_per_core
+      self.metadata['threads_per_core'] = self.threads_per_core
 
-    if (
-        self.gpu_count
-        and self.machine_type
-        and self.machine_type not in _FIXED_GPU_MACHINE_TYPES
+    if self.gpu_count and (
+        self.cpus
+        or (
+            self.machine_type
+            and self.machine_type not in _FIXED_GPU_MACHINE_TYPES
+        )
     ):
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(
           self.gpu_type, self.gpu_count
       )
+
     cmd.flags['tags'] = ','.join(['perfkitbenchmarker'] + (self.gce_tags or []))
     if not self.automatic_restart:
       cmd.flags['no-restart-on-failure'] = True
@@ -753,10 +761,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             'boot=no',
             'mode=rw',
         ]
-        if disk_spec.disk_type in [
-            gce_disk.PD_EXTREME,
-        ]:
+        if (
+            FLAGS.gcp_provisioned_iops
+            and disk_spec.disk_type in gce_disk.GCE_DYNAMIC_IOPS_DISK_TYPES
+        ):
           pd_args += [f'provisioned-iops={FLAGS.gcp_provisioned_iops}']
+        if (
+            FLAGS.gcp_provisioned_throughput
+            and disk_spec.disk_type
+            in gce_disk.GCE_DYNAMIC_THROUGHPUT_DISK_TYPES
+        ):
+          pd_args += [
+              f'provisioned-throughput={FLAGS.gcp_provisioned_throughput}'
+          ]
         create_disks.append(','.join(pd_args))
     if create_disks:
       cmd.flags['create-disk'] = create_disks
@@ -836,7 +853,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.create_return_time = time.time()
 
   def _ParseCreateErrors(
-      self, cmd_rate_limited: bool, stderr: str, retcode: int):
+      self, cmd_rate_limited: bool, stderr: str, retcode: int
+  ):
     """Parse error messages from a command in order to classify a failure."""
     num_hosts = len(self.host_list)
     if (
@@ -999,7 +1017,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       response = json.loads(stdout)
       if not self.image:
         self.image = response['sourceImage'].split('/')[-1]
-        self.backfill_image = True
       if not self.boot_disk_size:
         self.boot_disk_size = response['sizeGb']
       if not self.boot_disk_type:
@@ -1033,7 +1050,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry(
       poll_interval=1,
       log_errors=False,
-      retryable_exceptions=(GceServiceUnavailableError,)
+      retryable_exceptions=(GceServiceUnavailableError,),
   )
   def _Exists(self):
     """Returns true if the VM exists."""
@@ -1073,12 +1090,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if 'error' in response:
       create_stderr = json.dumps(response['error'])
       create_retcode = 1
-      self._ParseCreateErrors(getoperation_cmd.rate_limited,
-                              create_stderr, create_retcode)
+      self._ParseCreateErrors(
+          getoperation_cmd.rate_limited, create_stderr, create_retcode
+      )
     # Retry if the operation is not yet DONE.
     elif status != OPERATION_DONE:
-      logging.info('VM create operation has status %s; retrying operations '
-                   'describe command.', status)
+      logging.info(
+          'VM create operation has status %s; retrying operations '
+          'describe command.',
+          status,
+      )
       raise GceRetryDescribeOperationsError()
     # Collect the time-to-running timestamp once the operation completes.
     elif not self.is_running_time:
@@ -1147,10 +1168,49 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       disks.append(data_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
-    nvme_devices = self.GetNVMEDeviceInfo()
-    remote_nvme_devices = self.FindRemoteNVMEDevices(scratch_disk, nvme_devices)
-    self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
+    # Device path is needed to stripe disks on Linux, but not on Windows.
+    # The path is not updated for Windows machines.
+    if self.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+      nvme_devices = self.GetNVMEDeviceInfo()
+      remote_nvme_devices = self.FindRemoteNVMEDevices(
+          scratch_disk, nvme_devices
+      )
+      self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
     self._PrepareScratchDisk(scratch_disk, disk_spec)
+
+  def CreateIpReservation(
+      self, ip_address_name: str
+  ) -> gce_network.GceIPAddress:
+    """Creates an IP reservation.
+
+    Args:
+      ip_address_name: name of the IP reservation to be created.
+
+    Returns:
+      Reserved IP address.
+    """
+    reserved_ip_address = gce_network.GceIPAddress(
+        self.project,
+        util.GetRegionFromZone(self.zone),
+        ip_address_name,
+        self.network.primary_subnet_name,
+    )
+    reserved_ip_address.Create()
+    return reserved_ip_address
+
+  def ReleaseIpReservation(self, ip_address_name: str) -> None:
+    """Releases existing IP reservation.
+
+    Args:
+      ip_address_name: name of the IP reservation to be released.
+    """
+    reserv_ip_address = gce_network.GceIPAddress(
+        self.project,
+        util.GetRegionFromZone(self.zone),
+        ip_address_name,
+        self.network.primary_subnet_name,
+    )
+    reserv_ip_address.Delete()
 
   def FindRemoteNVMEDevices(self, _, nvme_devices):
     """Find the paths for all remote NVME devices inside the VM."""
@@ -1223,14 +1283,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       attr_value = getattr(self, attr_name)
       if attr_value:
         result[attr_name] = attr_value
-    # Only record image_family flag when it is used in vm creation command.
-    # Note, when using non-debian/ubuntu based custom images, user will need
-    # to use --os_type flag. In that case, we do not want to
-    # record image_family in metadata.
-    if self.backfill_image and self.image_family:
-      result['image_family'] = self.image_family
-    if self.image_project:
-      result['image_project'] = self.image_project
     if self.use_dedicated_host:
       result['node_type'] = self.node_type
       result['num_vms_per_host'] = self.num_vms_per_host
@@ -1257,13 +1309,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     )
     result['gce_network_tier'] = self.gce_network_tier
     result['gce_nic_type'] = self.gce_nic_type
-    if self.gce_egress_bandwidth_tier:
-      result['gce_egress_bandwidth_tier'] = self.gce_egress_bandwidth_tier
     result['gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
     result['boot_disk_type'] = self.boot_disk_type
     result['boot_disk_size'] = self.boot_disk_size
-    if self.threads_per_core:
-      result['threads_per_core'] = self.threads_per_core
     if self.network.mtu:
       result['mtu'] = self.network.mtu
     if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
@@ -1525,7 +1573,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
 
   # Subclasses should override the default image OR
   # both the image family and image_project.
-  DEFAULT_IMAGE_FAMILY = None
+  DEFAULT_X86_IMAGE_FAMILY = None
   DEFAULT_ARM_IMAGE_FAMILY = None
   DEFAULT_IMAGE_PROJECT = None
   SUPPORTS_GVNIC = True
@@ -1594,19 +1642,29 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
 
   # Use an explicit is_arm parameter to not accidentally assume a default
   def GetDefaultImageFamily(self, is_arm: bool) -> str:
-    if not self.DEFAULT_IMAGE_FAMILY:
-      raise ValueError('DEFAULT_IMAGE_FAMILY can not be None')
     if is_arm:
       if self.DEFAULT_ARM_IMAGE_FAMILY:
         return self.DEFAULT_ARM_IMAGE_FAMILY
-      if 'arm64' not in self.DEFAULT_IMAGE_FAMILY:
-        arm_image_family = self.DEFAULT_IMAGE_FAMILY + '-arm64'
-        logging.info(
-            'ARM image must be used; changing image to %s',
-            arm_image_family,
+
+      assert 'arm64' not in self.DEFAULT_X86_IMAGE_FAMILY
+      if 'amd64' in self.DEFAULT_X86_IMAGE_FAMILY:
+        # New convention as of Ubuntu 23
+        arm_image_family = self.DEFAULT_X86_IMAGE_FAMILY.replace(
+            'amd64', 'arm64'
         )
-        return arm_image_family
-    return self.DEFAULT_IMAGE_FAMILY
+      else:
+        # Older convention
+        arm_image_family = self.DEFAULT_X86_IMAGE_FAMILY + '-arm64'
+      logging.info(
+          'ARM image must be used; changing image to %s',
+          arm_image_family,
+      )
+      return arm_image_family
+    if not self.DEFAULT_X86_IMAGE_FAMILY:
+      raise ValueError(
+          'DEFAULT_X86_IMAGE_FAMILY can not be None for non-ARM vms.'
+      )
+    return self.DEFAULT_X86_IMAGE_FAMILY
 
   def GetDefaultImageProject(self) -> str:
     if not self.DEFAULT_IMAGE_PROJECT:
@@ -1617,7 +1675,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
 class Debian9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian9Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'debian-9'
+  DEFAULT_X86_IMAGE_FAMILY = 'debian-9'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
   SUPPORTS_GVNIC = False
 
@@ -1629,7 +1687,7 @@ class Debian9BasedGceVirtualMachine(
 class Debian10BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian10Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'debian-10'
+  DEFAULT_X86_IMAGE_FAMILY = 'debian-10'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
   SUPPORTS_GVNIC = False
 
@@ -1637,49 +1695,56 @@ class Debian10BasedGceVirtualMachine(
 class Debian11BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian11Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'debian-11'
+  DEFAULT_X86_IMAGE_FAMILY = 'debian-11'
+  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+
+
+class Debian12BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Debian12Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'debian-12'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
 class Rhel7BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel7Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'rhel-7'
+  DEFAULT_X86_IMAGE_FAMILY = 'rhel-7'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
 class Rhel8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel8Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'rhel-8'
+  DEFAULT_X86_IMAGE_FAMILY = 'rhel-8'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
 class Rhel9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel9Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'rhel-9'
+  DEFAULT_X86_IMAGE_FAMILY = 'rhel-9'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
 class CentOs7BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CentOs7Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'centos-7'
+  DEFAULT_X86_IMAGE_FAMILY = 'centos-7'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
 class CentOsStream8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CentOsStream8Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'centos-stream-8'
+  DEFAULT_X86_IMAGE_FAMILY = 'centos-stream-8'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
 class RockyLinux8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.RockyLinux8Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'rocky-linux-8'
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-8'
   DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
 
 
@@ -1688,13 +1753,13 @@ class RockyLinux8OptimizedBasedGceVirtualMachine(
     RockyLinux8BasedGceVirtualMachine
 ):
   OS_TYPE = os_types.ROCKY_LINUX8_OPTIMIZED
-  DEFAULT_IMAGE_FAMILY = 'rocky-linux-8-optimized-gcp'
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-8-optimized-gcp'
 
 
 class RockyLinux9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.RockyLinux9Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'rocky-linux-9'
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-9'
   DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
 
 
@@ -1702,18 +1767,20 @@ class RockyLinux9OptimizedBasedGceVirtualMachine(
     RockyLinux9BasedGceVirtualMachine
 ):
   OS_TYPE = os_types.ROCKY_LINUX9_OPTIMIZED
-  DEFAULT_IMAGE_FAMILY = 'rocky-linux-9-optimized-gcp'
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-9-optimized-gcp'
 
 
 class CentOsStream9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CentOsStream9Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'centos-stream-9'
+  DEFAULT_X86_IMAGE_FAMILY = 'centos-stream-9'
   DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
 class BaseCosBasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.BaseContainerLinuxMixin):
+    BaseLinuxGceVirtualMachine, linux_vm.BaseContainerLinuxMixin
+):
+  """Base class for COS-based GCE virtual machines."""
   BASE_OS_TYPE = os_types.CORE_OS
   DEFAULT_IMAGE_PROJECT = 'cos-cloud'
 
@@ -1728,46 +1795,49 @@ class BaseCosBasedGceVirtualMachine(
 
 class CosStableBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS
-  DEFAULT_IMAGE_FAMILY = 'cos-stable'
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-stable'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-stable'
 
 
 class CosDevBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS_DEV
-  DEFAULT_IMAGE_FAMILY = 'cos-dev'
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-dev'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-dev'
+
+
+class Cos109BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS109
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-109-lts'
+  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-109-lts'
 
 
 class Cos105BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS105
-  DEFAULT_IMAGE_FAMILY = 'cos-105-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-105-lts'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-105-lts'
 
 
 class Cos101BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS101
-  DEFAULT_IMAGE_FAMILY = 'cos-101-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-101-lts'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-101-lts'
 
 
-class Cos97BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+class Cos97BasedGceVirtualMachine(
+    BaseCosBasedGceVirtualMachine, virtual_machine.DeprecatedOsMixin
+):
   OS_TYPE = os_types.COS97
-  DEFAULT_IMAGE_FAMILY = 'cos-97-lts'
-
-
-class Cos93BasedGceVirtualMachine(
-    BaseCosBasedGceVirtualMachine, virtual_machine.DeprecatedOsMixin):
-  OS_TYPE = os_types.COS93
-  DEFAULT_IMAGE_FAMILY = 'cos-93-lts'
-  # Not sure if it's beginning or end of October
-  END_OF_LIFE = '2023-10-01'
-  ALTERNATIVE_OS = os_types.COS97
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-97-lts'
+  # https://cloud.google.com/container-optimized-os/docs/release-notes
+  # COS release page lists EOL as March 2024.
+  END_OF_LIFE = '2024-03-01'
+  ALTERNATIVE_OS = os_types.COS101
 
 
 class CoreOsBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CoreOsMixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'fedora-coreos-stable'
+  DEFAULT_X86_IMAGE_FAMILY = 'fedora-coreos-stable'
   DEFAULT_IMAGE_PROJECT = 'fedora-coreos-cloud'
   SUPPORTS_GVNIC = False
 
@@ -1780,21 +1850,28 @@ class CoreOsBasedGceVirtualMachine(
 class Ubuntu1804BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu1804Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-1804-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-1804-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
 class Ubuntu2004BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2004Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-2004-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2004-lts'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
 class Ubuntu2204BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2204Mixin
 ):
-  DEFAULT_IMAGE_FAMILY = 'ubuntu-2204-lts'
+  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2204-lts'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
+
+class Ubuntu2304BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2304Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2304-amd64'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 

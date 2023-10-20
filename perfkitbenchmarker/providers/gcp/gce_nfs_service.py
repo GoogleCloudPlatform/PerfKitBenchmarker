@@ -4,6 +4,7 @@ import json
 import logging
 
 from absl import flags
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import provider_info
@@ -12,6 +13,10 @@ from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
+
+
+class GceNFSDiskSpec(disk.BaseNFSDiskSpec):
+  CLOUD = provider_info.GCP
 
 
 class GceNfsService(nfs_service.BaseNfsService):

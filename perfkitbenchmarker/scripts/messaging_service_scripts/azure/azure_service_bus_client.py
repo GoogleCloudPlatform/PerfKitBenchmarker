@@ -75,7 +75,7 @@ class AzureServiceBusClient(client.BaseMessagingServiceClient):
     """Purges all the messages for the underlying service."""
     purge_receiver = self.servicebus_client.get_subscription_receiver(
         topic_name=self.topic_name,
-        susbcription_name=self.subscription_name,
+        subscription_name=self.subscription_name,
         receive_mode=servicebus.ServiceBusReceiveMode.RECEIVE_AND_DELETE)
     start_time = time.time()
     with purge_receiver:

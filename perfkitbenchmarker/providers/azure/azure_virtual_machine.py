@@ -996,6 +996,14 @@ class Debian11BasedAzureVirtualMachine(AzureVirtualMachine,
   ARM_IMAGE_URN = 'Debian:debian-11:11-backports-arm64:latest'
 
 
+class Debian12BasedAzureVirtualMachine(AzureVirtualMachine,
+                                       linux_virtual_machine.Debian12Mixin):
+  # From https://wiki.debian.org/Cloud/MicrosoftAzure
+  GEN2_IMAGE_URN = 'Debian:debian-12:12-gen2:latest'
+  IMAGE_URN = 'Debian:debian-12:12:latest'
+  ARM_IMAGE_URN = 'Debian:debian-12:12-arm64:latest'
+
+
 class Ubuntu1604BasedAzureVirtualMachine(AzureVirtualMachine,
                                          linux_virtual_machine.Ubuntu1604Mixin):
   GEN2_IMAGE_URN = 'Canonical:UbuntuServer:16_04-lts-gen2:latest'
@@ -1026,6 +1034,17 @@ class Ubuntu2204BasedAzureVirtualMachine(AzureVirtualMachine,
   IMAGE_URN = 'Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest'
   CONFIDENTIAL_IMAGE_URN = 'Canonical:0001-com-ubuntu-confidential-vm-jammy:22_04-lts-cvm:latest'
   ARM_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-jammy:22_04-lts-arm64:latest'
+
+
+class Ubuntu2304BasedAzureVirtualMachine(
+    AzureVirtualMachine, linux_virtual_machine.Ubuntu2304Mixin
+):
+  GEN2_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-lunar:23_04-gen2:latest'
+  IMAGE_URN = 'Canonical:0001-com-ubuntu-server-lunar:23_04:latest'
+  CONFIDENTIAL_IMAGE_URN = (
+      'Canonical:0001-com-ubuntu-confidential-vm-lunar:23_04-cvm:latest'
+  )
+  ARM_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-lunar:23_04-arm64:latest'
 
 
 class Rhel7BasedAzureVirtualMachine(AzureVirtualMachine,
@@ -1154,16 +1173,13 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
         GenerateStatPreprovisionedDataCommand(
             module_name, filename).split(' '), raise_on_failure=False)[-1] == 0
 
-
-# Azure seems to have dropped support for 2012 Server Core. It is neither here:
-# https://docs.microsoft.com/en-us/azure/virtual-machines/windows/cli-ps-findimage#table-of-commonly-used-windows-images
-# nor in `az vm image list -p MicrosoftWindowsServer -f WindowsServer -s 2012`
-# Rather than exclude this just allow 2012 to refer to the 2012 Base image.
-class Windows2012CoreAzureVirtualMachine(
-    BaseWindowsAzureVirtualMachine,
-    windows_virtual_machine.Windows2012CoreMixin):
-  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2012-r2-datacenter-gen2:latest'
-  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
+  def _DiskDriveIsLocal(self, device, model):
+    """Helper method to determine if a disk drive is a local ssd to stripe."""
+    # NVME Striped disks applies to Azure's L series
+    # https://learn.microsoft.com/en-us/azure/virtual-machines/lsv3-series
+    if 'Microsoft NVMe Direct Disk' in model:
+      return True
+    return False
 
 
 class Windows2016CoreAzureVirtualMachine(
@@ -1184,13 +1200,6 @@ class Windows2022CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2022CoreMixin):
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2022-Datacenter-Core:latest'
-
-
-class Windows2012DesktopAzureVirtualMachine(
-    BaseWindowsAzureVirtualMachine,
-    windows_virtual_machine.Windows2012DesktopMixin):
-  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2012-r2-datacenter-gen2:latest'
-  IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2012-R2-Datacenter:latest'
 
 
 class Windows2016DesktopAzureVirtualMachine(

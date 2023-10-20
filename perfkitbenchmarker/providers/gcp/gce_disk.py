@@ -47,12 +47,15 @@ GCE_REMOTE_DISK_TYPES = [
     HYPERDISK_EXTREME,
     HYPERDISK_BALANCED,
 ]
-GCE_REMOTE_EXTREME_DISK_TYPES = [
+GCE_DYNAMIC_IOPS_DISK_TYPES = [
     PD_EXTREME,
     HYPERDISK_EXTREME,
+    HYPERDISK_BALANCED,
 ]
-
-DISK_TYPE = {disk.STANDARD: PD_STANDARD, disk.REMOTE_SSD: PD_SSD}
+GCE_DYNAMIC_THROUGHPUT_DISK_TYPES = [
+    HYPERDISK_BALANCED,
+    HYPERDISK_THROUGHPUT,
+]
 
 REGIONAL_DISK_SCOPE = 'regional'
 
@@ -93,8 +96,6 @@ DISK_METADATA = {
 
 SCSI = 'SCSI'
 NVME = 'NVME'
-
-disk.RegisterDiskTypeMap(provider_info.GCP, DISK_TYPE)
 
 
 NVME_PD_MACHINE_FAMILIES = [
@@ -200,8 +201,13 @@ class GceDisk(disk.BaseDisk):
     self.replica_zones = replica_zones
     self.region = util.GetRegionFromZone(self.zone)
     self.provisioned_iops = None
-    if self.disk_type in GCE_REMOTE_EXTREME_DISK_TYPES:
+    self.provisioned_throughput = None
+    if self.disk_type in GCE_DYNAMIC_IOPS_DISK_TYPES:
       self.provisioned_iops = FLAGS.gcp_provisioned_iops
+      self.metadata['iops'] = self.provisioned_iops
+    if self.disk_type in GCE_DYNAMIC_THROUGHPUT_DISK_TYPES:
+      self.provisioned_throughput = FLAGS.gcp_provisioned_throughput
+      self.metadata['throughput'] = self.provisioned_throughput
 
     disk_metadata = DISK_METADATA[disk_spec.disk_type]
     if self.replica_zones:
@@ -210,22 +216,16 @@ class GceDisk(disk.BaseDisk):
     self.metadata.update(DISK_METADATA[disk_spec.disk_type])
     if self.disk_type == disk.LOCAL:
       self.metadata['interface'] = self.interface
-    if (
-        self.provisioned_iops
-        and self.disk_type in GCE_REMOTE_EXTREME_DISK_TYPES
-    ):
-      self.metadata['provisioned_iops'] = self.provisioned_iops
 
   def _Create(self):
     """Creates the disk."""
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'create', self.name)
     cmd.flags['size'] = self.disk_size
     cmd.flags['type'] = self.disk_type
-    if (
-        self.provisioned_iops
-        and self.disk_type in GCE_REMOTE_EXTREME_DISK_TYPES
-    ):
+    if self.provisioned_iops:
       cmd.flags['provisioned-iops'] = self.provisioned_iops
+    if self.provisioned_throughput:
+      cmd.flags['provisioned-throughput'] = self.provisioned_throughput
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     if self.image:
       cmd.flags['image'] = self.image

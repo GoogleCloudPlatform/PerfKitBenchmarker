@@ -37,6 +37,8 @@ Each workload runs for at most 30 minutes.
 
 from collections.abc import Mapping, Sequence
 import copy
+import dataclasses
+import datetime
 import io
 import logging
 import os
@@ -50,6 +52,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -100,7 +103,7 @@ flags.DEFINE_boolean(
 flags.DEFINE_boolean(
     'ycsb_load_samples', True, 'Include samples from pre-populating database.'
 )
-flags.DEFINE_boolean(
+SKIP_LOAD_STAGE = flags.DEFINE_boolean(
     'ycsb_skip_load_stage',
     False,
     'If True, skip the data '
@@ -298,6 +301,83 @@ _ERROR_RATE_THRESHOLD = flags.DEFINE_float(
     'The maximum error rate allowed for the run. '
     'By default, this allows any number of errors.',
 )
+CPU_OPTIMIZATION = flags.DEFINE_bool(
+    'ycsb_cpu_optimization',
+    False,
+    'Whether to run in CPU-optimized mode. The test will increase QPS until '
+    'CPU is over --ycsb_cpu_optimization_target.',
+)
+CPU_OPTIMIZATION_TARGET_MIN = flags.DEFINE_float(
+    'ycsb_cpu_optimization_target_min',
+    0.65,
+    'CPU-optimized mode: minimum target CPU utilization. The end sample must be'
+    ' between this number and --ycsb_cpu_optimization_target, else an exception'
+    ' will be thrown.',
+)
+CPU_OPTIMIZATION_TARGET = flags.DEFINE_float(
+    'ycsb_cpu_optimization_target',
+    0.70,
+    'CPU-optimized mode: maximum target CPU utilization at which to stop the'
+    ' test. The test will continue to increment until the utilization level is'
+    ' reached, and then return the maximum throughput for that usage level.',
+)
+_CPU_OPTIMIZATION_SLEEP_MINS = flags.DEFINE_integer(
+    'ycsb_cpu_optimization_sleep_mins',
+    0,
+    'CPU-optimized mode: time in minutes to sleep between run steps when'
+    ' increasing target QPS.',
+)
+CPU_OPTIMIZATION_INCREMENT_MINS = flags.DEFINE_integer(
+    'ycsb_cpu_optimization_workload_mins',
+    30,
+    'CPU-optimized mode: length of time to run YCSB until incrementing QPS.',
+)
+CPU_OPTIMIZATION_MEASUREMENT_MINS = flags.DEFINE_integer(
+    'ycsb_cpu_optimization_measurement_mins',
+    5,
+    'CPU-optimized mode: length of time to measure average CPU at the end of'
+    ' each step. For example, the default 5 means that only the last 5 minutes'
+    ' of the test will be used for representative CPU utilization. Must be '
+    ' less than or equal to --ycsb_cpu_optimization_workload_mins. Note that '
+    ' some APIs can have a delay in reporting results, so increase this'
+    ' accordingly.',
+)
+_LOWEST_LATENCY = flags.DEFINE_bool(
+    'ycsb_lowest_latency_load',
+    False,
+    'Finds the lowest latency the database can sustain and returns the relevant'
+    ' samples.',
+)
+
+
+def _ValidateCpuTargetFlags(flags_dict):
+  return (
+      flags_dict['ycsb_cpu_optimization_target']
+      > flags_dict['ycsb_cpu_optimization_target_min']
+  )
+
+
+def _ValidateCpuMeasurementFlag(flags_dict):
+  return (
+      flags_dict['ycsb_cpu_optimization_measurement_mins']
+      <= flags_dict['ycsb_cpu_optimization_workload_mins']
+  )
+
+
+flags.register_multi_flags_validator(
+    ['ycsb_cpu_optimization_target', 'ycsb_cpu_optimization_target_min'],
+    _ValidateCpuTargetFlags,
+    'CPU optimization target must be greater than min target.',
+)
+flags.register_multi_flags_validator(
+    [
+        'ycsb_cpu_optimization_measurement_mins',
+        'ycsb_cpu_optimization_workload_mins',
+    ],
+    _ValidateCpuMeasurementFlag,
+    'CPU measurement minutes must be shorter than or equal to workload'
+    ' duration.',
+)
 
 # Status line pattern
 _STATUS_PATTERN = r'(\d+) sec: \d+ operations; (\d+(\.\d+)?) current ops\/sec'
@@ -314,6 +394,12 @@ _ycsb_tar_url = None
 # Parameters for incremental workload. Can be made into flags in the future.
 _INCREMENTAL_STARTING_QPS = 500
 _INCREMENTAL_TIMELIMIT_SEC = 60 * 5
+
+# The upper-bound number of milliseconds above the measured minimum after which
+# to stop the test.
+_LOWEST_LATENCY_BUFFER = 1
+_LOWEST_LATENCY_STARTING_QPS = 100
+_LOWEST_LATENCY_PERCENTILE = 'p95'
 
 _ThroughputTimeSeries = dict[int, float]
 # Tuple of (percentile, latency, count)
@@ -455,6 +541,19 @@ def CheckPrerequisites():
         'Measuring a throughput histogram requires running with '
         '--ycsb_measurement_type=HDRHISTOGRAM. Other measurement types are '
         'unsupported unless additional parsing is added.'
+    )
+
+  if [
+      dynamic_load,
+      _BURST_LOAD_MULTIPLIER.value is not None,
+      _INCREMENTAL_TARGET_QPS.value is not None,
+      CPU_OPTIMIZATION.value,
+      _LOWEST_LATENCY.value,
+  ].count(True) > 1:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        '--ycsb_dynamic_load, --ycsb_burst_load, --ycsb_incremental_load,'
+        ' --ycsb_lowest_latency_load and --ycsb_cpu_optimization are mutually'
+        ' exclusive.'
     )
 
 
@@ -905,6 +1004,11 @@ class YCSBExecutor:
       # if no target is passed via flags.
       for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList():
 
+        @vm_util.Retry(
+            retryable_exceptions=ycsb_stats.CombineHdrLogError,
+            timeout=-1,
+            max_retries=5,
+        )
         def _DoRunStairCaseLoad(
             client_count, target_qps_per_vm, workload_meta, is_sustained=False
         ):
@@ -1013,7 +1117,7 @@ class YCSBExecutor:
 
   def Load(self, vms, workloads=None, load_kwargs=None):
     """Load data using YCSB."""
-    if FLAGS.ycsb_skip_load_stage:
+    if SKIP_LOAD_STAGE.value:
       return []
 
     workloads = workloads or GetWorkloadFileList()
@@ -1049,7 +1153,9 @@ class YCSBExecutor:
     else:
       return []
 
-  def Run(self, vms, workloads=None, run_kwargs=None) -> list[sample.Sample]:
+  def Run(
+      self, vms, workloads=None, run_kwargs=None, database=None
+  ) -> list[sample.Sample]:
     """Runs each workload/client count combination."""
     if FLAGS.ycsb_skip_run_stage:
       return []
@@ -1061,11 +1167,15 @@ class YCSBExecutor:
       samples = self._RunBurstMode(vms, workloads, run_kwargs)
     elif _INCREMENTAL_TARGET_QPS.value:
       samples = self._RunIncrementalMode(vms, workloads, run_kwargs)
+    elif CPU_OPTIMIZATION.value:
+      samples = self._RunCpuMode(vms, workloads, run_kwargs, database)
+    elif _LOWEST_LATENCY.value:
+      samples = self._RunLowestLatencyMode(vms, workloads, run_kwargs)
     else:
       samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
     if (
         FLAGS.ycsb_sleep_after_load_in_sec > 0
-        and not FLAGS.ycsb_skip_load_stage
+        and not SKIP_LOAD_STAGE.value
     ):
       for s in samples:
         s.metadata['sleep_after_load_in_sec'] = (
@@ -1152,7 +1262,7 @@ class YCSBExecutor:
     # Warm-up phase is shorter and doesn't need results parsing
     FLAGS['ycsb_timelimit'].parse(_INCREMENTAL_TIMELIMIT_SEC)
     for target in incremental_targets:
-      target /= FLAGS.ycsb_client_vms
+      target /= len(vms)
       run_params['target'] = int(target)
       self._SetClientThreadCount(min(ending_threadcount, int(target)))
       self._SetRunParameters(run_params)
@@ -1160,11 +1270,208 @@ class YCSBExecutor:
 
     # Reset back to the original workload args
     FLAGS['ycsb_timelimit'].parse(ending_length)
-    ending_qps /= FLAGS.ycsb_client_vms
+    ending_qps /= len(vms)
     run_params['target'] = int(ending_qps)
     self._SetClientThreadCount(ending_threadcount)
     self._SetRunParameters(run_params)
     return list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
+
+  def _RunLowestLatencyMode(
+      self,
+      vms: Sequence[virtual_machine.VirtualMachine],
+      workloads: Sequence[str],
+      run_kwargs: Mapping[str, str] = None,
+  ) -> list[sample.Sample]:
+    """Finds the lowest sustainable latency of the target.
+
+    Args:
+      vms: The client VMs to generate the load.
+      workloads: List of workloads to run.
+      run_kwargs: Extra run arguments.
+
+    Returns:
+      A list of samples of benchmark results.
+    """
+
+    @dataclasses.dataclass
+    class _ThroughputLatencyResult:
+      throughput: int = 0
+      read_latency: float = float('inf')
+      update_latency: float = float('inf')
+      samples: list[sample.Sample] = dataclasses.field(default_factory=list)
+
+    def _ExtractStats(samples: list[sample.Sample]) -> tuple[int, float, float]:
+      """Returns the throughput and latency recorded in the samples."""
+      throughput, read_latency, update_latency = 0, 0, 0
+      for result in samples:
+        if result.metric == 'overall Throughput':
+          throughput = result.value
+        elif result.metric == f'read {_LOWEST_LATENCY_PERCENTILE} latency':
+          read_latency = result.value
+        elif result.metric == f'update {_LOWEST_LATENCY_PERCENTILE} latency':
+          update_latency = result.value
+      return int(throughput), read_latency, update_latency
+
+    run_params = _GetRunParameters()
+    target = _LOWEST_LATENCY_STARTING_QPS
+    read_latency_threshold = 0
+    update_latency_threshold = 0
+    result = _ThroughputLatencyResult()
+    while True:
+      target_per_vm = int(target / len(vms))
+      run_params['target'] = target_per_vm
+      self._SetClientThreadCount(target_per_vm)
+      self._SetRunParameters(run_params)
+      samples = self.RunStaircaseLoads(vms, workloads, **run_kwargs)
+      # Currently uses p95 latencies, but could be generalized in the future.
+      throughput, read_latency, update_latency = _ExtractStats(samples)
+      # Assume that we see lowest latency at the lowest starting throughput
+      if target == _LOWEST_LATENCY_STARTING_QPS:
+        read_latency_threshold = read_latency + _LOWEST_LATENCY_BUFFER
+        update_latency_threshold = update_latency + _LOWEST_LATENCY_BUFFER
+      logging.info(
+          'Run had throughput %s ops/s, read %s latency %s ms, update %s'
+          ' latency %s ms',
+          throughput,
+          _LOWEST_LATENCY_PERCENTILE,
+          read_latency,
+          _LOWEST_LATENCY_PERCENTILE,
+          update_latency,
+      )
+      if (
+          read_latency > read_latency_threshold
+          or update_latency > update_latency_threshold
+      ):
+        logging.info(
+            'Found lowest latency at %s ops/s. Run had higher read and/or'
+            ' update latency than threshold %s read %s ms, update %s ms.',
+            result.throughput,
+            _LOWEST_LATENCY_PERCENTILE,
+            read_latency_threshold,
+            update_latency_threshold,
+        )
+        for s in result.samples:
+          s.metadata['ycsb_lowest_latency_buffer'] = _LOWEST_LATENCY_BUFFER
+          s.metadata['ycsb_lowest_latency_percentile'] = (
+              _LOWEST_LATENCY_PERCENTILE
+          )
+        return result.samples
+      result = _ThroughputLatencyResult(
+          throughput, read_latency, update_latency, samples
+      )
+      target += 100
+
+  def _RunCpuMode(
+      self,
+      vms: list[virtual_machine.VirtualMachine],
+      workloads: Sequence[str],
+      run_kwargs: Mapping[str, Any],
+      database: resource.BaseResource,
+  ) -> list[sample.Sample]:
+    """Runs YCSB until the CPU utilization is over the recommended amount.
+
+    Args:
+      vms: The client VMs that will be used to push the load.
+      workloads: List of workloads to run.
+      run_kwargs: A mapping of additional YCSB run args to pass to the test.
+      database: This class must implement CalculateTheoreticalMaxThroughput and
+        GetAverageCpuUsage.
+
+    Returns:
+      A list of samples from the YCSB test at the specified CPU utilization.
+    """
+
+    def _ExtractThroughput(samples: list[sample.Sample]) -> float:
+      """Gets the throughput recorded in the samples."""
+      for result in samples:
+        if result.metric == 'overall Throughput':
+          return result.value
+      return 0.0
+
+    def _GetReadAndUpdateProportion(workload: str) -> tuple[float, float]:
+      """Gets the starting throughput to start the test with."""
+      with open(workload) as f:
+        workload_args = ParseWorkload(f.read())
+      return float(workload_args['readproportion']), float(
+          workload_args['updateproportion']
+      )
+
+    def _ExecuteWorkload(target_qps: int) -> list[sample.Sample]:
+      """Executes the workload after setting run-specific args."""
+      run_kwargs['target'] = target_qps
+      run_kwargs['maxexecutiontime'] = (
+          CPU_OPTIMIZATION_INCREMENT_MINS.value * 60
+      )
+      return self.RunStaircaseLoads(vms, workloads=workloads, **run_kwargs)
+
+    def _RunCpuModeSingleWorkload(workload: str) -> list[sample.Sample]:
+      """Runs the CPU utilization test for a single workload."""
+      read_percent, update_percent = _GetReadAndUpdateProportion(workload)
+      theoretical_max_qps = database.CalculateTheoreticalMaxThroughput(
+          read_percent, update_percent
+      )
+      lower_bound = 0
+      upper_bound = theoretical_max_qps * 2
+      while lower_bound <= upper_bound:
+        target_qps = int((upper_bound + lower_bound) / 2)
+        run_samples = _ExecuteWorkload(target_qps)
+        measured_qps = _ExtractThroughput(run_samples)
+        end_timestamp = datetime.datetime.fromtimestamp(
+            run_samples[0].timestamp, tz=datetime.timezone.utc
+        )
+        cpu_utilization = database.GetAverageCpuUsage(
+            CPU_OPTIMIZATION_MEASUREMENT_MINS.value, end_timestamp
+        )
+        run_samples.append(
+            sample.Sample(
+                'CPU Normalized Throughput',
+                measured_qps / cpu_utilization * CPU_OPTIMIZATION_TARGET.value,
+                'ops/sec',
+                copy.copy(run_samples[0].metadata),
+            )
+        )
+        logging.info(
+            'Run had throughput target %s and measured throughput %s, with CPU'
+            ' utilization %s.',
+            target_qps,
+            measured_qps,
+            cpu_utilization,
+        )
+        if cpu_utilization < CPU_OPTIMIZATION_TARGET_MIN.value:
+          lower_bound = target_qps
+        elif cpu_utilization > CPU_OPTIMIZATION_TARGET.value:
+          upper_bound = target_qps
+        else:
+          logging.info(
+              'Found CPU utilization percentage between target %s and %s',
+              CPU_OPTIMIZATION_TARGET_MIN.value,
+              CPU_OPTIMIZATION_TARGET.value,
+          )
+          for s in run_samples:
+            s.metadata.update({
+                'ycsb_cpu_optimization': True,
+                'ycsb_cpu_utilization': cpu_utilization,
+                'ycsb_cpu_target': CPU_OPTIMIZATION_TARGET.value,
+                'ycsb_cpu_target_min': CPU_OPTIMIZATION_TARGET_MIN.value,
+                'ycsb_cpu_increment_minutes': (
+                    CPU_OPTIMIZATION_INCREMENT_MINS.value
+                ),
+            })
+          return run_samples
+
+        # Sleep between steps for some workloads.
+        if _CPU_OPTIMIZATION_SLEEP_MINS.value:
+          logging.info(
+              'Run phase finished, sleeping for %s minutes before starting the '
+              'next run.',
+              _CPU_OPTIMIZATION_SLEEP_MINS.value,
+          )
+          time.sleep(_CPU_OPTIMIZATION_SLEEP_MINS.value * 60)
+
+    results = []
+    for workload in workloads:
+      results += _RunCpuModeSingleWorkload(workload)
+    return results
 
   def LoadAndRun(self, vms, workloads=None, load_kwargs=None, run_kwargs=None):
     """Load data using YCSB, then run each workload/client count combination.
@@ -1187,7 +1494,7 @@ class YCSBExecutor:
       List of sample.Sample objects.
     """
     load_samples = []
-    if not FLAGS.ycsb_skip_load_stage:
+    if not SKIP_LOAD_STAGE.value:
       load_samples = self.Load(
           vms, workloads=workloads, load_kwargs=load_kwargs
       )

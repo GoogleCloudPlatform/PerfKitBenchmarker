@@ -22,12 +22,14 @@ memory subsystem and compiler.
 SPEC CPU2017 homepage: http://www.spec.org/cpu2017/
 """
 
+import os
 import re
 import time
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -68,6 +70,14 @@ flags.DEFINE_string(
 flags.DEFINE_boolean(
     'spec17_best_effort', False,
     'Best effort run of spec. Allow missing results without failing.')
+flags.DEFINE_string(
+    'spec17_numa_bind_config', None,
+    'Name of the config file to use for specifying NUMA binding. '
+    'None by default. To enable numa binding, ensure the runspec_config file, '
+    'contains "include: numactl.inc". In addition, setting to "auto", will '
+    'attempt to pin to local numa node and pin each SIR copy to a '
+    'exclusive hyperthread.'
+)
 
 BENCHMARK_NAME = 'speccpu2017'
 BENCHMARK_CONFIG = """
@@ -149,11 +159,41 @@ def Prepare(benchmark_spec):
 def _Prepare(vm):
   CheckVmPrerequisites(vm)
   vm.Install('speccpu2017')
+  if 'ampere' in FLAGS.runspec_config:
+    vm.Install('jemalloc')
   # Set attribute outside of the install function, so benchmark will work
   # even with --install_packages=False.
   config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
   setattr(vm, speccpu.VM_STATE_ATTR, config)
   _GenIncFile(vm)
+  _GenNumactlIncFile(vm)
+
+
+def _GenNumactlIncFile(vm):
+  """Generates numactl.inc file."""
+  config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
+  if FLAGS.spec17_numa_bind_config:
+    remote_numactl_path = os.path.join(
+        config.spec_dir, 'config', 'numactl.inc')
+    vm.Install('numactl')
+    if FLAGS.spec17_numa_bind_config == 'auto':
+      # Upload config and rename
+      numa_bind_cfg = [
+          'intrate,fprate:',
+          'submit = echo "${command}" > run.sh ; $BIND bash run.sh']
+      for idx in range(vm.NumCpusForBenchmark()):
+        numa_bind_cfg.append(
+            f'bind{idx} = /usr/bin/numactl --physcpubind=+{idx} --localalloc'
+        )
+      vm_util.CreateRemoteFile(
+          vm, '\n'.join(numa_bind_cfg), remote_numactl_path)
+    else:
+      vm.PushFile(data.ResourcePath(FLAGS.spec17_numa_bind_config),
+                  remote_numactl_path)
+    vm.RemoteCommand(f'cat {remote_numactl_path}')
+  else:
+    cfg_file_path = getattr(vm, speccpu.VM_STATE_ATTR, config).cfg_file_path
+    vm.RemoteCommand(f'sed -i "/include: numactl.inc/d" {cfg_file_path}')
 
 
 def _GenIncFile(vm):
@@ -232,13 +272,8 @@ def _Run(vm):
     cmd += '--rebuild '
 
   version_specific_parameters = []
-  # rate runs require 2 GB minimum system main memory per copy,
-  # not including os overhead. Refer to:
-  # https://www.spec.org/cpu2017/Docs/system-requirements.html#memory
-  copies = min(vm.NumCpusForBenchmark(),
-               vm.total_free_memory_kb // (2 * KB_TO_GB_MULTIPLIER))
-  version_specific_parameters.append(' --copies=%s ' %
-                                     (FLAGS.spec17_copies or copies))
+  copies = FLAGS.spec17_copies or vm.NumCpusForBenchmark()
+  version_specific_parameters.append(f' --copies={copies} ')
   version_specific_parameters.append(
       ' --threads=%s ' % (FLAGS.spec17_threads or vm.NumCpusForBenchmark()))
   version_specific_parameters.append(
@@ -295,6 +330,8 @@ def _Run(vm):
   for item in samples:
     item.metadata['vm_name'] = vm.name
     item.metadata['spec17_gcc_flags'] = FLAGS.spec17_gcc_flags
+    item.metadata['spec17_numa_bind_config'] = FLAGS.spec17_numa_bind_config
+    item.metadata['spec17_copies'] = copies
 
   return samples
 

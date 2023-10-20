@@ -229,7 +229,6 @@ class BaseDpbService(resource.BaseResource):
     # user_managed resources in a special manner and skips creation attempt
     super(BaseDpbService, self).__init__(user_managed=is_user_managed)
     self.spec = dpb_service_spec
-    self.dpb_hdfs_type = None
     if dpb_service_spec.static_dpb_service_instance:
       self.cluster_id = dpb_service_spec.static_dpb_service_instance
     else:
@@ -248,10 +247,15 @@ class BaseDpbService(resource.BaseResource):
           'Dynamic allocation off is not supported for the current DPB '
           f'Service: {type(self).__name__}.'
       )
+    self.cluster_duration = None
     self._InitializeMetadata()
 
   def GetDpbVersion(self) -> Optional[str]:
     return self.spec.version
+
+  def GetHdfsType(self) -> Optional[str]:
+    """Gets human friendly disk type for metric metadata."""
+    return None
 
   @property
   def base_dir(self):
@@ -418,7 +422,7 @@ class BaseDpbService(resource.BaseResource):
         'dpb_cluster_size':
             self.spec.worker_count,
         'dpb_hdfs_type':
-            self.dpb_hdfs_type,
+            self.GetHdfsType(),
         'dpb_disk_size':
             self.spec.worker_group.disk_spec.disk_size,
         'dpb_service_zone':
@@ -549,7 +553,7 @@ class BaseDpbService(resource.BaseResource):
       A float representing the number of seconds the cluster has been running or
       None if it cannot be obtained.
     """
-    return None
+    return self.cluster_duration
 
   def GetClusterCost(self) -> Optional[float]:
     """Gets the cost of running the cluster if applicable.
@@ -602,15 +606,33 @@ class BaseDpbService(resource.BaseResource):
     """Gets samples with service statistics."""
     samples = []
     metrics: dict[str, tuple[Optional[float], str]] = {
+        # Cluster creation time as reported by the DPB service
+        # (non-Serverless DPB services only).
         'dpb_cluster_create_time': (self.GetClusterCreateTime(), 'seconds'),
+
+        # Cluster duration as computed by the underlying benchmark.
+        # (non-Serverless DPB services only).
         'dpb_cluster_duration': (self.GetClusterDuration(), 'seconds'),
+
+        # Cluster hardware cost computed from cluster duration and
+        # hourly costs passed in flags (non-Serverless DPB services only).
         'dpb_cluster_hardware_cost': (self.GetClusterHardwareCost(), '$'),
+
+        # Cluster DPB service premium cost computed from cluster duration and
+        # hourly costs passed in flags (non-Serverless DPB services only).
         'dpb_cluster_premium_cost': (self.GetClusterPremiumCost(), '$'),
+
+        # Cluster hardware cost computed from cluster duration and
+        # hourly costs passed in flags (non-Serverless DPB services only).
         'dpb_cluster_total_cost': (self.GetClusterCost(), '$'),
+
+        # Cluster hardware cost per hour as specified in PKB flags.
         'dpb_cluster_hardware_hourly_cost': (
             _HARDWARE_HOURLY_COST.value,
             '$/hour',
         ),
+
+        # DPB Service premium cost per hour as specified in PKB flags.
         'dpb_cluster_premium_hourly_cost': (
             _SERVICE_PREMIUM_HOURLY_COST.value,
             '$/hour',

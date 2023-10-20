@@ -132,15 +132,21 @@
 -   Add support for multi-network creation/attachment. PKB currently does not
     handle subnet creation on an existing network.
 -   Add support for GCE Confidential VM's.
--   Add cos-dev, cos105, cos101, cos97, and cos93 OS support for GCP.
+-   Add cos-dev, cost109, cos105, cos101, and cos97 OS support for GCP.
 -   Add --object_ttl_days flag for lifecycle management of created buckets.
 -   Add support for multi-NIC netperf throughput on AWS.
 -   Added AWS/GCP support for Data Plane Development Kit (DPDK) on Linux VM's to
     improve networking performance, as well as a DPDK benchmark for testpmd.
 -   Add --dpb_hardware_hourly_cost and --dpb_service_premium_hourly_cost to
--   Add support for Spanner Postgres benchmarking with TPCC.
-    estimate cost of DPB service in benchmark runs.
--   Add --dpb_dynamic_allocation flag to disable dynamic allocation in Spark benchmarks.
+-   Add support for Spanner Postgres benchmarking with TPCC. estimate cost of
+    DPB service in benchmark runs.
+-   Add --dpb_dynamic_allocation flag to disable dynamic allocation in Spark
+    benchmarks.
+-   Add support for benchmarking VMs with Local SSD on Windows on GCE/AWS/Azure.
+-   Add support for Ubuntu 23.04.
+-   Add support for Debian 12.
+-   Add netperf_hammerdbcli benchmark, which executes netperf and hammerdbcli
+    benchmarks in parallel.
 
 ### Enhancements:
 
@@ -319,7 +325,7 @@
 -   Updated required numpy and six versions.
 -   Added `--hadoop_bin_url` flag to allow overrides for Hadoop downloads.
 -   Make RunBenchmark handle KeyboardInterrupt so that benchmark specific
-    resources can be cleaned up on cancellation.
+    resources can be cleaned up on cancellation. Expose these errors via status.
 -   Added --ycsb_fail_on_incomplete_loading flag to allow the test to fail fast
     in the case of table loading failures. --ycsb_insert_error_metric can be
     used to determine which metric indicates that loading failed (defaults to
@@ -395,3 +401,4 @@
 -   Remove cygwin codepath.
 -   Moved flags from `pkb.py` to `flags.py` to help avoid circular dependencies.
 -   Updated tracer dstat to use pcp dstat.
+-   Removed Windows 2012 after loss of support on all clouds.

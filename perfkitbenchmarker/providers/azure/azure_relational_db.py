@@ -63,6 +63,9 @@ class AzureSQLServerIAASRelationalDb(
 
   CLOUD = provider_info.AZURE
 
+  def MoveSQLServerTempDb(self):
+    """Moves the SQL Server temporary database to LocalSSD."""
+
 
 class AzurePostgresIAASRelationalDb(
     postgres_iaas_relational_db.PostgresIAASRelationalDb
@@ -392,7 +395,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
           '--zone-redundant',
           'true' if self.spec.high_availability else 'false'
       ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd, timeout=CREATE_AZURE_DB_TIMEOUT)
     self.database_name = DEFAULT_DATABASE_NAME
 
   def _CreateAzureManagedSqlInstance(self):
@@ -500,10 +503,12 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
-        'server',
+        self.SERVER_TYPE,
         'restart',
-        '--resource-group', self.resource_group.name,
-        '--name', self.instance_id
+        '--resource-group',
+        self.resource_group.name,
+        '--name',
+        self.instance_id,
     ]
     vm_util.IssueCommand(cmd)
 

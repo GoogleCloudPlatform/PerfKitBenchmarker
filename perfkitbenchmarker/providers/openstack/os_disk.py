@@ -26,10 +26,6 @@ FLAGS = flags.FLAGS
 
 STANDARD = 'standard'
 
-DISK_TYPE = {
-    disk.STANDARD: STANDARD,
-}
-
 
 def CreateVolume(resource, name):
   """Creates a remote (Cinder) block volume."""
@@ -85,9 +81,6 @@ def WaitForVolumeCreation(resource, volume_id):
   if resp['status'] != 'available':
     msg = 'Volume is not ready. Retrying to check status.'
     raise errors.Resource.RetryableCreationError(msg)
-
-
-disk.RegisterDiskTypeMap(provider_info.OPENSTACK, DISK_TYPE)
 
 
 class OpenStackDiskSpec(disk.BaseDiskSpec):

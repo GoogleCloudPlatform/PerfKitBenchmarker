@@ -147,8 +147,11 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
   def _Create(self):
     """Setup the underlying resource."""
     self._SetupUnmanagedDatabase()
-    self.endpoint = self.server_vm.internal_ip
     self.unmanaged_db_exists = True
+
+  def _SetEndpoint(self):
+    """Set the DB endpoint for this instance during _PostCreate."""
+    self.endpoint = self.server_vm.internal_ip
 
   def _Delete(self):
     """Deletes the underlying resource.

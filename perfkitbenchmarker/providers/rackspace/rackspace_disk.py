@@ -46,12 +46,6 @@ REMOTE_TYPES_TRANSLATION = {
     CBS_SSD: 'SSD'
 }
 
-DISK_TYPE = {
-    disk.STANDARD: BOOT,
-    disk.REMOTE_SSD: CBS_SSD,
-    disk.LOCAL: LOCAL
-}
-
 DISK_METADATA = {
     BOOT: {
         disk.REPLICATION: RAID10,
@@ -72,8 +66,6 @@ DISK_METADATA = {
         disk.MEDIA: disk.HDD
     }
 }
-
-disk.RegisterDiskTypeMap(provider_info.RACKSPACE, DISK_TYPE)
 
 
 class RackspaceDiskSpec(disk.BaseDiskSpec):

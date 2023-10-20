@@ -69,6 +69,28 @@ class S3Service(object_storage_service.ObjectStorageService):
            '--tagging', 'TagSet=[%s]' % tag_set,
            '--region=%s' % self.region])
 
+    if object_storage_service.OBJECT_TTL_DAYS.value:
+      # NOTE: buckets created with older APIs may have a different configuration
+      # (e.g. Prefix instead of Filter): This needs to stay updated for new
+      # buckets.
+      config = json.dumps(
+          {
+              'Rules': [{
+                  'Expiration': {
+                      'Days': object_storage_service.OBJECT_TTL_DAYS.value
+                  },
+                  'ID': 'PKB_OBJECT_TTL',
+                  'Filter': {},
+                  'Status': 'Enabled',
+              }]
+          }
+      )
+      vm_util.IssueCommand(util.AWS_PREFIX + [
+          's3api', 'put-bucket-lifecycle-configuration',
+          '--region', self.region,
+          '--bucket', bucket_name,
+          '--lifecycle-configuration', config])
+
   def Copy(self, src_url, dst_url, recursive=False):
     """See base class."""
     cmd = ['aws', 's3', 'cp', '--region', self.region]
@@ -158,27 +180,6 @@ class S3Service(object_storage_service.ObjectStorageService):
         '--bucket', bucket, '--policy',
         _MakeS3BucketPolicy(bucket, actions)
     ])
-    if object_storage_service.OBJECT_TTL_DAYS.value:
-      # NOTE: buckets created with older APIs may have a different configuration
-      # (e.g. Prefix instead of Filter): This needs to stay updated for new
-      # buckets.
-      config = json.dumps(
-          {
-              'Rules': [{
-                  'Expiration': {
-                      'Days': object_storage_service.OBJECT_TTL_DAYS.value
-                  },
-                  'ID': 'PKB_OBJECT_TTL',
-                  'Filter': {},
-                  'Status': 'Enabled',
-              }]
-          }
-      )
-      vm_util.IssueCommand(util.AWS_PREFIX + [
-          'put-bucket-lifecycle-configuration',
-          '--region', self.region,
-          '--bucket', bucket,
-          '--lifecycle-configuration', config])
 
   def GetDownloadUrl(self, bucket, object_name, use_https=True):
     """See base class."""

@@ -85,7 +85,9 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
         raise errors.Config.MissingOption(
             '{0}.cloud is "{1}", but {0}.db_disk_spec does not contain a '
             'configuration for "{1}".'.format(component_full_name, self.cloud))
-      disk_spec_class = disk.GetDiskSpecClass(self.cloud)
+      disk_spec_class = disk.GetDiskSpecClass(
+          self.cloud, disk_config.get('disk_type', None)
+      )
       self.db_disk_spec = disk_spec_class(
           '{0}.db_disk_spec.{1}'.format(component_full_name, self.cloud),
           flag_values=flag_values,

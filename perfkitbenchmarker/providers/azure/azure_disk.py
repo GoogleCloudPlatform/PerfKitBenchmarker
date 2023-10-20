@@ -46,13 +46,10 @@ STANDARD_DISK = 'Standard_LRS'
 ULTRA_STORAGE = 'UltraSSD_LRS'
 PREMIUM_ZRS = 'Premium_ZRS'
 
-# Deprecated
-DISK_TYPE = {disk.STANDARD: STANDARD_DISK, disk.REMOTE_SSD: PREMIUM_STORAGE}
 
 HOST_CACHING = 'host_caching'
 
 AZURE = 'Azure'
-disk.RegisterDiskTypeMap(AZURE, DISK_TYPE)
 
 AZURE_REPLICATION_MAP = {
     azure_flags.LRS: disk.ZONE,
@@ -77,7 +74,7 @@ AZURE_NO_TMP_DISK_TYPES = [
     r'(Standard_D[0-9]+l?s?_v5)',
     r'(Standard_E[0-9]+i?s?_v5)',
     r'(Standard_D[0-9]+as?_v5)',
-    r'(Standard_E[0-9]+as?_v5)',
+    r'(Standard_E[0-9]+i?as?_v5)',
     r'(Standard_E[0-9]+i?bs?_v5)',
     r'(Standard_D[0-9]+pl?s_v5)',
     r'(Standard_E[0-9]+ps_v5)',
