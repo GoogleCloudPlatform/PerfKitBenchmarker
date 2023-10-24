@@ -1,0 +1,78 @@
+[ 2023-10-18 21:35:30 'summary' sleep: 2.0s iteration: 49 ]
+~~~~~~~~~~~~~~~~~~~~~~~~~Cluster Summary~~~~~~~~~~~~~~~~~~~~~~~~~
+Migrations                |False
+Server Version            |E-6.2.0.19
+OS Version                |Ubuntu 20.04.6 LTS (5.15.0-1042-gcp)
+Cluster Size              |1
+Devices Total             |12
+Devices Per-Node          |12
+Devices Equal Across Nodes|True
+Memory Total              |1.087 TB
+Memory Used               |53.644 GB
+Memory Used %             |4.82
+Memory Avail              |1.034 TB
+Memory Avail%             |95.18
+Device Total              |24.000 TB
+Device Used               |898.540 GB
+Device Used %             |3.66
+Device Avail              |23.040 TB
+Device Avail%             |96.0
+License Usage Latest      |865.851 GB
+Active                    |1
+Total                     |2
+Active Features           |KVS
+Number of rows: 21
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Namespace Summary~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Namespace|~~~~Drives~~~~|~~~~~~~Memory~~~~~~~|~~~~~~~~Device~~~~~~~|Replication|   Master|~License~~
+         |Total|Per-Node|   Total|Used|Avail%|    Total|Used|Avail%|    Factors|  Objects|~~Usage~~~
+         |     |        |        |   %|      |         |   %|      |           |         |    Latest
+bar      |    0|       0|4.000 GB| 0.0| 100.0|       --|  --|    --|          2|  0.000  |  0.000 B
+test     |   12|      12|1.083 TB|4.84| 95.16|24.000 TB|3.66|  96.0|          1|900.000 M|865.851 GB
+Number of rows: 2
+
+
+[ 2023-10-18 21:35:28 'summary' sleep: 2.0s iteration: 77 ]
+~~~~~~~~~~~~~~~~~~~~~~~~~Cluster Summary~~~~~~~~~~~~~~~~~~~~~~~~~
+Migrations                |False
+Server Version            |E-6.2.0.19
+OS Version                |Ubuntu 20.04.6 LTS (5.15.0-1042-gcp)
+Cluster Size              |1
+Devices Total             |12
+Devices Per-Node          |12
+Devices Equal Across Nodes|True
+Memory Total              |1.087 TB
+Memory Used               |88 GB
+Memory Used %             |14.82
+Memory Avail              |1.034 TB
+Memory Avail%             |195.18
+Device Total              |24.000 TB
+Device Used               |1.2 TB
+Device Used %             |13.66
+Device Avail              |23.040 TB
+Device Avail%             |96.0
+License Usage Latest      |865.851 GB
+Active                    |1
+Total                     |2
+Active Features           |KVS
+Number of rows: 21
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Namespace Summary~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Namespace|~~~~Drives~~~~|~~~~~~~Memory~~~~~~~|~~~~~~~~Device~~~~~~~|Replication|   Master|~License~~
+         |Total|Per-Node|   Total|Used|Avail%|    Total|Used|Avail%|    Factors|  Objects|~~Usage~~~
+         |     |        |        |   %|      |         |   %|      |           |         |    Latest
+bar      |    0|       0|4.000 GB| 0.0| 100.0|       --|  --|    --|          2|  0.000  |  0.000 B
+test     |   12|      12|1.083 TB|4.84| 95.16|24.000 TB|3.66|  96.0|          1|900.000 M|865.851 GB
+Number of rows: 2
+
+[ 2023-10-18 21:35:24 'summary' sleep: 2.0s iteration: 199 ]
+~~~~~~~~~~~~~~~~~~~~~~~~~Cluster Summary~~~~~~~~~~~~~~~~~~~~~~~~~
+Migrations                |False
+Server Version            |E-6.2.0.19
+OS Version                |Ubuntu 20.04.6 LTS (5.15.0-1042-gcp)
+Cluster Size              |1
+Devices Total             |12
+Devices Per-Node          |12
+Devices Equal Across Nodes|True
+Memory Total              |1.087 TB
+Memory Used               |88 GB
