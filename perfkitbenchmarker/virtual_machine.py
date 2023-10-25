@@ -1346,6 +1346,10 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       result['numa_node_count'] = self.numa_node_count
     if self.num_disable_cpus is not None:
       result['num_disable_cpus'] = self.num_disable_cpus
+    if self.num_cpus is not None:
+      result['num_cpus'] = self.num_cpus
+      if self.NumCpusForBenchmark() != self.num_cpus:
+        result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
     # Some metadata is unique per VM.
     # Update publisher._VM_METADATA_TO_LIST to add more
     if self.id is not None:
