@@ -1,0 +1,20 @@
+[ 2023-10-18 21:35:30 'show latency' sleep: 2.0s iteration: 77 ]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Latency  (2023-10-23 04:10:32 UTC)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Namespace|Histogram|                                                   Node|ops/sec|>1ms|>8ms|>64ms
+test     |read     |pkb-286b2f43-1.c.bct-staging-z3-highmem-1.internal:3000|    12.0| 1.1| 2.2|  3.3
+        |         |                                                       |    11.0| 4.0| 5.0|  6.0
+test     |write    |pkb-286b2f43-1.c.bct-staging-z3-highmem-1.internal:3000|    10.0| 7.7| 8.8|  9.9
+        |         |                                                       |    9.0| 10.0| 11.0|  12.0
+Number of rows: 2
+[ 2023-10-18 21:35:28 'show latency' sleep: 2.0s iteration: 77 ]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Latency  (2023-10-23 04:10:32 UTC)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Namespace|Histogram|                                                   Node|ops/sec|>1ms|>8ms|>64ms
+test     |read     |pkb-286b2f43-1.c.bct-staging-z3-highmem-1.internal:3000|    21.0| 9.1| 8.2|  7.3
+        |         |                                                       |    20.0| 6.0| 5.0|  4.0
+test     |write    |pkb-286b2f43-1.c.bct-staging-z3-highmem-1.internal:3000|    22.0| 3.7| 2.8|  1.9
+        |         |                                                       |    23.0| 13.0| 12.0|  11.0
+Number of rows: 2
+[ 2023-10-18 21:35:26 'show latency' sleep: 2.0s iteration: 99 ]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Latency  (2023-10-23 04:10:32 UTC)~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Namespace|Histogram|                                                   Node|ops/sec|>1ms|>8ms|>64ms
+        |         |                                                       |    120.0| 116.0| 1115.0|  114.0

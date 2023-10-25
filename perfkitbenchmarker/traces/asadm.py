@@ -43,6 +43,15 @@ MEMORY_USED_PERCENTAGES_METRIC = 'memory_used_percentages'
 DISK_USED_METRIC = 'disk_used'
 DISK_USED_PERCENTAGES_METRIC = 'disk_used_percentages'
 
+READ_IOPS_METRIC = 'read_iops'
+READ_LATENCY_OVER_1_MS_METRIC = 'read_latencty_over_1_ms'
+READ_LATENCY_OVER_8_MS_METRIC = 'read_latencty_over_8_ms'
+READ_LATENCY_OVER_64_MS_METRIC = 'read_latencty_over_64_ms'
+WRITE_IOPS_METRIC = 'write_iops'
+WRITE_LATENCY_OVER_1_MS_METRIC = 'write_latencty_over_1_ms'
+WRITE_LATENCY_OVER_8_MS_METRIC = 'write_latencty_over_8_ms'
+WRITE_LATENCY_OVER_64_MS_METRIC = 'write_latencty_over_64_ms'
+
 DEFAULT_RESOURCE_SIZE_UNIT = 'GB'
 GB_CONVERSION_FACTOR = {
     'TB': 1000.0,
@@ -53,9 +62,9 @@ GB_CONVERSION_FACTOR = {
 
 
 class _AsadmSummaryCollector(base_collector.BaseCollector):
-  """Ops Agent collector.
+  """Asadm summary collector.
 
-  Installs Ops Agent and runs it on the VMs.
+  Collecting disk/memory usage info from Aerospike Server.
   """
 
   def _CollectorName(self):
@@ -91,6 +100,45 @@ class _AsadmSummaryCollector(base_collector.BaseCollector):
     )
 
 
+class _AsadmLatencyCollector(base_collector.BaseCollector):
+  """Asadm latency collector.
+
+  Collecting latency and IOPS from Aeropsike Server.
+  """
+
+  def _CollectorName(self):
+    """See base class."""
+    return 'AsadmLatency'
+
+  def _CollectorRunCommand(self, vm, collector_file):
+    """See base class."""
+    vm.RemoteCommand(f'sudo touch {collector_file}')
+    return (
+        f'sudo asadm -e "watch {self.interval} show latencies" -o'
+        f' {collector_file} > /dev/null 2>&1 & echo $!'
+    )
+
+  def Analyze(self, unused_sender, benchmark_spec, samples):
+    """Analyze asadm latency file and record samples."""
+
+    def _Analyze(role, f):
+      """Parse file and record samples."""
+      with open(
+          os.path.join(self.output_directory, os.path.basename(f)), 'r'
+      ) as fp:
+        output = fp.read()
+        metadata = {
+            'event': 'asadm_latency',
+            'interval': self.interval,
+            'role': role,
+        }
+        _AnalyzeAsadmLatencyResults(metadata, output, samples)
+
+    background_tasks.RunThreaded(
+        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+    )
+
+
 def Register(parsed_flags):
   """Registers the ops agent collector if FLAGS.enable_asadm_log is set."""
 
@@ -98,10 +146,16 @@ def Register(parsed_flags):
     return
   logging.info('Registering asadm collector.')
 
-  collector = _AsadmSummaryCollector(interval=FLAGS.asadm_interval_secs)
-  events.before_phase.connect(collector.Start, stages.RUN, weak=False)
-  events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
-  events.benchmark_samples_created.connect(collector.Analyze, weak=False)
+  # Collecting disk/memory usage
+  summary_c = _AsadmSummaryCollector(interval=FLAGS.asadm_interval_secs)
+  events.before_phase.connect(summary_c.Start, stages.RUN, weak=False)
+  events.after_phase.connect(summary_c.Stop, stages.RUN, weak=False)
+  events.benchmark_samples_created.connect(summary_c.Analyze, weak=False)
+
+  latency_c = _AsadmLatencyCollector(interval=FLAGS.asadm_interval_secs)
+  events.before_phase.connect(latency_c.Start, stages.RUN, weak=False)
+  events.after_phase.connect(latency_c.Stop, stages.RUN, weak=False)
+  events.benchmark_samples_created.connect(latency_c.Analyze, weak=False)
 
 
 def _AnalyzeAsadmSummaryResults(metadata, output, samples):
@@ -232,6 +286,161 @@ def _AnalyzeAsadmSummaryResults(metadata, output, samples):
           values=disk_used_percentages[:effective_metric_length],
           timestamps=timestamps_in_ms[:effective_metric_length],
           metric=DISK_USED_PERCENTAGES_METRIC,
+          units='%',
+          interval=metadata['interval'],
+      ),
+  ])
+
+
+def _AnalyzeAsadmLatencyResults(metadata, output, samples):
+  """Parse asadm result.
+
+  Args:
+    metadata: metadata of the sample.
+    output: the output of the stress-ng benchmark.
+    samples: list of samples to return.
+  """
+  output_lines = output.splitlines()
+  timestamps_in_ms = []
+  read_iops = []
+  read_lat_1_ms = []
+  read_lat_8_ms = []
+  read_lat_64_ms = []
+  write_iops = []
+  write_lat_1_ms = []
+  write_lat_8_ms = []
+  write_lat_64_ms = []
+  for line in output_lines:
+    if not line:  # Skip if the line is empty.
+      continue
+    if re.search(r'\[.*\]', line):
+      timestamps_in_ms.append(ParseTimestamp(line))
+      continue
+    line_split = line.split('|')
+    if not line_split or len(line_split) != 7:
+      continue
+    name = line_split[0].upper().strip()
+    op_str = line_split[1].upper().strip()
+    op_per_sec_str = line_split[3].strip()
+    lat_1_ms_str = line_split[4].strip()
+    lat_8_ms_str = line_split[5].strip()
+    lat_64_ms_str = line_split[6].strip()
+    if name != 'TEST':
+      continue
+    if op_str == 'READ':
+      read_iops.append(float(op_per_sec_str))
+      read_lat_1_ms.append(float(lat_1_ms_str))
+      read_lat_8_ms.append(float(lat_8_ms_str))
+      read_lat_64_ms.append(float(lat_64_ms_str))
+    elif op_str == 'WRITE':
+      write_iops.append(float(op_per_sec_str))
+      write_lat_1_ms.append(float(lat_1_ms_str))
+      write_lat_8_ms.append(float(lat_8_ms_str))
+      write_lat_64_ms.append(float(lat_64_ms_str))
+
+  effective_read_length = len(timestamps_in_ms)
+  effective_write_length = len(timestamps_in_ms)
+  if (
+      not len(timestamps_in_ms)
+      == len(read_iops)
+      == len(read_lat_1_ms)
+      == len(read_lat_8_ms)
+      == len(read_lat_64_ms)
+  ):
+    logging.warning(
+        'Lists are not in the same length: timestamps[%d], read_iops[%d],'
+        ' read_lat_1_ms[%d], read_lat_8_ms[%d], read_lat_64_ms[%d],',
+        len(timestamps_in_ms),
+        len(read_iops),
+        len(read_lat_1_ms),
+        len(read_lat_8_ms),
+        len(read_lat_64_ms),
+    )
+    effective_read_length = min(
+        len(timestamps_in_ms),
+        len(read_iops),
+        len(read_lat_1_ms),
+        len(read_lat_8_ms),
+        len(read_lat_64_ms),
+    )
+  if (
+      not len(timestamps_in_ms)
+      == len(write_iops)
+      == len(write_lat_1_ms)
+      == len(write_lat_8_ms)
+      == len(write_lat_64_ms)
+  ):
+    logging.warning(
+        'Lists are not in the same length: timestamps[%d], write_iops[%d],'
+        ' write_lat_1_ms[%d], write_lat_8_ms[%d], write_lat_64_ms[%d]',
+        len(timestamps_in_ms),
+        len(write_iops),
+        len(write_lat_1_ms),
+        len(write_lat_8_ms),
+        len(write_lat_64_ms),
+    )
+    effective_write_length = min(
+        len(timestamps_in_ms),
+        len(write_iops),
+        len(write_lat_1_ms),
+        len(write_lat_8_ms),
+        len(write_lat_64_ms)
+    )
+  effective_metric_length = min(effective_read_length, effective_write_length)
+  samples.extend([
+      sample.CreateTimeSeriesSample(
+          values=read_iops[:effective_metric_length],
+          timestamps=timestamps_in_ms[:effective_metric_length],
+          metric=READ_IOPS_METRIC,
+          units='ops/sec',
+          interval=metadata['interval'],
+      ),
+      sample.CreateTimeSeriesSample(
+          values=read_lat_1_ms[:effective_metric_length],
+          timestamps=timestamps_in_ms[:effective_metric_length],
+          metric=READ_LATENCY_OVER_1_MS_METRIC,
+          units='%',
+          interval=metadata['interval'],
+      ),
+      sample.CreateTimeSeriesSample(
+          values=read_lat_8_ms[:effective_metric_length],
+          timestamps=timestamps_in_ms[:effective_metric_length],
+          metric=READ_LATENCY_OVER_8_MS_METRIC,
+          units='%',
+          interval=metadata['interval'],
+      ),
+      sample.CreateTimeSeriesSample(
+          values=read_lat_64_ms[:effective_metric_length],
+          timestamps=timestamps_in_ms[:effective_metric_length],
+          metric=READ_LATENCY_OVER_64_MS_METRIC,
+          units='%',
+          interval=metadata['interval'],
+      ),
+      sample.CreateTimeSeriesSample(
+          values=write_iops[:effective_metric_length],
+          timestamps=timestamps_in_ms[:effective_metric_length],
+          metric=WRITE_IOPS_METRIC,
+          units='ops/sec',
+          interval=metadata['interval'],
+      ),
+      sample.CreateTimeSeriesSample(
+          values=write_lat_1_ms[:effective_metric_length],
+          timestamps=timestamps_in_ms[:effective_metric_length],
+          metric=WRITE_LATENCY_OVER_1_MS_METRIC,
+          units='%',
+          interval=metadata['interval'],
+      ),
+      sample.CreateTimeSeriesSample(
+          values=write_lat_8_ms[:effective_metric_length],
+          timestamps=timestamps_in_ms[:effective_metric_length],
+          metric=WRITE_LATENCY_OVER_8_MS_METRIC,
+          units='%',
+          interval=metadata['interval'],
+      ),
+      sample.CreateTimeSeriesSample(
+          values=write_lat_64_ms[:effective_metric_length],
+          timestamps=timestamps_in_ms[:effective_metric_length],
+          metric=WRITE_LATENCY_OVER_64_MS_METRIC,
           units='%',
           interval=metadata['interval'],
       ),
