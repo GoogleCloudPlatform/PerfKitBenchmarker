@@ -21,6 +21,7 @@ operate on the VM: boot, shutdown, etc.
 
 import abc
 import contextlib
+import copy
 import enum
 import logging
 import os.path
@@ -1247,6 +1248,36 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     elif self.internal_ip:
       return [self.internal_ip]
     return []
+
+  def SetDiskSpec(self, disk_spec, disk_count):
+    """Set Disk Specs of the current VM."""
+    # This method will be depreciate soon.
+    if disk_spec.disk_type == disk.LOCAL and disk_count is None:
+      disk_count = self.max_local_disks
+    self.disk_specs = [copy.copy(disk_spec) for _ in range(disk_count)]
+    # In the event that we need to create multiple disks from the same
+    # DiskSpec, we need to ensure that they have different mount points.
+    if disk_count > 1 and disk_spec.mount_point:
+      for i, vm_disk_spec in enumerate(self.disk_specs):
+        vm_disk_spec.mount_point += str(i)
+
+  def SetupAllScratchDisks(self):
+    """Set up all scratch disks of the current VM."""
+    # This method will be depreciate soon.
+    # Prepare vm scratch disks:
+    if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
+      self.SetupLocalDisks()
+    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
+      if disk_spec.disk_type == disk.RAM:
+        self.CreateRamDisk(disk_spec)
+      else:
+        self.CreateScratchDisk(disk_spec_id, disk_spec)
+      # TODO(user): Simplify disk logic.
+      if disk_spec.num_striped_disks > 1:
+        # scratch disks has already been created and striped together.
+        break
+    # This must come after Scratch Disk creation to support the
+    # Containerized VM case
 
   def CreateScratchDisk(self, disk_spec_id, disk_spec):
     """Create a VM's scratch disk.

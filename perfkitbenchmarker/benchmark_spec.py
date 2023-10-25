@@ -460,7 +460,6 @@ class BenchmarkSpec(object):
     vms = []
 
     vm_count = group_spec.vm_count
-    disk_count = group_spec.disk_count
 
     # First create the Static VM objects.
     if group_spec.static_vms:
@@ -501,14 +500,7 @@ class BenchmarkSpec(object):
         group_spec.vm_spec.cidr = group_spec.cidr
       vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
       if disk_spec and not vm.is_static:
-        if disk_spec.disk_type == disk.LOCAL and disk_count is None:
-          disk_count = vm.max_local_disks
-        vm.disk_specs = [copy.copy(disk_spec) for _ in range(disk_count)]
-        # In the event that we need to create multiple disks from the same
-        # DiskSpec, we need to ensure that they have different mount points.
-        if (disk_count > 1 and disk_spec.mount_point):
-          for i, vm_disk_spec in enumerate(vm.disk_specs):
-            vm_disk_spec.mount_point += str(i)
+        vm.SetDiskSpec(disk_spec, group_spec.disk_count)
       vm.vm_group = group_name
       vms.append(vm)
 
@@ -994,20 +986,7 @@ class BenchmarkSpec(object):
     """
     vm.AddMetadata()
     vm.OnStartup()
-    # Prepare vm scratch disks:
-    if any((spec.disk_type == disk.LOCAL for spec in vm.disk_specs)):
-      vm.SetupLocalDisks()
-    for disk_spec_id, disk_spec in enumerate(vm.disk_specs):
-      if disk_spec.disk_type == disk.RAM:
-        vm.CreateRamDisk(disk_spec)
-      else:
-        vm.CreateScratchDisk(disk_spec_id, disk_spec)
-      # TODO(user): Simplify disk logic.
-      if disk_spec.num_striped_disks > 1:
-        # scratch disks has already been created and striped together.
-        break
-    # This must come after Scratch Disk creation to support the
-    # Containerized VM case
+    vm.SetupAllScratchDisks()
     vm.PrepareVMEnvironment()
     vm.RecordAdditionalMetadata()
 
