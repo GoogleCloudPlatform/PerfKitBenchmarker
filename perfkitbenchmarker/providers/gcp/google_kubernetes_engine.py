@@ -144,8 +144,8 @@ class GkeCluster(container_service.KubernetesCluster):
     if self.cluster_version in RELEASE_CHANNELS:
       result['gke_release_channel'] = self.cluster_version
 
-    result['boot_disk_type'] = self.vm_config.boot_disk_type
-    result['boot_disk_size'] = self.vm_config.boot_disk_size
+    result['boot_disk_type'] = self.vm_config.boot_disk.boot_disk_type
+    result['boot_disk_size'] = self.vm_config.boot_disk.boot_disk_size
     if self.vm_config.max_local_disks:
       result['gce_local_ssd_count'] = self.vm_config.max_local_disks
       # TODO(pclay): support NVME when it leaves alpha
@@ -254,10 +254,10 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.use_alpha_gcloud = True
       cmd.flags['threads-per-core'] = vm_config.threads_per_core
 
-    if vm_config.boot_disk_size:
-      cmd.flags['disk-size'] = vm_config.boot_disk_size
-    if vm_config.boot_disk_type:
-      cmd.flags['disk-type'] = vm_config.boot_disk_type
+    if vm_config.boot_disk.boot_disk_size:
+      cmd.flags['disk-size'] = vm_config.boot_disk.boot_disk_size
+    if vm_config.boot_disk.boot_disk_type:
+      cmd.flags['disk-type'] = vm_config.boot_disk.boot_disk_type
     if vm_config.max_local_disks:
       # TODO(pclay): Switch to local-ssd-volumes which support NVME when it
       # leaves alpha. See

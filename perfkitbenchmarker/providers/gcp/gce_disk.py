@@ -20,6 +20,7 @@ Use 'gcloud compute disk-types list' to determine valid disk types.
 import json
 
 from absl import flags
+from perfkitbenchmarker import boot_disk
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -176,6 +177,45 @@ class GceDiskSpec(disk.BaseDiskSpec):
             'default': 'SCSI'
         }),
     })
+    return result
+
+
+class GceBootDisk(boot_disk.BootDisk):
+  """Object representing a GCE Boot Disk."""
+
+  def __init__(self, vm, boot_disk_spec):
+    """Initialize a Boot Diks."""
+    super(GceBootDisk, self).__init__(boot_disk_spec)
+    self.name = vm.name
+    self.image = None
+    self.vm = vm
+    self.boot_disk_size = boot_disk_spec.boot_disk_size
+    self.boot_disk_type = boot_disk_spec.boot_disk_type
+
+  def GetCreationCommand(self):
+    dic = {'boot-disk-auto-delete': True}
+    if self.boot_disk_size:
+      dic['boot-disk-size'] = self.boot_disk_size
+    if self.boot_disk_type:
+      dic['boot-disk-type'] = self.boot_disk_type
+    return dic
+
+  @vm_util.Retry()
+  def PostCreate(self):
+    getdisk_cmd = util.GcloudCommand(
+        self.vm, 'compute', 'disks', 'describe', self.name
+    )
+    stdout, _, _ = getdisk_cmd.Issue()
+    response = json.loads(stdout)
+    # Updates all the attrubutes to make sure it's up to date
+    self.image = response['sourceImage'].split('/')[-1]
+    self.boot_disk_size = response['sizeGb']
+    self.boot_disk_type = response['type'].split('/')[-1]
+
+  def GetResourceMetadata(self):
+    result = super(GceBootDisk, self).GetResourceMetadata()
+    result['boot_disk_type'] = self.boot_disk_type
+    result['boot_disk_size'] = self.boot_disk_size
     return result
 
 

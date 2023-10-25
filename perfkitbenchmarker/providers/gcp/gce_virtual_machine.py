@@ -38,6 +38,7 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 from absl import flags
+from perfkitbenchmarker import boot_disk
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -190,7 +191,9 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     self.min_node_cpus: int = None
     self.subnet_name: str = None
     super(GceVmSpec, self).__init__(*args, **kwargs)
-
+    self.boot_disk_spec = boot_disk.BootDiskSpec(
+        self.boot_disk_size, self.boot_disk_type
+    )
     if isinstance(
         self.machine_type, custom_virtual_machine_spec.CustomMachineTypeSpec
     ):
@@ -460,8 +463,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   CLOUD = provider_info.GCP
 
   DEFAULT_IMAGE = None
-  BOOT_DISK_SIZE_GB = None
-  BOOT_DISK_TYPE = None
 
   NVME_START_INDEX = 1
 
@@ -505,8 +506,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.subnet_name = vm_spec.subnet_name
     self.network = self._GetNetwork()
     self.firewall = gce_network.GceFirewall.GetFirewall()
-    self.boot_disk_size = vm_spec.boot_disk_size or self.BOOT_DISK_SIZE_GB
-    self.boot_disk_type = vm_spec.boot_disk_type or self.BOOT_DISK_TYPE
+    self.boot_disk = gce_disk.GceBootDisk(self, vm_spec.boot_disk_spec)
+    self.disks = [self.boot_disk]
     self.id = None
     self.node_type = vm_spec.node_type
     self.node_group = None
@@ -519,7 +520,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_nic_type = FLAGS.gce_nic_type
-
     # For certain machine families, we need to explicitly set the GPU type
     # and counts. See the _FIXED_GPU_MACHINE_TYPES dictionary for more details.
     if self.machine_type and self.machine_type in _FIXED_GPU_MACHINE_TYPES:
@@ -643,11 +643,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.image_project is not None:
       cmd.flags['image-project'] = self.image_project
       self.metadata['image_project'] = self.image_project
-    cmd.flags['boot-disk-auto-delete'] = True
-    if self.boot_disk_size:
-      cmd.flags['boot-disk-size'] = self.boot_disk_size
-    if self.boot_disk_type:
-      cmd.flags['boot-disk-type'] = self.boot_disk_type
+
+    for disk_ in self.disks:
+      cmd.flags.update(disk_.GetCreationCommand())
     if self.machine_type is None:
       cmd.flags['custom-cpu'] = self.cpus
       cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
@@ -1009,18 +1007,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       stdout, _, _ = getinstance_cmd.Issue()
       response = json.loads(stdout)
       self._ParseDescribeResponse(response)
-    if not all((self.image, self.boot_disk_size, self.boot_disk_type)):
-      getdisk_cmd = util.GcloudCommand(
-          self, 'compute', 'disks', 'describe', self.name
-      )
-      stdout, _, _ = getdisk_cmd.Issue()
-      response = json.loads(stdout)
-      if not self.image:
-        self.image = response['sourceImage'].split('/')[-1]
-      if not self.boot_disk_size:
-        self.boot_disk_size = response['sizeGb']
-      if not self.boot_disk_type:
-        self.boot_disk_type = response['type'].split('/')[-1]
+
+    for disk_ in self.disks:
+      disk_.PostCreate()
+
+    self.image = self.boot_disk.image
 
   def _Delete(self):
     """Delete a GCE VM instance."""
@@ -1310,8 +1301,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     result['gce_network_tier'] = self.gce_network_tier
     result['gce_nic_type'] = self.gce_nic_type
     result['gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
-    result['boot_disk_type'] = self.boot_disk_type
-    result['boot_disk_size'] = self.boot_disk_size
     if self.network.mtu:
       result['mtu'] = self.network.mtu
     if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
@@ -1319,6 +1308,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['confidential_compute_type'] = (
           gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value
       )
+
+    for disk_ in self.disks:
+      result.update(disk_.GetResourceMetadata())
     return result
 
   def SimulateMaintenanceWithLog(self):

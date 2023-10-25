@@ -346,8 +346,8 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(vm._Exists(), expected)
 
 
-def _CreateFakeDiskMetadata(image):
-  fake_disk = copy.copy(_FAKE_DISK_METADATA)
+def _CreateFakeDiskMetadata(image, fake_disk):
+  fake_disk = copy.copy(fake_disk)
   fake_disk['sourceImage'] = image
   return fake_disk
 
@@ -381,10 +381,14 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
-  def _CreateFakeReturnValues(self, fake_image=''):
+  def _CreateFakeReturnValues(self, fake_image='', fake_disk=None):
+    if not fake_disk:
+      fake_disk = _FAKE_DISK_METADATA
     fake_rets = [('', '', 0), (json.dumps(_FAKE_INSTANCE_METADATA), '', 0)]
     if fake_image:
-      fake_rets.append((json.dumps(_CreateFakeDiskMetadata(fake_image)), '', 0))
+      fake_rets.append(
+          (json.dumps(_CreateFakeDiskMetadata(fake_image, fake_disk)), '', 0)
+      )
     return fake_rets
 
   def testCreateUbuntu2004(self):
@@ -461,8 +465,17 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
                                          image_project=fake_image_project,
                                          boot_disk_size=20,
                                          boot_disk_type='fake-disk-type')
+    fake_disk = {
+        'id': '123456',
+        'kind': 'compute#disk',
+        'name': 'fakedisk',
+        'sizeGb': 20,
+        'sourceImage': '',
+        'type': 'fake-disk-type',
+    }
+
     with PatchCriticalObjects(
-        self._CreateFakeReturnValues(fake_image)) as issue_command:
+        self._CreateFakeReturnValues(fake_image, fake_disk)) as issue_command:
       vm = vm_class(spec)
       vm._Create()
       vm.created = True
@@ -473,7 +486,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--boot-disk-size 20', command_string)
       self.assertIn('--boot-disk-type fake-disk-type', command_string)
       vm._PostCreate()
-      self.assertEqual(issue_command.call_count, 2)
+      self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
       self.assertDictContainsSubset({'image': fake_image,
                                      'image_project': 'fake-project',
