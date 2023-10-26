@@ -26,6 +26,7 @@ import json
 import logging
 import string
 import threading
+from typing import Optional
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -397,8 +398,8 @@ class AwsDiskSpec(disk.BaseDiskSpec):
 @dataclasses.dataclass
 class AWSDiskIdentifiers:
   """Identifiers of an AWS disk assigned by AWS at creation time."""
-  volume_id: str
-  path: str
+  volume_id: Optional[str]
+  path: Optional[str]
 
 
 class AwsDisk(disk.BaseDisk):
