@@ -927,7 +927,6 @@ class SampleCollector(object):
 
   Attributes:
     samples: A list of Sample objects as dicts.
-    samples_for_console: A list of Sample objects to publish to console.
     metadata_providers: A list of MetadataProvider objects. Metadata providers
       to use.  Defaults to DEFAULT_METADATA_PROVIDERS.
     publishers: A list of SamplePublisher objects to publish to.
@@ -942,7 +941,6 @@ class SampleCollector(object):
   def __init__(self, metadata_providers=None, publishers=None,
                publishers_from_flags=True, add_default_publishers=True):
     self.samples: list[pkb_sample.SampleDict] = []
-    self.samples_for_console: list[pkb_sample.SampleDict] = []
 
     if metadata_providers is not None:
       self.metadata_providers = metadata_providers
@@ -1045,19 +1043,20 @@ class SampleCollector(object):
       sample['sample_uri'] = str(uuid.uuid4())
       self.samples.append(sample)
 
-      if not s.DisableConsoleLog():
-        self.samples_for_console.append(sample)
-
   def PublishSamples(self):
     """Publish samples via all registered publishers."""
     if not self.samples:
       logging.warning('No samples to publish.')
       return
+    samples_for_console = []
+    for s in self.samples:
+      if not s.get(pkb_sample.DISABLE_CONSOLE_LOG, False):
+        samples_for_console.append(s)
     for publisher in self.publishers:
       publisher.PublishSamples(
           self.samples
           if publisher.PUBLISH_CONSOLE_LOG_DATA
-          else self.samples_for_console
+          else samples_for_console
       )
     self.samples = []
 

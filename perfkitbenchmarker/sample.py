@@ -160,20 +160,6 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
         return False
     return True
 
-  def DisableConsoleLog(self) -> bool:
-    """Disable log to console when this return True."""
-
-    # Disable Console log is set as a metadata rather than a field
-    # is due to the current structure of samples class.
-    # Adding extra field to a sample might break serialization of some publisher
-    # pipeline as they expect certain format.
-    # Modyfing asdict function is also not enough because when we pickle
-    # the samples,
-    return (
-        DISABLE_CONSOLE_LOG in self.metadata
-        and self.metadata[DISABLE_CONSOLE_LOG]
-    )
-
   def asdict(self)-> Dict[str, Any]:  # pylint:disable=invalid-name
     """Converts the Sample to a dictionary."""
     return self._asdict()
