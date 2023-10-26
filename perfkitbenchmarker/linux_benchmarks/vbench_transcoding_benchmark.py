@@ -53,6 +53,8 @@ flags.register_validator(
 
 FLAGS = flags.FLAGS
 
+# TODO(user): Refactor GCP/Azure disk to include IOPs/Throughput in
+# disk_spec
 BENCHMARK_NAME = 'vbench_transcoding'
 BENCHMARK_CONFIG = """
 vbench_transcoding:
@@ -70,21 +72,26 @@ vbench_transcoding:
           machine_type: Standard_F8s
           zone: westus2
       disk_spec:
-        # Standardize with 250 MB/s bandwidth.
+        # Standardize with 500 MB/s bandwidth.
         # The largest video file is ~300 MB; we want to minimize I/O impact.
         GCP:
-          disk_size: 521
+          disk_size: 542
           disk_type: pd-ssd
           mount_point: /scratch
         AWS:
-          disk_size: 521
-          disk_type: gp2
+          disk_size: 542
+          disk_type: gp3
+          iops: 3000
+          throughput: 500
           mount_point: /scratch
         Azure:
-          disk_size: 2048
-          disk_type: Premium_LRS
+          disk_size: 542
+          disk_type: PremiumV2_LRS
           mount_point: /scratch
       os_type: ubuntu2004
+  flags:
+    azure_provisioned_iops: 3000
+    azure_provisioned_throughput: 500
 """
 
 
