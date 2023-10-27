@@ -1442,6 +1442,11 @@ class YCSBExecutor:
       theoretical_max_qps = database.CalculateTheoreticalMaxThroughput(
           read_percent, update_percent
       )
+
+      # Execute an initial test to warm up the database.
+      _ExecuteWorkload(theoretical_max_qps)
+      time.sleep(_CPU_OPTIMIZATION_SLEEP_MINS.value * 60)
+
       lower_bound = 0
       upper_bound = theoretical_max_qps * 2
       while lower_bound <= upper_bound:

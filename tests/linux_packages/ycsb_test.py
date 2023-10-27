@@ -188,7 +188,8 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
             self.test_executor,
             'RunStaircaseLoads',
             side_effect=[
-                [s] for s in _GetMockThroughputSamples([100, 300, 150, 250])
+                [s]
+                for s in _GetMockThroughputSamples([200, 100, 300, 150, 250])
             ],
         )
     )
