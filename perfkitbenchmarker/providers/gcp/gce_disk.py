@@ -158,6 +158,18 @@ class GceDiskSpec(disk.BaseDiskSpec):
     super(GceDiskSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['gce_ssd_interface'].present:
       config_values['interface'] = flag_values.gce_ssd_interface
+    if flag_values['gce_num_local_ssds'].present:
+      config_values['num_local_ssds'] = flag_values.gce_num_local_ssds
+    if flag_values['gcp_create_disks_with_vm'].present:
+      config_values['create_with_vm'] = flag_values.gcp_create_disks_with_vm
+    if flag_values['gcp_provisioned_iops'].present:
+      config_values['provisioned_iops'] = flag_values.gcp_provisioned_iops
+    if flag_values['gcp_provisioned_throughput'].present:
+      config_values['provisioned_throughput'] = (
+          flag_values.gcp_provisioned_throughput
+      )
+    if flag_values['data_disk_zones'].present:
+      config_values['replica_zones'] = flag_values.data_disk_zones
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -173,9 +185,30 @@ class GceDiskSpec(disk.BaseDiskSpec):
     """
     result = super(GceDiskSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'interface': (option_decoders.StringDecoder, {
-            'default': 'SCSI'
-        }),
+        'interface': (option_decoders.StringDecoder, {'default': 'SCSI'}),
+        'num_local_ssds': (
+            option_decoders.IntDecoder,
+            {'default': 0, 'min': 0},
+        ),
+        'provisioned_iops': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'provisioned_throughput': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'create_with_vm': (
+            option_decoders.BooleanDecoder,
+            {'default': True},
+        ),
+        'replica_zones': (
+            option_decoders.ListDecoder,
+            {
+                'item_decoder': option_decoders.StringDecoder(),
+                'default': None,
+            },
+        ),
     })
     return result
 
@@ -243,10 +276,10 @@ class GceDisk(disk.BaseDisk):
     self.provisioned_iops = None
     self.provisioned_throughput = None
     if self.disk_type in GCE_DYNAMIC_IOPS_DISK_TYPES:
-      self.provisioned_iops = FLAGS.gcp_provisioned_iops
+      self.provisioned_iops = disk_spec.provisioned_iops
       self.metadata['iops'] = self.provisioned_iops
     if self.disk_type in GCE_DYNAMIC_THROUGHPUT_DISK_TYPES:
-      self.provisioned_throughput = FLAGS.gcp_provisioned_throughput
+      self.provisioned_throughput = disk_spec.provisioned_throughput
       self.metadata['throughput'] = self.provisioned_throughput
 
     disk_metadata = DISK_METADATA[disk_spec.disk_type]

@@ -743,7 +743,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     create_disks = []
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      if not self.DiskTypeCreatedOnVMCreation(disk_spec.disk_type):
+      if not self.DiskTypeCreatedOnVMCreation(disk_spec):
         continue
       # local disks are handled above in a separate gcloud flag
       if disk_spec.disk_type == disk.LOCAL:
@@ -760,17 +760,17 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             'mode=rw',
         ]
         if (
-            FLAGS.gcp_provisioned_iops
+            disk_spec.provisioned_iops
             and disk_spec.disk_type in gce_disk.GCE_DYNAMIC_IOPS_DISK_TYPES
         ):
-          pd_args += [f'provisioned-iops={FLAGS.gcp_provisioned_iops}']
+          pd_args += [f'provisioned-iops={disk_spec.provisioned_iops}']
         if (
-            FLAGS.gcp_provisioned_throughput
+            disk_spec.provisioned_throughput
             and disk_spec.disk_type
             in gce_disk.GCE_DYNAMIC_THROUGHPUT_DISK_TYPES
         ):
           pd_args += [
-              f'provisioned-throughput={FLAGS.gcp_provisioned_throughput}'
+              f'provisioned-throughput={disk_spec.provisioned_throughput}'
           ]
         create_disks.append(','.join(pd_args))
     if create_disks:
@@ -1109,7 +1109,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
     disks = []
-    replica_zones = FLAGS.data_disk_zones
 
     for i in range(disk_spec.num_striped_disks):
       if disk_spec.disk_type == disk.LOCAL:
@@ -1144,7 +1143,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             name,
             self.zone,
             self.project,
-            replica_zones=replica_zones,
+            replica_zones=disk_spec.replica_zones,
         )
         if gce_disk.PdDriveIsNvme(self):
           data_disk.interface = gce_disk.NVME
@@ -1215,24 +1214,51 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def UpdateDevicePath(self, scratch_disk, remote_nvme_devices):
     """Updates the paths for all remote NVME devices inside the VM."""
-    disks = scratch_disk.disks if scratch_disk.is_striped else [scratch_disk]
+    if isinstance(scratch_disk, gcsfuse_disk.GcsFuseDisk):
+      return
+
+    disks = []
+    if isinstance(scratch_disk, disk.StripedDisk):
+      disks = scratch_disk.disks
+    else:
+      disks = [scratch_disk]
+
     # round robin assignment since we cannot tell the disks apart.
     for d in disks:
       if d.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES and d.interface == NVME:
         d.name = remote_nvme_devices.pop()
 
-  def DiskCreatedOnVMCreation(self, data_disk):
+  def DiskCreatedOnVMCreation(self, disk_spec):
     """Returns whether the disk has been created during VM creation."""
-    return self.DiskTypeCreatedOnVMCreation(data_disk.disk_type)
+    return self.DiskTypeCreatedOnVMCreation(disk_spec)
 
-  def DiskTypeCreatedOnVMCreation(self, disk_type):
+  def _CreateScratchDiskFromDisks(self, disk_spec, disks):
+    """Helper method to create scratch data disks."""
+    # This will soon be moved to disk class. As the disk class should
+    # be able to handle how it's created and attached
+    if len(disks) > 1:
+      # If the disk_spec called for a striped disk, create one.
+      scratch_disk = disk.StripedDisk(disk_spec, disks)
+    else:
+      scratch_disk = disks[0]
+
+    if not self.DiskCreatedOnVMCreation(disk_spec):
+      scratch_disk.Create()
+      scratch_disk.Attach(self)
+
+    return scratch_disk
+
+  def DiskTypeCreatedOnVMCreation(self, disk_spec):
     """Returns whether the disk type has been created during VM creation."""
-    if not FLAGS.gcp_create_disks_with_vm:
-      return False
-    # GCE regional disks cannot use create-on-create.
-    if FLAGS.data_disk_zones:
-      return False
-    return disk_type in gce_disk.GCE_REMOTE_DISK_TYPES + [disk.LOCAL]
+    # This will be moved to disk class
+    if isinstance(disk_spec, gce_disk.GceDiskSpec):
+      if disk_spec.replica_zones:
+        # GCE regional disks cannot use create-on-create.
+        return False
+      return disk_spec.create_with_vm
+
+    # Other disk type are created separately
+    return False
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to disk."""
@@ -1242,7 +1268,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     # Add metadata to data disks
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      if not self.DiskTypeCreatedOnVMCreation(disk_spec.disk_type):
+      if not self.DiskTypeCreatedOnVMCreation(disk_spec):
         continue
       # local disks are not tagged
       if disk_spec.disk_type == disk.LOCAL:

@@ -109,8 +109,7 @@ class ScratchDiskTestMixin(object):
     """
 
     vm = self._CreateVm()
-
-    disk_spec = disk.BaseDiskSpec(_COMPONENT, mount_point='/mountpoint0')
+    disk_spec = self.GetDiskSpec(mount_point='/mountpoint0')
     vm.CreateScratchDisk(0, disk_spec)
 
     assert len(vm.scratch_disks) == 1, 'Disk not added to scratch disks.'
@@ -123,7 +122,7 @@ class ScratchDiskTestMixin(object):
         scratch_disk.GetDevicePath(), '/mountpoint0',
         None, scratch_disk.mount_options, scratch_disk.fstab_options)
 
-    disk_spec = disk.BaseDiskSpec(_COMPONENT, mount_point='/mountpoint1')
+    disk_spec = self.GetDiskSpec(mount_point='/mountpoint1')
     vm.CreateScratchDisk(0, disk_spec)
 
     assert len(vm.scratch_disks) == 2, 'Disk not added to scratch disks.'
@@ -148,6 +147,9 @@ class ScratchDiskTestMixin(object):
 
     vm.scratch_disks[0].Delete.assert_called_once_with()
     vm.scratch_disks[1].Delete.assert_called_once_with()
+
+  def GetDiskSpec(self, mount_point):
+    return disk.BaseDiskSpec(_COMPONENT, mount_point=mount_point)
 
 
 class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
@@ -191,6 +193,11 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _GetDiskClass(self):
     return gce_disk.GceDisk
+
+  def GetDiskSpec(self, mount_point):
+    return gce_disk.GceDiskSpec(
+        _COMPONENT, mount_point=mount_point, create_with_vm=False
+    )
 
 
 class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):

@@ -223,6 +223,7 @@ class GCEPDDiskTest(GCEDiskTest):
     spec.disk_size = 10
     spec.mount_point = '/scratch'
     spec.num_striped_disks = 1
+    spec.create_with_vm = True
     fake_rets = [
         ('stdout', 'stderr', 0),
         ('stdout', 'stderr', 0),
@@ -270,7 +271,7 @@ class GCEPDDiskTest(GCEDiskTest):
     spec.disk_size = 10
     spec.mount_point = '/scratch'
     spec.num_striped_disks = 1
-    FLAGS.gcp_create_disks_with_vm = False
+    spec.create_with_vm = False
     fake_rets = [
         ('stdout', 'stderr', 0),
         (_DISK_JSON, 'stderr', 0),  # Exists command
@@ -382,10 +383,10 @@ class GCEPDDiskTest(GCEDiskTest):
     spec.disk_type = gce_disk.PD_EXTREME
     spec.disk_size = 10
     spec.mount_point = '/scratch'
-    FLAGS.gcp_provisioned_iops = 1000
-    FLAGS.gcp_provisioned_throughput = 200
     spec.num_striped_disks = 4
-    FLAGS.gcp_create_disks_with_vm = False
+    spec.provisioned_iops = 1000
+    spec.provisioned_throughput = 200
+    spec.create_with_vm = False
     fake_rets = [
         ('stdout', 'stderr', 0),
         (_DISK_JSON, 'stderr', 0),  # Create command
@@ -706,7 +707,6 @@ class GCEPDDiskTest(GCEDiskTest):
           ],
           ['echo "/dev/md0 /scratch ext4 defaults" | sudo tee -a /etc/fstab'],
       ]
-      print(issue_command.call_args_list)
       self.CompareCallArgs(expected_commands, issue_command.call_args_list)
 
       self.assertEqual(
