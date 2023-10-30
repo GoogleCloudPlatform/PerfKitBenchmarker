@@ -281,7 +281,7 @@ def BuildDiskSpecId(spec_index, strip_index):
   return f'{spec_index}_{strip_index}'
 
 
-def GetArmArchitecture(machine_type):
+def GetArmArchitecture(machine_type: str):
   """Returns the specific ARM processor architecture of the VM."""
   # c6g.medium -> c6g, m6gd.large -> m6g, c5n.18xlarge -> c5
   prefix = re.split(r'[dn]?\.', machine_type)[0]
@@ -315,7 +315,7 @@ class AwsDedicatedHost(resource.BaseResource):
     id: The host_id of the host.
   """
 
-  def __init__(self, machine_type, zone):
+  def __init__(self, machine_type: str, zone: str):
     super(AwsDedicatedHost, self).__init__()
     self.machine_type = machine_type
     self.zone = zone
@@ -543,6 +543,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   _lock = threading.Lock()
   deleted_hosts = set()
   host_map = collections.defaultdict(list)
+  machine_type: str
 
   def __init__(self, vm_spec):
     """Initialize a AWS virtual machine.
@@ -554,6 +555,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       ValueError: If an incompatible vm_spec is passed.
     """
     super(AwsVirtualMachine, self).__init__(vm_spec)
+    assert isinstance(self.zone, str)
     self.region = util.GetRegionFromZone(self.zone)
     self.user_name = FLAGS.aws_user_name or self.DEFAULT_USER_NAME
     if self.machine_type in aws_disk.NUM_LOCAL_VOLUMES:
@@ -629,6 +631,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   @property
   def group_id(self):
     """Returns the security group ID of this VM."""
+    assert self.network is not None
     return self.network.regional_network.vpc.default_security_group_id
 
   @classmethod
@@ -891,6 +894,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a VM instance."""
+    assert self.network is not None
     placement = []
     if not util.IsRegion(self.zone):
       placement.append('AvailabilityZone=%s' % self.zone)

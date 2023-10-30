@@ -314,6 +314,7 @@ class EcsTask(container_service.BaseContainer):
 
   def GetLogs(self):
     """Returns the logs from the container."""
+    assert self.arn is not None
     task_id = self.arn.split('/')[-1]
     log_stream = 'pkb/{name}/{task_id}'.format(name=self.name, task_id=task_id)
     return six.text_type(
