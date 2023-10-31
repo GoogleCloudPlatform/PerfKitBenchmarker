@@ -446,7 +446,7 @@ def GetScenarioFromScenarioString(scenario_string):
     value = key_value[1]
     if key not in FIO_KNOWN_FIELDS_IN_JINJA:
       raise errors.Setup.InvalidFlagConfigurationError(
-          'Unregonzied FIO parameter {0} out of scenario {1}'.format(
+          'Unrecognized FIO parameter {0} out of scenario {1}'.format(
               key, scenario_string))
     result[key] = value
 
