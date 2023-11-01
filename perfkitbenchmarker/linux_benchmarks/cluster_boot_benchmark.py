@@ -96,10 +96,10 @@ cluster_boot:
           machine_type: Standard_D2s_v3
           zone: eastus
           boot_disk_type: StandardSSD_LRS
+        # Boot disk can be overridden (e.g. --gce_boot_disk_type=pd-ssd)
         GCP:
           machine_type: n1-standard-2
           zone: us-central1-a
-          boot_disk_type: pd-ssd
         IBMCloud:
           machine_type: cx2-2x4
           zone: us-south-1
