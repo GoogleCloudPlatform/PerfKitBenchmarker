@@ -79,7 +79,7 @@ In its current release these are the benchmarks that are executed:
 -   `scimark2`: [public domain](http://math.nist.gov/scimark2/credits.html)
 -   `speccpu2006`: [SPEC CPU2006](http://www.spec.org/cpu2006/)
 -   [`SHOC`](https://github.com/vetter/shoc):
-    [BSD 3-clause](https://github.com/vetter/shoc/blob/master/LICENSE.txt)
+    [BSD 3-clause](https://github.com/vetter/shoc/blob/master/LICENSE.md)
 -   `sysbench_oltp`: [GPL v2](https://github.com/akopytov/sysbench)
 -   [`TensorFlow`](https://github.com/tensorflow/tensorflow):
     [Apache v2](https://github.com/tensorflow/tensorflow/blob/master/LICENSE)
