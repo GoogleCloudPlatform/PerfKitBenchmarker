@@ -84,6 +84,14 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     # Assert
     self.assertIn('-target 1000', self.test_cmd.call_args[0][0])
 
+  @flagsaver.flagsaver(ycsb_target_qps=250)
+  def testRunCalledWithCorrectTargetUsingFlag(self):
+    # Act
+    self.test_executor.Run([self.test_vm])
+
+    # Assert
+    self.assertIn('-target 250', self.test_cmd.call_args[0][0])
+
   @flagsaver.flagsaver
   def testBurstLoadUnlimitedMultiplier(self):
     # Arrange

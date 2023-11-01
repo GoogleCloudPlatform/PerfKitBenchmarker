@@ -157,10 +157,18 @@ _THROUGHPUT_TIME_SERIES = flags.DEFINE_bool(
 flags.DEFINE_list(
     'ycsb_threads_per_client',
     ['32'],
-    'Number of threads per '
-    'loader during the benchmark run. Specify a list to vary the '
-    'number of clients. For each thread count, optionally supply '
-    'target qps per client, which cause ycsb to self-throttle.',
+    'Number of threads per loader during the benchmark run. Specify a list to'
+    ' vary the number of clients. For each thread count, optionally supply'
+    ' target qps per client or ycsb_target_qps, which cause ycsb to'
+    ' self-throttle.',
+)
+_TARGET_QPS = flags.DEFINE_integer(
+    'ycsb_target_qps',
+    None,
+    'Total target QPS to use for the run. If there are multiple client VMs,'
+    ' this target QPS will be divided among them if they are run in parallel.'
+    ' TODO: switch burst load and incremental load use target QPS parsed from'
+    ' run params, which should be switched to using this flag.',
 )
 flags.DEFINE_integer(
     'ycsb_preload_threads',
@@ -443,13 +451,14 @@ def _GetVersionFromUrl(url):
   return _GetVersion(match.group(0).strip('ycsb-'))
 
 
-def _GetThreadsQpsPerLoaderList():
+def _GetThreadsQpsPerLoaderList(num_vms):
   """Returns the list of [client, qps] per VM to use in staircase load."""
 
   def _FormatThreadQps(thread_qps):
     thread_qps_pair = thread_qps.split(':')
     if len(thread_qps_pair) == 1:
-      thread_qps_pair.append(0)
+      target = int(_TARGET_QPS.value / num_vms) if _TARGET_QPS.value else 0
+      thread_qps_pair.append(target)
     return [int(val) for val in thread_qps_pair]
 
   return [
@@ -506,13 +515,14 @@ def CheckPrerequisites():
   per_thread_target = any(
       [':' in thread_qps for thread_qps in FLAGS.ycsb_threads_per_client]
   )
+  flag_target = _TARGET_QPS.value is not None
   dynamic_load = FLAGS.ycsb_dynamic_load
 
-  if run_target + per_thread_target + dynamic_load > 1:
+  if [flag_target, run_target, per_thread_target, dynamic_load].count(True) > 1:
     raise errors.Config.InvalidValue(
-        'Setting YCSB target in ycsb_threads_per_client '
-        'or ycsb_run_parameters or applying ycsb_dynamic_load_* flags'
-        ' are mutally exclusive.'
+        'Setting YCSB target in ycsb_target_qps, ycsb_threads_per_client, or'
+        ' ycsb_run_parameters or applying ycsb_dynamic_load_* flags are mutally'
+        ' exclusive.'
     )
 
   if FLAGS.ycsb_dynamic_load_throughput_lower_bound and not dynamic_load:
@@ -1003,8 +1013,9 @@ class YCSBExecutor:
 
       # _GetThreadsQpsPerLoaderList() passes tuple of (client_count, target=0)
       # if no target is passed via flags.
-      for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList():
-
+      for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList(
+          len(vms)
+      ):
         @vm_util.Retry(
             retryable_exceptions=ycsb_stats.CombineHdrLogError,
             timeout=-1,
