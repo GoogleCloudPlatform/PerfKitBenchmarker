@@ -104,7 +104,9 @@ _TLS = flags.DEFINE_bool(
 MEMCACHED_NODE_COUNT = 1
 
 
-def GetManagedMemoryStoreClass(cloud, memory_store):
+def GetManagedMemoryStoreClass(
+    cloud, memory_store
+) -> type['BaseManagedMemoryStore']:
   """Gets the cloud managed memory store class corresponding to 'cloud'.
 
   Args:

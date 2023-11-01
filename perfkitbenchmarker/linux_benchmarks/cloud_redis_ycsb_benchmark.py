@@ -75,18 +75,17 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   benchmark_spec.always_call_cleanup = True
 
   ycsb_vms = benchmark_spec.vm_groups['clients']
   background_tasks.RunThreaded(_Install, ycsb_vms)
 
-  cloud_redis_class = (
-      managed_memory_store.GetManagedMemoryStoreClass(
-          FLAGS.cloud,
-          managed_memory_store.REDIS))
-  benchmark_spec.cloud_redis_instance = (cloud_redis_class(benchmark_spec))
+  cloud_redis_class = managed_memory_store.GetManagedMemoryStoreClass(
+      FLAGS.cloud, managed_memory_store.REDIS
+  )
+  benchmark_spec.cloud_redis_instance = cloud_redis_class(benchmark_spec)  # pytype: disable=not-instantiable
   benchmark_spec.cloud_redis_instance.Create()
 
   redis_args = {

@@ -22,7 +22,7 @@ import abc
 import itertools
 import logging
 import time
-from typing import List
+from typing import List, TypeVar
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -32,16 +32,19 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 
 _RESOURCE_REGISTRY = {}
+RegisteredType = TypeVar('RegisteredType')
+ResourceType = type[RegisteredType]
 
 
-def GetResourceClass(base_class, **kwargs):
+def GetResourceClass(base_class: ResourceType, **kwargs) -> ResourceType:
   """Returns the subclass with the corresponding attributes.
 
   Args:
-    base_class: The base class of the resource to return
-        (e.g. BaseVirtualMachine).
+    base_class: The base class of the resource to return (e.g.
+      BaseVirtualMachine).
     **kwargs: Every attribute/value of the subclass's REQUIRED_ATTRS that were
-        used to register the subclass.
+      used to register the subclass.
+
   Raises:
     Exception: If no class could be found with matching attributes.
   """
@@ -49,9 +52,20 @@ def GetResourceClass(base_class, **kwargs):
   key += sorted(kwargs.items())
   if tuple(key) not in _RESOURCE_REGISTRY:
     raise errors.Resource.SubclassNotFoundError(
-        'No %s subclass defined with the attributes: %s' %
-        (base_class.__name__, kwargs))
+        'No %s subclass defined with the attributes: %s'
+        % (base_class.__name__, kwargs)
+    )
   resource = _RESOURCE_REGISTRY.get(tuple(key))
+  if not resource:
+    raise errors.Resource.SubclassNotFoundError(
+        'Should not reach this code, but no %s subclass defined with the '
+        'attributes: %s' % (base_class.__name__, kwargs)
+    )
+  if not issubclass(resource, base_class):
+    raise errors.Resource.SubclassNotFoundError(
+        'Class %s was registered for type %s but they did not match each other.'
+        % (resource.__name__, base_class.__name__)
+    )
 
   # Set the required attributes of the resource class
   for key, value in kwargs.items():
@@ -68,16 +82,20 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
   REQUIRED_ATTRS: List[str]
 
   def __init__(cls, name, bases, dct):
-    if (all(hasattr(cls, attr) for attr in cls.REQUIRED_ATTRS) and
-        cls.RESOURCE_TYPE):
+    if (
+        all(hasattr(cls, attr) for attr in cls.REQUIRED_ATTRS)
+        and cls.RESOURCE_TYPE
+    ):
       unset_attrs = [
-          attr for attr in cls.REQUIRED_ATTRS if getattr(cls, attr) is None]
+          attr for attr in cls.REQUIRED_ATTRS if getattr(cls, attr) is None
+      ]
       # Raise exception if subclass with unset attributes.
       if unset_attrs and cls.RESOURCE_TYPE != cls.__name__:
         raise Exception(
             'Subclasses of %s must have the following attrs set: %s. For %s '
-            'the following attrs were not set: %s.' %
-            (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, cls.__name__, unset_attrs))
+            'the following attrs were not set: %s.'
+            % (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, cls.__name__, unset_attrs)
+        )
       # Flatten list type attributes with cartesian product.
       # If a class have two list attributes i.e.
       # class Example(AutoRegisterResourceMeta):
@@ -300,22 +318,28 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     try:
       if not self._Exists():
         raise errors.Resource.RetryableCreationError(
-            'Creation of %s failed.' % type(self).__name__)
+            'Creation of %s failed.' % type(self).__name__
+        )
     except NotImplementedError:
       pass
     self._WaitUntilRunning()
     self.created = True
     self.create_end_time = time.time()
 
-  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableDeletionError,),
-                 timeout=3600)
+  @vm_util.Retry(
+      retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+      timeout=3600,
+  )
   def _DeleteResource(self):
     """Reliably deletes the underlying resource."""
 
     # Retryable method which allows waiting for deletion of the resource.
-    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0, timeout=3600,
-                   retryable_exceptions=(
-                       errors.Resource.RetryableDeletionError,))
+    @vm_util.Retry(
+        poll_interval=self.POLL_INTERVAL,
+        fuzz=0,
+        timeout=3600,
+        retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+    )
     def WaitUntilDeleted():
       if self._IsDeleting():
         raise errors.Resource.RetryableDeletionError('Not yet deleted')
@@ -329,7 +353,8 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     try:
       if self._Exists():
         raise errors.Resource.RetryableDeletionError(
-            'Deletion of %s failed.' % type(self).__name__)
+            'Deletion of %s failed.' % type(self).__name__
+        )
     except NotImplementedError:
       pass
 
@@ -348,10 +373,12 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     except NotImplementedError as e:
       raise errors.Resource.RestoreError(
           f'Class {self.__class__} does not have _Restore() implemented but a '
-          'restore file was provided.') from e
+          'restore file was provided.'
+      ) from e
     except Exception as e:
-      raise errors.Resource.RestoreError('Error restoring resource '
-                                         f'{repr(self)}') from e
+      raise errors.Resource.RestoreError(
+          f'Error restoring resource {repr(self)}'
+      ) from e
 
     self.restored = True
     self.UpdateTimeout(FLAGS.timeout_minutes)
@@ -367,10 +394,12 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
       RestoreError: If there is an error while restoring.
     """
 
-    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0,
-                   timeout=self.READY_TIMEOUT,
-                   retryable_exceptions=(
-                       errors.Resource.RetryableCreationError,))
+    @vm_util.Retry(
+        poll_interval=self.POLL_INTERVAL,
+        fuzz=0,
+        timeout=self.READY_TIMEOUT,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
     def WaitUntilReady():
       if not self._IsReady():
         raise errors.Resource.RetryableCreationError('Not yet ready')
@@ -385,7 +414,9 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
       except errors.Resource.RestoreError:
         logging.exception(
             'Encountered an exception while attempting to Restore(). '
-            'Creating: %s', self.create_on_restore_error)
+            'Creating: %s',
+            self.create_on_restore_error,
+        )
         if not self.create_on_restore_error:
           raise
 
@@ -409,10 +440,12 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     except NotImplementedError as e:
       raise errors.Resource.FreezeError(
           f'Class {self.__class__} does not have _Freeze() implemented but '
-          'Freeze() was called.') from e
+          'Freeze() was called.'
+      ) from e
     except Exception as e:
       raise errors.Resource.FreezeError(
-          f'Error freezing resource {repr(self)}') from e
+          f'Error freezing resource {repr(self)}'
+      ) from e
 
     # If frozen successfully, attempt to update the timeout.
     self.restored = False
@@ -446,7 +479,9 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
       except errors.Resource.FreezeError:
         logging.exception(
             'Encountered an exception while attempting to Freeze(). '
-            'Deleting: %s', self.delete_on_freeze_error)
+            'Deleting: %s',
+            self.delete_on_freeze_error,
+        )
         if not self.delete_on_freeze_error:
           raise
 
@@ -472,7 +507,9 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     except NotImplementedError:
       logging.exception(
           'Class %s does not have _UpdateTimeout() implemented, which is '
-          'needed for Freeze(). Please add an implementation.', self.__class__)
+          'needed for Freeze(). Please add an implementation.',
+          self.__class__,
+      )
       raise
 
   def GetSamples(self) -> List[sample.Sample]:

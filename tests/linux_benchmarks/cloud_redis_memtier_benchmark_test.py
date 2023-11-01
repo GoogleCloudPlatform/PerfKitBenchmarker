@@ -51,7 +51,7 @@ def _GetTestRedisInstance():
   mock_bm_spec = mock.Mock()
   mock_bm_spec.config.cloud_redis = test_spec
   redis_class = cloud_redis_memtier_benchmark._GetManagedMemoryStoreClass()
-  instance = redis_class(mock_bm_spec)
+  instance = redis_class(mock_bm_spec)  # pytype: disable=not-instantiable
   instance._ip = '0.0.0.0'
   instance._port = 1234
   return instance

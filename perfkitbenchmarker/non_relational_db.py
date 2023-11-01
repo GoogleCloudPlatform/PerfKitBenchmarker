@@ -75,13 +75,13 @@ class BaseNonRelationalDb(resource.BaseResource):
 
 
 def GetNonRelationalDbSpecClass(
-    service_type: str) -> Optional[spec.BaseSpecMetaClass]:
+    service_type: str) -> type[BaseNonRelationalDbSpec]:
   """Gets the non-relational db spec class corresponding to 'service_type'."""
   return spec.GetSpecClass(BaseNonRelationalDbSpec, SERVICE_TYPE=service_type)
 
 
 def GetNonRelationalDbClass(
-    service_type: str) -> Optional[resource.AutoRegisterResourceMeta]:
+    service_type: str) -> type[BaseNonRelationalDb]:
   """Gets the non-relational database class corresponding to 'service_type'."""
   return resource.GetResourceClass(BaseNonRelationalDb,
                                    SERVICE_TYPE=service_type)

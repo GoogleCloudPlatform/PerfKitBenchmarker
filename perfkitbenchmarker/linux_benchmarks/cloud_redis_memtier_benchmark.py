@@ -65,16 +65,20 @@ def CheckPrerequisites(benchmark_config):
   _GetManagedMemoryStoreClass().CheckPrerequisites(benchmark_config)  # pytype: disable=attribute-error
 
 
-def _GetManagedMemoryStoreClass():
+def _GetManagedMemoryStoreClass() -> (
+    type[managed_memory_store.BaseManagedMemoryStore]
+):
   """Gets the cloud-specific redis memory store class."""
   return managed_memory_store.GetManagedMemoryStoreClass(
       FLAGS.cloud, managed_memory_store.REDIS
   )
 
 
-def _GetManagedMemoryStore(benchmark_spec):
+def _GetManagedMemoryStore(
+    benchmark_spec,
+) -> managed_memory_store.BaseManagedMemoryStore:
   """Get redis instance from the shared class."""
-  return _GetManagedMemoryStoreClass()(benchmark_spec)
+  return _GetManagedMemoryStoreClass()(benchmark_spec)  # pytype: disable=not-instantiable
 
 
 def Prepare(benchmark_spec):

@@ -289,7 +289,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
           flag_values=flags.FLAGS)
 
       vm_class = GetStaticVmClass(os_type)
-      vm = vm_class(vm_spec)
+      vm = vm_class(vm_spec)  # pytype: disable=not-instantiable
       cls.vm_pool.append(vm)
 
   @classmethod
@@ -311,7 +311,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         return None
 
 
-def GetStaticVmClass(os_type):
+def GetStaticVmClass(os_type) -> type[virtual_machine.BaseVirtualMachine]:
   """Returns the static VM class that corresponds to the os_type."""
   if not os_type:
     os_type = os_types.DEFAULT
