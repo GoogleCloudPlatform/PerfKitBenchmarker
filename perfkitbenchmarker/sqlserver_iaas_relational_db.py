@@ -30,6 +30,7 @@ from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 CONTROLLER_SCRIPT_PATH = (
     "relational_db_configs/sqlserver_ha_configs/controller.ps1"
@@ -107,7 +108,9 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     self.spec.database_password = db_util.GenerateRandomDbPassword()
 
     if self.spec.high_availability:
-      self.ConfigureSQLServerHa()
+      if (self.spec.high_availability_type == "FCIMW"
+          or self.spec.high_availability_type == "FCIS2D"):
+        self.ConfigureSQLServerHaFci()
     else:
       ConfigureSQLServer(
           self.server_vm,
@@ -186,16 +189,23 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     """
     return DEFAULT_ENGINE_VERSION
 
-  def ConfigureSQLServerHa(self):
+  def ConfigureSQLServerHaFci(self):
     """Create SQL server HA deployment for performance testing."""
     server_vm = self.server_vm
     client_vm = self.client_vm
     controller_vm = self.controller_vm
     replica_vms = self.replica_vms
+
     win_password = vm_util.GenerateRandomWindowsPassword(
         vm_util.PASSWORD_LENGTH, "*!@#%^+=")
     ip_name = "fci-ip-{}".format(FLAGS.run_uri)
+
     reserved_ip = server_vm.CreateIpReservation(ip_name)
+    disk_size = 2000
+    if server_vm.disk_specs:
+      disk_size = server_vm.disk_specs[0].disk_size
+    self.CreateAndAttachSharedDisk(server_vm, disk_size, "pd-ssd",
+                                   server_vm.name, replica_vms[0].name)
     # Install and configure AD components.
     self.PushAndRunPowershellScript(controller_vm,
                                     "setup_domain_controller.ps1",
@@ -248,10 +258,15 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
                                  "/INSTANCENAME=MSSQLSERVER /Q")
     replica_vms[0].Reboot()
 
-    # Configure S2D pool and volumes.
-    # All available storage (both PD and local SSD) will be used
-    self.PushAndRunPowershellScript(server_vm, "setup_s2d_volumes.ps1",
-                                    [win_password])
+    if self.spec.high_availability_type == "FCIMW":
+      self.PushAndRunPowershellScript(server_vm, "setup_mw_volume.ps1",
+                                      [win_password])
+    else:
+      # Configure S2D pool and volumes.
+      # All available storage (both PD and local SSD) will be used
+      self.PushAndRunPowershellScript(server_vm, "setup_s2d_volumes.ps1",
+                                      [win_password])
+
     # install SQL server into newly created cluster
     self.PushAndRunPowershellScript(server_vm,
                                     "setup_sql_server_first_node.ps1",
@@ -297,6 +312,57 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     return vm.RemoteCommand("powershell {} {}"
                             .format(script_path_on_vm,
                                     " ".join(cmd_parameters)))
+
+  def CreateAndAttachSharedDisk(self,
+                                server_vm: virtual_machine.VirtualMachine,
+                                disk_size: int,
+                                disk_type: str,
+                                server_vm_name: str,
+                                replica_vm_name: str) -> None:
+    """Releases existing IP reservation.
+
+    Args:
+      server_vm: server VM .
+      disk_size: size of the disk to be created.
+      disk_type: multi-writer disk type.
+      server_vm_name: name of the first SQL node where disk will be attached.
+      replica_vm_name: name of the second SQL node.
+    """
+
+    shared_disk_name = "pkb-{}-mw-disk-0".format(FLAGS.run_uri)
+    cmd = gcp_util.GcloudCommand(
+        server_vm,
+        "beta",
+        "compute",
+        "disks",
+        "create",
+        shared_disk_name,
+        f"--type={disk_type}",
+        "--multi-writer",
+        f"--zone={server_vm.zone}",
+        f"--size={disk_size}",
+    )
+    cmd.Issue()
+
+    cmd = gcp_util.GcloudCommand(
+        server_vm,
+        "compute",
+        "instances",
+        "attach-disk",
+        server_vm_name,
+        f"--disk={shared_disk_name}",
+    )
+    cmd.Issue()
+
+    cmd = gcp_util.GcloudCommand(
+        server_vm,
+        "compute",
+        "instances",
+        "attach-disk",
+        replica_vm_name,
+        f"--disk={shared_disk_name}",
+    )
+    cmd.Issue()
 
 
 def ConfigureSQLServer(vm, username: str, password: str):

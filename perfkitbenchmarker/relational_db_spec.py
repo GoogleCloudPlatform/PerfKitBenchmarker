@@ -147,6 +147,8 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
             option_decoders.BooleanDecoder,
             {'default': False},
         ),
+        'high_availability_type': (
+            option_decoders.StringDecoder, {'default': None}),
         'backup_enabled': (option_decoders.BooleanDecoder, {'default': True}),
         'backup_start_time': (
             option_decoders.StringDecoder,
@@ -236,6 +238,9 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     if flag_values['db_high_availability'].present:
       config_values['high_availability'] = (
           flag_values.db_high_availability)
+    if flag_values['db_high_availability_type'].present:
+      config_values['high_availability_type'] = (
+          flag_values.db_high_availability_type)
     if flag_values['db_backup_enabled'].present:
       config_values['backup_enabled'] = (flag_values.db_backup_enabled)
     if flag_values['db_backup_start_time'].present:

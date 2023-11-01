@@ -144,6 +144,8 @@ def GetConfig(user_config):
     # First vm to act as the second node in sql cluster
     # and additional vm to act as a domain controller.
     config['relational_db']['vm_groups']['servers']['vm_count'] = 3
+    if FLAGS.db_high_availability_type == 'FCIMW':
+      config['relational_db']['vm_groups']['servers']['disk_count'] = 0
 
   return config
 

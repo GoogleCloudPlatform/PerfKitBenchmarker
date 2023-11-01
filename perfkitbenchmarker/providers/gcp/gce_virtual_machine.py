@@ -746,6 +746,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       if not self.DiskTypeCreatedOnVMCreation(disk_spec):
         continue
       # local disks are handled above in a separate gcloud flag
+
       if disk_spec.disk_type == disk.LOCAL:
         continue
       for i in range(disk_spec.num_striped_disks):

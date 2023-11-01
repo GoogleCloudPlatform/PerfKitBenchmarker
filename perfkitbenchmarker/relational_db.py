@@ -42,6 +42,8 @@ flags.DEFINE_string('database_password', None,
                     'a random 10-character alpha-numeric string')
 flags.DEFINE_boolean('db_high_availability', False,
                      'Specifies if the database should be high availability')
+flags.DEFINE_string('db_high_availability_type', None,
+                    'Specifies high availableity type. (AOAG, FCIS2D, FCIMW)')
 flags.DEFINE_boolean('db_backup_enabled', True,
                      'Whether or not to enable automated backups')
 flags.DEFINE_string('db_backup_start_time', '07:00',

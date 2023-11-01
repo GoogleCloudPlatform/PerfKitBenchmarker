@@ -8,13 +8,22 @@
 
   if (-not(Test-Path $scriptsFolder)) {
     New-Item -Path $scriptsFolder  -ItemType directory
-}
+  }
+
+  $sqlDestFolder = 'C:\ClusterStorage'
+  $clusterStorageName = 'Cluster Virtual Disk (Data)'
+
+  if (Test-Path -Path 'D:\MSSQL\fcimw.txt' -PathType Leaf) {
+    $sqlDestFolder = 'D:\MSSQL'
+    $clusterStorage = Get-ClusterResource | Where-Object { $_.ResourceType -eq 'Physical Disk' }
+    $clusterStorageName = $clusterStorage.Name
+  }
 
   Write-Host 'Install SQL Server'
   # SQL Server 2022 needs /PRODUCTCOVEREDBYSA=False
   $sql2022InstallParam = '/PRODUCTCOVEREDBYSA=False'
   $sql2022InstallParam = ''
-  $sqlInstallString = [string]::Format('c:\sql_server_install\Setup.exe /Action=InstallFailoverCluster /UpdateEnabled=True {2} /ENU=True /SQLSVCACCOUNT=''perflab\sql_server'' /SQLSVCPASSWORD=''{0}'' /SAPWD=''{0}'' /AGTSVCACCOUNT=''perflab\sql_server'' /AGTSVCPASSWORD=''{0}'' /FEATURES=SQLENGINE,REPLICATION,FULLTEXT,DQ /INSTANCEID=''MSSQLSERVER'' /INSTANCENAME=''MSSQLSERVER'' /INSTALLSHAREDDIR=''C:\Program Files\Microsoft SQL Server'' /INSTANCEDIR=''C:\Program Files\Microsoft SQL Server'' /FAILOVERCLUSTERDISKS=''Cluster Virtual Disk (Data)'' /FAILOVERCLUSTERNETWORKNAME=''sql'' /FAILOVERCLUSTERIPADDRESSES=''IPv4;{1};Cluster Network 1;255.255.240.0'' /FAILOVERCLUSTERGROUP=''SQL Server (MSSQLSERVER)'' /SQLSVCINSTANTFILEINIT=''True'' /SQLSYSADMINACCOUNTS=''perflab\domain admins'' /IACCEPTSQLSERVERLICENSETERMS=1 /INSTALLSQLDATADIR=''C:\ClusterStorage\Data\'' /SQLUSERDBLOGDIR=''C:\ClusterStorage\Data\MSSQL\Log'' /SQLTEMPDBDIR=''C:\ClusterStorage\Data\MSSQL\Temp'' /FTSVCACCOUNT=''NT Service\MSSQLFDLauncher'' /INDICATEPROGRESS /SECURITYMODE=SQL /Q 2>&1 > c:\scripts\sqlsetuplog.log',$clearPassword, $clusterIpAddress,$sql2022InstallParam)
+  $sqlInstallString = [string]::Format('c:\sql_server_install\Setup.exe /Action=InstallFailoverCluster /UpdateEnabled=True {2} /ENU=True /SQLSVCACCOUNT=''perflab\sql_server'' /SQLSVCPASSWORD=''{0}'' /SAPWD=''{0}'' /AGTSVCACCOUNT=''perflab\sql_server'' /AGTSVCPASSWORD=''{0}'' /FEATURES=SQLENGINE,REPLICATION,FULLTEXT,DQ /INSTANCEID=''MSSQLSERVER'' /INSTANCENAME=''MSSQLSERVER'' /INSTALLSHAREDDIR=''C:\Program Files\Microsoft SQL Server'' /INSTANCEDIR=''C:\Program Files\Microsoft SQL Server'' /FAILOVERCLUSTERDISKS=''{3}'' /FAILOVERCLUSTERNETWORKNAME=''sql'' /FAILOVERCLUSTERIPADDRESSES=''IPv4;{1};Cluster Network 1;255.255.240.0'' /FAILOVERCLUSTERGROUP=''SQL Server (MSSQLSERVER)'' /SQLSVCINSTANTFILEINIT=''True'' /SQLSYSADMINACCOUNTS=''perflab\domain admins'' /IACCEPTSQLSERVERLICENSETERMS=1 /INSTALLSQLDATADIR=''{4}\Data\'' /SQLUSERDBLOGDIR=''{4}\Data\MSSQL\Log'' /SQLTEMPDBDIR=''{4}\Data\MSSQL\Temp'' /FTSVCACCOUNT=''NT Service\MSSQLFDLauncher'' /INDICATEPROGRESS /SECURITYMODE=SQL /Q 2>&1 > c:\scripts\sqlsetuplog.log',$clearPassword, $clusterIpAddress,$sql2022InstallParam, $clusterStorageName, $sqlDestFolder)
 
   Out-File -FilePath $taskScriptPath -InputObject $sqlInstallString
   Add-Content $taskScriptPath 'Add-ClusterResource -Name fci-dnn -ResourceType ''Distributed Network Name'' -Group ''SQL Server (MSSQLSERVER)'''
