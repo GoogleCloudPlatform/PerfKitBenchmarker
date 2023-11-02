@@ -352,10 +352,18 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
     self._PrepareScratchDisk(scratch_disk, disk_spec)
 
-  def DownloadPreprovisionedData(self, install_path, module_name, filename):
+  def DownloadPreprovisionedData(
+      self,
+      install_path,
+      module_name,
+      filename,
+      timeout=virtual_machine.PREPROVISIONED_DATA_TIMEOUT,
+  ):
     """Creats a temp file, no download."""
-    self.RemoteCommand('echo "1234567890" > ' +
-                       os.path.join(install_path, filename))
+    self.RemoteCommand(
+        'echo "1234567890" > ' + os.path.join(install_path, filename),
+        timeout=timeout,
+    )
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""

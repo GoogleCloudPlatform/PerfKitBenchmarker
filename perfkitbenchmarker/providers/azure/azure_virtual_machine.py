@@ -118,8 +118,6 @@ CONFIDENTIAL_MILAN_TYPES = [
     r'(Standard_EC[0-9]+as?d?s_v5)'
 ]
 
-FIVE_MINUTE_TIMEOUT = 300
-
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
@@ -893,8 +891,13 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.Install('azure_cli')
     self.Install('azure_credentials')
 
-  def DownloadPreprovisionedData(self, install_path, module_name, filename,
-                                 timeout=FIVE_MINUTE_TIMEOUT):
+  def DownloadPreprovisionedData(
+      self,
+      install_path,
+      module_name,
+      filename,
+      timeout=virtual_machine.PREPROVISIONED_DATA_TIMEOUT,
+  ):
     """Downloads a data file from Azure blob storage with pre-provisioned data.
 
     Use --azure_preprovisioned_data_bucket to specify the name of the account.
@@ -1134,7 +1137,7 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
 
   def DownloadPreprovisionedData(
       self, install_path, module_name, filename,
-      timeout=FIVE_MINUTE_TIMEOUT
+      timeout=virtual_machine.PREPROVISIONED_DATA_TIMEOUT
   ):
     """Downloads a data file from Azure blob storage with pre-provisioned data.
 

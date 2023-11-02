@@ -51,6 +51,7 @@ import six
 FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
 QUOTA_EXCEEDED_MESSAGE = 'Creation failed due to quota exceeded: '
+PREPROVISIONED_DATA_TIMEOUT = 300
 
 
 def ValidateVmMetadataFlag(options_list):
@@ -1589,7 +1590,13 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     """Installs the cloud specific cli along with credentials on this vm."""
     raise NotImplementedError()
 
-  def DownloadPreprovisionedData(self, install_path, module_name, filename):
+  def DownloadPreprovisionedData(
+      self,
+      install_path: str,
+      module_name: str,
+      filename: str,
+      timeout: int = PREPROVISIONED_DATA_TIMEOUT,
+  ):
     """Downloads preprovisioned benchmark data.
 
     This function should be overridden by each cloud provider VM. The file
@@ -1603,6 +1610,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       install_path: The install path on this VM.
       module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
+      timeout: Timeout value for downloading preprovisioned data, default 5 min.
     """
     raise NotImplementedError()
 

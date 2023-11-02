@@ -603,7 +603,11 @@ class DebianBasedKubernetesVirtualMachine(
     self.InstallPackages('ubuntu-minimal ubuntu-server ubuntu-standard')
 
   def DownloadPreprovisionedData(
-      self, install_path: str, module_name: str, filename: str
+      self,
+      install_path: str,
+      module_name: str,
+      filename: str,
+      timeout: int = virtual_machine.PREPROVISIONED_DATA_TIMEOUT,
   ):
     """Downloads a preprovisioned data file.
 
@@ -620,6 +624,7 @@ class DebianBasedKubernetesVirtualMachine(
       install_path: The install path on this VM.
       module_name: Name of the module associated with this data file.
       filename: The name of the file that was downloaded.
+      timeout: Timeout for the command.
 
     Raises:
       NotImplementedError: if this method does not support the specified cloud.
@@ -645,7 +650,9 @@ class DebianBasedKubernetesVirtualMachine(
           'data on Kubernetes VMs.'.format(cloud)
       )
 
-    self.RemoteCommand(download_function(install_path, module_name, filename))
+    self.RemoteCommand(
+        download_function(install_path, module_name, filename), timeout=timeout
+    )
 
   def ShouldDownloadPreprovisionedData(self, module_name: str, filename: str):
     """Returns whether or not preprovisioned data is available."""

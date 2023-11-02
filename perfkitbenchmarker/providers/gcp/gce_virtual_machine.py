@@ -141,8 +141,6 @@ _FIXED_GPU_MACHINE_TYPES = {
     'g2-standard-96': (virtual_machine.GPU_L4, 8),
 }
 
-FIVE_MINUTE_TIMEOUT = 300
-
 
 class GceRetryDescribeOperationsError(Exception):
   """Exception for retrying Exists().
@@ -1482,7 +1480,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return events_dict
 
   def DownloadPreprovisionedData(
-      self, install_path, module_name, filename, timeout=FIVE_MINUTE_TIMEOUT
+      self,
+      install_path,
+      module_name,
+      filename,
+      timeout=virtual_machine.PREPROVISIONED_DATA_TIMEOUT,
   ):
     """Downloads a data file from a GCS bucket with pre-provisioned data.
 

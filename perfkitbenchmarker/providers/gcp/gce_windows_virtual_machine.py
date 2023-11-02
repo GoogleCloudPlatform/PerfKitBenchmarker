@@ -20,6 +20,7 @@ from typing import Any, Dict, Tuple
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
@@ -143,7 +144,7 @@ class WindowsGceVirtualMachine(
       install_path,
       module_name,
       filename,
-      timeout=gce_virtual_machine.FIVE_MINUTE_TIMEOUT,
+      timeout=virtual_machine.PREPROVISIONED_DATA_TIMEOUT,
   ):
     """Downloads a data file from a GCS bucket with pre-provisioned data.
 

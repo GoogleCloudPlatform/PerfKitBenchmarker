@@ -144,8 +144,6 @@ _EFA_PARAMS['InterfaceType'] = 'efa'
 _EFA_URL = ('https://s3-us-west-2.amazonaws.com/aws-efa-installer/'
             'aws-efa-installer-{version}.tar.gz')
 
-FIVE_MINUTE_TIMEOUT = 300
-
 
 class AwsTransitionalVmRetryableError(Exception):
   """Error for retrying _Exists when an AWS VM is in a transitional state."""
@@ -1505,8 +1503,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.Install('awscli')
     self.Install('aws_credentials')
 
-  def DownloadPreprovisionedData(self, install_path, module_name, filename,
-                                 timeout=FIVE_MINUTE_TIMEOUT):
+  def DownloadPreprovisionedData(
+      self,
+      install_path,
+      module_name,
+      filename,
+      timeout=virtual_machine.PREPROVISIONED_DATA_TIMEOUT,
+  ):
     """Downloads a data file from an AWS S3 bucket with pre-provisioned data.
 
     Use --aws_preprovisioned_data_bucket to specify the name of the bucket.
@@ -1820,7 +1823,7 @@ class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
 
   def DownloadPreprovisionedData(
       self, install_path, module_name, filename,
-      timeout=FIVE_MINUTE_TIMEOUT
+      timeout=virtual_machine.PREPROVISIONED_DATA_TIMEOUT
   ):
     """Downloads a data file from an AWS S3 bucket with pre-provisioned data.
 
