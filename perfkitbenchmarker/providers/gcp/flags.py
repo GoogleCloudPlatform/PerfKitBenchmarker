@@ -105,6 +105,8 @@ flags.DEFINE_integer('gce_boot_disk_size', None,
 flags.DEFINE_enum('gce_boot_disk_type', None,
                   ['pd-standard',
                    'pd-ssd',
+                   'pd-balanced',
+                   'hyperdisk-balanced',
                    ],
                   'The boot disk type for GCP VMs.')
 flags.DEFINE_enum('gce_ssd_interface', 'SCSI', ['SCSI', 'NVME'],

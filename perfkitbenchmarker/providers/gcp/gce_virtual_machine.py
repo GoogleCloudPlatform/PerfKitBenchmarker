@@ -191,6 +191,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     self.min_node_cpus: int = None
     self.subnet_name: str = None
     super(GceVmSpec, self).__init__(*args, **kwargs)
+    if not self.boot_disk_type:
+      self.boot_disk_type = gce_disk.GetDefaultBootDiskType(self.machine_type)
     self.boot_disk_spec = boot_disk.BootDiskSpec(
         self.boot_disk_size, self.boot_disk_type
     )

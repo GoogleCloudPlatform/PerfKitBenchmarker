@@ -412,7 +412,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
           '--image-family ubuntu-2004-lts --image-project ubuntu-os-cloud',
           command_string)
       self.assertNotIn('--boot-disk-size', command_string)
-      self.assertNotIn('--boot-disk-type', command_string)
+      self.assertIn('--boot-disk-type', command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       self.assertDictContainsSubset({'image': fake_image,
