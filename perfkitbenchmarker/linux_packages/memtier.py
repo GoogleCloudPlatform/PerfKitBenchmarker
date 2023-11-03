@@ -29,7 +29,6 @@ from typing import Any, Dict, List, Optional, Text, Tuple, Union
 
 from absl import flags
 from absl import logging
-import matplotlib.pyplot as plt
 import numpy as np
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
@@ -821,7 +820,6 @@ def MeasureLatencyCappedThroughput(
 
 def _CalculateMode(values: list[float]) -> float:
   """Calculates the mode of a distribution using kernel density estimation."""
-  plt.clf()
   ax = sns.histplot(values, kde=True)
   kdeline = ax.lines[0]
   xs = kdeline.get_xdata()
