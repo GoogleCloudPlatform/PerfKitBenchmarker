@@ -32,6 +32,8 @@ import uuid
 
 from absl import flags
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import disk_strategies
+
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_virtual_machine
@@ -1397,7 +1399,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       nvme_devices = self.GetNVMEDeviceInfo()
       self.PopulateNVMEDevicePath(scratch_disk, nvme_devices)
       self.UpdateDevicePath(scratch_disk)
-    self._PrepareScratchDisk(scratch_disk, disk_spec)
+    disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
+        self, scratch_disk, disk_spec
+    )
 
   def PopulateNVMEDevicePath(self, scratch_disk, nvme_devices):
     local_devices = []

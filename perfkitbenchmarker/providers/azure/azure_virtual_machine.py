@@ -39,6 +39,7 @@ from typing import Optional
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import placement_group
@@ -884,7 +885,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       disks.append(data_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
-    self._PrepareScratchDisk(scratch_disk, disk_spec)
+    disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
+        self, scratch_disk, disk_spec
+    )
 
   def InstallCli(self):
     """Installs the Azure cli and credentials on this Azure vm."""

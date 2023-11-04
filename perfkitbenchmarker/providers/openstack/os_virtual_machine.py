@@ -27,6 +27,7 @@ import json
 import logging
 import threading
 from absl import flags
+from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import provider_info
@@ -399,7 +400,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
              for name in disks_names]
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
-    self._PrepareScratchDisk(scratch_disk, disk_spec)
+    disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
+        self, scratch_disk, disk_spec
+    )
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the VM.

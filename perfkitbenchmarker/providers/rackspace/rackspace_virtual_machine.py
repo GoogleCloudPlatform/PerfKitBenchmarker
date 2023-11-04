@@ -35,6 +35,7 @@ import logging
 import re
 import tempfile
 from absl import flags
+from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import provider_info
@@ -429,7 +430,9 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       scratch_disks.append(scratch_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, scratch_disks)
-    self._PrepareScratchDisk(scratch_disk, disk_spec)
+    disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
+        self, scratch_disk, disk_spec
+    )
 
   def _GetFreeBlockDevices(self, block_devices, disk_spec):
     """Returns available block devices that are not in used as data disk or as

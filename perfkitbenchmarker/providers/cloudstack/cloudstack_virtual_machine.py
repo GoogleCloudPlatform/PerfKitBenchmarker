@@ -21,6 +21,7 @@ the Cloudstack documentation at https://github.com/syed/PerfKitBenchmarker.git
 import logging
 
 from absl import flags
+from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
@@ -42,7 +43,6 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
   DEFAULT_IMAGE = None
   DEFAULT_USER_NAME = 'cca-user'
   DEFAULT_PROJECT = 'cloudops-Engineering'
-
 
   def __init__(self, vm_spec):
     """Initialize a CloudStack virtual machine.
@@ -71,7 +71,6 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.image = self.image or self.DEFAULT_IMAGE
     self.disk_counter = 0
 
-
   @vm_util.Retry(max_retries=3)
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -89,7 +88,6 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
         assert res, "Unable to create ssh keypair"
 
-
     # Allocate a public ip
     network_id = self.network.id
     if self.network.is_vpc:
@@ -102,7 +100,6 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.ip_address_id = public_ip['id']
     else:
       logging.warn("Unable to allocate public IP")
-
 
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
@@ -140,7 +137,6 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._vm = vm
     self.id = vm['virtualmachine']['id']
 
-
   @vm_util.Retry(max_retries=3)
   def _PostCreate(self):
     """Get the instance's data."""
@@ -156,9 +152,7 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
                                             self.id,
                                             self.network.id)
 
-
       assert snat_rule, "Unable to create static NAT"
-
 
   def _Delete(self):
     """Delete the VM instance."""
@@ -200,7 +194,9 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.disk_counter += 1
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, self.disks)
-    self._PrepareScratchDisk(scratch_disk, disk_spec)
+    disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
+        self, scratch_disk, disk_spec
+    )
 
 
 class CentOs7BasedCloudStackVirtualMachine(CloudStackVirtualMachine,

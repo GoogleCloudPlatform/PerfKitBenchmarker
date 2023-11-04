@@ -853,6 +853,10 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
     return scratch_disk
 
+  def PrepareScratchDisk(self, scratch_disk, disk_spec):
+    """Expose internal prepare scratch disk."""
+    self._PrepareScratchDisk(scratch_disk, disk_spec)
+
   def _PrepareScratchDisk(self, scratch_disk, disk_spec):
     """Helper method to format and mount scratch disk.
 

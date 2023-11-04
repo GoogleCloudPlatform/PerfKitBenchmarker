@@ -41,6 +41,7 @@ from absl import flags
 from perfkitbenchmarker import boot_disk
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
@@ -1197,7 +1198,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           scratch_disk, nvme_devices
       )
       self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
-    self._PrepareScratchDisk(scratch_disk, disk_spec)
+    disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
+        self, scratch_disk, disk_spec
+    )
 
   def CreateIpReservation(
       self, ip_address_name: str
