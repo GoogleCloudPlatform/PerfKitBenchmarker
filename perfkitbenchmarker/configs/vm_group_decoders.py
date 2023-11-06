@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing a VM group spec and related decoders."""
+from typing import Optional
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
@@ -54,6 +55,8 @@ class VmGroupSpec(spec.BaseSpec):
   static_vms: list[static_virtual_machine.StaticVmSpec]
   vm_count: int
   vm_spec: virtual_machine.BaseVmSpec
+  vm_as_nfs: bool
+  vm_as_nfs_disk_spec: Optional[disk.BaseNFSDiskSpec]
   placement_group_name: str
   cidr: str
 
@@ -77,7 +80,15 @@ class VmGroupSpec(spec.BaseSpec):
       self.disk_spec = disk_spec_class(
           '{0}.disk_spec.{1}'.format(component_full_name, self.cloud),
           flag_values=flag_values,
-          **disk_config)
+          **disk_config
+      )
+
+      if self.vm_as_nfs:
+        self.vm_as_nfs_disk_spec = disk.BaseNFSDiskSpec(
+            '{0}.disk_spec.{1}'.format(component_full_name, self.cloud),
+            flag_values=flag_values,
+            **disk_config
+        )
     vm_config = getattr(self.vm_spec, self.cloud, None)
     if vm_config is None:
       raise errors.Config.MissingOption(
@@ -100,34 +111,37 @@ class VmGroupSpec(spec.BaseSpec):
     """
     result = super(VmGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': provider_info.VALID_CLOUDS
-        }),
-        'disk_count': (option_decoders.IntDecoder, {
-            'default': _DEFAULT_DISK_COUNT,
-            'min': 0,
-            'none_ok': True
-        }),
-        'disk_spec': (option_decoders.PerCloudConfigDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'os_type': (option_decoders.EnumDecoder, {
-            'valid_values': os_types.ALL
-        }),
+        'cloud': (
+            option_decoders.EnumDecoder,
+            {'valid_values': provider_info.VALID_CLOUDS},
+        ),
+        'disk_count': (
+            option_decoders.IntDecoder,
+            {'default': _DEFAULT_DISK_COUNT, 'min': 0, 'none_ok': True},
+        ),
+        'vm_as_nfs': (
+            option_decoders.BooleanDecoder,
+            {'default': False, 'none_ok': True},
+        ),
+        'disk_spec': (
+            option_decoders.PerCloudConfigDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'os_type': (
+            option_decoders.EnumDecoder,
+            {'valid_values': os_types.ALL},
+        ),
         'static_vms': (static_vm_decoders.StaticVmListDecoder, {}),
-        'vm_count': (option_decoders.IntDecoder, {
-            'default': _DEFAULT_VM_COUNT,
-            'min': 0
-        }),
-        'cidr': (option_decoders.StringDecoder, {
-            'default': None
-        }),
+        'vm_count': (
+            option_decoders.IntDecoder,
+            {'default': _DEFAULT_VM_COUNT, 'min': 0},
+        ),
+        'cidr': (option_decoders.StringDecoder, {'default': None}),
         'vm_spec': (option_decoders.PerCloudConfigDecoder, {}),
-        'placement_group_name': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
+        'placement_group_name': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
     })
     return result
 
