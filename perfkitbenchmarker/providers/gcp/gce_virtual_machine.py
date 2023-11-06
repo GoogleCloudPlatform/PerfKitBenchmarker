@@ -413,6 +413,14 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
+  def _IsReady(self) -> bool:
+    """Returns True if the node-group is ready."""
+    cmd = util.GcloudCommand(
+        self, 'compute', 'sole-tenancy', 'node-groups', 'describe', self.name
+    )
+    stdout, _, _ = cmd.Issue(raise_on_failure=False)
+    return json.loads(stdout).get('status') == 'READY'
+
   def _Delete(self):
     """Deletes the host."""
     cmd = util.GcloudCommand(
