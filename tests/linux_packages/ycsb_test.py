@@ -232,6 +232,22 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(results[1].value, 1)
     self.assertEqual(results[2].value, 9)
 
+  @flagsaver.flagsaver(
+      ycsb_lowest_latency_load=True, ycsb_lowest_latency_target_qps=250
+  )
+  def testLowestLatencyModeWithFixedThroughput(self):
+    self.enter_context(
+        mock.patch.object(
+            self.test_executor,
+            'RunStaircaseLoads',
+            side_effect=[
+                _GetMockThroughputLatencySamples(100, 3, 10),
+            ],
+        )
+    )
+    result = self.test_executor.Run([self.test_vm])
+    self.assertIn('ycsb_lowest_latency_fixed_qps', result[0].metadata)
+
 
 def _GetMockThroughputSamples(throughputs):
   result = []

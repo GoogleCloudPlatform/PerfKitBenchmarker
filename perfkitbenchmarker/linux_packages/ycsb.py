@@ -356,6 +356,12 @@ _LOWEST_LATENCY = flags.DEFINE_bool(
     'Finds the lowest latency the database can sustain and returns the relevant'
     ' samples.',
 )
+_LOWEST_LATENCY_TARGET_QPS = flags.DEFINE_integer(
+    'ycsb_lowest_latency_target_qps',
+    None,
+    'Runs the lowest latency workload with a fixed QPS instead of searching.'
+    ' Useful when the optimal throughput throughput is already known.',
+)
 
 
 def _ValidateCpuTargetFlags(flags_dict):
@@ -516,13 +522,20 @@ def CheckPrerequisites():
       [':' in thread_qps for thread_qps in FLAGS.ycsb_threads_per_client]
   )
   flag_target = _TARGET_QPS.value is not None
+  lowest_latency_target = _LOWEST_LATENCY_TARGET_QPS.value is not None
   dynamic_load = FLAGS.ycsb_dynamic_load
 
-  if [flag_target, run_target, per_thread_target, dynamic_load].count(True) > 1:
+  if [
+      flag_target,
+      run_target,
+      per_thread_target,
+      dynamic_load,
+      lowest_latency_target,
+  ].count(True) > 1:
     raise errors.Config.InvalidValue(
-        'Setting YCSB target in ycsb_target_qps, ycsb_threads_per_client, or'
-        ' ycsb_run_parameters or applying ycsb_dynamic_load_* flags are mutally'
-        ' exclusive.'
+        'Setting YCSB target in ycsb_target_qps, ycsb_threads_per_client,'
+        ' ycsb_lowest_latency_target_qps, ycsb_run_parameters or applying'
+        ' ycsb_dynamic_load_* flags are mutally exclusive.'
     )
 
   if FLAGS.ycsb_dynamic_load_throughput_lower_bound and not dynamic_load:
@@ -1325,6 +1338,16 @@ class YCSBExecutor:
           result.update_latency,
       )
 
+    def _RunWorkload(target_qps: int) -> list[sample.Sample]:
+      """Runs the workload at the target throughput."""
+      run_params = _GetRunParameters()
+      run_params['target'] = target_qps
+      self._SetClientThreadCount(
+          min(target_qps, int(FLAGS.ycsb_threads_per_client[0]))
+      )
+      self._SetRunParameters(run_params)
+      return self.RunStaircaseLoads([vms[0]], workloads, **run_kwargs)
+
     def _ExtractStats(samples: list[sample.Sample]) -> _ThroughputLatencyResult:
       """Returns the throughput and latency recorded in the samples."""
       throughput, read_latency, update_latency = 0, 0, 0
@@ -1370,20 +1393,23 @@ class YCSBExecutor:
           s.metadata['ycsb_lowest_latency_cpu_measurement_mins'] = (
               _LOWEST_LATENCY_CPU_MEASUREMENT_MINS
           )
+        if _LOWEST_LATENCY_TARGET_QPS.value:
+          s.metadata['ycsb_lowest_latency_fixed_qps'] = (
+              _LOWEST_LATENCY_TARGET_QPS.value
+          )
       return samples
 
-    run_params = _GetRunParameters()
+    if _LOWEST_LATENCY_TARGET_QPS.value:
+      return _ProcessSamples(
+          _RunWorkload(_LOWEST_LATENCY_TARGET_QPS.value), database
+      )
+
     target = _LOWEST_LATENCY_STARTING_QPS
     min_read_latency = float('inf')
     min_update_latency = float('inf')
     prev_result = _ThroughputLatencyResult()
     while True:
-      run_params['target'] = target
-      self._SetClientThreadCount(
-          min(target, int(FLAGS.ycsb_threads_per_client[0]))
-      )
-      self._SetRunParameters(run_params)
-      samples = self.RunStaircaseLoads([vms[0]], workloads, **run_kwargs)
+      samples = _RunWorkload(target)
       result = _ExtractStats(samples)
       _PrintDebugLog(result)
       if (
