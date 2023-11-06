@@ -692,7 +692,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
             f'os={self.os_disk.disk_type}',
             '--name',
             self.name,
-        ]  # pyformat: disable
+        ]
         + disk_size_args
         + confidential_args
         + self.resource_group.args
@@ -1179,7 +1179,7 @@ class BaseWindowsAzureVirtualMachine(AzureVirtualMachine,
         GenerateStatPreprovisionedDataCommand(
             module_name, filename).split(' '), raise_on_failure=False)[-1] == 0
 
-  def _DiskDriveIsLocal(self, device, model):
+  def DiskDriveIsLocal(self, device, model):
     """Helper method to determine if a disk drive is a local ssd to stripe."""
     # NVME Striped disks applies to Azure's L series
     # https://learn.microsoft.com/en-us/azure/virtual-machines/lsv3-series

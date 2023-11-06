@@ -585,7 +585,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     command = 'netsh advfirewall set allprofiles state on'
     self.RemoteCommand(command)
 
-  def _RunDiskpartScript(self, script):
+  def RunDiskpartScript(self, script):
     """Runs the supplied Diskpart script on the VM."""
     logging.info('Writing diskpart script \n %s', script)
     with vm_util.NamedTemporaryFile(prefix='diskpart', mode='w') as tf:
@@ -596,102 +596,10 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       self.RemoteCommand('diskpart /s {script_path}'.format(
           script_path=script_path))
 
-  def _DiskDriveIsLocal(self, device, model):
+  def DiskDriveIsLocal(self, device, model):
     """Helper method to determine if a disk drive is a local ssd to stripe."""
 
-  def _PrepareScratchDisk(self, scratch_disk, disk_spec):
-    """Helper method to format and mount scratch disk.
-
-    Args:
-      scratch_disk: Scratch disk to be formatted and mounted.
-      disk_spec: The BaseDiskSpec object corresponding to the disk.
-    """
-    # Create and then run a Diskpart script that will initialize the disks,
-    # create a volume, and then format and mount the volume.
-    script = ''
-
-    # Get DeviceId and Model (FriendlyNam) for all disks
-    # attached to the VM except boot disk.
-    # Using Get-Disk has option to query for disks with no partition
-    # (partitionstyle -eq 'raw'). Returned Number and FriendlyName represent
-    # DeviceID and model of the disk. Device ID is used for Diskpart cleanup.
-    # https://learn.microsoft.com/en-us/powershell/module/
-    # storage/get-disk?view=windowsserver2022-ps
-    stdout, _ = self.RemoteCommand(
-        'Get-Disk | Where partitionstyle -eq \'raw\' | '
-        'Select  Number,FriendlyName'
-    )
-    query_disk_numbers = []
-    lines = stdout.splitlines()
-    for line in lines:
-      if line:
-        device, model = line.strip().split(' ', 1)
-        if 'Number' in device or '-----' in device:
-          continue
-
-        if disk_spec.disk_type == 'local':
-          if self._DiskDriveIsLocal(device, model):
-            query_disk_numbers.append(device)
-        else:
-          if not self._DiskDriveIsLocal(device, model):
-            query_disk_numbers.append(device)
-
-    if scratch_disk.is_striped:
-      disk_numbers = query_disk_numbers
-    else:
-      disk_numbers = query_disk_numbers[0]
-
-    for disk_number in disk_numbers:
-      # For each disk, set the status to online (if it is not already),
-      # remove any formatting or partitioning on the disks, and convert
-      # it to a dynamic disk so it can be used to create a volume.
-      # TODO(user): Fix on Azure machines with temp disk, e.g.
-      # Ebdsv5 which have 1 local disk with partitions. Perhaps this means
-      # removing the clean and convert gpt lines.
-      script += ('select disk %s\n'
-                 'online disk noerr\n'
-                 'attributes disk clear readonly\n'
-                 'clean\n'
-                 'convert gpt\n'
-                 'convert dynamic\n' % disk_number)
-
-    # Create a volume out of the disk(s).
-    if scratch_disk.is_striped:
-      script += 'create volume stripe disk=%s\n' % ','.join(disk_numbers)
-    else:
-      script += 'create volume simple\n'
-
-    # If a mount point has been specified, create the directory where it will be
-    # mounted, format the volume, and assign the mount point to the volume.
-    if disk_spec.mount_point:
-      self.RemoteCommand('mkdir %s' % disk_spec.mount_point)
-      format_command = 'format quick'
-
-      if self.OS_TYPE in os_types.WINDOWS_SQLSERVER_OS_TYPES:
-        format_command = 'format fs=ntfs quick unit=64k'
-
-      script += ('%s\n'
-                 'assign letter=%s\n'
-                 'assign mount=%s\n' %
-                 (format_command, ATTACHED_DISK_LETTER.lower(),
-                  disk_spec.mount_point))
-
-    # No-op, useful for understanding the state of the disks
-    self._RunDiskpartScript('list disk')
-    self._RunDiskpartScript(script)
-
-    # Grant user permissions on the drive
-    self.RemoteCommand(
-        'icacls {}: /grant Users:F /L'.format(ATTACHED_DISK_LETTER))
-    self.RemoteCommand(
-        'icacls {}: --% /grant Users:(OI)(CI)F /L'.format(ATTACHED_DISK_LETTER))
-
-    self.scratch_disks.append(scratch_disk)
-
-    if(FLAGS.gce_num_local_ssds > 0 and FLAGS.db_disk_type != 'local'):
-      self._PrepareTempDbDisk()
-
-  def _PrepareTempDbDisk(self):
+  def PrepareTempDbDisk(self):
     """Helper method to format and setup disk for SQL Server TempDB."""
 
   def SetReadAhead(self, num_sectors, devices):

@@ -90,7 +90,7 @@ class WindowsGceVirtualMachine(
         windows_virtual_machine.STARTUP_SCRIPT
     )
 
-  def _PrepareTempDbDisk(self):
+  def PrepareTempDbDisk(self):
     """Helper method to format and setup disk for SQL Server TempDB."""
     # Create and then run a Diskpart script that will initialize the disks,
     # create a volume, and then format and mount the volume.
@@ -127,7 +127,7 @@ class WindowsGceVirtualMachine(
       script += 'format fs=ntfs quick unit=64k\nassign letter={}\n'.format(
           TEMPDB_DISK_LETTER.lower()
       )
-    self._RunDiskpartScript(script)
+    self.RunDiskpartScript(script)
 
     # Grant user permissions on the drive
     if local_ssd_disks:
@@ -300,7 +300,7 @@ class WindowsGceVirtualMachine(
   def _MetadataPreemptCmd(self) -> str:
     return _METADATA_PREEMPT_CMD_WIN
 
-  def _DiskDriveIsLocal(self, device, model):
+  def DiskDriveIsLocal(self, device, model):
     """Helper method to determine if a disk drive is a local ssd to stripe."""
     if (model.lower().strip() == 'nvme_card' or
         model.lower().strip() == 'google ephemeraldisk'):

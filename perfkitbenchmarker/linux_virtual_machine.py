@@ -1648,34 +1648,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                      self.mount_point, self.disk_size)
       vm.RemoteHostCommand(mnt_cmd)
 
-  def _PrepareScratchDisk(self, scratch_disk, disk_spec):
-    """Helper method to format and mount scratch disk.
-
-    Args:
-      scratch_disk: Scratch disk to be formatted and mounted.
-      disk_spec: The BaseDiskSpec object corresponding to the disk.
-    """
-    if scratch_disk.is_striped:
-      # the scratch disk is a logical device stripped together from raw disks
-      # scratch disk device path == disk_spec device path
-      # scratch disk device path != raw disks device path
-      scratch_disk_device_path = '/dev/md%d' % len(self.scratch_disks)
-      scratch_disk.device_path = scratch_disk_device_path
-      disk_spec.device_path = scratch_disk_device_path
-      raw_device_paths = [d.GetDevicePath() for d in scratch_disk.disks]
-      self.StripeDisks(raw_device_paths, scratch_disk.GetDevicePath())
-
-    if disk_spec.mount_point:
-      if isinstance(scratch_disk, disk.MountableDisk):
-        scratch_disk.Mount(self)
-      else:
-        self.FormatDisk(scratch_disk.GetDevicePath(), disk_spec.disk_type)
-        self.MountDisk(scratch_disk.GetDevicePath(), disk_spec.mount_point,
-                       disk_spec.disk_type, scratch_disk.mount_options,
-                       scratch_disk.fstab_options)
-
-    self.scratch_disks.append(scratch_disk)
-
   def StripeDisks(self, devices, striped_device):
     """Raids disks together using mdadm.
 

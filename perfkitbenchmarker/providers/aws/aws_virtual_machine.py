@@ -1951,7 +1951,7 @@ class BaseWindowsAwsVirtualMachine(AwsVirtualMachine,
       raise AwsUnexpectedWindowsAdapterOutputError(
           'InterruptModeration failed to disable')
 
-  def _DiskDriveIsLocal(self, device, model):
+  def DiskDriveIsLocal(self, device, model):
     """Helper method to determine if a disk drive is a local ssd to stripe."""
     if 'Amazon Elastic B' in model:
       return False
