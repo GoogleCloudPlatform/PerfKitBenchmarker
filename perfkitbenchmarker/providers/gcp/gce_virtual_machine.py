@@ -1297,7 +1297,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       if disk_spec.replica_zones:
         # GCE regional disks cannot use create-on-create.
         return False
-      return disk_spec.create_with_vm
+      return disk_spec.create_with_vm and (
+          disk_spec.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES + [disk.LOCAL]
+      )
 
     # Other disk type are created separately
     return False

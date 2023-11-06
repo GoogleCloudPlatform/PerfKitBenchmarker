@@ -390,7 +390,6 @@ class BaseDisk(resource.BaseResource):
     self.metadata.update({'fstab_options': opts})
     return opts
 
-  @abc.abstractmethod
   def Attach(self, vm):
     """Attaches the disk to a VM.
 
@@ -407,15 +406,19 @@ class BaseDisk(resource.BaseResource):
 
   def GetDevicePath(self):
     """Returns the path to the device inside a Linux VM."""
-    if self.device_path is None:
-      raise ValueError('device_path is None.')
     return self.device_path
 
   def GetDeviceId(self):
     """Return the Windows DeviceId of this disk."""
-    if self.disk_number is None:
-      raise ValueError('disk_number is None.')
     return r'\\.\PHYSICALDRIVE%s' % self.disk_number
+
+  def _Create(self):
+    # handled by disk
+    pass
+
+  def _Delete(self):
+    # handled by disk
+    pass
 
 
 class StripedDisk(BaseDisk):
