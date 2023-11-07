@@ -126,6 +126,9 @@ class BaseDiskSpec(spec.BaseSpec):
   def __init__(self, *args, **kwargs):
     self.device_path: str = None
     self.mount_point: str = None
+    self.disk_type: str = None
+    self.disk_size: int = None
+    self.num_striped_disks: int = None
     super(BaseDiskSpec, self).__init__(*args, **kwargs)
 
   @classmethod

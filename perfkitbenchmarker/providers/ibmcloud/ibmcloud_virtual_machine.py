@@ -337,7 +337,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.vm_deleted = True
     logging.info('Instance deleted: %s', cmd.flags['instanceid'])
 
-  def CreateScratchDisk(self, _, disk_spec: disk.BaseDisk):
+  def CreateScratchDisk(self, _, disk_spec: disk.BaseDiskSpec):
     """Create a VM's scratch disk.
 
     Args:

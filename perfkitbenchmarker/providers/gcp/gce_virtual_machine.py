@@ -1126,13 +1126,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Set up all scratch disks of the current VM."""
     # This method will be depreciate soon.
     # Prepare vm scratch disks:
+    if any((spec.disk_type == disk.RAM for spec in self.disk_specs)):
+      disk_strategies.SetUpRamDiskStrategy().SetUpDisk(self, self.disk_specs[0])
+      return
+
     if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
       self.SetupLocalDisks()
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      if disk_spec.disk_type == disk.RAM:
-        self.CreateRamDisk(disk_spec)
-      else:
-        self.CreateScratchDisk(disk_spec_id, disk_spec)
+      self.CreateScratchDisk(disk_spec_id, disk_spec)
       # TODO(user): Simplify disk logic.
       if disk_spec.num_striped_disks > 1:
         # scratch disks has already been created and striped together.

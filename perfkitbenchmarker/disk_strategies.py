@@ -16,27 +16,65 @@
 This module abstract out the disk algorithm for formatting and creating
 scratch disks.
 """
+import logging
+from typing import Union
 
 from absl import flags
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import windows_virtual_machine
-
 
 FLAGS = flags.FLAGS
+
+
+class SetUpRamDiskStrategy:
+  """Strategies to set up ram disks."""
+
+  def SetUpDisk(
+      self,
+      vm,
+      disk_spec: disk.BaseDiskSpec,
+  ) -> None:
+    if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
+      self.SetUpDiskOnLinux(vm, disk_spec)
+    else:
+      raise NotImplementedError('Ram disk is only supported on linux.')
+
+  def SetUpDiskOnLinux(self, vm, disk_spec: disk.BaseDiskSpec) -> None:
+    """Performs Linux specific setup of ram disk."""
+    scratch_disk = disk.BaseDisk(disk_spec)
+    logging.info(
+        'Mounting and creating Ram Disk %s, %s',
+        scratch_disk.mount_point,
+        scratch_disk.disk_size,
+    )
+    mnt_cmd = (
+        'sudo mkdir -p {0};sudo mount -t tmpfs -o size={1}g tmpfs {0};'
+        'sudo chown -R $USER:$USER {0};'
+    ).format(scratch_disk.mount_point, scratch_disk.disk_size)
+    vm.RemoteHostCommand(mnt_cmd)
+    vm.scratch_disks.append(disk.BaseDisk(disk_spec))
 
 
 class PrepareScratchDiskStrategy:
   """Strategies to prepare scratch disks."""
 
-  def PrepareScratchDisk(self, vm, disks, disk_spec):
-    if isinstance(vm, linux_virtual_machine.BaseLinuxMixin):
-      self.PrepareLinuxScratchDisk(vm, disks, disk_spec)
+  def PrepareScratchDisk(
+      self,
+      vm,
+      scratch_disk: Union[disk.BaseDisk, disk.StripedDisk],
+      disk_spec: disk.BaseDiskSpec,
+  ) -> None:
+    if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
+      self.PrepareLinuxScratchDisk(vm, scratch_disk, disk_spec)
     else:
-      self.PrepareWindowsScratchDisk(vm, disks, disk_spec)
+      self.PrepareWindowsScratchDisk(vm, scratch_disk, disk_spec)
 
-  def PrepareLinuxScratchDisk(self, vm, scratch_disk, disk_spec):
+  def PrepareLinuxScratchDisk(
+      self,
+      vm,
+      scratch_disk: Union[disk.BaseDisk, disk.StripedDisk],
+      disk_spec: disk.BaseDiskSpec,
+  ) -> None:
     """Helper method to format and mount scratch disk.
 
     Args:
@@ -44,7 +82,7 @@ class PrepareScratchDiskStrategy:
       scratch_disk: Scratch disk to be formatted and mounted.
       disk_spec: The BaseDiskSpec object corresponding to the disk.
     """
-    if scratch_disk.is_striped:
+    if isinstance(scratch_disk, disk.StripedDisk) and scratch_disk.is_striped:
       # the scratch disk is a logical device stripped together from raw disks
       # scratch disk device path == disk_spec device path
       # scratch disk device path != raw disks device path
@@ -69,7 +107,12 @@ class PrepareScratchDiskStrategy:
 
     vm.scratch_disks.append(scratch_disk)
 
-  def PrepareWindowsScratchDisk(self, vm, scratch_disk, disk_spec):
+  def PrepareWindowsScratchDisk(
+      self,
+      vm,
+      scratch_disk: Union[disk.BaseDisk, disk.StripedDisk],
+      disk_spec: disk.BaseDiskSpec,
+  ) -> None:
     """Helper method to format and mount scratch disk.
 
     Args:
@@ -145,7 +188,7 @@ class PrepareScratchDiskStrategy:
 
       script += '%s\nassign letter=%s\nassign mount=%s\n' % (
           format_command,
-          windows_virtual_machine.ATTACHED_DISK_LETTER.lower(),
+          vm.assigned_disk_letter.lower(),
           disk_spec.mount_point,
       )
 
@@ -155,13 +198,11 @@ class PrepareScratchDiskStrategy:
 
     # Grant user permissions on the drive
     vm.RemoteCommand(
-        'icacls {}: /grant Users:F /L'.format(
-            windows_virtual_machine.ATTACHED_DISK_LETTER
-        )
+        'icacls {}: /grant Users:F /L'.format(vm.assigned_disk_letter)
     )
     vm.RemoteCommand(
         'icacls {}: --% /grant Users:(OI)(CI)F /L'.format(
-            windows_virtual_machine.ATTACHED_DISK_LETTER
+            vm.assigned_disk_letter
         )
     )
 

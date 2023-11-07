@@ -43,11 +43,13 @@ class IbmCloudDisk(disk.BaseDisk):
     encryption_key: enryption key.
   """
 
-  def __init__(self,
-               disk_spec: disk.BaseDisk,
-               name: str,
-               zone: str,
-               encryption_key: Optional[str] = None):
+  def __init__(
+      self,
+      disk_spec: disk.BaseDiskSpec,
+      name: str,
+      zone: str,
+      encryption_key: Optional[str] = None,
+  ):
     super(IbmCloudDisk, self).__init__(disk_spec)
     self.name = name
     self.zone = zone

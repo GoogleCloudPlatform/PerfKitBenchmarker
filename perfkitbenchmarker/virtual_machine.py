@@ -38,6 +38,7 @@ from perfkitbenchmarker import benchmark_lookup
 from perfkitbenchmarker import context as pkb_context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import os_types
@@ -444,10 +445,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       dict mapping string property key to value.
     """
     return self.os_metadata
-
-  def CreateRamDisk(self, disk_spec):
-    """Create and mount Ram disk."""
-    raise NotImplementedError()
 
   def RemoteCommand(
       self,
@@ -1271,13 +1268,14 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     """Set up all scratch disks of the current VM."""
     # This method will be depreciate soon.
     # Prepare vm scratch disks:
+    if any((spec.disk_type == disk.RAM for spec in self.disk_specs)):
+      disk_strategies.SetUpRamDiskStrategy().SetUpDisk(self, self.disk_specs[0])
+      return
+
     if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
       self.SetupLocalDisks()
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      if disk_spec.disk_type == disk.RAM:
-        self.CreateRamDisk(disk_spec)
-      else:
-        self.CreateScratchDisk(disk_spec_id, disk_spec)
+      self.CreateScratchDisk(disk_spec_id, disk_spec)
       # TODO(user): Simplify disk logic.
       if disk_spec.num_striped_disks > 1:
         # scratch disks has already been created and striped together.

@@ -1630,21 +1630,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     """Performs Linux specific setup of local disks."""
     pass
 
-  def CreateRamDisk(self, disk_spec):
-    """Performs Linux specific setup of ram disk."""
-    scratch_disk = disk.BaseDisk(disk_spec)
-    logging.info(
-        'Mounting and creating Ram Disk %s, %s',
-        scratch_disk.mount_point,
-        scratch_disk.disk_size,
-    )
-    mnt_cmd = (
-        'sudo mkdir -p {0};sudo mount -t tmpfs -o size={1}g tmpfs {0};'
-        'sudo chown -R $USER:$USER {0};'
-    ).format(scratch_disk.mount_point, scratch_disk.disk_size)
-    self.RemoteHostCommand(mnt_cmd)
-    self.scratch_disks.append(disk.BaseDisk(disk_spec))
-
   def StripeDisks(self, devices, striped_device):
     """Raids disks together using mdadm.
 
