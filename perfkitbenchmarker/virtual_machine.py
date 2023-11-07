@@ -231,7 +231,7 @@ class BaseVmSpec(spec.BaseSpec):
   def __init__(self, *args, **kwargs):
     self.zone = None
     self.cidr = None
-    self.machine_type = None
+    self.machine_type: str
     self.gpu_count = None
     self.gpu_type = None
     self.image = None
@@ -244,6 +244,7 @@ class BaseVmSpec(spec.BaseSpec):
     self.disable_rss = None
     self.vm_metadata: Dict[str, Any] = None
     self.boot_startup_script: str = None
+    self.internal_ip: str
     super(BaseVmSpec, self).__init__(*args, **kwargs)
 
   @classmethod

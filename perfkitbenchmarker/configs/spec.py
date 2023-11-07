@@ -23,7 +23,7 @@ import six
 _SPEC_REGISTRY = {}
 
 
-def GetSpecClass(base_class, **kwargs):
+def GetSpecClass(base_class, **kwargs) -> 'BaseSpecMetaClass':
   """Returns the subclass with the corresponding attributes.
 
   Args:

@@ -36,11 +36,14 @@ class BaseNonRelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   SPEC_TYPE = 'BaseNonRelationalDbSpec'
   SPEC_ATTRS = ['SERVICE_TYPE']
 
-  def __init__(self,
-               component_full_name: str,
-               flag_values: Optional[flags.FlagValues] = None,
-               **kwargs):
+  def __init__(
+      self,
+      component_full_name: str,
+      flag_values: Optional[flags.FlagValues] = None,
+      **kwargs
+  ):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    self.service_type: str
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -56,32 +59,48 @@ class BaseNonRelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
         'service_type': (
             option_decoders.EnumDecoder,
             {
-                'default':
-                    None,
+                'default': None,
                 'valid_values': [
                     DYNAMODB,
                     BIGTABLE,
                 ],
-            }),
+            },
+        ),
     })
     return result
 
 
 class BaseNonRelationalDb(resource.BaseResource):
   """Object representing a nonrelational database."""
+
   REQUIRED_ATTRS = ['SERVICE_TYPE']
   RESOURCE_TYPE = 'BaseNonRelationalDb'
   SERVICE_TYPE = 'Base'
 
+  @classmethod
+  def FromSpec(cls, db_spec: BaseNonRelationalDbSpec) -> 'BaseNonRelationalDb':
+    """Constructs an instance from the class given a spec.
+
+    Overridden by children.
+    Args:
+      db_spec: A Base spec with details of the db.
+
+    Returns:
+      newly created instance.
+    """
+    del db_spec
+    return cls()
+
 
 def GetNonRelationalDbSpecClass(
-    service_type: str) -> type[BaseNonRelationalDbSpec]:
+    service_type: str,
+) -> type[BaseNonRelationalDbSpec]:
   """Gets the non-relational db spec class corresponding to 'service_type'."""
   return spec.GetSpecClass(BaseNonRelationalDbSpec, SERVICE_TYPE=service_type)
 
 
-def GetNonRelationalDbClass(
-    service_type: str) -> type[BaseNonRelationalDb]:
+def GetNonRelationalDbClass(service_type: str) -> type[BaseNonRelationalDb]:
   """Gets the non-relational database class corresponding to 'service_type'."""
-  return resource.GetResourceClass(BaseNonRelationalDb,
-                                   SERVICE_TYPE=service_type)
+  return resource.GetResourceClass(
+      BaseNonRelationalDb, SERVICE_TYPE=service_type
+  )

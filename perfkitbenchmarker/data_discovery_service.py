@@ -6,30 +6,39 @@ Discovery Service PKB supports (e.g. AWS Glue Crawler).
 """
 
 import abc
+import typing
 from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import resource
 
 _DATA_DISCOVERY_OBJECT_STORE_PATH = flags.DEFINE_string(
-    'data_discovery_object_store_path', None,
+    'data_discovery_object_store_path',
+    None,
     'Object store path which will be analyzed by the Data Discovery Service. '
     'Must be a fully qualified object store URL (e.g. s3://bucket/dir for S3, '
-    'or gs://bucket/dir for GCS).'
+    'or gs://bucket/dir for GCS).',
 )
 _DATA_DISCOVERY_REGION = flags.DEFINE_string(
-    'data_discovery_region', None,
-    'Region on which the data discovery service will be deployed.'
+    'data_discovery_region',
+    None,
+    'Region on which the data discovery service will be deployed.',
 )
 
 # Available service types
 GLUE = 'glue'
 
 
-def GetDataDiscoveryServiceClass(cloud, service_type):
+def GetDataDiscoveryServiceClass(
+    cloud, service_type
+) -> type['BaseDataDiscoveryService']:
   """Gets the underlying Data Discovery Service class."""
-  return resource.GetResourceClass(
-      BaseDataDiscoveryService, CLOUD=cloud, SERVICE_TYPE=service_type)
+  return typing.cast(
+      type[BaseDataDiscoveryService],
+      resource.GetResourceClass(
+          BaseDataDiscoveryService, CLOUD=cloud, SERVICE_TYPE=service_type
+      ),
+  )
 
 
 class BaseDataDiscoveryService(resource.BaseResource):

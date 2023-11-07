@@ -23,6 +23,7 @@ class BaseKeySpec(spec.BaseSpec):
                flag_values: Optional[flags.FlagValues] = None,
                **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    self.cloud: str
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):

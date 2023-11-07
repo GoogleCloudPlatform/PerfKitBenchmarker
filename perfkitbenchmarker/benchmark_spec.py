@@ -22,7 +22,8 @@ import logging
 import os
 import pickle
 import threading
-from typing import List
+import typing
+from typing import Any
 import uuid
 
 from absl import flags
@@ -56,6 +57,7 @@ from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import vpn_service
+from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import freeze_restore_spec
 import six
 from six.moves import range
@@ -63,11 +65,12 @@ import six.moves._thread
 import six.moves.copyreg
 
 
-def PickleLock(lock):
+def PickleLock(lock: threading.Lock):
   return UnPickleLock, (lock.locked(),)
 
 
-def UnPickleLock(locked, *args):
+def UnPickleLock(locked: bool, *args):
+  del args
   lock = threading.Lock()
   if locked:
     if not lock.acquire(False):
@@ -123,12 +126,17 @@ flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
 # pyformat: enable
 
 
-class BenchmarkSpec(object):
+class BenchmarkSpec:
   """Contains the various data required to make a benchmark run."""
 
   total_benchmarks = 0
 
-  def __init__(self, benchmark_module, benchmark_config, benchmark_uid):
+  def __init__(
+      self,
+      benchmark_module: Any,
+      benchmark_config: benchmark_config_spec.BenchmarkConfigSpec,
+      benchmark_uid: str,
+  ):
     """Initialize a BenchmarkSpec object.
 
     Args:
@@ -146,7 +154,7 @@ class BenchmarkSpec(object):
     self.status_detail = None
     BenchmarkSpec.total_benchmarks += 1
     self.sequence_number = BenchmarkSpec.total_benchmarks
-    self.resources: List[resource_type.Resource] = []
+    self.resources: list[resource_type.BaseResource] = []
     self.vms = []
     self.regional_networks = {}
     self.networks = {}
@@ -163,7 +171,7 @@ class BenchmarkSpec(object):
     self.deleted = False
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
     self.always_call_cleanup = False
-    self.spark_service = None
+    self.spark_service: spark_service.BaseSparkService = None
     self.dpb_service: dpb_service.BaseDpbService = None
     self.container_cluster = None
     self.key = None
@@ -201,6 +209,18 @@ class BenchmarkSpec(object):
 
     self.restore_spec = None
     self.freeze_path = None
+
+    # Used by huggingface_bert_pretraining
+    self.path: str
+    self.run_dir: str
+    self.data_dir: str
+    self.ckpt_dir: str
+    # Used by redis_memtier
+    self.redis_endpoint_ip: str
+    # Used by dino_benchmark
+    self.imagenet_dir: str
+    # Used by mlperf_inference_cpu_benchmark
+    self.cm: str
 
     # Modules can't be pickled, but functions can, so we store the functions
     # necessary to run the benchmark.
@@ -381,7 +401,7 @@ class BenchmarkSpec(object):
     cloud = group_spec.cloud
     providers.LoadProvider(cloud)
     tpu_class = cloud_tpu.GetTpuClass(cloud)
-    return tpu_class(group_spec)
+    return tpu_class(group_spec)  # pytype: disable=not-instantiable
 
   def ConstructTpu(self):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
@@ -418,7 +438,7 @@ class BenchmarkSpec(object):
         edw_service_class_name[0].upper() + edw_service_class_name[1:],
     )
     # Check if a new instance needs to be created or restored from snapshot
-    self.edw_service = edw_service_class(self.config.edw_service)
+    self.edw_service = edw_service_class(self.config.edw_service)  # pytype: disable=not-instantiable
 
   def ConstructEdwComputeResource(self):
     """Create an edw_compute_resource object."""
@@ -434,7 +454,7 @@ class BenchmarkSpec(object):
     )
     self.edw_compute_resource = edw_compute_resource_class(
         self.config.edw_compute_resource
-    )
+    )  # pytype: disable=not-instantiable
     self.resources.append(self.edw_compute_resource)
 
   def ConstructNfsService(self):
@@ -484,11 +504,13 @@ class BenchmarkSpec(object):
       cloud = group_spec.cloud
       providers.LoadProvider(cloud)
       smb_class = smb_service.GetSmbServiceClass(cloud)
-      self.smb_service = smb_class(disk_spec, group_spec.vm_spec.zone)
+      self.smb_service = smb_class(disk_spec, group_spec.vm_spec.zone)  # pytype: disable=not-instantiable
       logging.debug('SMB service %s', self.smb_service)
       break
 
-  def ConstructVirtualMachineGroup(self, group_name, group_spec):
+  def ConstructVirtualMachineGroup(
+      self, group_name, group_spec
+  ) -> list[virtual_machine.VirtualMachine]:
     """Construct the virtual machine(s) needed for a group."""
     vms = []
 
@@ -503,7 +525,7 @@ class BenchmarkSpec(object):
       ][:vm_count]
       for vm_spec in specs:
         static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
-        vms.append(static_vm_class(vm_spec))
+        vms.append(static_vm_class(vm_spec))  # pytype: disable=not-instantiable
 
     os_type = group_spec.os_type
     cloud = group_spec.cloud
@@ -550,7 +572,7 @@ class BenchmarkSpec(object):
       cloud = vm_group[0].CLOUD
       providers.LoadProvider(cloud)
       capacity_reservation_class = capacity_reservation.GetResourceClass(cloud)
-      self.capacity_reservations.append(capacity_reservation_class(vm_group))
+      self.capacity_reservations.append(capacity_reservation_class(vm_group))  # pytype: disable=not-instantiable
 
   def _CheckBenchmarkSupport(self, cloud):
     """Throw an exception if the benchmark isn't supported."""
@@ -571,7 +593,9 @@ class BenchmarkSpec(object):
           'to override this check.'.format(provider_info_class.CLOUD, self.name)
       )
 
-  def _ConstructJujuController(self, group_spec):
+  def _ConstructJujuController(
+      self, group_spec
+  ) -> virtual_machine.VirtualMachine:
     """Construct a VirtualMachine object for a Juju controller."""
     juju_spec = copy.copy(group_spec)
     juju_spec.vm_count = 1
@@ -580,7 +604,9 @@ class BenchmarkSpec(object):
       jujuvm = jujuvms.pop()
       jujuvm.is_controller = True
       return jujuvm
-    return None
+    raise errors.Config.ParseError(
+        'Attempted to construct Juju VM but none were created.'
+    )
 
   def ConstructVirtualMachines(self):
     """Constructs the BenchmarkSpec's VirtualMachine objects."""
@@ -618,6 +644,9 @@ class BenchmarkSpec(object):
         self.config.spark_service
         and self.config.spark_service.service_type == spark_service.PKB_MANAGED
     ):
+      self.spark_service = typing.cast(
+          spark_service.PkbSparkService, self.spark_service
+      )
       for group_name in 'master_group', 'worker_group':
         self.spark_service.vms[group_name] = self.vm_groups[group_name]
 
@@ -657,7 +686,7 @@ class BenchmarkSpec(object):
     spark_service_class = spark_service.GetSparkServiceClass(
         cloud, service_type
     )
-    self.spark_service = spark_service_class(spark_spec)
+    self.spark_service = spark_service_class(spark_spec)  # pytype: disable=not-instantiable
     # If this is Pkb managed, the benchmark spec needs to adopt vms.
     if service_type == spark_service.PKB_MANAGED:
       for name, group_spec in [
@@ -997,7 +1026,7 @@ class BenchmarkSpec(object):
 
     placement_group_class = placement_group.GetPlacementGroupClass(cloud)
     if placement_group_class:
-      return placement_group_class(placement_group_spec)
+      return placement_group_class(placement_group_spec)  # pytype: disable=not-instantiable
     else:
       return None
 
