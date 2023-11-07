@@ -453,6 +453,12 @@ class DebianBasedKubernetesVirtualMachine(
     if retries is None:
       retries = FLAGS.ssh_retries
     stack_level += 1
+    logging.info(
+        'Running on kubernetes %s cmd: %s',
+        self.name,
+        command,
+        stacklevel=stack_level + 1,
+    )
     cmd = [
         FLAGS.kubectl,
         '--kubeconfig=%s' % FLAGS.kubeconfig,
@@ -466,12 +472,19 @@ class DebianBasedKubernetesVirtualMachine(
     ]
     for _ in range(retries):
       stdout, stderr, retcode = vm_util.IssueCommand(
-          cmd, timeout=timeout, raise_on_failure=False, stack_level=stack_level
+          cmd,
+          timeout=timeout,
+          raise_on_failure=False,
+          stack_level=stack_level,
+          should_pre_log=False,
       )
       # Check for ephemeral connection issues.
       if not _IsKubectlErrorEphemeral(retcode, stderr):
         break
-      logger.info('Retrying ephemeral connection issue\n:%s', stderr)
+      logger.info(
+          'Retrying ephemeral connection issue\n:%s',
+          stderr,
+      )
     if not ignore_failure and retcode:
       error_text = (
           'Got non-zero return code (%s) executing %s\n'
