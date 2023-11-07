@@ -1118,7 +1118,8 @@ def _Run(
       if MEMTIER_TIME_SERIES.value
       else None
   )
-  vm.RemoteCommand(f'rm -f {json_results_file}')
+  if json_results_file is not None:
+    vm.RemoteCommand(f'rm -f {json_results_file}')
   # Specify one of run requests or run duration.
   requests = (
       MEMTIER_REQUESTS.value if MEMTIER_RUN_DURATION.value is None else None
