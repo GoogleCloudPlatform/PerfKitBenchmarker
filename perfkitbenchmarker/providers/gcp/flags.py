@@ -109,6 +109,10 @@ flags.DEFINE_enum('gce_boot_disk_type', None,
                    'hyperdisk-balanced',
                    ],
                   'The boot disk type for GCP VMs.')
+flags.DEFINE_integer('gce_boot_disk_iops', None,
+                     'The boot disk iops for GCP VMs.')
+flags.DEFINE_integer('gce_boot_disk_throughput', None,
+                     'The boot disk throughput for GCP VMs.')
 flags.DEFINE_enum('gce_ssd_interface', 'SCSI', ['SCSI', 'NVME'],
                   'The ssd interface for GCE local SSD.')
 flags.DEFINE_enum('gce_nic_type', 'GVNIC', ['VIRTIO_NET', 'GVNIC'],

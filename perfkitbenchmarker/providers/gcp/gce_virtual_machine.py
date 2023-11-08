@@ -171,6 +171,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       specified image.
     boot_disk_size: None or int. The size of the boot disk in GB.
     boot_disk_type: string or None. The type of the boot disk.
+    boot_disk_iops: None or int. I/O operations per second
+    boot_disk_throughtput: None or int. Number of throughput mb per second
   """
 
   CLOUD = provider_info.GCP
@@ -180,6 +182,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     self.preemptible: bool = None
     self.boot_disk_size: int = None
     self.boot_disk_type: str = None
+    self.boot_disk_iops: int = None
+    self.boot_disk_throughput: int = None
     self.project: str = None
     self.image_family: str = None
     self.image_project: str = None
@@ -193,7 +197,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     if not self.boot_disk_type:
       self.boot_disk_type = gce_disk.GetDefaultBootDiskType(self.machine_type)
     self.boot_disk_spec = boot_disk.BootDiskSpec(
-        self.boot_disk_size, self.boot_disk_type
+        self.boot_disk_size, self.boot_disk_type,
+        self.boot_disk_iops, self.boot_disk_throughput
     )
     if isinstance(
         self.machine_type, custom_virtual_machine_spec.CustomMachineTypeSpec
@@ -234,6 +239,12 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['preemptible'] = flag_values.gce_preemptible_vms
     if flag_values['gce_boot_disk_size'].present:
       config_values['boot_disk_size'] = flag_values.gce_boot_disk_size
+    if flag_values['gce_boot_disk_throughput'].present:
+      config_values['boot_disk_throughput'] = (
+          flag_values.gce_boot_disk_throughput
+      )
+    if flag_values['gce_boot_disk_iops'].present:
+      config_values['boot_disk_iops'] = flag_values.gce_boot_disk_iops
     if flag_values['gce_boot_disk_type'].present:
       config_values['boot_disk_type'] = flag_values.gce_boot_disk_type
     if flag_values['machine_type'].present:
@@ -287,6 +298,11 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
         'boot_disk_type': (
             option_decoders.StringDecoder,
+            {'default': None},
+        ),
+        'boot_disk_iops': (option_decoders.IntDecoder, {'default': None}),
+        'boot_disk_throughput': (
+            option_decoders.IntDecoder,
             {'default': None},
         ),
         'project': (option_decoders.StringDecoder, {'default': None}),

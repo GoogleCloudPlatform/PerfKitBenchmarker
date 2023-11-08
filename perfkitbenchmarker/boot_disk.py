@@ -22,11 +22,22 @@ class BootDiskSpec(object):
   Attributes:
     boot_disk_size: None or int. The size of the boot disk in GB.
     boot_disk_type: string or None. The type of the boot disk.
+    boot_disk_iops: None or int. The arbitrary iops of the boot disk.
+    boot_disk_throughput: None or int. The arbitrary throughput of the boot
+      disk.
   """
 
-  def __init__(self, boot_disk_size, boot_disk_type):
+  def __init__(
+      self,
+      boot_disk_size,
+      boot_disk_type,
+      boot_disk_iops=None,
+      boot_disk_throughput=None,
+  ):
     self.boot_disk_size: int = boot_disk_size
     self.boot_disk_type: str = boot_disk_type
+    self.boot_disk_iops: int = boot_disk_iops
+    self.boot_disk_throughput: int = boot_disk_throughput
 
 
 class BootDisk(resource.BaseResource):
