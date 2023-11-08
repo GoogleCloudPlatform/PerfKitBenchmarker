@@ -54,9 +54,9 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import gce_disk_strategies
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gcs
-from perfkitbenchmarker.providers.gcp import gcsfuse_disk
 from perfkitbenchmarker.providers.gcp import util
 import six
 from six.moves import range
@@ -1134,6 +1134,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       disk_strategies.SetUpRamDiskStrategy().SetUpDisk(self, self.disk_specs[0])
       return
 
+    if any((spec.disk_type == disk.OBJECT_STORAGE for spec in self.disk_specs)):
+      gce_disk_strategies.SetUpGcsFuseDiskStrategy().SetUpDisk(
+          self, self.disk_specs[0]
+      )
+      return
+
     if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
       self.SetupLocalDisks()
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
@@ -1179,8 +1185,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           raise errors.Error('Not enough local disks.')
       elif disk_spec.disk_type == disk.NFS:
         data_disk = self._GetNfsService().CreateNfsDisk()
-      elif disk_spec.disk_type == disk.OBJECT_STORAGE:
-        data_disk = gcsfuse_disk.GcsFuseDisk(disk_spec)
       else:  # disk_type is PD
         name = self._GenerateDiskNamePrefix(disk_spec_id, i)
         data_disk = gce_disk.GceDisk(
@@ -1261,9 +1265,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def UpdateDevicePath(self, scratch_disk, remote_nvme_devices):
     """Updates the paths for all remote NVME devices inside the VM."""
-    if isinstance(scratch_disk, gcsfuse_disk.GcsFuseDisk):
-      return
-
     disks = []
     if isinstance(scratch_disk, disk.StripedDisk):
       disks = scratch_disk.disks

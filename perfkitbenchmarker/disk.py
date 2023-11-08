@@ -464,42 +464,6 @@ class StripedDisk(BaseDisk):
       disk.Detach()
 
 
-class MountableDisk(BaseDisk):
-  """Object representing a disk that produces a mounted directory.
-
-  Examples are RamDisks or FUSE file systems.
-  """
-
-  def Attach(self, vm):
-    """Attaches the disk to a VM.
-
-    Args:
-      vm: The BaseVirtualMachine instance to which the disk will be attached.
-    """
-    pass
-
-  def GetDevicePath(self):
-    """Returns the path to the device inside a Linux VM."""
-    return None
-
-  def GetDeviceId(self):
-    """Return the Windows DeviceId of this disk."""
-    return None
-
-  def _Create(self):
-    """Creates the disk."""
-    pass
-
-  def _Delete(self):
-    """Deletes the disk."""
-    pass
-
-  @abc.abstractmethod
-  def Mount(self, vm):
-    """Mount disk at specified mount point."""
-    raise NotImplementedError()
-
-
 class NetworkDisk(BaseDisk):
   """Object representing a Network Disk."""
 

@@ -26,7 +26,7 @@ from perfkitbenchmarker import os_types
 FLAGS = flags.FLAGS
 
 
-class SetUpRamDiskStrategy:
+class SetUpDiskStrategy:
   """Strategies to set up ram disks."""
 
   def SetUpDisk(
@@ -37,9 +37,25 @@ class SetUpRamDiskStrategy:
     if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
       self.SetUpDiskOnLinux(vm, disk_spec)
     else:
-      raise NotImplementedError('Ram disk is only supported on linux.')
+      self.SetUpDiskOnWindows(vm, disk_spec)
 
-  def SetUpDiskOnLinux(self, vm, disk_spec: disk.BaseDiskSpec) -> None:
+  def SetUpDiskOnWindows(self, vm, disk_spec):
+    """Performs Windows specific setup of ram disk."""
+    raise NotImplementedError(
+        f'{disk_spec.disk_type} is not supported on Windows.'
+    )
+
+  def SetUpDiskOnLinux(self, vm, disk_spec):
+    """Performs Linux specific setup of ram disk."""
+    raise NotImplementedError(
+        f'{disk_spec.disk_type} is not supported on linux.'
+    )
+
+
+class SetUpRamDiskStrategy(SetUpDiskStrategy):
+  """Strategies to set up ram disks."""
+
+  def SetUpDiskOnLinux(self, vm, disk_spec):
     """Performs Linux specific setup of ram disk."""
     scratch_disk = disk.BaseDisk(disk_spec)
     logging.info(
@@ -93,17 +109,14 @@ class PrepareScratchDiskStrategy:
       vm.StripeDisks(raw_device_paths, scratch_disk.GetDevicePath())
 
     if disk_spec.mount_point:
-      if isinstance(scratch_disk, disk.MountableDisk):
-        scratch_disk.Mount(vm)
-      else:
-        vm.FormatDisk(scratch_disk.GetDevicePath(), disk_spec.disk_type)
-        vm.MountDisk(
-            scratch_disk.GetDevicePath(),
-            disk_spec.mount_point,
-            disk_spec.disk_type,
-            scratch_disk.mount_options,
-            scratch_disk.fstab_options,
-        )
+      vm.FormatDisk(scratch_disk.GetDevicePath(), disk_spec.disk_type)
+      vm.MountDisk(
+          scratch_disk.GetDevicePath(),
+          disk_spec.mount_point,
+          disk_spec.disk_type,
+          scratch_disk.mount_options,
+          scratch_disk.fstab_options,
+      )
 
     vm.scratch_disks.append(scratch_disk)
 
