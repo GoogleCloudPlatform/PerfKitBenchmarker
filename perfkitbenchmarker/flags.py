@@ -103,7 +103,7 @@ FREEZE_PATH = flags.DEFINE_string('freeze', None,
                                   'Path to freeze resources to.')
 COLLECT_MEMINFO = flags.DEFINE_bool('collect_meminfo', False,
                                     'Whether to collect /proc/meminfo stats.')
-flags.DEFINE_string(
+OWNER = flags.DEFINE_string(
     'owner', GetCurrentUser(), 'Owner name. '
     'Used to tag created resources and performance records.')
 flags.DEFINE_enum(
