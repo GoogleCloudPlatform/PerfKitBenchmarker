@@ -398,6 +398,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(self.spec)
+      vm._CreateDependencies()
       vm._Create()
       vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -435,6 +436,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(spec)
+      vm._CreateDependencies()
       vm._Create()
       vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -477,6 +479,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image, fake_disk)) as issue_command:
       vm = vm_class(spec)
+      vm._CreateDependencies()
       vm._Create()
       vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -504,6 +507,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(spec)
+      vm._CreateDependencies()
       vm._Create()
       vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -529,6 +533,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(spec)
+      vm._CreateDependencies()
       vm._Create()
       vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -553,6 +558,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)) as issue_command:
       vm = vm_class(spec)
+      vm._CreateDependencies()
       vm._Create()
       vm.created = True
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -602,6 +608,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
           image='image',
           machine_type='test_machine_type')
       vm = pkb_common_test_case.TestGceVirtualMachine(vm_spec)
+      vm._CreateDependencies()
       vm._Create()
       return ' '.join(issue_command.call_args[0][0]), issue_command.call_count
 
@@ -745,6 +752,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
               'memory': '1.0GiB',
           })
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+      vm._CreateDependencies()
       vm._Create()  # No error should be thrown.
       self.assertEqual(issue_command.call_count, 5)
 
@@ -761,6 +769,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           })
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(vm_util.RetriesExceededRetryError) as e:
+        vm._CreateDependencies()
         vm._Create()
       self.assertIs(type(e.exception.__cause__),
                     errors.Benchmarks.QuotaFailure.RateLimitExceededError)
@@ -777,6 +786,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           })
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(errors.Resource.CreationError):
+        vm._CreateDependencies()
         vm._Create()
 
   def testCreateVMSubnetworkNotReady(self):
@@ -792,6 +802,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           })
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(errors.Resource.RetryableCreationError):
+        vm._CreateDependencies()
         vm._Create()
 
   @parameterized.named_parameters(
@@ -865,6 +876,7 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           })
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(expected_error):
+        vm._CreateDependencies()
         vm._Create()
 
   @parameterized.named_parameters(
@@ -909,6 +921,7 @@ message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enou
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(
           errors.Benchmarks.InsufficientCapacityCloudFailure):
+        vm._CreateDependencies()
         vm._Create()
 
   def testVmWithoutGpu(self):
@@ -919,6 +932,7 @@ message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enou
               'memory': '1.0GiB',
           })
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+      vm._CreateDependencies()
       vm._Create()
       self.assertEqual(issue_command.call_count, 1)
       self.assertNotIn('--accelerator', issue_command.call_args[0][0])
@@ -931,6 +945,7 @@ message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enou
           gpu_count=2,
           gpu_type='k80')
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+      vm._CreateDependencies()
       vm._Create()
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('--accelerator', issue_command.call_args[0][0])

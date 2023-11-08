@@ -497,6 +497,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           at least one of "cpus" or "memory".
     """
     super(GceVirtualMachine, self).__init__(vm_spec)
+    self.create_cmd: util.GcloudCommand = None
     self.boot_metadata = {}
     self.boot_metadata_from_file = {}
     if self.boot_startup_script:
@@ -841,22 +842,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """Create a GCE VM instance."""
-    with open(self.ssh_public_key) as f:
-      public_key = f.read().rstrip('\n')
-    with vm_util.NamedTemporaryFile(
-        mode='w', dir=vm_util.GetTempDir(), prefix='key-metadata'
-    ) as tf:
-      tf.write('%s:%s\n' % (self.user_name, public_key))
-      tf.close()
-      create_cmd = self._GenerateCreateCommand(tf.name)
-      stdout, stderr, retcode = create_cmd.Issue(
-          timeout=_GCE_VM_CREATE_TIMEOUT, raise_on_failure=False
-      )
-      # Save the create operation name for use in _WaitUntilRunning
-      if 'name' in stdout:
-        response = json.loads(stdout)
-        self.create_operation_name = response[0]['name']
-    self._ParseCreateErrors(create_cmd.rate_limited, stderr, retcode)
+    stdout, stderr, retcode = self.create_cmd.Issue(
+        timeout=_GCE_VM_CREATE_TIMEOUT, raise_on_failure=False
+    )
+    # Save the create operation name for use in _WaitUntilRunning
+    if 'name' in stdout:
+      response = json.loads(stdout)
+      self.create_operation_name = response[0]['name']
+
+    self._ParseCreateErrors(self.create_cmd.rate_limited, stderr, retcode)
     if not self.create_return_time:
       self.create_return_time = time.time()
 
@@ -966,6 +960,16 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.node_group = self.host_list[-1]
         if self.num_vms_per_host:
           self.node_group.fill_fraction += 1.0 / self.num_vms_per_host
+
+    # Capture the public key, write it to a temp file, and save the filename.
+    with open(self.ssh_public_key) as f:
+      ssh_public_key = f.read().rstrip('\n')
+    with vm_util.NamedTemporaryFile(
+        mode='w', dir=vm_util.GetTempDir(), prefix='key-metadata', delete=False
+    ) as tf:
+      tf.write('%s:%s\n' % (self.user_name, ssh_public_key))
+      tf.close()
+      self.create_cmd = self._GenerateCreateCommand(tf.name)
 
   def _DeleteDependencies(self):
     if self.node_group:
