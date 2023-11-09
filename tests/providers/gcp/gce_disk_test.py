@@ -22,6 +22,7 @@ import unittest
 from absl import flags
 import mock
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -749,20 +750,25 @@ class GCENFSDiskTest(GCEDiskTest):
     nfs_service = gce_nfs_service.GceNfsService(spec, 'test-zone')
     self.linux_vm._GetNfsService = mock.MagicMock(return_value=nfs_service)
     self.linux_vm.GetConnectionIp = mock.MagicMock(return_value='1.1.1.1')
+    disk_strategy = disk_strategies.SetUpNFSDiskStrategy(nfs_service)
     fake_rets = [
+        ('stdout', 'stderr', 0),
+        ('stdout', 'stderr', 0),
         (json.dumps(self._DescribeResult()), '', 0),
         ('stdout', 'stderr', 0),
         ('stdout', 'stderr', 0),
         ('stdout', 'stderr', 0),
-        ('20 20 20', 'stderr', 0),
-        ('', 'stderr', 0),
-        ('', 'stderr', 0),
-        ('', 'stderr', 0),
     ]
+
     with PatchCriticalObjects(fake_rets) as issue_command:
-      self.linux_vm.SetDiskSpec(spec, 1)
+      disk_strategy.SetUpDisk(self.linux_vm, spec)
       self.linux_vm.SetupAllScratchDisks()
       expected_commands = [
+          ['sudo apt-get update'],
+          [
+              "sudo DEBIAN_FRONTEND='noninteractive' /usr/bin/apt-get -y"
+              ' install nfs-common'
+          ],
           [
               'gcloud',
               '--quiet',
@@ -775,17 +781,6 @@ class GCENFSDiskTest(GCEDiskTest):
               '--location',
               'test-zone',
           ],
-          ['sudo apt-get update'],
-          [
-              "sudo DEBIAN_FRONTEND='noninteractive' /usr/bin/apt-get -y"
-              ' install nfs-common'
-          ],
-          [
-              "sudo DEBIAN_FRONTEND='noninteractive' /usr/bin/apt-get -y"
-              ' install nvme-cli'
-          ],
-          ['sudo nvme --version'],
-          ['sudo nvme list --output-format json'],
           [
               'sudo mkdir -p /scratch;sudo mount -t nfs -o'
               ' hard,nconnect=3,nfsvers=1,retrans=1,rsize=10,timeo=100,wsize=11'

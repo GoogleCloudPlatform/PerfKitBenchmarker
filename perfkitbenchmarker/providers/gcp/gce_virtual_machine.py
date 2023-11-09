@@ -1139,7 +1139,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           self, self.disk_specs[0]
       )
       return
-
+    if any((spec.disk_type == disk.NFS for spec in self.disk_specs)):
+      disk_strategies.SetUpNFSDiskStrategy().SetUpDisk(
+          self, self.disk_specs[0]
+      )
+      return
     if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
       self.SetupLocalDisks()
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
@@ -1183,8 +1187,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.local_disk_counter += 1
         if self.local_disk_counter > self.max_local_disks:
           raise errors.Error('Not enough local disks.')
-      elif disk_spec.disk_type == disk.NFS:
-        data_disk = self._GetNfsService().CreateNfsDisk()
       else:  # disk_type is PD
         name = self._GenerateDiskNamePrefix(disk_spec_id, i)
         data_disk = gce_disk.GceDisk(

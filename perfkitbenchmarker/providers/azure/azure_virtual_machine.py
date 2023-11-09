@@ -860,11 +860,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     disks = []
 
     for _ in range(disk_spec.num_striped_disks):
-      if disk_spec.disk_type == disk.NFS:
-        data_disk = self._GetNfsService().CreateNfsDisk()
-        disks.append(data_disk)
-        continue
-      elif disk_spec.disk_type == disk.SMB:
+      if disk_spec.disk_type == disk.SMB:
         data_disk = self._GetSmbService().CreateSmbDisk()
         disks.append(data_disk)
         continue

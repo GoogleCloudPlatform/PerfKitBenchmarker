@@ -35,7 +35,6 @@ from absl import flags
 import jinja2
 from perfkitbenchmarker import background_workload
 from perfkitbenchmarker import benchmark_lookup
-from perfkitbenchmarker import context as pkb_context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
@@ -1063,23 +1062,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """Whether SMT is enabled on the vm."""
     raise NotImplementedError()
 
-  def _GetNfsService(self):
-    """Returns the NfsService created in the benchmark spec.
-
-    Before calling this method check that the disk.disk_type is equal to
-    disk.NFS or else an exception will be raised.
-
-    Returns:
-      The nfs_service.BaseNfsService service for this cloud.
-
-    Raises:
-      CreationError: If no NFS service was created.
-    """
-    nfs = getattr(pkb_context.GetThreadBenchmarkSpec(), 'nfs_service')
-    if nfs is None:
-      raise errors.Resource.CreationError('No NFS Service created')
-    return nfs
-
   # TODO(pclay): Implement on Windows, make abstract and non Optional
   @property
   def cpu_arch(self) -> Optional[str]:
@@ -1271,9 +1253,13 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     if any((spec.disk_type == disk.RAM for spec in self.disk_specs)):
       disk_strategies.SetUpRamDiskStrategy().SetUpDisk(self, self.disk_specs[0])
       return
+    if any((spec.disk_type == disk.NFS for spec in self.disk_specs)):
+      disk_strategies.SetUpNFSDiskStrategy().SetUpDisk(self, self.disk_specs[0])
+      return
 
     if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
       self.SetupLocalDisks()
+
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
       self.CreateScratchDisk(disk_spec_id, disk_spec)
       # TODO(user): Simplify disk logic.

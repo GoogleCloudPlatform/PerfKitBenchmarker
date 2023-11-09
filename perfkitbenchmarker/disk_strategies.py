@@ -17,10 +17,12 @@ This module abstract out the disk algorithm for formatting and creating
 scratch disks.
 """
 import logging
-from typing import Union
+from typing import Optional, Union
 
 from absl import flags
+from perfkitbenchmarker import context as pkb_context
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 
 FLAGS = flags.FLAGS
@@ -39,13 +41,13 @@ class SetUpDiskStrategy:
     else:
       self.SetUpDiskOnWindows(vm, disk_spec)
 
-  def SetUpDiskOnWindows(self, vm, disk_spec):
+  def SetUpDiskOnWindows(self, vm, disk_spec: disk.BaseDiskSpec):
     """Performs Windows specific setup of ram disk."""
     raise NotImplementedError(
         f'{disk_spec.disk_type} is not supported on Windows.'
     )
 
-  def SetUpDiskOnLinux(self, vm, disk_spec):
+  def SetUpDiskOnLinux(self, vm, disk_spec: disk.BaseDiskSpec):
     """Performs Linux specific setup of ram disk."""
     raise NotImplementedError(
         f'{disk_spec.disk_type} is not supported on linux.'
@@ -55,7 +57,7 @@ class SetUpDiskStrategy:
 class SetUpRamDiskStrategy(SetUpDiskStrategy):
   """Strategies to set up ram disks."""
 
-  def SetUpDiskOnLinux(self, vm, disk_spec):
+  def SetUpDiskOnLinux(self, vm, disk_spec: disk.BaseDiskSpec):
     """Performs Linux specific setup of ram disk."""
     scratch_disk = disk.BaseDisk(disk_spec)
     logging.info(
@@ -69,6 +71,34 @@ class SetUpRamDiskStrategy(SetUpDiskStrategy):
     ).format(scratch_disk.mount_point, scratch_disk.disk_size)
     vm.RemoteHostCommand(mnt_cmd)
     vm.scratch_disks.append(disk.BaseDisk(disk_spec))
+
+
+class SetUpNFSDiskStrategy(SetUpDiskStrategy):
+  """Strategies to set up NFS disks."""
+
+  def __init__(
+      self, unmanaged_nfs_service: Optional[nfs_service.BaseNfsService] = None
+  ):
+    if unmanaged_nfs_service:
+      self.nfs_service = unmanaged_nfs_service
+    else:
+      self.nfs_service = getattr(
+          pkb_context.GetThreadBenchmarkSpec(), 'nfs_service'
+      )
+
+  def SetUpDiskOnLinux(self, vm, disk_spec: disk.BaseDiskSpec):
+    """Performs Linux specific setup of ram disk."""
+    vm.Install('nfs_utils')
+    nfs_disk = self.nfs_service.CreateNfsDisk()
+    vm.MountDisk(
+        nfs_disk.GetDevicePath(),
+        disk_spec.mount_point,
+        disk_spec.disk_type,
+        nfs_disk.mount_options,
+        nfs_disk.fstab_options,
+    )
+
+    vm.scratch_disks.append(nfs_disk)
 
 
 class PrepareScratchDiskStrategy:
