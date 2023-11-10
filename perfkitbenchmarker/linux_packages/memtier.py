@@ -139,6 +139,14 @@ MEMTIER_RATIO = flags.DEFINE_string(
 MEMTIER_DATA_SIZE = flags.DEFINE_integer(
     'memtier_data_size', 32, 'Object data size. Defaults to 32 bytes.'
 )
+MEMTIER_DATA_SIZE_LIST = flags.DEFINE_string(
+    'memtier_data_size_list',
+    None,
+    (
+        'Mutually exclusive with memtier_data_size. Object data size list'
+        ' specified as [size1:weight1],...[sizeN:weightN].'
+    ),
+)
 MEMTIER_KEY_PATTERN = flags.DEFINE_string(
     'memtier_key_pattern',
     'R:R',
@@ -338,6 +346,7 @@ def BuildMemtierCommand(
     threads: Optional[int] = None,
     ratio: Optional[str] = None,
     data_size: Optional[int] = None,
+    data_size_list: Optional[str] = None,
     pipeline: Optional[int] = None,
     key_minimum: Optional[int] = None,
     key_maximum: Optional[int] = None,
@@ -363,7 +372,6 @@ def BuildMemtierCommand(
       'clients': clients,
       'threads': threads,
       'ratio': ratio,
-      'data-size': data_size,
       'pipeline': pipeline,
       'key-minimum': key_minimum,
       'key-maximum': key_maximum,
@@ -376,6 +384,10 @@ def BuildMemtierCommand(
       'print-percentile': '50,90,95,99,99.5,99.9,99.95,99.99',
       'shard-addresses': shard_addresses,
   }
+  if data_size_list:
+    args['data-size-list'] = data_size_list
+  else:
+    args['data-size'] = data_size
   # Arguments passed without a parameter
   no_param_args = {
       'random-data': random_data,
@@ -418,6 +430,7 @@ def _LoadSingleVM(
       threads=1,
       ratio=_WRITE_ONLY,
       data_size=MEMTIER_DATA_SIZE.value,
+      data_size_list=MEMTIER_DATA_SIZE_LIST.value,
       pipeline=_LOAD_NUM_PIPELINES,
       key_minimum=request.key_minimum,
       key_maximum=request.key_maximum,
@@ -1138,6 +1151,7 @@ def _Run(
       threads=threads,
       ratio=MEMTIER_RATIO.value,
       data_size=MEMTIER_DATA_SIZE.value,
+      data_size_list=MEMTIER_DATA_SIZE_LIST.value,
       key_pattern=MEMTIER_KEY_PATTERN.value,
       pipeline=pipeline,
       key_minimum=1,
@@ -1196,13 +1210,16 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
       'memtier_clients': clients,
       'memtier_ratio': MEMTIER_RATIO.value,
       'memtier_key_maximum': MEMTIER_KEY_MAXIMUM.value,
-      'memtier_data_size': MEMTIER_DATA_SIZE.value,
       'memtier_key_pattern': MEMTIER_KEY_PATTERN.value,
       'memtier_pipeline': pipeline,
       'memtier_version': GIT_TAG,
       'memtier_run_mode': MEMTIER_RUN_MODE.value,
       'memtier_cluster_mode': MEMTIER_CLUSTER_MODE.value,
   }
+  if MEMTIER_DATA_SIZE_LIST.value:
+    meta['memtier_data_size_list'] = MEMTIER_DATA_SIZE_LIST.value
+  else:
+    meta['memtier_data_size'] = MEMTIER_DATA_SIZE.value
   if MEMTIER_RUN_DURATION.value:
     meta['memtier_run_duration'] = MEMTIER_RUN_DURATION.value
   if MEMTIER_RUN_MODE.value == MemtierMode.MEASURE_CPU_LATENCY:

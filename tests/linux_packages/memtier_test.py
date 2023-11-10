@@ -8,6 +8,7 @@ from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
@@ -1726,7 +1727,9 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
         expected_result, memtier._CombineResults([result1, result2])
     )
 
-  @flagsaver.flagsaver(memtier_key_maximum=1000)
+  @flagsaver.flagsaver(
+      memtier_key_maximum=1000, memtier_data_size_list='1024:1,32:1'
+  )
   def testLoad(self):
     vm1 = mock.Mock()
     vm2 = mock.Mock()
@@ -1740,6 +1743,61 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
     vm2.RemoteCommand.assert_called_once_with(
         matchers.HAS('--key-minimum 500 --key-maximum 1000')
     )
+    vm1.RemoteCommand.assert_called_once_with(
+        matchers.HAS('--data-size-list 1024:1,32:1')
+    )
+    vm2.RemoteCommand.assert_called_once_with(
+        matchers.HAS('--data-size-list 1024:1,32:1')
+    )
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'WithDataSizeArg',
+          'input_args': {'data_size': 1024},
+          'expected_cmd_regex': '--data-size 1024',
+      },
+      {
+          'testcase_name': 'WithDataSizeListArg',
+          'input_args': {'data_size_list': '1024:1,32:2'},
+          'expected_cmd_regex': '--data-size-list 1024:1,32:2',
+      },
+      {
+          'testcase_name': 'WithBothDataSizeAndListArgs',
+          'input_args': {'data_size': 1024, 'data_size_list': '1024:1,32:2'},
+          'expected_cmd_regex': '--data-size-list 1024:1,32:2',
+      },
+  )
+  def testBuildMemtierCommand(self, input_args, expected_cmd_regex):
+    cmd = memtier.BuildMemtierCommand(**input_args)
+    self.assertRegex(cmd, expected_cmd_regex)
+
+  def testGetMetadataDefault(self):
+    meta = memtier.GetMetadata(clients=100, threads=4, pipeline=1)
+    self.assertEqual(
+        meta,
+        {
+            'memtier_clients': 100,
+            'memtier_cluster_mode': False,
+            'memtier_data_size': 32,
+            'memtier_key_maximum': 10000000,
+            'memtier_key_pattern': 'R:R',
+            'memtier_pipeline': 1,
+            'memtier_protocol': 'memcache_binary',
+            'memtier_ratio': '1:9',
+            'memtier_requests': 10000,
+            'memtier_run_count': 1,
+            'memtier_run_mode': 'NORMAL_RUN',
+            'memtier_threads': 4,
+            'memtier_version': '1.4.0',
+        },
+    )
+
+  @flagsaver.flagsaver(memtier_data_size_list='1024:1,32:2')
+  def testGetMetadataWithDataSizeList(self):
+    meta = memtier.GetMetadata(clients=100, threads=4, pipeline=1)
+    self.assertNotIn('memtier_data_size', meta)
+    self.assertEqual(meta['memtier_data_size_list'], '1024:1,32:2')
+
 
 if __name__ == '__main__':
   unittest.main()
