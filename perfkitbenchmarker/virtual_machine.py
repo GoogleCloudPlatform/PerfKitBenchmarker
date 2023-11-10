@@ -1257,6 +1257,10 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       disk_strategies.SetUpNFSDiskStrategy().SetUpDisk(self, self.disk_specs[0])
       return
 
+    if any((spec.disk_type == disk.SMB for spec in self.disk_specs)):
+      disk_strategies.SetUpSMBDiskStrategy().SetUpDisk(self, self.disk_specs[0])
+      return
+
     if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
       self.SetupLocalDisks()
 

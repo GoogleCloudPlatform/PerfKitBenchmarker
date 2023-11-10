@@ -101,6 +101,24 @@ class SetUpNFSDiskStrategy(SetUpDiskStrategy):
     vm.scratch_disks.append(nfs_disk)
 
 
+class SetUpSMBDiskStrategy(SetUpDiskStrategy):
+  """Strategies to set up NFS disks."""
+
+  def SetUpDiskOnLinux(self, vm, disk_spec):
+    """Performs Linux specific setup of ram disk."""
+    smb_service = getattr(pkb_context.GetThreadBenchmarkSpec(), 'smb_service')
+    smb_disk = smb_service.CreateSmbDisk()
+    vm.MountDisk(
+        smb_disk.GetDevicePath(),
+        disk_spec.mount_point,
+        disk_spec.disk_type,
+        smb_disk.mount_options,
+        smb_disk.fstab_options,
+    )
+
+    vm.scratch_disks.append(smb_disk)
+
+
 class PrepareScratchDiskStrategy:
   """Strategies to prepare scratch disks."""
 
