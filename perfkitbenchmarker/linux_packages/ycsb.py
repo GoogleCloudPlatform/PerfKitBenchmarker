@@ -148,11 +148,16 @@ flags.DEFINE_list(
     'Passed to YCSB during the run stage. Comma-separated list '
     'of "key=value" pairs.',
 )
-_THROUGHPUT_TIME_SERIES = flags.DEFINE_bool(
-    'ycsb_throughput_time_series',
+_STATUS = flags.DEFINE_bool(
+    'ycsb_status',
     False,
-    'If true, run prints status which includes a throughput time series (1s '
-    'granularity), and includes the results in the samples.',
+    'If true, run prints status which includes a throughput and latency time'
+    ' series and includes the results in the samples.',
+)
+_STATUS_INTERVAL_SEC = flags.DEFINE_integer(
+    'ycsb_status_interval_sec',
+    10,
+    'The amount of time in between status printing.',
 )
 flags.DEFINE_list(
     'ycsb_threads_per_client',
@@ -396,8 +401,6 @@ flags.register_multi_flags_validator(
 # Status line pattern
 _STATUS_PATTERN = r'(\d+) sec: \d+ operations; (\d+(\.\d+)?) current ops\/sec'
 _STATUS_GROUPS_PATTERN = r'\[(.+?): (.+?)\]'
-# Status interval default is 10 sec, change to 1 sec.
-_STATUS_INTERVAL_SEC = 1
 
 # Default loading thread count for non-batching backends.
 DEFAULT_PRELOAD_THREADS = 32
@@ -557,12 +560,9 @@ def CheckPrerequisites():
 
   # Both HISTOGRAM and TIMESERIES do not output latencies on a per-interval
   # basis, so we use the more-detailed HDRHISTOGRAM.
-  if (
-      _THROUGHPUT_TIME_SERIES.value
-      and FLAGS.ycsb_measurement_type != ycsb_stats.HDRHISTOGRAM
-  ):
+  if _STATUS.value and FLAGS.ycsb_measurement_type != ycsb_stats.HDRHISTOGRAM:
     raise errors.Config.InvalidValue(
-        'Measuring a throughput histogram requires running with '
+        'Showing status during run requires running with '
         '--ycsb_measurement_type=HDRHISTOGRAM. Other measurement types are '
         'unsupported unless additional parsing is added.'
     )
@@ -719,9 +719,9 @@ class YCSBExecutor:
     parameters.update(kwargs)
 
     # Adding -s prints status which includes average throughput per sec.
-    if _THROUGHPUT_TIME_SERIES.value and command_name == 'run':
+    if _STATUS.value and command_name == 'run':
       command.append('-s')
-      parameters['status.interval'] = _STATUS_INTERVAL_SEC
+      parameters['status.interval'] = _STATUS_INTERVAL_SEC.value
 
     # These are passed as flags rather than properties, so they
     # are handled differently.

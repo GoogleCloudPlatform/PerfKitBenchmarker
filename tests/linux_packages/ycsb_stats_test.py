@@ -163,7 +163,7 @@ class StatusTimeSeriesParserTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(results.status_time_series[10], expected)
     self.assertLen(results.status_time_series, 9)
 
-  @flagsaver.flagsaver(ycsb_throughput_time_series=True)
+  @flagsaver.flagsaver(ycsb_status=True)
   def testCombinedStatusTimeSeriesIsCorrect(self):
     results_1 = _parse_and_return_time_series('ycsb-time-series.dat')
     results_2 = _parse_and_return_time_series('ycsb-time-series-2.dat')
