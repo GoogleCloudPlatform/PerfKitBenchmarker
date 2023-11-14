@@ -27,7 +27,6 @@ from perfkitbenchmarker.providers import ibmcloud
 
 _imported_providers = set()
 
-
 def _GetProviderPackageName(cloud: str) -> str:
   """Gets the name of the provider package that corresponds to the cloud."""
   return cloud.lower()

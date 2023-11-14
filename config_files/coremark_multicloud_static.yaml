@@ -1,0 +1,51 @@
+static_vms:
+  - &vm1
+    user_name: ubuntu
+    ssh_private_key: /home/jetryan4/GitRepos/PerfKitBenchmarker/config_files/.ssh/oci-ssh.key
+    ip_address: 141.148.85.37
+    zone: AD-1
+    internal_ip: 10.0.0.197
+    
+  - &vm2
+    user_name: ubuntu
+    ssh_private_key: /home/jetryan4/GitRepos/PerfKitBenchmarker/config_files/.ssh/oci-ssh.key
+    ip_address: 129.213.9.23
+    zone: AD-1
+    internal_ip: 10.0.0.40
+  
+  - &vm3
+    user_name: ubuntu
+    ssh_private_key: /home/jetryan4/GitRepos/PerfKitBenchmarker/config_files/.ssh/aws-ssh.pem
+    ip_address: 3.95.194.226
+    zone: us-east-1a
+    internal_ip: 10.0.10.142
+
+  - &vm4
+    user_name: ubuntu
+    ssh_private_key: /home/jetryan4/GitRepos/PerfKitBenchmarker/config_files/.ssh/azure-ssh.pem
+    ip_address: 20.55.53.154
+    zone: eastus
+    internal_ip: 10.0.0.6
+
+  - &vm5
+    user_name: ubuntu
+    ssh_private_key: /home/jetryan4/GitRepos/PerfKitBenchmarker/config_files/.ssh/gcp-ssh
+    ip_address: 34.150.232.143
+    zone: us-east4-c
+    internal_ip: 10.0.0.3
+
+coremark: &c1
+  vm_groups:
+    default:
+      static_vms:
+        - *vm5        
+
+# coremark: &c2
+#   vm_groups:
+#     default:
+#       static_vms:
+#         - *vm2   
+
+# benchmarks:
+#  - coremark: *c1
+#  - coremark: *c2

@@ -1,0 +1,78 @@
+# Creating defaults for each of the machine types for each CSP
+# Compute node - vCPU: 16, Memory: 42 ( or 64)
+compute_node: &compute_node
+  GCP:
+    machine_type: c2d-standard-16
+    zone: us-east4-a
+  Azure:
+    machine_type: Standard_D16_v4
+    zone: eastus
+  AWS:
+    machine_type: c5n.4xlarge
+    zone: us-east-2
+# Memory node - vCPU: 4, Memory: 16
+memory_node: &memory_node
+  GCP:
+    machine_type: n2-standard-4
+    zone: us-east4-a
+  Azure:
+    machine_type: Standard_D4_v3
+    zone: eastus
+  AWS:
+    machine_type: m5.xlarge
+    zone: us-east-2
+# GPU node - vCPU: 4, Memory: 16 ( or 14)
+gpu_node: &gpu_node
+  GCP:
+    machine_type: n1-standard-1
+    zone: us-central1-a
+  Azure:
+    machine_type: Standard_NC4as_v3
+    zone: eastus2
+  AWS:
+    machine_type: g4dn.xlarge
+    zone: us-east-2
+
+iperf: &iperf_compute_aws
+  vm_groups:
+    aws_compute:
+      cloud: AWS
+      vm_spec: *compute_node
+iperf: &iperf_compute_azure
+  vm_groups:
+    azure_compute:
+      cloud: Azure
+      vm_spec: *compute_node
+iperf: &iperf_compute_gcp
+  vm_groups:
+    gcp_compute:
+      cloud: GCP
+      vm_spec: *compute_node
+
+iperf: &iperf_memory_aws
+  vm_groups:
+    vm_1:
+      cloud: AWS
+      vm_spec: *memory_node
+    vm_2:
+      cloud: AWS
+      vm_spec: *memory_node
+iperf: &iperf_memory_azure
+  vm_groups:
+    azure_memory:
+      cloud: Azure
+      vm_spec: *memory_node
+iperf: &iperf_memory_gcp
+  vm_groups:
+    gcp_memory_1:
+      cloud: GCP
+      vm_spec: *memory_node
+    gcp_memory_2:
+      cloud: GCP
+      vm_spec: *memory_node
+
+benchmarks:
+  - iperf: *iperf_memory_aws
+  - iperf: *iperf_memory_gcp
+
+  

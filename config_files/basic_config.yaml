@@ -1,0 +1,46 @@
+# Creating basic defaults for each of the machine types for each CSP
+
+
+# test_node: &test_node
+#   GCP:
+#     machine_type: n2-standard-4
+#     # zone: us-east4-a
+#   Azure:
+#     machine_type: Standard_D4_v3
+#     # zone: eastus
+#   AWS:
+#     machine_type: m5.xlarge
+#     # zone: us-east-2b
+
+iperf:
+  vm_groups:
+    vm_spec:
+      default:
+        AWS:
+          machine_type: m5.xlarge
+          zone: us-east-2b
+    
+
+# iperf: &iperf_aws
+#   vm_groups:
+#     vm_1:
+#       cloud: AWS
+#       vm_spec: *test_node
+#     vm_2:
+#       cloud: AWS
+#       vm_spec: *test_node
+
+# iperf: &iperf_gcp
+#   vm_groups:
+#     vm_1:
+#       cloud: GCP
+#       vm_spec: *test_node
+#     vm_2:
+#       cloud: GCP
+#       vm_spec: *test_node
+
+# benchmarks:
+#   - iperf: *test_iperf
+#   - iperf: null
+ # - iperf: *iperf_aws
+ # - iperf: *iperf_gcp

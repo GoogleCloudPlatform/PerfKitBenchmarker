@@ -1,0 +1,17 @@
+iperf:
+  vm_groups:
+    vm_1:
+      cloud: GCP
+      vm_spec:
+        GCP:
+          machine_type: n2-standard-4
+          zone: us-east4-a
+    vm_2:
+      cloud: AWS
+      vm_spec:
+        AWS:
+          machine_type: m5.xlarge
+          zone: us-east-1a
+flags:
+  iperf_sending_thread_count: 5
+  iperf_runtime_in_seconds: 30
