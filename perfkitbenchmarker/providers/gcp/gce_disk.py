@@ -230,6 +230,12 @@ class GceBootDisk(boot_disk.BootDisk):
     self.vm = vm
     self.boot_disk_size = boot_disk_spec.boot_disk_size
     self.boot_disk_type = boot_disk_spec.boot_disk_type
+    self.boot_disk_iops = None
+    self.boot_disk_throughput = None
+    if self.boot_disk_type in GCE_DYNAMIC_IOPS_DISK_TYPES:
+      self.boot_disk_iops = boot_disk_spec.boot_disk_iops
+    if self.boot_disk_type in GCE_DYNAMIC_THROUGHPUT_DISK_TYPES:
+      self.boot_disk_throughput = boot_disk_spec.boot_disk_throughput
 
   def GetCreationCommand(self):
     dic = {'boot-disk-auto-delete': True}
@@ -237,6 +243,10 @@ class GceBootDisk(boot_disk.BootDisk):
       dic['boot-disk-size'] = self.boot_disk_size
     if self.boot_disk_type:
       dic['boot-disk-type'] = self.boot_disk_type
+    if self.boot_disk_iops:
+      dic['boot-disk-provisioned-iops'] = self.boot_disk_iops
+    if self.boot_disk_throughput:
+      dic['boot-disk-provisioned-throughput'] = self.boot_disk_throughput
     return dic
 
   @vm_util.Retry()
@@ -255,6 +265,10 @@ class GceBootDisk(boot_disk.BootDisk):
     result = super(GceBootDisk, self).GetResourceMetadata()
     result['boot_disk_type'] = self.boot_disk_type
     result['boot_disk_size'] = self.boot_disk_size
+    if self.boot_disk_iops:
+      result['boot_disk_provisioned_iops'] = self.boot_disk_iops
+    if self.boot_disk_throughput:
+      result['boot_disk_provisioned_throughput'] = self.boot_disk_throughput
     return result
 
 
