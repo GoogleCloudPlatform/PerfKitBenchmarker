@@ -27,10 +27,10 @@ def GetSpecClass(base_class, **kwargs) -> 'BaseSpecMetaClass':
   """Returns the subclass with the corresponding attributes.
 
   Args:
-    base_class: The base class of the resource to return
-        (e.g. BaseVmSpec).
-    **kwargs: Every attribute/value of the subclass's ATTRS that were
-        used to register the subclass.
+    base_class: The base class of the resource to return (e.g. BaseVmSpec).
+    **kwargs: Every attribute/value of the subclass's ATTRS that were used to
+      register the subclass.
+
   Raises:
     Exception: If no class could be found with matching attributes.
   """
@@ -40,8 +40,8 @@ def GetSpecClass(base_class, **kwargs) -> 'BaseSpecMetaClass':
 
 
 class BaseSpecMetaClass(type):
-  """Metaclass that allows each BaseSpec derived class to have its own decoders.
-  """
+  """Metaclass that allows each BaseSpec derived class to have its own decoders."""
+
   # The name of the spec class that will be extended with auto-registered
   # subclasses.
   SPEC_TYPE = None
@@ -49,22 +49,24 @@ class BaseSpecMetaClass(type):
   SPEC_ATTRS = ['CLOUD']
 
   def __init__(cls, name, bases, dct):
-    super(BaseSpecMetaClass, cls).__init__(name, bases, dct)
+    super().__init__(name, bases, dct)
     cls._init_decoders_lock = threading.Lock()
     cls._decoders = collections.OrderedDict()
     cls._required_options = set()
-    if (all(hasattr(cls, attr) for attr in cls.SPEC_ATTRS) and
-        cls.SPEC_TYPE):
+    if all(hasattr(cls, attr) for attr in cls.SPEC_ATTRS) and cls.SPEC_TYPE:
       key = [cls.SPEC_TYPE]
       key += sorted([(attr, getattr(cls, attr)) for attr in cls.SPEC_ATTRS])
       if tuple(key) in _SPEC_REGISTRY:
-        raise Exception('Subclasses of %s must define unique values for the '
-                        'attrs: %s.' % (cls.SPEC_TYPE, cls.SPEC_ATTRS))
+        raise errors.Config.InvalidValue(
+            'Subclasses of %s must define unique values for the attrs: %s.'
+            % (cls.SPEC_TYPE, cls.SPEC_ATTRS)
+        )
       _SPEC_REGISTRY[tuple(key)] = cls
 
 
 class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
   """Object decoded from a YAML config."""
+
   # Each derived class has its own copy of the following three variables. They
   # are initialized by BaseSpecMetaClass.__init__ and later populated by
   # _InitDecoders when the first instance of the derived class is created.
@@ -82,9 +84,9 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
 
     Args:
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config options.
-      flag_values: None or flags.FlagValues. Runtime flags that may override
-          the provided config option values in kwargs.
+        component containing the config options.
+      flag_values: None or flags.FlagValues. Runtime flags that may override the
+        provided config option values in kwargs.
       **kwargs: dict mapping config option names to provided values.
 
     Raises:
@@ -101,14 +103,19 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
     if missing_options:
       raise errors.Config.MissingOption(
           'Required options were missing from {0}: {1}.'.format(
-              component_full_name, ', '.join(sorted(missing_options))))
+              component_full_name, ', '.join(sorted(missing_options))
+          )
+      )
     unrecognized_options = frozenset(kwargs).difference(self._decoders)
     if unrecognized_options:
       raise errors.Config.UnrecognizedOption(
           'Unrecognized options were found in {0}: {1}.'.format(
-              component_full_name, ', '.join(sorted(unrecognized_options))))
-    self._DecodeAndInit(component_full_name, kwargs, self._decoders,
-                        flag_values)
+              component_full_name, ', '.join(sorted(unrecognized_options))
+          )
+      )
+    self._DecodeAndInit(
+        component_full_name, kwargs, self._decoders, flag_values
+    )
 
   @classmethod
   def _InitDecoders(cls):
@@ -120,7 +127,8 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
       if not cls._decoders:
         constructions = cls._GetOptionDecoderConstructions()
         for option, decoder_construction in sorted(
-            six.iteritems(constructions)):
+            six.iteritems(constructions)
+        ):
           decoder_class, init_args = decoder_construction
           decoder = decoder_class(option=option, **init_args)
           cls._decoders[option] = decoder
@@ -134,10 +142,10 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     pass
 
@@ -160,17 +168,18 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
 
     Args:
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config options.
+        component containing the config options.
       config: dict mapping option name string to option value.
       decoders: OrderedDict mapping option name string to ConfigOptionDecoder.
       flag_values: flags.FlagValues. Runtime flags that may override provided
-          config option values. These flags have already been applied to the
-          current config, but they may be passed to the decoders for propagation
-          to deeper spec constructors.
+        config option values. These flags have already been applied to the
+        current config, but they may be passed to the decoders for propagation
+        to deeper spec constructors.
     """
     assert isinstance(decoders, collections.OrderedDict), (
         'decoders must be an OrderedDict. The order in which options are '
-        'decoded must be guaranteed.')
+        'decoded must be guaranteed.'
+    )
     for option, decoder in six.iteritems(decoders):
       if option in config:
         value = decoder.Decode(config[option], component_full_name, flag_values)
