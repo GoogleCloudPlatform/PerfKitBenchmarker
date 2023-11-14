@@ -156,8 +156,8 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
         ),
         'is_managed_db': (option_decoders.BooleanDecoder, {'default': True}),
         'db_tier': (option_decoders.StringDecoder, {'default': None}),
-        'db_spec': (option_decoders.PerCloudConfigDecoder, {}),
-        'db_disk_spec': (option_decoders.PerCloudConfigDecoder, {}),
+        'db_spec': (spec.PerCloudConfigDecoder, {}),
+        'db_disk_spec': (spec.PerCloudConfigDecoder, {}),
         'vm_groups': (vm_group_decoders.VmGroupsDecoder, {'default': {}}),
         'db_flags': (
             option_decoders.ListDecoder,

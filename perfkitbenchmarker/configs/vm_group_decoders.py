@@ -124,7 +124,7 @@ class VmGroupSpec(spec.BaseSpec):
             {'default': False, 'none_ok': True},
         ),
         'disk_spec': (
-            option_decoders.PerCloudConfigDecoder,
+            spec.PerCloudConfigDecoder,
             {'default': None, 'none_ok': True},
         ),
         'os_type': (
@@ -137,7 +137,7 @@ class VmGroupSpec(spec.BaseSpec):
             {'default': _DEFAULT_VM_COUNT, 'min': 0},
         ),
         'cidr': (option_decoders.StringDecoder, {'default': None}),
-        'vm_spec': (option_decoders.PerCloudConfigDecoder, {}),
+        'vm_spec': (spec.PerCloudConfigDecoder, {}),
         'placement_group_name': (
             option_decoders.StringDecoder,
             {'default': None, 'none_ok': True},

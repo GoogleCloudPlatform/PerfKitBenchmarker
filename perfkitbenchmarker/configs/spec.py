@@ -13,12 +13,16 @@
 # limitations under the License.
 """Base class for objects decoded from a YAML config."""
 
-
 import collections
 import threading
+from typing import Any, Optional
 
+from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import provider_info
+from perfkitbenchmarker.configs import option_decoders
 import six
+
 
 _SPEC_REGISTRY = {}
 
@@ -74,7 +78,12 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
   _decoders = None  # dict mapping config option name to ConfigOptionDecoder.
   _required_options = None  # set of strings. Required config options.
 
-  def __init__(self, component_full_name, flag_values=None, **kwargs):
+  def __init__(
+      self,
+      component_full_name: str,
+      flag_values: Optional[flags.FlagValues] = None,
+      **kwargs: Any
+  ):
     """Initializes a BaseSpec.
 
     Translates keyword arguments via the class's decoders and assigns the
@@ -136,7 +145,9 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
             cls._required_options.add(option)
 
   @classmethod
-  def _ApplyFlags(cls, config_values, flag_values):
+  def _ApplyFlags(
+      cls, config_values: dict[str, Any], flag_values: flags.FlagValues
+  ):
     """Modifies config options based on runtime flag values.
 
     Can be overridden by derived classes to add support for specific flags.
@@ -163,7 +174,15 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
     """
     return {}
 
-  def _DecodeAndInit(self, component_full_name, config, decoders, flag_values):
+  def _DecodeAndInit(
+      self,
+      component_full_name: str,
+      config: dict[str, Any],
+      decoders: collections.OrderedDict[
+          str, option_decoders.ConfigOptionDecoder
+      ],
+      flag_values: Optional[flags.FlagValues],
+  ):
     """Initializes spec attributes from provided config option values.
 
     Args:
@@ -186,3 +205,56 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
       else:
         value = decoder.default
       setattr(self, option, value)
+
+
+class PerCloudConfigSpec(BaseSpec):
+  """Contains one config dict attribute per cloud provider.
+
+  The name of each attribute is the name of the cloud provider.
+  """
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+      The pair specifies a decoder class and its __init__() keyword arguments
+      to construct in order to decode the named option.
+    """
+    result = super()._GetOptionDecoderConstructions()
+    for cloud in provider_info.VALID_CLOUDS:
+      result[cloud] = option_decoders.TypeVerifier, {
+          'default': None,
+          'valid_types': (dict,),
+      }
+    return result
+
+
+class PerCloudConfigDecoder(option_decoders.TypeVerifier):
+  """Decodes the disk_spec or vm_spec option of a VM group config object."""
+
+  def __init__(self, **kwargs):
+    super().__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Decodes the disk_spec or vm_spec option of a VM group config object.
+
+    Args:
+      value: None or dict mapping cloud provider name string to a dict.
+      component_full_name: string. Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _PerCloudConfigSpec decoded from the input dict.
+    """
+    input_dict = super().Decode(value, component_full_name, flag_values)
+    if input_dict is None:
+      return None
+    return PerCloudConfigSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **input_dict
+    )

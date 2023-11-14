@@ -294,7 +294,7 @@ class ContainerRegistrySpec(spec.BaseSpec):
     result = super(ContainerRegistrySpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.StringDecoder, {}),
-        'spec': (option_decoders.PerCloudConfigDecoder, {
+        'spec': (spec.PerCloudConfigDecoder, {
             'default': {}
         })
     })

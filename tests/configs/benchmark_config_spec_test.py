@@ -26,7 +26,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import benchmark_config_spec
-from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import static_vm_decoders
 from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
@@ -52,20 +52,20 @@ class PerCloudConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(PerCloudConfigSpecTestCase, self).setUp()
-    self._spec_class = option_decoders.PerCloudConfigSpec
+    self._spec_class = spec.PerCloudConfigSpec
 
   def testDefaults(self):
-    spec = self._spec_class(_COMPONENT)
+    cloud_spec = self._spec_class(_COMPONENT)
     for cloud in provider_info.VALID_CLOUDS:
-      self.assertIsNone(getattr(spec, cloud))
+      self.assertIsNone(getattr(cloud_spec, cloud))
 
   def testDict(self):
-    spec = self._spec_class(_COMPONENT, GCP={})
-    self.assertEqual(spec.GCP, {})
+    cloud_spec = self._spec_class(_COMPONENT, GCP={})
+    self.assertEqual(cloud_spec.GCP, {})
     for cloud in frozenset(provider_info.VALID_CLOUDS).difference(
         [provider_info.GCP]
     ):
-      self.assertIsNone(getattr(spec, cloud))
+      self.assertIsNone(getattr(cloud_spec, cloud))
 
   def testNonDict(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
@@ -85,26 +85,25 @@ class PerCloudConfigDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(PerCloudConfigDecoderTestCase, self).setUp()
-    self._decoder = option_decoders.PerCloudConfigDecoder(option=_OPTION)
+    self._decoder = spec.PerCloudConfigDecoder(option=_OPTION)
 
   def testRejectNone(self):
     with self.assertRaises(errors.Config.InvalidValue):
       self._decoder.Decode(None, _COMPONENT, {})
 
   def testAcceptNone(self):
-    decoder = option_decoders.PerCloudConfigDecoder(none_ok=True,
-                                                    option=_OPTION)
+    decoder = spec.PerCloudConfigDecoder(none_ok=True, option=_OPTION)
     self.assertIsNone(decoder.Decode(None, _COMPONENT, {}))
 
   def testEmptyDict(self):
     result = self._decoder.Decode({}, _COMPONENT, {})
-    self.assertIsInstance(result, option_decoders.PerCloudConfigSpec)
+    self.assertIsInstance(result, spec.PerCloudConfigSpec)
     self.assertEqual(result.__dict__, {
         cloud: None for cloud in provider_info.VALID_CLOUDS})
 
   def testNonEmptyDict(self):
     result = self._decoder.Decode(_GCP_ONLY_VM_CONFIG, _COMPONENT, {})
-    self.assertIsInstance(result, option_decoders.PerCloudConfigSpec)
+    self.assertIsInstance(result, spec.PerCloudConfigSpec)
     expected_attributes = {cloud: None for cloud in provider_info.VALID_CLOUDS}
     expected_attributes['GCP'] = {'machine_type': 'n1-standard-1'}
     self.assertEqual(result.__dict__, expected_attributes)

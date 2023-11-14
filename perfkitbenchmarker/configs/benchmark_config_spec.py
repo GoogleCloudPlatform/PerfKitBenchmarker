@@ -740,7 +740,7 @@ class _ContainerSpecsDecoder(option_decoders.TypeVerifier):
 class _NodepoolSpec(spec.BaseSpec):
   """Configurable options of a Nodepool."""
 
-  vm_spec: option_decoders.PerCloudConfigSpec
+  vm_spec: spec.PerCloudConfigSpec
 
   def __init__(self,
                component_full_name,
@@ -767,7 +767,7 @@ class _NodepoolSpec(spec.BaseSpec):
             'default': _DEFAULT_VM_COUNT,
             'min': 0
         }),
-        'vm_spec': (option_decoders.PerCloudConfigDecoder, {}),
+        'vm_spec': (spec.PerCloudConfigDecoder, {}),
         'sandbox_config': (_SandboxDecoder, {'default': None}),
     })
     return result
@@ -893,7 +893,7 @@ class _ContainerClusterSpec(spec.BaseSpec):
   """Spec containing info needed to create a container cluster."""
 
   cloud: str
-  vm_spec: option_decoders.PerCloudConfigSpec
+  vm_spec: spec.PerCloudConfigSpec
   nodepools: dict[str, _NodepoolSpec]
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
@@ -969,7 +969,7 @@ class _ContainerClusterSpec(spec.BaseSpec):
             'min': 0
         }),
         # vm_spec is used to define the machine type for the default nodepool
-        'vm_spec': (option_decoders.PerCloudConfigDecoder, {}),
+        'vm_spec': (spec.PerCloudConfigDecoder, {}),
         # nodepools specifies a list of additional nodepools to create alongside
         # the default nodepool (nodepool created on cluster creation).
         'nodepools': (_NodepoolsDecoder, {

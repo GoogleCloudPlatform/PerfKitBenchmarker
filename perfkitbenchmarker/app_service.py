@@ -1,5 +1,4 @@
 """Module containing class for BaseAppService and BaseAppServiceSpec."""
-from collections.abc import MutableMapping
 import logging
 import threading
 import time
@@ -74,7 +73,7 @@ class BaseAppServiceSpec(spec.BaseSpec):
   @classmethod
   def _ApplyFlags(
       cls,
-      config_values: MutableMapping[str, Any],
+      config_values: dict[str, Any],
       flag_values: flags.FlagValues,
   ):
     super()._ApplyFlags(config_values, flag_values)

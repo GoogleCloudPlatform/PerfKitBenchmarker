@@ -34,6 +34,7 @@ from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import util
 import requests
 
@@ -147,8 +148,8 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
         'spanner_nodes': (option_decoders.IntDecoder, _NONE_OK),
         'spanner_load_nodes': (option_decoders.IntDecoder, _NONE_OK),
         'spanner_project': (option_decoders.StringDecoder, _NONE_OK),
-        'db_spec': (option_decoders.PerCloudConfigDecoder, _NONE_OK),
-        'db_disk_spec': (option_decoders.PerCloudConfigDecoder, _NONE_OK),
+        'db_spec': (spec.PerCloudConfigDecoder, _NONE_OK),
+        'db_disk_spec': (spec.PerCloudConfigDecoder, _NONE_OK),
     })
     return result
 
