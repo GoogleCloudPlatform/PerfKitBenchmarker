@@ -52,6 +52,12 @@ _RAMP_UP = flags.DEFINE_boolean(
     'If true, runs YCSB with a target throughput equal to the provisioned qps '
     'of the instance and increments until a max throughput is found.'
 )
+_PROVISIONED_QPS = flags.DEFINE_boolean(
+    'aws_dynamodb_ycsb_provisioned_qps',
+    False,
+    'If true, runs YCSB with a target throughput equal to the provisioned qps '
+    'of the instance and returns the result.',
+)
 FLAGS = flags.FLAGS
 
 _TARGET_QPS_INCREMENT = 1000
@@ -166,6 +172,10 @@ def Run(benchmark_spec):
   samples = []
   if _RAMP_UP.value:
     samples += RampUpRun(benchmark_spec.executor, instance, vms, run_kwargs)
+  elif _PROVISIONED_QPS.value:
+    samples += ExactThroughputRun(
+        benchmark_spec.executor, instance, vms, run_kwargs
+    )
   else:
     samples += list(benchmark_spec.executor.Run(vms, run_kwargs=run_kwargs))
   benchmark_metadata = {
@@ -210,6 +220,23 @@ def RampUpRun(executor: ycsb.YCSBExecutor,
 
     max_throughput = throughput
     qps += _TARGET_QPS_INCREMENT
+
+
+def ExactThroughputRun(
+    executor: ycsb.YCSBExecutor,
+    db: aws_dynamodb.AwsDynamoDBInstance,
+    vms: Collection[virtual_machine.VirtualMachine],
+    run_kwargs: MutableMapping[str, Any],
+) -> list[sample.Sample]:
+  """Runs YCSB at provisioned QPS."""
+  rcu = 0 if db.rcu <= 25 else db.rcu
+  wcu = 0 if db.wcu <= 25 else db.wcu
+  qps = rcu + wcu
+  run_kwargs['target'] = qps
+  run_samples = executor.Run(vms, run_kwargs=run_kwargs)
+  for s in run_samples:
+    s.metadata['provisioned_qps'] = True
+  return run_samples
 
 
 def Cleanup(benchmark_spec):
