@@ -390,6 +390,8 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       }
   )
   def testVMCreationError(self, stderr, expected_error):
+    vm_util.IssueCommand.side_effect = [('', '', 0)]
+    self.vm._CreateDependencies()
     vm_util.IssueCommand.side_effect = [(None, stderr, None)]
     with self.assertRaises(expected_error) as e:
       self.vm._Create()
@@ -412,6 +414,8 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'An error occurred (RequestLimitExceeded) when calling the RunInstances'
         ' operation (reached max retries: 4): Request limit exceeded.'
     )
+    vm_util.IssueCommand.side_effect = [('', '', 0)]
+    self.vm._CreateDependencies()
     vm_util.IssueCommand.side_effect = [(None, stderr, None)]
     with self.assertRaises(expected_error) as e:
       self.vm._Create()
@@ -490,9 +494,10 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch.object(util, 'FormatTagSpecifications')
   def testCreateSpot(self, mock_cmd):
     mock_cmd.return_value = 'foobar'
-    vm_util.IssueCommand.side_effect = [(None, '', None)]
-
     self.vm.use_spot_instance = True
+    vm_util.IssueCommand.side_effect = [(None, '', None)] * 2
+    self.vm._CreateDependencies()
+    vm_util.IssueCommand.side_effect = [(None, '', None)]
     self.vm._Create()
 
     vm_util.IssueCommand.assert_called_with([
@@ -522,8 +527,10 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     stderr = ('An error occurred (InsufficientInstanceCapacity) when calling '
               'the RunInstances operation (reached max retries: 4): '
               'Insufficient capacity.')
-    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
+    vm_util.IssueCommand.side_effect = [('', '', 0)]
 
+    self.vm._CreateDependencies()
+    vm_util.IssueCommand.side_effect = [(None, stderr, None)]
     with self.assertRaises(
         errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
       self.vm.use_spot_instance = True
@@ -621,6 +628,8 @@ def CreateVm():
   vm.network.subnet = mock.Mock(id='subnet-1234')
   vm.network.placement_group = mock.Mock()
   vm.network.Create()
+  vm.image = 'ami-12345'
+  vm._CreateDependencies()
   vm._Create()
   return ' '.join(vm_util.IssueCommand.call_args[0][0])
 

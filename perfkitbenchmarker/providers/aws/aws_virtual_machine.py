@@ -574,6 +574,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.spot_block_duration_minutes = vm_spec.spot_block_duration_minutes
     self.boot_disk_size = vm_spec.boot_disk_size
     self.client_token = str(uuid.uuid4())
+    self.num_hosts = None
     self.host = None
     self.id = None
     self.metadata.update({
@@ -598,6 +599,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # See:
     # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking-os.html
     self._smp_affinity_script = 'smp_affinity.sh'
+    self.create_cmd = None
 
     arm_arch = GetArmArchitecture(self.machine_type)
     if arm_arch:
@@ -861,46 +863,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       # efa_installer.sh should reboot enabling this change, reboot if necessary
       self.Reboot()
 
-  def _CreateDependencies(self):
-    """Create VM dependencies."""
-    AwsKeyFileManager.ImportKeyfile(self.region)
-    # GetDefaultImage calls the AWS CLI.
-    self.image = self.image or self.GetDefaultImage(self.machine_type,
-                                                    self.region)
-    self.AllowRemoteAccessPorts()
-
-    if self.use_dedicated_host:
-      with self._lock:
-        if (not self.host_list or (self.num_vms_per_host and
-                                   self.host_list[-1].fill_fraction +
-                                   1.0 / self.num_vms_per_host > 1.0)):
-          host = AwsDedicatedHost(self.machine_type, self.zone)
-          self.host_list.append(host)
-          host.Create()
-        self.host = self.host_list[-1]
-        if self.num_vms_per_host:
-          self.host.fill_fraction += 1.0 / self.num_vms_per_host
-
-  def _DeleteDependencies(self):
-    """Delete VM dependencies."""
-    AwsKeyFileManager.DeleteKeyfile(self.region)
-    if self.host:
-      with self._lock:
-        if self.host in self.host_list:
-          self.host_list.remove(self.host)
-        if self.host not in self.deleted_hosts:
-          self.host.Delete()
-          self.deleted_hosts.add(self.host)
-
-  def _Create(self):
-    """Create a VM instance."""
+  def _GenerateCreateCommand(self):
+    """Generate VM Create Command."""
     assert self.network is not None
     placement = []
     if not util.IsRegion(self.zone):
       placement.append('AvailabilityZone=%s' % self.zone)
     if self.use_dedicated_host:
       placement.append('Tenancy=host,HostId=%s' % self.host.id)
-      num_hosts = len(self.host_list)
+      self.num_hosts = len(self.host_list)
     elif self.placement_group:
       placement.append('GroupName=%s' % self.placement_group.name)
 
@@ -937,7 +908,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--query',
           'InstanceTypes[0].VCpuInfo.DefaultCores'
       ]
-      stdout, _, retcode = vm_util.IssueCommand(query_cmd)
+      stdout, _, _ = vm_util.IssueCommand(query_cmd)
       cores = int(json.loads(stdout))
       create_cmd.append(f'--cpu-options=CoreCount={cores},ThreadsPerCore=1')
     if FLAGS.aws_efa:
@@ -1003,7 +974,44 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       instance_market_options['SpotOptions'] = spot_options
       create_cmd.append(
           '--instance-market-options=%s' % json.dumps(instance_market_options))
-    _, stderr, retcode = vm_util.IssueCommand(create_cmd,
+    return create_cmd
+
+  def _CreateDependencies(self):
+    """Create VM dependencies."""
+    AwsKeyFileManager.ImportKeyfile(self.region)
+    # GetDefaultImage calls the AWS CLI.
+    self.image = self.image or self.GetDefaultImage(self.machine_type,
+                                                    self.region)
+    self.AllowRemoteAccessPorts()
+
+    if self.use_dedicated_host:
+      with self._lock:
+        if (not self.host_list or (self.num_vms_per_host and
+                                   self.host_list[-1].fill_fraction +
+                                   1.0 / self.num_vms_per_host > 1.0)):
+          host = AwsDedicatedHost(self.machine_type, self.zone)
+          self.host_list.append(host)
+          host.Create()
+        self.host = self.host_list[-1]
+        if self.num_vms_per_host:
+          self.host.fill_fraction += 1.0 / self.num_vms_per_host
+
+    self.create_cmd = self._GenerateCreateCommand()
+
+  def _DeleteDependencies(self):
+    """Delete VM dependencies."""
+    AwsKeyFileManager.DeleteKeyfile(self.region)
+    if self.host:
+      with self._lock:
+        if self.host in self.host_list:
+          self.host_list.remove(self.host)
+        if self.host not in self.deleted_hosts:
+          self.host.Delete()
+          self.deleted_hosts.add(self.host)
+
+  def _Create(self):
+    """Create a VM instance."""
+    _, stderr, retcode = vm_util.IssueCommand(self.create_cmd,
                                               raise_on_failure=False)
 
     if self.use_dedicated_host and 'InsufficientCapacityOnHost' in stderr:
@@ -1018,7 +1026,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             'will be created and instance creation will be retried.'
         )
         with self._lock:
-          if num_hosts == len(self.host_list):
+          if self.num_hosts == len(self.host_list):
             host = AwsDedicatedHost(self.machine_type, self.zone)
             self.host_list.append(host)
             host.Create()
