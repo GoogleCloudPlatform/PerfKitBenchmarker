@@ -48,12 +48,14 @@ def GetConfig(user_config):
 def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   """Provision container, because it's not handled by provision stage."""
   cluster = bm_spec.container_cluster
+  assert cluster
   cluster.DeployContainer('hello-world', bm_spec.container_specs['hello_world'])
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Get samples from resource provisioning."""
   cluster = bm_spec.container_cluster
+  assert cluster
   container = cluster.containers['hello-world'][0]
   samples = container.GetSamples()
   if not cluster.user_managed:
@@ -68,4 +70,5 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
+  assert bm_spec.container_cluster
   bm_spec.container_cluster.containers['hello-world'][0].Delete()
