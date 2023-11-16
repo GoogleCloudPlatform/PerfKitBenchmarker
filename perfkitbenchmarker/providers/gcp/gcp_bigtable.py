@@ -44,11 +44,14 @@ ADMIN_ENDPOINT = flags.DEFINE_string(
     'bigtableadmin.googleapis.com',
     'Google API endpoint for Cloud Bigtable table administration.',
 )
-flags.DEFINE_string('google_bigtable_instance_name', None,
-                    'Bigtable instance name. If not specified, new instance '
-                    'will be created and deleted on the fly. If specified, '
-                    'the instance is considered user managed and will not '
-                    'created/deleted by PKB.')
+flags.DEFINE_string(
+    'google_bigtable_instance_name',
+    None,
+    'Bigtable instance name. If not specified, new instance '
+    'will be created and deleted on the fly. If specified, '
+    'the instance is considered user managed and will not '
+    'created/deleted by PKB.',
+)
 flags.DEFINE_integer(
     'bigtable_node_count',
     None,
@@ -65,24 +68,42 @@ _LOAD_NODES = flags.DEFINE_integer(
     ' correct node count manually before the run phase.',
 )
 _AUTOSCALING_MIN_NODES = flags.DEFINE_integer(
-    'bigtable_autoscaling_min_nodes', None,
-    'Minimum number of nodes for autoscaling.')
+    'bigtable_autoscaling_min_nodes',
+    None,
+    'Minimum number of nodes for autoscaling.',
+)
 _AUTOSCALING_MAX_NODES = flags.DEFINE_integer(
-    'bigtable_autoscaling_max_nodes', None,
-    'Maximum number of nodes for autoscaling.')
+    'bigtable_autoscaling_max_nodes',
+    None,
+    'Maximum number of nodes for autoscaling.',
+)
 _AUTOSCALING_CPU_TARGET = flags.DEFINE_integer(
-    'bigtable_autoscaling_cpu_target', None,
-    'The target CPU utilization percent for autoscaling.')
-flags.DEFINE_enum('bigtable_storage_type', None, ['ssd', 'hdd'],
-                  'Storage class for the cluster')
-flags.DEFINE_string('google_bigtable_zone', None,
-                    'Bigtable zone.')
-flags.DEFINE_boolean('bigtable_replication_cluster', None,
-                     'Whether to create a Bigtable replication cluster.')
-flags.DEFINE_string('bigtable_replication_cluster_zone', None,
-                    'Zone in which to create a Bigtable replication cluster.')
-flags.DEFINE_boolean('bigtable_multicluster_routing', None,
-                     'Whether to use multi-cluster routing.')
+    'bigtable_autoscaling_cpu_target',
+    None,
+    'The target CPU utilization percent for autoscaling.',
+)
+flags.DEFINE_enum(
+    'bigtable_storage_type',
+    None,
+    ['ssd', 'hdd'],
+    'Storage class for the cluster',
+)
+flags.DEFINE_string('google_bigtable_zone', None, 'Bigtable zone.')
+flags.DEFINE_boolean(
+    'bigtable_replication_cluster',
+    None,
+    'Whether to create a Bigtable replication cluster.',
+)
+flags.DEFINE_string(
+    'bigtable_replication_cluster_zone',
+    None,
+    'Zone in which to create a Bigtable replication cluster.',
+)
+flags.DEFINE_boolean(
+    'bigtable_multicluster_routing',
+    None,
+    'Whether to use multi-cluster routing.',
+)
 
 _DEFAULT_NODE_COUNT = 3
 _DEFAULT_STORAGE_TYPE = 'ssd'
@@ -147,11 +168,13 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
   @classmethod
   def _ValidateConfig(cls, config_values) -> None:
     """Verifies correct usage of the bigtable config options."""
-    if (config_values.get('multicluster_routing', False) and
-        not config_values.get('replication_cluster', False)):
+    if config_values.get(
+        'multicluster_routing', False
+    ) and not config_values.get('replication_cluster', False):
       raise errors.Config.InvalidValue(
           'bigtable_replication_cluster must be set if '
-          'bigtable_multicluster_routing is True.')
+          'bigtable_multicluster_routing is True.'
+      )
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values) -> None:
@@ -215,20 +238,22 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
 
   SERVICE_TYPE = non_relational_db.BIGTABLE
 
-  def __init__(self,
-               name: Optional[str],
-               project: Optional[str],
-               zone: Optional[str],
-               node_count: Optional[int],
-               load_node_count: Optional[int],
-               storage_type: Optional[str],
-               replication_cluster: Optional[bool],
-               replication_cluster_zone: Optional[str],
-               multicluster_routing: Optional[bool],
-               autoscaling_min_nodes: Optional[int],
-               autoscaling_max_nodes: Optional[int],
-               autoscaling_cpu_target: Optional[int],
-               **kwargs):
+  def __init__(
+      self,
+      name: Optional[str],
+      project: Optional[str],
+      zone: Optional[str],
+      node_count: Optional[int],
+      load_node_count: Optional[int],
+      storage_type: Optional[str],
+      replication_cluster: Optional[bool],
+      replication_cluster_zone: Optional[str],
+      multicluster_routing: Optional[bool],
+      autoscaling_min_nodes: Optional[int],
+      autoscaling_max_nodes: Optional[int],
+      autoscaling_cpu_target: Optional[int],
+      **kwargs,
+  ):
     super(GcpBigtableInstance, self).__init__(**kwargs)
     if name is not None:
       self.user_managed = True
@@ -240,8 +265,10 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     self.storage_type: str = storage_type or _DEFAULT_STORAGE_TYPE
     self.replication_cluster: bool = replication_cluster or False
     self.replication_cluster_zone: Optional[str] = (
-        replication_cluster_zone or
-        _DEFAULT_REPLICATION_ZONE) if self.replication_cluster else None
+        (replication_cluster_zone or _DEFAULT_REPLICATION_ZONE)
+        if self.replication_cluster
+        else None
+    )
     self.multicluster_routing: bool = multicluster_routing or False
     self.autoscaling_min_nodes: Optional[int] = autoscaling_min_nodes or None
     self.autoscaling_max_nodes: Optional[int] = autoscaling_max_nodes or None
@@ -264,7 +291,8 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
         autoscaling_cpu_target=spec.autoscaling_cpu_target,
         delete_on_freeze_error=spec.delete_on_freeze_error,
         create_on_restore_error=spec.create_on_restore_error,
-        enable_freeze_restore=spec.enable_freeze_restore)
+        enable_freeze_restore=spec.enable_freeze_restore,
+    )
 
   def _BuildClusterConfigs(self) -> List[str]:
     """Return flag values for --cluster_config when creating an instance.
@@ -296,23 +324,28 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     for key in keys_to_remove:
       del cluster_config[key]
 
-    flag_values.append(','.join(
-        '{}={}'.format(k, v) for (k, v) in cluster_config.items()))
+    flag_values.append(
+        ','.join('{}={}'.format(k, v) for (k, v) in cluster_config.items())
+    )
 
     if self.replication_cluster:
       replication_cluster_config = cluster_config.copy()
       replication_cluster_config['id'] = f'{self.name}-1'
       replication_cluster_config['zone'] = self.replication_cluster_zone
-      flag_values.append(','.join(
-          '{}={}'.format(k, v)
-          for (k, v) in replication_cluster_config.items()))
+      flag_values.append(
+          ','.join(
+              '{}={}'.format(k, v)
+              for (k, v) in replication_cluster_config.items()
+          )
+      )
 
     return flag_values
 
   def _Create(self):
     """Creates the instance."""
-    cmd = _GetBigtableGcloudCommand(self, 'bigtable', 'instances', 'create',
-                                    self.name)
+    cmd = _GetBigtableGcloudCommand(
+        self, 'bigtable', 'instances', 'create', self.name
+    )
     cmd.flags['display-name'] = self.name
     cmd.flags['cluster-storage-type'] = self.storage_type
     cmd.flags['project'] = self.project
@@ -324,13 +357,15 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     if 'Insufficient node quota' in stderr:
       raise errors.Benchmarks.QuotaFailure(
           f'Insufficient node quota in project {self.project} '
-          f'and zone {self.zone}')
+          f'and zone {self.zone}'
+      )
 
     self._UpdateLabels(util.GetDefaultTags())
 
     if self.multicluster_routing:
       cmd = _GetBigtableGcloudCommand(
-          self, 'bigtable', 'app-profiles', 'update', 'default')
+          self, 'bigtable', 'app-profiles', 'update', 'default'
+      )
       cmd.flags['instance'] = self.name
       cmd.flags['route-any'] = True
       cmd.flags['force'] = True
@@ -354,12 +389,15 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
         url,
         headers=header,
         params={'updateMask': 'labels'},
-        json={'labels': tags})
-    logging.info('Update labels: status code %s, %s', response.status_code,
-                 response.text)
+        json={'labels': tags},
+    )
+    logging.info(
+        'Update labels: status code %s, %s', response.status_code, response.text
+    )
     if response.status_code != 200:
       raise errors.Resource.UpdateError(
-          f'Unable to update Bigtable instance: {response.text}')
+          f'Unable to update Bigtable instance: {response.text}'
+      )
 
   def _UpdateTimeout(self, timeout_minutes: int) -> None:
     """See base class."""
@@ -367,13 +405,15 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
 
   def _Delete(self):
     """Deletes the instance."""
-    cmd = _GetBigtableGcloudCommand(self, 'bigtable', 'instances', 'delete',
-                                    self.name)
+    cmd = _GetBigtableGcloudCommand(
+        self, 'bigtable', 'instances', 'delete', self.name
+    )
     cmd.Issue(raise_on_failure=False)
 
   def _DescribeInstance(self) -> Dict[str, Any]:
     cmd = _GetBigtableGcloudCommand(
-        self, 'bigtable', 'instances', 'describe', self.name)
+        self, 'bigtable', 'instances', 'describe', self.name
+    )
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Describing instance %s failed: %s', self.name, stderr)
@@ -391,12 +431,13 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     metadata = {}
     if self.user_managed:
       clusters = GetClustersDescription(self.name, self.project)
-      metadata['bigtable_zone'] = [
-          cluster['zone'] for cluster in clusters]
+      metadata['bigtable_zone'] = [cluster['zone'] for cluster in clusters]
       metadata['bigtable_storage_type'] = [
-          cluster['defaultStorageType'] for cluster in clusters]
+          cluster['defaultStorageType'] for cluster in clusters
+      ]
       metadata['bigtable_node_count'] = [
-          cluster['serveNodes'] for cluster in clusters]
+          cluster['serveNodes'] for cluster in clusters
+      ]
     else:
       metadata['bigtable_zone'] = self.zone
       metadata['bigtable_replication_zone'] = self.replication_cluster_zone
@@ -570,8 +611,12 @@ def GetClustersDescription(instance_name, project):
   cmd.flags['project'] = project
   stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
   if retcode:
-    logging.error('Command "%s" failed:\nSTDOUT:\n%s\nSTDERR:\n%s',
-                  repr(cmd), stdout, stderr)
+    logging.error(
+        'Command "%s" failed:\nSTDOUT:\n%s\nSTDERR:\n%s',
+        repr(cmd),
+        stdout,
+        stderr,
+    )
   output = json.loads(stdout)
 
   result = []

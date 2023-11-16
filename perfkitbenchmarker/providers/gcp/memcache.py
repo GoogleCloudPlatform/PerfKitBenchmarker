@@ -17,7 +17,6 @@ from perfkitbenchmarker.memcache_service import MemcacheService
 
 
 class MemcacheService(MemcacheService):
-
   CLOUD = provider_info.GCP
 
   def __init__(self):

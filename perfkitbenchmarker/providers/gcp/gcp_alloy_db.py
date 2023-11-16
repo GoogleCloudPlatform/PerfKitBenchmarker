@@ -16,25 +16,36 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 
 # https://cloud.google.com/alloydb/docs/columnar-engine/enable
-_COLUMNAR_ENGINE = flags.DEFINE_bool('alloydb_columnar_engine', False,
-                                     'Set to true to enable columnar engine.')
+_COLUMNAR_ENGINE = flags.DEFINE_bool(
+    'alloydb_columnar_engine', False, 'Set to true to enable columnar engine.'
+)
 
 _COLUMNAR_ENGINE_SIZE = flags.DEFINE_integer(
-    'alloydb_columnar_engine_size_mb', 1024,
-    'Columnar engine is set to 1GB by default.')
+    'alloydb_columnar_engine_size_mb',
+    1024,
+    'Columnar engine is set to 1GB by default.',
+)
 
 _ENABLE_AUTO_COLUMNARIZATION = flags.DEFINE_enum(
-    'alloydb_enable_auto_columnarization', 'on', ['on', 'off'],
-    'Set alloydb_enable_auto_columnarization to On or off.')
+    'alloydb_enable_auto_columnarization',
+    'on',
+    ['on', 'off'],
+    'Set alloydb_enable_auto_columnarization to On or off.',
+)
 
 _ENABLE_COLUMNAR_RECOMMENDATION = flags.DEFINE_bool(
-    'alloydb_enable_columnar_recommendation', False,
-    'Set alloydb_enable_columnar_recommendation to On if true.')
+    'alloydb_enable_columnar_recommendation',
+    False,
+    'Set alloydb_enable_columnar_recommendation to On if true.',
+)
 
 
 _READ_POOL_NODE_COUNT = flags.DEFINE_integer(
-    'alloydb_read_pool_node_count', 0, 'Create read replica for alloydb.',
-    upper_bound=20)
+    'alloydb_read_pool_node_count',
+    0,
+    'Create read replica for alloydb.',
+    upper_bound=20,
+)
 
 SUPPORTED_ALLOYDB_ENGINE_VERSIONS = ['13']
 
@@ -48,6 +59,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
 
   This class contains logic required to provision and teardown the database.
   """
+
   CLOUD = 'GCP'
   IS_MANAGED = True
   ENGINE = 'alloydb-postgresql'
@@ -63,7 +75,8 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     self.project = FLAGS.project or util.GetDefaultProject()
     self.enable_columnar_engine = _COLUMNAR_ENGINE.value
     self.enable_columnar_engine_recommendation = (
-        _ENABLE_COLUMNAR_RECOMMENDATION.value)
+        _ENABLE_COLUMNAR_RECOMMENDATION.value
+    )
 
   @staticmethod
   def GetDefaultEngineVersion(engine: str) -> str:
@@ -76,8 +89,9 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
       (string): Default version for the given database engine.
     """
     if engine not in SUPPORTED_ALLOYDB_ENGINE_VERSIONS:
-      raise NotImplementedError('Default engine not specified for '
-                                'engine {0}'.format(engine))
+      raise NotImplementedError(
+          'Default engine not specified for engine {0}'.format(engine)
+      )
     return DEFAULT_ENGINE_VERSION
 
   def GetResourceMetadata(self) -> Dict[str, Any]:
@@ -104,8 +118,10 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     """
     # Create a database cluster
     cmd_string = [
-        'clusters', 'create', self.cluster_id,
-        '--password=%s' % self.spec.database_password
+        'clusters',
+        'create',
+        self.cluster_id,
+        '--password=%s' % self.spec.database_password,
     ]
 
     cmd = self._GetAlloyDbCommand(cmd_string)
@@ -113,17 +129,22 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
 
     # Create a primary instance
     cmd_string = [
-        'instances', 'create', self.instance_id,
+        'instances',
+        'create',
+        self.instance_id,
         '--cluster=%s' % self.cluster_id,
-        '--cpu-count=%s' % self.spec.db_spec.cpus, '--instance-type=PRIMARY'
+        '--cpu-count=%s' % self.spec.db_spec.cpus,
+        '--instance-type=PRIMARY',
     ]
 
     cmd = self._GetAlloyDbCommand(cmd_string)
     cmd.Issue(timeout=CREATION_TIMEOUT)
 
     cmd_string = [
-        'instances', 'describe', self.instance_id,
-        '--cluster=%s' % self.cluster_id
+        'instances',
+        'describe',
+        self.instance_id,
+        '--cluster=%s' % self.cluster_id,
     ]
 
     # Assign the endpoint from the describe command
@@ -149,8 +170,10 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
 
       # Assign the endpoint for the read replica
       cmd_string = [
-          'instances', 'describe', self.replica_instance_id,
-          f'--cluster={self.cluster_id}'
+          'instances',
+          'describe',
+          self.replica_instance_id,
+          f'--cluster={self.cluster_id}',
       ]
       cmd = self._GetAlloyDbCommand(cmd_string)
       stdout, _, _ = cmd.Issue()
@@ -163,36 +186,44 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     columnar_engine_size = None
     if _COLUMNAR_ENGINE.value:
       columnar_engine_size = _COLUMNAR_ENGINE_SIZE.value
-    self.UpdateAlloyDBFlags(columnar_engine_size,
-                            _ENABLE_COLUMNAR_RECOMMENDATION.value,
-                            _ENABLE_AUTO_COLUMNARIZATION.value)
+    self.UpdateAlloyDBFlags(
+        columnar_engine_size,
+        _ENABLE_COLUMNAR_RECOMMENDATION.value,
+        _ENABLE_AUTO_COLUMNARIZATION.value,
+    )
 
   def AddTableToColumnarEngine(self, table: str, database_name: str) -> None:
     self.client_vm_query_tools.IssueSqlCommand(
-        f'SELECT google_columnar_engine_add(\'{table}\');',
-        database_name=database_name)
+        f"SELECT google_columnar_engine_add('{table}');",
+        database_name=database_name,
+    )
 
   def CreateColumnarEngineExtension(self, database_name: str) -> None:
     self.client_vm_query_tools.IssueSqlCommand(
         'CREATE EXTENSION IF NOT EXISTS google_columnar_engine;',
-        database_name=database_name)
+        database_name=database_name,
+    )
 
   def RunColumnarEngineRecommendation(self, database_name: str) -> None:
     self.client_vm_query_tools.IssueSqlCommand(
         'SELECT '
         'google_columnar_engine_run_recommendation'
-        '(0, \'FIXED_SIZE\', true)',
-        database_name=database_name)
+        "(0, 'FIXED_SIZE', true)",
+        database_name=database_name,
+    )
 
   def WaitColumnarEnginePopulates(self, database_name: str):
     self.client_vm_query_tools.IssueSqlCommand(
-        'SELECT google_columnar_engine_jobs_wait(14400000)', database_name)
+        'SELECT google_columnar_engine_jobs_wait(14400000)', database_name
+    )
 
-  def UpdateAlloyDBFlags(self,
-                         columnar_engine_size: Optional[int],
-                         enable_columnar_recommendation: bool,
-                         enable_auto_columnarization: str,
-                         relation: Optional[str] = None):
+  def UpdateAlloyDBFlags(
+      self,
+      columnar_engine_size: Optional[int],
+      enable_columnar_recommendation: bool,
+      enable_auto_columnarization: str,
+      relation: Optional[str] = None,
+  ):
     database_flags = []
     if FLAGS.db_flags:
       database_flags += [':'.join(FLAGS.db_flags)]
@@ -200,10 +231,11 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     if columnar_engine_size:
       database_flags += [
           'google_columnar_engine.enabled=on',
-          'google_columnar_engine.memory_size_in_mb'
-          f'={columnar_engine_size}',
-          'google_columnar_engine.enable_auto_columnarization='
-          f'{enable_auto_columnarization}'
+          f'google_columnar_engine.memory_size_in_mb={columnar_engine_size}',
+          (
+              'google_columnar_engine.enable_auto_columnarization='
+              f'{enable_auto_columnarization}'
+          ),
       ]
 
       if enable_columnar_recommendation:
@@ -215,25 +247,32 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     if database_flags:
       database_flags_str = ':'.join(database_flags)
       cmd_string = [
-          'instances', 'update', self.instance_id,
+          'instances',
+          'update',
+          self.instance_id,
           f'--database-flags=^:^{database_flags_str}',
-          f'--cluster={self.cluster_id}'
+          f'--cluster={self.cluster_id}',
       ]
       cmd = self._GetAlloyDbCommand(cmd_string)
       cmd.Issue(timeout=CREATION_TIMEOUT)
 
-  def GetColumnarEngineRecommendation(self,
-                                      database_name: str) -> Tuple[int, str]:
+  def GetColumnarEngineRecommendation(
+      self, database_name: str
+  ) -> Tuple[int, str]:
     result, _ = self.client_vm_query_tools.IssueSqlCommand(
         'SELECT google_columnar_engine_run_recommendation'
-        '(65536, \'PERFORMANCE_OPTIMAL\');', database_name)
+        "(65536, 'PERFORMANCE_OPTIMAL');",
+        database_name,
+    )
     regex = r'\((\d*),"(.*)"\)'
-    return (regex_util.ExtractInt(regex, result),
-            regex_util.ExtractGroup(regex, result, group=2))
+    return (
+        regex_util.ExtractInt(regex, result),
+        regex_util.ExtractGroup(regex, result, group=2),
+    )
 
-  def _GetAlloyDbCommand(self,
-                         cmd_string: List[str],
-                         timeout: Optional[int] = None) -> util.GcloudCommand:
+  def _GetAlloyDbCommand(
+      self, cmd_string: List[str], timeout: Optional[int] = None
+  ) -> util.GcloudCommand:
     """Used to issue alloydb command."""
     cmd_string = [self, 'alpha', 'alloydb'] + cmd_string
     cmd = util.GcloudCommand(*cmd_string)

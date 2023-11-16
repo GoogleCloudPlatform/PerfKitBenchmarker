@@ -121,7 +121,8 @@ class WindowsGceVirtualMachine(
     if local_ssd_disks:
       if len(local_ssd_disks_str) > 1:
         script += 'create volume stripe disk=%s\n' % ','.join(
-            local_ssd_disks_str)
+            local_ssd_disks_str
+        )
       else:
         script += 'create volume simple\n'
       script += 'format fs=ntfs quick unit=64k\nassign letter={}\n'.format(
@@ -302,8 +303,10 @@ class WindowsGceVirtualMachine(
 
   def DiskDriveIsLocal(self, device, model):
     """Helper method to determine if a disk drive is a local ssd to stripe."""
-    if (model.lower().strip() == 'nvme_card' or
-        model.lower().strip() == 'google ephemeraldisk'):
+    if (
+        model.lower().strip() == 'nvme_card'
+        or model.lower().strip() == 'google ephemeraldisk'
+    ):
       return True
     return False
 

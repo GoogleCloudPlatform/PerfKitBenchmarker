@@ -79,8 +79,7 @@ class GcpDataproc(spark_service.BaseSparkService):
     if done_time and start_time:
       stats[spark_service.RUNTIME] = (done_time - start_time).total_seconds()
     if start_time and pending_time:
-      stats[spark_service.WAITING] = (
-          (start_time - pending_time).total_seconds())
+      stats[spark_service.WAITING] = (start_time - pending_time).total_seconds()
     return stats
 
   def DataprocGcloudCommand(self, *args):
@@ -101,7 +100,8 @@ class GcpDataproc(spark_service.BaseSparkService):
 
     for group_type, group_spec in [
         ('worker', self.spec.worker_group),
-        ('master', self.spec.master_group)]:
+        ('master', self.spec.master_group),
+    ]:
       flag_name = group_type + '-machine-type'
       cmd.flags[flag_name] = group_spec.vm_spec.machine_type
 
@@ -148,10 +148,16 @@ class GcpDataproc(spark_service.BaseSparkService):
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return retcode == 0
 
-  def SubmitJob(self, jarfile, classname, job_script=None,
-                job_poll_interval=None,
-                job_arguments=None, job_stdout_file=None,
-                job_type=spark_service.SPARK_JOB_TYPE):
+  def SubmitJob(
+      self,
+      jarfile,
+      classname,
+      job_script=None,
+      job_poll_interval=None,
+      job_arguments=None,
+      job_stdout_file=None,
+      job_type=spark_service.SPARK_JOB_TYPE,
+  ):
     cmd = self.DataprocGcloudCommand('jobs', 'submit', job_type)
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
@@ -174,7 +180,8 @@ class GcpDataproc(spark_service.BaseSparkService):
     # to suppress those messages, and we can then separate, hopefully
     # the job standard out from the log messages.
     cmd.flags['driver-log-levels'] = 'root={}'.format(
-        FLAGS.spark_service_log_level)
+        FLAGS.spark_service_log_level
+    )
     if job_arguments:
       cmd.additional_flags += ['--'] + job_arguments
     stdout, stderr, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
@@ -187,8 +194,9 @@ class GcpDataproc(spark_service.BaseSparkService):
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
         lines = stderr.splitlines(True)
-        if (not re.match(r'Job \[.*\] submitted.', lines[0]) or
-            not re.match(r'Waiting for job output...', lines[1])):
+        if not re.match(r'Job \[.*\] submitted.', lines[0]) or not re.match(
+            r'Waiting for job output...', lines[1]
+        ):
           raise Exception('Dataproc output in unexpected format.')
         i = 2
         if job_type == spark_service.SPARK_JOB_TYPE:
@@ -217,16 +225,29 @@ class GcpDataproc(spark_service.BaseSparkService):
       scp_cmd = ['gcloud', 'beta', 'compute', 'scp', '--internal-ip']
     else:
       scp_cmd = ['gcloud', 'compute', 'scp']
-    scp_cmd += ['--zone', self.GetZone(), '--quiet', script_path,
-                'pkb@' + master_name + ':/tmp/' + script_name]
+    scp_cmd += [
+        '--zone',
+        self.GetZone(),
+        '--quiet',
+        script_path,
+        'pkb@' + master_name + ':/tmp/' + script_name,
+    ]
     vm_util.IssueCommand(scp_cmd)
     ssh_cmd = ['gcloud', 'compute', 'ssh']
     if FLAGS.gcp_internal_ip:
       ssh_cmd += ['--internal-ip']
-    ssh_cmd += ['--zone=' + self.GetZone(), '--quiet',
-                'pkb@' + master_name, '--',
-                'chmod +x /tmp/' + script_name + '; sudo /tmp/' + script_name
-                + ' ' + ' '.join(script_args)]
+    ssh_cmd += [
+        '--zone=' + self.GetZone(),
+        '--quiet',
+        'pkb@' + master_name,
+        '--',
+        'chmod +x /tmp/'
+        + script_name
+        + '; sudo /tmp/'
+        + script_name
+        + ' '
+        + ' '.join(script_args),
+    ]
     vm_util.IssueCommand(ssh_cmd)
 
   def CopyFromMaster(self, remote_path, local_path):
@@ -235,9 +256,12 @@ class GcpDataproc(spark_service.BaseSparkService):
       scp_cmd = ['gcloud', 'beta', 'compute', 'scp', '--internal-ip']
     else:
       scp_cmd = ['gcloud', 'compute', 'scp']
-    scp_cmd += ['--zone=' + self.GetZone(), '--quiet',
-                'pkb@' + master_name + ':' +
-                remote_path, local_path]
+    scp_cmd += [
+        '--zone=' + self.GetZone(),
+        '--quiet',
+        'pkb@' + master_name + ':' + remote_path,
+        local_path,
+    ]
     vm_util.IssueCommand(scp_cmd)
 
   def SetClusterProperty(self):
@@ -247,7 +271,8 @@ class GcpDataproc(spark_service.BaseSparkService):
     basic_data = super(GcpDataproc, self).GetMetadata()
     if self.spec.worker_group.vm_spec.num_local_ssds:
       basic_data.update(
-          {'ssd_count': str(self.spec.worker_group.vm_spec.num_local_ssds)})
+          {'ssd_count': str(self.spec.worker_group.vm_spec.num_local_ssds)}
+      )
     return basic_data
 
   def GetZone(self):

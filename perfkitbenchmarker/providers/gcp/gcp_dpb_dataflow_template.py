@@ -67,16 +67,16 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
       template_gcs_location=None,
       job_poll_interval=None,
       job_arguments=None,
-      job_input_sub=None):
-
+      job_input_sub=None,
+  ):
     worker_machine_type = self.spec.worker_group.vm_spec.machine_type
     num_workers = self.spec.worker_count
     max_workers = self.spec.worker_count
 
     now = datetime.datetime.now()
-    job_name = '_'.join([
-        template_gcs_location.split('/')[-1],
-        now.strftime('%Y%m%d_%H%M%S')])
+    job_name = '_'.join(
+        [template_gcs_location.split('/')[-1], now.strftime('%Y%m%d_%H%M%S')]
+    )
     region = util.GetRegionFromZone(FLAGS.dpb_service_zone)
 
     cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'run', job_name)
@@ -106,7 +106,8 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
     logging.info('Dataflow job ID: %s', self.job_id)
     # TODO(user): return JobResult() with pre-computed time stats.
     return self._WaitForJob(
-        job_input_sub, FLAGS.dpb_dataflow_timeout, job_poll_interval)
+        job_input_sub, FLAGS.dpb_dataflow_timeout, job_poll_interval
+    )
 
   def _GetCompletedJob(self, job_id):
     """See base class."""
@@ -116,13 +117,15 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
     # otherwise keep waiting
     if not self.input_sub_empty:
       backlog_size = self.GetSubscriptionBacklogSize(job_input_sub)
-      logging.info('Polling: Backlog size of subscription %s is %s',
-                   job_input_sub, backlog_size)
+      logging.info(
+          'Polling: Backlog size of subscription %s is %s',
+          job_input_sub,
+          backlog_size,
+      )
       if backlog_size == 0:
         self.input_sub_empty = True
         # Start draining job once input subscription is empty
-        cmd = util.GcloudCommand(
-            self, 'dataflow', 'jobs', 'drain', self.job_id)
+        cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'drain', self.job_id)
         cmd.flags = {
             'project': self.project,
             'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),

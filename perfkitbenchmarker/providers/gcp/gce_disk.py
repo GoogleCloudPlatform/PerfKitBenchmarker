@@ -100,9 +100,7 @@ SCSI = 'SCSI'
 NVME = 'NVME'
 
 
-NVME_PD_MACHINE_FAMILIES = [
-    'm3'
-]
+NVME_PD_MACHINE_FAMILIES = ['m3']
 # Some machine families cannot use pd-ssd
 HYPERDISK_ONLY_MACHINE_FAMILIES = ['c3a']
 # Default boot disk type in pkb.
@@ -135,7 +133,8 @@ def AddLabels(gcp_resource: resource.BaseResource, disk_name: str):
     disk_name: the name of the disk
   """
   cmd = util.GcloudCommand(
-      gcp_resource, 'compute', 'disks', 'add-labels', disk_name)
+      gcp_resource, 'compute', 'disks', 'add-labels', disk_name
+  )
   cmd.flags['labels'] = util.MakeFormattedDefaultTags()
   cmd.Issue()
 
@@ -288,7 +287,8 @@ def GetDefaultBootDiskType(machine_type: str) -> str:
     default boot disk type.
   """
   if not machine_type or isinstance(
-      machine_type, custom_virtual_machine_spec.CustomMachineTypeSpec):
+      machine_type, custom_virtual_machine_spec.CustomMachineTypeSpec
+  ):
     return PKB_DEFAULT_BOOT_DISK_TYPE
   family = machine_type.split('-')[0].lower()
   if family in HYPERDISK_ONLY_MACHINE_FAMILIES:
@@ -299,14 +299,16 @@ def GetDefaultBootDiskType(machine_type: str) -> str:
 class GceDisk(disk.BaseDisk):
   """Object representing a GCE Disk."""
 
-  def __init__(self,
-               disk_spec,
-               name,
-               zone,
-               project,
-               image=None,
-               image_project=None,
-               replica_zones=None):
+  def __init__(
+      self,
+      disk_spec,
+      name,
+      zone,
+      project,
+      image=None,
+      image_project=None,
+      replica_zones=None,
+  ):
     super(GceDisk, self).__init__(disk_spec)
     self.interface = disk_spec.interface
     self.attached_vm_name = None
@@ -400,8 +402,9 @@ class GceDisk(disk.BaseDisk):
       vm: The GceVirtualMachine instance to which the disk will be attached.
     """
     self.attached_vm_name = vm.name
-    cmd = util.GcloudCommand(self, 'compute', 'instances', 'attach-disk',
-                             self.attached_vm_name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'attach-disk', self.attached_vm_name
+    )
     cmd.flags['device-name'] = self.name
     cmd.flags['disk'] = self.name
 
@@ -412,18 +415,27 @@ class GceDisk(disk.BaseDisk):
     # Gcloud attach-disk commands may still attach disks despite being rate
     # limited.
     if retcode:
-      if (cmd.rate_limited and 'is already being used' in stderr and
-          FLAGS.retry_on_rate_limited):
+      if (
+          cmd.rate_limited
+          and 'is already being used' in stderr
+          and FLAGS.retry_on_rate_limited
+      ):
         return
-      debug_text = ('Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' %
-                    (' '.join(cmd.GetCommand()), retcode, stdout, stderr))
+      debug_text = 'Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' % (
+          ' '.join(cmd.GetCommand()),
+          retcode,
+          stdout,
+          stderr,
+      )
       raise errors.VmUtil.CalledProcessException(
-          'Command returned a non-zero exit code:\n{}'.format(debug_text))
+          'Command returned a non-zero exit code:\n{}'.format(debug_text)
+      )
 
   def Detach(self):
     """Detaches the disk from a VM."""
-    cmd = util.GcloudCommand(self, 'compute', 'instances', 'detach-disk',
-                             self.attached_vm_name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'detach-disk', self.attached_vm_name
+    )
     cmd.flags['device-name'] = self.name
 
     if self.replica_zones:

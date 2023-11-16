@@ -52,8 +52,9 @@ class GcpTpu(cloud_tpu.BaseTpu):
 
   def _Create(self):
     """Create Cloud TPU."""
-    cmd = util.GcloudCommand(self, 'compute', 'tpus', 'create',
-                             self.spec.tpu_name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'tpus', 'create', self.spec.tpu_name
+    )
     cmd.flags['range'] = self.spec.tpu_cidr_range
     if self.spec.tpu_accelerator_type:
       cmd.flags['accelerator-type'] = self.spec.tpu_accelerator_type
@@ -73,15 +74,17 @@ class GcpTpu(cloud_tpu.BaseTpu):
     if _INSUFFICIENT_CAPACITY in stderr:
       logging.error(util.STOCKOUT_MESSAGE)
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(
-          util.STOCKOUT_MESSAGE)
+          util.STOCKOUT_MESSAGE
+      )
 
     if retcode != 0:
       logging.error('Create GCP cloud TPU failed.')
 
   def _Delete(self):
     """Deletes the cloud TPU."""
-    cmd = util.GcloudCommand(self, 'compute', 'tpus', 'delete',
-                             self.spec.tpu_name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'tpus', 'delete', self.spec.tpu_name
+    )
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
     cmd.flags['project'] = self.project
@@ -93,15 +96,15 @@ class GcpTpu(cloud_tpu.BaseTpu):
 
   def _GetTpuDescription(self):
     """Gets the cloud TPU description."""
-    cmd = util.GcloudCommand(self, 'compute', 'tpus', 'describe',
-                             self.spec.tpu_name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'tpus', 'describe', self.spec.tpu_name
+    )
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
     cmd.flags['project'] = self.project
     stdout, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
-      logging.info('Could not found GCP cloud TPU %s.',
-                   self.spec.tpu_name)
+      logging.info('Could not found GCP cloud TPU %s.', self.spec.tpu_name)
     return stdout and json.loads(stdout), retcode
 
   def _Exists(self):
@@ -116,11 +119,13 @@ class GcpTpu(cloud_tpu.BaseTpu):
   def GetMasterGrpcAddress(self):
     """Gets the grpc address of the 0th NetworkEndpoint."""
     master_network_endpoint = self._GetTpuDescription()[0]['networkEndpoints'][
-        0]
+        0
+    ]
 
     return 'grpc://{ip_address}:{port}'.format(
         ip_address=master_network_endpoint['ipAddress'],
-        port=master_network_endpoint['port'])
+        port=master_network_endpoint['port'],
+    )
 
   def GetNumShards(self):
     """Gets the number of TPU shards."""
@@ -145,8 +150,5 @@ class GcpTpu(cloud_tpu.BaseTpu):
       metadata: dict of GCP cloud TPU metadata.
     """
     metadata = super(GcpTpu, self).GetResourceMetadata()
-    metadata.update({
-        'project': self.project,
-        'cloud': self.CLOUD
-    })
+    metadata.update({'project': self.project, 'cloud': self.CLOUD})
     return metadata

@@ -17,7 +17,8 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 MESSAGING_SERVICE_SCRIPTS_VM_GCP_DIR = os.path.join(
-    msgsvc.MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'gcp')
+    msgsvc.MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'gcp'
+)
 MESSAGING_SERVICE_SCRIPTS_GCP_PREFIX = 'messaging_service_scripts/gcp'
 MESSAGING_SERVICE_SCRIPTS_GCP_FILES = ['__init__.py', 'gcp_pubsub_client.py']
 MESSAGING_SERVICE_SCRIPTS_GCP_BIN = 'messaging_service_scripts/gcp_benchmark.py'
@@ -68,17 +69,24 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
     # Install/uploads GCP specific modules/files.
     self.client_vm.RemoteCommand(
         'sudo pip3 install --upgrade --ignore-installed google-cloud-pubsub',
-        ignore_failure=False)
+        ignore_failure=False,
+    )
 
     self._CopyFiles(
         MESSAGING_SERVICE_SCRIPTS_GCP_PREFIX,
         MESSAGING_SERVICE_SCRIPTS_GCP_FILES,
-        MESSAGING_SERVICE_SCRIPTS_VM_GCP_DIR)
+        MESSAGING_SERVICE_SCRIPTS_VM_GCP_DIR,
+    )
     self.client_vm.PushDataFile(MESSAGING_SERVICE_SCRIPTS_GCP_BIN)
 
-  def Run(self, benchmark_scenario: str, number_of_messages: int,
-          message_size: int, warmup_messages: int,
-          streaming_pull: bool = False) -> Dict[str, Any]:
+  def Run(
+      self,
+      benchmark_scenario: str,
+      number_of_messages: int,
+      message_size: int,
+      warmup_messages: int,
+      streaming_pull: bool = False,
+  ) -> Dict[str, Any]:
     """Runs a benchmark on GCP PubSub from the client VM.
 
     Runs a benchmark based on the configuration specified through the arguments:
@@ -107,14 +115,16 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
           ...
         }
     """
-    command = (f'python3 -m gcp_benchmark '
-               f'--pubsub_project={self.project} '
-               f'--pubsub_topic={self.pubsub_topic} '
-               f'--pubsub_subscription={self.pubsub_subscription} '
-               f'--benchmark_scenario={benchmark_scenario} '
-               f'--number_of_messages={number_of_messages} '
-               f'--message_size={message_size} '
-               f'--warmup_messages={warmup_messages}')
+    command = (
+        'python3 -m gcp_benchmark '
+        f'--pubsub_project={self.project} '
+        f'--pubsub_topic={self.pubsub_topic} '
+        f'--pubsub_subscription={self.pubsub_subscription} '
+        f'--benchmark_scenario={benchmark_scenario} '
+        f'--number_of_messages={number_of_messages} '
+        f'--message_size={message_size} '
+        f'--warmup_messages={warmup_messages}'
+    )
     if streaming_pull:
       command += ' --streaming_pull'
     stdout, _ = self.client_vm.RemoteCommand(command)
@@ -123,50 +133,58 @@ class GCPCloudPubSub(msgsvc.BaseMessagingService):
 
   def _CreateTopic(self):
     """Handles topic creation on GCP Pub/Sub."""
-    cmd = util.GcloudCommand(self, 'pubsub', 'topics', 'create',
-                             self.pubsub_topic)
+    cmd = util.GcloudCommand(
+        self, 'pubsub', 'topics', 'create', self.pubsub_topic
+    )
     _, stderr, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Creation of GCP PubSub topic failed.')
       raise errors.Resource.CreationError(
-          'Failed to create PubSub Topic: %s return code: %s' %
-          (retcode, stderr))
+          'Failed to create PubSub Topic: %s return code: %s'
+          % (retcode, stderr)
+      )
 
   def _TopicExists(self) -> bool:
     """Check if subscription exists on GCP Pub/Sub."""
-    cmd = util.GcloudCommand(self, 'pubsub', 'topics', 'describe',
-                             self.pubsub_topic)
+    cmd = util.GcloudCommand(
+        self, 'pubsub', 'topics', 'describe', self.pubsub_topic
+    )
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return retcode == 0
 
   def _DeleteTopic(self):
     """Handles topic deletion on GCP Pub/Sub."""
-    cmd = util.GcloudCommand(self, 'pubsub', 'topics', 'delete',
-                             self.pubsub_topic)
+    cmd = util.GcloudCommand(
+        self, 'pubsub', 'topics', 'delete', self.pubsub_topic
+    )
     cmd.Issue(raise_on_failure=False)
 
   def _CreateSubscription(self):
     """Handles Subscription creation on GCP Pub/Sub."""
-    cmd = util.GcloudCommand(self, 'pubsub', 'subscriptions', 'create',
-                             self.pubsub_subscription)
+    cmd = util.GcloudCommand(
+        self, 'pubsub', 'subscriptions', 'create', self.pubsub_subscription
+    )
     cmd.flags['topic'] = self.pubsub_topic
     cmd.flags['topic-project'] = self.project
     _, stderr, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.error('Creation of GCP PubSub subscription failed.')
       raise errors.Resource.CreationError(
-          'Failed to create PubSub Subscription: %s return code: %s' %
-          (retcode, stderr))
+          'Failed to create PubSub Subscription: %s return code: %s'
+          % (retcode, stderr)
+      )
 
   def _SubscriptionExists(self) -> bool:
     """Check if subscription exists on GCP Pub/Sub.."""
-    cmd = util.GcloudCommand(self, 'pubsub', 'subscriptions', 'describe',
-                             self.pubsub_subscription)
+    cmd = util.GcloudCommand(
+        self, 'pubsub', 'subscriptions', 'describe', self.pubsub_subscription
+    )
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return retcode == 0
 
   def _DeleteSubscription(self):
     """Handles subscription deletion on GCP Pub/Sub."""
-    cmd = util.GcloudCommand(self, 'pubsub', 'subscriptions', 'delete',
-                             self.pubsub_subscription)
+    cmd = util.GcloudCommand(
+        self, 'pubsub', 'subscriptions', 'delete', self.pubsub_subscription
+    )
     cmd.Issue(raise_on_failure=False)

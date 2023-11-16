@@ -37,8 +37,11 @@ from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('dpb_dataproc_image_version', None,
-                    'The image version to use for the cluster.')
+flags.DEFINE_string(
+    'dpb_dataproc_image_version',
+    None,
+    'The image version to use for the cluster.',
+)
 
 disk_to_hdfs_map = {
     'pd-standard': 'HDD',
@@ -57,6 +60,7 @@ DATAPROC_FLINK_TRIGGER_SCRIPT = os.path.join('beam', 'flink-trigger.sh')
 
 class MetricNotReadyError(Exception):
   """Used to signal metric is not ready."""
+
   pass
 
 
@@ -68,7 +72,8 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
     self.project = FLAGS.project
     if not self.dpb_service_zone:
       raise errors.Setup.InvalidSetupError(
-          'dpb_service_zone must be provided, for provisioning.')
+          'dpb_service_zone must be provided, for provisioning.'
+      )
     self.region = self.dpb_service_zone.rsplit('-', 1)[0]
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
@@ -105,10 +110,9 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
     cmd.flags['region'] = self.region
     return cmd
 
-  def MigrateCrossCloud(self,
-                        source_location,
-                        destination_location,
-                        dest_cloud='AWS'):
+  def MigrateCrossCloud(
+      self, source_location, destination_location, dest_cloud='AWS'
+  ):
     """Method to copy data cross cloud using a distributed job on the cluster.
 
     Currently the only supported destination cloud is AWS.
@@ -134,7 +138,8 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
         properties={
             'fs.s3a.access.key': s3_access_key,
             'fs.s3a.secret.key': s3_secret_key,
-        })
+        },
+    )
 
 
 class GcpDpbDataproc(GcpDpbBaseDataproc):
@@ -191,25 +196,38 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     for role in ['worker', 'master']:
       # Set machine type
       if self.spec.worker_group.vm_spec.machine_type:
-        self._AddToCmd(cmd, '{0}-machine-type'.format(role),
-                       self.spec.worker_group.vm_spec.machine_type)
+        self._AddToCmd(
+            cmd,
+            '{0}-machine-type'.format(role),
+            self.spec.worker_group.vm_spec.machine_type,
+        )
       # Set boot_disk_size
       if self.spec.worker_group.disk_spec.disk_size:
         size_in_gb = '{}GB'.format(
-            str(self.spec.worker_group.disk_spec.disk_size))
+            str(self.spec.worker_group.disk_spec.disk_size)
+        )
         self._AddToCmd(cmd, '{0}-boot-disk-size'.format(role), size_in_gb)
       # Set boot_disk_type
       if self.spec.worker_group.disk_spec.disk_type:
-        self._AddToCmd(cmd, '{0}-boot-disk-type'.format(role),
-                       self.spec.worker_group.disk_spec.disk_type)
+        self._AddToCmd(
+            cmd,
+            '{0}-boot-disk-type'.format(role),
+            self.spec.worker_group.disk_spec.disk_type,
+        )
       # Set ssd count
       if self.spec.worker_group.vm_spec.num_local_ssds:
-        self._AddToCmd(cmd, 'num-{0}-local-ssds'.format(role),
-                       self.spec.worker_group.vm_spec.num_local_ssds)
+        self._AddToCmd(
+            cmd,
+            'num-{0}-local-ssds'.format(role),
+            self.spec.worker_group.vm_spec.num_local_ssds,
+        )
       # Set SSD interface
       if self.spec.worker_group.vm_spec.ssd_interface:
-        self._AddToCmd(cmd, '{0}-local-ssd-interface'.format(role),
-                       self.spec.worker_group.vm_spec.ssd_interface)
+        self._AddToCmd(
+            cmd,
+            '{0}-local-ssd-interface'.format(role),
+            self.spec.worker_group.vm_spec.ssd_interface,
+        )
     # Set zone
     cmd.flags['zone'] = self.dpb_service_zone
     if self.GetDpbVersion():
@@ -259,8 +277,11 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
       creation_data = {}
     can_parse = creation_data.get('status', {}).get('state') == 'RUNNING'
     status_history = creation_data.get('statusHistory', [])
-    can_parse = can_parse and len(
-        status_history) == 1 and status_history[0]['state'] == 'CREATING'
+    can_parse = (
+        can_parse
+        and len(status_history) == 1
+        and status_history[0]['state'] == 'CREATING'
+    )
     if not can_parse:
       logging.warning('Unable to parse cluster creation duration.')
       return None, None
@@ -304,19 +325,21 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     """Checks to see whether the cluster exists."""
     return self._GetCluster() is not None
 
-  def SubmitJob(self,
-                jarfile=None,
-                classname=None,
-                pyspark_file=None,
-                query_file=None,
-                job_poll_interval=None,
-                job_stdout_file=None,
-                job_arguments=None,
-                job_files=None,
-                job_jars=None,
-                job_py_files=None,
-                job_type=None,
-                properties=None):
+  def SubmitJob(
+      self,
+      jarfile=None,
+      classname=None,
+      pyspark_file=None,
+      query_file=None,
+      job_poll_interval=None,
+      job_stdout_file=None,
+      job_arguments=None,
+      job_files=None,
+      job_jars=None,
+      job_py_files=None,
+      job_type=None,
+      properties=None,
+  ):
     """See base class."""
     assert job_type
     args = ['jobs', 'submit', job_type]
@@ -361,7 +384,8 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     if all_properties:
       # For commas: https://cloud.google.com/sdk/gcloud/reference/topic/escaping
       cmd.flags['properties'] = '^@^' + '@'.join(
-          '{}={}'.format(k, v) for k, v in all_properties.items())
+          '{}={}'.format(k, v) for k, v in all_properties.items()
+      )
 
     if job_arguments:
       cmd.additional_flags = ['--'] + job_arguments
@@ -386,7 +410,8 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
 
     return dpb_service.JobResult(
         run_time=(done_time - start_time).total_seconds(),
-        pending_time=(start_time - pending_time).total_seconds())
+        pending_time=(start_time - pending_time).total_seconds(),
+    )
 
   def _AddToCmd(self, cmd, cmd_property, cmd_value):
     flag_name = cmd_property
@@ -419,21 +444,25 @@ class GcpDpbDpgke(GcpDpbDataproc):
   def __init__(self, dpb_service_spec):
     super(GcpDpbDpgke, self).__init__(dpb_service_spec)
     required_spec_attrs = [
-        'gke_cluster_name', 'gke_cluster_nodepools',
-        'gke_cluster_location'
+        'gke_cluster_name',
+        'gke_cluster_nodepools',
+        'gke_cluster_location',
     ]
     missing_attrs = [
-        attr for attr in required_spec_attrs
+        attr
+        for attr in required_spec_attrs
         if not getattr(self.spec, attr, None)
     ]
     if missing_attrs:
       raise errors.Setup.InvalidSetupError(
-          f'{missing_attrs} must be provided for provisioning DPGKE.')
+          f'{missing_attrs} must be provided for provisioning DPGKE.'
+      )
 
   def _Create(self):
     """Creates the dpgke virtual cluster."""
-    cmd = self.DataprocGcloudCommand('clusters', 'gke', 'create',
-                                     self.cluster_id)
+    cmd = self.DataprocGcloudCommand(
+        'clusters', 'gke', 'create', self.cluster_id
+    )
     cmd.use_alpha_gcloud = True
     cmd.flags['setup-workload-identity'] = True
     cmd.flags['gke-cluster'] = self.spec.gke_cluster_name
@@ -451,8 +480,11 @@ class GcpDpbDpgke(GcpDpbDataproc):
     if self.GetClusterProperties():
       cmd.flags['properties'] = ','.join(self.GetClusterProperties())
     timeout = 900  # 15 min
-    logging.info('Issuing command to create dpgke cluster. Flags %s, Args %s',
-                 cmd.flags, cmd.args)
+    logging.info(
+        'Issuing command to create dpgke cluster. Flags %s, Args %s',
+        cmd.flags,
+        cmd.args,
+    )
     stdout, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
     self._cluster_create_time, self._cluster_delete_time = (
         self._ParseClusterCreateTime(stdout)
@@ -487,19 +519,21 @@ class GcpDpbDataprocServerless(
     self.batch_name = f'{self.cluster_id}-{self._job_counter}'
     self._FillMetadata()
 
-  def SubmitJob(self,
-                jarfile=None,
-                classname=None,
-                pyspark_file=None,
-                query_file=None,
-                job_poll_interval=None,
-                job_stdout_file=None,
-                job_arguments=None,
-                job_files=None,
-                job_jars=None,
-                job_py_files=None,
-                job_type=None,
-                properties=None):
+  def SubmitJob(
+      self,
+      jarfile=None,
+      classname=None,
+      pyspark_file=None,
+      query_file=None,
+      job_poll_interval=None,
+      job_stdout_file=None,
+      job_arguments=None,
+      job_files=None,
+      job_jars=None,
+      job_py_files=None,
+      job_type=None,
+      properties=None,
+  ):
     """See base class."""
     assert job_type
     args = ['batches', 'submit', job_type]
@@ -548,7 +582,8 @@ class GcpDpbDataprocServerless(
     if all_properties:
       # For commas: https://cloud.google.com/sdk/gcloud/reference/topic/escaping
       cmd.flags['properties'] = '^@^' + '@'.join(
-          '{}={}'.format(k, v) for k, v in all_properties.items())
+          '{}={}'.format(k, v) for k, v in all_properties.items()
+      )
 
     if job_arguments:
       additional_args += ['--'] + job_arguments
@@ -559,9 +594,11 @@ class GcpDpbDataprocServerless(
       raise dpb_service.JobSubmissionError(stderr)
 
     fetch_batch_cmd = self.DataprocGcloudCommand(
-        'batches', 'describe', self.batch_name)
+        'batches', 'describe', self.batch_name
+    )
     stdout, stderr, retcode = fetch_batch_cmd.Issue(
-        timeout=None, raise_on_failure=False)
+        timeout=None, raise_on_failure=False
+    )
     if retcode != 0:
       raise dpb_service.JobSubmissionError(stderr)
 
@@ -581,7 +618,8 @@ class GcpDpbDataprocServerless(
 
     return dpb_service.JobResult(
         run_time=(done_time - start_time).total_seconds(),
-        pending_time=(start_time - pending_time).total_seconds())
+        pending_time=(start_time - pending_time).total_seconds(),
+    )
 
   def GetJobProperties(self) -> Dict[str, str]:
     result = {}
@@ -590,13 +628,16 @@ class GcpDpbDataprocServerless(
       result['spark.driver.cores'] = self.spec.dataproc_serverless_core_count
     if self.spec.dataproc_serverless_initial_executors:
       result['spark.executor.instances'] = (
-          self.spec.dataproc_serverless_initial_executors)
+          self.spec.dataproc_serverless_initial_executors
+      )
     if self.spec.dataproc_serverless_min_executors:
       result['spark.dynamicAllocation.minExecutors'] = (
-          self.spec.dataproc_serverless_min_executors)
+          self.spec.dataproc_serverless_min_executors
+      )
     if self.spec.dataproc_serverless_max_executors:
       result['spark.dynamicAllocation.maxExecutors'] = (
-          self.spec.dataproc_serverless_max_executors)
+          self.spec.dataproc_serverless_max_executors
+      )
     if self.spec.worker_group.disk_spec.disk_size:
       result['spark.dataproc.driver.disk.size'] = (
           f'{self.spec.worker_group.disk_spec.disk_size}g'
@@ -610,7 +651,8 @@ class GcpDpbDataprocServerless(
     if self.spec.dataproc_serverless_memory:
       result['spark.driver.memory'] = f'{self.spec.dataproc_serverless_memory}m'
       result['spark.executor.memory'] = (
-          f'{self.spec.dataproc_serverless_memory}m')
+          f'{self.spec.dataproc_serverless_memory}m'
+      )
     if self.spec.dataproc_serverless_memory_overhead:
       result['spark.driver.memoryOverhead'] = (
           f'{self.spec.dataproc_serverless_memory_overhead}m'
@@ -624,7 +666,8 @@ class GcpDpbDataprocServerless(
   def _FillMetadata(self) -> None:
     if self.spec.dataproc_serverless_core_count:
       cluster_shape = (
-          f'dataproc-serverless-{self.spec.dataproc_serverless_core_count}')
+          f'dataproc-serverless-{self.spec.dataproc_serverless_core_count}'
+      )
     else:
       cluster_shape = 'dataproc-serverless-default'
 
@@ -647,10 +690,12 @@ class GcpDpbDataprocServerless(
         'dpb_cluster_max_executors': max_executors,
         'dpb_cluster_initial_executors': initial_executors,
         'dpb_cores_per_node': self.spec.dataproc_serverless_core_count,
-        'dpb_memory_per_node':
-            self.spec.dataproc_serverless_memory or 'default',
-        'dpb_memory_overhead_per_node':
-            self.spec.dataproc_serverless_memory_overhead or 'default',
+        'dpb_memory_per_node': (
+            self.spec.dataproc_serverless_memory or 'default'
+        ),
+        'dpb_memory_overhead_per_node': (
+            self.spec.dataproc_serverless_memory_overhead or 'default'
+        ),
         'dpb_hdfs_type': self.metadata['dpb_hdfs_type'],
         'dpb_disk_size': self.metadata['dpb_disk_size'],
         'dpb_service_zone': self.metadata['dpb_service_zone'],
@@ -658,20 +703,24 @@ class GcpDpbDataprocServerless(
     }
 
   def CalculateLastJobCost(self):
-    fetch_batch_cmd = self.DataprocGcloudCommand('batches', 'describe',
-                                                 self.batch_name)
+    fetch_batch_cmd = self.DataprocGcloudCommand(
+        'batches', 'describe', self.batch_name
+    )
+
     @vm_util.Retry(
         timeout=180,
         poll_interval=15,
         fuzz=0,
-        retryable_exceptions=(MetricNotReadyError,))
+        retryable_exceptions=(MetricNotReadyError,),
+    )
     def FetchBatchResults():
-      stdout, _, _ = fetch_batch_cmd.Issue(
-          timeout=None, raise_on_failure=False)
+      stdout, _, _ = fetch_batch_cmd.Issue(timeout=None, raise_on_failure=False)
       results = json.loads(stdout)
       # If the approximate usage data is not available, sleep and retry
-      if 'runtimeInfo' not in results or 'approximateUsage' not in results[
-          'runtimeInfo']:
+      if (
+          'runtimeInfo' not in results
+          or 'approximateUsage' not in results['runtimeInfo']
+      ):
         raise MetricNotReadyError('Usage metric is not ready')
       return results
 
@@ -695,14 +744,15 @@ class GcpDpbDataprocServerless(
     if usd_per_milli_dcu_sec is None or usd_per_shuffle_storage_gb_sec is None:
       return None
     results = FetchBatchResults()
-    milli_dcu_seconds = int(results['runtimeInfo']
-                            ['approximateUsage']['milliDcuSeconds'])
+    milli_dcu_seconds = int(
+        results['runtimeInfo']['approximateUsage']['milliDcuSeconds']
+    )
     shuffle_storage_gb_seconds = int(
         results['runtimeInfo']['approximateUsage']['shuffleStorageGbSeconds']
     )
     cost = (
-        usd_per_milli_dcu_sec * milli_dcu_seconds +
-        usd_per_shuffle_storage_gb_sec * shuffle_storage_gb_seconds
+        usd_per_milli_dcu_sec * milli_dcu_seconds
+        + usd_per_shuffle_storage_gb_sec * shuffle_storage_gb_seconds
     )
     return cost
 
@@ -712,7 +762,8 @@ class GcpDpbDataprocServerless(
       return serverless_disk_to_hdfs_map[self._dpb_s8s_disk_type]
     except KeyError:
       raise errors.Setup.InvalidSetupError(
-          f'Invalid disk_type={self._dpb_s8s_disk_type!r} in spec.') from None
+          f'Invalid disk_type={self._dpb_s8s_disk_type!r} in spec.'
+      ) from None
 
 
 class GcpDpbDataprocFlink(GcpDpbDataproc):
@@ -734,19 +785,21 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
     super()._Create()
     self.ExecuteOnMaster(data.ResourcePath(DATAPROC_FLINK_INIT_SCRIPT), [])
 
-  def SubmitJob(self,
-                jarfile=None,
-                classname=None,
-                pyspark_file=None,
-                query_file=None,
-                job_poll_interval=None,
-                job_stdout_file=None,
-                job_arguments=None,
-                job_files=None,
-                job_jars=None,
-                job_py_files=None,
-                job_type=None,
-                properties=None):
+  def SubmitJob(
+      self,
+      jarfile=None,
+      classname=None,
+      pyspark_file=None,
+      query_file=None,
+      job_poll_interval=None,
+      job_stdout_file=None,
+      job_arguments=None,
+      job_files=None,
+      job_jars=None,
+      job_py_files=None,
+      job_type=None,
+      properties=None,
+  ):
     """See base class."""
     assert job_type in [
         dpb_service.BaseDpbService.FLINK_JOB_TYPE,
@@ -754,8 +807,9 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
     ], 'Unsupported job type {}'.format(job_type)
     logging.info('Running presubmit script...')
     start_time = datetime.datetime.now()
-    self.ExecuteOnMaster(data.ResourcePath(DATAPROC_FLINK_PRESUBMIT_SCRIPT),
-                         [jarfile])
+    self.ExecuteOnMaster(
+        data.ResourcePath(DATAPROC_FLINK_PRESUBMIT_SCRIPT), [jarfile]
+    )
     presubmit_done_time = datetime.datetime.now()
     logging.info('Submitting beam jobs with flink component enabled.')
     job_script_args = []
@@ -766,13 +820,15 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
       job_script_args.extend(job_arguments)
     else:
       job_script_args.extend([arg.replace('=', ' ') for arg in job_arguments])
-    self.ExecuteOnMaster(data.ResourcePath(DATAPROC_FLINK_TRIGGER_SCRIPT),
-                         job_script_args)
+    self.ExecuteOnMaster(
+        data.ResourcePath(DATAPROC_FLINK_TRIGGER_SCRIPT), job_script_args
+    )
     done_time = datetime.datetime.now()
     logging.info('Flink job done.')
     return dpb_service.JobResult(
         run_time=(done_time - presubmit_done_time).total_seconds(),
-        pending_time=(presubmit_done_time - start_time).total_seconds())
+        pending_time=(presubmit_done_time - start_time).total_seconds(),
+    )
 
   def ExecuteOnMaster(self, script_path, script_args):
     master_name = self.cluster_id + '-m'
@@ -783,16 +839,29 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
       scp_cmd = ['gcloud', 'compute', 'scp']
     if self.project is not None:
       scp_cmd += ['--project', self.project]
-    scp_cmd += ['--zone', self.dpb_service_zone, '--quiet', script_path,
-                'pkb@' + master_name + ':/tmp/' + script_name]
+    scp_cmd += [
+        '--zone',
+        self.dpb_service_zone,
+        '--quiet',
+        script_path,
+        'pkb@' + master_name + ':/tmp/' + script_name,
+    ]
     vm_util.IssueCommand(scp_cmd)
     ssh_cmd = ['gcloud', 'compute', 'ssh']
     if self.project is not None:
       ssh_cmd += ['--project', self.project]
     if FLAGS.gcp_internal_ip:
       ssh_cmd += ['--internal-ip']
-    ssh_cmd += ['--zone=' + self.dpb_service_zone, '--quiet',
-                'pkb@' + master_name, '--',
-                'chmod +x /tmp/' + script_name + '; sudo /tmp/' + script_name
-                + ' ' + ' '.join(script_args)]
+    ssh_cmd += [
+        '--zone=' + self.dpb_service_zone,
+        '--quiet',
+        'pkb@' + master_name,
+        '--',
+        'chmod +x /tmp/'
+        + script_name
+        + '; sudo /tmp/'
+        + script_name
+        + ' '
+        + ' '.join(script_args),
+    ]
     vm_util.IssueCommand(ssh_cmd, timeout=None)

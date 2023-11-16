@@ -61,11 +61,17 @@ class GcePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
     result.update({
         'project': (option_decoders.StringDecoder, {'none_ok': False}),
         'num_vms': (option_decoders.IntDecoder, {'none_ok': False}),
-        'placement_group_style': (option_decoders.EnumDecoder, {
-            'valid_values': set([COLLOCATED, AVAILABILITY_DOMAIN] +
-                                list(placement_group.PLACEMENT_GROUP_OPTIONS)),
-            'default': placement_group.PLACEMENT_GROUP_NONE,
-        })
+        'placement_group_style': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': set(
+                    [COLLOCATED, AVAILABILITY_DOMAIN]
+                    +
+                    list(placement_group.PLACEMENT_GROUP_OPTIONS)
+                ),
+                'default': placement_group.PLACEMENT_GROUP_NONE,
+            },
+        ),
     })
     return result
 
@@ -79,8 +85,8 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
     """Init method for GcePlacementGroup.
 
     Args:
-      gce_placement_group_spec: Object containing the
-        information needed to create an GcePlacementGroup.
+      gce_placement_group_spec: Object containing the information needed to
+        create an GcePlacementGroup.
     """
     super(GcePlacementGroup, self).__init__(gce_placement_group_spec)
     self.project = gce_placement_group_spec.project
@@ -161,13 +167,15 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
       raise errors.Benchmarks.QuotaFailure(stderr)
     elif retcode:
       raise errors.Resource.CreationError(
-          'Failed to create placement group: %s return code: %s' %
-          (stderr, retcode))
+          'Failed to create placement group: %s return code: %s'
+          % (stderr, retcode)
+      )
 
   def _Exists(self):
     """See base class."""
-    cmd = gcp_util.GcloudCommand(self, 'compute', 'resource-policies',
-                                 'describe', self.name)
+    cmd = gcp_util.GcloudCommand(
+        self, 'compute', 'resource-policies', 'describe', self.name
+    )
     cmd.flags.update({'region': self.region, 'format': 'json'})
     stdout, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode:
@@ -179,7 +187,8 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
   def _Delete(self):
     """See base class."""
     logging.info('Deleting placement group %s', self.name)
-    cmd = gcp_util.GcloudCommand(self, 'compute', 'resource-policies',
-                                 'delete', self.name)
+    cmd = gcp_util.GcloudCommand(
+        self, 'compute', 'resource-policies', 'delete', self.name
+    )
     cmd.flags.update({'region': self.region, 'format': 'json'})
     cmd.Issue(raise_on_failure=False)

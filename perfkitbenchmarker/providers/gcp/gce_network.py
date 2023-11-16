@@ -51,10 +51,12 @@ _PLACEMENT_GROUP_PREFIXES = frozenset(
 
 class GceVpnGateway(network.BaseVpnGateway):
   """Object representing a GCE VPN Gateway."""
+
   CLOUD = provider_info.GCP
 
-  def __init__(self, name: str, network_name: str, region: str, cidr: str,
-               project: str):
+  def __init__(
+      self, name: str, network_name: str, region: str, cidr: str, project: str
+  ):
     super(GceVpnGateway, self).__init__()
 
     self.forwarding_rules: Dict[str, GceForwardingRule] = {}
@@ -63,7 +65,8 @@ class GceVpnGateway(network.BaseVpnGateway):
     self.routes: Dict[str, GceRoute] = {}
     self.ip_resource = None
     self.vpn_gateway_resource = GceVpnGatewayResource(
-        name, network_name, region, cidr, project)
+        name, network_name, region, cidr, project
+    )
     self.vpn_gateway_resource_lock = threading.Lock()
 
     self.name = name
@@ -82,8 +85,9 @@ class GceVpnGateway(network.BaseVpnGateway):
     # Add gateway to benchmark spec at init().
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
-      raise errors.Error('GetNetwork called in a thread without a '
-                         'BenchmarkSpec.')
+      raise errors.Error(
+          'GetNetwork called in a thread without a BenchmarkSpec.'
+      )
     key = self.name
     with benchmark_spec.vpn_gateways_lock:
       if key not in benchmark_spec.vpn_gateways:
@@ -100,8 +104,9 @@ class GceVpnGateway(network.BaseVpnGateway):
 
     # update tunnel_config if needed
     if self.name not in tunnel_config.endpoints:
-      logging.debug('tunnel_config: This endpoint isnt registered yet... %s',
-                    self.name)
+      logging.debug(
+          'tunnel_config: This endpoint isnt registered yet... %s', self.name
+      )
       tunnel_config.endpoints[self.name] = {
           'is_configured': False,
           'cidr': self.cidr,
@@ -135,20 +140,24 @@ class GceVpnGateway(network.BaseVpnGateway):
 
     # Abort if we don't have a target info configured yet
     if len(tunnel_config.endpoints) < 2:
-      logging.debug('tunnel_config: Only found %d endpoints... '
-                    'waiting for target to configure',
-                    len(tunnel_config.endpoints))
+      logging.debug(
+          'tunnel_config: Only found %d endpoints... '
+          'waiting for target to configure',
+          len(tunnel_config.endpoints),
+      )
       return
 
     # Get target endpoint config key
-    target_endpoint = [k for k in tunnel_config.endpoints.keys()
-                       if k not in self.name][0]
+    target_endpoint = [
+        k for k in tunnel_config.endpoints.keys() if k not in self.name
+    ][0]
 
     # configure tunnel resources
     # requires: target_ip_address, IKE version (default 1),
     if 'ip_address' not in tunnel_config.endpoints[target_endpoint]:
-      logging.debug('tunnel_config: Target IP needed... '
-                    'waiting for target to configure')
+      logging.debug(
+          'tunnel_config: Target IP needed... waiting for target to configure'
+      )
       return
     if not hasattr(tunnel_config, 'psk'):
       logging.debug('tunnel_config: PSK not provided... setting to runid')
@@ -160,15 +169,19 @@ class GceVpnGateway(network.BaseVpnGateway):
     # TODO(dlott) Should be Optional[str], but that requires making endpoints a
     # proper class rather than a dictionary of string and bool. See TunnelConfig
     dest_cidr: Optional[Any] = tunnel_config.endpoints[target_endpoint].get(
-        'cidr')
+        'cidr'
+    )
     if not dest_cidr or not dest_cidr.strip():
-      logging.debug('tunnel_config: destination CIDR needed... '
-                    'waiting for target to configure')
+      logging.debug(
+          'tunnel_config: destination CIDR needed... '
+          'waiting for target to configure'
+      )
       return
     self._SetupRouting(
         tunnel_config.suffix,
         tunnel_config.endpoints[self.name]['tunnel_id'],
-        tunnel_config.endpoints[target_endpoint]['cidr'])
+        tunnel_config.endpoints[target_endpoint]['cidr'],
+    )
 
     tunnel_config.endpoints[self.name]['is_configured'] = True
 
@@ -180,7 +193,6 @@ class GceVpnGateway(network.BaseVpnGateway):
 
     Returns:
       boolean.
-
     """
     return self.tunnels[tunnel_id].IsReady()
 
@@ -190,8 +202,9 @@ class GceVpnGateway(network.BaseVpnGateway):
     Args:
       tunnel_config: VPN tunnel configuration.
     """
-    target_endpoint = [k for k in tunnel_config.endpoints.keys()
-                       if k not in self.name][0]
+    target_endpoint = [
+        k for k in tunnel_config.endpoints.keys() if k not in self.name
+    ][0]
     project = tunnel_config.endpoints[self.name]['project']
     region = tunnel_config.endpoints[self.name]['region']
     vpn_gateway_id = self.name
@@ -202,7 +215,8 @@ class GceVpnGateway(network.BaseVpnGateway):
     name = 'tun-' + self.name + '-' + suffix
     if name not in self.tunnels:
       self.tunnels[name] = GceStaticTunnel(
-          project, region, name, vpn_gateway_id, target_ip, ike_version, psk)
+          project, region, name, vpn_gateway_id, target_ip, ike_version, psk
+      )
       self.tunnels[name].Create()
       tunnel_config.endpoints[self.name]['tunnel_id'] = name
 
@@ -218,28 +232,22 @@ class GceVpnGateway(network.BaseVpnGateway):
       return  # backout if already set
     suffix = tunnel_config.suffix
     # GCP doesnt like uppercase names?!?
-    fr_UDP500_name = ('fr-udp500-%s-%s' %
-                      (suffix, FLAGS.run_uri))
-    fr_UDP4500_name = ('fr-udp4500-%s-%s' %
-                       (suffix, FLAGS.run_uri))
-    fr_ESP_name = ('fr-esp-%s-%s' %
-                   (suffix, FLAGS.run_uri))
+    fr_udp500_name = 'fr-udp500-%s-%s' % (suffix, FLAGS.run_uri)
+    fr_udp4500_name = 'fr-udp4500-%s-%s' % (suffix, FLAGS.run_uri)
+    fr_esp_name = 'fr-esp-%s-%s' % (suffix, FLAGS.run_uri)
 
-    if fr_UDP500_name not in self.forwarding_rules:
-      fr_UDP500 = GceForwardingRule(
-          fr_UDP500_name, 'UDP', self, 500)
-      self.forwarding_rules[fr_UDP500_name] = fr_UDP500
-      fr_UDP500.Create()
-    if fr_UDP4500_name not in self.forwarding_rules:
-      fr_UDP4500 = GceForwardingRule(
-          fr_UDP4500_name, 'UDP', self, 4500)
-      self.forwarding_rules[fr_UDP4500_name] = fr_UDP4500
-      fr_UDP4500.Create()
-    if fr_ESP_name not in self.forwarding_rules:
-      fr_ESP = GceForwardingRule(
-          fr_ESP_name, 'ESP', self)
-      self.forwarding_rules[fr_ESP_name] = fr_ESP
-      fr_ESP.Create()
+    if fr_udp500_name not in self.forwarding_rules:
+      fr_udp500 = GceForwardingRule(fr_udp500_name, 'UDP', self, 500)
+      self.forwarding_rules[fr_udp500_name] = fr_udp500
+      fr_udp500.Create()
+    if fr_udp4500_name not in self.forwarding_rules:
+      fr_udp4500 = GceForwardingRule(fr_udp4500_name, 'UDP', self, 4500)
+      self.forwarding_rules[fr_udp4500_name] = fr_udp4500
+      fr_udp4500.Create()
+    if fr_esp_name not in self.forwarding_rules:
+      fr_esp = GceForwardingRule(fr_esp_name, 'ESP', self)
+      self.forwarding_rules[fr_esp_name] = fr_esp
+      fr_esp.Create()
 
   def _SetupRouting(self, suffix: str, next_hop_tun: str, dest_cidr: str):
     """Create IPSec routing rules between the source and target gateways."""
@@ -247,16 +255,22 @@ class GceVpnGateway(network.BaseVpnGateway):
     route_name = 'route-' + self.name + '-' + suffix
     if route_name not in self.routes:
       self.routes[route_name] = GceRoute(
-          route_name, dest_cidr, self.network_name, next_hop_tun,
-          self.region, self.project)
+          route_name,
+          dest_cidr,
+          self.network_name,
+          next_hop_tun,
+          self.region,
+          self.project,
+      )
       self.routes[route_name].Create()
 
   def Create(self):
     """Creates the actual VpnGateway."""
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
-      raise errors.Error('GetNetwork called in a thread without a '
-                         'BenchmarkSpec.')
+      raise errors.Error(
+          'GetNetwork called in a thread without a BenchmarkSpec.'
+      )
     if self.created:
       return
     self.vpn_gateway_resource.Create()
@@ -293,8 +307,9 @@ class GceVpnGateway(network.BaseVpnGateway):
 class GceVpnGatewayResource(resource.BaseResource):
   """Object representing a GCE VPN Gateway Resource."""
 
-  def __init__(self, name: str, network_name: str, region: str, cidr: str,
-               project: str):
+  def __init__(
+      self, name: str, network_name: str, region: str, cidr: str, project: str
+  ):
     super(GceVpnGatewayResource, self).__init__()
     self.name = name
     self.network_name = network_name
@@ -303,22 +318,25 @@ class GceVpnGatewayResource(resource.BaseResource):
     self.project = project
 
   def _Create(self):
-    cmd = util.GcloudCommand(self, 'compute', 'target-vpn-gateways', 'create',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'target-vpn-gateways', 'create', self.name
+    )
     cmd.flags['network'] = self.network_name
     cmd.flags['region'] = self.region
     cmd.Issue()
 
   def _Exists(self):
-    cmd = util.GcloudCommand(self, 'compute', 'target-vpn-gateways', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'target-vpn-gateways', 'describe', self.name
+    )
     cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
   def _Delete(self):
-    cmd = util.GcloudCommand(self, 'compute', 'target-vpn-gateways', 'delete',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'target-vpn-gateways', 'delete', self.name
+    )
     cmd.flags['region'] = self.region
     cmd.Issue(raise_on_failure=False)
 
@@ -326,8 +344,9 @@ class GceVpnGatewayResource(resource.BaseResource):
 class GceIPAddress(resource.BaseResource):
   """Object representing a GCE IP address."""
 
-  def __init__(self, project: str, region: str, name: str,
-               subnet: Optional[str] = None):
+  def __init__(
+      self, project: str, region: str, name: str, subnet: Optional[str] = None
+  ):
     super(GceIPAddress, self).__init__()
     self.project = project
     self.region = region
@@ -344,8 +363,9 @@ class GceIPAddress(resource.BaseResource):
     cmd.Issue()
 
   def _PostCreate(self):
-    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'addresses', 'describe', self.name
+    )
     cmd.flags['region'] = self.region
     cmd.flags['format'] = 'value(address)'
     stdout, _, _ = cmd.Issue()
@@ -359,16 +379,18 @@ class GceIPAddress(resource.BaseResource):
 
   def _Exists(self) -> bool:
     """Returns True if the IP address exists."""
-    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'addresses', 'describe', self.name
+    )
     cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
   def _IsReady(self) -> bool:
     """Returns True if the IP address is reserved."""
-    cmd = util.GcloudCommand(self, 'compute', 'addresses', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'addresses', 'describe', self.name
+    )
     cmd.flags['region'] = self.region
     cmd.flags['format'] = 'value(status)'
     stdout, _, _ = cmd.Issue()
@@ -378,8 +400,16 @@ class GceIPAddress(resource.BaseResource):
 class GceStaticTunnel(resource.BaseResource):
   """An object representing a GCE Tunnel."""
 
-  def __init__(self, project: str, region: str, name: str, vpn_gateway_id: str,
-               target_ip: str, ike_version: str, psk: str):
+  def __init__(
+      self,
+      project: str,
+      region: str,
+      name: str,
+      vpn_gateway_id: str,
+      target_ip: str,
+      ike_version: str,
+      psk: str,
+  ):
     super(GceStaticTunnel, self).__init__()
     self.project = project
     self.region = region
@@ -391,8 +421,9 @@ class GceStaticTunnel(resource.BaseResource):
 
   def _Create(self):
     """Creates the Tunnel."""
-    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'create',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'vpn-tunnels', 'create', self.name
+    )
     cmd.flags['peer-address'] = self.target_ip
     cmd.flags['target-vpn-gateway'] = self.vpn_gateway_id
     cmd.flags['ike-version'] = self.ike_version
@@ -404,22 +435,25 @@ class GceStaticTunnel(resource.BaseResource):
 
   def _Delete(self):
     """Delete IPSec tunnel."""
-    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'delete',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'vpn-tunnels', 'delete', self.name
+    )
     cmd.flags['region'] = self.region
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self) -> bool:
     """Returns True if the tunnel exists."""
-    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'vpn-tunnels', 'describe', self.name
+    )
     cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
   def IsReady(self) -> bool:
-    cmd = util.GcloudCommand(self, 'compute', 'vpn-tunnels', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'vpn-tunnels', 'describe', self.name
+    )
     cmd.flags['region'] = self.region
     response = cmd.Issue()
     return 'established' in str(response).lower()
@@ -428,8 +462,15 @@ class GceStaticTunnel(resource.BaseResource):
 class GceRoute(resource.BaseResource):
   """An object representing a GCE Route."""
 
-  def __init__(self, route_name: str, dest_cidr: str, network_name: str,
-               next_hop_tun: str, next_hop_region: str, project: str):
+  def __init__(
+      self,
+      route_name: str,
+      dest_cidr: str,
+      network_name: str,
+      next_hop_tun: str,
+      next_hop_region: str,
+      project: str,
+  ):
     super(GceRoute, self).__init__()
     self.name = route_name
     self.dest_cidr = dest_cidr
@@ -454,8 +495,7 @@ class GceRoute(resource.BaseResource):
 
   def _Exists(self) -> bool:
     """Returns True if the Route exists."""
-    cmd = util.GcloudCommand(self, 'compute', 'routes', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(self, 'compute', 'routes', 'describe', self.name)
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
@@ -463,11 +503,13 @@ class GceRoute(resource.BaseResource):
 class GceForwardingRule(resource.BaseResource):
   """An object representing a GCE Forwarding Rule."""
 
-  def __init__(self,
-               name: str,
-               protocol: str,
-               src_vpn_gateway: GceVpnGateway,
-               port: Optional[int] = None):
+  def __init__(
+      self,
+      name: str,
+      protocol: str,
+      src_vpn_gateway: GceVpnGateway,
+      port: Optional[int] = None,
+  ):
     super(GceForwardingRule, self).__init__()
     self.name = name
     self.protocol = protocol
@@ -479,17 +521,20 @@ class GceForwardingRule(resource.BaseResource):
 
   def __eq__(self, other: 'GceForwardingRule') -> bool:
     """Defines equality to make comparison easy."""
-    return (self.name == other.name and
-            self.protocol == other.protocol and
-            self.port == other.port and
-            self.target_name == other.target_name and
-            self.target_ip == other.target_ip and
-            self.src_region == other.src_region)
+    return (
+        self.name == other.name
+        and self.protocol == other.protocol
+        and self.port == other.port
+        and self.target_name == other.target_name
+        and self.target_ip == other.target_ip
+        and self.src_region == other.src_region
+    )
 
   def _Create(self):
     """Creates the Forwarding Rule."""
-    cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'create',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'forwarding-rules', 'create', self.name
+    )
     cmd.flags['ip-protocol'] = self.protocol
     if self.port:
       cmd.flags['ports'] = self.port
@@ -500,15 +545,17 @@ class GceForwardingRule(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the Forwarding Rule."""
-    cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'delete',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'forwarding-rules', 'delete', self.name
+    )
     cmd.flags['region'] = self.src_region
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self) -> bool:
     """Returns True if the Forwarding Rule exists."""
-    cmd = util.GcloudCommand(self, 'compute', 'forwarding-rules', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'forwarding-rules', 'describe', self.name
+    )
     cmd.flags['region'] = self.src_region
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
@@ -517,12 +564,14 @@ class GceForwardingRule(resource.BaseResource):
 class GceFirewallRule(resource.BaseResource):
   """An object representing a GCE Firewall Rule."""
 
-  def __init__(self,
-               name: str,
-               project: str,
-               allow: str,
-               network_name: str,
-               source_range: Optional[str] = None):
+  def __init__(
+      self,
+      name: str,
+      project: str,
+      allow: str,
+      network_name: str,
+      source_range: Optional[str] = None,
+  ):
     super(GceFirewallRule, self).__init__()
     self.name = name
     self.project = project
@@ -532,16 +581,19 @@ class GceFirewallRule(resource.BaseResource):
 
   def __eq__(self, other: 'GceFirewallRule') -> bool:
     """Defines equality to make comparison easy."""
-    return (self.name == other.name and
-            self.allow == other.allow and
-            self.project == other.project and
-            self.network_name == other.network_name and
-            self.source_range == other.source_range)
+    return (
+        self.name == other.name
+        and self.allow == other.allow
+        and self.project == other.project
+        and self.network_name == other.network_name
+        and self.source_range == other.source_range
+    )
 
   def _Create(self):
     """Creates the Firewall Rule."""
-    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'create',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'firewall-rules', 'create', self.name
+    )
     cmd.flags['allow'] = self.allow
     cmd.flags['network'] = self.network_name
     if self.source_range:
@@ -552,20 +604,26 @@ class GceFirewallRule(resource.BaseResource):
     if retcode:
       if cmd.rate_limited and 'already exists' in stderr:
         return
-      debug_text = ('Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' %
-                    (' '.join(cmd.GetCommand()), retcode, stdout, stderr))
+      debug_text = 'Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' % (
+          ' '.join(cmd.GetCommand()),
+          retcode,
+          stdout,
+          stderr,
+      )
       raise errors.VmUtil.IssueCommandError(debug_text)
 
   def _Delete(self):
     """Deletes the Firewall Rule."""
-    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'delete',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'firewall-rules', 'delete', self.name
+    )
     cmd.Issue(raise_on_failure=False)
 
   def _Exists(self) -> bool:
     """Returns True if the Firewall Rule exists."""
-    cmd = util.GcloudCommand(self, 'compute', 'firewall-rules', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'firewall-rules', 'describe', self.name
+    )
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
@@ -587,7 +645,8 @@ class GceFirewall(network.BaseFirewall):
       vm,  # gce_virtual_machine.GceVirtualMachine
       start_port: int,
       end_port: Optional[int] = None,
-      source_range: Optional[List[str]] = None):
+      source_range: Optional[List[str]] = None,
+  ):
     """Opens a port on the firewall.
 
     Args:
@@ -607,20 +666,33 @@ class GceFirewall(network.BaseFirewall):
         end_port = start_port
       if vm.cidr:  # Allow multiple networks per zone.
         cidr_string = network.BaseNetwork.FormatCidrString(vm.cidr)
-        firewall_name = ('perfkit-firewall-%s-%s-%d-%d' %
-                         (cidr_string, FLAGS.run_uri, start_port, end_port))
+        firewall_name = 'perfkit-firewall-%s-%s-%d-%d' % (
+            cidr_string,
+            FLAGS.run_uri,
+            start_port,
+            end_port,
+        )
         key = (vm.project, vm.cidr, start_port, end_port, source_range)
       else:
-        firewall_name = ('perfkit-firewall-%s-%d-%d' %
-                         (FLAGS.run_uri, start_port, end_port))
+        firewall_name = 'perfkit-firewall-%s-%d-%d' % (
+            FLAGS.run_uri,
+            start_port,
+            end_port,
+        )
         key = (vm.project, start_port, end_port, source_range)
       if key in self.firewall_rules:
         return
-      allow = ','.join('{0}:{1}-{2}'.format(protocol, start_port, end_port)
-                       for protocol in ('tcp', 'udp'))
+      allow = ','.join(
+          '{0}:{1}-{2}'.format(protocol, start_port, end_port)
+          for protocol in ('tcp', 'udp')
+      )
       firewall_rule = GceFirewallRule(
-          firewall_name, vm.project, allow,
-          vm.network.network_resource.name, source_range)
+          firewall_name,
+          vm.project,
+          allow,
+          vm.network.network_resource.name,
+          source_range,
+      )
       self.firewall_rules[key] = firewall_rule
       firewall_rule.Create()
 
@@ -642,21 +714,22 @@ class GceFirewall(network.BaseFirewall):
     with self._lock:
       if vm.cidr:  # Allow multiple networks per zone.
         cidr_string = network.BaseNetwork.FormatCidrString(vm.cidr)
-        firewall_name = ('perfkit-firewall-icmp-%s-%s' %
-                         (cidr_string, FLAGS.run_uri))
+        firewall_name = 'perfkit-firewall-icmp-%s-%s' % (
+            cidr_string,
+            FLAGS.run_uri,
+        )
         key = (vm.project, vm.cidr)
       else:
-        firewall_name = ('perfkit-firewall-icmp-%s' %
-                         (FLAGS.run_uri))
-        key = (vm.project)
+        firewall_name = 'perfkit-firewall-icmp-%s' % FLAGS.run_uri
+        key = vm.project
 
       if key in self.firewall_icmp_rules:
         return
 
       allow = 'ICMP'
       firewall_rule = GceFirewallRule(
-          firewall_name, vm.project, allow,
-          vm.network.network_resource.name)
+          firewall_name, vm.project, allow, vm.network.network_resource.name
+      )
       self.firewall_icmp_rules[key] = firewall_rule
       firewall_rule.Create()
 
@@ -664,12 +737,14 @@ class GceFirewall(network.BaseFirewall):
 class GceNetworkSpec(network.BaseNetworkSpec):
   """Object representing a GCE Network specification."""
 
-  def __init__(self,
-               project: Optional[str] = None,
-               mtu: Optional[int] = None,
-               machine_type: Optional[str] = None,
-               subnet_name: Optional[str] = None,
-               **kwargs):
+  def __init__(
+      self,
+      project: Optional[str] = None,
+      mtu: Optional[int] = None,
+      machine_type: Optional[str] = None,
+      subnet_name: Optional[str] = None,
+      **kwargs,
+  ):
     """Initializes the GceNetworkSpec.
 
     Args:
@@ -689,11 +764,9 @@ class GceNetworkSpec(network.BaseNetworkSpec):
 class GceNetworkResource(resource.BaseResource):
   """Object representing a GCE Network resource."""
 
-  def __init__(self,
-               name: str,
-               mode: str,
-               project: str,
-               mtu: Optional[int] = None):
+  def __init__(
+      self, name: str, mode: str, project: str, mtu: Optional[int] = None
+  ):
     super(GceNetworkResource, self).__init__()
     self.name = name
     self.mode = mode
@@ -730,15 +803,25 @@ class GceNetworkResource(resource.BaseResource):
 
     stdout, _, _ = cmd.Issue()
     result = json.loads(stdout)
-    return [GceFirewallRule(entry['name'], self.project, ALLOW_ALL, self.name,
-                            NETWORK_RANGE) for entry in result]
+    return [
+        GceFirewallRule(
+            entry['name'], self.project, ALLOW_ALL, self.name, NETWORK_RANGE
+        )
+        for entry in result
+    ]
 
 
 class GceSubnetResource(resource.BaseResource):
   """Object representing a GCE subnet resource."""
 
-  def __init__(self, name: str, network_name: str, region: str, addr_range: str,
-               project: str):
+  def __init__(
+      self,
+      name: str,
+      network_name: str,
+      region: str,
+      addr_range: str,
+      project: str,
+  ):
     super(GceSubnetResource, self).__init__()
     self.name = name
     self.network_name = network_name
@@ -758,24 +841,27 @@ class GceSubnetResource(resource.BaseResource):
     self.addr_range = json_details['ipCidrRange']
 
   def _Create(self):
-    cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'create',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'networks', 'subnets', 'create', self.name
+    )
     cmd.flags['network'] = self.network_name
     cmd.flags['region'] = self.region
     cmd.flags['range'] = self.addr_range
     cmd.Issue()
 
   def _Exists(self) -> bool:
-    cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'describe',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'networks', 'subnets', 'describe', self.name
+    )
     if self.region:
       cmd.flags['region'] = self.region
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     return not retcode
 
   def _Delete(self):
-    cmd = util.GcloudCommand(self, 'compute', 'networks', 'subnets', 'delete',
-                             self.name)
+    cmd = util.GcloudCommand(
+        self, 'compute', 'networks', 'subnets', 'delete', self.name
+    )
     if self.region:
       cmd.flags['region'] = self.region
     cmd.Issue(raise_on_failure=False)
@@ -851,11 +937,13 @@ class GceNetwork(network.BaseNetwork):
           self.cidr,
           self.project,
       )
-    self.network_resource = GceNetworkResource(self.primary_subnet_name, mode,
-                                               self.project, self.mtu)
+    self.network_resource = GceNetworkResource(
+        self.primary_subnet_name, mode, self.project, self.mtu
+    )
     # Stage FW rules.
     self.all_nets = self._GetNetworksFromSpec(
-        network_spec)  # Holds the different networks in this run.
+        network_spec
+    )  # Holds the different networks in this run.
     # Holds FW rules for any external subnets.
     self.external_nets_rules: Dict[str, GceFirewallRule] = {}
 
@@ -882,26 +970,37 @@ class GceNetwork(network.BaseNetwork):
     if FLAGS.use_vpn:
       for gatewaynum in range(0, FLAGS.vpn_service_gateway_count):
         vpn_gateway_name = 'vpngw-%s-%s-%s' % (
-            util.GetRegionFromZone(network_spec.zone), gatewaynum,
-            FLAGS.run_uri)
-        self.vpn_gateway[vpn_gateway_name] = GceVpnGateway(
-            vpn_gateway_name, self.primary_subnet_name,
             util.GetRegionFromZone(network_spec.zone),
-            network_spec.cidr, self.project)
+            gatewaynum,
+            FLAGS.run_uri,
+        )
+        self.vpn_gateway[vpn_gateway_name] = GceVpnGateway(
+            vpn_gateway_name,
+            self.primary_subnet_name,
+            util.GetRegionFromZone(network_spec.zone),
+            network_spec.cidr,
+            self.project,
+        )
 
     # Placement Group
     no_placement_group = (
-        not FLAGS.placement_group_style or
-        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
-    has_optional_pg = (FLAGS.placement_group_style ==
-                       placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED)
+        not FLAGS.placement_group_style
+        or FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE
+    )
+    has_optional_pg = (
+        FLAGS.placement_group_style
+        == placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED
+    )
     if no_placement_group:
       self.placement_group = None
     elif has_optional_pg and not IsPlacementGroupCompatible(
-        network_spec.machine_type):
+        network_spec.machine_type
+    ):
       logging.warning(
           'machine type %s does not support placement groups. '
-          'Placement group style set to none.', network_spec.machine_type)
+          'Placement group style set to none.',
+          network_spec.machine_type,
+      )
       self.placement_group = None
     elif has_optional_pg and len(set(FLAGS.zone)) > 1:
       logging.warning(
@@ -912,20 +1011,24 @@ class GceNetwork(network.BaseNetwork):
     elif not IsPlacementGroupCompatible(network_spec.machine_type):
       raise errors.Benchmarks.UnsupportedConfigError(
           f'machine type {network_spec.machine_type} does not support '
-          f'placement groups. Use placement group style none.')
+          'placement groups. Use placement group style none.'
+      )
     elif len(set(FLAGS.zone)) > 1:
       raise errors.Benchmarks.UnsupportedConfigError(
           'inter-zone/inter-region tests do not support placement groups. '
-          'Use placement group style closest_supported.')
+          'Use placement group style closest_supported.'
+      )
     else:
       placement_group_spec = gce_placement_group.GcePlacementGroupSpec(
           'GcePlacementGroupSpec',
           flag_values=FLAGS,
           zone=network_spec.zone,
           project=self.project,
-          num_vms=self._GetNumberVms())
+          num_vms=self._GetNumberVms(),
+      )
       self.placement_group = gce_placement_group.GcePlacementGroup(
-          placement_group_spec)
+          placement_group_spec
+      )
 
   def _GetNetworksFromSpec(self, network_spec: GceNetworkSpec) -> Set[str]:
     """Returns a list of distinct CIDR networks for this benchmark.
@@ -938,15 +1041,17 @@ class GceNetwork(network.BaseNetwork):
 
     Args:
       network_spec: The network spec for the network.
+
     Returns:
       A set of CIDR strings used by this benchmark.
     """
     nets = set()
-    gce_default_subnet = (FLAGS.gce_subnet_addr if FLAGS.gce_subnet_region
-                          else NETWORK_RANGE)
+    gce_default_subnet = (
+        FLAGS.gce_subnet_addr if FLAGS.gce_subnet_region else NETWORK_RANGE
+    )
 
     if hasattr(network_spec, 'custom_subnets'):
-      for (_, v) in network_spec.custom_subnets.items():
+      for _, v in network_spec.custom_subnets.items():
         if not v['cidr'] and v['cloud'] != 'GCP':
           pass  # @TODO handle other providers defaults in net_util
         elif not v['cidr']:
@@ -955,10 +1060,12 @@ class GceNetwork(network.BaseNetwork):
           nets.add(v['cidr'])
     return nets
 
-  def _MakeGceNetworkName(self,
-                          net_type: Optional[str] = None,
-                          cidr: Optional[str] = None,
-                          uri: Optional[str] = None) -> str:
+  def _MakeGceNetworkName(
+      self,
+      net_type: Optional[str] = None,
+      cidr: Optional[str] = None,
+      uri: Optional[str] = None,
+  ) -> str:
     """Build the current network's name string.
 
     Uses current instance properties if none provided.
@@ -968,6 +1075,7 @@ class GceNetwork(network.BaseNetwork):
       net_type: One of ['default', 'single', 'multi']
       cidr: The CIDR range of this network.
       uri: A network suffix (if different than FLAGS.run_uri)
+
     Returns:
       String The name of this network.
     """
@@ -977,20 +1085,24 @@ class GceNetwork(network.BaseNetwork):
 
     name = 'pkb-network-%s' % uri  # Assume the default network naming.
 
-    if net_type in (network.NetType.SINGLE.value,
-                    network.NetType.MULTI.value):
+    if net_type in (network.NetType.SINGLE.value, network.NetType.MULTI.value):
       name = 'pkb-network-%s-%s-%s' % (
-          net_type, self.FormatCidrString(cidr), uri)
+          net_type,
+          self.FormatCidrString(cidr),
+          uri,
+      )
 
     return name
 
-  def _MakeGceFWRuleName(self,
-                         net_type: Optional[str] = None,
-                         src_cidr: Optional[str] = None,
-                         dst_cidr: Optional[str] = None,
-                         port_range_lo: Optional[str] = None,
-                         port_range_hi: Optional[str] = None,
-                         uri: Optional[str] = None) -> str:
+  def _MakeGceFWRuleName(
+      self,
+      net_type: Optional[str] = None,
+      src_cidr: Optional[str] = None,
+      dst_cidr: Optional[str] = None,
+      port_range_lo: Optional[str] = None,
+      port_range_hi: Optional[str] = None,
+      uri: Optional[str] = None,
+  ) -> str:
     """Build a firewall name string.
 
     Firewall rule names must be unique within a project so we include source
@@ -1003,6 +1115,7 @@ class GceNetwork(network.BaseNetwork):
       port_range_lo: The low port to open
       port_range_hi: The high port to open in range.
       uri: A firewall suffix (if different than FLAGS.run_uri)
+
     Returns:
       The name of this firewall rule.
     """
@@ -1012,15 +1125,18 @@ class GceNetwork(network.BaseNetwork):
     dst_cidr = dst_cidr or self.cidr
 
     prefix = None if src_cidr == dst_cidr else 'perfkit-firewall'
-    src_cidr = 'internal' if src_cidr == dst_cidr else self.FormatCidrString(
-        src_cidr)
+    src_cidr = (
+        'internal' if src_cidr == dst_cidr else self.FormatCidrString(src_cidr)
+    )
     dst_cidr = self.FormatCidrString(dst_cidr)
     port_lo = port_range_lo
     port_hi = None if port_range_lo == port_range_hi else port_range_hi
 
-    firewall_name = '-'.join(str(i) for i in (
-        prefix, net_type, src_cidr, dst_cidr,
-        port_lo, port_hi, uri) if i)
+    firewall_name = '-'.join(
+        str(i)
+        for i in (prefix, net_type, src_cidr, dst_cidr, port_lo, port_hi, uri)
+        if i
+    )
 
     return firewall_name
 
@@ -1058,8 +1174,10 @@ class GceNetwork(network.BaseNetwork):
       Count of the number of VMs in the benchmark.
     """
     benchmark_spec = context.GetThreadBenchmarkSpec()
-    return sum((group_spec.vm_count - len(group_spec.static_vms))
-               for group_spec in benchmark_spec.config.vm_groups.values())
+    return sum(
+        (group_spec.vm_count - len(group_spec.static_vms))
+        for group_spec in benchmark_spec.config.vm_groups.values()
+    )
 
   def Create(self):
     """Creates the actual network."""

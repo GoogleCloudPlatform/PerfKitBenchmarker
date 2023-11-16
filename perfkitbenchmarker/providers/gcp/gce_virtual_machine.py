@@ -197,8 +197,10 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     if not self.boot_disk_type:
       self.boot_disk_type = gce_disk.GetDefaultBootDiskType(self.machine_type)
     self.boot_disk_spec = boot_disk.BootDiskSpec(
-        self.boot_disk_size, self.boot_disk_type,
-        self.boot_disk_iops, self.boot_disk_throughput
+        self.boot_disk_size,
+        self.boot_disk_type,
+        self.boot_disk_iops,
+        self.boot_disk_throughput,
     )
     if isinstance(
         self.machine_type, custom_virtual_machine_spec.CustomMachineTypeSpec
@@ -1156,9 +1158,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       )
       return
     if any((spec.disk_type == disk.NFS for spec in self.disk_specs)):
-      disk_strategies.SetUpNFSDiskStrategy().SetUpDisk(
-          self, self.disk_specs[0]
-      )
+      disk_strategies.SetUpNFSDiskStrategy().SetUpDisk(self, self.disk_specs[0])
       return
     if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
       self.SetupLocalDisks()
@@ -1871,6 +1871,7 @@ class BaseCosBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.BaseContainerLinuxMixin
 ):
   """Base class for COS-based GCE virtual machines."""
+
   BASE_OS_TYPE = os_types.CORE_OS
   DEFAULT_IMAGE_PROJECT = 'cos-cloud'
 

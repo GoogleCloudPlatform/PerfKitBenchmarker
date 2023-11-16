@@ -43,7 +43,8 @@ READ_LIMITED_MESSAGE = "limit 'Read requests per minute'"
 # service 'compute.googleapis.com' for consumer 'project_number:012345678901'.
 TAGGING_RATE_LIMITED_REGEX = re.compile(
     "Quota exceeded for quota group '.*?' and limit "
-    "'.*? per.*?seconds' of service 'compute.googleapis.com'")
+    "'.*? per.*?seconds' of service 'compute.googleapis.com'"
+)
 RATE_LIMITED_MAX_RETRIES = 10
 # 200s is chosen because 1) quota is measured in 100s intervals and 2) fuzzing
 # causes a random number between 100 and this to be chosen.
@@ -51,8 +52,10 @@ RATE_LIMITED_MAX_POLLING_INTERVAL = 200
 # This must be set. Otherwise, calling Issue() will fail in util_test.py.
 RATE_LIMITED_FUZZ = 0.5
 RATE_LIMITED_TIMEOUT = 1200
-STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
-                    'potential stockout scenario.')
+STOCKOUT_MESSAGE = (
+    'Creation failed due to insufficient capacity indicating a '
+    'potential stockout scenario.'
+)
 
 
 @functools.lru_cache()
@@ -151,9 +154,11 @@ def GetRegionsInGeo(geo: str) -> Set[str]:
 
 def GetMultiRegionFromRegion(region):
   """Gets the closest multi-region location to the region."""
-  if (region.startswith('us') or
-      region.startswith('northamerica') or
-      region.startswith('southamerica')):
+  if (
+      region.startswith('us')
+      or region.startswith('northamerica')
+      or region.startswith('southamerica')
+  ):
     return 'us'
   elif region.startswith('europe'):
     return 'eu'
@@ -243,8 +248,8 @@ class GcloudCommand(object):
     Args:
       resource: A GCE resource of type BaseResource.
       *args: sequence of strings. Non-flag args to pass to gcloud, typically
-          specifying an operation to perform (e.g. ['compute', 'images', 'list']
-          to list available images).
+        specifying an operation to perform (e.g. ['compute', 'images', 'list']
+        to list available images).
     """
     self.args = list(args)
     self.flags = collections.OrderedDict()
@@ -304,7 +309,9 @@ class GcloudCommand(object):
       fuzz=RATE_LIMITED_FUZZ,
       timeout=RATE_LIMITED_TIMEOUT,
       retryable_exceptions=(
-          errors.Benchmarks.QuotaFailure.RateLimitExceededError,))
+          errors.Benchmarks.QuotaFailure.RateLimitExceededError,
+      ),
+  )
   def Issue(self, **kwargs):
     """Tries to run the gcloud command once, retrying if Rate Limited.
 
@@ -319,7 +326,6 @@ class GcloudCommand(object):
       QuotaFailure: if command fails without Rate Limit Exceeded and
       retry_on_rate_limited is set to false
       IssueCommandError: if command fails without Rate Limit Exceeded.
-
     """
     try:
       stdout, stderr, retcode = _issue_command_function(self, **kwargs)
@@ -385,7 +391,8 @@ class GcloudCommand(object):
 
 
 _QUOTA_EXCEEDED_REGEX = re.compile(
-    r"(Quota '.*' exceeded|Insufficient .*\w+.* quota)")
+    r"(Quota '.*' exceeded|Insufficient .*\w+.* quota)"
+)
 
 # Resource availability errors documented at
 # https://cloud.google.com/compute/docs/resource-error#resource_availability
@@ -397,7 +404,8 @@ _NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 
 _INVALID_MACHINE_TYPE_REGEX = re.compile(
     r"Invalid value for field 'resource.machineType': '.*?'. "
-    r"Machine type with name '.*?' does not exist in zone '.*?'.")
+    r"Machine type with name '.*?' does not exist in zone '.*?'."
+)
 _INVALID_MACHINE_TYPE_MESSAGE = 'Creation failed due to invalid machine type: '
 
 
@@ -442,22 +450,27 @@ def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):
   if not FLAGS.gcp_service_account:
     raise errors.Setup.InvalidFlagConfigurationError(
         'Authentication requires the service account name to be '
-        'specified via --gcp_service_account.')
+        'specified via --gcp_service_account.'
+    )
   if not FLAGS.gcp_service_account_key_file:
     raise errors.Setup.InvalidFlagConfigurationError(
         'Authentication requires the service account credential json to be '
-        'specified via --gcp_service_account_key_file.')
+        'specified via --gcp_service_account_key_file.'
+    )
   if '/' in FLAGS.gcp_service_account_key_file:
     vm.PushFile(FLAGS.gcp_service_account_key_file, vm_util.VM_TMP_DIR)
     key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
   else:
-    vm.InstallPreprovisionedBenchmarkData(benchmark,
-                                          [FLAGS.gcp_service_account_key_file],
-                                          vm_util.VM_TMP_DIR)
+    vm.InstallPreprovisionedBenchmarkData(
+        benchmark, [FLAGS.gcp_service_account_key_file], vm_util.VM_TMP_DIR
+    )
     key_file_name = FLAGS.gcp_service_account_key_file
-  activate_cmd = ('{} auth activate-service-account {} --key-file={}/{}'
-                  .format(vm_gcloud_path, FLAGS.gcp_service_account,
-                          vm_util.VM_TMP_DIR, key_file_name))
+  activate_cmd = '{} auth activate-service-account {} --key-file={}/{}'.format(
+      vm_gcloud_path,
+      FLAGS.gcp_service_account,
+      vm_util.VM_TMP_DIR,
+      key_file_name,
+  )
   vm.RemoteCommand(activate_cmd)
 
 
@@ -469,8 +482,9 @@ def InstallGcloudComponents(vm, vm_gcloud_path='gcloud', component='alpha'):
     vm_gcloud_path: Optional path to the gcloud binary on the vm.
     component: Gcloud component to install.
   """
-  install_cmd = '{} components install {} --quiet'.format(vm_gcloud_path,
-                                                          component)
+  install_cmd = '{} components install {} --quiet'.format(
+      vm_gcloud_path, component
+  )
   vm.RemoteCommand(install_cmd)
 
 
@@ -484,7 +498,8 @@ def FormatTags(tags_dict):
     A string contains formatted tags
   """
   return ','.join(
-      '{0}={1}'.format(k, v) for k, v in sorted(six.iteritems(tags_dict)))
+      '{0}={1}'.format(k, v) for k, v in sorted(six.iteritems(tags_dict))
+  )
 
 
 def SplitTags(tags):
@@ -497,7 +512,8 @@ def SplitTags(tags):
     An OrderedDict mapping tag keys to values in the order the tags were given.
   """
   return collections.OrderedDict(
-      tag_pair.split('=', 1) for tag_pair in tags.split(','))
+      tag_pair.split('=', 1) for tag_pair in tags.split(',')
+  )
 
 
 def GetDefaultTags(timeout_minutes=None):
