@@ -565,6 +565,20 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       self.user_data = None
     self.network = aws_network.AwsNetwork.GetNetwork(self)
+    self.network_eni_count = aws_network.AWS_ENI_COUNT.value
+    self.network_card_count = aws_network.AWS_NETWORK_CARD_COUNT.value
+    if (
+        (self.network_eni_count > 1)
+        and (self.network_card_count > 1)
+        and (self.machine_type not in aws_network.DUAL_NETWORK_CARD_MACHINES)
+    ):
+      logging.warning(
+          '%s does not support %s network cards. Using 1 instead.',
+          self.machine_type,
+          self.network_card_count,
+      )
+      self.network_eni_count = 1
+      self.network_card_count = 1
     self.placement_group = self.network.placement_group
     self.firewall = aws_network.AwsFirewall.GetFirewall()
     self.use_dedicated_host = vm_spec.use_dedicated_host
@@ -781,7 +795,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.group_id, instance['SecurityGroups'][0]['GroupId'])
     if FLAGS.aws_efa:
       self._ConfigureEfa(instance)
-    elif aws_network.AWS_ENI_COUNT.value > 1:
+    elif self.network_eni_count > 1:
       self._ConfigureElasticIp(instance)
     elif 'PublicIpAddress' in instance:
       self.ip_address = instance['PublicIpAddress']
@@ -927,13 +941,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         efas.append(','.join(f'{key}={value}' for key, value in
                              sorted(efa_params.items())))
       create_cmd.extend(efas)
-    elif aws_network.AWS_ENI_COUNT.value > 1:
+    elif self.network_eni_count > 1:
       enis = ['--network-interfaces']
       enis_per_network_card = (
-          aws_network.AWS_ENI_COUNT.value //
-          aws_network.AWS_NETWORK_CARD_COUNT.value
+          self.network_eni_count //
+          self.network_card_count
           )
-      for device_index in range(aws_network.AWS_ENI_COUNT.value):
+      for device_index in range(self.network_eni_count):
         eni_params = _ENI_PARAMS.copy()
         eni_params.update({
             'NetworkCardIndex': device_index // enis_per_network_card,
@@ -1176,7 +1190,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--spot-instance-request-ids=%s' % self.spot_instance_request_id]
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
-    if FLAGS.aws_efa or aws_network.AWS_ENI_COUNT.value > 1:
+    if FLAGS.aws_efa or self.network_eni_count > 1:
       if self.association_id:
         vm_util.IssueCommand(util.AWS_PREFIX +
                              ['ec2', 'disassociate-address',
@@ -1573,11 +1587,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     result['boot_disk_size'] = self.boot_disk_size
     if self.use_dedicated_host:
       result['num_vms_per_host'] = self.num_vms_per_host
-    result['nic_count'] = aws_network.AWS_ENI_COUNT.value
+    result['nic_count'] = self.network_eni_count
     result['efa'] = FLAGS.aws_efa
     if FLAGS.aws_efa:
       result['efa_version'] = FLAGS.aws_efa_version
       result['efa_count'] = FLAGS.aws_efa_count
+      result['nic_count'] = FLAGS.aws_efa_count
     result['preemptible'] = self.use_spot_instance
     return result
 
