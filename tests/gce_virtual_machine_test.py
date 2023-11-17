@@ -844,6 +844,13 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           'expected_error': errors.Benchmarks.UnsupportedConfigError
       }, {
           'testcase_name':
+              'unsupported_requires_accelerator',
+          'fake_stderr':
+              ('ERROR: (gcloud.compute.instances.create) HTTPError 400: '
+               'n1-standard-2 can not be used without accelerator(s) in zone'),
+          'expected_error': errors.Benchmarks.UnsupportedConfigError
+      }, {
+          'testcase_name':
               'internal_error',
           'fake_stderr':
               ('ERROR: (gcloud.compute.instances.create) Could not fetch '

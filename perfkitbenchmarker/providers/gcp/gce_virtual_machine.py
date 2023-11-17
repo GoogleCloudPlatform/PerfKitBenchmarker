@@ -948,6 +948,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           "CPU platform type with name '.*' does not exist in zone", stderr
       ):
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
+      if re.search(
+          r'HTTPError 400: .* can not be used without accelerator\(s\) in zone',
+          stderr):
+        raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if 'The service is currently unavailable' in stderr:
         raise errors.Benchmarks.KnownIntermittentError(stderr)
       # The initial request failed, prompting a retry, but the instance was
