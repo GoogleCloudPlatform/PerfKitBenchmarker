@@ -146,6 +146,11 @@ _EFA_PARAMS['InterfaceType'] = 'efa'
 _EFA_URL = ('https://s3-us-west-2.amazonaws.com/aws-efa-installer/'
             'aws-efa-installer-{version}.tar.gz')
 
+# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/p5-efa.html
+# Based on testing, dl1 and trn1 require similar commandline arguments.
+_EFA_V2_MACHINE_TYPES = ('p5.48xlarge', 'dl1.24xlarge',
+                         'trn1.32xlarge', 'trn1n.32xlarge')
+
 
 class AwsTransitionalVmRetryableError(Exception):
   """Error for retrying _Exists when an AWS VM is in a transitional state."""
@@ -936,6 +941,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             'Groups': self.group_id,
             'SubnetId': self.network.subnet.id
         })
+        if self.machine_type in _EFA_V2_MACHINE_TYPES and efa_params[
+            'DeviceIndex']:
+          efa_params['DeviceIndex'] = 1
         if FLAGS.aws_efa_count == 1 and self.assign_external_ip:
           efa_params['AssociatePublicIpAddress'] = True
         efas.append(','.join(f'{key}={value}' for key, value in
@@ -1701,7 +1709,8 @@ class Ubuntu2004BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
 class Ubuntu2004EfaBasedAwsVirtualMachine(
     UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2004EfaMixin):
   IMAGE_OWNER = UBUNTU_EFA_IMAGE_PROJECT
-  IMAGE_NAME_FILTER_PATTERN = 'Deep Learning AMI GPU CUDA * (Ubuntu 20.04) *'
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
+  IMAGE_NAME_FILTER_PATTERN = 'Deep Learning Base GPU AMI (Ubuntu 20.04) *'
 
 
 class Ubuntu2204BasedAwsVirtualMachine(UbuntuBasedAwsVirtualMachine,
