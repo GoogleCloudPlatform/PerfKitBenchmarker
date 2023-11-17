@@ -76,6 +76,41 @@ flags.DEFINE_string(
     'mandatory to use this flag.',
 )
 
+# Flags related to managed autoscaler
+# https://cloud.google.com/spanner/docs/create-manage-instances#gcloud
+flags.DEFINE_boolean(
+    'cloud_spanner_autoscaler',
+    False,
+    'Turn on the autoscaler for the spanner instance.',
+)
+
+flags.DEFINE_integer(
+    'cloud_spanner_autoscaler_min_processing_units',
+    None,
+    'Minimum number of processing units. Autoscaler will not go lower than'
+    ' this.',
+)
+
+flags.DEFINE_integer(
+    'cloud_spanner_autoscaler_max_processing_units',
+    None,
+    'Maximum number of processing units. Autoscaler will not go higher than'
+    ' this.',
+)
+
+flags.DEFINE_integer(
+    'cloud_spanner_autoscaler_high_priority_cpu_target',
+    None,
+    'The CPU usage when spanner starts scaling.',
+)
+
+flags.DEFINE_integer(
+    'cloud_spanner_autoscaler_storage_target',
+    None,
+    'Storage target when spanner starts scaling.',
+)
+
+
 # Type aliases
 _RelationalDbSpec = relational_db_spec.RelationalDbSpec
 
@@ -84,6 +119,11 @@ _DEFAULT_DESCRIPTION = 'Created by PKB.'
 _DEFAULT_ENDPOINT = 'https://spanner.googleapis.com'
 _DEFAULT_NODES = 1
 _FROZEN_NODE_COUNT = 1
+
+_DEFAULT_MIN_PROCESSING_UNITS = 5000
+_DEFAULT_MAX_PROCESSING_UNITS = 50000
+_DEFAULT_HIGH_PRIORITY_CPU_TARGET = 65
+_DEFAULT_STORAGE_TARGET = 95
 
 # Dialect options
 GOOGLESQL = 'GOOGLE_STANDARD_SQL'
@@ -120,6 +160,11 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
   spanner_nodes: int
   spanner_load_nodes: int
   spanner_project: str
+  spanner_autoscaler: bool
+  spanner_min_processing_units: int
+  spanner_max_processing_units: int
+  spanner_high_priority_cpu_target: int
+  spanner_storage_target: int
 
   def __init__(
       self,
@@ -150,6 +195,14 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
         'spanner_project': (option_decoders.StringDecoder, _NONE_OK),
         'db_spec': (spec.PerCloudConfigDecoder, _NONE_OK),
         'db_disk_spec': (spec.PerCloudConfigDecoder, _NONE_OK),
+        'spanner_autoscaler': (option_decoders.BooleanDecoder, _NONE_OK),
+        'spanner_min_processing_units': (option_decoders.IntDecoder, _NONE_OK),
+        'spanner_max_processing_units': (option_decoders.IntDecoder, _NONE_OK),
+        'spanner_high_priority_cpu_target': (
+            option_decoders.IntDecoder,
+            _NONE_OK,
+        ),
+        'spanner_storage_target': (option_decoders.IntDecoder, _NONE_OK),
     })
     return result
 
@@ -180,6 +233,25 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
       config_values['spanner_load_nodes'] = flag_values.cloud_spanner_load_nodes
     if flag_values['cloud_spanner_project'].present:
       config_values['spanner_project'] = flag_values.cloud_spanner_project
+
+    if flag_values['cloud_spanner_autoscaler'].present:
+      config_values['spanner_autoscaler'] = flag_values.cloud_spanner_autoscaler
+    if flag_values['cloud_spanner_autoscaler_min_processing_units'].present:
+      config_values['spanner_min_processing_units'] = (
+          flag_values.cloud_spanner_autoscaler_min_processing_units
+      )
+    if flag_values['cloud_spanner_autoscaler_max_processing_units'].present:
+      config_values['spanner_max_processing_units'] = (
+          flag_values.cloud_spanner_autoscaler_max_processing_units
+      )
+    if flag_values['cloud_spanner_autoscaler_high_priority_cpu_target'].present:
+      config_values['spanner_high_priority_cpu_target'] = (
+          flag_values.cloud_spanner_autoscaler_high_priority_cpu_target
+      )
+    if flag_values['cloud_spanner_autoscaler_storage_target'].present:
+      config_values['spanner_storage_target'] = (
+          flag_values.cloud_spanner_autoscaler_storage_target
+      )
 
 
 class GcpSpannerInstance(relational_db.BaseRelationalDb):
@@ -216,6 +288,20 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     self.nodes = db_spec.spanner_nodes or _DEFAULT_NODES
     self._load_nodes = db_spec.spanner_load_nodes or self.nodes
     self._api_endpoint = None
+    self._autoscaler = db_spec.spanner_autoscaler
+    self._min_processing_units = (
+        db_spec.spanner_min_processing_units or _DEFAULT_MIN_PROCESSING_UNITS
+    )
+    self._max_processing_units = (
+        db_spec.spanner_max_processing_units or _DEFAULT_MAX_PROCESSING_UNITS
+    )
+    self._high_priority_cpu_target = (
+        db_spec.spanner_high_priority_cpu_target
+        or _DEFAULT_HIGH_PRIORITY_CPU_TARGET
+    )
+    self._storage_target = (
+        db_spec.spanner_storage_target or _DEFAULT_STORAGE_TARGET
+    )
 
     # Cloud Spanner may not explicitly set the following common flags.
     self.project = (
@@ -240,8 +326,18 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
         self, 'spanner', 'instances', 'create', self.instance_id
     )
     cmd.flags['description'] = self._description
-    cmd.flags['nodes'] = self.nodes
     cmd.flags['config'] = self._config
+
+    if self._autoscaler:
+      cmd.use_beta_gcloud = True
+      cmd.flags['autoscaling-min-processing-units'] = self._min_processing_units
+      cmd.flags['autoscaling-max-processing-units'] = self._max_processing_units
+      cmd.flags['autoscaling-high-priority-cpu-target'] = (
+          self._high_priority_cpu_target
+      )
+      cmd.flags['autoscaling-storage-target'] = self._storage_target
+    else:
+      cmd.flags['nodes'] = self.nodes
     _, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       # TODO(user) Currently loops if the database doesn't exist. To fix
@@ -369,6 +465,10 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     # are not discovered.
     if self.user_managed:
       return
+
+    # Cannot set nodes with autoscaler.
+    if self._autoscaler:
+      return
     current_nodes = self._GetNodes()
     if nodes == current_nodes:
       return
@@ -451,15 +551,28 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
   def GetResourceMetadata(self) -> Dict[Any, Any]:
     """Returns useful metadata about the instance."""
-    return {
+    metadata = {
         'gcp_spanner_name': self.instance_id,
         'gcp_spanner_database': self.database,
         'gcp_spanner_database_dialect': self.dialect,
-        'gcp_spanner_node_count': self.nodes,
         'gcp_spanner_config': self._config,
         'gcp_spanner_endpoint': self.GetApiEndPoint(),
         'gcp_spanner_load_node_count': self._load_nodes,
     }
+
+    if self._autoscaler:
+      metadata.update({
+          'gcp_spanner_autoscaler': self._autoscaler,
+          'gcp_spanner_min_processing_units': self._min_processing_units,
+          'gcp_spanner_max_processing_units': self._max_processing_units,
+          'gcp_spanner_high_priority_cpu_target': (
+              self._high_priority_cpu_target
+          ),
+          'gcp_spanner_storage_target': self._storage_target,
+      })
+    else:
+      metadata['gcp_spanner_node_count'] = self.nodes
+    return metadata
 
   def GetAverageCpuUsage(
       self, duration_minutes: int, end_time: datetime.datetime

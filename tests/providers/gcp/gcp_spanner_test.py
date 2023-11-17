@@ -36,6 +36,16 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.run_uri = 'test_uri'
     self.addCleanup(flagsaver.restore_flag_values, saved_flag_values)
 
+  def testFlagOverridesAutoScaler(self):
+    FLAGS['cloud_spanner_autoscaler'].parse('True')
+
+    test_instance = GetTestSpannerInstance()
+    self.assertEqual(test_instance._autoscaler, True)
+    self.assertEqual(test_instance._min_processing_units, 5000)
+    self.assertEqual(test_instance._max_processing_units, 50000)
+    self.assertEqual(test_instance._high_priority_cpu_target, 65)
+    self.assertEqual(test_instance._storage_target, 95)
+
   def testFlagOverrides(self):
     FLAGS['cloud_spanner_config'].parse('regional-us-central1')
     FLAGS['cloud_spanner_nodes'].parse(5)

@@ -130,6 +130,13 @@ BENCHMARK_DATA = {
     ),
 }
 
+
+flags.DEFINE_integer(
+    'sysbench_scalup_clients_test',
+    1,
+    'Scale up the number of clients running the benchmark.',
+)
+
 SPANNER_TPCC = 'spanner-tpcc'
 
 # Parameters are defined in oltp_common.lua file
