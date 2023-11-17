@@ -46,7 +46,7 @@ flags.DEFINE_integer('nccl_iters', 20, 'Number of iterations')
 flags.DEFINE_multi_enum(
     'nccl_operations', ['all_reduce', 'all_gather', 'alltoall'],
     ['all_reduce', 'all_gather', 'broadcast', 'reduce_scatter', 'reduce',
-     'alltoall'], 'The NCCL collective operation.')
+     'alltoall', 'sendrecv'], 'The NCCL collective operation.')
 _NCCL_TESTS = flags.DEFINE_boolean('nccl_install_tests', True,
                                    'Install NCCL tests benchmarks.')
 
@@ -78,6 +78,8 @@ nccl:
           zone: eastus
           image: microsoft-dsvm:ubuntu-hpc:2004:latest
           boot_disk_size: 130
+  flags:
+    placement_group_style: closest_supported
 """
 
 HOSTFILE = 'HOSTFILE'
