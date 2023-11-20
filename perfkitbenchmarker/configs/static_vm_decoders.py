@@ -44,7 +44,8 @@ class StaticVmDecoder(option_decoders.TypeVerifier):
     return static_virtual_machine.StaticVmSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
-        **input_dict)
+        **input_dict
+    )
 
 
 class StaticVmListDecoder(option_decoders.ListDecoder):

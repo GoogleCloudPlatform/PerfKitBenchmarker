@@ -62,17 +62,21 @@ class VmGroupSpec(spec.BaseSpec):
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(VmGroupSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+        component_full_name, flag_values=flag_values, **kwargs
+    )
     ignore_package_requirements = (
         getattr(flag_values, 'ignore_package_requirements', True)
-        if flag_values else True)
+        if flag_values
+        else True
+    )
     providers.LoadProvider(self.cloud, ignore_package_requirements)
     if self.disk_spec:
       disk_config = getattr(self.disk_spec, self.cloud, None)
       if disk_config is None:
         raise errors.Config.MissingOption(
             '{0}.cloud is "{1}", but {0}.disk_spec does not contain a '
-            'configuration for "{1}".'.format(component_full_name, self.cloud))
+            'configuration for "{1}".'.format(component_full_name, self.cloud)
+        )
       disk_type = disk_config.get('disk_type', None)
       if flag_values and flag_values['data_disk_type'].present:
         disk_type = flag_values['data_disk_type'].value
@@ -93,12 +97,14 @@ class VmGroupSpec(spec.BaseSpec):
     if vm_config is None:
       raise errors.Config.MissingOption(
           '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
-          'configuration for "{1}".'.format(component_full_name, self.cloud))
+          'configuration for "{1}".'.format(component_full_name, self.cloud)
+      )
     vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
     self.vm_spec = vm_spec_class(
         '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
         flag_values=flag_values,
-        **vm_config)
+        **vm_config
+    )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -189,16 +195,18 @@ class VmGroupsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_configs = super(VmGroupsDecoder,
-                             self).Decode(value, component_full_name,
-                                          flag_values)
+    vm_group_configs = super(VmGroupsDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     result = {}
     for vm_group_name, vm_group_config in vm_group_configs.items():
       result[vm_group_name] = VmGroupSpec(
           '{0}.{1}'.format(
-              self._GetOptionFullName(component_full_name), vm_group_name),
+              self._GetOptionFullName(component_full_name), vm_group_name
+          ),
           flag_values=flag_values,
-          **vm_group_config)
+          **vm_group_config
+      )
     return result
 
 
@@ -224,10 +232,11 @@ class VmGroupSpecDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_config = super(VmGroupSpecDecoder,
-                            self).Decode(value, component_full_name,
-                                         flag_values)
+    vm_group_config = super(VmGroupSpecDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     return VmGroupSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
-        **vm_group_config)
+        **vm_group_config
+    )

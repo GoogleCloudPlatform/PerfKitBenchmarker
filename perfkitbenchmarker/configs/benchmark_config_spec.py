@@ -53,8 +53,10 @@ class _DpbApplicationListDecoder(option_decoders.ListDecoder):
     super(_DpbApplicationListDecoder, self).__init__(
         default=None,
         item_decoder=option_decoders.EnumDecoder(
-            [dpb_constants.FLINK, dpb_constants.HIVE]),
-        **kwargs)
+            [dpb_constants.FLINK, dpb_constants.HIVE]
+        ),
+        **kwargs,
+    )
 
 
 class _DpbServiceDecoder(option_decoders.TypeVerifier):
@@ -97,22 +99,23 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
 class _DpbServiceSpec(spec.BaseSpec):
   """Configurable options of an Distributed Processing Backend Service.
 
-    We may add more options here, such as disk specs, as necessary.
-    When there are flags for these attributes, the convention is that
-    the flag is prefixed with dpb.
-    Attributes:
-      service_type: string.  pkb_managed or dataflow,dataproc,emr, etc.
-      static_dpb_service_instance: if user has pre created a container, the id
-      worker_group: Vm group spec for workers.
-      worker_count: the number of workers part of the dpb service
-      applications: An enumerated list of applications that need to be enabled
-        on the dpb service
-      version: string. The version of software to install inside the service.
+  We may add more options here, such as disk specs, as necessary.
+  When there are flags for these attributes, the convention is that
+  the flag is prefixed with dpb.
+  Attributes:
+    service_type: string.  pkb_managed or dataflow,dataproc,emr, etc.
+    static_dpb_service_instance: if user has pre created a container, the id
+    worker_group: Vm group spec for workers.
+    worker_count: the number of workers part of the dpb service
+    applications: An enumerated list of applications that need to be enabled on
+      the dpb service
+    version: string. The version of software to install inside the service.
   """
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_DpbServiceSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+        component_full_name, flag_values=flag_values, **kwargs
+    )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -125,15 +128,14 @@ class _DpbServiceSpec(spec.BaseSpec):
     """
     result = super(_DpbServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'static_dpb_service_instance': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
+        'static_dpb_service_instance': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
         'service_type': (
             option_decoders.EnumDecoder,
             {
-                'default':
-                    dpb_constants.DATAPROC,
+                'default': dpb_constants.DATAPROC,
                 'valid_values': [
                     dpb_constants.DATAPROC,
                     dpb_constants.DATAPROC_FLINK,
@@ -147,70 +149,77 @@ class _DpbServiceSpec(spec.BaseSpec):
                     dpb_constants.UNMANAGED_SPARK_CLUSTER,
                     dpb_constants.KUBERNETES_SPARK_CLUSTER,
                     dpb_constants.KUBERNETES_FLINK_CLUSTER,
-                ]
-            }),
+                ],
+            },
+        ),
         'worker_group': (vm_group_decoders.VmGroupSpecDecoder, {}),
-        'worker_count': (option_decoders.IntDecoder, {
-            'default': dpb_constants.DEFAULT_WORKER_COUNT,
-            'min': 0
-        }),
+        'worker_count': (
+            option_decoders.IntDecoder,
+            {'default': dpb_constants.DEFAULT_WORKER_COUNT, 'min': 0},
+        ),
         'applications': (_DpbApplicationListDecoder, {}),
-        'version': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'gke_cluster_name': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'gke_cluster_nodepools': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'gke_cluster_location': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'dataflow_max_worker_count': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True,
-        }),
-        'dataproc_serverless_core_count': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True,
-        }),
-        'dataproc_serverless_initial_executors': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'dataproc_serverless_min_executors': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'dataproc_serverless_max_executors': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'dataproc_serverless_memory': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'dataproc_serverless_memory_overhead': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'emr_serverless_executor_count': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'emr_serverless_core_count': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'emr_serverless_memory': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
+        'version': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'gke_cluster_name': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'gke_cluster_nodepools': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'gke_cluster_location': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'dataflow_max_worker_count': (
+            option_decoders.IntDecoder,
+            {
+                'default': None,
+                'none_ok': True,
+            },
+        ),
+        'dataproc_serverless_core_count': (
+            option_decoders.IntDecoder,
+            {
+                'default': None,
+                'none_ok': True,
+            },
+        ),
+        'dataproc_serverless_initial_executors': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'dataproc_serverless_min_executors': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'dataproc_serverless_max_executors': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'dataproc_serverless_memory': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'dataproc_serverless_memory_overhead': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'emr_serverless_executor_count': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'emr_serverless_core_count': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'emr_serverless_memory': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
     })
     return result
 
@@ -229,14 +238,14 @@ class _DpbServiceSpec(spec.BaseSpec):
     super(_DpbServiceSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['static_dpb_service_instance'].present:
       config_values['static_dpb_service_instance'] = (
-          flag_values.static_dpb_service_instance)
+          flag_values.static_dpb_service_instance
+      )
     # TODO(saksena): Update the documentation for zones assignment
     if flag_values['zone'].present:
       group = 'worker_group'
       if group in config_values:
         for cloud in config_values[group]['vm_spec']:
-          config_values[group]['vm_spec'][cloud]['zone'] = (
-              flag_values.zone[0])
+          config_values[group]['vm_spec'][cloud]['zone'] = flag_values.zone[0]
 
 
 class _TpuGroupSpec(spec.BaseSpec):
@@ -244,18 +253,18 @@ class _TpuGroupSpec(spec.BaseSpec):
 
   tpu_name: str
 
-  def __init__(self,
-               component_full_name,
-               group_name,
-               flag_values=None,
-               **kwargs):
+  def __init__(
+      self, component_full_name, group_name, flag_values=None, **kwargs
+  ):
     super(_TpuGroupSpec, self).__init__(
         '{0}.{1}'.format(component_full_name, group_name),
         flag_values=flag_values,
-        **kwargs)
+        **kwargs,
+    )
     if not self.tpu_name:
       self.tpu_name = 'pkb-tpu-{group_name}-{run_uri}'.format(
-          group_name=group_name, run_uri=flag_values.run_uri)
+          group_name=group_name, run_uri=flag_values.run_uri
+      )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -268,33 +277,33 @@ class _TpuGroupSpec(spec.BaseSpec):
     """
     result = super(_TpuGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': provider_info.VALID_CLOUDS
-        }),
-        'tpu_cidr_range': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'tpu_accelerator_type': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'tpu_description': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'tpu_network': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'tpu_tf_version': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'tpu_zone': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'tpu_name': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'tpu_preemptible': (option_decoders.BooleanDecoder, {
-            'default': False
-        })
+        'cloud': (
+            option_decoders.EnumDecoder,
+            {'valid_values': provider_info.VALID_CLOUDS},
+        ),
+        'tpu_cidr_range': (
+            option_decoders.StringDecoder,
+            {'default': None},
+        ),
+        'tpu_accelerator_type': (
+            option_decoders.StringDecoder,
+            {'default': None},
+        ),
+        'tpu_description': (
+            option_decoders.StringDecoder,
+            {'default': None},
+        ),
+        'tpu_network': (option_decoders.StringDecoder, {'default': None}),
+        'tpu_tf_version': (
+            option_decoders.StringDecoder,
+            {'default': None},
+        ),
+        'tpu_zone': (option_decoders.StringDecoder, {'default': None}),
+        'tpu_name': (option_decoders.StringDecoder, {'default': None}),
+        'tpu_preemptible': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
+        ),
     })
     return result
 
@@ -352,12 +361,14 @@ class _EdwServiceDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    edw_service_config = super(_EdwServiceDecoder,
-                               self).Decode(value, component_full_name,
-                                            flag_values)
+    edw_service_config = super(_EdwServiceDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     result = _EdwServiceSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **edw_service_config)
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **edw_service_config,
+    )
     return result
 
 
@@ -367,8 +378,7 @@ class _EdwServiceSpec(spec.BaseSpec):
     When there are flags for these attributes, the convention is that
     the flag is prefixed with edw_service.
 
-  Attributes:
-    cluster_name  : string. If set, the name of the cluster
+  Attributes: cluster_name  : string. If set, the name of the cluster
     type: string. The type of EDW service (redshift)
     node_type: string, type of node comprising the cluster
     node_count: integer, number of nodes in the cluster
@@ -376,7 +386,8 @@ class _EdwServiceSpec(spec.BaseSpec):
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_EdwServiceSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+        component_full_name, flag_values=flag_values, **kwargs
+    )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -389,66 +400,69 @@ class _EdwServiceSpec(spec.BaseSpec):
     """
     result = super(_EdwServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'type': (option_decoders.StringDecoder, {
-            'default': 'redshift',
-            'none_ok': False
-        }),
-        'cluster_identifier': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'endpoint': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'concurrency': (option_decoders.IntDecoder, {
-            'default': 5,
-            'none_ok': True
-        }),
-        'db': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'user': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'password': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'node_type': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'node_count': (option_decoders.IntDecoder, {
-            'default': edw_service.DEFAULT_NUMBER_OF_NODES,
-            'min': edw_service.DEFAULT_NUMBER_OF_NODES
-        }),
-        'snapshot': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'cluster_subnet_group': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'cluster_parameter_group': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'resource_group': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'server_name': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'iam_role': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        })
+        'type': (
+            option_decoders.StringDecoder,
+            {'default': 'redshift', 'none_ok': False},
+        ),
+        'cluster_identifier': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'endpoint': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'concurrency': (
+            option_decoders.IntDecoder,
+            {'default': 5, 'none_ok': True},
+        ),
+        'db': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'user': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'password': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'node_type': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'node_count': (
+            option_decoders.IntDecoder,
+            {
+                'default': edw_service.DEFAULT_NUMBER_OF_NODES,
+                'min': edw_service.DEFAULT_NUMBER_OF_NODES,
+            },
+        ),
+        'snapshot': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'cluster_subnet_group': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'cluster_parameter_group': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'resource_group': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'server_name': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'iam_role': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
     })
     return result
 
@@ -471,7 +485,8 @@ class _EdwServiceSpec(spec.BaseSpec):
       config_values['snapshot'] = flag_values.edw_service_cluster_snapshot
     if flag_values['edw_service_cluster_identifier'].present:
       config_values['cluster_identifier'] = (
-          flag_values.edw_service_cluster_identifier)
+          flag_values.edw_service_cluster_identifier
+      )
     if flag_values['edw_service_endpoint'].present:
       config_values['endpoint'] = flag_values.edw_service_endpoint
     if flag_values['edw_service_cluster_concurrency'].present:
@@ -527,7 +542,8 @@ class _EdwComputeResourceSpec(spec.BaseSpec):
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_EdwComputeResourceSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+        component_full_name, flag_values=flag_values, **kwargs
+    )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -570,7 +586,8 @@ class _SparkServiceSpec(spec.BaseSpec):
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_SparkServiceSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+        component_full_name, flag_values=flag_values, **kwargs
+    )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -583,22 +600,25 @@ class _SparkServiceSpec(spec.BaseSpec):
     """
     result = super(_SparkServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'static_cluster_id': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'service_type': (option_decoders.EnumDecoder, {
-            'default':
-                spark_service.PROVIDER_MANAGED,
-            'valid_values': [
-                spark_service.PROVIDER_MANAGED, spark_service.PKB_MANAGED
-            ]
-        }),
+        'static_cluster_id': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'service_type': (
+            option_decoders.EnumDecoder,
+            {
+                'default': spark_service.PROVIDER_MANAGED,
+                'valid_values': [
+                    spark_service.PROVIDER_MANAGED,
+                    spark_service.PKB_MANAGED,
+                ],
+            },
+        ),
         'worker_group': (vm_group_decoders.VmGroupSpecDecoder, {}),
-        'master_group': (vm_group_decoders.VmGroupSpecDecoder, {
-            'default': None,
-            'none_ok': True
-        })
+        'master_group': (
+            vm_group_decoders.VmGroupSpecDecoder,
+            {'default': None, 'none_ok': True},
+        ),
     })
     return result
 
@@ -616,13 +636,12 @@ class _SparkServiceSpec(spec.BaseSpec):
     """
     super(_SparkServiceSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['spark_static_cluster_id'].present:
-      config_values['static_cluster_id'] = (flag_values.spark_static_cluster_id)
+      config_values['static_cluster_id'] = flag_values.spark_static_cluster_id
     if flag_values['zone'].present:
       for group in ('master_group', 'worker_group'):
         if group in config_values:
           for cloud in config_values[group]['vm_spec']:
-            config_values[group]['vm_spec'][cloud]['zone'] = (
-                flag_values.zone[0])
+            config_values[group]['vm_spec'][cloud]['zone'] = flag_values.zone[0]
 
 
 class _PlacementGroupSpecsDecoder(option_decoders.TypeVerifier):
@@ -632,7 +651,8 @@ class _PlacementGroupSpecsDecoder(option_decoders.TypeVerifier):
 
   def __init__(self, **kwargs):
     super(_PlacementGroupSpecsDecoder, self).__init__(
-        valid_types=(dict,), **kwargs)
+        valid_types=(dict,), **kwargs
+    )
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies placement_group_specs dictionary of a benchmark config object.
@@ -652,20 +672,23 @@ class _PlacementGroupSpecsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    placement_group_spec_configs = (
-        super(_PlacementGroupSpecsDecoder,
-              self).Decode(value, component_full_name, flag_values))
+    placement_group_spec_configs = super(
+        _PlacementGroupSpecsDecoder, self
+    ).Decode(value, component_full_name, flag_values)
     result = {}
     for placement_group_name, placement_group_spec_config in six.iteritems(
-        placement_group_spec_configs):
+        placement_group_spec_configs
+    ):
       placement_group_spec_class = placement_group.GetPlacementGroupSpecClass(
-          self.cloud)
+          self.cloud
+      )
       result[placement_group_name] = placement_group_spec_class(
           '{0}.{1}'.format(
-              self._GetOptionFullName(component_full_name),
-              placement_group_name),
+              self._GetOptionFullName(component_full_name), placement_group_name
+          ),
           flag_values=flag_values,
-          **placement_group_spec_config)
+          **placement_group_spec_config,
+      )
     return result
 
 
@@ -674,7 +697,8 @@ class _ContainerRegistryDecoder(option_decoders.TypeVerifier):
 
   def __init__(self, **kwargs):
     super(_ContainerRegistryDecoder, self).__init__(
-        valid_types=(dict,), **kwargs)
+        valid_types=(dict,), **kwargs
+    )
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies container_registry dictionary of a benchmark config object.
@@ -693,13 +717,14 @@ class _ContainerRegistryDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_config = super(_ContainerRegistryDecoder,
-                            self).Decode(value, component_full_name,
-                                         flag_values)
+    vm_group_config = super(_ContainerRegistryDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     return container_service.ContainerRegistrySpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
-        **vm_group_config)
+        **vm_group_config,
+    )
 
 
 class _ContainerSpecsDecoder(option_decoders.TypeVerifier):
@@ -725,16 +750,18 @@ class _ContainerSpecsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    container_spec_configs = super(_ContainerSpecsDecoder,
-                                   self).Decode(value, component_full_name,
-                                                flag_values)
+    container_spec_configs = super(_ContainerSpecsDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     result = {}
     for spec_name, spec_config in six.iteritems(container_spec_configs):
       result[spec_name] = container_service.ContainerSpec(
           '{0}.{1}'.format(
-              self._GetOptionFullName(component_full_name), spec_name),
+              self._GetOptionFullName(component_full_name), spec_name
+          ),
           flag_values=flag_values,
-          **spec_config)
+          **spec_config,
+      )
     return result
 
 
@@ -743,15 +770,14 @@ class _NodepoolSpec(spec.BaseSpec):
 
   vm_spec: spec.PerCloudConfigSpec
 
-  def __init__(self,
-               component_full_name,
-               group_name,
-               flag_values=None,
-               **kwargs):
+  def __init__(
+      self, component_full_name, group_name, flag_values=None, **kwargs
+  ):
     super(_NodepoolSpec, self).__init__(
         '{0}.{1}'.format(component_full_name, group_name),
         flag_values=flag_values,
-        **kwargs)
+        **kwargs,
+    )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -764,10 +790,10 @@ class _NodepoolSpec(spec.BaseSpec):
     """
     result = super(_NodepoolSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'vm_count': (option_decoders.IntDecoder, {
-            'default': _DEFAULT_VM_COUNT,
-            'min': 0
-        }),
+        'vm_count': (
+            option_decoders.IntDecoder,
+            {'default': _DEFAULT_VM_COUNT, 'min': 0},
+        ),
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
         'sandbox_config': (_SandboxDecoder, {'default': None}),
     })
@@ -794,7 +820,7 @@ class _NodepoolSpec(spec.BaseSpec):
     # running in multiple zones in a single PKB invocation.
     if flag_values['zone'].present:
       for cloud in config_values['vm_spec']:
-        config_values['vm_spec'][cloud]['zone'] = (flag_values.zone[0])
+        config_values['vm_spec'][cloud]['zone'] = flag_values.zone[0]
 
 
 class _NodepoolsDecoder(option_decoders.TypeVerifier):
@@ -820,12 +846,16 @@ class _NodepoolsDecoder(option_decoders.TypeVerifier):
       errors.Config.InvalidValue upon invalid input value.
     """
     nodepools_configs = super(_NodepoolsDecoder, self).Decode(
-        value, component_full_name, flag_values)
+        value, component_full_name, flag_values
+    )
     result = {}
     for nodepool_name, nodepool_config in six.iteritems(nodepools_configs):
       result[nodepool_name] = _NodepoolSpec(
-          self._GetOptionFullName(component_full_name), nodepool_name,
-          flag_values, **nodepool_config)
+          self._GetOptionFullName(component_full_name),
+          nodepool_name,
+          flag_values,
+          **nodepool_config,
+      )
     return result
 
 
@@ -850,8 +880,10 @@ class _SandboxSpec(spec.BaseSpec):
     """
     result = super(_SandboxSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'type': (option_decoders.StringDecoder, {'none_ok': True,
-                                                 'default': None}),
+        'type': (
+            option_decoders.StringDecoder,
+            {'none_ok': True, 'default': None},
+        ),
     })
     return result
 
@@ -882,12 +914,12 @@ class _SandboxDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    super(_SandboxDecoder, self).Decode(value, component_full_name,
-                                        flag_values)
+    super(_SandboxDecoder, self).Decode(value, component_full_name, flag_values)
     return _SandboxSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
-        **value)
+        **value,
+    )
 
 
 class _ContainerClusterSpec(spec.BaseSpec):
@@ -899,37 +931,45 @@ class _ContainerClusterSpec(spec.BaseSpec):
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_ContainerClusterSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+        component_full_name, flag_values=flag_values, **kwargs
+    )
     ignore_package_requirements = (
         getattr(flag_values, 'ignore_package_requirements', True)
-        if flag_values else True)
+        if flag_values
+        else True
+    )
     providers.LoadProvider(self.cloud, ignore_package_requirements)
     vm_config = getattr(self.vm_spec, self.cloud, None)
     if vm_config is None:
       raise errors.Config.MissingOption(
           '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
-          'configuration for "{1}".'.format(component_full_name, self.cloud))
+          'configuration for "{1}".'.format(component_full_name, self.cloud)
+      )
     vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
     self.vm_spec = vm_spec_class(
         '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
         flag_values=flag_values,
-        **vm_config)
+        **vm_config,
+    )
     nodepools = {}
     for nodepool_name, nodepool_spec in sorted(six.iteritems(self.nodepools)):
       if nodepool_name == container_service.DEFAULT_NODEPOOL:
         raise errors.Config.InvalidValue(
             'Nodepool name {0} is reserved for use during cluster creation. '
-            'Please rename nodepool'.format(nodepool_name))
+            'Please rename nodepool'.format(nodepool_name)
+        )
       nodepool_config = getattr(nodepool_spec.vm_spec, self.cloud, None)
       if nodepool_config is None:
         raise errors.Config.MissingOption(
             '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
-            'configuration for "{1}".'.format(component_full_name, self.cloud))
+            'configuration for "{1}".'.format(component_full_name, self.cloud)
+        )
       vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
       nodepool_spec.vm_spec = vm_spec_class(
           '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
           flag_values=flag_values,
-          **nodepool_config)
+          **nodepool_config,
+      )
       nodepools[nodepool_name] = nodepool_spec
 
     self.nodepools = nodepools
@@ -945,38 +985,37 @@ class _ContainerClusterSpec(spec.BaseSpec):
     """
     result = super(_ContainerClusterSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'static_cluster': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': provider_info.VALID_CLOUDS
-        }),
-        'type': (option_decoders.StringDecoder, {
-            'default': container_service.KUBERNETES,
-        }),
-        'vm_count': (option_decoders.IntDecoder, {
-            'default': _DEFAULT_VM_COUNT,
-            'min': 0
-        }),
-        'min_vm_count': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True,
-            'min': 0
-        }),
-        'max_vm_count': (option_decoders.IntDecoder, {
-            'default': None,
-            'none_ok': True,
-            'min': 0
-        }),
+        'static_cluster': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'cloud': (
+            option_decoders.EnumDecoder,
+            {'valid_values': provider_info.VALID_CLOUDS},
+        ),
+        'type': (
+            option_decoders.StringDecoder,
+            {
+                'default': container_service.KUBERNETES,
+            },
+        ),
+        'vm_count': (
+            option_decoders.IntDecoder,
+            {'default': _DEFAULT_VM_COUNT, 'min': 0},
+        ),
+        'min_vm_count': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 0},
+        ),
+        'max_vm_count': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 0},
+        ),
         # vm_spec is used to define the machine type for the default nodepool
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
         # nodepools specifies a list of additional nodepools to create alongside
         # the default nodepool (nodepool created on cluster creation).
-        'nodepools': (_NodepoolsDecoder, {
-            'default': {},
-            'none_ok': True
-        }),
+        'nodepools': (_NodepoolsDecoder, {'default': {}, 'none_ok': True}),
     })
     return result
 
@@ -997,7 +1036,7 @@ class _ContainerClusterSpec(spec.BaseSpec):
     # running in multiple zones in a single PKB invocation.
     if flag_values['zone'].present:
       for cloud in config_values['vm_spec']:
-        config_values['vm_spec'][cloud]['zone'] = (flag_values.zone[0])
+        config_values['vm_spec'][cloud]['zone'] = flag_values.zone[0]
 
 
 class _ContainerClusterSpecDecoder(option_decoders.TypeVerifier):
@@ -1005,17 +1044,20 @@ class _ContainerClusterSpecDecoder(option_decoders.TypeVerifier):
 
   def __init__(self, **kwargs):
     super(_ContainerClusterSpecDecoder, self).__init__(
-        valid_types=(dict,), **kwargs)
+        valid_types=(dict,), **kwargs
+    )
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies container_cluster dictionairy of a benchmark config object."""
-    cluster_config = super(_ContainerClusterSpecDecoder,
-                           self).Decode(value, component_full_name, flag_values)
+    cluster_config = super(_ContainerClusterSpecDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
 
     return _ContainerClusterSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
-        **cluster_config)
+        **cluster_config,
+    )
 
 
 class _SparkServiceDecoder(option_decoders.TypeVerifier):
@@ -1039,12 +1081,14 @@ class _SparkServiceDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    spark_service_config = super(_SparkServiceDecoder,
-                                 self).Decode(value, component_full_name,
-                                              flag_values)
+    spark_service_config = super(_SparkServiceDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     result = _SparkServiceSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **spark_service_config)
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **spark_service_config,
+    )
     return result
 
 
@@ -1070,17 +1114,22 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    relational_db_config = super().Decode(value, component_full_name,
-                                          flag_values)
+    relational_db_config = super().Decode(
+        value, component_full_name, flag_values
+    )
     if 'engine' in relational_db_config:
       db_spec_class = relational_db_spec.GetRelationalDbSpecClass(
-          relational_db_config['engine'])
+          relational_db_config['engine']
+      )
     else:
       raise errors.Config.InvalidValue(
-          'Required attribute `engine` missing from relational_db config.')
+          'Required attribute `engine` missing from relational_db config.'
+      )
     return db_spec_class(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **relational_db_config)
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **relational_db_config,
+    )
 
 
 class _NonRelationalDbDecoder(option_decoders.TypeVerifier):
@@ -1105,18 +1154,23 @@ class _NonRelationalDbDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    non_relational_db_config = super().Decode(value, component_full_name,
-                                              flag_values)
+    non_relational_db_config = super().Decode(
+        value, component_full_name, flag_values
+    )
     if 'service_type' in non_relational_db_config:
       db_spec_class = non_relational_db.GetNonRelationalDbSpecClass(
-          non_relational_db_config['service_type'])
+          non_relational_db_config['service_type']
+      )
     else:
       raise errors.Config.InvalidValue(
           'Required attribute `service_type` missing from non_relational_db '
-          'config.')
+          'config.'
+      )
     return db_spec_class(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **non_relational_db_config)
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **non_relational_db_config,
+    )
 
 
 class _TpuGroupsDecoder(option_decoders.TypeVerifier):
@@ -1141,14 +1195,17 @@ class _TpuGroupsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    tpu_group_configs = super(_TpuGroupsDecoder,
-                              self).Decode(value, component_full_name,
-                                           flag_values)
+    tpu_group_configs = super(_TpuGroupsDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     result = {}
     for tpu_group_name, tpu_group_config in six.iteritems(tpu_group_configs):
       result[tpu_group_name] = _TpuGroupSpec(
-          self._GetOptionFullName(component_full_name), tpu_group_name,
-          flag_values, **tpu_group_config)
+          self._GetOptionFullName(component_full_name),
+          tpu_group_name,
+          flag_values,
+          **tpu_group_config,
+      )
     return result
 
 
@@ -1159,7 +1216,8 @@ class _CloudRedisSpec(spec.BaseSpec):
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_CloudRedisSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+        component_full_name, flag_values=flag_values, **kwargs
+    )
     if not self.redis_name:
       self.redis_name = 'pkb-cloudredis-{0}'.format(flag_values.run_uri)
 
@@ -1174,17 +1232,21 @@ class _CloudRedisSpec(spec.BaseSpec):
     """
     result = super(_CloudRedisSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': provider_info.VALID_CLOUDS
-        }),
-        'redis_name': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': False
-        }),
-        'redis_version': (option_decoders.EnumDecoder, {
-            'default': managed_memory_store.REDIS_3_2,
-            'valid_values': managed_memory_store.REDIS_VERSIONS
-        }),
+        'cloud': (
+            option_decoders.EnumDecoder,
+            {'valid_values': provider_info.VALID_CLOUDS},
+        ),
+        'redis_name': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': False},
+        ),
+        'redis_version': (
+            option_decoders.EnumDecoder,
+            {
+                'default': managed_memory_store.REDIS_3_2,
+                'valid_values': managed_memory_store.REDIS_VERSIONS,
+            },
+        ),
     })
     return result
 
@@ -1225,27 +1287,30 @@ class _CloudRedisDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    cloud_redis_config = super(_CloudRedisDecoder,
-                               self).Decode(value, component_full_name,
-                                            flag_values)
+    cloud_redis_config = super(_CloudRedisDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     result = _CloudRedisSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **cloud_redis_config)
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **cloud_redis_config,
+    )
     return result
 
 
 class _VPNServiceSpec(spec.BaseSpec):
   """Spec needed to configure a vpn tunnel between two vm_groups.
 
-    Since vpn_gateway may be across cloud providers we only create tunnel when
-    vpn_gateway's are up and known
+  Since vpn_gateway may be across cloud providers we only create tunnel when
+  vpn_gateway's are up and known
   """
 
   name: str
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(_VPNServiceSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+        component_full_name, flag_values=flag_values, **kwargs
+    )
     if not self.name:
       self.name = 'pkb-vpn-svc-{0}'.format(flag_values.run_uri)
 
@@ -1260,30 +1325,30 @@ class _VPNServiceSpec(spec.BaseSpec):
     """
     result = super(_VPNServiceSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'shared_key': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'name': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'tunnel_count': (option_decoders.IntDecoder, {
-            'default': 1,
-            'none_ok': True
-        }),
-        'gateway_count': (option_decoders.IntDecoder, {
-            'default': 1,
-            'none_ok': True
-        }),
-        'routing_type': (option_decoders.StringDecoder, {
-            'default': 'static',
-            'none_ok': True
-        }),
-        'ike_version': (option_decoders.IntDecoder, {
-            'default': 1,
-            'none_ok': True
-        }),
+        'shared_key': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'name': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'tunnel_count': (
+            option_decoders.IntDecoder,
+            {'default': 1, 'none_ok': True},
+        ),
+        'gateway_count': (
+            option_decoders.IntDecoder,
+            {'default': 1, 'none_ok': True},
+        ),
+        'routing_type': (
+            option_decoders.StringDecoder,
+            {'default': 'static', 'none_ok': True},
+        ),
+        'ike_version': (
+            option_decoders.IntDecoder,
+            {'default': 1, 'none_ok': True},
+        ),
     })
     return result
 
@@ -1334,23 +1399,26 @@ class _VPNServiceDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vpn_service_config = super(_VPNServiceDecoder,
-                               self).Decode(value, component_full_name,
-                                            flag_values)
+    vpn_service_config = super(_VPNServiceDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     result = _VPNServiceSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **vpn_service_config)
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **vpn_service_config,
+    )
     return result
 
 
 class AppGroupSpec(spec.BaseSpec):
   """Configurable options of a AppService group.
 
-    Attributes:
-    SPEC_TYPE: The class / spec name.
-    app_runtime: The runtime environment (e.g. java).
-    app_type: The type / workload of the app (e.g. echo).
-    appservice_count: The number of app services in the group.
+  Attributes:
+
+  SPEC_TYPE: The class / spec name.
+  app_runtime: The runtime environment (e.g. java).
+  app_type: The type / workload of the app (e.g. echo).
+  appservice_count: The number of app services in the group.
   """
 
   SPEC_TYPE = 'AppGroupSpec'
@@ -1369,18 +1437,16 @@ class AppGroupSpec(spec.BaseSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
-        'app_runtime': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'app_type': (option_decoders.StringDecoder, {
-            'default': None,
-            'none_ok': True
-        }),
-        'appservice_count': (option_decoders.IntDecoder, {
-            'default': 1
-        }),
-        'appservice_spec': (_AppServiceDecoder, {})
+        'app_runtime': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'app_type': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'appservice_count': (option_decoders.IntDecoder, {'default': 1}),
+        'appservice_spec': (_AppServiceDecoder, {}),
     })
     return result
 
@@ -1417,16 +1483,18 @@ class _AppGroupsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    app_group_configs = super(_AppGroupsDecoder,
-                              self).Decode(value, component_full_name,
-                                           flag_values)
+    app_group_configs = super(_AppGroupsDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     result = {}
     for app_group_name, app_group_config in six.iteritems(app_group_configs):
       result[app_group_name] = AppGroupSpec(
           '{0}.{1}'.format(
-              self._GetOptionFullName(component_full_name), app_group_name),
+              self._GetOptionFullName(component_full_name), app_group_name
+          ),
           flag_values=flag_values,
-          **app_group_config)
+          **app_group_config,
+      )
     return result
 
 
@@ -1452,19 +1520,21 @@ class _AppServiceDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    config = super(_AppServiceDecoder, self).Decode(value, component_full_name,
-                                                    flag_values)
+    config = super(_AppServiceDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     spec_cls = app_service.GetAppServiceSpecClass(
-        flag_values.appservice or config.get('appservice'))
+        flag_values.appservice or config.get('appservice')
+    )
     return spec_cls(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
-        **config)
+        **config,
+    )
 
 
 class _MessagingServiceSpec(spec.BaseSpec):
-  """Specs needed to configure messaging service.
-  """
+  """Specs needed to configure messaging service."""
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -1480,11 +1550,12 @@ class _MessagingServiceSpec(spec.BaseSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
-        'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': provider_info.VALID_CLOUDS}),
+        'cloud': (
+            option_decoders.EnumDecoder,
+            {'valid_values': provider_info.VALID_CLOUDS},
+        ),
         # TODO(odiego): Add support for push delivery mechanism
-        'delivery': (option_decoders.EnumDecoder, {
-            'valid_values': ('pull',)}),
+        'delivery': (option_decoders.EnumDecoder, {'valid_values': ('pull',)}),
     })
     return result
 
@@ -1493,10 +1564,10 @@ class _MessagingServiceSpec(spec.BaseSpec):
     """Modifies config options based on runtime flag values.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
@@ -1526,17 +1597,19 @@ class _MessagingServiceDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    messaging_service_config = super().Decode(value, component_full_name,
-                                              flag_values)
+    messaging_service_config = super().Decode(
+        value, component_full_name, flag_values
+    )
     result = _MessagingServiceSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **messaging_service_config)
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **messaging_service_config,
+    )
     return result
 
 
 class _DataDiscoveryServiceSpec(spec.BaseSpec):
-  """Specs needed to configure data discovery service.
-  """
+  """Specs needed to configure data discovery service."""
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -1549,18 +1622,19 @@ class _DataDiscoveryServiceSpec(spec.BaseSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
-        'cloud': (option_decoders.EnumDecoder, {
-            'valid_values': provider_info.VALID_CLOUDS
-        }),
+        'cloud': (
+            option_decoders.EnumDecoder,
+            {'valid_values': provider_info.VALID_CLOUDS},
+        ),
         'service_type': (
             option_decoders.EnumDecoder,
             {
-                'default':
-                    data_discovery_service.GLUE,
+                'default': data_discovery_service.GLUE,
                 'valid_values': [
                     data_discovery_service.GLUE,
-                ]
-            }),
+                ],
+            },
+        ),
     })
     return result
 
@@ -1569,10 +1643,10 @@ class _DataDiscoveryServiceSpec(spec.BaseSpec):
     """Modifies config options based on runtime flag values.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
@@ -1603,11 +1677,14 @@ class _DataDiscoveryServiceDecoder(option_decoders.TypeVerifier):
     """
     if value is None:
       value = {}
-    data_discovery_service_config = super().Decode(value, component_full_name,
-                                                   flag_values)
+    data_discovery_service_config = super().Decode(
+        value, component_full_name, flag_values
+    )
     result = _DataDiscoveryServiceSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **data_discovery_service_config)
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **data_discovery_service_config,
+    )
     return result
 
 
@@ -1625,10 +1702,11 @@ class _KeyDecoder(option_decoders.TypeVerifier):
       key_spec_class = key.GetKeySpecClass(key_config['cloud'])
     else:
       raise errors.Config.InvalidValue(
-          'Required attribute "cloud" missing from "key" config.')
+          'Required attribute "cloud" missing from "key" config.'
+      )
     return key_spec_class(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **key_config)
+        self._GetOptionFullName(component_full_name), flag_values, **key_config
+    )
 
 
 class BenchmarkConfigSpec(spec.BaseSpec):
@@ -1662,15 +1740,23 @@ class BenchmarkConfigSpec(spec.BaseSpec):
       mismatched_os_types = []
       for group_name, group_spec in sorted(six.iteritems(self.vm_groups)):
         if group_spec.os_type not in expected_os_types:
-          mismatched_os_types.append('{0}.vm_groups[{1}].os_type: {2}'.format(
-              component_full_name, repr(group_name), repr(group_spec.os_type)))
+          mismatched_os_types.append(
+              '{0}.vm_groups[{1}].os_type: {2}'.format(
+                  component_full_name,
+                  repr(group_name),
+                  repr(group_spec.os_type),
+              )
+          )
       if mismatched_os_types:
         raise errors.Config.InvalidValue(
             'VM groups in {0} may only have the following OS types: {1}. The '
             'following VM group options are invalid:{2}{3}'.format(
                 component_full_name,
                 ', '.join(repr(os_type) for os_type in expected_os_types),
-                os.linesep, os.linesep.join(mismatched_os_types)))
+                os.linesep,
+                os.linesep.join(mismatched_os_types),
+            )
+        )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -1686,84 +1772,65 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     """
     result = super(BenchmarkConfigSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'description': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'name': (option_decoders.StringDecoder, {
-            'default': None
-        }),
-        'flags': (option_decoders.TypeVerifier, {
-            'default': None,
-            'none_ok': True,
-            'valid_types': (dict,)
-        }),
-        'vm_groups': (vm_group_decoders.VmGroupsDecoder, {
-            'default': {}
-        }),
-        'placement_group_specs': (_PlacementGroupSpecsDecoder, {
-            'default': {}
-        }),
-        'spark_service': (_SparkServiceDecoder, {
-            'default': None
-        }),
-        'container_cluster': (_ContainerClusterSpecDecoder, {
-            'default': None
-        }),
-        'container_registry': (_ContainerRegistryDecoder, {
-            'default': None
-        }),
-        'container_specs': (_ContainerSpecsDecoder, {
-            'default': None
-        }),
-        'dpb_service': (_DpbServiceDecoder, {
-            'default': None
-        }),
-        'relational_db': (_RelationalDbDecoder, {
-            'default': None
-        }),
-        'tpu_groups': (_TpuGroupsDecoder, {
-            'default': {}
-        }),
-        'edw_compute_resource': (_EdwComputeResourceDecoder, {
-            'default': None
-        }),
-        'edw_service': (_EdwServiceDecoder, {
-            'default': None
-        }),
-        'cloud_redis': (_CloudRedisDecoder, {
-            'default': None
-        }),
-        'vpn_service': (_VPNServiceDecoder, {
-            'default': None
-        }),
-        'app_groups': (_AppGroupsDecoder, {
-            'default': {}
-        }),
-        'vpc_peering': (option_decoders.BooleanDecoder, {
-            'default': False,
-            'none_ok': True,
-        }),
-        'non_relational_db': (_NonRelationalDbDecoder, {
-            'default': None,
-            'none_ok': True,
-        }),
-        'messaging_service': (_MessagingServiceDecoder, {
-            'default': None,
-        }),
-        'data_discovery_service': (_DataDiscoveryServiceDecoder, {
-            'default': None,
-            'none_ok': True,
-        }),
-        'key': (_KeyDecoder, {
-            'default': None,
-            'none_ok': True,
-        }),
+        'description': (option_decoders.StringDecoder, {'default': None}),
+        'name': (option_decoders.StringDecoder, {'default': None}),
+        'flags': (
+            option_decoders.TypeVerifier,
+            {'default': None, 'none_ok': True, 'valid_types': (dict,)},
+        ),
+        'vm_groups': (vm_group_decoders.VmGroupsDecoder, {'default': {}}),
+        'placement_group_specs': (_PlacementGroupSpecsDecoder, {'default': {}}),
+        'spark_service': (_SparkServiceDecoder, {'default': None}),
+        'container_cluster': (_ContainerClusterSpecDecoder, {'default': None}),
+        'container_registry': (_ContainerRegistryDecoder, {'default': None}),
+        'container_specs': (_ContainerSpecsDecoder, {'default': None}),
+        'dpb_service': (_DpbServiceDecoder, {'default': None}),
+        'relational_db': (_RelationalDbDecoder, {'default': None}),
+        'tpu_groups': (_TpuGroupsDecoder, {'default': {}}),
+        'edw_compute_resource': (_EdwComputeResourceDecoder, {'default': None}),
+        'edw_service': (_EdwServiceDecoder, {'default': None}),
+        'cloud_redis': (_CloudRedisDecoder, {'default': None}),
+        'vpn_service': (_VPNServiceDecoder, {'default': None}),
+        'app_groups': (_AppGroupsDecoder, {'default': {}}),
+        'vpc_peering': (
+            option_decoders.BooleanDecoder,
+            {
+                'default': False,
+                'none_ok': True,
+            },
+        ),
+        'non_relational_db': (
+            _NonRelationalDbDecoder,
+            {
+                'default': None,
+                'none_ok': True,
+            },
+        ),
+        'messaging_service': (
+            _MessagingServiceDecoder,
+            {
+                'default': None,
+            },
+        ),
+        'data_discovery_service': (
+            _DataDiscoveryServiceDecoder,
+            {
+                'default': None,
+                'none_ok': True,
+            },
+        ),
+        'key': (
+            _KeyDecoder,
+            {
+                'default': None,
+                'none_ok': True,
+            },
+        ),
         # A place to hold temporary data
-        'temporary': (option_decoders.TypeVerifier, {
-            'default': None,
-            'none_ok': True,
-            'valid_types': (dict,)
-        }),
+        'temporary': (
+            option_decoders.TypeVerifier,
+            {'default': None, 'none_ok': True, 'valid_types': (dict,)},
+        ),
     })
     return result
 
@@ -1785,9 +1852,9 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     decoders = decoders.copy()
     self.flags = config.get('flags')
     with self.RedirectFlags(flag_values):
-      super(BenchmarkConfigSpec,
-            self)._DecodeAndInit(component_full_name, config, decoders,
-                                 flag_values)
+      super(BenchmarkConfigSpec, self)._DecodeAndInit(
+          component_full_name, config, decoders, flag_values
+      )
 
   @contextlib.contextmanager
   def RedirectFlags(self, flag_values):

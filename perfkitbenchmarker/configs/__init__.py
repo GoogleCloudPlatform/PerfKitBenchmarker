@@ -81,19 +81,24 @@ CONFIG_CONSTANTS = 'default_config_constants.yaml'
 FLAGS_KEY = 'flags'
 IMPORT_REGEX = re.compile('^#import (.*)')
 
-flags.DEFINE_string('benchmark_config_file', None,
-                    'The file path to the user config file which will '
-                    'override benchmark defaults. This should either be '
-                    'a path relative to the current working directory, '
-                    'an absolute path, or just the name of a file in the '
-                    'configs/ directory.')
+flags.DEFINE_string(
+    'benchmark_config_file',
+    None,
+    'The file path to the user config file which will '
+    'override benchmark defaults. This should either be '
+    'a path relative to the current working directory, '
+    'an absolute path, or just the name of a file in the '
+    'configs/ directory.',
+)
 flags.DEFINE_multi_string(
-    'config_override', None,
+    'config_override',
+    None,
     'This flag can be used to override any config value. It is applied after '
     'the user config (specified via --benchmark_config_file_path), so it has '
     'a higher priority than that config. The value of the flag should be '
     'fully.qualified.key=value (e.g. --config_override=cluster_boot.vm_groups.'
-    'default.vm_count=4).')
+    'default.vm_count=4).',
+)
 
 
 class _ConcatenatedFiles(object):
@@ -124,8 +129,8 @@ def _GetImportFiles(config_file, imported_set=None):
 
   Args:
     config_file: The name of a config file to find imports for.
-    imported_set: A set of files that _GetImportFiles has already
-        been called on that should be ignored.
+    imported_set: A set of files that _GetImportFiles has already been called on
+      that should be ignored.
 
   Returns:
     A list of file names that are imported by config_file
@@ -174,9 +179,11 @@ def _GetConfigFromOverrides(overrides):
 
   for override in overrides:
     if override.count('=') != 1:
-      raise ValueError('--config_override flag value has incorrect number of '
-                       '"=" characters. The value must take the form '
-                       'fully.qualified.key=value.')
+      raise ValueError(
+          '--config_override flag value has incorrect number of '
+          '"=" characters. The value must take the form '
+          'fully.qualified.key=value.'
+      )
     full_key, value = override.split('=')
     keys = full_key.split('.')
     new_config = {keys.pop(): yaml.safe_load(value)}
@@ -217,11 +224,13 @@ def GetUserConfig():
   except yaml.parser.ParserError as e:
     raise errors.Config.ParseError(
         'Encountered a problem loading config. Please ensure that the config '
-        'is valid YAML. Error received:\n%s' % e)
+        'is valid YAML. Error received:\n%s' % e
+    )
   except yaml.composer.ComposerError as e:
     raise errors.Config.ParseError(
         'Encountered a problem loading config. Please ensure that all '
-        'references are defined. Error received:\n%s' % e)
+        'references are defined. Error received:\n%s' % e
+    )
 
   return config
 
@@ -237,13 +246,14 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
   Args:
     default_config: The dict which will have its values overridden.
     override_config: The dict wich contains the overrides.
-    warn_new_key: Determines whether we warn the user if the override config
-      has a key that the default config did not have.
+    warn_new_key: Determines whether we warn the user if the override config has
+      a key that the default config did not have.
 
   Returns:
     A dict containing the values from the default_config merged with those from
     the override_config.
   """
+
   def _Merge(d1, d2):
     """Merge two nested dicts."""
     merged_dict = copy.deepcopy(d1)
@@ -251,9 +261,12 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
       if k not in d1:
         merged_dict[k] = copy.deepcopy(v)
         if warn_new_key:
-          logging.warning('The key "%s" was not in the default config, '
-                          'but was in user overrides. This may indicate '
-                          'a typo.', k)
+          logging.warning(
+              'The key "%s" was not in the default config, '
+              'but was in user overrides. This may indicate '
+              'a typo.',
+              k,
+          )
       elif isinstance(d1[k], dict) and isinstance(v, dict):
         merged_dict[k] = _Merge(d1[k], v)
       else:
@@ -289,11 +302,13 @@ def LoadMinimalConfig(benchmark_config, benchmark_name):
   except yaml.parser.ParserError as e:
     raise errors.Config.ParseError(
         'Encountered a problem loading the default benchmark config. Please '
-        'ensure that the config is valid YAML. Error received:\n%s' % e)
+        'ensure that the config is valid YAML. Error received:\n%s' % e
+    )
   except yaml.composer.ComposerError as e:
     raise errors.Config.ParseError(
         'Encountered a problem loading the default benchmark config. Please '
-        'ensure that all references are defined. Error received:\n%s' % e)
+        'ensure that all references are defined. Error received:\n%s' % e
+    )
 
   config = config[benchmark_name]
   # yaml safe_parse parses anchor by reference and return the same

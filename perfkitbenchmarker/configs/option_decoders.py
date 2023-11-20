@@ -227,9 +227,7 @@ class IntDecoder(TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    value = super().Decode(
-        value, component_full_name, flag_values
-    )
+    value = super().Decode(value, component_full_name, flag_values)
     if value is not None:
       if self.max is not None and value > self.max:
         raise errors.Config.InvalidValue(
@@ -275,9 +273,7 @@ class FloatDecoder(TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    value = super().Decode(
-        value, component_full_name, flag_values
-    )
+    value = super().Decode(value, component_full_name, flag_values)
     if value is not None:
       if self.max is not None and value > self.max:
         raise errors.Config.InvalidValue(
@@ -332,9 +328,7 @@ class ListDecoder(TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    input_list = super().Decode(
-        value, component_full_name, flag_values
-    )
+    input_list = super().Decode(value, component_full_name, flag_values)
     if input_list is None:
       return None
     list_full_name = self._GetOptionFullName(component_full_name)
@@ -345,4 +339,3 @@ class ListDecoder(TypeVerifier):
           self._item_decoder.Decode(input_item, item_full_name, flag_values)
       )
     return result
-

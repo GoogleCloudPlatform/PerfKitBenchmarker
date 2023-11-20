@@ -26,10 +26,9 @@ class FreezeRestoreSpec(spec.BaseSpec):
   """Configurable freeze/restore options for resources.
 
   Attributes:
-    enable_freeze_restore: Designates the current resource to use
-      freeze/restore functionality if --freeze/--restore is specified on the
-      command line. This is a no-op if the resource does not have
-      _Freeze/_Restore implemented.
+    enable_freeze_restore: Designates the current resource to use freeze/restore
+      functionality if --freeze/--restore is specified on the command line. This
+      is a no-op if the resource does not have _Freeze/_Restore implemented.
     delete_on_freeze_error: If true, the resource deletes itself if there are
       issues during a freeze.
     create_on_restore_error: If true, the resource creates itself if there are
@@ -40,10 +39,12 @@ class FreezeRestoreSpec(spec.BaseSpec):
   delete_on_freeze_error: bool
   create_on_restore_error: bool
 
-  def __init__(self,
-               component_full_name: str,
-               flag_values: Optional[flags.FlagValues] = None,
-               **kwargs):
+  def __init__(
+      self,
+      component_full_name: str,
+      flag_values: Optional[flags.FlagValues] = None,
+      **kwargs
+  ):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
 
   @classmethod
@@ -57,17 +58,17 @@ class FreezeRestoreSpec(spec.BaseSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
-        'enable_freeze_restore': (option_decoders.BooleanDecoder, {
-            'default': False,
-            'none_ok': True
-        }),
-        'delete_on_freeze_error': (option_decoders.BooleanDecoder, {
-            'default': False,
-            'none_ok': True
-        }),
-        'create_on_restore_error': (option_decoders.BooleanDecoder, {
-            'default': False,
-            'none_ok': True
-        }),
+        'enable_freeze_restore': (
+            option_decoders.BooleanDecoder,
+            {'default': False, 'none_ok': True},
+        ),
+        'delete_on_freeze_error': (
+            option_decoders.BooleanDecoder,
+            {'default': False, 'none_ok': True},
+        ),
+        'create_on_restore_error': (
+            option_decoders.BooleanDecoder,
+            {'default': False, 'none_ok': True},
+        ),
     })
     return result
