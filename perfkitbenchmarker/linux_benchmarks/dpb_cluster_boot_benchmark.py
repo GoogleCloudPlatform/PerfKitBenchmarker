@@ -17,9 +17,8 @@ import copy
 import logging
 from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.dpb_service import BaseDpbService
 
 BENCHMARK_NAME = 'dpb_cluster_boot_benchmark'
 
@@ -45,13 +44,13 @@ dpb_cluster_boot_benchmark:
 """
 
 flags.DEFINE_enum(
-    'dpb_cluster_boot_fs', BaseDpbService.GCS_FS,
-    [BaseDpbService.GCS_FS, BaseDpbService.S3_FS, BaseDpbService.HDFS_FS],
+    'dpb_cluster_boot_fs', dpb_constants.GCS_FS,
+    [dpb_constants.GCS_FS, dpb_constants.S3_FS, dpb_constants.HDFS_FS],
     'File System to use in the dpb cluster boot benchmark')
 
 FLAGS = flags.FLAGS
 
-SUPPORTED_DPB_BACKENDS = [dpb_service.DATAPROC, dpb_service.EMR]
+SUPPORTED_DPB_BACKENDS = [dpb_constants.DATAPROC, dpb_constants.EMR]
 
 
 def GetConfig(user_config):

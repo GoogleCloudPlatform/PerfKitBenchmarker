@@ -38,6 +38,7 @@ from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import object_storage_service
@@ -146,7 +147,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   job_result = cluster.SubmitJob(
       pyspark_file='/'.join([cluster.base_dir, SPARK_SQL_RUNNER_SCRIPT]),
       job_arguments=args,
-      job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE)
+      job_type=dpb_constants.PYSPARK_JOB_TYPE,
+  )
 
   # Spark can only write data to directories not files. So do a recursive copy
   # of that directory and then search it for the single JSON file with the

@@ -22,7 +22,7 @@ from unittest import mock
 from absl import flags
 from absl.testing import parameterized
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
@@ -197,7 +197,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
       }
       emr_serverless.SubmitJob(
           pyspark_file='s3://test/hello.py',
-          job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE,
+          job_type=dpb_constants.PYSPARK_JOB_TYPE,
       )
 
     self.assertEqual(emr_serverless.CalculateLastJobCost(), 4.711576935499999)

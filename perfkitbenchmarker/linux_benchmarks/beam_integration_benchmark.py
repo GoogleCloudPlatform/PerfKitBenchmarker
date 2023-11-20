@@ -26,11 +26,10 @@ from absl import flags
 from perfkitbenchmarker import beam_benchmark_helper
 from perfkitbenchmarker import beam_pipeline_options
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.dpb_service import BaseDpbService
 
 BENCHMARK_NAME = 'beam_integration_benchmark'
 
@@ -94,7 +93,7 @@ def CheckPrerequisites(benchmark_config_spec):
     raise errors.Config.InvalidValue(
         'No sdk provided. To run Beam integration benchmark, the test must'
         'specify which sdk is used in the pipeline. For example, java/python.')
-  if benchmark_config_spec.dpb_service.service_type != dpb_service.DATAFLOW:
+  if benchmark_config_spec.dpb_service.service_type != dpb_constants.DATAFLOW:
     raise NotImplementedError('Currently only works against Dataflow.')
   if (FLAGS.beam_it_options and
       (not FLAGS.beam_it_options.endswith(']') or
@@ -147,7 +146,7 @@ def Run(benchmark_spec):
       static_pipeline_options,
       dynamic_pipeline_options)
 
-  job_type = BaseDpbService.BEAM_JOB_TYPE
+  job_type = dpb_constants.BEAM_JOB_TYPE
 
   results = []
   metadata = copy.copy(dpb_service_instance.GetResourceMetadata())

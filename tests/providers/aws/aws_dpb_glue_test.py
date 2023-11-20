@@ -21,7 +21,7 @@ from unittest import mock
 
 from absl import flags
 
-from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_dpb_glue
 from perfkitbenchmarker.providers.aws import aws_dpb_glue_prices
@@ -108,7 +108,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
       aws_dpb_glue_prices.GLUE_PRICES = {'us-east-1': 0.44}
       dpb_glue.SubmitJob(
           pyspark_file='s3://test/hello.py',
-          job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE,
+          job_type=dpb_constants.PYSPARK_JOB_TYPE,
           job_arguments=[])
 
     self.assertEqual(dpb_glue.CalculateLastJobCost(), 10.45048888888889)

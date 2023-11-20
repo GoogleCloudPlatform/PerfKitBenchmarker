@@ -23,6 +23,7 @@ from typing import Any, Dict, Optional
 
 from absl import flags
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -387,7 +388,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       arg_spec = '[' + ','.join(arg_list) + ']'
       step_type_spec = 'Type=Spark'
       step_list = [step_type_spec, 'Args=' + arg_spec]
-    elif job_type == self.PYSPARK_JOB_TYPE:
+    elif job_type == dpb_constants.PYSPARK_JOB_TYPE:
       arg_list = []
       if job_files:
         arg_list += ['--files', ','.join(job_files)]
@@ -431,7 +432,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     return self.SubmitJob(
         'command-runner.jar',
         job_arguments=job_arguments,
-        job_type=dpb_service.BaseDpbService.HADOOP_JOB_TYPE)
+        job_type=dpb_constants.HADOOP_JOB_TYPE)
 
   def GetHdfsType(self) -> Optional[str]:
     """Gets human friendly disk type for metric metadata."""
@@ -504,7 +505,7 @@ class AwsDpbEmrServerless(
     assert job_type
 
     # Set vars according to job type.
-    if job_type == self.PYSPARK_JOB_TYPE:
+    if job_type == dpb_constants.PYSPARK_JOB_TYPE:
       application_type = 'SPARK'
       spark_props = self.GetJobProperties()
       if job_py_files:

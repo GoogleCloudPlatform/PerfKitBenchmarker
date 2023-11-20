@@ -26,9 +26,9 @@ import os
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.dpb_service import BaseDpbService
 
 BENCHMARK_NAME = 'dpb_spark_io_benchmark'
 BENCHMARK_CONFIG = """
@@ -126,7 +126,7 @@ def Prepare(benchmark_spec):
   data_folder_uri = uri_map['data']
   stats = dpb_service_instance.SubmitJob(
       pyspark_file=dml_script_uri,
-      job_type=BaseDpbService.PYSPARK_JOB_TYPE,
+      job_type=dpb_constants.PYSPARK_JOB_TYPE,
       job_arguments=[data_folder_uri])
   logging.info(stats)
   if not stats['success']:
@@ -158,7 +158,7 @@ def Run(benchmark_spec):
 
   result = dpb_service_instance.SubmitJob(
       query_file=query_script_uri,
-      job_type=BaseDpbService.SPARKSQL_JOB_TYPE)
+      job_type=dpb_constants.SPARKSQL_JOB_TYPE)
   logging.info(result)
 
   results.append(

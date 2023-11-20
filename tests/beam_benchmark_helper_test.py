@@ -20,7 +20,7 @@ from absl import flags
 import mock
 
 from perfkitbenchmarker import beam_benchmark_helper
-from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -136,7 +136,7 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
         mock.patch.object(vm_util, 'GenTempDir'):
 
       mock_spec = mock.MagicMock()
-      mock_spec.dpb_service.SERVICE_TYPE = dpb_service.DATAFLOW
+      mock_spec.dpb_service.SERVICE_TYPE = dpb_constants.DATAFLOW
 
       beam_benchmark_helper.InitializeBeamRepo(mock_spec)
       mock_prebuild.assert_called_once()
@@ -150,7 +150,7 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
         mock.patch.object(vm_util, 'IssueCommand') as mock_run:
 
       mock_spec = mock.MagicMock()
-      mock_spec.dpb_service.SERVICE_TYPE = dpb_service.DATAFLOW
+      mock_spec.dpb_service.SERVICE_TYPE = dpb_constants.DATAFLOW
 
       beam_benchmark_helper.InitializeBeamRepo(mock_spec)
 
@@ -200,7 +200,7 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
 
       mock_gradle.return_value = 'gradlew'
       mock_spec = mock.MagicMock()
-      mock_spec.service_type = dpb_service.DATAFLOW
+      mock_spec.service_type = dpb_constants.DATAFLOW
 
       actual_cmd, _ = beam_benchmark_helper.BuildBeamCommand(mock_spec,
                                                              'apache_beam.py',
@@ -231,7 +231,7 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
 
       mock_gradle.return_value = 'gradlew'
       mock_spec = mock.MagicMock()
-      mock_spec.service_type = dpb_service.DATAFLOW
+      mock_spec.service_type = dpb_constants.DATAFLOW
 
       actual_cmd, _ = beam_benchmark_helper.BuildBeamCommand(
           mock_spec, 'org.apache.beam.sdk.java', ['--args'])

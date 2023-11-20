@@ -25,10 +25,9 @@ import copy
 
 from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.dpb_service import BaseDpbService
 
 BENCHMARK_NAME = 'dpb_testdfsio_benchmark'
 
@@ -53,9 +52,9 @@ dpb_testdfsio_benchmark:
     worker_count: 2
 """
 
-flags.DEFINE_enum('dfsio_fs', BaseDpbService.GCS_FS,
-                  [BaseDpbService.GCS_FS, BaseDpbService.S3_FS,
-                   BaseDpbService.HDFS_FS],
+flags.DEFINE_enum('dfsio_fs', dpb_constants.GCS_FS,
+                  [dpb_constants.GCS_FS, dpb_constants.S3_FS,
+                   dpb_constants.HDFS_FS],
                   'File System to use in the dfsio operations')
 
 flags.DEFINE_list(
@@ -69,7 +68,7 @@ flags.DEFINE_list(
 
 FLAGS = flags.FLAGS
 
-SUPPORTED_DPB_BACKENDS = [dpb_service.DATAPROC, dpb_service.EMR]
+SUPPORTED_DPB_BACKENDS = [dpb_constants.DATAPROC, dpb_constants.EMR]
 
 # TestDSIO commands
 WRITE = 'write'
@@ -111,7 +110,7 @@ def Run(benchmark_spec):
   """
   service = benchmark_spec.dpb_service
 
-  if FLAGS.dfsio_fs == BaseDpbService.HDFS_FS:
+  if FLAGS.dfsio_fs == dpb_constants.HDFS_FS:
     base_dir = 'hdfs:/dfsio'
   elif service.base_dir.startswith(FLAGS.dfsio_fs):
     base_dir = service.base_dir + '/dfsio'
@@ -157,14 +156,14 @@ def RunTestDfsio(service, command, data_dir, num_files, file_size):
       str(file_size)
   ]
   properties = {'test.build.data': data_dir}
-  if not (data_dir.startswith(BaseDpbService.HDFS_FS + ':') or
+  if not (data_dir.startswith(dpb_constants.HDFS_FS + ':') or
           data_dir.startswith('/')):
     properties['fs.default.name'] = data_dir
   return service.SubmitJob(
       classname='org.apache.hadoop.fs.TestDFSIO',
       properties=properties,
       job_arguments=args,
-      job_type=dpb_service.BaseDpbService.HADOOP_JOB_TYPE)
+      job_type=dpb_constants.HADOOP_JOB_TYPE)
 
 
 def Cleanup(benchmark_spec):

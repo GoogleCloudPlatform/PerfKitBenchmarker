@@ -22,7 +22,7 @@ import fnmatch
 import os
 
 from absl import flags
-from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 
@@ -68,7 +68,7 @@ flags.DEFINE_string('beam_filesystem', None,
 
 FLAGS = flags.FLAGS
 
-SUPPORTED_RUNNERS = [dpb_service.DATAFLOW]
+SUPPORTED_RUNNERS = [dpb_constants.DATAFLOW]
 
 BEAM_REPO_LOCATION = 'https://github.com/apache/beam.git'
 
@@ -282,7 +282,7 @@ def _BuildPythonCommand(benchmark_spec, classname, job_arguments):
   AddPythonAttributes(cmd, FLAGS.beam_python_attr)
 
   beam_args = job_arguments if job_arguments else []
-  if benchmark_spec.service_type == dpb_service.DATAFLOW:
+  if benchmark_spec.service_type == dpb_constants.DATAFLOW:
     beam_args.append('"--runner={}"'.format(FLAGS.beam_runner))
 
     sdk_location = FLAGS.beam_python_sdk_location

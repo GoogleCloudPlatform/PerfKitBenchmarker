@@ -53,6 +53,7 @@ from typing import List
 
 from absl import flags
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import dpb_sparksql_benchmark_helper
 from perfkitbenchmarker import errors
@@ -205,7 +206,7 @@ def Prepare(benchmark_spec):
               cluster.base_dir,
               dpb_sparksql_benchmark_helper.SPARK_SQL_DISTCP_SCRIPT,
           ]),
-          job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE,
+          job_type=dpb_constants.PYSPARK_JOB_TYPE,
           job_arguments=job_arguments,
       )
       logging.info(result)
@@ -226,7 +227,7 @@ def Prepare(benchmark_spec):
               cluster.base_dir,
               dpb_sparksql_benchmark_helper.SPARK_TABLE_SCRIPT,
           ]),
-          job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE,
+          job_type=dpb_constants.PYSPARK_JOB_TYPE,
           job_arguments=[
               benchmark_spec.data_dir,
               ','.join(benchmark_spec.table_subdirs),
@@ -334,7 +335,7 @@ def _RunQueries(benchmark_spec) -> tuple[str, dpb_service.JobResult]:
       ]),
       job_arguments=args,
       job_jars=jars,
-      job_type=dpb_service.BaseDpbService.PYSPARK_JOB_TYPE,
+      job_type=dpb_constants.PYSPARK_JOB_TYPE,
   )
   return report_dir, job_result
 

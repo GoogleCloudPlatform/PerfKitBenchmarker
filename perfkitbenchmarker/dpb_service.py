@@ -34,6 +34,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import data
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
@@ -46,15 +47,6 @@ from perfkitbenchmarker.providers.aws import util as aws_util
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 import yaml
-
-# Job types that are supported on the dpb service backends
-_PYSPARK_JOB_TYPE = 'pyspark'
-_SPARKSQL_JOB_TYPE = 'spark-sql'
-_SPARK_JOB_TYPE = 'spark'
-_HADOOP_JOB_TYPE = 'hadoop'
-_DATAFLOW_JOB_TYPE = 'dataflow'
-_BEAM_JOB_TYPE = 'beam'
-_FLINK_JOB_TYPE = 'flink'
 
 flags.DEFINE_string(
     'static_dpb_service_instance', None,
@@ -100,13 +92,13 @@ flags.DEFINE_enum(
     'dpb_job_type',
     None,
     [
-        _PYSPARK_JOB_TYPE,
-        _SPARKSQL_JOB_TYPE,
-        _SPARK_JOB_TYPE,
-        _HADOOP_JOB_TYPE,
-        _BEAM_JOB_TYPE,
-        _DATAFLOW_JOB_TYPE,
-        _FLINK_JOB_TYPE,
+        dpb_constants.PYSPARK_JOB_TYPE,
+        dpb_constants.SPARKSQL_JOB_TYPE,
+        dpb_constants.SPARK_JOB_TYPE,
+        dpb_constants.HADOOP_JOB_TYPE,
+        dpb_constants.BEAM_JOB_TYPE,
+        dpb_constants.DATAFLOW_JOB_TYPE,
+        dpb_constants.FLINK_JOB_TYPE,
     ],
     'The type of the job to be run on the backends.',
 )
@@ -129,38 +121,6 @@ _DYNAMIC_ALLOCATION = flags.DEFINE_bool(
 
 
 FLAGS = flags.FLAGS
-
-# List of supported data processing backend services
-DATAPROC = 'dataproc'
-DATAPROC_FLINK = 'dataproc_flink'
-DATAPROC_GKE = 'dataproc_gke'
-DATAPROC_SERVERLESS = 'dataproc_serverless'
-DATAFLOW = 'dataflow'
-DATAFLOW_TEMPLATE = 'dataflow_template'
-EMR = 'emr'
-EMR_SERVERLESS = 'emr_serverless'
-GLUE = 'glue'
-UNMANAGED_DPB_SVC_YARN_CLUSTER = 'unmanaged_dpb_svc_yarn_cluster'
-UNMANAGED_SPARK_CLUSTER = 'unmanaged_spark_cluster'
-KUBERNETES_SPARK_CLUSTER = 'kubernetes_spark_cluster'
-KUBERNETES_FLINK_CLUSTER = 'kubernetes_flink_cluster'
-UNMANAGED_SERVICES = [
-    UNMANAGED_DPB_SVC_YARN_CLUSTER,
-    UNMANAGED_SPARK_CLUSTER,
-]
-
-# Default number of workers to be used in the dpb service implementation
-DEFAULT_WORKER_COUNT = 2
-
-# List of supported applications that can be enabled on the dpb service
-FLINK = 'flink'
-HIVE = 'hive'
-
-# Metrics and Status related metadata
-# TODO(pclay): Remove these after migrating all callers to SubmitJob
-SUCCESS = 'success'
-RUNTIME = 'running_time'
-WAITING = 'pending_time'
 
 
 class JobNotCompletedError(Exception):
@@ -194,20 +154,11 @@ class BaseDpbService(resource.BaseResource):
   RESOURCE_TYPE = 'BaseDpbService'
   CLOUD = 'abstract'
   SERVICE_TYPE = 'abstract'
-  HDFS_FS = 'hdfs'
-  GCS_FS = 'gs'
-  S3_FS = 's3'
+  HDFS_FS = dpb_constants.HDFS_FS
+  GCS_FS = dpb_constants.GCS_FS
+  S3_FS = dpb_constants.S3_FS
 
   SUPPORTS_NO_DYNALLOC = False
-
-  # Job types that are supported on the dpb service backends
-  PYSPARK_JOB_TYPE = _PYSPARK_JOB_TYPE
-  SPARKSQL_JOB_TYPE = _SPARKSQL_JOB_TYPE
-  SPARK_JOB_TYPE = _SPARK_JOB_TYPE
-  HADOOP_JOB_TYPE = _HADOOP_JOB_TYPE
-  DATAFLOW_JOB_TYPE = _DATAFLOW_JOB_TYPE
-  BEAM_JOB_TYPE = _BEAM_JOB_TYPE
-  FLINK_JOB_TYPE = _FLINK_JOB_TYPE
 
   def _JobJars(self) -> Dict[str, Dict[str, str]]:
     """Known mappings of jars in the cluster used by GetExecutionJar."""
@@ -354,10 +305,10 @@ class BaseDpbService(resource.BaseResource):
       properties: Optional[Dict[str, str]] = None,
       spark_submit_cmd: str = spark.SPARK_SUBMIT) -> List[str]:
     """Builds the command to run spark-submit on cluster."""
-    # TODO(pclay): support BaseDpbService.SPARKSQL_JOB_TYPE
+    # TODO(pclay): support dpb_constants.SPARKSQL_JOB_TYPE
     if job_type not in [
-        BaseDpbService.PYSPARK_JOB_TYPE,
-        BaseDpbService.SPARK_JOB_TYPE,
+        dpb_constants.PYSPARK_JOB_TYPE,
+        dpb_constants.SPARK_JOB_TYPE,
     ]:
       raise NotImplementedError
     cmd = [spark_submit_cmd]
@@ -373,10 +324,10 @@ class BaseDpbService(resource.BaseResource):
     if job_py_files:
       cmd += ['--py-files', ','.join(job_py_files)]
     # Main jar/script goes last before args.
-    if job_type == BaseDpbService.SPARK_JOB_TYPE:
+    if job_type == dpb_constants.SPARK_JOB_TYPE:
       assert jarfile
       cmd.append(jarfile)
-    elif job_type == BaseDpbService.PYSPARK_JOB_TYPE:
+    elif job_type == dpb_constants.PYSPARK_JOB_TYPE:
       assert pyspark_file
       cmd.append(pyspark_file)
     if job_arguments:
@@ -403,7 +354,7 @@ class BaseDpbService(resource.BaseResource):
     return self.SubmitJob(
         classname='org.apache.hadoop.tools.DistCp',
         job_arguments=[source, destination],
-        job_type=BaseDpbService.HADOOP_JOB_TYPE,
+        job_type=dpb_constants.HADOOP_JOB_TYPE,
         properties=properties)
 
   def _InitializeMetadata(self) -> None:
@@ -747,7 +698,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
   """Object representing an un-managed dpb service yarn cluster."""
 
   CLOUD = 'Unmanaged'
-  SERVICE_TYPE = UNMANAGED_DPB_SVC_YARN_CLUSTER
+  SERVICE_TYPE = dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER
 
   def __init__(self, dpb_service_spec):
     super(UnmanagedDpbServiceYarnCluster, self).__init__(dpb_service_spec)
@@ -831,7 +782,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
   """Object representing an un-managed dpb service spark cluster."""
 
   CLOUD = 'Unmanaged'
-  SERVICE_TYPE = UNMANAGED_SPARK_CLUSTER
+  SERVICE_TYPE = dpb_constants.UNMANAGED_SPARK_CLUSTER
 
   def _JobJars(self) -> Dict[str, Dict[str, str]]:
     """Known mappings of jars in the cluster used by GetExecutionJar."""
@@ -915,7 +866,7 @@ class KubernetesSparkCluster(BaseDpbService):
   """Object representing a Kubernetes dpb service spark cluster."""
 
   CLOUD = container_service.KUBERNETES
-  SERVICE_TYPE = KUBERNETES_SPARK_CLUSTER
+  SERVICE_TYPE = dpb_constants.KUBERNETES_SPARK_CLUSTER
 
   # Constants to sychronize between YAML and Spark configuration
   # TODO(pclay): Consider setting in YAML
@@ -965,8 +916,9 @@ class KubernetesSparkCluster(BaseDpbService):
 
     if self.k8s_cluster.num_nodes < 2:
       raise errors.Config.InvalidValue(
-          f'Cluster type {KUBERNETES_SPARK_CLUSTER} requires at least 2 nodes.'
-          f'Found {self.k8s_cluster.num_nodes}.')
+          f'Cluster type {dpb_constants.KUBERNETES_SPARK_CLUSTER} requires at'
+          f' least 2 nodes.Found {self.k8s_cluster.num_nodes}.'
+      )
 
   def GetDpbVersion(self) -> Optional[str]:
     return 'spark_' + FLAGS.spark_version
@@ -1110,7 +1062,7 @@ class KubernetesFlinkCluster(BaseDpbService):
   """Object representing a Kubernetes dpb service flink cluster."""
 
   CLOUD = container_service.KUBERNETES
-  SERVICE_TYPE = KUBERNETES_FLINK_CLUSTER
+  SERVICE_TYPE = dpb_constants.KUBERNETES_FLINK_CLUSTER
 
   FLINK_JOB_MANAGER_SERVICE = 'flink-jobmanager'
   DEFAULT_FLINK_IMAGE = 'flink'
@@ -1141,8 +1093,9 @@ class KubernetesFlinkCluster(BaseDpbService):
 
     if self.k8s_cluster.num_nodes < 2:
       raise errors.Config.InvalidValue(
-          f'Cluster type {KUBERNETES_FLINK_CLUSTER} requires at least 2 nodes.'
-          f'Found {self.k8s_cluster.num_nodes}.')
+          f'Cluster type {dpb_constants.KUBERNETES_FLINK_CLUSTER} requires at'
+          f' least 2 nodes.Found {self.k8s_cluster.num_nodes}.'
+      )
 
   def GetDpbVersion(self) -> Optional[str]:
     return self.spec.version or self.DEFAULT_FLINK_IMAGE
@@ -1300,8 +1253,9 @@ class KubernetesFlinkCluster(BaseDpbService):
     pass
 
 
-def GetDpbServiceClass(cloud: str,
-                       dpb_service_type: str) -> Optional[Type[BaseDpbService]]:
+def GetDpbServiceClass(
+    cloud: str, dpb_service_type: str
+) -> Optional[Type[BaseDpbService]]:
   """Gets the Data Processing Backend class corresponding to 'service_type'.
 
   Args:
@@ -1314,9 +1268,13 @@ def GetDpbServiceClass(cloud: str,
   Raises:
     Exception: An invalid data processing backend service type was provided
   """
-  if dpb_service_type in UNMANAGED_SERVICES:
+  if dpb_service_type in dpb_constants.UNMANAGED_SERVICES:
     cloud = 'Unmanaged'
-  elif dpb_service_type in [KUBERNETES_SPARK_CLUSTER, KUBERNETES_FLINK_CLUSTER]:
+  elif dpb_service_type in [
+      dpb_constants.KUBERNETES_SPARK_CLUSTER,
+      dpb_constants.KUBERNETES_FLINK_CLUSTER,
+  ]:
     cloud = container_service.KUBERNETES
   return resource.GetResourceClass(
-      BaseDpbService, CLOUD=cloud, SERVICE_TYPE=dpb_service_type)
+      BaseDpbService, CLOUD=cloud, SERVICE_TYPE=dpb_service_type
+  )

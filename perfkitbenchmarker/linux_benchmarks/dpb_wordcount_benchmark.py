@@ -34,6 +34,7 @@ import os
 
 from absl import flags
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
@@ -67,27 +68,51 @@ dpb_wordcount_benchmark:
 
 # TODO(odiego): Deprecate WORD_COUNT_CONFIGURATION (not used in practice).
 WORD_COUNT_CONFIGURATION = dict([
-    (dpb_service.DATAPROC, ('org.apache.spark.examples.JavaWordCount',
-                            dpb_service.BaseDpbService.SPARK_JOB_TYPE)),
-    (dpb_service.DATAPROC_FLINK, ('org.example.WordCount',
-                                  dpb_service.BaseDpbService.FLINK_JOB_TYPE)),
-    (dpb_service.DATAPROC_SERVERLESS,
-     ('org.apache.spark.examples.JavaWordCount',
-      dpb_service.BaseDpbService.SPARK_JOB_TYPE)),
-    (dpb_service.DATAFLOW, ('org.example.WordCount',
-                            dpb_service.BaseDpbService.DATAFLOW_JOB_TYPE)),
-    (dpb_service.EMR, ('org.apache.spark.examples.JavaWordCount',
-                       dpb_service.BaseDpbService.SPARK_JOB_TYPE)),
-    (dpb_service.KUBERNETES_FLINK_CLUSTER,
-     ('org.apache.beam.examples.WordCount',
-      dpb_service.BaseDpbService.FLINK_JOB_TYPE))
+    (
+        dpb_constants.DATAPROC,
+        (
+            'org.apache.spark.examples.JavaWordCount',
+            dpb_constants.SPARK_JOB_TYPE,
+        ),
+    ),
+    (
+        dpb_constants.DATAPROC_FLINK,
+        ('org.example.WordCount', dpb_constants.FLINK_JOB_TYPE),
+    ),
+    (
+        dpb_constants.DATAPROC_SERVERLESS,
+        (
+            'org.apache.spark.examples.JavaWordCount',
+            dpb_constants.SPARK_JOB_TYPE,
+        ),
+    ),
+    (
+        dpb_constants.DATAFLOW,
+        ('org.example.WordCount', dpb_constants.DATAFLOW_JOB_TYPE),
+    ),
+    (
+        dpb_constants.EMR,
+        (
+            'org.apache.spark.examples.JavaWordCount',
+            dpb_constants.SPARK_JOB_TYPE,
+        ),
+    ),
+    (
+        dpb_constants.KUBERNETES_FLINK_CLUSTER,
+        (
+            'org.apache.beam.examples.WordCount',
+            dpb_constants.FLINK_JOB_TYPE,
+        ),
+    ),
 ])
 
 flags.DEFINE_string('dpb_wordcount_input', None, 'Input for word count')
-flags.DEFINE_enum('dpb_wordcount_fs', dpb_service.BaseDpbService.GCS_FS,
-                  [dpb_service.BaseDpbService.GCS_FS,
-                   dpb_service.BaseDpbService.S3_FS],
-                  'File System to use for the job output')
+flags.DEFINE_enum(
+    'dpb_wordcount_fs',
+    dpb_constants.GCS_FS,
+    [dpb_constants.GCS_FS, dpb_constants.S3_FS],
+    'File System to use for the job output',
+)
 flags.DEFINE_string('dpb_wordcount_out_base', None,
                     'Base directory for word count output')
 flags.DEFINE_list('dpb_wordcount_additional_args', [], 'Additional arguments '
@@ -111,7 +136,7 @@ def CheckPrerequisites(benchmark_config):
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
   if (FLAGS.dpb_wordcount_input is None and
-      FLAGS.dpb_wordcount_fs != dpb_service.BaseDpbService.GCS_FS):
+      FLAGS.dpb_wordcount_fs != dpb_constants.GCS_FS):
     raise errors.Config.InvalidValue('Invalid default input directory.')
   # Get handle to the dpb service
   dpb_service_class = dpb_service.GetDpbServiceClass(

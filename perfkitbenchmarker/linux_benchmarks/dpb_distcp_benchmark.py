@@ -25,10 +25,9 @@ of various cloud providers.
 import copy
 from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.dpb_service import BaseDpbService
 from perfkitbenchmarker.linux_benchmarks import dpb_testdfsio_benchmark
 
 BENCHMARK_NAME = 'dpb_distcp_benchmark'
@@ -54,27 +53,35 @@ dpb_distcp_benchmark:
     worker_count: 8
 """
 
-flags.DEFINE_enum('distcp_source_fs', BaseDpbService.GCS_FS,
-                  [BaseDpbService.GCS_FS, BaseDpbService.S3_FS,
-                   BaseDpbService.HDFS_FS],
-                  'File System to use as the source of the distcp operation')
+flags.DEFINE_enum(
+    'distcp_source_fs',
+    dpb_constants.GCS_FS,
+    [dpb_constants.GCS_FS, dpb_constants.S3_FS, dpb_constants.HDFS_FS],
+    'File System to use as the source of the distcp operation',
+)
 
-flags.DEFINE_enum('distcp_dest_fs', BaseDpbService.GCS_FS,
-                  [BaseDpbService.GCS_FS, BaseDpbService.S3_FS,
-                   BaseDpbService.HDFS_FS],
-                  'File System to use as destination of the distcp operation')
+flags.DEFINE_enum(
+    'distcp_dest_fs',
+    dpb_constants.GCS_FS,
+    [dpb_constants.GCS_FS, dpb_constants.S3_FS, dpb_constants.HDFS_FS],
+    'File System to use as destination of the distcp operation',
+)
 
-flags.DEFINE_integer('distcp_file_size_mbs', 10,
-                     'File size to use for each of the distcp source files')
+flags.DEFINE_integer(
+    'distcp_file_size_mbs',
+    10,
+    'File size to use for each of the distcp source files',
+)
 
 flags.DEFINE_integer('distcp_num_files', 10, 'Number of distcp source files')
 
 FLAGS = flags.FLAGS
 
 SUPPORTED_DPB_BACKENDS = [
-    dpb_service.DATAPROC,
-    dpb_service.EMR,
-    dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER]
+    dpb_constants.DATAPROC,
+    dpb_constants.EMR,
+    dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER,
+]
 
 
 def GetConfig(user_config):
@@ -114,7 +121,7 @@ def Run(benchmark_spec):
   run_uri = benchmark_spec.uuid.split('-')[0]
   service = benchmark_spec.dpb_service
 
-  if FLAGS.distcp_source_fs == BaseDpbService.HDFS_FS:
+  if FLAGS.distcp_source_fs == dpb_constants.HDFS_FS:
     source_dir = '/pkb-{}/distcp_source/'.format(run_uri)
   elif service.base_dir.startswith(FLAGS.distcp_source_fs):
     source_dir = service.base_dir + '/distcp_source/'
@@ -126,7 +133,7 @@ def Run(benchmark_spec):
   # Subdirectory TestDFSO writes data to
   source_data_dir = source_dir + 'io_data'
 
-  if FLAGS.distcp_dest_fs == BaseDpbService.HDFS_FS:
+  if FLAGS.distcp_dest_fs == dpb_constants.HDFS_FS:
     destination_dir = '/pkb-{}/distcp_destination/'.format(run_uri)
   elif service.base_dir.startswith(FLAGS.distcp_dest_fs):
     destination_dir = service.base_dir + '/distcp_destination/'

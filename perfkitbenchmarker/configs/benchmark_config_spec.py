@@ -23,7 +23,7 @@ import os
 from perfkitbenchmarker import app_service
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data_discovery_service
-from perfkitbenchmarker import dpb_service
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
@@ -39,7 +39,6 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
-from perfkitbenchmarker.dpb_service import BaseDpbService
 import six
 
 _DEFAULT_VM_COUNT = 1
@@ -54,7 +53,7 @@ class _DpbApplicationListDecoder(option_decoders.ListDecoder):
     super(_DpbApplicationListDecoder, self).__init__(
         default=None,
         item_decoder=option_decoders.EnumDecoder(
-            [dpb_service.FLINK, dpb_service.HIVE]),
+            [dpb_constants.FLINK, dpb_constants.HIVE]),
         **kwargs)
 
 
@@ -79,17 +78,19 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    dpb_service_config = super(_DpbServiceDecoder,
-                               self).Decode(value, component_full_name,
-                                            flag_values)
+    dpb_service_config = super().Decode(value, component_full_name, flag_values)
 
-    if (dpb_service_config['service_type'] == dpb_service.EMR and
-        component_full_name == 'dpb_wordcount_benchmark'):
-      if flag_values.dpb_wordcount_fs != BaseDpbService.S3_FS:
+    if (
+        dpb_service_config['service_type'] == dpb_constants.EMR
+        and component_full_name == 'dpb_wordcount_benchmark'
+    ):
+      if flag_values.dpb_wordcount_fs != dpb_constants.S3_FS:
         raise errors.Config.InvalidValue('EMR service requires S3.')
     result = _DpbServiceSpec(
-        self._GetOptionFullName(component_full_name), flag_values,
-        **dpb_service_config)
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **dpb_service_config,
+    )
     return result
 
 
@@ -132,25 +133,25 @@ class _DpbServiceSpec(spec.BaseSpec):
             option_decoders.EnumDecoder,
             {
                 'default':
-                    dpb_service.DATAPROC,
+                    dpb_constants.DATAPROC,
                 'valid_values': [
-                    dpb_service.DATAPROC,
-                    dpb_service.DATAPROC_FLINK,
-                    dpb_service.DATAPROC_GKE,
-                    dpb_service.DATAPROC_SERVERLESS,
-                    dpb_service.DATAFLOW,
-                    dpb_service.EMR,
-                    dpb_service.EMR_SERVERLESS,
-                    dpb_service.GLUE,
-                    dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
-                    dpb_service.UNMANAGED_SPARK_CLUSTER,
-                    dpb_service.KUBERNETES_SPARK_CLUSTER,
-                    dpb_service.KUBERNETES_FLINK_CLUSTER,
+                    dpb_constants.DATAPROC,
+                    dpb_constants.DATAPROC_FLINK,
+                    dpb_constants.DATAPROC_GKE,
+                    dpb_constants.DATAPROC_SERVERLESS,
+                    dpb_constants.DATAFLOW,
+                    dpb_constants.EMR,
+                    dpb_constants.EMR_SERVERLESS,
+                    dpb_constants.GLUE,
+                    dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER,
+                    dpb_constants.UNMANAGED_SPARK_CLUSTER,
+                    dpb_constants.KUBERNETES_SPARK_CLUSTER,
+                    dpb_constants.KUBERNETES_FLINK_CLUSTER,
                 ]
             }),
         'worker_group': (vm_group_decoders.VmGroupSpecDecoder, {}),
         'worker_count': (option_decoders.IntDecoder, {
-            'default': dpb_service.DEFAULT_WORKER_COUNT,
+            'default': dpb_constants.DEFAULT_WORKER_COUNT,
             'min': 0
         }),
         'applications': (_DpbApplicationListDecoder, {}),

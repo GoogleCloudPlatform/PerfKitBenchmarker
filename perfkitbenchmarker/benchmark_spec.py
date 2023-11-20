@@ -35,6 +35,7 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import data_discovery_service
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import edw_compute_resource
 from perfkitbenchmarker import edw_service
@@ -323,8 +324,8 @@ class BenchmarkSpec:
     # If the dpb service is un-managed, the provisioning needs to be handed
     # over to the vm creation module.
     if dpb_service_type in [
-        dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
-        dpb_service.UNMANAGED_SPARK_CLUSTER,
+        dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER,
+        dpb_constants.UNMANAGED_SPARK_CLUSTER,
     ]:
       # Ensure non cluster vms are not present in the spec.
       if self.vms_to_boot:
@@ -654,8 +655,8 @@ class BenchmarkSpec:
     # installation, the dpb service instance needs access to constructed
     # master group and worker group.
     if self.config.dpb_service and self.config.dpb_service.service_type in [
-        dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER,
-        dpb_service.UNMANAGED_SPARK_CLUSTER,
+        dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER,
+        dpb_constants.UNMANAGED_SPARK_CLUSTER,
     ]:
       self.dpb_service.vms['master_group'] = self.vm_groups['master_group']
       if self.config.dpb_service.worker_count:

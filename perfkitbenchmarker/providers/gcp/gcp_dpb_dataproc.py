@@ -26,6 +26,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
@@ -344,7 +345,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     assert job_type
     args = ['jobs', 'submit', job_type]
 
-    if job_type == self.PYSPARK_JOB_TYPE:
+    if job_type == dpb_constants.PYSPARK_JOB_TYPE:
       args.append(pyspark_file)
 
     cmd = self.DataprocGcloudCommand(*args)
@@ -539,7 +540,7 @@ class GcpDpbDataprocServerless(
     args = ['batches', 'submit', job_type]
     additional_args = []
 
-    if job_type == self.PYSPARK_JOB_TYPE:
+    if job_type == dpb_constants.PYSPARK_JOB_TYPE:
       args.append(pyspark_file)
 
     cmd = self.DataprocGcloudCommand(*args)
@@ -802,8 +803,8 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
   ):
     """See base class."""
     assert job_type in [
-        dpb_service.BaseDpbService.FLINK_JOB_TYPE,
-        dpb_service.BaseDpbService.BEAM_JOB_TYPE,
+        dpb_constants.FLINK_JOB_TYPE,
+        dpb_constants.BEAM_JOB_TYPE,
     ], 'Unsupported job type {}'.format(job_type)
     logging.info('Running presubmit script...')
     start_time = datetime.datetime.now()
@@ -815,7 +816,7 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
     job_script_args = []
     job_script_args.append('-c {}'.format(classname))
     job_script_args.append('--')
-    if job_type == dpb_service.BaseDpbService.BEAM_JOB_TYPE:
+    if job_type == dpb_constants.BEAM_JOB_TYPE:
       job_script_args.append('--runner=FlinkRunner')
       job_script_args.extend(job_arguments)
     else:

@@ -33,10 +33,10 @@ from typing import List
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.dpb_service import BaseDpbService
 
 BENCHMARK_NAME = 'dpb_terasort_benchmark'
 
@@ -89,8 +89,8 @@ flags.DEFINE_integer(
 FLAGS = flags.FLAGS
 
 SUPPORTED_DPB_BACKENDS = [
-    dpb_service.DATAPROC, dpb_service.EMR,
-    dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER
+    dpb_constants.DATAPROC, dpb_constants.EMR,
+    dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER
 ]
 TERASORT_JAR = 'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar'
 UNMANAGED_TERASORT_JAR = '/opt/pkb/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-*.jar'
@@ -230,7 +230,7 @@ def RunStage(spec: benchmark_spec.BenchmarkSpec, stage: str,
     JobSubmissionError if job fails.
   """
   service = spec.dpb_service
-  if service.dpb_service_type == dpb_service.UNMANAGED_DPB_SVC_YARN_CLUSTER:
+  if service.dpb_service_type == dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER:
     jar = UNMANAGED_TERASORT_JAR
   else:
     jar = TERASORT_JAR
@@ -241,4 +241,4 @@ def RunStage(spec: benchmark_spec.BenchmarkSpec, stage: str,
         scheme, FLAGS.dpb_terasort_block_size_mb * 1024 * 1024))
   args += stage_args
   return service.SubmitJob(
-      jarfile=jar, job_arguments=args, job_type=BaseDpbService.HADOOP_JOB_TYPE)
+      jarfile=jar, job_arguments=args, job_type=dpb_constants.HADOOP_JOB_TYPE)

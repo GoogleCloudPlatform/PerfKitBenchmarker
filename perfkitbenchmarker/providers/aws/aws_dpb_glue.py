@@ -13,6 +13,7 @@ from typing import List, Optional
 
 from absl import flags
 
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -117,7 +118,7 @@ class AwsDpbGlue(
     self._job_counter += 1
     glue_command = {}
     glue_default_args = {}
-    if job_type == self.PYSPARK_JOB_TYPE:
+    if job_type == dpb_constants.PYSPARK_JOB_TYPE:
       glue_command = {
           'Name': 'glueetl',
           'ScriptLocation': self._glue_script_wrapper_url,
