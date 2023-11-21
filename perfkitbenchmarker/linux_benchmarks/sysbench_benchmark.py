@@ -130,11 +130,22 @@ BENCHMARK_DATA = {
     ),
 }
 
+_SCALEUP_CLIENTS_TEST = flags.DEFINE_boolean(
+    'sysbench_scaleup_clients_test',
+    False,
+    'Scale up the number of clients running the benchmark. This is a benchmark'
+    ' mode to test how the server reacts when the load increases gradually by'
+    ' having more clients over time. Need to override'
+    ' sysbench.relational_db.vm_groups.clients.vm_count and the number have to'
+    ' be creater than sysbench_scaleup_clients_test_num_clients for this'
+    ' benchmark mode to work',
+)
 
-flags.DEFINE_integer(
-    'sysbench_scalup_clients_test',
+_SCALEUP_CLIENTS_TEST_NUM_CLIENTS = flags.DEFINE_integer(
+    'sysbench_scaleup_clients_test_num_clients',
     1,
-    'Scale up the number of clients running the benchmark.',
+    'This defines the number of client we scale up to. Have to be smaller than'
+    ' the number of existing clients.',
 )
 
 SPANNER_TPCC = 'spanner-tpcc'
@@ -731,11 +742,11 @@ def _UpdateSessions(
     )
 
 
-def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
+def _RunSysbench(vms, metadata, benchmark_spec, sysbench_thread_count):
   """Runs the Sysbench OLTP test.
 
   Args:
-    vm: The VM that will issue the sysbench test.
+    vms: The VMs that will issue the sysbench test.
     metadata: The PKB metadata to be passed along to the final results.
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
@@ -749,6 +760,7 @@ def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
   # as requested by the caller. Second step is the 'real' run where the results
   # are parsed and reported.
   _UpdateSessions(benchmark_spec.relational_db, sysbench_thread_count)
+  vm = vms[0]
 
   warmup_seconds = FLAGS.sysbench_warmup_seconds
   if warmup_seconds > 0:
@@ -759,6 +771,12 @@ def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
 
   run_seconds = FLAGS.sysbench_run_seconds
   logging.info('Sysbench real run, duration is %d', run_seconds)
+
+  if _SCALEUP_CLIENTS_TEST.value:
+    return _RunScaleUpClientsBenchmark(
+        vms, run_seconds, benchmark_spec, sysbench_thread_count, metadata
+    )
+
   stdout, _ = _IssueSysbenchCommand(
       vm, run_seconds, benchmark_spec, sysbench_thread_count
   )
@@ -770,6 +788,34 @@ def _RunSysbench(vm, metadata, benchmark_spec, sysbench_thread_count):
       + _ParseSysbenchLatency(stdout, metadata)
       + _ParseSysbenchTransactions(stdout, metadata)
   )
+
+
+def _RunScaleUpClientsBenchmark(
+    vms, run_seconds, benchmark_spec, sysbench_thread_count, metadata
+):
+  """Runs the Scale Up Clients benchmark. Only TPS and QPS is supported."""
+  scale_up_samples = []
+  for i in range(1, _SCALEUP_CLIENTS_TEST_NUM_CLIENTS.value + 1):
+    new_metadata = metadata.copy()
+    new_metadata['sysbench_scale_up_client_count'] = i
+    command_vm_pairs = [
+        (vm, run_seconds, benchmark_spec, sysbench_thread_count)
+        for vm in vms[:i]
+    ]
+    args = [(command_vm_pair, {}) for command_vm_pair in command_vm_pairs]
+    results = background_tasks.RunThreaded(_IssueSysbenchCommand, args)
+    total_tps = 0
+    total_qps = 0
+    for stdout, _ in results:
+      current_transactions = _ParseSysbenchTransactions(stdout, new_metadata)
+      total_tps += current_transactions[0].value
+      total_qps += current_transactions[1].value
+    scale_up_samples += [
+        sample.Sample('total_tps', total_tps, 'tps', new_metadata),
+        sample.Sample('total_qps', total_qps, 'qps', new_metadata),
+    ]
+
+  return scale_up_samples
 
 
 def Run(benchmark_spec):
@@ -784,7 +830,7 @@ def Run(benchmark_spec):
   """
   logging.info('Start benchmarking, Cloud Provider is %s.', FLAGS.cloud)
   results = []
-  client_vm = benchmark_spec.vms[0]
+  client_vms = benchmark_spec.vms
   db = benchmark_spec.relational_db
 
   for thread_count in FLAGS.sysbench_run_threads:
@@ -794,7 +840,7 @@ def Run(benchmark_spec):
     metadata['sysbench_thread_count'] = thread_count
     # The run phase is common across providers. The VMs[0] object contains all
     # information and states necessary to carry out the run.
-    results += _RunSysbench(client_vm, metadata, benchmark_spec, thread_count)
+    results += _RunSysbench(client_vms, metadata, benchmark_spec, thread_count)
   return results
 
 

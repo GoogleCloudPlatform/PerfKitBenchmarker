@@ -28,6 +28,72 @@ from tests import pkb_common_test_case
 FLAGS = flags.FLAGS
 
 
+class ScaleUpClientTestCase(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
+
+  def setUp(self):
+    super().setUp()
+    path = os.path.join(
+        os.path.dirname(__file__), '..', 'data', 'sysbench-output-sample.txt'
+    )
+    with open(path) as fp:
+      self.contents = fp.read()
+    self.enter_context(
+        mock.patch.object(
+            sysbench_benchmark, '_GetCommonSysbenchOptions', return_value=[]
+        )
+    )
+    FLAGS.sysbench_testname = sysbench_benchmark.SPANNER_TPCC
+
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @flagsaver.flagsaver(sysbench_scaleup_clients_test_num_clients=2)
+  def testScaleUpClient(self):
+    benchmark_spec = mock.Mock()
+    benchmark_spec.relational_db = mock.Mock()
+    clients = [mock.Mock(), mock.Mock()]
+    for client in clients:
+      client.RobustRemoteCommand = mock.Mock(return_value=[self.contents, ''])
+    result = sysbench_benchmark._RunScaleUpClientsBenchmark(
+        clients, 100, mock.Mock(), 10, {}
+    )
+    self.assertEqual(clients[0].RobustRemoteCommand.call_count, 2)
+    self.assertEqual(clients[1].RobustRemoteCommand.call_count, 1)
+    self.assertEqual(
+        result,
+        [
+            sample.Sample(
+                metric='total_tps',
+                value=986.49,
+                unit='tps',
+                metadata={'sysbench_scale_up_client_count': 1},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_qps',
+                value=19730.45,
+                unit='qps',
+                metadata={'sysbench_scale_up_client_count': 1},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_tps',
+                value=1972.98,
+                unit='tps',
+                metadata={'sysbench_scale_up_client_count': 2},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_qps',
+                value=39460.9,
+                unit='qps',
+                metadata={'sysbench_scale_up_client_count': 2},
+                timestamp=0,
+            ),
+        ],
+    )
+
+
 class MySQLServiceBenchmarkTestCase(unittest.TestCase,
                                     test_util.SamplesTestMixin):
 
