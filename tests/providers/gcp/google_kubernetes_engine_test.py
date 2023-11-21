@@ -27,7 +27,7 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
 from perfkitbenchmarker.providers.gcp import util
@@ -93,7 +93,7 @@ class GoogleKubernetesEngineCustomMachineTypeTestCase(
 
   @staticmethod
   def create_kubernetes_engine_spec():
-    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -124,7 +124,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @staticmethod
   def create_kubernetes_engine_spec():
-    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -267,7 +267,7 @@ class GoogleKubernetesEngineAutoscalingTestCase(
 
   @staticmethod
   def create_kubernetes_engine_spec():
-    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -335,7 +335,7 @@ class GoogleKubernetesEngineVersionFlagTestCase(
 
   @staticmethod
   def create_kubernetes_engine_spec():
-    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -391,7 +391,7 @@ class GoogleKubernetesEngineGvnicFlagTestCase(
 
   @staticmethod
   def create_kubernetes_engine_spec():
-    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -431,7 +431,7 @@ class GoogleKubernetesEngineWithGpusTestCase(
 
   @staticmethod
   def create_kubernetes_engine_spec():
-    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {
@@ -519,7 +519,7 @@ class GoogleKubernetesEngineRegionalTestCase(
 
   @staticmethod
   def create_kubernetes_engine_spec(use_zonal_nodepools=False):
-    kubernetes_engine_spec = benchmark_config_spec._ContainerClusterSpec(
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME', **{
             'cloud': 'GCP',
             'vm_spec': {

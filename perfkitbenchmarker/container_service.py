@@ -32,7 +32,6 @@ from typing import Any, Optional, Sequence
 from absl import flags
 import jinja2
 from perfkitbenchmarker import context
-from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
@@ -43,16 +42,15 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.configs import option_decoders
-from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.configs import container_spec as container_spec_lib
 import requests
 import six
 import yaml
 
 BenchmarkSpec = Any  # benchmark_spec lib imports this module.
 
-KUBERNETES = 'Kubernetes'
-DEFAULT_NODEPOOL = 'default'
+KUBERNETES = container_spec_lib.KUBERNETES
+DEFAULT_NODEPOOL = container_spec_lib.DEFAULT_NODEPOOL
 
 FLAGS = flags.FLAGS
 
@@ -162,77 +160,12 @@ def RunKubectlCommand(command: list[str], **kwargs):
   return vm_util.IssueCommand(cmd, **kwargs)
 
 
-class ContainerSpec(spec.BaseSpec):
-  """Class containing options for creating containers."""
-
-  def __init__(
-      self,
-      component_full_name: str,
-      flag_values: Optional[flags.FlagValues] = None,
-      **kwargs: Any,
-  ):
-    super().__init__(component_full_name, flag_values, **kwargs)
-    self.cpus: float
-    self.memory: int
-    self.command: list[str]
-    self.image: str
-    self.container_port: int
-    self.static_image: bool
-
-  @classmethod
-  def _ApplyFlags(
-      cls, config_values: dict[str, Any], flag_values: flags.FlagValues
-  ):
-    """Apply flag settings to the container spec."""
-    super()._ApplyFlags(config_values, flag_values)
-    if flag_values['image'].present:
-      config_values['image'] = flag_values.image
-    if flag_values['static_container_image'].present:
-      config_values['static_image'] = flag_values.static_container_image
-
-  @classmethod
-  def _GetOptionDecoderConstructions(cls):
-    """Gets decoder classes and constructor args for each configurable option.
-
-    Can be overridden by derived classes to add options or impose additional
-    requirements on existing options.
-
-    Returns:
-      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
-          The pair specifies a decoder class and its __init__() keyword
-          arguments to construct in order to decode the named option.
-    """
-    result = super()._GetOptionDecoderConstructions()
-    result.update({
-        'image': (option_decoders.StringDecoder, {'default': None}),
-        'static_image': (option_decoders.BooleanDecoder, {'default': False}),
-        'cpus': (option_decoders.FloatDecoder, {'default': None}),
-        'memory': (
-            custom_virtual_machine_spec.MemoryDecoder,
-            {'default': None},
-        ),
-        'command': (_CommandDecoder, {}),
-        'container_port': (option_decoders.IntDecoder, {'default': 8080}),
-    })
-    return result
-
-
-class _CommandDecoder(option_decoders.ListDecoder):
-  """Decodes the command/arg list for containers."""
-
-  def __init__(self, **kwargs):
-    super().__init__(
-        default=None,
-        none_ok=True,
-        item_decoder=option_decoders.StringDecoder(),
-        **kwargs,
-    )
-
-
 class BaseContainer(resource.BaseResource):
   """Class representing a single container."""
 
-  def __init__(self, container_spec: Optional[ContainerSpec] = None):
+  def __init__(
+      self, container_spec: Optional[container_spec_lib.ContainerSpec] = None
+  ):
     # Hack to make container_spec a kwarg
     assert container_spec
     super().__init__()
@@ -262,7 +195,7 @@ class BaseContainer(resource.BaseResource):
 class BaseContainerService(resource.BaseResource):
   """Class representing a service backed by containers."""
 
-  def __init__(self, container_spec: ContainerSpec):
+  def __init__(self, container_spec: container_spec_lib.ContainerSpec):
     super().__init__()
     self.cpus: float = container_spec.cpus
     self.memory: int = container_spec.memory
@@ -284,76 +217,13 @@ class _ContainerImage:
     )
 
 
-class ContainerRegistrySpec(spec.BaseSpec):
-  """Spec containing options for creating a Container Registry."""
-
-  def __init__(
-      self,
-      component_full_name: str,
-      flag_values: Optional[flags.FlagValues] = None,
-      **kwargs: Any,
-  ):
-    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
-    self.spec: Optional[dict[str, Any]]
-    self.cloud: str
-    registry_spec = getattr(self.spec, self.cloud, {})
-    self.project: Optional[str] = registry_spec.get('project')
-    self.zone: Optional[str] = registry_spec.get('zone')
-    self.name: Optional[str] = registry_spec.get('name')
-    self.cpus: float
-    self.memory: int
-    self.command: list[str]
-    self.image: str
-    self.container_port: int
-    self.cloud: str
-
-  @classmethod
-  def _ApplyFlags(
-      cls, config_values: dict[str, Any], flag_values: flags.FlagValues
-  ):
-    """Apply flag values to the spec."""
-    super()._ApplyFlags(config_values, flag_values)
-    if flag_values['cloud'].present or 'cloud' not in config_values:
-      config_values['cloud'] = flag_values.cloud
-    if flag_values['container_cluster_cloud'].present:
-      config_values['cloud'] = flag_values.container_cluster_cloud
-    updated_spec = {}
-    if flag_values['project'].present:
-      updated_spec['project'] = flag_values.project
-    if flag_values['zone'].present:
-      updated_spec['zone'] = flag_values.zone[0]
-    cloud = config_values['cloud']
-    cloud_spec = config_values.get('spec', {}).get(cloud, {})
-    cloud_spec.update(updated_spec)
-    config_values['spec'] = {cloud: cloud_spec}
-
-  @classmethod
-  def _GetOptionDecoderConstructions(cls) -> dict[str, Any]:
-    """Gets decoder classes and constructor args for each configurable option.
-
-    Can be overridden by derived classes to add options or impose additional
-    requirements on existing options.
-
-    Returns:
-      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
-          The pair specifies a decoder class and its __init__() keyword
-          arguments to construct in order to decode the named option.
-    """
-    result = super()._GetOptionDecoderConstructions()
-    result.update({
-        'cloud': (option_decoders.StringDecoder, {}),
-        'spec': (spec.PerCloudConfigDecoder, {'default': {}}),
-    })
-    return result
-
-
 class BaseContainerRegistry(resource.BaseResource):
   """Base class for container image registries."""
 
   RESOURCE_TYPE = 'BaseContainerRegistry'
   CLOUD: str
 
-  def __init__(self, registry_spec: ContainerRegistrySpec):
+  def __init__(self, registry_spec: container_spec_lib.ContainerRegistrySpec):
     super().__init__()
     benchmark_spec: BenchmarkSpec = context.GetThreadBenchmarkSpec()
     container_cluster = getattr(benchmark_spec, 'container_cluster', None)
@@ -882,7 +752,9 @@ class KubernetesCluster(BaseContainerCluster):
       result['container_cluster_version'] = self.k8s_version
     return result
 
-  def DeployContainer(self, name: str, container_spec: ContainerSpec):
+  def DeployContainer(
+      self, name: str, container_spec: container_spec_lib.ContainerSpec
+  ):
     """Deploys Containers according to the ContainerSpec."""
     base_name = name
     name = base_name + str(len(self.containers[base_name]))
@@ -890,7 +762,9 @@ class KubernetesCluster(BaseContainerCluster):
     self.containers[base_name].append(container)
     container.Create()
 
-  def DeployContainerService(self, name: str, container_spec: ContainerSpec):
+  def DeployContainerService(
+      self, name: str, container_spec: container_spec_lib.ContainerSpec
+  ):
     """Deploys a ContainerSerivice according to the ContainerSpec."""
     service = KubernetesContainerService(container_spec, name)
     self.services[name] = service
