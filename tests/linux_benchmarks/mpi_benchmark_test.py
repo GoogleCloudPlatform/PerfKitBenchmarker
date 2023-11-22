@@ -44,7 +44,7 @@ class Vm(pkb_common_test_case.TestLinuxVirtualMachine):
                robust_remote_command_text=None) -> None:
     super(Vm, self).__init__(vm_spec=pkb_common_test_case.CreateTestVmSpec())
     self.internal_ip = ip
-    self._num_cpus = 32
+    self.num_cpus = 32
     # pylint: disable=invalid-name
     self.IsSmtEnabled = mock.PropertyMock(return_value=smt_enabled)
     self.RemoteCommand = mock.PropertyMock(

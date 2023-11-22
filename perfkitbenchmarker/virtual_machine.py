@@ -388,7 +388,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   user_name: str  # mixed from BaseVirtualMachine
   disable_interrupt_moderation: str  # mixed from BaseVirtualMachine
   disable_rss: str  # mixed from BaseVirtualMachine
-  num_disable_cpus: str  # mixed from BaseVirtualMachine
+  num_disable_cpus: int  # mixed from BaseVirtualMachine
   ip_address: str  # mixed from BaseVirtualMachine
   internal_ip: str  # mixed from BaseVirtualMachine
   can_connect_via_internal_ip: bool  # mixed from BaseVirtualMachine
@@ -415,8 +415,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     # Cached values
     self._reachable = {}
     self._total_memory_kb = None
-    self._num_cpus = None
-    self._num_benchmark_cpus = None
+    self.num_cpus: int = None
     self._is_smt_enabled = None
     # Update to Json type if ever available:
     # https://github.com/python/typing/issues/182
@@ -694,7 +693,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     events.on_vm_startup.send(vm=self)
     # Resets the cached SMT enabled status and number cpus value.
     self._is_smt_enabled = None
-    self._num_cpus = None
+    self.num_cpus = None
 
   def RecordAdditionalMetadata(self):
     """After the VM has been prepared, store VM metadata."""
@@ -702,10 +701,8 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     # VM connection attempts failed.
     if not self.bootable_time:
       return
-
-    if self.num_cpus is not None:
-      if self.NumCpusForBenchmark() != self.num_cpus:
-        self._num_benchmark_cpus = self.NumCpusForBenchmark()
+    if self.num_cpus is None:
+      self.num_cpus = self._GetNumCpus()
 
   def PrepareVMEnvironment(self):
     """Performs any necessary setup on the VM specific to the OS.
@@ -862,17 +859,6 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       disk_spec: The BaseDiskSpec object corresponding to the disk.
     """
     raise NotImplementedError()
-
-  @property
-  def num_cpus(self):
-    """Gets the number of CPUs on the VM.
-
-    Returns:
-      The number of CPUs on the VM.
-    """
-    if self._num_cpus is None:
-      self._num_cpus = self._GetNumCpus()
-    return self._num_cpus
 
   def NumCpusForBenchmark(self, report_only_physical_cpus=False):
     """Gets the number of CPUs for benchmark configuration purposes.
@@ -1373,8 +1359,11 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       result['num_disable_cpus'] = self.num_disable_cpus
     if self.num_cpus is not None:
       result['num_cpus'] = self.num_cpus
-      if self.NumCpusForBenchmark() != self.num_cpus:
-        result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
+    if (
+        self.num_cpus is not None
+        and self.NumCpusForBenchmark() != self.num_cpus
+    ):
+      result['num_benchmark_cpus'] = self.NumCpusForBenchmark()
     # Some metadata is unique per VM.
     # Update publisher._VM_METADATA_TO_LIST to add more
     if self.id is not None:

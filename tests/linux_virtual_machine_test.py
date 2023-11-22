@@ -493,9 +493,9 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'cat /proc/cpuinfo | grep processor | wc -l': '16'
   }
 
-  def CreateVm(self, run_cmd_response: Union[str, Dict[str, str]]):
+  def CreateVm(self, run_cmd_response: Union[str, Dict[str, str]],
+               metadata: bool = False):
     vm = CreateTestLinuxVm()
-
     def FakeRemoteHostCommandWithReturnCode(cmd, **_):
       if isinstance(run_cmd_response, str):
         stdout = run_cmd_response
@@ -521,6 +521,9 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm.CheckLsCpu = mock.Mock(
         return_value=linux_virtual_machine.LsCpuResults(self.lscpu_output))
     vm.WaitForBootCompletion = mock.Mock(side_effect=FakeWaitForBootCompletion)
+    if metadata:
+      vm.WaitForBootCompletion()
+      vm.RecordAdditionalMetadata()
     return vm
 
   @parameterized.named_parameters(
@@ -545,7 +548,8 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'cat /sys/fs/cgroup/cpuset.cpus.effective': f'0-{vcpus-1}',
         'cat /proc/cmdline': kernel_command_line,
     }
-    vm = self.CreateVm(responses)
+    responses.update(self.normal_boot_responses)
+    vm = self.CreateVm(responses, metadata=True)
     self.assertEqual(expected_num_cpus, vm.NumCpusForBenchmark(True))
 
   def testNumCpusForBenchmarkDefaultCall(self):
@@ -557,7 +561,8 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         ),
         'cat /sys/fs/cgroup/cpuset.cpus.effective': '0-31',
     }
-    vm = self.CreateVm(responses)
+    responses.update(self.normal_boot_responses)
+    vm = self.CreateVm(responses, metadata=True)
     vm.IsSmtEnabled = mock.Mock()
     self.assertEqual(32, vm.NumCpusForBenchmark())
     vm.IsSmtEnabled.assert_not_called()
@@ -573,7 +578,8 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         ),
         'cat /sys/fs/cgroup/cpuset.cpus.effective': '0-15,17-32',
     }
-    vm = self.CreateVm(responses)
+    responses.update(self.normal_boot_responses)
+    vm = self.CreateVm(responses, metadata=True)
     self.assertEqual(32, vm.NumCpusForBenchmark())
     responses = {
         'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
@@ -587,7 +593,8 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
             'Cpus_allowed_list:\t0-3,7-8'
         ),
     }
-    vm = self.CreateVm(responses)
+    responses.update(self.normal_boot_responses)
+    vm = self.CreateVm(responses, metadata=True)
     self.assertEqual(6, vm.NumCpusForBenchmark())
     responses = {
         'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
@@ -602,7 +609,8 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'ls /proc/cpuinfo >> /dev/null 2>&1 || echo file_not_exist': '',
         'cat /proc/cpuinfo | grep processor | wc -l': '16',
     }
-    vm = self.CreateVm(responses)
+    responses.update(self.normal_boot_responses)
+    vm = self.CreateVm(responses, metadata=True)
     self.assertEqual(16, vm.NumCpusForBenchmark())
 
   def testMemCapFromDifferentSources(self):
