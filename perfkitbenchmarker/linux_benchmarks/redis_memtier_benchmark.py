@@ -108,11 +108,18 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
       vm_spec[cloud]['machine_type'] = (
           FLAGS.redis_memtier_server_machine_type)
   if redis_server.REDIS_SIMULATE_AOF.value:
+    # Revisit this logic
+    local_ssd = 8
+    if FLAGS.server_gce_num_local_ssds:
+      local_ssd = FLAGS.server_gce_num_local_ssds
+
     config['vm_groups']['servers']['disk_spec']['GCP']['disk_type'] = 'local'
-    config['vm_groups']['servers']['vm_spec']['GCP']['num_local_ssds'] = 8
+    config['vm_groups']['servers']['vm_spec']['GCP'][
+        'num_local_ssds'
+    ] = local_ssd
     # To auto mount scratch disks (/scratch0, /scratch1, ...etc)
-    config['vm_groups']['servers']['disk_count'] = 7
-    FLAGS.num_striped_disks = 7
+    config['vm_groups']['servers']['disk_count'] = local_ssd - 1
+    FLAGS.num_striped_disks = local_ssd - 1
     FLAGS.gce_ssd_interface = 'NVME'
   else:
     config['vm_groups']['servers'].pop('disk_spec')
