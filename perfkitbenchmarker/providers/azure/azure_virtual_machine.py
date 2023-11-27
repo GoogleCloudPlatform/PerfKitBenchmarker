@@ -119,6 +119,17 @@ CONFIDENTIAL_MILAN_TYPES = [
     r'(Standard_EC[0-9]+as?d?s_v5)'
 ]
 
+# Reference -
+# https://learn.microsoft.com/en-us/azure/virtual-machines/trusted-launch#virtual-machines-sizes
+TRUSTED_LAUNCH_UNSUPPORTED_TYPES = AZURE_ARM_TYPES + [
+    r'(Standard_A[0-9]+_v2)',
+    r'(Standard_D[0-9]+_v2)',
+    r'(Standard_D[0-9]+_v3)',
+    r'(Standard_E[0-9]+_v3)',
+    r'(Standard_M[0-9]+.*)',
+    r'(Standard_ND[0-9]+a.*)',
+]
+
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
@@ -582,6 +593,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         re.search(machine_series, self.machine_type)
         for machine_series in CONFIDENTIAL_MILAN_TYPES
     )
+    self.trusted_launch_unsupported_type = any(
+        re.search(machine_series, self.machine_type)
+        for machine_series in TRUSTED_LAUNCH_UNSUPPORTED_TYPES
+    )
     arm_arch = 'neoverse-n1' if _MachineTypeIsArm(self.machine_type) else None
     if arm_arch:
       self.host_arch = arm_arch
@@ -699,6 +714,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         + self.nic.args
         + tag_args
     )
+    if self.trusted_launch_unsupported_type:
+      create_cmd.extend(['--security-type', 'Standard'])
     if self.boot_startup_script:
       create_cmd.extend(['--custom-data', self.boot_startup_script])
 
