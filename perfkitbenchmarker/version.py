@@ -29,16 +29,19 @@ def _GetVersion():
   root_dir = os.path.dirname(os.path.dirname(__file__))
   git_dir = os.path.join(root_dir, '.git')
   try:
-    version = subprocess.check_output(['git', '--git-dir', git_dir,
-                                       'describe', '--always'],
-                                      stderr=subprocess.STDOUT,
-                                      universal_newlines=True)
+    version = subprocess.check_output(
+        ['git', '--git-dir', git_dir, 'describe', '--always'],
+        stderr=subprocess.STDOUT,
+        universal_newlines=True,
+    )
   except (OSError, subprocess.CalledProcessError):
     # Could not get the version from git. Resort to contents of the static
     # version file.
     try:
-      version = pkg_resources.resource_string(perfkitbenchmarker.__name__,  # pytype: disable=not-callable
-                                              _STATIC_VERSION_FILE)
+      version = pkg_resources.resource_string(  # pytype: disable=not-callable
+          perfkitbenchmarker.__name__,
+          _STATIC_VERSION_FILE,
+      )
     except IOError:
       # Could not determine version.
       return 'unknown'

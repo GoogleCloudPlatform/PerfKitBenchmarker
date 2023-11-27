@@ -25,7 +25,6 @@ from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -48,16 +47,10 @@ _FLAGS = None
 
 _FAKE_INSTANCE_METADATA = {
     'id': '123456',
-    'networkInterfaces': [
-        {
-            'accessConfigs': [
-                {
-                    'natIP': '1.2.3.4'
-                }
-            ],
-            'networkIP': '1.2.3.4'
-        }
-    ]
+    'networkInterfaces': [{
+        'accessConfigs': [{'natIP': '1.2.3.4'}],
+        'networkIP': '1.2.3.4',
+    }],
 }
 _FAKE_DISK_METADATA = {
     'id': '123456',
@@ -65,7 +58,7 @@ _FAKE_DISK_METADATA = {
     'name': 'fakedisk',
     'sizeGb': '10',
     'sourceImage': '',
-    'type': 'pd-standard'
+    'type': 'pd-standard',
 }
 
 
@@ -96,19 +89,19 @@ def PatchCriticalObjects(retvals=None):
     return ('', '', 0) if retvals is None else retvals.pop(0)
 
   with mock.patch(
-      vm_util.__name__ + '.IssueCommand',
-      side_effect=ReturnVal) as issue_command, mock.patch(
-          builtins.__name__ +
-          '.open'), mock.patch(vm_util.__name__ +
-                               '.NamedTemporaryFile'):
+      vm_util.__name__ + '.IssueCommand', side_effect=ReturnVal
+  ) as issue_command, mock.patch(builtins.__name__ + '.open'), mock.patch(
+      vm_util.__name__ + '.NamedTemporaryFile'
+  ):
     yield issue_command
 
 
 class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testStringMachineType(self):
-    result = gce_virtual_machine.GceVmSpec(_COMPONENT,
-                                           machine_type='n1-standard-8')
+    result = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='n1-standard-8'
+    )
     self.assertEqual(result.machine_type, 'n1-standard-8')
     self.assertIsNone(result.cpus)
     self.assertIsNone(result.memory)
@@ -116,17 +109,20 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testStringMachineTypeWithGpus(self):
     gpu_count = 2
     gpu_type = 'k80'
-    result = gce_virtual_machine.GceVmSpec(_COMPONENT,
-                                           machine_type='n1-standard-8',
-                                           gpu_count=gpu_count,
-                                           gpu_type=gpu_type)
+    result = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='n1-standard-8',
+        gpu_count=gpu_count,
+        gpu_type=gpu_type,
+    )
     self.assertEqual(result.machine_type, 'n1-standard-8')
     self.assertEqual(result.gpu_type, 'k80')
     self.assertEqual(result.gpu_count, 2)
 
   def testCustomMachineType(self):
-    result = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
-        'cpus': 1, 'memory': '7.5GiB'})
+    result = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type={'cpus': 1, 'memory': '7.5GiB'}
+    )
     self.assertIsNone(result.machine_type)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
@@ -134,13 +130,12 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCustomMachineTypeWithGpus(self):
     gpu_count = 2
     gpu_type = 'k80'
-    result = gce_virtual_machine.GceVmSpec(_COMPONENT,
-                                           machine_type={
-                                               'cpus': 1,
-                                               'memory': '7.5GiB'
-                                           },
-                                           gpu_count=gpu_count,
-                                           gpu_type=gpu_type)
+    result = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type={'cpus': 1, 'memory': '7.5GiB'},
+        gpu_count=gpu_count,
+        gpu_type=gpu_type,
+    )
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
     self.assertEqual(result.gpu_type, 'k80')
@@ -151,10 +146,8 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     result = gce_virtual_machine.GceVmSpec(
         _COMPONENT,
         flag_values=FLAGS,
-        machine_type={
-            'cpus': 1,
-            'memory': '7.5GiB'
-        })
+        machine_type={'cpus': 1, 'memory': '7.5GiB'},
+    )
     self.assertEqual(result.machine_type, 'n1-standard-8')
     self.assertIsNone(result.cpus)
     self.assertIsNone(result.memory)
@@ -162,7 +155,8 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCustomMachineTypeFlagOverride(self):
     FLAGS['machine_type'].parse('{cpus: 1, memory: 7.5GiB}')
     result = gce_virtual_machine.GceVmSpec(
-        _COMPONENT, flag_values=FLAGS, machine_type='n1-standard-8')
+        _COMPONENT, flag_values=FLAGS, machine_type='n1-standard-8'
+    )
     self.assertIsNone(result.machine_type)
     self.assertEqual(result.cpus, 1)
     self.assertEqual(result.memory, 7680)
@@ -172,63 +166,92 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(GceVirtualMachineTestCase, self).setUp()
-    p = mock.patch(gce_virtual_machine.__name__ +
-                   '.gce_network.GceNetwork.GetNetwork')
+    p = mock.patch(
+        gce_virtual_machine.__name__ + '.gce_network.GceNetwork.GetNetwork'
+    )
     self.mock_get_network = p.start()
     self.addCleanup(p.stop)
-    p = mock.patch(gce_virtual_machine.__name__ +
-                   '.gce_network.GceFirewall.GetFirewall')
+    p = mock.patch(
+        gce_virtual_machine.__name__ + '.gce_network.GceFirewall.GetFirewall'
+    )
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
 
     get_tmp_dir_mock = mock.patch(
-        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir'
+    )
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
   def testVmWithMachineTypeNonPreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(
-        _COMPONENT, machine_type='test_machine_type', project='p')
+        _COMPONENT, machine_type='test_machine_type', project='p'
+    )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
     self.assertDictContainsSubset(
-        {'dedicated_host': False, 'machine_type': 'test_machine_type',
-         'project': 'p'},
-        vm.GetResourceMetadata()
+        {
+            'dedicated_host': False,
+            'machine_type': 'test_machine_type',
+            'project': 'p',
+        },
+        vm.GetResourceMetadata(),
     )
 
   def testVmWithMachineTypePreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(
-        _COMPONENT, machine_type='test_machine_type', preemptible=True,
-        project='p')
+        _COMPONENT,
+        machine_type='test_machine_type',
+        preemptible=True,
+        project='p',
+    )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
     self.assertDictContainsSubset(
-        {'dedicated_host': False, 'machine_type': 'test_machine_type',
-         'preemptible': True, 'project': 'p'},
-        vm.GetResourceMetadata()
+        {
+            'dedicated_host': False,
+            'machine_type': 'test_machine_type',
+            'preemptible': True,
+            'project': 'p',
+        },
+        vm.GetResourceMetadata(),
     )
 
   def testCustomVmNonPreemptible(self):
-    spec = gce_virtual_machine.GceVmSpec(_COMPONENT, machine_type={
-        'cpus': 1, 'memory': '1.0GiB'}, project='p')
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type={'cpus': 1, 'memory': '1.0GiB'}, project='p'
+    )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
     self.assertDictContainsSubset(
-        {'cpus': 1, 'memory_mib': 1024, 'project': 'p',
-         'dedicated_host': False},
-        vm.GetResourceMetadata())
+        {
+            'cpus': 1,
+            'memory_mib': 1024,
+            'project': 'p',
+            'dedicated_host': False,
+        },
+        vm.GetResourceMetadata(),
+    )
 
   def testCustomVmPreemptible(self):
     spec = gce_virtual_machine.GceVmSpec(
-        _COMPONENT, machine_type={'cpus': 1, 'memory': '1.0GiB'},
+        _COMPONENT,
+        machine_type={'cpus': 1, 'memory': '1.0GiB'},
         preemptible=True,
-        project='fakeproject')
+        project='fakeproject',
+    )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
-    self.assertDictContainsSubset({
-        'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
-        'dedicated_host': False, 'preemptible': True}, vm.GetResourceMetadata())
+    self.assertDictContainsSubset(
+        {
+            'cpus': 1,
+            'memory_mib': 1024,
+            'project': 'fakeproject',
+            'dedicated_host': False,
+            'preemptible': True,
+        },
+        vm.GetResourceMetadata(),
+    )
 
   def testCustomVmWithGpus(self):
     spec = gce_virtual_machine.GceVmSpec(
@@ -236,40 +259,51 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         machine_type={'cpus': 1, 'memory': '1.0GiB'},
         gpu_count=2,
         gpu_type='k80',
-        project='fakeproject')
+        project='fakeproject',
+    )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm._GenerateCreateCommand('')
     vm.created = True
-    self.assertDictContainsSubset({
-        'cpus': 1, 'memory_mib': 1024, 'project': 'fakeproject',
-        'dedicated_host': False, 'gpu_count': 2, 'gpu_type': 'k80'
-    }, vm.GetResourceMetadata())
+    self.assertDictContainsSubset(
+        {
+            'cpus': 1,
+            'memory_mib': 1024,
+            'project': 'fakeproject',
+            'dedicated_host': False,
+            'gpu_count': 2,
+            'gpu_type': 'k80',
+        },
+        vm.GetResourceMetadata(),
+    )
 
   @parameterized.named_parameters(
-      ('custom', {
-          'cpus': 1,
-          'memory': '1.0GiB'
-      }, 'skylake', 'skylake'),
+      ('custom', {'cpus': 1, 'memory': '1.0GiB'}, 'skylake', 'skylake'),
       ('n1', 'n1-standard-2', 'skylake', 'skylake'),
   )
-  def testGenerateCreateCommand(self, machine_type, min_cpu_platform_flag,
-                                min_cpu_platform_in_command):
+  def testGenerateCreateCommand(
+      self, machine_type, min_cpu_platform_flag, min_cpu_platform_in_command
+  ):
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT,
         machine_type=machine_type,
         gpu_count=2,
         gpu_type='t4',
         project='fakeproject',
-        min_cpu_platform=min_cpu_platform_flag)
+        min_cpu_platform=min_cpu_platform_flag,
+    )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     gcloud_cmd = vm._GenerateCreateCommand('x')
-    self.assertEqual(min_cpu_platform_in_command,
-                     gcloud_cmd.flags.get('min-cpu-platform'))
+    self.assertEqual(
+        min_cpu_platform_in_command, gcloud_cmd.flags.get('min-cpu-platform')
+    )
 
   def testUpdateInterruptibleVmStatus(self):
     spec = gce_virtual_machine.GceVmSpec(
-        _COMPONENT, machine_type='test_machine_type', preemptible=True,
-        project='p')
+        _COMPONENT,
+        machine_type='test_machine_type',
+        preemptible=True,
+        project='p',
+    )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
     vm.name = 'pkb-1234-0'
@@ -297,9 +331,12 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(fake_rets) as issue_command:
       vm._UpdateInterruptibleVmStatusThroughApi()
       command_string = ' '.join(issue_command.call_args[0][0])
-      self.assertRegex(command_string, 'gcloud compute operations list --filter'
-                       fr' targetLink.scope\(\):{vm.name} --format json '
-                       f'--project p --quiet --zones {vm.zone}')
+      self.assertRegex(
+          command_string,
+          'gcloud compute operations list --filter'
+          rf' targetLink.scope\(\):{vm.name} --format json '
+          f'--project p --quiet --zones {vm.zone}',
+      )
       self.assertTrue(vm.spot_early_termination)
 
   @parameterized.named_parameters(
@@ -360,24 +397,29 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.gcp_instance_metadata = ''
     FLAGS.gcloud_path = 'gcloud'
 
-    p = mock.patch(gce_virtual_machine.__name__ +
-                   '.gce_network.GceNetwork.GetNetwork')
+    p = mock.patch(
+        gce_virtual_machine.__name__ + '.gce_network.GceNetwork.GetNetwork'
+    )
     self.mock_get_network = p.start()
     self.addCleanup(p.stop)
-    p = mock.patch(gce_virtual_machine.__name__ +
-                   '.gce_network.GceFirewall.GetFirewall')
+    p = mock.patch(
+        gce_virtual_machine.__name__ + '.gce_network.GceFirewall.GetFirewall'
+    )
 
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
-    self.spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
-                                              machine_type='fake-machine-type')
-    p = mock.patch(gce_virtual_machine.__name__ +
-                   '.linux_vm.BaseLinuxMixin._GetNumCpus')
+    self.spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='fake-machine-type'
+    )
+    p = mock.patch(
+        gce_virtual_machine.__name__ + '.linux_vm.BaseLinuxMixin._GetNumCpus'
+    )
     self.mock_get_num_cpus = p.start()
     self.addCleanup(p.stop)
 
     get_tmp_dir_mock = mock.patch(
-        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir'
+    )
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
@@ -392,11 +434,13 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     return fake_rets
 
   def testCreateUbuntu2004(self):
-    vm_class = virtual_machine.GetVmClass(provider_info.GCP,
-                                          os_types.UBUNTU2004)
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.GCP, os_types.UBUNTU2004
+    )
     fake_image = 'fake-ubuntu2004'
     with PatchCriticalObjects(
-        self._CreateFakeReturnValues(fake_image)) as issue_command:
+        self._CreateFakeReturnValues(fake_image)
+    ) as issue_command:
       vm = vm_class(self.spec)
       vm._CreateDependencies()
       vm._Create()
@@ -411,30 +455,39 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('gcloud compute instances create', command_string)
       self.assertIn(
           '--image-family ubuntu-2004-lts --image-project ubuntu-os-cloud',
-          command_string)
+          command_string,
+      )
       self.assertNotIn('--boot-disk-size', command_string)
       self.assertIn('--boot-disk-type', command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
-      self.assertDictContainsSubset({'image': fake_image,
-                                     'image_family': 'ubuntu-2004-lts',
-                                     'image_project': 'ubuntu-os-cloud',
-                                     'boot_disk_size': '10',
-                                     'boot_disk_type': 'pd-standard'},
-                                    vm.GetResourceMetadata())
+      self.assertDictContainsSubset(
+          {
+              'image': fake_image,
+              'image_family': 'ubuntu-2004-lts',
+              'image_project': 'ubuntu-os-cloud',
+              'boot_disk_size': '10',
+              'boot_disk_type': 'pd-standard',
+          },
+          vm.GetResourceMetadata(),
+      )
 
   def testCreateUbuntuInCustomProject(self):
     """Test simulating passing --image and --image_project."""
-    vm_class = virtual_machine.GetVmClass(provider_info.GCP,
-                                          os_types.UBUNTU2004)
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.GCP, os_types.UBUNTU2004
+    )
     fake_image = 'fake-ubuntu2004'
     fake_image_project = 'fake-project'
-    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
-                                         machine_type='fake-machine-type',
-                                         image=fake_image,
-                                         image_project=fake_image_project)
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='fake-machine-type',
+        image=fake_image,
+        image_project=fake_image_project,
+    )
     with PatchCriticalObjects(
-        self._CreateFakeReturnValues(fake_image)) as issue_command:
+        self._CreateFakeReturnValues(fake_image)
+    ) as issue_command:
       vm = vm_class(spec)
       vm._CreateDependencies()
       vm._Create()
@@ -444,29 +497,32 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud compute instances create', command_string)
       self.assertIn(
-          '--image fake-ubuntu2004 --image-project fake-project',
-          command_string)
+          '--image fake-ubuntu2004 --image-project fake-project', command_string
+      )
       self.assertNotIn('--image-family', command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset({'image': fake_image,
-                                     'image_project': 'fake-project'},
-                                    vm_metadata)
+      self.assertDictContainsSubset(
+          {'image': fake_image, 'image_project': 'fake-project'}, vm_metadata
+      )
       self.assertNotIn('image_family', vm_metadata)
 
   def testCreateUbuntuInCustomDisk(self):
     """Test simulating passing --image and --image_project."""
-    vm_class = virtual_machine.GetVmClass(provider_info.GCP,
-                                          os_types.UBUNTU2004)
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.GCP, os_types.UBUNTU2004
+    )
     fake_image = 'fake-ubuntu2004'
     fake_image_project = 'fake-project'
-    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
-                                         machine_type='fake-machine-type',
-                                         image=fake_image,
-                                         image_project=fake_image_project,
-                                         boot_disk_size=20,
-                                         boot_disk_type='fake-disk-type')
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='fake-machine-type',
+        image=fake_image,
+        image_project=fake_image_project,
+        boot_disk_size=20,
+        boot_disk_type='fake-disk-type',
+    )
     fake_disk = {
         'id': '123456',
         'kind': 'compute#disk',
@@ -477,7 +533,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
 
     with PatchCriticalObjects(
-        self._CreateFakeReturnValues(fake_image, fake_disk)) as issue_command:
+        self._CreateFakeReturnValues(fake_image, fake_disk)
+    ) as issue_command:
       vm = vm_class(spec)
       vm._CreateDependencies()
       vm._Create()
@@ -491,21 +548,26 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset({'image': fake_image,
-                                     'image_project': 'fake-project',
-                                     'boot_disk_size': 20,
-                                     'boot_disk_type': 'fake-disk-type'},
-                                    vm_metadata)
+      self.assertDictContainsSubset(
+          {
+              'image': fake_image,
+              'image_project': 'fake-project',
+              'boot_disk_size': 20,
+              'boot_disk_type': 'fake-disk-type',
+          },
+          vm_metadata,
+      )
       self.assertNotIn('image_family', vm_metadata)
 
   def testCreateRhel7CustomImage(self):
     vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.RHEL7)
     fake_image = 'fake-custom-rhel-image'
-    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
-                                         machine_type='fake-machine-type',
-                                         image=fake_image)
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='fake-machine-type', image=fake_image
+    )
     with PatchCriticalObjects(
-        self._CreateFakeReturnValues(fake_image)) as issue_command:
+        self._CreateFakeReturnValues(fake_image)
+    ) as issue_command:
       vm = vm_class(spec)
       vm._CreateDependencies()
       vm._Create()
@@ -519,19 +581,20 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset({'image': fake_image,
-                                     'image_project': 'rhel-cloud'},
-                                    vm_metadata)
+      self.assertDictContainsSubset(
+          {'image': fake_image, 'image_project': 'rhel-cloud'}, vm_metadata
+      )
       self.assertNotIn('image_family', vm_metadata)
 
   def testCreateCentOs7CustomImage(self):
     vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.CENTOS7)
     fake_image = 'fake-custom-centos7-image'
-    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
-                                         machine_type='fake-machine-type',
-                                         image=fake_image)
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='fake-machine-type', image=fake_image
+    )
     with PatchCriticalObjects(
-        self._CreateFakeReturnValues(fake_image)) as issue_command:
+        self._CreateFakeReturnValues(fake_image)
+    ) as issue_command:
       vm = vm_class(spec)
       vm._CreateDependencies()
       vm._Create()
@@ -545,18 +608,20 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset({'image': fake_image,
-                                     'image_project': 'centos-cloud'},
-                                    vm_metadata)
+      self.assertDictContainsSubset(
+          {'image': fake_image, 'image_project': 'centos-cloud'}, vm_metadata
+      )
       self.assertNotIn('image_family', vm_metadata)
 
   def testCosVm(self):
     vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.COS)
-    spec = gce_virtual_machine.GceVmSpec(_COMPONENT,
-                                         machine_type='fake-machine-type')
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='fake-machine-type'
+    )
     fake_image = 'fake_cos_image'
     with PatchCriticalObjects(
-        self._CreateFakeReturnValues(fake_image)) as issue_command:
+        self._CreateFakeReturnValues(fake_image)
+    ) as issue_command:
       vm = vm_class(spec)
       vm._CreateDependencies()
       vm._Create()
@@ -570,10 +635,14 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset({'image': fake_image,
-                                     'image_family': 'cos-stable',
-                                     'image_project': 'cos-cloud'},
-                                    vm_metadata)
+      self.assertDictContainsSubset(
+          {
+              'image': fake_image,
+              'image_family': 'cos-stable',
+              'image_project': 'cos-cloud',
+          },
+          vm_metadata,
+      )
 
 
 class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -589,12 +658,15 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     # thread's benchmark spec. Create such a benchmark spec for these tests.
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={})
+        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={}
+    )
     self._benchmark_spec = benchmark_spec.BenchmarkSpec(
-        mock.MagicMock(), config_spec, _BENCHMARK_UID)
+        mock.MagicMock(), config_spec, _BENCHMARK_UID
+    )
 
     get_tmp_dir_mock = mock.patch(
-        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir'
+    )
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
@@ -606,7 +678,8 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
           'test_vm_spec.GCP',
           FLAGS,
           image='image',
-          machine_type='test_machine_type')
+          machine_type='test_machine_type',
+      )
       vm = pkb_common_test_case.TestGceVirtualMachine(vm_spec)
       vm._CreateDependencies()
       vm._Create()
@@ -620,19 +693,26 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testMigrateOnMaintenanceFlagTrueWithGpus(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._CreateVmCommand(
-          gce_migrate_on_maintenance=True, gpu_count=1, gpu_type='k80')
-    self.assertEqual(str(cm.exception), (
-        'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
-        'or network placement groups, as it is not supported by GCP.'))
+          gce_migrate_on_maintenance=True, gpu_count=1, gpu_type='k80'
+      )
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
+            'or network placement groups, as it is not supported by GCP.'
+        ),
+    )
 
   def testMigrateOnMaintenanceFlagFalseWithGpus(self):
     _, call_count = self._CreateVmCommand(
-        gce_migrate_on_maintenance=False, gpu_count=1, gpu_type='k80')
+        gce_migrate_on_maintenance=False, gpu_count=1, gpu_type='k80'
+    )
     self.assertEqual(call_count, 1)
 
   def testAcceleratorTypeOverrideFlag(self):
     cmd, call_count = self._CreateVmCommand(
-        gce_accelerator_type_override='fake_type', gpu_count=1, gpu_type='k80')
+        gce_accelerator_type_override='fake_type', gpu_count=1, gpu_type='k80'
+    )
     self.assertEqual(call_count, 1)
     self.assertIn('--accelerator', cmd)
     self.assertIn('type=fake_type,count=1', cmd)
@@ -676,21 +756,26 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testAlphaMaintenanceFlag(self):
     """Tests that egress bandwidth can be set as tier 1."""
     gcloud_init = util.GcloudCommand.__init__
+
     def InitAndSetAlpha(self, resource, *args):
       gcloud_init(self, resource, *args)
       self.use_alpha_gcloud = True
+
     with mock.patch.object(util.GcloudCommand, '__init__', InitAndSetAlpha):
       cmd, call_count = self._CreateVmCommand(
-          gce_egress_bandwidth_tier='TIER_1', gpu_count=1, gpu_type='k80')
+          gce_egress_bandwidth_tier='TIER_1', gpu_count=1, gpu_type='k80'
+      )
     self.assertEqual(call_count, 1)
     self.assertIn('--on-host-maintenance', cmd)
 
   def testGcpInstanceMetadataFlag(self):
     cmd, call_count = self._CreateVmCommand(
-        gcp_instance_metadata=['k1:v1', 'k2:v2,k3:v3'], owner='test-owner')
+        gcp_instance_metadata=['k1:v1', 'k2:v2,k3:v3'], owner='test-owner'
+    )
     self.assertEqual(call_count, 1)
-    actual_metadata = re.compile(
-        r'--metadata\s+(.*)(\s+--)?').search(cmd).group(1)  # pytype: disable=attribute-error  # re-none
+    actual_metadata = (
+        re.compile(r'--metadata\s+(.*)(\s+--)?').search(cmd).group(1)  # pytype: disable=attribute-error  # re-none
+    )
     self.assertIn('k1=v1', actual_metadata)
     self.assertIn('k2=v2', actual_metadata)
     self.assertIn('k3=v3', actual_metadata)
@@ -699,23 +784,26 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testGcpInstanceMetadataFromFileFlag(self):
     cmd, call_count = self._CreateVmCommand(
-        gcp_instance_metadata_from_file=['k1:p1', 'k2:p2,k3:p3'])
+        gcp_instance_metadata_from_file=['k1:p1', 'k2:p2,k3:p3']
+    )
     self.assertEqual(call_count, 1)
-    actual_metadata_from_file = re.compile(
-        r'--metadata-from-file\s+(.*)(\s+--)?').search(cmd).group(1)  # pytype: disable=attribute-error  # re-none
+    actual_metadata_from_file = (
+        re.compile(r'--metadata-from-file\s+(.*)(\s+--)?').search(cmd).group(1)  # pytype: disable=attribute-error  # re-none
+    )
     self.assertIn('k1=p1', actual_metadata_from_file)
     self.assertIn('k2=p2', actual_metadata_from_file)
     self.assertIn('k3=p3', actual_metadata_from_file)
 
   def testGceTags(self):
     self.assertIn('--tags perfkitbenchmarker', self._CreateVmCommand()[0])
-    self.assertIn('--tags perfkitbenchmarker,testtag',
-                  self._CreateVmCommand(gce_tags=['testtag'])[0])
+    self.assertIn(
+        '--tags perfkitbenchmarker,testtag',
+        self._CreateVmCommand(gce_tags=['testtag'])[0],
+    )
 
   def testShieldedSecureBootFlag(self):
     """Tests that the custom shielded secure boot flag is supported."""
-    cmd, call_count = self._CreateVmCommand(
-        gce_shielded_secure_boot=True)
+    cmd, call_count = self._CreateVmCommand(gce_shielded_secure_boot=True)
     self.assertEqual(call_count, 1)
     self.assertIn('--shielded-secure-boot', cmd)
 
@@ -724,33 +812,40 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(GCEVMCreateTestCase, self).setUp()
-    p = mock.patch(gce_virtual_machine.__name__ +
-                   '.gce_network.GceNetwork.GetNetwork')
+    p = mock.patch(
+        gce_virtual_machine.__name__ + '.gce_network.GceNetwork.GetNetwork'
+    )
     self.mock_get_network = p.start()
     self.addCleanup(p.stop)
-    p = mock.patch(gce_virtual_machine.__name__ +
-                   '.gce_network.GceFirewall.GetFirewall')
+    p = mock.patch(
+        gce_virtual_machine.__name__ + '.gce_network.GceFirewall.GetFirewall'
+    )
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
 
     get_tmp_dir_mock = mock.patch(
-        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir'
+    )
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
   @mock.patch('time.sleep', side_effect=lambda _: None)
   def testCreateRateLimitedMachineCreated(self, mock_cmd):
-    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'The resource already exists', 1)]
+    fake_rets = [
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'The resource already exists', 1),
+    ]
     with PatchCriticalObjects(fake_rets) as issue_command:
       spec = gce_virtual_machine.GceVmSpec(
-          _COMPONENT, machine_type={
+          _COMPONENT,
+          machine_type={
               'cpus': 1,
               'memory': '1.0GiB',
-          })
+          },
+      )
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       vm._CreateDependencies()
       vm._Create()  # No error should be thrown.
@@ -763,43 +858,55 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
       fake_rets.append(('stdout', 'Rate Limit Exceeded', 1))
     with PatchCriticalObjects(fake_rets) as issue_command:
       spec = gce_virtual_machine.GceVmSpec(
-          _COMPONENT, machine_type={
+          _COMPONENT,
+          machine_type={
               'cpus': 1,
               'memory': '1.0GiB',
-          })
+          },
+      )
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(vm_util.RetriesExceededRetryError) as e:
         vm._CreateDependencies()
         vm._Create()
-      self.assertIs(type(e.exception.__cause__),
-                    errors.Benchmarks.QuotaFailure.RateLimitExceededError)
-      self.assertEqual(issue_command.call_count,
-                       util.RATE_LIMITED_MAX_RETRIES + 1)
+      self.assertIs(
+          type(e.exception.__cause__),
+          errors.Benchmarks.QuotaFailure.RateLimitExceededError,
+      )
+      self.assertEqual(
+          issue_command.call_count, util.RATE_LIMITED_MAX_RETRIES + 1
+      )
 
   def testCreateVMAlreadyExists(self):
     fake_rets = [('stdout', 'The resource already exists', 1)]
     with PatchCriticalObjects(fake_rets):
       spec = gce_virtual_machine.GceVmSpec(
-          _COMPONENT, machine_type={
+          _COMPONENT,
+          machine_type={
               'cpus': 1,
               'memory': '1.0GiB',
-          })
+          },
+      )
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(errors.Resource.CreationError):
         vm._CreateDependencies()
         vm._Create()
 
   def testCreateVMSubnetworkNotReady(self):
-    fake_rets = [('stdout', """\
+    fake_rets = [(
+        'stdout',
+        """\
 (gcloud.compute.instances.create) Could not fetch resource:
 - The resource 'projects/myproject/regions/us-central1/subnetworks/mysubnet' is not ready""",
-                  1)]
+        1,
+    )]
     with PatchCriticalObjects(fake_rets):
       spec = gce_virtual_machine.GceVmSpec(
-          _COMPONENT, machine_type={
+          _COMPONENT,
+          machine_type={
               'cpus': 1,
               'memory': '1.0GiB',
-          })
+          },
+      )
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(errors.Resource.RetryableCreationError):
         vm._CreateDependencies()
@@ -807,92 +914,106 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @parameterized.named_parameters(
       {
-          'testcase_name':
-              'unsupported_machine_type',
+          'testcase_name': 'unsupported_machine_type',
           'fake_stderr': (
-              'ERROR: (gcloud.compute.instances.create) Could not '
-              "fetch resource:\n - Invalid value for field 'resource.machineType'"
-              ": 'https://compute.googleapis.com/compute/v1/projects/"
-              "control-plane-tests/zones/us-west3-c/machineTypes/n2-standard-2'"
-              ". Machine type with name 'n2-standard-2' does not exist in zone "
-              "'us-west3-c'."),
-          'expected_error': errors.Benchmarks.UnsupportedConfigError
-      }, {
-          'testcase_name':
-              'unsupported_cpu_platform_type',
-          'fake_stderr':
-              ('ERROR: (gcloud.compute.instances.create) Could not fetch '
-               'resource:\n - '
-               "CPU platform type with name 'icelake' does not exist in zone "
-               "'europe-west8-a'."),
-          'expected_error': errors.Benchmarks.UnsupportedConfigError
-      }, {
-          'testcase_name':
-              'unsupported_resource',
-          'fake_stderr':
-              ('ERROR: (gcloud.compute.instances.create) Could not fetch '
-               "resource:\n - The resource 'projects/bionic-baton-343/zones/"
-               "us-west4-c/acceleratorTypes/nvidia-tesla-v100' was not found"),
-          'expected_error': errors.Benchmarks.UnsupportedConfigError
-      }, {
-          'testcase_name':
-              'unsupported_features_not_compatible',
-          'fake_stderr':
-              ('ERROR: (gcloud.compute.instances.create) Could not fetch '
-               'resource:\n - [n1-standard-2, Absence of any accelerator] '
-               'features are not compatible for creating instance.'),
-          'expected_error': errors.Benchmarks.UnsupportedConfigError
-      }, {
-          'testcase_name':
-              'unsupported_requires_accelerator',
-          'fake_stderr':
-              ('ERROR: (gcloud.compute.instances.create) HTTPError 400: '
-               'n1-standard-2 can not be used without accelerator(s) in zone'),
-          'expected_error': errors.Benchmarks.UnsupportedConfigError
-      }, {
-          'testcase_name':
-              'internal_error',
-          'fake_stderr':
-              ('ERROR: (gcloud.compute.instances.create) Could not fetch '
-               'resource:\n - Internal error. Please try again or contact '
-               "Google Support. (Code: '5EB8741503E10.AC27D3.3305BC26')"),
-          'expected_error': errors.Resource.CreationInternalError
-      }, {
-          'testcase_name':
-              'service_unavailable',
-          'fake_stderr':
-              ('ERROR: (gcloud.compute.instances.create) Could not fetch'
-               'resource:\n - The service is currently unavailable.'),
-          'expected_error': errors.Benchmarks.KnownIntermittentError
-      }, {
-          'testcase_name':
-              'duplicate_create_request',
-          'fake_stderr':
-              ('ERROR: (gcloud.compute.instances.create) HTTPError 409: '
-               'The resource "projects/control-plane-tests/zones/europe-west6-b/'
-               'instances/pkb-5b778a551293-0" already exists'),
-          'expected_error': errors.Benchmarks.KnownIntermittentError
-      })
+              'ERROR: (gcloud.compute.instances.create) Could not fetch'
+              " resource:\n - Invalid value for field 'resource.machineType':"
+              " 'https://compute.googleapis.com/compute/v1/projects/control-plane-tests/zones/us-west3-c/machineTypes/n2-standard-2'."
+              " Machine type with name 'n2-standard-2' does not exist in zone"
+              " 'us-west3-c'."
+          ),
+          'expected_error': errors.Benchmarks.UnsupportedConfigError,
+      },
+      {
+          'testcase_name': 'unsupported_cpu_platform_type',
+          'fake_stderr': (
+              'ERROR: (gcloud.compute.instances.create) Could not fetch '
+              'resource:\n - '
+              "CPU platform type with name 'icelake' does not exist in zone "
+              "'europe-west8-a'."
+          ),
+          'expected_error': errors.Benchmarks.UnsupportedConfigError,
+      },
+      {
+          'testcase_name': 'unsupported_resource',
+          'fake_stderr': (
+              'ERROR: (gcloud.compute.instances.create) Could not fetch '
+              "resource:\n - The resource 'projects/bionic-baton-343/zones/"
+              "us-west4-c/acceleratorTypes/nvidia-tesla-v100' was not found"
+          ),
+          'expected_error': errors.Benchmarks.UnsupportedConfigError,
+      },
+      {
+          'testcase_name': 'unsupported_features_not_compatible',
+          'fake_stderr': (
+              'ERROR: (gcloud.compute.instances.create) Could not fetch '
+              'resource:\n - [n1-standard-2, Absence of any accelerator] '
+              'features are not compatible for creating instance.'
+          ),
+          'expected_error': errors.Benchmarks.UnsupportedConfigError,
+      },
+      {
+          'testcase_name': 'unsupported_requires_accelerator',
+          'fake_stderr': (
+              'ERROR: (gcloud.compute.instances.create) HTTPError 400: '
+              'n1-standard-2 can not be used without accelerator(s) in zone'
+          ),
+          'expected_error': errors.Benchmarks.UnsupportedConfigError,
+      },
+      {
+          'testcase_name': 'internal_error',
+          'fake_stderr': (
+              'ERROR: (gcloud.compute.instances.create) Could not fetch '
+              'resource:\n - Internal error. Please try again or contact '
+              "Google Support. (Code: '5EB8741503E10.AC27D3.3305BC26')"
+          ),
+          'expected_error': errors.Resource.CreationInternalError,
+      },
+      {
+          'testcase_name': 'service_unavailable',
+          'fake_stderr': (
+              'ERROR: (gcloud.compute.instances.create) Could not fetch'
+              'resource:\n - The service is currently unavailable.'
+          ),
+          'expected_error': errors.Benchmarks.KnownIntermittentError,
+      },
+      {
+          'testcase_name': 'duplicate_create_request',
+          'fake_stderr': (
+              'ERROR: (gcloud.compute.instances.create) HTTPError 409: '
+              'The resource "projects/control-plane-tests/zones/europe-west6-b/'
+              'instances/pkb-5b778a551293-0" already exists'
+          ),
+          'expected_error': errors.Benchmarks.KnownIntermittentError,
+      },
+  )
   def testCreateVMErrorCases(self, fake_stderr, expected_error):
     fake_rets = [('stdout', fake_stderr, 1)]
     with PatchCriticalObjects(fake_rets):
       spec = gce_virtual_machine.GceVmSpec(
-          _COMPONENT, machine_type={
+          _COMPONENT,
+          machine_type={
               'cpus': 1,
               'memory': '1.0GiB',
-          })
+          },
+      )
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(expected_error):
         vm._CreateDependencies()
         vm._Create()
 
   @parameterized.named_parameters(
-      {'testcase_name': 'old_message', 'fake_stderr': '''\
+      {
+          'testcase_name': 'old_message',
+          'fake_stderr': """\
 "The zone 'projects/fake-project/zones/fake-zone' does not have enough \
 resources available to fulfill the request. Try a different zone, or try again \
 later."
-'''},
-      {'testcase_name': 'new_message', 'fake_stderr': '''\
+""",
+      },
+      {
+          'testcase_name': 'new_message',
+          'fake_stderr': """\
 code: ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS
 errorDetails:
 - help:
@@ -916,28 +1037,35 @@ errorDetails:
       zonesAvailable: us-central1-f,us-central1-a,us-central1-c
     reason: stockout
 message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enough
-  resources available to fulfill the request.  '(resource type:compute)'.'''})
+  resources available to fulfill the request.  '(resource type:compute)'.""",
+      },
+  )
   def testInsufficientCapacityCloudFailure(self, fake_stderr):
     fake_rets = [('stdout', fake_stderr, 1)]
     with PatchCriticalObjects(fake_rets):
       spec = gce_virtual_machine.GceVmSpec(
-          _COMPONENT, machine_type={
+          _COMPONENT,
+          machine_type={
               'cpus': 1,
               'memory': '1.0GiB',
-          })
+          },
+      )
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       with self.assertRaises(
-          errors.Benchmarks.InsufficientCapacityCloudFailure):
+          errors.Benchmarks.InsufficientCapacityCloudFailure
+      ):
         vm._CreateDependencies()
         vm._Create()
 
   def testVmWithoutGpu(self):
     with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(
-          _COMPONENT, machine_type={
+          _COMPONENT,
+          machine_type={
               'cpus': 1,
               'memory': '1.0GiB',
-          })
+          },
+      )
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       vm._CreateDependencies()
       vm._Create()
@@ -947,17 +1075,16 @@ message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enou
   def testVmWithGpu(self):
     with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(
-          _COMPONENT,
-          machine_type='n1-standard-8',
-          gpu_count=2,
-          gpu_type='k80')
+          _COMPONENT, machine_type='n1-standard-8', gpu_count=2, gpu_type='k80'
+      )
       vm = pkb_common_test_case.TestGceVirtualMachine(spec)
       vm._CreateDependencies()
       vm._Create()
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('--accelerator', issue_command.call_args[0][0])
-      self.assertIn('type=nvidia-tesla-k80,count=2',
-                    issue_command.call_args[0][0])
+      self.assertIn(
+          'type=nvidia-tesla-k80,count=2', issue_command.call_args[0][0]
+      )
       self.assertIn('--maintenance-policy', issue_command.call_args[0][0])
       self.assertIn('TERMINATE', issue_command.call_args[0][0])
 
@@ -966,34 +1093,43 @@ class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
 
   @mock.patch('time.sleep', side_effect=lambda _: None)
   def testGceFirewallRuleSuccessfulAfterRateLimited(self, mock_cmd):
-    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'some warning perhaps', 0)]
+    fake_rets = [
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'some warning perhaps', 0),
+    ]
     with PatchCriticalObjects(fake_rets) as issue_command:
-      fr = gce_network.GceFirewallRule('name', 'project', 'allow',
-                                       'network_name')
+      fr = gce_network.GceFirewallRule(
+          'name', 'project', 'allow', 'network_name'
+      )
       fr._Create()
       self.assertEqual(issue_command.call_count, 2)
 
   @mock.patch('time.sleep', side_effect=lambda _: None)
   def testGceFirewallRuleGenericErrorAfterRateLimited(self, mock_cmd):
-    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'some random firewall error', 1)]
+    fake_rets = [
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'some random firewall error', 1),
+    ]
     with PatchCriticalObjects(fake_rets) as issue_command:
       with self.assertRaises(errors.VmUtil.IssueCommandError):
-        fr = gce_network.GceFirewallRule('name', 'project', 'allow',
-                                         'network_name')
+        fr = gce_network.GceFirewallRule(
+            'name', 'project', 'allow', 'network_name'
+        )
         fr._Create()
       self.assertEqual(issue_command.call_count, 3)
 
   @mock.patch('time.sleep', side_effect=lambda _: None)
   def testGceFirewallRuleAlreadyExistsAfterRateLimited(self, mock_cmd):
-    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'firewall already exists', 1)]
+    fake_rets = [
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'firewall already exists', 1),
+    ]
     with PatchCriticalObjects(fake_rets) as issue_command:
-      fr = gce_network.GceFirewallRule('name', 'project', 'allow',
-                                       'network_name')
+      fr = gce_network.GceFirewallRule(
+          'name', 'project', 'allow', 'network_name'
+      )
       fr._Create()
       self.assertEqual(issue_command.call_count, 3)
 
@@ -1002,8 +1138,9 @@ class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
     fake_rets = [('stdout', 'some random firewall error', 1)]
     with PatchCriticalObjects(fake_rets) as issue_command:
       with self.assertRaises(errors.VmUtil.IssueCommandError):
-        fr = gce_network.GceFirewallRule('name', 'project', 'allow',
-                                         'network_name')
+        fr = gce_network.GceFirewallRule(
+            'name', 'project', 'allow', 'network_name'
+        )
         fr._Create()
       self.assertEqual(issue_command.call_count, 1)
 
@@ -1014,7 +1151,8 @@ class GceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
     super(GceNetworkTest, self).setUp()
     # need a benchmarkspec in the context to run
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        'cluster_boot', flag_values=FLAGS)
+        'cluster_boot', flag_values=FLAGS
+    )
     benchmark_spec.BenchmarkSpec(mock.Mock(), config_spec, 'uid')
 
   def testGetNetwork(self):
@@ -1078,21 +1216,24 @@ class GvnicTest(GceVirtualMachineTestCase):
         'supports-register-dump': 'no',
         'supports-statistics': 'yes',
         'supports-test': 'no',
-        'version': '1.0.0'
+        'version': '1.0.0',
     }
     self.assertEqual(expected, props)
-    self.mock_cmd.assert_called_with(
-        'PATH="${PATH}":/usr/sbin ethtool -i ens4')
+    self.mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ethtool -i ens4')
 
   @flagsaver.flagsaver(gce_nic_record_version=True)
   def testOnStartupSetGvnicVersion(self):
-    self.mock_cmd.side_effect = [(_IP_LINK_TEXT, ''), (_ETHTOOL_TEXT, ''),
-                                 (_IP_LINK_TEXT, '')]
+    self.mock_cmd.side_effect = [
+        (_IP_LINK_TEXT, ''),
+        (_ETHTOOL_TEXT, ''),
+        (_IP_LINK_TEXT, ''),
+    ]
     self.vm.OnStartup()
     self.assertEqual('1.0.0', self.vm._gvnic_version)
     self.assertEqual('1.0.0', self.vm.GetResourceMetadata()['gvnic_version'])
-    self.assertEqual('1460',
-                     list(self.vm._get_network_device_mtus().values())[0])
+    self.assertEqual(
+        '1460', list(self.vm._get_network_device_mtus().values())[0]
+    )
 
   @flagsaver.flagsaver(gce_nic_record_version=True)
   def testMissingVersionInProperties(self):
