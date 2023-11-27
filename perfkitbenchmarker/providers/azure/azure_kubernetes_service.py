@@ -20,6 +20,7 @@ from typing import List
 from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -128,6 +129,14 @@ class AksCluster(container_service.KubernetesCluster):
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
 
+  def InitializeNodePoolForCloud(
+      self,
+      vm_config: virtual_machine.BaseVirtualMachine,
+      nodepool_config: container_service.BaseNodePoolConfig,
+  ):
+    nodepool_config.disk_type = vm_config.os_disk.disk_type
+    nodepool_config.disk_size = vm_config.os_disk.disk_size
+
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
 
@@ -135,8 +144,8 @@ class AksCluster(container_service.KubernetesCluster):
       dict mapping string property key to value.
     """
     result = super(AksCluster, self).GetResourceMetadata()
-    result['boot_disk_type'] = self.vm_config.os_disk.disk_type
-    result['boot_disk_size'] = self.vm_config.os_disk.disk_size
+    result['boot_disk_type'] = self.default_nodepool.disk_type
+    result['boot_disk_size'] = self.default_nodepool.disk_size
     return result
 
   def _Create(self):
@@ -154,7 +163,7 @@ class AksCluster(container_service.KubernetesCluster):
         container_service.DEFAULT_NODEPOOL,
         '--nodepool-labels',
         f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
-    ] + self._GetNodeFlags(self.num_nodes, self.vm_config)
+    ] + self._GetNodeFlags(self.default_nodepool)
 
     # TODO(pclay): expose quota and capacity errors
     # Creating an AKS cluster with a fresh service principal usually fails due
@@ -166,30 +175,38 @@ class AksCluster(container_service.KubernetesCluster):
         # Half hour timeout on creating the cluster.
         timeout=1800)
 
-    for name, node_pool in self.nodepools.items():
-      self._CreateNodePool(name, node_pool)
+    for _, nodepool in self.nodepools.items():
+      self._CreateNodePool(nodepool)
 
-  def _CreateNodePool(self, name: str, node_pool):
+  def _CreateNodePool(
+      self, nodepool_config: container_service.BaseNodePoolConfig
+  ):
     """Creates a node pool."""
     cmd = [
         azure.AZURE_PATH, 'aks', 'nodepool', 'add',
         '--cluster-name', self.name,
-        '--name', name,
-        '--labels', f'pkb_nodepool={name}',
-    ] + self._GetNodeFlags(node_pool.num_nodes, node_pool.vm_config)
+        '--name', nodepool_config.name,
+        '--labels', f'pkb_nodepool={nodepool_config.name}',
+    ] + self._GetNodeFlags(nodepool_config)
     vm_util.IssueCommand(cmd, timeout=600)
 
-  def _GetNodeFlags(self, num_nodes: int, vm_config) -> List[str]:
+  def _GetNodeFlags(
+      self, nodepool_config: container_service.BaseNodePoolConfig
+  ) -> List[str]:
     """Common flags for create and nodepools add."""
     args = [
-        '--node-vm-size', vm_config.machine_type,
-        '--node-count', str(num_nodes),
+        '--node-vm-size',
+        nodepool_config.machine_type,
+        '--node-count',
+        str(nodepool_config.num_nodes),
     ] + self.resource_group.args
-    if self.vm_config.zone and self.vm_config.zone != self.region:
-      zones = ' '.join(zone[-1] for zone in self.vm_config.zone.split(','))
+    if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
+      zones = ' '.join(
+          zone[-1] for zone in self.default_nodepool.zone.split(',')
+      )
       args += ['--zones', zones]
-    if self.vm_config.os_disk and self.vm_config.os_disk.disk_size:
-      args += ['--node-osdisk-size', str(self.vm_config.os_disk.disk_size)]
+    if self.default_nodepool.disk_size:
+      args += ['--node-osdisk-size', str(self.default_nodepool.disk_size)]
     if self.cluster_version:
       args += ['--kubernetes-version', self.cluster_version]
     return args

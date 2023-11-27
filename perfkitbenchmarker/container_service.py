@@ -381,6 +381,33 @@ def NodePoolName(name: str) -> str:
   return name.replace('_', '')
 
 
+class BaseNodePoolConfig:
+  """A node pool's config, where each node in the node pool has the same config.
+
+  See also: https://cloud.google.com/kubernetes-engine/docs/concepts/node-pools
+  """
+
+  def __init__(self, vm_config: virtual_machine.BaseVirtualMachine, name: str):
+    # Use Virtual Machine class to resolve VM Spec. Note there is no actual VM;
+    # we just use it as a data holder to let VM subclass __init__'s handle
+    # parsing specific information like disks out of the spec.
+    self.machine_type = vm_config.machine_type
+    self.name = NodePoolName(name)
+    self.zone: str = vm_config.zone
+    self.sandbox_config: Optional[container_spec_lib.SandboxSpec] = None
+    self.num_nodes: int
+    self.disk_type: str
+    self.disk_size: int
+    # Defined by google_kubernetes_engine
+    self.max_local_disks: Optional[int]
+    self.gpu_type: Optional[str]
+    self.gpu_count: Optional[int]
+    self.threads_per_core: int
+    self.min_cpu_platform: str
+    self.cpus: int
+    self.memory_mib: int
+
+
 class BaseContainerCluster(resource.BaseResource):
   """A cluster that can be used to schedule containers."""
 
@@ -389,39 +416,86 @@ class BaseContainerCluster(resource.BaseResource):
   CLOUD: str
   CLUSTER_TYPE: str
 
-  def __init__(self, cluster_spec):
+  def __init__(self, cluster_spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(user_managed=bool(cluster_spec.static_cluster))
     self.name: str = cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
-    # Use Virtual Machine class to resolve VM Spec. Note there is no actual VM;
-    # we just use it as a data holder & letting VM subclass __init__'s handle
-    # parse out specific information like disks out of the spec.
-    self.vm_config: virtual_machine.BaseVirtualMachine = (
+    default_vm_config: virtual_machine.BaseVirtualMachine = (
         virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
             cluster_spec.vm_spec
         )
     )
-    self.zone: str = self.vm_config.zone
-    for name, nodepool in cluster_spec.nodepools.copy().items():
-      nodepool_zone = nodepool.vm_spec.zone
-      # VM Classes can require zones. But nodepools have optional zones.
-      if not nodepool_zone:
-        nodepool.vm_spec.zone = self.zone
-      nodepool.vm_config = virtual_machine.GetVmClass(
-          self.CLOUD, os_types.DEFAULT
-      )(nodepool.vm_spec)
-      nodepool.vm_config.zone = nodepool_zone
-      nodepool.num_nodes = nodepool.vm_count
-      # Fix name
-      del cluster_spec.nodepools[name]
-      cluster_spec.nodepools[NodePoolName(name)] = nodepool
-    self.nodepools: dict[str, Any] = cluster_spec.nodepools
-    self.num_nodes: int = cluster_spec.vm_count
-    self.min_nodes: int = cluster_spec.min_vm_count or self.num_nodes
-    self.max_nodes: int = cluster_spec.max_vm_count or self.num_nodes
+    self.default_nodepool = self._InitializeDefaultNodePool(
+        cluster_spec, default_vm_config
+    )
+    self.nodepools: dict[str, BaseNodePoolConfig] = {}
+    for name, nodepool_spec in cluster_spec.nodepools.copy().items():
+      vm_config: virtual_machine.BaseVirtualMachine = (
+          virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
+              nodepool_spec.vm_spec
+          )
+      )
+      nodepool = self._InitializeNodePool(name, nodepool_spec, vm_config)
+      self.nodepools[nodepool.name] = nodepool
+    self.min_nodes: int = (
+        cluster_spec.min_vm_count or self.default_nodepool.num_nodes
+    )
+    self.max_nodes: int = (
+        cluster_spec.max_vm_count or self.default_nodepool.num_nodes
+    )
     self.containers: dict[str, list[KubernetesContainer]] = (
         collections.defaultdict(list)
     )
     self.services: dict[str, KubernetesContainerService] = {}
+
+  @property
+  def num_nodes(self) -> int:
+    return self.default_nodepool.num_nodes
+
+  @property
+  def zone(self) -> str:
+    return self.default_nodepool.zone
+
+  def _InitializeDefaultNodePool(
+      self,
+      cluster_spec: container_spec_lib.ContainerClusterSpec,
+      vm_config: virtual_machine.BaseVirtualMachine,
+  ) -> BaseNodePoolConfig:
+    nodepool_config = BaseNodePoolConfig(
+        vm_config,
+        DEFAULT_NODEPOOL,
+    )
+    nodepool_config.num_nodes = cluster_spec.vm_count
+    self.InitializeNodePoolForCloud(vm_config, nodepool_config)
+    return nodepool_config
+
+  def _InitializeNodePool(
+      self,
+      name: str,
+      nodepool_spec: container_spec_lib.NodepoolSpec,
+      vm_config: virtual_machine.BaseVirtualMachine,
+  ) -> BaseNodePoolConfig:
+    zone = (
+        nodepool_spec.vm_spec.zone
+        if nodepool_spec.vm_spec
+        else self.default_nodepool.zone
+    )
+    nodepool_config = BaseNodePoolConfig(
+        vm_config,
+        name,
+    )
+    nodepool_config.sandbox_config = nodepool_spec.sandbox_config
+    nodepool_config.zone = zone
+    nodepool_config.num_nodes = nodepool_spec.vm_count
+    self.InitializeNodePoolForCloud(vm_config, nodepool_config)
+    return nodepool_config
+
+  def InitializeNodePoolForCloud(
+      self,
+      vm_config: virtual_machine.BaseVirtualMachine,
+      nodepool_config: BaseNodePoolConfig,
+  ):
+    """Override to initialize cloud specific configs."""
+    pass
 
   def DeleteContainers(self):
     """Delete containers belonging to the cluster."""
@@ -435,29 +509,32 @@ class BaseContainerCluster(resource.BaseResource):
 
   def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
-    nodepools = {}
+    nodepools_metadata = {}
     for name, nodepool in six.iteritems(self.nodepools):
       nodepool_metadata = {
           'size': nodepool.num_nodes,
-          'machine_type': nodepool.vm_config.machine_type,
+          'machine_type': nodepool.machine_type,
           'name': name,
       }
       if nodepool.sandbox_config is not None:
         nodepool_metadata['sandbox_config'] = {
             'type': nodepool.sandbox_config.type,
         }
-      nodepools[name] = nodepool_metadata
+      nodepools_metadata[name] = nodepool_metadata
 
     metadata = {
         'cloud': self.CLOUD,
         'cluster_type': self.CLUSTER_TYPE,
-        'zone': self.zone,
-        'size': self.num_nodes,
-        'machine_type': self.vm_config.machine_type,
-        'nodepools': nodepools,
+        'zone': self.default_nodepool.zone,
+        'size': self.default_nodepool.num_nodes,
+        'machine_type': self.default_nodepool.machine_type,
+        'nodepools': nodepools_metadata,
     }
 
-    if self.min_nodes != self.num_nodes or self.max_nodes != self.num_nodes:
+    if (
+        self.min_nodes != self.default_nodepool.num_nodes
+        or self.max_nodes != self.default_nodepool.num_nodes
+    ):
       metadata.update({
           'max_size': self.max_nodes,
           'min_size': self.min_nodes,

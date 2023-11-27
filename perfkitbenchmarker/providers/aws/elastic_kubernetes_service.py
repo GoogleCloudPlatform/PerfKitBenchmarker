@@ -28,6 +28,7 @@ from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -62,9 +63,9 @@ class EksCluster(container_service.KubernetesCluster):
       self.region = util.GetRegionFromZones(self.control_plane_zones)
     # control_plane_zones must be a superset of the node zones
     for nodepool in self.nodepools.values():
-      if (nodepool.vm_config.zone and
-          nodepool.vm_config.zone not in self.control_plane_zones):
-        self.control_plane_zones.append(nodepool.vm_config.zone)
+      if (nodepool.zone and
+          nodepool.zone not in self.control_plane_zones):
+        self.control_plane_zones.append(nodepool.zone)
     if len(self.control_plane_zones) == 1:
       # eksctl essentially requires you pass --zones if you pass --node-zones
       # and --zones must have at least 2 zones
@@ -73,8 +74,15 @@ class EksCluster(container_service.KubernetesCluster):
                                       ('b' if self.zone.endswith('a') else 'a'))
     self.cluster_version = FLAGS.container_cluster_version
     # TODO(user) support setting boot disk type if EKS does.
-    self.boot_disk_type = self.vm_config.DEFAULT_ROOT_DISK_TYPE
     self.account = util.GetAccount()
+
+  def InitializeNodePoolForCloud(
+      self,
+      vm_config: virtual_machine.BaseVirtualMachine,
+      nodepool_config: container_service.BaseNodePoolConfig,
+  ):
+    nodepool_config.disk_type = vm_config.DEFAULT_ROOT_DISK_TYPE
+    nodepool_config.disk_size = vm_config.boot_disk_size
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -83,8 +91,8 @@ class EksCluster(container_service.KubernetesCluster):
       dict mapping string property key to value.
     """
     result = super(EksCluster, self).GetResourceMetadata()
-    result['boot_disk_type'] = self.boot_disk_type
-    result['boot_disk_size'] = self.vm_config.boot_disk_size
+    result['boot_disk_type'] = self.default_nodepool.disk_type
+    result['boot_disk_size'] = self.default_nodepool.disk_size
     return result
 
   def _CreateDependencies(self):
@@ -116,8 +124,7 @@ class EksCluster(container_service.KubernetesCluster):
           'nodes-max': self.max_nodes,
       })
     eksctl_flags.update(
-        self._GetNodeFlags(container_service.DEFAULT_NODEPOOL, self.num_nodes,
-                           self.vm_config))
+        self._GetNodeFlags(self.default_nodepool))
 
     cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(
         '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v)
@@ -130,8 +137,8 @@ class EksCluster(container_service.KubernetesCluster):
       else:
         raise errors.Resource.CreationError(stdout)
 
-    for name, node_group in self.nodepools.items():
-      self._CreateNodeGroup(name, node_group)
+    for _, node_group in self.nodepools.items():
+      self._CreateNodeGroup(node_group)
 
     # EBS CSI driver is required for creating EBS volumes in version > 1.23
     # https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
@@ -161,36 +168,39 @@ class EksCluster(container_service.KubernetesCluster):
     ]
     vm_util.IssueCommand(cmd)
 
-  def _CreateNodeGroup(self, name: str, node_group):
+  def _CreateNodeGroup(
+      self, nodepool_config: container_service.BaseNodePoolConfig
+  ):
     """Creates a node group."""
     eksctl_flags = {
         'cluster': self.name,
-        'name': name,
+        'name': nodepool_config.name,
         # Support ARM: https://github.com/weaveworks/eksctl/issues/3569
-        'skip-outdated-addons-check': True
+        'skip-outdated-addons-check': True,
     }
-    eksctl_flags.update(
-        self._GetNodeFlags(name, node_group.num_nodes, node_group.vm_config))
+    eksctl_flags.update(self._GetNodeFlags(nodepool_config))
     cmd = [FLAGS.eksctl, 'create', 'nodegroup'] + sorted(
-        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v)
+        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v
+    )
     vm_util.IssueCommand(cmd, timeout=600)
 
-  def _GetNodeFlags(self, node_group: str, num_nodes: int,
-                    vm_config) -> Dict[str, Any]:
+  def _GetNodeFlags(
+      self, nodepool_config: container_service.BaseNodePoolConfig
+  ) -> Dict[str, Any]:
     """Get common flags for creating clusters and node_groups."""
     tags = util.MakeDefaultTags()
     return {
         'nodes':
-            num_nodes,
+            nodepool_config.num_nodes,
         'node-labels':
-            f'pkb_nodepool={node_group}',
+            f'pkb_nodepool={nodepool_config.name}',
         'node-type':
-            vm_config.machine_type,
+            nodepool_config.machine_type,
         'node-volume-size':
-            vm_config.boot_disk_size,
-        # vm_config.zone may be split a comma separated list
+            nodepool_config.disk_size,
+        # zone may be split a comma separated list
         'node-zones':
-            vm_config.zone,
+            nodepool_config.zone,
         'region':
             self.region,
         'tags':

@@ -526,9 +526,9 @@ class AwsKopsCluster(container_service.KubernetesCluster):
     create_cmd = [
         FLAGS.kops, 'create', 'cluster',
         '--name=%s' % self.name,
-        '--zones=%s' % self.zone,
-        '--node-count=%s' % self.num_nodes,
-        '--node-size=%s' % self.machine_type
+        '--zones=%s' % self.default_node_pool.zone,
+        '--node-count=%s' % self.default_node_pool.num_nodes,
+        '--node-size=%s' % self.default_node_pool.machine_type
     ]
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig

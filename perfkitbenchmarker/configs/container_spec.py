@@ -247,6 +247,9 @@ class NodepoolSpec(spec.BaseSpec):
         flag_values=flag_values,
         **kwargs,
     )
+    self.vm_count: int
+    self.vm_spec: spec.PerCloudConfigSpec
+    self.sandbox_config: Optional[SandboxSpec]
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -257,7 +260,7 @@ class NodepoolSpec(spec.BaseSpec):
       The pair specifies a decoder class and its __init__() keyword arguments
       to construct in order to decode the named option.
     """
-    result = super(NodepoolSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'vm_count': (
             option_decoders.IntDecoder,
@@ -296,7 +299,7 @@ class _NodepoolsDecoder(option_decoders.TypeVerifier):
   """Validate the nodepool dictionary of a nodepools config object."""
 
   def __init__(self, **kwargs):
-    super(_NodepoolsDecoder, self).__init__(valid_types=(dict,), **kwargs)
+    super().__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verify Nodepool dict of a benchmark config object.
@@ -383,7 +386,7 @@ class _SandboxDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    super(_SandboxDecoder, self).Decode(value, component_full_name, flag_values)
+    super().Decode(value, component_full_name, flag_values)
     return SandboxSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
