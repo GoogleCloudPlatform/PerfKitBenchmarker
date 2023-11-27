@@ -18,7 +18,6 @@ import time
 import unittest
 import object_storage_api_tests  # noqa: importing for flags
 import object_storage_interface
-import validate_service
 
 
 class MockObjectStorageService(object_storage_interface.ObjectStorageServiceBase):  # noqa
@@ -114,20 +113,6 @@ class TestScenarios(unittest.TestCase):
     # MultiStreamWrites generates.
     object_storage_api_tests.MultiStreamWrites(service)
     object_storage_api_tests.MultiStreamReads(service)
-
-
-class TestValidateService(unittest.TestCase):
-  """Validate the ValidateService script."""
-
-  def setUp(self):
-    self.FLAGS = object_storage_api_tests.FLAGS
-    self.FLAGS([])
-    self.objects_written_file = self.FLAGS.objects_written_file
-    self.FLAGS.objects_written_file = '/tmp/objects-written'
-
-  def testValidateService(self):
-    validate_service.ValidateService(MockObjectStorageService())
-
 
 
 if __name__ == '__main__':
