@@ -141,9 +141,13 @@ def _BenchmarkClusterResize(
       time.sleep(5)
     raise errors.Benchmarks.RunError(failure_message)
 
+  def GetNode() -> str:
+    new_nodes = set(cluster.GetNodeNames()) - initial_nodes
+    if new_nodes:
+      return new_nodes.pop()
+    return ''
   new_node = PollForData(
-      # pylint: disable=unnecessary-lambda
-      lambda: (set(cluster.GetNodeNames()) - initial_nodes).pop(),
+      GetNode,
       poll_message='Node not found waiting...',
       failure_message='Cluster failed to add new node.',
   )

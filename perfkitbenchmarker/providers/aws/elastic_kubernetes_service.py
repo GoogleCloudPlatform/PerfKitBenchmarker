@@ -231,3 +231,18 @@ class EksCluster(container_service.KubernetesCluster):
     """Get the default storage class for the provider."""
     # https://docs.aws.amazon.com/eks/latest/userguide/storage-classes.html
     return aws_disk.GP2
+
+  def ResizeNodePool(
+      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+  ):
+    """Change the number of nodes in the node group."""
+    cmd = [
+        FLAGS.eksctl, 'scale', 'nodegroup', node_pool,
+        f'--nodes={new_size}',
+        f'--nodes-min={new_size}',
+        f'--nodes-max={new_size}',
+        f'--cluster={self.name}',
+        f'--region={self.region}',
+        '--wait',
+    ]
+    vm_util.IssueCommand(cmd)

@@ -286,3 +286,15 @@ class AksCluster(container_service.KubernetesCluster):
     # https://docs.microsoft.com/en-us/azure/aks/csi-storage-drivers
     # Premium_LRS
     return 'managed-csi-premium'
+
+  def ResizeNodePool(
+      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+  ):
+    """Change the number of nodes in the node pool."""
+    cmd = [
+        azure.AZURE_PATH, 'aks', 'nodepool', 'scale',
+        '--cluster-name', self.name,
+        '--name', node_pool,
+        f'--node-count={new_size}'
+    ] + self.resource_group.args
+    vm_util.IssueCommand(cmd)
