@@ -270,6 +270,8 @@
     create` and `gcloud compute operations describe`.
 -   Update AWS/Azure/GCP data disks to use cheap ssds rather than hdds.
 -   Support Azure ZRS disks and hyperdisk balanced.
+-   Add --create_container_cluster_time_resize option to time adding node to
+    provisioned Kubernetes clusters.
 
 ### Bug fixes and maintenance updates:
 

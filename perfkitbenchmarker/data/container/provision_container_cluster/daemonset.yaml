@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: daemon-set
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      name: daemon-set
+  template:
+    metadata:
+      labels:
+        name: daemon-set
+    spec:
+      containers:
+      - name: sleep
+        image: alpine
+        # Daemonsets expect their pods to stay alive so just sleep.
+        command:
+        - sleep
+        - '3600' # one hour

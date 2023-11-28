@@ -20,12 +20,16 @@ without pre-provisioning container clusters. In the future, this may be
 expanded to support first-class container benchmarks.
 """
 
+import calendar
 import collections
+import dataclasses
+import datetime
 import functools
 import ipaddress
 import itertools
 import logging
 import os
+import re
 import time
 from typing import Any, Optional, Sequence
 
@@ -596,6 +600,10 @@ class BaseContainerCluster(resource.BaseResource):
 
     return samples
 
+  def ResizeNodePool(self, new_size: int, node_pool: str = DEFAULT_NODEPOOL):
+    """Change the number of nodes in the node pool."""
+    raise NotImplementedError
+
 
 def GetContainerClusterClass(
     cloud: str, cluster_type: str
@@ -1055,3 +1063,64 @@ class KubernetesCluster(BaseContainerCluster):
   def GetDefaultStorageClass(self) -> str:
     """Get the default storage class for the provider."""
     raise NotImplementedError
+
+  def GetNodeNames(self) -> list[str]:
+    """Get the node names for the cluster."""
+    stdout, _, _ = RunKubectlCommand(
+        ['get', 'nodes', '-o', 'jsonpath={.items[*].metadata.name}']
+    )
+    return stdout.split()
+
+  def GetEvents(self):
+    """Get the events for the cluster."""
+    stdout, _, _ = RunKubectlCommand(['get', 'events', '-o', 'yaml'])
+    k8s_events = []
+    for item in yaml.safe_load(stdout)['items']:
+      k8s_event = KubernetesEvent.FromDict(item)
+      if k8s_event:
+        k8s_events.append(k8s_event)
+    return k8s_events
+
+
+@dataclasses.dataclass
+class KubernetesEventResource:
+  """Holder for Kubernetes event involved objects."""
+  kind: str
+  name: str
+
+  @classmethod
+  def FromDict(cls, yaml_data: dict[str, Any]) -> 'KubernetesEventResource':
+    """Parse Kubernetes Event YAML output."""
+    return cls(kind=yaml_data['kind'], name=yaml_data['name'])
+
+
+@dataclasses.dataclass
+class KubernetesEvent:
+  """Holder for Kubernetes event data."""
+  resource: KubernetesEventResource
+  message: str
+  # Reason is actually more of a machine readable message.
+  reason: Optional[str]
+  timestamp: float
+
+  @classmethod
+  def FromDict(cls, yaml_data: dict[str, Any]) -> Optional['KubernetesEvent']:
+    """Parse Kubernetes Event YAML output."""
+    if 'message' not in yaml_data:
+      return
+    # There are multiple timestamps. They should be equivalent.
+    raw_timestamp = yaml_data['lastTimestamp']
+    assert raw_timestamp
+    # Python 3.10 cannot handle Z as utc in ISO 8601 timestamps
+    python_3_10_compatible_timestamp = re.sub('Z$', '+00:00', raw_timestamp)
+    timestamp = calendar.timegm(
+        datetime.datetime.fromisoformat(
+            python_3_10_compatible_timestamp
+        ).timetuple()
+    )
+    return cls(
+        message=yaml_data['message'],
+        reason=yaml_data.get('reason'),
+        resource=KubernetesEventResource.FromDict(yaml_data['involvedObject']),
+        timestamp=timestamp,
+    )

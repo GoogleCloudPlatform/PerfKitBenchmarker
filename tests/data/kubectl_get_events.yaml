@@ -1,0 +1,1000 @@
+apiVersion: v1
+items:
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:47Z"
+  involvedObject:
+    apiVersion: v1
+    kind: Pod
+    name: daemon-set-jntzg
+    namespace: default
+    resourceVersion: "1987"
+    uid: bc064e02-3fc8-4f79-a2b2-6b32ddbc6f6d
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:47Z"
+  message: Successfully assigned default/daemon-set-jntzg to gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:47Z"
+    name: daemon-set-jntzg.1799c4c5bab1f1ed
+    namespace: default
+    resourceVersion: "353"
+    uid: 2beb46db-4ae9-4e5d-8b1f-75ca9beb3fa1
+  reason: Scheduled
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: default-scheduler
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:48Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{sleep}
+    kind: Pod
+    name: daemon-set-jntzg
+    namespace: default
+    resourceVersion: "1989"
+    uid: bc064e02-3fc8-4f79-a2b2-6b32ddbc6f6d
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:48Z"
+  message: Pulling image "alpine"
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:48Z"
+    name: daemon-set-jntzg.1799c4c5f40f649e
+    namespace: default
+    resourceVersion: "361"
+    uid: 47f28c73-a75b-4605-9853-fea30efd1bed
+  reason: Pulling
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:52Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{sleep}
+    kind: Pod
+    name: daemon-set-jntzg
+    namespace: default
+    resourceVersion: "1989"
+    uid: bc064e02-3fc8-4f79-a2b2-6b32ddbc6f6d
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:52Z"
+  message: Successfully pulled image "alpine" in 1.252108014s (3.296669096s including
+    waiting)
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:52Z"
+    name: daemon-set-jntzg.1799c4c6b88ee90c
+    namespace: default
+    resourceVersion: "370"
+    uid: 91980d44-fdde-45e8-b5de-ef6a9387b6e6
+  reason: Pulled
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:52Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{sleep}
+    kind: Pod
+    name: daemon-set-jntzg
+    namespace: default
+    resourceVersion: "1989"
+    uid: bc064e02-3fc8-4f79-a2b2-6b32ddbc6f6d
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:52Z"
+  message: Created container sleep
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:52Z"
+    name: daemon-set-jntzg.1799c4c6c1b53dc1
+    namespace: default
+    resourceVersion: "372"
+    uid: feb65675-f597-46bd-8c34-537bd4620670
+  reason: Created
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:52Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{sleep}
+    kind: Pod
+    name: daemon-set-jntzg
+    namespace: default
+    resourceVersion: "1989"
+    uid: bc064e02-3fc8-4f79-a2b2-6b32ddbc6f6d
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:52Z"
+  message: Started container sleep
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:52Z"
+    name: daemon-set-jntzg.1799c4c6d1b8570e
+    namespace: default
+    resourceVersion: "374"
+    uid: 3d409e56-c4a1-4002-81fb-44ea43fcf42e
+  reason: Started
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:59Z"
+  involvedObject:
+    apiVersion: v1
+    kind: Pod
+    name: daemon-set-njnkj
+    namespace: default
+    resourceVersion: "1525"
+    uid: b7ca3eec-788d-4f4f-9ada-07f4bd225950
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:59Z"
+  message: Successfully assigned default/daemon-set-njnkj to gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:59Z"
+    name: daemon-set-njnkj.1799c4ba6e61b263
+    namespace: default
+    resourceVersion: "309"
+    uid: 6dba7811-7159-49f2-a502-7065be675fb7
+  reason: Scheduled
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: default-scheduler
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:59Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{sleep}
+    kind: Pod
+    name: daemon-set-njnkj
+    namespace: default
+    resourceVersion: "1526"
+    uid: b7ca3eec-788d-4f4f-9ada-07f4bd225950
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:59Z"
+  message: Pulling image "alpine"
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:59Z"
+    name: daemon-set-njnkj.1799c4ba92c9b642
+    namespace: default
+    resourceVersion: "310"
+    uid: 7c17e3db-5b61-406b-8d17-c29ad6b9f58d
+  reason: Pulling
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:00Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{sleep}
+    kind: Pod
+    name: daemon-set-njnkj
+    namespace: default
+    resourceVersion: "1526"
+    uid: b7ca3eec-788d-4f4f-9ada-07f4bd225950
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:00Z"
+  message: Successfully pulled image "alpine" in 561.115079ms (561.127843ms including
+    waiting)
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:00Z"
+    name: daemon-set-njnkj.1799c4bab43c1b56
+    namespace: default
+    resourceVersion: "311"
+    uid: 59edb3ec-2f04-4cb7-bfb4-04f6f8d5da9b
+  reason: Pulled
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:00Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{sleep}
+    kind: Pod
+    name: daemon-set-njnkj
+    namespace: default
+    resourceVersion: "1526"
+    uid: b7ca3eec-788d-4f4f-9ada-07f4bd225950
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:00Z"
+  message: Created container sleep
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:00Z"
+    name: daemon-set-njnkj.1799c4bab56f1a17
+    namespace: default
+    resourceVersion: "312"
+    uid: f4d010f3-fdf4-4458-ab28-1e6c951e457d
+  reason: Created
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:00Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{sleep}
+    kind: Pod
+    name: daemon-set-njnkj
+    namespace: default
+    resourceVersion: "1526"
+    uid: b7ca3eec-788d-4f4f-9ada-07f4bd225950
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:00Z"
+  message: Started container sleep
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:00Z"
+    name: daemon-set-njnkj.1799c4baba69ffc7
+    namespace: default
+    resourceVersion: "313"
+    uid: a139c52a-8764-4dba-8203-67961431b990
+  reason: Started
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:59Z"
+  involvedObject:
+    apiVersion: apps/v1
+    kind: DaemonSet
+    name: daemon-set
+    namespace: default
+    resourceVersion: "1523"
+    uid: 76f65212-da3c-414f-b79c-10b169030f80
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:59Z"
+  message: 'Created pod: daemon-set-njnkj'
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:59Z"
+    name: daemon-set.1799c4ba6db6767e
+    namespace: default
+    resourceVersion: "308"
+    uid: ffb46fc6-a806-4d99-ad5b-dc18e6aad319
+  reason: SuccessfulCreate
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: daemonset-controller
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:47Z"
+  involvedObject:
+    apiVersion: apps/v1
+    kind: DaemonSet
+    name: daemon-set
+    namespace: default
+    resourceVersion: "1547"
+    uid: 76f65212-da3c-414f-b79c-10b169030f80
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:47Z"
+  message: 'Created pod: daemon-set-jntzg'
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:47Z"
+    name: daemon-set.1799c4c5b8828d9a
+    namespace: default
+    resourceVersion: "352"
+    uid: 01b7eb2f-3ee6-4fa6-aed9-0e9661f2bf6c
+  reason: SuccessfulCreate
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: daemonset-controller
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:10Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:10Z"
+  message: Starting kubelet.
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:10Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4af18dc6365
+    namespace: default
+    resourceVersion: "65"
+    uid: 9118a6d2-3ec6-42d8-b18d-83cb12a36363
+  reason: Starting
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:10Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:10Z"
+  message: invalid capacity 0 on image filesystem
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:10Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4af1a454823
+    namespace: default
+    resourceVersion: "66"
+    uid: 72446ddd-61d6-4721-afa9-ed81b67a5d47
+  reason: InvalidDiskCapacity
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Warning
+- apiVersion: v1
+  count: 4
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:10Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:10Z"
+  message: 'Node gke-pkb-74f3ec93-default-pool-3dcae581-1f1t status is now: NodeHasSufficientMemory'
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:10Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4af1e61d390
+    namespace: default
+    resourceVersion: "77"
+    uid: 20ca4308-6f4b-4150-a219-3cc6d51818d7
+  reason: NodeHasSufficientMemory
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 4
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:10Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:10Z"
+  message: 'Node gke-pkb-74f3ec93-default-pool-3dcae581-1f1t status is now: NodeHasNoDiskPressure'
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:10Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4af1e63ce86
+    namespace: default
+    resourceVersion: "78"
+    uid: 377ed4eb-bd91-4bac-bd4c-1c5ac066aa6a
+  reason: NodeHasNoDiskPressure
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 4
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:10Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:10Z"
+  message: 'Node gke-pkb-74f3ec93-default-pool-3dcae581-1f1t status is now: NodeHasSufficientPID'
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:10Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4af1e663a14
+    namespace: default
+    resourceVersion: "79"
+    uid: 2b5892e6-4b3b-4446-95b1-8664368d507c
+  reason: NodeHasSufficientPID
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:10Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:10Z"
+  message: Updated Node Allocatable limit across pods
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:10Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4af213c2e29
+    namespace: default
+    resourceVersion: "73"
+    uid: 64eef9c7-3e3a-4e0e-813e-65f9423dea84
+  reason: NodeAllocatableEnforced
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:11Z"
+  involvedObject:
+    apiVersion: v1
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    uid: 9867b215-8462-45ce-9d85-84e8ec75637c
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:11Z"
+  message: 'Node gke-pkb-74f3ec93-default-pool-3dcae581-1f1t event: Registered Node
+    gke-pkb-74f3ec93-default-pool-3dcae581-1f1t in Controller'
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:11Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4af4811340e
+    namespace: default
+    resourceVersion: "95"
+    uid: 4e76ccf8-b7be-4541-b363-628298844376
+  reason: RegisteredNode
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: node-controller
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:11Z"
+  involvedObject:
+    apiVersion: v1
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    resourceVersion: "970"
+    uid: 9867b215-8462-45ce-9d85-84e8ec75637c
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:11Z"
+  message: Node synced successfully
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:11Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4af52d8b10d
+    namespace: default
+    resourceVersion: "99"
+    uid: 06ed55b6-3035-4284-b7d1-7d15131c8848
+  reason: Synced
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: cloud-node-controller
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:11Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:11Z"
+  message: 'Node gke-pkb-74f3ec93-default-pool-3dcae581-1f1t status is now: NodeReady'
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:11Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4af607ae1d5
+    namespace: default
+    resourceVersion: "104"
+    uid: a5af95d7-05d0-4d39-b98d-342d44cf63d1
+  reason: NodeReady
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- action: StartKubeProxy
+  apiVersion: v1
+  eventTime: "2023-11-21T22:43:12.303628Z"
+  firstTimestamp: null
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  kind: Event
+  lastTimestamp: null
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:12Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4af7cf20368
+    namespace: default
+    resourceVersion: "108"
+    uid: ee5f9d0f-3725-4b37-8398-6d05f30a40b5
+  reason: Starting
+  reportingComponent: kube-proxy
+  reportingInstance: kube-proxy-gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  source: {}
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:16Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:16Z"
+  message: Tue Nov 21 22:39:23 UTC 2023 - ** Starting Node Registration Checker **
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:16Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t.1799c4b059e3c9d9
+    namespace: default
+    resourceVersion: "133"
+    uid: d4c25a9b-9b20-4777-b333-316dc961d8ef
+  reason: NodeRegistrationCheckerStart
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: node-registration-checker-monitor
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Warning
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:46Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:46Z"
+  message: Starting kubelet.
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:46Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c564878e7b
+    namespace: default
+    resourceVersion: "324"
+    uid: c1201e19-9700-40eb-95c2-774673ad6946
+  reason: Starting
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:46Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:46Z"
+  message: invalid capacity 0 on image filesystem
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:46Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c5687f8276
+    namespace: default
+    resourceVersion: "325"
+    uid: 152db7e4-a79f-46ce-ad44-de6e26ca4c50
+  reason: InvalidDiskCapacity
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Warning
+- apiVersion: v1
+  count: 3
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:46Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:46Z"
+  message: 'Node gke-pkb-74f3ec93-default-pool-3dcae581-9dw1 status is now: NodeHasSufficientMemory'
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:46Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c56d09038e
+    namespace: default
+    resourceVersion: "333"
+    uid: 0675302a-db57-4c1c-b636-a718fb9992e0
+  reason: NodeHasSufficientMemory
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Normal
+- apiVersion: v1
+  count: 3
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:46Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:46Z"
+  message: 'Node gke-pkb-74f3ec93-default-pool-3dcae581-9dw1 status is now: NodeHasNoDiskPressure'
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:46Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c56d097898
+    namespace: default
+    resourceVersion: "334"
+    uid: 07f8f638-ac9d-47e8-93a1-dd8ca4311c90
+  reason: NodeHasNoDiskPressure
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Normal
+- apiVersion: v1
+  count: 3
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:46Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:46Z"
+  message: 'Node gke-pkb-74f3ec93-default-pool-3dcae581-9dw1 status is now: NodeHasSufficientPID'
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:46Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c56d09b965
+    namespace: default
+    resourceVersion: "335"
+    uid: 50ffa867-111e-4a52-94c4-3f99143cc24c
+  reason: NodeHasSufficientPID
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:46Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:46Z"
+  message: Updated Node Allocatable limit across pods
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:46Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c5731d4547
+    namespace: default
+    resourceVersion: "332"
+    uid: bab9cee4-cd3e-4a19-8114-daaeb592ea0a
+  reason: NodeAllocatableEnforced
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:47Z"
+  involvedObject:
+    apiVersion: v1
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    resourceVersion: "1940"
+    uid: c7e0e2f6-f25c-41a5-a9a6-ce183cc481ae
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:47Z"
+  message: Node synced successfully
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:47Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c59c4f8d60
+    namespace: default
+    resourceVersion: "344"
+    uid: 61d4f6c1-562c-47c4-b600-ba6eb62857f5
+  reason: Synced
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: cloud-node-controller
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:47Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:47Z"
+  message: 'Node gke-pkb-74f3ec93-default-pool-3dcae581-9dw1 status is now: NodeReady'
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:47Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c5af7a5bc1
+    namespace: default
+    resourceVersion: "349"
+    uid: d8a8c61a-0176-4a3d-8bc6-44df70afdc13
+  reason: NodeReady
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Normal
+- action: StartKubeProxy
+  apiVersion: v1
+  eventTime: "2023-11-21T22:44:48.932777Z"
+  firstTimestamp: null
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  kind: Event
+  lastTimestamp: null
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:48Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c5fc7dd69a
+    namespace: default
+    resourceVersion: "362"
+    uid: 1937a1d6-5dca-464c-abf0-c287edf2704b
+  reason: Starting
+  reportingComponent: kube-proxy
+  reportingInstance: kube-proxy-gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  source: {}
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:51Z"
+  involvedObject:
+    apiVersion: v1
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    uid: c7e0e2f6-f25c-41a5-a9a6-ce183cc481ae
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:51Z"
+  message: 'Node gke-pkb-74f3ec93-default-pool-3dcae581-9dw1 event: Registered Node
+    gke-pkb-74f3ec93-default-pool-3dcae581-9dw1 in Controller'
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:51Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c691fece02
+    namespace: default
+    resourceVersion: "368"
+    uid: 9cb45b3c-7c13-4c03-9652-74c1e51d8bd4
+  reason: RegisteredNode
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: node-controller
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:44:51Z"
+  involvedObject:
+    kind: Node
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+    uid: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  kind: Event
+  lastTimestamp: "2023-11-21T22:44:51Z"
+  message: Tue Nov 21 22:44:44 UTC 2023 - ** Starting Node Registration Checker **
+  metadata:
+    creationTimestamp: "2023-11-21T22:44:51Z"
+    name: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1.1799c4c69ecbe113
+    namespace: default
+    resourceVersion: "369"
+    uid: 150cc8f4-ff15-4fda-a0f9-f6d4571b4056
+  reason: NodeRegistrationCheckerStart
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: node-registration-checker-monitor
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-9dw1
+  type: Warning
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:49Z"
+  involvedObject:
+    apiVersion: v1
+    kind: Pod
+    name: hello-world0
+    namespace: default
+    resourceVersion: "1428"
+    uid: 33b487e1-effd-4919-9d87-8bb7c2395ad9
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:49Z"
+  message: Successfully assigned default/hello-world0 to gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:49Z"
+    name: hello-world0.1799c4b83c06ccba
+    namespace: default
+    resourceVersion: "278"
+    uid: 6bc737f4-7ef2-461e-b9b9-e823e1938f32
+  reason: Scheduled
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: default-scheduler
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:50Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{hello-world0}
+    kind: Pod
+    name: hello-world0
+    namespace: default
+    resourceVersion: "1429"
+    uid: 33b487e1-effd-4919-9d87-8bb7c2395ad9
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:50Z"
+  message: Pulling image "hello-world"
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:50Z"
+    name: hello-world0.1799c4b864a43f1a
+    namespace: default
+    resourceVersion: "284"
+    uid: 7af58e93-5d8c-4fa4-b192-eee0da27f471
+  reason: Pulling
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:51Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{hello-world0}
+    kind: Pod
+    name: hello-world0
+    namespace: default
+    resourceVersion: "1429"
+    uid: 33b487e1-effd-4919-9d87-8bb7c2395ad9
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:51Z"
+  message: Successfully pulled image "hello-world" in 971.998511ms (972.013317ms including
+    waiting)
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:51Z"
+    name: hello-world0.1799c4b89e94fbc7
+    namespace: default
+    resourceVersion: "289"
+    uid: e0890274-8540-4858-88e2-4f3a6ff9affd
+  reason: Pulled
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:52Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{hello-world0}
+    kind: Pod
+    name: hello-world0
+    namespace: default
+    resourceVersion: "1429"
+    uid: 33b487e1-effd-4919-9d87-8bb7c2395ad9
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:52Z"
+  message: Created container hello-world0
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:52Z"
+    name: hello-world0.1799c4b8bf76fe87
+    namespace: default
+    resourceVersion: "291"
+    uid: 3f405bb1-acf4-4cb3-9195-ada78a6bf9fc
+  reason: Created
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2023-11-21T22:43:52Z"
+  involvedObject:
+    apiVersion: v1
+    fieldPath: spec.containers{hello-world0}
+    kind: Pod
+    name: hello-world0
+    namespace: default
+    resourceVersion: "1429"
+    uid: 33b487e1-effd-4919-9d87-8bb7c2395ad9
+  kind: Event
+  lastTimestamp: "2023-11-21T22:43:52Z"
+  message: Started container hello-world0
+  metadata:
+    creationTimestamp: "2023-11-21T22:43:52Z"
+    name: hello-world0.1799c4b8cb1519b5
+    namespace: default
+    resourceVersion: "292"
+    uid: a6bc49ab-f7c3-41ec-bee0-8e381ee13ef4
+  reason: Started
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubelet
+    host: gke-pkb-74f3ec93-default-pool-3dcae581-1f1t
+  type: Normal
+kind: List
+metadata:
+  resourceVersion: ""

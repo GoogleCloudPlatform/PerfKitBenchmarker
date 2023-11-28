@@ -411,3 +411,14 @@ class GkeCluster(container_service.KubernetesCluster):
     # https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/gce-pd-csi-driver
     # PD-SSD
     return 'premium-rwo'
+
+  def ResizeNodePool(
+      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+  ):
+    """Change the number of nodes in the node pool."""
+    cmd = self._GcloudCommand('container', 'clusters', 'resize', self.name)
+    cmd.flags['num-nodes'] = new_size
+    # updates default node pool by default
+    if node_pool != container_service.DEFAULT_NODEPOOL:
+      cmd.flags['node-pool'] = node_pool
+    cmd.Issue()

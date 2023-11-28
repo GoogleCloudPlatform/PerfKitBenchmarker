@@ -28,6 +28,7 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import pkb  # pylint:disable=unused-import
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -146,9 +147,7 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
     return True
 
 
-class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
-  """Test class that has dummy methods for a base virtual machine."""
-  CLOUD = 'test_vm_cloud'
+class TestResource(resource.BaseResource):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
@@ -159,6 +158,12 @@ class TestVirtualMachine(TestOsMixin, virtual_machine.BaseVirtualMachine):
 
   def _Delete(self):
     pass
+
+
+class TestVirtualMachine(
+    TestResource, TestOsMixin, virtual_machine.BaseVirtualMachine):
+  """Test class that has dummy methods for a base virtual machine."""
+  CLOUD = 'test_vm_cloud'
 
   def _Start(self):
     pass
