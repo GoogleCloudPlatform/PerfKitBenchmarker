@@ -22,6 +22,9 @@ from perfkitbenchmarker.linux_packages import pip
 
 def Install(vm):
   """Install pip3 on the VM."""
+  # This is also run in pip.py, but it must come before removing
+  # EXTERNALLY-MANAGED below.
+  vm.Install('python3_dev')
   # Python 3.11 added https://peps.python.org/pep-0668/, which allows the OS to
   # disable any pip installation outside of a virtual env. This is good in
   # long-lived systems, but counter-productive in short lived test
