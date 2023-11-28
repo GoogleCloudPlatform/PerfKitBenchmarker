@@ -3,13 +3,13 @@
 In this module we define helper classes to spawn and connect to subprocesses to
 to measure end-to-end latency accurately.
 """
+
 import asyncio
 import multiprocessing as mp
 import time
 from typing import Any, Callable, Optional, Set, Type
 
 from absl import flags
-
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import app
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import errors
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import protocol
@@ -26,9 +26,11 @@ class BaseWorker:
   PURGE_TIMEOUT = 90
   CPUS_REQUIRED = 1
 
-  def __init__(self,
-               subprocess_func: Callable[..., Any],
-               pinned_cpus: Optional[Set[int]] = None):
+  def __init__(
+      self,
+      subprocess_func: Callable[..., Any],
+      pinned_cpus: Optional[Set[int]] = None,
+  ):
     self.subprocess_func = subprocess_func
     self.subprocess = None
     self.subprocess_in_writer, self.subprocess_in_reader = mp.Pipe()
@@ -49,7 +51,8 @@ class BaseWorker:
             'serialized_flags': flags.FLAGS.flags_into_string(),
             'app': app.App.get_instance(),
             'pinned_cpus': self.pinned_cpus,
-        })
+        },
+    )
     self.subprocess.start()
     await self._read_subprocess_output(protocol.Ready, timeout)
 
@@ -66,9 +69,9 @@ class BaseWorker:
       self.subprocess.kill()
       await self._join_subprocess(timeout)
 
-  async def _read_subprocess_output(self,
-                                    message_type: Type[Any],
-                                    timeout: Optional[float] = None):
+  async def _read_subprocess_output(
+      self, message_type: Type[Any], timeout: Optional[float] = None
+  ):
     """Attempts to read the subprocess output with a timeout."""
     timeout = self.DEFAULT_TIMEOUT if timeout is None else timeout
     deadline = time.time() + timeout
@@ -79,7 +82,8 @@ class BaseWorker:
     message = self.subprocess_out_reader.recv()
     if not isinstance(message, message_type):
       raise errors.EndToEnd.ReceivedUnexpectedObjectError(
-          'Unexpected subprocess output')
+          'Unexpected subprocess output'
+      )
     return message
 
   async def _join_subprocess(self, timeout=None):
@@ -110,7 +114,8 @@ class PublisherWorker(BaseWorker):
     super().__init__(publisher.main, pinned_cpus)
 
   async def publish(
-      self, seq: int, timeout: Optional[float] = None) -> protocol.AckPublish:
+      self, seq: int, timeout: Optional[float] = None
+  ) -> protocol.AckPublish:
     """Commands the worker to send a message.
 
     Args:
@@ -125,7 +130,8 @@ class PublisherWorker(BaseWorker):
     response = await self._read_subprocess_output(protocol.AckPublish, timeout)
     if response.publish_error is not None:
       raise errors.EndToEnd.PublisherFailedOperationError(
-          response.publish_error)
+          response.publish_error
+      )
     return response
 
 
@@ -168,7 +174,8 @@ class ReceiverWorker(BaseWorker):
     await self._read_subprocess_output(protocol.AckConsume, timeout)
 
   async def receive(
-      self, timeout: Optional[float] = None) -> protocol.ReceptionReport:
+      self, timeout: Optional[float] = None
+  ) -> protocol.ReceptionReport:
     """Awaits the worker to receive a message and returns reported timestamps.
 
     Args:
@@ -178,8 +185,9 @@ class ReceiverWorker(BaseWorker):
       A tuple of ints timestamps in nanoseconds
       (receive_timestamp, ack_timestamp)
     """
-    report = await self._read_subprocess_output(protocol.ReceptionReport,
-                                                timeout)
+    report = await self._read_subprocess_output(
+        protocol.ReceptionReport, timeout
+    )
     if report.receive_error is not None:
       raise errors.EndToEnd.ReceiverFailedOperationError(report.receive_error)
     return report

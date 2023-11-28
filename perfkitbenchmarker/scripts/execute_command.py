@@ -40,28 +40,58 @@ _DEFAULT_NEAR_ETERNAL_TIMEOUT = 60 * 60 * 24 * 365 * 100
 
 def main():
   parser = optparse.OptionParser()
-  parser.add_option('-o', '--stdout', dest='stdout', metavar='FILE',
-                    help="""Write stdout to FILE. Required.""")
-  parser.add_option('-e', '--stderr', dest='stderr', metavar='FILE',
-                    help="""Write stderr to FILE. Required.""")
-  parser.add_option('-p', '--pid', dest='pid', help="""Write PID to FILE.""",
-                    metavar='FILE')
-  parser.add_option('-s', '--status', dest='status', help="""Write process exit
+  parser.add_option(
+      '-o',
+      '--stdout',
+      dest='stdout',
+      metavar='FILE',
+      help="""Write stdout to FILE. Required.""",
+  )
+  parser.add_option(
+      '-e',
+      '--stderr',
+      dest='stderr',
+      metavar='FILE',
+      help="""Write stderr to FILE. Required.""",
+  )
+  parser.add_option(
+      '-p', '--pid', dest='pid', help="""Write PID to FILE.""", metavar='FILE'
+  )
+  parser.add_option(
+      '-s',
+      '--status',
+      dest='status',
+      help="""Write process exit
                     status to FILE. An exclusive lock will be placed on FILE
-                    until this process exits. Required.""", metavar='FILE')
-  parser.add_option('-c', '--command', dest='command', help="""Shell command to
-                    execute. Required.""")
+                    until this process exits. Required.""",
+      metavar='FILE',
+  )
+  parser.add_option(
+      '-c',
+      '--command',
+      dest='command',
+      help="""Shell command to
+                    execute. Required.""",
+  )
   parser.add_option(
       '-x',
       '--exclusive',
       dest='exclusive',
-      help='Make FILE exist to indicate the exclusive lock on status has been '
-      'placed. Required.',
-      metavar='FILE')
-  parser.add_option('-t', '--timeout', dest='timeout',
-                    default=_DEFAULT_NEAR_ETERNAL_TIMEOUT,
-                    type='int', help="""Timeout in seconds before killing
-                    the command.""")
+      help=(
+          'Make FILE exist to indicate the exclusive lock on status has been '
+          'placed. Required.'
+      ),
+      metavar='FILE',
+  )
+  parser.add_option(
+      '-t',
+      '--timeout',
+      dest='timeout',
+      default=_DEFAULT_NEAR_ETERNAL_TIMEOUT,
+      type='int',
+      help="""Timeout in seconds before killing
+                    the command.""",
+  )
   options, args = parser.parse_args()
   if args:
     sys.stderr.write('Unexpected arguments: {0}\n'.format(args))
@@ -75,7 +105,8 @@ def main():
   if missing:
     parser.print_usage()
     msg = 'Missing required flag(s): {0}\n'.format(
-        ', '.join('--' + i for i in missing))
+        ', '.join('--' + i for i in missing)
+    )
     sys.stderr.write(msg)
     return 1
 
@@ -87,8 +118,9 @@ def main():
         # acquisition fails, which is desirable here.
         fcntl.lockf(status, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-        p = subprocess.Popen(options.command, stdout=stdout, stderr=stderr,
-                             shell=True)
+        p = subprocess.Popen(
+            options.command, stdout=stdout, stderr=stderr, shell=True
+        )
         logging.info('Started pid %d: %s', p.pid, options.command)
 
         # Create empty file to inform consumers of status that we've taken an
@@ -101,8 +133,10 @@ def main():
             pid.write(str(p.pid))
 
         def _KillProcess():
-          logging.error('ExecuteCommand timed out after %d seconds. Killing '
-                        'command.', options.timeout)
+          logging.error(
+              'ExecuteCommand timed out after %d seconds. Killing command.',
+              options.timeout,
+          )
           p.kill()
 
         timer = threading.Timer(options.timeout, _KillProcess)
@@ -118,6 +152,7 @@ def main():
 
         # File lock will be released when the status file is closed.
         return return_code
+
 
 if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)

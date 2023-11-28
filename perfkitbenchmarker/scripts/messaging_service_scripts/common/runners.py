@@ -1,4 +1,5 @@
 """Runners for the different benchmark scenarios."""
+
 # pylint: disable=broad-except
 import abc
 import json
@@ -7,18 +8,22 @@ from typing import Any, Dict, List
 
 from absl import flags
 import numpy as np
-
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 
 GET_TIME_IN_MILLISECONDS = lambda: time.time() * 1000
 UNIT_OF_TIME = 'milliseconds'
 
 _WARMUP_MESSAGES = flags.DEFINE_integer(
-    'warmup_messages', 0, lower_bound=0,
-    help=('Number of messages that will be considered warm-up and will not be '
-          'included into the steady_state resulting metrics. Must be greater '
-          'or equal to 0 and less than number_of_messages. If set to 0, no '
-          'steady_state metrics will be reported (this is the default).'))
+    'warmup_messages',
+    0,
+    lower_bound=0,
+    help=(
+        'Number of messages that will be considered warm-up and will not be '
+        'included into the steady_state resulting metrics. Must be greater '
+        'or equal to 0 and less than number_of_messages. If set to 0, no '
+        'steady_state metrics will be reported (this is the default).'
+    ),
+)
 
 
 class BaseRunner(metaclass=abc.ABCMeta):
@@ -55,9 +60,13 @@ class BaseRunner(metaclass=abc.ABCMeta):
   def __init__(self, client_: client.BaseMessagingServiceClient):
     self.client = client_
 
-  def _get_summary_statistics(self, scenario: str, results: List[float],
-                              number_of_messages: int,
-                              failure_counter: int) -> Dict[str, Any]:
+  def _get_summary_statistics(
+      self,
+      scenario: str,
+      results: List[float],
+      number_of_messages: int,
+      failure_counter: int,
+  ) -> Dict[str, Any]:
     """Getting statistics based on results from the benchmark."""
     metrics_data = {}
     common_metadata = {}
@@ -68,61 +77,60 @@ class BaseRunner(metaclass=abc.ABCMeta):
     metrics_data[scenario + '_failure_counter'] = {
         'value': failure_counter,
         'unit': '',
-        'metadata': common_metadata
+        'metadata': common_metadata,
     }
     metrics_data[scenario + '_mean'] = {
         'value': latency_mean,
         'unit': UNIT_OF_TIME,
-        'metadata': {
-            'samples': results
-        }
+        'metadata': {'samples': results},
     }
     metrics_data[scenario + '_cold'] = {
         'value': results[0],
         'unit': UNIT_OF_TIME,
-        'metadata': common_metadata
+        'metadata': common_metadata,
     }
     metrics_data[scenario + '_p50'] = {
         'value': np.percentile(results, 50),
         'unit': UNIT_OF_TIME,
-        'metadata': common_metadata
+        'metadata': common_metadata,
     }
     metrics_data[scenario + '_p99'] = {
         'value': np.percentile(results, 99),
         'unit': UNIT_OF_TIME,
-        'metadata': common_metadata
+        'metadata': common_metadata,
     }
     metrics_data[scenario + '_p99_9'] = {
         'value': np.percentile(results, 99.9),
         'unit': UNIT_OF_TIME,
-        'metadata': common_metadata
+        'metadata': common_metadata,
     }
     if _WARMUP_MESSAGES.value:
       metrics_data[scenario + '_steady_state_p50'] = {
-          'value': np.percentile(results[_WARMUP_MESSAGES.value:], 50),
+          'value': np.percentile(results[_WARMUP_MESSAGES.value :], 50),
           'unit': UNIT_OF_TIME,
-          'metadata': common_metadata
+          'metadata': common_metadata,
       }
       metrics_data[scenario + '_steady_state_p99'] = {
-          'value': np.percentile(results[_WARMUP_MESSAGES.value:], 99),
+          'value': np.percentile(results[_WARMUP_MESSAGES.value :], 99),
           'unit': UNIT_OF_TIME,
-          'metadata': common_metadata
+          'metadata': common_metadata,
       }
       metrics_data[scenario + '_steady_state_p99_9'] = {
-          'value': np.percentile(results[_WARMUP_MESSAGES.value:], 99.9),
+          'value': np.percentile(results[_WARMUP_MESSAGES.value :], 99.9),
           'unit': UNIT_OF_TIME,
-          'metadata': common_metadata
+          'metadata': common_metadata,
       }
     metrics_data[scenario + '_percentage_received'] = {
         'value': latency_percentage_received,
         'unit': '%',
-        'metadata': common_metadata
+        'metadata': common_metadata,
     }
     return metrics_data
 
   @abc.abstractmethod
-  def run_phase(self, number_of_messages: int,
-                message_size: int) -> Dict[str, Any]:
+  def run_phase(
+      self, number_of_messages: int, message_size: int
+  ) -> Dict[str, Any]:
     """Runs a given benchmark based on the benchmark_messaging_service Flag.
 
     Args:
@@ -149,8 +157,9 @@ class BaseRunner(metaclass=abc.ABCMeta):
 class PullLatencyRunner(BaseRunner):
   """Runner for single pull latency measurement."""
 
-  def run_phase(self, number_of_messages: int,
-                message_size: int) -> Dict[str, Any]:
+  def run_phase(
+      self, number_of_messages: int, message_size: int
+  ) -> Dict[str, Any]:
     """Pull messages from messaging service and measure single pull latency.
 
     This function attempts to pull messages from a messaging service in a
@@ -199,12 +208,15 @@ class PullLatencyRunner(BaseRunner):
         failure_counter += 1
 
     # getting summary statistics
-    pull_metrics = self._get_summary_statistics('pull_latency', pull_latencies,
-                                                number_of_messages,
-                                                failure_counter)
+    pull_metrics = self._get_summary_statistics(
+        'pull_latency', pull_latencies, number_of_messages, failure_counter
+    )
     acknowledge_metrics = self._get_summary_statistics(
-        'pull_and_acknowledge_latency', acknowledge_latencies,
-        number_of_messages, failure_counter)
+        'pull_and_acknowledge_latency',
+        acknowledge_latencies,
+        number_of_messages,
+        failure_counter,
+    )
 
     # merging metrics dictionaries
     metrics = {**pull_metrics, **acknowledge_metrics}
@@ -216,8 +228,9 @@ class PullLatencyRunner(BaseRunner):
 class PublishLatencyRunner(BaseRunner):
   """Runner for single publish latency measurement."""
 
-  def run_phase(self, number_of_messages: int,
-                message_size: int) -> Dict[str, Any]:
+  def run_phase(
+      self, number_of_messages: int, message_size: int
+  ) -> Dict[str, Any]:
     """Publish messages on messaging service and measure single publish latency.
 
     This function attempts to publish messages to a messaging service in a
@@ -261,9 +274,11 @@ class PublishLatencyRunner(BaseRunner):
         failure_counter += 1
 
     # getting metrics for publish, pull, and acknowledge latencies
-    publish_metrics = self._get_summary_statistics('publish_latency',
-                                                   publish_latencies,
-                                                   number_of_messages,
-                                                   failure_counter)
+    publish_metrics = self._get_summary_statistics(
+        'publish_latency',
+        publish_latencies,
+        number_of_messages,
+        failure_counter,
+    )
     print(json.dumps(publish_metrics))
     return publish_metrics

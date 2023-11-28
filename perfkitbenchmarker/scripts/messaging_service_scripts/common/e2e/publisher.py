@@ -1,4 +1,5 @@
 """Module for the publisher subprocess for end-to-end latency measurement."""
+
 import itertools
 import logging
 from multiprocessing import connection
@@ -7,7 +8,6 @@ import time
 from typing import Any, Iterable, Optional
 
 from absl import flags
-
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import log_utils
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import protocol
 from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import worker_utils
@@ -19,12 +19,14 @@ FLAGS = flags.FLAGS
 logger = logging.getLogger('')
 
 
-def main(input_conn: connection.Connection,
-         output_conn: connection.Connection,
-         serialized_flags: str,
-         app: Any,
-         iterations: Optional[int] = None,
-         pinned_cpus: Optional[Iterable[Any]] = None):
+def main(
+    input_conn: connection.Connection,
+    output_conn: connection.Connection,
+    serialized_flags: str,
+    app: Any,
+    iterations: Optional[int] = None,
+    pinned_cpus: Optional[Iterable[Any]] = None,
+):
   """Runs the code for the publisher worker subprocess.
 
   Intended to be called with the multiprocessing.Process stdlib function.
@@ -53,31 +55,36 @@ def main(input_conn: connection.Connection,
   communicator = worker_utils.Communicator(input_conn, output_conn)
   communicator.greet()
   logger.debug('Publisher ready!')
-  times_iterable = itertools.repeat(0) if iterations is None else range(
-      iterations)
+  times_iterable = (
+      itertools.repeat(0) if iterations is None else range(iterations)
+  )
   for _ in times_iterable:
     logger.debug('Awaiting for Publish request from main...')
     publish_obj = communicator.await_from_main(protocol.Publish)
     message_payload = client.generate_message(
-        publish_obj.seq, FLAGS.message_size)
+        publish_obj.seq, FLAGS.message_size
+    )
     publish_timestamp = time.time_ns()
     try:
       logger.debug(
-          'Publishing message (seq=%d)...',
-          publish_obj.seq,
-          exc_info=True)
+          'Publishing message (seq=%d)...', publish_obj.seq, exc_info=True
+      )
       client.publish_message(message_payload)
     except Exception as e:  # pylint: disable=broad-except
       logger.debug(
           'Got an error while publishing message (seq=%d).',
           publish_obj.seq,
-          exc_info=True)
+          exc_info=True,
+      )
       communicator.send(protocol.AckPublish(publish_error=repr(e)))
     else:
       logger.debug(
           'Message (seq=%d) published successfully.',
           publish_obj.seq,
-          exc_info=True)
+          exc_info=True,
+      )
       communicator.send(
           protocol.AckPublish(
-              seq=publish_obj.seq, publish_timestamp=publish_timestamp))
+              seq=publish_obj.seq, publish_timestamp=publish_timestamp
+          )
+      )

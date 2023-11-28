@@ -25,11 +25,11 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_integer('num_streams', 1, 'Number of netperf processes to run')
 
-flags.DEFINE_string('netperf_cmd', None,
-                    'netperf command to run')
+flags.DEFINE_string('netperf_cmd', None, 'netperf command to run')
 
-flags.DEFINE_integer('port_start', None,
-                     'Starting port for netperf command and data ports')
+flags.DEFINE_integer(
+    'port_start', None, 'Starting port for netperf command and data ports'
+)
 
 
 def Main():
@@ -64,15 +64,24 @@ def Main():
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         shell=True,
-        universal_newlines=True)
+        universal_newlines=True,
+    )
   end_starting_processes = time.time()
   # Wait for all of the netperf processes to finish and save their return codes
   for i, process in enumerate(processes):
     stdouts[i], stderrs[i] = process.communicate()
     return_codes[i] = process.returncode
   # Dump the stdouts, stderrs, and return_codes to stdout in json form
-  print(json.dumps((stdouts, stderrs, return_codes,
-                    begin_starting_processes, end_starting_processes)))
+  print(
+      json.dumps((
+          stdouts,
+          stderrs,
+          return_codes,
+          begin_starting_processes,
+          end_starting_processes,
+      ))
+  )
+
 
 if __name__ == '__main__':
   sys.exit(Main())

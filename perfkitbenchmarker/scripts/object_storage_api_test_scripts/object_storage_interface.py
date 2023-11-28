@@ -48,12 +48,14 @@ class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
     pass
 
   @abc.abstractmethod
-  def DeleteObjects(self,
-                    bucket,
-                    objects_to_delete,
-                    objects_deleted=None,
-                    delay_time=0,
-                    object_sizes=None):
+  def DeleteObjects(
+      self,
+      bucket,
+      objects_to_delete,
+      objects_deleted=None,
+      delay_time=0,
+      object_sizes=None,
+  ):
     """Delete a list of objects.
 
     Args:
@@ -63,7 +65,6 @@ class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
         successfully deleted.
       delay_time: time to delay each API call by
       object_sizes: if given, a list of sizes of the objects to delete
-
 
     Returns:
       A tuple of (start_times, latencies, sizes).

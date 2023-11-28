@@ -15,7 +15,8 @@ class StreamingPullReceiverRunner(receiver.ReceiverRunner):
   def __init__(
       self,
       client: common_client.BaseMessagingServiceClient,
-      communicator: worker_utils.Communicator):
+      communicator: worker_utils.Communicator,
+  ):
     super().__init__(client, communicator)
     self.messages_received = queue.Queue()
 

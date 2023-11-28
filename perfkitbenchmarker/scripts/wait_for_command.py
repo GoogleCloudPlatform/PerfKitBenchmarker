@@ -54,22 +54,47 @@ def signal_handler(signum, frame):
 
 def main():
   p = optparse.OptionParser()
-  p.add_option('-o', '--stdout', dest='stdout',
-               help="""Read stdout from FILE.""", metavar='FILE')
-  p.add_option('-e', '--stderr', dest='stderr',
-               help="""Read stderr from FILE.""", metavar='FILE')
-  p.add_option('-s', '--status', dest='status', metavar='FILE',
-               help='Get process exit status from FILE. '
-               'Will block until a shared lock is acquired on FILE.')
-  p.add_option('-d', '--delete', dest='delete', action='store_true',
-               help='Delete stdout, stderr, and status files when finished.')
+  p.add_option(
+      '-o',
+      '--stdout',
+      dest='stdout',
+      help="""Read stdout from FILE.""",
+      metavar='FILE',
+  )
+  p.add_option(
+      '-e',
+      '--stderr',
+      dest='stderr',
+      help="""Read stderr from FILE.""",
+      metavar='FILE',
+  )
+  p.add_option(
+      '-s',
+      '--status',
+      dest='status',
+      metavar='FILE',
+      help=(
+          'Get process exit status from FILE. '
+          'Will block until a shared lock is acquired on FILE.'
+      ),
+  )
+  p.add_option(
+      '-d',
+      '--delete',
+      dest='delete',
+      action='store_true',
+      help='Delete stdout, stderr, and status files when finished.',
+  )
   p.add_option(
       '-x',
       '--exclusive',
       dest='exclusive',
-      help='Will block until FILE exists to ensure that status is ready to be '
-      'read. Required.',
-      metavar='FILE')
+      help=(
+          'Will block until FILE exists to ensure that status is ready to be '
+          'read. Required.'
+      ),
+      metavar='FILE',
+  )
   options, args = p.parse_args()
   if args:
     sys.stderr.write('Unexpected arguments: {0}\n'.format(args))
@@ -83,7 +108,8 @@ def main():
   if missing:
     p.print_usage()
     msg = 'Missing required flag(s): {0}\n'.format(
-        ', '.join('--' + i for i in missing))
+        ', '.join('--' + i for i in missing)
+    )
     sys.stderr.write(msg)
     return 1
 
@@ -95,7 +121,7 @@ def main():
         with open(options.status, 'r'):
           break
     except IOError as e:
-      print('WARNING: file doesn\'t exist, retrying: %s' % e, file=sys.stderr)
+      print("WARNING: file doesn't exist, retrying: %s" % e, file=sys.stderr)
       time.sleep(WAIT_SLEEP_IN_SEC)
 
   # Set a signal handler to raise an InterruptedError on SIGALRM (this is no
@@ -117,12 +143,16 @@ def main():
     # here for compatibility.
     except (OSError, IOError) as e:
       if e.errno == errno.ECONNREFUSED:
-        print('Connection refused during wait. '
-              'This will be retried with a subsequent wait.')
+        print(
+            'Connection refused during wait. '
+            'This will be retried with a subsequent wait.'
+        )
         return 0
       elif e.errno in (errno.EAGAIN, errno.EACCES):
-        print('Status currently being modified and cannot be read right now. '
-              'This will be retried with a subsequent wait.')
+        print(
+            'Status currently being modified and cannot be read right now. '
+            'This will be retried with a subsequent wait.'
+        )
         return 0
       raise e
     signal.alarm(0)
@@ -148,9 +178,11 @@ def main():
         print('WARNING: command returned 255.', file=sys.stderr)
         return_code = 1
 
-      stderr_copier = threading.Thread(target=shutil.copyfileobj,
-                                       args=[stderr, sys.stderr],
-                                       name='stderr-copier')
+      stderr_copier = threading.Thread(
+          target=shutil.copyfileobj,
+          args=[stderr, sys.stderr],
+          name='stderr-copier',
+      )
       stderr_copier.daemon = True
       stderr_copier.start()
       try:
@@ -163,6 +195,7 @@ def main():
       os.unlink(f)
 
   return return_code
+
 
 if __name__ == '__main__':
   sys.exit(main())

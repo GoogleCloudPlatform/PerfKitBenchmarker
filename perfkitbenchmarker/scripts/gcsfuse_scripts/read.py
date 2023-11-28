@@ -9,6 +9,7 @@ Example usages:
 `--iterations` to run it multiple times.
 > gsutil ls gs://gcsfuse-benchmark/10M/ | python read.py --iterations=3
 """
+
 import concurrent.futures
 import sys
 import time
@@ -21,16 +22,20 @@ import tensorflow as tf
 FLAGS = flags.FLAGS
 
 flags.DEFINE_integer(
-    "iterations", 1, "Number of iterations this benchmark should repeated run.")
+    "iterations", 1, "Number of iterations this benchmark should repeated run."
+)
 
-flags.DEFINE_integer("workers", 16,
-                     "Number of workers this benchmark runs concurrently.")
+flags.DEFINE_integer(
+    "workers", 16, "Number of workers this benchmark runs concurrently."
+)
 
 flags.DEFINE_string(
-    "mountpoint", None,
+    "mountpoint",
+    None,
     "The directory where all the GCS buckets are mounted. If "
     "omitted, the benchmark reads the objects with tf.io.gfile "
-    "instead.")
+    "instead.",
+)
 
 flags.DEFINE_bool("verbose", False, "Print the results with extra information.")
 
@@ -77,7 +82,8 @@ class ReadBenchmark:
   def __init__(self):
     self.iterations = FLAGS.iterations
     self.executor = concurrent.futures.ThreadPoolExecutor(
-        max_workers=FLAGS.workers)
+        max_workers=FLAGS.workers
+    )
 
     objects = sys.stdin.read().split("\n")
     self.readers = [ObjectReader(o, FLAGS.mountpoint) for o in objects if o]
@@ -102,8 +108,9 @@ class ReadBenchmark:
     duration_sec = time.time() - start
     return total_mb, duration_sec
 
-  def PrintResult(self, iteration: int, total_mb: float,
-                  duration_sec: float) -> None:
+  def PrintResult(
+      self, iteration: int, total_mb: float, duration_sec: float
+  ) -> None:
     """Print the benchmark result.
 
     Args:
@@ -114,7 +121,8 @@ class ReadBenchmark:
     throughput = total_mb / duration_sec
     if FLAGS.verbose:
       info = "#{}: {} MB, {:.1f} seconds, {:.1f} MB/s".format(
-          iteration, total_mb, duration_sec, throughput)
+          iteration, total_mb, duration_sec, throughput
+      )
       print(info)
     else:
       print(throughput)

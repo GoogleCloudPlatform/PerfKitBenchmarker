@@ -10,7 +10,8 @@ JOB_NAME = 'worker'
 def RunServer(server1: str, server2: str, task_index: int) -> None:
   cluster_spec = tf.train.ClusterSpec({JOB_NAME: [server1, server2]})
   server = tf.distribute.Server(
-      cluster_spec, job_name=JOB_NAME, task_index=task_index)
+      cluster_spec, job_name=JOB_NAME, task_index=task_index
+  )
   server.join()
 
 

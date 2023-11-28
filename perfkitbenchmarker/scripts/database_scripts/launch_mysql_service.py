@@ -12,23 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """launch_mysql_service is a wrapper class for mysql_service_benchmark.
+
 It will call mysql_service_benchmark with varying thread counts depending on
-thread_count_list flag values.
-If a run_uri flag is provided, the program assumes that the PKB instance
-has been provisioned and prepared, and will only execute the run phase of PKB.
-If no run_uri is given, the program will execute the provision and prepare
-phase followed by consecutive run phases and then the cleanup and teardown
-phase. Below are examples of possible ways to call this class.
-Possible call:
-./launch_mysql_service --thread_count_list=[1,2,5] --sysbench_run_seconds=20
-./launch_mysql_service --run_uri=12e4s6t8 --thread_count_list=[1,2,4,8,10]
-All requirements for mysql_service_benchmark still apply. See
-perkfitbenchmarker.linuxbenchmarks.mysql_service_benchmark for more details.
-Any additional flags not specifically outlined in the flags below can be added
-as a list of strings under the 'additional_flags' flag. These flags will be
-passed through as is to the underlying benchmarking code. For example,
-a possible call with additional flags could be:
-./launch_mysql_service --run_uri=2u2u2u3i
+thread_count_list flag values. If a run_uri flag is provided, the program
+assumes that the PKB instance has been provisioned and prepared, and will only
+execute the run phase of PKB. If no run_uri is given, the program will execute
+the provision and prepare phase followed by consecutive run phases and then the
+cleanup and teardown phase. Below are examples of possible ways to call this
+class. Possible call: ./launch_mysql_service --thread_count_list=[1,2,5]
+--sysbench_run_seconds=20 ./launch_mysql_service --run_uri=12e4s6t8
+--thread_count_list=[1,2,4,8,10] All requirements for mysql_service_benchmark
+still apply. See perkfitbenchmarker.linuxbenchmarks.mysql_service_benchmark for
+more details. Any additional flags not specifically outlined in the flags below
+can be added as a list of strings under the 'additional_flags' flag. These flags
+will be passed through as is to the underlying benchmarking code. For example, a
+possible call with additional flags could be: ./launch_mysql_service
+--run_uri=2u2u2u3i
+
   --additional_flags=['--cloud=GCP'].
 Launcher has a few defaults, listed below:
   - Sysbench run seconds: 480
@@ -101,44 +101,78 @@ CLEANUP = 'cleanup'
 TEARDOWN = 'teardown'
 
 FLAGS = flags.FLAGS
-flags.DEFINE_bool(PER_SECOND_GRAPHS, False,
-                  'Indicator for using per second data collection.'
-                  'To enable set True.')
-flags.DEFINE_integer(SYSBENCH_RUN_SECONDS, 480,
-                     'The duration, in seconds, of each run phase with varying'
-                     'thread count.')
-flags.DEFINE_integer(SYSBENCH_WARMUP_SECONDS, 0,
-                     'The duration, in seconds, of the warmup run in which '
-                     'results are discarded.')
-flags.DEFINE_list(THREAD_COUNT_LIST, [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
-                  'The number of test threads on the client side.')
-flags.DEFINE_integer(SYSBENCH_REPORT_INTERVAL, 1,
-                     'The interval, in seconds, we ask sysbench to report '
-                     'results.')
-flags.DEFINE_string(RUN_URI, None,
-                    'Run identifier, if provided, only run phase '
-                    'will be completed.')
-flags.DEFINE_string(RUN_STAGE, None,
-                    'List of phases to be executed. For example:'
-                    '"--run_uri=provision,prepare". Available phases:'
-                    'prepare, provision, run, cleanup, teardown.')
-flags.DEFINE_string(GCE_BOOT_DISK_SIZE, '1000',
-                    'The boot disk size in GB for GCP VMs..')
-flags.DEFINE_string(GCE_BOOT_DISK_TYPE, 'pd-ssd',
-                    'The boot disk type for GCP VMs.')
-flags.DEFINE_string(MACHINE_TYPE, 'n1-standard-16',
-                    'Machine type for GCE Virtual machines.')
-flags.DEFINE_enum(MYSQL_SVC_DB_INSTANCE_CORES, '4', ['1', '4', '8', '16'],
-                  'The number of cores to be provisioned for the DB instance.')
-flags.DEFINE_string(MYSQL_SVC_OLTP_TABLES_COUNT, '4',
-                    'The number of tables used in sysbench oltp.lua tests')
-flags.DEFINE_string(MYSQL_SVC_OLTP_TABLE_SIZE, '100000',
-                    'The number of rows of each table used in the oltp tests')
-flags.DEFINE_string(MYSQL_INSTANCE_STORAGE_SIZE, '300',
-                    'Storage size (in GB) for SQL instance.')
-flags.DEFINE_list(ADDITIONAL_FLAGS, None,
-                  'List of additional PKB mysql_service valid flags (strings).'
-                  'For example: "--cloud_storage_bucket=bucket_name".')
+flags.DEFINE_bool(
+    PER_SECOND_GRAPHS,
+    False,
+    'Indicator for using per second data collection.To enable set True.',
+)
+flags.DEFINE_integer(
+    SYSBENCH_RUN_SECONDS,
+    480,
+    'The duration, in seconds, of each run phase with varyingthread count.',
+)
+flags.DEFINE_integer(
+    SYSBENCH_WARMUP_SECONDS,
+    0,
+    'The duration, in seconds, of the warmup run in which '
+    'results are discarded.',
+)
+flags.DEFINE_list(
+    THREAD_COUNT_LIST,
+    [1, 2, 4, 8, 16, 32, 64, 128, 256, 512],
+    'The number of test threads on the client side.',
+)
+flags.DEFINE_integer(
+    SYSBENCH_REPORT_INTERVAL,
+    1,
+    'The interval, in seconds, we ask sysbench to report results.',
+)
+flags.DEFINE_string(
+    RUN_URI,
+    None,
+    'Run identifier, if provided, only run phase will be completed.',
+)
+flags.DEFINE_string(
+    RUN_STAGE,
+    None,
+    'List of phases to be executed. For example:'
+    '"--run_uri=provision,prepare". Available phases:'
+    'prepare, provision, run, cleanup, teardown.',
+)
+flags.DEFINE_string(
+    GCE_BOOT_DISK_SIZE, '1000', 'The boot disk size in GB for GCP VMs..'
+)
+flags.DEFINE_string(
+    GCE_BOOT_DISK_TYPE, 'pd-ssd', 'The boot disk type for GCP VMs.'
+)
+flags.DEFINE_string(
+    MACHINE_TYPE, 'n1-standard-16', 'Machine type for GCE Virtual machines.'
+)
+flags.DEFINE_enum(
+    MYSQL_SVC_DB_INSTANCE_CORES,
+    '4',
+    ['1', '4', '8', '16'],
+    'The number of cores to be provisioned for the DB instance.',
+)
+flags.DEFINE_string(
+    MYSQL_SVC_OLTP_TABLES_COUNT,
+    '4',
+    'The number of tables used in sysbench oltp.lua tests',
+)
+flags.DEFINE_string(
+    MYSQL_SVC_OLTP_TABLE_SIZE,
+    '100000',
+    'The number of rows of each table used in the oltp tests',
+)
+flags.DEFINE_string(
+    MYSQL_INSTANCE_STORAGE_SIZE, '300', 'Storage size (in GB) for SQL instance.'
+)
+flags.DEFINE_list(
+    ADDITIONAL_FLAGS,
+    None,
+    'List of additional PKB mysql_service valid flags (strings).'
+    'For example: "--cloud_storage_bucket=bucket_name".',
+)
 
 # TODO: Implement flag for STDOUT/STDERR file paths.
 
@@ -157,10 +191,12 @@ class CallFailureError(Exception):
 
 def driver(argv):
   """Driver initiates sysbench run with different thread counts.
-  If running this wrapper module with a bash script the print statement
-  can be used to capture the run_uri. This allows user to provision and prepare
-  the database and client VM less frequently which is advantageous when the
+
+  If running this wrapper module with a bash script the print statement can be
+  used to capture the run_uri. This allows user to provision and prepare the
+  database and client VM less frequently which is advantageous when the
   specifications contain larger values.
+
   Args:
     argv: system arguments (command line flags).
   """
@@ -173,11 +209,13 @@ def driver(argv):
   run_stage = FLAGS.run_stage
   if not run_uri:
     if not run_stage:
-      logging.info('No run_uri given. Will run full mysql_service_benchmark '
-                   'test.')
+      logging.info(
+          'No run_uri given. Will run full mysql_service_benchmark test.'
+      )
     run_uri = _provision_prepare_pkb()
-    logging.info('Provision and prepare completed. Run uri assigned: %s',
-                 run_uri)
+    logging.info(
+        'Provision and prepare completed. Run uri assigned: %s', run_uri
+    )
     if run_stage == 'provision,prepare':
       return run_uri
   if not run_stage or run_stage == RUN:
@@ -190,22 +228,33 @@ def driver(argv):
 
 def _provision_prepare_pkb():
   """Run provision and prepare stage of PKB benchmark.
+
   Returns:
     run_uri: (string)
   """
   pkb_cmd = PKB + STAGE_FLAG + PROVISION + ',' + PREPARE
   pkb_cmd += (
-      BOOT_DISK_SIZE_FLAG + FLAGS.gce_boot_disk_size + BOOT_DISK_TYPE_FLAG +
-      FLAGS.gce_boot_disk_type + MACHINE_TYPE_FLAG + FLAGS.machine_type +
-      MYSQL_SVC_DB_CORES_FLAG + FLAGS.mysql_svc_db_instance_cores +
-      MYSQL_SVC_OLTP_TABLE_SIZE_FLAG + FLAGS.mysql_svc_oltp_table_size +
-      MYSQL_SVC_DB_TABLES_COUNT_FLAG + FLAGS.mysql_svc_oltp_tables_count +
-      MYSQL_INSTANCE_STORAGE_SIZE_FLAG + FLAGS.mysql_instance_storage_size)
+      BOOT_DISK_SIZE_FLAG
+      + FLAGS.gce_boot_disk_size
+      + BOOT_DISK_TYPE_FLAG
+      + FLAGS.gce_boot_disk_type
+      + MACHINE_TYPE_FLAG
+      + FLAGS.machine_type
+      + MYSQL_SVC_DB_CORES_FLAG
+      + FLAGS.mysql_svc_db_instance_cores
+      + MYSQL_SVC_OLTP_TABLE_SIZE_FLAG
+      + FLAGS.mysql_svc_oltp_table_size
+      + MYSQL_SVC_DB_TABLES_COUNT_FLAG
+      + FLAGS.mysql_svc_oltp_tables_count
+      + MYSQL_INSTANCE_STORAGE_SIZE_FLAG
+      + FLAGS.mysql_instance_storage_size
+  )
   if FLAGS.additional_flags:
     pkb_cmd = _append_additional_flags(pkb_cmd)
   # PKB run with prepare,provision, wait
-  logging.info('Provision and prepare sysbench with the following command:\n%s',
-               pkb_cmd)
+  logging.info(
+      'Provision and prepare sysbench with the following command:\n%s', pkb_cmd
+  )
   [stdout_filename, stderr_filename] = _generate_filenames(PROVISION, None)
   _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
   return _get_run_uri(stderr_filename)
@@ -213,22 +262,34 @@ def _provision_prepare_pkb():
 
 def _run(run_uri):
   """Run stage of PKB benchmark.
+
   Args:
     run_uri: (string).
   """
   if FLAGS.per_second_graphs:
     logging.info('Will generate per second logs for this run.')
-    plotter = plot_sysbench_results.Plotter(FLAGS.sysbench_run_seconds,
-                                            FLAGS.sysbench_report_interval,
-                                            run_uri)
+    plotter = plot_sysbench_results.Plotter(
+        FLAGS.sysbench_run_seconds, FLAGS.sysbench_report_interval, run_uri
+    )
   run_iterations = len(FLAGS.thread_count_list)
   logging.info(
       'Beginning run phase. Will execute runs with %d different thread counts.',
-      run_iterations)
+      run_iterations,
+  )
   for t in FLAGS.thread_count_list:
-    pkb_cmd = (PKB + STAGE_FLAG + RUN + URI_FLAG + run_uri + THREAD_FLAG +
-               str(t) + RUN_TIME + str(FLAGS.sysbench_run_seconds) + WARMUP_FLAG
-               + str(FLAGS.sysbench_warmup_seconds))
+    pkb_cmd = (
+        PKB
+        + STAGE_FLAG
+        + RUN
+        + URI_FLAG
+        + run_uri
+        + THREAD_FLAG
+        + str(t)
+        + RUN_TIME
+        + str(FLAGS.sysbench_run_seconds)
+        + WARMUP_FLAG
+        + str(FLAGS.sysbench_warmup_seconds)
+    )
     if FLAGS.additional_flags:
       pkb_cmd = _append_additional_flags(pkb_cmd)
     stdout_filename, stderr_filename = _generate_filenames(RUN, t)
@@ -251,13 +312,15 @@ def _run(run_uri):
 
 def _cleanup_teardown_pkb(run_uri):
   """Run cleanup stage of PKB benchmark.
+
   Args:
     run_uri: (string)
   """
   logging.info('Run phase complete. Starting cleanup/teardown.')
-  pkb_cmd = (PKB + STAGE_FLAG + CLEANUP + ',' + TEARDOWN + URI_FLAG + run_uri)
-  logging.info('Cleanup, teardown sysbench with the following command:'
-               '\n%s', pkb_cmd)
+  pkb_cmd = PKB + STAGE_FLAG + CLEANUP + ',' + TEARDOWN + URI_FLAG + run_uri
+  logging.info(
+      'Cleanup, teardown sysbench with the following command:\n%s', pkb_cmd
+  )
   [stdout_filename, stderr_filename] = _generate_filenames(CLEANUP, None)
   _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename)
   logging.info('Finished executing PKB cleanup and teardown.')
@@ -265,12 +328,14 @@ def _cleanup_teardown_pkb(run_uri):
 
 def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   """Given pkb run command, execute.
+
   Args:
     pkb_cmd: (str)
     stdout_filename: (str) filename string.
     stderr_filename: (str) filename_str
+
   Raises:
-    Exception (CallFailureError): Popen call failed.
+    CallFailureError: Popen call failed.
   """
   stdout_file = open(stdout_filename, 'w+')
   stderr_file = open(stderr_filename, 'w+')
@@ -285,15 +350,19 @@ def _execute_pkb_cmd(pkb_cmd, stdout_filename, stderr_filename):
   elapsed_time = time.time() - start_time
   retcode = p.returncode
   if retcode != 0:
-    raise CallFailureError('The call failed (return code is {}). '
-                           'Check stderr for traceback.'.format(retcode))
+    raise CallFailureError(
+        'The call failed (return code is {}). '
+        'Check stderr for traceback.'.format(retcode)
+    )
   logging.info('PKB call finished in %i seconds.', int(elapsed_time))
 
 
 def _get_run_uri(filename):
   """Grab the last lines of file and return the first match with URI_REGEX.
+
   Args:
     filename: (string)
+
   Returns:
     run_uri: (string) Run identifier from file.
   Raises:
@@ -304,7 +373,8 @@ def _get_run_uri(filename):
       grab_file_tail_cmd,
       stdout=subprocess.PIPE,
       stderr=subprocess.PIPE,
-      universal_newlines=True)
+      universal_newlines=True,
+  )
   lines = p.stdout.readlines()
   r = re.compile(URI_REGEX)
   for line in lines:
@@ -316,8 +386,10 @@ def _get_run_uri(filename):
 
 def _append_additional_flags(pkb_cmd):
   """Appends additional flags to the end of pkb_cmd.
+
   Args:
     pkb_cmd: (string) Current pkb command.
+
   Returns:
     pkb_cmd: (string) PKB command with additional flags.
   """
@@ -328,18 +400,22 @@ def _append_additional_flags(pkb_cmd):
 
 def _generate_filenames(run_stage, thread_number):
   """Generate filenames for STDOUT and STDERR based on phase and time.
+
   Args:
     run_stage: Current stage of sysbench.
     thread_number: (int) Number of sysbench threads for run iteration.
+
   Returns:
     [stdout_filename, stderr_filename]: list of filename strings.
   """
   date_string = DATETIME_FORMAT.format(datetime.datetime.now())
   if run_stage == RUN:
     stdout_filename = '{}{}_THREAD_RUN_PKB_STDOUT.txt'.format(
-        date_string, thread_number)
+        date_string, thread_number
+    )
     stderr_filename = '{}{}_THREAD_RUN_PKB_STDERR.txt'.format(
-        date_string, thread_number)
+        date_string, thread_number
+    )
   else:
     stdout_filename = '{}{}_PKB_STDOUT.txt'.format(date_string, run_stage)
     stderr_filename = '{}{}_PKB_STDERR.txt'.format(date_string, run_stage)

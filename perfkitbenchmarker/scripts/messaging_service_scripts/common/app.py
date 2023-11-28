@@ -3,7 +3,6 @@
 from typing import Type
 
 from absl import flags
-
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import log_utils
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import runners
@@ -19,18 +18,23 @@ _BENCHMARK_SCENARIO = flags.DEFINE_enum(
     'benchmark_scenario',
     'publish_latency',
     BENCHMARK_SCENARIO_CHOICES,
-    help='Which part of the benchmark to run.',)
+    help='Which part of the benchmark to run.',
+)
 _NUMBER_OF_MESSAGES = flags.DEFINE_integer(
-    'number_of_messages', 100, help='Number of messages to send on benchmark.')
+    'number_of_messages', 100, help='Number of messages to send on benchmark.'
+)
 _MESSAGE_SIZE = flags.DEFINE_integer(
     'message_size',
     10,
-    help='Number of characters to have in a message. '
-    "Ex: 1: 'A', 2: 'AA', ...")
+    help="Number of characters to have in a message. Ex: 1: 'A', 2: 'AA', ...",
+)
 _STREAMING_PULL = flags.DEFINE_boolean(
-    'streaming_pull', False,
-    help=('Use StreamingPull to fetch messages. Supported only in GCP Pubsub '
-          'end-to-end benchmarking.')
+    'streaming_pull',
+    False,
+    help=(
+        'Use StreamingPull to fetch messages. Supported only in GCP Pubsub '
+        'end-to-end benchmarking.'
+    ),
 )
 
 
@@ -38,17 +42,22 @@ _STREAMING_PULL = flags.DEFINE_boolean(
     ['streaming_pull', 'benchmark_scenario'],
     message=(
         'streaming_pull is only supported for end-to-end latency benchmarking '
-        'with GCP PubSub.'))
+        'with GCP PubSub.'
+    ),
+)
 def validate_streaming_pull(flags_dict):
   client_class_name = App.get_instance().get_client_class().__name__
-  return (not flags_dict['streaming_pull'] or
-          client_class_name == 'GCPPubSubClient' and
-          flags_dict['benchmark_scenario'] == END_TO_END_LATENCY)
+  return (
+      not flags_dict['streaming_pull']
+      or client_class_name == 'GCPPubSubClient'
+      and flags_dict['benchmark_scenario'] == END_TO_END_LATENCY
+  )
 
 
 @flags.multi_flags_validator(
     ['warmup_messages', 'number_of_messages'],
-    message='warmup_message must be less than number_of_messages.')
+    message='warmup_message must be less than number_of_messages.',
+)
 def validate_warmup_messages(flags_dict):
   return flags_dict['warmup_messages'] < flags_dict['number_of_messages']
 
@@ -80,8 +89,9 @@ class App:
     return cls.instance
 
   @classmethod
-  def for_client(cls,
-                 client_cls: Type[client.BaseMessagingServiceClient]) -> 'App':
+  def for_client(
+      cls, client_cls: Type[client.BaseMessagingServiceClient]
+  ) -> 'App':
     """Gets the app instance and configures it to use the passed client class.
 
     Args:
@@ -149,15 +159,18 @@ class App:
       A BaseRunner class.
     """
     try:
-      if (_STREAMING_PULL.value and
-          _BENCHMARK_SCENARIO.value == END_TO_END_LATENCY):
+      if (
+          _STREAMING_PULL.value
+          and _BENCHMARK_SCENARIO.value == END_TO_END_LATENCY
+      ):
         return self.runner_registry[STREAMING_PULL_END_TO_END_LATENCY]
       return self.runner_registry[_BENCHMARK_SCENARIO.value]
     except KeyError:
       raise Exception('Unknown benchmark_scenario flag value.') from None
 
-  def register_client(self,
-                      client_cls: Type[client.BaseMessagingServiceClient]):
+  def register_client(
+      self, client_cls: Type[client.BaseMessagingServiceClient]
+  ):
     """Registers a client class to create instances with.
 
     Args:
@@ -170,13 +183,16 @@ class App:
     self._register_runner(PUBLISH_LATENCY, runners.PublishLatencyRunner)
     self._register_runner(PULL_LATENCY, runners.PullLatencyRunner)
     self._register_runner(
-        END_TO_END_LATENCY, latency_runner.EndToEndLatencyRunner)
+        END_TO_END_LATENCY, latency_runner.EndToEndLatencyRunner
+    )
     self._register_runner(
         STREAMING_PULL_END_TO_END_LATENCY,
-        latency_runner.StreamingPullEndToEndLatencyRunner)
+        latency_runner.StreamingPullEndToEndLatencyRunner,
+    )
 
-  def _register_runner(self, benchmark_scenario: str,
-                       runner_cls: Type[runners.BaseRunner]):
+  def _register_runner(
+      self, benchmark_scenario: str, runner_cls: Type[runners.BaseRunner]
+  ):
     self.runner_registry[benchmark_scenario] = runner_cls
 
   def promote_to_singleton_instance(self):

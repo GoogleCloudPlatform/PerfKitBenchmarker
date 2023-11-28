@@ -21,7 +21,6 @@ The following stats are reported:
   * a list of all measured latencies
 """
 
-
 from datetime import datetime
 import os
 import random
@@ -51,24 +50,32 @@ DEFAULT_TIMEOUT = 3600  # one hour "infinite" timeout
 FLAGS = flags.FLAGS
 flags.DEFINE_string('server', 'localhost:8500', 'PredictionService host:port')
 flags.DEFINE_string(
-    'image_directory', ILSVRC_VALIDATION_IMAGES,
+    'image_directory',
+    ILSVRC_VALIDATION_IMAGES,
     'Path to a directory containing images to be classified. '
     'A random image from the directory will be chosen for '
-    'every classification request.')
+    'every classification request.',
+)
 flags.DEFINE_integer('runtime', 60, 'Runtime in seconds.')
-flags.DEFINE_integer('num_threads', 16,
-                     'Number of concurrent worker threads to launch.')
-flags.DEFINE_integer('rpc_timeout', DEFAULT_TIMEOUT,
-                     'Number of seconds to set the rpc timeout to.')
+flags.DEFINE_integer(
+    'num_threads', 16, 'Number of concurrent worker threads to launch.'
+)
+flags.DEFINE_integer(
+    'rpc_timeout',
+    DEFAULT_TIMEOUT,
+    'Number of seconds to set the rpc timeout to.',
+)
 
 
 def get_files_in_directory_sorted(directory):
   """Returns a list of files in directory, sorted alphabetically."""
-  return sorted([
-      os.path.join(directory, name)
-      for name in os.listdir(directory)
-      if os.path.isfile(os.path.join(directory, name))
-  ])
+  return sorted(
+      [
+          os.path.join(directory, name)
+          for name in os.listdir(directory)
+          if os.path.isfile(os.path.join(directory, name))
+      ]
+  )
 
 
 class TfServingClientWorkload(object):
@@ -113,7 +120,8 @@ class TfServingClientWorkload(object):
       request.model_spec.signature_name = 'serving_default'
       request.inputs['image_bytes'].CopyFrom(
           # Uses version 1 of the TensorFlow protobuf
-          tf.compat.v1.make_tensor_proto(data, shape=[1]))
+          tf.compat.v1.make_tensor_proto(data, shape=[1])
+      )
 
       try:
         start_time = time.time()

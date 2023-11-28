@@ -1,7 +1,6 @@
 """Main script for GCP messaging service benchmark."""
 
 from absl import app as absl_app
-
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import app
 from perfkitbenchmarker.scripts.messaging_service_scripts.gcp import gcp_pubsub_client
 

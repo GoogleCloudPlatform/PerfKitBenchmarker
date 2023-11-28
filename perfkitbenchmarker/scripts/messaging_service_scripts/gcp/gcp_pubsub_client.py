@@ -2,6 +2,7 @@
 
 This PubSub client is implemented using Google Cloud SDK.
 """
+
 import datetime
 import typing
 from typing import Any, Callable, Optional, Union
@@ -26,9 +27,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('pubsub_project', '', help='Project name.')
 flags.DEFINE_string('pubsub_topic', 'pkb-topic-default', help='Topic name.')
 flags.DEFINE_string(
-    'pubsub_subscription',
-    'pkb-subscription-default',
-    help='Subscription name.')
+    'pubsub_subscription', 'pkb-subscription-default', help='Subscription name.'
+)
 
 
 class GCPPubSubClient(client.BaseMessagingServiceClient):
@@ -39,8 +39,9 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
 
   @classmethod
   def from_flags(cls):
-    return cls(FLAGS.pubsub_project, FLAGS.pubsub_topic,
-               FLAGS.pubsub_subscription)
+    return cls(
+        FLAGS.pubsub_project, FLAGS.pubsub_topic, FLAGS.pubsub_subscription
+    )
 
   def __init__(self, project: str, topic: str, subscription: str):
     self.project = project
@@ -56,7 +57,8 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
 
     self.topic_path = self.publisher.topic_path(self.project, self.topic)
     self.subscription_path = self.subscriber.subscription_path(
-        self.project, self.subscription)
+        self.project, self.subscription
+    )
 
   def generate_message(self, seq: int, message_size: int) -> bytes:  # pytype: disable=signature-mismatch  # overriding-return-type-checks
     return super().generate_message(seq, message_size).encode('utf-8')
@@ -68,35 +70,39 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     return message_id
 
   def pull_message(
-      self, timeout: float = client.TIMEOUT) -> Optional[types.ReceivedMessage]:
+      self, timeout: float = client.TIMEOUT
+  ) -> Optional[types.ReceivedMessage]:
     """See base class."""
     # Cloud Pub/Sub has support for 2 different ways of retrieving messages:
     # Pull, and StreamingPull. We're using Pull, and doing 1 message / request.
     try:
       pulled_messages = self.subscriber.pull(
-          request={
-              'subscription': self.subscription_path,
-              'max_messages': 1
-          },
+          request={'subscription': self.subscription_path, 'max_messages': 1},
           retry=retry.Retry(deadline=timeout),
-          timeout=timeout)
-      return (pulled_messages.received_messages[0]
-              if pulled_messages.received_messages else None)
+          timeout=timeout,
+      )
+      return (
+          pulled_messages.received_messages[0]
+          if pulled_messages.received_messages
+          else None
+      )
     except exceptions.DeadlineExceeded:
       return None
 
   def acknowledge_received_message(
-      self,
-      message: Union[types.ReceivedMessage, pubsub_message.Message]) -> None:
+      self, message: Union[types.ReceivedMessage, pubsub_message.Message]
+  ) -> None:
     # Acknowledges the received message so it will not be sent again.
-    self.subscriber.acknowledge(request={
-        'subscription': self.subscription_path,
-        'ack_ids': [message.ack_id]
-    })
+    self.subscriber.acknowledge(
+        request={
+            'subscription': self.subscription_path,
+            'ack_ids': [message.ack_id],
+        }
+    )
 
   def _get_first_six_bytes_from_payload(
-      self,
-      message: Union[types.ReceivedMessage, pubsub_message.Message]) -> bytes:
+      self, message: Union[types.ReceivedMessage, pubsub_message.Message]
+  ) -> bytes:
     """Gets the first 6 bytes of a message (as returned by pull_message or PullingStream)."""
     if isinstance(message, types.ReceivedMessage):
       return typing.cast(types.ReceivedMessage, message).message.data[:6]
@@ -109,10 +115,12 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     """Purges all the messages for the underlying service."""
     timestamp = timestamp_pb2.Timestamp()
     timestamp.FromDatetime(
-        datetime.datetime.now() + datetime.timedelta(days=30))
+        datetime.datetime.now() + datetime.timedelta(days=30)
+    )
     request = types.SeekRequest(
         subscription=self.subscription,
-        time=timestamp,)
+        time=timestamp,
+    )
     self.subscriber.seek(request=request)
 
   def start_streaming_pull(self, callback: Callable[[Any], None]) -> None:

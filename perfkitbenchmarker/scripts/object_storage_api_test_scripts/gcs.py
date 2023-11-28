@@ -19,9 +19,9 @@ import logging
 import time
 
 from absl import flags
+from google.cloud import storage
 # This is the path that we SCP object_storage_interface to.
 from providers import object_storage_interface
-from google.cloud import storage
 
 FLAGS = flags.FLAGS
 
@@ -36,12 +36,14 @@ class GcsService(object_storage_interface.ObjectStorageServiceBase):
     bucket = storage.bucket.Bucket(self.client, bucket_name)
     return [obj.name for obj in self.client.list_blobs(bucket, prefix=prefix)]
 
-  def DeleteObjects(self,
-                    bucket_name,
-                    objects_to_delete,
-                    objects_deleted=None,
-                    delay_time=0,
-                    object_sizes=None):
+  def DeleteObjects(
+      self,
+      bucket_name,
+      objects_to_delete,
+      objects_deleted=None,
+      delay_time=0,
+      object_sizes=None,
+  ):
     start_times = []
     latencies = []
     sizes = []
@@ -60,8 +62,9 @@ class GcsService(object_storage_interface.ObjectStorageServiceBase):
         if object_sizes:
           sizes.append(object_sizes[index])
       except Exception as e:  # pylint: disable=broad-except
-        logging.exception('Caught exception while deleting object %s: %s',
-                          object_name, e)
+        logging.exception(
+            'Caught exception while deleting object %s: %s', object_name, e
+        )
     return start_times, latencies, sizes
 
   def BulkDeleteObjects(self, bucket_name, objects_to_delete, delay_time):

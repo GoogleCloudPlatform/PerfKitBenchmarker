@@ -53,9 +53,10 @@ class EndToEndLatencyRunner(runners.BaseRunner):
     shuffled_cpus = list(available_cpus)
     random.shuffle(shuffled_cpus)
     main_process_cpus = {shuffled_cpus[0]}
-    publisher_cpus = set(shuffled_cpus[1:publisher_cpus_required + 1])
+    publisher_cpus = set(shuffled_cpus[1 : publisher_cpus_required + 1])
     receiver_cpus = set(
-        shuffled_cpus[publisher_cpus_required + 1: total_cpus_required])
+        shuffled_cpus[publisher_cpus_required + 1 : total_cpus_required]
+    )
     os.sched_setaffinity(0, main_process_cpus)
     cls.MAIN_PINNED_CPUS = main_process_cpus
     cls.PUBLISHER_PINNED_CPUS = publisher_cpus
@@ -74,9 +75,11 @@ class EndToEndLatencyRunner(runners.BaseRunner):
     self._published_timestamps[ack_publish.seq] = ack_publish.publish_timestamp
 
   def _record_message_reception(
-      self, reception_report: protocol.ReceptionReport) -> None:
-    self._receive_timestamps[
-        reception_report.seq] = reception_report.receive_timestamp
+      self, reception_report: protocol.ReceptionReport
+  ) -> None:
+    self._receive_timestamps[reception_report.seq] = (
+        reception_report.receive_timestamp
+    )
     self._ack_timestamps[reception_report.seq] = reception_report.ack_timestamp
 
   def _compute_metrics(self, number_of_messages: int) -> Dict[str, Any]:
@@ -85,25 +88,31 @@ class EndToEndLatencyRunner(runners.BaseRunner):
     failure_counter = 0
     i = 0
     for published_timestamp, receive_timestamp, ack_timestamp in zip(
-        self._published_timestamps, self._receive_timestamps,
-        self._ack_timestamps):
+        self._published_timestamps,
+        self._receive_timestamps,
+        self._ack_timestamps,
+    ):
       if None in (published_timestamp, receive_timestamp, ack_timestamp):
         failure_counter += 1
         continue
       e2e_pull_latencies[i] = nanoseconds_to_milliseconds(
-          receive_timestamp - published_timestamp)
+          receive_timestamp - published_timestamp
+      )
       e2e_ack_latencies[i] = nanoseconds_to_milliseconds(
-          ack_timestamp - published_timestamp)
+          ack_timestamp - published_timestamp
+      )
       i += 1
     e2e_pull_latencies = e2e_pull_latencies[:i]
     e2e_ack_latencies = e2e_ack_latencies[:i]
-    pull_metrics = self._get_summary_statistics('e2e_latency',
-                                                e2e_pull_latencies,
-                                                number_of_messages,
-                                                failure_counter)
+    pull_metrics = self._get_summary_statistics(
+        'e2e_latency', e2e_pull_latencies, number_of_messages, failure_counter
+    )
     acknowledge_metrics = self._get_summary_statistics(
-        'e2e_acknowledge_latency', e2e_ack_latencies, number_of_messages,
-        failure_counter)
+        'e2e_acknowledge_latency',
+        e2e_ack_latencies,
+        number_of_messages,
+        failure_counter,
+    )
     metrics = {**pull_metrics, **acknowledge_metrics}
     return metrics
 
@@ -184,4 +193,5 @@ class EndToEndLatencyRunner(runners.BaseRunner):
 
 class StreamingPullEndToEndLatencyRunner(EndToEndLatencyRunner):
   """Runner for end-to-end latency measurement using StreamingPull."""
+
   RECEIVER_WORKER = main_process.StreamingPullReceiverWorker

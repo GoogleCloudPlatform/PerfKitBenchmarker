@@ -9,7 +9,6 @@ sys.argv[1]: The root HCFS directory
 sys.argv[2]: A comma separated list of the subdirectories/table names
 """
 
-
 import argparse
 import logging
 import os
@@ -27,10 +26,11 @@ def parse_args(args=None):
 
 
 def main(args):
-  spark = (SparkSession.builder
-           .appName('Setup Spark tables')
-           .enableHiveSupport()
-           .getOrCreate())
+  spark = (
+      SparkSession.builder.appName('Setup Spark tables')
+      .enableHiveSupport()
+      .getOrCreate()
+  )
   for table in args.tables:
     logging.info('Creating table %s', table)
     table_dir = os.path.join(args.root_dir, table)

@@ -32,19 +32,23 @@ class AzureService(object_storage_interface.ObjectStorageServiceBase):
   def __init__(self):
     if FLAGS.azure_key is None or FLAGS.azure_account is None:
       raise ValueError('Must specify azure account and key.')
-    self.blob_service = azure.storage.blob.BlobService(FLAGS.azure_account,
-                                                       FLAGS.azure_key)
+    self.blob_service = azure.storage.blob.BlobService(
+        FLAGS.azure_account, FLAGS.azure_key
+    )
 
   def ListObjects(self, bucket, prefix):
-    return [obj.name
-            for obj in self.blob_service.list_blobs(bucket, prefix=prefix)]
+    return [
+        obj.name for obj in self.blob_service.list_blobs(bucket, prefix=prefix)
+    ]
 
-  def DeleteObjects(self,
-                    bucket,
-                    objects_to_delete,
-                    objects_deleted=None,
-                    delay_time=0,
-                    object_sizes=None):
+  def DeleteObjects(
+      self,
+      bucket,
+      objects_to_delete,
+      objects_deleted=None,
+      delay_time=0,
+      object_sizes=None,
+  ):
     start_times = []
     latencies = []
     sizes = []
@@ -61,22 +65,25 @@ class AzureService(object_storage_interface.ObjectStorageServiceBase):
         if object_sizes:
           sizes.append(object_sizes[index])
       except:
-        logging.exception('Caught exception while deleting object %s.',
-                          object_name)
+        logging.exception(
+            'Caught exception while deleting object %s.', object_name
+        )
     return start_times, latencies, sizes
 
   def BulkDeleteObjects(self, bucket, objects_to_delete, delay_time):
     # This version of Azure Blob APIs do not support Bulk Delete
     # TODO(user): Update to latest version of Azure Blob Storage API
     start_times, latencies, _ = self.DeleteObjects(
-        bucket, objects_to_delete, delay_time=delay_time)
+        bucket, objects_to_delete, delay_time=delay_time
+    )
     return min(start_times), sum(latencies)
 
   def WriteObjectFromBuffer(self, bucket, object, stream, size):
     stream.seek(0)
     start_time = time.time()
     self.blob_service.put_block_blob_from_file(
-        bucket, object, stream, count=size)
+        bucket, object, stream, count=size
+    )
     latency = time.time() - start_time
     return start_time, latency
 

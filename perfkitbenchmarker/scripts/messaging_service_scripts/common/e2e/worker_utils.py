@@ -1,4 +1,5 @@
 """Utils for the worker subprocesses."""
+
 from multiprocessing import connection
 from typing import Any, Optional, Type
 
@@ -9,9 +10,11 @@ from perfkitbenchmarker.scripts.messaging_service_scripts.common.e2e import prot
 class Communicator:
   """Allows easy communication from workers to main process."""
 
-  def __init__(self,
-               input_conn: connection.Connection,
-               output_conn: connection.Connection):
+  def __init__(
+      self,
+      input_conn: connection.Connection,
+      output_conn: connection.Connection,
+  ):
     self.input_conn = input_conn
     self.output_conn = output_conn
     self._peeked = None
@@ -24,9 +27,9 @@ class Communicator:
     """Greets the main process with a Ready object."""
     self.output_conn.send(protocol.Ready())
 
-  def await_from_main(self,
-                      obj_class: Type[Any],
-                      ack_obj: Optional[Any] = None) -> Any:
+  def await_from_main(
+      self, obj_class: Type[Any], ack_obj: Optional[Any] = None
+  ) -> Any:
     """Awaits an incoming object from the main process, then returns it.
 
     Args:

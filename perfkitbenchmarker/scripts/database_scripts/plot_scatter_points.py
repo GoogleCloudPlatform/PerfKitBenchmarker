@@ -41,12 +41,15 @@ DEFAULT_ITERATIONS = '10'
 class GnuplotInfo(object):
   """Gnuplot metadata."""
 
-  def __init__(self, gnuplot_data_filename,
-               entries_per_run,
-               run_uri,
-               y_max,
-               iterations=DEFAULT_ITERATIONS,
-               title=None):
+  def __init__(
+      self,
+      gnuplot_data_filename,
+      entries_per_run,
+      run_uri,
+      y_max,
+      iterations=DEFAULT_ITERATIONS,
+      title=None,
+  ):
     """Initialize GnuplotInfo object.
 
     Args:
@@ -75,8 +78,8 @@ class GnuplotInfo(object):
     self.chart_title = CHART_TITLE_PREFIX + date_title_string
     identifier = date_string + run_uri + '_sysbench_run.png'
     self.output_chart = os.path.join(
-        os.path.dirname(__file__), '..', '..', '..', 'charts',
-        identifier)
+        os.path.dirname(__file__), '..', '..', '..', 'charts', identifier
+    )
     self.output_gnuplot_file = self.output_chart + '_gnuplot_input'
 
   def create_file(self):
@@ -92,14 +95,16 @@ class GnuplotInfo(object):
     title = self.title or 'Cloud SQL Prod'
 
     output_file = open(self.output_gnuplot_file, 'w')
-    output_file.write('set terminal pngcairo size 1500,800 '
-                      'enhanced font "Verdana,12"\n')
+    output_file.write(
+        'set terminal pngcairo size 1500,800 enhanced font "Verdana,12"\n'
+    )
     output_file.write('set output "' + self.output_chart + '"\n')
     output_file.write('set multiplot\n')
     output_file.write('set grid\n')
-    output_file.write('set border 4095 ls 0 lc rgb \"black\"\n')
-    output_file.write('set title (\"' + self.chart_title +
-                      '") font \"aerial, 14\" noenhanced\n')
+    output_file.write('set border 4095 ls 0 lc rgb "black"\n')
+    output_file.write(
+        'set title ("' + self.chart_title + '") font "aerial, 14" noenhanced\n'
+    )
     output_file.write('set xlabel "' + X_LABEL + '"\n')
     output_file.write('set ylabel "' + Y_LABEL + '"\n')
 
@@ -116,9 +121,11 @@ class GnuplotInfo(object):
       output_file.write('x=0\n')
       output_file.write('do for [t=1:' + self.iterations + ':+1] {\n')
       output_file.write(
-          '\tset label (sprintf(\"%d\", thread)) at x+20, 0  offset -2\n')
+          '\tset label (sprintf("%d", thread)) at x+20, 0  offset -2\n'
+      )
       output_file.write(
-          '\tset arrow from x,0 to x,y nohead ls 0 lc rgb \"blue\"\n')
+          '\tset arrow from x,0 to x,y nohead ls 0 lc rgb "blue"\n'
+      )
       # TODO: This code assumes thread count increases by 2 times the previous
       # number. Future implementation should take a list of thread counts and
       # properly handle that here.
@@ -130,8 +137,16 @@ class GnuplotInfo(object):
     output_file.write('plot\\\n')
 
     column = '1'
-    output_file.write('\"' + self.gnuplot_data_filename + '\" using ' + column +
-                      ' with points lc rgb \"#' + color + '\"  title \"' + title
-                      + '\"')
+    output_file.write(
+        '"'
+        + self.gnuplot_data_filename
+        + '" using '
+        + column
+        + ' with points lc rgb "#'
+        + color
+        + '"  title "'
+        + title
+        + '"'
+    )
 
     return self.output_gnuplot_file, self.output_chart

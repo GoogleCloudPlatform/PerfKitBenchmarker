@@ -16,8 +16,10 @@
 
 from absl import flags
 
-flags.DEFINE_string('azure_account', None,
-                    'The name of the storage account for Azure.')
+flags.DEFINE_string(
+    'azure_account', None, 'The name of the storage account for Azure.'
+)
 
-flags.DEFINE_string('azure_key', None,
-                    'The key of the storage account for Azure.')
+flags.DEFINE_string(
+    'azure_key', None, 'The key of the storage account for Azure.'
+)

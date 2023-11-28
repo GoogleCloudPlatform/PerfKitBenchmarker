@@ -11,17 +11,24 @@ from tensorflow_io.bigquery import BigQueryClient
 
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string("project_id", None,
-                    "GCP project id benchmark is run under.")
+flags.DEFINE_string(
+    "project_id", None, "GCP project id benchmark is run under."
+)
 flags.mark_flag_as_required("project_id")
-flags.DEFINE_string("dataset_project_id", "bigquery-public-data",
-                    "GCP project where dataset is located.")
+flags.DEFINE_string(
+    "dataset_project_id",
+    "bigquery-public-data",
+    "GCP project where dataset is located.",
+)
 flags.DEFINE_string("dataset_id", "baseball", "Dataset id.")
 flags.DEFINE_string("table_id", "games_wide", "Table id.")
 flags.DEFINE_integer("num_iterations", 1000, "Number of batches to load.")
-flags.DEFINE_integer("num_warmup_iterations", 10,
-                     "Number of warmup batches to load that doesn't count "
-                     "towards benchmark results.")
+flags.DEFINE_integer(
+    "num_warmup_iterations",
+    10,
+    "Number of warmup batches to load that doesn't count "
+    "towards benchmark results.",
+)
 
 flags.DEFINE_integer("requested_streams", 1, "Number of streams.")
 flags.DEFINE_integer("batch_size", 2048, "Batch size.")
@@ -36,8 +43,9 @@ flags.DEFINE_bool(
     "If True the implementation is allowed, for the sake of expediency, "
     "to produce elements in a non-deterministic order",
 )
-flags.DEFINE_enum("format", "AVRO", ["AVRO", "ARROW"],
-                  "Serialization format - AVRO or ARROW")
+flags.DEFINE_enum(
+    "format", "AVRO", ["AVRO", "ARROW"], "Serialization format - AVRO or ARROW"
+)
 
 
 def convert_field_type(field_type):
@@ -56,17 +64,17 @@ def get_dataset_schema(dataset_project_id, dataset_id, table_id):
   table_ref = dataset_ref.table(table_id)
   table = client.get_table(table_ref)
   column_names = [field.name for field in table.schema]
-  output_types = [convert_field_type(field.field_type)
-                  for field in table.schema]
+  output_types = [
+      convert_field_type(field.field_type) for field in table.schema
+  ]
   return (column_names, output_types)
 
 
 def get_dataset_from_bigquery(dataset_project_id, dataset_id, table_id):
   """Reads data from BigQuery and returns it as a TensorFlow dataset."""
   (selected_fields, output_types) = get_dataset_schema(
-      dataset_project_id,
-      dataset_id,
-      table_id)
+      dataset_project_id, dataset_id, table_id
+  )
 
   client = BigQueryClient()
 
@@ -78,7 +86,8 @@ def get_dataset_from_bigquery(dataset_project_id, dataset_id, table_id):
       selected_fields=selected_fields,
       output_types=output_types,
       requested_streams=FLAGS.requested_streams,
-      data_format=BigQueryClient.DataFormat[FLAGS.format])
+      data_format=BigQueryClient.DataFormat[FLAGS.format],
+  )
 
   streams = read_session.get_streams()
   print(
@@ -99,7 +108,8 @@ def get_dataset_from_bigquery(dataset_project_id, dataset_id, table_id):
       read_rows,
       cycle_length=streams_count64,
       num_parallel_calls=streams_count64,
-      deterministic=not FLAGS.sloppy)
+      deterministic=not FLAGS.sloppy,
+  )
 
   if FLAGS.prefetch_size is not None:
     dataset = dataset.prefetch(FLAGS.prefetch_size)
@@ -109,9 +119,9 @@ def get_dataset_from_bigquery(dataset_project_id, dataset_id, table_id):
 
 def run_benchmark(_):
   """Runs a BigQuery TensorFlow Connector benchmark."""
-  dataset = get_dataset_from_bigquery(FLAGS.dataset_project_id,
-                                      FLAGS.dataset_id,
-                                      FLAGS.table_id)
+  dataset = get_dataset_from_bigquery(
+      FLAGS.dataset_project_id, FLAGS.dataset_id, FLAGS.table_id
+  )
   num_iterations = FLAGS.num_iterations
   batch_size = FLAGS.batch_size
 
@@ -145,9 +155,12 @@ def run_benchmark(_):
     )
 
   end = time.time()
-  print("Processed %d entries in %f seconds. [%f] rows/s" %
-        (n, end - start, n / (end - start)))
+  print(
+      "Processed %d entries in %f seconds. [%f] rows/s"
+      % (n, end - start, n / (end - start))
+  )
   print("Benchmark result: [%f] rows/s" % (n / (end - start)))
+
 
 # Run as:
 # pylint: disable=line-too-long

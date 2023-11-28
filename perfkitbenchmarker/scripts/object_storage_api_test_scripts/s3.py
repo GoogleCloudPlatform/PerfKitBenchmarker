@@ -36,12 +36,14 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
   def ListObjects(self, bucket, prefix):
     return self.client.list_objects_v2(Bucket=bucket, Prefix=prefix)
 
-  def DeleteObjects(self,
-                    bucket,
-                    objects_to_delete,
-                    objects_deleted=None,
-                    delay_time=0,
-                    object_sizes=None):
+  def DeleteObjects(
+      self,
+      bucket,
+      objects_to_delete,
+      objects_deleted=None,
+      delay_time=0,
+      object_sizes=None,
+  ):
     start_times = []
     latencies = []
     sizes = []
@@ -58,8 +60,9 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
         if object_sizes:
           sizes.append(object_sizes[index])
       except Exception as e:  # pylint: disable=broad-except
-        logging.exception('Caught exception while deleting object %s: %s',
-                          object_name, e)
+        logging.exception(
+            'Caught exception while deleting object %s: %s', object_name, e
+        )
     return start_times, latencies, sizes
 
   def BulkDeleteObjects(self, bucket, objects_to_delete, delay_time):
@@ -83,8 +86,7 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
 
   def ReadObject(self, bucket, object_name):
     start_time = time.time()
-    s3_response_object = self.client.get_object(
-        Bucket=bucket, Key=object_name)
+    s3_response_object = self.client.get_object(Bucket=bucket, Key=object_name)
     s3_response_object['Body'].read()
     latency = time.time() - start_time
     return start_time, latency

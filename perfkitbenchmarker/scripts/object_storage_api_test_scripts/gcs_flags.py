@@ -18,6 +18,9 @@ from absl import flags
 GCS_CLIENT_PYTHON = 'python'
 GCS_CLIENT_BOTO = 'boto'
 
-flags.DEFINE_enum('gcs_client', GCS_CLIENT_BOTO,
-                  [GCS_CLIENT_PYTHON, GCS_CLIENT_BOTO],
-                  'The GCS client library to use (default boto).')
+flags.DEFINE_enum(
+    'gcs_client',
+    GCS_CLIENT_BOTO,
+    [GCS_CLIENT_PYTHON, GCS_CLIENT_BOTO],
+    'The GCS client library to use (default boto).',
+)

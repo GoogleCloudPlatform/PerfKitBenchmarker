@@ -5,7 +5,8 @@ from absl import flags
 
 _LOG_FORMAT = '%(asctime)s @ %(filename)s:%(lineno)d - %(message)s'
 _DEBUG = flags.DEFINE_bool(
-    'debug', False, help='Logs messages to files for further debugging.')
+    'debug', False, help='Logs messages to files for further debugging.'
+)
 
 
 def silence_log_messages_by_default():

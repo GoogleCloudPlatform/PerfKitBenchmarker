@@ -1,4 +1,5 @@
 """GPU PingPong test script."""
+
 import logging
 from typing import Sequence, Tuple
 from absl import app
@@ -17,9 +18,10 @@ def Run(server: str) -> None:
   g = tf.Graph()
 
   with g.as_default():
-    def Connect(tensor: tf.Tensor,
-                iteration: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
 
+    def Connect(
+        tensor: tf.Tensor, iteration: tf.Tensor
+    ) -> Tuple[tf.Tensor, tf.Tensor]:
       with tf.device(recver.name):
         recv_tensor = tf.multiply(tensor, 2.0)
 
@@ -34,11 +36,13 @@ def Run(server: str) -> None:
     recv_pong, _ = tf.while_loop(
         lambda recv_tensor, iteration: tf.less(iteration, 1000),
         Connect,
-        [send_tensor, 0])
+        [send_tensor, 0],
+    )
 
   with tf.compat.v1.Session(server, graph=g) as sess:
     run_options = tf.compat.v1.RunOptions(
-        trace_level=tf.compat.v1.RunOptions.FULL_TRACE)
+        trace_level=tf.compat.v1.RunOptions.FULL_TRACE
+    )
     run_metadata = tf.compat.v1.RunMetadata()
     sess.run([recv_pong], options=run_options, run_metadata=run_metadata)
     logging.info(run_metadata)

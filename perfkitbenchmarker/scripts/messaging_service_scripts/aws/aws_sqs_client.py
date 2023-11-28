@@ -4,12 +4,12 @@ This AWS SQS client interface is implemented using Boto3 - AWS SDK for Python.
 Boto3 SQS Documentation:
 https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/sqs.html
 """
+
 import time
 from typing import Any, Dict, Optional
 
 from absl import flags
 import boto3
-
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 
 FLAGS = flags.FLAGS
@@ -41,18 +41,21 @@ class AwsSqsClient(client.BaseMessagingServiceClient):
     return published_message
 
   def pull_message(
-      self, timeout: float = client.TIMEOUT) -> Optional[Dict[str, Any]]:
+      self, timeout: float = client.TIMEOUT
+  ) -> Optional[Dict[str, Any]]:
     response = self.sqs_client.receive_message(
         QueueUrl=self.queue.url,
         MaxNumberOfMessages=1,
-        WaitTimeSeconds=max(1, int(timeout)))  # WaitTimeSeconds must be an int
+        WaitTimeSeconds=max(1, int(timeout)),
+    )  # WaitTimeSeconds must be an int
     messages = response.get('Messages', [])
     return messages[0] if messages else None
 
   def acknowledge_received_message(self, message: Dict[str, Any]):
     receipt_handle = message['ReceiptHandle']
     self.sqs_client.delete_message(
-        QueueUrl=self.queue.url, ReceiptHandle=receipt_handle)
+        QueueUrl=self.queue.url, ReceiptHandle=receipt_handle
+    )
 
   def purge_messages(self) -> None:
     """Purges all the messages for the underlying service."""

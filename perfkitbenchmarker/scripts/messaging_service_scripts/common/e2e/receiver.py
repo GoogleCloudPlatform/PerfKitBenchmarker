@@ -8,7 +8,6 @@ import time
 from typing import Any, Iterable, Optional
 
 from absl import flags
-
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client as common_client
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import errors
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import log_utils
@@ -29,13 +28,15 @@ class ReceiverRunner:
   """
 
   @classmethod
-  def main(cls,
-           input_conn: connection.Connection,
-           output_conn: connection.Connection,
-           serialized_flags: str,
-           app: Any,
-           iterations: Optional[int] = None,
-           pinned_cpus: Optional[Iterable[Any]] = None):
+  def main(
+      cls,
+      input_conn: connection.Connection,
+      output_conn: connection.Connection,
+      serialized_flags: str,
+      app: Any,
+      iterations: Optional[int] = None,
+      pinned_cpus: Optional[Iterable[Any]] = None,
+  ):
     """Runs the code for the receiver worker subprocess.
 
     Intended to be called with the multiprocessing.Process stdlib function.
@@ -70,7 +71,8 @@ class ReceiverRunner:
   def __init__(
       self,
       client: common_client.BaseMessagingServiceClient,
-      communicator: worker_utils.Communicator):
+      communicator: worker_utils.Communicator,
+  ):
     self.client = client
     self.communicator = communicator
     self.state = BootingState(self)
@@ -122,7 +124,8 @@ class ReceiverRunner:
     return protocol.ReceptionReport(
         seq=seq,
         receive_timestamp=pull_timestamp,
-        ack_timestamp=ack_timestamp,)
+        ack_timestamp=ack_timestamp,
+    )
 
   def got_purge_command(self) -> bool:
     peeked_obj = self.communicator.peek()
@@ -200,10 +203,12 @@ class ReadyState(ReceiverState):
   def process_state(self) -> ReceiverState:
     logger.debug('Awaiting for consume request from main...')
     consume_cmd = self.receiver_runner.communicator.await_from_main(
-        protocol.Consume, protocol.AckConsume())
+        protocol.Consume, protocol.AckConsume()
+    )
     deadline = time.time() + common_client.TIMEOUT
     return self.get_next_state(
-        PullingState, consume_cmd=consume_cmd, deadline=deadline)
+        PullingState, consume_cmd=consume_cmd, deadline=deadline
+    )
 
 
 class PullingState(ReceiverState):
@@ -221,7 +226,8 @@ class PullingState(ReceiverState):
       self,
       receiver_runner: ReceiverRunner,
       consume_cmd: protocol.Consume,
-      deadline: float):
+      deadline: float,
+  ):
     super().__init__(receiver_runner)
     self.consume_cmd = consume_cmd
     self.deadline = deadline
@@ -233,7 +239,8 @@ class PullingState(ReceiverState):
       if time.time() > self.deadline:
         logger.debug(
             'Deadline exceeded for message (expected_seq=%d)',
-            self.consume_cmd.seq)
+            self.consume_cmd.seq,
+        )
         raise errors.EndToEnd.PullTimeoutOnReceiverError
       reception_report = self.receiver_runner.await_message_received()
     except Exception as e:  # pylint: disable=broad-except
@@ -242,14 +249,14 @@ class PullingState(ReceiverState):
       if reception_report is None:
         logger.debug('No message received. Retrying...')
         return self.get_next_state(
-            PullingState,
-            consume_cmd=self.consume_cmd,
-            deadline=self.deadline)
+            PullingState, consume_cmd=self.consume_cmd, deadline=self.deadline
+        )
       return self.get_next_state(
           PullSuccessState,
           consume_cmd=self.consume_cmd,
           deadline=self.deadline,
-          reception_report=reception_report)
+          reception_report=reception_report,
+      )
 
 
 class PullSuccessState(ReceiverState):
@@ -272,7 +279,8 @@ class PullSuccessState(ReceiverState):
       receiver_runner: ReceiverRunner,
       consume_cmd: protocol.Consume,
       deadline: float,
-      reception_report: protocol.ReceptionReport):
+      reception_report: protocol.ReceptionReport,
+  ):
     super().__init__(receiver_runner)
     self.consume_cmd = consume_cmd
     self.deadline = deadline
@@ -281,7 +289,8 @@ class PullSuccessState(ReceiverState):
   # TODO(odiego): Rename consume to receive
   def process_state(self) -> ReceiverState:
     logger.debug(
-        'Received message (expected_seq=%d)', self.reception_report.seq)
+        'Received message (expected_seq=%d)', self.reception_report.seq
+    )
     if self.receiver_runner.got_purge_command():
       logger.debug('Got purge command from main!')
       return self.get_next_state(PurgingState, notify_to_main_process=True)
@@ -294,7 +303,8 @@ class PullSuccessState(ReceiverState):
       return self.get_next_state(ReadyState)
     else:
       return self.get_next_state(
-          PullingState, consume_cmd=self.consume_cmd, deadline=self.deadline)
+          PullingState, consume_cmd=self.consume_cmd, deadline=self.deadline
+      )
 
 
 class PullErrorState(ReceiverState):
@@ -324,7 +334,8 @@ class PurgingState(ReceiverState):
   def __init__(
       self,
       receiver_runner: ReceiverRunner,
-      notify_to_main_process: bool = False):
+      notify_to_main_process: bool = False,
+  ):
     super().__init__(receiver_runner)
     self.notify_to_main_process = notify_to_main_process
 

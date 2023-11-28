@@ -1,4 +1,5 @@
 """This module contains the base cloud client class."""
+
 import abc
 import base64
 from typing import Any, Callable, Type, TypeVar
@@ -7,7 +8,8 @@ TIMEOUT = 10
 
 # Workaround for forward declaration
 BaseMessagingServiceClientT = TypeVar(
-    'BaseMessagingServiceClientT', bound='BaseMessagingServiceClient')
+    'BaseMessagingServiceClientT', bound='BaseMessagingServiceClient'
+)
 
 
 class BaseMessagingServiceClient(metaclass=abc.ABCMeta):
@@ -35,7 +37,8 @@ class BaseMessagingServiceClient(metaclass=abc.ABCMeta):
     if message_size < 6:
       raise ValueError('Minimum message_size is 6.')
     encoded_seq_str = base64.b64encode(
-        seq.to_bytes(4, byteorder='big', signed=False)).decode('ascii')
+        seq.to_bytes(4, byteorder='big', signed=False)
+    ).decode('ascii')
     encoded_seq_str = (encoded_seq_str + '      ')[:6]
     message = encoded_seq_str + ' ' * (message_size - 6)
     return message
@@ -63,7 +66,7 @@ class BaseMessagingServiceClient(metaclass=abc.ABCMeta):
   @classmethod
   @abc.abstractmethod
   def from_flags(
-      cls: Type[BaseMessagingServiceClientT]
+      cls: Type[BaseMessagingServiceClientT],
   ) -> BaseMessagingServiceClientT:
     """Gets an actual instance based upon the FLAGS values."""
     pass
@@ -73,8 +76,8 @@ class BaseMessagingServiceClient(metaclass=abc.ABCMeta):
     """Publishes a single message to the messaging service.
 
     Args:
-      message_payload: Message, created by 'generate_message'. This
-        message will be the one that we publish/pull from the messaging service.
+      message_payload: Message, created by 'generate_message'. This message will
+        be the one that we publish/pull from the messaging service.
 
     Returns:
       Return response to publish a message from the provider. For GCP PubSub

@@ -60,12 +60,14 @@ class GcsServiceBoto(object_storage_interface.ObjectStorageServiceBase):
     bucket_uri = self._StorageURI(bucket)
     return [obj.name for obj in bucket_uri.list_bucket(prefix=prefix)]
 
-  def DeleteObjects(self,
-                    bucket,
-                    objects_to_delete,
-                    objects_deleted=None,
-                    delay_time=0,
-                    object_sizes=None):
+  def DeleteObjects(
+      self,
+      bucket,
+      objects_to_delete,
+      objects_deleted=None,
+      delay_time=0,
+      object_sizes=None,
+  ):
     start_times = []
     latencies = []
     sizes = []
@@ -83,14 +85,16 @@ class GcsServiceBoto(object_storage_interface.ObjectStorageServiceBase):
         if object_sizes:
           sizes.append(object_sizes[index])
       except:  # pylint:disable=bare-except
-        logging.exception('Caught exception while deleting object %s.',
-                          object_name)
+        logging.exception(
+            'Caught exception while deleting object %s.', object_name
+        )
     return start_times, latencies, sizes
 
   def BulkDeleteObjects(self, bucket, objects_to_delete, delay_time):
     # GCS Boto currently does not support Bulk delete
     start_times, latencies, _ = self.DeleteObjects(
-        bucket, objects_to_delete, delay_time=delay_time)
+        bucket, objects_to_delete, delay_time=delay_time
+    )
     return min(start_times), sum(latencies)
 
   def WriteObjectFromBuffer(self, bucket, object_name, stream, size):
@@ -98,7 +102,8 @@ class GcsServiceBoto(object_storage_interface.ObjectStorageServiceBase):
     stream.seek(0)
     object_uri = self._StorageURI(bucket, object_name)
     object_uri.set_contents_from_file(
-        stream, size=size, headers=self._CreateHeader())
+        stream, size=size, headers=self._CreateHeader()
+    )
     latency = time.time() - start_time
     return start_time, latency
 

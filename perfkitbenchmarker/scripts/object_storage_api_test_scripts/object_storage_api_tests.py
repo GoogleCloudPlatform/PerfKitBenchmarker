@@ -14,12 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A Test Script to be copied to the test VM to perform various tests to
-   object storage via APIs exposed by the provider.
+"""A test script running various on object storage via provider.
 
-   Note: it is intentional that this test script is NOT dependant on the PKB
-   package so we do not have to copy the entire PKB package to test VM just to
-   run this script.
+Note: This script is copied to the test VM.
+It is intentional that this test script is NOT dependant on the PKB
+package so we do not have to copy the entire PKB package to test VM just to
+run this script.
 """
 
 
@@ -66,20 +66,32 @@ NAMING_SCHEMES = [
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum(
-    'storage_provider', 'GCS', ['GCS', 'S3', 'AZURE'],
-    'The target storage provider to test.')
+    'storage_provider',
+    'GCS',
+    ['GCS', 'S3', 'AZURE'],
+    'The target storage provider to test.',
+)
 
-flags.DEFINE_string('bucket', None,
-                    'The name of the bucket to test with. Caller is '
-                    'responsible to create an empty bucket for a particular '
-                    'invocation of this test and then clean-up the bucket '
-                    'after this test returns.')
+flags.DEFINE_string(
+    'bucket',
+    None,
+    'The name of the bucket to test with. Caller is '
+    'responsible to create an empty bucket for a particular '
+    'invocation of this test and then clean-up the bucket '
+    'after this test returns.',
+)
 
 flags.DEFINE_enum(
-    'scenario', 'OneByteRW', [
-        'OneByteRW', 'ListConsistency', 'SingleStreamThroughput',
-        'CleanupBucket', 'MultiStreamWrite', 'MultiStreamRead',
-        'MultiStreamDelete'
+    'scenario',
+    'OneByteRW',
+    [
+        'OneByteRW',
+        'ListConsistency',
+        'SingleStreamThroughput',
+        'CleanupBucket',
+        'MultiStreamWrite',
+        'MultiStreamRead',
+        'MultiStreamDelete',
     ],
     'The various scenarios to run. OneByteRW: read and write of single byte. '
     'ListConsistency: List-after-write and list-after-update consistency. '
@@ -87,45 +99,76 @@ flags.DEFINE_enum(
     'CleanupBucket: Cleans up everything in a given bucket.'
     'MultiStreamWrite: Write objects with many streams at once.'
     'MultiStreamRead: Read objects with many streams at once.'
-    'MultiStreamDelete: Deletes all objects in a bucket with many streams.')
+    'MultiStreamDelete: Deletes all objects in a bucket with many streams.',
+)
 
-flags.DEFINE_integer('iterations', 1, 'The number of iterations to run for the '
-                     'particular test scenario. Currently only applicable to '
-                     'the ListConsistency scenario, ignored in others.')
+flags.DEFINE_integer(
+    'iterations',
+    1,
+    'The number of iterations to run for the '
+    'particular test scenario. Currently only applicable to '
+    'the ListConsistency scenario, ignored in others.',
+)
 
-flags.DEFINE_integer('objects_per_stream', 1000, 'The number of objects to '
-                     'read and write per stream in the MultiStreamThroughput '
-                     'scenario.')
-flags.DEFINE_string('object_sizes', '{1024: 100.0}', 'The size of the objects '
-                    'to use, as a distribution. Currently only applicable to '
-                    'the MultiStreamThroughput scenario, ignored in others. '
-                    'Must be a dict-based representation, even for a constant '
-                    'distribution. Ex: {1024: 100.0}, (1KiB 100% of the time), '
-                    '{1000: 50.0, 10000: 50.0} (1KB 50% of the time, 10KB 50% '
-                    'of the time)')
-flags.DEFINE_integer('num_streams', 10, 'The number of streams to use. Only '
-                     'applies to the MultiStreamThroughput scenario.',
-                     lower_bound=1)
-flags.DEFINE_integer('stream_num_start', 1, 'The number of the first thread in '
-                     'this process.')
-flags.DEFINE_string('objects_written_file', None, 'The path where the '
-                    'multistream write benchmark will save a list of the '
-                    'objects it wrote, and the multistream read benchmark will '
-                    'get a list of objects to read. If the scenario is '
-                    'MultiStreamWrite and this file exists, it will be '
-                    'deleted.')
+flags.DEFINE_integer(
+    'objects_per_stream',
+    1000,
+    'The number of objects to '
+    'read and write per stream in the MultiStreamThroughput '
+    'scenario.',
+)
+flags.DEFINE_string(
+    'object_sizes',
+    '{1024: 100.0}',
+    'The size of the objects '
+    'to use, as a distribution. Currently only applicable to '
+    'the MultiStreamThroughput scenario, ignored in others. '
+    'Must be a dict-based representation, even for a constant '
+    'distribution. Ex: {1024: 100.0}, (1KiB 100% of the time), '
+    '{1000: 50.0, 10000: 50.0} (1KB 50% of the time, 10KB 50% '
+    'of the time)',
+)
+flags.DEFINE_integer(
+    'num_streams',
+    10,
+    'The number of streams to use. Only '
+    'applies to the MultiStreamThroughput scenario.',
+    lower_bound=1,
+)
+flags.DEFINE_integer(
+    'stream_num_start', 1, 'The number of the first thread in this process.'
+)
+flags.DEFINE_string(
+    'objects_written_file',
+    None,
+    'The path where the '
+    'multistream write benchmark will save a list of the '
+    'objects it wrote, and the multistream read benchmark will '
+    'get a list of objects to read. If the scenario is '
+    'MultiStreamWrite and this file exists, it will be '
+    'deleted.',
+)
 
-flags.DEFINE_float('start_time', None, 'The time (as a POSIX timestamp) '
-                   'to start the operation. Only applies to the '
-                   'MultiStreamRead and MultiStreamWrite scenarios.')
+flags.DEFINE_float(
+    'start_time',
+    None,
+    'The time (as a POSIX timestamp) '
+    'to start the operation. Only applies to the '
+    'MultiStreamRead and MultiStreamWrite scenarios.',
+)
 
-flags.DEFINE_string('object_storage_class', None, 'The storage class to use '
-                    'for uploads. Currently only applicable to AWS. For other '
-                    'providers, storage class is determined by the bucket, '
-                    'which is passed in by the --bucket parameter.')
+flags.DEFINE_string(
+    'object_storage_class',
+    None,
+    'The storage class to use '
+    'for uploads. Currently only applicable to AWS. For other '
+    'providers, storage class is determined by the bucket, '
+    'which is passed in by the --bucket parameter.',
+)
 
 flags.DEFINE_enum(
-    'object_naming_scheme', SEQUENTIAL_BY_STREAM,
+    'object_naming_scheme',
+    SEQUENTIAL_BY_STREAM,
     NAMING_SCHEMES,
     'How objects will be named. Only applies to the '
     'MultiStreamWrite benchmark.\n'
@@ -139,18 +182,21 @@ flags.DEFINE_enum(
     'streams will roughly increase together.\n'
     'prefix_by_vm_and_stream: '
     'object names from each stream will create a '
-    'directory prefix as vm_id/worker_id/ attached to each object name.')
+    'directory prefix as vm_id/worker_id/ attached to each object name.',
+)
 
 flags.DEFINE_boolean(
-    'bulk_delete', False,
+    'bulk_delete',
+    False,
     'If true, deletes objects with bulk delete client request and records '
     'average latency per object. Otherwise, deletes one object per request '
-    'and records individual delete latency'
+    'and records individual delete latency',
 )
 
 flags.DEFINE_integer('vm_id', 0, 'ID of VM.')
-flags.DEFINE_float('delete_delay', 0,
-                   'Time to delay inbetween delete API call.')
+flags.DEFINE_float(
+    'delete_delay', 0, 'Time to delay inbetween delete API call.'
+)
 
 STORAGE_TO_SCHEMA_DICT = {'GCS': 'gs', 'S3': 's3', 'AZURE': 'azure'}
 
@@ -264,8 +310,10 @@ class SizeDistributionIterator(object):
       if self.cutoffs[i] > val:
         return self.sizes[i]
 
-    raise AssertionError("Random percent %s didn't match percent cutoff list %s"
-                         % (val, self.cutoffs))
+    raise AssertionError(
+        "Random percent %s didn't match percent cutoff list %s"
+        % (val, self.cutoffs)
+    )
 
     return self.size
 
@@ -306,6 +354,7 @@ def PercentileCalculator(numbers):
       result['stddev'] = 0
 
   return result
+
 
 # ### Object naming schemes ###
 
@@ -370,6 +419,7 @@ class PrefixHashCountIterator(ObjectNameIterator):
     obj_hash = hashlib.md5(name.encode()).hexdigest()[:10]
     return f'{obj_hash}/{name}'
 
+
 # ### Utilities for benchmarking ###
 
 
@@ -407,9 +457,16 @@ def GenerateWritePayload(size):
   return payload_bytes
 
 
-def WriteObjects(service, bucket, object_prefix, count,
-                 size, objects_written, latency_results=None,
-                 bandwidth_results=None):
+def WriteObjects(
+    service,
+    bucket,
+    object_prefix,
+    count,
+    size,
+    objects_written,
+    latency_results=None,
+    bandwidth_results=None,
+):
   """Write a number of objects to a storage service.
 
   Args:
@@ -419,14 +476,13 @@ def WriteObjects(service, bucket, object_prefix, count,
     count: The total number of objects that need to be written.
     size: The size of each object in bytes.
     objects_written: A list of names of objects that have been successfully
-        written by this function. Caller supplies the list and this function
-        fills in the name of the objects.
+      written by this function. Caller supplies the list and this function fills
+      in the name of the objects.
     latency_results: An optional parameter that caller can supply to hold
-        latency numbers, in seconds, for each object that is successfully
-        written.
+      latency numbers, in seconds, for each object that is successfully written.
     bandwidth_results: An optional parameter that caller can supply to hold
-        bandwidth numbers, in bytes per second, for each object that is
-        successfully written.
+      bandwidth numbers, in bytes per second, for each object that is
+      successfully written.
   """
 
   payload = GenerateWritePayload(size)
@@ -437,7 +493,8 @@ def WriteObjects(service, bucket, object_prefix, count,
 
     try:
       _, latency = service.WriteObjectFromBuffer(
-          bucket, object_name, handle, size)
+          bucket, object_name, handle, size
+      )
 
       objects_written.append(object_name)
       if latency_results is not None:
@@ -445,13 +502,20 @@ def WriteObjects(service, bucket, object_prefix, count,
       if bandwidth_results is not None and latency > 0.0:
         bandwidth_results.append(size / latency)
     except Exception as e:
-      logging.info('Caught exception %s while writing object %s' %
-                   (e, object_name))
+      logging.info(
+          'Caught exception %s while writing object %s', e, object_name
+      )
 
 
-def ReadObjects(service, bucket, objects_to_read, latency_results=None,
-                bandwidth_results=None, object_size=None,
-                start_times=None):
+def ReadObjects(
+    service,
+    bucket,
+    objects_to_read,
+    latency_results=None,
+    bandwidth_results=None,
+    object_size=None,
+    start_times=None,
+):
   """Read a bunch of objects.
 
   Args:
@@ -474,29 +538,37 @@ def ReadObjects(service, bucket, objects_to_read, latency_results=None,
       if latency_results is not None:
         latency_results.append(latency)
 
-      if (bandwidth_results is not None and
-          object_size is not None and latency > 0.0):
+      if (
+          bandwidth_results is not None
+          and object_size is not None
+          and latency > 0.0
+      ):
         bandwidth_results.append(object_size / latency)
     except:
       logging.exception('Failed to read object %s', object_name)
 
 
-def DeleteObjectsConcurrently(service, per_thread_objects_to_delete,
-                              per_thread_objects_deleted):
+def DeleteObjectsConcurrently(
+    service, per_thread_objects_to_delete, per_thread_objects_deleted
+):
   """Delete a bunch of objects concurrently.
 
   Args:
     service: the ObjectStorageServiceBase object to use.
     per_thread_objects_to_delete: A 2-d list of objects to delete per thread.
     per_thread_objects_deleted: A 2-d list to record the objects that have been
-        successfully deleted per thread.
+      successfully deleted per thread.
   """
   threads = []
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
-    thread = Thread(target=service.DeleteObjects,
-                    args=(FLAGS.bucket,
-                          per_thread_objects_to_delete[i],
-                          per_thread_objects_deleted[i]))
+    thread = Thread(
+        target=service.DeleteObjects,
+        args=(
+            FLAGS.bucket,
+            per_thread_objects_to_delete[i],
+            per_thread_objects_deleted[i],
+        ),
+    )
     thread.daemon = True
     thread.start()
     threads.append(thread)
@@ -505,20 +577,22 @@ def DeleteObjectsConcurrently(service, per_thread_objects_to_delete,
     try:
       threads[i].join()
     except:
-      logging.exception('Caught exception waiting for the %dth deletion '
-                        'thread.', i)
+      logging.exception(
+          'Caught exception waiting for the %dth deletion thread.', i
+      )
 
   logging.info('Finished deleting')
 
 
-def ListAndWaitForObjects(service, counting_start_time,
-                          expected_set_of_objects, object_prefix):
+def ListAndWaitForObjects(
+    service, counting_start_time, expected_set_of_objects, object_prefix
+):
   """List objects and wait for consistency.
 
   Args:
     service: the ObjectStorageServiceBase object to use.
     counting_start_time: The start time used to count for the inconsistency
-        window.
+      window.
     expected_set_of_objects: The set of expectation.
     object_prefix: The prefix of objects to list from.
 
@@ -549,8 +623,14 @@ def ListAndWaitForObjects(service, counting_start_time,
   return result_consistent, list_count, list_latency, total_wait_time
 
 
-def AnalyzeListResults(final_result, result_consistent, list_count,
-                       list_latency, total_wait_time, list_scenario):
+def AnalyzeListResults(
+    final_result,
+    result_consistent,
+    list_count,
+    list_latency,
+    total_wait_time,
+    list_scenario,
+):
   """Analyze the results of list consistency test, and fill in the final result.
 
   Args:
@@ -560,13 +640,17 @@ def AnalyzeListResults(final_result, result_consistent, list_count,
     list_latency: The latency of the lists in seconds.
     total_wait_time: Time spent waiting for the list to be consistent (seconds).
     list_scenario: The scenario that was tested: list-after-update,
-        list-after-write.
+      list-after-write.
   """
-  result_string_consistency = '%s%s' % (list_scenario,
-                                        LIST_RESULT_SUFFIX_CONSISTENT)
+  result_string_consistency = '%s%s' % (
+      list_scenario,
+      LIST_RESULT_SUFFIX_CONSISTENT,
+  )
   result_string_latency = '%s%s' % (list_scenario, LIST_RESULT_SUFFIX_LATENCY)
   result_string_inconsistency_window = '%s%s' % (
-      list_scenario, LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW)
+      list_scenario,
+      LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW,
+  )
 
   if result_consistent:
     logging.debug('Listed %d times until results are consistent.', list_count)
@@ -580,11 +664,13 @@ def AnalyzeListResults(final_result, result_consistent, list_count,
       final_result[result_string_consistency] = False
       final_result[result_string_inconsistency_window] = total_wait_time
   else:
-    logging.debug('Results are still inconsistent after waiting for the max '
-                  'limit!')
+    logging.debug(
+        'Results are still inconsistent after waiting for the max limit!'
+    )
     final_result[result_string_consistency] = False
     final_result[result_string_inconsistency_window] = (
-        LIST_CONSISTENCY_WAIT_TIME_LIMIT)
+        LIST_CONSISTENCY_WAIT_TIME_LIMIT
+    )
 
 
 def SingleStreamThroughputBenchmark(service):
@@ -602,38 +688,54 @@ def SingleStreamThroughputBenchmark(service):
   write_bandwidth = []
   objects_written = []
 
-  WriteObjects(service, FLAGS.bucket, object_prefix,
-               LARGE_OBJECT_COUNT, LARGE_OBJECT_SIZE_BYTES, objects_written,
-               bandwidth_results=write_bandwidth)
+  WriteObjects(
+      service,
+      FLAGS.bucket,
+      object_prefix,
+      LARGE_OBJECT_COUNT,
+      LARGE_OBJECT_SIZE_BYTES,
+      objects_written,
+      bandwidth_results=write_bandwidth,
+  )
 
   try:
     if len(objects_written) < LARGE_OBJECT_COUNT * (
-                              1 - LARGE_OBJECT_FAILURE_TOLERANCE):  # noqa
-      raise LowAvailabilityError('Failed to write required number of large '
-                                 'objects, exiting.')
+        1 - LARGE_OBJECT_FAILURE_TOLERANCE
+    ):  # noqa
+      raise LowAvailabilityError(
+          'Failed to write required number of large objects, exiting.'
+      )
 
     logging.info('Single stream upload individual results in Bps:')
     for bandwidth in write_bandwidth:
       logging.info('%f', bandwidth)
-    logging.info('Single stream upload throughput in Bps: %s',
-                 json.dumps(PercentileCalculator(write_bandwidth),
-                            sort_keys=True))
+    logging.info(
+        'Single stream upload throughput in Bps: %s',
+        json.dumps(PercentileCalculator(write_bandwidth), sort_keys=True),
+    )
 
     read_bandwidth = []
-    ReadObjects(service, FLAGS.bucket, objects_written,
-                bandwidth_results=read_bandwidth,
-                object_size=LARGE_OBJECT_SIZE_BYTES)
+    ReadObjects(
+        service,
+        FLAGS.bucket,
+        objects_written,
+        bandwidth_results=read_bandwidth,
+        object_size=LARGE_OBJECT_SIZE_BYTES,
+    )
     if len(read_bandwidth) < len(objects_written) * (
-        1 - LARGE_OBJECT_FAILURE_TOLERANCE):  # noqa
-      raise LowAvailabilityError('Failed to read required number of objects, '
-                                 'exiting.')
+        1 - LARGE_OBJECT_FAILURE_TOLERANCE
+    ):  # noqa
+      raise LowAvailabilityError(
+          'Failed to read required number of objects, exiting.'
+      )
 
     logging.info('Single stream download individual results in Bps:')
     for bandwidth in read_bandwidth:
       logging.info('%f', bandwidth)
-    logging.info('Single stream download throughput in Bps: %s',
-                 json.dumps(PercentileCalculator(read_bandwidth),
-                            sort_keys=True))
+    logging.info(
+        'Single stream download throughput in Bps: %s',
+        json.dumps(PercentileCalculator(read_bandwidth), sort_keys=True),
+    )
 
   finally:
     service.DeleteObjects(FLAGS.bucket, objects_written)
@@ -646,10 +748,9 @@ def RunWorkerProcesses(worker, worker_args, per_process_args=None):
     worker: either WriteWorker or ReadWorker. The worker function to call.
     worker_args: a tuple. The arguments to pass to the worker function. The
       result queue and stream number will be appended as the last two arguments.
-    per_process_args: if given, an array with length equal to the
-      number of processes. Process number i will be passed
-      per_process_args[i] after its regular arguments and before the
-      result queue and stream number.
+    per_process_args: if given, an array with length equal to the number of
+      processes. Process number i will be passed per_process_args[i] after its
+      regular arguments and before the result queue and stream number.
 
   Returns:
     A list of the results returned by the workers.
@@ -660,15 +761,18 @@ def RunWorkerProcesses(worker, worker_args, per_process_args=None):
 
   logging.info('Creating %s processes', FLAGS.num_streams)
   if per_process_args is None:
-    processes = [mp.Process(target=worker,
-                            args=worker_args + (result_queue, i))
-                 for i in range(num_streams)]
+    processes = [
+        mp.Process(target=worker, args=worker_args + (result_queue, i))
+        for i in range(num_streams)
+    ]
   else:
-    processes = [mp.Process(target=worker,
-                            args=worker_args +
-                            (per_process_args[i],) +
-                            (result_queue, i))
-                 for i in range(num_streams)]
+    processes = [
+        mp.Process(
+            target=worker,
+            args=worker_args + (per_process_args[i],) + (result_queue, i),
+        )
+        for i in range(num_streams)
+    ]
   logging.info('Processes created. Starting processes.')
   for process in processes:
     process.start()
@@ -709,7 +813,6 @@ def MultiStreamWrites(service):
 
   Both kinds of output are written as JSON, for easy serialization and
   deserialization.
-
   """
 
   size_distribution = yaml.safe_load(FLAGS.object_sizes)
@@ -718,12 +821,15 @@ def MultiStreamWrites(service):
 
   results = RunWorkerProcesses(
       WriteWorker,
-      (service,
-       payload,
-       size_distribution,
-       FLAGS.objects_per_stream,
-       FLAGS.start_time,
-       FLAGS.object_naming_scheme))
+      (
+          service,
+          payload,
+          size_distribution,
+          FLAGS.objects_per_stream,
+          FLAGS.start_time,
+          FLAGS.object_naming_scheme,
+      ),
+  )
 
   # object_records is the data we leave on the VM for future reads. We
   # need to pass data to the reader so it will know what object names
@@ -741,8 +847,9 @@ def MultiStreamWrites(service):
     except Exception as ex:
       # If we can't write our objects written, we still want to return
       # the data we collected, so keep going.
-      logging.info('Got exception %s while trying to write objects written '
-                   'file.', ex)
+      logging.info(
+          'Got exception %s while trying to write objects written file.', ex
+      )
 
   logging.info('len(results) = %s', len(results))
 
@@ -757,8 +864,9 @@ def MultiStreamWrites(service):
   min_writes_required = num_writes_requested * (1.0 - FAILURE_TOLERANCE)
   if num_writes < min_writes_required:
     raise LowAvailabilityError(
-        'Wrote %s objects out of %s requested (%s requred)' %
-        (num_writes, num_writes_requested, min_writes_required))
+        'Wrote %s objects out of %s requested (%s requred)'
+        % (num_writes, num_writes_requested, min_writes_required)
+    )
 
   json.dump(streams, sys.stdout, indent=0)
 
@@ -782,26 +890,28 @@ def MultiStreamReads(service):
    {"operation": "download", "start_time": start_time_1,
     "latency": latency_1, "size": size_1, "stream_num": stream_num_1},
    ...]
-
   """
 
   # Read the object records that the MultiStreamWriter left for us.
   if FLAGS.objects_written_file is None:
-    raise ValueError('The MultiStreamRead benchmark needs a list of object '
-                     'names to read from. Use '
-                     '--objects_written_file=<filename>.')
+    raise ValueError(
+        'The MultiStreamRead benchmark needs a list of object '
+        'names to read from. Use '
+        '--objects_written_file=<filename>.'
+    )
   with open(FLAGS.objects_written_file, 'r') as object_file:
     object_records = json.load(object_file)
 
   num_workers = FLAGS.num_streams
-  objects_by_worker = [object_records[i::num_workers]
-                       for i in range(num_workers)]
+  objects_by_worker = [
+      object_records[i::num_workers] for i in range(num_workers)
+  ]
 
   results = RunWorkerProcesses(
       ReadWorker,
-      (service,
-       FLAGS.start_time),
-      per_process_args=objects_by_worker)
+      (service, FLAGS.start_time),
+      per_process_args=objects_by_worker,
+  )
 
   # streams is the data we send back to the controller.
   streams = []
@@ -814,8 +924,9 @@ def MultiStreamReads(service):
   min_reads_required = num_reads_requested * (1.0 - FAILURE_TOLERANCE)
   if num_reads < min_reads_required:
     raise LowAvailabilityError(
-        'Read %s objects out of %s requested (%s requred)' %
-        (num_reads, num_reads_requested, min_reads_required))
+        'Read %s objects out of %s requested (%s requred)'
+        % (num_reads, num_reads_requested, min_reads_required)
+    )
 
   json.dump(streams, sys.stdout, indent=0)
 
@@ -839,7 +950,6 @@ def MultiStreamDelete(service):
    {"operation": "delete", "start_time": start_time_1,
     "latency": latency_1, "size": size_1, "stream_num": stream_num_1},
    ...]
-
   """
 
   # Read the object records that the MultiStreamWriter left for us.
@@ -847,18 +957,19 @@ def MultiStreamDelete(service):
     raise ValueError(
         'The MultiStream Read and Delete benchmarks need a list of object '
         'names to read from. Use '
-        '--objects_written_file=<filename>.')
+        '--objects_written_file=<filename>.'
+    )
   with open(FLAGS.objects_written_file, 'r') as object_file:
     object_records = json.load(object_file)
 
   num_workers = FLAGS.num_streams
-  objects_by_worker = [object_records[i::num_workers]
-                       for i in range(num_workers)]
+  objects_by_worker = [
+      object_records[i::num_workers] for i in range(num_workers)
+  ]
 
   results = RunWorkerProcesses(
-      DeleteWorker,
-      (service,),
-      per_process_args=objects_by_worker)
+      DeleteWorker, (service,), per_process_args=objects_by_worker
+  )
 
   # streams is the data we send back to the controller.
   streams = []
@@ -886,9 +997,16 @@ def SleepUntilTime(when):
     logging.info('Sleep time %s was too small', sleep_time)
 
 
-def WriteWorker(service, payload,
-                size_distribution, num_objects,
-                start_time, naming_scheme, result_queue, worker_num):
+def WriteWorker(
+    service,
+    payload,
+    size_distribution,
+    num_objects,
+    start_time,
+    naming_scheme,
+    result_queue,
+    worker_num,
+):
   """Upload objects for the multi-stream writes benchmark.
 
   Args:
@@ -911,18 +1029,21 @@ def WriteWorker(service, payload,
     # Unique prefix helps with backend sharding
     uuid_prefix = str(uuid.uuid4())[-8:]
     name_iterator = PrefixCounterIterator(
-        '%s_vm_%s_worker_%s/pkb_write_worker_%s' %
-        (uuid_prefix, FLAGS.vm_id, worker_num, worker_num))
+        '%s_vm_%s_worker_%s/pkb_write_worker_%s'
+        % (uuid_prefix, FLAGS.vm_id, worker_num, worker_num)
+    )
   elif naming_scheme == SEQUENTIAL_BY_STREAM:
     name_iterator = PrefixCounterIterator(
-        'pkb_write_worker_%f_%s' % (time.time(), worker_num))
+        'pkb_write_worker_%f_%s' % (time.time(), worker_num)
+    )
   elif naming_scheme == APPROXIMATELY_SEQUENTIAL:
     name_iterator = PrefixTimestampSuffixIterator(
-        'pkb_writes_%s' % start_time,
-        '%s' % worker_num)
+        'pkb_writes_%s' % start_time, '%s' % worker_num
+    )
   elif naming_scheme == SEQUENTIAL_WITH_HASH_PREFIX:
     name_iterator = PrefixHashCountIterator(
-        f'pkb_write_worker_{time.time()}_{worker_num}')
+        f'pkb_write_worker_{time.time()}_{worker_num}'
+    )
   else:
     raise ValueError(f'Unknown naming scheme {naming_scheme}')
   size_iterator = SizeDistributionIterator(size_distribution)
@@ -938,29 +1059,33 @@ def WriteWorker(service, payload,
 
     try:
       start_time, latency = service.WriteObjectFromBuffer(
-          FLAGS.bucket, object_name,
-          payload_handle, object_size)
+          FLAGS.bucket, object_name, payload_handle, object_size
+      )
 
       object_names.append(object_name)
       start_times.append(start_time)
       latencies.append(latency)
       sizes.append(object_size)
     except Exception as e:
-      logging.info('Worker %s caught exception %s while writing object %s' %
-                   (worker_num, e, object_name))
+      logging.info(
+          'Worker %s caught exception %s while writing object %s',
+          worker_num,
+          e,
+          object_name,
+      )
 
-  logging.info('Worker %s finished writing its objects' % worker_num)
+  logging.info('Worker %s finished writing its objects', worker_num)
 
-  result_queue.put({'object_names': object_names,
-                    'start_times': start_times,
-                    'latencies': latencies,
-                    'sizes': sizes,
-                    'stream_num': worker_num + FLAGS.stream_num_start})
+  result_queue.put({
+      'object_names': object_names,
+      'start_times': start_times,
+      'latencies': latencies,
+      'sizes': sizes,
+      'stream_num': worker_num + FLAGS.stream_num_start,
+  })
 
 
-def ReadWorker(service, start_time, object_records,
-               result_queue, worker_num):
-
+def ReadWorker(service, start_time, object_records, result_queue, worker_num):
   start_times = []
   latencies = []
   sizes = []
@@ -976,13 +1101,19 @@ def ReadWorker(service, start_time, object_records,
       latencies.append(latency)
       sizes.append(size)
     except Exception as e:
-      logging.info('Worker %s caught exception %s while reading object %s' %
-                   (worker_num, e, name))
+      logging.info(
+          'Worker %s caught exception %s while reading object %s',
+          worker_num,
+          e,
+          name,
+      )
 
-  result_queue.put({'start_times': start_times,
-                    'latencies': latencies,
-                    'sizes': sizes,
-                    'stream_num': worker_num + FLAGS.stream_num_start})
+  result_queue.put({
+      'start_times': start_times,
+      'latencies': latencies,
+      'sizes': sizes,
+      'stream_num': worker_num + FLAGS.stream_num_start,
+  })
 
 
 def DeleteWorker(service, object_records, result_queue, worker_num):
@@ -1004,8 +1135,9 @@ def DeleteWorker(service, object_records, result_queue, worker_num):
     object_sizes.append(size)
 
   if FLAGS.bulk_delete:
-    start_time, latency = service.BulkDeleteObjects(FLAGS.bucket, object_names,
-                                                    FLAGS.delete_delay)
+    start_time, latency = service.BulkDeleteObjects(
+        FLAGS.bucket, object_names, FLAGS.delete_delay
+    )
     start_times = [start_time]
     latencies = [latency]
     sizes = [sum(object_sizes)]
@@ -1014,13 +1146,14 @@ def DeleteWorker(service, object_records, result_queue, worker_num):
         FLAGS.bucket,
         object_names,
         delay_time=FLAGS.delete_delay,
-        object_sizes=object_sizes)
+        object_sizes=object_sizes,
+    )
 
   result_queue.put({
       'start_times': start_times,
       'latencies': latencies,
       'sizes': sizes,
-      'stream_num': worker_num + FLAGS.stream_num_start
+      'stream_num': worker_num + FLAGS.stream_num_start,
   })
 
 
@@ -1046,39 +1179,52 @@ def OneByteRWBenchmark(service):
   one_byte_write_latency = []
   one_byte_objects_written = []
 
-  WriteObjects(service, FLAGS.bucket, object_prefix,
-               ONE_BYTE_OBJECT_COUNT, 1, one_byte_objects_written,
-               latency_results=one_byte_write_latency)
+  WriteObjects(
+      service,
+      FLAGS.bucket,
+      object_prefix,
+      ONE_BYTE_OBJECT_COUNT,
+      1,
+      one_byte_objects_written,
+      latency_results=one_byte_write_latency,
+  )
 
   try:
     success_count = len(one_byte_objects_written)
     if success_count < ONE_BYTE_OBJECT_COUNT * (1 - FAILURE_TOLERANCE):
-      raise LowAvailabilityError('Failed to write required number of objects, '
-                                 'exiting.')
+      raise LowAvailabilityError(
+          'Failed to write required number of objects, exiting.'
+      )
 
     logging.info('Individual results of one byte upload:')
     for latency in one_byte_write_latency:
       logging.info('%f', latency)
-    logging.info('One byte upload - %s',
-                 json.dumps(PercentileCalculator(one_byte_write_latency),
-                            sort_keys=True))
+    logging.info(
+        'One byte upload - %s',
+        json.dumps(
+            PercentileCalculator(one_byte_write_latency), sort_keys=True
+        ),
+    )
 
     # Now download these objects and measure the latencies.
     one_byte_read_latency = []
-    ReadObjects(service, FLAGS.bucket, one_byte_objects_written,
-                one_byte_read_latency)
+    ReadObjects(
+        service, FLAGS.bucket, one_byte_objects_written, one_byte_read_latency
+    )
 
     success_count = len(one_byte_read_latency)
     if success_count < ONE_BYTE_OBJECT_COUNT * (1 - FAILURE_TOLERANCE):
-      raise LowAvailabilityError('Failed to read required number of objects, '
-                                 'exiting.')
+      raise LowAvailabilityError(
+          'Failed to read required number of objects, exiting.'
+      )
 
     logging.info('Individual results of one byte download:')
     for latency in one_byte_read_latency:
       logging.info('%f', latency)
-    logging.info('One byte download - %s',
-                 json.dumps(PercentileCalculator(one_byte_read_latency),
-                            sort_keys=True))
+    logging.info(
+        'One byte download - %s',
+        json.dumps(PercentileCalculator(one_byte_read_latency), sort_keys=True),
+    )
   finally:
     service.DeleteObjects(FLAGS.bucket, one_byte_objects_written)
 
@@ -1113,19 +1259,27 @@ def ListConsistencyBenchmark(service):
   object_prefix = 'pkb_list_consistency_%f' % time.time()
   final_objects_written = []
 
-  per_thread_objects_written = [[] for i in
-                                 range(LIST_CONSISTENCY_THREAD_COUNT)]  # noqa
+  per_thread_objects_written = [
+      [] for i in range(LIST_CONSISTENCY_THREAD_COUNT)
+  ]  # noqa
 
   threads = []
 
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
     my_prefix = '%s_%d' % (object_prefix, i)
-    thread = Thread(target=WriteObjects,
-                    args=(service, FLAGS.bucket, my_prefix,
-                          LIST_CONSISTENCY_OBJECT_COUNT //
-                          LIST_CONSISTENCY_THREAD_COUNT,
-                          1,
-                          per_thread_objects_written[i], None, None))
+    thread = Thread(
+        target=WriteObjects,
+        args=(
+            service,
+            FLAGS.bucket,
+            my_prefix,
+            LIST_CONSISTENCY_OBJECT_COUNT // LIST_CONSISTENCY_THREAD_COUNT,
+            1,
+            per_thread_objects_written[i],
+            None,
+            None,
+        ),
+    )
     thread.daemon = True
     thread.start()
     threads.append(thread)
@@ -1144,31 +1298,46 @@ def ListConsistencyBenchmark(service):
 
   final_count = len(final_objects_written)
   if final_count < LIST_CONSISTENCY_OBJECT_COUNT * (1 - FAILURE_TOLERANCE):
-    raise LowAvailabilityError('Failed to provision required number of '
-                               'objects, exiting.')
+    raise LowAvailabilityError(
+        'Failed to provision required number of objects, exiting.'
+    )
 
-  logging.info('Done provisioning the objects, objects written %d. Now start '
-               'doing the lists...', final_count)
+  logging.info(
+      'Done provisioning the objects, objects written %d. Now start '
+      'doing the lists...',
+      final_count,
+  )
 
   # Now list this bucket under this prefix, compare the list results with
   # objects_written. If they are not the same, keep doing it until they
   # are the same.
   result_consistent, list_count, list_latency, total_wait_time = (
-      ListAndWaitForObjects(service, write_finish_time,
-                            set(final_objects_written), object_prefix))
+      ListAndWaitForObjects(
+          service, write_finish_time, set(final_objects_written), object_prefix
+      )
+  )
 
   final_result = {}
-  AnalyzeListResults(final_result, result_consistent, list_count, list_latency,
-                     total_wait_time, LIST_AFTER_WRITE_SCENARIO)
+  AnalyzeListResults(
+      final_result,
+      result_consistent,
+      list_count,
+      list_latency,
+      total_wait_time,
+      LIST_AFTER_WRITE_SCENARIO,
+  )
 
-  logging.info('One list-after-write iteration completed. result is %s',
-               final_result)
+  logging.info(
+      'One list-after-write iteration completed. result is %s', final_result
+  )
   if not result_consistent:
     # There is no point continuing testing the list-after-update consistency if
     # list-after-write is still not consistent after waiting for extended
     # period of time.
-    logging.info('Not doing list-after-update tests because results are still '
-                 'not consistent after max wait time for list-after-write.')
+    logging.info(
+        'Not doing list-after-update tests because results are still '
+        'not consistent after max wait time for list-after-write.'
+    )
     return final_result
 
   logging.info('Start benchmarking list-after-update consistency.')
@@ -1176,7 +1345,8 @@ def ListConsistencyBenchmark(service):
   # Now delete some objects and do list again, this measures list-after-update
   # consistency
   per_thread_objects_to_delete = [
-      [] for i in range(LIST_CONSISTENCY_THREAD_COUNT)]
+      [] for i in range(LIST_CONSISTENCY_THREAD_COUNT)
+  ]
 
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
     for j in range(len(per_thread_objects_written[i])):
@@ -1186,11 +1356,12 @@ def ListConsistencyBenchmark(service):
 
   # Now issue the delete concurrently.
   per_thread_objects_deleted = [
-      [] for i in range(LIST_CONSISTENCY_THREAD_COUNT)]
+      [] for i in range(LIST_CONSISTENCY_THREAD_COUNT)
+  ]
 
-  DeleteObjectsConcurrently(service,
-                            per_thread_objects_to_delete,
-                            per_thread_objects_deleted)
+  DeleteObjectsConcurrently(
+      service, per_thread_objects_to_delete, per_thread_objects_deleted
+  )
 
   delete_finish_time = time.time()
   final_expectation = []
@@ -1200,19 +1371,28 @@ def ListConsistencyBenchmark(service):
     final_expectation += per_thread_objects_written[i]
 
   result_consistent, list_count, list_latency, total_wait_time = (
-      ListAndWaitForObjects(service, delete_finish_time,
-                            set(final_expectation), object_prefix))
+      ListAndWaitForObjects(
+          service, delete_finish_time, set(final_expectation), object_prefix
+      )
+  )
 
-  AnalyzeListResults(final_result, result_consistent, list_count, list_latency,
-                     total_wait_time, LIST_AFTER_UPDATE_SCENARIO)
+  AnalyzeListResults(
+      final_result,
+      result_consistent,
+      list_count,
+      list_latency,
+      total_wait_time,
+      LIST_AFTER_UPDATE_SCENARIO,
+  )
 
-  logging.info('One list-after-update iteration completed. result is %s',
-               final_result)
+  logging.info(
+      'One list-after-update iteration completed. result is %s', final_result
+  )
 
   # Final clean up: delete the objects still remaining.
-  DeleteObjectsConcurrently(service,
-                            per_thread_objects_written,
-                            per_thread_objects_deleted)
+  DeleteObjectsConcurrently(
+      service, per_thread_objects_written, per_thread_objects_deleted
+  )
   return final_result
 
 
@@ -1222,35 +1402,40 @@ def Main(argv=sys.argv):
   try:
     argv = FLAGS(argv)  # parse flags
   except flags.Error as e:
-    logging.error(
-        '%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
+    logging.exception('%s\nUsage: %s ARGS\n%s', e, sys.argv[0], FLAGS)
     sys.exit(1)
 
   if FLAGS.bucket is None:
     raise ValueError('Must specify a valid bucket for this test.')
 
-  logging.info('Storage provider is %s, bucket is %s, scenario is %s',
-               FLAGS.storage_provider,
-               FLAGS.bucket,
-               FLAGS.scenario)
+  logging.info(
+      'Storage provider is %s, bucket is %s, scenario is %s',
+      FLAGS.storage_provider,
+      FLAGS.bucket,
+      FLAGS.scenario,
+  )
 
   # This is essentially a dictionary lookup implemented in if
   # statements, but doing it this way allows us to not import the
   # modules of storage providers we're not using.
   if FLAGS.storage_provider == 'AZURE':
     from providers import azure_service
+
     service = azure_service.AzureService()
   elif FLAGS.storage_provider == 'GCS':
     if FLAGS.gcs_client == gcs_flags.GCS_CLIENT_BOTO:
       from providers import gcs_boto
+
       service = gcs_boto.GcsServiceBoto()
     elif FLAGS.gcs_client == gcs_flags.GCS_CLIENT_PYTHON:
       from providers import gcs
+
       service = gcs.GcsService()
     else:
       raise ValueError('Invalid GCS client library %s' % FLAGS.gcs_client)
   elif FLAGS.storage_provider == 'S3':
     from providers import s3
+
     service = s3.S3Service()
   else:
     raise ValueError('Invalid storage provider %s' % FLAGS.storage_provider)
@@ -1278,8 +1463,9 @@ def Main(argv=sys.argv):
       list_inconsistency_window[scenario] = []
       inconsistent_list_count[scenario] = 0.0
 
-    logging.info('Running list consistency tests for %d iterations...',
-                 FLAGS.iterations)
+    logging.info(
+        'Running list consistency tests for %d iterations...', FLAGS.iterations
+    )
     for _ in range(FLAGS.iterations):
       result = ListConsistencyBenchmark(service)
       # Analyze the result for both scenarios.
@@ -1288,30 +1474,43 @@ def Main(argv=sys.argv):
         if result_consistent in result:
           if result[result_consistent]:
             list_latency[scenario].append(
-                result['%s%s' % (scenario, LIST_RESULT_SUFFIX_LATENCY)])
+                result['%s%s' % (scenario, LIST_RESULT_SUFFIX_LATENCY)]
+            )
           else:
             inconsistent_list_count[scenario] += 1
             list_inconsistency_window[scenario].append(
-                result['%s%s' % (scenario,
-                                 LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW)])
+                result[
+                    '%s%s' % (scenario, LIST_RESULT_SUFFIX_INCONSISTENCY_WINDOW)
+                ]
+            )
 
     # All iterations completed, ready to print out final stats.
     logging.info('\n\nFinal stats:')
     for scenario in [LIST_AFTER_WRITE_SCENARIO, LIST_AFTER_UPDATE_SCENARIO]:
-      logging.info('%s consistency percentage: %f', scenario,
-                   100 *
-                   (1 - inconsistent_list_count[scenario] / FLAGS.iterations))
+      logging.info(
+          '%s consistency percentage: %f',
+          scenario,
+          100 * (1 - inconsistent_list_count[scenario] / FLAGS.iterations),
+      )
 
       if len(list_inconsistency_window[scenario]) > 0:
-        logging.info('%s inconsistency window: %s', scenario,
-                     json.dumps(PercentileCalculator(
-                         list_inconsistency_window[scenario]),
-                         sort_keys=True))
+        logging.info(
+            '%s inconsistency window: %s',
+            scenario,
+            json.dumps(
+                PercentileCalculator(list_inconsistency_window[scenario]),
+                sort_keys=True,
+            ),
+        )
 
       if len(list_latency[scenario]) > 0:
-        logging.info('%s latency: %s', scenario,
-                     json.dumps(PercentileCalculator(list_latency[scenario]),
-                                sort_keys=True))
+        logging.info(
+            '%s latency: %s',
+            scenario,
+            json.dumps(
+                PercentileCalculator(list_latency[scenario]), sort_keys=True
+            ),
+        )
 
     return 0
   elif FLAGS.scenario == 'SingleStreamThroughput':
@@ -1324,6 +1523,7 @@ def Main(argv=sys.argv):
     return MultiStreamReads(service)
   elif FLAGS.scenario == 'MultiStreamDelete':
     return MultiStreamDelete(service)
+
 
 if __name__ == '__main__':
   sys.exit(Main())

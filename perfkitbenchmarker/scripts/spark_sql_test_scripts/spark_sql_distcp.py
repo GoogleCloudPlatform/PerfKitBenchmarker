@@ -29,7 +29,8 @@ dataframe reader. e.g.:
 [
   ["bigquery", {"table": "bigquery_public_data:dataset.table"}],
   ["parquet", {"path": "gs://some/directory"}]
-]""")
+]""",
+  )
   parser.add_argument(
       '--destination-metadata',
       required=True,
@@ -41,7 +42,8 @@ dataframe writer. e.g.:
 [
   ["bigquery", {"table": "bigquery_public_data:dataset.table"}],
   ["parquet", {"path": "gs://some/directory"}]
-]""")
+]""",
+  )
   if args is None:
     return parser.parse_args()
   return parser.parse_args(args)
@@ -56,8 +58,9 @@ def main(args):
   spark = sql.SparkSession.builder.appName('Spark SQL DistCp').getOrCreate()
   source_metadata = json.loads(load_file(spark, args.source_metadata))
   dest_metadata = json.loads(load_file(spark, args.destination_metadata))
-  for (r_fmt, r_options), (w_fmt, w_options) in zip(source_metadata,
-                                                    dest_metadata):
+  for (r_fmt, r_options), (w_fmt, w_options) in zip(
+      source_metadata, dest_metadata
+  ):
     df = spark.read.format(r_fmt).options(**r_options).load()
     # TODO(saksena): Split into read and write times
     # If we want to use this as a benchmark instead of just as a utility, we
@@ -65,6 +68,7 @@ def main(args):
     # read: df.cache().count() and write: (the next line)
     # Also report per table durations (and data size?)
     df.write.format(w_fmt).options(**w_options).save()
+
 
 if __name__ == '__main__':
   main(parse_args())

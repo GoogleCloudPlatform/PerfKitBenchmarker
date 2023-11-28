@@ -38,8 +38,8 @@ How to use plot_sysbench_results:
 """
 import datetime
 import subprocess
-from . import plot_scatter_points
 from six.moves import range
+from . import plot_scatter_points
 
 # Assumes Sysbench 0.5 stderr output.
 DATETIME_FORMAT = '{:%m_%d_%Y_%H_%M_}'
@@ -94,6 +94,7 @@ class Plotter(object):
 
     Args:
       filename: (string) Name of file to be parsed.
+
     Raises:
       STDERRFileDoesNotExistError:
     """
@@ -101,8 +102,11 @@ class Plotter(object):
       f = open(filename, 'r')
     except:
       raise STDERRFileDoesNotExistError(
-          ('Unable to open file (%s). Assume this is because run failed. Will'
-           ' raise exception to kill run now.' % filename))
+          (
+              'Unable to open file (%s). Assume this is because run failed.'
+              ' Will raise exception to kill run now.' % filename
+          )
+      )
     data = self._parse_file(f)
     f.close()
     self._add_data(data)
@@ -116,6 +120,7 @@ class Plotter(object):
     Sysbench 0.5.
     Args:
       f: (file object) file to be parsed.
+
     Returns:
       (list): list of TPS values.
     Raises:
@@ -131,9 +136,11 @@ class Plotter(object):
           start_id = line.find(TPS) + len(TPS)
           end_id = line.find(BREAK, start_id)
           if start_id == -1 or end_id == -1:
-            raise PatternNotFoundError('No thread data (OR improper run seconds'
-                                       '/report interval given) found in STDERR'
-                                       '. Assume run failed.')
+            raise PatternNotFoundError(
+                'No thread data (OR improper run seconds'
+                '/report interval given) found in STDERR'
+                '. Assume run failed.'
+            )
           tps = float(line[start_id:end_id].strip())
           tps_values.append(tps)
           if tps > self.max_tps:
@@ -153,13 +160,14 @@ class Plotter(object):
         f.write(str(d) + '\n')
 
   def plot(self):
-    """Generates a graph using gnuplot and data from filename.
-    """
-    p = plot_scatter_points.GnuplotInfo(self.filename,
-                                        self.data_entries_per_file,
-                                        self.run_uri,
-                                        self.max_tps,
-                                        self.iterations)
+    """Generates a graph using gnuplot and data from filename."""
+    p = plot_scatter_points.GnuplotInfo(
+        self.filename,
+        self.data_entries_per_file,
+        self.run_uri,
+        self.max_tps,
+        self.iterations,
+    )
     output_gnuplot_file, _ = p.create_file()
     subprocess.Popen(['gnuplot', output_gnuplot_file])
     # TODO(user): Implement copy command to copy output_chart
