@@ -21,8 +21,8 @@ import unittest
 
 from absl import flags
 import mock
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -718,6 +718,12 @@ class GCEPDDiskTest(GCEDiskTest):
 
 class GCENFSDiskTest(GCEDiskTest):
 
+  def _CreatePatched(self, module, method_name):
+    patcher = mock.patch.object(module, method_name)
+    mock_method = patcher.start()
+    self.addCleanup(patcher.stop)
+    return mock_method
+
   def _DescribeResult(self, tier='STANDARD'):
     return {
         'createTime': '2018-05-04T21:38:49.862374Z',
@@ -748,9 +754,13 @@ class GCENFSDiskTest(GCEDiskTest):
     spec.nfs_managed = False
     spec.nfs_directory = '/scratch'
     nfs_service = gce_nfs_service.GceNfsService(spec, 'test-zone')
+    bm_spec = mock.Mock()
+    bm_spec.nfs_service = nfs_service
+    get_spec = self._CreatePatched(context, 'GetThreadBenchmarkSpec')
+    get_spec.return_value = bm_spec
     self.linux_vm._GetNfsService = mock.MagicMock(return_value=nfs_service)
     self.linux_vm.GetConnectionIp = mock.MagicMock(return_value='1.1.1.1')
-    disk_strategy = disk_strategies.SetUpNFSDiskStrategy(nfs_service)
+    self.linux_vm.SetDiskSpec(spec, 1)
     fake_rets = [
         ('stdout', 'stderr', 0),
         ('stdout', 'stderr', 0),
@@ -761,7 +771,6 @@ class GCENFSDiskTest(GCEDiskTest):
     ]
 
     with PatchCriticalObjects(fake_rets) as issue_command:
-      disk_strategy.SetUpDisk(self.linux_vm, spec)
       self.linux_vm.SetupAllScratchDisks()
       expected_commands = [
           ['sudo apt-get update'],
