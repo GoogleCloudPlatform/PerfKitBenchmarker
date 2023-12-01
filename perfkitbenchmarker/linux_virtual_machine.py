@@ -470,6 +470,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
           the command fails.
     """
     self._SetupRobustCommand()
+    logger.info(
+        'Running RobustRemoteCommand on %s: %s',
+        self.name,
+        command,
+        stacklevel=2,
+    )
 
     execute_path = os.path.join(vm_util.VM_TMP_DIR,
                                 os.path.basename(EXECUTE_COMMAND))
@@ -515,7 +521,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       ])  # pyformat: disable
       return self.RemoteCommand(' '.join(wait_command),
                                 ignore_failure=ignore_failure,
-                                stack_level=4)
+                                stack_level=3)
 
     try:
       return _WaitForCommand()
