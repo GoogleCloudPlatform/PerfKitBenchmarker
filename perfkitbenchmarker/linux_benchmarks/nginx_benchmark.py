@@ -30,36 +30,61 @@ _FLAG_FORMAT_DESCRIPTION = (
     'target rate, threads, and connections (but not duration since they are '
     'run concurrently)). The target request rate is measured in requests per '
     'second and the duration is measured in seconds. Increasing the duration '
-    'or connections does not impact the aggregate target rate for the client.')
+    'or connections does not impact the aggregate target rate for the client.'
+)
 
-flags.DEFINE_string('nginx_conf', None,
-                    'The path to an Nginx config file that should be applied '
-                    'to the server instead of the default one.')
-flags.DEFINE_integer('nginx_content_size', 1024,
-                     'The size of the content Nginx will serve in bytes. '
-                     'Larger files stress the network over the VMs.')
-flags.DEFINE_list('nginx_load_configs', ['100:60:1:1'],
-                  'For each load spec in the list, wrk2 will be run once '
-                  'against Nginx with those parameters. ' +
-                  _FLAG_FORMAT_DESCRIPTION)
-flags.DEFINE_boolean('nginx_throttle', False,
-                     'If True, skip running the nginx_load_configs and run '
-                     'wrk2 once aiming to throttle the nginx server.')
-flags.DEFINE_string('nginx_client_machine_type', None,
-                    'Machine type to use for the wrk2 client if different '
-                    'from nginx server machine type.')
-flags.DEFINE_string('nginx_server_machine_type', None,
-                    'Machine type to use for the nginx server if different '
-                    'from wrk2 client machine type.')
-flags.DEFINE_boolean('nginx_use_ssl', False,
-                     'Use HTTPs when connecting to nginx.')
-flags.DEFINE_integer('nginx_worker_connections', 1024,
-                     'The maximum number of simultaneous connections that can '
-                     'be opened by a worker process.')
+flags.DEFINE_string(
+    'nginx_conf',
+    None,
+    'The path to an Nginx config file that should be applied '
+    'to the server instead of the default one.',
+)
+flags.DEFINE_integer(
+    'nginx_content_size',
+    1024,
+    'The size of the content Nginx will serve in bytes. '
+    'Larger files stress the network over the VMs.',
+)
+flags.DEFINE_list(
+    'nginx_load_configs',
+    ['100:60:1:1'],
+    'For each load spec in the list, wrk2 will be run once '
+    'against Nginx with those parameters. '
+    + _FLAG_FORMAT_DESCRIPTION,
+)
+flags.DEFINE_boolean(
+    'nginx_throttle',
+    False,
+    'If True, skip running the nginx_load_configs and run '
+    'wrk2 once aiming to throttle the nginx server.',
+)
+flags.DEFINE_string(
+    'nginx_client_machine_type',
+    None,
+    'Machine type to use for the wrk2 client if different '
+    'from nginx server machine type.',
+)
+flags.DEFINE_string(
+    'nginx_server_machine_type',
+    None,
+    'Machine type to use for the nginx server if different '
+    'from wrk2 client machine type.',
+)
+flags.DEFINE_boolean(
+    'nginx_use_ssl', False, 'Use HTTPs when connecting to nginx.'
+)
+flags.DEFINE_integer(
+    'nginx_worker_connections',
+    1024,
+    'The maximum number of simultaneous connections that can '
+    'be opened by a worker process.',
+)
 _NGINX_SERVER_PORT = flags.DEFINE_integer(
-    'nginx_server_port', 0,
+    'nginx_server_port',
+    0,
     'The port that nginx server will listen to. 0 will use '
-    'default ports (80 or 443 depending on --nginx_use_ssl).')
+    'default ports (80 or 443 depending on --nginx_use_ssl).',
+)
 
 
 def _ValidateLoadConfigs(load_configs):
@@ -77,8 +102,10 @@ def _ValidateLoadConfigs(load_configs):
 
 
 flags.register_validator(
-    'nginx_load_configs', _ValidateLoadConfigs,
-    'Malformed load config. ' + _FLAG_FORMAT_DESCRIPTION)
+    'nginx_load_configs',
+    _ValidateLoadConfigs,
+    'Malformed load config. ' + _FLAG_FORMAT_DESCRIPTION,
+)
 
 BENCHMARK_NAME = 'nginx'
 BENCHMARK_CONFIG = """
@@ -120,43 +147,58 @@ def _ConfigureNginxForSsl(server):
   # - ECDSA for authentication
   # - AES256-GCM for bulk encryption
   # - SHA384 for message authentication
-  server.RemoteCommand('sudo openssl req -x509 -nodes -days 365 -newkey ec '
-                       '-subj "/CN=localhost" '
-                       '-pkeyopt ec_paramgen_curve:secp384r1 '
-                       '-keyout /etc/nginx/ssl/ecdsa.key '
-                       '-out /etc/nginx/ssl/ecdsa.crt')
+  server.RemoteCommand(
+      'sudo openssl req -x509 -nodes -days 365 -newkey ec '
+      '-subj "/CN=localhost" '
+      '-pkeyopt ec_paramgen_curve:secp384r1 '
+      '-keyout /etc/nginx/ssl/ecdsa.key '
+      '-out /etc/nginx/ssl/ecdsa.crt'
+  )
   isipv6 = isinstance(
-      ipaddress.ip_address(server.internal_ip), ipaddress.IPv6Address)
-  server.RemoteCommand(r"sudo sed -i 's|\(listen 80 .*\)|#\1|g' "
-                       r'/etc/nginx/sites-enabled/default')
-  server.RemoteCommand(r"sudo sed -i 's|\(listen \[::\]:80 .*;\)|#\1|g' "
-                       r"/etc/nginx/sites-enabled/default")
+      ipaddress.ip_address(server.internal_ip), ipaddress.IPv6Address
+  )
+  server.RemoteCommand(
+      r"sudo sed -i 's|\(listen 80 .*\)|#\1|g' "
+      r'/etc/nginx/sites-enabled/default'
+  )
+  server.RemoteCommand(
+      r"sudo sed -i 's|\(listen \[::\]:80 .*;\)|#\1|g' "
+      r'/etc/nginx/sites-enabled/default'
+  )
   if not isipv6:
-    server.RemoteCommand(r"sudo sed -i 's|# \(listen 443 ssl .*\)|\1|g' "
-                         r'/etc/nginx/sites-enabled/default')
+    server.RemoteCommand(
+        r"sudo sed -i 's|# \(listen 443 ssl .*\)|\1|g' "
+        r'/etc/nginx/sites-enabled/default'
+    )
   else:
-    server.RemoteCommand(r"sudo sed -i 's|# \(listen \[::\]:443 ssl .*\)|\1|g' "
-                         r'/etc/nginx/sites-enabled/default')
+    server.RemoteCommand(
+        r"sudo sed -i 's|# \(listen \[::\]:443 ssl .*\)|\1|g' "
+        r'/etc/nginx/sites-enabled/default'
+    )
   server.RemoteCommand(
       r"sudo sed -i 's|\(\s*\)\(listen \[::\]:443 ssl .*;\)|"
-      r"\1\2\n"
-      r"\1ssl_certificate /etc/nginx/ssl/ecdsa.crt;\n"
-      r"\1ssl_certificate_key /etc/nginx/ssl/ecdsa.key;\n"
+      r'\1\2\n'
+      r'\1ssl_certificate /etc/nginx/ssl/ecdsa.crt;\n'
+      r'\1ssl_certificate_key /etc/nginx/ssl/ecdsa.key;\n'
       r"\1ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384;|g' "
-      r"/etc/nginx/sites-enabled/default")
+      r'/etc/nginx/sites-enabled/default'
+  )
   if _NGINX_SERVER_PORT.value:
     server_port = _NGINX_SERVER_PORT.value
-    replace_str = fr's|\(listen .*\)443 |\1{server_port} |g'
+    replace_str = rf's|\(listen .*\)443 |\1{server_port} |g'
     server.RemoteCommand(
-        f"sudo sed -i '{replace_str}' /etc/nginx/sites-enabled/default")
+        f"sudo sed -i '{replace_str}' /etc/nginx/sites-enabled/default"
+    )
 
 
 def _ConfigureNginx(server):
   """Configures nginx server."""
   content_path = '/var/www/html/random_content'
   server.RemoteCommand('sudo mkdir -p /var/www/html')  # create folder if needed
-  server.RemoteCommand('sudo dd  bs=1 count=%s if=/dev/urandom of=%s' %
-                       (FLAGS.nginx_content_size, content_path))
+  server.RemoteCommand(
+      'sudo dd  bs=1 count=%s if=/dev/urandom of=%s'
+      % (FLAGS.nginx_content_size, content_path)
+  )
   if FLAGS.nginx_conf:
     server.PushDataFile(FLAGS.nginx_conf)
     server.RemoteCommand('sudo cp %s /etc/nginx/nginx.conf' % FLAGS.nginx_conf)
@@ -164,43 +206,54 @@ def _ConfigureNginx(server):
     # disable logging, nginx logs every request by default.
     server.RemoteCommand(
         r"sudo sed -i 's|access_log .*|access_log /dev/null;|g' "
-        r"/etc/nginx/nginx.conf")
+        r'/etc/nginx/nginx.conf'
+    )
     # Add some optimizations to the Nginx stack to improve throughput.
     # This is based off https://www.nginx.com/blog/tuning-nginx/
     # Increase worker_connections from to 1024 (default 768)
     server.RemoteCommand(
         r"sudo sed -i 's|worker_connections .*|worker_connections %s;|g' "
-        r"/etc/nginx/nginx.conf" % FLAGS.nginx_worker_connections)
+        r'/etc/nginx/nginx.conf' % FLAGS.nginx_worker_connections
+    )
     # Increase keepalive_requests to a large value (default 1000)
     server.RemoteCommand(
         r"sudo sed -i 's|\(\s*\)keepalive_timeout .*|"
         r"\1keepalive_timeout 75;\n\1keepalive_requests 1000000000;|g' "
-        r"/etc/nginx/nginx.conf")
+        r'/etc/nginx/nginx.conf'
+    )
     # Enable caching
-    server.RemoteCommand("sudo sed -i 's|# server_tokens off;|"
-                         'open_file_cache max=200000 inactive=20s;'
-                         'open_file_cache_valid 30s;'
-                         'open_file_cache_min_uses 2;'
-                         'open_file_cache_errors on;'
-                         "# server_tokens off;|g' "
-                         '/etc/nginx/nginx.conf')
+    server.RemoteCommand(
+        "sudo sed -i 's|# server_tokens off;|"
+        'open_file_cache max=200000 inactive=20s;'
+        'open_file_cache_valid 30s;'
+        'open_file_cache_min_uses 2;'
+        'open_file_cache_errors on;'
+        "# server_tokens off;|g' "
+        '/etc/nginx/nginx.conf'
+    )
 
   if FLAGS.nginx_use_ssl:
     _ConfigureNginxForSsl(server)
   else:
     isipv6 = isinstance(
-        ipaddress.ip_address(server.internal_ip), ipaddress.IPv6Address)
+        ipaddress.ip_address(server.internal_ip), ipaddress.IPv6Address
+    )
     if not isipv6:
-      server.RemoteCommand(r"sudo sed -i 's|\(listen \[::\]:80 .*;\)|#\1|g' "
-                           r'/etc/nginx/sites-enabled/default')
+      server.RemoteCommand(
+          r"sudo sed -i 's|\(listen \[::\]:80 .*;\)|#\1|g' "
+          r'/etc/nginx/sites-enabled/default'
+      )
     else:
-      server.RemoteCommand(r"sudo sed -i 's|\(listen 80 .*\)|#\1|g' "
-                           r'/etc/nginx/sites-enabled/default')
+      server.RemoteCommand(
+          r"sudo sed -i 's|\(listen 80 .*\)|#\1|g' "
+          r'/etc/nginx/sites-enabled/default'
+      )
     if FLAGS.nginx_server_port:
       server_port = FLAGS.nginx_server_port
-      replace_str = fr's|\(listen .*\)80 |\1{server_port} |g'
+      replace_str = rf's|\(listen .*\)80 |\1{server_port} |g'
       server.RemoteCommand(
-          f"sudo sed -i '{replace_str}' /etc/nginx/sites-enabled/default")
+          f"sudo sed -i '{replace_str}' /etc/nginx/sites-enabled/default"
+      )
 
   server.RemoteCommand('sudo service nginx restart')
 
@@ -210,7 +263,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   clients = benchmark_spec.vm_groups['clients']
   server = benchmark_spec.vm_groups['server'][0]
@@ -218,8 +271,9 @@ def Prepare(benchmark_spec):
   _ConfigureNginx(server)
   background_tasks.RunThreaded(lambda vm: vm.Install('wrk2'), clients)
 
-  benchmark_spec.nginx_endpoint_ip = (
-      benchmark_spec.vm_groups['server'][0].internal_ip)
+  benchmark_spec.nginx_endpoint_ip = benchmark_spec.vm_groups['server'][
+      0
+  ].internal_ip
 
 
 def _RunMultiClient(clients, target, rate, connections, duration, threads):
@@ -229,9 +283,16 @@ def _RunMultiClient(clients, target, rate, connections, duration, threads):
 
   def _RunSingleClient(client, client_number):
     """Run wrk2 from a single client."""
-    client_results = list(wrk2.Run(
-        client, target, rate, connections=connections,
-        duration=duration, threads=threads))
+    client_results = list(
+        wrk2.Run(
+            client,
+            target,
+            rate,
+            connections=connections,
+            duration=duration,
+            threads=threads,
+        )
+    )
     for result in client_results:
       result.metadata.update({'client_number': client_number})
     results.extend(client_results)
@@ -261,7 +322,7 @@ def _RunMultiClient(clients, target, rate, connections, duration, threads):
       'target_rate': rate * num_clients,
       'nginx_throttle': FLAGS.nginx_throttle,
       'nginx_worker_connections': FLAGS.nginx_worker_connections,
-      'nginx_use_ssl': FLAGS.nginx_use_ssl
+      'nginx_use_ssl': FLAGS.nginx_use_ssl,
   }
   if not FLAGS.nginx_conf:
     metadata['caching'] = True
@@ -270,7 +331,7 @@ def _RunMultiClient(clients, target, rate, connections, duration, threads):
       sample.Sample('aggregate requests', requests, '', metadata),
       sample.Sample('aggregate errors', errors, '', metadata),
       sample.Sample('aggregate error_rate', error_rate, '', metadata),
-      sample.Sample('aggregate p100 latency', max_latency, '', metadata)
+      sample.Sample('aggregate p100 latency', max_latency, '', metadata),
   ]
   return results
 
@@ -280,7 +341,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -289,8 +350,11 @@ def Run(benchmark_spec):
   results = []
   scheme = 'https' if FLAGS.nginx_use_ssl else 'http'
   hostip = benchmark_spec.nginx_endpoint_ip
-  hoststr = f'[{hostip}]' if isinstance(
-      ipaddress.ip_address(hostip), ipaddress.IPv6Address) else f'{hostip}'
+  hoststr = (
+      f'[{hostip}]'
+      if isinstance(ipaddress.ip_address(hostip), ipaddress.IPv6Address)
+      else f'{hostip}'
+  )
   portstr = f':{FLAGS.nginx_server_port}' if FLAGS.nginx_server_port else ''
   target = f'{scheme}://{hoststr}{portstr}/random_content'
 
@@ -301,12 +365,14 @@ def Run(benchmark_spec):
         rate=1000000,  # 1M aggregate requests/sec should max out requests.
         connections=clients[0].NumCpusForBenchmark() * 10,
         duration=60,
-        threads=clients[0].NumCpusForBenchmark())
+        threads=clients[0].NumCpusForBenchmark(),
+    )
 
   for config in FLAGS.nginx_load_configs:
     rate, duration, threads, connections = list(map(int, config.split(':')))
-    results += _RunMultiClient(clients, target, rate,
-                               connections, duration, threads)
+    results += _RunMultiClient(
+        clients, target, rate, connections, duration, threads
+    )
   return results
 
 
@@ -315,6 +381,6 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   del benchmark_spec

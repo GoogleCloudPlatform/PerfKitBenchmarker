@@ -37,8 +37,11 @@ from six.moves import range
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('aerospike_client_vms', 1,
-                     'Number of client machines to use for running asbench.')
+flags.DEFINE_integer(
+    'aerospike_client_vms',
+    1,
+    'Number of client machines to use for running asbench.',
+)
 flags.DEFINE_integer(
     'aerospike_client_threads_for_load_phase',
     8,
@@ -59,33 +62,53 @@ flags.DEFINE_integer(
 )
 flags.DEFINE_integer(
     'aerospike_client_threads_step_size',
-    8, 'The number to increase the Aerospike client threads '
+    8,
+    'The number to increase the Aerospike client threads '
     'per vm by for each iteration of the test.',
-    lower_bound=1)
-flags.DEFINE_integer('aerospike_read_percent', 90,
-                     'The percent of operations which are reads.',
-                     lower_bound=0, upper_bound=100)
-flags.DEFINE_integer('aerospike_num_keys', 1000000,
-                     'The number of keys to load Aerospike with. The index '
-                     'must fit in memory regardless of where the actual '
-                     'data is being stored and each entry in the '
-                     'index requires 64 bytes.')
-flags.DEFINE_integer('aerospike_benchmark_duration', 60,
-                     'Duration of each test iteration in secs.')
+    lower_bound=1,
+)
+flags.DEFINE_integer(
+    'aerospike_read_percent',
+    90,
+    'The percent of operations which are reads.',
+    lower_bound=0,
+    upper_bound=100,
+)
+flags.DEFINE_integer(
+    'aerospike_num_keys',
+    1000000,
+    'The number of keys to load Aerospike with. The index '
+    'must fit in memory regardless of where the actual '
+    'data is being stored and each entry in the '
+    'index requires 64 bytes.',
+)
+flags.DEFINE_integer(
+    'aerospike_benchmark_duration',
+    60,
+    'Duration of each test iteration in secs.',
+)
 flags.DEFINE_boolean(
-    'aerospike_publish_detailed_samples', False,
+    'aerospike_publish_detailed_samples',
+    False,
     'Whether or not to publish one sample per aggregation'
     'window with histogram. By default, only TimeSeries '
-    'sample will be generated.')
+    'sample will be generated.',
+)
 flags.DEFINE_integer(
-    'aerospike_instances', 1, 'Number of aerospike_server processes to run. '
+    'aerospike_instances',
+    1,
+    'Number of aerospike_server processes to run. '
     'e.g. if this is set to 2, we will launch 2 aerospike '
     'processes on the same VM. Flags such as '
     'aerospike_num_keys and client threads will be applied '
-    'to each instance.')
-flags.DEFINE_string('aerospike_client_machine_type', None,
-                    'Machine type to use for the aerospike client if different '
-                    'from aerospike server machine type.')
+    'to each instance.',
+)
+flags.DEFINE_string(
+    'aerospike_client_machine_type',
+    None,
+    'Machine type to use for the aerospike client if different '
+    'from aerospike server machine type.',
+)
 _PUBLISH_PERCENTILE_TIME_SERIES = flags.DEFINE_boolean(
     'aerospike_publish_percentile_time_series',
     True,
@@ -134,7 +157,8 @@ def GetConfig(user_config):
     if FLAGS.data_disk_type == disk.LOCAL:
       # Didn't know max number of local disks, decide later.
       config['vm_groups']['workers']['disk_count'] = (
-          config['vm_groups']['workers']['disk_count'] or None)
+          config['vm_groups']['workers']['disk_count'] or None
+      )
       if FLAGS.cloud == 'GCP':
         config['vm_groups']['workers']['vm_spec']['GCP']['num_local_ssds'] = (
             FLAGS.gce_num_local_ssds or FLAGS.server_gce_num_local_ssds
@@ -143,13 +167,15 @@ def GetConfig(user_config):
         FLAGS.gce_num_local_ssds = 0
         if FLAGS['server_gce_ssd_interface'].present:
           config['vm_groups']['workers']['vm_spec']['GCP'][
-              'ssd_interface'] = FLAGS.server_gce_ssd_interface
+              'ssd_interface'
+          ] = FLAGS.server_gce_ssd_interface
           FLAGS['gce_ssd_interface'].present = False
           FLAGS.gce_ssd_interface = FLAGS.server_gce_ssd_interface
         config['vm_groups']['clients']['vm_spec']['GCP']['num_local_ssds'] = 0
     else:
       config['vm_groups']['workers']['disk_count'] = (
-          config['vm_groups']['workers']['disk_count'] or 1)
+          config['vm_groups']['workers']['disk_count'] or 1
+      )
 
   if FLAGS.aerospike_server_machine_type:
     vm_spec = config['vm_groups']['workers']['vm_spec']
@@ -168,7 +194,8 @@ def GetConfig(user_config):
 
   if FLAGS.aerospike_instances > 1 and FLAGS.aerospike_vms > 1:
     raise errors.Setup.InvalidFlagConfigurationError(
-        'Only one of aerospike_instances and aerospike_vms can be set.')
+        'Only one of aerospike_instances and aerospike_vms can be set.'
+    )
 
   return config
 
@@ -187,7 +214,8 @@ def Prepare(benchmark_spec):
   seed_ips = [vm.internal_ip for vm in servers]
   aerospike_install_fns = [
       functools.partial(
-          aerospike_server.ConfigureAndStart, vm, seed_node_ips=seed_ips)
+          aerospike_server.ConfigureAndStart, vm, seed_node_ips=seed_ips
+      )
       for vm in servers
   ]
   client_install_fns = [
@@ -199,8 +227,8 @@ def Prepare(benchmark_spec):
   )
 
   loader_counts = [
-      int(FLAGS.aerospike_num_keys) // len(clients) +
-      (1 if i < (FLAGS.aerospike_num_keys % num_client_vms) else 0)
+      int(FLAGS.aerospike_num_keys) // len(clients)
+      + (1 if i < (FLAGS.aerospike_num_keys % num_client_vms) else 0)
       for i in range(num_client_vms)
   ]
 
@@ -230,7 +258,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -242,9 +270,11 @@ def Run(benchmark_spec):
   seed_ips = ','.join([vm.internal_ip for vm in servers])
   metadata = {}
 
-  for threads in range(FLAGS.aerospike_min_client_threads,
-                       FLAGS.aerospike_max_client_threads + 1,
-                       FLAGS.aerospike_client_threads_step_size):
+  for threads in range(
+      FLAGS.aerospike_min_client_threads,
+      FLAGS.aerospike_max_client_threads + 1,
+      FLAGS.aerospike_client_threads_step_size,
+  ):
     stdout_samples = []
 
     def _Run(client_idx, process_idx):
@@ -257,7 +287,8 @@ def Run(benchmark_spec):
           f'--duration {FLAGS.aerospike_benchmark_duration} '
           '--latency --percentiles 50,90,99,99.9,99.99 '
           '--output-file '
-          f'result.{client_idx}.{process_idx}.{threads}')
+          f'result.{client_idx}.{process_idx}.{threads}'
+      )
       stdout, _ = clients[client_idx].RobustRemoteCommand(run_command)
       stdout_samples.extend(aerospike_client.ParseAsbenchStdout(stdout))  # pylint: disable=cell-var-from-loop
 
@@ -272,7 +303,8 @@ def Run(benchmark_spec):
       detailed_samples = stdout_samples
     else:
       detailed_samples = aerospike_client.AggregateAsbenchSamples(
-          stdout_samples)
+          stdout_samples
+      )
 
     temp_samples = aerospike_client.CreateTimeSeriesSample(detailed_samples)
 
@@ -287,7 +319,8 @@ def Run(benchmark_spec):
         or _PUBLISH_PERCENTILE_TIME_SERIES.value
     ):
       detailed_samples.extend(
-          aerospike_client.ParseAsbenchHistogram(result_files))
+          aerospike_client.ParseAsbenchHistogram(result_files)
+      )
       temp_samples.extend(detailed_samples)
     metadata.update({
         'num_clients_vms': FLAGS.aerospike_client_vms,
@@ -304,7 +337,7 @@ def Run(benchmark_spec):
     if FLAGS.aerospike_edition == aerospike_server.AerospikeEdition.ENTERPRISE:
       metadata.update({
           'aerospike_version': FLAGS.aerospike_enterprise_version,
-          'aerospike_package': FLAGS.aerospike_enterprise_package
+          'aerospike_package': FLAGS.aerospike_enterprise_package,
       })
     for s in temp_samples:
       s.metadata.update(metadata)
@@ -318,7 +351,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   servers = benchmark_spec.vm_groups['workers']
   clients = benchmark_spec.vm_groups['client']
@@ -329,7 +362,9 @@ def Cleanup(benchmark_spec):
   background_tasks.RunThreaded(StopClient, clients)
 
   def StopServer(server):
-    server.RemoteCommand('cd %s && nohup sudo make stop' %
-                         aerospike_server.AEROSPIKE_DIR)
+    server.RemoteCommand(
+        'cd %s && nohup sudo make stop' % aerospike_server.AEROSPIKE_DIR
+    )
     server.RemoteCommand('sudo rm -rf aerospike*')
+
   background_tasks.RunThreaded(StopServer, servers)

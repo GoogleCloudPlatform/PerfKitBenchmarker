@@ -19,7 +19,6 @@ manpage: http://manpages.ubuntu.com/manpages/maverick/man1/netperf.1.html
 
 Runs multiple tests in script between one source machine and two target machines
 to test packets per second and inbound and outbound throughput
-
 """
 
 import collections
@@ -35,15 +34,18 @@ from perfkitbenchmarker.linux_packages import netperf
 
 ALL_BENCHMARKS = ['STREAM', 'MAERTS', 'BIDIR', 'RRAGG']
 flags.DEFINE_list(
-    'netperf_aggregate_benchmarks', ALL_BENCHMARKS,
+    'netperf_aggregate_benchmarks',
+    ALL_BENCHMARKS,
     'The netperf aggregate benchmark(s) to run. '
     'STREAM measures outbound throughput. '
     'MAERTS measures inbound throughput. '
     'RRAGG measures packets per second.'
-    'BIDIR measure bidirectional bulk throughput')
+    'BIDIR measure bidirectional bulk throughput',
+)
 flags.register_validator(
     'netperf_aggregate_benchmarks',
-    lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_BENCHMARKS))
+    lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_BENCHMARKS),
+)
 
 FLAGS = flags.FLAGS
 
@@ -87,7 +89,8 @@ def PrepareNetperfAggregate(vm):
   # Enable test types in the script runemomniaggdemo.sh
   for benchmark in FLAGS.netperf_aggregate_benchmarks:
     vm.RemoteCommand(
-        f'sed -i "s/DO_{benchmark}=0;/DO_{benchmark}=1;/g" /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
+        f'sed -i "s/DO_{benchmark}=0;/DO_{benchmark}=1;/g"'
+        ' /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
     )
 
   port_end = PORT_START
@@ -96,7 +99,8 @@ def PrepareNetperfAggregate(vm):
     vm.AllowPort(PORT_START, port_end)
 
   netserver_cmd = ('{netserver_path} -p {port_start}').format(
-      port_start=PORT_START, netserver_path=netperf.NETSERVER_PATH)
+      port_start=PORT_START, netserver_path=netperf.NETSERVER_PATH
+  )
   vm.RemoteCommand(netserver_cmd)
 
 
@@ -113,7 +117,8 @@ def Prepare(benchmark_spec):
 
   background_tasks.RunThreaded(PrepareNetperfAggregate, vms)
   client_vm.RemoteCommand(
-      f'sudo chmod 755 {os.path.join(netperf.NETPERF_EXAMPLE_DIR, REMOTE_SCRIPT)}'
+      'sudo chmod 755'
+      f' {os.path.join(netperf.NETPERF_EXAMPLE_DIR, REMOTE_SCRIPT)}'
   )
 
 
@@ -168,12 +173,16 @@ def RunNetperfAggregate(vm, server_ips):
   vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm remote_hosts')
   ip_num = 0
   for ip in server_ips:
-    vm.RemoteCommand(f"echo 'REMOTE_HOSTS[{ip_num}]={ip}' >> "
-                     f'{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts')
+    vm.RemoteCommand(
+        f"echo 'REMOTE_HOSTS[{ip_num}]={ip}' >> "
+        f'{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts'
+    )
     ip_num += 1
 
-  vm.RemoteCommand(f"echo 'NUM_REMOTE_HOSTS={len(server_ips)}' >> "
-                   f'{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts')
+  vm.RemoteCommand(
+      f"echo 'NUM_REMOTE_HOSTS={len(server_ips)}' >> "
+      f'{netperf.NETPERF_EXAMPLE_DIR}/remote_hosts'
+  )
 
   vm.RemoteCommand(
       f'cd {netperf.NETPERF_EXAMPLE_DIR} && '
@@ -182,15 +191,17 @@ def RunNetperfAggregate(vm, server_ips):
       './runemomniaggdemo.sh',
       ignore_failure=True,
       login_shell=False,
-      timeout=1800)
+      timeout=1800,
+  )
 
-  interval_naming = collections.namedtuple('IntervalNaming',
-                                           'output_file parse_name')
+  interval_naming = collections.namedtuple(
+      'IntervalNaming', 'output_file parse_name'
+  )
   benchmark_interval_mapping = {
       'STREAM': interval_naming('netperf_outbound', 'Outbound'),
       'MAERTS': interval_naming('netperf_inbound', 'Inbound'),
       'RRAGG': interval_naming('netperf_tps', 'Request/Response Aggregate'),
-      'BIDIR': interval_naming('netperf_bidirectional', 'Bidirectional')
+      'BIDIR': interval_naming('netperf_bidirectional', 'Bidirectional'),
   }
 
   samples = []
@@ -200,7 +211,8 @@ def RunNetperfAggregate(vm, server_ips):
     proc_stdout, _ = vm.RemoteCommand(
         f'cd {netperf.NETPERF_EXAMPLE_DIR} && python3 post_proc.py '
         f'--intervals {output_file}.log',
-        ignore_failure=False)
+        ignore_failure=False,
+    )
     vm.RemoteCommand(f'cd {netperf.NETPERF_EXAMPLE_DIR} && rm {output_file}*')
     samples.extend(ParseNetperfAggregateOutput(proc_stdout, f'{parse_name}'))
 

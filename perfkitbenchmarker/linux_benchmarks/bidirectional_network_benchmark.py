@@ -33,23 +33,28 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import netperf
 from six.moves import range
 
-flags.DEFINE_list('bidirectional_network_tests',
-                  ['TCP_STREAM', 'TCP_MAERTS', 'TCP_MAERTS'],
-                  'The network tests to run.')
+flags.DEFINE_list(
+    'bidirectional_network_tests',
+    ['TCP_STREAM', 'TCP_MAERTS', 'TCP_MAERTS'],
+    'The network tests to run.',
+)
 flags.register_validator(
     'bidirectional_network_tests',
-    lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_TESTS))
+    lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_TESTS),
+)
 
 flags.DEFINE_integer(
     'bidirectional_network_test_length',
     60,
     'bidirectional_network test length, in seconds',
-    lower_bound=1)
+    lower_bound=1,
+)
 flags.DEFINE_integer(
     'bidirectional_stream_num_streams',
     8,
     'Number of netperf processes to run.',
-    lower_bound=1)
+    lower_bound=1,
+)
 
 ALL_TESTS = ['TCP_STREAM', 'TCP_MAERTS']
 
@@ -84,7 +89,8 @@ def GetConfig(user_config):
   # each network test has its own secondary vm to ensure the bottleneck is
   # the primary vm
   config['vm_groups']['secondary']['vm_count'] = len(
-      FLAGS.bidirectional_network_tests)
+      FLAGS.bidirectional_network_tests
+  )
   return config
 
 
@@ -107,11 +113,14 @@ def Prepare(benchmark_spec):
 
   # Start the netserver processes
   for vm in vms[1:]:
-    netserver_cmd = ('for i in $(seq {port_start} 2 {port_end}); do '
-                     '{netserver_path} -p $i & done').format(
-                         port_start=PORT_START,
-                         port_end=PORT_START + num_streams * 2 - 1,
-                         netserver_path=netperf.NETSERVER_PATH)
+    netserver_cmd = (
+        'for i in $(seq {port_start} 2 {port_end}); do '
+        '{netserver_path} -p $i & done'
+    ).format(
+        port_start=PORT_START,
+        port_end=PORT_START + num_streams * 2 - 1,
+        netserver_path=netperf.NETSERVER_PATH,
+    )
     vm.RemoteCommand(netserver_cmd)
 
   # Copy remote test script to client
@@ -168,14 +177,18 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name, iteration_id):
     assert results
     assert 'Throughput' in results
   except:
-    raise Exception('Netperf ERROR: Failed to parse stdout. STDOUT: %s' %
-                    stdout)
+    raise Exception(
+        'Netperf ERROR: Failed to parse stdout. STDOUT: %s' % stdout
+    )
 
   # Update the metadata with some additional infos
-  meta_keys = [('Confidence Iterations Run', 'confidence_iter'),
-               ('Throughput Confidence Width (%)', 'confidence_width_percent')]
+  meta_keys = [
+      ('Confidence Iterations Run', 'confidence_iter'),
+      ('Throughput Confidence Width (%)', 'confidence_width_percent'),
+  ]
   metadata.update(
-      {meta_key: results[netperf_key] for netperf_key, meta_key in meta_keys})
+      {meta_key: results[netperf_key] for netperf_key, meta_key in meta_keys}
+  )
 
   # Create the throughput sample
   throughput = float(results['Throughput'])
@@ -186,15 +199,17 @@ def _ParseNetperfOutput(stdout, metadata, benchmark_name, iteration_id):
     metric = '%s_%s_Throughput' % (iteration_id, benchmark_name)
   else:
     raise ValueError(
-        'Netperf output specifies unrecognized throughput units %s' %
-        throughput_units)
+        'Netperf output specifies unrecognized throughput units %s'
+        % throughput_units
+    )
   throughput_sample = sample.Sample(metric, throughput, unit, metadata)
 
   return throughput_sample
 
 
-def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams, iteration,
-               results):
+def RunNetperf(
+    primary_vm, secondary_vm, benchmark_name, num_streams, iteration, results
+):
   """Spawns netperf on a remote VM, parses results.
 
   Args:
@@ -211,27 +226,35 @@ def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams, iteration,
   # Flags:
   # -o specifies keys to include in CSV output.
   # -j keeps additional latency numbers
-  netperf_cmd = ('{netperf_path} -p {{command_port}} -j '
-                 '-t {benchmark_name} -H {server_ip} -l {length}'
-                 ' -- '
-                 '-P ,{{data_port}} '
-                 '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
-                 'P99_LATENCY,STDDEV_LATENCY,'
-                 'MIN_LATENCY,MAX_LATENCY,'
-                 'CONFIDENCE_ITERATION,THROUGHPUT_CONFID').format(
-                     netperf_path=netperf.NETPERF_PATH,
-                     benchmark_name=benchmark_name,
-                     server_ip=secondary_vm.internal_ip,
-                     length=FLAGS.bidirectional_network_test_length)
+  netperf_cmd = (
+      '{netperf_path} -p {{command_port}} -j '
+      '-t {benchmark_name} -H {server_ip} -l {length}'
+      ' -- '
+      '-P ,{{data_port}} '
+      '-o THROUGHPUT,THROUGHPUT_UNITS,P50_LATENCY,P90_LATENCY,'
+      'P99_LATENCY,STDDEV_LATENCY,'
+      'MIN_LATENCY,MAX_LATENCY,'
+      'CONFIDENCE_ITERATION,THROUGHPUT_CONFID'
+  ).format(
+      netperf_path=netperf.NETPERF_PATH,
+      benchmark_name=benchmark_name,
+      server_ip=secondary_vm.internal_ip,
+      length=FLAGS.bidirectional_network_test_length,
+  )
 
   # Run all of the netperf processes and collect their stdout
 
   # Give the remote script the test length plus 5 minutes to complete
   remote_cmd_timeout = FLAGS.bidirectional_network_test_length + 300
-  remote_cmd = ('./%s --netperf_cmd="%s" --num_streams=%s --port_start=%s' %
-                (REMOTE_SCRIPT, netperf_cmd, num_streams, PORT_START))
+  remote_cmd = './%s --netperf_cmd="%s" --num_streams=%s --port_start=%s' % (
+      REMOTE_SCRIPT,
+      netperf_cmd,
+      num_streams,
+      PORT_START,
+  )
   remote_stdout, _ = primary_vm.RemoteCommand(
-      remote_cmd, timeout=remote_cmd_timeout)
+      remote_cmd, timeout=remote_cmd_timeout
+  )
 
   # Decode the remote command's stdout which the stdouts, stderrs and return
   # code from each sub invocation of netperf (per stream)
@@ -246,26 +269,26 @@ def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams, iteration,
 
   # Metadata to attach to samples
   metadata = {
-      'bidirectional_network_test_length':
-          FLAGS.bidirectional_network_test_length,
-      'bidirectional_stream_num_streams':
-          num_streams,
-      'ip_type':
-          'internal',
-      'primary_machine_type':
-          primary_vm.machine_type,
-      'primary_zone':
-          primary_vm.zone,
-      'secondary_machine_type':
-          secondary_vm.machine_type,
-      'secondary_zone':
-          secondary_vm.zone,
+      'bidirectional_network_test_length': (
+          FLAGS.bidirectional_network_test_length
+      ),
+      'bidirectional_stream_num_streams': num_streams,
+      'ip_type': 'internal',
+      'primary_machine_type': primary_vm.machine_type,
+      'primary_zone': primary_vm.zone,
+      'secondary_machine_type': secondary_vm.machine_type,
+      'secondary_zone': secondary_vm.zone,
   }
 
   stream_start_delta = end_starting_processes - begin_starting_processes
   local_results.append(
-      sample.Sample('%s_%s_start_delta' % (iteration, benchmark_name),
-                    float(stream_start_delta), SEC, metadata))
+      sample.Sample(
+          '%s_%s_start_delta' % (iteration, benchmark_name),
+          float(stream_start_delta),
+          SEC,
+          metadata,
+      )
+  )
 
   throughput_samples = [
       _ParseNetperfOutput(stdout, metadata, benchmark_name, iteration)
@@ -285,10 +308,18 @@ def RunNetperf(primary_vm, secondary_vm, benchmark_name, num_streams, iteration,
   # Create samples for throughput stats
   for stat, value in throughput_stats.items():
     local_results.append(
-        sample.Sample('%s_%s_Throughput_%s' % (iteration, benchmark_name, stat),
-                      float(value), throughput_unit, metadata))
-  results[iteration] = (local_results, begin_starting_processes,
-                        end_starting_processes)
+        sample.Sample(
+            '%s_%s_Throughput_%s' % (iteration, benchmark_name, stat),
+            float(value),
+            throughput_unit,
+            metadata,
+        )
+    )
+  results[iteration] = (
+      local_results,
+      begin_starting_processes,
+      end_starting_processes,
+  )
 
 
 def Run(benchmark_spec):
@@ -306,8 +337,20 @@ def Run(benchmark_spec):
   num_streams = FLAGS.bidirectional_stream_num_streams
   test_results = [None] * num_tests
 
-  args = [((vms[0], vms[i + 1], FLAGS.bidirectional_network_tests[i],
-            num_streams, i, test_results), {}) for i in range(num_tests)]
+  args = [
+      (
+          (
+              vms[0],
+              vms[i + 1],
+              FLAGS.bidirectional_network_tests[i],
+              num_streams,
+              i,
+              test_results,
+          ),
+          {},
+      )
+      for i in range(num_tests)
+  ]
 
   background_tasks.RunThreaded(RunNetperf, args, num_tests)
 
@@ -326,32 +369,37 @@ def Run(benchmark_spec):
 
   primary_vm = vms[0]  # client in netperf terms
   metadata = {
-      'primary_machine_type':
-          primary_vm.machine_type,
-      'primary_zone':
-          primary_vm.zone,
-      'ip_type':
-          'internal',
-      'bidirectional_network_tests':
-          ','.join(FLAGS.bidirectional_network_tests),
-      'bidirectional_network_test_length':
-          FLAGS.bidirectional_network_test_length,
-      'bidirectional_stream_num_streams':
-          num_streams,
+      'primary_machine_type': primary_vm.machine_type,
+      'primary_zone': primary_vm.zone,
+      'ip_type': 'internal',
+      'bidirectional_network_tests': ','.join(
+          FLAGS.bidirectional_network_tests
+      ),
+      'bidirectional_network_test_length': (
+          FLAGS.bidirectional_network_test_length
+      ),
+      'bidirectional_stream_num_streams': num_streams,
   }
 
   if total_outbound > 0:
     results.append(
-        sample.Sample('outbound_network_total', total_outbound, MBPS, metadata))
+        sample.Sample('outbound_network_total', total_outbound, MBPS, metadata)
+    )
   if total_inbound > 0:
     results.append(
-        sample.Sample('inbound_network_total', total_inbound, MBPS, metadata))
+        sample.Sample('inbound_network_total', total_inbound, MBPS, metadata)
+    )
 
   start_times = [r[1] for r in test_results]
   end_times = [r[2] for r in test_results]
   results.append(
-      sample.Sample('all_streams_start_delta',
-                    max(end_times) - min(start_times), SEC, metadata))
+      sample.Sample(
+          'all_streams_start_delta',
+          max(end_times) - min(start_times),
+          SEC,
+          metadata,
+      )
+  )
   return results
 
 

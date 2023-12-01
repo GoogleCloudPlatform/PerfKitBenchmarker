@@ -58,9 +58,11 @@ tailbench:
 """
 
 _TESTS = flags.DEFINE_multi_enum(
-    'tailbench_tests', ['img-dnn', 'specjbb', 'masstree'],
+    'tailbench_tests',
     ['img-dnn', 'specjbb', 'masstree'],
-    'Which tailbench tests to run, all by default')
+    ['img-dnn', 'specjbb', 'masstree'],
+    'Which tailbench tests to run, all by default',
+)
 
 INSTALL_DIR = '/scratch_ts'
 
@@ -77,7 +79,8 @@ def Prepare(benchmark_spec):
 
 def CheckFlag(value: str):
   return any(
-      substring in value for substring in ['img-dnn', 'specjbb', 'masstree'])
+      substring in value for substring in ['img-dnn', 'specjbb', 'masstree']
+  )
 
 
 def Run(benchmark_spec):
@@ -95,7 +98,8 @@ def Run(benchmark_spec):
   for test in _TESTS.value:
     vm.PullFile(vm_util.GetTempDir(), f'{INSTALL_DIR}/results/{test}.txt')
     samples += tailbench.BuildHistogramSamples(
-        f'{vm_util.GetTempDir()}/{test}.txt', test, 'latency')
+        f'{vm_util.GetTempDir()}/{test}.txt', test, 'latency'
+    )
   return samples
 
 

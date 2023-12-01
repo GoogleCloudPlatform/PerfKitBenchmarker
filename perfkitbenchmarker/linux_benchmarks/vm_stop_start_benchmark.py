@@ -66,7 +66,8 @@ def Prepare(unused_benchmark_spec: benchmark_spec.BenchmarkSpec):
 
 
 def _MeasureStart(
-    vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
+    vms: List[virtual_machine.BaseVirtualMachine],
+) -> List[sample.Sample]:
   """Measures the times to start the VMs.
 
   Args:
@@ -79,12 +80,14 @@ def _MeasureStart(
   before_start_timestamp = time.time()
   start_times = background_tasks.RunThreaded(lambda vm: vm.Start(), vms)
   cluster_start_time = time.time() - before_start_timestamp
-  return _GetVmOperationDataSamples(start_times, cluster_start_time, 'Start',
-                                    vms)
+  return _GetVmOperationDataSamples(
+      start_times, cluster_start_time, 'Start', vms
+  )
 
 
 def _MeasureStop(
-    vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
+    vms: List[virtual_machine.BaseVirtualMachine],
+) -> List[sample.Sample]:
   """Measures the times to stop the VMss.
 
   Args:
@@ -97,14 +100,16 @@ def _MeasureStop(
   before_stop_timestamp = time.time()
   stop_times = background_tasks.RunThreaded(lambda vm: vm.Stop(), vms)
   cluster_stop_time = time.time() - before_stop_timestamp
-  return _GetVmOperationDataSamples(stop_times, cluster_stop_time, 'Stop',
-                                    vms)
+  return _GetVmOperationDataSamples(stop_times, cluster_stop_time, 'Stop', vms)
 
 
 # TODO(user): Refactor to be useable in other files
 def _GetVmOperationDataSamples(
-    operation_times: List[int], cluster_time: float, operation: str,
-    vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
+    operation_times: List[int],
+    cluster_time: float,
+    operation: str,
+    vms: List[virtual_machine.BaseVirtualMachine],
+) -> List[sample.Sample]:
   """Append samples from given data.
 
   Args:
@@ -122,17 +127,20 @@ def _GetVmOperationDataSamples(
     metadata = {
         'machine_instance': i,
         'num_vms': len(vms),
-        'os_type': vm.OS_TYPE
+        'os_type': vm.OS_TYPE,
     }
     metadata_list.append(metadata)
   for operation_time, metadata in zip(operation_times, metadata_list):
     samples.append(
-        sample.Sample(f'{operation} Time', operation_time, 'seconds', metadata))
+        sample.Sample(f'{operation} Time', operation_time, 'seconds', metadata)
+    )
   os_types = set([vm.OS_TYPE for vm in vms])
   metadata = {'num_vms': len(vms), 'os_type': ','.join(sorted(os_types))}
   samples.append(
-      sample.Sample(f'Cluster {operation} Time', cluster_time, 'seconds',
-                    metadata))
+      sample.Sample(
+          f'Cluster {operation} Time', cluster_time, 'seconds', metadata
+      )
+  )
   return samples
 
 

@@ -26,8 +26,11 @@ from perfkitbenchmarker.linux_benchmarks import nginx_benchmark
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('kubernetes_nginx_runtime_class_name', None,
-                    'A custom runtimeClassName to apply to the nginx pods.')
+flags.DEFINE_string(
+    'kubernetes_nginx_runtime_class_name',
+    None,
+    'A custom runtimeClassName to apply to the nginx pods.',
+)
 
 BENCHMARK_NAME = 'kubernetes_nginx'
 BENCHMARK_CONFIG = """
@@ -111,7 +114,8 @@ def _PrepareCluster(benchmark_spec):
   """Prepares a cluster to run the Nginx benchmark."""
   with _CreateNginxConfigMapDir() as nginx_config_map_dirname:
     benchmark_spec.container_cluster.CreateConfigMap(
-        'default-config', nginx_config_map_dirname)
+        'default-config', nginx_config_map_dirname
+    )
   container_image = benchmark_spec.container_specs['kubernetes_nginx'].image
   replicas = benchmark_spec.container_cluster.nodepools['nginx'].num_nodes
 
@@ -126,10 +130,12 @@ def _PrepareCluster(benchmark_spec):
       nginx_content_size=FLAGS.nginx_content_size,
       nginx_port=nginx_port,
       nginx_worker_connections=FLAGS.nginx_worker_connections,
-      runtime_class_name=FLAGS.kubernetes_nginx_runtime_class_name)
+      runtime_class_name=FLAGS.kubernetes_nginx_runtime_class_name,
+  )
 
   benchmark_spec.container_cluster.WaitForResource(
-      'deploy/nginx-deployment', 'available')
+      'deploy/nginx-deployment', 'available'
+  )
 
 
 def Prepare(benchmark_spec):
@@ -137,17 +143,19 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   clients = benchmark_spec.vm_groups['clients']
 
-  prepare_fns = ([functools.partial(_PrepareCluster, benchmark_spec)] +
-                 [functools.partial(vm.Install, 'wrk2') for vm in clients])
+  prepare_fns = [functools.partial(_PrepareCluster, benchmark_spec)] + [
+      functools.partial(vm.Install, 'wrk2') for vm in clients
+  ]
 
   background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
   benchmark_spec.nginx_endpoint_ip = (
-      benchmark_spec.container_cluster.GetClusterIP('nginx-cluster'))
+      benchmark_spec.container_cluster.GetClusterIP('nginx-cluster')
+  )
 
 
 def Run(benchmark_spec):

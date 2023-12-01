@@ -47,9 +47,11 @@ edw_benchmark:
 """
 
 flags.DEFINE_string(
-    'local_query_dir', '',
+    'local_query_dir',
+    '',
     'Optional local directory containing all query files. '
-    'Can be absolute or relative to the executable.')
+    'Can be absolute or relative to the executable.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -70,7 +72,8 @@ def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
 
   edw_service_instance.GetClientInterface().SetProvisionedAttributes(
-      benchmark_spec)
+      benchmark_spec
+  )
   edw_service_instance.GetClientInterface().Prepare('edw_common')
 
   query_locations = [
@@ -97,19 +100,22 @@ def Run(benchmark_spec):
 
   # Accumulator for the entire benchmark's performance
   benchmark_performance = results_aggregator.EdwBenchmarkPerformance(
-      total_iterations=FLAGS.edw_suite_iterations, expected_queries=all_queries)
+      total_iterations=FLAGS.edw_suite_iterations, expected_queries=all_queries
+  )
 
   # Multiple iterations of the suite are performed to avoid cold start penalty
   for i in range(1, FLAGS.edw_suite_iterations + 1):
     iteration = str(i)
     # Accumulator for the current suite's performance
     iteration_performance = results_aggregator.EdwPowerIterationPerformance(
-        iteration_id=iteration, total_queries=len(all_queries))
+        iteration_id=iteration, total_queries=len(all_queries)
+    )
 
     for query in all_queries:
       execution_time, metadata = client_interface.ExecuteQuery(query)
-      iteration_performance.add_query_performance(query, execution_time,
-                                                  metadata)
+      iteration_performance.add_query_performance(
+          query, execution_time, metadata
+      )
     benchmark_performance.add_iteration_performance(iteration_performance)
 
   # Execution complete, generate results only if the benchmark was successful.
@@ -117,12 +123,15 @@ def Run(benchmark_spec):
   benchmark_metadata.update(edw_service_instance.GetMetadata())
   if benchmark_performance.is_successful():
     query_samples = benchmark_performance.get_all_query_performance_samples(
-        metadata=benchmark_metadata)
+        metadata=benchmark_metadata
+    )
     results.extend(query_samples)
 
     geomean_samples = (
         benchmark_performance.get_queries_geomean_performance_samples(
-            metadata=benchmark_metadata))
+            metadata=benchmark_metadata
+        )
+    )
     results.extend(geomean_samples)
   else:
     logging.error('At least one query failed, so not reporting any results.')

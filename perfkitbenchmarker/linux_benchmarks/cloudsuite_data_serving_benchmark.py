@@ -27,15 +27,19 @@ from perfkitbenchmarker.linux_packages import docker
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('cloudsuite_data_serving_rec_count',
-                     1000,
-                     'Record count in the database.',
-                     lower_bound=1)
+flags.DEFINE_integer(
+    'cloudsuite_data_serving_rec_count',
+    1000,
+    'Record count in the database.',
+    lower_bound=1,
+)
 
-flags.DEFINE_integer('cloudsuite_data_serving_op_count',
-                     1000,
-                     'Operation count to be executed.',
-                     lower_bound=1)
+flags.DEFINE_integer(
+    'cloudsuite_data_serving_op_count',
+    1000,
+    'Operation count to be executed.',
+    lower_bound=1,
+)
 
 BENCHMARK_NAME = 'cloudsuite_data_serving'
 BENCHMARK_CONFIG = """
@@ -70,7 +74,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   server_seed = benchmark_spec.vm_groups['server_seed'][0]
   servers = benchmark_spec.vm_groups['servers']
@@ -83,25 +87,31 @@ def Prepare(benchmark_spec):
   def PrepareServerSeed(vm):
     PrepareCommon(vm)
     vm.Install('cloudsuite/data-serving:server')
-    vm.RemoteCommand('sudo docker run -d --name cassandra-server-seed '
-                     '--net host cloudsuite/data-serving:server')
+    vm.RemoteCommand(
+        'sudo docker run -d --name cassandra-server-seed '
+        '--net host cloudsuite/data-serving:server'
+    )
 
   def PrepareServer(vm):
     PrepareCommon(vm)
     vm.Install('cloudsuite/data-serving:server')
-    start_server_cmd = ('sudo docker run -d --name cassandra-server '
-                        '-e CASSANDRA_SEEDS=%s --net host '
-                        'cloudsuite/data-serving:server' %
-                        server_seed.internal_ip)
+    start_server_cmd = (
+        'sudo docker run -d --name cassandra-server '
+        '-e CASSANDRA_SEEDS=%s --net host '
+        'cloudsuite/data-serving:server'
+        % server_seed.internal_ip
+    )
     vm.RemoteCommand(start_server_cmd)
 
   def PrepareClient(vm):
     PrepareCommon(vm)
     vm.Install('cloudsuite/data-serving:client')
 
-  target_arg_tuples = ([(PrepareServerSeed, [server_seed], {})] +
-                       [(PrepareServer, [vm], {}) for vm in servers] +
-                       [(PrepareClient, [client], {})])
+  target_arg_tuples = (
+      [(PrepareServerSeed, [server_seed], {})]
+      + [(PrepareServer, [vm], {}) for vm in servers]
+      + [(PrepareClient, [client], {})]
+  )
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
@@ -110,7 +120,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -131,59 +141,89 @@ def Run(benchmark_spec):
   rec_count_cfg = '-e RECORDCOUNT=%d' % FLAGS.cloudsuite_data_serving_rec_count
   op_count_cfg = '-e OPERATIONCOUNT=%d' % FLAGS.cloudsuite_data_serving_op_count
 
-  benchmark_cmd = ('sudo docker run %s %s --rm --name cassandra-client'
-                   ' --net host cloudsuite/data-serving:client %s' %
-                   (rec_count_cfg, op_count_cfg, server_ips))
+  benchmark_cmd = (
+      'sudo docker run %s %s --rm --name cassandra-client'
+      ' --net host cloudsuite/data-serving:client %s'
+      % (rec_count_cfg, op_count_cfg, server_ips)
+  )
   stdout, _ = client.RemoteCommand(benchmark_cmd)
 
   def GetResults(match_str, result_label, result_metric):
     matches = re.findall(match_str, stdout)
     if len(matches) != 1:
-      raise errors.Benchmarks.RunError('Expected to find result label: %s' %
-                                       result_label)
-    results.append(sample.Sample(result_label, float(matches[0]),
-                                 result_metric))
+      raise errors.Benchmarks.RunError(
+          'Expected to find result label: %s' % result_label
+      )
+    results.append(
+        sample.Sample(result_label, float(matches[0]), result_metric)
+    )
 
-  GetResults('\[OVERALL\], RunTime\(ms\), (\d+.?\d*)',
-             'OVERALL RunTime', 'ms')
-  GetResults('\[OVERALL\], Throughput\(ops\/sec\), (\d+.?\d*)',
-             'OVERALL Throughput', 'ops/sec')
-  GetResults('\[CLEANUP\], Operations, (\d+.?\d*)',
-             'CLEANUP Operations', 'ops')
-  GetResults('\[CLEANUP\], AverageLatency\(us\), (\d+.?\d*)',
-             'CLEANUP AverageLatency', 'us')
-  GetResults('\[CLEANUP\], MinLatency\(us\), (\d+.?\d*)',
-             'CLEANUP MinLatency', 'us')
-  GetResults('\[CLEANUP\], MaxLatency\(us\), (\d+.?\d*)',
-             'CLEANUP MaxLatency', 'us')
-  GetResults('\[CLEANUP\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
-             'CLEANUP 95thPercentileLatency', 'ms')
-  GetResults('\[CLEANUP\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
-             'CLEANUP 99thPercentileLatency', 'ms')
-  GetResults('\[READ\], Operations, (\d+.?\d*)',
-             'READ Operations', 'ops')
-  GetResults('\[READ\], AverageLatency\(us\), (\d+.?\d*)',
-             'READ AverageLatency', 'us')
-  GetResults('\[READ\], MinLatency\(us\), (\d+.?\d*)',
-             'READ MinLatency', 'us')
-  GetResults('\[READ\], MaxLatency\(us\), (\d+.?\d*)',
-             'READ MaxLatency', 'us')
-  GetResults('\[READ\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
-             'READ 95thPercentileLatency', 'ms')
-  GetResults('\[READ\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
-             'READ 99thPercentileLatency', 'ms')
-  GetResults('\[UPDATE\], Operations, (\d+.?\d*)',
-             'UPDATE Operations', 'us')
-  GetResults('\[UPDATE\], AverageLatency\(us\), (\d+.?\d*)',
-             'UPDATE AverageLatency', 'us')
-  GetResults('\[UPDATE\], MinLatency\(us\), (\d+.?\d*)',
-             'UPDATE MinLatency', 'us')
-  GetResults('\[UPDATE\], MaxLatency\(us\), (\d+.?\d*)',
-             'UPDATE MaxLatency', 'us')
-  GetResults('\[UPDATE\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
-             'UPDATE 95thPercentileLatency', 'ms')
-  GetResults('\[UPDATE\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
-             'UPDATE 99thPercentileLatency', 'ms')
+  GetResults('\[OVERALL\], RunTime\(ms\), (\d+.?\d*)', 'OVERALL RunTime', 'ms')
+  GetResults(
+      '\[OVERALL\], Throughput\(ops\/sec\), (\d+.?\d*)',
+      'OVERALL Throughput',
+      'ops/sec',
+  )
+  GetResults('\[CLEANUP\], Operations, (\d+.?\d*)', 'CLEANUP Operations', 'ops')
+  GetResults(
+      '\[CLEANUP\], AverageLatency\(us\), (\d+.?\d*)',
+      'CLEANUP AverageLatency',
+      'us',
+  )
+  GetResults(
+      '\[CLEANUP\], MinLatency\(us\), (\d+.?\d*)', 'CLEANUP MinLatency', 'us'
+  )
+  GetResults(
+      '\[CLEANUP\], MaxLatency\(us\), (\d+.?\d*)', 'CLEANUP MaxLatency', 'us'
+  )
+  GetResults(
+      '\[CLEANUP\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
+      'CLEANUP 95thPercentileLatency',
+      'ms',
+  )
+  GetResults(
+      '\[CLEANUP\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
+      'CLEANUP 99thPercentileLatency',
+      'ms',
+  )
+  GetResults('\[READ\], Operations, (\d+.?\d*)', 'READ Operations', 'ops')
+  GetResults(
+      '\[READ\], AverageLatency\(us\), (\d+.?\d*)', 'READ AverageLatency', 'us'
+  )
+  GetResults('\[READ\], MinLatency\(us\), (\d+.?\d*)', 'READ MinLatency', 'us')
+  GetResults('\[READ\], MaxLatency\(us\), (\d+.?\d*)', 'READ MaxLatency', 'us')
+  GetResults(
+      '\[READ\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
+      'READ 95thPercentileLatency',
+      'ms',
+  )
+  GetResults(
+      '\[READ\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
+      'READ 99thPercentileLatency',
+      'ms',
+  )
+  GetResults('\[UPDATE\], Operations, (\d+.?\d*)', 'UPDATE Operations', 'us')
+  GetResults(
+      '\[UPDATE\], AverageLatency\(us\), (\d+.?\d*)',
+      'UPDATE AverageLatency',
+      'us',
+  )
+  GetResults(
+      '\[UPDATE\], MinLatency\(us\), (\d+.?\d*)', 'UPDATE MinLatency', 'us'
+  )
+  GetResults(
+      '\[UPDATE\], MaxLatency\(us\), (\d+.?\d*)', 'UPDATE MaxLatency', 'us'
+  )
+  GetResults(
+      '\[UPDATE\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
+      'UPDATE 95thPercentileLatency',
+      'ms',
+  )
+  GetResults(
+      '\[UPDATE\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
+      'UPDATE 99thPercentileLatency',
+      'ms',
+  )
 
   return results
 
@@ -193,7 +233,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   server_seed = benchmark_spec.vm_groups['server_seed'][0]
   servers = benchmark_spec.vm_groups['servers']
@@ -209,6 +249,7 @@ def Cleanup(benchmark_spec):
     vm.RemoteCommand('sudo docker stop cassandra-server')
     CleanupServerCommon(vm)
 
-  target_arg_tuples = ([(CleanupServerSeed, [server_seed], {})] +
-                       [(CleanupServer, [vm], {}) for vm in servers])
+  target_arg_tuples = [(CleanupServerSeed, [server_seed], {})] + [
+      (CleanupServer, [vm], {}) for vm in servers
+  ]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))

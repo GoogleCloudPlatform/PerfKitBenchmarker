@@ -44,7 +44,6 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
-
 from perfkitbenchmarker.providers.aws import util as aws_util
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import util as gcp_util
@@ -87,28 +86,55 @@ large_scale_boot:
 """
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('boots_per_launcher', 1, 'Number of VMs to boot per '
-                     'launcher server VM. Defaults to 1.')
-flags.register_validator('boots_per_launcher',
-                         lambda value: 1 <= value <= 1000,
-                         message='The number of VMs booted by each launcher '
-                         'should be between 1 and 1000.')
-flags.DEFINE_string('boot_os_type', 'debian11', 'OS to boot on the VMs. '
-                    'Defaults to debian11. OS on launcher server VM is set '
-                    'using os_type flag.')
-flags.DEFINE_string('boot_machine_type', 'n1-standard-2', 'Machine type to boot'
-                    'on the VMs. Defaults to n1-standard-2. Set machine type '
-                    'on launcher server VM with launcher_machine_type flag.')
-flags.DEFINE_string('launcher_machine_type', 'n1-standard-16', 'Machine type '
-                    'to launcher the VMs. Defaults to n1-standard-16. Set '
-                    'machine type on boot VMs with boot_machine_type flag.')
-flags.DEFINE_boolean('vms_contact_launcher', True, 'Whether launched vms '
-                     'attempt to contact the launcher before launcher attempts '
-                     'to connect to them. Default to True.')
-flags.DEFINE_boolean('use_public_ip', False, 'Whether launcher should contact '
-                     'boot vms using public ip instead of internal ip. Only '
-                     'applicable for vms_contact_launcher=False mode. '
-                     'Defaults to False.')
+flags.DEFINE_integer(
+    'boots_per_launcher',
+    1,
+    'Number of VMs to boot per launcher server VM. Defaults to 1.',
+)
+flags.register_validator(
+    'boots_per_launcher',
+    lambda value: 1 <= value <= 1000,
+    message=(
+        'The number of VMs booted by each launcher '
+        'should be between 1 and 1000.'
+    ),
+)
+flags.DEFINE_string(
+    'boot_os_type',
+    'debian11',
+    'OS to boot on the VMs. '
+    'Defaults to debian11. OS on launcher server VM is set '
+    'using os_type flag.',
+)
+flags.DEFINE_string(
+    'boot_machine_type',
+    'n1-standard-2',
+    'Machine type to boot'
+    'on the VMs. Defaults to n1-standard-2. Set machine type '
+    'on launcher server VM with launcher_machine_type flag.',
+)
+flags.DEFINE_string(
+    'launcher_machine_type',
+    'n1-standard-16',
+    'Machine type '
+    'to launcher the VMs. Defaults to n1-standard-16. Set '
+    'machine type on boot VMs with boot_machine_type flag.',
+)
+flags.DEFINE_boolean(
+    'vms_contact_launcher',
+    True,
+    'Whether launched vms '
+    'attempt to contact the launcher before launcher attempts '
+    'to connect to them. Default to True.',
+)
+flags.DEFINE_boolean(
+    'use_public_ip',
+    False,
+    'Whether launcher should contact '
+    'boot vms using public ip instead of internal ip. Only '
+    'applicable for vms_contact_launcher=False mode. '
+    'Defaults to False.',
+)
 
 # Tag for undefined hostname, should be synced with listener_server.py script.
 UNDEFINED_HOSTNAME = 'UNDEFINED'
@@ -166,8 +192,9 @@ STATUS_RUNNING = 'Running'
 # If not using service account credentials from preprovisioned data bucket,
 # use --gcp_service_account_key_file flag to specify the same credentials.
 BENCHMARK_DATA = {
-    'large-scale-boot-381ea7fa0a7d.json':
-        '22cd2412f38f5b6f1615ae565cd74073deff3f30829769ec66eebb5cf9672329',
+    'large-scale-boot-381ea7fa0a7d.json': (
+        '22cd2412f38f5b6f1615ae565cd74073deff3f30829769ec66eebb5cf9672329'
+    ),
 }
 # default linux ssh port
 _SSH_PORT = linux_virtual_machine.DEFAULT_SSH_PORT
@@ -192,8 +219,11 @@ def GetAzBootVMStartIdByLauncher(launcher_name):
     launcher_name: indexed launcher name to calculate ids for the VMs it boots.
   """
   launcher_index = int(launcher_name.split('-')[-1]) - 1
-  return (launcher_index * FLAGS.boots_per_launcher +
-          _AZURE_RESERVED_IPS + FLAGS.num_vms)
+  return (
+      launcher_index * FLAGS.boots_per_launcher
+      + _AZURE_RESERVED_IPS
+      + FLAGS.num_vms
+  )
 
 
 def _GetServerStartCommand(client_port, launcher_vm):
@@ -202,33 +232,37 @@ def _GetServerStartCommand(client_port, launcher_vm):
   if cloud == 'GCP' and FLAGS.use_public_ip:
     vms_name_pattern = UNDEFINED_HOSTNAME
   elif cloud == 'GCP':
-    vms_name_pattern = '{name_pattern}-VM_ID.{zone}.c.{project}.internal'.format(
-        name_pattern=_BOOT_VM_NAME_PREFIX.format(
-            launcher_name=launcher_vm.name),
-        zone=launcher_vm.zone,
-        project=FLAGS.project)
+    vms_name_pattern = (
+        '{name_pattern}-VM_ID.{zone}.c.{project}.internal'.format(
+            name_pattern=_BOOT_VM_NAME_PREFIX.format(
+                launcher_name=launcher_vm.name
+            ),
+            zone=launcher_vm.zone,
+            project=FLAGS.project,
+        )
+    )
   elif cloud == 'AWS':
     # AWS do not have a defined vm name pattern till after vm is launched.
     vms_name_pattern = UNDEFINED_HOSTNAME
   elif cloud == 'Azure':
     if FLAGS.use_public_ip:
       public_dns = 'booter-{}-VMID.{}.cloudapp.azure.com'.format(
-          FLAGS.run_uri,
-          launcher_vm.zone)
+          FLAGS.run_uri, launcher_vm.zone
+      )
     else:
       public_dns = ''
     # Azure assigns a sequential ip
     vms_name_pattern = SEQUENTIAL_IP.format(
-        public_dns,
-        GetAzBootVMStartIdByLauncher(launcher_vm.name))
+        public_dns, GetAzBootVMStartIdByLauncher(launcher_vm.name)
+    )
   return (
       'python3 {server_path} {server_name} {port} {results_path} {client_port} '
       '{use_server} {vms_name_pattern} {vms_count} {use_public_ip} '
-      '> {server_log} 2>&1 &'
-      .format(
+      '> {server_log} 2>&1 &'.format(
           server_name=launcher_vm.name,
           server_path=posixpath.join(
-              _REMOTE_DIR, _LISTENER_SERVER.split('/')[-1]),
+              _REMOTE_DIR, _LISTENER_SERVER.split('/')[-1]
+          ),
           port=_PORT,
           results_path=_RESULTS_FILE_PATH,
           client_port=client_port,
@@ -236,7 +270,9 @@ def _GetServerStartCommand(client_port, launcher_vm):
           vms_name_pattern=vms_name_pattern,
           vms_count=FLAGS.boots_per_launcher,
           server_log=_LISTENER_SERVER_LOG,
-          use_public_ip=FLAGS.use_public_ip))
+          use_public_ip=FLAGS.use_public_ip,
+      )
+  )
 
 
 def _IsLinux():
@@ -260,12 +296,14 @@ def CheckPrerequisites(_):
   if FLAGS.cloud == 'Azure' and FLAGS.vms_contact_launcher and not _IsLinux():
     raise errors.Benchmarks.PrepareException(
         'Booting Windows VMs on Azure with a start-up script is not supported. '
-        'See https://github.com/Azure/azure-powershell/issues/9600.')
+        'See https://github.com/Azure/azure-powershell/issues/9600.'
+    )
   if FLAGS.vms_contact_launcher and FLAGS.use_public_ip:
     raise errors.Benchmarks.PrepareException(
         'After VMs contact launcher server, launcher will check connectivity '
         'of the VMs using the client address of the curl request. This option '
-        'is only applicable when launcher makes the initial contact.')
+        'is only applicable when launcher makes the initial contact.'
+    )
 
 
 def GetConfig(user_config):
@@ -280,22 +318,26 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   launcher_config = config['vm_groups']['servers']
   launcher_config['vm_count'] = FLAGS.num_vms
-  launcher_config['vm_spec'][FLAGS.cloud]['machine_type'] = (
-      FLAGS.launcher_machine_type)
+  launcher_config['vm_spec'][FLAGS.cloud][
+      'machine_type'
+  ] = FLAGS.launcher_machine_type
   booter_template = config['vm_groups']['clients']
   booter_template['os_type'] = FLAGS.boot_os_type
-  booter_template['vm_spec'][FLAGS.cloud]['machine_type'] = (
-      FLAGS.boot_machine_type)
+  booter_template['vm_spec'][FLAGS.cloud][
+      'machine_type'
+  ] = FLAGS.boot_machine_type
   if FLAGS.machine_type:
     raise errors.Setup.InvalidConfigurationError(
         'Do not set machine type flag as it will override both launcher and '
         'booter machine types. Use launcher_machine_type and boot_machine_type'
-        'instead.')
+        'instead.'
+    )
   if booter_template['vm_count'] != 1:
     raise errors.Setup.InvalidConfigurationError(
         'Booter_template is a configuration template VM. '
         'Booter count should be set by number of launchers (FLAGS.num_vms) and '
-        'booters per launcher (FLAGS.boots_per_launcher).')
+        'booters per launcher (FLAGS.boots_per_launcher).'
+    )
   return config
 
 
@@ -320,7 +362,8 @@ def _BuildContext(launcher_vm, booter_template_vm):
     context.update({
         'boot_disk_size': booter_template_vm.boot_disk_size,
         'boot_vm_name_prefix': _BOOT_VM_NAME_PREFIX.format(
-            launcher_name=launcher_vm.name),
+            launcher_name=launcher_vm.name
+        ),
         'image_family': booter_template_vm.image_family,
         'image_project': booter_template_vm.image_project,
         'gcloud_path': FLAGS.gcloud_path,
@@ -358,10 +401,12 @@ def _Install(launcher_vm, booter_template_vm):
   launcher_vm.InstallCli()
   # Render boot script on launcher server VM(s)
   context = _BuildContext(launcher_vm, booter_template_vm)
-  launcher_vm.RenderTemplate(data.ResourcePath(_BOOT_TEMPLATE), _BOOT_PATH,
-                             context)
-  launcher_vm.RenderTemplate(data.ResourcePath(_STATUS_TEMPLATE), _STATUS_PATH,
-                             context)
+  launcher_vm.RenderTemplate(
+      data.ResourcePath(_BOOT_TEMPLATE), _BOOT_PATH, context
+  )
+  launcher_vm.RenderTemplate(
+      data.ResourcePath(_STATUS_TEMPLATE), _STATUS_PATH, context
+  )
 
   # Installs and start listener server on launcher VM(s).
   launcher_vm.InstallPackages('netcat')
@@ -370,8 +415,9 @@ def _Install(launcher_vm, booter_template_vm):
   launcher_vm.RemoteCommand('touch log')
   launcher_vm.RemoteCommand(_GetServerStartCommand(client_port, launcher_vm))
   # Render clean up script on launcher server VM(s).
-  launcher_vm.RenderTemplate(data.ResourcePath(_CLEAN_UP_TEMPLATE),
-                             _CLEAN_UP_SCRIPT_PATH, context)
+  launcher_vm.RenderTemplate(
+      data.ResourcePath(_CLEAN_UP_TEMPLATE), _CLEAN_UP_SCRIPT_PATH, context
+  )
 
 
 def Prepare(benchmark_spec):
@@ -400,20 +446,25 @@ def Prepare(benchmark_spec):
         'Each launcher server VM is launching too many VMs. '
         'Increase launcher server VM size or decrease boots_per_launcher. '
         'For a VM with {} CPUs, launch at most {} VMs.'.format(
-            launcher_vms[0].num_cpus, launcher_vms[0].num_cpus * 50))
+            launcher_vms[0].num_cpus, launcher_vms[0].num_cpus * 50
+        )
+    )
 
   if FLAGS.cloud == 'Azure':
     used_private_ips = _AZURE_RESERVED_IPS + FLAGS.num_vms
     for i in range(used_private_ips, used_private_ips + _GetExpectedBoots()):
       nic_name_prefix = _BOOT_NIC_NAME_PREFIX.format(run_uri=FLAGS.run_uri)
       private_ip = '10.0.{octet3}.{octet4}'.format(
-          octet3=i // 256,
-          octet4=i % 256)
+          octet3=i // 256, octet4=i % 256
+      )
       public_ip_name = ''
       if FLAGS.use_public_ip:
         public_ip = azure_virtual_machine.AzurePublicIPAddress(
-            launcher_vms[0].region, launcher_vms[0].availability_zone,
-            '{}-public-ip'.format(i), 'booter-{}-{}'.format(FLAGS.run_uri, i))
+            launcher_vms[0].region,
+            launcher_vms[0].availability_zone,
+            '{}-public-ip'.format(i),
+            'booter-{}-{}'.format(FLAGS.run_uri, i),
+        )
         public_ip.Create()
         public_ip_name = public_ip.name
       nic = azure_virtual_machine.AzureNIC(
@@ -422,7 +473,8 @@ def Prepare(benchmark_spec):
           public_ip=public_ip_name,
           accelerated_networking=False,
           network_security_group=None,
-          private_ip=private_ip)
+          private_ip=private_ip,
+      )
       nic.Create()
 
   background_tasks.RunThreaded(
@@ -440,22 +492,31 @@ def _ReportRunningStatus():
   return FLAGS.boots_per_launcher == 1 and not FLAGS.vms_contact_launcher
 
 
-@vm_util.Retry(poll_interval=_POLLING_DELAY, timeout=_TIMEOUT_SECONDS,
-               retryable_exceptions=(InsufficientBootsError))
+@vm_util.Retry(
+    poll_interval=_POLLING_DELAY,
+    timeout=_TIMEOUT_SECONDS,
+    retryable_exceptions=(InsufficientBootsError),
+)
 def _WaitForResponses(launcher_vms):
   """Wait for all results or server shutdown or TIMEOUT_SECONDS."""
+
   # if any listener server exited, stop waiting.
   def _LauncherError(vm):
-    error, _ = vm.RemoteCommand('grep ERROR ' + _LISTENER_SERVER_LOG,
-                                ignore_failure=True)
+    error, _ = vm.RemoteCommand(
+        'grep ERROR ' + _LISTENER_SERVER_LOG, ignore_failure=True
+    )
     return error
+
   error_str = background_tasks.RunThreaded(_LauncherError, launcher_vms)
   if any(error_str):
     raise errors.Benchmarks.RunError(
-        'Some listening server errored out: %s' % error_str)
+        'Some listening server errored out: %s' % error_str
+    )
+
   def _CountState(vm, state):
-    stdout, _ = vm.RemoteCommand(f'grep -c {state} {_RESULTS_FILE_PATH}',
-                                 ignore_failure=True)
+    stdout, _ = vm.RemoteCommand(
+        f'grep -c {state} {_RESULTS_FILE_PATH}', ignore_failure=True
+    )
     try:
       return int(stdout)
     except ValueError:
@@ -465,23 +526,33 @@ def _WaitForResponses(launcher_vms):
       lambda vm: _CountState(vm, STATUS_PASSING), launcher_vms
   )
   for vm, boot_count in zip(launcher_vms, boots):
-    logging.info('Launcher %s reported %d/%d booted VMs',
-                 vm.internal_ip, boot_count, FLAGS.boots_per_launcher)
+    logging.info(
+        'Launcher %s reported %d/%d booted VMs',
+        vm.internal_ip,
+        boot_count,
+        FLAGS.boots_per_launcher,
+    )
   total_running_count = 0
   if _ReportRunningStatus():
     running = background_tasks.RunThreaded(
         lambda vm: _CountState(vm, STATUS_RUNNING), launcher_vms
     )
     for vm, running_count in zip(launcher_vms, running):
-      logging.info('Launcher %s reported %d/%d running VMs',
-                   vm.internal_ip, running_count, FLAGS.boots_per_launcher)
+      logging.info(
+          'Launcher %s reported %d/%d running VMs',
+          vm.internal_ip,
+          running_count,
+          FLAGS.boots_per_launcher,
+      )
     total_running_count = sum(running)
   reporting_vms_count = sum(boots)
-  if (reporting_vms_count != _GetExpectedBoots() or
-      (_ReportRunningStatus() and total_running_count != _GetExpectedBoots())):
+  if reporting_vms_count != _GetExpectedBoots() or (
+      _ReportRunningStatus() and total_running_count != _GetExpectedBoots()
+  ):
     raise InsufficientBootsError(
-        'Launcher vms reported %d total boots. Expecting %d.' %
-        (reporting_vms_count, _GetExpectedBoots()))
+        'Launcher vms reported %d total boots. Expecting %d.'
+        % (reporting_vms_count, _GetExpectedBoots())
+    )
 
 
 def _ParseResult(launcher_vms):
@@ -541,28 +612,54 @@ def _ParseResult(launcher_vms):
         'launcher_closed_incoming': cur_launcher_closed_incoming,
     }
     current_metadata.update(common_metadata)
-    samples.append(sample.Sample('Launcher Boot Details', -1,
-                                 '', current_metadata))
+    samples.append(
+        sample.Sample('Launcher Boot Details', -1, '', current_metadata)
+    )
 
   mean_time = statistics.mean(durations)
   median_time = statistics.median(durations)
-  samples.append(sample.Sample('Cluster Max Boot Time', slowest_time,
-                               'nanoseconds', common_metadata))
   samples.append(
-      sample.Sample('Cluster Max Boot Sec', slowest_time / _NANO,
-                    'seconds', common_metadata))
+      sample.Sample(
+          'Cluster Max Boot Time', slowest_time, 'nanoseconds', common_metadata
+      )
+  )
   samples.append(
-      sample.Sample('Cluster Mean Boot Sec', mean_time / _NANO,
-                    'seconds', common_metadata))
+      sample.Sample(
+          'Cluster Max Boot Sec',
+          slowest_time / _NANO,
+          'seconds',
+          common_metadata,
+      )
+  )
   samples.append(
-      sample.Sample('Cluster Median Boot Sec', median_time / _NANO,
-                    'seconds', common_metadata))
-  samples.append(sample.Sample('Cluster Expected Boots', _GetExpectedBoots(),
-                               '', common_metadata))
-  samples.append(sample.Sample('Cluster Success Boots', vm_count,
-                               '', common_metadata))
-  samples.append(sample.Sample('Cluster Max Time to Running', time_to_running,
-                               'nanoseconds', common_metadata))
+      sample.Sample(
+          'Cluster Mean Boot Sec', mean_time / _NANO, 'seconds', common_metadata
+      )
+  )
+  samples.append(
+      sample.Sample(
+          'Cluster Median Boot Sec',
+          median_time / _NANO,
+          'seconds',
+          common_metadata,
+      )
+  )
+  samples.append(
+      sample.Sample(
+          'Cluster Expected Boots', _GetExpectedBoots(), '', common_metadata
+      )
+  )
+  samples.append(
+      sample.Sample('Cluster Success Boots', vm_count, '', common_metadata)
+  )
+  samples.append(
+      sample.Sample(
+          'Cluster Max Time to Running',
+          time_to_running,
+          'nanoseconds',
+          common_metadata,
+      )
+  )
   return samples
 
 

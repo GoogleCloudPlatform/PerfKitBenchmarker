@@ -52,18 +52,24 @@ dpb_testdfsio_benchmark:
     worker_count: 2
 """
 
-flags.DEFINE_enum('dfsio_fs', dpb_constants.GCS_FS,
-                  [dpb_constants.GCS_FS, dpb_constants.S3_FS,
-                   dpb_constants.HDFS_FS],
-                  'File System to use in the dfsio operations')
+flags.DEFINE_enum(
+    'dfsio_fs',
+    dpb_constants.GCS_FS,
+    [dpb_constants.GCS_FS, dpb_constants.S3_FS, dpb_constants.HDFS_FS],
+    'File System to use in the dfsio operations',
+)
 
 flags.DEFINE_list(
-    'dfsio_file_sizes_list', [1], 'A list of file sizes to use for each of the'
-                                  ' dfsio files.')
+    'dfsio_file_sizes_list',
+    [1],
+    'A list of file sizes to use for each of the dfsio files.',
+)
 
 flags.DEFINE_list(
-    'dfsio_num_files_list', [4], 'A list of number of dfsio files to use'
-    ' during individual runs.')
+    'dfsio_num_files_list',
+    [4],
+    'A list of number of dfsio files to use during individual runs.',
+)
 
 
 FLAGS = flags.FLAGS
@@ -83,16 +89,19 @@ def GetConfig(user_config):
 def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
 
-    Args:
-      benchmark_config: The config used to construct the BenchmarkSpec.
+  Args:
+    benchmark_config: The config used to construct the BenchmarkSpec.
 
-    Raises:
-      InvalidValue: On encountering invalid configuration.
+  Raises:
+    InvalidValue: On encountering invalid configuration.
   """
   dpb_service_type = benchmark_config.dpb_service.service_type
   if dpb_service_type not in SUPPORTED_DPB_BACKENDS:
-    raise errors.Config.InvalidValue('Invalid backend for dfsio. Not in:{}'.
-                                     format(str(SUPPORTED_DPB_BACKENDS)))
+    raise errors.Config.InvalidValue(
+        'Invalid backend for dfsio. Not in:{}'.format(
+            str(SUPPORTED_DPB_BACKENDS)
+        )
+    )
 
 
 def Prepare(benchmark_spec):
@@ -115,13 +124,15 @@ def Run(benchmark_spec):
   elif service.base_dir.startswith(FLAGS.dfsio_fs):
     base_dir = service.base_dir + '/dfsio'
   else:
-    raise errors.Config.InvalidValue('Service type {} cannot use dfsio_fs: {}'
-                                     .format(service.type, FLAGS.dfsio_fs))
+    raise errors.Config.InvalidValue(
+        'Service type {} cannot use dfsio_fs: {}'.format(
+            service.type, FLAGS.dfsio_fs
+        )
+    )
 
   results = []
   for file_size in FLAGS.dfsio_file_sizes_list:
     for num_files in FLAGS.dfsio_num_files_list:
-
       metadata = copy.copy(service.GetResourceMetadata())
       metadata.update({'dfsio_fs': FLAGS.dfsio_fs})
       metadata.update({'dfsio_num_files': num_files})
@@ -140,30 +151,36 @@ def Run(benchmark_spec):
       # This order is important. Write generates the data for read and clean
       # deletes it for the next write.
       for command in (WRITE, READ, CLEAN):
-        result = RunTestDfsio(
-            service, command, base_dir, num_files, file_size)
+        result = RunTestDfsio(service, command, base_dir, num_files, file_size)
         results.append(
-            sample.Sample(command + '_run_time', result.run_time, 'seconds',
-                          metadata))
+            sample.Sample(
+                command + '_run_time', result.run_time, 'seconds', metadata
+            )
+        )
   return results
 
 
 def RunTestDfsio(service, command, data_dir, num_files, file_size):
   """Run the given TestDFSIO command."""
   args = [
-      '-' + command, '-nrFiles',
-      str(num_files), '-fileSize',
-      str(file_size)
+      '-' + command,
+      '-nrFiles',
+      str(num_files),
+      '-fileSize',
+      str(file_size),
   ]
   properties = {'test.build.data': data_dir}
-  if not (data_dir.startswith(dpb_constants.HDFS_FS + ':') or
-          data_dir.startswith('/')):
+  if not (
+      data_dir.startswith(dpb_constants.HDFS_FS + ':')
+      or data_dir.startswith('/')
+  ):
     properties['fs.default.name'] = data_dir
   return service.SubmitJob(
       classname='org.apache.hadoop.fs.TestDFSIO',
       properties=properties,
       job_arguments=args,
-      job_type=dpb_constants.HADOOP_JOB_TYPE)
+      job_type=dpb_constants.HADOOP_JOB_TYPE,
+  )
 
 
 def Cleanup(benchmark_spec):

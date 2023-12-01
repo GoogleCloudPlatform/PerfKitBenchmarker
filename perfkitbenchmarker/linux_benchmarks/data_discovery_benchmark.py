@@ -52,8 +52,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """
   discovery_duration = benchmark_spec.data_discovery_service.DiscoverData()
   return [
-      sample.Sample('data_discovery_duration', discovery_duration, 'seconds',
-                    benchmark_spec.data_discovery_service.GetMetadata())]
+      sample.Sample(
+          'data_discovery_duration',
+          discovery_duration,
+          'seconds',
+          benchmark_spec.data_discovery_service.GetMetadata(),
+      )
+  ]
 
 
 def Cleanup(_: bm_spec.BenchmarkSpec) -> None:

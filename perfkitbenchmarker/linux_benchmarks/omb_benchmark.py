@@ -8,7 +8,6 @@ Uses IntelMPI
 
 from typing import Any, Dict, Iterator, List
 from absl import flags
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -25,14 +24,22 @@ omb:
 """
 
 _BENCHMARKS_ARG = flags.DEFINE_multi_enum(
-    'omb_benchmarks', None, sorted(omb.BENCHMARKS),
-    'OSU micro-bencmarks to run.  Default is to run all')
+    'omb_benchmarks',
+    None,
+    sorted(omb.BENCHMARKS),
+    'OSU micro-bencmarks to run.  Default is to run all',
+)
 _RUN_LONG_LATENCY = flags.DEFINE_bool(
-    'omb_run_long_latency', False,
-    'Whether to run the very long latency test get_acc_latency and latency_mt.')
+    'omb_run_long_latency',
+    False,
+    'Whether to run the very long latency test get_acc_latency and latency_mt.',
+)
 _MESSAGE_SIZES = flags.DEFINE_list(
-    'omb_message_sizes', None, '--message-size values to pass in.  Value of '
-    '"1:8,1024" will run sizes 1,2,4,8,1024.  Default is to run all sizes')
+    'omb_message_sizes',
+    None,
+    '--message-size values to pass in.  Value of '
+    '"1:8,1024" will run sizes 1,2,4,8,1024.  Default is to run all sizes',
+)
 FLAGS = flags.FLAGS
 
 
@@ -79,8 +86,11 @@ def _GetBenchmarks() -> List[str]:
     return _BENCHMARKS_ARG.value
   if _RUN_LONG_LATENCY.value:
     return sorted(omb.BENCHMARKS)
-  return sorted(name for name, run_type in sorted(omb.BENCHMARKS.items())
-                if not run_type.long_running)
+  return sorted(
+      name
+      for name, run_type in sorted(omb.BENCHMARKS.items())
+      if not run_type.long_running
+  )
 
 
 def _CreateSamples(result: omb.RunResult) -> Iterator[sample.Sample]:

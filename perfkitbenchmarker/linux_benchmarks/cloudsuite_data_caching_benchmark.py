@@ -23,12 +23,14 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import docker
 
-flags.DEFINE_string('cloudsuite_data_caching_memcached_flags',
-                    '-t 1 -m 2048 -n 550',
-                    'Flags to be given to memcached.')
-flags.DEFINE_integer('cloudsuite_data_caching_rps',
-                     18000,
-                     'Number of requests per second.')
+flags.DEFINE_string(
+    'cloudsuite_data_caching_memcached_flags',
+    '-t 1 -m 2048 -n 550',
+    'Flags to be given to memcached.',
+)
+flags.DEFINE_integer(
+    'cloudsuite_data_caching_rps', 18000, 'Number of requests per second.'
+)
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'cloudsuite_data_caching'
@@ -53,7 +55,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   server_vm = benchmark_spec.vm_groups['server'][0]
   client_vm = benchmark_spec.vm_groups['client'][0]
@@ -65,38 +67,48 @@ def Prepare(benchmark_spec):
 
   # Prepare and start the server VM.
   server_vm.Install('cloudsuite/data-caching:server')
-  server_vm.RemoteCommand("echo '%s    dc-client' | sudo tee -a /etc/hosts >"
-                          " /dev/null" % client_vm.internal_ip)
-  server_vm.RemoteCommand('sudo docker run --name dc-server --net host -d '
-                          'cloudsuite/data-caching:server %s' %
-                          FLAGS.cloudsuite_data_caching_memcached_flags)
+  server_vm.RemoteCommand(
+      "echo '%s    dc-client' | sudo tee -a /etc/hosts > /dev/null"
+      % client_vm.internal_ip
+  )
+  server_vm.RemoteCommand(
+      'sudo docker run --name dc-server --net host -d '
+      'cloudsuite/data-caching:server %s'
+      % FLAGS.cloudsuite_data_caching_memcached_flags
+  )
 
   # Prepare the client.
   client_vm.Install('cloudsuite/data-caching:client')
-  client_vm.RemoteCommand("echo '%s    dc-server' | sudo tee -a /etc/hosts >"
-                          " /dev/null" % server_vm.internal_ip)
+  client_vm.RemoteCommand(
+      "echo '%s    dc-server' | sudo tee -a /etc/hosts > /dev/null"
+      % server_vm.internal_ip
+  )
 
 
 def _ParseOutput(output_str):
-  numbers = [float(f) for f in re.findall(r"([-+]?\d*\.\d+|\d+)",
-             " ".join(output_str.splitlines(1)[-4:]))]
+  numbers = [
+      float(f)
+      for f in re.findall(
+          r'([-+]?\d*\.\d+|\d+)', ' '.join(output_str.splitlines(1)[-4:])
+      )
+  ]
 
   results = []
-  results.append(sample.Sample("Requests per second",
-                               numbers[1], "req/s"))
-  results.append(sample.Sample("Average latency",
-                               numbers[7], "ms"))
-  results.append(sample.Sample("90th percentile latency",
-                               numbers[8], "ms"))
-  results.append(sample.Sample("95th percentile latency",
-                               numbers[9], "ms"))
-  results.append(sample.Sample("99th percentile latency",
-                               numbers[10], "ms"))
+  results.append(sample.Sample('Requests per second', numbers[1], 'req/s'))
+  results.append(sample.Sample('Average latency', numbers[7], 'ms'))
+  results.append(sample.Sample('90th percentile latency', numbers[8], 'ms'))
+  results.append(sample.Sample('95th percentile latency', numbers[9], 'ms'))
+  results.append(sample.Sample('99th percentile latency', numbers[10], 'ms'))
 
   req_rems = numbers[15:-1]
 
-  results.append(sample.Sample("Average outstanding requests per requester",
-                               sum(req_rems) / len(req_rems), "reqs"))
+  results.append(
+      sample.Sample(
+          'Average outstanding requests per requester',
+          sum(req_rems) / len(req_rems),
+          'reqs',
+      )
+  )
 
   return results
 
@@ -106,16 +118,18 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
   """
   client_vm = benchmark_spec.vm_groups['client'][0]
 
-  benchmark_cmd = ('sudo docker run --rm --name dc-client --net host'
-                   ' cloudsuite/data-caching:client -rps %d' %
-                   FLAGS.cloudsuite_data_caching_rps)
+  benchmark_cmd = (
+      'sudo docker run --rm --name dc-client --net host'
+      ' cloudsuite/data-caching:client -rps %d'
+      % FLAGS.cloudsuite_data_caching_rps
+  )
 
   stdout, _ = client_vm.RemoteCommand(benchmark_cmd)
 
@@ -127,7 +141,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   server_vm = benchmark_spec.vm_groups['server'][0]
   client_vm = benchmark_spec.vm_groups['client'][0]

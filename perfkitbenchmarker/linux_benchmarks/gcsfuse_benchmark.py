@@ -9,9 +9,11 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
 
 flags.DEFINE_string(
-    'gcsfuse_data_dir', '',
+    'gcsfuse_data_dir',
+    '',
     'The GCS directory storing the files for the benchmark, such as '
-    'gs://bucket/dir/')
+    'gs://bucket/dir/',
+)
 
 BENCHMARK_NAME = 'gcsfuse'
 BENCHMARK_CONFIG = """

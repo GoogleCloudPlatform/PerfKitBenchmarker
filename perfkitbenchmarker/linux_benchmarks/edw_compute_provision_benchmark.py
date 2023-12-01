@@ -17,7 +17,6 @@
 This benchmark measures the latency (from initial request until the resource
 reports a ready status) for provisioning edw computation resources such as
 BigQuery slot capacity commitments, Snowflake warehouses, and Redshift clusters.
-
 """
 
 from typing import Any, Dict, List

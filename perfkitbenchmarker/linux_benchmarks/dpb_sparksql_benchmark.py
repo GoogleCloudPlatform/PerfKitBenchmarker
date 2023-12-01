@@ -416,8 +416,8 @@ def _GetGlobalSamples(
     )
 
   cumulative_run_time = sum(run_times.values())
-  cluster.cluster_duration = (
-      cumulative_run_time + (cluster.GetClusterCreateTime() or 0)
+  cluster.cluster_duration = cumulative_run_time + (
+      cluster.GetClusterCreateTime() or 0
   )
   cluster.metadata.update(metadata)
 

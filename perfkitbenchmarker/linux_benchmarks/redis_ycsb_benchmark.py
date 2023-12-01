@@ -31,8 +31,11 @@ from perfkitbenchmarker.linux_packages import redis_server
 from perfkitbenchmarker.linux_packages import ycsb
 from six.moves import range
 
-flags.DEFINE_integer('redis_ycsb_processes', 1,
-                     'Number of total ycsb processes across all clients.')
+flags.DEFINE_integer(
+    'redis_ycsb_processes',
+    1,
+    'Number of total ycsb processes across all clients.',
+)
 
 FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'redis_ycsb'
@@ -70,14 +73,15 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   groups = benchmark_spec.vm_groups
   redis_vm = groups['workers'][0]
   ycsb_vms = groups['clients']
 
-  prepare_fns = ([functools.partial(PrepareServer, redis_vm)] +
-                 [functools.partial(vm.Install, 'ycsb') for vm in ycsb_vms])
+  prepare_fns = [functools.partial(PrepareServer, redis_vm)] + [
+      functools.partial(vm.Install, 'ycsb') for vm in ycsb_vms
+  ]
 
   background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
@@ -88,13 +92,17 @@ def Prepare(benchmark_spec):
   # to assign target server process to each ycsb process
   server_metadata = [
       {'redis.port': redis_server.DEFAULT_PORT + i % num_server}
-      for i in range(num_ycsb)]
+      for i in range(num_ycsb)
+  ]
 
   benchmark_spec.executor = ycsb.YCSBExecutor(
-      'redis', **{
+      'redis',
+      **{
           'shardkeyspace': True,
           'redis.host': redis_vm.internal_ip,
-          'perclientparam': server_metadata})
+          'perclientparam': server_metadata,
+      }
+  )
 
 
 def Run(benchmark_spec):
@@ -116,7 +124,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -126,10 +134,12 @@ def Run(benchmark_spec):
   num_ycsb = FLAGS.redis_ycsb_processes
   num_server = FLAGS.redis_total_num_processes
   num_client = FLAGS.ycsb_client_vms
-  metadata = {'ycsb_client_vms': num_client,
-              'ycsb_processes': num_ycsb,
-              'redis_total_num_processes': num_server,
-              'redis_server_version': FLAGS.redis_server_version}
+  metadata = {
+      'ycsb_client_vms': num_client,
+      'ycsb_processes': num_ycsb,
+      'redis_total_num_processes': num_server,
+      'redis_server_version': FLAGS.redis_server_version,
+  }
 
   # Matching client vms and ycsb processes sequentially:
   # 1st to xth ycsb clients are assigned to client vm 1
@@ -137,11 +147,13 @@ def Run(benchmark_spec):
   # Duplicate VirtualMachine objects passed into YCSBExecutor to match
   # corresponding ycsb clients.
   duplicate = int(math.ceil(num_ycsb / float(num_client)))
-  client_vms = [
-      vm for item in ycsb_vms for vm in repeat(item, duplicate)][:num_ycsb]
+  client_vms = [vm for item in ycsb_vms for vm in repeat(item, duplicate)][
+      :num_ycsb
+  ]
 
-  samples = list(benchmark_spec.executor.Load(client_vms,
-                                              load_kwargs={'threads': 4}))
+  samples = list(
+      benchmark_spec.executor.Load(client_vms, load_kwargs={'threads': 4})
+  )
   samples += list(benchmark_spec.executor.Run(client_vms))
 
   for sample in samples:
@@ -155,6 +167,6 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   del benchmark_spec  # unused

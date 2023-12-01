@@ -44,9 +44,11 @@ dpb_cluster_boot_benchmark:
 """
 
 flags.DEFINE_enum(
-    'dpb_cluster_boot_fs', dpb_constants.GCS_FS,
+    'dpb_cluster_boot_fs',
+    dpb_constants.GCS_FS,
     [dpb_constants.GCS_FS, dpb_constants.S3_FS, dpb_constants.HDFS_FS],
-    'File System to use in the dpb cluster boot benchmark')
+    'File System to use in the dpb cluster boot benchmark',
+)
 
 FLAGS = flags.FLAGS
 
@@ -71,7 +73,9 @@ def CheckPrerequisites(benchmark_config):
   if dpb_service_type not in SUPPORTED_DPB_BACKENDS:
     raise errors.Config.InvalidValue(
         'Invalid backend for dpb cluster boot . Not in:{}'.format(
-            str(SUPPORTED_DPB_BACKENDS)))
+            str(SUPPORTED_DPB_BACKENDS)
+        )
+    )
 
 
 def Prepare(benchmark_spec):
@@ -98,14 +102,19 @@ def Run(benchmark_spec):
   metadata = copy.copy(benchmark_spec.dpb_service.GetResourceMetadata())
 
   logging.info('metadata %s ', str(metadata))
-  logging.info('Resource create_start_time %s ',
-               str(dpb_service_instance.create_start_time))
-  logging.info('Resource resource_ready_time %s ',
-               str(dpb_service_instance.resource_ready_time))
+  logging.info(
+      'Resource create_start_time %s ',
+      str(dpb_service_instance.create_start_time),
+  )
+  logging.info(
+      'Resource resource_ready_time %s ',
+      str(dpb_service_instance.resource_ready_time),
+  )
 
   create_time = (
-      dpb_service_instance.resource_ready_time -
-      dpb_service_instance.create_start_time)
+      dpb_service_instance.resource_ready_time
+      - dpb_service_instance.create_start_time
+  )
   logging.info('create_time %s ', str(create_time))
 
   return results

@@ -66,46 +66,85 @@ class TlsEncryptionType(enum.Enum):
   UNENCRYPTED = 'unencrypted'
 
 
-flags.DEFINE_enum('ch_network_test_service_type', COMPUTE,
-                  [COMPUTE, STORAGE, DNS],
-                  'The service type to host the website.')
-flags.DEFINE_enum('ch_network_test', 'latency', NETWORK_TESTS,
-                  'Test supported by CloudHarmony network benchmark as defined'
-                  'in NETWORK_TESTS. If none is specified, latency test is run'
-                  'by default.')
-flags.DEFINE_boolean('ch_network_throughput_https', False,
-                     'The protocol for throughput tests will default to https, '
-                     'otherwise it defaults to http')
-flags.DEFINE_float('ch_network_throughput_size', 5,
-                   'Default size for throughput tests in megabytes.')
-flags.DEFINE_boolean('ch_network_throughput_small_file', False,
-                     '--ch_network_throughput_size is ignored and throughput '
-                     'tests are constrained to test files smaller than 128KB. '
-                     'Each thread of each request will randomly select one such'
-                     ' file. When used, the throughput_size result value will '
-                     'be the average file size')
-flags.DEFINE_string('ch_network_throughput_threads', '2',
-                    'The number of concurrent threads for throughput tests.')
-flags.DEFINE_boolean('ch_network_throughput_time', False,
-                     'throughput metrics will be average request times (ms) '
-                     'instead of rate (Mb/s).')
-flags.DEFINE_integer('ch_network_throughput_samples', 5,
-                     'The number of test samples for throughput tests.')
-flags.DEFINE_boolean('ch_network_throughput_slowest_thread', False, 'If set, '
-                     'throughput metrics will be based on the speed of the '
-                     'slowest thread instead of average speed X number of '
-                     'threads.')
-flags.DEFINE_integer('ch_network_tcp_samples', 10, 'The number of test samples '
-                     'for TCP tests (rtt, ssl or ttfb).')
-flags.DEFINE_enum_class('ch_ssl_encryption_type',
-                        TlsEncryptionType.ECC, TlsEncryptionType,
-                        'Encryption type to use for SSL.')
+flags.DEFINE_enum(
+    'ch_network_test_service_type',
+    COMPUTE,
+    [COMPUTE, STORAGE, DNS],
+    'The service type to host the website.',
+)
+flags.DEFINE_enum(
+    'ch_network_test',
+    'latency',
+    NETWORK_TESTS,
+    'Test supported by CloudHarmony network benchmark as defined'
+    'in NETWORK_TESTS. If none is specified, latency test is run'
+    'by default.',
+)
+flags.DEFINE_boolean(
+    'ch_network_throughput_https',
+    False,
+    'The protocol for throughput tests will default to https, '
+    'otherwise it defaults to http',
+)
+flags.DEFINE_float(
+    'ch_network_throughput_size',
+    5,
+    'Default size for throughput tests in megabytes.',
+)
+flags.DEFINE_boolean(
+    'ch_network_throughput_small_file',
+    False,
+    '--ch_network_throughput_size is ignored and throughput '
+    'tests are constrained to test files smaller than 128KB. '
+    'Each thread of each request will randomly select one such'
+    ' file. When used, the throughput_size result value will '
+    'be the average file size',
+)
+flags.DEFINE_string(
+    'ch_network_throughput_threads',
+    '2',
+    'The number of concurrent threads for throughput tests.',
+)
+flags.DEFINE_boolean(
+    'ch_network_throughput_time',
+    False,
+    'throughput metrics will be average request times (ms) '
+    'instead of rate (Mb/s).',
+)
+flags.DEFINE_integer(
+    'ch_network_throughput_samples',
+    5,
+    'The number of test samples for throughput tests.',
+)
+flags.DEFINE_boolean(
+    'ch_network_throughput_slowest_thread',
+    False,
+    'If set, '
+    'throughput metrics will be based on the speed of the '
+    'slowest thread instead of average speed X number of '
+    'threads.',
+)
+flags.DEFINE_integer(
+    'ch_network_tcp_samples',
+    10,
+    'The number of test samples for TCP tests (rtt, ssl or ttfb).',
+)
+flags.DEFINE_enum_class(
+    'ch_ssl_encryption_type',
+    TlsEncryptionType.ECC,
+    TlsEncryptionType,
+    'Encryption type to use for SSL.',
+)
 CLIENT_ZONE = flags.DEFINE_string(
-    'ch_client_zone', None,
-    'zone to launch the network or storage test client in. ')
+    'ch_client_zone',
+    None,
+    'zone to launch the network or storage test client in. ',
+)
 ENDPOINT_ZONE = flags.DEFINE_string(
-    'ch_endpoint_zone', None,
-    'zone to launch the network server or storage test bucket in. ')
+    'ch_endpoint_zone',
+    None,
+    'zone to launch the network server or storage test bucket in. ',
+)
 
 FLAGS = flags.FLAGS
 HTTP_DIR = '/var/www/html/web-probe'
@@ -123,14 +162,17 @@ def CheckPrerequisites(_):
   # TODO(user): add AWS & Azure support for object storage
   if FLAGS.ch_network_test_service_type == STORAGE and FLAGS.cloud != 'GCP':
     raise NotImplementedError('Benchmark only supports GCS object storage.')
-  elif [FLAGS.ch_network_test_service_type,
-        FLAGS.ch_network_test].count(DNS) == 1:
+  elif [FLAGS.ch_network_test_service_type, FLAGS.ch_network_test].count(
+      DNS
+  ) == 1:
     raise errors.Setup.InvalidConfigurationError(
         'To perform DNS test, both ch_network_test flag and '
-        'ch_network_test_service_type flag must be set to dns')
+        'ch_network_test_service_type flag must be set to dns'
+    )
   elif FLAGS.ch_network_test_service_type == DNS and FLAGS.cloud != 'GCP':
     raise NotImplementedError(
-        'DNS Benchmark not implemented for this cloud type')
+        'DNS Benchmark not implemented for this cloud type'
+    )
 
 
 def GetConfig(user_config):
@@ -144,11 +186,13 @@ def GetConfig(user_config):
   """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
-  config['vm_groups']['client']['vm_spec'][FLAGS.cloud]['zone'] = (
-      CLIENT_ZONE.value)
+  config['vm_groups']['client']['vm_spec'][FLAGS.cloud][
+      'zone'
+  ] = CLIENT_ZONE.value
 
-  config['vm_groups']['server']['vm_spec'][FLAGS.cloud]['zone'] = (
-      ENDPOINT_ZONE.value)
+  config['vm_groups']['server']['vm_spec'][FLAGS.cloud][
+      'zone'
+  ] = ENDPOINT_ZONE.value
 
   return config
 
@@ -163,10 +207,12 @@ def _PrepareServer(vm):
 
   # Required to make uplink test function properly
   vm.RemoteCommand(
-      r'sudo sed -i "/server_name _;/a error_page  405 =200 \$uri;" /etc/nginx/sites-enabled/default'
+      r'sudo sed -i "/server_name _;/a error_page  405 =200 \$uri;"'
+      r' /etc/nginx/sites-enabled/default'
   )
   vm.RemoteCommand(
-      'sudo sed -i "/server_name _;/a client_max_body_size 100M;" /etc/nginx/sites-enabled/default'
+      'sudo sed -i "/server_name _;/a client_max_body_size 100M;"'
+      ' /etc/nginx/sites-enabled/default'
   )
 
   # Required for SSL test
@@ -176,50 +222,63 @@ def _PrepareServer(vm):
   # Create self signed certificate (RSA)
   if FLAGS.ch_ssl_encryption_type == TlsEncryptionType.RSA:
     vm.RemoteCommand(
-        f'sudo openssl req -x509 -nodes -days 1 -newkey rsa:2048 -subj '
-        f'"/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" '
-        f'-keyout /etc/ssl/private/nginx-selfsigned.key -out /etc/ssl/certs/nginx-selfsigned.crt '
+        'sudo openssl req -x509 -nodes -days 1 -newkey rsa:2048 -subj'
+        f' "/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" -keyout'
+        ' /etc/ssl/private/nginx-selfsigned.key -out'
+        ' /etc/ssl/certs/nginx-selfsigned.crt '
     )
   # Create self signed certificate (ECC)
   elif FLAGS.ch_ssl_encryption_type == TlsEncryptionType.ECC:
     vm.RemoteCommand(
-        'sudo openssl ecparam -genkey -name prime256v1 -out /etc/ssl/private/nginx-selfsigned.key'
-        )
+        'sudo openssl ecparam -genkey -name prime256v1 -out'
+        ' /etc/ssl/private/nginx-selfsigned.key'
+    )
     vm.RemoteCommand(
-        f'sudo openssl req -new -x509 -days 365 -extensions v3_ca -key /etc/ssl/private/nginx-selfsigned.key -subj '
-        f'"/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" '
-        f'-out /etc/ssl/certs/nginx-selfsigned.crt '
+        'sudo openssl req -new -x509 -days 365 -extensions v3_ca -key'
+        ' /etc/ssl/private/nginx-selfsigned.key -subj'
+        f' "/C=NA/ST=NA/L=NA/O=PerfKitBenchmarker/CN={vm.internal_ip}" -out'
+        ' /etc/ssl/certs/nginx-selfsigned.crt '
     )
   if FLAGS.ch_ssl_encryption_type != TlsEncryptionType.UNENCRYPTED:
     # Setup SSL config for nginx
     vm.RemoteCommand('sudo openssl dhparam -out /etc/nginx/dhparam.pem 1024')
     vm.RemoteCommand(
-        'sudo sed -i "/server_name _;/a ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;" /etc/nginx/sites-enabled/default'
+        'sudo sed -i "/server_name _;/a ssl_certificate'
+        ' /etc/ssl/certs/nginx-selfsigned.crt;"'
+        ' /etc/nginx/sites-enabled/default'
     )
     vm.RemoteCommand(
-        'sudo sed -i "/server_name _;/a ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;" /etc/nginx/sites-enabled/default'
+        'sudo sed -i "/server_name _;/a ssl_certificate_key'
+        ' /etc/ssl/private/nginx-selfsigned.key;"'
+        ' /etc/nginx/sites-enabled/default'
     )
     vm.RemoteCommand(
-        'sudo sed -i "/server_name _;/a listen 443 ssl default_server;" /etc/nginx/sites-enabled/default'
+        'sudo sed -i "/server_name _;/a listen 443 ssl default_server;"'
+        ' /etc/nginx/sites-enabled/default'
     )
     vm.RemoteCommand(
-        'sudo sed -i "/server_name _;/a listen [::]:443 ssl default_server;" /etc/nginx/sites-enabled/default'
+        'sudo sed -i "/server_name _;/a listen [::]:443 ssl default_server;"'
+        ' /etc/nginx/sites-enabled/default'
     )
 
   vm.RemoteCommand('sudo systemctl restart nginx')
 
   web_probe_file = posixpath.join(vm.GetScratchDir(), 'probe.tgz')
-  vm.InstallPreprovisionedPackageData(cloud_harmony_network.PACKAGE_NAME,
-                                      [cloud_harmony_network.WEB_PROBE_TAR],
-                                      vm.GetScratchDir())
+  vm.InstallPreprovisionedPackageData(
+      cloud_harmony_network.PACKAGE_NAME,
+      [cloud_harmony_network.WEB_PROBE_TAR],
+      vm.GetScratchDir(),
+  )
   vm.RemoteCommand(f'tar zxf {web_probe_file} -C {vm.GetScratchDir()}')
   vm.RemoteCommand(f'rm -f {web_probe_file}')
   # Commands to generated larger test files (since they aren't included in the
   # repository due to size limitations). Commands obtained from
   # https://github.com/cloudharmony/web-probe
   web_probe_dir = posixpath.join(vm.GetScratchDir(), 'probe')
-  vm.RemoteCommand(f'dd if=/dev/urandom of={web_probe_dir}/test10gb.bin '
-                   'bs=10240 count=1048576')
+  vm.RemoteCommand(
+      f'dd if=/dev/urandom of={web_probe_dir}/test10gb.bin '
+      'bs=10240 count=1048576'
+  )
   vm.RemoteCommand(f'sudo ln -s {web_probe_dir} {HTTP_DIR}')
 
 
@@ -248,7 +307,8 @@ def _PrepareBucket(benchmark_spec):
   vm_util.IssueCommand(perm_cmd)
   # set bucket lifecyle to ensure bucket deletion after 30 days
   lifecyle_config_file = data.ResourcePath(
-      'cloudharmony_network_gcp_lifecycle.json')
+      'cloudharmony_network_gcp_lifecycle.json'
+  )
   lc_cmd = ['gsutil', 'lifecycle', 'set', lifecyle_config_file, bucket_uri]
   vm_util.IssueCommand(lc_cmd)
   # prepare preprovisioned test data
@@ -262,8 +322,11 @@ def _PrepareBucket(benchmark_spec):
   vm_util.IssueCommand(tar_cmd)
   remote_probe_dir = posixpath.join(tmp_dir, 'probe')
   dd_cmd = [
-      'dd', 'if=/dev/urandom', f'of={remote_probe_dir}/test10gb.bin',
-      'bs=10240', 'count=1048576'
+      'dd',
+      'if=/dev/urandom',
+      f'of={remote_probe_dir}/test10gb.bin',
+      'bs=10240',
+      'count=1048576',
   ]
   vm_util.IssueCommand(dd_cmd)
   # copy preprovisioned test data to test bucket
@@ -328,11 +391,9 @@ def _AddComputeMetadata(client, server, metadata):
       # test_instance_id, test_region and meta_os_info are informational and
       # used in conjunction with saving results.
       'test_instance_id': server.machine_type,
-      'test_region':
-          cloud_harmony_util.GetRegionFromZone(server.zone),
+      'test_region': cloud_harmony_util.GetRegionFromZone(server.zone),
       'meta_instance_id': client.machine_type,
-      'meta_region':
-          cloud_harmony_util.GetRegionFromZone(client.zone),
+      'meta_region': cloud_harmony_util.GetRegionFromZone(client.zone),
       'meta_zone': client.zone,
   }
   metadata.update(compute_metadata)
@@ -376,10 +437,12 @@ def _Run(benchmark_spec, test):
     vms = vm_groups['server']
     # use GCP zonal internal DNS,
     # but maybe should add domain to vm's data attributes?
-    endpoints = ' '.join([
-        f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal'
-        for vm in vms
-    ])
+    endpoints = ' '.join(
+        [
+            f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal'
+            for vm in vms
+        ]
+    )
     _AddComputeMetadata(client, vms[0], metadata)
 
   if FLAGS.ch_network_throughput_https:
@@ -403,7 +466,8 @@ def _Run(benchmark_spec, test):
   save_command = posixpath.join(cloud_harmony_network.INSTALL_PATH, 'save.sh')
   client.RemoteCommand(f'{save_command} {outdir}')
   cloud_harmony_metadata = cloud_harmony_util.ParseCsvResultsIntoMetadata(
-      client, OUTPUT)
+      client, OUTPUT
+  )
   return ParseOutput(cloud_harmony_metadata)
 
 
@@ -416,9 +480,11 @@ def Run(benchmark_spec):
 def Cleanup(benchmark_spec):
   """Cleanup any artifacts left by the benchmark."""
   if FLAGS.ch_network_test_service_type != STORAGE or not hasattr(
-      benchmark_spec, 'service'):
+      benchmark_spec, 'service'
+  ):
     logging.info(
-        'Skipping cleanup as not needed or storage prepare method failed.')
+        'Skipping cleanup as not needed or storage prepare method failed.'
+    )
     return
   service = benchmark_spec.service
   bucket = benchmark_spec.bucket

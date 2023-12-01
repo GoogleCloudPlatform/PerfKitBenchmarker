@@ -25,7 +25,8 @@ from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import shoc_benchmark_suite
 
 flags.DEFINE_integer(
-    'stencil2d_iterations', 5, 'number of iterations to run', lower_bound=1)
+    'stencil2d_iterations', 5, 'number of iterations to run', lower_bound=1
+)
 
 flag_util.DEFINE_integerlist(
     'stencil2d_problem_sizes',
@@ -34,7 +35,9 @@ flag_util.DEFINE_integerlist(
     'number, like --stencil2d_problem_sizes=4096 '
     'or a list like --stencil2d_problem_sizes='
     '1024,4096',
-    on_nonincreasing=flag_util.IntegerListParser.WARN, module_name=__name__)
+    on_nonincreasing=flag_util.IntegerListParser.WARN,
+    module_name=__name__,
+)
 FLAGS = flags.FLAGS
 
 MACHINEFILE = 'machinefile'
@@ -97,19 +100,20 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   background_tasks.RunThreaded(_InstallAndAuthenticateVm, benchmark_spec.vms)
 
   master_vm = benchmark_spec.vms[0]
   benchmark_spec.num_gpus = nvidia_driver.QueryNumberOfGpus(master_vm)
-  hpc_util.CreateMachineFile(benchmark_spec.vms,
-                             lambda _: benchmark_spec.num_gpus,
-                             MACHINEFILE)
+  hpc_util.CreateMachineFile(
+      benchmark_spec.vms, lambda _: benchmark_spec.num_gpus, MACHINEFILE
+  )
 
 
-def _CreateMedianStencilOutputSample(stencil2d_output, sample_name, pretty_name,
-                                     metadata):
+def _CreateMedianStencilOutputSample(
+    stencil2d_output, sample_name, pretty_name, metadata
+):
   """Extract the specified sample from the stencil2d output.
 
   Args:
@@ -121,7 +125,6 @@ def _CreateMedianStencilOutputSample(stencil2d_output, sample_name, pretty_name,
   Returns:
     A sample.Sample with the name, pretty_name, containing the value and units
     as parsed from stencil2d_output, along with metadata.
-
   """
   results = [
       x for x in stencil2d_output.splitlines() if x.find(sample_name) != -1
@@ -155,8 +158,9 @@ def _MakeSamplesFromStencilOutput(stdout, metadata):
   return results
 
 
-def _RunSingleIteration(master_vm, problem_size, num_processes, num_iterations,
-                        metadata):
+def _RunSingleIteration(
+    master_vm, problem_size, num_processes, num_iterations, metadata
+):
   """Run a single iteration of Stencil2D and return a list of samples.
 
   Args:
@@ -169,13 +173,19 @@ def _RunSingleIteration(master_vm, problem_size, num_processes, num_iterations,
   Returns:
     A list of sample.Samples
   """
-  stencil2d_path = os.path.join(shoc_benchmark_suite.SHOC_BIN_DIR, 'TP', 'CUDA',
-                                'Stencil2D')
+  stencil2d_path = os.path.join(
+      shoc_benchmark_suite.SHOC_BIN_DIR, 'TP', 'CUDA', 'Stencil2D'
+  )
   current_problem_size = '%s,%s' % (problem_size, problem_size)
   run_as_root = '--allow-run-as-root' if FLAGS.mpirun_allow_run_as_root else ''
-  run_command = ('mpirun --hostfile %s -np %s %s %s --customSize %s -n %s' %
-                 (MACHINEFILE, num_processes, run_as_root, stencil2d_path,
-                  current_problem_size, num_iterations))
+  run_command = 'mpirun --hostfile %s -np %s %s %s --customSize %s -n %s' % (
+      MACHINEFILE,
+      num_processes,
+      run_as_root,
+      stencil2d_path,
+      current_problem_size,
+      num_iterations,
+  )
   metadata['run_command'] = run_command
   metadata['problem_size'] = current_problem_size
 
@@ -188,7 +198,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -210,8 +220,10 @@ def Run(benchmark_spec):
   results = []
   for problem_size in problem_sizes:
     results.extend(
-        _RunSingleIteration(master_vm, problem_size, num_processes,
-                            num_iterations, metadata))
+        _RunSingleIteration(
+            master_vm, problem_size, num_processes, num_iterations, metadata
+        )
+    )
   return results
 
 

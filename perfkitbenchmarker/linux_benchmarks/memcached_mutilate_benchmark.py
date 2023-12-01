@@ -47,23 +47,31 @@ FLAGS = flags.FLAGS
 
 
 _SERVER_VM_TYPE = flags.DEFINE_string(
-    'memcached_mutilate_server_machine_type', None,
+    'memcached_mutilate_server_machine_type',
+    None,
     'Machine type to use for the memcached server if different '
-    'from memcached client machine type.')
+    'from memcached client machine type.',
+)
 _CLIENT_VM_TYPE = flags.DEFINE_string(
-    'memcached_mutilate_client_machine_type', None,
+    'memcached_mutilate_client_machine_type',
+    None,
     'Machine type to use for the mutilate client if different '
-    'from memcached server machine type.')
+    'from memcached server machine type.',
+)
 _CLIENT_COUNT = flags.DEFINE_integer(
-    'memcached_mutilate_num_client_vms', 1,
+    'memcached_mutilate_num_client_vms',
+    1,
     'Number of mutilate client machines to use. '
-    'To run memcached/mutilate on same machine, set to 0.')
+    'To run memcached/mutilate on same machine, set to 0.',
+)
 _SMP = flags.DEFINE_boolean(
-    'set_smp_affinity', False,
-    'Manually set smp affinity.')
+    'set_smp_affinity', False, 'Manually set smp affinity.'
+)
 _NUM_INSTANCES = flags.DEFINE_integer(
-    'memcached_num_local_instances', 1,
-    'Number of memcached instancs to launch locally.')
+    'memcached_num_local_instances',
+    1,
+    'Number of memcached instancs to launch locally.',
+)
 
 BENCHMARK_NAME = 'memcached_mutilate'
 BENCHMARK_CONFIG = """
@@ -140,12 +148,13 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   clients = GetClients(benchmark_spec)
   server = benchmark_spec.vm_groups['server'][0]
   client_install_fns = [
-      functools.partial(vm.Install, 'mutilate') for vm in clients]
+      functools.partial(vm.Install, 'mutilate') for vm in clients
+  ]
   server_install_fns = [functools.partial(server.Install, 'memcached_server')]
   background_tasks.RunThreaded(
       lambda f: f(), client_install_fns + server_install_fns
@@ -157,7 +166,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample instances.
@@ -170,7 +179,8 @@ def Run(benchmark_spec):
   for idx in range(_NUM_INSTANCES.value):
     port = memcached_server.MEMCACHED_PORT + idx
     memcached_server.ConfigureAndStart(
-        server, port=port, smp_affinity=_SMP.value)
+        server, port=port, smp_affinity=_SMP.value
+    )
     mutilate.Load(clients[0], server_ip, port)
 
   metadata = {
@@ -178,11 +188,12 @@ def Run(benchmark_spec):
       'memcached_server_size': FLAGS.memcached_size_mb,
       'memcached_server_threads': FLAGS.memcached_num_threads,
       'memcached_local_instances': _NUM_INSTANCES.value,
-      'smp_affinity': _SMP.value
+      'smp_affinity': _SMP.value,
   }
 
-  samples = mutilate.Run(clients, server_ip, memcached_server.MEMCACHED_PORT,
-                         _NUM_INSTANCES.value)
+  samples = mutilate.Run(
+      clients, server_ip, memcached_server.MEMCACHED_PORT, _NUM_INSTANCES.value
+  )
   for sample in samples:
     sample.metadata.update(metadata)
 

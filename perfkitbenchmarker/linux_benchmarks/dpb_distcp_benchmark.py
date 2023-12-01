@@ -91,7 +91,6 @@ def GetConfig(user_config):
 def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
 
-
   Args:
     benchmark_config: Configu to validate.
 
@@ -101,8 +100,11 @@ def CheckPrerequisites(benchmark_config):
   """
   dpb_service_type = benchmark_config.dpb_service.service_type
   if dpb_service_type not in SUPPORTED_DPB_BACKENDS:
-    raise errors.Config.InvalidValue('Invalid backend for distcp. Not in:{}'.
-                                     format(str(SUPPORTED_DPB_BACKENDS)))
+    raise errors.Config.InvalidValue(
+        'Invalid backend for distcp. Not in:{}'.format(
+            str(SUPPORTED_DPB_BACKENDS)
+        )
+    )
 
 
 def Prepare(benchmark_spec):
@@ -128,7 +130,9 @@ def Run(benchmark_spec):
   else:
     raise errors.Config.InvalidValue(
         'Service type {} cannot use distcp_source_fs: {}'.format(
-            service.type, FLAGS.distcp_source_fs))
+            service.type, FLAGS.distcp_source_fs
+        )
+    )
 
   # Subdirectory TestDFSO writes data to
   source_data_dir = source_dir + 'io_data'
@@ -140,7 +144,9 @@ def Run(benchmark_spec):
   else:
     raise errors.Config.InvalidValue(
         'Service type {} cannot use distcp_dest_fs: {}'.format(
-            service.type, FLAGS.distcp_destination_fs))
+            service.type, FLAGS.distcp_destination_fs
+        )
+    )
 
   # Generate data to copy
   # TODO(saksena): Add a generic GenerateData method to dpb_service.
@@ -149,10 +155,12 @@ def Run(benchmark_spec):
       dpb_testdfsio_benchmark.WRITE,
       source_dir,
       FLAGS.distcp_num_files,
-      FLAGS.distcp_file_size_mbs)
+      FLAGS.distcp_file_size_mbs,
+  )
 
   result = benchmark_spec.dpb_service.DistributedCopy(
-      source_data_dir, destination_dir)
+      source_data_dir, destination_dir
+  )
 
   results = []
   metadata = copy.copy(benchmark_spec.dpb_service.GetResourceMetadata())
@@ -170,8 +178,9 @@ def Run(benchmark_spec):
     metadata.update({'region': 'aws_default'})
   service.metadata.update(metadata)
 
-  results.append(sample.Sample(
-      'run_time', result.run_time, 'seconds', metadata))
+  results.append(
+      sample.Sample('run_time', result.run_time, 'seconds', metadata)
+  )
   return results
 
 

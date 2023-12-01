@@ -21,7 +21,6 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 """
 
 import functools
-
 import time
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -31,18 +30,22 @@ from perfkitbenchmarker.linux_packages import ycsb
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('kubernetes_mongodb_cpu_request', '7.1',
-                    'CPU request of mongodb.')
-flags.DEFINE_string('kubernetes_mongodb_memory_request', '16Gi',
-                    'Memory request of mongodb.')
-flags.DEFINE_string('kubernetes_mongodb_disk_size', '200Gi',
-                    'Disk size used by mongodb')
+flags.DEFINE_string(
+    'kubernetes_mongodb_cpu_request', '7.1', 'CPU request of mongodb.'
+)
+flags.DEFINE_string(
+    'kubernetes_mongodb_memory_request', '16Gi', 'Memory request of mongodb.'
+)
+flags.DEFINE_string(
+    'kubernetes_mongodb_disk_size', '200Gi', 'Disk size used by mongodb'
+)
 # TODO(user): Use GetStorageClass function, once available.
 STORAGE_CLASS = flags.DEFINE_string(
     'kubernetes_mongodb_storage_class',
     None,
     'storageClassType of data disk. Defaults to provider specific storage '
-    'class.')
+    'class.',
+)
 
 BENCHMARK_NAME = 'kubernetes_mongodb'
 BENCHMARK_CONFIG = """
@@ -90,8 +93,9 @@ def GetConfig(user_config):
   """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
-    config['container_cluster']['nodepools']['mongodb']['vm_count'] = (
-        FLAGS.ycsb_client_vms)
+    config['container_cluster']['nodepools']['mongodb'][
+        'vm_count'
+    ] = FLAGS.ycsb_client_vms
   return config
 
 
@@ -101,8 +105,9 @@ def _PrepareClient(vm):
   # Disable logging for MongoDB driver, which is otherwise quite verbose.
   log_config = """<configuration><root level="WARN"/></configuration>"""
 
-  vm.RemoteCommand("echo '{0}' > {1}/logback.xml".format(
-      log_config, ycsb.YCSB_DIR))
+  vm.RemoteCommand(
+      "echo '{0}' > {1}/logback.xml".format(log_config, ycsb.YCSB_DIR)
+  )
 
 
 def _PrepareDeployment(benchmark_spec):
@@ -114,7 +119,8 @@ def _PrepareDeployment(benchmark_spec):
       cpu_request=FLAGS.kubernetes_mongodb_cpu_request,
       memory_request=FLAGS.kubernetes_mongodb_memory_request,
       disk_size=FLAGS.kubernetes_mongodb_disk_size,
-      storage_class=storage_class)
+      storage_class=storage_class,
+  )
   time.sleep(60)
 
   benchmark_spec.container_cluster.WaitForResource('pod/mongodb-0', 'Ready')
@@ -123,9 +129,11 @@ def _PrepareDeployment(benchmark_spec):
   benchmark_spec.container_cluster.LabelDisks()
 
   mongodb_cluster_ip = benchmark_spec.container_cluster.GetClusterIP(
-      'mongodb-service')
+      'mongodb-service'
+  )
   benchmark_spec.mongodb_url = 'mongodb://{ip_address}:27017/ycsb'.format(
-      ip_address=mongodb_cluster_ip)
+      ip_address=mongodb_cluster_ip
+  )
 
 
 def Prepare(benchmark_spec):

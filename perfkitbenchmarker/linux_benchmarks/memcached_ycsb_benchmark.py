@@ -33,32 +33,69 @@ from perfkitbenchmarker.providers.aws import aws_network
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_enum('memcached_managed', provider_info.GCP,
-                  [provider_info.GCP, provider_info.AWS],
-                  'Managed memcached provider (GCP/AWS) to use.')
+flags.DEFINE_enum(
+    'memcached_managed',
+    provider_info.GCP,
+    [provider_info.GCP, provider_info.AWS],
+    'Managed memcached provider (GCP/AWS) to use.',
+)
 
-flags.DEFINE_enum('memcached_scenario', 'custom',
-                  ['custom', 'managed'],
-                  'select one scenario to run: \n'
-                  'custom: Provision VMs and install memcached ourselves. \n'
-                  'managed: Use the specified provider\'s managed memcache.')
+flags.DEFINE_enum(
+    'memcached_scenario',
+    'custom',
+    ['custom', 'managed'],
+    'select one scenario to run: \n'
+    'custom: Provision VMs and install memcached ourselves. \n'
+    "managed: Use the specified provider's managed memcache.",
+)
 
-flags.DEFINE_enum('memcached_elasticache_region', 'us-west-1',
-                  ['ap-northeast-1', 'ap-northeast-2', 'ap-southeast-1',
-                   'ap-southeast-2', 'ap-south-1', 'cn-north-1', 'eu-central-1',
-                   'eu-west-1', 'us-gov-west-1', 'sa-east-1', 'us-east-1',
-                   'us-east-2', 'us-west-1', 'us-west-2'],
-                  'The region to use for AWS ElastiCache memcached servers.')
+flags.DEFINE_enum(
+    'memcached_elasticache_region',
+    'us-west-1',
+    [
+        'ap-northeast-1',
+        'ap-northeast-2',
+        'ap-southeast-1',
+        'ap-southeast-2',
+        'ap-south-1',
+        'cn-north-1',
+        'eu-central-1',
+        'eu-west-1',
+        'us-gov-west-1',
+        'sa-east-1',
+        'us-east-1',
+        'us-east-2',
+        'us-west-1',
+        'us-west-2',
+    ],
+    'The region to use for AWS ElastiCache memcached servers.',
+)
 
-flags.DEFINE_enum('memcached_elasticache_node_type', 'cache.m3.medium',
-                  ['cache.t2.micro', 'cache.t2.small', 'cache.t2.medium',
-                   'cache.m3.medium', 'cache.m3.large', 'cache.m3.xlarge',
-                   'cache.m3.2xlarge', 'cache.m4.large', 'cache.m4.xlarge',
-                   'cache.m4.2xlarge', 'cache.m4.4xlarge', 'cache.m4.10xlarge'],
-                  'The node type to use for AWS ElastiCache memcached servers.')
+flags.DEFINE_enum(
+    'memcached_elasticache_node_type',
+    'cache.m3.medium',
+    [
+        'cache.t2.micro',
+        'cache.t2.small',
+        'cache.t2.medium',
+        'cache.m3.medium',
+        'cache.m3.large',
+        'cache.m3.xlarge',
+        'cache.m3.2xlarge',
+        'cache.m4.large',
+        'cache.m4.xlarge',
+        'cache.m4.2xlarge',
+        'cache.m4.4xlarge',
+        'cache.m4.10xlarge',
+    ],
+    'The node type to use for AWS ElastiCache memcached servers.',
+)
 
-flags.DEFINE_integer('memcached_elasticache_num_servers', 1,
-                     'The number of memcached instances for AWS ElastiCache.')
+flags.DEFINE_integer(
+    'memcached_elasticache_num_servers',
+    1,
+    'The number of memcached instances for AWS ElastiCache.',
+)
 
 
 BENCHMARK_NAME = 'memcached_ycsb'
@@ -105,7 +142,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   clients = benchmark_spec.vm_groups['clients']
   assert clients, benchmark_spec.vm_groups
@@ -117,15 +154,18 @@ def Prepare(benchmark_spec):
     benchmark_spec.always_call_cleanup = True
 
     if FLAGS.memcached_managed == provider_info.GCP:
-      raise NotImplementedError("GCP managed memcached backend not implemented "
-                                "yet")
+      raise NotImplementedError(
+          'GCP managed memcached backend not implemented yet'
+      )
     elif FLAGS.memcached_managed == provider_info.AWS:
       cluster_id = 'pkb%s' % FLAGS.run_uri
       service = providers.aws.elasticache.ElastiCacheMemcacheService(
           aws_network.AwsNetwork.GetNetwork(clients[0]),
-          cluster_id, FLAGS.memcached_elasticache_region,
+          cluster_id,
+          FLAGS.memcached_elasticache_region,
           FLAGS.memcached_elasticache_node_type,
-          FLAGS.memcached_elasticache_num_servers)
+          FLAGS.memcached_elasticache_num_servers,
+      )
     service.Create()
     hosts = service.GetHosts()
     benchmark_spec.service = service
@@ -135,24 +175,28 @@ def Prepare(benchmark_spec):
     # Install memcached on all the servers
     servers = benchmark_spec.vm_groups['servers']
     assert servers, 'No memcached servers: {0}'.format(benchmark_spec.vm_groups)
-    memcached_install_fns = \
-        [functools.partial(memcached_server.ConfigureAndStart, vm)
-         for vm in servers]
+    memcached_install_fns = [
+        functools.partial(memcached_server.ConfigureAndStart, vm)
+        for vm in servers
+    ]
     background_tasks.RunThreaded(lambda f: f(), memcached_install_fns)
-    hosts = ['%s:%s' % (vm.internal_ip, memcached_server.MEMCACHED_PORT)
-             for vm in servers]
-    benchmark_spec.metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
-                               'ycsb_server_vms': len(servers),
-                               'cache_size': FLAGS.memcached_size_mb}
+    hosts = [
+        '%s:%s' % (vm.internal_ip, memcached_server.MEMCACHED_PORT)
+        for vm in servers
+    ]
+    benchmark_spec.metadata = {
+        'ycsb_client_vms': FLAGS.ycsb_client_vms,
+        'ycsb_server_vms': len(servers),
+        'cache_size': FLAGS.memcached_size_mb,
+    }
 
   assert len(hosts) > 0
 
-  ycsb_install_fns = [functools.partial(vm.Install, 'ycsb')
-                      for vm in clients]
+  ycsb_install_fns = [functools.partial(vm.Install, 'ycsb') for vm in clients]
   background_tasks.RunThreaded(lambda f: f(), ycsb_install_fns)
   benchmark_spec.executor = ycsb.YCSBExecutor(
-      'memcached',
-      **{'memcached.hosts': ','.join(hosts)})
+      'memcached', **{'memcached.hosts': ','.join(hosts)}
+  )
 
 
 def Run(benchmark_spec):
@@ -160,14 +204,16 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample instances.
   """
 
-  logging.info('Start benchmarking memcached service, scenario is %s.',
-               FLAGS.memcached_scenario)
+  logging.info(
+      'Start benchmarking memcached service, scenario is %s.',
+      FLAGS.memcached_scenario,
+  )
 
   clients = benchmark_spec.vm_groups['clients']
 
@@ -184,7 +230,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   if FLAGS.memcached_scenario == 'managed':
     service = benchmark_spec.service

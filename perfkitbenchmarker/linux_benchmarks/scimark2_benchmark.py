@@ -55,7 +55,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -68,7 +68,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -85,13 +85,15 @@ def Run(benchmark_spec):
   # RESULT_START_REGEX as used below.
   cmds = [
       '(echo ";;; Java small"; cd {0} && java -cp {1} {2})'.format(
-          scimark2.PATH, scimark2.JAVA_JAR, scimark2.JAVA_MAIN),
-      '(echo ";;; C small"; cd {0} && ./scimark2)'.format(
-          scimark2.C_SRC),
+          scimark2.PATH, scimark2.JAVA_JAR, scimark2.JAVA_MAIN
+      ),
+      '(echo ";;; C small"; cd {0} && ./scimark2)'.format(scimark2.C_SRC),
       '(echo ";;; Java large"; cd {0} && java -cp {1} {2} -large)'.format(
-          scimark2.PATH, scimark2.JAVA_JAR, scimark2.JAVA_MAIN),
+          scimark2.PATH, scimark2.JAVA_JAR, scimark2.JAVA_MAIN
+      ),
       '(echo ";;; C large"; cd {0} && ./scimark2 -large)'.format(
-          scimark2.C_SRC),
+          scimark2.C_SRC
+      ),
   ]
   for cmd in cmds:
     stdout, _ = vm.RemoteCommand(cmd)
@@ -145,37 +147,52 @@ def ParseResults(results):
     A list of sample.Sample objects.
   """
 
-  result_start_regex = re.compile(r"""
+  result_start_regex = re.compile(
+      r"""
     ^
     ;;; \s+ (\S+)  #1: Language ("C" or "Java")
     \s+ (\S+)  #2: Size ("small" or "large")
-  """, re.VERBOSE | re.MULTILINE)
+  """,
+      re.VERBOSE | re.MULTILINE,
+  )
 
-  score_regex = re.compile(r"""
+  score_regex = re.compile(
+      r"""
     ^ (Composite \s+ Score) : \s+ (\d+ \. \d+)
-  """, re.VERBOSE | re.MULTILINE)
+  """,
+      re.VERBOSE | re.MULTILINE,
+  )
 
-  result_regex_c = re.compile(r"""
+  result_regex_c = re.compile(
+      r"""
     ^
     ( .+? ) \s+  #1: Test name
     Mflops: \s+
     ( \d+ \. \d+ )  #2: Test score
     ( \s+ \( .+? \) )?  #3: Optional test details
-  """, re.VERBOSE | re.MULTILINE)
+  """,
+      re.VERBOSE | re.MULTILINE,
+  )
 
-  result_regex_java = re.compile(r"""
+  result_regex_java = re.compile(
+      r"""
     ^
     ( .+? )  #1: Test name
     : \s+
     ( \d+ \. \d+ )  #2: Test score
-  """, re.VERBOSE | re.MULTILINE)
+  """,
+      re.VERBOSE | re.MULTILINE,
+  )
 
-  platform_regex = re.compile(r"""
+  platform_regex = re.compile(
+      r"""
     ^
     ( \w+ \. \w+ )  #1: Property name
     : \s+
     ( .* )  #2: Property value
-  """, re.VERBOSE | re.MULTILINE)
+  """,
+      re.VERBOSE | re.MULTILINE,
+  )
 
   def FindBenchStart(results, start_index=0):
     m = result_start_regex.search(results, start_index)
@@ -223,7 +240,8 @@ def ParseResults(results):
   test_start_pos = 0
   while True:
     start_index, benchmark_language, benchmark_size = FindBenchStart(
-        results, test_start_pos)
+        results, test_start_pos
+    )
     if start_index == -1:
       break
     tests.append((start_index, benchmark_language, benchmark_size))
@@ -239,8 +257,10 @@ def ParseResults(results):
       end_index = tests[test_num + 1][0]
     result = results[start_index:end_index]
 
-    metadata = {'benchmark_language': benchmark_language,
-                'benchmark_size': benchmark_size}
+    metadata = {
+        'benchmark_language': benchmark_language,
+        'benchmark_size': benchmark_size,
+    }
 
     # Assume that the result consists of overall score followed by
     # specific scores and then platform metadata.
@@ -258,7 +278,8 @@ def ParseResults(results):
     # items. The overall score and platform data would match the
     # result regex.
     datapoints = ExtractResults(
-        result[score_end:meta_start], benchmark_language)
+        result[score_end:meta_start], benchmark_language
+    )
     for metric, value in datapoints:
       samples.append(sample.Sample(metric, value, 'Mflops', metadata))
 

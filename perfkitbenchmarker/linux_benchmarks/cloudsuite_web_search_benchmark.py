@@ -26,25 +26,35 @@ from perfkitbenchmarker.linux_packages import docker
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('cloudsuite_web_search_server_heap_size',
-                    '3g',
-                    'Java heap size for Solr server in the usual java format.')
-flags.DEFINE_integer('cloudsuite_web_search_ramp_up',
-                     90,
-                     'Benchmark ramp up time in seconds.',
-                     lower_bound=1)
-flags.DEFINE_integer('cloudsuite_web_search_ramp_down',
-                     60,
-                     'Benchmark ramp down time in seconds.',
-                     lower_bound=1)
-flags.DEFINE_integer('cloudsuite_web_search_steady_state',
-                     60,
-                     'Benchmark steady state time in seconds.',
-                     lower_bound=1)
-flags.DEFINE_integer('cloudsuite_web_search_scale',
-                     50,
-                     'Number of simulated web search users.',
-                     lower_bound=1)
+flags.DEFINE_string(
+    'cloudsuite_web_search_server_heap_size',
+    '3g',
+    'Java heap size for Solr server in the usual java format.',
+)
+flags.DEFINE_integer(
+    'cloudsuite_web_search_ramp_up',
+    90,
+    'Benchmark ramp up time in seconds.',
+    lower_bound=1,
+)
+flags.DEFINE_integer(
+    'cloudsuite_web_search_ramp_down',
+    60,
+    'Benchmark ramp down time in seconds.',
+    lower_bound=1,
+)
+flags.DEFINE_integer(
+    'cloudsuite_web_search_steady_state',
+    60,
+    'Benchmark steady state time in seconds.',
+    lower_bound=1,
+)
+flags.DEFINE_integer(
+    'cloudsuite_web_search_scale',
+    50,
+    'Number of simulated web search users.',
+    lower_bound=1,
+)
 
 BENCHMARK_NAME = 'cloudsuite_web_search'
 BENCHMARK_CONFIG = """
@@ -78,7 +88,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   servers = benchmark_spec.vm_groups['servers'][0]
   clients = benchmark_spec.vm_groups['clients']
@@ -89,8 +99,10 @@ def Prepare(benchmark_spec):
 
   def PrepareServer(vm):
     PrepareCommon(vm)
-    server_cmd = ('sudo echo \'DOCKER_OPTS="-g %s"\''
-                  '| sudo tee /etc/default/docker > /dev/null' % (DISK_PATH))
+    server_cmd = (
+        'sudo echo \'DOCKER_OPTS="-g %s"\''
+        '| sudo tee /etc/default/docker > /dev/null' % (DISK_PATH)
+    )
     stdout, _ = vm.RemoteCommand(server_cmd)
 
     server_cmd = 'sudo service docker restart'
@@ -98,9 +110,11 @@ def Prepare(benchmark_spec):
 
     vm.Install('cloudsuite/web-search:server')
 
-    server_cmd = ('sudo docker run -d --net host '
-                  '--name server cloudsuite/web-search:server %s 1' %
-                  (FLAGS.cloudsuite_web_search_server_heap_size))
+    server_cmd = (
+        'sudo docker run -d --net host '
+        '--name server cloudsuite/web-search:server %s 1'
+        % (FLAGS.cloudsuite_web_search_server_heap_size)
+    )
 
     stdout, _ = servers.RemoteCommand(server_cmd)
 
@@ -110,7 +124,7 @@ def Prepare(benchmark_spec):
 
   PrepareServer(servers)
 
-  target_arg_tuples = ([(PrepareClient, [vm], {}) for vm in clients])
+  target_arg_tuples = [(PrepareClient, [vm], {}) for vm in clients]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
@@ -119,7 +133,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -127,13 +141,17 @@ def Run(benchmark_spec):
   clients = benchmark_spec.vm_groups['clients'][0]
   servers = benchmark_spec.vm_groups['servers'][0]
 
-  benchmark_cmd = ('sudo docker run --rm --net host --name client '
-                   'cloudsuite/web-search:client %s %d %d %d %d ' %
-                   (servers.internal_ip,
-                    FLAGS.cloudsuite_web_search_scale,
-                    FLAGS.cloudsuite_web_search_ramp_up,
-                    FLAGS.cloudsuite_web_search_steady_state,
-                    FLAGS.cloudsuite_web_search_ramp_down))
+  benchmark_cmd = (
+      'sudo docker run --rm --net host --name client '
+      'cloudsuite/web-search:client %s %d %d %d %d '
+      % (
+          servers.internal_ip,
+          FLAGS.cloudsuite_web_search_scale,
+          FLAGS.cloudsuite_web_search_ramp_up,
+          FLAGS.cloudsuite_web_search_steady_state,
+          FLAGS.cloudsuite_web_search_ramp_down,
+      )
+  )
   stdout, _ = clients.RemoteCommand(benchmark_cmd)
 
   ops_per_sec = re.findall(r'\<metric unit="ops/sec"\>(\d+\.?\d*)', stdout)
@@ -144,8 +162,9 @@ def Run(benchmark_spec):
   num_p99 = float(p99[0])
 
   results = []
-  results.append(sample.Sample('Operations per second', num_ops_per_sec,
-                               'ops/s'))
+  results.append(
+      sample.Sample('Operations per second', num_ops_per_sec, 'ops/s')
+  )
   results.append(sample.Sample('90th percentile latency', num_p90, 's'))
   results.append(sample.Sample('99th percentile latency', num_p99, 's'))
   return results
@@ -156,7 +175,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   servers = benchmark_spec.vm_groups['servers'][0]
   clients = benchmark_spec.vm_groups['clients']
@@ -169,6 +188,9 @@ def Cleanup(benchmark_spec):
     vm.RemoteCommand('sudo docker stop server')
     vm.RemoteCommand('sudo docker rm server')
 
-  target_arg_tuples = ([(CleanupClient, [vm], {}) for vm in clients] +
-                       [(CleanupServer, [servers], {})])
+  target_arg_tuples = [(CleanupClient, [vm], {}) for vm in clients] + [(
+      CleanupServer,
+      [servers],
+      {},
+  )]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))

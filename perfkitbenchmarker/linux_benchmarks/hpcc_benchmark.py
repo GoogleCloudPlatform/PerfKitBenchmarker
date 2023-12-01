@@ -38,13 +38,13 @@ http://www.netlib.org/benchmark/hpl/faqs.html
 """
 
 
+import dataclasses
 import inspect
 import logging
 import math
 import re
 from typing import Any, Dict, List, Tuple
 from absl import flags
-import dataclasses
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
@@ -120,6 +120,7 @@ class HpccDimensions:
     u: 'U': whether the panel of rows U should be stored in transposed form.
     equilibration: whether to enable the equilibration phase.
   """
+
   problem_size: int
   block_size: int
   num_rows: int
@@ -143,61 +144,96 @@ L1_U_MAPPING = {True: 0, False: 1}
 EQUILIBRATION_MAPPING = {True: 1, False: 0}
 
 flags.DEFINE_integer(
-    'memory_size_mb', None,
+    'memory_size_mb',
+    None,
     'The amount of memory in MB on each machine to use. By '
-    'default it will use the entire system\'s memory.')
+    "default it will use the entire system's memory.",
+)
 flags.DEFINE_string(
-    'hpcc_binary', None,
+    'hpcc_binary',
+    None,
     'The path of prebuilt hpcc binary to use. If not provided, '
-    'this benchmark built its own using OpenBLAS.')
+    'this benchmark built its own using OpenBLAS.',
+)
 flags.DEFINE_list(
-    'hpcc_mpi_env', [], 'Comma separated list containing environment variables '
+    'hpcc_mpi_env',
+    [],
+    'Comma separated list containing environment variables '
     'to use with mpirun command. e.g. '
-    'MKL_DEBUG_CPU_TYPE=7,MKL_ENABLE_INSTRUCTIONS=AVX512')
+    'MKL_DEBUG_CPU_TYPE=7,MKL_ENABLE_INSTRUCTIONS=AVX512',
+)
 flags.DEFINE_float(
-    'hpcc_timeout_hours', 4,
+    'hpcc_timeout_hours',
+    4,
     'The number of hours to wait for the HPCC binary to '
-    'complete before timing out and assuming it failed.')
+    'complete before timing out and assuming it failed.',
+)
 flags.DEFINE_boolean(
-    'hpcc_numa_binding', False,
-    'If True, attempt numa binding with membind and cpunodebind.')
+    'hpcc_numa_binding',
+    False,
+    'If True, attempt numa binding with membind and cpunodebind.',
+)
 
 # HPL.dat configuration parameters
 CONFIG_PROBLEM_SIZE = flags.DEFINE_integer(
-    'hpcc_problem_size', None,
+    'hpcc_problem_size',
+    None,
     'Size of problems to solve.  Leave as None to run one single problem '
-    'whose size is based on the amount of memory.')
+    'whose size is based on the amount of memory.',
+)
 CONFIG_BLOCK_SIZE = flags.DEFINE_integer(
-    'hpcc_block_size', None,
-    'Block size.  Left as None to be based on the amount of memory.')
+    'hpcc_block_size',
+    None,
+    'Block size.  Left as None to be based on the amount of memory.',
+)
 CONFIG_DIMENSIONS = flags.DEFINE_string(
-    'hpcc_dimensions', None,
+    'hpcc_dimensions',
+    None,
     'Number of rows and columns in the array: "1,2" is 1 row, 2 columns. '
-    'Leave as None for computer to select based on number of CPUs.')
+    'Leave as None for computer to select based on number of CPUs.',
+)
 CONFIG_PFACTS = flags.DEFINE_enum(
-    'hpcc_pfacts', 'right', sorted(PFACT_RFACT_MAPPING),
-    'What type of matrix-vector operation based factorization to use.')
+    'hpcc_pfacts',
+    'right',
+    sorted(PFACT_RFACT_MAPPING),
+    'What type of matrix-vector operation based factorization to use.',
+)
 CONFIG_NBMINS = flags.DEFINE_integer(
-    'hpcc_nbmins', 4,
-    'The number of columns at which to stop panel factorization.')
+    'hpcc_nbmins',
+    4,
+    'The number of columns at which to stop panel factorization.',
+)
 CONFIG_RFACTS = flags.DEFINE_enum(
-    'hpcc_rfacts', 'crout', sorted(PFACT_RFACT_MAPPING),
-    'The type of recursive panel factorization to use.')
+    'hpcc_rfacts',
+    'crout',
+    sorted(PFACT_RFACT_MAPPING),
+    'The type of recursive panel factorization to use.',
+)
 CONFIG_BCASTS = flags.DEFINE_enum(
-    'hpcc_bcasts', '1rM', sorted(BCAST_MAPPING),
-    'The broadcast methodology to use on the current panel.')
+    'hpcc_bcasts',
+    '1rM',
+    sorted(BCAST_MAPPING),
+    'The broadcast methodology to use on the current panel.',
+)
 CONFIG_DEPTHS = flags.DEFINE_integer(
-    'hpcc_depths', 1, 'Look ahead depth. '
+    'hpcc_depths',
+    1,
+    'Look ahead depth. '
     '0: next panel is factorized after current completely finished. '
-    '1: next panel is immediately factorized after current is updated.')
-CONFIG_SWAP = flags.DEFINE_enum('hpcc_swap', 'mix', sorted(SWAP_MAPPING),
-                                'Swapping algorithm to use.')
+    '1: next panel is immediately factorized after current is updated.',
+)
+CONFIG_SWAP = flags.DEFINE_enum(
+    'hpcc_swap', 'mix', sorted(SWAP_MAPPING), 'Swapping algorithm to use.'
+)
 CONFIG_L1 = flags.DEFINE_boolean(
-    'hpcc_l1', True, 'Whether to store the upper triangle as transposed.')
-CONFIG_U = flags.DEFINE_boolean('hpcc_u', True,
-                                'Whether to store the U column as transposed.')
+    'hpcc_l1', True, 'Whether to store the upper triangle as transposed.'
+)
+CONFIG_U = flags.DEFINE_boolean(
+    'hpcc_u', True, 'Whether to store the U column as transposed.'
+)
 CONFIG_EQUILIBRATION = flags.DEFINE_boolean(
-    'hpcc_equilibration', True, 'Whether to enable the equilibration phase.')
+    'hpcc_equilibration', True, 'Whether to enable the equilibration phase.'
+)
 
 
 def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -216,25 +252,30 @@ def CheckPrerequisites(_) -> None:
     data.ResourcePath(FLAGS.hpcc_binary)
   if FLAGS.hpcc_numa_binding and FLAGS.num_vms > 1:
     raise errors.Setup.InvalidFlagConfigurationError(
-        'Numa binding with with multiple hpcc vm not supported.')
+        'Numa binding with with multiple hpcc vm not supported.'
+    )
   if CONFIG_DIMENSIONS.value:
     parts = CONFIG_DIMENSIONS.value.split(',')
     if len(parts) != 2:
       raise errors.Setup.InvalidFlagConfigurationError(
           'For --hpcc_dimensions must have two values like "1,2" '
-          f'not "{CONFIG_DIMENSIONS.value}"')
+          f'not "{CONFIG_DIMENSIONS.value}"'
+      )
     if not (parts[0].isnumeric() and parts[1].isnumeric()):
       raise errors.Setup.InvalidFlagConfigurationError(
           '--hpcc_dimensions must be integers like "1,2" not '
-          f'"{parts[0]},{parts[1]}"')
+          f'"{parts[0]},{parts[1]}"'
+      )
   if hpcc.USE_INTEL_COMPILED_HPL.value:
     if FLAGS.hpcc_benchmarks != ['HPL']:
       raise errors.Setup.InvalidFlagConfigurationError(
-          'Intel compiled HPCC can only run linpack (--hpcc_benchmarks=HPL)')
+          'Intel compiled HPCC can only run linpack (--hpcc_benchmarks=HPL)'
+      )
 
 
-def _CalculateHpccDimensions(num_vms: int, num_cpus: int,
-                             vm_memory_size_actual: int) -> HpccDimensions:
+def _CalculateHpccDimensions(
+    num_vms: int, num_cpus: int, vm_memory_size_actual: int
+) -> HpccDimensions:
   """Calculates the HPCC dimensions for the run."""
   if FLAGS.memory_size_mb:
     total_memory = FLAGS.memory_size_mb * 1024 * 1024 * num_vms
@@ -248,7 +289,7 @@ def _CalculateHpccDimensions(num_vms: int, num_cpus: int,
   else:
     # Finds a problem size that will fit in memory and is a multiple of the
     # block size.
-    base_problem_size = math.sqrt(total_memory * .1)
+    base_problem_size = math.sqrt(total_memory * 0.1)
     blocks = int(base_problem_size / block_size)
     blocks = blocks if (blocks % 2) == 0 else blocks - 1
     problem_size = block_size * blocks
@@ -281,20 +322,23 @@ def _CalculateHpccDimensions(num_vms: int, num_cpus: int,
       swap=SWAP_MAPPING[CONFIG_SWAP.value],
       l1=L1_U_MAPPING[CONFIG_L1.value],
       u=L1_U_MAPPING[CONFIG_U.value],
-      equilibration=EQUILIBRATION_MAPPING[CONFIG_EQUILIBRATION.value])
+      equilibration=EQUILIBRATION_MAPPING[CONFIG_EQUILIBRATION.value],
+  )
 
 
-def CreateHpccinf(vm: linux_vm.BaseLinuxVirtualMachine,
-                  benchmark_spec: bm_spec.BenchmarkSpec) -> HpccDimensions:
+def CreateHpccinf(
+    vm: linux_vm.BaseLinuxVirtualMachine, benchmark_spec: bm_spec.BenchmarkSpec
+) -> HpccDimensions:
   """Creates the HPCC input file."""
   dimensions = _CalculateHpccDimensions(
-      len(benchmark_spec.vms), vm.NumCpusForBenchmark(),
-      vm.total_free_memory_kb)
+      len(benchmark_spec.vms), vm.NumCpusForBenchmark(), vm.total_free_memory_kb
+  )
   vm.RemoteCommand(f'rm -f {HPCCINF_FILE}')
   vm.RenderTemplate(
       data.ResourcePath(LOCAL_HPCCINF_FILE),
       remote_path=HPCCINF_FILE,
-      context=dataclasses.asdict(dimensions))
+      context=dataclasses.asdict(dimensions),
+  )
   return dimensions
 
 
@@ -322,8 +366,10 @@ def PrepareBinaries(vms: List[linux_vm.BaseLinuxVirtualMachine]) -> None:
   )
 
 
-def _PrepareBinaries(headnode_vm: linux_vm.BaseLinuxVirtualMachine,
-                     vm: linux_vm.BaseLinuxVirtualMachine) -> None:
+def _PrepareBinaries(
+    headnode_vm: linux_vm.BaseLinuxVirtualMachine,
+    vm: linux_vm.BaseLinuxVirtualMachine,
+) -> None:
   """Prepares the binaries on the vm."""
   vm.Install('fortran')
   headnode_vm.MoveFile(vm, 'hpcc', 'hpcc')
@@ -430,9 +476,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   return samples
 
 
-def _AddCommonMetadata(samples: List[sample.Sample],
-                       benchmark_spec: bm_spec.BenchmarkSpec,
-                       dimensions: Dict[str, Any]) -> None:
+def _AddCommonMetadata(
+    samples: List[sample.Sample],
+    benchmark_spec: bm_spec.BenchmarkSpec,
+    dimensions: Dict[str, Any],
+) -> None:
   """Adds metadata common to all samples."""
   for item in samples:
     item.metadata.update(BaseMetadata())
@@ -441,17 +489,24 @@ def _AddCommonMetadata(samples: List[sample.Sample],
 
 
 def RunHpccSource(
-    vms: List[linux_vm.BaseLinuxVirtualMachine]) -> List[sample.Sample]:
+    vms: List[linux_vm.BaseLinuxVirtualMachine],
+) -> List[sample.Sample]:
   """Returns the parsed output from running the compiled from source HPCC."""
   headnode_vm = vms[0]
   # backup existing HPCC output, if any
-  headnode_vm.RemoteCommand(('if [ -f hpccoutf.txt ]; then '
-                             'mv hpccoutf.txt hpccoutf-$(date +%s).txt; '
-                             'fi'))
+  headnode_vm.RemoteCommand(
+      (
+          'if [ -f hpccoutf.txt ]; then '
+          'mv hpccoutf.txt hpccoutf-$(date +%s).txt; '
+          'fi'
+      )
+  )
   num_processes = len(vms) * headnode_vm.NumCpusForBenchmark()
   run_as_root = '--allow-run-as-root' if FLAGS.mpirun_allow_run_as_root else ''
-  mpi_flags = (f'-machinefile {MACHINEFILE} --mca orte_rsh_agent '
-               f'"ssh -o StrictHostKeyChecking=no" {run_as_root} {_MpiEnv()}')
+  mpi_flags = (
+      f'-machinefile {MACHINEFILE} --mca orte_rsh_agent '
+      f'"ssh -o StrictHostKeyChecking=no" {run_as_root} {_MpiEnv()}'
+  )
   mpi_cmd = 'mpirun '
   hpcc_exec = './hpcc'
   if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
@@ -463,16 +518,19 @@ def RunHpccSource(
     numa_map = numactl.GetNuma(headnode_vm)
     numa_hpcc_cmd = []
     for node, num_cpus in numa_map.items():
-      numa_hpcc_cmd.append(f'-np {num_cpus} {mpi_flags} '
-                           f'numactl --cpunodebind {node} '
-                           f'--membind {node} {hpcc_exec}')
+      numa_hpcc_cmd.append(
+          f'-np {num_cpus} {mpi_flags} '
+          f'numactl --cpunodebind {node} '
+          f'--membind {node} {hpcc_exec}'
+      )
     mpi_cmd += ' : '.join(numa_hpcc_cmd)
   else:
     mpi_cmd += f'-np {num_processes} {mpi_flags} {hpcc_exec}'
 
   headnode_vm.RobustRemoteCommand(
       f'ulimit -n 32768; {mpi_cmd}',
-      timeout=int(FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR))
+      timeout=int(FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR),
+  )
   logging.info('HPCC Results:')
   stdout, _ = headnode_vm.RemoteCommand('cat hpccoutf.txt')
   if stdout.startswith('HPL ERROR'):
@@ -519,8 +577,9 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     vm.RemoveFile('/usr/bin/orted')
 
 
-def RunIntelLinpack(vms: List[linux_vm.BaseLinuxVirtualMachine],
-                    dimensions: HpccDimensions) -> sample.Sample:
+def RunIntelLinpack(
+    vms: List[linux_vm.BaseLinuxVirtualMachine], dimensions: HpccDimensions
+) -> sample.Sample:
   """Returns the parsed output from running the Intel compiled HPCC.
 
   Unlike the compiled from source linpack run the Intel compiled linpack can
@@ -533,6 +592,7 @@ def RunIntelLinpack(vms: List[linux_vm.BaseLinuxVirtualMachine],
   Args:
     vms: List of VMs to run benchmark on.
     dimensions: The HPCC configuration.
+
   Returns: Sample of the HPL_Tflops for the run.
   """
   vm = vms[0]
@@ -543,7 +603,8 @@ def RunIntelLinpack(vms: List[linux_vm.BaseLinuxVirtualMachine],
   run_cmd_txt, _ = vm.RobustRemoteCommand(
       mpi_cmd,
       ignore_failure=True,
-      timeout=int(FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR))
+      timeout=int(FLAGS.hpcc_timeout_hours * SECONDS_PER_HOUR),
+  )
 
   file_text, _ = vm.RemoteCommand('cat HPL.out', ignore_failure=True)
   tflops, metadata = _ParseIntelLinpackStdout(run_cmd_txt)
@@ -562,8 +623,9 @@ def RunIntelLinpack(vms: List[linux_vm.BaseLinuxVirtualMachine],
   return sample.Sample('HPL_Tflops', tflops, 'Tflops/s', metadata)
 
 
-def _CreateIntelMpiRunCommand(vms: List[linux_vm.BaseLinuxVirtualMachine],
-                              dimensions: HpccDimensions) -> Tuple[str, int]:
+def _CreateIntelMpiRunCommand(
+    vms: List[linux_vm.BaseLinuxVirtualMachine], dimensions: HpccDimensions
+) -> Tuple[str, int]:
   """Creates the command to run HPL for Intel compiled linpack.
 
   Args:
@@ -576,11 +638,11 @@ def _CreateIntelMpiRunCommand(vms: List[linux_vm.BaseLinuxVirtualMachine],
   headnode = vms[0]
   # Create the file for mpirun to execute
   hpl_path = '/opt/intel/mkl/benchmarks/mp_linpack/xhpl_intel64_static'
-  bash_script = inspect.cleandoc(f'''
+  bash_script = inspect.cleandoc(f"""
   #!/bin/bash
   export HPL_HOST_NODE=$((PMI_RANK % {headnode.numa_node_count}))
   {hpl_path}
-  ''')
+  """)
   run_file = './hpl_run'
   for vm in vms:
     vm_util.CreateRemoteFile(vm, bash_script + '\n', run_file)
@@ -589,10 +651,12 @@ def _CreateIntelMpiRunCommand(vms: List[linux_vm.BaseLinuxVirtualMachine],
 
   num_processes = dimensions.num_rows * dimensions.num_columns
   hosts = ','.join([vm.internal_ip for vm in vms])
-  mpi_cmd = (f'{intelmpi.SourceMpiVarsCommand(headnode)}; '
-             'mpirun '
-             f'-perhost {headnode.numa_node_count} {_MpiEnv("-genv")} '
-             f'-np {num_processes} -host {hosts} {run_file}')
+  mpi_cmd = (
+      f'{intelmpi.SourceMpiVarsCommand(headnode)}; '
+      'mpirun '
+      f'-perhost {headnode.numa_node_count} {_MpiEnv("-genv")} '
+      f'-np {num_processes} -host {hosts} {run_file}'
+  )
   return mpi_cmd, num_processes
 
 
@@ -606,9 +670,17 @@ def _ParseIntelLinpackOutputFile(file_text: str) -> float:
   Args:
     file_text: The hpcc output file contents.
   """
-  line_re = re.compile(r'\s+'.join([
-      r'WR\S+', r'\d+', r'\d+', r'\d+', r'\d+', r'\d+\.\d+', r'([\d\.e\+\-]+)'
-  ]))
+  line_re = re.compile(
+      r'\s+'.join([
+          r'WR\S+',
+          r'\d+',
+          r'\d+',
+          r'\d+',
+          r'\d+',
+          r'\d+\.\d+',
+          r'([\d\.e\+\-]+)',
+      ])
+  )
   gflops = None
   for line in file_text.splitlines():
     match = line_re.match(line)
@@ -646,7 +718,9 @@ def _ParseIntelLinpackStdout(stdout: str) -> Tuple[float, Dict[str, float]]:
       r"""Column=\s*(?P<column>\d+)
         \s*Fraction=\s*(?P<fraction>[\d\.]+)
         \s*Kernel=\s*(?P<kernel>[\d\.]+)
-        \s*Mflops=\s*(?P<mflops>[\d\.]+)""", re.X)
+        \s*Mflops=\s*(?P<mflops>[\d\.]+)""",
+      re.X,
+  )
   fractions = []
   kernel_tflops = []
   tflops = []
@@ -655,7 +729,8 @@ def _ParseIntelLinpackStdout(stdout: str) -> Tuple[float, Dict[str, float]]:
     next(line_matches)  # first outputted values are artificially low
   except StopIteration:
     raise ValueError(
-        f'Could not find a line in stdout to match {line_re.pattern}: {stdout}')
+        f'Could not find a line in stdout to match {line_re.pattern}: {stdout}'
+    )
   for line_match in line_matches:
     fractions.append(float(line_match['fraction']))
     kernel_tflops.append(float(line_match['kernel']) / 1e6)
@@ -663,8 +738,9 @@ def _ParseIntelLinpackStdout(stdout: str) -> Tuple[float, Dict[str, float]]:
   if not tflops:
     raise ValueError('No metrics found in stdout')
   # Grab all the I_MPI* environment variables in debug output to put in metadata
-  intel_env_re = re.compile(r'(.*MPI startup.*?)?\s*'
-                            r'(?P<key>I_MPI[A-Z_\d]+)=(?P<value>.*)\s*')
+  intel_env_re = re.compile(
+      r'(.*MPI startup.*?)?\s*' r'(?P<key>I_MPI[A-Z_\d]+)=(?P<value>.*)\s*'
+  )
   env_vars = {row['key']: row['value'] for row in intel_env_re.finditer(stdout)}
   env_vars.pop('I_MPI_HYDRA_UUID', None)
   metadata = {
@@ -672,6 +748,6 @@ def _ParseIntelLinpackStdout(stdout: str) -> Tuple[float, Dict[str, float]]:
       'kernel_tflops': ','.join([str(x) for x in kernel_tflops]),
       'tflops': ','.join([str(x) for x in tflops]),
       'last_fraction_completed': fractions[-1],
-      'intel_mpi_env': vm_util.DictionaryToEnvString(env_vars, ';')
+      'intel_mpi_env': vm_util.DictionaryToEnvString(env_vars, ';'),
   }
   return tflops[-1], metadata

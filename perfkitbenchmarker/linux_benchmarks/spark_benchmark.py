@@ -76,17 +76,24 @@ spark:
 # This points to a file on the spark cluster.
 DEFAULT_CLASSNAME = 'org.apache.spark.examples.SparkPi'
 
-flags.DEFINE_string('spark_jarfile', None,
-                    'If none, use the spark sample jar.')
-flags.DEFINE_string('spark_classname', DEFAULT_CLASSNAME,
-                    'Classname to be used')
-flags.DEFINE_bool('spark_print_stdout', True, 'Print the standard '
-                  'output of the job')
-flags.DEFINE_list('spark_job_arguments', [], 'Arguments to be passed '
-                  'to the class given by spark_classname')
-flags.DEFINE_enum('spark_job_type', spark_service.SPARK_JOB_TYPE,
-                  [spark_service.SPARK_JOB_TYPE, spark_service.HADOOP_JOB_TYPE],
-                  'Type of the job to submit.')
+flags.DEFINE_string('spark_jarfile', None, 'If none, use the spark sample jar.')
+flags.DEFINE_string(
+    'spark_classname', DEFAULT_CLASSNAME, 'Classname to be used'
+)
+flags.DEFINE_bool(
+    'spark_print_stdout', True, 'Print the standard output of the job'
+)
+flags.DEFINE_list(
+    'spark_job_arguments',
+    [],
+    'Arguments to be passed to the class given by spark_classname',
+)
+flags.DEFINE_enum(
+    'spark_job_type',
+    spark_service.SPARK_JOB_TYPE,
+    [spark_service.SPARK_JOB_TYPE, spark_service.HADOOP_JOB_TYPE],
+    'Type of the job to submit.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -104,7 +111,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -114,53 +121,72 @@ def Run(benchmark_spec):
 
   stdout_path = None
   results = []
-  jarfile = (FLAGS.spark_jarfile or
-             spark_cluster.GetExampleJar(spark_service.SPARK_JOB_TYPE))
+  jarfile = FLAGS.spark_jarfile or spark_cluster.GetExampleJar(
+      spark_service.SPARK_JOB_TYPE
+  )
   try:
     if FLAGS.spark_print_stdout:
       # We need to get a name for a temporary file, so we create
       # a file, then close it, and use that path name.
-      stdout_file = tempfile.NamedTemporaryFile(suffix='.stdout',
-                                                prefix='spark_benchmark',
-                                                delete=False)
+      stdout_file = tempfile.NamedTemporaryFile(
+          suffix='.stdout', prefix='spark_benchmark', delete=False
+      )
       stdout_path = stdout_file.name
       stdout_file.close()
 
-    stats = spark_cluster.SubmitJob(jarfile,
-                                    FLAGS.spark_classname,
-                                    job_arguments=FLAGS.spark_job_arguments,
-                                    job_stdout_file=stdout_path,
-                                    job_type=FLAGS.spark_job_type)
+    stats = spark_cluster.SubmitJob(
+        jarfile,
+        FLAGS.spark_classname,
+        job_arguments=FLAGS.spark_job_arguments,
+        job_stdout_file=stdout_path,
+        job_type=FLAGS.spark_job_type,
+    )
     if not stats[spark_service.SUCCESS]:
-      raise Exception('Class {0} from jar {1} did not run'.format(
-          FLAGS.spark_classname, jarfile))
+      raise Exception(
+          'Class {0} from jar {1} did not run'.format(
+              FLAGS.spark_classname, jarfile
+          )
+      )
     jar_end = datetime.datetime.now()
     if stdout_path:
       with open(stdout_path, 'r') as f:
         logging.info('The output of the job is ' + f.read())
     metadata = spark_cluster.GetMetadata()
-    metadata.update({'jarfile': jarfile,
-                     'class': FLAGS.spark_classname,
-                     'job_arguments': str(FLAGS.spark_job_arguments),
-                     'print_stdout': str(FLAGS.spark_print_stdout)})
+    metadata.update({
+        'jarfile': jarfile,
+        'class': FLAGS.spark_classname,
+        'job_arguments': str(FLAGS.spark_job_arguments),
+        'print_stdout': str(FLAGS.spark_print_stdout),
+    })
 
-    results.append(sample.Sample('wall_time',
-                                 (jar_end - jar_start).total_seconds(),
-                                 'seconds', metadata))
+    results.append(
+        sample.Sample(
+            'wall_time',
+            (jar_end - jar_start).total_seconds(),
+            'seconds',
+            metadata,
+        )
+    )
     if spark_service.RUNTIME in stats:
-      results.append(sample.Sample('runtime',
-                                   stats[spark_service.RUNTIME],
-                                   'seconds', metadata))
+      results.append(
+          sample.Sample(
+              'runtime', stats[spark_service.RUNTIME], 'seconds', metadata
+          )
+      )
     if spark_service.WAITING in stats:
-      results.append(sample.Sample('pending_time',
-                                   stats[spark_service.WAITING],
-                                   'seconds', metadata))
+      results.append(
+          sample.Sample(
+              'pending_time', stats[spark_service.WAITING], 'seconds', metadata
+          )
+      )
 
     if not spark_cluster.user_managed:
-      create_time = (spark_cluster.resource_ready_time -
-                     spark_cluster.create_start_time)
-      results.append(sample.Sample('cluster_create_time', create_time,
-                                   'seconds', metadata))
+      create_time = (
+          spark_cluster.resource_ready_time - spark_cluster.create_start_time
+      )
+      results.append(
+          sample.Sample('cluster_create_time', create_time, 'seconds', metadata)
+      )
   finally:
     if stdout_path and os.path.isfile(stdout_path):
       os.remove(stdout_path)

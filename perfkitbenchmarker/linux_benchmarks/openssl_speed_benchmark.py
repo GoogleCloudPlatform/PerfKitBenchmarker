@@ -34,13 +34,19 @@ openssl_speed:
 
 FLAGS = flags.FLAGS
 _OPENSSL_SPEED_DURATION = flags.DEFINE_integer(
-    'openssl_speed_duration', 60, 'Duration of speed test in seconds.')
+    'openssl_speed_duration', 60, 'Duration of speed test in seconds.'
+)
 _OPENSSL_SPEED_ALGORITHM = flags.DEFINE_string(
-    'openssl_speed_algorithm', 'aes-256-ctr',
-    'Use the specified cipher or message digest algorithm.')
+    'openssl_speed_algorithm',
+    'aes-256-ctr',
+    'Use the specified cipher or message digest algorithm.',
+)
 _OPENSSL_SPEED_MULTI = flags.DEFINE_integer(
-    'openssl_speed_multi', None, 'Run multiple operations in parallel. '
-    'By default, equals to number of vCPUs available for benchmark.')
+    'openssl_speed_multi',
+    None,
+    'Run multiple operations in parallel. '
+    'By default, equals to number of vCPUs available for benchmark.',
+)
 # TODO(user): Support additional options.
 
 # Block sizes for encryption/decryption. Openssl speed loop through following
@@ -62,17 +68,23 @@ def ParseOpenSSLOutput(raw_result: str, version: str, parallelism: int):
   results = []
   for idx, blocksize in enumerate(BLOCKSIZES_IN_BYTES):
     value_unit_tuple = regex_util.ExtractExactlyOneMatch(
-        r'([\d\.]+)(\w+)', matches[idx])
+        r'([\d\.]+)(\w+)', matches[idx]
+    )
     metadata = {
         'duration': _OPENSSL_SPEED_DURATION.value,
         'algorithm': _OPENSSL_SPEED_ALGORITHM.value,
         'parallelism': parallelism,
         'version': version,
-        'blocksize': blocksize
+        'blocksize': blocksize,
     }
     results.append(
-        sample.Sample('Throughput', float(value_unit_tuple[0]),
-                      value_unit_tuple[1], metadata))
+        sample.Sample(
+            'Throughput',
+            float(value_unit_tuple[0]),
+            value_unit_tuple[1],
+            metadata,
+        )
+    )
   return results
 
 
@@ -98,10 +110,12 @@ def Run(benchmark_spec):
   stderr, _ = vm.RemoteCommand('openssl version')
   version = regex_util.ExtractGroup(r'OpenSSL\s+([\w\.]+)\s+', stderr)
   parallelism = _OPENSSL_SPEED_MULTI.value or vm.NumCpusForBenchmark()
-  raw_result, _ = vm.RemoteCommand('openssl speed -elapsed '
-                                   f'-seconds {_OPENSSL_SPEED_DURATION.value} '
-                                   f'-evp {_OPENSSL_SPEED_ALGORITHM.value} '
-                                   f'-multi {parallelism}')
+  raw_result, _ = vm.RemoteCommand(
+      'openssl speed -elapsed '
+      f'-seconds {_OPENSSL_SPEED_DURATION.value} '
+      f'-evp {_OPENSSL_SPEED_ALGORITHM.value} '
+      f'-multi {parallelism}'
+  )
 
   return ParseOpenSSLOutput(raw_result, version, parallelism)
 

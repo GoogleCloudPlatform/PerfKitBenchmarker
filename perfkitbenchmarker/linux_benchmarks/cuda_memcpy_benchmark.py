@@ -28,22 +28,32 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
 _MEMORY = flags.DEFINE_enum(
-    'cuda_memcpy_memory', 'pinned', ['pageable', 'pinned'],
+    'cuda_memcpy_memory',
+    'pinned',
+    ['pageable', 'pinned'],
     'Specify which memory mode to use. pageable memory or non-pageable system '
-    'memory.')
+    'memory.',
+)
 _MODE = flags.DEFINE_enum(
-    'cuda_memcpy_mode', 'quick', ['quick', 'shamoo'],
+    'cuda_memcpy_mode',
+    'quick',
+    ['quick', 'shamoo'],
     'Specify the mode to use. performs a quick measurement, or measures a '
     'user-specified range of values, or performs an intense shmoo of a large '
-    'range of values.')
+    'range of values.',
+)
 _HTOD = flags.DEFINE_boolean(
-    'cuda_memcpy_htod', True, 'Measure host to device transfers.')
+    'cuda_memcpy_htod', True, 'Measure host to device transfers.'
+)
 _DTOH = flags.DEFINE_boolean(
-    'cuda_memcpy_dtoh', True, 'Measure device to host transfers.')
+    'cuda_memcpy_dtoh', True, 'Measure device to host transfers.'
+)
 _DTOD = flags.DEFINE_boolean(
-    'cuda_memcpy_dtod', True, 'Measure device to device transfers.')
+    'cuda_memcpy_dtod', True, 'Measure device to device transfers.'
+)
 _WC = flags.DEFINE_boolean(
-    'cuda_memcpy_wc', False, 'Allocate pinned memory as write-combined.')
+    'cuda_memcpy_wc', False, 'Allocate pinned memory as write-combined.'
+)
 
 
 FLAGS = flags.FLAGS
@@ -109,7 +119,8 @@ def _MetadataFromFlags() -> Dict[str, Any]:
 
 
 def _CollectGpuSamples(
-    vm: virtual_machine.BaseVirtualMachine) -> List[sample.Sample]:
+    vm: virtual_machine.BaseVirtualMachine,
+) -> List[sample.Sample]:
   """Run CUDA memcpy on the cluster.
 
   Args:
@@ -123,8 +134,12 @@ def _CollectGpuSamples(
   global_metadata = _MetadataFromFlags()
   global_metadata.update(cuda_toolkit.GetMetadata(vm))
 
-  global_cmd = [cuda_samples.GetBandwidthTestPath(vm), '--csv',
-                f'--memory={_MEMORY.value}', f'--mode={_MODE.value}']
+  global_cmd = [
+      cuda_samples.GetBandwidthTestPath(vm),
+      '--csv',
+      f'--memory={_MEMORY.value}',
+      f'--mode={_MODE.value}',
+  ]
   if _HTOD.value:
     global_cmd.append('--htod')
   if _DTOH.value:
@@ -140,7 +155,8 @@ def _CollectGpuSamples(
   for device in devices:
     cmd = ' '.join(global_cmd + [f'--device={device}'])
     stdout, stderr, exit_code = vm.RemoteCommandWithReturnCode(
-        cmd, ignore_failure=True)
+        cmd, ignore_failure=True
+    )
     if exit_code:
       logging.warning('Error with getting GPU stats: %s', stderr)
       continue
@@ -149,7 +165,9 @@ def _CollectGpuSamples(
         r'Bandwidth = ([\d\.]+) (\S+), '
         r'Time = ([\d\.]+) s, '
         r'Size = (\d+) bytes, '
-        r'NumDevsUsed = (\d+)', stdout)
+        r'NumDevsUsed = (\d+)',
+        stdout,
+    )
 
     for metric, bandwidth, unit, time, size, num_devs_used in results:
       metadata = {
@@ -160,8 +178,7 @@ def _CollectGpuSamples(
           'command': cmd,
       }
       metadata.update(global_metadata)
-      samples.append(
-          sample.Sample(metric, float(bandwidth), unit, metadata))
+      samples.append(sample.Sample(metric, float(bandwidth), unit, metadata))
   return samples
 
 
@@ -170,15 +187,16 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       lambda vm: vm.InstallPackages('freeglut3-dev'), bm_spec.vms
   )
   sample_lists = background_tasks.RunThreaded(_CollectGpuSamples, bm_spec.vms)
-  return (functools.reduce(lambda a, b: a + b, sample_lists) if sample_lists
-          else [])
+  return (
+      functools.reduce(lambda a, b: a + b, sample_lists) if sample_lists else []
+  )
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   """Cleanup CUDA memcpy on the cluster.
 
   Args:
-    bm_spec: The benchmark specification. Contains all data that
-      is required to run the benchmark.
+    bm_spec: The benchmark specification. Contains all data that is required to
+      run the benchmark.
   """
   del bm_spec

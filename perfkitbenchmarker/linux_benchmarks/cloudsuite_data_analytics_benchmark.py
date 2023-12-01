@@ -54,7 +54,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-    required to run the benchmark.
+      required to run the benchmark.
   """
   master = benchmark_spec.vm_groups['master'][0]
   slaves = benchmark_spec.vm_groups['slaves']
@@ -66,17 +66,24 @@ def Prepare(benchmark_spec):
   def PrepareMaster(vm):
     PrepareCommon(vm)
     vm.RemoteCommand('sudo docker pull cloudsuite/data-analytics')
-    vm.RemoteCommand('sudo docker run -d --name master --net host '
-                     'cloudsuite/data-analytics master')
+    vm.RemoteCommand(
+        'sudo docker run -d --name master --net host '
+        'cloudsuite/data-analytics master'
+    )
 
   def PrepareSlave(vm):
     PrepareCommon(vm)
     vm.RemoteCommand('sudo docker pull cloudsuite/hadoop')
-    vm.RemoteCommand('sudo docker run -d --name slave --net host '
-                     'cloudsuite/hadoop slave %s' % master.internal_ip)
+    vm.RemoteCommand(
+        'sudo docker run -d --name slave --net host cloudsuite/hadoop slave %s'
+        % master.internal_ip
+    )
 
-  target_arg_tuples = ([(PrepareSlave, [vm], {}) for vm in slaves] +
-                       [(PrepareMaster, [master], {})])
+  target_arg_tuples = [(PrepareSlave, [vm], {}) for vm in slaves] + [(
+      PrepareMaster,
+      [master],
+      {},
+  )]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
@@ -85,7 +92,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-    required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -99,8 +106,9 @@ def Run(benchmark_spec):
   if len(matches) != 1:
     raise errors.Benchmark.RunError('Expected to find benchmark runtime')
 
-  results.append(sample.Sample('Benchmark runtime', float(matches[0]) / 1000,
-                               'seconds'))
+  results.append(
+      sample.Sample('Benchmark runtime', float(matches[0]) / 1000, 'seconds')
+  )
   return results
 
 
@@ -109,7 +117,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-    required to run the benchmark.
+      required to run the benchmark.
   """
   master = benchmark_spec.vm_groups['master'][0]
   slaves = benchmark_spec.vm_groups['slaves']
@@ -124,6 +132,9 @@ def Cleanup(benchmark_spec):
     vm.RemoteCommand('sudo docker rm slave')
     vm.RemoteCommand('sudo docker rmi cloudsuite/hadoop')
 
-  target_arg_tuples = ([(CleanupSlave, [vm], {}) for vm in slaves] +
-                       [(CleanupMaster, [master], {})])
+  target_arg_tuples = [(CleanupSlave, [vm], {}) for vm in slaves] + [(
+      CleanupMaster,
+      [master],
+      {},
+  )]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))

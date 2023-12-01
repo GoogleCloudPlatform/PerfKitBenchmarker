@@ -127,7 +127,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   metadata['command'] = ' '.join(cmd)
 
   stdout, stderr, exit_code = vm.RemoteCommandWithReturnCode(
-      metadata['command'], ignore_failure=True)
+      metadata['command'], ignore_failure=True
+  )
   if exit_code:
     logging.warning('Error with getting XGBoost stats: %s', stderr)
   training_time = regex_util.ExtractFloat(
@@ -140,7 +141,7 @@ def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   """Cleanup XGBoost on the cluster.
 
   Args:
-    bm_spec: The benchmark specification. Contains all data that
-      is required to run the benchmark.
+    bm_spec: The benchmark specification. Contains all data that is required to
+      run the benchmark.
   """
   del bm_spec

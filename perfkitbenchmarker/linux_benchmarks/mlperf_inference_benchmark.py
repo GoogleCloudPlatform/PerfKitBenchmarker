@@ -163,15 +163,18 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     vm.Install('nvidia_driver')
     vm.Install('nvidia_docker')
 
-  bm_spec.env_cmd = (f'export MLPERF_SCRATCH_PATH={_MLPERF_SCRATCH_PATH} && '
-                     f'cd {repository}/closed/NVIDIA')
+  bm_spec.env_cmd = (
+      f'export MLPERF_SCRATCH_PATH={_MLPERF_SCRATCH_PATH} && '
+      f'cd {repository}/closed/NVIDIA'
+  )
   docker.AddUser(vm)
   vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
       'make build_docker NO_BUILD=1 && '
       'make docker_add_user && '
       'make launch_docker DOCKER_COMMAND="make clean" && '
-      'make launch_docker DOCKER_COMMAND="make link_dirs"')
+      'make launch_docker DOCKER_COMMAND="make link_dirs"'
+  )
   if benchmark == mlperf_benchmark.DLRM:
     # Download data
     data_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'data', _DLRM_DATA_MODULE)
@@ -182,23 +185,25 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     # Download model
     model_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'models', benchmark)
     vm.DownloadPreprovisionedData(model_dir, benchmark, _DLRM_MODEL)
-    vm.RemoteCommand(f'cd {model_dir} && '
-                     f'tar -zxvf {_DLRM_MODEL} && '
-                     f'rm -f {_DLRM_MODEL}')
+    vm.RemoteCommand(
+        f'cd {model_dir} && tar -zxvf {_DLRM_MODEL} && rm -f {_DLRM_MODEL}'
+    )
     # tb00_40M.pt is 89.5 GB. Set timeout to 4 hours.
     vm.DownloadPreprovisionedData(model_dir, benchmark, _DLRM_ROW_FREQ, 14400)
 
     # Preprocess Data
-    preprocessed_data_dir = posixpath.join(_MLPERF_SCRATCH_PATH,
-                                           'preprocessed_data',
-                                           _DLRM_DATA_MODULE)
+    preprocessed_data_dir = posixpath.join(
+        _MLPERF_SCRATCH_PATH, 'preprocessed_data', _DLRM_DATA_MODULE
+    )
     # full_recalib.tar.gz is 7.9 GB. Set timeout to 1 hour.
     vm.DownloadPreprovisionedData(
         preprocessed_data_dir, _DLRM_DATA_MODULE, _DLRM_PREPROCESSED_DATA, 3600
     )
-    vm.RemoteCommand(f'cd {preprocessed_data_dir} && '
-                     f'tar -zxvf {_DLRM_PREPROCESSED_DATA} && '
-                     f'rm -f {_DLRM_PREPROCESSED_DATA}')
+    vm.RemoteCommand(
+        f'cd {preprocessed_data_dir} && '
+        f'tar -zxvf {_DLRM_PREPROCESSED_DATA} && '
+        f'rm -f {_DLRM_PREPROCESSED_DATA}'
+    )
   elif benchmark == mlperf_benchmark.BERT:
     # Download data
     data_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'data', 'squad')
@@ -207,33 +212,40 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     # Download model
     model_dir = posixpath.join(_MLPERF_SCRATCH_PATH, 'models', benchmark)
     vm.DownloadPreprovisionedData(model_dir, benchmark, 'bert_large_v1_1.onnx')
-    vm.DownloadPreprovisionedData(model_dir, benchmark,
-                                  'bert_large_v1_1_fake_quant.onnx')
+    vm.DownloadPreprovisionedData(
+        model_dir, benchmark, 'bert_large_v1_1_fake_quant.onnx'
+    )
     vm.DownloadPreprovisionedData(model_dir, benchmark, 'vocab.txt')
 
     # Preprocess Data
-    preprocessed_data_dir = posixpath.join(_MLPERF_SCRATCH_PATH,
-                                           'preprocessed_data',
-                                           'squad_tokenized')
-    vm.DownloadPreprovisionedData(preprocessed_data_dir, benchmark,
-                                  'input_ids.npy')
-    vm.DownloadPreprovisionedData(preprocessed_data_dir, benchmark,
-                                  'input_mask.npy')
-    vm.DownloadPreprovisionedData(preprocessed_data_dir, benchmark,
-                                  'segment_ids.npy')
+    preprocessed_data_dir = posixpath.join(
+        _MLPERF_SCRATCH_PATH, 'preprocessed_data', 'squad_tokenized'
+    )
+    vm.DownloadPreprovisionedData(
+        preprocessed_data_dir, benchmark, 'input_ids.npy'
+    )
+    vm.DownloadPreprovisionedData(
+        preprocessed_data_dir, benchmark, 'input_mask.npy'
+    )
+    vm.DownloadPreprovisionedData(
+        preprocessed_data_dir, benchmark, 'segment_ids.npy'
+    )
   else:
     vm.RobustRemoteCommand(
         f'{bm_spec.env_cmd} && '
         'make launch_docker DOCKER_COMMAND='
-        f'"make download_data BENCHMARKS={benchmark}"')
+        f'"make download_data BENCHMARKS={benchmark}"'
+    )
     vm.RobustRemoteCommand(
         f'{bm_spec.env_cmd} && '
         'make launch_docker DOCKER_COMMAND='
-        f'"make download_model BENCHMARKS={benchmark}"')
+        f'"make download_model BENCHMARKS={benchmark}"'
+    )
     vm.RobustRemoteCommand(
         f'{bm_spec.env_cmd} && '
         'make launch_docker DOCKER_COMMAND='
-        f'"make preprocess_data BENCHMARKS={benchmark}"')
+        f'"make preprocess_data BENCHMARKS={benchmark}"'
+    )
 
   vm.RobustRemoteCommand(
       f'{bm_spec.env_cmd} && '
@@ -242,11 +254,13 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       'make launch_docker DOCKER_COMMAND='
       '"make run RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} --fast\'"')
+      f'--scenarios={_SCENARIOS.value} --fast\'"'
+  )
 
 
 def _CreateMetadataDict(
-    bm_spec: benchmark_spec.BenchmarkSpec) -> Dict[str, Any]:
+    bm_spec: benchmark_spec.BenchmarkSpec,
+) -> Dict[str, Any]:
   """Creates metadata dict to be used in run results.
 
   Args:
@@ -272,13 +286,15 @@ def _CreateMetadataDict(
   return metadata
 
 
-def MakePerformanceSamplesFromOutput(base_metadata: Dict[str, Any],
-                                     output: str) -> List[sample.Sample]:
+def MakePerformanceSamplesFromOutput(
+    base_metadata: Dict[str, Any], output: str
+) -> List[sample.Sample]:
   """Creates performance samples containing metrics.
 
   Args:
     base_metadata: dict contains all the metadata that reports.
     output: string, command output
+
   Example output:
     perfkitbenchmarker/tests/linux_benchmarks/mlperf_inference_benchmark_test.py
 
@@ -324,7 +340,8 @@ def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
-      f'--scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly --fast\'"')
+      f'--scenarios={_SCENARIOS.value} --test_mode=PerformanceOnly --fast\'"'
+  )
   if _SCENARIOS.value == SERVER:
     return VALID in stdout
   elif _SCENARIOS.value == OFFLINE:
@@ -350,7 +367,8 @@ def _LastRunResults(bm_spec: benchmark_spec.BenchmarkSpec) -> str:
 
 
 def _FindStartingQps(
-    bm_spec: benchmark_spec.BenchmarkSpec) -> Tuple[float, float]:
+    bm_spec: benchmark_spec.BenchmarkSpec,
+) -> Tuple[float, float]:
   """Finds the QPS range to search.
 
   Args:
@@ -366,8 +384,9 @@ def _FindStartingQps(
     if _Run(bm_spec, falling_qps):
       passing_qps, falling_qps = falling_qps, falling_qps * 10
     else:
-      logging.info('Lower QPS is %s and upper QPS is %s', passing_qps,
-                   falling_qps)
+      logging.info(
+          'Lower QPS is %s and upper QPS is %s', passing_qps, falling_qps
+      )
       return passing_qps, falling_qps
 
 

@@ -33,10 +33,8 @@ export PATH="$(echo ~)/helm-v%HELM_VERSION/linux-amd64:$PATH”
 
 
 import functools
-
 from typing import Any, Dict
 from absl import flags
-
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -85,13 +83,15 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   if FLAGS.memcached_memtier_client_machine_type:
     vm_spec = config['container_cluster']['nodepools']['clients']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = (
-          FLAGS.memcached_memtier_client_machine_type)
+      vm_spec[cloud][
+          'machine_type'
+      ] = FLAGS.memcached_memtier_client_machine_type
   if FLAGS.memcached_memtier_server_machine_type:
     vm_spec = config['container_cluster']['nodepools']['memcached']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = (
-          FLAGS.memcached_memtier_server_machine_type)
+      vm_spec[cloud][
+          'machine_type'
+      ] = FLAGS.memcached_memtier_server_machine_type
   return config
 
 
@@ -132,7 +132,7 @@ def _PrepareCluster() -> None:
       cwd=vm_util.GetTempDir(),
   )
 
-# Waiting for replica to be created
+  # Waiting for replica to be created
   vm_util.IssueCommand(
       [
           'kubectl',
@@ -151,9 +151,9 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   """Install Memcached on K8s cluster and memtier_benchmark on client VMs."""
   client_vms = bm_spec.vm_groups['clients']
   # Install Memtier and Memcached on the cluster
-  prepare_fns = (
-      [functools.partial(_PrepareCluster)] +
-      [functools.partial(vm.Install, 'memtier') for vm in client_vms])
+  prepare_fns = [functools.partial(_PrepareCluster)] + [
+      functools.partial(vm.Install, 'memtier') for vm in client_vms
+  ]
 
   background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
@@ -162,8 +162,8 @@ def Run(bm_spec: _BenchmarkSpec):
   """Runs memtier against memcached and gathers the results.
 
   Args:
-    bm_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+    bm_spec: The benchmark specification. Contains all data that is required to
+      run the benchmark.
 
   Returns:
     A list of sample.Sample instances.
@@ -173,11 +173,12 @@ def Run(bm_spec: _BenchmarkSpec):
   server_ip = bm_spec.container_cluster.GetPodIpsByLabel('app', 'memcached')[0]
   metadata = {
       'memcached_server_size': FLAGS.memcached_size_mb,
-      'memcached_server_threads': FLAGS.memcached_num_threads
+      'memcached_server_threads': FLAGS.memcached_num_threads,
   }
 
   samples = memtier.RunOverAllThreadsPipelinesAndClients(
-      [client], server_ip, [memcached_port])
+      [client], server_ip, [memcached_port]
+  )
   for sample in samples:
     sample.metadata.update(metadata)
   return samples

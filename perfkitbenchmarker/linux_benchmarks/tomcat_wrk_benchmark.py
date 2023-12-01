@@ -39,17 +39,26 @@ import six
 import six.moves.urllib.parse
 
 
-flags.DEFINE_integer('tomcat_wrk_test_length', 120,
-                     'Length of time, in seconds, to run wrk for each '
-                     'connction count', lower_bound=1)
-flags.DEFINE_integer('tomcat_wrk_max_connections', 128,
-                     'Maximum number of simultaneous connections to attempt',
-                     lower_bound=1)
-flags.DEFINE_boolean('tomcat_wrk_report_all_samples', False,
-                     'If true, report throughput/latency at all connection '
-                     'counts. If false (the default), report only the '
-                     'connection counts with lowest p50 latency and highest '
-                     'throughput.')
+flags.DEFINE_integer(
+    'tomcat_wrk_test_length',
+    120,
+    'Length of time, in seconds, to run wrk for each connction count',
+    lower_bound=1,
+)
+flags.DEFINE_integer(
+    'tomcat_wrk_max_connections',
+    128,
+    'Maximum number of simultaneous connections to attempt',
+    lower_bound=1,
+)
+flags.DEFINE_boolean(
+    'tomcat_wrk_report_all_samples',
+    False,
+    'If true, report throughput/latency at all connection '
+    'counts. If false (the default), report only the '
+    'connection counts with lowest p50 latency and highest '
+    'throughput.',
+)
 
 # Stop when >= 1% of requests have errors
 MAX_ERROR_RATE = 0.01
@@ -79,9 +88,11 @@ def GetConfig(user_config):
 
 
 def _IncreaseMaxOpenFiles(vm):
-  vm.RemoteCommand(('echo "{0} soft nofile {1}\n{0} hard nofile {1}" | '
-                    'sudo tee {2}').format(vm.user_name, MAX_OPEN_FILES,
-                                           NOFILE_LIMIT_CONF))
+  vm.RemoteCommand(
+      ('echo "{0} soft nofile {1}\n{0} hard nofile {1}" | sudo tee {2}').format(
+          vm.user_name, MAX_OPEN_FILES, NOFILE_LIMIT_CONF
+      )
+  )
 
 
 def _RemoveOpenFileLimit(vm):
@@ -107,7 +118,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   tomcat_vm = benchmark_spec.vm_groups['server'][0]
   wrk_vm = benchmark_spec.vm_groups['client'][0]
@@ -128,7 +139,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -143,9 +154,9 @@ def Run(benchmark_spec):
   max_connections = FLAGS.tomcat_wrk_max_connections
 
   target = six.moves.urllib.parse.urljoin(
-      'http://{0}:{1}'.format(tomcat_vm.ip_address,
-                              tomcat.TOMCAT_HTTP_PORT),
-      SAMPLE_PAGE_PATH)
+      'http://{0}:{1}'.format(tomcat_vm.ip_address, tomcat.TOMCAT_HTTP_PORT),
+      SAMPLE_PAGE_PATH,
+  )
 
   logging.info('Warming up for %ds', WARM_UP_DURATION)
   list(wrk.Run(wrk_vm, connections=1, target=target, duration=WARM_UP_DURATION))
@@ -153,16 +164,18 @@ def Run(benchmark_spec):
   all_by_metric = []
 
   while connections <= max_connections:
-    run_samples = list(wrk.Run(wrk_vm, connections=connections, target=target,
-                               duration=duration))
+    run_samples = list(
+        wrk.Run(
+            wrk_vm, connections=connections, target=target, duration=duration
+        )
+    )
 
     by_metric = {i.metric: i for i in run_samples}
     errors = by_metric['errors'].value
     requests = by_metric['requests'].value
     throughput = by_metric['throughput'].value
     if requests < 1:
-      logging.warn('No requests issued for %d connections.',
-                   connections)
+      logging.warning('No requests issued for %d connections.', connections)
       error_rate = 1.0
     else:
       error_rate = float(errors) / requests
@@ -170,11 +183,16 @@ def Run(benchmark_spec):
     if error_rate <= MAX_ERROR_RATE:
       all_by_metric.append(by_metric)
     else:
-      logging.warn('Error rate exceeded maximum (%g > %g)', error_rate,
-                   MAX_ERROR_RATE)
+      logging.warning(
+          'Error rate exceeded maximum (%g > %g)', error_rate, MAX_ERROR_RATE
+      )
 
-    logging.info('Ran with %d connections; %.2f%% errors, %.2f req/s',
-                 connections, error_rate, throughput)
+    logging.info(
+        'Ran with %d connections; %.2f%% errors, %.2f req/s',
+        connections,
+        error_rate,
+        throughput,
+    )
 
     # Retry with double the connections
     connections *= 2
@@ -194,11 +212,15 @@ def Run(benchmark_spec):
 
   sort_key = operator.attrgetter('metric')
   if FLAGS.tomcat_wrk_report_all_samples:
-    samples = [sample for d in all_by_metric
-               for sample in sorted(six.itervalues(d), key=sort_key)]
+    samples = [
+        sample
+        for d in all_by_metric
+        for sample in sorted(six.itervalues(d), key=sort_key)
+    ]
   else:
-    samples = (sorted(six.itervalues(min_p50), key=sort_key) +
-               sorted(six.itervalues(max_throughput), key=sort_key))
+    samples = sorted(six.itervalues(min_p50), key=sort_key) + sorted(
+        six.itervalues(max_throughput), key=sort_key
+    )
 
   for sample in samples:
     sample.metadata.update(ip_type='external', runtime_in_seconds=duration)
@@ -211,7 +233,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   tomcat_vm = benchmark_spec.vm_groups['server'][0]
   tomcat.Stop(tomcat_vm)

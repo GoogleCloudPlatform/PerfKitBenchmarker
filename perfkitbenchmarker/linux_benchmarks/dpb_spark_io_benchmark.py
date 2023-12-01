@@ -55,16 +55,9 @@ FLAGS = flags.FLAGS
 
 SPARK_SAMPLE_SCRIPT = 'query.sql'
 RESOURCE_LIFECYCLE_ARTIFACTS = {
-    'dml_script': {
-        'artifact': 'dml_script.py'
-    },
-    'data': {
-        'artifact': 'data.snappy.parquet',
-        'prefix': '/data/'
-    },
-    'query_script': {
-        'artifact': SPARK_SAMPLE_SCRIPT
-    }
+    'dml_script': {'artifact': 'dml_script.py'},
+    'data': {'artifact': 'data.snappy.parquet', 'prefix': '/data/'},
+    'query_script': {'artifact': SPARK_SAMPLE_SCRIPT},
 }
 
 
@@ -72,10 +65,10 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def ManageLifecycleResources(base_folder, dpb_service_instance,
-                             storage_service):
+def ManageLifecycleResources(
+    base_folder, dpb_service_instance, storage_service
+):
   """Takes the static artifacts and persists them in object store for execution.
-
 
   Args:
     base_folder: Base folder for the current benchmark run.
@@ -91,21 +84,26 @@ def ManageLifecycleResources(base_folder, dpb_service_instance,
     dpb_service_instance.CreateBucket(lifecycle_bucket_name)
 
     lifecycle_folder_uri = '{}{}'.format(
-        dpb_service_instance.persistent_fs_prefix, lifecycle_bucket_name)
+        dpb_service_instance.persistent_fs_prefix, lifecycle_bucket_name
+    )
     if 'prefix' in artifact_details.keys():
-      lifecycle_folder_uri = '{}{}'.format(lifecycle_folder_uri,
-                                           artifact_details['prefix'])
+      lifecycle_folder_uri = '{}{}'.format(
+          lifecycle_folder_uri, artifact_details['prefix']
+      )
 
     static_artifact_url = data.ResourcePath(
-        os.path.join('spark_io', artifact_details['artifact']))
+        os.path.join('spark_io', artifact_details['artifact'])
+    )
     storage_service.Copy(static_artifact_url, lifecycle_folder_uri)
 
     if 'prefix' in artifact_details.keys():
-      lifecycle_artifact_uri = lifecycle_folder_uri[0:len(
-          lifecycle_folder_uri) - 1]
+      lifecycle_artifact_uri = lifecycle_folder_uri[
+          0 : len(lifecycle_folder_uri) - 1
+      ]
     else:
-      lifecycle_artifact_uri = '{}/{}'.format(lifecycle_folder_uri,
-                                              artifact_details['artifact'])
+      lifecycle_artifact_uri = '{}/{}'.format(
+          lifecycle_folder_uri, artifact_details['artifact']
+      )
     resource_uri_dictionary[lifecycle_step] = lifecycle_artifact_uri
   return resource_uri_dictionary
 
@@ -120,14 +118,16 @@ def Prepare(benchmark_spec):
   storage_service = object_storage_service.GetObjectStorageClass(FLAGS.cloud)()
   dpb_service_instance = benchmark_spec.dpb_service
   run_uri = benchmark_spec.uuid.split('-')[0]
-  uri_map = ManageLifecycleResources(run_uri, dpb_service_instance,
-                                     storage_service)
+  uri_map = ManageLifecycleResources(
+      run_uri, dpb_service_instance, storage_service
+  )
   dml_script_uri = uri_map['dml_script']
   data_folder_uri = uri_map['data']
   stats = dpb_service_instance.SubmitJob(
       pyspark_file=dml_script_uri,
       job_type=dpb_constants.PYSPARK_JOB_TYPE,
-      job_arguments=[data_folder_uri])
+      job_arguments=[data_folder_uri],
+  )
   logging.info(stats)
   if not stats['success']:
     logging.warning('Table Creation Failed')
@@ -152,17 +152,20 @@ def Run(benchmark_spec):
   metadata = copy.copy(dpb_service_instance.GetResourceMetadata())
   query_script_folder = '{}_query_script'.format(run_uri)
   query_script_folder_uri = '{}{}'.format(
-      dpb_service_instance.PERSISTENT_FS_PREFIX, query_script_folder)
-  query_script_uri = '{}/{}'.format(query_script_folder_uri,
-                                    SPARK_SAMPLE_SCRIPT)
+      dpb_service_instance.PERSISTENT_FS_PREFIX, query_script_folder
+  )
+  query_script_uri = '{}/{}'.format(
+      query_script_folder_uri, SPARK_SAMPLE_SCRIPT
+  )
 
   result = dpb_service_instance.SubmitJob(
-      query_file=query_script_uri,
-      job_type=dpb_constants.SPARKSQL_JOB_TYPE)
+      query_file=query_script_uri, job_type=dpb_constants.SPARKSQL_JOB_TYPE
+  )
   logging.info(result)
 
   results.append(
-      sample.Sample('run_time', result.run_time, 'seconds', metadata))
+      sample.Sample('run_time', result.run_time, 'seconds', metadata)
+  )
 
 
 def Cleanup(benchmark_spec):

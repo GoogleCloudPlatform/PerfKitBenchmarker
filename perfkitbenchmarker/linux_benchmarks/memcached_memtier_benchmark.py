@@ -35,12 +35,18 @@ from perfkitbenchmarker.linux_packages import memtier
 FLAGS = flags.FLAGS
 
 
-flags.DEFINE_string('memcached_memtier_client_machine_type', None,
-                    'Machine type to use for the memtier client if different '
-                    'from memcached server machine type.')
-flags.DEFINE_string('memcached_memtier_server_machine_type', None,
-                    'Machine type to use for the memtier server if different '
-                    'from memcached client machine type.')
+flags.DEFINE_string(
+    'memcached_memtier_client_machine_type',
+    None,
+    'Machine type to use for the memtier client if different '
+    'from memcached server machine type.',
+)
+flags.DEFINE_string(
+    'memcached_memtier_server_machine_type',
+    None,
+    'Machine type to use for the memtier server if different '
+    'from memcached client machine type.',
+)
 
 
 BENCHMARK_NAME = 'memcached_memtier'
@@ -70,13 +76,15 @@ def GetConfig(user_config):
   if FLAGS.memcached_memtier_client_machine_type:
     vm_spec = config['vm_groups']['client']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = (
-          FLAGS.memcached_memtier_client_machine_type)
+      vm_spec[cloud][
+          'machine_type'
+      ] = FLAGS.memcached_memtier_client_machine_type
   if FLAGS.memcached_memtier_server_machine_type:
     vm_spec = config['vm_groups']['server']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = (
-          FLAGS.memcached_memtier_server_machine_type)
+      vm_spec[cloud][
+          'machine_type'
+      ] = FLAGS.memcached_memtier_server_machine_type
   return config
 
 
@@ -93,7 +101,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   clients = benchmark_spec.vm_groups['client']
   server = benchmark_spec.vm_groups['server'][0]
@@ -109,7 +117,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample instances.
@@ -117,11 +125,14 @@ def Run(benchmark_spec):
   client = benchmark_spec.vm_groups['client']
   server = benchmark_spec.vm_groups['server'][0]
   server_ip = server.internal_ip
-  metadata = {'memcached_version': memcached_server.GetVersion(server),
-              'memcached_server_size': FLAGS.memcached_size_mb,
-              'memcached_server_threads': FLAGS.memcached_num_threads}
+  metadata = {
+      'memcached_version': memcached_server.GetVersion(server),
+      'memcached_server_size': FLAGS.memcached_size_mb,
+      'memcached_server_threads': FLAGS.memcached_num_threads,
+  }
   samples = memtier.RunOverAllThreadsPipelinesAndClients(
-      client, server_ip, [memcached_server.MEMCACHED_PORT])
+      client, server_ip, [memcached_server.MEMCACHED_PORT]
+  )
   for sample in samples:
     sample.metadata.update(metadata)
 

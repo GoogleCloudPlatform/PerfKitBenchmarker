@@ -64,25 +64,41 @@ _CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE = 3000
 _CLEANUP_KIND_DELETE_OP_BATCH_SIZE = 500
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('google_datastore_keyfile', None,
-                    'The path to Google API P12 private key file')
 flags.DEFINE_string(
-    'private_keyfile', '/tmp/key.p12',
-    'The path where the private key file is copied to on a VM.')
+    'google_datastore_keyfile',
+    None,
+    'The path to Google API P12 private key file',
+)
 flags.DEFINE_string(
-    'google_datastore_serviceAccount', None,
-    'The service account email associated with'
-    'datastore private key file')
-flags.DEFINE_string('google_datastore_datasetId', None,
-                    'The project ID that has Cloud Datastore service')
-flags.DEFINE_string('google_datastore_debug', 'false',
-                    'The logging level when running YCSB')
-flags.DEFINE_boolean('google_datastore_repopulate', False,
-                     'If True, empty database & repopulate with new data.'
-                     'By default, tests are run with pre-populated data.')
+    'private_keyfile',
+    '/tmp/key.p12',
+    'The path where the private key file is copied to on a VM.',
+)
+flags.DEFINE_string(
+    'google_datastore_serviceAccount',
+    None,
+    'The service account email associated withdatastore private key file',
+)
+flags.DEFINE_string(
+    'google_datastore_datasetId',
+    None,
+    'The project ID that has Cloud Datastore service',
+)
+flags.DEFINE_string(
+    'google_datastore_debug', 'false', 'The logging level when running YCSB'
+)
+flags.DEFINE_boolean(
+    'google_datastore_repopulate',
+    False,
+    'If True, empty database & repopulate with new data.'
+    'By default, tests are run with pre-populated data.',
+)
 # the JSON keyfile is needed to validate credentials when cleaning up the db
-flags.DEFINE_string('google_datastore_deletion_keyfile', None,
-                    'The path to Google API JSON private key file')
+flags.DEFINE_string(
+    'google_datastore_deletion_keyfile',
+    None,
+    'The path to Google API JSON private key file',
+)
 
 _INSERTION_RETRY_LIMIT = 100
 _SLEEP_AFTER_LOADING_SECS = 30 * 60
@@ -118,10 +134,13 @@ def _Install(vm):
   # Copy private key file to VM
   if FLAGS.google_datastore_keyfile.startswith('gs://'):
     vm.Install('google_cloud_sdk')
-    vm.RemoteCommand('{cmd} {datastore_keyfile} {private_keyfile}'.format(
-        cmd='gsutil cp',
-        datastore_keyfile=FLAGS.google_datastore_keyfile,
-        private_keyfile=FLAGS.private_keyfile))
+    vm.RemoteCommand(
+        '{cmd} {datastore_keyfile} {private_keyfile}'.format(
+            cmd='gsutil cp',
+            datastore_keyfile=FLAGS.google_datastore_keyfile,
+            private_keyfile=FLAGS.private_keyfile,
+        )
+    )
   else:
     vm.RemoteCopy(FLAGS.google_datastore_keyfile, FLAGS.private_keyfile)
 
@@ -131,7 +150,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   if FLAGS.google_datastore_repopulate:
     EmptyDatabase()
@@ -144,8 +163,9 @@ def Prepare(benchmark_spec):
   load_kwargs = {
       'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
       'googledatastore.privateKeyFile': FLAGS.private_keyfile,
-      'googledatastore.serviceAccountEmail':
-          FLAGS.google_datastore_serviceAccount,
+      'googledatastore.serviceAccountEmail': (
+          FLAGS.google_datastore_serviceAccount
+      ),
       'googledatastore.debug': FLAGS.google_datastore_debug,
       'core_workload_insertion_retry_limit': _INSERTION_RETRY_LIMIT,
   }
@@ -157,7 +177,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample instances.
@@ -171,8 +191,9 @@ def Run(benchmark_spec):
   run_kwargs = {
       'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
       'googledatastore.privateKeyFile': FLAGS.private_keyfile,
-      'googledatastore.serviceAccountEmail':
-          FLAGS.google_datastore_serviceAccount,
+      'googledatastore.serviceAccountEmail': (
+          FLAGS.google_datastore_serviceAccount
+      ),
       'googledatastore.debug': FLAGS.google_datastore_debug,
       'readallfields': True,
       'writeallfields': True,
@@ -190,7 +211,8 @@ def EmptyDatabase():
   if FLAGS.google_datastore_deletion_keyfile:
     dataset_id = FLAGS.google_datastore_datasetId
     executor = concurrent.futures.ThreadPoolExecutor(
-        max_workers=_CLEANUP_THREAD_POOL_WORKERS)
+        max_workers=_CLEANUP_THREAD_POOL_WORKERS
+    )
 
     logging.info('Attempting to delete all data in %s', dataset_id)
 
@@ -200,10 +222,13 @@ def EmptyDatabase():
     for kind in _YCSB_COLLECTIONS:
       futures.append(
           executor.submit(
-              _ReadAndDeleteAllEntities(dataset_id, credentials, kind)))
+              _ReadAndDeleteAllEntities(dataset_id, credentials, kind)
+          )
+      )
 
     concurrent.futures.wait(
-        futures, timeout=None, return_when=concurrent.futures.ALL_COMPLETED)
+        futures, timeout=None, return_when=concurrent.futures.ALL_COMPLETED
+    )
     logging.info('Deleted all data for %s', dataset_id)
 
   else:
@@ -215,8 +240,10 @@ def GetDatastoreDeleteCredentials():
   if FLAGS.google_datastore_deletion_keyfile.startswith('gs://'):
     # Copy private keyfile to local disk
     cp_cmd = [
-        'gsutil', 'cp', FLAGS.google_datastore_deletion_keyfile,
-        FLAGS.private_keyfile
+        'gsutil',
+        'cp',
+        FLAGS.google_datastore_deletion_keyfile,
+        FLAGS.private_keyfile,
     ]
     vm_util.IssueCommand(cp_cmd)
     credentials_path = FLAGS.private_keyfile
@@ -256,7 +283,8 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
     query = _CreateClient(dataset_id, credentials).query(kind=kind)
     query.keys_only()
     query_iter = query.fetch(
-        start_cursor=start_cursor, limit=_CLEANUP_KIND_READ_BATCH_SIZE)
+        start_cursor=start_cursor, limit=_CLEANUP_KIND_READ_BATCH_SIZE
+    )
 
     for current_entities in query_iter.pages:
       delete_keys.extend([entity.key for entity in current_entities])
@@ -267,19 +295,23 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
         total_entity_count += entity_read_count
         logging.info('Creating tasks...Read %d in total', total_entity_count)
         while delete_keys:
-          delete_chunk = delete_keys[:
-                                     _CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE]
+          delete_chunk = delete_keys[
+              :_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE
+          ]
           delete_keys = delete_keys[_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE:]
           # logging.debug(
           #    'Creating new Task %d - Read %d entities for %s kind , Read %d '
           #    + 'in total.',
           #    task_id, entity_read_count, kind, total_entity_count)
           deletion_task = _DeletionTask(kind, task_id)
-          pool.apply_async(deletion_task.DeleteEntities, (
-              dataset_id,
-              credentials,
-              delete_chunk,
-          ))
+          pool.apply_async(
+              deletion_task.DeleteEntities,
+              (
+                  dataset_id,
+                  credentials,
+                  delete_chunk,
+              ),
+          )
           task_id += 1
 
         # Reset delete batch,
@@ -291,11 +323,14 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
     if start_cursor is None:
       logging.info('Read all existing records for %s', kind)
       if delete_keys:
-        logging.info('Entities batch is not empty %d, submitting new tasks',
-                     len(delete_keys))
+        logging.info(
+            'Entities batch is not empty %d, submitting new tasks',
+            len(delete_keys),
+        )
         while delete_keys:
-          delete_chunk = delete_keys[:
-                                     _CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE]
+          delete_chunk = delete_keys[
+              :_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE
+          ]
           delete_keys = delete_keys[_CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE:]
           logging.debug(
               (
@@ -308,11 +343,14 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
               total_entity_count,
           )
           deletion_task = _DeletionTask(kind, task_id)
-          pool.apply_async(deletion_task.DeleteEntities, (
-              dataset_id,
-              credentials,
-              delete_chunk,
-          ))
+          pool.apply_async(
+              deletion_task.DeleteEntities,
+              (
+                  dataset_id,
+                  credentials,
+                  delete_chunk,
+              ),
+          )
           task_id += 1
       break
 
@@ -335,8 +373,9 @@ def _ReadAndDeleteAllEntities(dataset_id, credentials, kind):
     delete_keys.extend([entity.key for entity in entities])
     deletion_task.DeleteEntities(dataset_id, credentials, delete_keys)
 
-  logging.info('Deleted all data for %s - %s - %d', dataset_id, kind,
-               total_entity_count)
+  logging.info(
+      'Deleted all data for %s - %s - %d', dataset_id, kind, total_entity_count
+  )
 
 
 def _CreateClient(dataset_id, credentials):
@@ -352,7 +391,7 @@ def _CreateClient(dataset_id, credentials):
   return datastore.Client(project=dataset_id, credentials=credentials)
 
 
-class _DeletionTask():
+class _DeletionTask:
   """Represents a cleanup deletion task.
 
   Attributes:
@@ -390,11 +429,19 @@ class _DeletionTask():
         client.delete_multi(chunk)
         self.entity_deletion_count += len(chunk)
 
-      logging.info('Task %d - Completed deletion for %s - %d', self.task_id,
-                   self.kind, self.entity_deletion_count)
+      logging.info(
+          'Task %d - Completed deletion for %s - %d',
+          self.task_id,
+          self.kind,
+          self.entity_deletion_count,
+      )
       return self.entity_deletion_count
     except ValueError as error:
-      logging.exception('Task %d - Delete entities for %s failed due to %s',
-                        self.task_id, self.kind, error)
+      logging.exception(
+          'Task %d - Delete entities for %s failed due to %s',
+          self.task_id,
+          self.kind,
+          error,
+      )
       self.deletion_error = True
       raise error

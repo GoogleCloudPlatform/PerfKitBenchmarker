@@ -63,25 +63,34 @@ BERT_BASE_URL = 'https://storage.googleapis.com/bert_models/2018_10_18/uncased_L
 BERT_LARGE_URL = 'https://storage.googleapis.com/bert_models/2018_10_18/uncased_L-24_H-1024_A-16.zip'
 
 flags.DEFINE_enum(
-    'horovod_model', 'resnet-50',
+    'horovod_model',
+    'resnet-50',
     ['resnet-50', 'bert-base', 'bert-large', 'maskrcnn', 'resnext-101'],
-    'name of the model to run.')
+    'name of the model to run.',
+)
 
 flags.DEFINE_integer('horovod_batch_size', 64, 'Batch size per compute device.')
 
-flags.DEFINE_integer('horovod_num_steps', 10,
-                     'Number of steps (epochs for BERT) to train for. ')
+flags.DEFINE_integer(
+    'horovod_num_steps', 10, 'Number of steps (epochs for BERT) to train for. '
+)
 
-flags.DEFINE_bool('horovod_synthetic', False,
-                  'Whether to train with synthetic data.')
+flags.DEFINE_bool(
+    'horovod_synthetic', False, 'Whether to train with synthetic data.'
+)
 
-flags.DEFINE_enum('horovod_max_seq_len', '128', ['128', '384'],
-                  'Max sequence length for BERT.')
+flags.DEFINE_enum(
+    'horovod_max_seq_len',
+    '128',
+    ['128', '384'],
+    'Max sequence length for BERT.',
+)
 
 flags.DEFINE_enum('horovod_precision', 'fp16', ['fp16', 'fp32'], 'Precision.')
 
-flags.DEFINE_bool('horovod_bert_finetune', True,
-                  'Pretrain or finetune a BERT model.')
+flags.DEFINE_bool(
+    'horovod_bert_finetune', True, 'Pretrain or finetune a BERT model.'
+)
 
 flags.DEFINE_bool('horovod_timeline', False, 'Enable timeline in Horovod.')
 
@@ -110,41 +119,49 @@ def _CopyAndUpdateRunScripts(model, vm):
     vm: vm to place and update run scripts on
   """
   vm.RemoteCommand(
-      '[ -d "DeepLearningExamples" ] || git clone --branch clan-dev %s' %
-      GITHUB_MODELS_URL)
+      '[ -d "DeepLearningExamples" ] || git clone --branch clan-dev %s'
+      % GITHUB_MODELS_URL
+  )
 
   # MaskRCNN
   if model == 'maskrcnn':
     vm.RemoteCommand(
-        'wget -q -N http://models.tensorpack.com/FasterRCNN/ImageNet-R50-AlignPadding.npz'
+        'wget -q -N'
+        ' http://models.tensorpack.com/FasterRCNN/ImageNet-R50-AlignPadding.npz'
     )
     vm.RemoteCommand(
-        'mkdir -p coco && cd coco && '
-        'wget -q -N http://images.cocodataset.org/zips/train2017.zip && '
-        'wget -q -N http://images.cocodataset.org/zips/val2017.zip && '
-        'wget -q -N http://images.cocodataset.org/annotations/annotations_trainval2017.zip && '
-        'unzip -q -o train2017.zip && unzip -q -o val2017.zip && '
-        'unzip -q -o annotations_trainval2017.zip && rm *.zip')
+        'mkdir -p coco && cd coco && wget -q -N'
+        ' http://images.cocodataset.org/zips/train2017.zip && wget -q -N'
+        ' http://images.cocodataset.org/zips/val2017.zip && wget -q -N'
+        ' http://images.cocodataset.org/annotations/annotations_trainval2017.zip'
+        ' && unzip -q -o train2017.zip && unzip -q -o val2017.zip && unzip -q'
+        ' -o annotations_trainval2017.zip && rm *.zip'
+    )
 
   # BERT
   bert_base_dir = 'DeepLearningExamples/TensorFlow/LanguageModeling/BERT'
   if model == 'bert-base' or model == 'bert-large':
     vm.RemoteCommand(
-        'mkdir -p {bert}/data/download/google_pretrained_weights &&'
-        'mkdir -p {bert}/data/download/squad/v1.1 && '
-        'cd {bert}/data/download/squad/v1.1 && '
-        'wget -q https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v1.1.json'
-        .format(bert=bert_base_dir))
+        'mkdir -p {bert}/data/download/google_pretrained_weights &&mkdir -p'
+        ' {bert}/data/download/squad/v1.1 && cd {bert}/data/download/squad/v1.1'
+        ' && wget -q'
+        ' https://rajpurkar.github.io/SQuAD-explorer/dataset/train-v1.1.json'
+        .format(bert=bert_base_dir)
+    )
 
-  get_bert_data_cmd = ('cd {bert}/data/download/google_pretrained_weights/ && '
-                       'wget -q {url} && unzip -o $(basename {url})')
+  get_bert_data_cmd = (
+      'cd {bert}/data/download/google_pretrained_weights/ && '
+      'wget -q {url} && unzip -o $(basename {url})'
+  )
   if model == 'bert-base':
     vm.RemoteCommand(
-        get_bert_data_cmd.format(bert=bert_base_dir, url=BERT_BASE_URL))
+        get_bert_data_cmd.format(bert=bert_base_dir, url=BERT_BASE_URL)
+    )
 
   if model == 'bert-large':
     vm.RemoteCommand(
-        get_bert_data_cmd.format(bert=bert_base_dir, url=BERT_LARGE_URL))
+        get_bert_data_cmd.format(bert=bert_base_dir, url=BERT_LARGE_URL)
+    )
 
 
 def PrepareHorovod(vm):
@@ -175,19 +192,25 @@ def PrepareHorovod(vm):
       f'sudo {pip} install '
       '--extra-index-url https://developer.download.nvidia.com/compute/redist/ '
       'git+https://github.com/NVIDIA/dllogger.git '
-      f'nvidia-dali-cuda{cuda_version}')
+      f'nvidia-dali-cuda{cuda_version}'
+  )
 
   vm.RemoteCommand(f'sudo {pip} uninstall -y horovod')
   vm.RemoteCommand(
-      f'sudo HOROVOD_GPU_OPERATIONS=NCCL HOROVOD_WITH_TENSORFLOW=1 HOROVOD_WITH_MPI=1 {pip} install -U --no-cache horovod'
+      'sudo HOROVOD_GPU_OPERATIONS=NCCL HOROVOD_WITH_TENSORFLOW=1'
+      f' HOROVOD_WITH_MPI=1 {pip} install -U --no-cache horovod'
   )
   vm.RemoteCommand(
-      f'sudo {pip} install pynvml cython scipy \'opencv-python==3.4.2.17\'')
-  vm.RemoteCommand(
-      f'sudo {pip} install \'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI\''
+      f"sudo {pip} install pynvml cython scipy 'opencv-python==3.4.2.17'"
   )
   vm.RemoteCommand(
-      f'[ -d "tensorpack" ] || git clone https://github.com/tensorpack/tensorpack.git && sudo {pip} install ./tensorpack'
+      f'sudo {pip} install'
+      " 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'"
+  )
+  vm.RemoteCommand(
+      '[ -d "tensorpack" ] || git clone'
+      f' https://github.com/tensorpack/tensorpack.git && sudo {pip} install'
+      ' ./tensorpack'
   )
 
   _CopyAndUpdateRunScripts(FLAGS.horovod_model, vm)
@@ -326,7 +349,8 @@ def _MakeSamplesFromOutput(vms, stdout, stderr):
 
   samples = []
   samples.append(
-      sample.Sample('Training throughput', throughput, unit, metadata))
+      sample.Sample('Training throughput', throughput, unit, metadata)
+  )
   return samples
 
 
@@ -400,13 +424,16 @@ def RunWithVMs(vms, extra_envs=None):
       '{nccl_params} '
       '-mca pml ob1 -mca btl ^openib '
       '-mca btl_tcp_if_exclude lo,docker0 '
-      '{python} ').format(
-          mpi=FLAGS.nccl_mpi,
-          num_gpus=total_gpus,
-          host_file=MACHINEFILE,
-          python=python_interpreter,
-          nccl_params=' '.join(
-              [f'-x {key}={value}' for key, value in nccl_params.items()]))
+      '{python} '
+  ).format(
+      mpi=FLAGS.nccl_mpi,
+      num_gpus=total_gpus,
+      host_file=MACHINEFILE,
+      python=python_interpreter,
+      nccl_params=' '.join(
+          [f'-x {key}={value}' for key, value in nccl_params.items()]
+      ),
+  )
 
   if FLAGS.horovod_model == 'resnet-50':
     run_flags = {
@@ -420,7 +447,7 @@ def RunWithVMs(vms, extra_envs=None):
         'lr_warmup_epochs': 8,
         'momentum': 0.875,
         'weight_decay': 3.0517578125e-05,
-        'iter_unit': 'batch'
+        'iter_unit': 'batch',
     }
     run_flags.update({
         'batch_size': FLAGS.horovod_batch_size,
@@ -433,11 +460,17 @@ def RunWithVMs(vms, extra_envs=None):
     if not FLAGS.horovod_synthetic:
       run_flags['data_dir'] = 'gs://cloud-ml-nas-public/classification/imagenet'
 
-    run_command += 'DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py '
-    run_command += ' '.join([
-        '--{}'.format(key) if value is None else '--{}={}'.format(key, value)
-        for key, value in sorted(run_flags.items())
-    ])
+    run_command += (
+        'DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py '
+    )
+    run_command += ' '.join(
+        [
+            '--{}'.format(key)
+            if value is None
+            else '--{}={}'.format(key, value)
+            for key, value in sorted(run_flags.items())
+        ]
+    )
   elif FLAGS.horovod_model == 'resnext-101':
     run_flags = {
         'arch': 'resnext101-32x4d',
@@ -452,7 +485,7 @@ def RunWithVMs(vms, extra_envs=None):
         'momentum': 0.875,
         'weight_decay': 3.0517578125e-05,
         'weight_init': 'fan_in',
-        'iter_unit': 'batch'
+        'iter_unit': 'batch',
     }
     run_flags.update({
         'precision': FLAGS.horovod_precision,
@@ -464,17 +497,25 @@ def RunWithVMs(vms, extra_envs=None):
     if not FLAGS.horovod_synthetic:
       run_flags['data_dir'] = 'gs://cloud-ml-nas-public/classification/imagenet'
 
-    run_command += 'DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py '
-    run_command += ' '.join([
-        '--{}'.format(key) if value is None else '--{}={}'.format(key, value)
-        for key, value in sorted(run_flags.items())
-    ])
+    run_command += (
+        'DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py '
+    )
+    run_command += ' '.join(
+        [
+            '--{}'.format(key)
+            if value is None
+            else '--{}={}'.format(key, value)
+            for key, value in sorted(run_flags.items())
+        ]
+    )
   elif FLAGS.horovod_model.startswith('bert'):  # bert
     if not FLAGS.horovod_bert_finetune:
       raise NotImplementedError('BERT pretraining is not supported.')
     bert_dir = 'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/google_pretrained_weights/{}'.format(
-        'uncased_L-12_H-768_A-12' if FLAGS.horovod_model ==
-        'bert-base' else 'uncased_L-24_H-1024_A-16')
+        'uncased_L-12_H-768_A-12'
+        if FLAGS.horovod_model == 'bert-base'
+        else 'uncased_L-24_H-1024_A-16'
+    )
     squad_train_file = 'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/data/download/squad/v1.1/train-v1.1.json'
     run_flags = {
         'vocab_file': '{}/vocab.txt'.format(bert_dir),
@@ -494,13 +535,19 @@ def RunWithVMs(vms, extra_envs=None):
         'num_train_epochs': FLAGS.horovod_num_steps,
         'max_seq_length': FLAGS.horovod_max_seq_len,
         'doc_stride': 64 if FLAGS.horovod_max_seq_len == 128 else 128,
-        'amp': FLAGS.horovod_precision == 'fp16'
+        'amp': FLAGS.horovod_precision == 'fp16',
     })
-    run_command += 'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py '
-    run_command += ' '.join([
-        '--{}'.format(key) if value is None else '--{}={}'.format(key, value)
-        for key, value in sorted(run_flags.items())
-    ])
+    run_command += (
+        'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py '
+    )
+    run_command += ' '.join(
+        [
+            '--{}'.format(key)
+            if value is None
+            else '--{}={}'.format(key, value)
+            for key, value in sorted(run_flags.items())
+        ]
+    )
   else:
     run_command += (
         'tensorpack/examples/FasterRCNN/train.py --config '
@@ -510,14 +557,17 @@ def RunWithVMs(vms, extra_envs=None):
         'TRAIN.EVAL_PERIOD=0 '
         # LR_SCHEDULE means equivalent steps when the total batch size is 8.
         'TRAIN.LR_SCHEDULE="[{step}, {step}, {step}]" '
-        '--logdir {log_dir}/maskrcnn ').format(
-            log_dir=vm_util.VM_TMP_DIR,
-            step=FLAGS.horovod_num_steps * total_gpus // 8)
+        '--logdir {log_dir}/maskrcnn '
+    ).format(
+        log_dir=vm_util.VM_TMP_DIR,
+        step=FLAGS.horovod_num_steps * total_gpus // 8,
+    )
   stdout, stderr = master_vm.RobustRemoteCommand(run_command)
 
   if FLAGS.horovod_timeline:
-    master_vm.PullFile(vm_util.GetTempDir(),
-                       '{}/timeline.json'.format(vm_util.VM_TMP_DIR))
+    master_vm.PullFile(
+        vm_util.GetTempDir(), '{}/timeline.json'.format(vm_util.VM_TMP_DIR)
+    )
   return _MakeSamplesFromOutput(vms, stdout, stderr)
 
 

@@ -18,16 +18,17 @@ import json
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
-
 from perfkitbenchmarker.linux_packages import fio
 from perfkitbenchmarker.linux_packages import gluster
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('fill_disk_size', '4G',
-                    'Amount to fill the disk before reading.')
-flags.DEFINE_string('fill_disk_bs', '128k',
-                    'Block size used to fill the disk before reading.')
+flags.DEFINE_string(
+    'fill_disk_size', '4G', 'Amount to fill the disk before reading.'
+)
+flags.DEFINE_string(
+    'fill_disk_bs', '128k', 'Block size used to fill the disk before reading.'
+)
 flags.DEFINE_integer('fill_disk_iodepth', 64, 'iodepth used to fill the disk.')
 flags.DEFINE_string('read_size', '4G', 'Size of the file to read.')
 flags.DEFINE_string('read_bs', '512k', 'Block size of the file to read.')
@@ -73,21 +74,25 @@ def Prepare(benchmark_spec):
       lambda vm: vm.Install('fio'), gluster_servers + clients
   )
   for vm in gluster_servers:
-    vm.SetReadAhead(_NUM_SECTORS_READ_AHEAD,
-                    [d.GetDevicePath() for d in vm.scratch_disks])
+    vm.SetReadAhead(
+        _NUM_SECTORS_READ_AHEAD, [d.GetDevicePath() for d in vm.scratch_disks]
+    )
 
   # Set up Gluster
   if gluster_servers:
     gluster.ConfigureServers(gluster_servers, _VOLUME_NAME)
 
-    args = [((client, gluster_servers[0], _VOLUME_NAME, _MOUNT_POINT), {})
-            for client in clients]
+    args = [
+        ((client, gluster_servers[0], _VOLUME_NAME, _MOUNT_POINT), {})
+        for client in clients
+    ]
     background_tasks.RunThreaded(gluster.MountGluster, args)
 
     gluster_address = gluster_servers[0].internal_ip
     client_vm.RemoteCommand('sudo mkdir -p /testdir')
-    client_vm.RemoteCommand('sudo mount %s:/vol01 /testdir -t glusterfs' %
-                            gluster_address)
+    client_vm.RemoteCommand(
+        'sudo mount %s:/vol01 /testdir -t glusterfs' % gluster_address
+    )
 
 
 def _RunFio(vm, fio_params, metadata):
@@ -101,14 +106,16 @@ def _RunFio(vm, fio_params, metadata):
   Returns:
     A list of sample.Sample objects
   """
-  stdout, _ = vm.RemoteCommand('sudo {0} {1}'.format(fio.GetFioExec(),
-                                                     fio_params))
+  stdout, _ = vm.RemoteCommand(
+      'sudo {0} {1}'.format(fio.GetFioExec(), fio_params)
+  )
   job_file_contents = fio.FioParametersToJob(fio_params)
   samples = fio.ParseResults(
       job_file_contents,
       json.loads(stdout),
       base_metadata=metadata,
-      skip_latency_individual_stats=True)
+      skip_latency_individual_stats=True,
+  )
   return samples
 
 
@@ -136,12 +143,17 @@ def Run(benchmark_spec):
       'read_iodepth': FLAGS.read_iodepth,
   }
   fio_params = ' '.join([
-      '--output-format=json', '--name=fill_disk',
+      '--output-format=json',
+      '--name=fill_disk',
       '--filename=/testdir/testfile',
-      '--filesize=%s' % FLAGS.fill_disk_size, '--ioengine=libaio', '--direct=1',
-      '--verify=0', '--randrepeat=0',
+      '--filesize=%s' % FLAGS.fill_disk_size,
+      '--ioengine=libaio',
+      '--direct=1',
+      '--verify=0',
+      '--randrepeat=0',
       '--bs=%s' % FLAGS.fill_disk_bs,
-      '--iodepth=%s' % FLAGS.fill_disk_iodepth, '--rw=randwrite'
+      '--iodepth=%s' % FLAGS.fill_disk_iodepth,
+      '--rw=randwrite',
   ])
   samples = _RunFio(client_vm, fio_params, metadata)
   results += samples
@@ -153,11 +165,15 @@ def Run(benchmark_spec):
     vm.DropCaches()
 
   fio_read_common_params = [
-      '--output-format=json', '--randrepeat=1', '--ioengine=libaio',
-      '--gtod_reduce=1', '--filename=/testdir/testfile',
+      '--output-format=json',
+      '--randrepeat=1',
+      '--ioengine=libaio',
+      '--gtod_reduce=1',
+      '--filename=/testdir/testfile',
       '--bs=%s' % FLAGS.read_bs,
       '--iodepth=%s' % FLAGS.read_iodepth,
-      '--size=%s' % FLAGS.read_size, '--readwrite=randread'
+      '--size=%s' % FLAGS.read_size,
+      '--readwrite=randread',
   ]
   fio_params = '--name=first_read ' + ' '.join(fio_read_common_params)
   samples = _RunFio(client_vm, fio_params, metadata)

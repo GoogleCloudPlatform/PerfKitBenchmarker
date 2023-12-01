@@ -18,7 +18,6 @@ import time
 from typing import List
 
 from absl import flags
-
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
@@ -83,12 +82,14 @@ def Run(_) -> List[sample.Sample]:
           'Time to Create Bucket',
           bucket_created_time - start_time,
           'seconds',
-          metadata),
+          metadata,
+      ),
       sample.Sample(
           'Time to Create Bucket and Object',
           object_created_time - start_time,
           'seconds',
-          metadata),
+          metadata,
+      ),
   ]
   return samples
 

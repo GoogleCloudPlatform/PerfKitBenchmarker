@@ -28,14 +28,28 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
-
 from perfkitbenchmarker.linux_packages import multichase
 
 
 _CHASES_WITHOUT_ARGS = (
-    'simple', 'incr', 't0', 't1', 't2', 'nta', 'movdqa', 'movntdqa',
-    'parallel2', 'parallel3', 'parallel4', 'parallel5', 'parallel6',
-    'parallel7', 'parallel8', 'parallel9', 'parallel10')
+    'simple',
+    'incr',
+    't0',
+    't1',
+    't2',
+    'nta',
+    'movdqa',
+    'movntdqa',
+    'parallel2',
+    'parallel3',
+    'parallel4',
+    'parallel5',
+    'parallel6',
+    'parallel7',
+    'parallel8',
+    'parallel9',
+    'parallel10',
+)
 _CHASES_WITH_ARGS = 'critword', 'critword2', 'work'
 
 # Dict mapping possible chase types accepted by the multichase -c flag to a
@@ -43,8 +57,9 @@ _CHASES_WITH_ARGS = 'critword', 'critword2', 'work'
 # example, the 'simple' chase type does not require an argument and is specified
 # as `multichase -c simple`, but the 'work' chase type requires an argument and
 # is specified as `multichase -c work:N`.
-_CHASES = {c: c in _CHASES_WITH_ARGS
-           for c in _CHASES_WITHOUT_ARGS + _CHASES_WITH_ARGS}
+_CHASES = {
+    c: c in _CHASES_WITH_ARGS for c in _CHASES_WITHOUT_ARGS + _CHASES_WITH_ARGS
+}
 
 _BENCHMARK_SPECIFIC_VM_STATE_ATTR = 'multichase_vm_state'
 _NOT_ENOUGH_CPUS = 'error: more threads than cpus available'
@@ -63,16 +78,17 @@ FLAGS = flags.FLAGS
 
 
 class _MemorySizeParser(flag_util.UnitsParser):
-
   syntactic_help = (
-      "An explicit memory size that must be convertible to an integer number "
+      'An explicit memory size that must be convertible to an integer number '
       "of bytes (e.g. '7.5 MiB') or a percentage of the total memory rounded "
       "down to the next integer byte (e.g. '97.5%', which translates to "
-      "1046898278 bytes if a total of 1 GiB memory is available).")
+      '1046898278 bytes if a total of 1 GiB memory is available).'
+  )
 
   def __init__(self):
-    super(_MemorySizeParser, self).__init__(convertible_to=(units.byte,
-                                                            units.percent))
+    super(_MemorySizeParser, self).__init__(
+        convertible_to=(units.byte, units.percent)
+    )
 
   def parse(self, inp):
     """Parse the input.
@@ -93,7 +109,8 @@ class _MemorySizeParser(flag_util.UnitsParser):
       if size_byte_count != int(size_byte_count):
         raise ValueError(
             'Expression {0!r} parses to memory size {1!r}, which is not '
-            'convertible to an integer number of bytes.'.format(inp, str(size)))
+            'convertible to an integer number of bytes.'.format(inp, str(size))
+        )
     return size
 
 
@@ -104,60 +121,88 @@ _DEFAULT_STRIDE_SIZE = units.Quantity('256 bytes')
 
 
 def _DefineMemorySizeFlag(name, default, help, flag_values=FLAGS, **kwargs):
-  flags.DEFINE(_MEMORY_SIZE_PARSER, name, default, help, flag_values,
-               _UNITS_SERIALIZER, **kwargs)
+  flags.DEFINE(
+      _MEMORY_SIZE_PARSER,
+      name,
+      default,
+      help,
+      flag_values,
+      _UNITS_SERIALIZER,
+      **kwargs
+  )
 
 
 flags.DEFINE_enum(
-    'multichase_chase_type', 'simple', sorted(_CHASES),
+    'multichase_chase_type',
+    'simple',
+    sorted(_CHASES),
     'Chase type to use when executing multichase. Passed to multichase via its '
-    '-c flag.')
+    '-c flag.',
+)
 flags.DEFINE_integer(
-    'multichase_chase_arg', 1,
+    'multichase_chase_arg',
+    1,
     'Argument to refine the chase type specified with --multichase_chase_type. '
-    'Applicable for the following types: {0}.'.format(', '.join(
-        _CHASES_WITH_ARGS)))
+    'Applicable for the following types: {0}.'.format(
+        ', '.join(_CHASES_WITH_ARGS)
+    ),
+)
 flag_util.DEFINE_integerlist(
-    'multichase_thread_count', flag_util.IntegerList([1]),
+    'multichase_thread_count',
+    flag_util.IntegerList([1]),
     'Number of threads (one per core), to use when executing multichase. '
-    'Passed to multichase via its -t flag.', module_name=__name__)
+    'Passed to multichase via its -t flag.',
+    module_name=__name__,
+)
 _DefineMemorySizeFlag(
-    'multichase_memory_size_min', _DEFAULT_MEMORY_SIZE,
+    'multichase_memory_size_min',
+    _DEFAULT_MEMORY_SIZE,
     'Memory size to use when executing multichase. Passed to multichase via '
     'its -m flag. If it differs from multichase_memory_size_max, then '
     'multichase is executed multiple times, starting with a memory size equal '
     'to the min and doubling while the memory size does not exceed the max. '
-    'Can be specified as a percentage of the total memory on the machine.')
+    'Can be specified as a percentage of the total memory on the machine.',
+)
 _DefineMemorySizeFlag(
-    'multichase_memory_size_max', _DEFAULT_MEMORY_SIZE,
+    'multichase_memory_size_max',
+    _DEFAULT_MEMORY_SIZE,
     'Memory size to use when executing multichase. Passed to multichase via '
     'its -m flag. If it differs from multichase_memory_size_min, then '
     'multichase is executed multiple times, starting with a memory size equal '
     'to the min and doubling while the memory size does not exceed the max. '
-    'Can be specified as a percentage of the total memory on the machine.')
+    'Can be specified as a percentage of the total memory on the machine.',
+)
 _DefineMemorySizeFlag(
-    'multichase_stride_size_min', _DEFAULT_STRIDE_SIZE,
+    'multichase_stride_size_min',
+    _DEFAULT_STRIDE_SIZE,
     'Stride size to use when executing multichase. Passed to multichase via '
     'its -s flag. If it differs from multichase_stride_size_max, then '
     'multichase is executed multiple times, starting with a stride size equal '
     'to the min and doubling while the stride size does not exceed the max. '
     'Can be specified as a percentage of the maximum memory (-m flag) of each '
-    'multichase execution.')
+    'multichase execution.',
+)
 _DefineMemorySizeFlag(
-    'multichase_stride_size_max', _DEFAULT_STRIDE_SIZE,
+    'multichase_stride_size_max',
+    _DEFAULT_STRIDE_SIZE,
     'Stride size to use when executing multichase. Passed to multichase via '
     'its -s flag. If it differs from multichase_stride_size_min, then '
     'multichase is executed multiple times, starting with a stride size equal '
     'to the min and doubling while the stride size does not exceed the max. '
     'Can be specified as a percentage of the maximum memory (-m flag) of each '
-    'multichase execution.')
+    'multichase execution.',
+)
 flags.DEFINE_string(
-    'multichase_numactl_options', None,
+    'multichase_numactl_options',
+    None,
     'If provided, numactl is used to control memory placement and process '
-    'CPU affinity. Examples: "--membind=0" or "--cpunodebind=0".')
+    'CPU affinity. Examples: "--membind=0" or "--cpunodebind=0".',
+)
 flags.DEFINE_string(
-    'multichase_additional_flags', '',
-    "Additional flags to use when executing multichase. Example: '-O 16 -y'.")
+    'multichase_additional_flags',
+    '',
+    "Additional flags to use when executing multichase. Example: '-O 16 -y'.",
+)
 
 
 def _TranslateMemorySize(get_total_memory, size):
@@ -165,15 +210,15 @@ def _TranslateMemorySize(get_total_memory, size):
 
   Args:
     get_total_memory: Function that accepts no arguments and returns an integer
-        specifying the total amount of memory available in bytes.
+      specifying the total amount of memory available in bytes.
     size: units.Quantity specifying either an explicit memory size in a unit
-        convertible to bytes or a percentage of the total memory.
+      convertible to bytes or a percentage of the total memory.
 
   Returns:
     int expressing the specified memory size in bytes.
   """
   if size.units == units.percent:
-    return int(get_total_memory() * size.magnitude / 100.)
+    return int(get_total_memory() * size.magnitude / 100.0)
   return int(size.to(units.byte).magnitude)
 
 
@@ -182,11 +227,11 @@ def _IterMemorySizes(get_total_memory, min_size, max_size):
 
   Args:
     get_total_memory: Function that accepts no arguments and returns an integer
-        specifying the total amount of memory available.
+      specifying the total amount of memory available.
     min_size: units.Quantity specifying either an explicit memory size in a unit
-        convertible to bytes or a percentage of the total memory.
+      convertible to bytes or a percentage of the total memory.
     max_size: units.Quantity specifying either an explicit memory size in a unit
-        convertible to bytes or a percentage of the total memory.
+      convertible to bytes or a percentage of the total memory.
 
   Yields:
     int expressing memory sizes in bytes. The first yielded value is the
@@ -216,7 +261,8 @@ def CheckPrerequisites(benchmark_config):
   if not _CHASES[chase_type] and FLAGS['multichase_chase_arg'].present:
     raise ValueError(
         'Cannot use --multichase_chase_arg with chase type {0!r}. Chase type '
-        '{0!r} does not require an argument.'.format(chase_type))
+        '{0!r} does not require an argument.'.format(chase_type)
+    )
 
 
 class _MultichaseSpecificState(object):
@@ -227,9 +273,9 @@ class _MultichaseSpecificState(object):
 
   Attributes:
     dir: Optional string. Path of a directory on the remote machine where files
-        files related to this benchmark are stored.
+      files related to this benchmark are stored.
     multichase_dir: Optional string. Path of a directory on the remote machine
-        where multichase files are stored. A subdirectory within dir.
+      where multichase files are stored. A subdirectory within dir.
   """
 
   def __init__(self):
@@ -252,8 +298,9 @@ def Prepare(benchmark_spec):
   vm.RemoteCommand('mkdir ' + remote_benchmark_dir)
   vm_state.dir = remote_benchmark_dir
   vm_state.multichase_dir = posixpath.join(vm_state.dir, 'multichase')
-  vm.RemoteCommand('cp -ar {0} {1}'.format(
-      multichase.INSTALL_PATH, vm_state.multichase_dir))
+  vm.RemoteCommand(
+      'cp -ar {0} {1}'.format(multichase.INSTALL_PATH, vm_state.multichase_dir)
+  )
 
 
 def Run(benchmark_spec):
@@ -266,9 +313,11 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   samples = []
-  base_metadata = {'additional_flags': FLAGS.multichase_additional_flags,
-                   'chase_type': FLAGS.multichase_chase_type,
-                   'multichase_version': multichase.GIT_VERSION}
+  base_metadata = {
+      'additional_flags': FLAGS.multichase_additional_flags,
+      'chase_type': FLAGS.multichase_chase_type,
+      'multichase_version': multichase.GIT_VERSION,
+  }
   vm = benchmark_spec.vms[0]
   vm_state = getattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR)
   max_thread_count = float('inf')
@@ -291,41 +340,63 @@ def Run(benchmark_spec):
     if thread_count > vm.NumCpusForBenchmark():
       continue
     memory_size_iterator = _IterMemorySizes(
-        lambda: vm.total_memory_kb * 1024, FLAGS.multichase_memory_size_min,
-        FLAGS.multichase_memory_size_max)
+        lambda: vm.total_memory_kb * 1024,
+        FLAGS.multichase_memory_size_min,
+        FLAGS.multichase_memory_size_max,
+    )
     for memory_size in memory_size_iterator:
       stride_size_iterator = _IterMemorySizes(
-          lambda: memory_size, FLAGS.multichase_stride_size_min,
-          FLAGS.multichase_stride_size_max)
+          lambda: memory_size,
+          FLAGS.multichase_stride_size_min,
+          FLAGS.multichase_stride_size_max,
+      )
       for stride_size in stride_size_iterator:
         if thread_count >= max_thread_count:
           continue
-        cmd = ' '.join(str(s) for s in itertools.chain(base_cmd, (
-            '-m', memory_size, '-s', stride_size, '-t', thread_count,
-            FLAGS.multichase_additional_flags)))
+        cmd = ' '.join(
+            str(s)
+            for s in itertools.chain(
+                base_cmd,
+                (
+                    '-m',
+                    memory_size,
+                    '-s',
+                    stride_size,
+                    '-t',
+                    thread_count,
+                    FLAGS.multichase_additional_flags,
+                ),
+            )
+        )
 
         stdout, stderr, retcode = vm.RemoteCommandWithReturnCode(
-            cmd, ignore_failure=True)
+            cmd, ignore_failure=True
+        )
         if retcode:
           if _NOT_ENOUGH_CPUS in stderr:
             logging.warning(
                 'Not enough CPUs to run %s threads. If you have more than that '
                 'number of CPUs on the system, it could be due to process '
-                'CPU affinity.', thread_count)
+                'CPU affinity.',
+                thread_count,
+            )
             max_thread_count = min(max_thread_count, thread_count)
             continue
           else:
             raise errors.VirtualMachine.RemoteCommandError(
-                'Multichase failed.\nSTDOUT: %s\nSTDERR: %s' % (stdout, stderr))
+                'Multichase failed.\nSTDOUT: %s\nSTDERR: %s' % (stdout, stderr)
+            )
 
         # Latency is printed in ns in the last line.
         latency_ns = float(stdout.split()[-1])
 
         # Generate one sample from one run of multichase.
         metadata = base_metadata.copy()
-        metadata.update({'memory_size_bytes': memory_size,
-                         'stride_size_bytes': stride_size,
-                         'thread_count': thread_count})
+        metadata.update({
+            'memory_size_bytes': memory_size,
+            'stride_size_bytes': stride_size,
+            'thread_count': thread_count,
+        })
         samples.append(sample.Sample('latency', latency_ns, 'ns', metadata))
 
   return samples

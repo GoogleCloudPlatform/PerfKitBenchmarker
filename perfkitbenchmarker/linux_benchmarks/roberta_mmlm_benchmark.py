@@ -67,21 +67,43 @@ ENCODER_JSON = 'https://dl.fbaipublicfiles.com/fairseq/gpt2_bpe/encoder.json'
 VOCAB_BPE = 'https://dl.fbaipublicfiles.com/fairseq/gpt2_bpe/vocab.bpe'
 FAIRSEQ_DICT = 'https://dl.fbaipublicfiles.com/fairseq/gpt2_bpe/dict.txt'
 WORD_COUNT = 249997
-METADATA_COLUMNS = ('epoch', 'step', 'steps per epoch', 'loss', 'nll_loss',
-                    'ppl', 'wps', 'ups', 'wpb', 'bsz', 'num_updates', 'lr',
-                    'gnorm', 'clip', 'oom', 'loss_scale', 'wall', 'train_wall')
+METADATA_COLUMNS = (
+    'epoch',
+    'step',
+    'steps per epoch',
+    'loss',
+    'nll_loss',
+    'ppl',
+    'wps',
+    'ups',
+    'wpb',
+    'bsz',
+    'num_updates',
+    'lr',
+    'gnorm',
+    'clip',
+    'oom',
+    'loss_scale',
+    'wall',
+    'train_wall',
+)
 
 
 flags.DEFINE_integer('robertammlm_max_sentences', 2, 'max sentences')
 flags.DEFINE_integer('robertammlm_log_interval', 10, 'log interval')
 flags.DEFINE_integer('robertammlm_nproc_per_node', 8, 'nproc per node')
 flags.DEFINE_integer('robertammlm_update_freq', None, 'update frequence')
-flags.DEFINE_integer('robertammlm_num_copies', None,
-                     'num of training data copies.')
+flags.DEFINE_integer(
+    'robertammlm_num_copies', None, 'num of training data copies.'
+)
 flags.DEFINE_integer('robertammlm_global_batch_size', 8192, 'global batch size')
 flags.DEFINE_integer('robertammlm_max_epoch', 1, 'max number of epoch')
-flags.DEFINE_enum('robertammlm_profiler', None, [NVPROF, TFPROF],
-                  'profiler used to analysis GPU training')
+flags.DEFINE_enum(
+    'robertammlm_profiler',
+    None,
+    [NVPROF, TFPROF],
+    'profiler used to analysis GPU training',
+)
 
 
 def GetConfig(user_config):
@@ -118,8 +140,9 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   if FLAGS.robertammlm_update_freq:
     benchmark_spec.update_freq = FLAGS.robertammlm_update_freq
   else:
-    benchmark_spec.update_freq = (benchmark_spec.global_batch_size // (
-        benchmark_spec.max_sentences * num_accelerators))
+    benchmark_spec.update_freq = benchmark_spec.global_batch_size // (
+        benchmark_spec.max_sentences * num_accelerators
+    )
   if FLAGS.robertammlm_num_copies:
     benchmark_spec.num_copies = FLAGS.robertammlm_num_copies
   else:
@@ -137,22 +160,31 @@ def _DownloadData(benchmark_spec, rank):
   vm = benchmark_spec.vms[rank]
   vm.Install('pip3')
   vm.Install('wget')
-  vm.RemoteCommand('[ -d $HOME/fairseq ] || git clone {git} -b {branch}'
-                   .format(git=FAIRSEQ_GIT, branch=FAIRSEQ_BRANCH))
+  vm.RemoteCommand(
+      '[ -d $HOME/fairseq ] || git clone {git} -b {branch}'.format(
+          git=FAIRSEQ_GIT, branch=FAIRSEQ_BRANCH
+      )
+  )
   vm.RemoteCommand(f'{FLAGS.torch_env} python3 -m pip install pyarrow')
-  vm.RemoteCommand(f'cd fairseq && {FLAGS.torch_env} python3 -m pip install '
-                   '--editable .')
+  vm.RemoteCommand(
+      f'cd fairseq && {FLAGS.torch_env} python3 -m pip install --editable .'
+  )
   vm.RemoteCommand('mkdir -p {}'.format(DATA_PATH))
   text_zip = posixpath.join(DATA_PATH, posixpath.basename(WIKI_TEXT))
   vm.RemoteCommand('wget -O {des} {src}'.format(des=text_zip, src=WIKI_TEXT))
-  vm.RemoteCommand('unzip {text_zip} -d {data_path}'
-                   .format(data_path=DATA_PATH, text_zip=text_zip))
+  vm.RemoteCommand(
+      'unzip {text_zip} -d {data_path}'.format(
+          data_path=DATA_PATH, text_zip=text_zip
+      )
+  )
   bpe_dir = posixpath.join(DATA_PATH, 'gpt2_bpe')
   vm.RemoteCommand('mkdir -p {}'.format(bpe_dir))
-  vm.RemoteCommand('wget -O {des}/encoder.json {src}'
-                   .format(des=bpe_dir, src=ENCODER_JSON))
-  vm.RemoteCommand('wget -O {des}/vocab.bpe {src}'
-                   .format(des=bpe_dir, src=VOCAB_BPE))
+  vm.RemoteCommand(
+      'wget -O {des}/encoder.json {src}'.format(des=bpe_dir, src=ENCODER_JSON)
+  )
+  vm.RemoteCommand(
+      'wget -O {des}/vocab.bpe {src}'.format(des=bpe_dir, src=VOCAB_BPE)
+  )
   for phase in ('train', 'valid', 'test'):
     vm.RemoteCommand(
         f'cd {DATA_PATH} && {FLAGS.torch_env} python3 -m '
@@ -162,10 +194,12 @@ def _DownloadData(benchmark_spec, rank):
         f'--inputs wikitext-103-raw/wiki.{phase}.raw '
         f'--outputs wikitext-103-raw/wiki.{phase}.bpe '
         '--keep-empty '
-        '--workers 60 ')
+        '--workers 60 '
+    )
 
-  vm.RemoteCommand('wget -O {des}/dict.txt {src}'
-                   .format(des=bpe_dir, src=FAIRSEQ_DICT))
+  vm.RemoteCommand(
+      'wget -O {des}/dict.txt {src}'.format(des=bpe_dir, src=FAIRSEQ_DICT)
+  )
   vm.RemoteCommand(
       f'cd {DATA_PATH} && {FLAGS.torch_env} fairseq-preprocess '
       '--only-source  --srcdict gpt2_bpe/dict.txt '
@@ -173,18 +207,27 @@ def _DownloadData(benchmark_spec, rank):
       '--validpref wikitext-103-raw/wiki.valid.bpe '
       '--testpref wikitext-103-raw/wiki.test.bpe '
       '--destdir data-bin/wikitext-103 '
-      '--workers 60')
+      '--workers 60'
+  )
   data_bin = posixpath.join(DATA_PATH, 'data-bin')
   vm.RemoteCommand('mkdir -p {}/mlm-w103'.format(data_bin))
-  vm.RemoteCommand('for x in `seq 1 {word_count}`;'
-                   'do echo "$x 1" >> {data_bin}/mlm-w103/dict.txt;'
-                   'done'.format(word_count=WORD_COUNT, data_bin=data_bin))
+  vm.RemoteCommand(
+      'for x in `seq 1 {word_count}`;'
+      'do echo "$x 1" >> {data_bin}/mlm-w103/dict.txt;'
+      'done'.format(word_count=WORD_COUNT, data_bin=data_bin)
+  )
 
   for copy in range(benchmark_spec.num_copies):
-    vm.RemoteCommand('cp -r {data_bin}/wikitext-103 {data_bin}/mlm-w103/{copy}'
-                     .format(data_bin=data_bin, copy=copy))
-    vm.RemoteCommand('cp {data_bin}/mlm-w103/dict.txt {data_bin}/mlm-w103/'
-                     '{copy}'.format(data_bin=data_bin, copy=copy))
+    vm.RemoteCommand(
+        'cp -r {data_bin}/wikitext-103 {data_bin}/mlm-w103/{copy}'.format(
+            data_bin=data_bin, copy=copy
+        )
+    )
+    vm.RemoteCommand(
+        'cp {data_bin}/mlm-w103/dict.txt {data_bin}/mlm-w103/{copy}'.format(
+            data_bin=data_bin, copy=copy
+        )
+    )
 
 
 def _PrepareVm(benchmark_spec, rank):
@@ -203,13 +246,14 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vms = benchmark_spec.vms
   benchmark_spec.always_call_cleanup = True
-  list_params = [((benchmark_spec, rank), {})
-                 for rank in range(benchmark_spec.num_vms)]
+  list_params = [
+      ((benchmark_spec, rank), {}) for rank in range(benchmark_spec.num_vms)
+  ]
   background_tasks.RunThreaded(_PrepareVm, list_params)
   master = vms[0]
   if nvidia_driver.CheckNvidiaGpuExists(master):
@@ -222,7 +266,7 @@ def _CreateMetadataDict(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     metadata dict
@@ -271,16 +315,23 @@ def MakeSamplesFromOutput(metadata, output):
       r'loss_scale=(\S+), '
       r'wall=(\S+), '
       r'train_wall=(\S+)$',
-      output, re.MULTILINE)
+      output,
+      re.MULTILINE,
+  )
   samples = []
   for row in results:
     metadata_copy = metadata.copy()
     metadata_copy.update(zip(METADATA_COLUMNS, row))
     wps = float(metadata_copy['wps'])
     samples.append(sample.Sample('wps', wps, 'wps', metadata_copy))
-    samples.append(sample.Sample('wps per accelerator',
-                                 wps / metadata['num_accelerators'],
-                                 'wps', metadata_copy))
+    samples.append(
+        sample.Sample(
+            'wps per accelerator',
+            wps / metadata['num_accelerators'],
+            'wps',
+            metadata_copy,
+        )
+    )
   return samples
 
 
@@ -299,14 +350,17 @@ def _Run(benchmark_spec, rank):
   master = benchmark_spec.vms[0]
   nccl_env = []
   if FLAGS.nccl_cuda_visible_devices:
-    nccl_env.append('CUDA_VISIBLE_DEVICES={}'
-                    .format(FLAGS.nccl_cuda_visible_devices))
+    nccl_env.append(
+        'CUDA_VISIBLE_DEVICES={}'.format(FLAGS.nccl_cuda_visible_devices)
+    )
   nccl_env.extend(FLAGS.nccl_extra_params)
 
   prof_cmd = ''
   if benchmark_spec.profiler:
-    prof_cmd = (r'{}/bin/nvprof --profile-child-processes '
-                r'-o /tmp/pkb/%h.%p.nvprof'.format(cuda_toolkit.CUDA_HOME))
+    prof_cmd = (
+        r'{}/bin/nvprof --profile-child-processes '
+        r'-o /tmp/pkb/%h.%p.nvprof'.format(cuda_toolkit.CUDA_HOME)
+    )
 
   distributed_cmd = (
       'torch.distributed.launch '
@@ -314,11 +368,13 @@ def _Run(benchmark_spec, rank):
       '--nnodes={num_vms} '
       '--node_rank={rank} '
       '--master_addr={addr} '
-      '--master_port=2222'
-      .format(num_vms=benchmark_spec.num_vms,
-              rank=rank,
-              addr=master.internal_ip,
-              nproc_per_node=benchmark_spec.nproc_per_node))
+      '--master_port=2222'.format(
+          num_vms=benchmark_spec.num_vms,
+          rank=rank,
+          addr=master.internal_ip,
+          nproc_per_node=benchmark_spec.nproc_per_node,
+      )
+  )
 
   cmd_flags = {
       'adam-betas': "'(0.9, 0.98)'",
@@ -361,12 +417,14 @@ def _Run(benchmark_spec, rank):
   })
   roberta_benchmark_flags = ' '.join(
       f'--{key}={value}' if value else f'--{key}'
-      for key, value in sorted(cmd_flags.items()))
+      for key, value in sorted(cmd_flags.items())
+  )
   roberta_benchmark_cmd = (
       f'{FLAGS.torch_env} DGXSYSTEM=DGX1 NEXP=1 PULL=0 LOGDIR=/tmp/robertammlm '
       f'{" ".join(nccl_env)} {prof_cmd} python3 -m {distributed_cmd} '
       f'$HOME/fairseq/train.py {DATA_PATH}/data-bin/mlm-w103 '
-      f'{roberta_benchmark_flags}')
+      f'{roberta_benchmark_flags}'
+  )
   metadata = _CreateMetadataDict(benchmark_spec)
   stdout, _ = vm.RobustRemoteCommand(roberta_benchmark_cmd)
   return MakeSamplesFromOutput(metadata, stdout) if master == vm else []
@@ -375,8 +433,9 @@ def _Run(benchmark_spec, rank):
 def Run(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   samples = []
-  list_params = [((benchmark_spec, rank), {})
-                 for rank in range(benchmark_spec.num_vms)]
+  list_params = [
+      ((benchmark_spec, rank), {}) for rank in range(benchmark_spec.num_vms)
+  ]
   for results in background_tasks.RunThreaded(_Run, list_params):
     samples.extend(results)
   return samples

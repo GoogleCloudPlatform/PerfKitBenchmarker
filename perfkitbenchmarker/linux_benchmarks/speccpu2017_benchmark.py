@@ -38,45 +38,72 @@ from perfkitbenchmarker.linux_packages import speccpu
 from perfkitbenchmarker.linux_packages import speccpu2017
 
 INT_SUITE = [
-    'perlbench', 'gcc', 'mcf', 'omnetpp', 'xalancbmk', 'x264', 'deepsjeng',
-    'leela', 'exchange2', 'xz'
+    'perlbench',
+    'gcc',
+    'mcf',
+    'omnetpp',
+    'xalancbmk',
+    'x264',
+    'deepsjeng',
+    'leela',
+    'exchange2',
+    'xz',
 ]
 INTSPEED_SUITE = [benchmark + '_s' for benchmark in INT_SUITE]
 INTRATE_SUITE = [benchmark + '_r' for benchmark in INT_SUITE]
 
 COMMON_FP_SUITE = [
-    'bwaves', 'cactuBSSN', 'lbm', 'wrf', 'cam4', 'imagick', 'nab', 'fotonik3d',
-    'roms'
+    'bwaves',
+    'cactuBSSN',
+    'lbm',
+    'wrf',
+    'cam4',
+    'imagick',
+    'nab',
+    'fotonik3d',
+    'roms',
 ]
 FPSPEED_SUITE = [benchmark + '_s' for benchmark in COMMON_FP_SUITE] + ['pop2_s']
-FPRATE_SUITE = [benchmark + '_r' for benchmark in COMMON_FP_SUITE
-               ] + ['namd_r', 'parest_r', 'povray_r', 'blender_r']
+FPRATE_SUITE = [benchmark + '_r' for benchmark in COMMON_FP_SUITE] + [
+    'namd_r',
+    'parest_r',
+    'povray_r',
+    'blender_r',
+]
 
 FLAGS = flags.FLAGS
 
 flags.DEFINE_boolean(
-    'spec17_build_only', False,
-    'Compile benchmarks only, but don\'t run benchmarks. '
+    'spec17_build_only',
+    False,
+    "Compile benchmarks only, but don't run benchmarks. "
     'Defaults to False. The benchmark fails if the build '
-    'fails.')
+    'fails.',
+)
 flags.DEFINE_boolean(
-    'spec17_rebuild', True,
+    'spec17_rebuild',
+    True,
     'Rebuild spec binaries, defaults to True. Set to False '
-    'when using run_stage_iterations > 1 to avoid recompiling')
+    'when using run_stage_iterations > 1 to avoid recompiling',
+)
 flags.DEFINE_string(
-    'spec17_gcc_flags', '-O3',
-    'Flags to be used to override the default GCC -O3 used '
-    'to compile SPEC.')
+    'spec17_gcc_flags',
+    '-O3',
+    'Flags to be used to override the default GCC -O3 used to compile SPEC.',
+)
 flags.DEFINE_boolean(
-    'spec17_best_effort', False,
-    'Best effort run of spec. Allow missing results without failing.')
+    'spec17_best_effort',
+    False,
+    'Best effort run of spec. Allow missing results without failing.',
+)
 flags.DEFINE_string(
-    'spec17_numa_bind_config', None,
+    'spec17_numa_bind_config',
+    None,
     'Name of the config file to use for specifying NUMA binding. '
     'None by default. To enable numa binding, ensure the runspec_config file, '
     'contains "include: numactl.inc". In addition, setting to "auto", will '
     'attempt to pin to local numa node and pin each SIR copy to a '
-    'exclusive hyperthread.'
+    'exclusive hyperthread.',
 )
 
 BENCHMARK_NAME = 'speccpu2017'
@@ -115,7 +142,8 @@ def CheckPrerequisites(benchmark_config):
   del benchmark_config  # unused
   if FLAGS.spec17_fdo and FLAGS.spec_runmode == 'base':
     raise errors.Config.InvalidValue(
-        'Feedback Directed Optimization is not allowed with base report.')
+        'Feedback Directed Optimization is not allowed with base report.'
+    )
 
 
 def CheckVmPrerequisites(vm):
@@ -136,13 +164,15 @@ def CheckVmPrerequisites(vm):
     # AWS machines that advertise 16 GB have slightly less than that
     if available_memory < 15.6 * KB_TO_GB_MULTIPLIER:
       raise errors.Config.InvalidValue(
-          'Available memory of %s GB is insufficient for spec17 speed runs.' %
-          (available_memory / KB_TO_GB_MULTIPLIER))
+          'Available memory of %s GB is insufficient for spec17 speed runs.'
+          % (available_memory / KB_TO_GB_MULTIPLIER)
+      )
   if 'intrate' in FLAGS.spec17_subset or 'fprate' in FLAGS.spec17_subset:
     if available_memory < 2 * KB_TO_GB_MULTIPLIER:
       raise errors.Config.InvalidValue(
-          'Available memory of %s GB is insufficient for spec17 rate runs.' %
-          (available_memory / KB_TO_GB_MULTIPLIER))
+          'Available memory of %s GB is insufficient for spec17 rate runs.'
+          % (available_memory / KB_TO_GB_MULTIPLIER)
+      )
 
 
 def Prepare(benchmark_spec):
@@ -173,23 +203,25 @@ def _GenNumactlIncFile(vm):
   """Generates numactl.inc file."""
   config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
   if FLAGS.spec17_numa_bind_config:
-    remote_numactl_path = os.path.join(
-        config.spec_dir, 'config', 'numactl.inc')
+    remote_numactl_path = os.path.join(config.spec_dir, 'config', 'numactl.inc')
     vm.Install('numactl')
     if FLAGS.spec17_numa_bind_config == 'auto':
       # Upload config and rename
       numa_bind_cfg = [
           'intrate,fprate:',
-          'submit = echo "${command}" > run.sh ; $BIND bash run.sh']
+          'submit = echo "${command}" > run.sh ; $BIND bash run.sh',
+      ]
       for idx in range(vm.NumCpusForBenchmark()):
         numa_bind_cfg.append(
             f'bind{idx} = /usr/bin/numactl --physcpubind=+{idx} --localalloc'
         )
       vm_util.CreateRemoteFile(
-          vm, '\n'.join(numa_bind_cfg), remote_numactl_path)
+          vm, '\n'.join(numa_bind_cfg), remote_numactl_path
+      )
     else:
-      vm.PushFile(data.ResourcePath(FLAGS.spec17_numa_bind_config),
-                  remote_numactl_path)
+      vm.PushFile(
+          data.ResourcePath(FLAGS.spec17_numa_bind_config), remote_numactl_path
+      )
     vm.RemoteCommand(f'cat {remote_numactl_path}')
   else:
     cfg_file_path = getattr(vm, speccpu.VM_STATE_ATTR, config).cfg_file_path
@@ -198,21 +230,24 @@ def _GenNumactlIncFile(vm):
 
 def _GenIncFile(vm):
   """Generates .inc files when not already included in tarballs."""
-  if re.search(r'amd_(speed|rate)_aocc300_milan_(A1|B2).cfg',
-               FLAGS.runspec_config):
-
+  if re.search(
+      r'amd_(speed|rate)_aocc300_milan_(A1|B2).cfg', FLAGS.runspec_config
+  ):
     # python script requires stdin
     vm.RemoteCommand("printf 'yes\nyes\nyes\n' > yes.txt")
     config = FLAGS.runspec_config.split('.')[0]
-    cmd = (f'cd /scratch/cpu2017 && sudo ./run_{config}.py '
-           '--tuning=base --exit_after_inc_gen < ~/yes.txt')
+    cmd = (
+        f'cd /scratch/cpu2017 && sudo ./run_{config}.py '
+        '--tuning=base --exit_after_inc_gen < ~/yes.txt'
+    )
     stdout, _ = vm.RemoteCommand(cmd)
     if 'ERROR' in stdout:
       raise errors.Benchmarks.PrepareException(
           'Error during creation of .inc file.'
           ' This is likely due to a missing entry in cpu_info.json for the'
           ' given machine type and speccpu17 tar file. This will cause the'
-          ' run to fail.')
+          ' run to fail.'
+      )
 
 
 def Run(benchmark_spec):
@@ -238,7 +273,7 @@ def Run(benchmark_spec):
 def _OverwriteGccO3(vm):
   config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
   config_filepath = getattr(vm, speccpu.VM_STATE_ATTR, config).cfg_file_path
-  cmd = (f'sed -i \'s/-g -O3/{FLAGS.spec17_gcc_flags}/g\' {config_filepath}')
+  cmd = f"sed -i 's/-g -O3/{FLAGS.spec17_gcc_flags}/g' {config_filepath}"
   vm.RemoteCommand(cmd)
   return
 
@@ -260,10 +295,12 @@ def _Run(vm):
   # swap only if necessary; free local node memory and avoid remote memory;
   # reset caches; set stack size to unlimited
   # Also consider setting enable_transparent_hugepages flag to true
-  cmd = ('echo 1 | sudo tee /proc/sys/vm/swappiness && '
-         'echo 1 | sudo tee /proc/sys/vm/zone_reclaim_mode && '
-         'sync ; echo 3 | sudo tee /proc/sys/vm/drop_caches && '
-         'ulimit -s unlimited && ')
+  cmd = (
+      'echo 1 | sudo tee /proc/sys/vm/swappiness && '
+      'echo 1 | sudo tee /proc/sys/vm/zone_reclaim_mode && '
+      'sync ; echo 3 | sudo tee /proc/sys/vm/drop_caches && '
+      'ulimit -s unlimited && '
+  )
 
   cmd += 'runcpu '
   if FLAGS.spec17_build_only:
@@ -275,17 +312,20 @@ def _Run(vm):
   copies = FLAGS.spec17_copies or vm.NumCpusForBenchmark()
   version_specific_parameters.append(f' --copies={copies} ')
   version_specific_parameters.append(
-      ' --threads=%s ' % (FLAGS.spec17_threads or vm.NumCpusForBenchmark()))
+      ' --threads=%s ' % (FLAGS.spec17_threads or vm.NumCpusForBenchmark())
+  )
   version_specific_parameters.append(
-      ' --define build_ncpus=%s ' % (vm.NumCpusForBenchmark()))
+      ' --define build_ncpus=%s ' % (vm.NumCpusForBenchmark())
+  )
 
   if FLAGS.spec17_fdo:
     version_specific_parameters.append('--feedback ')
     vm.RemoteCommand('cd /scratch/cpu2017; mkdir fdo_profiles')
 
   start_time = time.time()
-  stdout, _ = speccpu.Run(vm, cmd, ' '.join(FLAGS.spec17_subset),
-                          version_specific_parameters)
+  stdout, _ = speccpu.Run(
+      vm, cmd, ' '.join(FLAGS.spec17_subset), version_specific_parameters
+  )
 
   if not FLAGS.spec17_best_effort:
     if 'Error' in stdout and 'Please review this file' in stdout:
@@ -295,10 +335,13 @@ def _Run(vm):
     return [
         sample.Sample(
             'compilation_time',
-            time.time() - start_time, 's', {
+            time.time() - start_time,
+            's',
+            {
                 'spec17_subset': FLAGS.spec17_subset,
-                'gcc_version': build_tools.GetVersion(vm, 'gcc')
-            })
+                'gcc_version': build_tools.GetVersion(vm, 'gcc'),
+            },
+        )
     ]
 
   partial_results = True
@@ -323,7 +366,8 @@ def _Run(vm):
 
   for log_file in log_files:
     vm.RemoteCommand(
-        f'cp {vm.GetScratchDir()}/cpu2017/result/{log_file} ~/{log_file}.log')
+        f'cp {vm.GetScratchDir()}/cpu2017/result/{log_file} ~/{log_file}.log'
+    )
     vm.PullFile(vm_util.GetTempDir(), f'~/{log_file}.log')
 
   samples = speccpu.ParseOutput(vm, log_files, partial_results, None)

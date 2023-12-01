@@ -31,26 +31,32 @@ from perfkitbenchmarker.linux_packages import ior
 FLAGS = flags.FLAGS
 
 flags.DEFINE_integer(
-    'ior_num_procs', 256,
-    'The number of MPI processes to use for IOR.')
+    'ior_num_procs', 256, 'The number of MPI processes to use for IOR.'
+)
 flags.DEFINE_string(
-    'ior_script', 'default_ior_script',
+    'ior_script',
+    'default_ior_script',
     'The IOR script to run. See '
     'https://github.com/hpc/ior/blob/master/doc/sphinx/userDoc/skripts.rst '
-    'for more info.')
+    'for more info.',
+)
 flags.DEFINE_integer(
-    'mdtest_num_procs', 32,
-    'The number of MPI processes to use for mdtest.')
+    'mdtest_num_procs', 32, 'The number of MPI processes to use for mdtest.'
+)
 flags.DEFINE_list(
-    'mdtest_args', ['-n 1000 -u'],
+    'mdtest_args',
+    ['-n 1000 -u'],
     'Command line arguments to be passed to mdtest. '
-    'Each set of args in the list will be run separately.')
+    'Each set of args in the list will be run separately.',
+)
 flags.DEFINE_boolean(
-    'mdtest_drop_caches', True,
+    'mdtest_drop_caches',
+    True,
     'Whether to drop caches between the create/stat/delete phases. '
     'If this is set, mdtest will be run 3 times with the -C, -T, and -r '
     'options and the client page caches will be dropped between runs. '
-    'When False, a Full Sweep (Create, Stat, Delete) is run.')
+    'When False, a Full Sweep (Create, Stat, Delete) is run.',
+)
 
 
 BENCHMARK_NAME = 'ior'
@@ -77,7 +83,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   background_tasks.RunThreaded(lambda vm: vm.Install('ior'), vms)
@@ -90,7 +96,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -99,19 +105,23 @@ def Run(benchmark_spec):
   results = []
   # Run IOR benchmark.
   if FLAGS.ior_num_procs and FLAGS.ior_script:
-    remote_script_path = posixpath.join(master_vm.scratch_disks[0].mount_point,
-                                        FLAGS.ior_script)
+    remote_script_path = posixpath.join(
+        master_vm.scratch_disks[0].mount_point, FLAGS.ior_script
+    )
     master_vm.PushDataFile(
         FLAGS.ior_script,
         remote_script_path,
         # SCP directly to SMB returns an error, so first copy to disk.
-        should_double_copy=(FLAGS.data_disk_type == disk.SMB))
+        should_double_copy=(FLAGS.data_disk_type == disk.SMB),
+    )
     results += ior.RunIOR(master_vm, FLAGS.ior_num_procs, remote_script_path)
 
   # Run mdtest benchmark.
   phase_args = ('-C', '-T', '-r') if FLAGS.mdtest_drop_caches else ('-C -T -r',)
-  mdtest_args = (' '.join(args) for args in
-                 itertools.product(FLAGS.mdtest_args, phase_args))
+  mdtest_args = (
+      ' '.join(args)
+      for args in itertools.product(FLAGS.mdtest_args, phase_args)
+  )
   for args in mdtest_args:
     results += ior.RunMdtest(master_vm, FLAGS.mdtest_num_procs, args)
     if FLAGS.mdtest_drop_caches:
@@ -127,6 +137,6 @@ def Cleanup(unused_benchmark_spec):
 
   Args:
     unused_benchmark_spec: The benchmark specification. Contains all data that
-        is required to run the benchmark.
+      is required to run the benchmark.
   """
   pass

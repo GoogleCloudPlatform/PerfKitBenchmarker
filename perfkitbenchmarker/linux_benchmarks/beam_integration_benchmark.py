@@ -55,20 +55,33 @@ beam_integration_benchmark:
 """
 
 DEFAULT_JAVA_IT_CLASS = 'org.apache.beam.examples.WordCountIT'
-DEFAULT_PYTHON_IT_MODULE = ('apache_beam.examples.wordcount_it_test:'
-                            'WordCountIT.test_wordcount_it')
+DEFAULT_PYTHON_IT_MODULE = (
+    'apache_beam.examples.wordcount_it_test:WordCountIT.test_wordcount_it'
+)
 
 flags.DEFINE_string('beam_it_class', None, 'Path to IT class')
-flags.DEFINE_string('beam_it_args', None, 'Args to provide to the IT.'
-                    ' Deprecated & replaced by beam_it_options')
-flags.DEFINE_string('beam_it_options', None, 'Pipeline Options sent to the'
-                    ' integration test.')
-flags.DEFINE_string('beam_kubernetes_scripts', None, 'A local path to the'
-                    ' Kubernetes scripts to run which will instantiate a'
-                    ' datastore.')
-flags.DEFINE_string('beam_options_config_file', None, 'A local path to the'
-                    ' yaml file defining static and dynamic pipeline options to'
-                    ' use for this benchmark run.')
+flags.DEFINE_string(
+    'beam_it_args',
+    None,
+    'Args to provide to the IT. Deprecated & replaced by beam_it_options',
+)
+flags.DEFINE_string(
+    'beam_it_options', None, 'Pipeline Options sent to the integration test.'
+)
+flags.DEFINE_string(
+    'beam_kubernetes_scripts',
+    None,
+    'A local path to the'
+    ' Kubernetes scripts to run which will instantiate a'
+    ' datastore.',
+)
+flags.DEFINE_string(
+    'beam_options_config_file',
+    None,
+    'A local path to the'
+    ' yaml file defining static and dynamic pipeline options to'
+    ' use for this benchmark run.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -88,18 +101,22 @@ def CheckPrerequisites(benchmark_config_spec):
     raise errors.Config.InvalidValue(
         'No options provided. To run with default class (WordCountIT), must'
         ' provide --beam_it_options=--tempRoot=<temp dir,'
-        ' e.g. gs://my-dir/temp>.')
+        ' e.g. gs://my-dir/temp>.'
+    )
   if FLAGS.beam_sdk is None:
     raise errors.Config.InvalidValue(
         'No sdk provided. To run Beam integration benchmark, the test must'
-        'specify which sdk is used in the pipeline. For example, java/python.')
+        'specify which sdk is used in the pipeline. For example, java/python.'
+    )
   if benchmark_config_spec.dpb_service.service_type != dpb_constants.DATAFLOW:
     raise NotImplementedError('Currently only works against Dataflow.')
-  if (FLAGS.beam_it_options and
-      (not FLAGS.beam_it_options.endswith(']') or
-       not FLAGS.beam_it_options.startswith('['))):
-    raise Exception("beam_it_options must be of form"
-                    " [\"--option=value\",\"--option2=val2\"]")
+  if FLAGS.beam_it_options and (
+      not FLAGS.beam_it_options.endswith(']')
+      or not FLAGS.beam_it_options.startswith('[')
+  ):
+    raise Exception(
+        'beam_it_options must be of form ["--option=value","--option2=val2"]'
+    )
 
 
 def Prepare(benchmark_spec):
@@ -123,9 +140,9 @@ def Run(benchmark_spec):
 
   # Create a file handle to contain the response from running the job on
   # the dpb service
-  stdout_file = tempfile.NamedTemporaryFile(suffix='.stdout',
-                                            prefix='beam_integration_benchmark',
-                                            delete=False)
+  stdout_file = tempfile.NamedTemporaryFile(
+      suffix='.stdout', prefix='beam_integration_benchmark', delete=False
+  )
   stdout_file.close()
 
   if FLAGS.beam_it_class is None:
@@ -138,13 +155,16 @@ def Run(benchmark_spec):
   else:
     classname = FLAGS.beam_it_class
 
-  static_pipeline_options, dynamic_pipeline_options = \
+  static_pipeline_options, dynamic_pipeline_options = (
       beam_pipeline_options.ReadPipelineOptionConfigFile()
+  )
 
   job_arguments = beam_pipeline_options.GenerateAllPipelineOptions(
-      FLAGS.beam_it_args, FLAGS.beam_it_options,
+      FLAGS.beam_it_args,
+      FLAGS.beam_it_options,
       static_pipeline_options,
-      dynamic_pipeline_options)
+      dynamic_pipeline_options,
+  )
 
   job_type = dpb_constants.BEAM_JOB_TYPE
 
@@ -156,7 +176,8 @@ def Run(benchmark_spec):
       classname=classname,
       job_arguments=job_arguments,
       job_stdout_file=stdout_file,
-      job_type=job_type)
+      job_type=job_type,
+  )
   end_time = datetime.datetime.now()
   run_time = (end_time - start).total_seconds()
   results.append(sample.Sample('run_time', run_time, 'seconds', metadata))

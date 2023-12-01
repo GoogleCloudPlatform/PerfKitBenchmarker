@@ -34,13 +34,13 @@ from perfkitbenchmarker.configs import option_decoders
 import six
 
 
-class CopyThroughputBenchmarkSpec(
-    benchmark_config_spec.BenchmarkConfigSpec):
+class CopyThroughputBenchmarkSpec(benchmark_config_spec.BenchmarkConfigSpec):
 
   def __init__(self, component_full_name, **kwargs):
     self.data_size_in_mb = None
     super(CopyThroughputBenchmarkSpec, self).__init__(
-        component_full_name, **kwargs)
+        component_full_name, **kwargs
+    )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -51,19 +51,29 @@ class CopyThroughputBenchmarkSpec(
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(CopyThroughputBenchmarkSpec,
-                   cls)._GetOptionDecoderConstructions()
+    result = super(
+        CopyThroughputBenchmarkSpec, cls
+    )._GetOptionDecoderConstructions()
     result.update({
         'data_size_in_mb': (option_decoders.FloatDecoder, {'default': None}),
     })
     return result
 
-flags.DEFINE_enum('copy_benchmark_mode', 'cp', ['cp', 'dd', 'scp'],
-                  'Runs either cp, dd or scp tests.')
-flags.DEFINE_integer('copy_benchmark_single_file_mb', None, 'If set, a '
-                     'single file of the specified number of MB is used '
-                     'instead of the normal cloud-storage-workload.sh basket '
-                     'of files.  Not supported when copy_benchmark_mode is dd')
+
+flags.DEFINE_enum(
+    'copy_benchmark_mode',
+    'cp',
+    ['cp', 'dd', 'scp'],
+    'Runs either cp, dd or scp tests.',
+)
+flags.DEFINE_integer(
+    'copy_benchmark_single_file_mb',
+    None,
+    'If set, a '
+    'single file of the specified number of MB is used '
+    'instead of the normal cloud-storage-workload.sh basket '
+    'of files.  Not supported when copy_benchmark_mode is dd',
+)
 
 FLAGS = flags.FLAGS
 
@@ -97,7 +107,8 @@ def GetConfig(user_config):
   if FLAGS.copy_benchmark_mode == 'dd' and FLAGS.copy_benchmark_single_file_mb:
     raise errors.Setup.InvalidFlagConfigurationError(
         'Flag copy_benchmark_single_file_mb is not supported when flag '
-        'copy_benchmark_mode is dd.')
+        'copy_benchmark_mode is dd.'
+    )
 
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS.copy_benchmark_mode == 'scp':
@@ -113,6 +124,7 @@ def CheckPrerequisites(benchmark_config):
 
   Args:
    benchmark_config: Unused
+
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
@@ -130,11 +142,14 @@ def PrepareDataFile(vm, data_size_in_mb):
   file_path = data.ResourcePath(DATA_FILE)
   vm.PushFile(file_path, '%s/' % vm.GetScratchDir(0))
   if data_size_in_mb:
-    vm.RemoteCommand('cd %s/; bash cloud-storage-workload.sh single_file %s'
-                     % (vm.GetScratchDir(0), data_size_in_mb))
+    vm.RemoteCommand(
+        'cd %s/; bash cloud-storage-workload.sh single_file %s'
+        % (vm.GetScratchDir(0), data_size_in_mb)
+    )
   else:
-    vm.RemoteCommand('cd %s/; bash cloud-storage-workload.sh'
-                     % vm.GetScratchDir(0))
+    vm.RemoteCommand(
+        'cd %s/; bash cloud-storage-workload.sh' % vm.GetScratchDir(0)
+    )
 
 
 def PreparePrivateKey(vm):
@@ -146,13 +161,15 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   background_tasks.RunThreaded(PreparePrivateKey, vms)
 
-  args = [((vm, benchmark_spec.config.data_size_in_mb), {})
-          for vm in benchmark_spec.vms]
+  args = [
+      ((vm, benchmark_spec.config.data_size_in_mb), {})
+      for vm in benchmark_spec.vms
+  ]
   background_tasks.RunThreaded(PrepareDataFile, args)
 
 
@@ -167,15 +184,23 @@ def RunCp(vms, data_size_in_mb, metadata):
   Returns:
     A list of sample.Sample objects.
   """
-  cmd = ('rm -rf %s/*; sudo sync; sudo sysctl vm.drop_caches=3; '
-         'time cp %s/data/* %s/; ' %
-         (vms[0].GetScratchDir(1), vms[0].GetScratchDir(0),
-          vms[0].GetScratchDir(1)))
+  cmd = (
+      'rm -rf %s/*; sudo sync; sudo sysctl vm.drop_caches=3; '
+      'time cp %s/data/* %s/; '
+      % (
+          vms[0].GetScratchDir(1),
+          vms[0].GetScratchDir(0),
+          vms[0].GetScratchDir(1),
+      )
+  )
   _, res = vms[0].RemoteCommand(cmd)
   logging.info(res)
   time_used = vm_util.ParseTimeCommandResult(res)
-  return [sample.Sample('cp throughput', data_size_in_mb / time_used, UNIT,
-                        metadata=metadata)]
+  return [
+      sample.Sample(
+          'cp throughput', data_size_in_mb / time_used, UNIT, metadata=metadata
+      )
+  ]
 
 
 def RunDd(vms, data_size_in_mb, metadata):
@@ -191,16 +216,20 @@ def RunDd(vms, data_size_in_mb, metadata):
     metadata), as accepted by PerfKitBenchmarkerPublisher.AddSamples.
   """
   vm = vms[0]
-  cmd = ('rm -rf %s/*; sudo sync; sudo sysctl vm.drop_caches=3; '
-         'time for i in {0..99}; do dd if=%s/data/file-$i.dat '
-         'of=%s/file-$i.dat bs=262144; done' %
-         (vm.GetScratchDir(1), vm.GetScratchDir(0),
-          vm.GetScratchDir(1)))
+  cmd = (
+      'rm -rf %s/*; sudo sync; sudo sysctl vm.drop_caches=3; '
+      'time for i in {0..99}; do dd if=%s/data/file-$i.dat '
+      'of=%s/file-$i.dat bs=262144; done'
+      % (vm.GetScratchDir(1), vm.GetScratchDir(0), vm.GetScratchDir(1))
+  )
   _, res = vm.RemoteCommand(cmd)
   logging.info(res)
   time_used = vm_util.ParseTimeCommandResult(res)
-  return [sample.Sample('dd throughput', data_size_in_mb / time_used, UNIT,
-                        metadata=metadata)]
+  return [
+      sample.Sample(
+          'dd throughput', data_size_in_mb / time_used, UNIT, metadata=metadata
+      )
+  ]
 
 
 def AvailableCiphers(vm):
@@ -211,13 +240,16 @@ def AvailableCiphers(vm):
 
 def ChooseSshCipher(vms):
   """Returns the most-preferred cipher that's available to all vms."""
-  available = functools.reduce(lambda a, b: a & b,
-                               [AvailableCiphers(vm) for vm in vms])
+  available = functools.reduce(
+      lambda a, b: a & b, [AvailableCiphers(vm) for vm in vms]
+  )
   for cipher in CIPHERS:
     if cipher in available:
       return cipher
-  raise Exception('None of the preferred ciphers (%s) are available (%s).'
-                  % (CIPHERS, available))
+  raise Exception(
+      'None of the preferred ciphers (%s) are available (%s).'
+      % (CIPHERS, available)
+  )
 
 
 def RunScp(vms, data_size_in_mb, metadata):
@@ -234,20 +266,20 @@ def RunScp(vms, data_size_in_mb, metadata):
   """
   cipher = ChooseSshCipher(vms)
   result = RunScpSingleDirection(
-      vms[0], vms[1], cipher, data_size_in_mb, metadata)
+      vms[0], vms[1], cipher, data_size_in_mb, metadata
+  )
   result += RunScpSingleDirection(
-      vms[1], vms[0], cipher, data_size_in_mb, metadata)
+      vms[1], vms[0], cipher, data_size_in_mb, metadata
+  )
   return result
 
 
-MODE_FUNCTION_DICTIONARY = {
-    'cp': RunCp,
-    'dd': RunDd,
-    'scp': RunScp}
+MODE_FUNCTION_DICTIONARY = {'cp': RunCp, 'dd': RunDd, 'scp': RunScp}
 
 
-def RunScpSingleDirection(sending_vm, receiving_vm, cipher,
-                          data_size_in_mb, base_metadata):
+def RunScpSingleDirection(
+    sending_vm, receiving_vm, cipher, data_size_in_mb, base_metadata
+):
   """Run scp from sending_vm to receiving_vm and parse results.
 
   If 'receiving_vm' is accessible via internal IP from 'sending_vm', throughput
@@ -270,12 +302,16 @@ def RunScpSingleDirection(sending_vm, receiving_vm, cipher,
     for k, v in six.iteritems(vm.GetResourceMetadata()):
       metadata['{0}_{1}'.format(vm_specifier, k)] = v
 
-  cmd_template = ('sudo sync; sudo sysctl vm.drop_caches=3; '
-                  'time /usr/bin/scp -o StrictHostKeyChecking=no -i %s -c %s '
-                  '%s %s@%%s:%%s/;') % (
-                      linux_virtual_machine.REMOTE_KEY_PATH, cipher,
-                      '%s/data/*' % sending_vm.GetScratchDir(0),
-                      receiving_vm.user_name)
+  cmd_template = (
+      'sudo sync; sudo sysctl vm.drop_caches=3; '
+      'time /usr/bin/scp -o StrictHostKeyChecking=no -i %s -c %s '
+      '%s %s@%%s:%%s/;'
+  ) % (
+      linux_virtual_machine.REMOTE_KEY_PATH,
+      cipher,
+      '%s/data/*' % sending_vm.GetScratchDir(0),
+      receiving_vm.user_name,
+  )
 
   def RunForIpAddress(ip_address, ip_type):
     """Run SCP benchmark against a destination IP address."""
@@ -304,7 +340,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of throughput samples. Each sample contains
@@ -317,11 +353,13 @@ def Run(benchmark_spec):
   if benchmark_spec.config.data_size_in_mb:
     data_size_for_calculation = benchmark_spec.config.data_size_in_mb
 
-  metadata = {'copy_benchmark_single_file_mb':
-              benchmark_spec.config.data_size_in_mb}
+  metadata = {
+      'copy_benchmark_single_file_mb': benchmark_spec.config.data_size_in_mb
+  }
 
   results = MODE_FUNCTION_DICTIONARY[FLAGS.copy_benchmark_mode](
-      vms, data_size_for_calculation, metadata)
+      vms, data_size_for_calculation, metadata
+  )
 
   return results
 
@@ -331,6 +369,6 @@ def Cleanup(benchmark_spec):  # pylint: disable=unused-argument
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   pass

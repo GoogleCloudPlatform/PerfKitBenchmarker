@@ -193,7 +193,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
           ),
       ],
       max_concurrency=2,
-      post_task_delay=hammerdb.HAMMERDB_TPCC_RAMPUP.value
+      post_task_delay=hammerdb.HAMMERDB_TPCC_RAMPUP.value,
   )
 
   return output_samples_list[0] + output_samples_list[1]

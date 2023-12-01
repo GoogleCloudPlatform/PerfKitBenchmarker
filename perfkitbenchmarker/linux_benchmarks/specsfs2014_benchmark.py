@@ -35,7 +35,6 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-
 from perfkitbenchmarker.linux_packages import gluster
 import six
 
@@ -43,37 +42,50 @@ FLAGS = flags.FLAGS
 BENCHMARKS = ['VDI', 'DATABASE', 'SWBUILD', 'VDA', 'EDA']
 
 flags.DEFINE_string(
-    'specsfs2014_config', None,
+    'specsfs2014_config',
+    None,
     'This flag can be used to specify an alternate SPEC config file to use. '
     'If this option is specified, none of the other benchmark specific flags '
     'which operate on the config file will be used (since the default config '
-    'file will be replaced by this one).')
-flags.DEFINE_list('specsfs2014_benchmarks', BENCHMARKS,
-                  'The SPEC SFS 2014 benchmarks to run.')
+    'file will be replaced by this one).',
+)
+flags.DEFINE_list(
+    'specsfs2014_benchmarks', BENCHMARKS, 'The SPEC SFS 2014 benchmarks to run.'
+)
 flags.register_validator(
     'specsfs2014_benchmarks',
     lambda benchmarks: benchmarks and set(benchmarks).issubset(BENCHMARKS),
-    'Invalid benchmarks list. specsfs2014_benchmarks must be a subset of ' +
-    ', '.join(BENCHMARKS))
+    'Invalid benchmarks list. specsfs2014_benchmarks must be a subset of '
+    + ', '.join(BENCHMARKS),
+)
 flag_util.DEFINE_integerlist(
-    'specsfs2014_load', [1],
+    'specsfs2014_load',
+    [1],
     'The starting load in units of SPEC "business metrics". The meaning of '
     'business metric varies depending on the SPEC benchmark (e.g. VDI has '
-    'load measured in virtual desktops).', module_name=__name__)
+    'load measured in virtual desktops).',
+    module_name=__name__,
+)
 flags.DEFINE_integer(
-    'specsfs2014_incr_load', 1,
+    'specsfs2014_incr_load',
+    1,
     'The amount to increment "load" by for each run.',
-    lower_bound=1)
+    lower_bound=1,
+)
 flags.DEFINE_integer(
-    'specsfs2014_num_runs', 1,
+    'specsfs2014_num_runs',
+    1,
     'The total number of SPEC runs. The load for the nth run is '
     '"load" + n * "specsfs_incr_load".',
-    lower_bound=1)
+    lower_bound=1,
+)
 flags.DEFINE_boolean(
-    'specsfs2014_auto_mode', False,
+    'specsfs2014_auto_mode',
+    False,
     'If True, automatically find the max passing score for each benchmark. '
     'This ignores other flags such as specsfs2014_load, specsfs2014_incr_load, '
-    'and specsfs2014_num_runs.')
+    'and specsfs2014_num_runs.',
+)
 
 BENCHMARK_NAME = 'specsfs2014'
 BENCHMARK_CONFIG = """
@@ -102,18 +114,27 @@ _VOLUME_NAME = 'gv0'
 _MOUNT_POINT = '/scratch'
 _MOUNTPOINTS_FILE = 'mountpoints.txt'
 _PUBLISHED_METRICS = frozenset([
-    'achieved rate', 'average latency', 'overall throughput',
-    'read throughput', 'write throughput'
+    'achieved rate',
+    'average latency',
+    'overall throughput',
+    'read throughput',
+    'write throughput',
 ])
 _METADATA_KEYS = frozenset([
-    'op rate', 'run time', 'processes per client', 'file size',
-    'client data set size', 'starting data set size', 'initial file space',
-    'maximum file space'
+    'op rate',
+    'run time',
+    'processes per client',
+    'file size',
+    'client data set size',
+    'starting data set size',
+    'initial file space',
+    'maximum file space',
 ])
 
 BENCHMARK_DATA = {
-    _SPEC_SFS_2014_ISO:
+    _SPEC_SFS_2014_ISO: (
         '666d3f79e9184211736c32c825edb007c6a5ad88eeceb3c99aa01acf733c6fb3'
+    )
 }
 
 
@@ -137,17 +158,20 @@ def _PrepareSpec(vm):
   mount_dir = 'spec_mnt'
   vm.RemoteCommand('mkdir %s' % mount_dir)
   vm.RemoteCommand('mkdir %s' % _SPEC_DIR)
-  vm.InstallPreprovisionedBenchmarkData('specsfs2014', [_SPEC_SFS_2014_ISO],
-                                        '~/')
+  vm.InstallPreprovisionedBenchmarkData(
+      'specsfs2014', [_SPEC_SFS_2014_ISO], '~/'
+  )
   vm.PushFile(data.ResourcePath(_SPEC_SFS_2014_LICENSE), _SPEC_DIR)
-  vm.RemoteCommand('sudo mount -t iso9660 -o loop %s %s' %
-                   (_SPEC_SFS_2014_ISO, mount_dir))
+  vm.RemoteCommand(
+      'sudo mount -t iso9660 -o loop %s %s' % (_SPEC_SFS_2014_ISO, mount_dir)
+  )
   vm.RemoteCommand('cp -r %s/* %s' % (mount_dir, _SPEC_DIR))
   vm.RemoteCommand('sudo umount {0} && sudo rm -rf {0}'.format(mount_dir))
 
 
-def _ConfigureSpec(prime_client, clients, benchmark,
-                   load=None, num_runs=None, incr_load=None):
+def _ConfigureSpec(
+    prime_client, clients, benchmark, load=None, num_runs=None, incr_load=None
+):
   """Configures SPEC SFS 2014 on the prime client.
 
   This function modifies the default configuration file (sfs_rc) which
@@ -167,8 +191,9 @@ def _ConfigureSpec(prime_client, clients, benchmark,
   prime_client.RemoteCommand('sudo cp {0}.bak {0}'.format(config_path))
 
   stdout, _ = prime_client.RemoteCommand('pwd')
-  exec_path = posixpath.join(stdout.strip(), _SPEC_DIR, 'binaries',
-                             'linux', 'x86_64', 'netmist')
+  exec_path = posixpath.join(
+      stdout.strip(), _SPEC_DIR, 'binaries', 'linux', 'x86_64', 'netmist'
+  )
   load = load or FLAGS.specsfs2014_load
   num_runs = num_runs or FLAGS.specsfs2014_num_runs
   incr_load = incr_load or FLAGS.specsfs2014_incr_load
@@ -184,16 +209,21 @@ def _ConfigureSpec(prime_client, clients, benchmark,
   }
   # Any special characters in the overrides dictionary should be escaped so
   # that they don't interfere with sed.
-  sed_expressions = ' '.join([
-      '-e "s/{0}=.*/{0}={1}/"'.format(k, v)
-      for k, v in six.iteritems(configuration_overrides)
-  ])
+  sed_expressions = ' '.join(
+      [
+          '-e "s/{0}=.*/{0}={1}/"'.format(k, v)
+          for k, v in six.iteritems(configuration_overrides)
+      ]
+  )
   sed_cmd = 'sudo sed -i {0} {1}'.format(sed_expressions, config_path)
   prime_client.RemoteCommand(sed_cmd)
 
   mount_points = [f'{client.internal_ip} {_MOUNT_POINT}' for client in clients]
-  vm_util.CreateRemoteFile(prime_client, '\n'.join(mount_points),
-                           posixpath.join(_SPEC_DIR, _MOUNTPOINTS_FILE))
+  vm_util.CreateRemoteFile(
+      prime_client,
+      '\n'.join(mount_points),
+      posixpath.join(_SPEC_DIR, _MOUNTPOINTS_FILE),
+  )
 
 
 def Prepare(benchmark_spec):
@@ -201,7 +231,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   gluster_servers = benchmark_spec.vm_groups['gluster_servers']
   clients = benchmark_spec.vm_groups['clients']
@@ -211,16 +241,19 @@ def Prepare(benchmark_spec):
   if gluster_servers:
     gluster.ConfigureServers(gluster_servers, _VOLUME_NAME)
 
-    args = [((client, gluster_servers[0], _VOLUME_NAME, _MOUNT_POINT), {})
-            for client in clients]
+    args = [
+        ((client, gluster_servers[0], _VOLUME_NAME, _MOUNT_POINT), {})
+        for client in clients
+    ]
     background_tasks.RunThreaded(gluster.MountGluster, args)
 
   # Set up SPEC
   background_tasks.RunThreaded(_PrepareSpec, clients)
 
   # Create a backup of the config file.
-  prime_client.RemoteCommand('cp {0} {0}.bak'.format(
-      posixpath.join(_SPEC_DIR, _SPEC_CONFIG)))
+  prime_client.RemoteCommand(
+      'cp {0} {0}.bak'.format(posixpath.join(_SPEC_DIR, _SPEC_CONFIG))
+  )
 
   prime_client.AuthenticateVm()
   # Make sure any Static VMs are setup correctly.
@@ -249,7 +282,7 @@ def _ParseSpecSfsOutput(output, extra_metadata=None):
   for run in root.findall('run'):
     metadata = {
         'benchmark': run.find('benchmark').attrib['name'],
-        'business_metric': run.find('business_metric').text
+        'business_metric': run.find('business_metric').text,
     }
     if extra_metadata:
       metadata.update(extra_metadata)
@@ -268,10 +301,14 @@ def _ParseSpecSfsOutput(output, extra_metadata=None):
     for metric in run.findall('metric'):
       name = metric.attrib['name']
       if name in _PUBLISHED_METRICS:
-        samples.append(sample.Sample(name,
-                                     float(metric.text),
-                                     metric.attrib.get('units', ''),
-                                     metadata))
+        samples.append(
+            sample.Sample(
+                name,
+                float(metric.text),
+                metric.attrib.get('units', ''),
+                metadata,
+            )
+        )
   return samples
 
 
@@ -280,14 +317,15 @@ def _RunSpecSfs(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
   """
   prime_client = benchmark_spec.vm_groups['clients'][0]
   run_cmd = 'cd {0} && python3 sfsmanager -r sfs_rc {1}'.format(
-      _SPEC_DIR, '-a' if FLAGS.specsfs2014_auto_mode else '')
+      _SPEC_DIR, '-a' if FLAGS.specsfs2014_auto_mode else ''
+  )
   prime_client.RobustRemoteCommand(run_cmd, ignore_failure=True)
   results_file = posixpath.join(_SPEC_DIR, 'results', 'sfssum_sfs2014_SP2.xml')
   output, _ = prime_client.RemoteCommand('cat %s' % results_file)
@@ -295,7 +333,7 @@ def _RunSpecSfs(benchmark_spec):
   if benchmark_spec.vm_groups['gluster_servers']:
     gluster_metadata = {
         'gluster_stripes': FLAGS.gluster_stripes,
-        'gluster_replicas': FLAGS.gluster_replicas
+        'gluster_replicas': FLAGS.gluster_replicas,
     }
   else:
     gluster_metadata = {}
@@ -308,7 +346,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -320,7 +358,8 @@ def Run(benchmark_spec):
   if FLAGS.specsfs2014_config:
     prime_client.PushFile(
         data.ResourcePath(FLAGS.specsfs2014_config),
-        posixpath.join(_SPEC_DIR, _SPEC_CONFIG))
+        posixpath.join(_SPEC_DIR, _SPEC_CONFIG),
+    )
     results += _RunSpecSfs(benchmark_spec)
   else:
     for benchmark in FLAGS.specsfs2014_benchmarks:
@@ -335,7 +374,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   clients = benchmark_spec.vm_groups['clients']
   gluster_servers = benchmark_spec.vm_groups['gluster_servers']
@@ -343,7 +382,8 @@ def Cleanup(benchmark_spec):
   for client in clients:
     client.RemoteCommand('sudo umount %s' % _MOUNT_POINT)
     client.RemoteCommand(
-        'rm %s && sudo rm -rf %s' % (_SPEC_SFS_2014_ISO, _SPEC_DIR))
+        'rm %s && sudo rm -rf %s' % (_SPEC_SFS_2014_ISO, _SPEC_DIR)
+    )
 
   if gluster_servers:
     gluster.DeleteVolume(gluster_servers[0], _VOLUME_NAME)

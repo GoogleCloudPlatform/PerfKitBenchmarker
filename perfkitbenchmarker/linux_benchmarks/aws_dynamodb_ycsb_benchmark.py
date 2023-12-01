@@ -33,24 +33,31 @@ from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
 
 _INITIAL_WRITES = flags.DEFINE_integer(
-    'aws_dynamodb_ycsb_provision_wcu', 10000,
-    'The provisioned WCU to use during the load phase.')
+    'aws_dynamodb_ycsb_provision_wcu',
+    10000,
+    'The provisioned WCU to use during the load phase.',
+)
 flags.register_validator(
     'aws_dynamodb_ycsb_provision_wcu',
     lambda wcu: wcu >= 1,
-    message='WCU must be >=1 to load successfully.')
+    message='WCU must be >=1 to load successfully.',
+)
 _CONSISTENT_READS = flags.DEFINE_boolean(
-    'aws_dynamodb_ycsb_consistentReads', False,
+    'aws_dynamodb_ycsb_consistentReads',
+    False,
     'Consistent reads cost 2x eventual reads. '
-    "'false' is default which is eventual")
+    "'false' is default which is eventual",
+)
 _MAX_CONNECTIONS = flags.DEFINE_integer(
-    'aws_dynamodb_connectMax', 50,
-    'Maximum number of concurrent dynamodb connections. '
-    'Defaults to 50.')
+    'aws_dynamodb_connectMax',
+    50,
+    'Maximum number of concurrent dynamodb connections. Defaults to 50.',
+)
 _RAMP_UP = flags.DEFINE_boolean(
-    'aws_dynamodb_ycsb_ramp_up', False,
+    'aws_dynamodb_ycsb_ramp_up',
+    False,
     'If true, runs YCSB with a target throughput equal to the provisioned qps '
-    'of the instance and increments until a max throughput is found.'
+    'of the instance and increments until a max throughput is found.',
 )
 _PROVISIONED_QPS = flags.DEFINE_boolean(
     'aws_dynamodb_ycsb_provisioned_qps',
@@ -101,8 +108,10 @@ def CheckPrerequisites(benchmark_config):
   ycsb.CheckPrerequisites()
 
 
-def _GetYcsbArgs(client: virtual_machine.VirtualMachine,
-                 instance: aws_dynamodb.AwsDynamoDBInstance) -> dict[str, Any]:
+def _GetYcsbArgs(
+    client: virtual_machine.VirtualMachine,
+    instance: aws_dynamodb.AwsDynamoDBInstance,
+) -> dict[str, Any]:
   """Returns args to pass to YCSB."""
   run_kwargs = {
       'dynamodb.awsCredentialsFile': GetRemoteVMCredentialsFullPath(client),
@@ -116,7 +125,7 @@ def _GetYcsbArgs(client: virtual_machine.VirtualMachine,
         'dynamodb.primaryKeyType': 'HASH_AND_RANGE',
         'aws_dynamodb_connectMax': _MAX_CONNECTIONS.value,
         'dynamodb.hashKeyName': instance.primary_key,
-        'dynamodb.primaryKey': instance.sort_key
+        'dynamodb.primaryKey': instance.sort_key,
     })
   if _CONSISTENT_READS.value:
     run_kwargs['dynamodb.consistentReads'] = 'true'
@@ -196,10 +205,12 @@ def _ExtractThroughput(samples: Iterable[sample.Sample]) -> float:
   return 0.0
 
 
-def RampUpRun(executor: ycsb.YCSBExecutor,
-              db: aws_dynamodb.AwsDynamoDBInstance,
-              vms: Collection[virtual_machine.VirtualMachine],
-              run_kwargs: MutableMapping[str, Any]) -> list[sample.Sample]:
+def RampUpRun(
+    executor: ycsb.YCSBExecutor,
+    db: aws_dynamodb.AwsDynamoDBInstance,
+    vms: Collection[virtual_machine.VirtualMachine],
+    run_kwargs: MutableMapping[str, Any],
+) -> list[sample.Sample]:
   """Runs YCSB starting from provisioned QPS until max throughput is found."""
   # Database is already provisioned with the correct QPS.
   qps = db.rcu + db.wcu
@@ -208,8 +219,11 @@ def RampUpRun(executor: ycsb.YCSBExecutor,
     run_kwargs['target'] = qps
     run_samples = executor.Run(vms, run_kwargs=run_kwargs)
     throughput = _ExtractThroughput(run_samples)
-    logging.info('Run had throughput target %s and measured throughput %s.',
-                 qps, throughput)
+    logging.info(
+        'Run had throughput target %s and measured throughput %s.',
+        qps,
+        throughput,
+    )
 
     if throughput < max_throughput + _QPS_THRESHOLD:
       logging.info('Found maximum throughput %s.', throughput)
@@ -253,7 +267,8 @@ def GetRemoteVMCredentialsFullPath(vm):
   """Returns the full path for first AWS credentials file found."""
   home_dir, _ = vm.RemoteCommand('echo ~')
   search_path = os.path.join(
-      home_dir.rstrip('\n'), FLAGS.aws_credentials_remote_path)
+      home_dir.rstrip('\n'), FLAGS.aws_credentials_remote_path
+  )
   result, _ = vm.RemoteCommand('grep -irl "key" {0}'.format(search_path))
   return result.strip('\n').split('\n')[0]
 
@@ -264,7 +279,13 @@ def _Install(vm):
   # copy AWS creds
   vm.Install('aws_credentials')
   # aws credentials file format to ycsb recognized format
-  vm.RemoteCommand('sed -i "s/aws_access_key_id/accessKey/g" {0}'.format(
-      GetRemoteVMCredentialsFullPath(vm)))
-  vm.RemoteCommand('sed -i "s/aws_secret_access_key/secretKey/g" {0}'.format(
-      GetRemoteVMCredentialsFullPath(vm)))
+  vm.RemoteCommand(
+      'sed -i "s/aws_access_key_id/accessKey/g" {0}'.format(
+          GetRemoteVMCredentialsFullPath(vm)
+      )
+  )
+  vm.RemoteCommand(
+      'sed -i "s/aws_secret_access_key/secretKey/g" {0}'.format(
+          GetRemoteVMCredentialsFullPath(vm)
+      )
+  )

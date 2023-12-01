@@ -33,41 +33,81 @@ _PORT = 8080
 _BW_SCRATCH_FILE = '/tmp/tcpbw'
 # List of cloudharmony metric names
 _CLOUDHARMONY_IPERF_METRICS = [
-    'bandwidth_max', 'bandwidth_mean', 'bandwidth_median', 'bandwidth_min',
-    'bandwidth_p10', 'bandwidth_p25', 'bandwidth_p75', 'bandwidth_p90',
+    'bandwidth_max',
+    'bandwidth_mean',
+    'bandwidth_median',
+    'bandwidth_min',
+    'bandwidth_p10',
+    'bandwidth_p25',
+    'bandwidth_p75',
+    'bandwidth_p90',
     'bandwidth_stdev',
-    'jitter_max', 'jitter_mean', 'jitter_median', 'jitter_min',
-    'jitter_p10', 'jitter_p25', 'jitter_p75', 'jitter_p90', 'jitter_stdev',
-    'loss_max', 'loss_mean', 'loss_median', 'loss_min', 'loss_p10',
-    'loss_p25', 'loss_p75', 'loss_p90', 'loss_stdev',
+    'jitter_max',
+    'jitter_mean',
+    'jitter_median',
+    'jitter_min',
+    'jitter_p10',
+    'jitter_p25',
+    'jitter_p75',
+    'jitter_p90',
+    'jitter_stdev',
+    'loss_max',
+    'loss_mean',
+    'loss_median',
+    'loss_min',
+    'loss_p10',
+    'loss_p25',
+    'loss_p75',
+    'loss_p90',
+    'loss_stdev',
 ]
 
 
 _IPERF_BANDWIDTH = flags.DEFINE_string(
-    'ch_iperf_bandwidth', default=None,
-    help='Set target bandwidth to n bits/sec.')
+    'ch_iperf_bandwidth',
+    default=None,
+    help='Set target bandwidth to n bits/sec.',
+)
 _IPERF_PARALLEL = flags.DEFINE_string(
-    'ch_iperf_parallel', default='1', help='The number of simultaneous '
-    'connections to make to the server. May contain [cpus] which will be '
-    'automatically replaced with the number of CPU cores. May also contain an '
-    'equation which will be automatically evaluated '
-    '(e.g. --ch_iperf_parallel "[cpus]*2").')
+    'ch_iperf_parallel',
+    default='1',
+    help=(
+        'The number of simultaneous connections to make to the server. May'
+        ' contain [cpus] which will be automatically replaced with the number'
+        ' of CPU cores. May also contain an equation which will be'
+        ' automatically evaluated (e.g. --ch_iperf_parallel "[cpus]*2").'
+    ),
+)
 _IPERF_CONCURRENCY = flags.DEFINE_integer(
-    'ch_iperf_concurrency', default=1,
-    help='Number of concurrent iperf server processes.')
+    'ch_iperf_concurrency',
+    default=1,
+    help='Number of concurrent iperf server processes.',
+)
 _IPERF_TIME = flags.DEFINE_integer(
-    'ch_iperf_time', default=10, help='The time in seconds to transmit for')
+    'ch_iperf_time', default=10, help='The time in seconds to transmit for'
+)
 _IPERF_TEST = flags.DEFINE_enum(
-    'ch_iperf_test', default=TCP, enum_values=[TCP, UDP],
-    help='Run TCP or UDP.')
+    'ch_iperf_test', default=TCP, enum_values=[TCP, UDP], help='Run TCP or UDP.'
+)
 _IPERF_WARMUP = flags.DEFINE_integer(
-    'ch_iperf_warmup', default=0, help='Number of initial seconds of testing to'
-    ' ignore for result calculations.')
+    'ch_iperf_warmup',
+    default=0,
+    help=(
+        'Number of initial seconds of testing to'
+        ' ignore for result calculations.'
+    ),
+)
 _IPERF_ZEROCOPY = flags.DEFINE_boolean(
-    'ch_iperf_zerocopy', default=False, help='Use a "zero copy" method of '
-    'sending data, such as sendfile, instead of the usual write.')
+    'ch_iperf_zerocopy',
+    default=False,
+    help=(
+        'Use a "zero copy" method of '
+        'sending data, such as sendfile, instead of the usual write.'
+    ),
+)
 _IPERF_SERVER_VMS = flags.DEFINE_integer(
-    'ch_iperf_server_vms', default=1, help='Number of servers for this test. ')
+    'ch_iperf_server_vms', default=1, help='Number of servers for this test. '
+)
 
 
 def GetConfig(user_config):
@@ -151,12 +191,12 @@ def _Run(benchmark_spec):
     metadata['skip_bandwidth_graphs'] = True
 
   ch_metadata = cloud_harmony_util.GetCommonMetadata(metadata)
-  cmd = (f'{cmd_path} {endpoints} {ch_metadata} --wkhtml_xvfb --verbose')
+  cmd = f'{cmd_path} {endpoints} {ch_metadata} --wkhtml_xvfb --verbose'
 
   client.RobustRemoteCommand(cmd)
 
   cmd_path = posixpath.join('iperf', 'save.sh')
-  save_command = (f'sudo {cmd_path} ')
+  save_command = f'sudo {cmd_path} '
 
   if FLAGS.ch_store_results:
     save_command += cloud_harmony_util.GetSaveCommand()
@@ -175,8 +215,10 @@ def Run(benchmark_spec):
   for result_row in cloud_harmony_metadata:
     for metric in _CLOUDHARMONY_IPERF_METRICS:
       samples.append(
-          sample.Sample(metric, result_row[metric], _GetMetricUnit(metric),
-                        result_row))
+          sample.Sample(
+              metric, result_row[metric], _GetMetricUnit(metric), result_row
+          )
+      )
 
   return samples
 

@@ -17,7 +17,6 @@ import os
 
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
-
 from perfkitbenchmarker.linux_packages import kernel_compile
 
 
@@ -33,6 +32,7 @@ kernel_compile:
 
 
 class _Paths(object):
+
   def __init__(self, vm):
     self.working_dir = os.path.join(vm.GetScratchDir(), BENCHMARK_NAME)
     self.source_dir = os.path.join(self.working_dir, kernel_compile.UNTAR_DIR)
@@ -47,15 +47,17 @@ def _GetVm(benchmark_spec):
   if len(vms) != 1:
     raise ValueError(
         'kernel_compile benchmark requires exactly one machine, found {0}'
-        .format(len(vms)))
+        .format(len(vms))
+    )
   return vms[0]
 
 
 def Prepare(benchmark_spec):
   """Install Linux kernel source code and build dependencies.
+
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vm = _GetVm(benchmark_spec)
   vm.Install('kernel_compile')
@@ -72,17 +74,20 @@ def Run(benchmark_spec):
 
   def make(target=''):
     return time_command(
-        'make -C {} -j$(egrep -c "^processor" /proc/cpuinfo) {}'
-        .format(paths.source_dir, target))
+        'make -C {} -j$(egrep -c "^processor" /proc/cpuinfo) {}'.format(
+            paths.source_dir, target
+        )
+    )
 
-  untar_time = time_command('rm -rf {dir} && '
-                            'mkdir {dir} && '
-                            'tar -C {dir} -xzf {tarball}'.format(
-                                dir=paths.working_dir,
-                                tarball=kernel_compile.KERNEL_TARBALL))
+  untar_time = time_command(
+      'rm -rf {dir} && mkdir {dir} && tar -C {dir} -xzf {tarball}'.format(
+          dir=paths.working_dir, tarball=kernel_compile.KERNEL_TARBALL
+      )
+  )
 
-  vm.PushDataFile('kernel_compile.config',
-                  '{}/.config'.format(paths.source_dir))
+  vm.PushDataFile(
+      'kernel_compile.config', '{}/.config'.format(paths.source_dir)
+  )
 
   cold_build_time = make()
   clean_time = make('clean')

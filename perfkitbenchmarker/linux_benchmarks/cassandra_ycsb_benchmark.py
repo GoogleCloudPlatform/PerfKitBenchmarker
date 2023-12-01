@@ -59,8 +59,9 @@ CREATE_TABLE_SCRIPT = 'cassandra/create-ycsb-table.cql.j2'
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  config['vm_groups']['workers']['vm_count'] = FLAGS.num_vms if FLAGS[
-      'num_vms'].present else 3
+  config['vm_groups']['workers']['vm_count'] = (
+      FLAGS.num_vms if FLAGS['num_vms'].present else 3
+  )
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
   return config
@@ -83,21 +84,32 @@ def _InstallCassandra(vm, seed_vms):
   cassandra.Configure(vm, seed_vms=seed_vms)
 
 
-def _CreateYCSBTable(vm, keyspace=KEYSPACE_NAME, column_family=COLUMN_FAMILY,
-                     replication_factor=REPLICATION_FACTOR):
+def _CreateYCSBTable(
+    vm,
+    keyspace=KEYSPACE_NAME,
+    column_family=COLUMN_FAMILY,
+    replication_factor=REPLICATION_FACTOR,
+):
   """Creates a Cassandra table for use with YCSB."""
   template_path = data.ResourcePath(CREATE_TABLE_SCRIPT)
   remote_path = os.path.join(
       cassandra.CASSANDRA_DIR,
-      os.path.basename(os.path.splitext(template_path)[0]))
-  vm.RenderTemplate(template_path, remote_path,
-                    context={'keyspace': keyspace,
-                             'column_family': column_family,
-                             'replication_factor': replication_factor})
+      os.path.basename(os.path.splitext(template_path)[0]),
+  )
+  vm.RenderTemplate(
+      template_path,
+      remote_path,
+      context={
+          'keyspace': keyspace,
+          'column_family': column_family,
+          'replication_factor': replication_factor,
+      },
+  )
 
   cassandra_cli = cassandra.GetCassandraCliPath(vm)
-  command = '{0} -f {1} -h {2}'.format(cassandra_cli, remote_path,
-                                       vm.internal_ip)
+  command = '{0} -f {1} -h {2}'.format(
+      cassandra_cli, remote_path, vm.internal_ip
+  )
   vm.RemoteCommand(command)
 
 
@@ -108,11 +120,13 @@ def _GetVMsByRole(benchmark_spec):
     clients = benchmark_spec.vm_groups['clients']
   else:
     clients = cassandra_vms
-  return {'vms': benchmark_spec.vms,
-          'cassandra_vms': cassandra_vms,
-          'seed_vm': cassandra_vms[0],
-          'non_seed_cassandra_vms': cassandra_vms[1:],
-          'clients': clients}
+  return {
+      'vms': benchmark_spec.vms,
+      'cassandra_vms': cassandra_vms,
+      'seed_vm': cassandra_vms[0],
+      'non_seed_cassandra_vms': cassandra_vms[1:],
+      'clients': clients,
+  }
 
 
 def Prepare(benchmark_spec):
@@ -120,7 +134,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   by_role = _GetVMsByRole(benchmark_spec)
@@ -134,11 +148,11 @@ def Prepare(benchmark_spec):
   seed_vm = by_role['seed_vm']
   assert seed_vm, 'No seed VM: {0}'.format(by_role)
 
-  cassandra_install_fns = [functools.partial(_InstallCassandra,
-                                             vm, seed_vms=[seed_vm])
-                           for vm in cassandra_vms]
-  ycsb_install_fns = [functools.partial(vm.Install, 'ycsb')
-                      for vm in loaders]
+  cassandra_install_fns = [
+      functools.partial(_InstallCassandra, vm, seed_vms=[seed_vm])
+      for vm in cassandra_vms
+  ]
+  ycsb_install_fns = [functools.partial(vm.Install, 'ycsb') for vm in loaders]
   if FLAGS.ycsb_client_vms:
     background_tasks.RunThreaded(
         lambda f: f(), cassandra_install_fns + ycsb_install_fns
@@ -152,11 +166,12 @@ def Prepare(benchmark_spec):
   cassandra.StartCluster(seed_vm, by_role['non_seed_cassandra_vms'])
 
   _CreateYCSBTable(
-      seed_vm, replication_factor=FLAGS.cassandra_replication_factor)
+      seed_vm, replication_factor=FLAGS.cassandra_replication_factor
+  )
 
   benchmark_spec.executor = ycsb.YCSBExecutor(
-      'cassandra2-cql',
-      hosts=','.join(vm.internal_ip for vm in cassandra_vms))
+      'cassandra2-cql', hosts=','.join(vm.internal_ip for vm in cassandra_vms)
+  )
 
 
 def Run(benchmark_spec):
@@ -164,7 +179,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample instances.
@@ -173,23 +188,29 @@ def Run(benchmark_spec):
   cassandra_vms = _GetVMsByRole(benchmark_spec)['cassandra_vms']
   logging.debug('Loaders: %s', loaders)
 
+  kwargs = {
+      'hosts': ','.join(vm.internal_ip for vm in cassandra_vms),
+      'columnfamily': COLUMN_FAMILY,
+      'cassandra.readconsistencylevel': READ_CONSISTENCY,
+      'cassandra.scanconsistencylevel': READ_CONSISTENCY,
+      'cassandra.writeconsistencylevel': WRITE_CONSISTENCY,
+      'cassandra.deleteconsistencylevel': WRITE_CONSISTENCY,
+  }
 
-  kwargs = {'hosts': ','.join(vm.internal_ip for vm in cassandra_vms),
-            'columnfamily': COLUMN_FAMILY,
-            'cassandra.readconsistencylevel': READ_CONSISTENCY,
-            'cassandra.scanconsistencylevel': READ_CONSISTENCY,
-            'cassandra.writeconsistencylevel': WRITE_CONSISTENCY,
-            'cassandra.deleteconsistencylevel': WRITE_CONSISTENCY}
-
-  metadata = {'ycsb_client_vms': FLAGS.ycsb_client_vms,
-              'num_vms': len(cassandra_vms),
-              'concurrent_reads': FLAGS.cassandra_concurrent_reads,
-              'replication_factor': FLAGS.cassandra_replication_factor}
+  metadata = {
+      'ycsb_client_vms': FLAGS.ycsb_client_vms,
+      'num_vms': len(cassandra_vms),
+      'concurrent_reads': FLAGS.cassandra_concurrent_reads,
+      'replication_factor': FLAGS.cassandra_replication_factor,
+  }
   if not FLAGS.ycsb_client_vms:
     metadata['ycsb_client_on_server'] = True
 
-  samples = list(benchmark_spec.executor.LoadAndRun(
-      loaders, load_kwargs=kwargs, run_kwargs=kwargs))
+  samples = list(
+      benchmark_spec.executor.LoadAndRun(
+          loaders, load_kwargs=kwargs, run_kwargs=kwargs
+      )
+  )
 
   for sample in samples:
     sample.metadata.update(metadata)
@@ -202,7 +223,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   cassandra_vms = _GetVMsByRole(benchmark_spec)['cassandra_vms']
   background_tasks.RunThreaded(cassandra.Stop, cassandra_vms)

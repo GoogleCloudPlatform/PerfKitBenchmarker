@@ -41,7 +41,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import spark_service
 
 
-
 BENCHMARK_NAME = 'hadoop_terasort'
 BENCHMARK_CONFIG = """
 hadoop_terasort:
@@ -62,21 +61,33 @@ TERAGEN = 'teragen'
 TERASORT = 'terasort'
 TERAVALIDATE = 'teravalidate'
 
-flags.DEFINE_integer('terasort_num_rows', 10000,
-                     'Number of 100-byte rows to generate.')
-flags.DEFINE_string('terasort_unsorted_dir', 'tera_gen_data', 'Location of '
-                    'the unsorted data. TeraGen writes here, and TeraSort '
-                    'reads from here.')
+flags.DEFINE_integer(
+    'terasort_num_rows', 10000, 'Number of 100-byte rows to generate.'
+)
+flags.DEFINE_string(
+    'terasort_unsorted_dir',
+    'tera_gen_data',
+    'Location of '
+    'the unsorted data. TeraGen writes here, and TeraSort '
+    'reads from here.',
+)
 
-flags.DEFINE_string('terasort_data_base', 'terasort_data/',
-                    'The benchmark will append to this to create three '
-                    'directories: one for the generated, unsorted data, '
-                    'one for the sorted data, and one for the validate '
-                    'data.  If using a static cluster or if using object '
-                    'storage buckets, you must cleanup.')
-flags.DEFINE_bool('terasort_append_timestamp', True, 'Append a timestamp to '
-                  'the directories given by terasort_unsorted_dir, '
-                  'terasort_sorted_dir, and terasort_validate_dir')
+flags.DEFINE_string(
+    'terasort_data_base',
+    'terasort_data/',
+    'The benchmark will append to this to create three '
+    'directories: one for the generated, unsorted data, '
+    'one for the sorted data, and one for the validate '
+    'data.  If using a static cluster or if using object '
+    'storage buckets, you must cleanup.',
+)
+flags.DEFINE_bool(
+    'terasort_append_timestamp',
+    True,
+    'Append a timestamp to '
+    'the directories given by terasort_unsorted_dir, '
+    'terasort_sorted_dir, and terasort_validate_dir',
+)
 
 FLAGS = flags.FLAGS
 
@@ -94,7 +105,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -114,50 +125,69 @@ def Run(benchmark_spec):
   sorted_dir = base_dir + 'sorted'
   validate_dir = base_dir + 'validate'
 
-  metadata.update({'terasort_num_rows': FLAGS.terasort_num_rows,
-                   'terasort_sorted_dir': sorted_dir,
-                   'terasort_unsorted_dir': unsorted_dir,
-                   'terasort_validate_dir': validate_dir})
+  metadata.update({
+      'terasort_num_rows': FLAGS.terasort_num_rows,
+      'terasort_sorted_dir': sorted_dir,
+      'terasort_unsorted_dir': unsorted_dir,
+      'terasort_validate_dir': validate_dir,
+  })
   gen_args = [TERAGEN, str(FLAGS.terasort_num_rows), unsorted_dir]
   sort_args = [TERASORT, unsorted_dir, sorted_dir]
   validate_args = [TERAVALIDATE, sorted_dir, validate_dir]
 
-  stages = [('generate', gen_args),
-            ('sort', sort_args),
-            ('validate', validate_args)]
+  stages = [
+      ('generate', gen_args),
+      ('sort', sort_args),
+      ('validate', validate_args),
+  ]
   cumulative_runtime = 0
-  for (label, args) in stages:
-    stats = spark_cluster.SubmitJob(terasort_jar,
-                                    None,
-                                    job_type=spark_service.HADOOP_JOB_TYPE,
-                                    job_arguments=args)
+  for label, args in stages:
+    stats = spark_cluster.SubmitJob(
+        terasort_jar,
+        None,
+        job_type=spark_service.HADOOP_JOB_TYPE,
+        job_arguments=args,
+    )
     if not stats[spark_service.SUCCESS]:
       raise Exception('Stage {0} unsuccessful'.format(label))
     current_time = datetime.datetime.now()
     wall_time = (current_time - start).total_seconds()
-    results.append(sample.Sample(label + '_wall_time',
-                                 wall_time,
-                                 'seconds', metadata))
+    results.append(
+        sample.Sample(label + '_wall_time', wall_time, 'seconds', metadata)
+    )
     start = current_time
 
     if spark_service.RUNTIME in stats:
-      results.append(sample.Sample(label + '_runtime',
-                                   stats[spark_service.RUNTIME],
-                                   'seconds', metadata))
+      results.append(
+          sample.Sample(
+              label + '_runtime',
+              stats[spark_service.RUNTIME],
+              'seconds',
+              metadata,
+          )
+      )
     cumulative_runtime += stats[spark_service.RUNTIME]
     if spark_service.WAITING in stats:
-      results.append(sample.Sample(label + '_pending_time',
-                                   stats[spark_service.WAITING],
-                                   'seconds', metadata))
-  results.append(sample.Sample('cumulative_runtime',
-                               cumulative_runtime,
-                               'seconds', metadata))
+      results.append(
+          sample.Sample(
+              label + '_pending_time',
+              stats[spark_service.WAITING],
+              'seconds',
+              metadata,
+          )
+      )
+  results.append(
+      sample.Sample(
+          'cumulative_runtime', cumulative_runtime, 'seconds', metadata
+      )
+  )
   if not spark_cluster.user_managed:
-    create_time = (spark_cluster.resource_ready_time -
-                   spark_cluster.create_start_time)
-    results.append(sample.Sample('cluster_create_time',
-                                 create_time,
-                                 'seconds', metadata))
+    create_time = (
+        spark_cluster.resource_ready_time - spark_cluster.create_start_time
+    )
+    results.append(
+        sample.Sample('cluster_create_time', create_time, 'seconds', metadata)
+    )
   return results
 
 

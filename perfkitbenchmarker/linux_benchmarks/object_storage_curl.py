@@ -53,14 +53,20 @@ object_storage_curl:
 # Blocksize for dd to pipe data into uploads.
 DD_BLOCKSIZE = 4000
 
-flags.DEFINE_string('object_storage_curl_object_size', '1MB',
-                    'Size of objects to upload / download. Similar to '
-                    '--object_storage_object_sizes, but only takes a single '
-                    'size.')
-flags.DEFINE_bool('object_storage_curl_i_am_ok_with_public_read_write_buckets',
-                  False, 'Acknowledge that this bucket will create buckets '
-                  'which are publicly readable and writable. Required to run '
-                  'this benchmark.')
+flags.DEFINE_string(
+    'object_storage_curl_object_size',
+    '1MB',
+    'Size of objects to upload / download. Similar to '
+    '--object_storage_object_sizes, but only takes a single '
+    'size.',
+)
+flags.DEFINE_bool(
+    'object_storage_curl_i_am_ok_with_public_read_write_buckets',
+    False,
+    'Acknowledge that this bucket will create buckets '
+    'which are publicly readable and writable. Required to run '
+    'this benchmark.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -71,24 +77,30 @@ def GetConfig(user_config):
 
 def CheckPrerequisites(_):
   """Validate some unsupported flags."""
-  if (flag_util.StringToBytes(FLAGS.object_storage_curl_object_size) <
-      DD_BLOCKSIZE):
+  if (
+      flag_util.StringToBytes(FLAGS.object_storage_curl_object_size)
+      < DD_BLOCKSIZE
+  ):
     raise errors.Config.InvalidValue(
-        '--object_storage_curl_object_size must be larger than 4KB')
+        '--object_storage_curl_object_size must be larger than 4KB'
+    )
   # TODO(pclay): Consider supporting multiple objects per stream.
   if FLAGS.object_storage_multistream_objects_per_stream != 1:
     raise errors.Config.InvalidValue(
-        'object_storage_curl only supports 1 object per stream')
+        'object_storage_curl only supports 1 object per stream'
+    )
   if FLAGS.object_storage_object_naming_scheme != 'sequential_by_stream':
     raise errors.Config.InvalidValue(
-        'object_storage_curl only supports sequential_by_stream naming.')
+        'object_storage_curl only supports sequential_by_stream naming.'
+    )
   if not FLAGS.object_storage_curl_i_am_ok_with_public_read_write_buckets:
     raise errors.Config.InvalidValue(
         'This benchmark uses public read/write object storage bucket.\n'
         'You must explicitly pass '
         '--object_storage_curl_i_am_ok_with_public_read_write_buckets to '
         'acknowledge that it will be created.\n'
-        'If PKB is interrupted, you should ensure it is cleaned up.')
+        'If PKB is interrupted, you should ensure it is cleaned up.'
+    )
 
 
 # PyType does not currently support returning Abstract classes
@@ -142,7 +154,8 @@ def Run(benchmark_spec) -> List[sample.Sample]:
   start_time_cmd = "date '+%s.%N'"
   generate_data_cmd = (
       'openssl aes-256-ctr -iter 1 -pass file:/dev/urandom -in /dev/zero'
-      f' | dd bs={DD_BLOCKSIZE} count={blocks} iflag=fullblock')
+      f' | dd bs={DD_BLOCKSIZE} count={blocks} iflag=fullblock'
+  )
   # TODO(pclay): consider adding size_down/upload to verify we are actually
   # reading the data.
   curl_cmd = "curl -fsw '%{time_total}' -o /dev/null"
@@ -152,7 +165,8 @@ def Run(benchmark_spec) -> List[sample.Sample]:
     url = service.GetUploadUrl(bucket=bucket, object_name=object_name)
     stdout, _ = vm.RemoteCommand(
         f'{start_time_cmd}; {generate_data_cmd} | '
-        f"{curl_cmd} -X {service.UPLOAD_HTTP_METHOD} --data-binary @- '{url}'")
+        f"{curl_cmd} -X {service.UPLOAD_HTTP_METHOD} --data-binary @- '{url}'"
+    )
     return stdout
 
   def Download(vm, object_index):
@@ -176,7 +190,8 @@ def Run(benchmark_spec) -> List[sample.Sample]:
         all_sizes=[object_bytes],
         sizes=[np.array([object_bytes])] * streams_per_vm * len(vms),
         operation=operation,
-        results=samples)
+        results=samples,
+    )
   return samples
 
 
@@ -189,7 +204,8 @@ def Cleanup(_):
 
 
 def _LoadWorkerOutput(
-    output: List[str]) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    output: List[str],
+) -> Tuple[List[np.ndarray], List[np.ndarray]]:
   """Parse the output of Upload and Download functions.
 
   The output of Upload and Download is

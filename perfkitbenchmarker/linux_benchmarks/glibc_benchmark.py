@@ -46,20 +46,25 @@ glibc:
       vm_count: null
 """
 
-glibc_default_benchset = ['bench-math',
-                          'bench-pthread',
-                          'bench-string',
-                          'string-benchset',
-                          'wcsmbs-benchset',
-                          'stdlib-benchset',
-                          'stdio-common-benchset',
-                          'math-benchset',
-                          'malloc-thread']
+glibc_default_benchset = [
+    'bench-math',
+    'bench-pthread',
+    'bench-string',
+    'string-benchset',
+    'wcsmbs-benchset',
+    'stdlib-benchset',
+    'stdio-common-benchset',
+    'math-benchset',
+    'malloc-thread',
+]
 flags.DEFINE_multi_enum(
-    'glibc_benchset', glibc_default_benchset, glibc_default_benchset,
+    'glibc_benchset',
+    glibc_default_benchset,
+    glibc_default_benchset,
     'By default, it will run the whole set of benchmarks. To run only a subset '
     'of benchmarks, one may set "glibc_benchset = bench-math bench-pthread" by '
-    'using the flag on the command line multiple times.')
+    'using the flag on the command line multiple times.',
+)
 
 GLIBC_BENCH = ['bench-math', 'bench-pthread', 'bench-string']
 GLIBC_BENCH_MALLOC = ['malloc-thread']
@@ -182,27 +187,29 @@ def Run(benchmark_spec):
   metadata = GetCommonMetadata(benchmark_spec)
 
   glibc_user_benchset = ' '.join(FLAGS.glibc_benchset)
-  vm.RobustRemoteCommand('cd %s/glibc/glibc-build && '
-                         'make bench BENCHSET="%s"' %
-                         (linux_packages.INSTALL_DIR, glibc_user_benchset))
+  vm.RobustRemoteCommand(
+      'cd %s/glibc/glibc-build && make bench BENCHSET="%s"'
+      % (linux_packages.INSTALL_DIR, glibc_user_benchset)
+  )
 
   logging.info('Glibc Benchmark Tests Results:')
   # Parse the output for "bench-math", "bench-string" and "bench-pthread".
   if any(i in GLIBC_BENCH for i in FLAGS.glibc_benchset):
-    stdout, _ = vm.RemoteCommand(
-        'cat {0}/bench.out'.format(RESULTS_DIR))
+    stdout, _ = vm.RemoteCommand('cat {0}/bench.out'.format(RESULTS_DIR))
     ParseOutput(stdout, 'functions', results, metadata)
   # Parse the output for "malloc-thread".
   if any(i in GLIBC_BENCH_MALLOC for i in FLAGS.glibc_benchset):
     thread_num = ['1', '8', '16', '32']
     for num in thread_num:
       stdout, _ = vm.RemoteCommand(
-          'cat {0}/bench-malloc-thread-{1}.out'.format(RESULTS_DIR, num))
+          'cat {0}/bench-malloc-thread-{1}.out'.format(RESULTS_DIR, num)
+      )
       ParseOutput(stdout, 'functions', results, metadata)
   # Parse the output for "math-benchset".
   if any(i in GLIBC_MATH_BENCHSET for i in FLAGS.glibc_benchset):
     stdout, _ = vm.RemoteCommand(
-        'cat {0}/bench-math-inlines.out'.format(RESULTS_DIR))
+        'cat {0}/bench-math-inlines.out'.format(RESULTS_DIR)
+    )
     ParseOutput('{%s}' % stdout, 'math-inlines', results, metadata)
   return results
 

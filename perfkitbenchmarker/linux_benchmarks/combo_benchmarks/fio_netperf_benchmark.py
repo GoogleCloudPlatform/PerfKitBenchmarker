@@ -153,17 +153,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   sample_times = {}
   for fio_sample in output_samples_list[0]:
     if fio_sample.metric == 'start_time':
-      key = (
-          'fio_start_time' + str(fio_sample.metadata['machine_instance'])
-      )
+      key = 'fio_start_time' + str(fio_sample.metadata['machine_instance'])
       sample_times[key] = min(
           sample_times.get(key, float('inf')), fio_sample.value
       )
 
     elif fio_sample.metric == 'end_time':
-      key = (
-          'fio_end_time' + str(fio_sample.metadata['machine_instance'])
-      )
+      key = 'fio_end_time' + str(fio_sample.metadata['machine_instance'])
       sample_times[key] = max(
           sample_times.get(key, float('-inf')), fio_sample.value
       )

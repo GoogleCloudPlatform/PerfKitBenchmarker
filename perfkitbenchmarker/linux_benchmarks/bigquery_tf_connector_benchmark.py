@@ -34,14 +34,18 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
-flags.DEFINE_string('dataset_project_id', 'bigquery-public-data',
-                    'GCP project where dataset is located.')
+flags.DEFINE_string(
+    'dataset_project_id',
+    'bigquery-public-data',
+    'GCP project where dataset is located.',
+)
 flags.DEFINE_string('dataset_id', 'baseball', 'Dataset id.')
 flags.DEFINE_string('table_id', 'games_wide', 'Table id.')
 flags.DEFINE_integer('requested_streams', 1, 'Number of streams.')
 flags.DEFINE_integer('batch_size', 2048, 'Batch size.')
-flags.DEFINE_enum('format', 'AVRO', ['AVRO', 'ARROW'],
-                  'Serialization format - AVRO or ARROW')
+flags.DEFINE_enum(
+    'format', 'AVRO', ['AVRO', 'ARROW'], 'Serialization format - AVRO or ARROW'
+)
 
 BENCHMARK_NAME = 'bigquery_tf_connector'
 BENCHMARK_CONFIG = """
@@ -103,13 +107,15 @@ def _RunBenchmark(vm, streams=1, batch_size=2048, data_format='AVRO'):
     Benchmark result.
   """
   project_id = FLAGS.project or gcp_util.GetDefaultProject()
-  options = (f' --project_id="{project_id}"'
-             f' --dataset_project_id="{FLAGS.dataset_project_id}"'
-             f' --dataset_id="{FLAGS.dataset_id}"'
-             f' --table_id="{FLAGS.table_id}"'
-             f' --requested_streams="{streams}"'
-             f' --batch_size="{batch_size}"'
-             f' --format="{data_format}"')
+  options = (
+      f' --project_id="{project_id}"'
+      f' --dataset_project_id="{FLAGS.dataset_project_id}"'
+      f' --dataset_id="{FLAGS.dataset_id}"'
+      f' --table_id="{FLAGS.table_id}"'
+      f' --requested_streams="{streams}"'
+      f' --batch_size="{batch_size}"'
+      f' --format="{data_format}"'
+  )
   cmd = f'{DLVM_PYTHON} {REMOTE_SCRIPT} {options}'
   logging.info(cmd)
   stdout, stderr = vm.RemoteCommand(cmd)
@@ -135,8 +141,12 @@ def _RunBenchmark(vm, streams=1, batch_size=2048, data_format='AVRO'):
       'table_id': FLAGS.table_id,
   }
   return [
-      sample.Sample('BigQuery TensorFlow connector read throughput', result,
-                    UNIT, metadata)
+      sample.Sample(
+          'BigQuery TensorFlow connector read throughput',
+          result,
+          UNIT,
+          metadata,
+      )
   ]
 
 
@@ -147,7 +157,8 @@ def Run(benchmark_spec):
       vm,
       streams=FLAGS.requested_streams,
       batch_size=FLAGS.batch_size,
-      data_format=FLAGS.format)
+      data_format=FLAGS.format,
+  )
   return results
 
 

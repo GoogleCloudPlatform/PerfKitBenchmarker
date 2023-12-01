@@ -29,8 +29,11 @@ FLAGS = flags.FLAGS
 
 # We set the default to 128KB (131072 bytes) to override the Linux default
 # of 16K so that we can achieve the "link rate".
-flags.DEFINE_integer('container_netperf_tcp_stream_send_size_in_bytes', 131072,
-                     'Send size to use for TCP_STREAM tests (netperf -m flag)')
+flags.DEFINE_integer(
+    'container_netperf_tcp_stream_send_size_in_bytes',
+    131072,
+    'Send size to use for TCP_STREAM tests (netperf -m flag)',
+)
 
 BENCHMARK_NAME = 'container_netperf'
 BENCHMARK_CONFIG = """
@@ -67,7 +70,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   cluster = benchmark_spec.container_cluster
   cluster.DeployContainer('netperf', benchmark_spec.container_specs['netperf'])
@@ -78,7 +81,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -89,18 +92,24 @@ def Run(benchmark_spec):
   spec = benchmark_spec.container_specs['netperf']
   spec.command = [
       'netperf',
-      '-t', 'TCP_STREAM',
-      '-H', container_0.ip_address,
-      '-l', '100',
-      '--', '-m',
-      str(FLAGS.container_netperf_tcp_stream_send_size_in_bytes), '-o',
-      netperf_benchmark.OUTPUT_SELECTOR
+      '-t',
+      'TCP_STREAM',
+      '-H',
+      container_0.ip_address,
+      '-l',
+      '100',
+      '--',
+      '-m',
+      str(FLAGS.container_netperf_tcp_stream_send_size_in_bytes),
+      '-o',
+      netperf_benchmark.OUTPUT_SELECTOR,
   ]
   cluster.DeployContainer('netperf', benchmark_spec.container_specs['netperf'])
   container_1 = cluster.containers['netperf'][1]
   container_1.WaitForExit()
   throughput_sample, _, _ = netperf_benchmark.ParseNetperfOutput(
-      container_1.GetLogs(), {}, 'TCP_STREAM', False)
+      container_1.GetLogs(), {}, 'TCP_STREAM', False
+  )
   samples.append(throughput_sample)
   return samples
 
@@ -110,6 +119,6 @@ def Cleanup(unused_benchmark_spec):
 
   Args:
     unused_benchmark_spec: The benchmark specification. Contains all data that
-        is required to run the benchmark.
+      is required to run the benchmark.
   """
   pass

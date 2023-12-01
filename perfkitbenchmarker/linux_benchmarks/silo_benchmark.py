@@ -39,14 +39,16 @@ silo:
 """
 
 
-flags.DEFINE_string('silo_benchmark', 'tpcc',
-                    'benchmark to run with silo. Options include tpcc, ycsb,'
-                    ' queue, bid')
+flags.DEFINE_string(
+    'silo_benchmark',
+    'tpcc',
+    'benchmark to run with silo. Options include tpcc, ycsb, queue, bid',
+)
 
-AGG_THPUT_REGEX = \
-    r'(agg_throughput):\s+(\d+\.?\d*e?[+-]?\d*)\s+([a-z/]+)'
-PER_CORE_THPUT_REGEX = \
+AGG_THPUT_REGEX = r'(agg_throughput):\s+(\d+\.?\d*e?[+-]?\d*)\s+([a-z/]+)'
+PER_CORE_THPUT_REGEX = (
     r'(avg_per_core_throughput):\s+(\d+\.?\d*e?[+-]?\d*)\s+([a-z/]+)'
+)
 LAT_REGEX = r'(avg_latency):\s+(\d+\.?\d*e?[+-]?\d*)\s+([a-z]+)'
 
 
@@ -59,7 +61,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -112,18 +114,15 @@ def ParseResults(results):
 
   # agg throughput
   match = regex_util.ExtractAllMatches(AGG_THPUT_REGEX, results)[0]
-  samples.append(sample.Sample(
-      match[0], float(match[1]), match[2]))
+  samples.append(sample.Sample(match[0], float(match[1]), match[2]))
 
   # per core throughput
   match = regex_util.ExtractAllMatches(PER_CORE_THPUT_REGEX, results)[0]
-  samples.append(sample.Sample(
-      match[0], float(match[1]), match[2]))
+  samples.append(sample.Sample(match[0], float(match[1]), match[2]))
 
   # avg latency
   match = regex_util.ExtractAllMatches(LAT_REGEX, results)[0]
-  samples.append(sample.Sample(
-      match[0], float(match[1]), match[2]))
+  samples.append(sample.Sample(match[0], float(match[1]), match[2]))
 
   return samples
 
@@ -133,7 +132,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -142,12 +141,13 @@ def Run(benchmark_spec):
   vm = vms[0]
   nthreads = vm.NumCpusForBenchmark()
   logging.info('Silo running on %s', vm)
-  command = 'cd {0} && '\
-            'out-perf.masstree/benchmarks/dbtest '\
-            '--bench {1} --num-threads {2} --verbose'.format(
-                silo.SILO_DIR,
-                FLAGS.silo_benchmark,
-                nthreads)
+  command = (
+      'cd {0} && '
+      'out-perf.masstree/benchmarks/dbtest '
+      '--bench {1} --num-threads {2} --verbose'.format(
+          silo.SILO_DIR, FLAGS.silo_benchmark, nthreads
+      )
+  )
   logging.info('Silo Results:')
   stdout, stderr = vm.RemoteCommand(command)
   return ParseResults(stderr)
@@ -158,6 +158,6 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   pass

@@ -13,51 +13,51 @@
 # limitations under the License.
 """Records the time required to boot a cluster of VMs.
 
-  This benchmark collects several provisioning time metrics, some of which are
-  conditional based on the type of VMs that the benchmark is being run on.
+This benchmark collects several provisioning time metrics, some of which are
+conditional based on the type of VMs that the benchmark is being run on.
 
-  The metrics that are recorded are captured along the following timeline
-  and under the following conditions:
+The metrics that are recorded are captured along the following timeline
+and under the following conditions:
 
-  create_start_time recorded: this is the time that all metrics are measured
-    against. Every metric mentioned below involves capturing a timestamp and
-    calculating the difference between it and create_start_time.
-  create command invoked: cloud-specific VM instance create command is invoked
-    immediately following the recording of create_start_time. Some clouds
-    invoke a synchronous command, where the command waits until the instance
-    is created before returning to PKB. Meanwhile, other clouds invoke
-    their create command asynchronously, where the command returns to PKB
-    immediately and instance creation is verified through a separate process.
+create_start_time recorded: this is the time that all metrics are measured
+  against. Every metric mentioned below involves capturing a timestamp and
+  calculating the difference between it and create_start_time.
+create command invoked: cloud-specific VM instance create command is invoked
+  immediately following the recording of create_start_time. Some clouds
+  invoke a synchronous command, where the command waits until the instance
+  is created before returning to PKB. Meanwhile, other clouds invoke
+  their create command asynchronously, where the command returns to PKB
+  immediately and instance creation is verified through a separate process.
 
-  The metrics and steps below apply only to asynchronous creates:
-  - Metric: time-to-create-async-return
-    create_async_return_time recorded:
-      The timestamp is captured immediately after an asynchronous create command
-      returns to PKB.
-  - VM describe polling process:
-      After the asynchronous create returns, the instance is polled via the use
-      of a cloud-specific 'describe' command. The command runs in 1 second
-      intervals and has its output parsed to see when the VM enters the
-      cloud-specific 'running' state.
-  - Metric: time-to-running
-    is_running_time recorded:
-      This timestamp is captured once the polling process above determines that
-      the VM is running.
-  Network reachability polling process:
-    PKB uses a retryable WaitForSSH function that invokes a command to determine
-    whether or not the VM is ready to respond to SSH commands.
-  Metric: time-to-ssh-internal
-    ssh_internal_time recorded:
-      This timestamp is captured once the VM responds to the network
-      reachability polling command via its internal IP address.
-  Metric: time-to-ssh-external
-    ssh_external_time recorded:
-      This timestamp is captured once the VM responds to the network
-      reachability polling command via its public IP address.
-  Metric: cluster-boot-time
-    bootable_time recorded:
-      This timestamp is captured once all times are captured. The maximum
-      vm.bootable_time in a cluster of VMs is reported as the cluster boot time.
+The metrics and steps below apply only to asynchronous creates:
+- Metric: time-to-create-async-return
+  create_async_return_time recorded:
+    The timestamp is captured immediately after an asynchronous create command
+    returns to PKB.
+- VM describe polling process:
+    After the asynchronous create returns, the instance is polled via the use
+    of a cloud-specific 'describe' command. The command runs in 1 second
+    intervals and has its output parsed to see when the VM enters the
+    cloud-specific 'running' state.
+- Metric: time-to-running
+  is_running_time recorded:
+    This timestamp is captured once the polling process above determines that
+    the VM is running.
+Network reachability polling process:
+  PKB uses a retryable WaitForSSH function that invokes a command to determine
+  whether or not the VM is ready to respond to SSH commands.
+Metric: time-to-ssh-internal
+  ssh_internal_time recorded:
+    This timestamp is captured once the VM responds to the network
+    reachability polling command via its internal IP address.
+Metric: time-to-ssh-external
+  ssh_external_time recorded:
+    This timestamp is captured once the VM responds to the network
+    reachability polling command via its public IP address.
+Metric: cluster-boot-time
+  bootable_time recorded:
+    This timestamp is captured once all times are captured. The maximum
+    vm.bootable_time in a cluster of VMs is reported as the cluster boot time.
 """
 
 import datetime
@@ -68,7 +68,7 @@ import signal
 import socket
 import subprocess
 import time
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -117,13 +117,17 @@ cluster_boot:
 """
 
 flags.DEFINE_boolean(
-    'cluster_boot_time_reboot', False,
+    'cluster_boot_time_reboot',
+    False,
     'Whether to reboot the VMs during the cluster boot benchmark to measure '
-    'reboot performance.')
+    'reboot performance.',
+)
 flags.DEFINE_boolean(
-    'cluster_boot_test_port_listening', False,
+    'cluster_boot_test_port_listening',
+    False,
     'Test the time it takes to successfully connect to the port that is used '
-    'to run the remote command.')
+    'to run the remote command.',
+)
 _LINUX_BOOT_METRICS = flags.DEFINE_boolean(
     'cluster_boot_linux_boot_metrics',
     False,
@@ -134,20 +138,20 @@ _CALLBACK_INTERNAL = flags.DEFINE_string(
     '',
     'Internal ip address to use for collecting first egress/ingress packet, '
     'requires installation of tcpdump on the runner and tcpdump port is '
-    'reachable from the VMs.'
+    'reachable from the VMs.',
 )
 _CALLBACK_EXTERNAL = flags.DEFINE_string(
     'cluster_boot_callback_external_ip',
     '',
     'External ip address to use for collecting first egress/ingress packet, '
     'requires installation of tcpdump on the runner and tcpdump port is '
-    'reachable from the VMs.'
+    'reachable from the VMs.',
 )
 _TCPDUMP_PORT = flags.DEFINE_integer(
     'cluster_boot_tcpdump_port',
     0,
     'Port the runner uses to test VM network connectivity. By default, pick '
-    'a random unused port.'
+    'a random unused port.',
 )
 FLAGS = flags.FLAGS
 
@@ -197,7 +201,8 @@ def PrepareStartupScript() -> Tuple[str, Optional[int]]:
 
 def GetConfig(user_config):
   benchmark_config = configs.LoadConfig(
-      BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+      BENCHMARK_CONFIG, user_config, BENCHMARK_NAME
+  )
   if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
     startup_script_path, pid = PrepareStartupScript()
     benchmark_config['flags']['boot_startup_script'] = startup_script_path
@@ -256,22 +261,29 @@ def GetTimeToBoot(vms):
         'machine_instance': i,
         'num_vms': len(vms),
         'os_type': vm.OS_TYPE,
-        'create_delay_sec': '%0.1f' % create_delay_sec
+        'create_delay_sec': '%0.1f' % create_delay_sec,
     }
 
     # TIME TO CREATE ASYNC RETURN
     if vm.create_return_time:
       time_to_create_sec = vm.create_return_time - min_create_start_time
       samples.append(
-          sample.Sample('Time to Create Async Return', time_to_create_sec,
-                        'seconds', metadata))
+          sample.Sample(
+              'Time to Create Async Return',
+              time_to_create_sec,
+              'seconds',
+              metadata,
+          )
+      )
 
     # TIME TO RUNNING
     if vm.is_running_time:
       time_to_running_sec = vm.is_running_time - vm.create_start_time
       samples.append(
-          sample.Sample('Time to Running', time_to_running_sec, 'seconds',
-                        metadata))
+          sample.Sample(
+              'Time to Running', time_to_running_sec, 'seconds', metadata
+          )
+      )
 
     # TIME TO SSH
     boot_time_sec = vm.bootable_time - min_create_start_time
@@ -279,28 +291,43 @@ def GetTimeToBoot(vms):
       # TODO(pclay): Remove when Windows refactor below is complete.
       if vm.ssh_external_time:
         samples.append(
-            sample.Sample('Time to SSH - External',
-                          vm.ssh_external_time - min_create_start_time,
-                          'seconds', metadata))
+            sample.Sample(
+                'Time to SSH - External',
+                vm.ssh_external_time - min_create_start_time,
+                'seconds',
+                metadata,
+            )
+        )
       if vm.ssh_internal_time:
         samples.append(
-            sample.Sample('Time to SSH - Internal',
-                          vm.ssh_internal_time - min_create_start_time,
-                          'seconds', metadata))
+            sample.Sample(
+                'Time to SSH - Internal',
+                vm.ssh_internal_time - min_create_start_time,
+                'seconds',
+                metadata,
+            )
+        )
 
     # TIME TO PORT LISTENING
     max_boot_time_sec = max(max_boot_time_sec, boot_time_sec)
     samples.append(
-        sample.Sample('Boot Time', boot_time_sec, 'seconds', metadata))
+        sample.Sample('Boot Time', boot_time_sec, 'seconds', metadata)
+    )
     if FLAGS.cluster_boot_test_port_listening:
       assert vm.port_listening_time
       assert vm.port_listening_time >= vm.create_start_time
       port_listening_time_sec = vm.port_listening_time - min_create_start_time
-      max_port_listening_time_sec = max(max_port_listening_time_sec,
-                                        port_listening_time_sec)
+      max_port_listening_time_sec = max(
+          max_port_listening_time_sec, port_listening_time_sec
+      )
       samples.append(
-          sample.Sample('Port Listening Time', port_listening_time_sec,
-                        'seconds', metadata))
+          sample.Sample(
+              'Port Listening Time',
+              port_listening_time_sec,
+              'seconds',
+              metadata,
+          )
+      )
 
     # TIME TO RDP LISTENING
     # TODO(pclay): refactor so Windows specifics aren't in linux_benchmarks
@@ -308,34 +335,52 @@ def GetTimeToBoot(vms):
       assert vm.rdp_port_listening_time
       assert vm.rdp_port_listening_time >= vm.create_start_time
       rdp_port_listening_time_sec = (
-          vm.rdp_port_listening_time - min_create_start_time)
-      max_rdp_port_listening_time_sec = max(max_rdp_port_listening_time_sec,
-                                            rdp_port_listening_time_sec)
+          vm.rdp_port_listening_time - min_create_start_time
+      )
+      max_rdp_port_listening_time_sec = max(
+          max_rdp_port_listening_time_sec, rdp_port_listening_time_sec
+      )
       samples.append(
-          sample.Sample('RDP Port Listening Time', rdp_port_listening_time_sec,
-                        'seconds', metadata))
+          sample.Sample(
+              'RDP Port Listening Time',
+              rdp_port_listening_time_sec,
+              'seconds',
+              metadata,
+          )
+      )
 
   # Add a total cluster boot sample as the maximum boot time.
   metadata = {
       'num_vms': len(vms),
       'os_type': ','.join(sorted(os_types)),
-      'max_create_delay_sec': '%0.1f' % max_create_delay_sec
+      'max_create_delay_sec': '%0.1f' % max_create_delay_sec,
   }
   samples.append(
-      sample.Sample('Cluster Boot Time', max_boot_time_sec, 'seconds',
-                    metadata))
+      sample.Sample('Cluster Boot Time', max_boot_time_sec, 'seconds', metadata)
+  )
   if FLAGS.cluster_boot_test_port_listening:
     samples.append(
-        sample.Sample('Cluster Port Listening Time',
-                      max_port_listening_time_sec, 'seconds', metadata))
+        sample.Sample(
+            'Cluster Port Listening Time',
+            max_port_listening_time_sec,
+            'seconds',
+            metadata,
+        )
+    )
   if FLAGS.cluster_boot_test_rdp_port_listening:
     samples.append(
-        sample.Sample('Cluster RDP Port Listening Time',
-                      max_rdp_port_listening_time_sec, 'seconds', metadata))
+        sample.Sample(
+            'Cluster RDP Port Listening Time',
+            max_rdp_port_listening_time_sec,
+            'seconds',
+            metadata,
+        )
+    )
   if max_create_delay_sec > 1:
     logging.warning(
         'The maximum delay between starting VM creations is %0.1fs.',
-        max_create_delay_sec)
+        max_create_delay_sec,
+    )
 
   return samples
 
@@ -353,12 +398,14 @@ def _MeasureReboot(vms):
   before_reboot_timestamp = time.time()
   reboot_times = background_tasks.RunThreaded(lambda vm: vm.Reboot(), vms)
   cluster_reboot_time = time.time() - before_reboot_timestamp
-  return _GetVmOperationDataSamples(reboot_times, cluster_reboot_time, 'Reboot',
-                                    vms)
+  return _GetVmOperationDataSamples(
+      reboot_times, cluster_reboot_time, 'Reboot', vms
+  )
 
 
 def MeasureDelete(
-    vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
+    vms: List[virtual_machine.BaseVirtualMachine],
+) -> List[sample.Sample]:
   """Measures the time to delete the cluster of VMs.
 
   Args:
@@ -379,13 +426,17 @@ def MeasureDelete(
   max_delete_end_time = max([vm.delete_end_time for vm in vms])
   cluster_delete_time = max_delete_end_time - min_delete_start_time
   # Record the delete metrics as samples.
-  return _GetVmOperationDataSamples(delete_times, cluster_delete_time, 'Delete',
-                                    vms)
+  return _GetVmOperationDataSamples(
+      delete_times, cluster_delete_time, 'Delete', vms
+  )
 
 
 def _GetVmOperationDataSamples(
-    operation_times: List[int], cluster_time: float, operation: str,
-    vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
+    operation_times: List[int],
+    cluster_time: float,
+    operation: str,
+    vms: List[virtual_machine.BaseVirtualMachine],
+) -> List[sample.Sample]:
   """Append samples from given data.
 
   Args:
@@ -403,17 +454,20 @@ def _GetVmOperationDataSamples(
     metadata = {
         'machine_instance': i,
         'num_vms': len(vms),
-        'os_type': vm.OS_TYPE
+        'os_type': vm.OS_TYPE,
     }
     metadata_list.append(metadata)
   for operation_time, metadata in zip(operation_times, metadata_list):
     samples.append(
-        sample.Sample(f'{operation} Time', operation_time, 'seconds', metadata))
+        sample.Sample(f'{operation} Time', operation_time, 'seconds', metadata)
+    )
   os_types = set([vm.OS_TYPE for vm in vms])
   metadata = {'num_vms': len(vms), 'os_type': ','.join(sorted(os_types))}
   samples.append(
-      sample.Sample(f'Cluster {operation} Time', cluster_time, 'seconds',
-                    metadata))
+      sample.Sample(
+          f'Cluster {operation} Time', cluster_time, 'seconds', metadata
+      )
+  )
   return samples
 
 
@@ -436,7 +490,7 @@ def Run(benchmark_spec):
               datetime.datetime.fromtimestamp(
                   vm.create_start_time, pytz.timezone('UTC')
               ),
-              include_networking_samples=CollectNetworkSamples()
+              include_networking_samples=CollectNetworkSamples(),
           )
       )
   if FLAGS.cluster_boot_time_reboot:

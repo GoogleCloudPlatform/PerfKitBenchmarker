@@ -29,10 +29,12 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_packages import ycsb
 
 # See http://api.mongodb.org/java/2.13/com/mongodb/WriteConcern.html
-flags.DEFINE_string('mongodb_writeconcern', 'acknowledged',
-                    'MongoDB write concern.')
-flags.DEFINE_integer('mongodb_readahead_kb', None,
-                     'Configure block device readahead settings.')
+flags.DEFINE_string(
+    'mongodb_writeconcern', 'acknowledged', 'MongoDB write concern.'
+)
+flags.DEFINE_integer(
+    'mongodb_readahead_kb', None, 'Configure block device readahead settings.'
+)
 
 
 FLAGS = flags.FLAGS
@@ -68,18 +70,21 @@ def _PrepareServer(vm):
   data_dir = _GetDataDir(vm)
   vm.RemoteCommand('mkdir {0} && chmod a+rwx {0}'.format(data_dir))
   vm.RemoteCommand(
-      "sudo sed -i -e '/bind_ip/ s/^/#/; s,dbPath:.*,dbPath: %s,' %s" %
-      (data_dir,
-       vm.GetPathToConfig('mongodb_server')))
+      "sudo sed -i -e '/bind_ip/ s/^/#/; s,dbPath:.*,dbPath: %s,' %s"
+      % (data_dir, vm.GetPathToConfig('mongodb_server'))
+  )
   if FLAGS.mongodb_readahead_kb is not None:
-    vm.SetReadAhead(FLAGS.mongodb_readahead_kb * 2,
-                    [d.GetDevicePath() for d in vm.scratch_disks])
+    vm.SetReadAhead(
+        FLAGS.mongodb_readahead_kb * 2,
+        [d.GetDevicePath() for d in vm.scratch_disks],
+    )
 
   vm.RemoteCommand('sudo pkill mongod', ignore_failure=True)
 
   vm.RemoteCommand(
-      'nohup sudo /usr/bin/mongod --fork --config %s &' %
-      vm.GetPathToConfig('mongodb_server'))
+      'nohup sudo /usr/bin/mongod --fork --config %s &'
+      % vm.GetPathToConfig('mongodb_server')
+  )
 
 
 def _PrepareClient(vm):
@@ -88,8 +93,9 @@ def _PrepareClient(vm):
   # Disable logging for MongoDB driver, which is otherwise quite verbose.
   log_config = """<configuration><root level="WARN"/></configuration>"""
 
-  vm.RemoteCommand("echo '{0}' > {1}/logback.xml".format(
-      log_config, ycsb.YCSB_DIR))
+  vm.RemoteCommand(
+      "echo '{0}' > {1}/logback.xml".format(log_config, ycsb.YCSB_DIR)
+  )
 
 
 def Prepare(benchmark_spec):
@@ -97,19 +103,23 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
-  server_partials = [functools.partial(_PrepareServer, mongo_vm)
-                     for mongo_vm in benchmark_spec.vm_groups['workers']]
-  client_partials = [functools.partial(_PrepareClient, client)
-                     for client in benchmark_spec.vm_groups['clients']]
+  server_partials = [
+      functools.partial(_PrepareServer, mongo_vm)
+      for mongo_vm in benchmark_spec.vm_groups['workers']
+  ]
+  client_partials = [
+      functools.partial(_PrepareClient, client)
+      for client in benchmark_spec.vm_groups['clients']
+  ]
 
   background_tasks.RunThreaded(
       (lambda f: f()), server_partials + client_partials
   )
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   server = benchmark_spec.vm_groups['workers'][0]
-  benchmark_spec.mongodb_url = 'mongodb://%s:27017/' % server.internal_ip,
+  benchmark_spec.mongodb_url = ('mongodb://%s:27017/' % server.internal_ip,)
 
 
 def Run(benchmark_spec):
@@ -117,17 +127,22 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
   """
   kwargs = {
       'mongodb.url': benchmark_spec.mongodb_url,
-      'mongodb.writeConcern': FLAGS.mongodb_writeconcern}
-  samples = list(benchmark_spec.executor.LoadAndRun(
-      benchmark_spec.vm_groups['clients'],
-      load_kwargs=kwargs, run_kwargs=kwargs))
+      'mongodb.writeConcern': FLAGS.mongodb_writeconcern,
+  }
+  samples = list(
+      benchmark_spec.executor.LoadAndRun(
+          benchmark_spec.vm_groups['clients'],
+          load_kwargs=kwargs,
+          run_kwargs=kwargs,
+      )
+  )
   if FLAGS.mongodb_readahead_kb is not None:
     for s in samples:
       s.metadata['readahdead_kb'] = FLAGS.mongodb_readahead_kb
@@ -139,11 +154,13 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
+
   def CleanupServer(server):
-    server.RemoteCommand('sudo service %s stop' %
-                         server.GetServiceName('mongodb_server'))
+    server.RemoteCommand(
+        'sudo service %s stop' % server.GetServiceName('mongodb_server')
+    )
     server.RemoteCommand('rm -rf %s' % _GetDataDir(server))
 
   CleanupServer(benchmark_spec.vm_groups['workers'][0])

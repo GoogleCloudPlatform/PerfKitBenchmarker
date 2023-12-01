@@ -26,14 +26,33 @@ from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 
 _BENCHMARKS = [
-    'avrora', 'batik', 'eclipse', 'fop', 'h2', 'jython', 'luindex', 'lusearch',
-    'pmd', 'sunflow', 'tomcat', 'tradebeans', 'tradesoap', 'xalan'
+    'avrora',
+    'batik',
+    'eclipse',
+    'fop',
+    'h2',
+    'jython',
+    'luindex',
+    'lusearch',
+    'pmd',
+    'sunflow',
+    'tomcat',
+    'tradebeans',
+    'tradesoap',
+    'xalan',
 ]
 
-flags.DEFINE_string('dacapo_jar_filename', 'dacapo-9.12-MR1-bach.jar',
-                    'Filename of DaCapo jar file.')
-flags.DEFINE_enum('dacapo_benchmark', 'luindex', _BENCHMARKS,
-                  'Name of specific DaCapo benchmark to execute.')
+flags.DEFINE_string(
+    'dacapo_jar_filename',
+    'dacapo-9.12-MR1-bach.jar',
+    'Filename of DaCapo jar file.',
+)
+flags.DEFINE_enum(
+    'dacapo_benchmark',
+    'luindex',
+    _BENCHMARKS,
+    'Name of specific DaCapo benchmark to execute.',
+)
 flags.DEFINE_integer('dacapo_num_iters', 1, 'Number of iterations to execute.')
 
 FLAGS = flags.FLAGS
@@ -58,7 +77,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   benchmark_spec.vms[0].Install('dacapo')
 
@@ -68,7 +87,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A singleton list of sample.Sample objects containing the DaCapo benchmark
@@ -78,17 +97,22 @@ def Run(benchmark_spec):
     errors.Benchmarks.RunError if the DaCapo benchmark didn't succeed.
   """
   _, stderr = benchmark_spec.vms[0].RemoteCommand(
-      'java -jar %s %s -n %i --scratch-directory=%s' %
-      (os.path.join(linux_packages.INSTALL_DIR, FLAGS.dacapo_jar_filename),
-       FLAGS.dacapo_benchmark, FLAGS.dacapo_num_iters,
-       os.path.join(linux_packages.INSTALL_DIR, 'dacapo_scratch')))
+      'java -jar %s %s -n %i --scratch-directory=%s'
+      % (
+          os.path.join(linux_packages.INSTALL_DIR, FLAGS.dacapo_jar_filename),
+          FLAGS.dacapo_benchmark,
+          FLAGS.dacapo_num_iters,
+          os.path.join(linux_packages.INSTALL_DIR, 'dacapo_scratch'),
+      )
+  )
   for line in stderr.splitlines():
     m = _PASS_PATTERN.match(line)
     if m:
       metadata = {'dacapo_benchmark': FLAGS.dacapo_benchmark}
       return [sample.Sample('run_time', float(m.group(1)), 'ms', metadata)]
   raise errors.Benchmarks.RunError(
-      'DaCapo benchmark %s failed.' % FLAGS.dacapo_benchmark)
+      'DaCapo benchmark %s failed.' % FLAGS.dacapo_benchmark
+  )
 
 
 def Cleanup(benchmark_spec):
@@ -96,7 +120,8 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   benchmark_spec.vms[0].RemoteCommand(
-      'rm -rf %s' % os.path.join(linux_packages.INSTALL_DIR, 'dacapo_scratch'))
+      'rm -rf %s' % os.path.join(linux_packages.INSTALL_DIR, 'dacapo_scratch')
+  )

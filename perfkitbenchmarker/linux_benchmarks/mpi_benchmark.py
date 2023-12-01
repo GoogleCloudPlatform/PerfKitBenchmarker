@@ -7,7 +7,6 @@ there should be tuning on each of the clouds
 import logging
 from typing import Any, Dict, Iterator, List, Tuple
 from absl import flags
-
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -15,7 +14,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
-
 from perfkitbenchmarker.linux_packages import mpi
 
 _BaseLinuxVirtualMachine = linux_virtual_machine.BaseLinuxVirtualMachine
@@ -23,89 +21,177 @@ _BaseLinuxVirtualMachine = linux_virtual_machine.BaseLinuxVirtualMachine
 # documents the individual MPI tests in each suite
 _MPI_SUITE_TESTS = {
     'IMB-MPI1': [
-        'Allgather', 'Allgatherv', 'Allreduce', 'Alltoall', 'Alltoallv',
-        'Barrier', 'Bcast', 'Exchange', 'Gather', 'Gatherv', 'PingPing',
-        'PingPong', 'Reduce', 'Reduce_scatter', 'Reduce_scatter_block',
-        'Scatter', 'Scatterv', 'Sendrecv'
+        'Allgather',
+        'Allgatherv',
+        'Allreduce',
+        'Alltoall',
+        'Alltoallv',
+        'Barrier',
+        'Bcast',
+        'Exchange',
+        'Gather',
+        'Gatherv',
+        'PingPing',
+        'PingPong',
+        'Reduce',
+        'Reduce_scatter',
+        'Reduce_scatter_block',
+        'Scatter',
+        'Scatterv',
+        'Sendrecv',
     ],
     'IMB-MPI2': [],
     'IMB-NBC': [
-        'Iallgather', 'Iallgatherv', 'Iallreduce', 'Ialltoall', 'Ialltoallv',
-        'Ibarrier', 'Ibcast', 'Igather', 'Igatherv', 'Ireduce',
-        'Ireduce_scatter', 'Iscatter', 'Iscatterv'
+        'Iallgather',
+        'Iallgatherv',
+        'Iallreduce',
+        'Ialltoall',
+        'Ialltoallv',
+        'Ibarrier',
+        'Ibcast',
+        'Igather',
+        'Igatherv',
+        'Ireduce',
+        'Ireduce_scatter',
+        'Iscatter',
+        'Iscatterv',
     ],
     'IMB-RMA': [
-        'Accumulate', 'All_get_all', 'All_put_all', 'Bidir_get', 'Bidir_put',
-        'Compare_and_swap', 'Exchange_get', 'Exchange_put', 'Fetch_and_op',
-        'Get_accumulate', 'One_get_all', 'One_put_all', 'Put_all_local',
-        'Put_local', 'Truly_passive_put', 'Unidir_get', 'Unidir_put'
+        'Accumulate',
+        'All_get_all',
+        'All_put_all',
+        'Bidir_get',
+        'Bidir_put',
+        'Compare_and_swap',
+        'Exchange_get',
+        'Exchange_put',
+        'Fetch_and_op',
+        'Get_accumulate',
+        'One_get_all',
+        'One_put_all',
+        'Put_all_local',
+        'Put_local',
+        'Truly_passive_put',
+        'Unidir_get',
+        'Unidir_put',
     ],
     'IMB-MT': [
-        'AllReduceMT', 'BarrierMT', 'BcastMT', 'BiBandMT', 'ExchangeMT',
-        'PingPingMT', 'PingPongMT', 'ReduceMT', 'SendRecvMT', 'UniBandMT'
-    ]
+        'AllReduceMT',
+        'BarrierMT',
+        'BcastMT',
+        'BiBandMT',
+        'ExchangeMT',
+        'PingPingMT',
+        'PingPongMT',
+        'ReduceMT',
+        'SendRecvMT',
+        'UniBandMT',
+    ],
 }
 
-flags.DEFINE_list('mpi_suites', ['IMB-MPI1'],
-                  'MPI benchmarks suites: {}.'.format(sorted(_MPI_SUITE_TESTS)))
+flags.DEFINE_list(
+    'mpi_suites',
+    ['IMB-MPI1'],
+    'MPI benchmarks suites: {}.'.format(sorted(_MPI_SUITE_TESTS)),
+)
 _BENCHMARKS = flags.DEFINE_list(
-    'mpi_benchmarks', [],
-    ('List of MPI benchmarks.  Default is [], which means '
-     'running all benchmarks in the suite.'))
+    'mpi_benchmarks',
+    [],
+    (
+        'List of MPI benchmarks.  Default is [], which means '
+        'running all benchmarks in the suite.'
+    ),
+)
 flag_util.DEFINE_integerlist(
-    'mpi_threads', [0, 1], 'Number of MPI processes to use per host.  For 0 '
-    'use half the number of vCPUs.')
+    'mpi_threads',
+    [0, 1],
+    'Number of MPI processes to use per host.  For 0 '
+    'use half the number of vCPUs.',
+)
 flags.DEFINE_integer('mpi_timeout', 60, 'MPI testing timeout (seconds).')
 flags.DEFINE_integer(
-    'mpi_iterations', 100000,
-    'Number of times to run an individual benchmark for a given byte size.')
-flags.DEFINE_bool('mpi_include_zero_byte', False,
-                  'Whether to include a 0 byte payload in runs.')
+    'mpi_iterations',
+    100000,
+    'Number of times to run an individual benchmark for a given byte size.',
+)
+flags.DEFINE_bool(
+    'mpi_include_zero_byte',
+    False,
+    'Whether to include a 0 byte payload in runs.',
+)
 _MSG_SIZES = flags.DEFINE_multi_integer(
-    'mpi_msglog_sizes', [], ('List of 2^n byte sizes to use.  '
-                             'Example: [2,8] will use 4 and 64 byte payloads.'))
-_MSG_SIZE_MIN = flags.DEFINE_integer('mpi_msglog_min', 10,
-                                     '2^n byte message min size.')
-_MSG_SIZE_MAX = flags.DEFINE_integer('mpi_msglog_max', 11,
-                                     '2^n byte message max size.')
+    'mpi_msglog_sizes',
+    [],
+    (
+        'List of 2^n byte sizes to use.  '
+        'Example: [2,8] will use 4 and 64 byte payloads.'
+    ),
+)
+_MSG_SIZE_MIN = flags.DEFINE_integer(
+    'mpi_msglog_min', 10, '2^n byte message min size.'
+)
+_MSG_SIZE_MAX = flags.DEFINE_integer(
+    'mpi_msglog_max', 11, '2^n byte message max size.'
+)
 flags.DEFINE_integer(
-    'mpi_off_cache_size', -1,
+    'mpi_off_cache_size',
+    -1,
     'Avoids cache-size (use --mpi_off_cache_size= to reuse '
     'cache, but that gives unrealistic numbers.  -1 uses the '
-    'value in IMB_mem_info.h.')
-flags.DEFINE_integer('mpi_off_cache_line_size', None,
-                     'Size of a last level cache line.')
+    'value in IMB_mem_info.h.',
+)
+flags.DEFINE_integer(
+    'mpi_off_cache_line_size', None, 'Size of a last level cache line.'
+)
 # For more info on --mpi_ppn changes the MPI rank assignment see
 # https://software.intel.com/en-us/articles/controlling-process-placement-with-the-intel-mpi-library
 flags.DEFINE_integer(
-    'mpi_ppn', 0, 'Processes/Ranks per node. Defaults to not setting a ppn '
-    'when running tests, instead relying on -map to place threads.')
+    'mpi_ppn',
+    0,
+    'Processes/Ranks per node. Defaults to not setting a ppn '
+    'when running tests, instead relying on -map to place threads.',
+)
 
 flags.DEFINE_list(
-    'mpi_env', ['I_MPI_DEBUG=6'],
+    'mpi_env',
+    ['I_MPI_DEBUG=6'],
     'Comma separated list of environment variables, e.g. '
     '--mpi_env=FI_PROVIDER=tcp,FI_LOG_LEVEL=info '
-    'Default set to output MPI pinning debugging information.')
+    'Default set to output MPI pinning debugging information.',
+)
 flags.DEFINE_list(
-    'mpi_genv', [], 'Comma separated list of global environment variables, '
+    'mpi_genv',
+    [],
+    'Comma separated list of global environment variables, '
     'i.e. environment variables to be applied to all nodes, e.g. '
-    '--mpi_genv=I_MPI_PIN_PROCESSOR_LIST=0,I_MPI_PIN=1')
-flags.DEFINE_bool('mpi_record_latency', True,
-                  'Whether to record the individual packet latencies.')
-flags.DEFINE_integer(
-    'mpi_npmin', None, 'Minimum number of processes to use. For IMB, this '
-    'becomes -npmin. If unspecified, no attempt will be made to specify the '
-    'minimum number of processes (i.e. the application defaults will prevail).')
+    '--mpi_genv=I_MPI_PIN_PROCESSOR_LIST=0,I_MPI_PIN=1',
+)
 flags.DEFINE_bool(
-    'mpi_tune', False,
+    'mpi_record_latency',
+    True,
+    'Whether to record the individual packet latencies.',
+)
+flags.DEFINE_integer(
+    'mpi_npmin',
+    None,
+    'Minimum number of processes to use. For IMB, this '
+    'becomes -npmin. If unspecified, no attempt will be made to specify the '
+    'minimum number of processes (i.e. the application defaults will prevail).',
+)
+flags.DEFINE_bool(
+    'mpi_tune',
+    False,
     'Whether to instruct the mpirun command to use data collected by an MPI '
     'tuning utility like mpitune, e.g. by passing -tune to mpirun. Consider '
     'using in conjunction with specifying the tuning data directory, e.g. for '
-    'Intel MPI setting I_MPI_TUNER_DATA_DIR.')
+    'Intel MPI setting I_MPI_TUNER_DATA_DIR.',
+)
 flags.DEFINE_bool(
-    'mpi_multi', True,
+    'mpi_multi',
+    True,
     'Whether to instruct the mpirun command to set -multi and run with '
-    'multiple number of groups as opposed to just one.')
+    'multiple number of groups as opposed to just one.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -136,17 +222,21 @@ flags.register_validator(
     'mpi_suites',
     lambda suites: set(suites) <= set(_MPI_SUITE_TESTS),
     message='--mpi_suites values must be in {}'.format(
-        sorted(_MPI_SUITE_TESTS.keys())))
+        sorted(_MPI_SUITE_TESTS.keys())
+    ),
+)
 
 flags.register_validator(
     'mpi_env',
     lambda env_params: all('=' in param for param in env_params),
-    message='--mpi_env values must be in format "key=value" or "key="')
+    message='--mpi_env values must be in format "key=value" or "key="',
+)
 
 flags.register_validator(
     'mpi_genv',
     lambda genv_params: all('=' in param for param in genv_params),
-    message='--mpi_genv values must be in format "key=value" or "key="')
+    message='--mpi_genv values must be in format "key=value" or "key="',
+)
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -162,7 +252,8 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
     if FLAGS['mpi_msglog_min'].present or FLAGS['mpi_msglog_max'].present:
       raise errors.Setup.InvalidFlagConfigurationError(
           'If --mpi_msglog_sizes set cannot set '
-          '--mpi_msglog_min or --mpi_msglog_min')
+          '--mpi_msglog_min or --mpi_msglog_min'
+      )
   if _BENCHMARKS.value:
     all_tests = set()
     for tests in _MPI_SUITE_TESTS.values():
@@ -170,7 +261,8 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
     unknown_tests = set(_LowerList(_BENCHMARKS.value)).difference(all_tests)
     if unknown_tests:
       raise errors.Setup.InvalidFlagConfigurationError(
-          f'Unknown MPI benchmarks: "{",".join(sorted(unknown_tests))}"')
+          f'Unknown MPI benchmarks: "{",".join(sorted(unknown_tests))}"'
+      )
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['num_vms'].present:
     config['vm_groups']['default']['vm_count'] = FLAGS.num_vms
@@ -206,9 +298,13 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
     # thread per real (1/2 of vCPUs) CPUs.
     on_real_cpus = process_count == real_cpus
     samples.extend(
-        _RunTest(vms,
-                 process_count * len(vms),  # this is num ranks
-                 FLAGS.mpi_ppn, on_real_cpus))
+        _RunTest(
+            vms,
+            process_count * len(vms),  # this is num ranks
+            FLAGS.mpi_ppn,
+            on_real_cpus,
+        )
+    )
   for item in samples:
     # TODO(user) reenable installing MKL when Intel repos work
     # google3/cloud/performance/artemis/internal_packages/internal_intelmpi.py;l=65
@@ -216,8 +312,12 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   return samples
 
 
-def _RunTest(vms: List[_BaseLinuxVirtualMachine], total_processes: int,
-             ppn: int, on_real_cpus: bool) -> List[sample.Sample]:
+def _RunTest(
+    vms: List[_BaseLinuxVirtualMachine],
+    total_processes: int,
+    ppn: int,
+    on_real_cpus: bool,
+) -> List[sample.Sample]:
   """Runs the MPI test for this given number of processes per host.
 
   Args:
@@ -238,7 +338,8 @@ def _RunTest(vms: List[_BaseLinuxVirtualMachine], total_processes: int,
         total_processes=total_processes,
         suite=suite,
         tests=_GetTests(suite),
-        ppn=ppn):
+        ppn=ppn,
+    ):
       response = mpi.RunMpiStats(vms[0], request)
       for item in _CreateSamples(response):
         item.metadata['mpi_suite'] = suite
@@ -281,8 +382,9 @@ def _CreateSamples(response: mpi.MpiResponse) -> Iterator[sample.Sample]:
         if result.processes_per_group is not None:
           item.metadata['mpi_processes_per_group'] = result.processes_per_group
           if result.groups is not None:
-            item.metadata[
-                'mpi_ranks'] = result.processes_per_group * result.groups
+            item.metadata['mpi_ranks'] = (
+                result.processes_per_group * result.groups
+            )
           else:  # only one group => ranks = ppg
             item.metadata['mpi_ranks'] = result.processes_per_group
         if result.mode:
@@ -291,8 +393,9 @@ def _CreateSamples(response: mpi.MpiResponse) -> Iterator[sample.Sample]:
           # Convert {0: [1,2], 1: [3,4]} into '0=1,2;1=3,4'
           layout = []
           for group_number, cpu_ids in sorted(result.group_layout.items()):
-            layout.append(f'{group_number}='
-                          f'{",".join(str(cpu) for cpu in cpu_ids)}')
+            layout.append(
+                f'{group_number}={",".join(str(cpu) for cpu in cpu_ids)}'
+            )
           item.metadata['mpi_layout'] = ';'.join(layout)
         else:
           item.metadata['mpi_layout'] = None
@@ -301,7 +404,8 @@ def _CreateSamples(response: mpi.MpiResponse) -> Iterator[sample.Sample]:
         if response.mpi_env:
           mpi_env = sorted(response.mpi_env.items())
           item.metadata['mpi_running_env'] = ';'.join(
-              f'{key}={value}' for key, value in mpi_env)
+              f'{key}={value}' for key, value in mpi_env
+          )
         yield item
 
 
@@ -328,8 +432,11 @@ def _MpiDataToSamples(row: mpi.MpiData) -> List[sample.Sample]:
     return [sample.Sample('timeout_error', 1, 'count', metadata)]
   found_metrics = _METRIC_NAMES.intersection(row.data)
   if not found_metrics:
-    logging.warning('Skipping row %s as missing a required metric name %s', row,
-                    _METRIC_NAMES)
+    logging.warning(
+        'Skipping row %s as missing a required metric name %s',
+        row,
+        _METRIC_NAMES,
+    )
     return []
   metric = list(found_metrics)[0]
   ret = [sample.Sample(metric, row.data[metric], 'usec', row.data)]
@@ -353,10 +460,13 @@ def Cleanup(spec: benchmark_spec.BenchmarkSpec) -> None:
   del spec  # Unused
 
 
-def _CreateRequestWithFlagParameters(vms: List[_BaseLinuxVirtualMachine],
-                                     total_processes: int, suite: str,
-                                     tests: List[str],
-                                     ppn: int) -> Iterator[mpi.MpiRequest]:
+def _CreateRequestWithFlagParameters(
+    vms: List[_BaseLinuxVirtualMachine],
+    total_processes: int,
+    suite: str,
+    tests: List[str],
+    ppn: int,
+) -> Iterator[mpi.MpiRequest]:
   """Yields an MpiRequest using settings passed in as flags.
 
   If told to record MPI latencies (--mpi_record_latency) then must create
@@ -405,7 +515,8 @@ def _CreateRequestWithFlagParameters(vms: List[_BaseLinuxVirtualMachine],
           record_latencies=FLAGS.mpi_record_latency,
           npmin=FLAGS.mpi_npmin,
           tune=FLAGS.mpi_tune,
-          multi=FLAGS.mpi_multi)
+          multi=FLAGS.mpi_multi,
+      )
 
 
 def _LowerList(elements: List[str]) -> List[str]:

@@ -23,10 +23,8 @@ memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 
 
 import functools
-
 from typing import Any, Dict, List
 from absl import flags
-
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -37,8 +35,11 @@ from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('kubernetes_redis_memtier_runtime_class_name', None,
-                    'A custom runtimeClassName to apply to the redis pods.')
+flags.DEFINE_string(
+    'kubernetes_redis_memtier_runtime_class_name',
+    None,
+    'A custom runtimeClassName to apply to the redis pods.',
+)
 
 BENCHMARK_NAME = 'kubernetes_redis_memtier'
 BENCHMARK_CONFIG = """
@@ -79,13 +80,11 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   if FLAGS.redis_memtier_client_machine_type:
     vm_spec = config['container_cluster']['nodepools']['clients']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = (
-          FLAGS.redis_memtier_client_machine_type)
+      vm_spec[cloud]['machine_type'] = FLAGS.redis_memtier_client_machine_type
   if FLAGS.redis_memtier_server_machine_type:
     vm_spec = config['container_cluster']['nodepools']['redis']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = (
-          FLAGS.redis_memtier_server_machine_type)
+      vm_spec[cloud]['machine_type'] = FLAGS.redis_memtier_server_machine_type
   return config
 
 
@@ -94,14 +93,17 @@ def _PrepareCluster(bm_spec: _BenchmarkSpec):
   redis_port = redis_server.GetRedisPorts()[0]
   replicas = bm_spec.container_cluster.nodepools['redis'].num_nodes * 2
   with kubernetes_helper.CreateRenderedManifestFile(
-      'container/kubernetes_redis_memtier/kubernetes_redis_memtier.yaml.j2', {
+      'container/kubernetes_redis_memtier/kubernetes_redis_memtier.yaml.j2',
+      {
           'redis_replicas': replicas,
           'redis_port': redis_port,
           # Redis expects cluster bus port as 'the client port + 10000'
           'redis_cluster_port': redis_port + 10000,
-          'runtime_class_name':
-              FLAGS.kubernetes_redis_memtier_runtime_class_name,
-      }) as rendered_manifest:
+          'runtime_class_name': (
+              FLAGS.kubernetes_redis_memtier_runtime_class_name
+          ),
+      },
+  ) as rendered_manifest:
     bm_spec.container_cluster.ApplyManifest(rendered_manifest.name)
 
   bm_spec.container_cluster.WaitForRollout('statefulset/redis')
@@ -110,9 +112,11 @@ def _PrepareCluster(bm_spec: _BenchmarkSpec):
   ip_and_port_list = list(map(lambda ip: '%s:%s' % (ip, redis_port), pod_ips))
   cmd = [
       'redis-cli',
-      '--cluster', 'create',
-      '--cluster-replicas', '1',
-      '--cluster-yes'
+      '--cluster',
+      'create',
+      '--cluster-replicas',
+      '1',
+      '--cluster-yes',
   ] + ip_and_port_list
   bm_spec.container_cluster.RunKubectlExec('redis-0', cmd)
 
@@ -123,15 +127,16 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   """Install Redis on K8s cluster and memtier_benchmark on client VMs."""
   client_vms = bm_spec.vm_groups['clients']
   # Install Memtier and Redis on the cluster
-  prepare_fns = (
-      [functools.partial(_PrepareCluster, bm_spec)] +
-      [functools.partial(vm.Install, 'memtier') for vm in client_vms])
+  prepare_fns = [functools.partial(_PrepareCluster, bm_spec)] + [
+      functools.partial(vm.Install, 'memtier') for vm in client_vms
+  ]
 
   background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
   # Load Redis database
-  memtier.Load(client_vms, bm_spec.redis_endpoint_ip,
-               redis_server.GetRedisPorts()[0])
+  memtier.Load(
+      client_vms, bm_spec.redis_endpoint_ip, redis_server.GetRedisPorts()[0]
+  )
 
 
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:

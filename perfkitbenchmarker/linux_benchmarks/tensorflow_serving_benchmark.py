@@ -67,14 +67,15 @@ BENCHMARK_DATA = {
     # official TF models repo. It takes in JPG as input and is channels-last
     # (NHWC), which is generally better for CPU. It is available here:
     # http://download.tensorflow.org/models/official/20181001_resnet/savedmodels/resnet_v2_fp32_savedmodel_NHWC_jpg.tar.gz
-    RESNET_NHWC_SAVEDMODEL_TGZ:
-        '545965f0f85c87386e51076abc7ef4f9f1decaf641e8a90906f98c6774547e3f',
-
+    RESNET_NHWC_SAVEDMODEL_TGZ: (
+        '545965f0f85c87386e51076abc7ef4f9f1decaf641e8a90906f98c6774547e3f'
+    ),
     # Collection of 50,000 imagenet 2012 validation images.
     # Available here:
     # http://www.image-net.org/challenges/LSVRC/2012/nnoupb/ILSVRC2012_img_val.tar
-    ILSVRC_VALIDATION_IMAGES_TAR:
-        'c7e06a6c0baccf06d8dbeb6577d71efff84673a5dbdd50633ab44f8ea0456ae0',
+    ILSVRC_VALIDATION_IMAGES_TAR: (
+        'c7e06a6c0baccf06d8dbeb6577d71efff84673a5dbdd50633ab44f8ea0456ae0'
+    ),
 }
 
 BENCHMARK_NAME = 'tensorflow_serving'
@@ -111,11 +112,14 @@ tensorflow_serving:
 """
 
 flags.DEFINE_integer(
-    'tf_serving_runtime', 60, 'benchmark runtime in seconds', lower_bound=1)
+    'tf_serving_runtime', 60, 'benchmark runtime in seconds', lower_bound=1
+)
 flag_util.DEFINE_integerlist(
-    'tf_serving_client_thread_counts', [16, 32],
+    'tf_serving_client_thread_counts',
+    [16, 32],
     'number of client worker threads',
-    module_name=__name__)
+    module_name=__name__,
+)
 
 
 class ClientWorkloadScriptExecutionError(Exception):
@@ -160,20 +164,24 @@ def _PrepareClient(vm):
   """
   logging.info('Installing Tensorflow Serving on client %s', vm)
   vm.Install('tensorflow_serving')
-  vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME,
-                                        [ILSVRC_VALIDATION_IMAGES_TAR],
-                                        linux_packages.INSTALL_DIR)
+  vm.InstallPreprovisionedBenchmarkData(
+      BENCHMARK_NAME, [ILSVRC_VALIDATION_IMAGES_TAR], linux_packages.INSTALL_DIR
+  )
 
   # The image tarball does not contain a subfolder, so create one
   # using the filename of the tarball, minus the extension and extract
   # it there.
   extract_dir = posixpath.join(
       linux_packages.INSTALL_DIR,
-      posixpath.splitext(ILSVRC_VALIDATION_IMAGES_TAR)[0])
+      posixpath.splitext(ILSVRC_VALIDATION_IMAGES_TAR)[0],
+  )
   vm.RemoteCommand('mkdir {0}'.format(extract_dir))
 
-  vm.RemoteCommand('cd {0} && tar xvf {1} --directory {2}'.format(
-      linux_packages.INSTALL_DIR, ILSVRC_VALIDATION_IMAGES_TAR, extract_dir))
+  vm.RemoteCommand(
+      'cd {0} && tar xvf {1} --directory {2}'.format(
+          linux_packages.INSTALL_DIR, ILSVRC_VALIDATION_IMAGES_TAR, extract_dir
+      )
+  )
 
 
 def _PrepareServer(vm):
@@ -185,15 +193,17 @@ def _PrepareServer(vm):
   logging.info('Installing Tensorflow Serving on server %s', vm)
   vm.Install('tensorflow_serving')
   vm.InstallPreprovisionedBenchmarkData(
-      BENCHMARK_NAME, [RESNET_NHWC_SAVEDMODEL_TGZ], TF_SERVING_BASE_DIRECTORY)
+      BENCHMARK_NAME, [RESNET_NHWC_SAVEDMODEL_TGZ], TF_SERVING_BASE_DIRECTORY
+  )
 
-  extract_dir = posixpath.join(
-      TF_SERVING_BASE_DIRECTORY, 'resnet')
+  extract_dir = posixpath.join(TF_SERVING_BASE_DIRECTORY, 'resnet')
   vm.RemoteCommand('mkdir {0}'.format(extract_dir))
 
-  vm.RemoteCommand('cd {0} && tar --strip-components=2 --directory {1} -xvzf '
-                   '{2}'.format(TF_SERVING_BASE_DIRECTORY, extract_dir,
-                                RESNET_NHWC_SAVEDMODEL_TGZ))
+  vm.RemoteCommand(
+      'cd {0} && tar --strip-components=2 --directory {1} -xvzf {2}'.format(
+          TF_SERVING_BASE_DIRECTORY, extract_dir, RESNET_NHWC_SAVEDMODEL_TGZ
+      )
+  )
 
 
 def Prepare(benchmark_spec):
@@ -251,7 +261,9 @@ def _StartServer(vm):
       '--mount type=bind,source={0},target=/models/resnet '
       '-e MODEL_NAME=resnet '
       '-t benchmarks/tensorflow-serving --port={1}'.format(
-          model_download_directory, SERVER_PORT))
+          model_download_directory, SERVER_PORT
+      )
+  )
 
 
 def _StartClient(vm, server_ip, client_thread_count):
@@ -272,22 +284,32 @@ def _StartClient(vm, server_ip, client_thread_count):
   stdout, stderr = vm.RemoteCommand(
       'python3 {0} --server={1}:{2} --image_directory={3} '
       '--runtime={4} --num_threads={5}'.format(
-          posixpath.join(linux_packages.INSTALL_DIR,
-                         CLIENT_SCRIPT), server_ip, SERVER_PORT,
-          posixpath.join(linux_packages.INSTALL_DIR,
-                         posixpath.splitext(ILSVRC_VALIDATION_IMAGES_TAR)[0]),
-          FLAGS.tf_serving_runtime, client_thread_count))
+          posixpath.join(linux_packages.INSTALL_DIR, CLIENT_SCRIPT),
+          server_ip,
+          SERVER_PORT,
+          posixpath.join(
+              linux_packages.INSTALL_DIR,
+              posixpath.splitext(ILSVRC_VALIDATION_IMAGES_TAR)[0],
+          ),
+          FLAGS.tf_serving_runtime,
+          client_thread_count,
+      )
+  )
 
   # Ensure that stderr from the client script is empty.
   # If it is, stderr from the remote command should contain a single line:
   # Warning: Permanently added {ip} (ECDSA) to the list of known hosts.
   # However, don't raise if the following is in stderr:
   # Ignore above cudart dlerror if you do not have a GPU set up on your machine.
-  if len(
-      stderr.splitlines()) > 1 and 'Ignore above cudart dlerror' not in stderr:
+  if (
+      len(stderr.splitlines()) > 1
+      and 'Ignore above cudart dlerror' not in stderr
+  ):
     raise ClientWorkloadScriptExecutionError(
         'Exception occurred during execution of client script: {0}'.format(
-            stderr))
+            stderr
+        )
+    )
 
   return stdout
 
@@ -340,8 +362,9 @@ def _CreateLatenciesSample(metadata, client_stdout):
   return sample.Sample('Latency', -1, 'seconds', updated_metadata)
 
 
-def _MakeSamplesFromClientOutput(benchmark_spec, client_stdout,
-                                 client_thread_count):
+def _MakeSamplesFromClientOutput(
+    benchmark_spec, client_stdout, client_thread_count
+):
   """Returns an array of samples extracted from client_stdout.
 
   Args:
@@ -365,7 +388,8 @@ def _MakeSamplesFromClientOutput(benchmark_spec, client_stdout,
 
   for metric in metrics_to_extract:
     samples.append(
-        _CreateSingleSample(metric[0], metric[1], metadata, client_stdout))
+        _CreateSingleSample(metric[0], metric[1], metadata, client_stdout)
+    )
 
   samples.append(_CreateLatenciesSample(metadata, client_stdout))
   return samples
@@ -384,15 +408,16 @@ def Run(benchmark_spec):
   client = benchmark_spec.vm_groups['clients'][0]
 
   _StartServer(server)
-  client.PushDataFile(
-      CLIENT_SCRIPT, remote_path=linux_packages.INSTALL_DIR)
+  client.PushDataFile(CLIENT_SCRIPT, remote_path=linux_packages.INSTALL_DIR)
 
   samples = []
   for thread_count in FLAGS.tf_serving_client_thread_counts:
     client_stdout = _StartClient(client, server.internal_ip, thread_count)
     samples.extend(
-        _MakeSamplesFromClientOutput(benchmark_spec, client_stdout,
-                                     thread_count))
+        _MakeSamplesFromClientOutput(
+            benchmark_spec, client_stdout, thread_count
+        )
+    )
 
   return samples
 

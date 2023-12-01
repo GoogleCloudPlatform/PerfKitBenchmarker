@@ -14,7 +14,6 @@
 
 """Runs YCSB against HBase.
 
-
 HBase is a scalable NoSQL database built on Hadoop.
 https://hbase.apache.org/
 
@@ -56,11 +55,15 @@ from perfkitbenchmarker.linux_packages import ycsb
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
-    'hbase_binding', 'hbase12', 'HBase binding to use. After '
-    'YCSB 0.17.0, "hbase1x" is renamed to "hbase1".')
+    'hbase_binding',
+    'hbase12',
+    'HBase binding to use. After '
+    'YCSB 0.17.0, "hbase1x" is renamed to "hbase1".',
+)
 flags.DEFINE_integer('hbase_zookeeper_nodes', 1, 'Number of Zookeeper nodes.')
-flags.DEFINE_boolean('hbase_use_snappy', True,
-                     'Whether to use snappy compression.')
+flags.DEFINE_boolean(
+    'hbase_use_snappy', True, 'Whether to use snappy compression.'
+)
 
 BENCHMARK_NAME = 'hbase_ycsb'
 BENCHMARK_CONFIG = """
@@ -111,9 +114,14 @@ def CheckPrerequisites(benchmark_config):
   ycsb.CheckPrerequisites()
 
 
-def CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
-                    n_splits=TABLE_SPLIT_COUNT, limit_filesize=True,
-                    use_snappy=True):
+def CreateYCSBTable(
+    vm,
+    table_name=TABLE_NAME,
+    family=COLUMN_FAMILY,
+    n_splits=TABLE_SPLIT_COUNT,
+    limit_filesize=True,
+    use_snappy=True,
+):
   """Create a table for use with YCSB.
 
   Args:
@@ -126,16 +134,22 @@ def CreateYCSBTable(vm, table_name=TABLE_NAME, family=COLUMN_FAMILY,
   """
   # See: https://issues.apache.org/jira/browse/HBASE-4163
   template_path = data.ResourcePath(CREATE_TABLE_SCRIPT)
-  remote = posixpath.join(hbase.HBASE_DIR,
-                          os.path.basename(os.path.splitext(template_path)[0]))
-  vm.RenderTemplate(template_path, remote,
-                    context={'table_name': table_name,
-                             'family': family,
-                             'limit_filesize': limit_filesize,
-                             'n_splits': n_splits,
-                             'use_snappy': use_snappy})
+  remote = posixpath.join(
+      hbase.HBASE_DIR, os.path.basename(os.path.splitext(template_path)[0])
+  )
+  vm.RenderTemplate(
+      template_path,
+      remote,
+      context={
+          'table_name': table_name,
+          'family': family,
+          'limit_filesize': limit_filesize,
+          'n_splits': n_splits,
+          'use_snappy': use_snappy,
+      },
+  )
   # TODO(user): on HBase update, add '-n' flag.
-  command = "{0}/hbase shell {1}".format(hbase.HBASE_BIN, remote)
+  command = '{0}/hbase shell {1}'.format(hbase.HBASE_BIN, remote)
   vm.RemoteCommand(command)
 
 
@@ -156,12 +170,14 @@ def _GetVMsByRole(vm_groups):
   """
   hbase_vms = vm_groups['master'] + vm_groups['workers']
   vms = hbase_vms + vm_groups['clients']
-  return {'vms': vms,
-          'hbase_vms': hbase_vms,
-          'master': vm_groups['master'][0],
-          'zk_quorum': hbase_vms[:FLAGS.hbase_zookeeper_nodes],
-          'workers': vm_groups['workers'],
-          'clients': vm_groups['clients']}
+  return {
+      'vms': vms,
+      'hbase_vms': hbase_vms,
+      'master': vm_groups['master'][0],
+      'zk_quorum': hbase_vms[: FLAGS.hbase_zookeeper_nodes],
+      'workers': vm_groups['workers'],
+      'clients': vm_groups['clients'],
+  }
 
 
 def Prepare(benchmark_spec):
@@ -169,7 +185,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   by_role = _GetVMsByRole(benchmark_spec.vm_groups)
 
@@ -185,10 +201,10 @@ def Prepare(benchmark_spec):
   workers = by_role['workers']
   assert workers, 'No workers: {0}'.format(by_role)
 
-  hbase_install_fns = [functools.partial(vm.Install, 'hbase')
-                       for vm in hbase_vms]
-  ycsb_install_fns = [functools.partial(vm.Install, 'ycsb')
-                      for vm in loaders]
+  hbase_install_fns = [
+      functools.partial(vm.Install, 'hbase') for vm in hbase_vms
+  ]
+  ycsb_install_fns = [functools.partial(vm.Install, 'ycsb') for vm in loaders]
 
   background_tasks.RunThreaded(
       lambda f: f(), hbase_install_fns + ycsb_install_fns
@@ -201,16 +217,18 @@ def Prepare(benchmark_spec):
 
   # Populate hbase-site.xml on the loaders.
   master.PullFile(
-      vm_util.GetTempDir(),
-      posixpath.join(hbase.HBASE_CONF_DIR, HBASE_SITE))
+      vm_util.GetTempDir(), posixpath.join(hbase.HBASE_CONF_DIR, HBASE_SITE)
+  )
 
   def PushHBaseSite(vm):
-    conf_dir = posixpath.join(ycsb.YCSB_DIR, FLAGS.hbase_binding + '-binding',
-                              'conf')
+    conf_dir = posixpath.join(
+        ycsb.YCSB_DIR, FLAGS.hbase_binding + '-binding', 'conf'
+    )
     vm.RemoteCommand('mkdir -p {}'.format(conf_dir))
     vm.PushFile(
         os.path.join(vm_util.GetTempDir(), HBASE_SITE),
-        posixpath.join(conf_dir, HBASE_SITE))
+        posixpath.join(conf_dir, HBASE_SITE),
+    )
 
   background_tasks.RunThreaded(PushHBaseSite, loaders)
   benchmark_spec.executor = ycsb.YCSBExecutor(FLAGS.hbase_binding)
@@ -221,7 +239,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -241,8 +259,7 @@ def Run(benchmark_spec):
   # This leads to incorrect update latencies, since since the call returns
   # before the request is acked by the server.
   # Disable this behavior during the benchmark run.
-  run_kwargs = {'columnfamily': COLUMN_FAMILY,
-                'clientbuffering': 'false'}
+  run_kwargs = {'columnfamily': COLUMN_FAMILY, 'clientbuffering': 'false'}
   load_kwargs = run_kwargs.copy()
 
   # During the load stage, use a buffered mutator with a single thread.
@@ -250,8 +267,11 @@ def Run(benchmark_spec):
   load_kwargs['clientbuffering'] = 'true'
   if not FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = 1
-  samples = list(benchmark_spec.executor.LoadAndRun(
-      loaders, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  samples = list(
+      benchmark_spec.executor.LoadAndRun(
+          loaders, load_kwargs=load_kwargs, run_kwargs=run_kwargs
+      )
+  )
   for sample in samples:
     sample.metadata.update(metadata)
 
@@ -263,7 +283,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   by_role = _GetVMsByRole(benchmark_spec.vm_groups)
   hbase.Stop(by_role['master'])

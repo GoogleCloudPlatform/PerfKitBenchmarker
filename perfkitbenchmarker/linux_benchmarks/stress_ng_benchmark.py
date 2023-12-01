@@ -44,83 +44,331 @@ stress_ng:
       disk_spec: *default_50_gb
 """
 
-VALID_CPU_METHODS = {
-    'all', 'ackermann', 'bitops', 'callfunc', 'cdouble', 'cfloat',
-    'clongdouble', 'correlate', 'crc16', 'decimal32', 'decimal64', 'decimal128',
-    'dither', 'djb2a', 'double', 'euler', 'explog', 'fft', 'fibonacci', 'float',
-    'fnv1a', 'gamma', 'gcd', 'gray', 'hamming', 'hanoi', 'hyperbolic', 'idct',
-    'int128', 'int64', 'int32', 'int16', 'int8', 'int128float', 'int128double',
-    'int128longdouble', 'int128decimal32', 'int128decimal64',
-    'int128decimal128', 'int64float', 'int64double', 'int64longdouble',
-    'int32float', 'int32double', 'int32longdouble', 'jenkin', 'jmp', 'ln2',
-    'longdouble', 'loop', 'matrixprod', 'nsqrt', 'omega', 'parity', 'phi', 'pi',
-    'pjw', 'prime', 'psi', 'queens', 'rand', 'rand48', 'rgb', 'sdbm', 'sieve',
-    'sqrt', 'trig', 'union', 'zeta'
-}
+VALID_CPU_METHODS = frozenset({
+    'all',
+    'ackermann',
+    'bitops',
+    'callfunc',
+    'cdouble',
+    'cfloat',
+    'clongdouble',
+    'correlate',
+    'crc16',
+    'decimal32',
+    'decimal64',
+    'decimal128',
+    'dither',
+    'djb2a',
+    'double',
+    'euler',
+    'explog',
+    'fft',
+    'fibonacci',
+    'float',
+    'fnv1a',
+    'gamma',
+    'gcd',
+    'gray',
+    'hamming',
+    'hanoi',
+    'hyperbolic',
+    'idct',
+    'int128',
+    'int64',
+    'int32',
+    'int16',
+    'int8',
+    'int128float',
+    'int128double',
+    'int128longdouble',
+    'int128decimal32',
+    'int128decimal64',
+    'int128decimal128',
+    'int64float',
+    'int64double',
+    'int64longdouble',
+    'int32float',
+    'int32double',
+    'int32longdouble',
+    'jenkin',
+    'jmp',
+    'ln2',
+    'longdouble',
+    'loop',
+    'matrixprod',
+    'nsqrt',
+    'omega',
+    'parity',
+    'phi',
+    'pi',
+    'pjw',
+    'prime',
+    'psi',
+    'queens',
+    'rand',
+    'rand48',
+    'rgb',
+    'sdbm',
+    'sieve',
+    'sqrt',
+    'trig',
+    'union',
+    'zeta',
+})
 
-VALID_STRESSORS = {
-    'affinity', 'af-alg', 'aio', 'aio-linux', 'apparmor', 'bigheap', 'brk',
-    'bsearch', 'cache', 'chdir', 'chmod', 'clock', 'clone', 'context', 'cpu',
-    'cpu-online', 'crypt', 'daemon', 'dentry', 'dir', 'dup', 'epoll', 'eventfd',
-    'exec', 'fallocate', 'fault', 'fcntl', 'fiemap', 'fifo', 'filename',
-    'flock', 'fork', 'fp-error', 'fstat', 'futex', 'get', 'getrandom',
-    'getdent', 'handle', 'hdd', 'heapsort', 'hsearch', 'icache', 'iosync',
-    'inotify', 'itimer', 'kcmp', 'key', 'kill', 'klog', 'lease', 'link',
-    'lockbus', 'lockf', 'longjmp', 'lsearch', 'malloc', 'matrix', 'membarrier',
-    'memcpy', 'memfd', 'mergesort', 'mincore', 'mknod', 'mlock', 'mmap',
-    'mmapfork', 'mmapmany', 'mremap', 'msg', 'mq', 'nice', 'null', 'numa',
-    'oom-pipe', 'open', 'personality', 'pipe', 'poll', 'procfs', 'pthread',
-    'ptrace', 'qsort', 'quota', 'rdrand', 'readahead', 'remap-file-pages',
-    'rename', 'rlimit', 'seccomp', 'seek', 'sem-posix', 'sem-sysv', 'shm-posix',
-    'shm-sysv', 'sendfile', 'sigfd', 'sigfpe', 'sigpending', 'sigq', 'sigsegv',
-    'sigsuspend', 'sleep', 'socket', 'socket-fd', 'socket-pair', 'spawn',
-    'splice', 'stack', 'str', 'stream', 'switch', 'symlink', 'sync-file',
-    'sysinfo', 'sysfs', 'tee', 'timer', 'timerfd', 'tsc', 'tsearch', 'udp',
-    'udp-flood', 'unshare', 'urandom', 'userfaultfd', 'utime', 'vecmath',
-    'vfork', 'vm', 'vm-rw', 'vm-splice', 'wait', 'wcs', 'xattr', 'yield',
-    'zero', 'zlib', 'zombie'
-}
-CPU_SUITE = {
-    'af-alg', 'bsearch', 'context', 'cpu', 'cpu-online', 'crypt', 'fp-error',
-    'getrandom', 'heapsort', 'hsearch', 'longjmp', 'lsearch', 'matrix',
-    'mergesort', 'numa', 'qsort', 'rdrand', 'str', 'stream', 'tsc', 'tsearch',
-    'vecmath', 'wcs', 'zlib'
-}
-CPU_CACHE_SUITE = {
-    'bsearch', 'cache', 'heapsort', 'hsearch', 'icache', 'lockbus', 'lsearch',
-    'malloc', 'matrix', 'membarrier', 'memcpy', 'mergesort', 'qsort', 'str',
-    'stream', 'tsearch', 'vecmath', 'wcs', 'zlib'
-}
-MEMORY_SUITE = {
-    'bsearch', 'context', 'heapsort', 'hsearch', 'lockbus', 'lsearch', 'malloc',
-    'matrix', 'membarrier', 'memcpy', 'memfd', 'mergesort', 'mincore', 'null',
-    'numa', 'oom-pipe', 'pipe', 'qsort', 'stack', 'str', 'stream', 'tsearch',
-    'vm', 'vm-rw', 'wcs', 'zero', 'zlib'
-}
+VALID_STRESSORS = frozenset({
+    'affinity',
+    'af-alg',
+    'aio',
+    'aio-linux',
+    'apparmor',
+    'bigheap',
+    'brk',
+    'bsearch',
+    'cache',
+    'chdir',
+    'chmod',
+    'clock',
+    'clone',
+    'context',
+    'cpu',
+    'cpu-online',
+    'crypt',
+    'daemon',
+    'dentry',
+    'dir',
+    'dup',
+    'epoll',
+    'eventfd',
+    'exec',
+    'fallocate',
+    'fault',
+    'fcntl',
+    'fiemap',
+    'fifo',
+    'filename',
+    'flock',
+    'fork',
+    'fp-error',
+    'fstat',
+    'futex',
+    'get',
+    'getrandom',
+    'getdent',
+    'handle',
+    'hdd',
+    'heapsort',
+    'hsearch',
+    'icache',
+    'iosync',
+    'inotify',
+    'itimer',
+    'kcmp',
+    'key',
+    'kill',
+    'klog',
+    'lease',
+    'link',
+    'lockbus',
+    'lockf',
+    'longjmp',
+    'lsearch',
+    'malloc',
+    'matrix',
+    'membarrier',
+    'memcpy',
+    'memfd',
+    'mergesort',
+    'mincore',
+    'mknod',
+    'mlock',
+    'mmap',
+    'mmapfork',
+    'mmapmany',
+    'mremap',
+    'msg',
+    'mq',
+    'nice',
+    'null',
+    'numa',
+    'oom-pipe',
+    'open',
+    'personality',
+    'pipe',
+    'poll',
+    'procfs',
+    'pthread',
+    'ptrace',
+    'qsort',
+    'quota',
+    'rdrand',
+    'readahead',
+    'remap-file-pages',
+    'rename',
+    'rlimit',
+    'seccomp',
+    'seek',
+    'sem-posix',
+    'sem-sysv',
+    'shm-posix',
+    'shm-sysv',
+    'sendfile',
+    'sigfd',
+    'sigfpe',
+    'sigpending',
+    'sigq',
+    'sigsegv',
+    'sigsuspend',
+    'sleep',
+    'socket',
+    'socket-fd',
+    'socket-pair',
+    'spawn',
+    'splice',
+    'stack',
+    'str',
+    'stream',
+    'switch',
+    'symlink',
+    'sync-file',
+    'sysinfo',
+    'sysfs',
+    'tee',
+    'timer',
+    'timerfd',
+    'tsc',
+    'tsearch',
+    'udp',
+    'udp-flood',
+    'unshare',
+    'urandom',
+    'userfaultfd',
+    'utime',
+    'vecmath',
+    'vfork',
+    'vm',
+    'vm-rw',
+    'vm-splice',
+    'wait',
+    'wcs',
+    'xattr',
+    'yield',
+    'zero',
+    'zlib',
+    'zombie',
+})
+CPU_SUITE = frozenset({
+    'af-alg',
+    'bsearch',
+    'context',
+    'cpu',
+    'cpu-online',
+    'crypt',
+    'fp-error',
+    'getrandom',
+    'heapsort',
+    'hsearch',
+    'longjmp',
+    'lsearch',
+    'matrix',
+    'mergesort',
+    'numa',
+    'qsort',
+    'rdrand',
+    'str',
+    'stream',
+    'tsc',
+    'tsearch',
+    'vecmath',
+    'wcs',
+    'zlib',
+})
+CPU_CACHE_SUITE = frozenset({
+    'bsearch',
+    'cache',
+    'heapsort',
+    'hsearch',
+    'icache',
+    'lockbus',
+    'lsearch',
+    'malloc',
+    'matrix',
+    'membarrier',
+    'memcpy',
+    'mergesort',
+    'qsort',
+    'str',
+    'stream',
+    'tsearch',
+    'vecmath',
+    'wcs',
+    'zlib',
+})
+MEMORY_SUITE = frozenset({
+    'bsearch',
+    'context',
+    'heapsort',
+    'hsearch',
+    'lockbus',
+    'lsearch',
+    'malloc',
+    'matrix',
+    'membarrier',
+    'memcpy',
+    'memfd',
+    'mergesort',
+    'mincore',
+    'null',
+    'numa',
+    'oom-pipe',
+    'pipe',
+    'qsort',
+    'stack',
+    'str',
+    'stream',
+    'tsearch',
+    'vm',
+    'vm-rw',
+    'wcs',
+    'zero',
+    'zlib',
+})
 # Run the stressors that are each part of all of the compute related stress-ng
 # classes: cpu, cpu-cache, and memory.
 DEFAULT_STRESSORS = sorted(
-    CPU_SUITE.intersection(CPU_CACHE_SUITE).intersection(MEMORY_SUITE))
+    CPU_SUITE.intersection(CPU_CACHE_SUITE).intersection(MEMORY_SUITE)
+)
 
-flags.DEFINE_integer('stress_ng_duration', 10,
-                     'Number of seconds to run the test.')
-flags.DEFINE_boolean('stress_ng_calc_geomean', True,
-                     'Whether to calculate geomean or not.')
-flags.DEFINE_list('stress_ng_custom_stressors', DEFAULT_STRESSORS,
-                  'List of stressors to run against. Default combines cpu,'
-                  'cpu-cache, and memory suites')
-flags.DEFINE_list('stress_ng_cpu_methods', [],
-                  'List of cpu methods to run with. By default none are ran.')
+flags.DEFINE_integer(
+    'stress_ng_duration', 10, 'Number of seconds to run the test.'
+)
+flags.DEFINE_boolean(
+    'stress_ng_calc_geomean', True, 'Whether to calculate geomean or not.'
+)
+flags.DEFINE_list(
+    'stress_ng_custom_stressors',
+    DEFAULT_STRESSORS,
+    'List of stressors to run against. Default combines cpu,'
+    'cpu-cache, and memory suites',
+)
+flags.DEFINE_list(
+    'stress_ng_cpu_methods',
+    [],
+    'List of cpu methods to run with. By default none are ran.',
+)
 
 ALL_WORKLOADS = ['small', 'medium', 'large']
 flags.DEFINE_list(
-    'stress_ng_thread_workloads', ['large'],
+    'stress_ng_thread_workloads',
+    ['large'],
     'List of threads sizes to run against. Options are'
     'small (1 thread total), medium (1 thread per 2 cpus), and '
-    'large (1 thread per cpu).')
+    'large (1 thread per cpu).',
+)
 flags.register_validator(
     'stress_ng_thread_workloads',
-    lambda workloads: workloads and set(workloads).issubset(ALL_WORKLOADS))
+    lambda workloads: workloads and set(workloads).issubset(ALL_WORKLOADS),
+)
 
 
 def _GeoMeanOverflow(iterable):
@@ -130,6 +378,7 @@ def _GeoMeanOverflow(iterable):
 
   Args:
     iterable: a list of positive floats to take the geometric mean of.
+
   Returns: The geometric mean of the list.
   """
   a = numpy.log(iterable)
@@ -143,14 +392,15 @@ def StressngCustomStressorsValidator(stressors):
 
 def StressngCpuMethodsValidator(cpu_methods):
   """Returns whether or not the list of cpu methods is valid."""
-  return ('all_cpu_methods' in cpu_methods or
-          VALID_CPU_METHODS.issuperset(set(cpu_methods)))
+  return 'all_cpu_methods' in cpu_methods or VALID_CPU_METHODS.issuperset(
+      set(cpu_methods)
+  )
 
 
-flags.register_validator('stress_ng_custom_stressors',
-                         StressngCustomStressorsValidator)
-flags.register_validator('stress_ng_cpu_methods',
-                         StressngCpuMethodsValidator)
+flags.register_validator(
+    'stress_ng_custom_stressors', StressngCustomStressorsValidator
+)
+flags.register_validator('stress_ng_cpu_methods', StressngCpuMethodsValidator)
 
 
 def GetConfig(user_config):
@@ -168,9 +418,9 @@ def Prepare(benchmark_spec):
   vm.InstallPackages('stress-ng')
 
 
-def _ParseStressngResult(metadata,
-                         output,
-                         cpu_method=None) -> Optional[sample.Sample]:
+def _ParseStressngResult(
+    metadata, output, cpu_method=None
+) -> Optional[sample.Sample]:
   """Returns stress-ng data as a sample.
 
   Sample output eg:
@@ -204,13 +454,15 @@ def _ParseStressngResult(metadata,
         metric=cpu_method,
         value=value,
         unit='bogus_ops_sec',  # bogus operations per second
-        metadata=metadata)
+        metadata=metadata,
+    )
 
   return sample.Sample(
       metric=name,
       value=value,
       unit='bogus_ops_sec',  # bogus operations per second
-      metadata=metadata)
+      metadata=metadata,
+  )
 
 
 def _RunWorkload(vm, num_threads):
@@ -234,11 +486,14 @@ def _RunWorkload(vm, num_threads):
 
   stressors = FLAGS.stress_ng_custom_stressors
   for stressor in stressors:
-    cmd = ('stress-ng --{stressor} {numthreads} --metrics-brief '
-           '-t {duration}'.format(
-               stressor=stressor,
-               numthreads=num_threads,
-               duration=FLAGS.stress_ng_duration))
+    cmd = (
+        'stress-ng --{stressor} {numthreads} --metrics-brief '
+        '-t {duration}'.format(
+            stressor=stressor,
+            numthreads=num_threads,
+            duration=FLAGS.stress_ng_duration,
+        )
+    )
     stdout, stderr = vm.RemoteCommand(cmd)
     stdout = stderr
     stressng_sample = _ParseStressngResult(metadata, stdout)
@@ -246,15 +501,20 @@ def _RunWorkload(vm, num_threads):
       samples.append(stressng_sample)
       values_to_geomean_list.append(stressng_sample.value)
 
-  cpu_methods = (VALID_CPU_METHODS
-                 if 'all_cpu_methods' in FLAGS.stress_ng_cpu_methods
-                 else FLAGS.stress_ng_cpu_methods)
+  cpu_methods = (
+      VALID_CPU_METHODS
+      if 'all_cpu_methods' in FLAGS.stress_ng_cpu_methods
+      else FLAGS.stress_ng_cpu_methods
+  )
   for cpu_method in cpu_methods:
-    cmd = ('stress-ng --cpu {numthreads} --metrics-brief '
-           '-t {duration} --cpu-method {cpu_method}'.format(
-               numthreads=num_threads,
-               duration=FLAGS.stress_ng_duration,
-               cpu_method=cpu_method))
+    cmd = (
+        'stress-ng --cpu {numthreads} --metrics-brief '
+        '-t {duration} --cpu-method {cpu_method}'.format(
+            numthreads=num_threads,
+            duration=FLAGS.stress_ng_duration,
+            cpu_method=cpu_method,
+        )
+    )
     stdout, _ = vm.RemoteCommand(cmd)
     stressng_sample = _ParseStressngResult(metadata, stdout, cpu_method)
     if stressng_sample:
@@ -265,13 +525,15 @@ def _RunWorkload(vm, num_threads):
     geomean_metadata = metadata.copy()
     geomean_metadata['stressors'] = stressors
     # True only if each stressor provided a value
-    geomean_metadata['valid_run'] = (
-        len(values_to_geomean_list) == len(stressors) + len(cpu_methods))
+    geomean_metadata['valid_run'] = len(values_to_geomean_list) == len(
+        stressors
+    ) + len(cpu_methods)
     geomean_sample = sample.Sample(
         metric='STRESS_NG_GEOMEAN',
         value=_GeoMeanOverflow(values_to_geomean_list),
         unit='bogus_ops_sec',
-        metadata=geomean_metadata)
+        metadata=geomean_metadata,
+    )
     samples.append(geomean_sample)
 
   return samples

@@ -33,23 +33,31 @@ DEFAULT_H264_THREADS_LIST = [4, 8]
 DEFAULT_VP9_THREADS_LIST = [1]
 
 _FFMPEG_CODECS = flags.DEFINE_list(
-    'ffmpeg_codecs', [CODEC_H264],
+    'ffmpeg_codecs',
+    [CODEC_H264],
     'List of the codecs to use for the transcoding benchmark. '
-    'For now, this is some combination of h264 and vp9.')
+    'For now, this is some combination of h264 and vp9.',
+)
 _FFMPEG_THREADS_LIST = flag_util.DEFINE_integerlist(
-    'ffmpeg_threads_list', None,
+    'ffmpeg_threads_list',
+    None,
     'List of threads to give to each ffmpeg job. Defaults to '
-    '[4, 8] for h.264 and [1] for vp9.')
+    '[4, 8] for h.264 and [1] for vp9.',
+)
 _FFMPEG_PARALLELISM_LIST = flag_util.DEFINE_integerlist(
-    'ffmpeg_parallelism_list', None,
+    'ffmpeg_parallelism_list',
+    None,
     'List of ffmpeg-jobs to run in parallel. Defaults to '
-    '[number of logical CPUs].')
+    '[number of logical CPUs].',
+)
 _FFMPEG_DIR = flags.DEFINE_string(
-    'ffmpeg_dir', '/usr/bin', 'Directory where ffmpeg and ffprobe are located.')
+    'ffmpeg_dir', '/usr/bin', 'Directory where ffmpeg and ffprobe are located.'
+)
 
 _VALID_CODECS = [CODEC_H264, CODEC_VP9]
 flags.register_validator(
-    'ffmpeg_codecs', lambda codecs: all([c in _VALID_CODECS for c in codecs]))
+    'ffmpeg_codecs', lambda codecs: all([c in _VALID_CODECS for c in codecs])
+)
 
 FLAGS = flags.FLAGS
 
@@ -97,8 +105,9 @@ vbench_transcoding:
 
 BENCHMARK_DATA = {
     # Download from http://arcade.cs.columbia.edu/vbench/
-    'vbench.zip':
+    'vbench.zip': (
         'c34b873a18b151322483ca460fcf9ed6a5dbbc2bb74934c57927b88ee1de3472'
+    )
 }
 
 
@@ -110,8 +119,8 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec) -> None:
   """Install FFmpeg and download sample videos on the VM.
 
   Args:
-    spec: The benchmark specification. Contains all data that is
-      required to run the benchmark.
+    spec: The benchmark specification. Contains all data that is required to run
+      the benchmark.
   """
   vm = spec.vms[0]
   home_dir = vm.RemoteCommand('echo $HOME')[0].strip()
@@ -145,55 +154,72 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   for codec in _FFMPEG_CODECS.value:
     jobs_list = (
         _FFMPEG_PARALLELISM_LIST.value
-        if _FFMPEG_PARALLELISM_LIST else [vm.NumCpusForBenchmark()])
+        if _FFMPEG_PARALLELISM_LIST
+        else [vm.NumCpusForBenchmark()]
+    )
     if codec == CODEC_H264:
       ffmpeg_args = '-c:v libx264 -preset medium -crf 18'
       threads_list = (
           _FFMPEG_THREADS_LIST.value
-          if _FFMPEG_THREADS_LIST else DEFAULT_H264_THREADS_LIST)
+          if _FFMPEG_THREADS_LIST
+          else DEFAULT_H264_THREADS_LIST
+      )
     elif codec == CODEC_VP9:
       # A single VP9 ffmpeg thread almost saturates a CPU core. Increasing the
       # parallelism is counterproductive on all machines benchmarked so far.
       ffmpeg_args = '-c:v libvpx-vp9 -crf 10 -b:v 0 -quality good'
       threads_list = (
           _FFMPEG_THREADS_LIST.value
-          if _FFMPEG_THREADS_LIST else DEFAULT_VP9_THREADS_LIST)
+          if _FFMPEG_THREADS_LIST
+          else DEFAULT_VP9_THREADS_LIST
+      )
 
     for jobs, threads in itertools.product(jobs_list, threads_list):
       jobs_arg = f'-j{jobs}'
       threads_arg = f'-threads {threads} '
-      parallel_cmd = (f'parallel {jobs_arg} {_FFMPEG_DIR.value}/ffmpeg '
-                      f'{threads_arg} -y -i {{}} {ffmpeg_args} '
-                      f'{{.}}.out.mkv </dev/null >&/dev/null ::: *.mkv')
+      parallel_cmd = (
+          f'parallel {jobs_arg} {_FFMPEG_DIR.value}/ffmpeg '
+          f'{threads_arg} -y -i {{}} {ffmpeg_args} '
+          '{.}.out.mkv </dev/null >&/dev/null ::: *.mkv'
+      )
 
       time_file = '~/parallel.time'
       run_cmd = (
           f'cd {input_videos_dir} && /usr/bin/time -f "%e" -o {time_file} '
-          f'{parallel_cmd}')
+          f'{parallel_cmd}'
+      )
       vm.RemoteCommand(run_cmd)
       total_runtime, _ = vm.RemoteCommand(
-          ('awk \'{sum+=$1;} END {print sum}\' '
-           f'{time_file}'))
-      logging.info('Total runtime with %s jobs and %s threads: %s', jobs,
-                   threads, total_runtime)
+          f"awk '{{sum+=$1;}} END {{print sum}}' {time_file}"
+      )
+      logging.info(
+          'Total runtime with %s jobs and %s threads: %s',
+          jobs,
+          threads,
+          total_runtime,
+      )
       vm.RemoteCommand(f'cd {input_videos_dir} && rm -rf *.out.mkv')
 
-      samples.extend([
-          sample.Sample(
-              'Total Transcode Time',
-              total_runtime,
-              'seconds',
-              metadata={
-                  'test': 'upload',
-                  'codec': codec,
-                  'num_files': 15,  # TODO(spencerkim): Count *.out* files.
-                  'parallelism': jobs,
-                  'threads': threads,
-                  'ffmpeg_compiled_from_source':
-                      FLAGS.build_ffmpeg_from_source,
-                  'video_copies': 1,
-              })
-      ])
+      samples.extend(
+          [
+              sample.Sample(
+                  'Total Transcode Time',
+                  total_runtime,
+                  'seconds',
+                  metadata={
+                      'test': 'upload',
+                      'codec': codec,
+                      'num_files': 15,  # TODO(spencerkim): Count *.out* files.
+                      'parallelism': jobs,
+                      'threads': threads,
+                      'ffmpeg_compiled_from_source': (
+                          FLAGS.build_ffmpeg_from_source
+                      ),
+                      'video_copies': 1,
+                  },
+              )
+          ]
+      )
   return samples
 
 

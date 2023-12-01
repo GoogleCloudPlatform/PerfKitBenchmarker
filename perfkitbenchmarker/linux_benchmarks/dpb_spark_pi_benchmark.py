@@ -66,8 +66,9 @@ dpb_spark_pi_benchmark:
     worker_count: 2
 """
 
-flags.DEFINE_integer('dpb_spark_pi_partitions', 100, 'Number of task'
-                                                     ' partitions.')
+flags.DEFINE_integer(
+    'dpb_spark_pi_partitions', 100, 'Number of task partitions.'
+)
 
 FLAGS = flags.FLAGS
 
@@ -85,7 +86,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -107,12 +108,15 @@ def Run(benchmark_spec):
       job_type='spark',
       jarfile=cluster.GetExecutionJar('spark', 'examples'),
       classname='org.apache.spark.examples.SparkPi',
-      job_arguments=[num_partitions])
+      job_arguments=[num_partitions],
+  )
   logging.info(result)
   results.append(
-      sample.Sample('wall_time', result.wall_time, 'seconds', metadata))
+      sample.Sample('wall_time', result.wall_time, 'seconds', metadata)
+  )
   results.append(
-      sample.Sample('run_time', result.run_time, 'seconds', metadata))
+      sample.Sample('run_time', result.run_time, 'seconds', metadata)
+  )
   return results
 
 

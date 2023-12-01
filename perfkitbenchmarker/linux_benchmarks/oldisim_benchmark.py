@@ -45,21 +45,31 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
-
 from perfkitbenchmarker.linux_packages import oldisim_dependencies
 from six.moves import map
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('oldisim_num_leaves', 4, 'number of leaf nodes',
-                     lower_bound=1, upper_bound=64)
-flags.DEFINE_list('oldisim_fanout', [],
-                  'a list of fanouts to be tested. '
-                  'a root can connect to a subset of leaf nodes (fanout). '
-                  'the value of fanout has to be smaller than num_leaves.')
-flags.DEFINE_enum('oldisim_latency_metric', 'avg',
-                  ['avg', '50p', '90p', '95p', '99p', '99.9p'],
-                  'Allowable metrics for end-to-end latency')
+flags.DEFINE_integer(
+    'oldisim_num_leaves',
+    4,
+    'number of leaf nodes',
+    lower_bound=1,
+    upper_bound=64,
+)
+flags.DEFINE_list(
+    'oldisim_fanout',
+    [],
+    'a list of fanouts to be tested. '
+    'a root can connect to a subset of leaf nodes (fanout). '
+    'the value of fanout has to be smaller than num_leaves.',
+)
+flags.DEFINE_enum(
+    'oldisim_latency_metric',
+    'avg',
+    ['avg', '50p', '90p', '95p', '99p', '99.9p'],
+    'Allowable metrics for end-to-end latency',
+)
 flags.DEFINE_float('oldisim_latency_target', '30', 'latency target in ms')
 
 NUM_DRIVERS = 1
@@ -79,8 +89,9 @@ oldisim:
 def GetConfig(user_config):
   """Decide number of vms needed to run oldisim."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  config['vm_groups']['default']['vm_count'] = (FLAGS.oldisim_num_leaves
-                                                + NUM_DRIVERS + NUM_ROOTS)
+  config['vm_groups']['default']['vm_count'] = (
+      FLAGS.oldisim_num_leaves + NUM_DRIVERS + NUM_ROOTS
+  )
   return config
 
 
@@ -99,12 +110,13 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
 
-  leaf_vms = [vm for vm_idx, vm in enumerate(vms)
-              if vm_idx >= (NUM_DRIVERS + NUM_ROOTS)]
+  leaf_vms = [
+      vm for vm_idx, vm in enumerate(vms) if vm_idx >= (NUM_DRIVERS + NUM_ROOTS)
+  ]
 
   if vms:
     background_tasks.RunThreaded(InstallAndBuild, vms)
@@ -123,11 +135,13 @@ def SetupRoot(root_vm, leaf_vms):
     root_vm: A root vm instance.
     leaf_vms: A list of leaf vm instances.
   """
-  fanout_args = ' '.join(['--leaf=%s' % i.internal_ip
-                          for i in leaf_vms])
+  fanout_args = ' '.join(['--leaf=%s' % i.internal_ip for i in leaf_vms])
   root_server_bin = oldisim_dependencies.BinaryPath('ParentNode')
-  root_cmd = '%s --threads=%s %s' % (root_server_bin,
-                                     root_vm.NumCpusForBenchmark(), fanout_args)
+  root_cmd = '%s --threads=%s %s' % (
+      root_server_bin,
+      root_vm.NumCpusForBenchmark(),
+      fanout_args,
+  )
   logging.info('Root cmdline: %s', root_cmd)
   root_vm.RemoteCommand('%s &> /dev/null &' % root_cmd)
 
@@ -165,9 +179,9 @@ def RunLoadTest(benchmark_spec, fanout):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-    fanout: Request is first processed by a root node, which then
-        fans out to a subset of leaf nodes.
+      required to run the benchmark.
+    fanout: Request is first processed by a root node, which then fans out to a
+      subset of leaf nodes.
 
   Returns:
     A tuple of (peak_qps, peak_lat, target_qps, target_lat).
@@ -175,7 +189,8 @@ def RunLoadTest(benchmark_spec, fanout):
   assert fanout <= FLAGS.oldisim_num_leaves, (
       'The number of leaf nodes a root node connected to is defined by the '
       'flag fanout. Its current value %s is bigger than the total number of '
-      'leaves %s.' % (fanout, FLAGS.oldisim_num_leaves))
+      'leaves %s.' % (fanout, FLAGS.oldisim_num_leaves)
+  )
 
   vms = benchmark_spec.vms
   driver_vms = []
@@ -197,13 +212,17 @@ def RunLoadTest(benchmark_spec, fanout):
   driver_vm = driver_vms[0]
   driver_binary = oldisim_dependencies.BinaryPath('DriverNode')
   launch_script = oldisim_dependencies.Path('workloads/search/search_qps.sh')
-  driver_args = ' '.join(['--server=%s' % i.internal_ip
-                          for i in root_vms])
+  driver_args = ' '.join(['--server=%s' % i.internal_ip for i in root_vms])
   # Make sure server is up.
   time.sleep(5)
   driver_cmd = '%s -s %s:%s -t 30 -- %s %s --threads=%s --depth=16' % (
-      launch_script, FLAGS.oldisim_latency_metric, FLAGS.oldisim_latency_target,
-      driver_binary, driver_args, driver_vm.NumCpusForBenchmark())
+      launch_script,
+      FLAGS.oldisim_latency_metric,
+      FLAGS.oldisim_latency_target,
+      driver_binary,
+      driver_args,
+      driver_vm.NumCpusForBenchmark(),
+  )
   logging.info('Driver cmdline: %s', driver_cmd)
   stdout, _ = driver_vm.RemoteCommand(driver_cmd)
   return ParseOutput(stdout)
@@ -214,7 +233,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -245,7 +264,7 @@ def Cleanup(benchmark_spec):  # pylint: disable=unused-argument
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   for vm_index, vm in enumerate(vms):

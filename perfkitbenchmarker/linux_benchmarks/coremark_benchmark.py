@@ -52,13 +52,17 @@ PARALLELISM_PTHREAD = 'PTHREAD'
 PARALLELISM_FORK = 'FORK'
 PARALLELISM_SOCKET = 'SOCKET'
 _COREMARK_PARALLELISM_METHOD = flags.DEFINE_enum(
-    'coremark_parallelism_method', PARALLELISM_PTHREAD,
+    'coremark_parallelism_method',
+    PARALLELISM_PTHREAD,
     [PARALLELISM_PTHREAD, PARALLELISM_FORK, PARALLELISM_SOCKET],
-    'Method to use for parallelism in the Coremark benchmark.')
+    'Method to use for parallelism in the Coremark benchmark.',
+)
 flag_util.DEFINE_integerlist(
-    'coremark_thread_counts', [0, 1],
+    'coremark_thread_counts',
+    [0, 1],
     'Runs n-threaded Coremark for each element n in the list. If n=0, '
-    'vm.NumCpusForBenchmark() is used.')
+    'vm.NumCpusForBenchmark() is used.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -79,8 +83,10 @@ def PrepareCoremark(remote_command):
     remote_command: Function to run a remote command on the VM.
   """
   if _COREMARK_PARALLELISM_METHOD.value == PARALLELISM_PTHREAD:
-    remote_command('sed -i -e "s/LFLAGS_END += -lrt/LFLAGS_END += -lrt '
-                   '-lpthread/g" %s/%s' % (COREMARK_DIR, COREMARK_BUILDFILE))
+    remote_command(
+        'sed -i -e "s/LFLAGS_END += -lrt/LFLAGS_END += -lrt -lpthread/g" %s/%s'
+        % (COREMARK_DIR, COREMARK_BUILDFILE)
+    )
 
 
 def Prepare(benchmark_spec):
@@ -107,9 +113,14 @@ def RunCoremark(remote_command, thread_count):
   remote_command(
       'cd %s;make PORT_DIR=linux64 clean; '
       'make PORT_DIR=linux64 ITERATIONS=%s '
-      'XCFLAGS="-DMULTITHREAD=%d -DUSE_%s -DPERFORMANCE_RUN=1"' %
-      (COREMARK_DIR, ITERATIONS_PER_CPU, thread_count,
-       _COREMARK_PARALLELISM_METHOD.value))
+      'XCFLAGS="-DMULTITHREAD=%d -DUSE_%s -DPERFORMANCE_RUN=1"'
+      % (
+          COREMARK_DIR,
+          ITERATIONS_PER_CPU,
+          thread_count,
+          _COREMARK_PARALLELISM_METHOD.value,
+      )
+  )
   output, _ = remote_command('cat %s/run1.log' % COREMARK_DIR)
 
   return _ParseOutputForSamples(output, thread_count)
@@ -132,23 +143,18 @@ def _ParseOutputForSamples(output, thread_count):
     raise errors.Benchmarks.RunError('Correct operation not validated.')
   value = regex_util.ExtractFloat(r'CoreMark 1.0 : ([0-9]*\.[0-9]*)', output)
   metadata = {
-      'summary':
-          output.splitlines()[-1],  # Last line of output is a summary.
-      'size':
-          regex_util.ExtractInt(r'CoreMark Size\s*:\s*([0-9]*)', output),
-      'total_ticks':
-          regex_util.ExtractInt(r'Total ticks\s*:\s*([0-9]*)', output),
-      'total_time_sec':
-          regex_util.ExtractFloat(r'Total time \(secs\)\s*:\s*([0-9]*\.[0-9]*)',
-                                  output),
-      'iterations':
-          regex_util.ExtractInt(r'Iterations\s*:\s*([0-9]*)', output),
-      'iterations_per_cpu':
-          ITERATIONS_PER_CPU,
-      'parallelism_method':
-          _COREMARK_PARALLELISM_METHOD.value,
-      'thread_count':
-          thread_count,
+      'summary': output.splitlines()[-1],  # Last line of output is a summary.
+      'size': regex_util.ExtractInt(r'CoreMark Size\s*:\s*([0-9]*)', output),
+      'total_ticks': regex_util.ExtractInt(
+          r'Total ticks\s*:\s*([0-9]*)', output
+      ),
+      'total_time_sec': regex_util.ExtractFloat(
+          r'Total time \(secs\)\s*:\s*([0-9]*\.[0-9]*)', output
+      ),
+      'iterations': regex_util.ExtractInt(r'Iterations\s*:\s*([0-9]*)', output),
+      'iterations_per_cpu': ITERATIONS_PER_CPU,
+      'parallelism_method': _COREMARK_PARALLELISM_METHOD.value,
+      'thread_count': thread_count,
   }
   return [sample.Sample('Coremark Score', value, '', metadata)]
 
@@ -168,8 +174,9 @@ def Run(benchmark_spec):
   vm = benchmark_spec.vms[0]
   output_samples = []
   for thread_count in FLAGS.coremark_thread_counts:
-    thread_count_arg = vm.NumCpusForBenchmark() if (thread_count
-                                                    == 0) else thread_count
+    thread_count_arg = (
+        vm.NumCpusForBenchmark() if (thread_count == 0) else thread_count
+    )
     output_samples += RunCoremark(vm.RemoteCommand, thread_count_arg)
 
   return output_samples

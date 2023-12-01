@@ -39,19 +39,28 @@ cloud_firestore_ycsb:
       vm_spec: *default_single_core
       vm_count: 1"""
 
-YCSB_BINDING_TAR_URL = ('https://github.com/charlie-lobo/YCSB/releases'
-                        '/download/0.17.0fs/'
-                        'ycsb-googlefirestore-binding-0.17.0.tar.gz')
+YCSB_BINDING_TAR_URL = (
+    'https://github.com/charlie-lobo/YCSB/releases'
+    '/download/0.17.0fs/'
+    'ycsb-googlefirestore-binding-0.17.0.tar.gz'
+)
 YCSB_BINDING_LIB_DIR = posixpath.join(ycsb.YCSB_DIR, 'lib')
 PRIVATE_KEYFILE_DIR = '/tmp/key.json'
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('google_firestore_keyfile', None,
-                    'The path to Google API JSON private key file')
-flags.DEFINE_string('google_firestore_project_id', None,
-                    'The project ID that has Cloud Firestore service')
-flags.DEFINE_string('google_firestore_debug', 'false',
-                    'The logging level when running YCSB')
+flags.DEFINE_string(
+    'google_firestore_keyfile',
+    None,
+    'The path to Google API JSON private key file',
+)
+flags.DEFINE_string(
+    'google_firestore_project_id',
+    None,
+    'The project ID that has Cloud Firestore service',
+)
+flags.DEFINE_string(
+    'google_firestore_debug', 'false', 'The logging level when running YCSB'
+)
 
 
 def GetConfig(user_config):
@@ -95,14 +104,17 @@ def Run(benchmark_spec):
     load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
   samples = list(
       benchmark_spec.executor.LoadAndRun(
-          vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+          vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs
+      )
+  )
   return samples
 
 
 def Cleanup(benchmark_spec):
   # TODO: support automatic cleanup.
   logging.warning(
-      'For now, we can only manually delete all the entries via GCP portal.')
+      'For now, we can only manually delete all the entries via GCP portal.'
+  )
 
 
 def _Install(vm):

@@ -50,8 +50,10 @@ sample:
 # mapped to the sha256sum hash. This ensures that when we change versions of the
 # benchmark data or binaries, we update the code.
 BENCHMARK_DATA = {
-    'preprovisioned_data.txt':
-        '4795a1c2517089e4df569afd77c04e949139cf299c87f012b894fccf91df4594'}
+    'preprovisioned_data.txt': (
+        '4795a1c2517089e4df569afd77c04e949139cf299c87f012b894fccf91df4594'
+    )
+}
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
@@ -69,11 +71,13 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
     benchmark_spec: The benchmark spec for this sample benchmark.
   """
   vm = benchmark_spec.vms[0]
-  vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, BENCHMARK_DATA,
-                                        vm_util.VM_TMP_DIR)
+  vm.InstallPreprovisionedBenchmarkData(
+      BENCHMARK_NAME, BENCHMARK_DATA, vm_util.VM_TMP_DIR
+  )
 
-  stdout, _ = vm.RemoteCommand('cat %s' % (posixpath.join(
-      vm_util.VM_TMP_DIR, 'preprovisioned_data.txt')))
+  stdout, _ = vm.RemoteCommand(
+      'cat %s' % (posixpath.join(vm_util.VM_TMP_DIR, 'preprovisioned_data.txt'))
+  )
   assert stdout.strip() == '1234567890'
 
 

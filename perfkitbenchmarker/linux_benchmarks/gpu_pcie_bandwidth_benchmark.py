@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Runs NVIDIA's CUDA PCI-E bandwidth test
-      (https://developer.nvidia.com/cuda-code-samples)
+
+(https://developer.nvidia.com/cuda-code-samples)
 """
 
 import re
@@ -33,23 +34,30 @@ flags.DEFINE_integer(
     'gpu_pcie_bandwidth_iterations',
     30,
     'number of iterations to run',
-    lower_bound=1)
+    lower_bound=1,
+)
 
-flags.DEFINE_enum('gpu_pcie_bandwidth_mode', 'quick', ['quick', 'range'],
-                  'bandwidth test mode to use. '
-                  'If range is selected, provide desired range '
-                  'in flag gpu_pcie_bandwidth_transfer_sizes. '
-                  'Additionally, if range is selected, the resulting '
-                  'bandwidth will be averaged over all provided transfer '
-                  'sizes.')
+flags.DEFINE_enum(
+    'gpu_pcie_bandwidth_mode',
+    'quick',
+    ['quick', 'range'],
+    'bandwidth test mode to use. '
+    'If range is selected, provide desired range '
+    'in flag gpu_pcie_bandwidth_transfer_sizes. '
+    'Additionally, if range is selected, the resulting '
+    'bandwidth will be averaged over all provided transfer '
+    'sizes.',
+)
 
 flag_util.DEFINE_integerlist(
     'gpu_pcie_bandwidth_transfer_sizes',
     flag_util.IntegerList(
-        [DEFAULT_RANGE_START, DEFAULT_RANGE_END,
-         DEFAULT_RANGE_STEP]), 'range of transfer sizes to use in bytes. '
+        [DEFAULT_RANGE_START, DEFAULT_RANGE_END, DEFAULT_RANGE_STEP]
+    ),
+    'range of transfer sizes to use in bytes. '
     'Only used if gpu_pcie_bandwidth_mode is set to range',
-    module_name=__name__)
+    module_name=__name__,
+)
 
 FLAGS = flags.FLAGS
 
@@ -75,8 +83,9 @@ gpu_pcie_bandwidth:
           zone: eastus
 """
 BENCHMARK_METRICS = [
-    'Host to device bandwidth', 'Device to host bandwidth',
-    'Device to device bandwidth'
+    'Host to device bandwidth',
+    'Device to host bandwidth',
+    'Device to device bandwidth',
 ]
 
 EXTRACT_BANDWIDTH_TEST_RESULTS_REGEX = r'\d+\s+(\d+\.?\d*)'
@@ -106,7 +115,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
   vm.Install('cuda_toolkit')
@@ -116,15 +125,16 @@ def _ParseDeviceInfo(test_output):
   """Parses the GPU device info from the CUDA device bandwidth test output.
 
   Args:
-    test_output: The resulting output string from the bandwidth
-      test application.
+    test_output: The resulting output string from the bandwidth test
+      application.
 
   Returns:
     A dictionary mapping the device number to its name, for every
     device available on the system.
   """
-  matches = regex_util.ExtractAllMatches(EXTRACT_DEVICE_INFO_REGEX, test_output,
-                                         re.MULTILINE)
+  matches = regex_util.ExtractAllMatches(
+      EXTRACT_DEVICE_INFO_REGEX, test_output, re.MULTILINE
+  )
   devices = {str(i[0]): str(i[1]) for i in matches}
   return devices
 
@@ -134,8 +144,8 @@ def _AverageResultsForSection(lines, results_section_header_index):
 
   Args:
     lines: output of bandwidthTest, split by lines and stripped of whitespace
-    results_section_header_index: line number of results section header.
-      The actual results, in MB/s, should begin three lines after the header.
+    results_section_header_index: line number of results section header. The
+      actual results, in MB/s, should begin three lines after the header.
 
   Returns:
     average bandwidth, in MB/s, for the section beginning at
@@ -143,7 +153,9 @@ def _AverageResultsForSection(lines, results_section_header_index):
   """
   RESULTS_OFFSET_FROM_HEADER = 3
   results = []
-  for line in lines[results_section_header_index + RESULTS_OFFSET_FROM_HEADER:]:
+  for line in lines[
+      results_section_header_index + RESULTS_OFFSET_FROM_HEADER :
+  ]:
     if not line:
       break  # done with this section if line is empty
     results.append(float(line.split()[1]))
@@ -167,15 +179,16 @@ def _FindIndexOfLineThatStartsWith(lines, str):
     if line.startswith(str):
       return idx
   raise InvalidBandwidthTestOutputFormat(
-      'Unable to find {0} in bandwidthTest output'.format(str))
+      'Unable to find {0} in bandwidthTest output'.format(str)
+  )
 
 
 def _ParseOutputFromSingleIteration(test_output):
   """Parses the output of the CUDA device bandwidth test.
 
   Args:
-    test_output: The resulting output string from the bandwidth
-      test application.
+    test_output: The resulting output string from the bandwidth test
+      application.
 
   Returns:
     A dictionary containing the following values as floats:
@@ -187,18 +200,24 @@ def _ParseOutputFromSingleIteration(test_output):
   """
   lines = [line.strip() for line in test_output.splitlines()]
   host_to_device_results_start = _FindIndexOfLineThatStartsWith(
-      lines, 'Host to Device Bandwidth')
+      lines, 'Host to Device Bandwidth'
+  )
   device_to_host_results_start = _FindIndexOfLineThatStartsWith(
-      lines, 'Device to Host Bandwidth')
+      lines, 'Device to Host Bandwidth'
+  )
   device_to_device_results_start = _FindIndexOfLineThatStartsWith(
-      lines, 'Device to Device Bandwidth')
+      lines, 'Device to Device Bandwidth'
+  )
 
-  host_to_device_mean = _AverageResultsForSection(lines,
-                                                  host_to_device_results_start)
-  device_to_host_mean = _AverageResultsForSection(lines,
-                                                  device_to_host_results_start)
+  host_to_device_mean = _AverageResultsForSection(
+      lines, host_to_device_results_start
+  )
+  device_to_host_mean = _AverageResultsForSection(
+      lines, device_to_host_results_start
+  )
   device_to_device_mean = _AverageResultsForSection(
-      lines, device_to_device_results_start)
+      lines, device_to_device_results_start
+  )
 
   results = {
       'Host to device bandwidth': host_to_device_mean,
@@ -216,9 +235,8 @@ def _CalculateMetricsOverAllIterations(result_dicts, metadata={}):
 
   Args:
     result_dicts: a list of result dictionaries. Each result dictionary
-      represents a single run of the CUDA device bandwidth test,
-      parsed by _ParseOutputFromSingleIteration().
-
+      represents a single run of the CUDA device bandwidth test, parsed by
+      _ParseOutputFromSingleIteration().
     metadata: metadata dict to be added to each Sample.
 
   Returns:
@@ -241,15 +259,19 @@ def _CalculateMetricsOverAllIterations(result_dicts, metadata={}):
       samples.append(sample.Sample(metric, measurement, 'MB/s', metadata_copy))
 
     samples.append(
-        sample.Sample(metric + ', min', min(sequence), 'MB/s', metadata))
+        sample.Sample(metric + ', min', min(sequence), 'MB/s', metadata)
+    )
     samples.append(
-        sample.Sample(metric + ', max', max(sequence), 'MB/s', metadata))
+        sample.Sample(metric + ', max', max(sequence), 'MB/s', metadata)
+    )
     samples.append(
-        sample.Sample(metric + ', mean', numpy.mean(sequence), 'MB/s',
-                      metadata))
+        sample.Sample(metric + ', mean', numpy.mean(sequence), 'MB/s', metadata)
+    )
     samples.append(
-        sample.Sample(metric + ', stddev', numpy.std(sequence), 'MB/s',
-                      metadata))
+        sample.Sample(
+            metric + ', stddev', numpy.std(sequence), 'MB/s', metadata
+        )
+    )
   return samples
 
 
@@ -258,7 +280,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -277,12 +299,14 @@ def Run(benchmark_spec):
     metadata['range_stop'] = transfer_size_range[1]
     metadata['range_step'] = transfer_size_range[2]
 
-  run_command = ('%s/extras/demo_suite/bandwidthTest --device=all' %
-                 metadata['cuda_toolkit_home'])
+  run_command = (
+      '%s/extras/demo_suite/bandwidthTest --device=all'
+      % metadata['cuda_toolkit_home']
+  )
   if mode == 'range':
-    run_command += (' --mode=range --start={0} --end={1} --increment={2}'
-                    .format(transfer_size_range[0], transfer_size_range[1],
-                            transfer_size_range[2]))
+    run_command += ' --mode=range --start={0} --end={1} --increment={2}'.format(
+        transfer_size_range[0], transfer_size_range[1], transfer_size_range[2]
+    )
 
   for i in range(num_iterations):
     stdout, _ = vm.RemoteCommand(run_command)
@@ -297,7 +321,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
   vm.Uninstall('cuda_toolkit')

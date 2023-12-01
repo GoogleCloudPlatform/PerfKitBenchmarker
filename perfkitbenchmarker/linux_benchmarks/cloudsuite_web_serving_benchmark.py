@@ -24,12 +24,19 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import docker
 
-flags.DEFINE_integer('cloudsuite_web_serving_pm_max_children', 150,
-                     'The maximum number php-fpm pm children.', lower_bound=8)
+flags.DEFINE_integer(
+    'cloudsuite_web_serving_pm_max_children',
+    150,
+    'The maximum number php-fpm pm children.',
+    lower_bound=8,
+)
 
-flags.DEFINE_integer('cloudsuite_web_serving_load_scale', 100,
-                     'The maximum number of concurrent users '
-                     'that can be simulated.', lower_bound=2)
+flags.DEFINE_integer(
+    'cloudsuite_web_serving_load_scale',
+    100,
+    'The maximum number of concurrent users that can be simulated.',
+    lower_bound=2,
+)
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'cloudsuite_web_serving'
@@ -56,6 +63,7 @@ def GetConfig(user_config):
 
 def CheckPrerequisites(benchmark_config):
   """Verifies that the required resources are present.
+
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
@@ -68,7 +76,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   frontend = benchmark_spec.vm_groups['frontend'][0]
   backend = benchmark_spec.vm_groups['backend'][0]
@@ -77,39 +85,52 @@ def Prepare(benchmark_spec):
   def PrepareCommon(vm):
     if not docker.IsInstalled(vm):
       vm.Install('docker')
-    vm.RemoteCommand("sudo sh -c 'echo %s web_server >>/etc/hosts'" %
-                     frontend.internal_ip)
-    vm.RemoteCommand("sudo sh -c 'echo %s memcache_server >>/etc/hosts'" %
-                     frontend.internal_ip)
-    vm.RemoteCommand("sudo sh -c 'echo %s mysql_server >>/etc/hosts'" %
-                     backend.internal_ip)
-    vm.RemoteCommand("sudo sh -c 'echo %s faban_client >>/etc/hosts'" %
-                     client.internal_ip)
+    vm.RemoteCommand(
+        "sudo sh -c 'echo %s web_server >>/etc/hosts'" % frontend.internal_ip
+    )
+    vm.RemoteCommand(
+        "sudo sh -c 'echo %s memcache_server >>/etc/hosts'"
+        % frontend.internal_ip
+    )
+    vm.RemoteCommand(
+        "sudo sh -c 'echo %s mysql_server >>/etc/hosts'" % backend.internal_ip
+    )
+    vm.RemoteCommand(
+        "sudo sh -c 'echo %s faban_client >>/etc/hosts'" % client.internal_ip
+    )
 
   def PrepareFrontend(vm):
     PrepareCommon(vm)
     vm.Install('cloudsuite/web-serving:web_server')
     vm.Install('cloudsuite/web-serving:memcached_server')
-    vm.RemoteCommand('sudo docker run -dt --net host --name web_server '
-                     'cloudsuite/web-serving:web_server '
-                     '/etc/bootstrap.sh mysql_server memcache_server %s' %
-                     (FLAGS.cloudsuite_web_serving_pm_max_children))
-    vm.RemoteCommand('sudo docker run -dt --net host --name memcache_server '
-                     'cloudsuite/web-serving:memcached_server')
+    vm.RemoteCommand(
+        'sudo docker run -dt --net host --name web_server '
+        'cloudsuite/web-serving:web_server '
+        '/etc/bootstrap.sh mysql_server memcache_server %s'
+        % (FLAGS.cloudsuite_web_serving_pm_max_children)
+    )
+    vm.RemoteCommand(
+        'sudo docker run -dt --net host --name memcache_server '
+        'cloudsuite/web-serving:memcached_server'
+    )
 
   def PrepareBackend(vm):
     PrepareCommon(vm)
     vm.Install('cloudsuite/web-serving:db_server')
-    vm.RemoteCommand('sudo docker run -dt --net host --name mysql_server '
-                     'cloudsuite/web-serving:db_server web_server')
+    vm.RemoteCommand(
+        'sudo docker run -dt --net host --name mysql_server '
+        'cloudsuite/web-serving:db_server web_server'
+    )
 
   def PrepareClient(vm):
     PrepareCommon(vm)
     vm.Install('cloudsuite/web-serving:faban_client')
 
-  target_arg_tuples = [(PrepareFrontend, [frontend], {}),
-                       (PrepareBackend, [backend], {}),
-                       (PrepareClient, [client], {})]
+  target_arg_tuples = [
+      (PrepareFrontend, [frontend], {}),
+      (PrepareBackend, [backend], {}),
+      (PrepareClient, [client], {}),
+  ]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
@@ -118,7 +139,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -127,15 +148,18 @@ def Run(benchmark_spec):
   client = benchmark_spec.vm_groups['client'][0]
   results = []
 
-  cmd = ('sudo docker run --net host --name faban_client '
-         'cloudsuite/web-serving:faban_client %s %s' %
-         (frontend.internal_ip, FLAGS.cloudsuite_web_serving_load_scale))
+  cmd = (
+      'sudo docker run --net host --name faban_client '
+      'cloudsuite/web-serving:faban_client %s %s'
+      % (frontend.internal_ip, FLAGS.cloudsuite_web_serving_load_scale)
+  )
   stdout, _ = client.RemoteCommand(cmd)
 
   # The output contains a faban summary xml.
   # Example: http://faban.org/1.1/docs/guide/driver/samplesummary_xml.html
-  match = re.search(r'\<metric unit="ops/sec"\>(.+)\</metric\>',
-                    stdout, re.MULTILINE)
+  match = re.search(
+      r'\<metric unit="ops/sec"\>(.+)\</metric\>', stdout, re.MULTILINE
+  )
   if match:
     results.append(sample.Sample('Throughput', float(match.group(1)), 'ops/s'))
 
@@ -154,8 +178,8 @@ def Cleanup(benchmark_spec):
   """Stop and remove docker containers. Remove images.
 
   Args:
-    benchmark_spec: The benchmark specification. Contains all data
-        that is required to run the benchmark.
+    benchmark_spec: The benchmark specification. Contains all data that is
+      required to run the benchmark.
   """
   frontend = benchmark_spec.vm_groups['frontend'][0]
   backend = benchmark_spec.vm_groups['backend'][0]
@@ -174,7 +198,9 @@ def Cleanup(benchmark_spec):
   def CleanupClient(vm):
     vm.RemoteCommand('sudo docker rm faban_client')
 
-  target_arg_tuples = [(CleanupFrontend, [frontend], {}),
-                       (CleanupBackend, [backend], {}),
-                       (CleanupClient, [client], {})]
+  target_arg_tuples = [
+      (CleanupFrontend, [frontend], {}),
+      (CleanupBackend, [backend], {}),
+      (CleanupClient, [client], {}),
+  ]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))

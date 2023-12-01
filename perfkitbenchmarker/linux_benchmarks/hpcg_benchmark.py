@@ -63,16 +63,19 @@ hpcg:
 """
 
 flags.DEFINE_integer(
-    'hpcg_runtime', 60, 'hpcg runtime in seconds', lower_bound=1)
+    'hpcg_runtime', 60, 'hpcg runtime in seconds', lower_bound=1
+)
 
 flags.DEFINE_integer(
-    'hpcg_gpus_per_node', None, 'The number of gpus per node.', lower_bound=1)
+    'hpcg_gpus_per_node', None, 'The number of gpus per node.', lower_bound=1
+)
 
 flag_util.DEFINE_integerlist(
     'hpcg_problem_size',
     flag_util.IntegerList([256, 256, 256]),
-    'three dimensional problem size for each node. Must contain '
-    'three integers', module_name=__name__)
+    'three dimensional problem size for each node. Must contain three integers',
+    module_name=__name__,
+)
 
 
 class HpcgParseOutputException(Exception):
@@ -123,10 +126,12 @@ def _UpdateBenchmarkSpecWithFlags(benchmark_spec):
   Args:
     benchmark_spec: benchmark specification to update
   """
-  gpus_per_node = (FLAGS.hpcg_gpus_per_node or
-                   nvidia_driver.QueryNumberOfGpus(benchmark_spec.vms[0]))
-  cpus_per_rank = int(benchmark_spec.vms[0].NumCpusForBenchmark() /
-                      gpus_per_node)
+  gpus_per_node = FLAGS.hpcg_gpus_per_node or nvidia_driver.QueryNumberOfGpus(
+      benchmark_spec.vms[0]
+  )
+  cpus_per_rank = int(
+      benchmark_spec.vms[0].NumCpusForBenchmark() / gpus_per_node
+  )
   num_vms = len(benchmark_spec.vms)
   total_gpus = gpus_per_node * num_vms
 
@@ -147,22 +152,29 @@ def _CopyAndUpdateRunScripts(vm, benchmark_spec):
     benchmark_spec: benchmark specification
   """
   config_file_context = {
-      'PROBLEM_SIZE': '%s %s %s' % (benchmark_spec.hpcg_problem_size[0],
-                                    benchmark_spec.hpcg_problem_size[1],
-                                    benchmark_spec.hpcg_problem_size[2]),
-      'RUNTIME': benchmark_spec.hpcg_runtime
+      'PROBLEM_SIZE': '%s %s %s' % (
+          benchmark_spec.hpcg_problem_size[0],
+          benchmark_spec.hpcg_problem_size[1],
+          benchmark_spec.hpcg_problem_size[2],
+      ),
+      'RUNTIME': benchmark_spec.hpcg_runtime,
   }
-  vm.RenderTemplate(_LocalDataPath(CONFIG_FILE),
-                    os.path.join(hpcg.HPCG_DIR, CONFIG_FILE),
-                    config_file_context)
+  vm.RenderTemplate(
+      _LocalDataPath(CONFIG_FILE),
+      os.path.join(hpcg.HPCG_DIR, CONFIG_FILE),
+      config_file_context,
+  )
 
   run_script_context = {
       'ALLOW_RUN_AS_ROOT': (
-          '--allow-run-as-root' if benchmark_spec.run_as_root else ''),
+          '--allow-run-as-root' if benchmark_spec.run_as_root else ''
+      ),
   }
-  vm.RenderTemplate(_LocalDataPath(RUN_SCRIPT),
-                    os.path.join(hpcg.HPCG_DIR, RUN_SCRIPT),
-                    run_script_context)
+  vm.RenderTemplate(
+      _LocalDataPath(RUN_SCRIPT),
+      os.path.join(hpcg.HPCG_DIR, RUN_SCRIPT),
+      run_script_context,
+  )
   vm.RemoteCommand('chmod +x %s' % os.path.join(hpcg.HPCG_DIR, RUN_SCRIPT))
 
 
@@ -191,9 +203,11 @@ def Prepare(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   for vm in vms:
     _CopyAndUpdateRunScripts(vm, benchmark_spec)
-  hpc_util.CreateMachineFile(vms,
-                             lambda _: benchmark_spec.gpus_per_node,
-                             os.path.join(hpcg.HPCG_DIR, MACHINEFILE))
+  hpc_util.CreateMachineFile(
+      vms,
+      lambda _: benchmark_spec.gpus_per_node,
+      os.path.join(hpcg.HPCG_DIR, MACHINEFILE),
+  )
 
 
 def _CreateMetadataDict(benchmark_spec):
@@ -214,9 +228,11 @@ def _CreateMetadataDict(benchmark_spec):
   metadata['benchmark_version'] = BENCHMARK_VERSION
   metadata['runtime'] = int(benchmark_spec.hpcg_runtime)
   metadata['run_as_root'] = benchmark_spec.run_as_root
-  metadata['problem_size'] = '%s,%s,%s' % (benchmark_spec.hpcg_problem_size[0],
-                                           benchmark_spec.hpcg_problem_size[1],
-                                           benchmark_spec.hpcg_problem_size[2])
+  metadata['problem_size'] = '%s,%s,%s' % (
+      benchmark_spec.hpcg_problem_size[0],
+      benchmark_spec.hpcg_problem_size[1],
+      benchmark_spec.hpcg_problem_size[2],
+  )
 
   return metadata
 
@@ -232,7 +248,7 @@ def _GetEnvironmentVars(benchmark_spec):
   """
   return ' '.join([
       'NUM_GPUS=%s' % benchmark_spec.total_gpus,
-      'OMP_NUM_THREADS=%s' % benchmark_spec.cpus_per_rank
+      'OMP_NUM_THREADS=%s' % benchmark_spec.cpus_per_rank,
   ])
 
 
@@ -248,9 +264,7 @@ def _ExtractProblemSize(output):
   regex = r'(\d+)x(\d+)x(\d+)\s+local domain'
   match = re.search(regex, output)
   try:
-    return [int(match.group(1)),
-            int(match.group(2)),
-            int(match.group(3))]
+    return [int(match.group(1)), int(match.group(2)), int(match.group(3))]
   except:
     raise HpcgParseOutputException('Unable to parse HPCG output')
 
@@ -285,9 +299,9 @@ def _MakeSamplesFromOutput(benchmark_spec, output):
   actual_hpcg_problem_size = _ExtractProblemSize(output)
   if actual_hpcg_problem_size != benchmark_spec.hpcg_problem_size:
     raise HpcgIncorrectProblemSizeException(
-        'Actual problem size of %s does not match expected problem '
-        'size of %s' % (actual_hpcg_problem_size,
-                        benchmark_spec.hpcg_problem_size))
+        'Actual problem size of %s does not match expected problem size of %s'
+        % (actual_hpcg_problem_size, benchmark_spec.hpcg_problem_size)
+    )
 
   metadata = _CreateMetadataDict(benchmark_spec)
   hpcg_throughput = _ExtractThroughput(output)
@@ -299,16 +313,18 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
   """
   vms = benchmark_spec.vms
   master_vm = vms[0]
-  run_command = 'cd %s && %s ./%s' % (hpcg.HPCG_DIR,
-                                      _GetEnvironmentVars(benchmark_spec),
-                                      RUN_SCRIPT)
+  run_command = 'cd %s && %s ./%s' % (
+      hpcg.HPCG_DIR,
+      _GetEnvironmentVars(benchmark_spec),
+      RUN_SCRIPT,
+  )
   output, _ = master_vm.RobustRemoteCommand(run_command)
   return _MakeSamplesFromOutput(benchmark_spec, output)
 

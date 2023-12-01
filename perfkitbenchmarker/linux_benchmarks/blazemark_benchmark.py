@@ -20,18 +20,25 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import blazemark
 
-flags.DEFINE_list('blazemark_set', ['all'],
-                  'A set of blazemark benchmarks to run.'
-                  'See following link for a complete list of benchmarks to run:'
-                  ' https://bitbucket.org/blaze-lib/blaze/wiki/Blazemark.')
+flags.DEFINE_list(
+    'blazemark_set',
+    ['all'],
+    'A set of blazemark benchmarks to run.'
+    'See following link for a complete list of benchmarks to run:'
+    ' https://bitbucket.org/blaze-lib/blaze/wiki/Blazemark.',
+)
 # TODO: Support other library.
-flags.DEFINE_list('blazemark_kernels', ['-only-blaze'], 'A list of additional '
-                  'flags send to blazemark, in order to '
-                  'enable/disable kernels/libraries. '
-                  'Currently only support blaze. '
-                  'See following link for more details: '
-                  'https://bitbucket.org/blaze-lib/blaze/wiki/'
-                  'Blazemark#!command-line-parameters')
+flags.DEFINE_list(
+    'blazemark_kernels',
+    ['-only-blaze'],
+    'A list of additional '
+    'flags send to blazemark, in order to '
+    'enable/disable kernels/libraries. '
+    'Currently only support blaze. '
+    'See following link for more details: '
+    'https://bitbucket.org/blaze-lib/blaze/wiki/'
+    'Blazemark#!command-line-parameters',
+)
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'blazemark'
@@ -57,8 +64,9 @@ def CheckPrerequisites(benchmark_config):
     binaries = blazemark.GetBinaries()
     if requested - binaries:
       raise errors.Benchmarks.PrepareException(
-          'Binaries %s not available. Options are %s' % (
-              requested - binaries, binaries))
+          'Binaries %s not available. Options are %s'
+          % (requested - binaries, binaries)
+      )
 
 
 def Prepare(benchmark_spec):
@@ -66,7 +74,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
   vm.Install('blazemark')
@@ -77,7 +85,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects with individual machine boot times.

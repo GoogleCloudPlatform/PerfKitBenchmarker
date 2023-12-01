@@ -90,7 +90,8 @@ BONNIE_RESULTS_MAPPING_1_96 = {
     'seq_del_latency': 44,
     'ran_create_latency': 45,
     'ran_stat_latency': 46,
-    'ran_del_latency': 47}
+    'ran_del_latency': 47,
+}
 
 # Bonnie 1.97 looks the same as 1.96 as far as headings
 BONNIE_RESULTS_MAPPING_1_97 = BONNIE_RESULTS_MAPPING_1_96
@@ -145,12 +146,14 @@ BONNIE_RESULTS_MAPPING_1_98 = {
     'seq_del_latency': 46,
     'ran_create_latency': 47,
     'ran_stat_latency': 48,
-    'ran_del_latency': 49}
+    'ran_del_latency': 49,
+}
 
 BONNIE_SUPPORTED_VERSIONS = {
     '1.96': BONNIE_RESULTS_MAPPING_1_96,
     '1.97': BONNIE_RESULTS_MAPPING_1_97,
-    '1.98': BONNIE_RESULTS_MAPPING_1_98}
+    '1.98': BONNIE_RESULTS_MAPPING_1_98,
+}
 
 
 def GetConfig(user_config):
@@ -162,8 +165,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
-
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -215,8 +217,8 @@ def ParseLatencyResult(result):
   """Parse latency result into value and unit.
 
   Args:
-    result: string. Latency value in string format, contains value and unit.
-            eg. 200ms
+    result: string. Latency value in string format, contains value and unit. eg.
+      200ms
 
   Returns:
     A tuple of value (float) and unit (string).
@@ -237,8 +239,9 @@ def UpdateMetadata(metadata, key, value):
     metadata[key] = value
 
 
-def CreateSamples(results, start_index, end_index, metadata,
-                  field_index_mapping):
+def CreateSamples(
+    results, start_index, end_index, metadata, field_index_mapping
+):
   """Create samples with data in results from start_index to end_index.
 
   Args:
@@ -295,7 +298,8 @@ def ParseCSVResults(results):
   else:
     raise ValueError(
         f'Unsupported bonnie++ CSV Format version: {format_version} '
-        f'(expected version {BONNIE_SUPPORTED_VERSIONS.keys()})')
+        f'(expected version {BONNIE_SUPPORTED_VERSIONS.keys()})'
+    )
 
   field_index_mapping = {}
   for field, value in six.iteritems(bonnie_results_mapping):
@@ -303,23 +307,39 @@ def ParseCSVResults(results):
   assert len(results) == len(bonnie_results_mapping)
   samples = []
   metadata = {}
-  for field_index in range(bonnie_results_mapping['format_version'],
-                           bonnie_results_mapping['chunk_size'] + 1):
-    UpdateMetadata(metadata, field_index_mapping[field_index],
-                   results[field_index])
+  for field_index in range(
+      bonnie_results_mapping['format_version'],
+      bonnie_results_mapping['chunk_size'] + 1,
+  ):
+    UpdateMetadata(
+        metadata, field_index_mapping[field_index], results[field_index]
+    )
 
-  for field_index in range(bonnie_results_mapping['num_files'],
-                           bonnie_results_mapping['file_chunk_size'] + 1):
-    UpdateMetadata(metadata, field_index_mapping[field_index],
-                   results[field_index])
-  samples.extend(CreateSamples(results,
-                               bonnie_results_mapping['putc'],
-                               bonnie_results_mapping['num_files'],
-                               metadata, field_index_mapping))
-  samples.extend(CreateSamples(results,
-                               bonnie_results_mapping['seq_create'],
-                               bonnie_results_mapping['ran_del_latency'] + 1,
-                               metadata, field_index_mapping))
+  for field_index in range(
+      bonnie_results_mapping['num_files'],
+      bonnie_results_mapping['file_chunk_size'] + 1,
+  ):
+    UpdateMetadata(
+        metadata, field_index_mapping[field_index], results[field_index]
+    )
+  samples.extend(
+      CreateSamples(
+          results,
+          bonnie_results_mapping['putc'],
+          bonnie_results_mapping['num_files'],
+          metadata,
+          field_index_mapping,
+      )
+  )
+  samples.extend(
+      CreateSamples(
+          results,
+          bonnie_results_mapping['seq_create'],
+          bonnie_results_mapping['ran_del_latency'] + 1,
+          metadata,
+          field_index_mapping,
+      )
+  )
   return samples
 
 
@@ -328,7 +348,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of samples in the form of 3 or 4 tuples. The tuples contain
@@ -339,9 +359,10 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   vm = vms[0]
   logging.info('Bonnie++ running on %s', vm)
-  bonnie_command = ('/usr/sbin/bonnie++ -q -d %s -s %d -n 100 -f' %
-                    (vm.GetScratchDir(),
-                     2 * vm.total_memory_kb / 1024))
+  bonnie_command = '/usr/sbin/bonnie++ -q -d %s -s %d -n 100 -f' % (
+      vm.GetScratchDir(),
+      2 * vm.total_memory_kb / 1024,
+  )
   logging.info('Bonnie++ Results:')
   out, _ = vm.RemoteCommand(bonnie_command)
   return ParseCSVResults(out.strip())
@@ -352,6 +373,6 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   pass

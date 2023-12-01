@@ -25,30 +25,47 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
-flags.DEFINE_integer('nccl_slots', 8,
-                     'Launch n processes per node on all allocated nodes')
+flags.DEFINE_integer(
+    'nccl_slots', 8, 'Launch n processes per node on all allocated nodes'
+)
 flags.DEFINE_string(
-    'nccl_cuda_visible_devices', None, 'GPU identifiers are '
-    'given as integer indices or as UUID strings.')
+    'nccl_cuda_visible_devices',
+    None,
+    'GPU identifiers are given as integer indices or as UUID strings.',
+)
 flags.DEFINE_list('nccl_extra_params', [], 'Export an environment variable')
 flags.DEFINE_string('nccl_minbytes', '8', 'Minimum size to start with')
 flags.DEFINE_string('nccl_maxbytes', '256M', 'Maximum size to start with')
-flags.DEFINE_integer('nccl_stepfactor', 2,
-                     'Multiplication factor between sizes')
+flags.DEFINE_integer(
+    'nccl_stepfactor', 2, 'Multiplication factor between sizes'
+)
 flags.DEFINE_integer('nccl_ngpus', 1, 'Number of gpus per thread.')
 flags.DEFINE_boolean('nccl_check', False, 'Check correctness of results.')
 flags.DEFINE_integer('nccl_nthreads', 1, 'Number of threads per process')
 flags.DEFINE_integer(
-    'nccl_num_runs', 10, 'The number of consecutive run.', lower_bound=1)
-flags.DEFINE_integer('nccl_seconds_between_runs', 10,
-                     'Sleep between consecutive run.')
+    'nccl_num_runs', 10, 'The number of consecutive run.', lower_bound=1
+)
+flags.DEFINE_integer(
+    'nccl_seconds_between_runs', 10, 'Sleep between consecutive run.'
+)
 flags.DEFINE_integer('nccl_iters', 20, 'Number of iterations')
 flags.DEFINE_multi_enum(
-    'nccl_operations', ['all_reduce', 'all_gather', 'alltoall'],
-    ['all_reduce', 'all_gather', 'broadcast', 'reduce_scatter', 'reduce',
-     'alltoall', 'sendrecv'], 'The NCCL collective operation.')
-_NCCL_TESTS = flags.DEFINE_boolean('nccl_install_tests', True,
-                                   'Install NCCL tests benchmarks.')
+    'nccl_operations',
+    ['all_reduce', 'all_gather', 'alltoall'],
+    [
+        'all_reduce',
+        'all_gather',
+        'broadcast',
+        'reduce_scatter',
+        'reduce',
+        'alltoall',
+        'sendrecv',
+    ],
+    'The NCCL collective operation.',
+)
+_NCCL_TESTS = flags.DEFINE_boolean(
+    'nccl_install_tests', True, 'Install NCCL tests benchmarks.'
+)
 
 FLAGS = flags.FLAGS
 
@@ -83,50 +100,63 @@ nccl:
 """
 
 HOSTFILE = 'HOSTFILE'
-_SAMPLE_LINE_RE = re.compile(r'# nThread (?P<nThread>\d+) '
-                             r'nGpus (?P<nGpus>\d+) '
-                             r'minBytes (?P<minBytes>\d+) '
-                             r'maxBytes (?P<maxBytes>\d+) '
-                             r'step: (?P<step>\S+) '
-                             r'warmup iters: (?P<warmup_iters>\d+) '
-                             r'iters: (?P<iters>\d+) '
-                             r'agg iters: (?P<agg_iters>\d+) '
-                             r'validation: (?P<validation>\d+) '
-                             r'graph: (?P<graph>\d+)\s*')
+_SAMPLE_LINE_RE = re.compile(
+    r'# nThread (?P<nThread>\d+) '
+    r'nGpus (?P<nGpus>\d+) '
+    r'minBytes (?P<minBytes>\d+) '
+    r'maxBytes (?P<maxBytes>\d+) '
+    r'step: (?P<step>\S+) '
+    r'warmup iters: (?P<warmup_iters>\d+) '
+    r'iters: (?P<iters>\d+) '
+    r'agg iters: (?P<agg_iters>\d+) '
+    r'validation: (?P<validation>\d+) '
+    r'graph: (?P<graph>\d+)\s*'
+)
 
 # Without '--mca btl_tcp_if_exclude docker0,lo', it stuck forever
 # This is caused by Docker network in DLVM, use mca btl_tcp_if_exclude to skip
 # docker network.
 
-RUN_CMD = ('{mpi} '
-           '--hostfile {hostfile} '
-           '--mca pml ^cm '
-           '--mca btl tcp,self '
-           '--mca btl_tcp_if_exclude docker0,lo '
-           '--bind-to none '
-           '-N {slots} '
-           '{env} '
-           'nccl-tests/build/{operation}_perf '
-           '--minbytes {minbytes} '
-           '--maxbytes {maxbytes} '
-           '--stepfactor {stepfactor} '
-           '--ngpus {ngpus} '
-           '--check {check} '
-           '--nthreads {nthreads} '
-           '--iters {iters}')
+RUN_CMD = (
+    '{mpi} '
+    '--hostfile {hostfile} '
+    '--mca pml ^cm '
+    '--mca btl tcp,self '
+    '--mca btl_tcp_if_exclude docker0,lo '
+    '--bind-to none '
+    '-N {slots} '
+    '{env} '
+    'nccl-tests/build/{operation}_perf '
+    '--minbytes {minbytes} '
+    '--maxbytes {maxbytes} '
+    '--stepfactor {stepfactor} '
+    '--ngpus {ngpus} '
+    '--check {check} '
+    '--nthreads {nthreads} '
+    '--iters {iters}'
+)
 
 _DEFAULT = 'DEFAULT'
 
-_METADATA_COLUMNS = ('size', 'count', 'nccl_type', 'out_of_place_time',
-                     'out_of_place_algbw', 'out_of_place_busbw',
-                     'out_of_place_error', 'in_place_time', 'in_place_algbw',
-                     'in_place_busbw', 'in_place_error')
+_METADATA_COLUMNS = (
+    'size',
+    'count',
+    'nccl_type',
+    'out_of_place_time',
+    'out_of_place_algbw',
+    'out_of_place_busbw',
+    'out_of_place_error',
+    'in_place_time',
+    'in_place_algbw',
+    'in_place_busbw',
+    'in_place_error',
+)
 
 _SAMPLE_NAMES = {
     'Out of place algorithm bandwidth': 'out_of_place_algbw',
     'Out of place bus bandwidth': 'out_of_place_busbw',
     'In place algorithm bandwidth': 'in_place_algbw',
-    'In place bus bandwidth': 'in_place_busbw'
+    'In place bus bandwidth': 'in_place_busbw',
 }
 
 
@@ -150,8 +180,10 @@ def PrepareVm(vm):
   """
   env = ''
   if FLAGS.aws_efa:
-    env = ('export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'
-           '$LD_LIBRARY_PATH &&')
+    env = (
+        'export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'
+        '$LD_LIBRARY_PATH &&'
+    )
   if FLAGS.azure_infiniband:
     vm.Install('mofed')
   vm.AuthenticateVm()
@@ -161,13 +193,15 @@ def PrepareVm(vm):
   vm.Install('openmpi')
   vm.RemoteCommand('rm -rf nccl-tests')
   vm.RemoteCommand('git clone https://github.com/NVIDIA/nccl-tests.git')
-  vm.RemoteCommand('cd nccl-tests && {env} make MPI=1 MPI_HOME={mpi} '
-                   'NCCL_HOME={nccl} CUDA_HOME={cuda}'.format(
-                       env=env,
-                       mpi=FLAGS.nccl_mpi_home,
-                       nccl=FLAGS.nccl_home,
-                       cuda='/usr/local/cuda-{}'.format(
-                           FLAGS.cuda_toolkit_version)))
+  vm.RemoteCommand(
+      'cd nccl-tests && {env} make MPI=1 MPI_HOME={mpi} '
+      'NCCL_HOME={nccl} CUDA_HOME={cuda}'.format(
+          env=env,
+          mpi=FLAGS.nccl_mpi_home,
+          nccl=FLAGS.nccl_home,
+          cuda='/usr/local/cuda-{}'.format(FLAGS.cuda_toolkit_version),
+      )
+  )
 
 
 def Prepare(benchmark_spec):
@@ -180,7 +214,8 @@ def Prepare(benchmark_spec):
   if _NCCL_TESTS.value:
     background_tasks.RunThreaded(PrepareVm, benchmark_spec.vms)
   hpc_util.CreateMachineFile(
-      benchmark_spec.vms, nvidia_driver.QueryNumberOfGpus, HOSTFILE)
+      benchmark_spec.vms, nvidia_driver.QueryNumberOfGpus, HOSTFILE
+  )
 
 
 def CreateMetadataDict():
@@ -202,7 +237,7 @@ def CreateMetadataDict():
       'nccl_version': FLAGS.nccl_version,
       'nccl_net_plugin': FLAGS.nccl_net_plugin,
       'nccl_extra_params': FLAGS.nccl_extra_params,
-      'extra_params': FLAGS.nccl_extra_params
+      'extra_params': FLAGS.nccl_extra_params,
   }
   if FLAGS.azure_infiniband:
     metadata['mofed_version'] = FLAGS.mofed_version
@@ -215,6 +250,7 @@ def MakeSamplesFromOutput(metadata, output):
   Args:
     metadata: dict contains all the metadata that reports.
     output: string, command output
+
   Example output:
     perfkitbenchmarker/tests/linux_benchmarks/nccl_benchmark_test.py
 
@@ -239,26 +275,36 @@ def MakeSamplesFromOutput(metadata, output):
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
       r'(\d+(?:\.\d+)?)\s+'
-      r'(\S+)', output, re.MULTILINE)
+      r'(\S+)',
+      output,
+      re.MULTILINE,
+  )
   max_out_of_place_algbw = 0
   for row in results:
     row_metadata = dict(zip(_METADATA_COLUMNS, row))
     row_metadata.update(metadata)
     for metric, metadata_key in sorted(_SAMPLE_NAMES.items()):
       samples.append(
-          sample.Sample(metric, float(row_metadata[metadata_key]), 'GB/s',
-                        row_metadata))
+          sample.Sample(
+              metric, float(row_metadata[metadata_key]), 'GB/s', row_metadata
+          )
+      )
     # Gbps is gigaBIT per second and GB/s is gigaBYTE per second
-    max_out_of_place_algbw = max(max_out_of_place_algbw,
-                                 float(row_metadata['out_of_place_algbw']))
+    max_out_of_place_algbw = max(
+        max_out_of_place_algbw, float(row_metadata['out_of_place_algbw'])
+    )
 
   avg_bus_bandwidth = regex_util.ExtractExactlyOneMatch(
-      r'Avg bus bandwidth\s+: ([0-9\.]+)', output)
+      r'Avg bus bandwidth\s+: ([0-9\.]+)', output
+  )
   samples.append(
-      sample.Sample('avg_busbw', float(avg_bus_bandwidth), 'GB/s', metadata))
+      sample.Sample('avg_busbw', float(avg_bus_bandwidth), 'GB/s', metadata)
+  )
   samples.append(
-      sample.Sample('max_out_of_place_algbw', max_out_of_place_algbw * 8,
-                    'Gbps', metadata))
+      sample.Sample(
+          'max_out_of_place_algbw', max_out_of_place_algbw * 8, 'Gbps', metadata
+      )
+  )
   return samples, max_out_of_place_algbw
 
 
@@ -318,7 +364,8 @@ def Run(benchmark_spec):
 
   for extra_param in TuningParameters(list(extra_params.items())):
     param_metadata = {
-        param_key: param_value for param_key, param_value in extra_param}
+        param_key: param_value for param_key, param_value in extra_param
+    }
     param_metadata.update(base_metadata)
 
     for operation in FLAGS.nccl_operations:
@@ -328,8 +375,10 @@ def Run(benchmark_spec):
           mpi=FLAGS.nccl_mpi,
           hostfile=HOSTFILE,
           slots=FLAGS.nccl_slots,
-          env=' '.join('-x {key}={value}'.format(key=key, value=value)
-                       for key, value in env + extra_param),
+          env=' '.join(
+              '-x {key}={value}'.format(key=key, value=value)
+              for key, value in env + extra_param
+          ),
           minbytes=FLAGS.nccl_minbytes,
           maxbytes=FLAGS.nccl_maxbytes,
           stepfactor=FLAGS.nccl_stepfactor,
@@ -337,7 +386,8 @@ def Run(benchmark_spec):
           check=int(FLAGS.nccl_check),
           nthreads=FLAGS.nccl_nthreads,
           iters=FLAGS.nccl_iters,
-          operation=operation)
+          operation=operation,
+      )
       max_out_of_place_algbw_results = []
 
       for iteration in range(FLAGS.nccl_num_runs):
@@ -345,26 +395,35 @@ def Run(benchmark_spec):
         run_metadata.update(metadata)
         stdout, _ = master.RobustRemoteCommand(cmd)
         samples, max_out_of_place_algbw = MakeSamplesFromOutput(
-            run_metadata.copy(), stdout)
+            run_metadata.copy(), stdout
+        )
         sample_results.extend(samples)
         max_out_of_place_algbw_results.append(max_out_of_place_algbw)
         time.sleep(FLAGS.nccl_seconds_between_runs)
 
       avg_busbw = [s.value for s in sample_results if s.metric == 'avg_busbw']
       sample_results.append(
-          sample.Sample('avg_busbw_mean', np.mean(avg_busbw), 'GB/s',
-                        metadata))
+          sample.Sample('avg_busbw_mean', np.mean(avg_busbw), 'GB/s', metadata)
+      )
       sample_results.append(
-          sample.Sample('avg_busbw_std', np.std(avg_busbw), 'GB/s',
-                        metadata))
+          sample.Sample('avg_busbw_std', np.std(avg_busbw), 'GB/s', metadata)
+      )
       sample_results.append(
-          sample.Sample('max_out_of_place_algbw_mean',
-                        np.mean(max_out_of_place_algbw_results), 'Gbps',
-                        metadata))
+          sample.Sample(
+              'max_out_of_place_algbw_mean',
+              np.mean(max_out_of_place_algbw_results),
+              'Gbps',
+              metadata,
+          )
+      )
       sample_results.append(
-          sample.Sample('max_out_of_place_algbw_std',
-                        np.std(max_out_of_place_algbw_results), 'Gbps',
-                        metadata))
+          sample.Sample(
+              'max_out_of_place_algbw_std',
+              np.std(max_out_of_place_algbw_results),
+              'Gbps',
+              metadata,
+          )
+      )
   return sample_results
 
 

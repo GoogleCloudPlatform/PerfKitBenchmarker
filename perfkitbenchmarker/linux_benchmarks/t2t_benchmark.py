@@ -49,8 +49,9 @@ tensor2tensor:
 
 flags.DEFINE_string('t2t_model', None, 'Tensor2Tensor model to run')
 flags.DEFINE_string('t2t_problem', None, 'Tensor2Tensor problem to run')
-flags.DEFINE_string('t2t_hparams_set', None,
-                    'Tensor2Tensor hyperparameters set')
+flags.DEFINE_string(
+    't2t_hparams_set', None, 'Tensor2Tensor hyperparameters set'
+)
 flags.DEFINE_integer('t2t_train_steps', 1000, 'Number of train steps')
 flags.DEFINE_integer('t2t_eval_steps', 1, 'Number of eval steps')
 
@@ -109,7 +110,8 @@ def _CreateMetadataDict(benchmark_spec):
       'data_dir': benchmark_spec.data_dir,
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
-      'eval_steps': benchmark_spec.eval_steps})
+      'eval_steps': benchmark_spec.eval_steps,
+  })
   return metadata
 
 
@@ -126,43 +128,72 @@ def _MakeSamplesFromOutput(metadata, output):
   samples = []
 
   samples.extend(
-      mnist_benchmark.ExtractThroughput(r'global_step/sec: (\S+)', output,
-                                        metadata, 'Global Steps Per Second',
-                                        'global_steps/sec'))
+      mnist_benchmark.ExtractThroughput(
+          r'global_step/sec: (\S+)',
+          output,
+          metadata,
+          'Global Steps Per Second',
+          'global_steps/sec',
+      )
+  )
 
   # TODO(user) Workaround until t2t can use TPUEstimator on a GPU
   try:
     samples.extend(
-        mnist_benchmark.ExtractThroughput(r'examples/sec: (\S+)', output,
-                                          metadata, 'Examples Per Second',
-                                          'examples/sec'))
+        mnist_benchmark.ExtractThroughput(
+            r'examples/sec: (\S+)',
+            output,
+            metadata,
+            'Examples Per Second',
+            'examples/sec',
+        )
+    )
   except regex_util.NoMatchError:
     logging.info('examples/sec sample not collected')
 
-  pattern = (r'Saving dict for global step \d+: .*global_step = (\d+), '
-             r'.*loss = (\d+\.\d+), '
-             r'.*accuracy = (\d+\.\d+), '
-             r'.*accuracy_per_sequence = (\d+\.\d+), '
-             r'.*accuracy_top5 = (\d+\.\d+), '
-             r'.*neg_log_perplexity = (-?\d+\.\d+)')
-  for (step, loss, accuracy, accuracy_per_sequence, accuracy_top5,
-       neg_log_perplexity) in (
-           regex_util.ExtractAllMatches(pattern, output)):
+  pattern = (
+      r'Saving dict for global step \d+: .*global_step = (\d+), '
+      r'.*loss = (\d+\.\d+), '
+      r'.*accuracy = (\d+\.\d+), '
+      r'.*accuracy_per_sequence = (\d+\.\d+), '
+      r'.*accuracy_top5 = (\d+\.\d+), '
+      r'.*neg_log_perplexity = (-?\d+\.\d+)'
+  )
+  for (
+      step,
+      loss,
+      accuracy,
+      accuracy_per_sequence,
+      accuracy_top5,
+      neg_log_perplexity,
+  ) in regex_util.ExtractAllMatches(pattern, output):
     metadata_copy = metadata.copy()
     metadata_copy['step'] = int(step)
     samples.append(sample.Sample('Eval Loss', float(loss), '', metadata_copy))
     samples.append(
-        sample.Sample('Accuracy',
-                      float(accuracy) * 100, '%', metadata_copy))
+        sample.Sample('Accuracy', float(accuracy) * 100, '%', metadata_copy)
+    )
     samples.append(
-        sample.Sample('Accuracy Per Sequence',
-                      float(accuracy_per_sequence) * 100, '%', metadata_copy))
+        sample.Sample(
+            'Accuracy Per Sequence',
+            float(accuracy_per_sequence) * 100,
+            '%',
+            metadata_copy,
+        )
+    )
     samples.append(
-        sample.Sample('Negative Log Perplexity', float(neg_log_perplexity),
-                      'perplexity', metadata_copy))
+        sample.Sample(
+            'Negative Log Perplexity',
+            float(neg_log_perplexity),
+            'perplexity',
+            metadata_copy,
+        )
+    )
     samples.append(
-        sample.Sample('Top 5 Accuracy',
-                      float(accuracy_top5) * 100, '%', metadata_copy))
+        sample.Sample(
+            'Top 5 Accuracy', float(accuracy_top5) * 100, '%', metadata_copy
+        )
+    )
 
   return samples
 
@@ -180,33 +211,35 @@ def Run(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
 
-  t2t_benchmark_cmd = ('t2t-trainer '
-                       '--model={model} '
-                       '--problem={problem} '
-                       '--hparams_set={hparams_set} '
-                       '--train_steps={train_steps} --eval_steps={eval_steps} '
-                       '--data_dir={data_dir} --output_dir={model_dir}'.format(
-                           model=benchmark_spec.model,
-                           problem=benchmark_spec.problem,
-                           train_steps=benchmark_spec.train_steps,
-                           eval_steps=benchmark_spec.eval_steps,
-                           data_dir=benchmark_spec.data_dir,
-                           model_dir=benchmark_spec.model_dir,
-                           hparams_set=benchmark_spec.hparams_set,
-                       ))
+  t2t_benchmark_cmd = (
+      't2t-trainer '
+      '--model={model} '
+      '--problem={problem} '
+      '--hparams_set={hparams_set} '
+      '--train_steps={train_steps} --eval_steps={eval_steps} '
+      '--data_dir={data_dir} --output_dir={model_dir}'.format(
+          model=benchmark_spec.model,
+          problem=benchmark_spec.problem,
+          train_steps=benchmark_spec.train_steps,
+          eval_steps=benchmark_spec.eval_steps,
+          data_dir=benchmark_spec.data_dir,
+          model_dir=benchmark_spec.model_dir,
+          hparams_set=benchmark_spec.hparams_set,
+      )
+  )
 
   if benchmark_spec.tpus:
-    t2t_benchmark_cmd += (
-        ' --use_tpu=True '
-        '--master={master}'.format(
-            master=benchmark_spec.tpu_groups['train'].GetMasterGrpcAddress()))
+    t2t_benchmark_cmd += ' --use_tpu=True --master={master}'.format(
+        master=benchmark_spec.tpu_groups['train'].GetMasterGrpcAddress()
+    )
 
   stdout, stderr = vm.RobustRemoteCommand(t2t_benchmark_cmd)
 
   # TODO(user) Add timestamp to tensor2tensor output to enable samples like
   # resnet_benchmark
   return _MakeSamplesFromOutput(
-      _CreateMetadataDict(benchmark_spec), stdout + stderr)
+      _CreateMetadataDict(benchmark_spec), stdout + stderr
+  )
 
 
 def Cleanup(benchmark_spec):

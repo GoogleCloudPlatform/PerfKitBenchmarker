@@ -29,7 +29,8 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 
 _ENV = flags.DEFINE_string(
-    'gpu_pingpong_env', 'PATH=/opt/conda/bin:$PATH', 'Env')
+    'gpu_pingpong_env', 'PATH=/opt/conda/bin:$PATH', 'Env'
+)
 
 FLAGS = flags.FLAGS
 
@@ -58,12 +59,16 @@ _TEST_SCRIPT = 'gpu_pingpong_test.py'
 _SERVER_SCRIPT = 'gpu_pingpong_server.py'
 _SERVER_ADDR = '{hostname}:{port}'
 _PORT = '2000'
-_TIMELINE_PING = (r'timeline_label: "\[4B\] \[([\d\.]+)Mb/s\] \S+ from '
-                  '/job:worker/replica:0/task:0/device:GPU:0 to '
-                  '/job:worker/replica:0/task:1/device:GPU:0"')
-_TIMELINE_PONG = (r'timeline_label: "\[4B\] \[([\d\.]+)Mb/s\] \S+ from '
-                  '/job:worker/replica:0/task:1/device:GPU:0 to '
-                  '/job:worker/replica:0/task:0/device:GPU:0"')
+_TIMELINE_PING = (
+    r'timeline_label: "\[4B\] \[([\d\.]+)Mb/s\] \S+ from '
+    '/job:worker/replica:0/task:0/device:GPU:0 to '
+    '/job:worker/replica:0/task:1/device:GPU:0"'
+)
+_TIMELINE_PONG = (
+    r'timeline_label: "\[4B\] \[([\d\.]+)Mb/s\] \S+ from '
+    '/job:worker/replica:0/task:1/device:GPU:0 to '
+    '/job:worker/replica:0/task:0/device:GPU:0"'
+)
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -90,27 +95,35 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     for script in [_TEST_SCRIPT, _SERVER_SCRIPT]:
       vm.PushFile(data.ResourcePath(script), script)
   server1, server2 = bm_spec.vms[0], bm_spec.vms[1]
-  server1_addr = _SERVER_ADDR.format(
-      hostname=server1.hostname, port=_PORT)
-  server2_addr = _SERVER_ADDR.format(
-      hostname=server2.hostname, port=_PORT)
-  server1.RemoteCommand(f'{_ENV.value} nohup python {_SERVER_SCRIPT} '
-                        f'{server1_addr} {server2_addr} 0 '
-                        '1> /tmp/stdout.log 2> /tmp/stderr.log &')
-  server2.RemoteCommand(f'{_ENV.value} nohup python {_SERVER_SCRIPT} '
-                        f'{server1_addr} {server2_addr} 1 '
-                        '1> /tmp/stdout.log 2> /tmp/stderr.log &')
+  server1_addr = _SERVER_ADDR.format(hostname=server1.hostname, port=_PORT)
+  server2_addr = _SERVER_ADDR.format(hostname=server2.hostname, port=_PORT)
+  server1.RemoteCommand(
+      f'{_ENV.value} nohup python {_SERVER_SCRIPT} '
+      f'{server1_addr} {server2_addr} 0 '
+      '1> /tmp/stdout.log 2> /tmp/stderr.log &'
+  )
+  server2.RemoteCommand(
+      f'{_ENV.value} nohup python {_SERVER_SCRIPT} '
+      f'{server1_addr} {server2_addr} 1 '
+      '1> /tmp/stdout.log 2> /tmp/stderr.log &'
+  )
 
 
-def _RunGpuPingpong(vm: virtual_machine.BaseVirtualMachine,
-                    addr: str) -> List[Tuple[float, float]]:
+def _RunGpuPingpong(
+    vm: virtual_machine.BaseVirtualMachine, addr: str
+) -> List[Tuple[float, float]]:
   """Returns the Ping and Pong latency times."""
   stdout, stderr = vm.RemoteCommand(
-      f'{_ENV.value} python {_TEST_SCRIPT} {addr}')
-  ping_bws = [float(bw) for bw in
-              regex_util.ExtractAllMatches(_TIMELINE_PING, stdout + stderr)]
-  pong_bws = [float(bw) for bw in
-              regex_util.ExtractAllMatches(_TIMELINE_PONG, stdout + stderr)]
+      f'{_ENV.value} python {_TEST_SCRIPT} {addr}'
+  )
+  ping_bws = [
+      float(bw)
+      for bw in regex_util.ExtractAllMatches(_TIMELINE_PING, stdout + stderr)
+  ]
+  pong_bws = [
+      float(bw)
+      for bw in regex_util.ExtractAllMatches(_TIMELINE_PONG, stdout + stderr)
+  ]
 
   return list(zip(ping_bws, pong_bws))
 
@@ -136,9 +149,11 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   for ping_bw, pong_bw in bws[1:]:
     metadata = {'ping': 32 / ping_bw, 'pong': 32 / pong_bw}
     metadata.update(base_metadata)
-    samples.append(sample.Sample(
-        'latency', 32 / ping_bw + 32 / pong_bw, 'microseconds',
-        metadata))
+    samples.append(
+        sample.Sample(
+            'latency', 32 / ping_bw + 32 / pong_bw, 'microseconds', metadata
+        )
+    )
   return samples
 
 
@@ -146,7 +161,7 @@ def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   """Cleanup GPU PingPong on the cluster.
 
   Args:
-    bm_spec: The benchmark specification. Contains all data that
-      is required to run the benchmark.
+    bm_spec: The benchmark specification. Contains all data that is required to
+      run the benchmark.
   """
   del bm_spec

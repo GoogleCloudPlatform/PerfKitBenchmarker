@@ -41,19 +41,26 @@ unixbench:
       disk_spec: *default_500_gb
 """
 
-flags.DEFINE_boolean('unixbench_all_cores', default=False,
-                     help='Setting this flag changes the default behavior of '
-                     'Unix bench. It will now scale to the number of CPUs on '
-                     'the machine vs the limit of 16 CPUs today.')
+flags.DEFINE_boolean(
+    'unixbench_all_cores',
+    default=False,
+    help=(
+        'Setting this flag changes the default behavior of '
+        'Unix bench. It will now scale to the number of CPUs on '
+        'the machine vs the limit of 16 CPUs today.'
+    ),
+)
 
 UNIXBENCH_PATCH_FILE = 'unixbench-16core-limitation.patch'
 SYSTEM_SCORE_REGEX = r'\nSystem Benchmarks Index Score\s+([-+]?[0-9]*\.?[0-9]+)'
 RESULT_REGEX = (
     r'\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+) (\w+)\s+\('
-    r'([-+]?[0-9]*\.?[0-9]+) (\w+), (\d+) samples\)')
+    r'([-+]?[0-9]*\.?[0-9]+) (\w+), (\d+) samples\)'
+)
 SCORE_REGEX = (
     r'\n([A-Z][\w\-\(\) ]+)\s+([-+]?[0-9]*\.?[0-9]+)\s+([-+]?[0-9]*\.?[0-9]+)'
-    r'\s+([-+]?[0-9]*\.?[0-9]+)')
+    r'\s+([-+]?[0-9]*\.?[0-9]+)'
+)
 PARALLEL_COPIES_REGEX = r'running (\d+) parallel cop[yies]+ of tests'
 RESULT_START_STRING = 'Benchmark Run:'
 
@@ -78,7 +85,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -87,10 +94,13 @@ def Prepare(benchmark_spec):
 
   if FLAGS.unixbench_all_cores:
     vm.PushDataFile(UNIXBENCH_PATCH_FILE)
-    vm.RemoteCommand('cp %s %s' %
-                     (UNIXBENCH_PATCH_FILE, unixbench.UNIXBENCH_DIR))
-    vm.RemoteCommand('cd %s && patch ./Run %s' %
-                     (unixbench.UNIXBENCH_DIR, UNIXBENCH_PATCH_FILE))
+    vm.RemoteCommand(
+        'cp %s %s' % (UNIXBENCH_PATCH_FILE, unixbench.UNIXBENCH_DIR)
+    )
+    vm.RemoteCommand(
+        'cd %s && patch ./Run %s'
+        % (unixbench.UNIXBENCH_DIR, UNIXBENCH_PATCH_FILE)
+    )
 
 
 def ParseResults(results):
@@ -138,29 +148,42 @@ def ParseResults(results):
   start_index = results.find(RESULT_START_STRING)
   while start_index != -1:
     next_start_index = results.find(RESULT_START_STRING, start_index + 1)
-    result = results[start_index: next_start_index]
+    result = results[start_index:next_start_index]
     parallel_copies = regex_util.ExtractAllMatches(
-        PARALLEL_COPIES_REGEX, result)
+        PARALLEL_COPIES_REGEX, result
+    )
     parallel_copy_metadata = {'num_parallel_copies': int(parallel_copies[0])}
 
     match = regex_util.ExtractAllMatches(RESULT_REGEX, result)
     for groups in match:
       metadata = {'samples': int(groups[5]), 'time': groups[3] + groups[4]}
       metadata.update(parallel_copy_metadata)
-      samples.append(sample.Sample(
-          groups[0].strip(), float(groups[1]), groups[2], metadata))
+      samples.append(
+          sample.Sample(
+              groups[0].strip(), float(groups[1]), groups[2], metadata
+          )
+      )
     match = regex_util.ExtractAllMatches(SCORE_REGEX, result)
     for groups in match:
       metadata = {'baseline': float(groups[1]), 'index': float(groups[3])}
       metadata.update(parallel_copy_metadata)
-      samples.append(sample.Sample('%s:score' % groups[0].strip(),
-                                   value=float(groups[2]),
-                                   unit='',
-                                   metadata=metadata))
+      samples.append(
+          sample.Sample(
+              '%s:score' % groups[0].strip(),
+              value=float(groups[2]),
+              unit='',
+              metadata=metadata,
+          )
+      )
     match = regex_util.ExtractAllMatches(SYSTEM_SCORE_REGEX, result)
-    samples.append(sample.Sample('System Benchmarks Index Score',
-                                 float(match[0]), unit='',
-                                 metadata=parallel_copy_metadata))
+    samples.append(
+        sample.Sample(
+            'System Benchmarks Index Score',
+            float(match[0]),
+            unit='',
+            metadata=parallel_copy_metadata,
+        )
+    )
     start_index = next_start_index
 
   return samples
@@ -171,7 +194,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -180,7 +203,8 @@ def Run(benchmark_spec):
   vm = vms[0]
   logging.info('UnixBench running on %s', vm)
   unixbench_command = 'cd {0} && UB_TMPDIR={1} ./Run'.format(
-      unixbench.UNIXBENCH_DIR, vm.GetScratchDir())
+      unixbench.UNIXBENCH_DIR, vm.GetScratchDir()
+  )
   logging.info('Unixbench Results:')
   stdout, _ = vm.RemoteCommand(unixbench_command)
   return ParseResults(stdout)
@@ -191,6 +215,6 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   pass

@@ -31,11 +31,11 @@ from perfkitbenchmarker.linux_packages import netperf
 from six.moves import range
 
 
-flags.DEFINE_integer('num_connections', 1,
-                     'Number of connections between each pair of vms.')
+flags.DEFINE_integer(
+    'num_connections', 1, 'Number of connections between each pair of vms.'
+)
 
-flags.DEFINE_integer('num_iterations', 1,
-                     'Number of iterations for each run.')
+flags.DEFINE_integer('num_iterations', 1, 'Number of iterations for each run.')
 
 
 FLAGS = flags.FLAGS
@@ -79,7 +79,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the banchmark.
+      required to run the banchmark.
   """
   vms = benchmark_spec.vms
   logging.info('Preparing netperf on %s', vms[0])
@@ -106,13 +106,16 @@ def RunNetperf(vm, benchmark_name, servers, result):
     cmd_duration_suffix = ''
   for server in servers:
     if vm != server:
-      cmd += ('./netperf -t '
-              '{benchmark_name} -H {server_ip} -i {iterations} '
-              '{cmd_suffix} & ').format(
-                  benchmark_name=benchmark_name,
-                  server_ip=server.internal_ip,
-                  iterations=FLAGS.num_iterations,
-                  cmd_suffix=cmd_duration_suffix)
+      cmd += (
+          './netperf -t '
+          '{benchmark_name} -H {server_ip} -i {iterations} '
+          '{cmd_suffix} & '
+      ).format(
+          benchmark_name=benchmark_name,
+          server_ip=server.internal_ip,
+          iterations=FLAGS.num_iterations,
+          cmd_suffix=cmd_duration_suffix,
+      )
   netperf_cmd = ''
   for _ in range(FLAGS.num_connections):
     netperf_cmd += cmd
@@ -125,8 +128,9 @@ def RunNetperf(vm, benchmark_name, servers, result):
   expected_num_match = (len(servers) - 1) * FLAGS.num_connections
   if len(match) != expected_num_match:
     raise errors.Benchmarks.RunError(
-        'Netserver not reachable. Expecting %s results, got %s.' %
-        (expected_num_match, len(match)))
+        'Netserver not reachable. Expecting %s results, got %s.'
+        % (expected_num_match, len(match))
+    )
   for res in match:
     if benchmark_name == 'TCP_RR':
       value += 1.0 / float(res) * 1000.0
@@ -141,7 +145,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     Total throughput, average latency in the form of tuple. The tuple contains
@@ -154,7 +158,7 @@ def Run(benchmark_spec):
     args = []
     metadata = {
         'number_machines': num_vms,
-        'number_connections': FLAGS.num_connections
+        'number_connections': FLAGS.num_connections,
     }
 
     if netperf_benchmark == 'TCP_STREAM':
@@ -170,9 +174,7 @@ def Run(benchmark_spec):
     background_tasks.RunThreaded(RunNetperf, args, num_vms)
     result = sample.Sample(*result)
     if netperf_benchmark == 'TCP_RR':
-      denom = ((num_vms - 1) *
-               num_vms *
-               FLAGS.num_connections)
+      denom = (num_vms - 1) * num_vms * FLAGS.num_connections
       result = result._replace(value=result.value / denom)
 
     results.append(result)
@@ -185,7 +187,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   for vm in vms:

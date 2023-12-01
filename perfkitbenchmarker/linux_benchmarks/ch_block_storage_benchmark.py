@@ -32,9 +32,11 @@ ch_block_storage:
 """
 
 flags.DEFINE_multi_enum(
-    'ch_block_tests', ['iops'],
+    'ch_block_tests',
+    ['iops'],
     ['iops', 'throughput', 'latency', 'wsat', 'hir'],
-    'A list of tests supported by CloudHarmony block storage benchmark.')
+    'A list of tests supported by CloudHarmony block storage benchmark.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -88,21 +90,26 @@ def _LocateFioJson(vm, outdir, test):
 def Run(benchmark_spec):
   """Runs cloudharmony block storage and reports the results."""
   vm = benchmark_spec.vms[0]
-  target = ' '.join([
-      '--target=%s' % _PrepareDevicePath(vm, dev.GetDevicePath())
-      for dev in vm.scratch_disks
-  ])
+  target = ' '.join(
+      [
+          '--target=%s' % _PrepareDevicePath(vm, dev.GetDevicePath())
+          for dev in vm.scratch_disks
+      ]
+  )
   tests = ' '.join(['--test=%s' % test for test in FLAGS.ch_block_tests])
   args = ' '.join(['--%s' % param for param in FLAGS.ch_params])
   outdir = vm_util.VM_TMP_DIR
-  cmd = ('{benchmark_dir}/run.sh '
-         '{target} {tests} '
-         '--output={outdir} --noreport {args} --verbose').format(
-             benchmark_dir=ch_block_storage.INSTALL_PATH,
-             target=target,
-             outdir=outdir,
-             tests=tests,
-             args=args)
+  cmd = (
+      '{benchmark_dir}/run.sh '
+      '{target} {tests} '
+      '--output={outdir} --noreport {args} --verbose'
+  ).format(
+      benchmark_dir=ch_block_storage.INSTALL_PATH,
+      target=target,
+      outdir=outdir,
+      tests=tests,
+      args=args,
+  )
   vm.RobustRemoteCommand('sudo %s' % cmd)
   results = []
   for test in FLAGS.ch_block_tests:

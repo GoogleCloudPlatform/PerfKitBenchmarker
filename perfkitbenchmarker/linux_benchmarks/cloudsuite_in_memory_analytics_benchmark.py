@@ -25,12 +25,16 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import docker
 
-flags.DEFINE_string('cloudsuite_in_memory_analytics_dataset',
-                    '/data/ml-latest-small',
-                    'Dataset to use for training.')
-flags.DEFINE_string('cloudsuite_in_memory_analytics_ratings_file',
-                    '/data/myratings.csv',
-                    'Ratings file to give the recommendation for.')
+flags.DEFINE_string(
+    'cloudsuite_in_memory_analytics_dataset',
+    '/data/ml-latest-small',
+    'Dataset to use for training.',
+)
+flags.DEFINE_string(
+    'cloudsuite_in_memory_analytics_ratings_file',
+    '/data/myratings.csv',
+    'Ratings file to give the recommendation for.',
+)
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'cloudsuite_in_memory_analytics'
@@ -60,7 +64,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   master = benchmark_spec.vm_groups['master'][0]
   workers = benchmark_spec.vm_groups['workers']
@@ -70,26 +74,35 @@ def Prepare(benchmark_spec):
       vm.Install('docker')
     vm.Install('cloudsuite/spark')
     vm.Install('cloudsuite/movielens-dataset')
-    vm.RemoteCommand('sudo docker create --name data '
-                     'cloudsuite/movielens-dataset')
+    vm.RemoteCommand(
+        'sudo docker create --name data cloudsuite/movielens-dataset'
+    )
 
   def PrepareMaster(vm):
     PrepareCommon(vm)
     vm.Install('cloudsuite/in-memory-analytics')
-    start_master_cmd = ('sudo docker run -d --net host -e SPARK_MASTER_IP=%s '
-                        '--name spark-master cloudsuite/spark master' %
-                        master.internal_ip)
+    start_master_cmd = (
+        'sudo docker run -d --net host -e SPARK_MASTER_IP=%s '
+        '--name spark-master cloudsuite/spark master'
+        % master.internal_ip
+    )
     vm.RemoteCommand(start_master_cmd)
 
   def PrepareWorker(vm):
     PrepareCommon(vm)
-    start_worker_cmd = ('sudo docker run -d --net host --volumes-from data '
-                        '--name spark-worker cloudsuite/spark worker '
-                        'spark://%s:7077' % master.internal_ip)
+    start_worker_cmd = (
+        'sudo docker run -d --net host --volumes-from data '
+        '--name spark-worker cloudsuite/spark worker '
+        'spark://%s:7077'
+        % master.internal_ip
+    )
     vm.RemoteCommand(start_worker_cmd)
 
-  target_arg_tuples = ([(PrepareWorker, [vm], {}) for vm in workers] +
-                       [(PrepareMaster, [master], {})])
+  target_arg_tuples = [(PrepareWorker, [vm], {}) for vm in workers] + [(
+      PrepareMaster,
+      [master],
+      {},
+  )]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
@@ -98,7 +111,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -106,23 +119,30 @@ def Run(benchmark_spec):
   master = benchmark_spec.vm_groups['master'][0]
   results = []
 
-  benchmark_cmd = ('sudo docker run --rm --net host --volumes-from data '
-                   'cloudsuite/in-memory-analytics %s %s '
-                   '--master spark://%s:7077' %
-                   (FLAGS.cloudsuite_in_memory_analytics_dataset,
-                    FLAGS.cloudsuite_in_memory_analytics_ratings_file,
-                    master.internal_ip))
+  benchmark_cmd = (
+      'sudo docker run --rm --net host --volumes-from data '
+      'cloudsuite/in-memory-analytics %s %s '
+      '--master spark://%s:7077'
+      % (
+          FLAGS.cloudsuite_in_memory_analytics_dataset,
+          FLAGS.cloudsuite_in_memory_analytics_ratings_file,
+          master.internal_ip,
+      )
+  )
   stdout, _ = master.RemoteCommand(benchmark_cmd)
 
   matches = re.findall(r'Benchmark execution time: (\d+)ms', stdout)
   if len(matches) != 1:
-    raise errors.Benchmarks.RunError('Expected to find benchmark execution '
-                                     'time')
+    raise errors.Benchmarks.RunError(
+        'Expected to find benchmark execution time'
+    )
 
   execution_time = matches[0]
-  results.append(sample.Sample('Benchmark execution time',
-                               float(execution_time) / 1000,
-                               'seconds'))
+  results.append(
+      sample.Sample(
+          'Benchmark execution time', float(execution_time) / 1000, 'seconds'
+      )
+  )
   return results
 
 
@@ -131,7 +151,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   master = benchmark_spec.vm_groups['master'][0]
   workers = benchmark_spec.vm_groups['workers']
@@ -149,6 +169,9 @@ def Cleanup(benchmark_spec):
     vm.RemoteCommand('sudo docker rm spark-worker')
     CleanupCommon(vm)
 
-  target_arg_tuples = ([(CleanupWorker, [vm], {}) for vm in workers] +
-                       [(CleanupMaster, [master], {})])
+  target_arg_tuples = [(CleanupWorker, [vm], {}) for vm in workers] + [(
+      CleanupMaster,
+      [master],
+      {},
+  )]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))

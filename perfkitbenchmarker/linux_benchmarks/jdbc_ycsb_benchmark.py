@@ -22,7 +22,6 @@ Before running this benchmark, you have to manually create `usertable` as
 specified in YCSB JDBC binding.
 
 Tested against Azure SQL database.
-
 """
 
 import posixpath
@@ -45,37 +44,39 @@ jdbc_ycsb:
       vm_count: 1"""
 
 YCSB_BINDING_LIB_DIR = posixpath.join(ycsb.YCSB_DIR, 'jdbc-binding', 'lib')
-CREATE_TABLE_SQL = ("CREATE TABLE usertable "
-                    "(YCSB_KEY VARCHAR(255) PRIMARY KEY, "
-                    "FIELD0 TEXT, FIELD1 TEXT, "
-                    "FIELD2 TEXT, FIELD3 TEXT, "
-                    "FIELD4 TEXT, FIELD5 TEXT, "
-                    "FIELD6 TEXT, FIELD7 TEXT, "
-                    "FIELD8 TEXT, FIELD9 TEXT);")
-DROP_TABLE_SQL = "DROP TABLE IF EXISTS usertable;"
+CREATE_TABLE_SQL = (
+    'CREATE TABLE usertable '
+    '(YCSB_KEY VARCHAR(255) PRIMARY KEY, '
+    'FIELD0 TEXT, FIELD1 TEXT, '
+    'FIELD2 TEXT, FIELD3 TEXT, '
+    'FIELD4 TEXT, FIELD5 TEXT, '
+    'FIELD6 TEXT, FIELD7 TEXT, '
+    'FIELD8 TEXT, FIELD9 TEXT);'
+)
+DROP_TABLE_SQL = 'DROP TABLE IF EXISTS usertable;'
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('jdbc_ycsb_db_driver',
-                    None,
-                    'The class of JDBC driver that connects to DB.')
-flags.DEFINE_string('jdbc_ycsb_db_url',
-                    None,
-                    'The URL that is used to connect to DB')
-flags.DEFINE_string('jdbc_ycsb_db_user',
-                    None,
-                    'The username of target DB.')
-flags.DEFINE_string('jdbc_ycsb_db_passwd',
-                    None,
-                    'The password of specified DB user.')
-flags.DEFINE_string('jdbc_ycsb_db_driver_path',
-                    None,
-                    'The path to JDBC driver jar file on local machine.')
-flags.DEFINE_integer('jdbc_ycsb_db_batch_size',
-                     0,
-                     'The batch size for doing batched insert.')
-flags.DEFINE_integer('jdbc_ycsb_fetch_size',
-                     10,
-                     'The JDBC fetch size hinted to driver')
+flags.DEFINE_string(
+    'jdbc_ycsb_db_driver', None, 'The class of JDBC driver that connects to DB.'
+)
+flags.DEFINE_string(
+    'jdbc_ycsb_db_url', None, 'The URL that is used to connect to DB'
+)
+flags.DEFINE_string('jdbc_ycsb_db_user', None, 'The username of target DB.')
+flags.DEFINE_string(
+    'jdbc_ycsb_db_passwd', None, 'The password of specified DB user.'
+)
+flags.DEFINE_string(
+    'jdbc_ycsb_db_driver_path',
+    None,
+    'The path to JDBC driver jar file on local machine.',
+)
+flags.DEFINE_integer(
+    'jdbc_ycsb_db_batch_size', 0, 'The batch size for doing batched insert.'
+)
+flags.DEFINE_integer(
+    'jdbc_ycsb_fetch_size', 10, 'The JDBC fetch size hinted to driver'
+)
 
 
 def GetConfig(user_config):
@@ -115,17 +116,17 @@ def Prepare(benchmark_spec):
 
 def ExecuteSql(vm, sql):
   db_args = (
-      ' -p db.driver={0}'
-      ' -p db.url="{1}"'
-      ' -p db.user={2}'
-      ' -p db.passwd={3}').format(
+      ' -p db.driver={0} -p db.url="{1}" -p db.user={2} -p db.passwd={3}'
+  ).format(
       FLAGS.jdbc_ycsb_db_driver,
       FLAGS.jdbc_ycsb_db_url,
       FLAGS.jdbc_ycsb_db_user,
-      FLAGS.jdbc_ycsb_db_passwd)
+      FLAGS.jdbc_ycsb_db_passwd,
+  )
 
-  exec_cmd = 'java -cp "{0}/*" com.yahoo.ycsb.db.JdbcDBCli -c "{1}" ' \
-      .format(YCSB_BINDING_LIB_DIR, sql)
+  exec_cmd = 'java -cp "{0}/*" com.yahoo.ycsb.db.JdbcDBCli -c "{1}" '.format(
+      YCSB_BINDING_LIB_DIR, sql
+  )
   stdout, stderr = vm.RobustRemoteCommand(exec_cmd + db_args)
 
   if 'successfully executed' not in stdout and not stderr:
@@ -146,8 +147,11 @@ def Run(benchmark_spec):
   load_kwargs = run_kwargs.copy()
   if FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = FLAGS['ycsb_preload_threads']
-  samples = list(benchmark_spec.executor.LoadAndRun(
-      vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs))
+  samples = list(
+      benchmark_spec.executor.LoadAndRun(
+          vms, load_kwargs=load_kwargs, run_kwargs=run_kwargs
+      )
+  )
   return samples
 
 

@@ -40,7 +40,8 @@ BENCHMARK_ZERO_PADDING = 12
 
 REQUIRED_SCOPES = (
     'https://www.googleapis.com/auth/spanner.admin',
-    'https://www.googleapis.com/auth/spanner.data')
+    'https://www.googleapis.com/auth/spanner.data',
+)
 
 BENCHMARK_CONFIG = f"""
 cloud_spanner_ycsb:
@@ -63,17 +64,22 @@ cloud_spanner_ycsb:
       {' '.join(REQUIRED_SCOPES)}"""
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('cloud_spanner_ycsb_batchinserts',
-                     1,
-                     'The Cloud Spanner batch inserts used in the YCSB '
-                     'benchmark.')
-flags.DEFINE_integer('cloud_spanner_ycsb_boundedstaleness',
-                     0,
-                     'The Cloud Spanner bounded staleness used in the YCSB '
-                     'benchmark.')
-flags.DEFINE_enum('cloud_spanner_ycsb_readmode',
-                  'query', ['query', 'read'],
-                  'The Cloud Spanner read mode used in the YCSB benchmark.')
+flags.DEFINE_integer(
+    'cloud_spanner_ycsb_batchinserts',
+    1,
+    'The Cloud Spanner batch inserts used in the YCSB benchmark.',
+)
+flags.DEFINE_integer(
+    'cloud_spanner_ycsb_boundedstaleness',
+    0,
+    'The Cloud Spanner bounded staleness used in the YCSB benchmark.',
+)
+flags.DEFINE_enum(
+    'cloud_spanner_ycsb_readmode',
+    'query',
+    ['query', 'read'],
+    'The Cloud Spanner read mode used in the YCSB benchmark.',
+)
 flags.DEFINE_list(
     'cloud_spanner_ycsb_custom_vm_install_commands',
     [],
@@ -86,7 +92,8 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
     config['relational_db']['vm_groups']['default'][
-        'vm_count'] = FLAGS.ycsb_client_vms
+        'vm_count'
+    ] = FLAGS.ycsb_client_vms
   return config
 
 
@@ -111,7 +118,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   benchmark_spec.always_call_cleanup = True
 
@@ -126,10 +133,12 @@ def Prepare(benchmark_spec):
   spanner.CreateTables(_BuildSchema())
 
 
-def _LoadDatabase(executor: ycsb.YCSBExecutor,
-                  spanner: gcp_spanner.GcpSpannerInstance,
-                  vms: list[virtual_machine.VirtualMachine],
-                  load_kwargs: dict[str, Any]) -> list[sample.Sample]:
+def _LoadDatabase(
+    executor: ycsb.YCSBExecutor,
+    spanner: gcp_spanner.GcpSpannerInstance,
+    vms: list[virtual_machine.VirtualMachine],
+    load_kwargs: dict[str, Any],
+) -> list[sample.Sample]:
   """Loads the database with the specified infrastructure capacity."""
   if spanner.restored or ycsb.SKIP_LOAD_STAGE.value:
     return []
@@ -144,7 +153,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample instances.
@@ -159,8 +168,9 @@ def Run(benchmark_spec):
       'cloudspanner.instance': spanner.instance_id,
       'cloudspanner.database': spanner.database,
       'cloudspanner.readmode': FLAGS.cloud_spanner_ycsb_readmode,
-      'cloudspanner.boundedstaleness':
-          FLAGS.cloud_spanner_ycsb_boundedstaleness,
+      'cloudspanner.boundedstaleness': (
+          FLAGS.cloud_spanner_ycsb_boundedstaleness
+      ),
       'cloudspanner.batchinserts': FLAGS.cloud_spanner_ycsb_batchinserts,
   }
   # Uses overridden cloud spanner endpoint in gcloud configuration
@@ -189,7 +199,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   del benchmark_spec
 

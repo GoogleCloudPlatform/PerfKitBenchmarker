@@ -72,28 +72,39 @@ dpb_terasort_benchmark:
 _FS_TYPE_EPHEMERAL = 'ephemeral'
 _FS_TYPE_PERSISTENT = 'persistent'
 
-flags.DEFINE_enum('dpb_terasort_storage_type', _FS_TYPE_PERSISTENT,
-                  [_FS_TYPE_EPHEMERAL, _FS_TYPE_PERSISTENT],
-                  'The type of storage for executing the Terasort benchmark')
-flags.DEFINE_integer('dpb_terasort_num_records', 10000,
-                     'Number of 100-byte rows to generate.')
-flags.DEFINE_bool(
-    'dpb_terasort_pre_cleanup', False,
-    'Cleanup the terasort directories on the specified filesystem.')
+flags.DEFINE_enum(
+    'dpb_terasort_storage_type',
+    _FS_TYPE_PERSISTENT,
+    [_FS_TYPE_EPHEMERAL, _FS_TYPE_PERSISTENT],
+    'The type of storage for executing the Terasort benchmark',
+)
 flags.DEFINE_integer(
-    'dpb_terasort_block_size_mb', None,
+    'dpb_terasort_num_records', 10000, 'Number of 100-byte rows to generate.'
+)
+flags.DEFINE_bool(
+    'dpb_terasort_pre_cleanup',
+    False,
+    'Cleanup the terasort directories on the specified filesystem.',
+)
+flags.DEFINE_integer(
+    'dpb_terasort_block_size_mb',
+    None,
     'Virtual blocksize to use on the persistent file system. This controls '
     'the parallelism of the map stages of terasort and teravalidated. Defaults '
-    'to cluster defined defaults. Does not support HDFS.')
+    'to cluster defined defaults. Does not support HDFS.',
+)
 
 FLAGS = flags.FLAGS
 
 SUPPORTED_DPB_BACKENDS = [
-    dpb_constants.DATAPROC, dpb_constants.EMR,
-    dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER
+    dpb_constants.DATAPROC,
+    dpb_constants.EMR,
+    dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER,
 ]
 TERASORT_JAR = 'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar'
-UNMANAGED_TERASORT_JAR = '/opt/pkb/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-*.jar'
+UNMANAGED_TERASORT_JAR = (
+    '/opt/pkb/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-*.jar'
+)
 
 
 def GetConfig(user_config):
@@ -114,10 +125,14 @@ def CheckPrerequisites(benchmark_config):
   if dpb_service_type not in SUPPORTED_DPB_BACKENDS:
     raise errors.Config.InvalidValue(
         'Invalid backend {} for terasort. Not in:{}'.format(
-            dpb_service_type, str(SUPPORTED_DPB_BACKENDS)))
+            dpb_service_type, str(SUPPORTED_DPB_BACKENDS)
+        )
+    )
 
-  if (FLAGS.dpb_terasort_block_size_mb and
-      FLAGS.dpb_terasort_storage_type != _FS_TYPE_PERSISTENT):
+  if (
+      FLAGS.dpb_terasort_block_size_mb
+      and FLAGS.dpb_terasort_storage_type != _FS_TYPE_PERSISTENT
+  ):
     raise errors.Config.InvalidValue('You cannot set HDFS block size.')
 
 
@@ -161,51 +176,62 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
   results = []
   # May not exist for preprovisioned cluster.
   if service.resource_ready_time and service.create_start_time:
-
-    logging.info('Resource create_start_time %s ',
-                 str(service.create_start_time))
-    logging.info('Resource resource_ready_time %s ',
-                 str(service.resource_ready_time))
+    logging.info(
+        'Resource create_start_time %s ', str(service.create_start_time)
+    )
+    logging.info(
+        'Resource resource_ready_time %s ', str(service.resource_ready_time)
+    )
     create_time = service.GetClusterCreateTime()
     logging.info('Resource create_time %s ', str(create_time))
 
     if create_time is not None:
       results.append(
-          sample.Sample('dpb_cluster_create_time', create_time, 'seconds',
-                        metadata.copy()))
+          sample.Sample(
+              'dpb_cluster_create_time', create_time, 'seconds', metadata.copy()
+          )
+      )
 
   metadata.update({'base_dir': base_dir})
   metadata.update(
-      {'dpb_terasort_storage_type': FLAGS.dpb_terasort_storage_type})
+      {'dpb_terasort_storage_type': FLAGS.dpb_terasort_storage_type}
+  )
   metadata.update({'terasort_num_record': FLAGS.dpb_terasort_num_records})
   storage_in_gb = (FLAGS.dpb_terasort_num_records * 100) // (1000 * 1000 * 1000)
   metadata.update({'terasort_dataset_size_in_GB': storage_in_gb})
   if FLAGS.dpb_terasort_block_size_mb:
     # TODO(pclay): calculate default blocksize using configuration class?
     metadata.update(
-        {'terasort_block_size_mb': FLAGS.dpb_terasort_block_size_mb})
+        {'terasort_block_size_mb': FLAGS.dpb_terasort_block_size_mb}
+    )
   service.metadata.update(metadata)
 
   unsorted_dir = base_dir + 'unsorted'
   sorted_dir = base_dir + 'sorted'
   report_dir = base_dir + 'report'
-  stages = [('teragen', [str(FLAGS.dpb_terasort_num_records), unsorted_dir]),
-            ('terasort', [unsorted_dir, sorted_dir]),
-            ('teravalidate', [sorted_dir, report_dir])]
+  stages = [
+      ('teragen', [str(FLAGS.dpb_terasort_num_records), unsorted_dir]),
+      ('terasort', [unsorted_dir, sorted_dir]),
+      ('teravalidate', [sorted_dir, report_dir]),
+  ]
   cumulative_runtime = 0
-  for (stage, args) in stages:
+  for stage, args in stages:
     result = RunStage(spec, stage, args)
     logging.info(result)
     results.append(
-        sample.Sample(stage + '_run_time', result.run_time, 'seconds',
-                      metadata))
+        sample.Sample(stage + '_run_time', result.run_time, 'seconds', metadata)
+    )
     results.append(
-        sample.Sample(stage + '_wall_time', result.wall_time, 'seconds',
-                      metadata))
+        sample.Sample(
+            stage + '_wall_time', result.wall_time, 'seconds', metadata
+        )
+    )
     cumulative_runtime += result.run_time
   results.append(
-      sample.Sample('cumulative_runtime', cumulative_runtime, 'seconds',
-                    metadata))
+      sample.Sample(
+          'cumulative_runtime', cumulative_runtime, 'seconds', metadata
+      )
+  )
   return results
 
 
@@ -214,8 +240,9 @@ def Cleanup(spec: benchmark_spec.BenchmarkSpec):
   del spec  # unused
 
 
-def RunStage(spec: benchmark_spec.BenchmarkSpec, stage: str,
-             stage_args: List[str]) -> dpb_service.JobResult:
+def RunStage(
+    spec: benchmark_spec.BenchmarkSpec, stage: str, stage_args: List[str]
+) -> dpb_service.JobResult:
   """Runs one of the 3 job stages of Terasort.
 
   Args:
@@ -237,8 +264,12 @@ def RunStage(spec: benchmark_spec.BenchmarkSpec, stage: str,
   args = [stage]
   if FLAGS.dpb_terasort_block_size_mb:
     scheme = service.PERSISTENT_FS_PREFIX.strip(':/')
-    args.append('-Dfs.{}.block.size={}'.format(
-        scheme, FLAGS.dpb_terasort_block_size_mb * 1024 * 1024))
+    args.append(
+        '-Dfs.{}.block.size={}'.format(
+            scheme, FLAGS.dpb_terasort_block_size_mb * 1024 * 1024
+        )
+    )
   args += stage_args
   return service.SubmitJob(
-      jarfile=jar, job_arguments=args, job_type=dpb_constants.HADOOP_JOB_TYPE)
+      jarfile=jar, job_arguments=args, job_type=dpb_constants.HADOOP_JOB_TYPE
+  )

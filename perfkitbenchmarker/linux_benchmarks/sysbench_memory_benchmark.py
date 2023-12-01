@@ -22,7 +22,6 @@ import io
 import re
 from typing import Any, Dict, List, Tuple
 import numpy as np
-
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -61,9 +60,9 @@ def _ParseSysbenchMemoryOutput(sysbench_memory_output: str) -> List[float]:
 
   Args:
     sysbench_memory_output: The output from sysbench.
+
   Returns:
     An array, the tps numbers.
-
   """
   tps_numbers = []
 
@@ -79,16 +78,17 @@ def _ParseSysbenchMemoryOutput(sysbench_memory_output: str) -> List[float]:
 
 
 def _AddMetricsFromTPSNumbers(
-    tps_numbers: List[float]) -> List[Tuple[str, float, str]]:
+    tps_numbers: List[float],
+) -> List[Tuple[str, float, str]]:
   """Computes relevant metrics from tps_numbers.
 
   Specifically, we are interested in min/max/mean/(median-min)/(max-min).
 
   Args:
     tps_numbers: TPS numbers for each vCPU.
+
   Returns:
     An array, the tps metrics.
-
   """
 
   tps_min = np.min(tps_numbers)
@@ -100,8 +100,8 @@ def _AddMetricsFromTPSNumbers(
 
   total = np.sum(tps_numbers)
   size = len(tps_numbers)
-  all_max_diff = np.round((tps_max*size) - total, 2)
-  all_median_diff = np.round((tps_median*size) - total, 2)
+  all_max_diff = np.round((tps_max * size) - total, 2)
+  all_median_diff = np.round((tps_median * size) - total, 2)
 
   metrics = []
   tps_unit = 'MiB/sec'
@@ -117,8 +117,8 @@ def _AddMetricsFromTPSNumbers(
 
 
 def GenerateMetricsForSysbenchMemoryOutput(
-    sysbench_memory_output: str, metadata: Dict[str,
-                                                Any]) -> List[sample.Sample]:
+    sysbench_memory_output: str, metadata: Dict[str, Any]
+) -> List[sample.Sample]:
   """Generates results, an array of samples from sysbench_memory output.
 
   Obtains TPS metrics from _ParseSysbenchMemoryOutput and generates samples.
@@ -155,9 +155,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 
   vm = benchmark_spec.vms[0]
   num_cpus = vm.NumCpusForBenchmark()
-  stdout, _ = vm.RemoteCommand(f'for CPU in `seq 0 {num_cpus-1}`; do echo -n '
-                               '"CPU $CPU "; taskset --cpu-list $CPU sysbench '
-                               'memory run; done')
+  stdout, _ = vm.RemoteCommand(
+      f'for CPU in `seq 0 {num_cpus-1}`; do echo -n '
+      '"CPU $CPU "; taskset --cpu-list $CPU sysbench '
+      'memory run; done'
+  )
 
   return GenerateMetricsForSysbenchMemoryOutput(stdout, metadata)
 

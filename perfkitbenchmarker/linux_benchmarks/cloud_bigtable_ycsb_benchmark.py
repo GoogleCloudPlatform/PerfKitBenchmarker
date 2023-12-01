@@ -48,15 +48,20 @@ from perfkitbenchmarker.providers.gcp import gcp_bigtable
 FLAGS = flags.FLAGS
 
 _STATIC_TABLE_NAME = flags.DEFINE_string(
-    'google_bigtable_static_table_name', None,
+    'google_bigtable_static_table_name',
+    None,
     'Bigtable table name. If not specified, a temporary table '
-    'will be created and deleted on the fly.')
+    'will be created and deleted on the fly.',
+)
 _DELETE_STATIC_TABLE = flags.DEFINE_boolean(
-    'google_bigtable_delete_static_table', False,
+    'google_bigtable_delete_static_table',
+    False,
     'Whether or not to delete a static table during cleanup. Temporary tables '
-    'are always cleaned up.')
+    'are always cleaned up.',
+)
 _GET_CPU_UTILIZATION = flags.DEFINE_boolean(
-    'get_bigtable_cluster_cpu_utilization', False,
+    'get_bigtable_cluster_cpu_utilization',
+    False,
     'If true, will gather bigtable cluster cpu utilization '
     'for the duration of performance test run stage, and add '
     'samples to the result. Table loading phase is excluded '
@@ -64,26 +69,37 @@ _GET_CPU_UTILIZATION = flags.DEFINE_boolean(
     'need to set environment variable '
     'GOOGLE_APPLICATION_CREDENTIALS as described in '
     'https://cloud.google.com/docs/authentication/'
-    'getting-started.')
+    'getting-started.',
+)
 _MONITORING_ADDRESS = flags.DEFINE_string(
-    'google_monitoring_endpoint', 'monitoring.googleapis.com',
+    'google_monitoring_endpoint',
+    'monitoring.googleapis.com',
     'Google API endpoint for monitoring requests. Used when '
-    '--get_bigtable_cluster_cpu_utilization is enabled.')
+    '--get_bigtable_cluster_cpu_utilization is enabled.',
+)
 _USE_JAVA_VENEER_CLIENT = flags.DEFINE_boolean(
-    'google_bigtable_use_java_veneer_client', False,
-    'If true, will use the googlebigtableclient with ycsb.')
+    'google_bigtable_use_java_veneer_client',
+    False,
+    'If true, will use the googlebigtableclient with ycsb.',
+)
 _ENABLE_TRAFFIC_DIRECTOR = flags.DEFINE_boolean(
-    'google_bigtable_enable_traffic_director', False,
+    'google_bigtable_enable_traffic_director',
+    False,
     'If true, will use the googlebigtable'
-    'client with ycsb to enable traffic through traffic director.')
+    'client with ycsb to enable traffic through traffic director.',
+)
 _ENABLE_RLS_ROUTING = flags.DEFINE_boolean(
-    'google_bigtable_enable_rls_routing', False,
+    'google_bigtable_enable_rls_routing',
+    False,
     'If true, will use the googlebigtableclient with ycsb to enable traffic'
-    'through RLS with direct path')
+    'through RLS with direct path',
+)
 _ENABLE_EXPERIMENTAL_LB_POLICY = flags.DEFINE_boolean(
-    'google_bigtable_enable_experimental_lb_policy', False,
+    'google_bigtable_enable_experimental_lb_policy',
+    False,
     'If true, will use the googlebigtableclient with ycsb to enable beta LB'
-    'policy.')
+    'policy.',
+)
 _CHANNEL_COUNT = flags.DEFINE_integer(
     'google_bigtable_channel_count',
     None,
@@ -116,7 +132,9 @@ cloud_bigtable_ycsb:
 METRICS_CORE_JAR = 'metrics-core-3.1.2.jar'
 DROPWIZARD_METRICS_CORE_URL = posixpath.join(
     'https://search.maven.org/remotecontent?filepath='
-    'io/dropwizard/metrics/metrics-core/3.1.2/', METRICS_CORE_JAR)
+    'io/dropwizard/metrics/metrics-core/3.1.2/',
+    METRICS_CORE_JAR,
+)
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
 
@@ -129,8 +147,9 @@ REQUIRED_SCOPES = (
 # TODO(user): Make table parameters configurable.
 COLUMN_FAMILY = 'cf'
 BENCHMARK_DATA = {
-    METRICS_CORE_JAR:
-        '245ba2a66a9bc710ce4db14711126e77bcb4e6d96ef7e622659280f3c90cbb5c',
+    METRICS_CORE_JAR: (
+        '245ba2a66a9bc710ce4db14711126e77bcb4e6d96ef7e622659280f3c90cbb5c'
+    ),
 }
 BENCHMARK_DATA_URL = {
     METRICS_CORE_JAR: DROPWIZARD_METRICS_CORE_URL,
@@ -255,22 +274,24 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
 
 
 @vm_util.Retry()
-def _GetCpuUtilizationSample(samples: List[sample.Sample],
-                             instance_id: str) -> List[sample.Sample]:
+def _GetCpuUtilizationSample(
+    samples: List[sample.Sample], instance_id: str
+) -> List[sample.Sample]:
   """Gets a list of cpu utilization samples - one per cluster per workload.
 
   Note that the utilization only covers the workload run stage.
 
   Args:
     samples: list of sample.Sample. Used to find the timestamp information to
-             determine the time windows for the cpu metrics.
+      determine the time windows for the cpu metrics.
     instance_id: the bigtable instance id.
 
   Returns:
     a list of samples for metrics "cpu_load" and "cpu_load_hottest_node",
   """
   runtime_samples = [
-      s for s in samples
+      s
+      for s in samples
       if s.metadata.get('stage') == 'run' and s.metric == 'overall RunTime'
   ]
 
@@ -281,18 +302,23 @@ def _GetCpuUtilizationSample(samples: List[sample.Sample],
 
   client = monitoring_v3.MetricServiceClient(
       transport=metric_service_grpc_transport.MetricServiceGrpcTransport(
-          address=_MONITORING_ADDRESS.value))
+          address=_MONITORING_ADDRESS.value
+      )
+  )
 
   cpu_samples = []
   time_units_in_secs = {'s': 1, 'ms': 0.001, 'us': 0.000001}
   for runtime_sample in runtime_samples:
     if runtime_sample.unit not in time_units_in_secs:
-      logging.warning('The unit of overall RunTime is not supported: %s',
-                      runtime_sample.unit)
+      logging.warning(
+          'The unit of overall RunTime is not supported: %s',
+          runtime_sample.unit,
+      )
       continue
 
     duration_sec = runtime_sample.value * time_units_in_secs.get(
-        runtime_sample.unit)
+        runtime_sample.unit
+    )
     workload_duration_minutes = max(1, int(duration_sec / 60))
 
     # workload_index helps associate the cpu metrics with the current run stage.
@@ -303,22 +329,26 @@ def _GetCpuUtilizationSample(samples: List[sample.Sample],
     end_timestamp = runtime_sample.timestamp
     for metric in ['cpu_load', 'cpu_load_hottest_node']:
       cpu_query = query.Query(
-          client, project=(FLAGS.project or _GetDefaultProject()),
+          client,
+          project=(FLAGS.project or _GetDefaultProject()),
           metric_type=f'bigtable.googleapis.com/cluster/{metric}',
           end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
-          minutes=workload_duration_minutes)
+          minutes=workload_duration_minutes,
+      )
       cpu_query = cpu_query.select_resources(instance=instance_id)
       time_series = list(cpu_query)
       if not time_series:
         logging.debug(
-            'Time series for computing %s could not be found.', metric)
+            'Time series for computing %s could not be found.', metric
+        )
         continue
 
       # Build and add the cpu samples from the query results.
       for cluster_number, cluster_time_series in enumerate(time_series):
         utilization = [
             round(point.value.double_value, 3)
-            for point in cluster_time_series.points]
+            for point in cluster_time_series.points
+        ]
 
         average_utilization = round(sum(utilization) / len(utilization), 3)
         metadata = {
@@ -329,7 +359,8 @@ def _GetCpuUtilizationSample(samples: List[sample.Sample],
         }
 
         cpu_utilization_sample = sample.Sample(
-            f'{metric}_array', -1, '', metadata)
+            f'{metric}_array', -1, '', metadata
+        )
 
         cpu_samples.append(cpu_utilization_sample)
   return cpu_samples
@@ -340,7 +371,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   benchmark_spec.always_call_cleanup = True
   vms = benchmark_spec.vms
@@ -353,7 +384,8 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
 
 def _GetYcsbExecutor(
-    vms: list[virtual_machine.VirtualMachine]) -> ycsb.YCSBExecutor:
+    vms: list[virtual_machine.VirtualMachine],
+) -> ycsb.YCSBExecutor:
   """Gets the YCSB executor class for loading and running the benchmark."""
   ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
   jvm_args = pipes.quote(f' -Xmx{ycsb_memory}m')
@@ -366,14 +398,17 @@ def _GetYcsbExecutor(
   executor_flags = {
       'cp': hbase.HBASE_CONF_DIR,
       'jvm-args': jvm_args,
-      'table': _GetTableName()}
+      'table': _GetTableName(),
+  }
   return ycsb.YCSBExecutor(FLAGS.hbase_binding, **executor_flags)
 
 
-def _LoadDatabase(executor: ycsb.YCSBExecutor,
-                  bigtable: gcp_bigtable.GcpBigtableInstance,
-                  vms: list[virtual_machine.VirtualMachine],
-                  load_kwargs: dict[str, Any]) -> list[sample.Sample]:
+def _LoadDatabase(
+    executor: ycsb.YCSBExecutor,
+    bigtable: gcp_bigtable.GcpBigtableInstance,
+    vms: list[virtual_machine.VirtualMachine],
+    load_kwargs: dict[str, Any],
+) -> list[sample.Sample]:
   """Loads the database with the specified infrastructure capacity."""
   if bigtable.restored or ycsb.SKIP_LOAD_STAGE.value:
     return []
@@ -388,7 +423,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
+
   Returns:
     A list of sample.Sample instances.
   """
@@ -444,6 +480,7 @@ def _GenerateRunKwargs(instance: _Bigtable) -> Dict[str, str]:
 
   Args:
     instance: The instance the test will be run against.
+
   Returns:
     Run arguments for YCSB.
   """
@@ -464,6 +501,7 @@ def _GenerateLoadKwargs(instance: _Bigtable) -> Dict[str, str]:
 
   Args:
     instance: The instance the test will be run against.
+
   Returns:
     Load arguments for YCSB.
   """
@@ -545,10 +583,11 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   instance: _Bigtable = benchmark_spec.non_relational_db
-  if (instance.user_managed and
-      (_STATIC_TABLE_NAME.value is None or _DELETE_STATIC_TABLE.value)):
+  if instance.user_managed and (
+      _STATIC_TABLE_NAME.value is None or _DELETE_STATIC_TABLE.value
+  ):
     # Only need to drop the temporary tables if we're not deleting the instance.
     _CleanupTable(benchmark_spec)

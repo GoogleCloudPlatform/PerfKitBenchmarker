@@ -58,8 +58,11 @@ def Prepare(unused_benchmark_spec):
 
 
 def _GetVmOperationDataSamples(
-    operation_times: List[int], cluster_time: int, operation: str,
-    vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
+    operation_times: List[int],
+    cluster_time: int,
+    operation: str,
+    vms: List[virtual_machine.BaseVirtualMachine],
+) -> List[sample.Sample]:
   """Append samples from given data.
 
   Args:
@@ -77,23 +80,27 @@ def _GetVmOperationDataSamples(
     metadata = {
         'machine_instance': i,
         'num_vms': len(vms),
-        'os_type': vm.OS_TYPE
+        'os_type': vm.OS_TYPE,
     }
     metadata_list.append(metadata)
 
   for operation_time, metadata in zip(operation_times, metadata_list):
     samples.append(
-        sample.Sample(f'{operation} Time', operation_time, 'seconds', metadata))
+        sample.Sample(f'{operation} Time', operation_time, 'seconds', metadata)
+    )
   os_types = set([vm.OS_TYPE for vm in vms])
   metadata = {'num_vms': len(vms), 'os_type': ','.join(sorted(os_types))}
   samples.append(
-      sample.Sample(f'Cluster {operation} Time', cluster_time, 'seconds',
-                    metadata))
+      sample.Sample(
+          f'Cluster {operation} Time', cluster_time, 'seconds', metadata
+      )
+  )
   return samples
 
 
 def GetTimeToSuspend(
-    vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
+    vms: List[virtual_machine.BaseVirtualMachine],
+) -> List[sample.Sample]:
   """Creates Samples for the suspend time of a list of vms.
 
   The suspend time is the duration form when the VM is suspended to when the VM
@@ -118,12 +125,14 @@ def GetTimeToSuspend(
   cluster_suspend_time = time.time() - before_suspend_timestamp
 
   # get samples for the cluster of vms
-  return _GetVmOperationDataSamples(suspend_durations, cluster_suspend_time,
-                                    'Suspend', vms)
+  return _GetVmOperationDataSamples(
+      suspend_durations, cluster_suspend_time, 'Suspend', vms
+  )
 
 
 def GetTimeToResume(
-    vms: List[virtual_machine.BaseVirtualMachine]) -> List[sample.Sample]:
+    vms: List[virtual_machine.BaseVirtualMachine],
+) -> List[sample.Sample]:
   """Measures the time it takes to resume a cluster of vms that were suspended.
 
   Args:
@@ -146,8 +155,9 @@ def GetTimeToResume(
   cluster_resume_time = time.time() - before_resume_timestamp
 
   # get samples for the cluster of vms
-  return _GetVmOperationDataSamples(resume_durations, cluster_resume_time,
-                                    'Resume', vms)
+  return _GetVmOperationDataSamples(
+      resume_durations, cluster_resume_time, 'Resume', vms
+  )
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:

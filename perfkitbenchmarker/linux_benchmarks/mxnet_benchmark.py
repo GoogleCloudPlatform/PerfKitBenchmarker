@@ -55,48 +55,66 @@ mxnet:
 GPU = 'gpu'
 CPU = 'cpu'
 
-MODELS = ['alexnet', 'googlenet', 'inception-bn', 'inception-resnet-v2',
-          'inception-v3', 'inception-v4', 'lenet', 'mlp', 'mobilenet',
-          'resnet-v1', 'resnet', 'resnext', 'vgg']
-flags.DEFINE_list('mx_models', ['inception-v3', 'vgg', 'alexnet', 'resnet'],
-                  'The network to train')
-flags.register_validator('mx_models',
-                         lambda models: models and set(models).issubset(MODELS),
-                         'Invalid models list. mx_models must be a subset of '
-                         + ', '.join(MODELS))
+MODELS = [
+    'alexnet',
+    'googlenet',
+    'inception-bn',
+    'inception-resnet-v2',
+    'inception-v3',
+    'inception-v4',
+    'lenet',
+    'mlp',
+    'mobilenet',
+    'resnet-v1',
+    'resnet',
+    'resnext',
+    'vgg',
+]
+flags.DEFINE_list(
+    'mx_models',
+    ['inception-v3', 'vgg', 'alexnet', 'resnet'],
+    'The network to train',
+)
+flags.register_validator(
+    'mx_models',
+    lambda models: models and set(models).issubset(MODELS),
+    'Invalid models list. mx_models must be a subset of ' + ', '.join(MODELS),
+)
 flags.DEFINE_integer('mx_batch_size', None, 'The batch size for SGD training.')
-flags.DEFINE_integer('mx_num_epochs', 80,
-                     'The maximal number of epochs to train.')
-flags.DEFINE_enum('mx_device', GPU, [CPU, GPU],
-                  'Device to use for computation: cpu or gpu')
-flags.DEFINE_integer('mx_num_layers', None, 'Number of layers in the neural '
-                     'network, required by some networks such as resnet')
-flags.DEFINE_enum('mx_precision', 'float32', ['float16', 'float32'],
-                  'Precision')
-flags.DEFINE_enum('mx_key_value_store', 'device',
-                  ['local', 'device', 'nccl', 'dist_sync', 'dist_device_sync',
-                   'dist_async'], 'Key-Value store types.')
-flags.DEFINE_string('mx_image_shape', None,
-                    'The image shape that feeds into the network.')
+flags.DEFINE_integer(
+    'mx_num_epochs', 80, 'The maximal number of epochs to train.'
+)
+flags.DEFINE_enum(
+    'mx_device', GPU, [CPU, GPU], 'Device to use for computation: cpu or gpu'
+)
+flags.DEFINE_integer(
+    'mx_num_layers',
+    None,
+    'Number of layers in the neural '
+    'network, required by some networks such as resnet',
+)
+flags.DEFINE_enum(
+    'mx_precision', 'float32', ['float16', 'float32'], 'Precision'
+)
+flags.DEFINE_enum(
+    'mx_key_value_store',
+    'device',
+    ['local', 'device', 'nccl', 'dist_sync', 'dist_device_sync', 'dist_async'],
+    'Key-Value store types.',
+)
+flags.DEFINE_string(
+    'mx_image_shape', None, 'The image shape that feeds into the network.'
+)
 
 DEFAULT_BATCH_SIZE = 64
 DEFAULT = 'default'
 DEFAULT_BATCH_SIZES_BY_MODEL = {
-    'vgg': {
-        16: 32
-    },
-    'alexnet': {
-        DEFAULT: 512
-    },
-    'resnet': {
-        152: 32
-    }
+    'vgg': {16: 32},
+    'alexnet': {DEFAULT: 512},
+    'resnet': {152: 32},
 }
 
-DEFAULT_NUM_LAYERS_BY_MODEL = {
-    'vgg': 16,
-    'resnet': 50
-}
+DEFAULT_NUM_LAYERS_BY_MODEL = {'vgg': 16, 'resnet': 50}
 
 INCEPTION3_IMAGE_SHAPE = '3,299,299'
 MNIST_IMAGE_SHAPE = '1,28,28'
@@ -114,7 +132,7 @@ DEFAULT_IMAGE_SHAPE_BY_MODEL = {
     'resnet': IMAGENET_IMAGE_SHAPE,
     'resnext': IMAGENET_IMAGE_SHAPE,
     'vgg': IMAGENET_IMAGE_SHAPE,
-    'lenet': MNIST_IMAGE_SHAPE
+    'lenet': MNIST_IMAGE_SHAPE,
 }
 
 
@@ -135,8 +153,9 @@ def GetConfig(user_config):
 
 
 def _GetDefaultBatchSize(model, num_layers=None):
-  return DEFAULT_BATCH_SIZES_BY_MODEL.get(model, {}).get(num_layers or DEFAULT,
-                                                         DEFAULT_BATCH_SIZE)
+  return DEFAULT_BATCH_SIZES_BY_MODEL.get(model, {}).get(
+      num_layers or DEFAULT, DEFAULT_BATCH_SIZE
+  )
 
 
 def _GetBatchSize(model, num_layers=None):
@@ -207,7 +226,7 @@ def _CreateMetadataDict(benchmark_spec):
       'precision': benchmark_spec.precision,
       'key_value_store': benchmark_spec.key_value_store,
       'image_shape': benchmark_spec.image_shape,
-      'commit': mxnet_cnn.GetCommit(vm)
+      'commit': mxnet_cnn.GetCommit(vm),
   }
   if benchmark_spec.device == GPU:
     metadata.update(cuda_toolkit.GetMetadata(vm))
@@ -249,8 +268,9 @@ def _MakeSamplesFromOutput(benchmark_spec, output):
   """
   metadata = _CreateMetadataDict(benchmark_spec)
   mx_throughput = _ExtractThroughput(output)
-  return sample.Sample('Training synthetic data', mx_throughput,
-                       'samples/sec', metadata)
+  return sample.Sample(
+      'Training synthetic data', mx_throughput, 'samples/sec', metadata
+  )
 
 
 def Run(benchmark_spec):
@@ -282,30 +302,32 @@ def Run(benchmark_spec):
         '--image-shape={image_shape} '
         '--num-epochs={num_epochs} '
         '--dtype={precision} '
-        '--kv-store={key_value_store}').format(
-            network=model,
-            batch_size=batch_size,
-            image_shape=benchmark_spec.image_shape,
-            num_epochs=benchmark_spec.num_epochs,
-            precision=benchmark_spec.precision,
-            key_value_store=benchmark_spec.key_value_store)
+        '--kv-store={key_value_store}'
+    ).format(
+        network=model,
+        batch_size=batch_size,
+        image_shape=benchmark_spec.image_shape,
+        num_epochs=benchmark_spec.num_epochs,
+        precision=benchmark_spec.precision,
+        key_value_store=benchmark_spec.key_value_store,
+    )
     if benchmark_spec.device == GPU:
       num_gpus = nvidia_driver.QueryNumberOfGpus(vm)
       mx_benchmark_cmd = '{env} {cmd} --gpus {gpus}'.format(
           env=mxnet.GetEnvironmentVars(vm),
           cmd=mx_benchmark_cmd,
-          gpus=','.join(str(n) for n in range(num_gpus)))
+          gpus=','.join(str(n) for n in range(num_gpus)),
+      )
     elif benchmark_spec.device == CPU:
       # Specifies the number of threads to use in CPU test.
       # https://mxnet.incubator.apache.org/faq/perf.html
       mx_benchmark_cmd = 'OMP_NUM_THREADS={omp_num_threads} {cmd}'.format(
-          omp_num_threads=vm.NumCpusForBenchmark() // 2,
-          cmd=mx_benchmark_cmd)
+          omp_num_threads=vm.NumCpusForBenchmark() // 2, cmd=mx_benchmark_cmd
+      )
 
     if num_layers:
       mx_benchmark_cmd = '%s --num-layers %s' % (mx_benchmark_cmd, num_layers)
-    run_command = 'cd %s && %s' % (mx_benchmark_dir,
-                                   mx_benchmark_cmd)
+    run_command = 'cd %s && %s' % (mx_benchmark_dir, mx_benchmark_cmd)
     stdout, stderr = vm.RobustRemoteCommand(run_command)
 
     results.append(_MakeSamplesFromOutput(benchmark_spec, stdout or stderr))

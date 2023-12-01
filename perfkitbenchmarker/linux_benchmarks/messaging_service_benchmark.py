@@ -68,58 +68,83 @@ _MEASUREMENT = flags.DEFINE_enum(
     'messaging_service_measurement',
     'single_op',
     MEASUREMENT_CHOICES,
-    help='Way to measure latency.')
+    help='Way to measure latency.',
+)
 _NUMBER_OF_MESSAGES = flags.DEFINE_integer(
     'messaging_service_number_of_messages',
     100,
-    help='Number of messages to use on benchmark.')
+    help='Number of messages to use on benchmark.',
+)
 _MESSAGE_SIZE = flags.DEFINE_integer(
     'messaging_service_message_size',
     10,
-    help='Number of characters to have in a message. '
-    "Ex: 1: 'A', 2: 'AA', ...")
+    help="Number of characters to have in a message. Ex: 1: 'A', 2: 'AA', ...",
+)
 _STREAMING_PULL = flags.DEFINE_boolean(
     'messaging_service_streaming_pull',
     False,
-    help=('Use StreamingPull to fetch messages. Supported only in GCP Pubsub '
-          'end-to-end benchmarking.')
+    help=(
+        'Use StreamingPull to fetch messages. Supported only in GCP Pubsub '
+        'end-to-end benchmarking.'
+    ),
 )
 _WARMUP_MESSAGES = flags.DEFINE_integer(
-    'messaging_service_warmup_messages', 0, lower_bound=0,
-    help=('Number of messages that will be considered warm-up and will not be '
-          'included into the steady_state resulting metrics. Must be greater '
-          'or equal to 0 and less than number_of_messages. If set to 0, no '
-          'steady_state metrics will be reported (this is the default).'))
+    'messaging_service_warmup_messages',
+    0,
+    lower_bound=0,
+    help=(
+        'Number of messages that will be considered warm-up and will not be '
+        'included into the steady_state resulting metrics. Must be greater '
+        'or equal to 0 and less than number_of_messages. If set to 0, no '
+        'steady_state metrics will be reported (this is the default).'
+    ),
+)
 
 
 @flags.multi_flags_validator(
-    ['messaging_service_streaming_pull', 'messaging_service_measurement',
-     'cloud'],
+    [
+        'messaging_service_streaming_pull',
+        'messaging_service_measurement',
+        'cloud',
+    ],
     message=(
         'streaming_pull is only supported for end-to-end latency benchmarking '
-        'with GCP PubSub.'))
+        'with GCP PubSub.'
+    ),
+)
 def ValidateStreamingPull(flags_dict):
-  return (not flags_dict['messaging_service_streaming_pull'] or
-          flags_dict['cloud'] == 'GCP' and
-          flags_dict['messaging_service_measurement'] == END_TO_END)
+  return (
+      not flags_dict['messaging_service_streaming_pull']
+      or flags_dict['cloud'] == 'GCP'
+      and flags_dict['messaging_service_measurement'] == END_TO_END
+  )
 
 
 @flags.multi_flags_validator(
-    ['messaging_service_warmup_messages',
-     'messaging_service_number_of_messages'],
-    message='warmup_message must be less than number_of_messages.')
+    [
+        'messaging_service_warmup_messages',
+        'messaging_service_number_of_messages',
+    ],
+    message='warmup_message must be less than number_of_messages.',
+)
 def ValidateWarmupMessages(flags_dict):
-  return (flags_dict['messaging_service_warmup_messages'] <
-          flags_dict['messaging_service_number_of_messages'])
+  return (
+      flags_dict['messaging_service_warmup_messages']
+      < flags_dict['messaging_service_number_of_messages']
+  )
 
 
 def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def _CreateSamples(results: Dict[str, Any], number_of_messages: int,
-                   message_size: int, cloud: str,
-                   streaming_pull: bool) -> List[sample.Sample]:
+def _CreateSamples(
+    results: Dict[str, Any],
+    number_of_messages: int,
+    message_size: int,
+    cloud: str,
+    streaming_pull: bool,
+) -> List[sample.Sample]:
   """Handles sample creation from benchmark_scenario results."""
   samples = []
   common_metadata = {
@@ -143,7 +168,8 @@ def _CreateSamples(results: Dict[str, Any], number_of_messages: int,
 
     # aggregated metrics, such as: mean, p50, p99...
     samples.append(
-        sample.Sample(metric_name, metric_value, metric_unit, metric_metadata))
+        sample.Sample(metric_name, metric_value, metric_unit, metric_metadata)
+    )
 
   return samples
 
@@ -177,26 +203,36 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """
   service = benchmark_spec.messaging_service
   if _MEASUREMENT.value == SINGLE_OP:
-    publish_results = service.Run(service.PUBLISH_LATENCY,
-                                  int(_NUMBER_OF_MESSAGES.value),
-                                  int(_MESSAGE_SIZE.value),
-                                  int(_WARMUP_MESSAGES.value))
-    pull_results = service.Run(service.PULL_LATENCY,
-                               int(_NUMBER_OF_MESSAGES.value),
-                               int(_MESSAGE_SIZE.value),
-                               int(_WARMUP_MESSAGES.value))
+    publish_results = service.Run(
+        service.PUBLISH_LATENCY,
+        int(_NUMBER_OF_MESSAGES.value),
+        int(_MESSAGE_SIZE.value),
+        int(_WARMUP_MESSAGES.value),
+    )
+    pull_results = service.Run(
+        service.PULL_LATENCY,
+        int(_NUMBER_OF_MESSAGES.value),
+        int(_MESSAGE_SIZE.value),
+        int(_WARMUP_MESSAGES.value),
+    )
     publish_results.update(pull_results)
     results = publish_results
   elif _MEASUREMENT.value == END_TO_END:
-    results = service.Run(service.END_TO_END_LATENCY,
-                          int(_NUMBER_OF_MESSAGES.value),
-                          int(_MESSAGE_SIZE.value),
-                          int(_WARMUP_MESSAGES.value),
-                          _STREAMING_PULL.value,)
+    results = service.Run(
+        service.END_TO_END_LATENCY,
+        int(_NUMBER_OF_MESSAGES.value),
+        int(_MESSAGE_SIZE.value),
+        int(_WARMUP_MESSAGES.value),
+        _STREAMING_PULL.value,
+    )
   # Creating samples from results
-  samples = _CreateSamples(results, int(_NUMBER_OF_MESSAGES.value),
-                           int(_MESSAGE_SIZE.value), FLAGS.cloud,
-                           _STREAMING_PULL.value)
+  samples = _CreateSamples(
+      results,
+      int(_NUMBER_OF_MESSAGES.value),
+      int(_MESSAGE_SIZE.value),
+      FLAGS.cloud,
+      _STREAMING_PULL.value,
+  )
   return samples
 
 

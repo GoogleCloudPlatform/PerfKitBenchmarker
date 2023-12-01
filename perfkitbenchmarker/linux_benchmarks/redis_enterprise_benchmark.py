@@ -40,12 +40,13 @@ from perfkitbenchmarker.linux_packages import redis_enterprise
 FLAGS = flags.FLAGS
 
 _OPTIMIZE_THROUGHPUT = flags.DEFINE_boolean(
-    'enterprise_redis_optimize_throughput', False,
+    'enterprise_redis_optimize_throughput',
+    False,
     'If True, the benchmark will find the optimal throughput under 1ms latency '
     'for the machine type by optimizing the number of shards and proxy threads.'
     'Requires one or none of --enterprise_redis_proxy_threads and '
     '--enterprise_redis_shard_count to be set. If only one is set, keeps that '
-    'value constant for the run and optimizes the other.'
+    'value constant for the run and optimizes the other.',
 )
 
 BENCHMARK_NAME = 'redis_enterprise'
@@ -87,18 +88,24 @@ def GetConfig(user_config):
 def CheckPrerequisites(_):
   """Validates flag configuration."""
   if _OPTIMIZE_THROUGHPUT.value:
-    if (FLAGS.enterprise_redis_proxy_threads and
-        FLAGS.enterprise_redis_shard_count):
+    if (
+        FLAGS.enterprise_redis_proxy_threads
+        and FLAGS.enterprise_redis_shard_count
+    ):
       raise errors.Setup.InvalidFlagConfigurationError(
           'Running with --enterprise_redis_optimize_throughput, expected one '
           'of --enterprise_redis_proxy_threads or '
-          '--enterprise_redis_shard_count to be set, not both.')
+          '--enterprise_redis_shard_count to be set, not both.'
+      )
   else:
-    if not (FLAGS.enterprise_redis_proxy_threads and
-            FLAGS.enterprise_redis_shard_count):
+    if not (
+        FLAGS.enterprise_redis_proxy_threads
+        and FLAGS.enterprise_redis_shard_count
+    ):
       raise errors.Setup.InvalidFlagConfigurationError(
           'Expected both --enterprise_redis_proxy_threads and '
-          '--enterprise_redis_shard_count must be set, but they were not.')
+          '--enterprise_redis_shard_count must be set, but they were not.'
+      )
 
 
 def _InstallRedisEnterprise(vm):
@@ -111,7 +118,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   client_vms = benchmark_spec.vm_groups['clients']
   server_vms = benchmark_spec.vm_groups['servers']
@@ -137,8 +144,7 @@ def Prepare(benchmark_spec):
   redis_enterprise.TuneProxy(server_vm)
   client.CreateDatabases()
   redis_enterprise.PinWorkers(server_vms)
-  redis_enterprise.LoadDatabases(
-      server_vms, client_vms, client.GetEndpoints())
+  redis_enterprise.LoadDatabases(server_vms, client_vms, client.GetEndpoints())
 
 
 def Run(benchmark_spec):
@@ -146,7 +152,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -156,10 +162,12 @@ def Run(benchmark_spec):
   redis_vm = redis_vms[0]
 
   numa_pages_migrated, _ = redis_vm.RemoteCommand(
-      'cat /proc/vmstat | grep numa_pages_migrated')
+      'cat /proc/vmstat | grep numa_pages_migrated'
+  )
   numa_pages_migrated = numa_pages_migrated.split(' ')[1]
   numa_balancing, _ = redis_vm.RemoteCommand(
-      'cat /proc/sys/kernel/numa_balancing')
+      'cat /proc/sys/kernel/numa_balancing'
+  )
   setup_metadata = {
       'numa_pages_migrated': numa_pages_migrated.rstrip(),
       'numa_balancing': numa_balancing.rstrip(),
@@ -171,7 +179,8 @@ def Run(benchmark_spec):
     if not optimal_throughput:
       raise errors.Benchmarks.RunError(
           'Did not get a throughput under 1ms metric. Try decreasing the '
-          '--enterprise_redis_min_threads value.')
+          '--enterprise_redis_min_threads value.'
+      )
     logging.info('Found optimal throughput %s', optimal_throughput)
   else:
     _, results = redis_enterprise.Run(redis_vms, load_vms)

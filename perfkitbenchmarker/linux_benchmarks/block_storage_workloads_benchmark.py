@@ -52,16 +52,24 @@ LOGGING = 'logging'
 DATABASE = 'database'
 STREAMING = 'streaming'
 
-flags.DEFINE_enum('workload_mode', LOGGING,
-                  [LOGGING, DATABASE, STREAMING],
-                  'Simulate a logging, database or streaming scenario.')
+flags.DEFINE_enum(
+    'workload_mode',
+    LOGGING,
+    [LOGGING, DATABASE, STREAMING],
+    'Simulate a logging, database or streaming scenario.',
+)
 
-flags.DEFINE_list('iodepth_list', [], 'A list of iodepth parameter used by '
-                  'fio command in simulated database and streaming scenarios '
-                  'only.')
+flags.DEFINE_list(
+    'iodepth_list',
+    [],
+    'A list of iodepth parameter used by '
+    'fio command in simulated database and streaming scenarios '
+    'only.',
+)
 
-flags.DEFINE_integer('maxjobs', 0,
-                     'The maximum allowed number of jobs to support.')
+flags.DEFINE_integer(
+    'maxjobs', 0, 'The maximum allowed number of jobs to support.'
+)
 
 FLAGS = flags.FLAGS
 
@@ -100,7 +108,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm = vms[0]
@@ -123,6 +131,7 @@ def RunSimulatedLogging(vm):
 
   Args:
     vm: The vm that synthetic_storage_workloads_benchmark will be run upon.
+
   Returns:
     A list of sample.Sample objects
   """
@@ -136,9 +145,8 @@ def RunSimulatedLogging(vm):
       '--randrepeat=0 '
       '--direct=0 '
       '--size=%dk '
-      '--iodepth=%d ') % (vm.GetScratchDir(),
-                          test_size,
-                          DEFAULT_IODEPTH)
+      '--iodepth=%d '
+  ) % (vm.GetScratchDir(), test_size, DEFAULT_IODEPTH)
   if FLAGS.maxjobs:
     cmd += '--max-jobs=%s ' % FLAGS.maxjobs
   cmd += (
@@ -152,7 +160,8 @@ def RunSimulatedLogging(vm):
       '--rw=randread '
       '--name=sequential_read '
       '--stonewall '
-      '--rw=read ') % (test_size / 10)
+      '--rw=read '
+  ) % (test_size / 10)
   logging.info('FIO Results for simulated %s', LOGGING)
   res, _ = vm.RemoteCommand('%s %s' % (fio.FIO_CMD_PREFIX, cmd))
   results = fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res))
@@ -165,6 +174,7 @@ def RunSimulatedDatabase(vm):
 
   Args:
     vm: The vm that synthetic_storage_workloads_benchmark will be run upon.
+
   Returns:
     A list of sample.Sample objects
   """
@@ -183,9 +193,8 @@ def RunSimulatedDatabase(vm):
         '--randrepeat=0 '
         '--iodepth=%s '
         '--size=%dk '
-        '--blocksize=4k ') % (vm.GetScratchDir(),
-                              depth,
-                              test_size)
+        '--blocksize=4k '
+    ) % (vm.GetScratchDir(), depth, test_size)
     if FLAGS.maxjobs:
       cmd += '--max-jobs=%s ' % FLAGS.maxjobs
     cmd += (
@@ -200,11 +209,13 @@ def RunSimulatedDatabase(vm):
         '--rw=randrw '
         '--rwmixread=90 '
         '--rwmixwrite=10 '
-        '--end_fsync=1 ')
+        '--end_fsync=1 '
+    )
     logging.info('FIO Results for simulated %s, iodepth %s', DATABASE, depth)
     res, _ = vm.RemoteCommand('%s %s' % (fio.FIO_CMD_PREFIX, cmd))
     results.extend(
-        fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res)))
+        fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res))
+    )
   UpdateWorkloadMetadata(results)
   return results
 
@@ -214,6 +225,7 @@ def RunSimulatedStreaming(vm):
 
   Args:
     vm: The vm that synthetic_storage_workloads_benchmark will be run upon.
+
   Returns:
     A list of sample.Sample objects
   """
@@ -232,9 +244,8 @@ def RunSimulatedStreaming(vm):
         '--iodepth=%s '
         '--blocksize=1m '
         '--size=%dk '
-        '--filename=fio_test_file ') % (vm.GetScratchDir(),
-                                        depth,
-                                        test_size)
+        '--filename=fio_test_file '
+    ) % (vm.GetScratchDir(), depth, test_size)
     if FLAGS.maxjobs:
       cmd += '--max-jobs=%s ' % FLAGS.maxjobs
     cmd += (
@@ -243,11 +254,13 @@ def RunSimulatedStreaming(vm):
         '--end_fsync=1 '
         '--name=sequential_read '
         '--stonewall '
-        '--rw=read ')
+        '--rw=read '
+    )
     logging.info('FIO Results for simulated %s', STREAMING)
     res, _ = vm.RemoteCommand('%s %s' % (fio.FIO_CMD_PREFIX, cmd))
     results.extend(
-        fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res)))
+        fio.ParseResults(fio.FioParametersToJob(cmd), json.loads(res))
+    )
   UpdateWorkloadMetadata(results)
   return results
 
@@ -255,8 +268,11 @@ def RunSimulatedStreaming(vm):
 RUN_SCENARIO_FUNCTION_DICT = {
     LOGGING: {DESCRIPTION: 'simulated_logging', METHOD: RunSimulatedLogging},
     DATABASE: {DESCRIPTION: 'simulated_database', METHOD: RunSimulatedDatabase},
-    STREAMING: {DESCRIPTION: 'simulated_streaming',
-                METHOD: RunSimulatedStreaming}}
+    STREAMING: {
+        DESCRIPTION: 'simulated_streaming',
+        METHOD: RunSimulatedStreaming,
+    },
+}
 
 
 def Run(benchmark_spec):
@@ -264,7 +280,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -280,7 +296,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   vms = benchmark_spec.vms
   vm = vms[0]

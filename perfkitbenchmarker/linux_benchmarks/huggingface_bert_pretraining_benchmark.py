@@ -63,7 +63,8 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   run_dir = 'aws-neuron-samples/torch-neuronx/training/dp_bert_hf_pretrain'
   bm_spec.run_dir = run_dir
   vm.RemoteCommand(
-      'git clone https://github.com/aws-neuron/aws-neuron-samples.git')
+      'git clone https://github.com/aws-neuron/aws-neuron-samples.git'
+  )
   path = f'PATH={posixpath.join(neuron.ENV.value, "bin")}:$PATH'
   bm_spec.path = path
   vm.RemoteCommand(
@@ -111,8 +112,10 @@ def MakeSamplesFromOutput(output: str) -> List[sample.Sample]:
     }
     timestamp = time.mktime(time.strptime(time_now))
     samples.append(
-        sample.Sample('throughput', float(throughput), 'i/s', metadata,
-                      timestamp))
+        sample.Sample(
+            'throughput', float(throughput), 'i/s', metadata, timestamp
+        )
+    )
   return samples
 
 
@@ -140,7 +143,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       '--max_pred_len 80 '
       '--warmup_steps 781 '
       '--max_steps 782 '
-      f'--output_dir {bm_spec.ckpt_dir}')
+      f'--output_dir {bm_spec.ckpt_dir}'
+  )
   return MakeSamplesFromOutput(stdout)
 
 

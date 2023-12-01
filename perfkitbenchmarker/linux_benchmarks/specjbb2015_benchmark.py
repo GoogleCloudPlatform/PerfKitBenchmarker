@@ -42,14 +42,16 @@ specjbb2015:
 FLAGS = flags.FLAGS
 _FOUR_HOURS = 60 * 60 * 4
 # Customer's JVM args.
-_DEFAULT_JVM_ARGS = ('-XX:+AlwaysPreTouch -XX:-UseAdaptiveSizePolicy '
-                     '-XX:MaxTenuringThreshold=15 -XX:-UseBiasedLocking '
-                     '-XX:SurvivorRatio=10 '
-                     '-XX:TargetSurvivorRatio=90 -XX:TargetSurvivorRatio=90 '
-                     '-XX:+UseParallelOldGC -XX:+PrintGCDetails ')
-_DEFAULT_JVM_CONT_TXI_ARGS = ('-Xms2g -Xmx2g -Xmn1536m '
-                              '-XX:+AlwaysPreTouch '
-                              '-XX:ParallelGCThreads=2')
+_DEFAULT_JVM_ARGS = (
+    '-XX:+AlwaysPreTouch -XX:-UseAdaptiveSizePolicy '
+    '-XX:MaxTenuringThreshold=15 -XX:-UseBiasedLocking '
+    '-XX:SurvivorRatio=10 '
+    '-XX:TargetSurvivorRatio=90 -XX:TargetSurvivorRatio=90 '
+    '-XX:+UseParallelOldGC -XX:+PrintGCDetails '
+)
+_DEFAULT_JVM_CONT_TXI_ARGS = (
+    '-Xms2g -Xmx2g -Xmn1536m -XX:+AlwaysPreTouch -XX:ParallelGCThreads=2'
+)
 _DEFAULT_COMPOSITE_MEMORY_RATIO = 0.8
 _DEFAULT_WORKERS_RATIO = 1
 _DEFAULT_NUM_GROUPS = 4
@@ -60,8 +62,9 @@ _LOG_FILE = '~/specjbb2015.log'
 _JAR_FILE = 'specjbb2015.jar'
 _PROPS_FILE = 'config/specjbb2015.props'
 BENCHMARK_DATA = {
-    _SPEC_JBB_2015_ISO:
+    _SPEC_JBB_2015_ISO: (
         '524bc1588a579ddf35cfada5e07a408c78b5939e72ee5f02b05422d5c0d214bd'
+    )
 }
 BACKEND_MODE = 'backend'
 MULTIJVM_MODE = 'MultiJVM'
@@ -70,31 +73,47 @@ MULTICONTROLLER_MODE = 'multicontroller'
 TXINJECTOR_MODE = 'txinjector'
 NEW_MAX_RATIO = 0.94  # Taken from customer script
 
-flags.DEFINE_float('specjbb_workers_ratio', _DEFAULT_WORKERS_RATIO,
-                   'A number indicating number of workers per vCPU.')
-flags.DEFINE_enum('specjbb_run_mode', MULTIJVM_MODE,
-                  [MULTIJVM_MODE, COMPOSITE_MODE],
-                  'String representing run mode. COMPOSITE or MultiJVM.')
-flags.DEFINE_integer('specjbb_num_groups', _DEFAULT_NUM_GROUPS,
-                     'Used in MultiJVM, number of groups.')
+flags.DEFINE_float(
+    'specjbb_workers_ratio',
+    _DEFAULT_WORKERS_RATIO,
+    'A number indicating number of workers per vCPU.',
+)
+flags.DEFINE_enum(
+    'specjbb_run_mode',
+    MULTIJVM_MODE,
+    [MULTIJVM_MODE, COMPOSITE_MODE],
+    'String representing run mode. COMPOSITE or MultiJVM.',
+)
+flags.DEFINE_integer(
+    'specjbb_num_groups',
+    _DEFAULT_NUM_GROUPS,
+    'Used in MultiJVM, number of groups.',
+)
 flags.DEFINE_bool(
-    'specjbb_numa_aware', True,
-    'Whether to have MultiJVM backends pinned to specific NUMA nodes.')
+    'specjbb_numa_aware',
+    True,
+    'Whether to have MultiJVM backends pinned to specific NUMA nodes.',
+)
 flags.DEFINE_bool(
-    'build_openjdk_neoverse', False,
+    'build_openjdk_neoverse',
+    False,
     'Whether to build OpenJDK optimized for ARM Neoverse.'
-    'Requires Ubuntu 1804 and OpenJDK 11.')
+    'Requires Ubuntu 1804 and OpenJDK 11.',
+)
 flag_util.DEFINE_integerlist(
-    'specjbb_multijvm_nodes', None,
+    'specjbb_multijvm_nodes',
+    None,
     'By default specjbb jvm groups are bound to all numa nodes in '
     'host in a round robin way. When specjbb_multijvm_nodes is specified, '
     'specjbb jvm groups are bound to the specified numa nodes in a '
     'round robin way. For example, if user want to bind 4 specjbb '
     'jvm groups to numa node 0 and 1 in the following order: 1, 0, '
     '1, 0, user can specify the specjbb_multijvm_nodes flag as following:'
-    '--specjbb_multijvm_nodes=1,0')
+    '--specjbb_multijvm_nodes=1,0',
+)
 flags.DEFINE_integer(
-    'specjbb_file_descriptors_limit', 64*1024,
+    'specjbb_file_descriptors_limit',
+    64 * 1024,
     'Set FD limit for specjbb backend java processes. Specjbb '
     'background processes tends to create a lot of network connections. '
     'It could fail if FD limit is too low. Please search for "Too many '
@@ -103,13 +122,16 @@ flags.DEFINE_integer(
     'Please be careful when setting this flag. its value should be '
     'smaller than sysctl flag fs.nr_open. Benchmark will fail if this '
     'flag is set to a value bigger than fs.nr_open.',
-    lower_bound=0)
+    lower_bound=0,
+)
 flags.DEFINE_integer(
-    'specjbb_connection_pool_size', 256,
+    'specjbb_connection_pool_size',
+    256,
     'User can use this flag to set connection pool size for all specjbb '
     'agents. Please refer to section 16.1 of specjbb userguide:'
     'https://www.spec.org/jbb2015/docs/userguide.pdf',
-    lower_bound=0)
+    lower_bound=0,
+)
 
 
 def GetConfig(user_config):
@@ -131,24 +153,28 @@ def Prepare(benchmark_spec):
   # Used on m6g (AWS Graviton 2) machines for optimal performance
   if FLAGS.build_openjdk_neoverse:
     openjdk_neoverse.InstallNeoverseCompiledOpenJDK(
-        vm, openjdk.OPENJDK_VERSION.value)
+        vm, openjdk.OPENJDK_VERSION.value
+    )
   vm.InstallPackages('numactl')
 
   # swap only if necessary; free local node memory and avoid remote memory;
   # reset caches; set stack size to unlimited
   # Also consider setting enable_transparent_hugepages flag to true
-  cmd = ('echo 1 | sudo tee /proc/sys/vm/swappiness && '
-         'echo 1 | sudo tee /proc/sys/vm/zone_reclaim_mode && '
-         'sync ; echo 3 | sudo tee /proc/sys/vm/drop_caches && '
-         'ulimit -s unlimited')
+  cmd = (
+      'echo 1 | sudo tee /proc/sys/vm/swappiness && '
+      'echo 1 | sudo tee /proc/sys/vm/zone_reclaim_mode && '
+      'sync ; echo 3 | sudo tee /proc/sys/vm/drop_caches && '
+      'ulimit -s unlimited'
+  )
   vm.RemoteCommand(cmd)
 
 
 def _MaxHeapMB(vm, mode):
   """Returns max heap size in MB as an int."""
   if mode == BACKEND_MODE:
-    return int(
-        vm.NumCpusForBenchmark() // _DEFAULT_NUM_GROUPS) * _RAM_MB_PER_CORE
+    return (
+        int(vm.NumCpusForBenchmark() // _DEFAULT_NUM_GROUPS) * _RAM_MB_PER_CORE
+    )
   elif mode == COMPOSITE_MODE:
     return int(vm.total_memory_kb * _DEFAULT_COMPOSITE_MEMORY_RATIO / 1024)
 
@@ -164,14 +190,17 @@ def _JVMArgs(vm, mode):
   # Determine max/new heap arguments. max per group = 3/8 * vCPU GB.
   jvm_backend_mem_arg = '-Xms{max_}m -Xmx{max_}m -Xmn{new_}m '.format(
       max_=_MaxHeapMB(vm, BACKEND_MODE),
-      new_=int(_MaxHeapMB(vm, BACKEND_MODE) * NEW_MAX_RATIO))
+      new_=int(_MaxHeapMB(vm, BACKEND_MODE) * NEW_MAX_RATIO),
+  )
   jvm_composite_mem_arg = '-Xms{max_}m -Xmx{max_}m -Xmn{new_}m '.format(
       max_=_MaxHeapMB(vm, COMPOSITE_MODE),
-      new_=int(_MaxHeapMB(vm, COMPOSITE_MODE) * NEW_MAX_RATIO))
+      new_=int(_MaxHeapMB(vm, COMPOSITE_MODE) * NEW_MAX_RATIO),
+  )
 
   if mode == BACKEND_MODE:
     return ' '.join(
-        [jvm_backend_gc_arg, jvm_backend_mem_arg, _DEFAULT_JVM_ARGS])
+        [jvm_backend_gc_arg, jvm_backend_mem_arg, _DEFAULT_JVM_ARGS]
+    )
   elif mode == COMPOSITE_MODE:
     return ' '.join([jvm_composite_mem_arg, _DEFAULT_JVM_ARGS])
   else:
@@ -186,16 +215,17 @@ def _SpecArgs(vm, mode):
   spec_num_groups_arg = f' -Dspecjbb.group.count={FLAGS.specjbb_num_groups}'
   spec_rt_curve_arg = '-Dspecjbb.controller.rtcurve.warmup.step=0.5'
   spec_mr_arg = f'-Dspecjbb.mapreducer.pool.size={_DEFAULT_NUM_GROUPS * 2}'
-  spec_connect_pool_size_arg = (
-      f'-Dspecjbb.comm.connect.client.pool.size={FLAGS.specjbb_connection_pool_size}'
-  )
+  spec_connect_pool_size_arg = f'-Dspecjbb.comm.connect.client.pool.size={FLAGS.specjbb_connection_pool_size}'
 
   if mode == TXINJECTOR_MODE:
     return ''
   elif mode == MULTICONTROLLER_MODE:
     return ' '.join([
-        spec_rt_curve_arg, spec_mr_arg, spec_num_workers_arg,
-        spec_num_groups_arg, spec_connect_pool_size_arg
+        spec_rt_curve_arg,
+        spec_mr_arg,
+        spec_num_workers_arg,
+        spec_num_groups_arg,
+        spec_connect_pool_size_arg,
     ])
   elif mode == BACKEND_MODE:
     return ''
@@ -212,7 +242,8 @@ def _CollectSLAMetrics(vm):
   # are part of the report filename, we must determine it at runtime. The .raw
   # file is easier to parse than the .html file, so parse that instead.
   grep_stdout, _ = vm.RemoteCommand(
-      'grep -oE \'[^ ]+html\' ~/specjbb2015.log', ignore_failure=True)
+      "grep -oE '[^ ]+html' ~/specjbb2015.log", ignore_failure=True
+  )
   file_prefix = grep_stdout.split('.')[0]
   filename = f'spec/{file_prefix}.raw'
   cmd = f'cat {filename} | grep SLA-'
@@ -224,16 +255,21 @@ def ParseJbbOutput(stdout, metadata):
   """Generates samples from the RUN RESULT string."""
 
   samples = []
-  regex = re.compile(r'RUN\sRESULT:.*?max\-jOPS\s=\s(?P<maxjops>\d+),\s+'
-                     r'critical-jOPS\s=\s(?P<crjops>\d+)')
+  regex = re.compile(
+      r'RUN\sRESULT:.*?max\-jOPS\s=\s(?P<maxjops>\d+),\s+'
+      r'critical-jOPS\s=\s(?P<crjops>\d+)'
+  )
 
   jops = regex.search(stdout)
   if jops:
     samples.append(
-        sample.Sample('max_jOPS', int(jops.group('maxjops')), 'jops', metadata))
+        sample.Sample('max_jOPS', int(jops.group('maxjops')), 'jops', metadata)
+    )
     samples.append(
-        sample.Sample('critical_jOPS', int(jops.group('crjops')), 'jops',
-                      metadata))
+        sample.Sample(
+            'critical_jOPS', int(jops.group('crjops')), 'jops', metadata
+        )
+    )
   else:
     raise errors.Benchmarks.RunError('No specjbb results found!')
 
@@ -255,16 +291,20 @@ def _RunBackgroundNumaPinnedCommand(vm, cmd_list, node_id):
     # Persist the nohup command past the ssh session, and numa pin.
     # "sh -c 'cd /whereever; nohup ./whatever > /dev/null 2>&1 &'"
     # "numa --cpunodebind 0 --membind 0 cmd"
-    cmd = ('sh -c \'{fd_limit_cmd} && cd {dir} && nohup numactl '
-           '--cpunodebind {node_id} '
-           '--membind {node_id} {cmd} 2>&1 &\'').format(
-               fd_limit_cmd=fd_limit_cmd,
-               node_id=node_id, dir=_SPEC_DIR, cmd=' '.join(cmd_list))
+    cmd = (
+        "sh -c '{fd_limit_cmd} && cd {dir} && nohup numactl "
+        '--cpunodebind {node_id} '
+        "--membind {node_id} {cmd} 2>&1 &'"
+    ).format(
+        fd_limit_cmd=fd_limit_cmd,
+        node_id=node_id,
+        dir=_SPEC_DIR,
+        cmd=' '.join(cmd_list),
+    )
   else:
-    cmd = ('sh -c \'{fd_limit_cmd} && cd {dir} && '
-           'nohup {cmd} 2>&1 &\'').format(
-               fd_limit_cmd=fd_limit_cmd,
-               dir=_SPEC_DIR, cmd=' '.join(cmd_list))
+    cmd = ("sh -c '{fd_limit_cmd} && cd {dir} && nohup {cmd} 2>&1 &'").format(
+        fd_limit_cmd=fd_limit_cmd, dir=_SPEC_DIR, cmd=' '.join(cmd_list)
+    )
   vm.RemoteCommand(cmd)
 
 
@@ -297,16 +337,33 @@ def Run(benchmark_spec):
 
       txinjector_cmd = [
           'java',
-          _JVMArgs(vm,
-                   TXINJECTOR_MODE), '-jar', _JAR_FILE, '-m', TXINJECTOR_MODE,
-          '-G', f'GRP{group}', '-J', 'JVM1', '>', f'grp{group}jvm1.log'
+          _JVMArgs(vm, TXINJECTOR_MODE),
+          '-jar',
+          _JAR_FILE,
+          '-m',
+          TXINJECTOR_MODE,
+          '-G',
+          f'GRP{group}',
+          '-J',
+          'JVM1',
+          '>',
+          f'grp{group}jvm1.log',
       ]
       _RunBackgroundNumaPinnedCommand(vm, txinjector_cmd, node_id)
 
       backend_cmd = [
           'java',
-          _JVMArgs(vm, BACKEND_MODE), '-jar', _JAR_FILE, '-m', BACKEND_MODE,
-          '-G', f'GRP{group}', '-J', 'JVM2', '>', f'grp{group}jvm2.log'
+          _JVMArgs(vm, BACKEND_MODE),
+          '-jar',
+          _JAR_FILE,
+          '-m',
+          BACKEND_MODE,
+          '-G',
+          f'GRP{group}',
+          '-J',
+          'JVM2',
+          '>',
+          f'grp{group}jvm2.log',
       ]
       _RunBackgroundNumaPinnedCommand(vm, backend_cmd, node_id)
 
@@ -314,11 +371,17 @@ def Run(benchmark_spec):
     controller_cmd = [
         'java',
         _JVMArgs(vm, MULTICONTROLLER_MODE),
-        _SpecArgs(vm, MULTICONTROLLER_MODE), '-jar', _JAR_FILE, '-m',
-        MULTICONTROLLER_MODE, '-p', _PROPS_FILE
+        _SpecArgs(vm, MULTICONTROLLER_MODE),
+        '-jar',
+        _JAR_FILE,
+        '-m',
+        MULTICONTROLLER_MODE,
+        '-p',
+        _PROPS_FILE,
     ]
     run_cmd = ('cd {dir} && {cmd} 2>&1 | tee {log_file}').format(
-        dir=_SPEC_DIR, cmd=' '.join(controller_cmd), log_file=_LOG_FILE)
+        dir=_SPEC_DIR, cmd=' '.join(controller_cmd), log_file=_LOG_FILE
+    )
     stdout, _ = vm.RobustRemoteCommand(run_cmd)
     max_heap_size_gb = _MaxHeapMB(vm, BACKEND_MODE) / 1000.0  # for metadata
 
@@ -326,11 +389,17 @@ def Run(benchmark_spec):
     run_cmd = [
         'java',
         _JVMArgs(vm, COMPOSITE_MODE),
-        _SpecArgs(vm, COMPOSITE_MODE), '-jar', _JAR_FILE, '-m', COMPOSITE_MODE,
-        '-p', _PROPS_FILE
+        _SpecArgs(vm, COMPOSITE_MODE),
+        '-jar',
+        _JAR_FILE,
+        '-m',
+        COMPOSITE_MODE,
+        '-p',
+        _PROPS_FILE,
     ]
     cmd = ('cd {dir} && {cmd} 2>&1 | tee {log_file}').format(
-        dir=_SPEC_DIR, cmd=' '.join(run_cmd), log_file=_LOG_FILE)
+        dir=_SPEC_DIR, cmd=' '.join(run_cmd), log_file=_LOG_FILE
+    )
     stdout, _ = vm.RemoteCommand(cmd, timeout=_FOUR_HOURS)
     max_heap_size_gb = _MaxHeapMB(vm, COMPOSITE_MODE) / 1000.0  # for metadata
 

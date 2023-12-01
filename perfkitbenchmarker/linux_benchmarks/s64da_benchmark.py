@@ -13,16 +13,16 @@
 # limitations under the License.
 """s64da benchmark for PostgreSQL databases.
 
-  s64da benchmark is a HTAP database benchmark for Postgres.
+s64da benchmark is a HTAP database benchmark for Postgres.
 
-  This implementation of s64da in PKB uses the ManagedRelationalDB
-  resource. A client VM is also required. To change the specs of the
-  database server, change the vm_spec nested inside
-  managed_relational_db spec. To change the specs of the client,
-  change the vm_spec nested directly inside the pgbench spec.
+This implementation of s64da in PKB uses the ManagedRelationalDB
+resource. A client VM is also required. To change the specs of the
+database server, change the vm_spec nested inside
+managed_relational_db spec. To change the specs of the client,
+change the vm_spec nested directly inside the pgbench spec.
 
-  Documentations of s64da
-  https://github.com/swarm64/s64da-benchmark-toolkit
+Documentations of s64da
+https://github.com/swarm64/s64da-benchmark-toolkit
 """
 
 import itertools
@@ -40,14 +40,21 @@ _SCALE_FACTOR = flags.DEFINE_integer(
     1,
     'scale factor used to fill the database. '
     '1 scale factor roughly equals to 3GB.',
-    lower_bound=1)
+    lower_bound=1,
+)
 
 _BENCHMARK_TYPE = flags.DEFINE_enum(
-    's64da_benchmark_type', 'htap', ['htap'], 'Benchmark to run with s64da. '
-    'Only htap is currently supported.')
+    's64da_benchmark_type',
+    'htap',
+    ['htap'],
+    'Benchmark to run with s64da. Only htap is currently supported.',
+)
 
 SCHEMAS = [
-    'psql_native', 's64da_native', 's64da_native_enhanced', 's64da_performance'
+    'psql_native',
+    's64da_native',
+    's64da_native_enhanced',
+    's64da_performance',
 ]
 
 SCHEMA_PARTITIONS = ['', '_partitioned_id_hashed', '_partitioned_date_week']
@@ -56,36 +63,53 @@ ALL_SCHEMAS = [
     ''.join(i) for i in itertools.product(SCHEMAS, SCHEMA_PARTITIONS)
 ]
 
-_SCHEMA = flags.DEFINE_enum('s64da_schema', 'psql_native', ALL_SCHEMAS,
-                            'Schema to use for benchmarking the database.')
+_SCHEMA = flags.DEFINE_enum(
+    's64da_schema',
+    'psql_native',
+    ALL_SCHEMAS,
+    'Schema to use for benchmarking the database.',
+)
 
 _MAX_JOB = flags.DEFINE_integer(
-    's64da-max-jobs', 8,
-    'Limit the overall loading parallelism to this amount of jobs.')
+    's64da-max-jobs',
+    8,
+    'Limit the overall loading parallelism to this amount of jobs.',
+)
 
 _OLTP_WORKERS = flags.DEFINE_integer(
-    's64da-oltp-workers', 1, 'The number of OLTP workers executing '
-    'TPC-C transactions (i.e. simulated clients), default: 1')
+    's64da-oltp-workers',
+    1,
+    'The number of OLTP workers executing '
+    'TPC-C transactions (i.e. simulated clients), default: 1',
+)
 
 _OLAP_WORKERS = flags.DEFINE_integer(
-    's64da-olap-workers', 1,
-    'The number of OLAP workers running modified TPC-H queries, default: 1.')
+    's64da-olap-workers',
+    1,
+    'The number of OLAP workers running modified TPC-H queries, default: 1.',
+)
 
 _DURATION = flags.DEFINE_integer(
-    's64da-duration', 60,
-    'The number of seconds the benchmark should run for, default: 60 seconds')
+    's64da-duration',
+    60,
+    'The number of seconds the benchmark should run for, default: 60 seconds',
+)
 
 _RAMP_UP_DURATION = flags.DEFINE_integer(
-    's64da-ramp_up_duration', 10,
-    'The number of seconds the benchmark should ramp up for.')
+    's64da-ramp_up_duration',
+    10,
+    'The number of seconds the benchmark should ramp up for.',
+)
 
 _OLAP_TIMEOUT = flags.DEFINE_string(
-    's64da-olap-timeout', '5min',
-    'Timeout for OLAP queries in seconds, default: 5min')
+    's64da-olap-timeout',
+    '5min',
+    'Timeout for OLAP queries in seconds, default: 5min',
+)
 
 _RUN_OLTP_ON_REPLICA = flags.DEFINE_bool(
-    's64da-run_oltp_on_replica', False,
-    'Run the benchmark on read replica.')
+    's64da-run_oltp_on_replica', False, 'Run the benchmark on read replica.'
+)
 
 FLAGS = flags.FLAGS
 
@@ -171,8 +195,14 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   vm = benchmark_spec.vms[0]
   vm.Install('s64da')
   db = benchmark_spec.relational_db
-  s64da.PrepareBenchmark(vm, db, _BENCHMARK_TYPE.value, _SCHEMA.value,
-                         _SCALE_FACTOR.value, _MAX_JOB.value)
+  s64da.PrepareBenchmark(
+      vm,
+      db,
+      _BENCHMARK_TYPE.value,
+      _SCHEMA.value,
+      _SCALE_FACTOR.value,
+      _MAX_JOB.value,
+  )
 
 
 def GetMetadata() -> Dict[str, Any]:
@@ -187,7 +217,7 @@ def GetMetadata() -> Dict[str, Any]:
       's64da-duration': _DURATION.value,
       's64da-ramp_up_duration': _RAMP_UP_DURATION.value,
       's64da-olap-timeout': _OLAP_TIMEOUT.value,
-      's64da-run_oltp_on_replica': _RUN_OLTP_ON_REPLICA.value
+      's64da-run_oltp_on_replica': _RUN_OLTP_ON_REPLICA.value,
   }
 
 
@@ -205,11 +235,17 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   db = benchmark_spec.relational_db
   metadata = GetMetadata()
 
-  samples = s64da.RunBenchmark(vm, db, _BENCHMARK_TYPE.value,
-                               _OLTP_WORKERS.value, _OLAP_WORKERS.value,
-                               _DURATION.value, _OLAP_TIMEOUT.value,
-                               _RAMP_UP_DURATION.value,
-                               _RUN_OLTP_ON_REPLICA.value)
+  samples = s64da.RunBenchmark(
+      vm,
+      db,
+      _BENCHMARK_TYPE.value,
+      _OLTP_WORKERS.value,
+      _OLAP_WORKERS.value,
+      _DURATION.value,
+      _OLAP_TIMEOUT.value,
+      _RAMP_UP_DURATION.value,
+      _RUN_OLTP_ON_REPLICA.value,
+  )
   for s in samples:
     s.metadata.update(metadata)
   return samples

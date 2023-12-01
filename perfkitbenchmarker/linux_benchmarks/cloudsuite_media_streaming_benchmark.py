@@ -50,7 +50,7 @@ def Prepare(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   server = benchmark_spec.vm_groups['server'][0]
   client = benchmark_spec.vm_groups['client'][0]
@@ -59,22 +59,27 @@ def Prepare(benchmark_spec):
     if not docker.IsInstalled(vm):
       vm.Install('docker')
     vm.Install('cloudsuite/media-streaming:dataset')
-    vm.RemoteCommand('sudo docker create --name dataset '
-                     'cloudsuite/media-streaming:dataset')
+    vm.RemoteCommand(
+        'sudo docker create --name dataset cloudsuite/media-streaming:dataset'
+    )
 
   def PrepareServer(vm):
     PrepareCommon(vm)
     vm.Install('cloudsuite/media-streaming:server')
-    vm.RemoteCommand('sudo docker run -d --name server --net host '
-                     '--volumes-from dataset '
-                     'cloudsuite/media-streaming:server')
+    vm.RemoteCommand(
+        'sudo docker run -d --name server --net host '
+        '--volumes-from dataset '
+        'cloudsuite/media-streaming:server'
+    )
 
   def PrepareClient(vm):
     PrepareCommon(vm)
     vm.Install('cloudsuite/media-streaming:client')
 
-  target_arg_tuples = [(PrepareServer, [server], {}),
-                       (PrepareClient, [client], {})]
+  target_arg_tuples = [
+      (PrepareServer, [server], {}),
+      (PrepareClient, [client], {}),
+  ]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
 
 
@@ -83,7 +88,7 @@ def Run(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
 
   Returns:
     A list of sample.Sample objects.
@@ -92,10 +97,12 @@ def Run(benchmark_spec):
   client = benchmark_spec.vm_groups['client'][0]
   results = []
 
-  stdout, _ = client.RemoteCommand('sudo docker run --rm --name client '
-                                   '--net host --volumes-from dataset '
-                                   'cloudsuite/media-streaming:client %s'
-                                   % server.internal_ip)
+  stdout, _ = client.RemoteCommand(
+      'sudo docker run --rm --name client '
+      '--net host --volumes-from dataset '
+      'cloudsuite/media-streaming:client %s'
+      % server.internal_ip
+  )
 
   match = re.search(r'^Requests: (.+)$', stdout, re.MULTILINE)
   if match:
@@ -105,8 +112,9 @@ def Run(benchmark_spec):
     results.append(sample.Sample('Replies', float(match.group(1)), ''))
   match = re.search(r'^Reply rate: (.+)$', stdout, re.MULTILINE)
   if match:
-    results.append(sample.Sample('Reply rate', float(match.group(1)),
-                                 'replies/s'))
+    results.append(
+        sample.Sample('Reply rate', float(match.group(1)), 'replies/s')
+    )
   match = re.search(r'^Reply time: (.+)$', stdout, re.MULTILINE)
   if match:
     results.append(sample.Sample('Reply time', float(match.group(1)), 'ms'))
@@ -121,7 +129,7 @@ def Cleanup(benchmark_spec):
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
-        required to run the benchmark.
+      required to run the benchmark.
   """
   server = benchmark_spec.vm_groups['server'][0]
   client = benchmark_spec.vm_groups['client'][0]
@@ -137,6 +145,8 @@ def Cleanup(benchmark_spec):
   def CleanupClient(vm):
     CleanupCommon(vm)
 
-  target_arg_tuples = [(CleanupServer, [server], {}),
-                       (CleanupClient, [client], {})]
+  target_arg_tuples = [
+      (CleanupServer, [server], {}),
+      (CleanupClient, [client], {}),
+  ]
   background_tasks.RunParallelThreads(target_arg_tuples, len(target_arg_tuples))
