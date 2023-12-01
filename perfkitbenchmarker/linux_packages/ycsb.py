@@ -424,6 +424,10 @@ _ThroughputTimeSeries = dict[int, float]
 _HdrHistogramTuple = tuple[float, float, int]
 
 
+class RetriableCpuSearchBoundsError(Exception):
+  """Raised when CPU mode can't find the requested utilization number."""
+
+
 def SetYcsbTarUrl(url):
   global _ycsb_tar_url
   _ycsb_tar_url = url
@@ -1473,6 +1477,11 @@ class YCSBExecutor:
       )
       return self.RunStaircaseLoads(vms, workloads=workloads, **run_kwargs)
 
+    @vm_util.Retry(
+        retryable_exceptions=RetriableCpuSearchBoundsError,
+        timeout=-1,
+        max_retries=3,
+    )
     def _RunCpuModeSingleWorkload(workload: str) -> list[sample.Sample]:
       """Runs the CPU utilization test for a single workload."""
       read_percent, update_percent = _GetReadAndUpdateProportion(workload)
@@ -1487,6 +1496,10 @@ class YCSBExecutor:
       lower_bound = 0
       upper_bound = theoretical_max_qps * 2
       while lower_bound <= upper_bound:
+        if upper_bound - lower_bound <= theoretical_max_qps * 0.01:
+          raise RetriableCpuSearchBoundsError(
+              'Unable to find the requested CPU utilization, retrying.'
+          )
         target_qps = int((upper_bound + lower_bound) / 2)
         run_samples = _ExecuteWorkload(target_qps)
         measured_qps = _ExtractThroughput(run_samples)
