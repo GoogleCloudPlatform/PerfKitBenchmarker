@@ -111,12 +111,22 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       if (self.spec.high_availability_type == "FCIMW"
           or self.spec.high_availability_type == "FCIS2D"):
         self.ConfigureSQLServerHaFci()
+      elif self.spec.high_availability_type == "AOAG":
+        self.ConfigureSQLServerHaAoag()
+        ConfigureSQLServer(
+            self.server_vm,
+            self.spec.database_username,
+            self.spec.database_password)
+        ConfigureSQLServer(
+            self.replica_vms[0],
+            self.spec.database_username,
+            self.spec.database_password)
+        self.MoveSQLServerTempDb()
     else:
       ConfigureSQLServer(
           self.server_vm,
           self.spec.database_username,
-          self.spec.database_password,
-          )
+          self.spec.database_password)
       self.MoveSQLServerTempDb()
 
   def _SetEndpoint(self):
@@ -284,6 +294,221 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     # Update variables user for connection to SQL server.
     self.spec.database_password = win_password
     self.spec.endpoint = "fcidnn.perflab.local"
+
+  def ConfigureSQLServerHaAoag(self):
+    """Create SQL server HA deployment for performance testing."""
+    server_vm = self.server_vm
+    client_vm = self.client_vm
+    controller_vm = self.controller_vm
+    replica_vms = self.replica_vms
+
+    win_password = vm_util.GenerateRandomWindowsPassword(
+        vm_util.PASSWORD_LENGTH, "*!@#%^+=")
+
+    # Install and configure AD components.
+    self.PushAndRunPowershellScript(controller_vm,
+                                    "setup_domain_controller.ps1",
+                                    [win_password])
+    controller_vm.Reboot()
+
+    self.PushAndRunPowershellScript(server_vm, "set_dns_join_domain.ps1",
+                                    [controller_vm.internal_ip, win_password])
+    server_vm.Reboot()
+
+    self.PushAndRunPowershellScript(replica_vms[0], "set_dns_join_domain.ps1",
+                                    [controller_vm.internal_ip, win_password])
+    replica_vms[0].Reboot()
+
+    self.PushAndRunPowershellScript(client_vm, "set_dns.ps1",
+                                    [controller_vm.internal_ip])
+
+    # Install all components needed to create and configure failover cluster.
+    self.PushAndRunPowershellScript(controller_vm,
+                                    "install_cluster_components.ps1")
+    controller_vm.Reboot()
+    self.PushAndRunPowershellScript(server_vm, "install_cluster_components.ps1")
+    server_vm.Reboot()
+    self.PushAndRunPowershellScript(replica_vms[0],
+                                    "install_cluster_components.ps1")
+    replica_vms[0].Reboot()
+
+    # Setup cluster witness.
+    self.PushAndRunPowershellScript(controller_vm, "setup_witness.ps1")
+
+    self.PushAndRunPowershellScript(server_vm, "setup_fci_cluster.ps1",
+                                    [replica_vms[0].name, controller_vm.name,
+                                     win_password])
+
+    # Ensure all nodes in the cluster have access to the witness share
+    self.PushAndRunPowershellScript(controller_vm, "grant_witness_access.ps1")
+
+    server_vm.RemoteCommand(
+        f"Enable-SqlAlwaysOn -ServerInstance {server_vm.name} -Force")
+    replica_vms[0].RemoteCommand(
+        f"Enable-SqlAlwaysOn -ServerInstance {replica_vms[0].name} -Force")
+
+    # Create folder structure and tpcc database
+    server_vm.RemoteCommand(r"mkdir F:\DATA; mkdir F:\Logs; mkdir F:\Backup")
+    replica_vms[0].RemoteCommand(
+        r"mkdir F:\DATA; mkdir F:\Logs; mkdir F:\Backup")
+
+    server_vm.RemoteCommand("""sqlcmd -Q \"
+        USE [master]
+        GO
+        ALTER LOGIN [sa] ENABLE
+        GO
+        CREATE DATABASE [tpcc] ON PRIMARY (
+          NAME = [tpcc],
+          FILENAME='F:\\Data\\tpcc.mdf',
+          SIZE = 256MB,
+          MAXSIZE = UNLIMITED,
+          FILEGROWTH = 256MB)
+        LOG ON (
+          NAME = 'tpcc_log',
+          FILENAME='F:\\Logs\\tpcc.ldf',
+          SIZE = 256MB,
+          MAXSIZE = UNLIMITED,
+          FILEGROWTH = 256MB)
+        GO
+        USE [tpcc]
+        GO
+        EXEC sp_changedbowner 'sa'
+        GO
+        USE [master]
+        GO
+        ALTER DATABASE [tpcc] SET RECOVERY FULL
+        GO
+        BACKUP DATABASE [tpcc] TO DISK = 'F:\\Backup\\tpcc.bak'
+        GO\"
+        """)
+
+    # Change log on for MSSQLSERVICE to perflab\adminuser
+    # Default PowerShell version doesn't have Set-Service -Credential option
+    server_vm.RemoteCommand(
+        'sc.exe config MSSQLSERVER obj= "perflab\\adminuser" password='
+        f' "{win_password}" type= own'
+    )
+    replica_vms[0].RemoteCommand(
+        'sc.exe config MSSQLSERVER obj= "perflab\\adminuser" password='
+        f' "{win_password}" type= own'
+    )
+
+    # create AOAG
+    # running all the AOAG query from SQL server errors with Login
+    # failed to for user 'NT AUTHORITY\ANONYMOUS LOGON double
+    server_vm.RemoteCommand(
+        """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
+        USE [master]
+        GO
+
+        CREATE ENDPOINT [Hadr_endpoint]
+          AS TCP (LISTENER_PORT = 5022)
+            FOR DATA_MIRRORING (ROLE = ALL, ENCRYPTION = REQUIRED ALGORITHM AES)
+        GO
+
+        IF (SELECT state FROM sys.endpoints WHERE name = N'Hadr_endpoint') <> 0
+        BEGIN
+            ALTER ENDPOINT [Hadr_endpoint] STATE = STARTED
+        END
+        GO
+
+        CREATE LOGIN [perflab\\adminuser] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        GO
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [perflab\\adminuser]
+        GO
+
+        GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [perflab\\adminuser]
+        GO
+
+        IF EXISTS(SELECT * FROM sys.server_event_sessions WHERE name='AlwaysOn_health')
+        BEGIN
+            ALTER EVENT SESSION [AlwaysOn_health] ON SERVER WITH (STARTUP_STATE=ON);
+        END
+        IF NOT EXISTS(SELECT * FROM sys.dm_xe_sessions WHERE name='AlwaysOn_health')
+        BEGIN
+            ALTER EVENT SESSION [AlwaysOn_health] ON SERVER STATE=START;
+        END
+        GO\"
+        """)
+
+    replica_vms[0].RemoteCommand(
+        """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
+        USE [master]
+        GO
+
+        ALTER LOGIN [sa] ENABLE
+        GO
+
+        CREATE ENDPOINT [Hadr_endpoint]
+            AS TCP (LISTENER_PORT = 5022)
+        FOR DATA_MIRRORING (ROLE = ALL, ENCRYPTION = REQUIRED ALGORITHM AES)
+        GO
+
+        IF (SELECT state FROM sys.endpoints WHERE name = N'Hadr_endpoint') <> 0
+        BEGIN
+            ALTER ENDPOINT [Hadr_endpoint] STATE = STARTED
+        END
+        GO
+
+        CREATE LOGIN [perflab\\adminuser] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        GO
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [perflab\\adminuser]
+        GO
+
+        GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [perflab\\adminuser]
+        GO
+
+        IF EXISTS(SELECT * FROM sys.server_event_sessions WHERE name='AlwaysOn_health')
+        BEGIN
+            ALTER EVENT SESSION [AlwaysOn_health] ON SERVER WITH (STARTUP_STATE=ON);
+        END
+        IF NOT EXISTS(SELECT * FROM sys.dm_xe_sessions WHERE name='AlwaysOn_health')
+        BEGIN
+            ALTER EVENT SESSION [AlwaysOn_health] ON SERVER STATE=START;
+        END
+        GO\"
+        """)
+
+    server_vm.RemoteCommand(
+        """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
+        USE [master]
+        GO
+
+        CREATE AVAILABILITY GROUP [tpcc-aoag]
+        WITH (AUTOMATED_BACKUP_PREFERENCE = SECONDARY,
+        DB_FAILOVER = OFF,
+        DTC_SUPPORT = NONE,
+        REQUIRED_SYNCHRONIZED_SECONDARIES_TO_COMMIT = 0)
+        FOR DATABASE [tpcc]
+
+        REPLICA ON N'{0}' WITH (ENDPOINT_URL = N'TCP://{0}.perflab.local:5022', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SEEDING_MODE = AUTOMATIC, SECONDARY_ROLE(ALLOW_CONNECTIONS = NO)),
+            N'{1}' WITH (ENDPOINT_URL = N'TCP://{1}.perflab.local:5022', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SEEDING_MODE = AUTOMATIC, SECONDARY_ROLE(ALLOW_CONNECTIONS = NO));
+        GO\"
+        """.format(self.server_vm.name, self.replica_vms[0].name))
+
+    replica_vms[0].RemoteCommand(
+        """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
+        ALTER AVAILABILITY GROUP [tpcc-aoag] JOIN;
+        GO
+
+        ALTER AVAILABILITY GROUP [tpcc-aoag] GRANT CREATE ANY DATABASE;
+        GO\"
+        """)
+
+    # Restart SQL Service for AOAG replication to begin
+    server_vm.RemoteCommand("Restart-Service MSSQLSERVER -Force")
+    replica_vms[0].RemoteCommand("Restart-Service MSSQLSERVER -Force")
+
+    # Add DNN listener
+    self.PushAndRunPowershellScript(
+        server_vm,
+        "add_dnn_listener.ps1",
+        ["tpcc-aoag", "fcidnn", "1533"])
+
+    # Update variables user for connection to SQL server.
+    self.spec.database_password = win_password
+    self.spec.endpoint = "fcidnn.perflab.local"
+    self.port = 1533
 
   def PushAndRunPowershellScript(
       self,
