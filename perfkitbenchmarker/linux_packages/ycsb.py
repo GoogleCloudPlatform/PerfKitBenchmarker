@@ -1512,9 +1512,9 @@ class YCSBExecutor:
             cpu_utilization,
         )
         if cpu_utilization < CPU_OPTIMIZATION_TARGET_MIN.value:
-          lower_bound = target_qps
+          lower_bound = measured_qps
         elif cpu_utilization > CPU_OPTIMIZATION_TARGET.value:
-          upper_bound = target_qps
+          upper_bound = measured_qps
         else:
           logging.info(
               'Found CPU utilization percentage between target %s and %s',
