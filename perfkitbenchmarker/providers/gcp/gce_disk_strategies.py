@@ -24,6 +24,12 @@ from perfkitbenchmarker import disk_strategies
 FLAGS = flags.FLAGS
 
 
+def GetCreateDiskStrategy(
+    vm, disk_spec: disk.BaseDiskSpec, disk_count: int
+) -> disk_strategies.CreateDiskStrategy:
+  return disk_strategies.EmptyCreateDiskStrategy(vm, disk_spec, disk_count)
+
+
 class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
   """Strategies to set up ram disks."""
 

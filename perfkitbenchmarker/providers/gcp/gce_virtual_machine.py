@@ -1137,7 +1137,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return f'{self.name}-data-{disk_spec_id}-{index}'
 
   def SetDiskSpec(self, disk_spec, disk_count):
-    """Set Disk Specs of the current VM."""
+    """Sets Disk Specs of the current VM. Calls before the VM is created."""
+    self.create_disk_strategy = gce_disk_strategies.GetCreateDiskStrategy(
+        self, disk_spec, disk_count
+    )
+
     # This method will be depreciate soon.
     if disk_spec.disk_type == disk.LOCAL and disk_count is None:
       disk_count = self.max_local_disks
