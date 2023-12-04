@@ -13,11 +13,16 @@
 # limitations under the License.
 """Module containing strategies to prepare disks.
 
-This module abstract out the disk algorithm for formatting and creating
-scratch disks.
+This module abstract out the disk strategies of a virtual machine so code can
+be resuse and abstracted across clouds.
+There are two types of diks strategies.
+1. DiskCreationStrategy - This strategy governs how a
+                          virtual machine should create the disk resource.
+2. SetUpDiskStrategy - This strategy controls how a disk are set up.
 """
+import copy
 import logging
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from absl import flags
 from perfkitbenchmarker import context as pkb_context
@@ -26,6 +31,72 @@ from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 
 FLAGS = flags.FLAGS
+
+virtual_machine = Any  # virtual_machine.py imports this module.
+
+
+class CreateDiskStrategy:
+  """Handles disk related logic to create GCE Resource disk.
+
+  This strategy class handles creation of a disk.
+
+  Attributes:
+    vm: The virutal machine.
+    disk_spec: Spec of the disk to be created.
+    disk_count: The number of disk.
+    disk_specs: Duplicated disk_spec by disk_count
+  """
+
+  def __init__(self, vm: 'virtual_machine. BaseVirtualMachine',
+               disk_spec: disk.BaseDiskSpec, disk_count: int):
+    self.vm = vm
+    self.disk_spec = disk_spec
+    self.disk_count = disk_count
+    if disk_spec.disk_type == disk.LOCAL and disk_count is None:
+      disk_count = self.vm.max_local_disks
+    self.disk_specs = [copy.copy(disk_spec) for _ in range(disk_count)]
+    # In the event that we need to create multiple disks from the same
+    # DiskSpec, we need to ensure that they have different mount points.
+    if disk_count > 1 and disk_spec.mount_point:
+      for i, vm_disk_spec in enumerate(self.disk_specs):
+        vm_disk_spec.mount_point += str(i)
+
+  def AddMetadataToDiskResource(self):
+    """Add metadata to the disk resource for tagging purpose."""
+    pass
+
+  def GetCreationCommand(self) -> dict[str, str]:
+    """Returns the command to create the disk resource with the VM."""
+    return {}
+
+  def CreateAndAttachDisk(self) -> None:
+    """Calls Create and attach disk if needed."""
+    if not self.DiskCreatedOnVMCreation():
+      return
+    self._CreateAndAttachDisk()
+
+  def _CreateAndAttachDisk(self) -> None:
+    """Creates and attaches the disk resource to the VM."""
+    raise NotImplementedError()
+
+  def GetResourceMetadata(self):
+    """Returns the metadata of the disk resource."""
+    return {}
+
+  def DiskCreatedOnVMCreation(self) -> bool:
+    """Returns whether the disk is created on the VM."""
+    raise NotImplementedError()
+
+
+class EmptyCreateDiskStrategy(CreateDiskStrategy):
+  """Strategies to create nothing. Useful when there is no resource disk."""
+
+  def _CreateAndAttachDisk(self) -> None:
+    """Does nothing."""
+    return
+
+  def DiskCreatedOnVMCreation(self)-> bool:
+    return True
 
 
 class SetUpDiskStrategy:
@@ -52,6 +123,17 @@ class SetUpDiskStrategy:
     raise NotImplementedError(
         f'{disk_spec.disk_type} is not supported on linux.'
     )
+
+
+class EmptyDiskStrategy(SetUpDiskStrategy):
+  """Strategies to set up nothing. This is useful when there is no disk."""
+
+  def SetUpDisk(
+      self,
+      vm,
+      disk_spec: disk.BaseDiskSpec,
+  ) -> None:
+    del vm, disk_spec
 
 
 class SetUpRamDiskStrategy(SetUpDiskStrategy):
