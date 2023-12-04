@@ -259,30 +259,6 @@ def GetConfig(user_config):
 
 
 # TODO(chunla) Move this to engine specific module
-def _GetSysbenchConnectionParameter(client_vm_query_tools):
-  """Get Sysbench connection parameter."""
-  connection_string = ''
-  if client_vm_query_tools.ENGINE_TYPE == sql_engine_utils.MYSQL:
-    connection_string = (
-        '--mysql-host={0} --mysql-user={1} --mysql-password="{2}" '
-    ).format(
-        client_vm_query_tools.connection_properties.endpoint,
-        client_vm_query_tools.connection_properties.database_username,
-        client_vm_query_tools.connection_properties.database_password,
-    )
-  elif client_vm_query_tools.ENGINE_TYPE == sql_engine_utils.POSTGRES:
-    connection_string = (
-        '--pgsql-host={0} --pgsql-user={1} --pgsql-password="{2}" '
-        '--pgsql-port=5432'
-    ).format(
-        client_vm_query_tools.connection_properties.endpoint,
-        client_vm_query_tools.connection_properties.database_username,
-        client_vm_query_tools.connection_properties.database_password,
-    )
-  return connection_string
-
-
-# TODO(chunla) Move this to engine specific module
 def _GetCommonSysbenchOptions(db: relational_db.BaseRelationalDb):
   """Get Sysbench options."""
   engine_type = db.engine_type
