@@ -771,7 +771,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     create_disks = []
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      if not self.DiskTypeCreatedOnVMCreation(disk_spec):
+      if not self.create_disk_strategy.DiskCreatedOnVMCreation():
         continue
       # local disks are handled above in a separate gcloud flag
 
@@ -1302,10 +1302,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       if d.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES and d.interface == NVME:
         d.name = remote_nvme_devices.pop()
 
-  def DiskCreatedOnVMCreation(self, disk_spec):
-    """Returns whether the disk has been created during VM creation."""
-    return self.DiskTypeCreatedOnVMCreation(disk_spec)
-
   def _CreateScratchDiskFromDisks(self, disk_spec, disks):
     """Helper method to create scratch data disks."""
     # This will soon be moved to disk class. As the disk class should
@@ -1316,25 +1312,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       scratch_disk = disks[0]
 
-    if not self.DiskCreatedOnVMCreation(disk_spec):
+    if not self.create_disk_strategy.DiskCreatedOnVMCreation():
       scratch_disk.Create()
       scratch_disk.Attach(self)
 
     return scratch_disk
-
-  def DiskTypeCreatedOnVMCreation(self, disk_spec):
-    """Returns whether the disk type has been created during VM creation."""
-    # This will be moved to disk class
-    if isinstance(disk_spec, gce_disk.GceDiskSpec):
-      if disk_spec.replica_zones:
-        # GCE regional disks cannot use create-on-create.
-        return False
-      return disk_spec.create_with_vm and (
-          disk_spec.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES + [disk.LOCAL]
-      )
-
-    # Other disk type are created separately
-    return False
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to disk."""
@@ -1344,7 +1326,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     # Add metadata to data disks
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      if not self.DiskTypeCreatedOnVMCreation(disk_spec):
+      if not self.create_disk_strategy.DiskCreatedOnVMCreation():
         continue
       # local disks are not tagged
       if disk_spec.disk_type == disk.LOCAL:
