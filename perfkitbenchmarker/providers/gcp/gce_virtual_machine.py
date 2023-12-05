@@ -772,41 +772,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         'interface={0}'.format(self.ssd_interface)
     ] * self.max_local_disks
 
-    create_disks = []
-    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      if not self.create_disk_strategy.DiskCreatedOnVMCreation():
-        continue
-      # local disks are handled above in a separate gcloud flag
-
-      if disk_spec.disk_type == disk.LOCAL:
-        continue
-      for i in range(disk_spec.num_striped_disks):
-        name = self._GenerateDiskNamePrefix(disk_spec_id, i)
-        pd_args = [
-            f'name={name}',
-            f'device-name={name}',
-            f'size={disk_spec.disk_size}',
-            f'type={disk_spec.disk_type}',
-            'auto-delete=yes',
-            'boot=no',
-            'mode=rw',
-        ]
-        if (
-            disk_spec.provisioned_iops
-            and disk_spec.disk_type in gce_disk.GCE_DYNAMIC_IOPS_DISK_TYPES
-        ):
-          pd_args += [f'provisioned-iops={disk_spec.provisioned_iops}']
-        if (
-            disk_spec.provisioned_throughput
-            and disk_spec.disk_type
-            in gce_disk.GCE_DYNAMIC_THROUGHPUT_DISK_TYPES
-        ):
-          pd_args += [
-              f'provisioned-throughput={disk_spec.provisioned_throughput}'
-          ]
-        create_disks.append(','.join(pd_args))
-    if create_disks:
-      cmd.flags['create-disk'] = create_disks
+    cmd.flags.update(self.create_disk_strategy.GetCreationCommand())
 
     if FLAGS.gcloud_scopes:
       cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))

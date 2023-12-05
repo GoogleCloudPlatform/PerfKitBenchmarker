@@ -65,7 +65,7 @@ class CreateDiskStrategy:
     """Add metadata to the disk resource for tagging purpose."""
     pass
 
-  def GetCreationCommand(self) -> dict[str, str]:
+  def GetCreationCommand(self) -> dict[str, Any]:
     """Returns the command to create the disk resource with the VM."""
     return {}
 

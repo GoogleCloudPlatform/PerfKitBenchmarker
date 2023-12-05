@@ -70,6 +70,41 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
         cmd.flags['labels'] = util.MakeFormattedDefaultTags()
         cmd.Issue()
 
+  def GetCreationCommand(self) -> dict[str, Any]:
+    create_disks = []
+    dic = {}
+    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
+      if not self.DiskCreatedOnVMCreation():
+        continue
+      for i in range(disk_spec.num_striped_disks):
+        name = _GenerateDiskNamePrefix(self.vm, disk_spec_id, i)
+        pd_args = [
+            f'name={name}',
+            f'device-name={name}',
+            f'size={disk_spec.disk_size}',
+            f'type={disk_spec.disk_type}',
+            'auto-delete=yes',
+            'boot=no',
+            'mode=rw',
+        ]
+        if (
+            disk_spec.provisioned_iops
+            and disk_spec.disk_type in gce_disk.GCE_DYNAMIC_IOPS_DISK_TYPES
+        ):
+          pd_args += [f'provisioned-iops={disk_spec.provisioned_iops}']
+        if (
+            disk_spec.provisioned_throughput
+            and disk_spec.disk_type
+            in gce_disk.GCE_DYNAMIC_THROUGHPUT_DISK_TYPES
+        ):
+          pd_args += [
+              f'provisioned-throughput={disk_spec.provisioned_throughput}'
+          ]
+        create_disks.append(','.join(pd_args))
+    if create_disks:
+      dic['create-disk'] = create_disks
+    return dic
+
 
 class CreateLSSDDiskStrategy(GCPCreateDiskStrategy):
   """Contains logic to create LSSD disk on VM."""
