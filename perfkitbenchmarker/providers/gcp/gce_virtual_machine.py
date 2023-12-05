@@ -590,6 +590,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.image_family = vm_spec.image_family or self.GetDefaultImageFamily(
         self.is_aarch64
     )
+    self.create_disk_strategy = gce_disk_strategies.GetCreateDiskStrategy(
+        self, None, 0
+    )
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
@@ -950,7 +953,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if re.search(
           r'HTTPError 400: .* can not be used without accelerator\(s\) in zone',
-          stderr):
+          stderr,
+      ):
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       if 'The service is currently unavailable' in stderr:
         raise errors.Benchmarks.KnownIntermittentError(stderr)
@@ -1323,19 +1327,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # vm metadata added to vm on creation.
     # Add metadata to boot disk
     gce_disk.AddLabels(self, self.name)
-
-    # Add metadata to data disks
-    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      if not self.create_disk_strategy.DiskCreatedOnVMCreation():
-        continue
-      # local disks are not tagged
-      if disk_spec.disk_type == disk.LOCAL:
-        continue
-      for i in range(disk_spec.num_striped_disks):
-        name = self._GenerateDiskNamePrefix(disk_spec_id, i)
-        cmd = util.GcloudCommand(self, 'compute', 'disks', 'add-labels', name)
-        cmd.flags['labels'] = util.MakeFormattedDefaultTags()
-        cmd.Issue()
+    self.create_disk_strategy.AddMetadataToDiskResource()
 
   def AllowRemoteAccessPorts(self):
     """Creates firewall rules for remote access if required."""

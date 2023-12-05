@@ -21,6 +21,7 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
@@ -33,10 +34,11 @@ def GetCreateDiskStrategy(
     disk_spec: gce_disk.GceDiskSpec,
     disk_count: int,
 ) -> disk_strategies.CreateDiskStrategy:
-  if disk_spec.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES:
-    return CreatePDDiskStrategy(vm, disk_spec, disk_count)
-  elif disk_spec.disk_type == disk.LOCAL:
-    return CreateLSSDDiskStrategy(vm, disk_spec, disk_count)
+  if disk_spec:
+    if disk_spec.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES:
+      return CreatePDDiskStrategy(vm, disk_spec, disk_count)
+    elif disk_spec.disk_type == disk.LOCAL:
+      return CreateLSSDDiskStrategy(vm, disk_spec, disk_count)
   return GCEEmptyCreateDiskStrategy(vm, disk_spec, disk_count)
 
 
@@ -55,6 +57,18 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
       # GCE regional disks cannot use create-on-create.
       return False
     return self.disk_spec.create_with_vm
+
+  def AddMetadataToDiskResource(self):
+    if not self.DiskCreatedOnVMCreation():
+      return
+    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
+      for i in range(disk_spec.num_striped_disks):
+        name = _GenerateDiskNamePrefix(self.vm, disk_spec_id, i)
+        cmd = util.GcloudCommand(
+            self.vm, 'compute', 'disks', 'add-labels', name
+        )
+        cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+        cmd.Issue()
 
 
 class CreateLSSDDiskStrategy(GCPCreateDiskStrategy):

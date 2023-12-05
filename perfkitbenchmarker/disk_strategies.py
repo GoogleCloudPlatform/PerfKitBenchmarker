@@ -91,6 +91,10 @@ class CreateDiskStrategy:
 class EmptyCreateDiskStrategy(CreateDiskStrategy):
   """Strategies to create nothing. Useful when there is no resource disk."""
 
+  # pylint: disable=super-init-not-called
+  def __init__(self, vm: Any, disk_spec: disk.BaseDiskSpec, disk_count: int):
+    pass
+
   def _CreateAndAttachDisk(self) -> None:
     """Does nothing."""
     return
