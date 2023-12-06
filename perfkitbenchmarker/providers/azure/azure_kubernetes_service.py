@@ -49,9 +49,11 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     """Returns True if the registry exists."""
     if self._deleted:
       return False
-    stdout, _, _ = vm_util.IssueCommand([
-        azure.AZURE_PATH, 'acr', 'show', '--name', self.name,
-    ], raise_on_failure=False)
+    stdout, _, _ = vm_util.IssueCommand(
+        [azure.AZURE_PATH, 'acr', 'show', '--name', self.name]
+        + self.resource_group.args,
+        raise_on_failure=False,
+    )
     try:
       registry = json.loads(stdout)
       self.login_server = registry['loginServer']
