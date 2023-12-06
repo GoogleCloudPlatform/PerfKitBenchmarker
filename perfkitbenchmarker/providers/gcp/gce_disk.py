@@ -304,6 +304,20 @@ def GetDefaultBootDiskType(machine_type: str) -> str:
   return PKB_DEFAULT_BOOT_DISK_TYPE
 
 
+class GceLocalDisk(disk.BaseDisk):
+  """Object representing a GCE Local Disk."""
+
+  def __init__(self, disk_spec, name):
+    super(GceLocalDisk, self).__init__(disk_spec)
+    self.interface = disk_spec.interface
+    self.metadata['interface'] = disk_spec.interface
+    self.metadata.update(DISK_METADATA[disk_spec.disk_type])
+    self.name = name
+
+  def GetDevicePath(self) -> str:
+    return f'/dev/disk/by-id/google-{self.name}'
+
+
 class GceDisk(disk.BaseDisk):
   """Object representing a GCE Disk."""
 
@@ -341,8 +355,6 @@ class GceDisk(disk.BaseDisk):
       disk_metadata[disk.REPLICATION] = disk.REGION
       self.metadata['replica_zones'] = replica_zones
     self.metadata.update(DISK_METADATA[disk_spec.disk_type])
-    if self.disk_type == disk.LOCAL:
-      self.metadata['interface'] = self.interface
 
   def _Create(self):
     """Creates the disk."""
@@ -453,7 +465,7 @@ class GceDisk(disk.BaseDisk):
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    if self.disk_type in GCE_REMOTE_DISK_TYPES and self.interface == NVME:
+    if self.interface == NVME:
       return self.name
     # by default, returns this name id.
     return f'/dev/disk/by-id/google-{self.name}'

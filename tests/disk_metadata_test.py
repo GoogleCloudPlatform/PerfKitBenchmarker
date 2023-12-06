@@ -70,7 +70,7 @@ class GcpDiskMetadataTest(_DiskMetadataTestCase):
     disk_spec = gce_disk.GceDiskSpec(
         _COMPONENT, disk_size=2, disk_type=disk.LOCAL,
         interface=gce_disk.NVME)
-    disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
+    disk_obj = gce_disk.GceLocalDisk(disk_spec, 'name')
     self.assertDictContainsSubset(
         {disk.MEDIA: disk.SSD, disk.REPLICATION: 'none',
          'interface': gce_disk.NVME},

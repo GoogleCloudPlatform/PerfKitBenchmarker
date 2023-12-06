@@ -1175,8 +1175,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             disk_number = self.local_disk_counter + self.NVME_START_INDEX
         else:
           raise errors.Error('Unknown Local SSD Interface.')
-        # This is a local ssd, it does not need the regional pd flag.
-        data_disk = gce_disk.GceDisk(disk_spec, name, self.zone, self.project)
+        data_disk = gce_disk.GceLocalDisk(disk_spec, name)
         data_disk.disk_number = disk_number
         self.local_disk_counter += 1
         if self.local_disk_counter > self.max_local_disks:
