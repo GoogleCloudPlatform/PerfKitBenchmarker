@@ -371,7 +371,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         arg_list += job_arguments
       arg_spec = 'Args=[' + ','.join(arg_list) + ']'
       step_list = ['Jar=' + jarfile, arg_spec]
-    elif job_type == self.SPARK_JOB_TYPE:
+    elif job_type == dpb_constants.SPARK_JOB_TYPE:
       arg_list = []
       if job_files:
         arg_list += ['--files', ','.join(job_files)]
@@ -402,7 +402,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         arg_list += job_arguments
       arg_spec = 'Args=[{}]'.format(','.join(arg_list))
       step_list = ['Type=Spark', arg_spec]
-    elif job_type == self.SPARKSQL_JOB_TYPE:
+    elif job_type == dpb_constants.SPARKSQL_JOB_TYPE:
       assert not job_arguments
       arg_list = [query_file]
       jar_spec = 'Jar="command-runner.jar"'
