@@ -31,6 +31,7 @@ from absl import flags
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import types
 from perfkitbenchmarker import beam_benchmark_helper
+from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -195,7 +196,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
   ):
     """See base class."""
 
-    if job_type == self.BEAM_JOB_TYPE:
+    if job_type == dpb_constants.BEAM_JOB_TYPE:
       full_cmd, base_dir = beam_benchmark_helper.BuildBeamCommand(
           self.spec, classname, job_arguments
       )

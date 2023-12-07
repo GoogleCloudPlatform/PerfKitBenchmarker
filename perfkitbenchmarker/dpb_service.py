@@ -163,7 +163,7 @@ class BaseDpbService(resource.BaseResource):
   def _JobJars(self) -> Dict[str, Dict[str, str]]:
     """Known mappings of jars in the cluster used by GetExecutionJar."""
     return {
-        self.SPARK_JOB_TYPE: {
+        dpb_constants.SPARK_JOB_TYPE: {
             # Default for Dataproc and EMR
             'examples': 'file:///usr/lib/spark/examples/jars/spark-examples.jar'
         }
@@ -741,7 +741,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
                 job_type=None,
                 properties=None):
     """Submit a data processing job to the backend."""
-    if job_type != self.HADOOP_JOB_TYPE:
+    if job_type != dpb_constants.HADOOP_JOB_TYPE:
       raise NotImplementedError
     cmd_list = [hadoop.HADOOP_CMD]
     # Order is important
@@ -786,7 +786,9 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
 
   def _JobJars(self) -> Dict[str, Dict[str, str]]:
     """Known mappings of jars in the cluster used by GetExecutionJar."""
-    return {self.SPARK_JOB_TYPE: {'examples': spark.SparkExamplesJarPath()}}
+    return {
+        dpb_constants.SPARK_JOB_TYPE: {'examples': spark.SparkExamplesJarPath()}
+    }
 
   def __init__(self, dpb_service_spec):
     super(UnmanagedDpbSparkCluster, self).__init__(dpb_service_spec)
@@ -876,7 +878,9 @@ class KubernetesSparkCluster(BaseDpbService):
 
   def _JobJars(self) -> Dict[str, Dict[str, str]]:
     """Known mappings of jars in the cluster used by GetExecutionJar."""
-    return {self.SPARK_JOB_TYPE: {'examples': spark.SparkExamplesJarPath()}}
+    return {
+        dpb_constants.SPARK_JOB_TYPE: {'examples': spark.SparkExamplesJarPath()}
+    }
 
   # TODO(odiego): Implement GetClusterCreateTime adding K8s cluster create time
 

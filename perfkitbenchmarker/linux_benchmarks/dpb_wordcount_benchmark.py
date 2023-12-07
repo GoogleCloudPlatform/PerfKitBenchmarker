@@ -161,7 +161,7 @@ def Prepare(benchmark_spec):
   dpb_service_instance = benchmark_spec.dpb_service
   storage_service = dpb_service_instance.storage_service
   benchmark_spec.dpb_wordcount_jarfile = FLAGS.dpb_job_jarfile
-  if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
+  if dpb_service_instance.SERVICE_TYPE == dpb_constants.DATAFLOW:
     if FLAGS.dpb_job_jarfile and FLAGS.dpb_job_jarfile.startswith('gs://'):
       local_path = os.path.join(
           temp_dir.GetRunDirPath(), os.path.basename(FLAGS.dpb_job_jarfile)
@@ -192,16 +192,16 @@ def Run(benchmark_spec):
   if (
       dpb_service_instance.SERVICE_TYPE
       in [
-          dpb_service.DATAFLOW,
-          dpb_service.DATAPROC_FLINK,
-          dpb_service.KUBERNETES_FLINK_CLUSTER,
+          dpb_constants.DATAFLOW,
+          dpb_constants.DATAPROC_FLINK,
+          dpb_constants.KUBERNETES_FLINK_CLUSTER,
       ]
       or FLAGS.dpb_wordcount_force_beam_style_job_args
   ):
     jarfile = benchmark_spec.dpb_wordcount_jarfile
     job_arguments.append('--inputFile={}'.format(input_location))
     # Add the output argument for Dataflow
-    if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
+    if dpb_service_instance.SERVICE_TYPE == dpb_constants.DATAFLOW:
       if not FLAGS.dpb_wordcount_out_base:
         base_out = dpb_service_instance.GetStagingLocation()
       else:
@@ -263,7 +263,7 @@ def Run(benchmark_spec):
 
   # TODO(odiego): Refactor to avoid explicit service type checks.
   if FLAGS.dpb_export_job_stats:
-    if dpb_service_instance.SERVICE_TYPE == dpb_service.DATAFLOW:
+    if dpb_service_instance.SERVICE_TYPE == dpb_constants.DATAFLOW:
       avg_cpu_util = dpb_service_instance.GetAvgCpuUtilization(
           start_time, end_time
       )
