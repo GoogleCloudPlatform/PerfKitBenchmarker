@@ -511,10 +511,14 @@ class GcpDpbDataprocServerless(
     self._dpb_s8s_disk_type = (
         dpb_service_spec.worker_group.disk_spec.disk_type or 'standard'
     )
-    # This is to make it work with the default dpb_sparksql_benchmark GCP
-    # disk_type.
+    self._dpb_s8s_machine_type = (
+        dpb_service_spec.worker_group.vm_spec.machine_type or 'standard'
+    )
+    # This is to make it work with dpb_sparksql_benchmark GCP defaults.
     if self._dpb_s8s_disk_type == 'pd-standard':
       self._dpb_s8s_disk_type = 'standard'
+    if self._dpb_s8s_machine_type == 'n1-standard-4':
+      self._dpb_s8s_machine_type = 'standard'
     super().__init__(dpb_service_spec)
     self._job_counter = 0
     self.batch_name = f'{self.cluster_id}-{self._job_counter}'
@@ -649,6 +653,11 @@ class GcpDpbDataprocServerless(
     if self.spec.worker_group.disk_spec.disk_type:
       result['spark.dataproc.driver.disk.tier'] = self._dpb_s8s_disk_type
       result['spark.dataproc.executor.disk.tier'] = self._dpb_s8s_disk_type
+    if self.spec.worker_group.vm_spec.machine_type:
+      result['spark.dataproc.driver.compute.tier'] = self._dpb_s8s_machine_type
+      result['spark.dataproc.executor.compute.tier'] = (
+          self._dpb_s8s_machine_type
+      )
     if self.spec.dataproc_serverless_memory:
       result['spark.driver.memory'] = f'{self.spec.dataproc_serverless_memory}m'
       result['spark.executor.memory'] = (
@@ -665,16 +674,23 @@ class GcpDpbDataprocServerless(
     return result
 
   def _FillMetadata(self) -> None:
-    if self.spec.dataproc_serverless_core_count:
-      cluster_shape = (
-          f'dataproc-serverless-{self.spec.dataproc_serverless_core_count}'
-      )
-    else:
-      cluster_shape = 'dataproc-serverless-default'
+    cluster_shape_tier = (
+        '-premium' if self._dpb_s8s_machine_type == 'premium' else ''
+    )
+    cluster_shape_cores = self.spec.dataproc_serverless_core_count or 'default'
+    cluster_shape = (
+        f'dataproc-serverless{cluster_shape_tier}-{cluster_shape_cores}'
+    )
 
-    initial_executors = self.spec.dataproc_serverless_initial_executors
-    min_executors = self.spec.dataproc_serverless_min_executors
-    max_executors = self.spec.dataproc_serverless_max_executors
+    initial_executors = (
+        self.spec.dataproc_serverless_initial_executors or 'default'
+    )
+    min_executors = (
+        self.spec.dataproc_serverless_min_executors or 'default'
+    )
+    max_executors = (
+        self.spec.dataproc_serverless_max_executors or 'default'
+    )
 
     cluster_size = None
     if initial_executors == min_executors == max_executors:
@@ -690,7 +706,9 @@ class GcpDpbDataprocServerless(
         'dpb_cluster_min_executors': min_executors,
         'dpb_cluster_max_executors': max_executors,
         'dpb_cluster_initial_executors': initial_executors,
-        'dpb_cores_per_node': self.spec.dataproc_serverless_core_count,
+        'dpb_cores_per_node': (
+            self.spec.dataproc_serverless_core_count or 'default'
+        ),
         'dpb_memory_per_node': (
             self.spec.dataproc_serverless_memory or 'default'
         ),
@@ -739,9 +757,8 @@ class GcpDpbDataprocServerless(
     if self._dpb_s8s_disk_type == 'premium':
       # prices based on
       # https://cloud.google.com/dataproc-serverless/pricing#data_compute_unit_dcu_pricing
-      # TODO(odiego): Get prices for all regions like it's done for standard.
-      usd_per_milli_dcu_sec = 0.089 / 1000 / 3600
-      usd_per_shuffle_storage_gb_sec = 0.1 / 730 / 3600
+      # TODO(odiego): Add proper price calculation for premium in follow up CL.
+      return None
     if usd_per_milli_dcu_sec is None or usd_per_shuffle_storage_gb_sec is None:
       return None
     results = FetchBatchResults()

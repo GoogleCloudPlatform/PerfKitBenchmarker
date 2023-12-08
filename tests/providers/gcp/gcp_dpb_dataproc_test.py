@@ -83,6 +83,9 @@ def GetServerlessSpec():
       dataproc_serverless_memory=10000,
       dataproc_serverless_memory_overhead=4000,
       worker_group=mock.Mock(
+          vm_spec=mock.Mock(
+              machine_type='standard',
+          ),
           disk_spec=mock.Mock(
               disk_size=42,
               disk_type='standard',
@@ -269,19 +272,25 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.dpb_service_zone = GCP_ZONE_US_CENTRAL1_A
 
   @parameterized.named_parameters(
-      dict(testcase_name='Standard', disk_type='standard', hdfs_type='HDD'),
-      dict(testcase_name='Premium', disk_type='premium', hdfs_type='Local SSD'),
+      dict(testcase_name='Standard', tier='standard', hdfs_type='HDD'),
+      dict(testcase_name='Premium', tier='premium', hdfs_type='Local SSD'),
   )
-  def testMetadataStandard(self, disk_type, hdfs_type):
+  def testMetadata(self, tier, hdfs_type):
     spec = GetServerlessSpec()
-    spec.worker_group.disk_spec.disk_type = disk_type
+    spec.worker_group.vm_spec.machine_type = tier
+    spec.worker_group.disk_spec.disk_type = tier
+    cluster_shape = (
+        'dataproc-serverless-premium-4'
+        if tier == 'premium'
+        else 'dataproc-serverless-4'
+    )
     service = gcp_dpb_dataproc.GcpDpbDataprocServerless(spec)
     expected_metadata = {
         'dpb_service': 'dataproc_serverless',
         'dpb_version': 'fake-4.2',
         'dpb_service_version': 'dataproc_serverless_fake-4.2',
         'dpb_batch_id': 'pkb-fakeru',
-        'dpb_cluster_shape': 'dataproc-serverless-4',
+        'dpb_cluster_shape': cluster_shape,
         'dpb_cluster_size': None,
         'dpb_cluster_min_executors': 2,
         'dpb_cluster_max_executors': 10,
@@ -292,7 +301,7 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
         'dpb_hdfs_type': hdfs_type,
         'dpb_disk_size': 42,
         'dpb_service_zone': 'us-central1-a',
-        'dpb_job_properties': f'spark.executor.cores=4,spark.driver.cores=4,spark.executor.instances=4,spark.dynamicAllocation.minExecutors=2,spark.dynamicAllocation.maxExecutors=10,spark.dataproc.driver.disk.size=42g,spark.dataproc.executor.disk.size=42g,spark.dataproc.driver.disk.tier={disk_type},spark.dataproc.executor.disk.tier={disk_type},spark.driver.memory=10000m,spark.executor.memory=10000m,spark.driver.memoryOverhead=4000m,spark.executor.memoryOverhead=4000m',
+        'dpb_job_properties': f'spark.executor.cores=4,spark.driver.cores=4,spark.executor.instances=4,spark.dynamicAllocation.minExecutors=2,spark.dynamicAllocation.maxExecutors=10,spark.dataproc.driver.disk.size=42g,spark.dataproc.executor.disk.size=42g,spark.dataproc.driver.disk.tier={tier},spark.dataproc.executor.disk.tier={tier},spark.dataproc.driver.compute.tier={tier},spark.dataproc.executor.compute.tier={tier},spark.driver.memory=10000m,spark.executor.memory=10000m,spark.driver.memoryOverhead=4000m,spark.executor.memoryOverhead=4000m',
     }
     self.assertEqual(service.GetResourceMetadata(), expected_metadata)
 
@@ -345,6 +354,8 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
                     'spark.dataproc.executor.disk.size=42g@'
                     'spark.dataproc.driver.disk.tier=standard@'
                     'spark.dataproc.executor.disk.tier=standard@'
+                    'spark.dataproc.driver.compute.tier=standard@'
+                    'spark.dataproc.executor.compute.tier=standard@'
                     'spark.driver.memory=10000m@'
                     'spark.executor.memory=10000m@'
                     'spark.driver.memoryOverhead=4000m@'
