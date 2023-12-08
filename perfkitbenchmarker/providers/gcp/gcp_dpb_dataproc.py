@@ -53,6 +53,9 @@ serverless_disk_to_hdfs_map = {
     'standard': 'HDD',
     'premium': 'Local SSD',
 }
+_DATAPROC_SERVERLESS_PRICES = (
+    gcp_dpb_dataproc_serverless_prices.DATAPROC_SERVERLESS_PRICES
+)
 
 DATAPROC_FLINK_INIT_SCRIPT = os.path.join('beam', 'flink-init.sh')
 DATAPROC_FLINK_PRESUBMIT_SCRIPT = os.path.join('beam', 'flink-presubmit.sh')
@@ -685,12 +688,8 @@ class GcpDpbDataprocServerless(
     initial_executors = (
         self.spec.dataproc_serverless_initial_executors or 'default'
     )
-    min_executors = (
-        self.spec.dataproc_serverless_min_executors or 'default'
-    )
-    max_executors = (
-        self.spec.dataproc_serverless_max_executors or 'default'
-    )
+    min_executors = self.spec.dataproc_serverless_min_executors or 'default'
+    max_executors = self.spec.dataproc_serverless_max_executors or 'default'
 
     cluster_size = None
     if initial_executors == min_executors == max_executors:
@@ -743,22 +742,17 @@ class GcpDpbDataprocServerless(
         raise MetricNotReadyError('Usage metric is not ready')
       return results
 
-    # Pricing may vary based on regions. Only some regions available.
+    # Pricing may vary based on region and tier. Only some regions available.
     usd_per_milli_dcu_sec = (
-        gcp_dpb_dataproc_serverless_prices.DATAPROC_SERVERLESS_PRICES.get(
-            self.region, {}
-        ).get('usd_per_milli_dcu_sec')
+        _DATAPROC_SERVERLESS_PRICES.get(self._dpb_s8s_machine_type, {})
+        .get(self.region, {})
+        .get('usd_per_milli_dcu_sec')
     )
     usd_per_shuffle_storage_gb_sec = (
-        gcp_dpb_dataproc_serverless_prices.DATAPROC_SERVERLESS_PRICES.get(
-            self.region, {}
-        ).get('usd_per_shuffle_storage_gb_sec')
+        _DATAPROC_SERVERLESS_PRICES.get(self._dpb_s8s_disk_type, {})
+        .get(self.region, {})
+        .get('usd_per_shuffle_storage_gb_sec')
     )
-    if self._dpb_s8s_disk_type == 'premium':
-      # prices based on
-      # https://cloud.google.com/dataproc-serverless/pricing#data_compute_unit_dcu_pricing
-      # TODO(odiego): Add proper price calculation for premium in follow up CL.
-      return None
     if usd_per_milli_dcu_sec is None or usd_per_shuffle_storage_gb_sec is None:
       return None
     results = FetchBatchResults()
