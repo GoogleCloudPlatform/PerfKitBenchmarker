@@ -17,6 +17,7 @@ import unittest
 
 from absl import flags
 from absl.testing import flagsaver
+from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker.linux_benchmarks import aws_dynamodb_ycsb_benchmark
@@ -81,6 +82,17 @@ class LoadStageTest(pkb_common_test_case.PkbCommonTestCase):
     aws_dynamodb_ycsb_benchmark.Prepare(self.mock_spec)
 
     mock_set_throughput.assert_not_called()
+
+  @parameterized.parameters((100, 100, True, 200), (100, 100, False, 300))
+  @flagsaver.flagsaver()
+  def testTargetQpsIsCorrect(
+      self, rcu, wcu, strong_consistency, expected_qps
+  ):
+    FLAGS.aws_dynamodb_ycsb_consistentReads = strong_consistency
+    instance = aws_dynamodb.AwsDynamoDBInstance(rcu=rcu, wcu=wcu)
+    actual_qps = aws_dynamodb_ycsb_benchmark._GetTargetQps(instance)
+    self.assertEqual(actual_qps, expected_qps)
+
 
 if __name__ == '__main__':
   unittest.main()

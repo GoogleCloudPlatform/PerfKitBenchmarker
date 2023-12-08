@@ -205,6 +205,14 @@ def _ExtractThroughput(samples: Iterable[sample.Sample]) -> float:
   return 0.0
 
 
+def _GetTargetQps(db: aws_dynamodb.AwsDynamoDBInstance) -> int:
+  """Gets the target QPS for eventual and strong reads."""
+  read_multiplier = 1 if _CONSISTENT_READS.value else 2
+  rcu = 0 if db.rcu <= 25 else db.rcu * read_multiplier
+  wcu = 0 if db.wcu <= 25 else db.wcu
+  return rcu + wcu
+
+
 def RampUpRun(
     executor: ycsb.YCSBExecutor,
     db: aws_dynamodb.AwsDynamoDBInstance,
@@ -213,7 +221,7 @@ def RampUpRun(
 ) -> list[sample.Sample]:
   """Runs YCSB starting from provisioned QPS until max throughput is found."""
   # Database is already provisioned with the correct QPS.
-  qps = db.rcu + db.wcu
+  qps = _GetTargetQps(db)
   max_throughput = 0
   while True:
     run_kwargs['target'] = qps
@@ -243,10 +251,7 @@ def ExactThroughputRun(
     run_kwargs: MutableMapping[str, Any],
 ) -> list[sample.Sample]:
   """Runs YCSB at provisioned QPS."""
-  rcu = 0 if db.rcu <= 25 else db.rcu
-  wcu = 0 if db.wcu <= 25 else db.wcu
-  qps = rcu + wcu
-  run_kwargs['target'] = qps
+  run_kwargs['target'] = _GetTargetQps(db)
   run_samples = executor.Run(vms, run_kwargs=run_kwargs)
   for s in run_samples:
     s.metadata['provisioned_qps'] = True
