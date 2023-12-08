@@ -427,6 +427,7 @@ class DebianBasedKubernetesVirtualMachine(
       login_shell: bool = False,
       timeout: Optional[float] = None,
       ip_address: Optional[str] = None,
+      should_pre_log: bool = True,
       stack_level: int = 1,
   ):
     """Runs a command in the Kubernetes container using kubectl.
@@ -439,6 +440,7 @@ class DebianBasedKubernetesVirtualMachine(
       login_shell: If true, runs commands in a login shell.
       timeout: The timeout for the command.
       ip_address: Should always be None; incompatible with Kubernetes.
+      should_pre_log: Whether to output a "Running command" log statement.
       stack_level: The number of stack frames to skip for an "interesting"
         callsite to be logged.
 
@@ -453,12 +455,13 @@ class DebianBasedKubernetesVirtualMachine(
     if retries is None:
       retries = FLAGS.ssh_retries
     stack_level += 1
-    logging.info(
-        'Running on kubernetes %s cmd: %s',
-        self.name,
-        command,
-        stacklevel=stack_level + 1,
-    )
+    if should_pre_log:
+      logging.info(
+          'Running on kubernetes %s cmd: %s',
+          self.name,
+          command,
+          stacklevel=stack_level,
+      )
     cmd = [
         FLAGS.kubectl,
         '--kubeconfig=%s' % FLAGS.kubeconfig,

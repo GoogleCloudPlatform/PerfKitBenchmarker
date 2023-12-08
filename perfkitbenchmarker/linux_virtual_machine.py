@@ -477,10 +477,12 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         stacklevel=2,
     )
 
-    execute_path = os.path.join(vm_util.VM_TMP_DIR,
-                                os.path.basename(EXECUTE_COMMAND))
-    wait_path = os.path.join(vm_util.VM_TMP_DIR,
-                             os.path.basename(WAIT_FOR_COMMAND))
+    execute_path = os.path.join(
+        vm_util.VM_TMP_DIR, os.path.basename(EXECUTE_COMMAND)
+    )
+    wait_path = os.path.join(
+        vm_util.VM_TMP_DIR, os.path.basename(WAIT_FOR_COMMAND)
+    )
 
     uid = uuid.uuid4()
     file_base = os.path.join(vm_util.VM_TMP_DIR, 'cmd%s' % uid)
@@ -502,8 +504,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     if timeout:
       start_command.extend(['--timeout', str(timeout)])
 
-    start_command = '%s 1> %s 2>&1 &' % (' '.join(start_command),
-                                         wrapper_log)
+    start_command = '%s 1> %s 2>&1 &' % (' '.join(start_command), wrapper_log)
     self.RemoteCommand(start_command, stack_level=2)
 
     def _WaitForCommand():
@@ -512,16 +513,29 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
                       '--exclusive', exclusive_file]  # pyformat: disable
       stdout = ''
       while 'Command finished.' not in stdout:
+        logging.info('Waiting for original cmd: %s', command, stacklevel=3)
         stdout, _ = self.RemoteCommand(
-            ' '.join(wait_command), timeout=1800, stack_level=3)
+            ' '.join(wait_command),
+            timeout=1800,
+            should_pre_log=False,
+            stack_level=3,
+        )
       wait_command.extend([
           '--stdout', stdout_file,
           '--stderr', stderr_file,
           '--delete',
       ])  # pyformat: disable
-      return self.RemoteCommand(' '.join(wait_command),
-                                ignore_failure=ignore_failure,
-                                stack_level=3)
+      logging.info(
+          'Finished waiting, printing stdout & stderr for cmd: %s',
+          command,
+          stacklevel=3,
+      )
+      return self.RemoteCommand(
+          ' '.join(wait_command),
+          ignore_failure=ignore_failure,
+          should_pre_log=False,
+          stack_level=3,
+      )
 
     try:
       return _WaitForCommand()
@@ -1220,6 +1234,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       login_shell: bool = False,
       timeout: Optional[float] = None,
       ip_address: Optional[str] = None,
+      should_pre_log: bool = True,
       stack_level: int = 1,
   ) -> Tuple[str, str, int]:
     """Runs a command on the VM.
@@ -1237,6 +1252,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       timeout: The timeout for IssueCommand.
       ip_address: The ip address to use to connect to host.  If None, uses
         self.GetConnectionIp()
+      should_pre_log: Whether to output a "Running command" log statement.
       stack_level: Number of stack frames to skip & get an "interesting" caller,
         for logging. 1 skips this function, 2 skips this & its caller, etc..
 
@@ -1261,12 +1277,13 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     ssh_private_key = (self.ssh_private_key if self.is_static else
                        vm_util.GetPrivateKeyPath())
     ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
-    logger.info(
-        'Running on %s via ssh: %s',
-        self.name,
-        command,
-        stacklevel=stack_level,
-    )
+    if should_pre_log:
+      logger.info(
+          'Running on %s via ssh: %s',
+          self.name,
+          command,
+          stacklevel=stack_level,
+      )
     try:
       if login_shell:
         ssh_cmd.extend(['-t', '-t', 'bash -l -c "%s"' % command])
