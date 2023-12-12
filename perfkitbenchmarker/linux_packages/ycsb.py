@@ -1494,7 +1494,7 @@ class YCSBExecutor:
       time.sleep(_CPU_OPTIMIZATION_SLEEP_MINS.value * 60)
 
       lower_bound = 0
-      upper_bound = theoretical_max_qps * 2
+      upper_bound = theoretical_max_qps * 4
       while lower_bound <= upper_bound:
         if upper_bound - lower_bound <= theoretical_max_qps * 0.01:
           raise RetriableCpuSearchBoundsError(
