@@ -427,7 +427,7 @@ def ParseNetperfOutput(
   return (throughput_sample, latency_samples, latency_hist)
 
 
-def RunNetperf(vm, benchmark_name, server_ips, num_streams):
+def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
   """Spawns netperf on a remote VM, parses results.
 
   Args:
@@ -435,6 +435,7 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams):
     benchmark_name: The netperf benchmark to run, see the documentation.
     server_ips: A list of ips for a machine that is running netserver.
     num_streams: The number of netperf client threads to run.
+    client_ips: A list of ips for a machine that is running netperf.
 
   Returns:
     A sample.Sample object with the result.
@@ -468,13 +469,16 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams):
 
   remote_cmd_list = []
   assert server_ips, 'Server VM does not have an IP to use for netperf.'
+  if len(client_ips) != len(server_ips):
+    logging.warning('Number of client and server IPs do not match.')
   for server_ip_idx, server_ip in enumerate(server_ips):
+    client_ip = client_ips[server_ip_idx % len(client_ips)]
     netperf_cmd = (
         f'{netperf.NETPERF_PATH} '
         '-p {command_port} '
         f'-j {verbosity} '
         f'-t {benchmark_name} '
-        f'-H {server_ip} '
+        f'-H {server_ip} -L {client_ip} '
         f'-l {FLAGS.netperf_test_length} {confidence}'
         ' -- '
         '-P ,{data_port} '
@@ -679,7 +683,8 @@ def RunClientServerVMs(client_vm, server_vm):
     for netperf_benchmark in FLAGS.netperf_benchmarks:
       if vm_util.ShouldRunOnExternalIpAddress():
         external_ip_results = RunNetperf(
-            client_vm, netperf_benchmark, [server_vm.ip_address], num_streams
+            client_vm, netperf_benchmark, [server_vm.ip_address], num_streams,
+            [client_vm.ip_address]
         )
         for external_ip_result in external_ip_results:
           external_ip_result.metadata['ip_type'] = (
@@ -694,6 +699,7 @@ def RunClientServerVMs(client_vm, server_vm):
             netperf_benchmark,
             server_vm.GetInternalIPs(),
             num_streams,
+            client_vm.GetInternalIPs()
         )
         for internal_ip_result in internal_ip_results:
           internal_ip_result.metadata.update(metadata)
