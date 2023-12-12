@@ -42,6 +42,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
@@ -128,6 +129,11 @@ TRUSTED_LAUNCH_UNSUPPORTED_TYPES = AZURE_ARM_TYPES + [
     r'(Standard_E[0-9]+_v3)',
     r'(Standard_M[0-9]+.*)',
     r'(Standard_ND[0-9]+a.*)',
+]
+
+TRUSTED_LAUNCH_UNSUPPORTED_OS_TYPES = [
+    os_types.ROCKY_LINUX8,
+    os_types.ROCKY_LINUX9,
 ]
 
 
@@ -596,7 +602,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.trusted_launch_unsupported_type = any(
         re.search(machine_series, self.machine_type)
         for machine_series in TRUSTED_LAUNCH_UNSUPPORTED_TYPES
-    )
+    ) or self.OS_TYPE in TRUSTED_LAUNCH_UNSUPPORTED_OS_TYPES
     arm_arch = 'neoverse-n1' if _MachineTypeIsArm(self.machine_type) else None
     if arm_arch:
       self.host_arch = arm_arch
