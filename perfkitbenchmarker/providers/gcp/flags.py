@@ -314,6 +314,7 @@ flags.DEFINE_enum(
         'SIMBA_JDBC_1_2_4_1007',
         'SIMBA_JDBC_1_3_3_1004',
         'SIMBA_JDBC_1_5_0_1001',
+        'SIMBA_JDBC_1_5_2_1005',
     ],
     'The Runtime Interface used when interacting with BigQuery.',
 )
