@@ -1105,12 +1105,19 @@ class ZoneRetryManager():
     if self._GetCurrentZoneFlag() == _ANY_ZONE:
       if pkb_flags.MAX_RETRIES.value < 1:
         FLAGS['retries'].parse(len(self._supported_zones))
-      self._AssignNewZone()
+      self._ChooseAndSetNewZone(self._supported_zones)
     self._original_zone = self._GetCurrentZoneFlag()
     self._original_region = self._utils.GetRegionFromZone(self._original_zone)
 
   def HandleSmartRetries(self, spec: bm_spec.BenchmarkSpec) -> None:
-    """Handles smart zone retry flags if provided."""
+    """Handles smart zone retry flags if provided.
+
+    If quota retry, pick zone in new region. If unsupported or stockout retries,
+    pick zone in same region.
+
+    Args:
+      spec: benchmark spec.
+    """
     if (pkb_flags.SMART_QUOTA_RETRY.value and spec.failed_substatus
         == benchmark_status.FailedSubstatus.QUOTA):
       self._AssignZoneToNewRegion()
@@ -1118,7 +1125,7 @@ class ZoneRetryManager():
         benchmark_status.FailedSubstatus.UNSUPPORTED,
         benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
     }):
-      self._AssignNewZone()
+      self._AssignZoneToSameRegion()
 
   def _AssignZoneToNewRegion(self) -> None:
     """Changes zone to be a new zone in the different region."""
@@ -1136,9 +1143,11 @@ class ZoneRetryManager():
     logging.info('Retry using new region %s', new_region)
     self._ChooseAndSetNewZone(self._utils.GetZonesInRegion(new_region))
 
-  def _AssignNewZone(self) -> None:
-    """Changes zone to be a new zone."""
-    self._ChooseAndSetNewZone(self._supported_zones)
+  def _AssignZoneToSameRegion(self) -> None:
+    """Changes zone to be a new zone in the same region."""
+    supported_zones_in_region = self._utils.GetZonesInRegion(
+        self._original_region).intersection(self._supported_zones)
+    self._ChooseAndSetNewZone(supported_zones_in_region)
 
   def _ChooseAndSetNewZone(self, possible_zones: Set[str]) -> None:
     """Saves the current _zone_flag and sets it to a new zone.

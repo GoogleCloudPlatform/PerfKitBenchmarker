@@ -464,7 +464,7 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     mock_quota_retry = self.enter_context(
         mock.patch.object(pkb.ZoneRetryManager, '_AssignZoneToNewRegion'))
     mock_capacity_retry = self.enter_context(
-        mock.patch.object(pkb.ZoneRetryManager, '_AssignNewZone'))
+        mock.patch.object(pkb.ZoneRetryManager, '_AssignZoneToSameRegion'))
     self._MockGcpUtils('GetZonesFromMachineType', return_value=set())
 
     benchmark_specs, _ = pkb.RunBenchmarkTask(spec=test_spec)
