@@ -867,7 +867,6 @@ class AwsNetwork(network.BaseNetwork):
     self.regional_network = _AwsRegionalNetwork.GetForRegion(
         self.region, spec.vpc_id)
     self.subnet = None
-    self.subnets = []
     self.vpc_peering = None
 
     # Placement Group
@@ -911,7 +910,6 @@ class AwsNetwork(network.BaseNetwork):
           spec.vpc_id,
           cidr_block=self.regional_network.cidr_block,
           subnet_id=spec.subnet_id)
-      self.subnets = [self.subnet]
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
@@ -929,19 +927,17 @@ class AwsNetwork(network.BaseNetwork):
     self.regional_network.Create()
 
     if self.subnet is None:
-      for _ in range(AWS_ENI_COUNT.value):
-        cidr = self.regional_network.vpc.NextSubnetCidrBlock()
-        self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
-                                cidr_block=cidr)
-        self.subnet.Create()
-        self.subnets.append(self.subnet)
+      cidr = self.regional_network.vpc.NextSubnetCidrBlock()
+      self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
+                              cidr_block=cidr)
+      self.subnet.Create()
     if self.placement_group:
       self.placement_group.Create()
 
   def Delete(self):
     """Deletes the network."""
-    for subnet in self.subnets:
-      subnet.Delete()
+    if self.subnet:
+      self.subnet.Delete()
     if self.placement_group:
       self.placement_group.Delete()
     if hasattr(self, 'vpc_peering') and self.vpc_peering:

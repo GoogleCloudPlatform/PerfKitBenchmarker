@@ -961,7 +961,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             'NetworkCardIndex': device_index // enis_per_network_card,
             'DeviceIndex': device_index,
             'Groups': self.group_id,
-            'SubnetId': self.network.subnets[device_index].id,
+            'SubnetId': self.network.subnet.id,
         })
         enis.append(','.join(f'{key}={value}' for key, value in
                              sorted(eni_params.items())))
