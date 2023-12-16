@@ -20,7 +20,6 @@ import unittest
 from unittest import mock
 
 from absl import flags
-
 from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_dpb_glue
@@ -39,10 +38,7 @@ _BASE_JOB_RUN_PAYLOAD = {
         'LastModifiedOn': 1675105738.096,
         'CompletedOn': 1675105738.096,
         'JobRunState': 'SUCCEEDED',
-        'Arguments': {
-            '--pkb_main': 'hello',
-            '--pkb_args': '[]'
-        },
+        'Arguments': {'--pkb_main': 'hello', '--pkb_args': '[]'},
         'PredecessorRuns': [],
         'AllocatedCapacity': 32,
         'ExecutionTime': 2672,
@@ -51,7 +47,7 @@ _BASE_JOB_RUN_PAYLOAD = {
         'WorkerType': 'G.2X',
         'NumberOfWorkers': 4,
         'LogGroupName': '/aws-glue/jobs',
-        'GlueVersion': '3.0'
+        'GlueVersion': '3.0',
     }
 }
 
@@ -59,7 +55,7 @@ _BASE_JOB_RUN_PAYLOAD = {
 def _GetJobRunMockPayload(
     dpu_seconds: Optional[float],
     max_capacity: Optional[float],
-    execution_time: Optional[float]
+    execution_time: Optional[float],
 ) -> dict[str, Any]:
   payload = copy.deepcopy(_BASE_JOB_RUN_PAYLOAD)
   if dpu_seconds is not None:
@@ -76,7 +72,8 @@ GLUE_SPEC = mock.Mock(
     static_dpb_service_instance=None,
     version='3.0',
     worker_count=4,
-    worker_group=mock.Mock(vm_spec=mock.Mock(machine_type='G.2X')))
+    worker_group=mock.Mock(vm_spec=mock.Mock(machine_type='G.2X')),
+)
 
 
 class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -87,7 +84,8 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.dpb_service_zone = AWS_ZONE_US_EAST_1A
     FLAGS.zones = [AWS_ZONE_US_EAST_1A]
     self.issue_cmd_mock = self.enter_context(
-        mock.patch.object(vm_util, 'IssueCommand', autospec=True))
+        mock.patch.object(vm_util, 'IssueCommand', autospec=True)
+    )
 
   def testGlueCalculateLastJobCost(self):
     dpb_glue = aws_dpb_glue.AwsDpbGlue(GLUE_SPEC)
@@ -97,9 +95,15 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.issue_cmd_mock.side_effect = [
         (json.dumps(create_job_response), '', 0),
         (json.dumps(start_job_run_response), '', 0),
-        (json.dumps(
-            _GetJobRunMockPayload(dpu_seconds=None, max_capacity=32.0,
-                                  execution_time=2672)), '', 0)
+        (
+            json.dumps(
+                _GetJobRunMockPayload(
+                    dpu_seconds=None, max_capacity=32.0, execution_time=2672
+                )
+            ),
+            '',
+            0,
+        ),
     ]
 
     with mock.patch.object(aws_dpb_glue_prices, 'GLUE_PRICES'):
@@ -109,7 +113,8 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
       dpb_glue.SubmitJob(
           pyspark_file='s3://test/hello.py',
           job_type=dpb_constants.PYSPARK_JOB_TYPE,
-          job_arguments=[])
+          job_arguments=[],
+      )
 
     self.assertEqual(dpb_glue.CalculateLastJobCost(), 10.45048888888889)
 

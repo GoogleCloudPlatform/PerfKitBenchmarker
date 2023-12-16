@@ -36,8 +36,9 @@ from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string('dpb_emr_release_label', None,
-                    'DEPRECATED use dpb_service.version.')
+flags.DEFINE_string(
+    'dpb_emr_release_label', None, 'DEPRECATED use dpb_service.version.'
+)
 
 INVALID_STATES = ['TERMINATED_WITH_ERRORS', 'TERMINATED']
 READY_CHECK_SLEEP = 30
@@ -69,8 +70,9 @@ def _GetClusterConfiguration(cluster_properties: list[str]) -> str:
     key, value = kv.split('=')
     if file not in DATAPROC_TO_EMR_CONF_FILES:
       raise errors.Config.InvalidValue(
-          'Unsupported EMR configuration file "{}". '.format(file) +
-          'Please add it to aws_dpb_emr.DATAPROC_TO_EMR_CONF_FILES.')
+          'Unsupported EMR configuration file "{}". '.format(file)
+          + 'Please add it to aws_dpb_emr.DATAPROC_TO_EMR_CONF_FILES.'
+      )
     properties[DATAPROC_TO_EMR_CONF_FILES[file]][key] = value
   json_conf = []
   for file, props in properties.items():
@@ -112,10 +114,12 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       self.region = util.GetRegionFromZone(self.dpb_service_zone)
     else:
       raise errors.Setup.InvalidSetupError(
-          'dpb_service_zone must be provided, for provisioning.')
+          'dpb_service_zone must be provided, for provisioning.'
+      )
     self.cmd_prefix += ['--region', self.region]
     self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
-        aws_network.AwsNetworkSpec(zone=self.dpb_service_zone))
+        aws_network.AwsNetworkSpec(zone=self.dpb_service_zone)
+    )
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(self.region)
     self.persistent_fs_prefix = 's3://'
@@ -125,7 +129,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self._cluster_delete_time: Optional[float] = None
     if not self.GetDpbVersion():
       raise errors.Setup.InvalidSetupError(
-          'dpb_service.version must be provided.')
+          'dpb_service.version must be provided.'
+      )
 
   def GetDpbVersion(self) -> Optional[str]:
     return FLAGS.dpb_emr_release_label or super().GetDpbVersion()
@@ -168,25 +173,31 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       assert self.spec.worker_group.disk_spec.disk_number is None
       assert self.spec.worker_group.disk_spec.iops is None
       if self.spec.worker_group.disk_spec.disk_type != disk.LOCAL:
-        ebs_configuration = {'EbsBlockDeviceConfigs': [
-            {'VolumeSpecification': {
-                'SizeInGB': self.spec.worker_group.disk_spec.disk_size,
-                'VolumeType': self.spec.worker_group.disk_spec.disk_type},
-             'VolumesPerInstance': self.spec.worker_group.disk_count}]}
+        ebs_configuration = {
+            'EbsBlockDeviceConfigs': [{
+                'VolumeSpecification': {
+                    'SizeInGB': self.spec.worker_group.disk_spec.disk_size,
+                    'VolumeType': self.spec.worker_group.disk_spec.disk_type,
+                },
+                'VolumesPerInstance': self.spec.worker_group.disk_count,
+            }]
+        }
 
     # Create the specification for the master and the worker nodes
     instance_groups = []
-    core_instances = {'InstanceCount': self.spec.worker_count,
-                      'InstanceGroupType': 'CORE',
-                      'InstanceType':
-                          self.spec.worker_group.vm_spec.machine_type}
+    core_instances = {
+        'InstanceCount': self.spec.worker_count,
+        'InstanceGroupType': 'CORE',
+        'InstanceType': self.spec.worker_group.vm_spec.machine_type,
+    }
     if ebs_configuration:
       core_instances.update({'EbsConfiguration': ebs_configuration})
 
-    master_instance = {'InstanceCount': 1,
-                       'InstanceGroupType': 'MASTER',
-                       'InstanceType':
-                           self.spec.worker_group.vm_spec.machine_type}
+    master_instance = {
+        'InstanceCount': 1,
+        'InstanceGroupType': 'MASTER',
+        'InstanceType': self.spec.worker_group.vm_spec.machine_type,
+    }
     if ebs_configuration:
       master_instance.update({'EbsConfiguration': ebs_configuration})
 
@@ -194,14 +205,23 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     instance_groups.append(master_instance)
 
     # Spark SQL needs to access Hive
-    cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
-                             '--release-label', self.GetDpbVersion(),
-                             '--use-default-roles',
-                             '--instance-groups',
-                             json.dumps(instance_groups),
-                             '--application', 'Name=Spark',
-                             'Name=Hadoop', 'Name=Hive',
-                             '--log-uri', self.base_dir]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'create-cluster',
+        '--name',
+        name,
+        '--release-label',
+        self.GetDpbVersion(),
+        '--use-default-roles',
+        '--instance-groups',
+        json.dumps(instance_groups),
+        '--application',
+        'Name=Spark',
+        'Name=Hadoop',
+        'Name=Hive',
+        '--log-uri',
+        self.base_dir,
+    ]
 
     ec2_attributes = [
         'KeyName=' + aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
@@ -227,24 +247,29 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def _AddTags(self, tags_dict: dict[str, str]):
     tag_args = [f'{key}={value}' for key, value in tags_dict.items()]
-    cmd = self.cmd_prefix + ['emr', 'add-tags',
-                             '--resource-id', self.cluster_id,
-                             '--tags'] + tag_args
+    cmd = (
+        self.cmd_prefix
+        + ['emr', 'add-tags', '--resource-id', self.cluster_id, '--tags']
+        + tag_args
+    )
     try:
       vm_util.IssueCommand(cmd)
     except errors.VmUtil.IssueCommandError as e:
       error_message = str(e)
       if 'ThrottlingException' in error_message:
         raise errors.Benchmarks.QuotaFailure.RateLimitExceededError(
-            error_message) from e
+            error_message
+        ) from e
       raise
 
   def _Delete(self):
     if self.cluster_id:
-      delete_cmd = self.cmd_prefix + ['emr',
-                                      'terminate-clusters',
-                                      '--cluster-ids',
-                                      self.cluster_id]
+      delete_cmd = self.cmd_prefix + [
+          'emr',
+          'terminate-clusters',
+          '--cluster-ids',
+          self.cluster_id,
+      ]
       vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _DeleteDependencies(self):
@@ -255,10 +280,12 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     """Check to see whether the cluster exists."""
     if not self.cluster_id:
       return False
-    cmd = self.cmd_prefix + ['emr',
-                             'describe-cluster',
-                             '--cluster-id',
-                             self.cluster_id]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'describe-cluster',
+        '--cluster-id',
+        self.cluster_id,
+    ]
     stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       return False
@@ -279,9 +306,12 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def _IsReady(self):
     """Check to see if the cluster is ready."""
     logging.info('Checking _Ready cluster: %s', self.cluster_id)
-    cmd = self.cmd_prefix + ['emr',
-                             'describe-cluster', '--cluster-id',
-                             self.cluster_id]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'describe-cluster',
+        '--cluster-id',
+        self.cluster_id,
+    ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     # TODO(saksena): Handle error outcomees when spinning up emr clusters
@@ -307,44 +337,53 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def _GetCompletedJob(self, job_id):
     """See base class."""
     cmd = self.cmd_prefix + [
-        'emr', 'describe-step', '--cluster-id', self.cluster_id, '--step-id',
-        job_id
+        'emr',
+        'describe-step',
+        '--cluster-id',
+        self.cluster_id,
+        '--step-id',
+        job_id,
     ]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode:
       if 'ThrottlingException' in stderr:
-        logging.warning('Rate limited while polling EMR step:\n%s\nRetrying.',
-                        stderr)
+        logging.warning(
+            'Rate limited while polling EMR step:\n%s\nRetrying.', stderr
+        )
         return None
       else:
         raise errors.VmUtil.IssueCommandError(
-            f'Getting step status failed:\n{stderr}')
+            f'Getting step status failed:\n{stderr}'
+        )
     result = json.loads(stdout)
     state = result['Step']['Status']['State']
     if state == 'FAILED':
       raise dpb_service.JobSubmissionError(
-          result['Step']['Status']['FailureDetails'])
+          result['Step']['Status']['FailureDetails']
+      )
     if state == 'COMPLETED':
       pending_time = result['Step']['Status']['Timeline']['CreationDateTime']
       start_time = result['Step']['Status']['Timeline']['StartDateTime']
       end_time = result['Step']['Status']['Timeline']['EndDateTime']
       return dpb_service.JobResult(
-          run_time=end_time - start_time,
-          pending_time=start_time - pending_time)
+          run_time=end_time - start_time, pending_time=start_time - pending_time
+      )
 
-  def SubmitJob(self,
-                jarfile=None,
-                classname=None,
-                pyspark_file=None,
-                query_file=None,
-                job_poll_interval=None,
-                job_arguments=None,
-                job_files=None,
-                job_jars=None,
-                job_py_files=None,
-                job_stdout_file=None,
-                job_type=None,
-                properties=None):
+  def SubmitJob(
+      self,
+      jarfile=None,
+      classname=None,
+      pyspark_file=None,
+      query_file=None,
+      job_poll_interval=None,
+      job_arguments=None,
+      job_files=None,
+      job_jars=None,
+      job_py_files=None,
+      job_stdout_file=None,
+      job_type=None,
+      properties=None,
+  ):
     """See base class."""
     if job_arguments:
       # Escape commas in arguments
@@ -413,12 +452,14 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
     step_string = ','.join(step_list)
 
-    step_cmd = self.cmd_prefix + ['emr',
-                                  'add-steps',
-                                  '--cluster-id',
-                                  self.cluster_id,
-                                  '--steps',
-                                  step_string]
+    step_cmd = self.cmd_prefix + [
+        'emr',
+        'add-steps',
+        '--cluster-id',
+        self.cluster_id,
+        '--steps',
+        step_string,
+    ]
     stdout, _, _ = vm_util.IssueCommand(step_cmd)
     result = json.loads(stdout)
     step_id = result['StepIds'][0]
@@ -432,7 +473,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     return self.SubmitJob(
         'command-runner.jar',
         job_arguments=job_arguments,
-        job_type=dpb_constants.HADOOP_JOB_TYPE)
+        job_type=dpb_constants.HADOOP_JOB_TYPE,
+    )
 
   def GetHdfsType(self) -> Optional[str]:
     """Gets human friendly disk type for metric metadata."""
@@ -469,7 +511,8 @@ class AwsDpbEmrServerless(
       self.region = util.GetRegionFromZone(self.dpb_service_zone)
     else:
       raise errors.Setup.InvalidSetupError(
-          'dpb_service_zone must be provided, for provisioning.')
+          'dpb_service_zone must be provided, for provisioning.'
+      )
     self.cmd_prefix += ['--region', self.region]
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(self.region)
@@ -480,26 +523,29 @@ class AwsDpbEmrServerless(
           'dpb_service.version must be provided. Versions follow the format: '
           '"emr-x.y.z" and are listed at '
           'https://docs.aws.amazon.com/emr/latest/EMR-Serverless-UserGuide/'
-          'release-versions.html')
+          'release-versions.html'
+      )
     self.role = FLAGS.aws_emr_serverless_role
 
     # Last job run cost
     self._run_cost = None
     self._FillMetadata()
 
-  def SubmitJob(self,
-                jarfile=None,
-                classname=None,
-                pyspark_file=None,
-                query_file=None,
-                job_poll_interval=None,
-                job_arguments=None,
-                job_files=None,
-                job_jars=None,
-                job_py_files=None,
-                job_stdout_file=None,
-                job_type=None,
-                properties=None):
+  def SubmitJob(
+      self,
+      jarfile=None,
+      classname=None,
+      pyspark_file=None,
+      query_file=None,
+      job_poll_interval=None,
+      job_arguments=None,
+      job_files=None,
+      job_jars=None,
+      job_py_files=None,
+      job_stdout_file=None,
+      job_type=None,
+      properties=None,
+  ):
     """See base class."""
 
     assert job_type
@@ -515,49 +561,69 @@ class AwsDpbEmrServerless(
               'entryPoint': pyspark_file,
               'entryPointArguments': job_arguments,
               'sparkSubmitParameters': ' '.join(
-                  f'--conf {prop}={val}' for prop, val in spark_props.items())
+                  f'--conf {prop}={val}' for prop, val in spark_props.items()
+              ),
           }
       }
     else:
       raise NotImplementedError(
-          f'Unsupported job type {job_type} for AWS EMR Serverless.')
+          f'Unsupported job type {job_type} for AWS EMR Serverless.'
+      )
 
     # Create the application.
-    stdout, _, _ = vm_util.IssueCommand(self.cmd_prefix + [
-        'emr-serverless', 'create-application',
-        '--release-label', self.GetDpbVersion(),
-        '--name', self.cluster_id,
-        '--type', application_type,
-        '--tags', json.dumps(util.MakeDefaultTags()),
-    ])
+    stdout, _, _ = vm_util.IssueCommand(
+        self.cmd_prefix
+        + [
+            'emr-serverless',
+            'create-application',
+            '--release-label',
+            self.GetDpbVersion(),
+            '--name',
+            self.cluster_id,
+            '--type',
+            application_type,
+            '--tags',
+            json.dumps(util.MakeDefaultTags()),
+        ]
+    )
     result = json.loads(stdout)
     application_id = result['applicationId']
 
     @vm_util.Retry(
         poll_interval=job_poll_interval,
         fuzz=0,
-        retryable_exceptions=(EMRRetryableException,))
+        retryable_exceptions=(EMRRetryableException,),
+    )
     def WaitTilApplicationReady():
       result = self._GetApplication(application_id)
       if result['application']['state'] not in ('CREATED', 'STARTED'):
         raise EMRRetryableException(
-            f'Application {application_id} not ready yet.')
+            f'Application {application_id} not ready yet.'
+        )
       return result
 
     WaitTilApplicationReady()
 
     # Run the job.
-    stdout, _, _ = vm_util.IssueCommand(self.cmd_prefix + [
-        'emr-serverless', 'start-job-run',
-        '--application-id', application_id,
-        '--execution-role-arn', self.role,
-        '--job-driver', json.dumps(job_driver_dict),
-    ])
+    stdout, _, _ = vm_util.IssueCommand(
+        self.cmd_prefix
+        + [
+            'emr-serverless',
+            'start-job-run',
+            '--application-id',
+            application_id,
+            '--execution-role-arn',
+            self.role,
+            '--job-driver',
+            json.dumps(job_driver_dict),
+        ]
+    )
     result = json.loads(stdout)
     application_id = result['applicationId']
     job_run_id = result['jobRunId']
     return self._WaitForJob(
-        (application_id, job_run_id), EMR_TIMEOUT, job_poll_interval)
+        (application_id, job_run_id), EMR_TIMEOUT, job_poll_interval
+    )
 
   def CalculateLastJobCost(self) -> Optional[float]:
     return self._run_cost
@@ -571,7 +637,8 @@ class AwsDpbEmrServerless(
       result['spark.executor.memory'] = f'{self.spec.emr_serverless_memory}G'
     if self.spec.emr_serverless_executor_count:
       result['spark.executor.instances'] = (
-          self.spec.emr_serverless_executor_count)
+          self.spec.emr_serverless_executor_count
+      )
     if self.spec.worker_group.disk_spec.disk_size:
       result['spark.emr-serverless.driver.disk'] = (
           f'{self.spec.worker_group.disk_spec.disk_size}G'
@@ -584,29 +651,37 @@ class AwsDpbEmrServerless(
 
   def _GetApplication(self, application_id):
     stdout, _, _ = vm_util.IssueCommand(
-        self.cmd_prefix +
-        ['emr-serverless', 'get-application',
-         '--application-id', application_id])
+        self.cmd_prefix
+        + [
+            'emr-serverless',
+            'get-application',
+            '--application-id',
+            application_id,
+        ]
+    )
     result = json.loads(stdout)
     return result
 
   def _ComputeJobRunCost(
-      self,
-      memory_gb_hour: float,
-      storage_gb_hour: float,
-      vcpu_hour: float) -> Optional[float]:
+      self, memory_gb_hour: float, storage_gb_hour: float, vcpu_hour: float
+  ) -> Optional[float]:
     region_prices = aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES.get(
-        self.region, {})
+        self.region, {}
+    )
     memory_gb_hour_price = region_prices.get('memory_gb_hours')
     storage_gb_hour_price = region_prices.get('storage_gb_hours')
     vcpu_hour_price = region_prices.get('vcpu_hours')
-    if (memory_gb_hour_price is None or storage_gb_hour_price is None or
-        vcpu_hour_price is None):
+    if (
+        memory_gb_hour_price is None
+        or storage_gb_hour_price is None
+        or vcpu_hour_price is None
+    ):
       return None
     return (
-        memory_gb_hour * memory_gb_hour_price +
-        storage_gb_hour * storage_gb_hour_price +
-        vcpu_hour * vcpu_hour_price)
+        memory_gb_hour * memory_gb_hour_price
+        + storage_gb_hour * storage_gb_hour_price
+        + vcpu_hour * vcpu_hour_price
+    )
 
   def _GetCompletedJob(self, job_id):
     """See base class."""
@@ -614,17 +689,21 @@ class AwsDpbEmrServerless(
     cmd = self.cmd_prefix + [
         'emr-serverless',
         'get-job-run',
-        '--application-id', application_id,
-        '--job-run-id', job_run_id
+        '--application-id',
+        application_id,
+        '--job-run-id',
+        job_run_id,
     ]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode:
       if 'ThrottlingException' in stderr:
-        logging.warning('Rate limited while polling EMR JobRun:\n%s\nRetrying.',
-                        stderr)
+        logging.warning(
+            'Rate limited while polling EMR JobRun:\n%s\nRetrying.', stderr
+        )
         return None
       raise errors.VmUtil.IssueCommandError(
-          f'Getting JobRun status failed:\n{stderr}')
+          f'Getting JobRun status failed:\n{stderr}'
+      )
     result = json.loads(stdout)
     state = result['jobRun']['state']
     if state in ('FAILED', 'CANCELLED'):
@@ -632,14 +711,16 @@ class AwsDpbEmrServerless(
     if state == 'SUCCESS':
       start_time = result['jobRun']['createdAt']
       end_time = result['jobRun']['updatedAt']
-      resource_utilization = (
-          result.get('jobRun', {}).get('totalResourceUtilization', {}))
+      resource_utilization = result.get('jobRun', {}).get(
+          'totalResourceUtilization', {}
+      )
       memory_gb_hour = resource_utilization.get('memoryGBHour')
       storage_gb_hour = resource_utilization.get('storageGBHour')
       vcpu_hour = resource_utilization.get('vCPUHour')
       if None not in (memory_gb_hour, storage_gb_hour, vcpu_hour):
         self._run_cost = self._ComputeJobRunCost(
-            memory_gb_hour, storage_gb_hour, vcpu_hour)
+            memory_gb_hour, storage_gb_hour, vcpu_hour
+        )
       return dpb_service.JobResult(run_time=end_time - start_time)
 
   def _FillMetadata(self) -> None:

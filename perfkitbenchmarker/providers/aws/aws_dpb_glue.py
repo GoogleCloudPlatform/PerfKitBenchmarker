@@ -12,7 +12,6 @@ import os
 from typing import List, Optional
 
 from absl import flags
-
 from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
@@ -48,7 +47,8 @@ class AwsDpbGlue(
     self.cmd_prefix = list(util.AWS_PREFIX)
     if not self.dpb_service_zone:
       raise errors.Setup.InvalidSetupError(
-          'dpb_service_zone must be provided, for provisioning.')
+          'dpb_service_zone must be provided, for provisioning.'
+      )
     self.region = util.GetRegionFromZone(self.dpb_service_zone)
     self.cmd_prefix += ['--region', self.region]
     self.storage_service = s3.S3Service()
@@ -72,13 +72,16 @@ class AwsDpbGlue(
     cmd = self.cmd_prefix + [
         'glue',
         'get-job-run',
-        '--job-name', job_name,
-        '--run-id', job_run_id
+        '--job-name',
+        job_name,
+        '--run-id',
+        job_run_id,
     ]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode:
       raise errors.VmUtil.IssueCommandError(
-          f'Getting step status failed:\n{stderr}')
+          f'Getting step status failed:\n{stderr}'
+      )
     result = json.loads(stdout)
     state = result['JobRun']['JobRunState']
     if state in ('FAILED', 'ERROR', 'TIMEOUT'):
@@ -94,21 +97,24 @@ class AwsDpbGlue(
       )
       return dpb_service.JobResult(
           run_time=execution_time,
-          pending_time=completed_on - started_on - execution_time)
+          pending_time=completed_on - started_on - execution_time,
+      )
 
-  def SubmitJob(self,
-                jarfile=None,
-                classname=None,
-                pyspark_file=None,
-                query_file=None,
-                job_poll_interval=None,
-                job_stdout_file=None,
-                job_arguments=None,
-                job_files=None,
-                job_jars=None,
-                job_py_files=None,
-                job_type=None,
-                properties=None):
+  def SubmitJob(
+      self,
+      jarfile=None,
+      classname=None,
+      pyspark_file=None,
+      query_file=None,
+      job_poll_interval=None,
+      job_stdout_file=None,
+      job_arguments=None,
+      job_files=None,
+      job_jars=None,
+      job_py_files=None,
+      job_type=None,
+      properties=None,
+  ):
     """See base class."""
     assert job_type
 
@@ -130,34 +136,53 @@ class AwsDpbGlue(
       if properties:
         all_properties.update(properties)
       glue_default_args = {
-          '--extra-py-files': ','.join(extra_py_files), **all_properties}
+          '--extra-py-files': ','.join(extra_py_files),
+          **all_properties,
+      }
     else:
       raise ValueError(f'Unsupported job type {job_type} for AWS Glue.')
-    vm_util.IssueCommand(self.cmd_prefix + [
-        'glue',
-        'create-job',
-        '--name', job_name,
-        '--role', self.role,
-        '--command', json.dumps(glue_command),
-        '--default-arguments', json.dumps(glue_default_args),
-        '--glue-version', self.GetDpbVersion(),
-        '--number-of-workers', str(self.spec.worker_count),
-        '--worker-type', self.spec.worker_group.vm_spec.machine_type,
-
-    ])
+    vm_util.IssueCommand(
+        self.cmd_prefix
+        + [
+            'glue',
+            'create-job',
+            '--name',
+            job_name,
+            '--role',
+            self.role,
+            '--command',
+            json.dumps(glue_command),
+            '--default-arguments',
+            json.dumps(glue_default_args),
+            '--glue-version',
+            self.GetDpbVersion(),
+            '--number-of-workers',
+            str(self.spec.worker_count),
+            '--worker-type',
+            self.spec.worker_group.vm_spec.machine_type,
+        ]
+    )
 
     # Run job definition
-    stdout, _, _ = vm_util.IssueCommand(self.cmd_prefix + [
-        'glue',
-        'start-job-run',
-        '--job-name', job_name,
-        '--arguments', json.dumps(
-            {'--pkb_main': _ModuleFromPyFilename(pyspark_file),
-             '--pkb_args': json.dumps(job_arguments)})])
+    stdout, _, _ = vm_util.IssueCommand(
+        self.cmd_prefix
+        + [
+            'glue',
+            'start-job-run',
+            '--job-name',
+            job_name,
+            '--arguments',
+            json.dumps({
+                '--pkb_main': _ModuleFromPyFilename(pyspark_file),
+                '--pkb_args': json.dumps(job_arguments),
+            }),
+        ]
+    )
     job_run_id = json.loads(stdout)['JobRunId']
 
-    return self._WaitForJob((job_name, job_run_id), GLUE_TIMEOUT,
-                            job_poll_interval)
+    return self._WaitForJob(
+        (job_name, job_run_id), GLUE_TIMEOUT, job_poll_interval
+    )
 
   def _Delete(self):
     """Deletes Glue Jobs created to avoid quota issues."""
@@ -166,11 +191,10 @@ class AwsDpbGlue(
       self._DeleteGlueJob(job_name)
 
   def _DeleteGlueJob(self, job_name: str):
-    vm_util.IssueCommand(self.cmd_prefix + [
-        'glue',
-        'delete-job',
-        f'--job-name={job_name}'
-    ], raise_on_failure=False)
+    vm_util.IssueCommand(
+        self.cmd_prefix + ['glue', 'delete-job', f'--job-name={job_name}'],
+        raise_on_failure=False,
+    )
 
   def _FillMetadata(self) -> None:
     """Gets a dict to initialize this DPB service instance's metadata."""
@@ -180,7 +204,8 @@ class AwsDpbGlue(
     # https://docs.aws.amazon.com/glue/latest/dg/add-job.html#:~:text=Own%20Custom%20Scripts.-,Worker%20type,-The%20following%20worker
     disk_size_by_worker_type = {'Standard': '50', 'G.1X': '64', 'G.2X': '128'}
     dpb_disk_size = disk_size_by_worker_type.get(
-        self.spec.worker_group.vm_spec.machine_type, 'Unknown')
+        self.spec.worker_group.vm_spec.machine_type, 'Unknown'
+    )
 
     self.metadata = {
         'dpb_service': basic_data['dpb_service'],
