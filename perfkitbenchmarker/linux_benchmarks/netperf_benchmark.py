@@ -133,7 +133,10 @@ PORT_START = 20000
 REMOTE_SCRIPTS_DIR = 'netperf_test_scripts'
 REMOTE_SCRIPT = 'netperf_test.py'
 
-PERCENTILES = [50, 90, 95, 99]
+PERCENTILES = [50, 90, 99]
+
+flag_util.DEFINE_integerlist(
+    'percentiles', [50, 90, 99], 'Latency percentiles to calculate.')
 
 # By default, Container-Optimized OS (COS) host firewall allows only
 # outgoing connections and incoming SSH connections. To allow incoming
@@ -470,7 +473,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
     # Extract the throughput values from the samples
     throughputs = [s.value for s in throughput_samples]
     # Compute some stats on the throughput values
-    throughput_stats = sample.PercentileCalculator(throughputs, [50, 90, 95, 99])
+    throughput_stats = sample.PercentileCalculator(throughputs, FLAGS.percentiles)
     throughput_stats['min'] = min(throughputs)
     throughput_stats['max'] = max(throughputs)
     # Calculate aggregate throughput
@@ -492,7 +495,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
           sample.Sample(f'{benchmark_name}_Latency_Histogram', 0, 'us',
                         hist_metadata))
       # Calculate stats on aggregate latency histogram
-      latency_stats = _HistogramStatsCalculator(latency_histogram, [50, 90, 99])
+      latency_stats = _HistogramStatsCalculator(latency_histogram, FLAGS.percentiles)
       # Create samples for the latency stats
       for stat, value in latency_stats.items():
         samples.append(
