@@ -1139,7 +1139,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       disk_strategies.SetUpNFSDiskStrategy().SetUpDisk(self, self.disk_specs[0])
       return
     if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
-      self.SetupLocalDisks()
+      gce_disk_strategies.SetUpGceLocalDiskStrategy(self.disk_specs).SetUpDisk(
+          self, self.disk_specs[0]
+      )
+      return
+
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
       self.CreateScratchDisk(disk_spec_id, disk_spec)
       # TODO(user): Simplify disk logic.
@@ -1160,45 +1164,24 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     disks = []
 
     for i in range(disk_spec.num_striped_disks):
-      if disk_spec.disk_type == disk.LOCAL:
-        name = ''
-        if self.ssd_interface == SCSI:
-          name = 'local-ssd-%d' % self.local_disk_counter
-          disk_number = self.local_disk_counter + 1
-        elif self.ssd_interface == NVME:
-          name = f'local-nvme-ssd-{self.local_disk_counter}'
-          # TODO(user): Apply for new Gen 3 VMs (barring M3)
-          if self.machine_type.startswith('c3'):
-            # TODO(user): Also consider removing disk_number
-            disk_number = self.local_disk_counter
-          else:  # includes N2D CVM
-            disk_number = self.local_disk_counter + self.NVME_START_INDEX
-        else:
-          raise errors.Error('Unknown Local SSD Interface.')
-        data_disk = gce_disk.GceLocalDisk(disk_spec, name)
-        data_disk.disk_number = disk_number
-        self.local_disk_counter += 1
-        if self.local_disk_counter > self.max_local_disks:
-          raise errors.Error('Not enough local disks.')
-      else:  # disk_type is PD
-        name = self._GenerateDiskNamePrefix(disk_spec_id, i)
-        data_disk = gce_disk.GceDisk(
-            disk_spec,
-            name,
-            self.zone,
-            self.project,
-            replica_zones=disk_spec.replica_zones,
-        )
-        if gce_disk.PdDriveIsNvme(self):
-          data_disk.interface = gce_disk.NVME
-        else:
-          data_disk.interface = gce_disk.SCSI
-        # Remote disk numbers start at 1+max_local_disks (0 is the system disk
-        # and local disks occupy 1-max_local_disks).
-        data_disk.disk_number = (
-            self.remote_disk_counter + 1 + self.max_local_disks
-        )
-        self.remote_disk_counter += 1
+      name = self._GenerateDiskNamePrefix(disk_spec_id, i)
+      data_disk = gce_disk.GceDisk(
+          disk_spec,
+          name,
+          self.zone,
+          self.project,
+          replica_zones=disk_spec.replica_zones,
+      )
+      if gce_disk.PdDriveIsNvme(self):
+        data_disk.interface = gce_disk.NVME
+      else:
+        data_disk.interface = gce_disk.SCSI
+      # Remote disk numbers start at 1+max_local_disks (0 is the system disk
+      # and local disks occupy 1-max_local_disks).
+      data_disk.disk_number = (
+          self.remote_disk_counter + 1 + self.max_local_disks
+      )
+      self.remote_disk_counter += 1
       disks.append(data_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)

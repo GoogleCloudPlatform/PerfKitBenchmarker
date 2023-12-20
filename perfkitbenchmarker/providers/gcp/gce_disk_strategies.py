@@ -20,6 +20,8 @@ from typing import Any
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import util
 
@@ -121,6 +123,71 @@ class GCEEmptyCreateDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
     # This have to be set to False due to _CreateScratchDiskFromDisks in
     # virtual_machine.py.
     return False
+
+
+class SetUpGceLocalDiskStrategy(disk_strategies.SetUpDiskStrategy):
+  """Strategies to set up local disks."""
+
+  def __init__(self, disk_specs: list[disk.BaseDiskSpec]):
+    self.disk_specs = disk_specs
+
+  def SetUpDisk(self, vm: Any, _: disk.BaseDiskSpec):
+    # disk spec is not used here.
+    vm.SetupLocalDisks()
+    for disk_spec in self.disk_specs:
+      disks = []
+      for _ in range(disk_spec.num_striped_disks):
+        if vm.ssd_interface == gce_disk.SCSI:
+          name = 'local-ssd-%d' % vm.local_disk_counter
+          disk_number = vm.local_disk_counter + 1
+        elif vm.ssd_interface == gce_disk.NVME:
+          name = f'local-nvme-ssd-{vm.local_disk_counter}'
+          # TODO(user): Apply for new Gen 3 VMs (barring M3)
+          if vm.machine_type.startswith('c3'):
+            # TODO(user): Also consider removing disk_number
+            disk_number = vm.local_disk_counter
+          else:  # includes N2D CVM
+            disk_number = vm.local_disk_counter + vm.NVME_START_INDEX
+        else:
+          raise errors.Error('Unknown Local SSD Interface.')
+
+        data_disk = gce_disk.GceLocalDisk(disk_spec, name)
+        data_disk.disk_number = disk_number
+        vm.local_disk_counter += 1
+        if vm.local_disk_counter > vm.max_local_disks:
+          raise errors.Error('Not enough local disks.')
+        disks.append(data_disk)
+
+      scratch_disk = self._CreateScratchDiskFromDisks(vm, disk_spec, disks)
+      # Device path is needed to stripe disks on Linux, but not on Windows.
+      # The path is not updated for Windows machines.
+      if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+        nvme_devices = vm.GetNVMEDeviceInfo()
+        remote_nvme_devices = vm.FindRemoteNVMEDevices(
+            scratch_disk, nvme_devices
+        )
+        vm.UpdateDevicePath(scratch_disk, remote_nvme_devices)
+      disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
+          vm, scratch_disk, disk_spec
+      )
+      if disk_spec.num_striped_disks > 1:
+        break
+
+  def _CreateScratchDiskFromDisks(self, vm, disk_spec, disks):
+    """Helper method to create scratch data disks."""
+    # This will soon be moved to disk class. As the disk class should
+    # be able to handle how it's created and attached
+    if len(disks) > 1:
+      # If the disk_spec called for a striped disk, create one.
+      scratch_disk = disk.StripedDisk(disk_spec, disks)
+    else:
+      scratch_disk = disks[0]
+
+    if not vm.create_disk_strategy.DiskCreatedOnVMCreation():
+      scratch_disk.Create()
+      scratch_disk.Attach(vm)
+
+    return scratch_disk
 
 
 class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
