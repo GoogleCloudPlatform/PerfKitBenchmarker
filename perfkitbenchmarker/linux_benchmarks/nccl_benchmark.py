@@ -258,7 +258,7 @@ def MakeSamplesFromOutput(metadata, output):
     Samples containing training metrics, and the bandwidth
   """
   samples = []
-  metadata.update(_SAMPLE_LINE_RE.match(output).groupdict())
+  metadata.update(_SAMPLE_LINE_RE.search(output).groupdict())
   results = regex_util.ExtractAllMatches(r'(Rank\s+\d+) (.*)', output)
   metadata.update({rank: device for rank, device in results})
   results = regex_util.ExtractAllMatches(
