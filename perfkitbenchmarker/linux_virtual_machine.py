@@ -83,6 +83,7 @@ _DEFAULT_DISK_FSTAB_OPTIONS = 'defaults'
 # regex for parsing lscpu and /proc/cpuinfo
 _COLON_SEPARATED_RE = re.compile(r'^\s*(?P<key>.*?)\s*:\s*(?P<value>.*?)\s*$')
 
+_SYSFS_CPU_PATH = '/sys/devices/system/cpu'
 
 # TODO(user): update these to use a flag holder as recommended
 # in go/python-tips/051
@@ -211,6 +212,14 @@ _KERNEL_MODULES_TO_ADD = flags.DEFINE_list(
 _KERNEL_MODULES_TO_REMOVE = flags.DEFINE_list(
     'kernel_modules_to_remove', [], 'Kernel modules to remove from Linux VMs')
 
+_DISABLE_CSTATE_BY_NAME_AND_DEEPER = flags.DEFINE_string(
+    'disable_cstate_by_name_and_deeper',
+    None,
+    'When specified, cstates that either match the given string or lower are'
+    ' disabled. For instance, if C1E is specified for a VM running the'
+    ' intel_idle driver, then C1E and C6 states would all be disabled, but C1'
+    ' will remain enabled.',
+)
 
 # RHEL package managers
 YUM = 'yum'
@@ -412,6 +421,42 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         setting)
     self.os_metadata['transparent_hugepage'] = setting
 
+  def _DisableCstates(self):
+    """Disable cstates that either match or deeper than the given cstate."""
+    cstate = _DISABLE_CSTATE_BY_NAME_AND_DEEPER.value
+    if not cstate:
+      return
+    cstates = self._GetOrderedCstates()
+    if not cstates:
+      raise ValueError(
+          'No cstates found, the system does not support disabling cstates'
+      )
+    logging.info('Available cstates listed in order: %s', cstates)
+    if cstate not in cstates:
+      raise ValueError(f'Requested cstate {cstate} is not present in {cstates}')
+    num_cpus = self.num_cpus or self._GetNumCpus()
+    start_index = cstates.index(cstate)
+    disabled_cstates = []
+    for index in range(start_index, len(cstates)):
+      for cpu_id in range(num_cpus):
+        config_path = (
+            f'{_SYSFS_CPU_PATH}/cpu{cpu_id}/cpuidle/state{index}/disable'
+        )
+        self.RemoteCommand(f'echo 1 | sudo tee {config_path}')
+      disabled_cstates.append(cstates[index])
+    self.os_metadata['disabled_cstates'] = ','.join(disabled_cstates)
+
+  def _GetOrderedCstates(self) -> Optional[list[str]]:
+    """Returns the ordered cstates by querying the sysfs cpuidle path.
+
+    The ordering is obtained by the alphabetical wildcard expansion.
+    """
+    query_paths = f'{_SYSFS_CPU_PATH}/cpu0/cpuidle/state*/name'
+    if not self._RemoteFileExists(query_paths):
+      return None
+    out, _ = self.RemoteCommand(f'cat {query_paths}')
+    return list(filter(None, out.split('\n')))
+
   def _SetupRobustCommand(self):
     """Sets up the RobustRemoteCommand tooling.
 
@@ -581,6 +626,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     self.SetupProxy()
     self._CreateVmTmpDir()
     self._SetTransparentHugepages()
+    self._DisableCstates()
     if FLAGS.setup_remote_firewall:
       self.SetupRemoteFirewall()
     if self.install_packages:
@@ -1361,6 +1407,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self._CreateInstallDir()
     self._CreateVmTmpDir()
     self._SetTransparentHugepages()
+    self._DisableCstates()
     self._has_remote_command_script = False
     self._DisableCpus()
 

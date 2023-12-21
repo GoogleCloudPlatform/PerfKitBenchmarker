@@ -802,6 +802,60 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm.RecordAdditionalMetadata()
     self.assertEqual({}, vm.os_metadata)
 
+  def testDisableCstates(self):
+    cpu_cnt = 4
+    all_cstates = ['POLL', 'C1', 'C1E', 'C6']
+    disable_le_cstates = 'C1'
+    FLAGS['disable_cstate_by_name_and_deeper'].parse(disable_le_cstates)
+    responses = self.normal_boot_responses.copy()
+    responses.update({
+        'ls /sys/devices/system/cpu/cpu0/cpuidle/state*/name >> /dev/null 2>&1 || echo file_not_exist': (
+            ''
+        ),
+        'cat /sys/devices/system/cpu/cpu0/cpuidle/state*/name': (
+            '\n'.join(all_cstates) + '\n'
+        ),
+        'cat /proc/cpuinfo | grep processor | wc -l': cpu_cnt,
+    })
+    for state_i in range(
+        all_cstates.index(disable_le_cstates), len(all_cstates)
+    ):
+      for cpu_i in range(cpu_cnt):
+        responses[
+            'echo 1 | sudo tee'
+            f' /sys/devices/system/cpu/cpu{cpu_i}/cpuidle/state{state_i}/disable'
+        ] = ''
+    vm = self.CreateVm(responses)
+    vm._DisableCstates()
+    self.assertEqual(vm.os_metadata['disabled_cstates'], 'C1,C1E,C6')
+
+  def testDisableCstatesDefaultSkip(self):
+    vm = self.CreateVm(self.normal_boot_responses.copy())
+    vm._DisableCstates()
+    self.assertNotIn('disabled_cstates', vm.os_metadata)
+
+  @parameterized.named_parameters(
+      ('empty_cstates_list', [], 'C1', 'not support disabling cstates'),
+      ('non_existent_cstate', ['POLL', 'C1'], 'C1_NOT_EXIST', 'not present'),
+  )
+  def testDisableCstatesErrorCases(
+      self, all_cstates, requested_cstate, expected_error
+  ):
+    FLAGS['disable_cstate_by_name_and_deeper'].parse(requested_cstate)
+    responses = self.normal_boot_responses.copy()
+    responses.update({
+        'ls /sys/devices/system/cpu/cpu0/cpuidle/state*/name >> /dev/null 2>&1 || echo file_not_exist': (
+            ''
+        ),
+        'cat /sys/devices/system/cpu/cpu0/cpuidle/state*/name': (
+            '\n'.join(all_cstates) + '\n'
+        ),
+    })
+    vm = self.CreateVm(responses)
+    with self.assertRaisesRegex(ValueError, expected_error):
+      vm._DisableCstates()
+    self.assertNotIn('disabled_cstates', vm.os_metadata)
+
 
 if __name__ == '__main__':
   unittest.main()
