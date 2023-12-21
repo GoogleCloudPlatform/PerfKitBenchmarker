@@ -901,6 +901,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       # the same tags from the previous call.
       self.aws_tags.update(self.vm_metadata)
       self.aws_tags.update(util.MakeDefaultTags())
+      # Signal (along with timeout_utc) that VM is short lived.
+      self.aws_tags['vm_nature'] = 'ephemeral'
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'run-instances',

@@ -743,6 +743,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     metadata = {'enable-oslogin': 'FALSE'}
     metadata.update(self.boot_metadata)
     metadata.update(util.GetDefaultTags())
+    # Signal (along with timeout_utc) that VM is short lived.
+    metadata['vm_nature'] = 'ephemeral'
 
     additional_metadata = {}
     additional_metadata.update(self.vm_metadata)

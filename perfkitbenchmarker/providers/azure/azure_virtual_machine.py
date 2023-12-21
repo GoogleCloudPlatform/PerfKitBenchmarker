@@ -694,6 +694,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     tags = {}
     tags.update(self.vm_metadata)
     tags.update(util.GetResourceTags(self.resource_group.timeout_minutes))
+    # Signal (along with timeout_utc) that VM is short lived.
+    tags['vm_nature'] = 'ephemeral'
     tag_args = ['--tags'] + util.FormatTags(tags)
 
     create_cmd = (
