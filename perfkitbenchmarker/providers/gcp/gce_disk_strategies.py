@@ -125,11 +125,31 @@ class GCEEmptyCreateDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
     return False
 
 
-class SetUpGceLocalDiskStrategy(disk_strategies.SetUpDiskStrategy):
-  """Strategies to set up local disks."""
+class SetUpGCEResourceDiskStrategy(disk_strategies.SetUpDiskStrategy):
+  """Base Strategy class to set up local ssd and pd-ssd."""
 
   def __init__(self, disk_specs: list[disk.BaseDiskSpec]):
     self.disk_specs = disk_specs
+
+  def _CreateScratchDiskFromDisks(self, vm, disk_spec, disks):
+    """Helper method to create scratch data disks."""
+    # This will soon be moved to disk class. As the disk class should
+    # be able to handle how it's created and attached
+    if len(disks) > 1:
+      # If the disk_spec called for a striped disk, create one.
+      scratch_disk = disk.StripedDisk(disk_spec, disks)
+    else:
+      scratch_disk = disks[0]
+
+    if not vm.create_disk_strategy.DiskCreatedOnVMCreation():
+      scratch_disk.Create()
+      scratch_disk.Attach(vm)
+
+    return scratch_disk
+
+
+class SetUpGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
+  """Strategies to set up local disks."""
 
   def SetUpDisk(self, vm: Any, _: disk.BaseDiskSpec):
     # disk spec is not used here.
@@ -173,21 +193,50 @@ class SetUpGceLocalDiskStrategy(disk_strategies.SetUpDiskStrategy):
       if disk_spec.num_striped_disks > 1:
         break
 
-  def _CreateScratchDiskFromDisks(self, vm, disk_spec, disks):
-    """Helper method to create scratch data disks."""
-    # This will soon be moved to disk class. As the disk class should
-    # be able to handle how it's created and attached
-    if len(disks) > 1:
-      # If the disk_spec called for a striped disk, create one.
-      scratch_disk = disk.StripedDisk(disk_spec, disks)
-    else:
-      scratch_disk = disks[0]
 
-    if not vm.create_disk_strategy.DiskCreatedOnVMCreation():
-      scratch_disk.Create()
-      scratch_disk.Attach(vm)
+class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
+  """Strategies to Persistance disk on GCE."""
 
-    return scratch_disk
+  def __init__(self, disk_specs: list[gce_disk.GceDiskSpec]):
+    super().__init__(disk_specs)
+    self.disk_specs = disk_specs
+
+  def SetUpDisk(self, vm: Any, _: disk.BaseDiskSpec):
+    # disk spec is not used here.
+    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
+      disks = []
+
+      for i in range(disk_spec.num_striped_disks):
+        name = _GenerateDiskNamePrefix(vm, disk_spec_id, i)
+        data_disk = gce_disk.GceDisk(
+            disk_spec,
+            name,
+            vm.zone,
+            vm.project,
+            replica_zones=disk_spec.replica_zones,
+        )
+        if gce_disk.PdDriveIsNvme(vm):
+          data_disk.interface = gce_disk.NVME
+        else:
+          data_disk.interface = gce_disk.SCSI
+        # Remote disk numbers start at 1+max_local_disks (0 is the system disk
+        # and local disks occupy 1-max_local_disks).
+        data_disk.disk_number = vm.remote_disk_counter + 1 + vm.max_local_disks
+        vm.remote_disk_counter += 1
+        disks.append(data_disk)
+
+      scratch_disk = self._CreateScratchDiskFromDisks(vm, disk_spec, disks)
+      # Device path is needed to stripe disks on Linux, but not on Windows.
+      # The path is not updated for Windows machines.
+      if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+        nvme_devices = vm.GetNVMEDeviceInfo()
+        remote_nvme_devices = vm.FindRemoteNVMEDevices(
+            scratch_disk, nvme_devices
+        )
+        vm.UpdateDevicePath(scratch_disk, remote_nvme_devices)
+      disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
+          vm, scratch_disk, disk_spec
+      )
 
 
 class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):

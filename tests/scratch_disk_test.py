@@ -109,24 +109,40 @@ class ScratchDiskTestMixin(object):
     """
 
     vm = self._CreateVm()
-    disk_spec = self.GetDiskSpec(mount_point='/mountpoint0')
-    vm.SetDiskSpec(disk_spec, 1)
-    vm.CreateScratchDisk(0, disk_spec)
+    disk_spec = self.GetDiskSpec(mount_point='/mountpoint')
+    vm.SetDiskSpec(disk_spec, 2)
 
-    assert len(vm.scratch_disks) == 1, 'Disk not added to scratch disks.'
-
-    scratch_disk = vm.scratch_disks[0]
-
-    scratch_disk.Create.assert_called_once_with()
-    vm.FormatDisk.assert_called_once_with(scratch_disk.GetDevicePath(), None)
-    vm.MountDisk.assert_called_once_with(
-        scratch_disk.GetDevicePath(), '/mountpoint0',
-        None, scratch_disk.mount_options, scratch_disk.fstab_options)
-
-    disk_spec = self.GetDiskSpec(mount_point='/mountpoint1')
-    vm.CreateScratchDisk(0, disk_spec)
-
+    vm.SetupAllScratchDisks()
     assert len(vm.scratch_disks) == 2, 'Disk not added to scratch disks.'
+
+    scratch_disk1 = vm.scratch_disks[0]
+    scratch_disk2 = vm.scratch_disks[1]
+    scratch_disk1.Create.assert_called_once_with()
+    scratch_disk2.Create.assert_called_once_with()
+    format_disk_callls = [
+        mock.call(scratch_disk1.GetDevicePath(), None),
+        mock.call(scratch_disk2.GetDevicePath(), None),
+    ]
+
+    vm.FormatDisk.assert_has_calls(format_disk_callls, None)
+
+    mount_disk_callls = [
+        mock.call(
+            scratch_disk1.GetDevicePath(),
+            '/mountpoint0',
+            None,
+            scratch_disk1.mount_options,
+            scratch_disk1.fstab_options,
+        ),
+        mock.call(
+            scratch_disk2.GetDevicePath(),
+            '/mountpoint1',
+            None,
+            scratch_disk2.mount_options,
+            scratch_disk2.fstab_options,
+        ),
+    ]
+    vm.MountDisk.assert_has_calls(mount_disk_callls, None)
 
     # Check that these execute without exceptions. The return value
     # is a MagicMock, not a string, so we can't compare to expected results.
@@ -135,14 +151,6 @@ class ScratchDiskTestMixin(object):
     vm.GetScratchDir(1)
     with self.assertRaises(errors.Error):
       vm.GetScratchDir(2)
-
-    scratch_disk = vm.scratch_disks[1]
-
-    scratch_disk.Create.assert_called_once_with()
-    vm.FormatDisk.assert_called_with(scratch_disk.GetDevicePath(), None)
-    vm.MountDisk.assert_called_with(
-        scratch_disk.GetDevicePath(), '/mountpoint1',
-        None, scratch_disk.mount_options, scratch_disk.fstab_options)
 
     vm.DeleteScratchDisks()
 

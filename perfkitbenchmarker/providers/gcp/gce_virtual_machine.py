@@ -1124,7 +1124,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def SetupAllScratchDisks(self):
     """Set up all scratch disks of the current VM."""
-    # This method will be depreciate soon.
+    if not self.disk_specs:
+      return
+
     # Prepare vm scratch disks:
     if any((spec.disk_type == disk.RAM for spec in self.disk_specs)):
       disk_strategies.SetUpRamDiskStrategy().SetUpDisk(self, self.disk_specs[0])
@@ -1144,57 +1146,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       )
       return
 
-    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      self.CreateScratchDisk(disk_spec_id, disk_spec)
-      # TODO(user): Simplify disk logic.
-      if disk_spec.num_striped_disks > 1:
-        # scratch disks has already been created and striped together.
-        break
-    # This must come after Scratch Disk creation to support the
-    # Containerized VM case
-
-  def CreateScratchDisk(self, disk_spec_id, disk_spec):
-    """Create a VM's scratch disk.
-
-    Args:
-      disk_spec_id: Deterministic order of this disk_spec in the VM's list of
-        disk_specs.
-      disk_spec: virtual_machine.BaseDiskSpec object of the disk.
-    """
-    disks = []
-
-    for i in range(disk_spec.num_striped_disks):
-      name = self._GenerateDiskNamePrefix(disk_spec_id, i)
-      data_disk = gce_disk.GceDisk(
-          disk_spec,
-          name,
-          self.zone,
-          self.project,
-          replica_zones=disk_spec.replica_zones,
-      )
-      if gce_disk.PdDriveIsNvme(self):
-        data_disk.interface = gce_disk.NVME
-      else:
-        data_disk.interface = gce_disk.SCSI
-      # Remote disk numbers start at 1+max_local_disks (0 is the system disk
-      # and local disks occupy 1-max_local_disks).
-      data_disk.disk_number = (
-          self.remote_disk_counter + 1 + self.max_local_disks
-      )
-      self.remote_disk_counter += 1
-      disks.append(data_disk)
-
-    scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
-    # Device path is needed to stripe disks on Linux, but not on Windows.
-    # The path is not updated for Windows machines.
-    if self.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
-      nvme_devices = self.GetNVMEDeviceInfo()
-      remote_nvme_devices = self.FindRemoteNVMEDevices(
-          scratch_disk, nvme_devices
-      )
-      self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
-    disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
-        self, scratch_disk, disk_spec
+    gce_disk_strategies.SetUpPDDiskStrategy(self.disk_specs).SetUpDisk(
+        self, self.disk_specs[0]
     )
 
   def CreateIpReservation(
@@ -1253,22 +1206,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     for d in disks:
       if d.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES and d.interface == NVME:
         d.name = remote_nvme_devices.pop()
-
-  def _CreateScratchDiskFromDisks(self, disk_spec, disks):
-    """Helper method to create scratch data disks."""
-    # This will soon be moved to disk class. As the disk class should
-    # be able to handle how it's created and attached
-    if len(disks) > 1:
-      # If the disk_spec called for a striped disk, create one.
-      scratch_disk = disk.StripedDisk(disk_spec, disks)
-    else:
-      scratch_disk = disks[0]
-
-    if not self.create_disk_strategy.DiskCreatedOnVMCreation():
-      scratch_disk.Create()
-      scratch_disk.Attach(self)
-
-    return scratch_disk
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to disk."""
