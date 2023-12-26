@@ -147,6 +147,32 @@ class SetUpGCEResourceDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
     return scratch_disk
 
+  def FindRemoteNVMEDevices(self, nvme_devices):
+    """Find the paths for all remote NVME devices inside the VM."""
+    remote_nvme_devices = [
+        device['DevicePath']
+        for device in nvme_devices
+        if device['ModelNumber'] == 'nvme_card-pd'
+    ]
+
+    return sorted(remote_nvme_devices)
+
+  def UpdateDevicePath(self, scratch_disk, remote_nvme_devices):
+    """Updates the paths for all remote NVME devices inside the VM."""
+    disks = []
+    if isinstance(scratch_disk, disk.StripedDisk):
+      disks = scratch_disk.disks
+    else:
+      disks = [scratch_disk]
+
+    # round robin assignment since we cannot tell the disks apart.
+    for d in disks:
+      if (
+          d.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES
+          and d.interface == gce_disk.NVME
+      ):
+        d.name = remote_nvme_devices.pop()
+
 
 class SetUpGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
   """Strategies to set up local disks."""
@@ -183,10 +209,8 @@ class SetUpGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
       # The path is not updated for Windows machines.
       if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
         nvme_devices = vm.GetNVMEDeviceInfo()
-        remote_nvme_devices = vm.FindRemoteNVMEDevices(
-            scratch_disk, nvme_devices
-        )
-        vm.UpdateDevicePath(scratch_disk, remote_nvme_devices)
+        remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
+        self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
       disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
           vm, scratch_disk, disk_spec
       )
@@ -230,10 +254,8 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
       # The path is not updated for Windows machines.
       if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
         nvme_devices = vm.GetNVMEDeviceInfo()
-        remote_nvme_devices = vm.FindRemoteNVMEDevices(
-            scratch_disk, nvme_devices
-        )
-        vm.UpdateDevicePath(scratch_disk, remote_nvme_devices)
+        remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
+        self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
       disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
           vm, scratch_disk, disk_spec
       )

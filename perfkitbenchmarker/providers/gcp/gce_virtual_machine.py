@@ -1186,29 +1186,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     )
     reserv_ip_address.Delete()
 
-  def FindRemoteNVMEDevices(self, _, nvme_devices):
-    """Find the paths for all remote NVME devices inside the VM."""
-    remote_nvme_devices = [
-        device['DevicePath']
-        for device in nvme_devices
-        if device['ModelNumber'] == 'nvme_card-pd'
-    ]
-
-    return sorted(remote_nvme_devices)
-
-  def UpdateDevicePath(self, scratch_disk, remote_nvme_devices):
-    """Updates the paths for all remote NVME devices inside the VM."""
-    disks = []
-    if isinstance(scratch_disk, disk.StripedDisk):
-      disks = scratch_disk.disks
-    else:
-      disks = [scratch_disk]
-
-    # round robin assignment since we cannot tell the disks apart.
-    for d in disks:
-      if d.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES and d.interface == NVME:
-        d.name = remote_nvme_devices.pop()
-
   def AddMetadata(self, **kwargs):
     """Adds metadata to disk."""
     # vm metadata added to vm on creation.
