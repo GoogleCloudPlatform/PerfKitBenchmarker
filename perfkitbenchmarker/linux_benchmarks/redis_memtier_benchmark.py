@@ -21,7 +21,6 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
-import logging
 from typing import Any, Dict, List, Optional
 
 from absl import flags
@@ -115,22 +114,8 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
     vm_spec = config['vm_groups']['servers']['vm_spec']
     for cloud in vm_spec:
       vm_spec[cloud]['machine_type'] = FLAGS.redis_memtier_server_machine_type
-  if redis_server.REDIS_SIMULATE_AOF.value:
-    # Revisit this logic
-    local_ssd = 8
-    if FLAGS.server_gce_num_local_ssds:
-      local_ssd = FLAGS.server_gce_num_local_ssds
-
-    config['vm_groups']['servers']['disk_spec']['GCP']['disk_type'] = 'local'
-    config['vm_groups']['servers']['vm_spec']['GCP'][
-        'num_local_ssds'
-    ] = local_ssd
-    # To auto mount scratch disks (/scratch0, /scratch1, ...etc)
-    config['vm_groups']['servers']['disk_count'] = local_ssd - 1
-    FLAGS.num_striped_disks = local_ssd - 1
-    FLAGS.gce_ssd_interface = 'NVME'
-  else:
-    config['vm_groups']['servers'].pop('disk_spec')
+  if not redis_server.REDIS_SIMULATE_AOF.value:
+    config['vm_groups']['servers']['disk_count'] = 0
   return config
 
 
@@ -148,33 +133,6 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   background_tasks.RunThreaded(
       lambda client: client.Install('memtier'), client_vms
   )
-
-  if redis_server.REDIS_SIMULATE_AOF.value:
-    server_vm.Install('mdadm')
-    server_vm.RemoteCommand(
-        'yes | sudo mdadm --create /dev/md1 --level=stripe --force'
-        ' --raid-devices=1 /dev/nvme0n8'
-    )
-    server_vm.RemoteCommand('sudo mkfs.ext4 -F /dev/md1')
-    server_vm.RemoteCommand(
-        f'sudo mkdir -p /{redis_server.REDIS_BACKUP}; '
-        f'sudo mount -o discard /dev/md1 /{redis_server.REDIS_BACKUP} && '
-        f'sudo chown $USER:$USER /{redis_server.REDIS_BACKUP};'
-    )
-
-    server_vm.InstallPackages('fio')
-    for disk in server_vm.scratch_disks:
-      cmd = (
-          'sudo fio --name=global --direct=1 --ioengine=libaio --numjobs=1 '
-          '--refill_buffers --scramble_buffers=1 --allow_mounted_write=1 '
-          '--blocksize=128k --rw=write --iodepth=64 '
-          f'--size={disk.disk_size}G --name=wipc '
-          f'--filename={disk.mount_point}/fio_data &> /dev/null &'
-      )
-      logging.info(
-          'Start filling %s. This may take up to 30min...', disk.mount_point
-      )
-      server_vm.RemoteCommand(cmd)
 
   # Install redis on the 1st machine.
   server_vm.Install('redis_server')

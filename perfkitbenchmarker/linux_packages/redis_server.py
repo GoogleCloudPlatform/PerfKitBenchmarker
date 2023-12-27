@@ -68,7 +68,7 @@ DEFAULT_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
 FLAGS = flags.FLAGS
 REDIS_GIT = 'https://github.com/antirez/redis.git'
-REDIS_BACKUP = 'redis_backup'
+REDIS_BACKUP = 'scratch'
 
 
 def _GetRedisTarName() -> str:
