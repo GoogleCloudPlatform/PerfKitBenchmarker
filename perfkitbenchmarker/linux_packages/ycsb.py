@@ -367,6 +367,11 @@ _LOWEST_LATENCY_TARGET_QPS = flags.DEFINE_integer(
     'Runs the lowest latency workload with a fixed QPS instead of searching.'
     ' Useful when the optimal throughput throughput is already known.',
 )
+_LOWEST_LATENCY_WARMUP = flags.DEFINE_bool(
+    'ycsb_lowest_latency_warmup',
+    False,
+    'If true, runs a warmup before the actual load.',
+)
 
 
 def _ValidateCpuTargetFlags(flags_dict):
@@ -1404,6 +1409,8 @@ class YCSBExecutor:
       return samples
 
     if _LOWEST_LATENCY_TARGET_QPS.value:
+      if _LOWEST_LATENCY_WARMUP.value:
+        _RunWorkload(_LOWEST_LATENCY_TARGET_QPS.value)
       return _ProcessSamples(
           _RunWorkload(_LOWEST_LATENCY_TARGET_QPS.value), database
       )
