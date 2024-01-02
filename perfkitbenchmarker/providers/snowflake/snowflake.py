@@ -30,12 +30,13 @@ FLAGS = flags.FLAGS
 # TODO(jguertin): Update these jdbc client names to reflect their function
 JdbcClientDict = {
     provider_info.AWS: 'snowflake-jdbc-client-2.5-standard.jar',
-    provider_info.AZURE: 'snowflake-jdbc-client-azure-external-2.0.jar'
+    provider_info.AZURE: 'snowflake-jdbc-client-azure-external-2.0.jar',
 }
 
 
-def GetSnowflakeClientInterface(warehouse: str, database: str, schema: str,
-                                cloud: str) -> edw_service.EdwClientInterface:
+def GetSnowflakeClientInterface(
+    warehouse: str, database: str, schema: str, cloud: str
+) -> edw_service.EdwClientInterface:
   """Builds and Returns the requested Snowflake client Interface.
 
   Args:
@@ -52,8 +53,9 @@ def GetSnowflakeClientInterface(warehouse: str, database: str, schema: str,
     RuntimeError: if an unsupported snowflake_client_interface is requested
   """
   if FLAGS.snowflake_client_interface == 'JDBC':
-    return JdbcClientInterface(warehouse, database, schema,
-                               JdbcClientDict[cloud])
+    return JdbcClientInterface(
+        warehouse, database, schema, JdbcClientDict[cloud]
+    )
   raise RuntimeError('Unknown Snowflake Client Interface requested.')
 
 
@@ -68,8 +70,9 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
       Snowflake backend being tested (AWS/Azure/etc.)
   """
 
-  def __init__(self, warehouse: str, database: str, schema: str,
-               jdbc_client: str):
+  def __init__(
+      self, warehouse: str, database: str, schema: str, jdbc_client: str
+  ):
     self.warehouse = warehouse
     self.database = database
     self.schema = schema
@@ -89,8 +92,9 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.client_vm.Install('openjdk')
 
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(package_name,
-                                                    [self.jdbc_client], '')
+    self.client_vm.InstallPreprovisionedPackageData(
+        package_name, [self.jdbc_client], ''
+    )
 
   def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
@@ -105,19 +109,22 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         successful query the value is expected to be positive.
       performance_details: A dictionary of query execution attributes eg. job_id
     """
-    query_command = (f'java -cp {self.jdbc_client} '
-                     'com.google.cloud.performance.edw.Single '
-                     f'--warehouse {self.warehouse} '
-                     f'--database {self.database} '
-                     f'--schema {self.schema} '
-                     f'--query_file {query_name}')
+    query_command = (
+        f'java -cp {self.jdbc_client} '
+        'com.google.cloud.performance.edw.Single '
+        f'--warehouse {self.warehouse} '
+        f'--database {self.database} '
+        f'--schema {self.schema} '
+        f'--query_file {query_name}'
+    )
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
     return json.loads(stdout)['query_wall_time_in_secs'], details
 
-  def ExecuteSimultaneous(self, submission_interval: int,
-                          queries: List[str]) -> str:
+  def ExecuteSimultaneous(
+      self, submission_interval: int, queries: List[str]
+  ) -> str:
     """Executes queries simultaneously on client and return performance details.
 
     Simultaneous app expects queries as white space separated query file names.
@@ -130,13 +137,15 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     Returns:
       A serialized dictionary of execution details.
     """
-    query_command = (f'java -cp {self.jdbc_client} '
-                     'com.google.cloud.performance.edw.Simultaneous '
-                     f'--warehouse {self.warehouse} '
-                     f'--database {self.database} '
-                     f'--schema {self.schema} '
-                     f'--submission_interval {submission_interval} '
-                     f'--query_files {" ".join(queries)}')
+    query_command = (
+        f'java -cp {self.jdbc_client} '
+        'com.google.cloud.performance.edw.Simultaneous '
+        f'--warehouse {self.warehouse} '
+        f'--database {self.database} '
+        f'--schema {self.schema} '
+        f'--submission_interval {submission_interval} '
+        f'--query_files {" ".join(queries)}'
+    )
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     return stdout
 
@@ -169,6 +178,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
 
 class Snowflake(edw_service.EdwService):
   """Object representing a Snowflake Data Warehouse Instance."""
+
   CLOUD = None
   SERVICE_TYPE = None
 
@@ -177,9 +187,9 @@ class Snowflake(edw_service.EdwService):
     self.warehouse = FLAGS.snowflake_warehouse
     self.database = FLAGS.snowflake_database
     self.schema = FLAGS.snowflake_schema
-    self.client_interface = GetSnowflakeClientInterface(self.warehouse,
-                                                        self.database,
-                                                        self.schema, self.CLOUD)
+    self.client_interface = GetSnowflakeClientInterface(
+        self.warehouse, self.database, self.schema, self.CLOUD
+    )
 
   def IsUserManaged(self, edw_service_spec):
     # TODO(saksena): Remove the assertion after implementing provisioning of

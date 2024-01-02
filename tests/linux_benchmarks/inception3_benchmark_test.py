@@ -15,37 +15,53 @@
 import os
 import unittest
 import mock
-
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
 from perfkitbenchmarker.sample import Sample
 
 
-class Inception3BenchmarkTestCase(unittest.TestCase,
-                                  test_util.SamplesTestMixin):
+class Inception3BenchmarkTestCase(
+    unittest.TestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'inception3_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '..', 'data', 'inception3_output.txt'
+    )
     with open(path) as fp:
       self.contents = fp.read()
 
-    self.metadata_input = {'num_examples_per_epoch': 1251.1,
-                           'train_batch_size': 1024}
-    self.metadata_output = {'num_examples_per_epoch': 1251.1,
-                            'train_batch_size': 1024, 'step': 4000,
-                            'epoch': 3.197186475901207, 'elapsed_seconds': 0}
+    self.metadata_input = {
+        'num_examples_per_epoch': 1251.1,
+        'train_batch_size': 1024,
+    }
+    self.metadata_output = {
+        'num_examples_per_epoch': 1251.1,
+        'train_batch_size': 1024,
+        'step': 4000,
+        'epoch': 3.197186475901207,
+        'elapsed_seconds': 0,
+    }
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testTrainResults(self):
     samples = mnist_benchmark.MakeSamplesFromTrainOutput(
-        self.metadata_input, self.contents, 0, 4000)
+        self.metadata_input, self.contents, 0, 4000
+    )
     golden = [
         Sample('Loss', 5.7193503, '', self.metadata_output),
-        Sample('Global Steps Per Second', 1.4384171428571428,
-               'global_steps/sec', self.metadata_output),
-        Sample('Examples Per Second', 1472.9414285714283,
-               'examples/sec', self.metadata_output)
+        Sample(
+            'Global Steps Per Second',
+            1.4384171428571428,
+            'global_steps/sec',
+            self.metadata_output,
+        ),
+        Sample(
+            'Examples Per Second',
+            1472.9414285714283,
+            'examples/sec',
+            self.metadata_output,
+        ),
     ]
     self.assertEqual(samples, golden)
 

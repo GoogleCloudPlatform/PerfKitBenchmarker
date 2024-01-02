@@ -22,25 +22,27 @@ SPEC_JBB_2015_ISO = 'SPECjbb2015-1_03.iso'
 SPEC_DIR = 'spec'
 
 _MOUNT_SPECJBB_ISO = flags.DEFINE_bool(
-    'mount_specjbb_iso', True, 'Whether specjbb mounts iso or not')
+    'mount_specjbb_iso', True, 'Whether specjbb mounts iso or not'
+)
 
 
 def Install(vm) -> None:
   """Prepares a SPEC client by copying SPEC to the VM."""
   mount_dir = 'spec_mnt'
   vm.RemoteCommand(f'mkdir -p {mount_dir} {SPEC_DIR}')
-  vm.InstallPreprovisionedBenchmarkData(_BENCHMARK_NAME, [SPEC_JBB_2015_ISO],
-                                        '~/')
+  vm.InstallPreprovisionedBenchmarkData(
+      _BENCHMARK_NAME, [SPEC_JBB_2015_ISO], '~/'
+  )
   if _MOUNT_SPECJBB_ISO.value:
     vm.RemoteCommand(
-        f'sudo mount -t iso9660 -o loop {SPEC_JBB_2015_ISO} {mount_dir}')
+        f'sudo mount -t iso9660 -o loop {SPEC_JBB_2015_ISO} {mount_dir}'
+    )
     vm.RemoteCommand(f'cp -r {mount_dir}/* {SPEC_DIR}')
     vm.RemoteCommand(f'sudo umount {mount_dir} && sudo rm -rf {mount_dir}')
   else:
     vm.InstallPackages('p7zip-full')
     vm.InstallPackages('p7zip-rar')
-    vm.RemoteCommand(
-        f'7z x -o{mount_dir} {SPEC_JBB_2015_ISO}')
+    vm.RemoteCommand(f'7z x -o{mount_dir} {SPEC_JBB_2015_ISO}')
     vm.RemoteCommand(f'cp -r {mount_dir}/* {SPEC_DIR}')
     vm.RemoteCommand(f'rm -rf {mount_dir}')
 
@@ -50,7 +52,8 @@ def Uninstall(vm) -> None:
   if _MOUNT_SPECJBB_ISO.value:
     vm.RemoteCommand(f'sudo umount {SPEC_DIR}', ignore_failure=True)
   vm.RemoteCommand(
-      f'rm -rf {SPEC_DIR} {SPEC_JBB_2015_ISO}', ignore_failure=True)
+      f'rm -rf {SPEC_DIR} {SPEC_JBB_2015_ISO}', ignore_failure=True
+  )
 
 
 def AptInstall(vm) -> None:

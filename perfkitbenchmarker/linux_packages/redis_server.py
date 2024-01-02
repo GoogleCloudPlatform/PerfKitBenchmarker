@@ -21,8 +21,9 @@ from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 
 
-class RedisEvictionPolicy():
+class RedisEvictionPolicy:
   """Enum of options for --redis_eviction_policy."""
+
   NOEVICTION = 'noeviction'
   ALLKEYS_LRU = 'allkeys-lru'
   VOLATILE_LRU = 'volatile-lru'
@@ -31,37 +32,57 @@ class RedisEvictionPolicy():
   VOLATILE_TTL = 'volatile-ttl'
 
 
-_VERSION = flags.DEFINE_string('redis_server_version', '6.2.1',
-                               'Version of redis server to use.')
+_VERSION = flags.DEFINE_string(
+    'redis_server_version', '6.2.1', 'Version of redis server to use.'
+)
 _IO_THREADS = flags.DEFINE_integer(
-    'redis_server_io_threads', 4, 'Only supported for redis version >= 6, the '
-    'number of redis server IO threads to use.')
+    'redis_server_io_threads',
+    4,
+    'Only supported for redis version >= 6, the '
+    'number of redis server IO threads to use.',
+)
 _IO_THREADS_DO_READS = flags.DEFINE_bool(
-    'redis_server_io_threads_do_reads', False,
+    'redis_server_io_threads_do_reads',
+    False,
     'If true, makes both reads and writes use IO threads instead of just '
-    'writes.')
+    'writes.',
+)
 _IO_THREAD_AFFINITY = flags.DEFINE_bool(
-    'redis_server_io_threads_cpu_affinity', False,
-    'If true, attempts to pin IO threads to CPUs.')
+    'redis_server_io_threads_cpu_affinity',
+    False,
+    'If true, attempts to pin IO threads to CPUs.',
+)
 _ENABLE_SNAPSHOTS = flags.DEFINE_bool(
-    'redis_server_enable_snapshots', False,
-    'If true, uses the default redis snapshot policy.')
+    'redis_server_enable_snapshots',
+    False,
+    'If true, uses the default redis snapshot policy.',
+)
 _NUM_PROCESSES = flags.DEFINE_integer(
     'redis_total_num_processes',
     1,
     'Total number of redis server processes. Useful when running with a redis '
     'version lower than 6.',
-    lower_bound=1)
+    lower_bound=1,
+)
 _EVICTION_POLICY = flags.DEFINE_enum(
-    'redis_eviction_policy', RedisEvictionPolicy.NOEVICTION, [
-        RedisEvictionPolicy.NOEVICTION, RedisEvictionPolicy.ALLKEYS_LRU,
-        RedisEvictionPolicy.VOLATILE_LRU, RedisEvictionPolicy.ALLKEYS_RANDOM,
-        RedisEvictionPolicy.VOLATILE_RANDOM, RedisEvictionPolicy.VOLATILE_TTL
-    ], 'Redis eviction policy when maxmemory limit is reached. This requires '
-    'running clients with larger amounts of data than Redis can hold.')
+    'redis_eviction_policy',
+    RedisEvictionPolicy.NOEVICTION,
+    [
+        RedisEvictionPolicy.NOEVICTION,
+        RedisEvictionPolicy.ALLKEYS_LRU,
+        RedisEvictionPolicy.VOLATILE_LRU,
+        RedisEvictionPolicy.ALLKEYS_RANDOM,
+        RedisEvictionPolicy.VOLATILE_RANDOM,
+        RedisEvictionPolicy.VOLATILE_TTL,
+    ],
+    'Redis eviction policy when maxmemory limit is reached. This requires '
+    'running clients with larger amounts of data than Redis can hold.',
+)
 REDIS_SIMULATE_AOF = flags.DEFINE_bool(
-    'redis_simulate_aof', False, 'If true, simulate usage of '
-    'disks on the server for aof backups. ')
+    'redis_simulate_aof',
+    False,
+    'If true, simulate usage of disks on the server for aof backups. ',
+)
 
 # Default port for Redis
 DEFAULT_PORT = 6379
@@ -85,7 +106,8 @@ def _Install(vm) -> None:
   vm.Install('wget')
   vm.RemoteCommand(f'cd {linux_packages.INSTALL_DIR}; git clone {REDIS_GIT}')
   vm.RemoteCommand(
-      f'cd {GetRedisDir()} && git checkout {_VERSION.value} && make')
+      f'cd {GetRedisDir()} && git checkout {_VERSION.value} && make'
+  )
 
 
 def YumInstall(vm) -> None:
@@ -174,18 +196,22 @@ def Start(vm) -> None:
   """Start redis server process."""
   # 10 is an arbituary multiplier that ensures this value is high enough.
   mux_sessions = 10 * _NUM_PROCESSES.value
-  vm.RemoteCommand(f'echo "\nMaxSessions {mux_sessions}" | '
-                   'sudo tee -a /etc/ssh/sshd_config')
+  vm.RemoteCommand(
+      f'echo "\nMaxSessions {mux_sessions}" | sudo tee -a /etc/ssh/sshd_config'
+  )
   # Redis tuning parameters, see
   # https://www.techandme.se/performance-tips-for-redis-cache-server/.
   # This command works on 2nd generation of VMs only.
-  update_sysvtl = vm.TryRemoteCommand('echo "'
-                                      'vm.overcommit_memory = 1\n'
-                                      'net.core.somaxconn = 65535\n'
-                                      '" | sudo tee -a /etc/sysctl.conf')
+  update_sysvtl = vm.TryRemoteCommand(
+      'echo "'
+      'vm.overcommit_memory = 1\n'
+      'net.core.somaxconn = 65535\n'
+      '" | sudo tee -a /etc/sysctl.conf'
+  )
   # /usr/sbin/sysctl is not applicable on certain distros.
   commit_sysvtl = vm.TryRemoteCommand(
-      'sudo /usr/sbin/sysctl -p || sudo sysctl -p')
+      'sudo /usr/sbin/sysctl -p || sudo sysctl -p'
+  )
   if not (update_sysvtl and commit_sysvtl):
     logging.info('Fail to optimize overcommit_memory and socket connections.')
   for port in GetRedisPorts():

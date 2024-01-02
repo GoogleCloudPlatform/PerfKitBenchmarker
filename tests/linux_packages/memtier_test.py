@@ -1,6 +1,5 @@
 """Tests for perfkitbenchmarker.linux_packages.memtier."""
 
-
 import json
 import os
 import unittest
@@ -101,8 +100,9 @@ def GetMemtierResult(ops_per_sec, p95_latency):
   )
 
 
-class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
-                      test_util.SamplesTestMixin):
+class MemtierTestCase(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super(MemtierTestCase, self).setUp()
@@ -116,7 +116,8 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
     get_metadata = {
         'histogram': json.dumps([
             {'microsec': 0.0, 'count': 4500},
-            {'microsec': 2000.0, 'count': 4500}])
+            {'microsec': 2000.0, 'count': 4500},
+        ])
     }
     get_metadata.update(METADATA)
     set_metadata = {
@@ -130,7 +131,8 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
             {'microsec': 6000.0, 'count': 200},
             {'microsec': 7000.0, 'count': 50},
             {'microsec': 8000.0, 'count': 40},
-            {'microsec': 9000.0, 'count': 10}])
+            {'microsec': 9000.0, 'count': 10},
+        ])
     }
     set_metadata.update(METADATA)
 
@@ -142,7 +144,7 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
         'Start_time': 1657947420452,
         'Finish_time': 1657947420454,
         'Total_duration': 2,
-        'Time_unit': 'MILLISECONDS'
+        'Time_unit': 'MILLISECONDS',
     }
 
     expected_result = [
@@ -150,29 +152,32 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
             metric='Ops Throughput',
             value=44006.55,
             unit='ops/s',
-            metadata=METADATA),
+            metadata=METADATA,
+        ),
         sample.Sample(
-            metric='KB Throughput',
-            value=1828.0,
-            unit='KB/s',
-            metadata=METADATA),
+            metric='KB Throughput', value=1828.0, unit='KB/s', metadata=METADATA
+        ),
         sample.Sample(
-            metric='Latency', value=1.54, unit='ms', metadata=METADATA),
+            metric='Latency', value=1.54, unit='ms', metadata=METADATA
+        ),
         sample.Sample(
             metric='get latency histogram',
             value=0,
             unit='',
-            metadata=get_metadata),
+            metadata=get_metadata,
+        ),
         sample.Sample(
             metric='set latency histogram',
             value=0,
             unit='',
-            metadata=set_metadata),
+            metadata=set_metadata,
+        ),
         sample.Sample(
             metric='Memtier Duration',
             value=2,
             unit='ms',
-            metadata=runtime_info_metadata),
+            metadata=runtime_info_metadata,
+        ),
     ]
     samples = []
     results = memtier.MemtierResult.Parse(TEST_OUTPUT, TIME_SERIES_JSON)
@@ -1397,7 +1402,8 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
     get_metadata = {
         'histogram': json.dumps([
             {'microsec': 0.0, 'count': 4500},
-            {'microsec': 2000.0, 'count': 4500}])
+            {'microsec': 2000.0, 'count': 4500},
+        ])
     }
     get_metadata.update(METADATA)
     set_metadata = {
@@ -1411,7 +1417,8 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
             {'microsec': 6000.0, 'count': 200},
             {'microsec': 7000.0, 'count': 50},
             {'microsec': 8000.0, 'count': 40},
-            {'microsec': 9000.0, 'count': 10}])
+            {'microsec': 9000.0, 'count': 10},
+        ])
     }
     set_metadata.update(METADATA)
 
@@ -1425,24 +1432,26 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
             metric='Ops Throughput',
             value=44006.55,
             unit='ops/s',
-            metadata=METADATA),
+            metadata=METADATA,
+        ),
         sample.Sample(
-            metric='KB Throughput',
-            value=1828.0,
-            unit='KB/s',
-            metadata=METADATA),
+            metric='KB Throughput', value=1828.0, unit='KB/s', metadata=METADATA
+        ),
         sample.Sample(
-            metric='Latency', value=1.54, unit='ms', metadata=METADATA),
+            metric='Latency', value=1.54, unit='ms', metadata=METADATA
+        ),
         sample.Sample(
             metric='get latency histogram',
             value=0,
             unit='',
-            metadata=get_metadata),
+            metadata=get_metadata,
+        ),
         sample.Sample(
             metric='set latency histogram',
             value=0,
             unit='',
-            metadata=set_metadata),
+            metadata=set_metadata,
+        ),
     ]
     samples = []
     results = memtier.MemtierResult.Parse(TEST_OUTPUT, None)
@@ -1476,7 +1485,8 @@ class MemtierTestCase(pkb_common_test_case.PkbCommonTestCase,
         GetMemtierResult(3, 1.4),
     ]
     self.enter_context(
-        mock.patch.object(memtier, '_Run', side_effect=mock_run_results))
+        mock.patch.object(memtier, '_Run', side_effect=mock_run_results)
+    )
 
     mock_vm = pkb_common_test_case.TestLinuxVirtualMachine(
         pkb_common_test_case.CreateTestVmSpec()

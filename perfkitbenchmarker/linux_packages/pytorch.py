@@ -25,8 +25,9 @@ FLAGS = flags.FLAGS
 flags.DEFINE_string('torch_version', '1.7.1', 'The torch version.')
 flags.DEFINE_string('torchvision_version', '0.8.2', 'The torchvision version.')
 flags.DEFINE_string('torchaudio_version', '0.7.2', 'The torchaudio version.')
-flags.DEFINE_string('torch_env', 'PATH=/opt/conda/bin:$PATH',
-                    'The torch install environment.')
+flags.DEFINE_string(
+    'torch_env', 'PATH=/opt/conda/bin:$PATH', 'The torch install environment.'
+)
 
 _PYTORCH_WHL = 'https://download.pytorch.org/whl/{compute_platform}'
 
@@ -66,5 +67,6 @@ def Install(vm):
 
 def Uninstall(vm):
   """Uninstalls TensorFlow on the VM."""
-  vm.RemoteCommand(f'{FLAGS.torch_env} pip uninstall '
-                   'torch torchvision torchaudio')
+  vm.RemoteCommand(
+      f'{FLAGS.torch_env} pip uninstall torch torchvision torchaudio'
+  )

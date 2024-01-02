@@ -26,23 +26,35 @@ from perfkitbenchmarker.traces import base_collector
 import six
 
 flags.DEFINE_boolean(
-    'sar', False, 'Run sar (https://linux.die.net/man/1/sar) '
+    'sar',
+    False,
+    'Run sar (https://linux.die.net/man/1/sar) '
     'on each VM to collect system performance metrics during '
-    'each benchmark run.')
+    'each benchmark run.',
+)
 flags.DEFINE_integer(
-    'sar_interval', 5, 'sar sample collection frequency, in seconds. Only '
-    'applicable when --sar is specified.')
+    'sar_interval',
+    5,
+    'sar sample collection frequency, in seconds. Only '
+    'applicable when --sar is specified.',
+)
 flags.DEFINE_integer(
-    'sar_samples', None,
+    'sar_samples',
+    None,
     'Number of sar samples to collect. When undefined sar is '
     'ran indefinitely. This must be set to record average '
-    'statistics. Only applicable when --sar is specified.')
+    'statistics. Only applicable when --sar is specified.',
+)
 flags.DEFINE_string(
-    'sar_output', None, 'Output directory for sar output. '
+    'sar_output',
+    None,
+    'Output directory for sar output. '
     'Only applicable when --sar is specified. '
-    'Default: run temporary directory.')
-flags.DEFINE_boolean('sar_publish', True,
-                     'Whether to publish average sar statistics.')
+    'Default: run temporary directory.',
+)
+flags.DEFINE_boolean(
+    'sar_publish', True, 'Whether to publish average sar statistics.'
+)
 FLAGS = flags.FLAGS
 
 
@@ -85,7 +97,9 @@ def _AddStealResults(metadata, output, samples):
 
     samples.append(
         sample.Sample(
-            metric=metric, value=value, unit='%', metadata=my_metadata))
+            metric=metric, value=value, unit='%', metadata=my_metadata
+        )
+    )
 
 
 class _SarCollector(base_collector.BaseCollector):
@@ -101,11 +115,13 @@ class _SarCollector(base_collector.BaseCollector):
     vm.InstallPackages('sysstat')
 
   def _CollectorRunCommand(self, vm, collector_file):
-    cmd = ('sar -u {sar_interval} {sar_samples} > {output} 2>&1 & '
-           'echo $!').format(
-               output=collector_file,
-               sar_interval=FLAGS.sar_interval,
-               sar_samples=FLAGS.sar_samples if FLAGS.sar_samples else '')
+    cmd = (
+        'sar -u {sar_interval} {sar_samples} > {output} 2>&1 & echo $!'
+    ).format(
+        output=collector_file,
+        sar_interval=FLAGS.sar_interval,
+        sar_samples=FLAGS.sar_samples if FLAGS.sar_samples else '',
+    )
     return cmd
 
   def Analyze(self, unused_sender, benchmark_spec, samples):
@@ -113,8 +129,9 @@ class _SarCollector(base_collector.BaseCollector):
 
     def _Analyze(role, f):
       """Parse file and record samples."""
-      with open(os.path.join(self.output_directory, os.path.basename(f)),
-                'r') as fp:
+      with open(
+          os.path.join(self.output_directory, os.path.basename(f)), 'r'
+      ) as fp:
         output = fp.read()
         metadata = {
             'event': 'sar',
@@ -135,15 +152,21 @@ def Register(parsed_flags):
 
   output_directory = (
       parsed_flags.sar_output
-      if parsed_flags['sar_output'].present else vm_util.GetTempDir())
+      if parsed_flags['sar_output'].present
+      else vm_util.GetTempDir()
+  )
 
-  logging.debug('Registering sar collector with interval %s, output to %s.',
-                parsed_flags.sar_interval, output_directory)
+  logging.debug(
+      'Registering sar collector with interval %s, output to %s.',
+      parsed_flags.sar_interval,
+      output_directory,
+  )
 
   if not os.path.isdir(output_directory):
     os.makedirs(output_directory)
   collector = _SarCollector(
-      interval=parsed_flags.sar_interval, output_directory=output_directory)
+      interval=parsed_flags.sar_interval, output_directory=output_directory
+  )
   events.before_phase.connect(collector.Start, stages.RUN, weak=False)
   events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
   if parsed_flags.sar_publish:

@@ -32,8 +32,8 @@ PROXIMITY_PLACEMENT_GROUP = 'proximity-placement-group'
 AVAILABILITY_SET = 'availability-set'
 _CLI_STRATEGY_ARGS_DICT = {
     PROXIMITY_PLACEMENT_GROUP: ['ppg'],
-    AVAILABILITY_SET: ['vm', 'availability-set']
-    }
+    AVAILABILITY_SET: ['vm', 'availability-set'],
+}
 
 
 class AzurePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
@@ -54,21 +54,24 @@ class AzurePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(AzurePlacementGroupSpec,
-                   cls)._GetOptionDecoderConstructions()
+    result = super(
+        AzurePlacementGroupSpec, cls
+    )._GetOptionDecoderConstructions()
     result.update({
-        'resource_group': (option_decoders.StringDecoder, {
-            'none_ok': False
-        }),
-        'placement_group_style': (option_decoders.EnumDecoder, {
-            'valid_values':
-                set([
-                    PROXIMITY_PLACEMENT_GROUP,
-                    AVAILABILITY_SET
-                ] + list(placement_group.PLACEMENT_GROUP_OPTIONS)),
-            'default':
-                placement_group.PLACEMENT_GROUP_NONE,
-        })
+        'resource_group': (
+            option_decoders.StringDecoder,
+            {'none_ok': False},
+        ),
+        'placement_group_style': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': set(
+                    [PROXIMITY_PLACEMENT_GROUP, AVAILABILITY_SET]
+                    + list(placement_group.PLACEMENT_GROUP_OPTIONS)
+                ),
+                'default': placement_group.PLACEMENT_GROUP_NONE,
+            },
+        ),
     })
     return result
 
@@ -95,9 +98,17 @@ class AzurePlacementGroup(placement_group.BasePlacementGroup):
 
   def _Create(self):
     """Create the placement group."""
-    create_cmd = [azure.AZURE_PATH] + _CLI_STRATEGY_ARGS_DICT[self.strategy] + [
-        'create', '--resource-group', self.resource_group, '--name', self.name
-    ]
+    create_cmd = (
+        [azure.AZURE_PATH]
+        + _CLI_STRATEGY_ARGS_DICT[self.strategy]
+        + [
+            'create',
+            '--resource-group',
+            self.resource_group,
+            '--name',
+            self.name,
+        ]
+    )
     if self.region:
       create_cmd.extend(['--location', self.region])
     vm_util.IssueCommand(create_cmd)
@@ -108,10 +119,19 @@ class AzurePlacementGroup(placement_group.BasePlacementGroup):
   @vm_util.Retry()
   def _Exists(self):
     """Returns True if the placement group exists."""
-    show_cmd = [azure.AZURE_PATH] + _CLI_STRATEGY_ARGS_DICT[self.strategy] + [
-        'show', '--output', 'json', '--resource-group', self.resource_group,
-        '--name', self.name
-    ]
+    show_cmd = (
+        [azure.AZURE_PATH]
+        + _CLI_STRATEGY_ARGS_DICT[self.strategy]
+        + [
+            'show',
+            '--output',
+            'json',
+            '--resource-group',
+            self.resource_group,
+            '--name',
+            self.name,
+        ]
+    )
     stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
     return bool(json.loads(stdout))
 

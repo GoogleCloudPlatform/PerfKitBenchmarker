@@ -51,12 +51,14 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
     database_input = {
         'Name': self.db_name,
         'Description': '\n'.join(
-            f'{k}={v}' for k, v in util.MakeDefaultTags().items()),
+            f'{k}={v}' for k, v in util.MakeDefaultTags().items()
+        ),
     }
     cmd = util.AWS_PREFIX + [
         'glue',
         'create-database',
-        '--database-input', json.dumps(database_input),
+        '--database-input',
+        json.dumps(database_input),
         f'--region={self.region}',
     ]
     vm_util.IssueCommand(cmd)
@@ -69,13 +71,18 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
     cmd = util.AWS_PREFIX + [
         'glue',
         'create-crawler',
-        '--name', self.crawler_name,
-        '--role', self.role,
-        '--database-name', self.db_name,
-        '--targets', json.dumps(targets),
-        '--region', self.region,
-        '--tags', ','.join(
-            f'{k}={v}' for k, v in util.MakeDefaultTags().items()),
+        '--name',
+        self.crawler_name,
+        '--role',
+        self.role,
+        '--database-name',
+        self.db_name,
+        '--targets',
+        json.dumps(targets),
+        '--region',
+        self.region,
+        '--tags',
+        ','.join(f'{k}={v}' for k, v in util.MakeDefaultTags().items()),
     ]
     vm_util.IssueCommand(cmd)
 
@@ -85,10 +92,13 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
   def _IsReady(self, raise_on_crawl_failure=False) -> bool:
     stdout, _, _ = self._GetCrawler()
     data = json.loads(stdout)
-    if (data['Crawler'].get('LastCrawl', {}).get('Status') == self.FAILED and
-        raise_on_crawl_failure):
+    if (
+        data['Crawler'].get('LastCrawl', {}).get('Status') == self.FAILED
+        and raise_on_crawl_failure
+    ):
       raise CrawlFailedError(
-          data['Crawler'].get('LastCrawl', {}).get('ErrorMessage', ''))
+          data['Crawler'].get('LastCrawl', {}).get('ErrorMessage', '')
+      )
     return data['Crawler']['State'] == self.READY
 
   def _Delete(self) -> None:
@@ -96,8 +106,10 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
     cmd = util.AWS_PREFIX + [
         'glue',
         'delete-database',
-        '--name', self.db_name,
-        '--region', self.region,
+        '--name',
+        self.db_name,
+        '--region',
+        self.region,
     ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
@@ -105,8 +117,10 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
     cmd = util.AWS_PREFIX + [
         'glue',
         'delete-crawler',
-        '--name', self.crawler_name,
-        '--region', self.region,
+        '--name',
+        self.crawler_name,
+        '--region',
+        self.region,
     ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
@@ -123,21 +137,27 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
     cmd = util.AWS_PREFIX + [
         'glue',
         'start-crawler',
-        '--name', self.crawler_name,
-        '--region', self.region,
+        '--name',
+        self.crawler_name,
+        '--region',
+        self.region,
     ]
     vm_util.IssueCommand(cmd)
     self._WaitUntilCrawlerReady()
     cmd = util.AWS_PREFIX + [
         'glue',
         'get-crawler-metrics',
-        '--crawler-name-list', self.crawler_name,
-        '--region', self.region,
+        '--crawler-name-list',
+        self.crawler_name,
+        '--region',
+        self.region,
     ]
     output, _, _ = vm_util.IssueCommand(cmd)
     data = json.loads(output)
-    assert (isinstance(data['CrawlerMetricsList'], list) and
-            len(data['CrawlerMetricsList']) == 1)
+    assert (
+        isinstance(data['CrawlerMetricsList'], list)
+        and len(data['CrawlerMetricsList']) == 1
+    )
     return data['CrawlerMetricsList'][0]['LastRuntimeSeconds']
 
   def GetMetadata(self) -> Dict[str, Any]:
@@ -154,11 +174,13 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
       timeout=CRAWL_TIMEOUT,
       poll_interval=CRAWL_POLL_INTERVAL,
       fuzz=0,
-      retryable_exceptions=CrawlNotCompletedError,)
+      retryable_exceptions=CrawlNotCompletedError,
+  )
   def _WaitUntilCrawlerReady(self):
     if not self._IsReady(raise_on_crawl_failure=True):
       raise CrawlNotCompletedError(
-          f'Crawler {self.crawler_name} still running.')
+          f'Crawler {self.crawler_name} still running.'
+      )
 
   def _DbExists(self) -> Optional[bool]:
     """Whether the database exists or not.
@@ -171,8 +193,10 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
     cmd = util.AWS_PREFIX + [
         'glue',
         'get-database',
-        '--name', self.db_name,
-        '--region', self.region,
+        '--name',
+        self.db_name,
+        '--region',
+        self.region,
     ]
     _, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if not retcode:
@@ -197,7 +221,9 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
     cmd = util.AWS_PREFIX + [
         'glue',
         'get-crawler',
-        '--name', self.crawler_name,
-        '--region', self.region,
+        '--name',
+        self.crawler_name,
+        '--region',
+        self.region,
     ]
     return vm_util.IssueCommand(cmd, raise_on_failure=raise_on_failure)

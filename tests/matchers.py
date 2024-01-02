@@ -244,8 +244,9 @@ class HASALLOF(_NotEqualMixin):
       True if self._values is not empty and all self._values are in collection,
       False otherwise.
     """
-    if not self._values or (not self._hashable and
-                            isinstance(collection, Hashable)):
+    if not self._values or (
+        not self._hashable and isinstance(collection, Hashable)
+    ):
       return False
     if self._hashable:
       try:
@@ -302,7 +303,6 @@ class HASMETHODVALUE(_NotEqualMixin):
 
   This calls the compared object's method and checks if it returned value.
   Short form for HASATTRVALUE(method, IS(lambda x: x() == value)).
-
   """
 
   def __init__(self, method, value):
@@ -495,10 +495,14 @@ class SequenceEqual:
     self._sequence = sequence
 
   def __eq__(self, other: Any) -> bool:
-    return (isinstance(other, Sequence) and
-            len(self._sequence) == len(other) and
-            all(own_item == other_item
-                for own_item, other_item in zip(self._sequence, other)))
+    return (
+        isinstance(other, Sequence)
+        and len(self._sequence) == len(other)
+        and all(
+            own_item == other_item
+            for own_item, other_item in zip(self._sequence, other)
+        )
+    )
 
   def __repr__(self) -> str:
     return f"SequenceEqual({self._sequence!r})"
@@ -523,9 +527,9 @@ class SequenceIsCloseTo(_NotEqualMixin):
 
   def __eq__(self, other: Any) -> bool:
     return (
-        isinstance(other, Sequence) and
-        len(self._sequence) == len(other) and
-        all(
+        isinstance(other, Sequence)
+        and len(self._sequence) == len(other)
+        and all(
             math.isclose(own_item, other_item, **self._isclose_kwargs)
             for own_item, other_item in zip(self._sequence, other)
         )

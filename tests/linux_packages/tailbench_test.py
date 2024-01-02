@@ -26,22 +26,24 @@ class TailbenchTest(pkb_common_test_case.PkbCommonTestCase):
   def validate_results(self, results: List[tailbench._TestResult]):
     for result in results:
       histogram: sample._Histogram = result.histogram
-      if not (histogram[i] <= histogram[i + 1]
-              for i in range(len(histogram) - 1)):
+      if not (
+          histogram[i] <= histogram[i + 1] for i in range(len(histogram) - 1)
+      ):
         return False
     return True
 
   def testParseResultsIsReadable(self):
     test_results = List[tailbench._TestResult]
     path = os.path.join(
-        os.path.dirname(__file__), '..', 'data', 'tailbench-img-dnnResult.txt')
-    test_results = tailbench._ParseResultsFile(path,
-                                               'name')
+        os.path.dirname(__file__), '..', 'data', 'tailbench-img-dnnResult.txt'
+    )
+    test_results = tailbench._ParseResultsFile(path, 'name')
     self.assertTrue(self.validate_results(test_results))
 
   def testDataConforms(self):
     path = os.path.join(
-        os.path.dirname(__file__), '..', 'data', 'tailbench-img-dnnResult.txt')
+        os.path.dirname(__file__), '..', 'data', 'tailbench-img-dnnResult.txt'
+    )
     samp = tailbench.BuildHistogramSamples(path)
     dictionary = samp[0].asdict()
     self.assertGreater(len(dictionary), 0)

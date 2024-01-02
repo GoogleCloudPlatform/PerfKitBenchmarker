@@ -16,23 +16,27 @@
 
 from perfkitbenchmarker import errors
 
-RHEL_REPO = ('[nginx]\n'
-             'name=nginx repo\n'
-             'baseurl=https://nginx.org/packages/rhel/$releasever/$basearch/\n'
-             'gpgcheck=0\n'
-             'enabled=1')
+RHEL_REPO = (
+    '[nginx]\n'
+    'name=nginx repo\n'
+    'baseurl=https://nginx.org/packages/rhel/$releasever/$basearch/\n'
+    'gpgcheck=0\n'
+    'enabled=1'
+)
 
 
 def YumInstall(vm):
   """Installs nginx on the VM."""
-  vm.RemoteCommand('echo \'%s\' | '
-                   'sudo tee /etc/yum.repos.d/nginx.repo' % RHEL_REPO)
+  vm.RemoteCommand(
+      "echo '%s' | sudo tee /etc/yum.repos.d/nginx.repo" % RHEL_REPO
+  )
   try:
     vm.InstallPackages('nginx')
   except errors.VmUtil.IssueCommandError:
     # Amazon Linux does not have a releasever configured.
-    vm.RemoteCommand('sudo sed -i -e "s/\\$releasever/6/" '
-                     '/etc/yum.repos.d/nginx.repo')
+    vm.RemoteCommand(
+        'sudo sed -i -e "s/\\$releasever/6/" /etc/yum.repos.d/nginx.repo'
+    )
     vm.InstallPackages('nginx')
 
 

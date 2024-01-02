@@ -28,14 +28,21 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the mysql package on the VM."""
-  vm.RemoteCommand('wget -c '
-                   'https://repo.mysql.com//mysql-apt-config_0.8.17-1_all.deb')
-  vm.RemoteCommand('echo mysql-apt-config mysql-apt-config/select-server'
-                   ' select mysql-8.0 | sudo debconf-set-selections')
-  vm.RemoteCommand('echo mysql-apt-config mysql-apt-config/select-product'
-                   ' select Ok | sudo debconf-set-selections')
-  vm.RemoteCommand('sudo -E DEBIAN_FRONTEND=noninteractive dpkg -i'
-                   ' mysql-apt-config_0.8.17-1_all.deb')
+  vm.RemoteCommand(
+      'wget -c https://repo.mysql.com//mysql-apt-config_0.8.17-1_all.deb'
+  )
+  vm.RemoteCommand(
+      'echo mysql-apt-config mysql-apt-config/select-server'
+      ' select mysql-8.0 | sudo debconf-set-selections'
+  )
+  vm.RemoteCommand(
+      'echo mysql-apt-config mysql-apt-config/select-product'
+      ' select Ok | sudo debconf-set-selections'
+  )
+  vm.RemoteCommand(
+      'sudo -E DEBIAN_FRONTEND=noninteractive dpkg -i'
+      ' mysql-apt-config_0.8.17-1_all.deb'
+  )
 
   _, stderr = vm.RemoteCommand('sudo apt-get update', ignore_failure=True)
 
@@ -47,17 +54,23 @@ def AptInstall(vm):
       match = re.match('.*NO_PUBKEY ([A-Z0-9]*)', stderr)
       if match:
         key = match.group(1)
-        vm.RemoteCommand('sudo apt-key adv '
-                         f'--keyserver keyserver.ubuntu.com --recv-keys {key}')
+        vm.RemoteCommand(
+            'sudo apt-key adv '
+            f'--keyserver keyserver.ubuntu.com --recv-keys {key}'
+        )
       else:
         raise RuntimeError('No public key found by regex.')
     else:
       raise RuntimeError(stderr)
 
-  vm.RemoteCommand('echo "mysql-server-8.0 mysql-server/root_password password '
-                   f'{MYSQL_PSWD}" | sudo debconf-set-selections')
-  vm.RemoteCommand('echo "mysql-server-8.0 mysql-server/root_password_again '
-                   f'password {MYSQL_PSWD}" | sudo debconf-set-selections')
+  vm.RemoteCommand(
+      'echo "mysql-server-8.0 mysql-server/root_password password '
+      f'{MYSQL_PSWD}" | sudo debconf-set-selections'
+  )
+  vm.RemoteCommand(
+      'echo "mysql-server-8.0 mysql-server/root_password_again '
+      f'password {MYSQL_PSWD}" | sudo debconf-set-selections'
+  )
   vm.InstallPackages('mysql-server')
 
 

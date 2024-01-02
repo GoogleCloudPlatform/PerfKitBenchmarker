@@ -217,7 +217,8 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
     # that the body of the file is what we expect it to be (useful for
     # verifying that the pod.yml body was written correctly).
     temp_file = stack.enter_context(
-        mock.patch(vm_util.__name__ + '.NamedTemporaryFile'))
+        mock.patch(vm_util.__name__ + '.NamedTemporaryFile')
+    )
 
     issue_command = stack.enter_context(
         mock.patch(
@@ -232,37 +233,31 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
 
 class TestKubernetesVirtualMachine(
     pkb_common_test_case.TestOsMixin,
-    kubernetes_virtual_machine.KubernetesVirtualMachine):
+    kubernetes_virtual_machine.KubernetesVirtualMachine,
+):
   pass
 
 
 class BaseKubernetesVirtualMachineTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   def assertJsonEqual(self, str1, str2):
     json1 = json.loads(str1)
     json2 = json.loads(str2)
     self.assertEqual(
-        json.dumps(json1, sort_keys=True),
-        json.dumps(json2, sort_keys=True)
+        json.dumps(json1, sort_keys=True), json.dumps(json2, sort_keys=True)
     )
 
 
-class KubernetesResourcesTestCase(
-    BaseKubernetesVirtualMachineTestCase):
+class KubernetesResourcesTestCase(BaseKubernetesVirtualMachineTestCase):
 
   @staticmethod
   def create_virtual_machine_spec():
     spec = kubernetes_pod_spec.KubernetesPodSpec(
         _COMPONENT,
-        resource_limits={
-            'cpus': 2,
-            'memory': '5GiB'
-        },
-        resource_requests={
-            'cpus': 1.5,
-            'memory': '4GiB'
-        },
+        resource_limits={'cpus': 2, 'memory': '5GiB'},
+        resource_requests={'cpus': 1.5, 'memory': '4GiB'},
         gpu_count=2,
         gpu_type='k80',
     )
@@ -279,16 +274,8 @@ class KubernetesResourcesTestCase(
       kub_vm = TestKubernetesVirtualMachine(spec)
 
       expected = {
-          'limits': {
-              'cpu': '2',
-              'memory': '5120Mi',
-              'nvidia.com/gpu': '2'
-          },
-          'requests': {
-              'cpu': '1.5',
-              'memory': '4096Mi',
-              'nvidia.com/gpu': '2'
-          }
+          'limits': {'cpu': '2', 'memory': '5120Mi', 'nvidia.com/gpu': '2'},
+          'requests': {'cpu': '1.5', 'memory': '4096Mi', 'nvidia.com/gpu': '2'},
       }
       actual = kub_vm._BuildResourceBody()
       self.assertDictEqual(expected, actual)
@@ -319,14 +306,13 @@ class KubernetesResourcesTestCase(
 
 
 class KubernetesVirtualMachineOsTypesTestCase(
-    BaseKubernetesVirtualMachineTestCase):
+    BaseKubernetesVirtualMachineTestCase
+):
 
   @staticmethod
   def create_kubernetes_vm(os_type):
-    spec = kubernetes_pod_spec.KubernetesPodSpec(
-        _COMPONENT)
-    vm_class = virtual_machine.GetVmClass(provider_info.KUBERNETES,
-                                          os_type)
+    spec = kubernetes_pod_spec.KubernetesPodSpec(_COMPONENT)
+    vm_class = virtual_machine.GetVmClass(provider_info.KUBERNETES, os_type)
     kub_vm = vm_class(spec)
     kub_vm._WaitForPodBootCompletion = lambda: None
     kub_vm._Create()
@@ -337,12 +323,14 @@ class KubernetesVirtualMachineOsTypesTestCase(
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
       create_json = json.loads(write_mock.call_args[0][0])
-      self.assertEqual(create_json['spec']['containers'][0]['image'],
-                       'ubuntu:16.04')
+      self.assertEqual(
+          create_json['spec']['containers'][0]['image'], 'ubuntu:16.04'
+      )
 
 
 class KubernetesVirtualMachineVmGroupAffinityTestCase(
-    BaseKubernetesVirtualMachineTestCase):
+    BaseKubernetesVirtualMachineTestCase
+):
 
   @staticmethod
   def create_kubernetes_vm():
@@ -351,7 +339,8 @@ class KubernetesVirtualMachineVmGroupAffinityTestCase(
         image='test_image',
         install_packages=False,
         machine_type='test_machine_type',
-        zone='test_zone')
+        zone='test_zone',
+    )
     kub_vm = TestKubernetesVirtualMachine(spec)
     kub_vm.name = _NAME
     kub_vm.vm_group = 'my_vm_group'
@@ -364,13 +353,11 @@ class KubernetesVirtualMachineVmGroupAffinityTestCase(
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
       self.assertJsonEqual(
-          write_mock.call_args[0][0],
-          _EXPECTED_CALL_BODY_WITH_VM_GROUP
+          write_mock.call_args[0][0], _EXPECTED_CALL_BODY_WITH_VM_GROUP
       )
 
 
-class KubernetesVirtualMachineTestCase(
-    BaseKubernetesVirtualMachineTestCase):
+class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
 
   @staticmethod
   def create_virtual_machine_spec():
@@ -379,7 +366,8 @@ class KubernetesVirtualMachineTestCase(
         image='test_image',
         install_packages=False,
         machine_type='test_machine_type',
-        zone='test_zone')
+        zone='test_zone',
+    )
     return spec
 
   def testCreate(self):
@@ -392,8 +380,10 @@ class KubernetesVirtualMachineTestCase(
       command_string = ' '.join(command[:4])
 
       self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('{0} --kubeconfig={1} create -f'.format(
-          _KUBECTL, _KUBECONFIG), command_string)
+      self.assertIn(
+          '{0} --kubeconfig={1} create -f'.format(_KUBECTL, _KUBECONFIG),
+          command_string,
+      )
 
   def testCreatePodBodyWrittenCorrectly(self):
     spec = self.create_virtual_machine_spec()
@@ -409,8 +399,7 @@ class KubernetesVirtualMachineTestCase(
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
       self.assertJsonEqual(
-          write_mock.call_args[0][0],
-          _EXPECTED_CALL_BODY_WITHOUT_GPUS
+          write_mock.call_args[0][0], _EXPECTED_CALL_BODY_WITHOUT_GPUS
       )
 
   def testDownloadPreprovisionedDataAws(self):
@@ -419,7 +408,9 @@ class KubernetesVirtualMachineTestCase(
     with patch_critical_objects(flags=FLAGS) as (issue_command, _):
       kub_vm = (
           kubernetes_virtual_machine.Ubuntu1604BasedKubernetesVirtualMachine(
-              spec))
+              spec
+          )
+      )
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
@@ -433,7 +424,9 @@ class KubernetesVirtualMachineTestCase(
     with patch_critical_objects() as (issue_command, _):
       kub_vm = (
           kubernetes_virtual_machine.Ubuntu1604BasedKubernetesVirtualMachine(
-              spec))
+              spec
+          )
+      )
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
@@ -447,7 +440,9 @@ class KubernetesVirtualMachineTestCase(
     with patch_critical_objects() as (issue_command, _):
       kub_vm = (
           kubernetes_virtual_machine.Ubuntu1604BasedKubernetesVirtualMachine(
-              spec))
+              spec
+          )
+      )
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
@@ -456,7 +451,8 @@ class KubernetesVirtualMachineTestCase(
 
 
 class KubernetesVirtualMachineWithGpusTestCase(
-    BaseKubernetesVirtualMachineTestCase):
+    BaseKubernetesVirtualMachineTestCase
+):
 
   @staticmethod
   def create_virtual_machine_spec():
@@ -467,7 +463,8 @@ class KubernetesVirtualMachineWithGpusTestCase(
         gpu_type='k80',
         install_packages=False,
         machine_type='test_machine_type',
-        zone='test_zone')
+        zone='test_zone',
+    )
     return spec
 
   def testCreate(self):
@@ -480,8 +477,10 @@ class KubernetesVirtualMachineWithGpusTestCase(
       command_string = ' '.join(command[:4])
 
       self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('{0} --kubeconfig={1} create -f'.format(
-          _KUBECTL, _KUBECONFIG), command_string)
+      self.assertIn(
+          '{0} --kubeconfig={1} create -f'.format(_KUBECTL, _KUBECONFIG),
+          command_string,
+      )
 
   def testCreatePodBodyWrittenCorrectly(self):
     spec = self.create_virtual_machine_spec()
@@ -497,13 +496,13 @@ class KubernetesVirtualMachineWithGpusTestCase(
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
       self.assertJsonEqual(
-          write_mock.call_args[0][0],
-          _EXPECTED_CALL_BODY_WITH_2_GPUS
+          write_mock.call_args[0][0], _EXPECTED_CALL_BODY_WITH_2_GPUS
       )
 
 
 class KubernetesVirtualMachineWithNvidiaCudaImage(
-    BaseKubernetesVirtualMachineTestCase):
+    BaseKubernetesVirtualMachineTestCase
+):
 
   @staticmethod
   def create_virtual_machine_spec():
@@ -511,13 +510,15 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
         _COMPONENT,
         install_packages=False,
         machine_type='test_machine_type',
-        zone='test_zone')
+        zone='test_zone',
+    )
     return spec
 
   def testCreatePodBodyWrittenCorrectly(self):
     spec = self.create_virtual_machine_spec()
-    vm_class = virtual_machine.GetVmClass(provider_info.KUBERNETES,
-                                          os_types.UBUNTU1604_CUDA9)
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.KUBERNETES, os_types.UBUNTU1604_CUDA9
+    )
     with patch_critical_objects() as (_, temp_file):
       kub_vm = vm_class(spec)
       # Need to set the name explicitly on the instance because the test
@@ -530,8 +531,7 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
       self.assertJsonEqual(
-          write_mock.call_args[0][0],
-          _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE
+          write_mock.call_args[0][0], _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE
       )
 
 

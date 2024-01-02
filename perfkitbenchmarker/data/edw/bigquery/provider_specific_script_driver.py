@@ -9,10 +9,14 @@ __author__ = 'p3rf@google.com'
 
 from absl import flags
 
-flags.DEFINE_string('bq_project_id', None, 'Project Id which contains the query'
-                                           ' dataset and table.')
-flags.DEFINE_string('bq_dataset_id', None, 'Dataset Id which contains the query'
-                                           ' table.')
+flags.DEFINE_string(
+    'bq_project_id',
+    None,
+    'Project Id which contains the query dataset and table.',
+)
+flags.DEFINE_string(
+    'bq_dataset_id', None, 'Dataset Id which contains the query table.'
+)
 flags.mark_flags_as_required(['bq_project_id', 'bq_dataset_id'])
 
 FLAGS = flags.FLAGS
@@ -30,6 +34,12 @@ def generate_provider_specific_cmd_list(script, driver, output, error):
   Returns:
     Command list to execute the supplied script.
   """
-  cmd_list = [driver, FLAGS.bq_project_id, FLAGS.bq_dataset_id,
-              script, output, error]
+  cmd_list = [
+      driver,
+      FLAGS.bq_project_id,
+      FLAGS.bq_dataset_id,
+      script,
+      output,
+      error,
+  ]
   return cmd_list

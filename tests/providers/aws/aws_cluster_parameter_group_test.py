@@ -16,7 +16,6 @@
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_cluster_parameter_group
 from perfkitbenchmarker.providers.aws import util
@@ -30,7 +29,8 @@ FLAGS = flags.FLAGS
 
 
 class RedshiftClusterParameterGroupTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   def setUp(self):
     super(RedshiftClusterParameterGroupTestCase, self).setUp()
@@ -39,28 +39,37 @@ class RedshiftClusterParameterGroupTestCase(
 
   def testValidClusterParameterGroupCreation(self):
     cpg = aws_cluster_parameter_group.RedshiftClusterParameterGroup(
-        list(util.AWS_PREFIX))
+        list(util.AWS_PREFIX)
+    )
     self.assertEqual(cpg.name, 'pkb-%s' % TEST_RUN_URI)
     with mock.patch(
-        vm_util.__name__ + '.IssueCommand',
-        return_value=('out_', 'err_', 0)) as mock_issue:
+        vm_util.__name__ + '.IssueCommand', return_value=('out_', 'err_', 0)
+    ) as mock_issue:
       cpg._Create()
       self.assertEqual(mock_issue.call_count, 1)
 
   def testValidClusterParameterGroupDeletion(self):
     cpg = aws_cluster_parameter_group.RedshiftClusterParameterGroup(
-        list(util.AWS_PREFIX))
+        list(util.AWS_PREFIX)
+    )
     self.assertEqual(cpg.name, 'pkb-%s' % TEST_RUN_URI)
     with mock.patch(
-        vm_util.__name__ + '.IssueCommand',
-        return_value=('out_', 'err_', 0)) as mock_issue:
+        vm_util.__name__ + '.IssueCommand', return_value=('out_', 'err_', 0)
+    ) as mock_issue:
       cpg._Delete()
       mock_issue.assert_called_once()
-      mock_issue.assert_called_with([
-          'aws', '--output', 'json', 'redshift',
-          'delete-cluster-parameter-group', '--parameter-group-name',
-          'pkb-%s' % TEST_RUN_URI
-      ], raise_on_failure=False)
+      mock_issue.assert_called_with(
+          [
+              'aws',
+              '--output',
+              'json',
+              'redshift',
+              'delete-cluster-parameter-group',
+              '--parameter-group-name',
+              'pkb-%s' % TEST_RUN_URI,
+          ],
+          raise_on_failure=False,
+      )
 
 
 if __name__ == '__main__':

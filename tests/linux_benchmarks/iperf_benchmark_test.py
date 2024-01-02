@@ -16,7 +16,6 @@
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker.linux_benchmarks import iperf_benchmark
 

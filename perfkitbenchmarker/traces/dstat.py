@@ -23,7 +23,6 @@ import os
 import re
 from absl import flags
 import numpy as np
-
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
@@ -33,26 +32,40 @@ from perfkitbenchmarker.linux_packages import dstat
 from perfkitbenchmarker.traces import base_collector
 import six
 
-flags.DEFINE_boolean('dstat', False,
-                     'Run dstat (http://dag.wiee.rs/home-made/dstat/) '
-                     'on each VM to collect system performance metrics during '
-                     'each benchmark run.')
-flags.DEFINE_integer('dstat_interval', None,
-                     'dstat sample collection frequency, in seconds. Only '
-                     'applicable when --dstat is specified.')
-flags.DEFINE_string('dstat_output', None,
-                    'Output directory for dstat output. '
-                    'Only applicable when --dstat is specified. '
-                    'Default: run temporary directory.')
-flags.DEFINE_boolean('dstat_publish', False,
-                     'Whether to publish average dstat statistics.')
-flags.DEFINE_string('dstat_publish_regex', None, 'Requires setting '
-                    'dstat_publish to true. If specified, any dstat statistic '
-                    'matching this regular expression will be published such '
-                    'that each individual statistic will be in a sample with '
-                    'the time since the epoch in the metadata. Examples. Use '
-                    '".*" to record all samples. Use "net" to record '
-                    'networking statistics.')
+flags.DEFINE_boolean(
+    'dstat',
+    False,
+    'Run dstat (http://dag.wiee.rs/home-made/dstat/) '
+    'on each VM to collect system performance metrics during '
+    'each benchmark run.',
+)
+flags.DEFINE_integer(
+    'dstat_interval',
+    None,
+    'dstat sample collection frequency, in seconds. Only '
+    'applicable when --dstat is specified.',
+)
+flags.DEFINE_string(
+    'dstat_output',
+    None,
+    'Output directory for dstat output. '
+    'Only applicable when --dstat is specified. '
+    'Default: run temporary directory.',
+)
+flags.DEFINE_boolean(
+    'dstat_publish', False, 'Whether to publish average dstat statistics.'
+)
+flags.DEFINE_string(
+    'dstat_publish_regex',
+    None,
+    'Requires setting '
+    'dstat_publish to true. If specified, any dstat statistic '
+    'matching this regular expression will be published such '
+    'that each individual statistic will be in a sample with '
+    'the time since the epoch in the metadata. Examples. Use '
+    '".*" to record all samples. Use "net" to record '
+    'networking statistics.',
+)
 FLAGS = flags.FLAGS
 
 
@@ -69,7 +82,6 @@ class _DStatCollector(base_collector.BaseCollector):
     vm.Install('dstat')
 
   def _CollectorRunCommand(self, vm, collector_file):
-
     # List block devices so that I/O to each block device can be recorded.
     block_devices, _ = vm.RemoteCommand(
         'lsblk --nodeps --output NAME --noheadings'
@@ -92,7 +104,8 @@ class _DStatCollector(base_collector.BaseCollector):
     def _AnalyzeEvent(role, labels, out, event):
       # Find out index of rows belong to event according to timestamp.
       cond = (out[:, 0] > event.start_timestamp) & (
-          out[:, 0] < event.end_timestamp)
+          out[:, 0] < event.end_timestamp
+      )
       # Skip analyzing event if none of rows falling into time range.
       if not cond.any():
         return
@@ -104,7 +117,8 @@ class _DStatCollector(base_collector.BaseCollector):
 
       samples.extend([
           sample.Sample(label, avg[idx], '', metadata)
-          for idx, label in enumerate(labels[1:])])
+          for idx, label in enumerate(labels[1:])
+      ])
 
       dstat_publish_regex = FLAGS.dstat_publish_regex
       if dstat_publish_regex:
@@ -116,11 +130,13 @@ class _DStatCollector(base_collector.BaseCollector):
               individual_sample_metadata = copy.deepcopy(metadata)
               individual_sample_metadata['dstat_epoch'] = out[sample_idx, 0]
               samples.append(
-                  sample.Sample(label, value, '', individual_sample_metadata))
+                  sample.Sample(label, value, '', individual_sample_metadata)
+              )
 
     def _Analyze(role, file):
-      with open(os.path.join(self.output_directory,
-                             os.path.basename(file)), 'r') as f:
+      with open(
+          os.path.join(self.output_directory, os.path.basename(file)), 'r'
+      ) as f:
         fp = iter(f)
         labels, out = dstat.ParseCsvFile(fp)
         background_tasks.RunThreaded(
@@ -138,17 +154,23 @@ def Register(parsed_flags):
   if not parsed_flags.dstat:
     return
 
-  output_directory = (parsed_flags.dstat_output
-                      if parsed_flags['dstat_output'].present
-                      else vm_util.GetTempDir())
+  output_directory = (
+      parsed_flags.dstat_output
+      if parsed_flags['dstat_output'].present
+      else vm_util.GetTempDir()
+  )
 
-  logging.debug('Registering dstat collector with interval %s, output to %s.',
-                parsed_flags.dstat_interval, output_directory)
+  logging.debug(
+      'Registering dstat collector with interval %s, output to %s.',
+      parsed_flags.dstat_interval,
+      output_directory,
+  )
 
   if not os.path.isdir(output_directory):
     os.makedirs(output_directory)
-  collector = _DStatCollector(interval=parsed_flags.dstat_interval,
-                              output_directory=output_directory)
+  collector = _DStatCollector(
+      interval=parsed_flags.dstat_interval, output_directory=output_directory
+  )
   events.before_phase.connect(collector.Start, stages.RUN, weak=False)
   events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
   if parsed_flags.dstat_publish:

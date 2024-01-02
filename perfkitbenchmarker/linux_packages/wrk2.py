@@ -23,19 +23,23 @@ from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
-WRK2_URL = ('https://github.com/giltene/wrk2/archive/'
-            'c4250acb6921c13f8dccfc162d894bd7135a2979.tar.gz')
+WRK2_URL = (
+    'https://github.com/giltene/wrk2/archive/'
+    'c4250acb6921c13f8dccfc162d894bd7135a2979.tar.gz'
+)
 WRK2_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'wrk2')
 WRK2_PATH = posixpath.join(WRK2_DIR, 'wrk')
 
 _CORRECTED = flags.DEFINE_bool(
-    'wrk2_corrected_latency', False,
+    'wrk2_corrected_latency',
+    False,
     'Whether or not response latency is corrected.\n'
     'If True, wrk2 measure response latency from the time the '
     'transmission should have occurred according to the constant '
     'throughput configured for the run.\n'
     'If False, response latency is the time that actual '
-    'transmission of a request occured.')
+    'transmission of a request occured.',
+)
 
 
 def _Install(vm):
@@ -43,9 +47,10 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('openssl')
   vm.RemoteCommand(
-      ('mkdir -p {0} && '
-       'curl -L {1} | tar -xzf - -C {0} --strip-components 1').format(
-           WRK2_DIR, WRK2_URL))
+      (
+          'mkdir -p {0} && curl -L {1} | tar -xzf - -C {0} --strip-components 1'
+      ).format(WRK2_DIR, WRK2_URL)
+  )
   vm.RemoteCommand('make -C {}'.format(WRK2_DIR))
 
 
@@ -74,7 +79,9 @@ def _ParseOutput(output_text):
   inner_pat = r'^\s*(\d+\.\d+)%\s+(\d+\.\d+)(us|ms|s|m)\s*\n'
   regex = re.compile(
       r'^\s*Latency Distribution \(HdrHistogram - Recorded Latency\)\n'
-      r'((?:^' + inner_pat + ')+)', re.MULTILINE)
+      r'((?:^' + inner_pat + ')+)',
+      re.MULTILINE,
+  )
   m = regex.search(output_text)
   if not m:
     raise ValueError('No match for {} in\n{}'.format(regex, output_text))
@@ -85,13 +92,13 @@ def _ParseOutput(output_text):
       value_in_ms = float(value)
     elif unit == 'us':
       unit = 'ms'
-      value_in_ms = float(value) / 1000.
+      value_in_ms = float(value) / 1000.0
     elif unit == 's':
       unit = 'ms'
-      value_in_ms = float(value) * 1000.
+      value_in_ms = float(value) * 1000.0
     elif unit == 'm':
       unit = 'ms'
-      value_in_ms = float(value) * 60. * 1000.
+      value_in_ms = float(value) * 60.0 * 1000.0
     else:
       raise ValueError('Unknown unit {} for {}'.format(unit, m.group(1)))
     yield variable, value_in_ms, unit
@@ -116,13 +123,9 @@ def _ParseOutput(output_text):
     raise ValueError('More than 10% of requests failed.')
 
 
-def Run(vm,
-        target,
-        rate,
-        connections=1,
-        duration=60,
-        script_path=None,
-        threads=None):
+def Run(
+    vm, target, rate, connections=1, duration=60, script_path=None, threads=None
+):
   """Runs wrk against a given target.
 
   Args:
@@ -139,18 +142,21 @@ def Run(vm,
   """
   if threads is None:
     threads = min(connections, vm.NumCpusForBenchmark())
-  cmd = ('{wrk} '
-         '--rate={rate} '
-         '--connections={connections} '
-         '--threads={threads} '
-         '--duration={duration} '
-         '--{corrected}').format(
-             wrk=WRK2_PATH,
-             connections=connections,
-             threads=threads,
-             rate=rate,
-             duration=duration,
-             corrected=('latency' if _CORRECTED.value else 'u_latency'))
+  cmd = (
+      '{wrk} '
+      '--rate={rate} '
+      '--connections={connections} '
+      '--threads={threads} '
+      '--duration={duration} '
+      '--{corrected}'
+  ).format(
+      wrk=WRK2_PATH,
+      connections=connections,
+      threads=threads,
+      rate=rate,
+      duration=duration,
+      corrected=('latency' if _CORRECTED.value else 'u_latency'),
+  )
   if script_path:
     cmd += ' --script ' + script_path
   cmd += ' ' + target
@@ -165,5 +171,6 @@ def Run(vm,
             'threads': threads,
             'duration': duration,
             'target_rate': rate,
-            'corrected': _CORRECTED.value
-        })
+            'corrected': _CORRECTED.value,
+        },
+    )

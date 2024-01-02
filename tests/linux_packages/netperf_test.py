@@ -16,7 +16,6 @@
 import os
 import unittest
 
-
 from perfkitbenchmarker.linux_packages import netperf
 
 
@@ -30,9 +29,21 @@ class NetperfParseHistogramTestCase(unittest.TestCase):
 
   def testParsesHistogram(self):
     expected = {
-        300: 5771, 400: 118948, 500: 7121, 600: 639, 700: 199, 800: 90,
-        900: 53, 1000: 149, 2000: 31, 3000: 11, 4000: 8, 5000: 1, 6000: 1,
-        7000: 1, 9000: 1
+        300: 5771,
+        400: 118948,
+        500: 7121,
+        600: 639,
+        700: 199,
+        800: 90,
+        900: 53,
+        1000: 149,
+        2000: 31,
+        3000: 11,
+        4000: 8,
+        5000: 1,
+        6000: 1,
+        7000: 1,
+        9000: 1,
     }
 
     hist = netperf.ParseHistogram(self.netperf_output)

@@ -28,8 +28,9 @@ from perfkitbenchmarker import linux_packages
 # TODO: Make collection interval configurable.
 INTERVAL = 10
 SCRIPT_NAME = 'build_collectd.sh.j2'
-COLLECTD_URL = ('https://github.com/collectd/collectd/archive/'
-                'collectd-5.5.0.tar.gz')
+COLLECTD_URL = (
+    'https://github.com/collectd/collectd/archive/collectd-5.5.0.tar.gz'
+)
 BUILD_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'collectd-build')
 CSV_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'collectd-csv')
 PREFIX = posixpath.join(linux_packages.INSTALL_DIR, 'collectd')
@@ -42,13 +43,16 @@ def _Install(vm):
       'build_dir': BUILD_DIR,
       'root_dir': PREFIX,
       'csv_dir': CSV_DIR,
-      'interval': INTERVAL}
+      'interval': INTERVAL,
+  }
 
   remote_path = posixpath.join(
       linux_packages.INSTALL_DIR,
-      posixpath.splitext(posixpath.basename(SCRIPT_NAME))[0])
-  vm.RenderTemplate(data.ResourcePath(SCRIPT_NAME),
-                    remote_path, context=context)
+      posixpath.splitext(posixpath.basename(SCRIPT_NAME))[0],
+  )
+  vm.RenderTemplate(
+      data.ResourcePath(SCRIPT_NAME), remote_path, context=context
+  )
   vm.RemoteCommand('bash ' + remote_path)
 
 

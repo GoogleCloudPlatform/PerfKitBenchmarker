@@ -69,34 +69,81 @@ EXPECTED_JAVA_METADATA = {
 }
 
 EXPECTED_RESULT_C = [
-    sample.Sample(metric='Composite Score', value=1596.04,
-                  unit='Mflops', metadata=EXPECTED_C_METADATA),
-    sample.Sample(metric='FFT (N=1024)', value=1568.64,
-                  unit='Mflops', metadata=EXPECTED_C_METADATA),
-    sample.Sample(metric='SOR (100 x 100)', value=1039.98,
-                  unit='Mflops', metadata=EXPECTED_C_METADATA),
-    sample.Sample(metric='MonteCarlo', value=497.64,
-                  unit='Mflops', metadata=EXPECTED_C_METADATA),
-    sample.Sample(metric='Sparse matmult (N=1000, nz=5000)', value=1974.39,
-                  unit='Mflops', metadata=EXPECTED_C_METADATA),
-    sample.Sample(metric='LU (M=100, N=100)', value=2899.56,
-                  unit='Mflops', metadata=EXPECTED_C_METADATA),
+    sample.Sample(
+        metric='Composite Score',
+        value=1596.04,
+        unit='Mflops',
+        metadata=EXPECTED_C_METADATA,
+    ),
+    sample.Sample(
+        metric='FFT (N=1024)',
+        value=1568.64,
+        unit='Mflops',
+        metadata=EXPECTED_C_METADATA,
+    ),
+    sample.Sample(
+        metric='SOR (100 x 100)',
+        value=1039.98,
+        unit='Mflops',
+        metadata=EXPECTED_C_METADATA,
+    ),
+    sample.Sample(
+        metric='MonteCarlo',
+        value=497.64,
+        unit='Mflops',
+        metadata=EXPECTED_C_METADATA,
+    ),
+    sample.Sample(
+        metric='Sparse matmult (N=1000, nz=5000)',
+        value=1974.39,
+        unit='Mflops',
+        metadata=EXPECTED_C_METADATA,
+    ),
+    sample.Sample(
+        metric='LU (M=100, N=100)',
+        value=2899.56,
+        unit='Mflops',
+        metadata=EXPECTED_C_METADATA,
+    ),
 ]
 
 EXPECTED_RESULT_JAVA = [
-    sample.Sample(metric='Composite Score', value=1716.3662351463677,
-                  unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
-    sample.Sample(metric='FFT (1024)', value=1000.1380057152871,
-                  unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
-    sample.Sample(metric='SOR (100x100)', value=1353.1987180103354,
-                  unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
-    sample.Sample(metric='Monte Carlo', value=727.7138820888014,
-                  unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
-    sample.Sample(metric='Sparse matmult (N=1000, nz=5000)',
-                  value=1495.40225150659, unit='Mflops',
-                  metadata=EXPECTED_JAVA_METADATA),
-    sample.Sample(metric='LU (100x100)', value=4005.3783184108247,
-                  unit='Mflops', metadata=EXPECTED_JAVA_METADATA),
+    sample.Sample(
+        metric='Composite Score',
+        value=1716.3662351463677,
+        unit='Mflops',
+        metadata=EXPECTED_JAVA_METADATA,
+    ),
+    sample.Sample(
+        metric='FFT (1024)',
+        value=1000.1380057152871,
+        unit='Mflops',
+        metadata=EXPECTED_JAVA_METADATA,
+    ),
+    sample.Sample(
+        metric='SOR (100x100)',
+        value=1353.1987180103354,
+        unit='Mflops',
+        metadata=EXPECTED_JAVA_METADATA,
+    ),
+    sample.Sample(
+        metric='Monte Carlo',
+        value=727.7138820888014,
+        unit='Mflops',
+        metadata=EXPECTED_JAVA_METADATA,
+    ),
+    sample.Sample(
+        metric='Sparse matmult (N=1000, nz=5000)',
+        value=1495.40225150659,
+        unit='Mflops',
+        metadata=EXPECTED_JAVA_METADATA,
+    ),
+    sample.Sample(
+        metric='LU (100x100)',
+        value=4005.3783184108247,
+        unit='Mflops',
+        metadata=EXPECTED_JAVA_METADATA,
+    ),
 ]
 
 
@@ -113,8 +160,8 @@ class Scimark2BenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
   def testParseResultsCombined(self):
     samples = scimark2_benchmark.ParseResults(TEST_OUTPUT_C + TEST_OUTPUT_JAVA)
     self.assertSampleListsEqualUpToTimestamp(
-        samples,
-        EXPECTED_RESULT_C + EXPECTED_RESULT_JAVA)
+        samples, EXPECTED_RESULT_C + EXPECTED_RESULT_JAVA
+    )
 
 
 if __name__ == '__main__':

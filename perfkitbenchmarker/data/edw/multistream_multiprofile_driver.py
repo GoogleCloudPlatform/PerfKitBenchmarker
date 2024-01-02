@@ -4,7 +4,6 @@ The list of profiles are passed via flag each of which are defined in the
 profile_details module.
 """
 
-
 __author__ = 'p3rf@google.com'
 
 import json
@@ -17,9 +16,13 @@ from absl import flags
 import unistream_profile_driver
 
 
-flags.DEFINE_list('profile_list', None, 'List of profiles. Each will be run on '
-                                        'its own process to simulate '
-                                        'concurrency.')
+flags.DEFINE_list(
+    'profile_list',
+    None,
+    'List of profiles. Each will be run on '
+    'its own process to simulate '
+    'concurrency.',
+)
 
 flags.mark_flags_as_required(['profile_list'])
 
@@ -55,8 +58,13 @@ def manage_streams():
   start_time = time.time()
 
   for profile in FLAGS.profile_list:
-    profile_handling_process = Process(target=process_profile,
-                                       args=(profile, profile_performance,))
+    profile_handling_process = Process(
+        target=process_profile,
+        args=(
+            profile,
+            profile_performance,
+        ),
+    )
     profile_handling_process.start()
     profile_handling_process_list.append(profile_handling_process)
 

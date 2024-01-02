@@ -69,13 +69,11 @@ flags.DEFINE_integer(
 
 def get_files_in_directory_sorted(directory):
   """Returns a list of files in directory, sorted alphabetically."""
-  return sorted(
-      [
-          os.path.join(directory, name)
-          for name in os.listdir(directory)
-          if os.path.isfile(os.path.join(directory, name))
-      ]
-  )
+  return sorted([
+      os.path.join(directory, name)
+      for name in os.listdir(directory)
+      if os.path.isfile(os.path.join(directory, name))
+  ])
 
 
 class TfServingClientWorkload(object):

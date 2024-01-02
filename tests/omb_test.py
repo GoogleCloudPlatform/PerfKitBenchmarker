@@ -34,16 +34,49 @@ class OmbCommonTest(parameterized.TestCase, absltest.TestCase):
     self.enter_context(mock.patch.object(omb.time, 'time', return_value=0))
 
   @parameterized.parameters(
-      ('acc_latency',), ('allgather',), ('allgatherv',), ('allreduce',),
-      ('alltoall',), ('alltoallv',), ('barrier',), ('bcast',), ('bibw',),
-      ('bw',), ('cas_latency',), ('fop_latency',), ('gather',), ('gatherv',),
-      ('get_acc_latency',), ('get_bw',), ('get_latency',), ('iallgather',),
-      ('iallgatherv',), ('iallreduce',), ('ialltoall',), ('ialltoallv',),
-      ('ialltoallw',), ('ibarrier',), ('ibcast',), ('igather',), ('igatherv',),
-      ('ireduce',), ('iscatter',), ('iscatterv',), ('latency',),
-      ('latency_mp',), ('latency_mt',), ('mbw_mr',), ('multi_lat',),
-      ('put_bibw',), ('put_bw',), ('put_latency',), ('reduce',),
-      ('reduce_scatter',), ('scatter',), ('scatterv',))
+      ('acc_latency',),
+      ('allgather',),
+      ('allgatherv',),
+      ('allreduce',),
+      ('alltoall',),
+      ('alltoallv',),
+      ('barrier',),
+      ('bcast',),
+      ('bibw',),
+      ('bw',),
+      ('cas_latency',),
+      ('fop_latency',),
+      ('gather',),
+      ('gatherv',),
+      ('get_acc_latency',),
+      ('get_bw',),
+      ('get_latency',),
+      ('iallgather',),
+      ('iallgatherv',),
+      ('iallreduce',),
+      ('ialltoall',),
+      ('ialltoallv',),
+      ('ialltoallw',),
+      ('ibarrier',),
+      ('ibcast',),
+      ('igather',),
+      ('igatherv',),
+      ('ireduce',),
+      ('iscatter',),
+      ('iscatterv',),
+      ('latency',),
+      ('latency_mp',),
+      ('latency_mt',),
+      ('mbw_mr',),
+      ('multi_lat',),
+      ('put_bibw',),
+      ('put_bw',),
+      ('put_latency',),
+      ('reduce',),
+      ('reduce_scatter',),
+      ('scatter',),
+      ('scatterv',),
+  )
   def testParseData(self, test_name):
     input_text = ReadFile(f'{test_name}.txt')
 
@@ -52,17 +85,14 @@ class OmbCommonTest(parameterized.TestCase, absltest.TestCase):
     self.assertEqual(json.loads(ReadFile(f'{test_name}.json')), values)
 
   @parameterized.parameters(
-      ('acc_latency.txt', {
-          'sync': 'MPI_Win_flush',
-          'window_creation': 'MPI_Win_allocate'
-      }),
+      (
+          'acc_latency.txt',
+          {'sync': 'MPI_Win_flush', 'window_creation': 'MPI_Win_allocate'},
+      ),
       ('barrier.txt', {}),
       ('ibarrier.txt', {}),
       ('ibcast.txt', {}),
-      ('mbw_mr.txt', {
-          'pairs': '4',
-          'window_size': '64'
-      }),
+      ('mbw_mr.txt', {'pairs': '4', 'window_size': '64'}),
   )
   def testParseMetadata(self, test_file, expected_metadata):
     input_text = ReadFile(test_file)
@@ -75,12 +105,10 @@ class OmbCommonTest(parameterized.TestCase, absltest.TestCase):
       {
           'lines': ('a', 'b1', 'b2', 'c'),
           'regex_text': 'b',
-          'expected': ['b2', 'c']
-      }, {
-          'lines': ('a', 'b', 'c'),
-          'regex_text': 'd',
-          'expected': []
-      })
+          'expected': ['b2', 'c'],
+      },
+      {'lines': ('a', 'b', 'c'), 'regex_text': 'd', 'expected': []},
+  )
   def testLinesAfterMarker(self, lines, regex_text, expected):
     line_re = re.compile(regex_text)
     input_text = '\n'.join(lines)
@@ -101,7 +129,10 @@ class OmbCommonTest(parameterized.TestCase, absltest.TestCase):
     pinning = omb.ParseMpiPinning(txt.splitlines())
 
     expected_pinning = [
-        '0:0:0,1,15', '1:1:0,1,15', '2:0:2,16,17', '3:1:2,16,17'
+        '0:0:0,1,15',
+        '1:1:0,1,15',
+        '2:0:2,16,17',
+        '3:1:2,16,17',
     ]
     self.assertEqual(expected_pinning, pinning)
 
@@ -113,25 +144,31 @@ class OmbIntelMpiTest(parameterized.TestCase, absltest.TestCase):
     self.enter_context(flagsaver.flagsaver(mpi_vendor='intel'))
     self.enter_context(
         mock.patch.object(
-            intelmpi, 'SourceMpiVarsCommand', return_value='. mpivars.sh'))
+            intelmpi, 'SourceMpiVarsCommand', return_value='. mpivars.sh'
+        )
+    )
     self.enter_context(
-        mock.patch.object(intelmpi, 'MpirunMpiVersion', return_value='2019.6'))
+        mock.patch.object(intelmpi, 'MpirunMpiVersion', return_value='2019.6')
+    )
     self.enter_context(mock.patch.object(omb.time, 'time', return_value=0))
 
   @flagsaver.flagsaver(
       omb_mpi_env=['IMPI_DEBUG=5'],
-      omb_mpi_genv=['I_MPI_PIN_PROCESSOR_LIST=0', 'I_MPI_PIN=1'])
+      omb_mpi_genv=['I_MPI_PIN_PROCESSOR_LIST=0', 'I_MPI_PIN=1'],
+  )
   def testRunBenchmarkNormal(self):
     # all calls done with vm.RemoteCommand
     benchmark = 'barrier'
     benchmark_path = f'path/to/osu_{benchmark}'
     textoutput = 'textoutput'
     ls_cmd = f'ls {omb._RUN_DIR}/*/osu_{benchmark}'
-    expected_full_cmd = ('. mpivars.sh; IMPI_DEBUG=5 mpirun '
-                         '-genv I_MPI_PIN=1 '
-                         '-genv I_MPI_PIN_PROCESSOR_LIST=0 -perhost 1 -n 2 '
-                         f'-hosts 10.0.0.1,10.0.0.2 {benchmark_path} '
-                         '-t 1 --full')
+    expected_full_cmd = (
+        '. mpivars.sh; IMPI_DEBUG=5 mpirun '
+        '-genv I_MPI_PIN=1 '
+        '-genv I_MPI_PIN_PROCESSOR_LIST=0 -perhost 1 -n 2 '
+        f'-hosts 10.0.0.1,10.0.0.2 {benchmark_path} '
+        '-t 1 --full'
+    )
     vm = mock.Mock(internal_ip='10.0.0.1')
     vm.RemoteCommand.side_effect = [(benchmark_path, '')]
     vm.RobustRemoteCommand.side_effect = [(textoutput, '')]
@@ -142,7 +179,8 @@ class OmbIntelMpiTest(parameterized.TestCase, absltest.TestCase):
         number_processes=2,
         hosts=[vm, mock.Mock(internal_ip='10.0.0.2')],
         options={'-t': 1},
-        perhost=1)
+        perhost=1,
+    )
 
     self.assertEqual(textoutput, txt)
     self.assertEqual(expected_full_cmd, full_cmd)
@@ -152,10 +190,12 @@ class OmbIntelMpiTest(parameterized.TestCase, absltest.TestCase):
   def testPrepareWorkers(self):
     # to export /opt/intel
     mock_nfs_opt_intel = self.enter_context(
-        mock.patch.object(intelmpi, 'NfsExportIntelDirectory'))
+        mock.patch.object(intelmpi, 'NfsExportIntelDirectory')
+    )
     # to export /usr/.../osu-microbenchmarks
     mock_nfs_osu = self.enter_context(
-        mock.patch.object(nfs_service, 'NfsExportAndMount'))
+        mock.patch.object(nfs_service, 'NfsExportAndMount')
+    )
     mpi_dir = '/usr/local/libexec/osu-micro-benchmarks/mpi'
     vm = mock.Mock(internal_ip='10.0.0.1')
     vm.RemoteCommand.side_effect = [(f'{mpi_dir}/startup/osu_hello', '')]
@@ -169,12 +209,14 @@ class OmbIntelMpiTest(parameterized.TestCase, absltest.TestCase):
     vm.RemoteCommand.assert_called_with(f'ls {mpi_dir}/*/osu_hello')
     vm.RobustRemoteCommand.assert_called_with(
         '. mpivars.sh; mpirun -perhost 1 -n 2 '
-        f'-hosts 10.0.0.1,10.0.0.2 {mpi_dir}/startup/osu_hello')
+        f'-hosts 10.0.0.1,10.0.0.2 {mpi_dir}/startup/osu_hello'
+    )
 
   @flagsaver.flagsaver(
       omb_iterations=10,
       omb_mpi_env=['IMPI_DEBUG=5'],
-      omb_mpi_genv=['I_MPI_PIN_PROCESSOR_LIST=0', 'I_MPI_PIN=1'])
+      omb_mpi_genv=['I_MPI_PIN_PROCESSOR_LIST=0', 'I_MPI_PIN=1'],
+  )
   def testRunResult(self):
     test_output = inspect.cleandoc("""
     [0] MPI startup(): Rank    Pid      Node name       Pin cpu
@@ -195,19 +237,14 @@ class OmbIntelMpiTest(parameterized.TestCase, absltest.TestCase):
 
     expected_result = omb.RunResult(
         name='mbw_mr',
-        metadata={
-            'pairs': '15',
-            'window_size': '64'
-        },
-        data=[{
-            'size': 1,
-            'bandwidth': 6.39,
-            'messages_per_second': 6385003.8
-        }],
-        full_cmd=('. mpivars.sh; IMPI_DEBUG=5 mpirun '
-                  '-genv I_MPI_PIN=1 '
-                  '-genv I_MPI_PIN_PROCESSOR_LIST=0 -perhost 1 -n 2 '
-                  f'-hosts 10.0.0.1,10.0.0.2 {mpitest_path} --iterations 10'),
+        metadata={'pairs': '15', 'window_size': '64'},
+        data=[{'size': 1, 'bandwidth': 6.39, 'messages_per_second': 6385003.8}],
+        full_cmd=(
+            '. mpivars.sh; IMPI_DEBUG=5 mpirun '
+            '-genv I_MPI_PIN=1 '
+            '-genv I_MPI_PIN_PROCESSOR_LIST=0 -perhost 1 -n 2 '
+            f'-hosts 10.0.0.1,10.0.0.2 {mpitest_path} --iterations 10'
+        ),
         units='MB/s',
         params={'--iterations': 10},
         mpi_vendor='intel',
@@ -220,8 +257,9 @@ class OmbIntelMpiTest(parameterized.TestCase, absltest.TestCase):
         mpi_env={
             'I_MPI_PIN_PROCESSOR_LIST': '0',
             'I_MPI_PIN': '1',
-            'IMPI_DEBUG': '5'
-        })
+            'IMPI_DEBUG': '5',
+        },
+    )
     self.assertEqual(expected_result, results[0])
     self.assertLen(results, 2)
     # Called twice, the second time with 4*2=8 processes
@@ -244,7 +282,8 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
     super().setUp()
     self.enter_context(flagsaver.flagsaver(mpi_vendor='openmpi'))
     self.enter_context(
-        mock.patch.object(openmpi, 'GetMpiVersion', return_value='3.1.2'))
+        mock.patch.object(openmpi, 'GetMpiVersion', return_value='3.1.2')
+    )
     self.enter_context(mock.patch.object(omb.time, 'time', return_value=0))
 
   def testRunBenchmarkNormal(self):
@@ -253,10 +292,12 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
     benchmark_path = f'path/to/osu_{benchmark}'
     textoutput = 'textoutput'
     ls_cmd = f'ls {omb._RUN_DIR}/*/osu_{benchmark}'
-    expected_full_cmd = ('mpirun -report-bindings -display-map '
-                         '-n 2 -npernode 1 --use-hwthread-cpus '
-                         '-host 10.0.0.1:slots=2,10.0.0.2:slots=2 '
-                         f'{benchmark_path} -t 1 --full')
+    expected_full_cmd = (
+        'mpirun -report-bindings -display-map '
+        '-n 2 -npernode 1 --use-hwthread-cpus '
+        '-host 10.0.0.1:slots=2,10.0.0.2:slots=2 '
+        f'{benchmark_path} -t 1 --full'
+    )
     vm = mock.Mock(internal_ip='10.0.0.1')
     vm.RemoteCommand.side_effect = [(benchmark_path, '')]
     vm.RobustRemoteCommand.side_effect = [(textoutput, '')]
@@ -267,7 +308,8 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
         number_processes=2,
         hosts=[vm, mock.Mock(internal_ip='10.0.0.2')],
         options={'-t': 1},
-        perhost=1)
+        perhost=1,
+    )
 
     self.assertEqual(textoutput, txt)
     self.assertEqual(expected_full_cmd, full_cmd)
@@ -277,7 +319,8 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
   def testPrepareWorkers(self):
     # to export /usr/.../osu-microbenchmarks
     mock_nfs_osu = self.enter_context(
-        mock.patch.object(nfs_service, 'NfsExportAndMount'))
+        mock.patch.object(nfs_service, 'NfsExportAndMount')
+    )
     mpi_dir = '/usr/local/libexec/osu-micro-benchmarks/mpi'
     vm = mock.Mock(internal_ip='10.0.0.1')
     vm.RemoteCommand.side_effect = [(f'{mpi_dir}/startup/osu_hello', '')]
@@ -292,13 +335,15 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
     vm.RobustRemoteCommand.assert_called_with(
         'mpirun -report-bindings -display-map -n 2 -npernode 1 '
         '--use-hwthread-cpus -host 10.0.0.1:slots=2,10.0.0.2:slots=2 '
-        f'{mpi_dir}/startup/osu_hello')
+        f'{mpi_dir}/startup/osu_hello'
+    )
 
   @flagsaver.flagsaver(
       omb_iterations=10,
       # For OpenMPI, env and genv are treated the same.
       omb_mpi_env=['OMPI_MCA_btl=self,tcp'],
-      omb_mpi_genv=['OMPI_MCA_hwloc_base_binding_policy=core'])
+      omb_mpi_genv=['OMPI_MCA_hwloc_base_binding_policy=core'],
+  )
   def testRunResult(self):
     test_output = inspect.cleandoc("""
     [0] MPI startup(): Rank    Pid      Node name       Pin cpu
@@ -319,22 +364,17 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
 
     expected_result = omb.RunResult(
         name='mbw_mr',
-        metadata={
-            'pairs': '15',
-            'window_size': '64'
-        },
-        data=[{
-            'size': 1,
-            'bandwidth': 6.39,
-            'messages_per_second': 6385003.8
-        }],
-        full_cmd=('OMPI_MCA_btl=self,tcp '
-                  'OMPI_MCA_hwloc_base_binding_policy=core '
-                  'mpirun -x OMPI_MCA_btl '
-                  '-x OMPI_MCA_hwloc_base_binding_policy '
-                  '-report-bindings -display-map -n 2 -npernode 1 '
-                  '--use-hwthread-cpus -host 10.0.0.1:slots=2,10.0.0.2:slots=2 '
-                  f'{mpitest_path} --iterations 10'),
+        metadata={'pairs': '15', 'window_size': '64'},
+        data=[{'size': 1, 'bandwidth': 6.39, 'messages_per_second': 6385003.8}],
+        full_cmd=(
+            'OMPI_MCA_btl=self,tcp '
+            'OMPI_MCA_hwloc_base_binding_policy=core '
+            'mpirun -x OMPI_MCA_btl '
+            '-x OMPI_MCA_hwloc_base_binding_policy '
+            '-report-bindings -display-map -n 2 -npernode 1 '
+            '--use-hwthread-cpus -host 10.0.0.1:slots=2,10.0.0.2:slots=2 '
+            f'{mpitest_path} --iterations 10'
+        ),
         units='MB/s',
         params={'--iterations': 10},
         mpi_vendor='openmpi',
@@ -347,7 +387,8 @@ class OmbOpenMpiTest(parameterized.TestCase, absltest.TestCase):
         mpi_env={
             'OMPI_MCA_btl': 'self,tcp',
             'OMPI_MCA_hwloc_base_binding_policy': 'core',
-        })
+        },
+    )
     self.assertEqual(expected_result, results[0])
     self.assertLen(results, 2)
     # Called twice, the second time with 4*2=8 processes

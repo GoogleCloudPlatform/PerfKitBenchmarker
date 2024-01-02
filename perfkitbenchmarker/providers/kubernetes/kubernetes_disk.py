@@ -44,16 +44,21 @@ def CreateDisks(disk_specs, vm_name):
 
 class KubernetesDiskSpec(disk.BaseDiskSpec):
   """Kubernetes disk Spec class."""
+
   CLOUD = provider_info.KUBERNETES
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     result = super(KubernetesDiskSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'provisioner': (option_decoders.StringDecoder,
-                        {'default': None, 'none_ok': True}),
-        'parameters': (option_decoders.TypeVerifier,
-                       {'default': {}, 'valid_types': (dict,)})
+        'provisioner': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'parameters': (
+            option_decoders.TypeVerifier,
+            {'default': {}, 'valid_types': (dict,)},
+        ),
     })
     return result
 
@@ -65,9 +70,9 @@ class KubernetesDiskSpec(disk.BaseDiskSpec):
 
     Args:
       config_values: dict mapping config option names to provided values. Is
-          modified by this function.
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
 
     Returns:
       dict mapping config option names to values derived from the config
@@ -79,7 +84,8 @@ class KubernetesDiskSpec(disk.BaseDiskSpec):
     if flag_values['k8s_volume_parameters'].present:
       config_values['parameters'] = config_values.get('parameters', {})
       config_values['parameters'].update(
-          flag_util.ParseKeyValuePairs(flag_values.k8s_volume_parameters))
+          flag_util.ParseKeyValuePairs(flag_values.k8s_volume_parameters)
+      )
 
 
 def GetKubernetesDiskClass(volume_type):
@@ -112,10 +118,7 @@ class KubernetesDisk(disk.BaseDisk):
     return
 
   def AttachVolumeMountInfo(self, volume_mounts):
-    volume_mount = {
-        'mountPath': self.mount_point,
-        'name': self.name
-    }
+    volume_mount = {'mountPath': self.mount_point, 'name': self.name}
     volume_mounts.append(volume_mount)
 
 
@@ -132,10 +135,7 @@ class EmptyDirDisk(KubernetesDisk):
     raise errors.Error('GetDevicePath not supported for Kubernetes local disk')
 
   def AttachVolumeInfo(self, volumes):
-    local_volume = {
-        'name': self.name,
-        'emptyDir': {}
-    }
+    local_volume = {'name': self.name, 'emptyDir': {}}
     volumes.append(local_volume)
 
 
@@ -150,8 +150,15 @@ class CephDisk(KubernetesDisk):
 
   def _Create(self):
     """Creates Rados Block Device volumes and installs filesystem on them."""
-    cmd = ['rbd', '-p', FLAGS.rbd_pool, 'create', self.name, '--size',
-           str(1024 * self.disk_size)]
+    cmd = [
+        'rbd',
+        '-p',
+        FLAGS.rbd_pool,
+        'create',
+        self.name,
+        '--size',
+        str(1024 * self.disk_size),
+    ]
     _, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       raise Exception('Creating RBD image failed: %s' % stderr)
@@ -202,8 +209,8 @@ class CephDisk(KubernetesDisk):
             'keyring': FLAGS.ceph_keyring,
             'user': FLAGS.rbd_user,
             'fsType': 'ext4',
-            'readOnly': False
-        }
+            'readOnly': False,
+        },
     }
     if FLAGS.ceph_secret:
       ceph_volume['rbd']['secretRef'] = {'name': FLAGS.ceph_secret}
@@ -226,8 +233,14 @@ class PersistentVolumeClaim(resource.BaseResource):
   def _WaitForPVCBoundCompletion(self):
     """Need to wait for the PVC to get up."""
     # PVC may take some time to be ready(Bound).
-    exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
-                  'pvc', '-o=json', self.name]
+    exists_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig=%s' % FLAGS.kubeconfig,
+        'get',
+        'pvc',
+        '-o=json',
+        self.name,
+    ]
     logging.info('Waiting for PVC %s', self.name)
     pvc_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if pvc_info:
@@ -236,8 +249,9 @@ class PersistentVolumeClaim(resource.BaseResource):
       if pvc == 'Bound':
         logging.info('PVC is ready.')
         return
-    raise Exception('PVC %s is not ready. Retrying to check status.' %
-                    self.name)
+    raise Exception(
+        'PVC %s is not ready. Retrying to check status.' % self.name
+    )
 
   def __init__(self, name, storage_class, size):
     super(PersistentVolumeClaim, self).__init__()
@@ -261,18 +275,12 @@ class PersistentVolumeClaim(resource.BaseResource):
     body = {
         'kind': 'PersistentVolumeClaim',
         'apiVersion': 'v1',
-        'metadata': {
-            'name': self.name
-        },
+        'metadata': {'name': self.name},
         'spec': {
             'accessModes': ['ReadWriteOnce'],
-            'resources': {
-                'requests': {
-                    'storage': '%sGi' % self.size
-                }
-            },
+            'resources': {'requests': {'storage': '%sGi' % self.size}},
             'storageClassName': self.storage_class,
-        }
+        },
     }
     return json.dumps(body)
 
@@ -291,8 +299,14 @@ class StorageClass(resource.BaseResource):
     # If the StorageClass with the same name and parameters exists
     # :return: True or False
 
-    exists_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'get',
-                  'sc', '-o=json', self.name]
+    exists_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig=%s' % FLAGS.kubeconfig,
+        'get',
+        'sc',
+        '-o=json',
+        self.name,
+    ]
 
     sc_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
     if sc_info:
@@ -321,11 +335,9 @@ class StorageClass(resource.BaseResource):
     body = {
         'kind': 'StorageClass',
         'apiVersion': 'storage.k8s.io/v1',
-        'metadata': {
-            'name': self.name
-        },
+        'metadata': {'name': self.name},
         'provisioner': self.provisioner,
-        'parameters': self.parameters
+        'parameters': self.parameters,
     }
     return json.dumps(body)
 
@@ -339,9 +351,11 @@ class PvcVolume(KubernetesDisk):
   def __init__(self, disk_num, spec, name):
     super(PvcVolume, self).__init__(disk_num, spec, name)
     self.storage_class = StorageClass(
-        name, self.PROVISIONER or spec.provisioner, spec.parameters)
+        name, self.PROVISIONER or spec.provisioner, spec.parameters
+    )
     self.pvc = PersistentVolumeClaim(
-        self.name, self.storage_class.name, spec.disk_size)
+        self.name, self.storage_class.name, spec.disk_size
+    )
 
   def _Create(self):
     self.storage_class.Create()
@@ -354,8 +368,6 @@ class PvcVolume(KubernetesDisk):
   def AttachVolumeInfo(self, volumes):
     pvc_volume = {
         'name': self.name,
-        'persistentVolumeClaim': {
-            'claimName': self.name
-        }
+        'persistentVolumeClaim': {'claimName': self.name},
     }
     volumes.append(pvc_volume)

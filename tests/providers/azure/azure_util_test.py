@@ -1,7 +1,7 @@
 """Tests for perfkitbenchmarker.providers.azure.util."""
+
 import unittest
 import mock
-
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import util
 from tests import pkb_common_test_case
@@ -12,7 +12,8 @@ def _MockIssueCommand(file_name_text_response):
   with open(path) as f:
     output = f.read()
   return mock.patch.object(
-      vm_util, 'IssueCommand', autospec=True, return_value=[output, None, None])
+      vm_util, 'IssueCommand', autospec=True, return_value=[output, None, None]
+  )
 
 
 class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
@@ -24,13 +25,11 @@ class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_get_region_from_zone_valid_region(self):
     valid_region = 'eastus2'
-    self.assertEqual(self.expected_region,
-                     util.GetRegionFromZone(valid_region))
+    self.assertEqual(self.expected_region, util.GetRegionFromZone(valid_region))
 
   def test_get_region_from_zone_valid_zone(self):
     valid_zone = 'eastus2-1'
-    self.assertEqual(self.expected_region,
-                     util.GetRegionFromZone(valid_zone))
+    self.assertEqual(self.expected_region, util.GetRegionFromZone(valid_zone))
 
   def test_get_region_from_zone_invalid_region(self):
     valid_region = 'us-east2'
@@ -48,8 +47,10 @@ class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_get_availability_zone_from_zone_valid_zone(self):
     valid_zone = 'eastus2-1'
-    self.assertEqual(self.expected_availability_zone,
-                     util.GetAvailabilityZoneFromZone(valid_zone))
+    self.assertEqual(
+        self.expected_availability_zone,
+        util.GetAvailabilityZoneFromZone(valid_zone),
+    )
 
   def test_get_availability_zone_from_zone_invalid_zone(self):
     valid_region = 'eastus2-1a'
@@ -64,7 +65,8 @@ class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_get_all_regions(self):
     self.enter_context(
-        _MockIssueCommand('az-account-list-locations-output.json'))
+        _MockIssueCommand('az-account-list-locations-output.json')
+    )
 
     found_regions = util.GetAllRegions()
 
@@ -76,7 +78,9 @@ class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
             util,
             'GetAllRegions',
             autospec=True,
-            return_value={'eastus', 'eastus2'}))
+            return_value={'eastus', 'eastus2'},
+        )
+    )
 
     found_regions = util.GetAllZones()
 
@@ -95,9 +99,14 @@ class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
       "US"
     ]
     """
-    self.enter_context(mock.patch.object(vm_util, 'IssueRetryableCommand',
-                                         autospec=True,
-                                         return_value=[test_output, None]))
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueRetryableCommand',
+            autospec=True,
+            return_value=[test_output, None],
+        )
+    )
 
     found_geo = util.GetGeoFromRegion('test_region')
 
@@ -106,11 +115,13 @@ class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_get_region_in_geo(self):
     self.enter_context(
-        _MockIssueCommand('az-account-list-locations-output.json'))
+        _MockIssueCommand('az-account-list-locations-output.json')
+    )
 
     found_regions = util.GetRegionsInGeo('test_geo')
 
     self.assertEqual({'eastus', 'eastus2'}, found_regions)
+
 
 if __name__ == '__main__':
   unittest.main()

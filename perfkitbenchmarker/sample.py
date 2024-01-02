@@ -43,7 +43,11 @@ RAMP_DOWN_STARTS = 'ramp_down_starts'
 TIMESTAMPS = 'timestamps'
 INTERVAL = 'interval'
 TIME_SERIES_METADATA = [
-    RAMP_UP_ENDS, RAMP_DOWN_STARTS, VALUES, TIMESTAMPS, INTERVAL
+    RAMP_UP_ENDS,
+    RAMP_DOWN_STARTS,
+    VALUES,
+    TIMESTAMPS,
+    INTERVAL,
 ]
 
 
@@ -61,7 +65,6 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
   Raises:
     ValueError, if numbers is empty or if a percentile is outside of
     [0, 100].
-
   """
 
   # 'if not numbers' will fail if numbers is an np.Array or pd.Series.
@@ -85,8 +88,8 @@ def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
   average = total / float(count)
   result['average'] = average
   if count > 1:
-    total_of_squares = sum([(i - average)**2 for i in numbers])
-    result['stddev'] = (total_of_squares / (count - 1))**0.5
+    total_of_squares = sum([(i - average) ** 2 for i in numbers])
+    result['stddev'] = (total_of_squares / (count - 1)) ** 0.5
   else:
     result['stddev'] = 0
 
@@ -108,7 +111,7 @@ def GeoMean(iterable):
   arr = np.fromiter(iterable, dtype='float')
   if not arr.size:
     raise ValueError("Can't compute geomean of empty list.")
-  return arr.prod()**(1 / len(arr))
+  return arr.prod() ** (1 / len(arr))
 
 
 # The Sample is converted via collections.namedtuple._asdict for publishing
@@ -126,13 +129,9 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
     timestamp: float. Unix timestamp.
   """
 
-  def __new__(cls,
-              metric,
-              value,
-              unit,
-              metadata=None,
-              timestamp=None,
-              **kwargs):
+  def __new__(
+      cls, metric, value, unit, metadata=None, timestamp=None, **kwargs
+  ):
     if timestamp is None:
       timestamp = time.time()
 
@@ -143,7 +142,8 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
         unit,
         metadata=metadata or {},
         timestamp=timestamp,
-        **kwargs)
+        **kwargs,
+    )
 
   def __eq__(self, other) -> bool:
     if not isinstance(other, Sample):
@@ -160,7 +160,7 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
         return False
     return True
 
-  def asdict(self)-> Dict[str, Any]:  # pylint:disable=invalid-name
+  def asdict(self) -> Dict[str, Any]:  # pylint:disable=invalid-name
     """Converts the Sample to a dictionary."""
     return self._asdict()
 
@@ -168,9 +168,9 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
 _Histogram = collections.OrderedDict
 
 
-def MakeHistogram(values: List[float],
-                  round_bottom: float = 0.0,
-                  round_to_sig_fig: int = 3) -> _Histogram[float, int]:
+def MakeHistogram(
+    values: List[float], round_bottom: float = 0.0, round_to_sig_fig: int = 3
+) -> _Histogram[float, int]:
   """Take a list of float values and returns a ordered dict of values and frequency.
 
   Args:
@@ -195,7 +195,8 @@ def MakeHistogram(values: List[float],
       if value > 0:
         rounded_value = round(
             value,
-            round_to_sig_fig - int(math.floor(math.log10(abs(value)))) - 1)
+            round_to_sig_fig - int(math.floor(math.log10(abs(value)))) - 1,
+        )
       else:
         rounded_value = 0.0
       histogram[rounded_value] = histogram.get(rounded_value, 0) + 1
@@ -206,17 +207,20 @@ def MakeHistogram(values: List[float],
 
 def _ConvertHistogramToString(histogram: _Histogram[float, int]) -> str:
   histogram_label_values = ','.join(
-      f'"{key}": {value}' for (key, value) in histogram.items())
+      f'"{key}": {value}' for (key, value) in histogram.items()
+  )
   histogram_labels = '{%s}' % histogram_label_values
   return histogram_labels
 
 
-def CreateHistogramSample(histogram: _Histogram[float, int],
-                          name: str,
-                          subname: str,
-                          units: str,
-                          additional_metadata=None,
-                          metric='') -> Sample:
+def CreateHistogramSample(
+    histogram: _Histogram[float, int],
+    name: str,
+    subname: str,
+    units: str,
+    additional_metadata=None,
+    metric='',
+) -> Sample:
   """Given a histogram of values, create a sample.
 
   Args:
@@ -229,26 +233,27 @@ def CreateHistogramSample(histogram: _Histogram[float, int],
 
   Returns:
     sample: One sample object that reports the histogram passed in.
-
   """
   metadata = {
       'histogram': _ConvertHistogramToString(histogram),
       'Name': name,
-      'Subname': subname
+      'Subname': subname,
   }
   if additional_metadata:
     metadata.update(additional_metadata)
   return Sample(metric, 0, units, metadata)
 
 
-def CreateTimeSeriesSample(values: List[Any],
-                           timestamps: List[float],
-                           metric: str,
-                           units: str,
-                           interval: float,
-                           ramp_up_ends=None,
-                           ramp_down_starts=None,
-                           additional_metadata=None) -> Sample:
+def CreateTimeSeriesSample(
+    values: List[Any],
+    timestamps: List[float],
+    metric: str,
+    units: str,
+    interval: float,
+    ramp_up_ends=None,
+    ramp_down_starts=None,
+    additional_metadata=None,
+) -> Sample:
   """Create time series samples.
 
   Given  a list of values and the timestamp the values
@@ -269,7 +274,6 @@ def CreateTimeSeriesSample(values: List[Any],
 
   Returns:
     sample: One sample object that reports the time series passed in.
-
   """
   if len(values) != len(timestamps):
     raise errors.Error('Length of values is different to length of timestamps')

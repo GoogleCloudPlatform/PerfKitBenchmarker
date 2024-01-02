@@ -18,7 +18,6 @@ import os
 import unittest
 from absl import flags
 from absl.testing import parameterized
-
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.windows_packages import ntttcp
@@ -29,8 +28,9 @@ FLAGS.mark_as_parsed()
 NtttcpConf = ntttcp.NtttcpConf
 
 
-class NtttcpBenchmarkTestCase(parameterized.TestCase, unittest.TestCase,
-                              test_util.SamplesTestMixin):
+class NtttcpBenchmarkTestCase(
+    parameterized.TestCase, unittest.TestCase, test_util.SamplesTestMixin
+):
 
   def getDataContents(self, file_name):
     path = os.path.join(os.path.dirname(__file__), '..', 'data', file_name)
@@ -46,8 +46,9 @@ class NtttcpBenchmarkTestCase(parameterized.TestCase, unittest.TestCase,
     self.xml_udp_rec_results = self.getDataContents('ntttcp_udp_receiver.xml')
 
   def testNtttcpTcpParsing(self):
-    samples = ntttcp.ParseNtttcpResults(self.xml_tcp_send_results,
-                                        self.xml_tcp_rec_results, {})
+    samples = ntttcp.ParseNtttcpResults(
+        self.xml_tcp_send_results, self.xml_tcp_rec_results, {}
+    )
 
     expected_metadata = {
         'async': 'False',
@@ -123,17 +124,20 @@ class NtttcpBenchmarkTestCase(parameterized.TestCase, unittest.TestCase,
 
     expected_samples = [
         sample.Sample('Total Throughput', 291.485, 'Mbps', expected_metadata),
-        sample.Sample('Thread Throughput', 147.105, 'Mbps',
-                      expected_thread_0_metadata),
-        sample.Sample('Thread Throughput', 144.379, 'Mbps',
-                      expected_thread_1_metadata)
+        sample.Sample(
+            'Thread Throughput', 147.105, 'Mbps', expected_thread_0_metadata
+        ),
+        sample.Sample(
+            'Thread Throughput', 144.379, 'Mbps', expected_thread_1_metadata
+        ),
     ]
 
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
 
   def testNtttcpUdpParsing(self):
-    samples = ntttcp.ParseNtttcpResults(self.xml_udp_send_results,
-                                        self.xml_udp_rec_results, {})
+    samples = ntttcp.ParseNtttcpResults(
+        self.xml_udp_send_results, self.xml_udp_rec_results, {}
+    )
 
     expected_metadata = {
         'async': 'False',
@@ -209,10 +213,12 @@ class NtttcpBenchmarkTestCase(parameterized.TestCase, unittest.TestCase,
 
     expected_samples = [
         sample.Sample('Total Throughput', 245.153, 'Mbps', expected_metadata),
-        sample.Sample('Thread Throughput', 121.160, 'Mbps',
-                      expected_thread_0_metadata),
-        sample.Sample('Thread Throughput', 123.993, 'Mbps',
-                      expected_thread_1_metadata)
+        sample.Sample(
+            'Thread Throughput', 121.160, 'Mbps', expected_thread_0_metadata
+        ),
+        sample.Sample(
+            'Thread Throughput', 123.993, 'Mbps', expected_thread_1_metadata
+        ),
     ]
 
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
@@ -221,7 +227,8 @@ class NtttcpBenchmarkTestCase(parameterized.TestCase, unittest.TestCase,
     ntttcp.FLAGS.ntttcp_config_list = ['True:7:800:INTERNAL:1']
     expected_list = [
         NtttcpConf(
-            udp=True, threads=7, time_s=800, ip_type='INTERNAL', packet_size=1)
+            udp=True, threads=7, time_s=800, ip_type='INTERNAL', packet_size=1
+        )
     ]
     conf_list = ntttcp.ParseConfigList()
     self.assertListEqual(conf_list, expected_list)
@@ -234,27 +241,28 @@ class NtttcpBenchmarkTestCase(parameterized.TestCase, unittest.TestCase,
             threads=FLAGS.ntttcp_threads,
             time_s=FLAGS.ntttcp_time,
             ip_type=FLAGS.ip_addresses,
-            packet_size=FLAGS.ntttcp_packet_size)
+            packet_size=FLAGS.ntttcp_packet_size,
+        )
     ]
     conf_list = ntttcp.ParseConfigList()
     self.assertListEqual(conf_list, expected_list)
 
   def testMultiConfigParse(self):
     ntttcp.FLAGS.ntttcp_config_list = [
-        'True:7:800:INTERNAL:1', 'False:1:2:EXTERNAL:2',
-        'True:44:1001:INTERNAL:3'
+        'True:7:800:INTERNAL:1',
+        'False:1:2:EXTERNAL:2',
+        'True:44:1001:INTERNAL:3',
     ]
     expected_list = [
         NtttcpConf(
-            udp=True, threads=7, time_s=800, ip_type='INTERNAL', packet_size=1),
+            udp=True, threads=7, time_s=800, ip_type='INTERNAL', packet_size=1
+        ),
         NtttcpConf(
-            udp=False, threads=1, time_s=2, ip_type='EXTERNAL', packet_size=2),
+            udp=False, threads=1, time_s=2, ip_type='EXTERNAL', packet_size=2
+        ),
         NtttcpConf(
-            udp=True,
-            threads=44,
-            time_s=1001,
-            ip_type='INTERNAL',
-            packet_size=3),
+            udp=True, threads=44, time_s=1001, ip_type='INTERNAL', packet_size=3
+        ),
     ]
     conf_list = ntttcp.ParseConfigList()
     self.assertListEqual(conf_list, expected_list)
@@ -262,7 +270,8 @@ class NtttcpBenchmarkTestCase(parameterized.TestCase, unittest.TestCase,
   @parameterized.named_parameters(
       ('MissingVal', ['True:7:800:INTERNAL:1', 'False::2:EXTERNAL:2']),
       ('Misspell', ['rue:7:800:INTERNAL:3', 'True:44:1001:EXTERNAL:4']),
-      ('WrongOrder', ['True:7:INTERNAL:800:1', '44:True:1001:EXTERNAL:6']))
+      ('WrongOrder', ['True:7:INTERNAL:800:1', '44:True:1001:EXTERNAL:6']),
+  )
   def testMalformedConfig(self, conf):
     with self.assertRaises(flags.IllegalFlagValueError):
       ntttcp.FLAGS.ntttcp_config_list = conf

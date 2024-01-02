@@ -20,9 +20,7 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
-
 import mock
-
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
@@ -49,14 +47,17 @@ def CreateCentos7Vm():
 # /proc/cmdline on a GCP CentOS7 vm
 _CENTOS7_KERNEL_COMMAND_LINE = (
     'BOOT_IMAGE=/boot/vmlinuz-3.10.0-1127.13.1.el7.x86_64 '
-    'root=UUID=1-2-3-4-5 ro crashkernel=auto console=ttyS0,38400n8')
+    'root=UUID=1-2-3-4-5 ro crashkernel=auto console=ttyS0,38400n8'
+)
 
 _DISABLE_YUM_CRON = mock.call(
-    'sudo systemctl disable yum-cron.service', ignore_failure=True)
+    'sudo systemctl disable yum-cron.service', ignore_failure=True
+)
 
 
-class TestCentos7VirtualMachine(linux_virtual_machine.CentOs7Mixin,
-                                pkb_common_test_case.TestVirtualMachine):
+class TestCentos7VirtualMachine(
+    linux_virtual_machine.CentOs7Mixin, pkb_common_test_case.TestVirtualMachine
+):
   user_name = 'perfkit'
 
 
@@ -78,25 +79,40 @@ class TestSetFiles(pkb_common_test_case.PkbCommonTestCase):
       vm.SetFiles()
 
     self.assertCountEqual(  # use assertCountEqual because order is undefined
-        remote_command.call_args_list,
-        calls)
+        remote_command.call_args_list, calls
+    )
 
   def testNoFiles(self):
-    self.runTest([],
-                 [])
+    self.runTest([], [])
 
   def testOneFile(self):
-    self.runTest(['/sys/kernel/mm/transparent_hugepage/enabled=always'],
-                 [mock.call('echo "always" | sudo tee '
-                            '/sys/kernel/mm/transparent_hugepage/enabled')])
+    self.runTest(
+        ['/sys/kernel/mm/transparent_hugepage/enabled=always'],
+        [
+            mock.call(
+                'echo "always" | sudo tee '
+                '/sys/kernel/mm/transparent_hugepage/enabled'
+            )
+        ],
+    )
 
   def testMultipleFiles(self):
-    self.runTest(['/sys/kernel/mm/transparent_hugepage/enabled=always',
-                  '/sys/kernel/mm/transparent_hugepage/defrag=never'],
-                 [mock.call('echo "always" | sudo tee '
-                            '/sys/kernel/mm/transparent_hugepage/enabled'),
-                  mock.call('echo "never" | sudo tee '
-                            '/sys/kernel/mm/transparent_hugepage/defrag')])
+    self.runTest(
+        [
+            '/sys/kernel/mm/transparent_hugepage/enabled=always',
+            '/sys/kernel/mm/transparent_hugepage/defrag=never',
+        ],
+        [
+            mock.call(
+                'echo "always" | sudo tee '
+                '/sys/kernel/mm/transparent_hugepage/enabled'
+            ),
+            mock.call(
+                'echo "never" | sudo tee '
+                '/sys/kernel/mm/transparent_hugepage/defrag'
+            ),
+        ],
+    )
 
 
 class TestSysctl(pkb_common_test_case.PkbCommonTestCase):
@@ -113,15 +129,20 @@ class TestSysctl(pkb_common_test_case.PkbCommonTestCase):
   def testSysctl(self):
     self.runTest(
         ['vm.dirty_background_ratio=10', 'vm.dirty_ratio=25'],
-        [mock.call('sudo bash -c \'echo "vm.dirty_background_ratio=10" >> '
-                   '/etc/sysctl.conf\''),
-         mock.call('sudo bash -c \'echo "vm.dirty_ratio=25" >> '
-                   '/etc/sysctl.conf\''),
-         mock.call('sudo sysctl -p')])
+        [
+            mock.call(
+                'sudo bash -c \'echo "vm.dirty_background_ratio=10" >> '
+                "/etc/sysctl.conf'"
+            ),
+            mock.call(
+                'sudo bash -c \'echo "vm.dirty_ratio=25" >> /etc/sysctl.conf\''
+            ),
+            mock.call('sudo sysctl -p'),
+        ],
+    )
 
   def testNoSysctl(self):
-    self.runTest([],
-                 [])
+    self.runTest([], [])
 
 
 class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
@@ -129,42 +150,50 @@ class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(TestDiskOperations, self).setUp()
     FLAGS['default_timeout'].parse(0)  # due to @retry
-    patcher = mock.patch.object(pkb_common_test_case.TestLinuxVirtualMachine,
-                                'RemoteHostCommand')
+    patcher = mock.patch.object(
+        pkb_common_test_case.TestLinuxVirtualMachine, 'RemoteHostCommand'
+    )
     self.remote_command = patcher.start()
     self.addCleanup(patcher.stop)
     self.remote_command.side_effect = [('', None, 0), ('', None, 0)]
     self.vm = CreateTestLinuxVm()
 
   def assertRemoteHostCalled(self, *calls):
-    self.assertEqual([mock.call(call) for call in calls],
-                     self.remote_command.call_args_list)
+    self.assertEqual(
+        [mock.call(call) for call in calls], self.remote_command.call_args_list
+    )
 
   def testMountDisk(self):
-    mkdir_cmd = ('sudo mkdir -p mp;'
-                 'sudo mount -o discard dp mp && '
-                 'sudo chown $USER:$USER mp;')
+    mkdir_cmd = (
+        'sudo mkdir -p mp;'
+        'sudo mount -o discard dp mp && '
+        'sudo chown $USER:$USER mp;'
+    )
     fstab_cmd = 'echo "dp mp ext4 defaults" | sudo tee -a /etc/fstab'
     self.vm.MountDisk('dp', 'mp')
     self.assertRemoteHostCalled(mkdir_cmd, fstab_cmd)
 
   def testFormatDisk(self):
-    expected_command = ('[[ -d /mnt ]] && sudo umount /mnt; '
-                        'sudo mke2fs -F -E lazy_itable_init=0,discard '
-                        '-O ^has_journal -t ext4 -b 4096 dp')
+    expected_command = (
+        '[[ -d /mnt ]] && sudo umount /mnt; '
+        'sudo mke2fs -F -E lazy_itable_init=0,discard '
+        '-O ^has_journal -t ext4 -b 4096 dp'
+    )
     self.vm.FormatDisk('dp')
     self.assertRemoteHostCalled(expected_command)
     self.assertEqual('ext4', self.vm.os_metadata['disk_filesystem_type'])
     self.assertEqual(4096, self.vm.os_metadata['disk_filesystem_blocksize'])
 
   def testNfsMountDisk(self):
-    mkdir_cmd = ('sudo mkdir -p mp;'
-                 'sudo mount -t nfs -o hard,ro dp mp && '
-                 'sudo chown $USER:$USER mp;')
+    mkdir_cmd = (
+        'sudo mkdir -p mp;'
+        'sudo mount -t nfs -o hard,ro dp mp && '
+        'sudo chown $USER:$USER mp;'
+    )
     fstab_cmd = 'echo "dp mp nfs ro" | sudo tee -a /etc/fstab'
-    self.vm.MountDisk('dp', 'mp',
-                      disk_type='nfs', mount_options='hard,ro',
-                      fstab_options='ro')
+    self.vm.MountDisk(
+        'dp', 'mp', disk_type='nfs', mount_options='hard,ro', fstab_options='ro'
+    )
     self.assertRemoteHostCalled(mkdir_cmd, fstab_cmd)
 
   def testNfsFormatDisk(self):
@@ -192,7 +221,6 @@ class LogDmesgTestCase(pkb_common_test_case.PkbCommonTestCase):
 
 
 class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
-
   LSCPU_DATA = {
       'NUMA node(s)': '1',
       'Core(s) per socket': '2',
@@ -252,8 +280,10 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
       linux_virtual_machine.LsCpuResults('')
 
   def testLsCpuParsing(self):
-    vm = self.CreateVm(os_types.DEFAULT,
-                       self.LsCpuText(self.LSCPU_DATA) + '\nThis Line=Invalid')
+    vm = self.CreateVm(
+        os_types.DEFAULT,
+        self.LsCpuText(self.LSCPU_DATA) + '\nThis Line=Invalid',
+    )
     results = vm.CheckLsCpu()
     self.assertEqual(1, results.numa_node_count)
     self.assertEqual(2, results.cores_per_socket)
@@ -265,8 +295,10 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
             'Core(s) per socket': '2',
             'Thread(s) per core': '2',
             'Socket(s)': '3',
-            'a': 'b'
-        }, results.data)
+            'a': 'b',
+        },
+        results.data,
+    )
 
   def testProcCpuParsing(self):
     vm = self.CreateVm(os_types.DEFAULT, self.PROC_CPU_TEXT)
@@ -278,7 +310,7 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
     expected_common = {
         'cpu family': '6',
         'oddkey': 'v29;v30',
-        'proccpu': 'cpu family,oddkey'
+        'proccpu': 'cpu family,oddkey',
     }
     self.assertEqual(expected_mappings, results.mappings)
     self.assertEqual(expected_common, results.GetValues())
@@ -296,11 +328,11 @@ class TestLsCpu(unittest.TestCase, test_util.SamplesTestMixin):
         'node_name': 'pkb-test',
         'proc_29': 'apicid=27;core id=13',
         'proc_30': 'apicid=29;core id=14',
-        'proc_31': 'apicid=31;core id=15'
+        'proc_31': 'apicid=31;core id=15',
     }
     expected_samples = [
         sample.Sample('proccpu', 0, '', proccpu_metadata),
-        sample.Sample('proccpu_mapping', 0, '', proccpu_mapping_metadata)
+        sample.Sample('proccpu_mapping', 0, '', proccpu_mapping_metadata),
     ]
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
 
@@ -374,7 +406,8 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
   def testNonZeroReturnCodeIgnored(self):
     self.issue_cmd_mock.return_value = ('output', 'err', 1)
     stdout, stderr, ret = self.vm.RemoteCommandWithReturnCode(
-        'foo', ignore_failure=True)
+        'foo', ignore_failure=True
+    )
     self.assertEqual(stdout, 'output')
     self.assertEqual(stderr, 'err')
     self.assertEqual(ret, 1)
@@ -430,8 +463,7 @@ Disk identifier: 0x00067934
 /dev/sda1   *        2048    20971519    10484736   83  Linux
     """)
     results = vm.partition_table
-    self.assertEqual(
-        {'/dev/sda': 10737418240}, results)
+    self.assertEqual({'/dev/sda': 10737418240}, results)
 
   def testFdiskParsingWithRaidDisk(self):
     vm = self.CreateVm("""
@@ -465,10 +497,14 @@ I/O size (minimum/optimal): 524288 bytes / 1048576 bytes
     """)
     results = vm.partition_table
     self.assertEqual(
-        {'/dev/sda': 10737418240,
-         '/dev/sdb': 402653184000,
-         '/dev/sdc': 402653184000,
-         '/dev/md0': 805037932544}, results)
+        {
+            '/dev/sda': 10737418240,
+            '/dev/sdb': 402653184000,
+            '/dev/sdc': 402653184000,
+            '/dev/md0': 805037932544,
+        },
+        results,
+    )
 
 
 class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -488,14 +524,17 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'uname -r': kernel_release,
       'uname -m': cpu_arch,
       'sudo fdisk -l': partition_table,
-      'PATH="${PATH}":/usr/sbin ip link show up':
-          pkb_common_test_case.IP_LINK_TEXT,
-      'cat /proc/cpuinfo | grep processor | wc -l': '16'
+      'PATH="${PATH}":/usr/sbin ip link show up': (
+          pkb_common_test_case.IP_LINK_TEXT
+      ),
+      'cat /proc/cpuinfo | grep processor | wc -l': '16',
   }
 
-  def CreateVm(self, run_cmd_response: Union[str, Dict[str, str]],
-               metadata: bool = False):
+  def CreateVm(
+      self, run_cmd_response: Union[str, Dict[str, str]], metadata: bool = False
+  ):
     vm = CreateTestLinuxVm()
+
     def FakeRemoteHostCommandWithReturnCode(cmd, **_):
       if isinstance(run_cmd_response, str):
         stdout = run_cmd_response
@@ -517,9 +556,11 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm.bootable_time = 10
 
     vm.RemoteHostCommandWithReturnCode = mock.Mock(
-        side_effect=FakeRemoteHostCommandWithReturnCode)
+        side_effect=FakeRemoteHostCommandWithReturnCode
+    )
     vm.CheckLsCpu = mock.Mock(
-        return_value=linux_virtual_machine.LsCpuResults(self.lscpu_output))
+        return_value=linux_virtual_machine.LsCpuResults(self.lscpu_output)
+    )
     vm.WaitForBootCompletion = mock.Mock(side_effect=FakeWaitForBootCompletion)
     if metadata:
       vm.WaitForBootCompletion()
@@ -528,8 +569,12 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @parameterized.named_parameters(
       ('has_smt_centos7', _CENTOS7_KERNEL_COMMAND_LINE, True),
-      ('no_smt_centos7', _CENTOS7_KERNEL_COMMAND_LINE + ' noht nosmt nr_cpus=1',
-       False))
+      (
+          'no_smt_centos7',
+          _CENTOS7_KERNEL_COMMAND_LINE + ' noht nosmt nr_cpus=1',
+          False,
+      ),
+  )
   def testIsSmtEnabled(self, proc_cmdline, is_enabled):
     vm = self.CreateVm(proc_cmdline)
     self.assertEqual(is_enabled, vm.IsSmtEnabled())
@@ -538,8 +583,9 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       ('hasSMT_want_real', 32, 'regular', 16),
       ('noSMT_want_real', 32, 'nosmt', 32),
   )
-  def testNumCpusForBenchmarkNoSmt(self, vcpus, kernel_command_line,
-                                   expected_num_cpus):
+  def testNumCpusForBenchmarkNoSmt(
+      self, vcpus, kernel_command_line, expected_num_cpus
+  ):
     FLAGS['use_numcpu_multi_files'].parse(True)
     responses = {
         'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
@@ -680,7 +726,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'stat -c %z /proc/': '',
         'sudo mkdir -p /opt/pkb; sudo chmod a+rwxt /opt/pkb': '',
         'mkdir -p /tmp/pkb': '',
-        'cat /proc/cpuinfo | grep processor | wc -l': '8'
+        'cat /proc/cpuinfo | grep processor | wc -l': '8',
     })
     vm.Reboot()
     self.assertEqual(os_info_new, vm.os_metadata['os_info'])
@@ -693,8 +739,9 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     names = vm._get_network_device_mtus()
     self.assertEqual({'eth0': '1500', 'eth1': '1500'}, names)
     mock_cmd = vm.RemoteHostCommandWithReturnCode
-    mock_cmd.assert_called_with('PATH="${PATH}":/usr/sbin ip link show up',
-                                stack_level=3)
+    mock_cmd.assert_called_with(
+        'PATH="${PATH}":/usr/sbin ip link show up', stack_level=3
+    )
 
   def testCpuVulnerabilitiesEmpty(self):
     self.assertEqual({}, self.CreateVm('').cpu_vulnerabilities.asdict)
@@ -725,7 +772,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(expected_mitigation, cpu_vuln.mitigations)
     expected_vulnerability = {
         'itlb_multihit': 'KVM',
-        'mds': 'Clear CPU buffers attempted, no microcode'
+        'mds': 'Clear CPU buffers attempted, no microcode',
     }
     self.assertEqual(expected_vulnerability, cpu_vuln.vulnerabilities)
     expected_notaffecteds = set(['srbds', 'tsx_async_abort'])
@@ -748,9 +795,11 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
     self.assertEqual(expected_asdict, cpu_vuln.asdict)
 
-  @parameterized.named_parameters(('flag_true', True, _DISABLE_YUM_CRON),
-                                  ('default_flag', None, _DISABLE_YUM_CRON),
-                                  ('flag_false', False, None))
+  @parameterized.named_parameters(
+      ('flag_true', True, _DISABLE_YUM_CRON),
+      ('default_flag', None, _DISABLE_YUM_CRON),
+      ('flag_false', False, None),
+  )
   def testCentos7OnStartup(self, flag_disable_yum_cron, additional_command):
     vm = CreateCentos7Vm()
     mock_remote = mock.Mock(return_value=('', ''))
@@ -763,8 +812,9 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       # tests the default value of the flag
       vm.OnStartup()
 
-    common_call = ("echo 'Defaults:perfkit !requiretty' | "
-                   'sudo tee /etc/sudoers.d/pkb')
+    common_call = (
+        "echo 'Defaults:perfkit !requiretty' | sudo tee /etc/sudoers.d/pkb"
+    )
     calls = [mock.call(common_call, login_shell=True)]
     if additional_command:
       calls.append(additional_command)
@@ -776,8 +826,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.VirtualMachine.VirtualMachineError):
       vm._Reboot()
 
-  @parameterized.named_parameters(
-      ('regular', CreateTestLinuxVm, False))
+  @parameterized.named_parameters(('regular', CreateTestLinuxVm, False))
   def testRebootCommand(self, vm_create_function, ignore_ssh_error):
     vm = vm_create_function()
     mock_remote = mock.Mock(return_value=('', ''))
@@ -787,7 +836,8 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     if ignore_ssh_error:
       mock_remote.assert_called_with(
-          'sudo reboot', ignore_failure=True, ignore_ssh_error=True)
+          'sudo reboot', ignore_failure=True, ignore_ssh_error=True
+      )
     else:
       mock_remote.assert_called_with('sudo reboot', ignore_failure=True)
 

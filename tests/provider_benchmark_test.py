@@ -18,7 +18,6 @@
 import unittest
 
 import mock
-
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 import six
@@ -36,9 +35,16 @@ class ProviderBenchmarkChecks(unittest.TestCase):
     provider_info_class = provider_info.GetProviderInfoClass(cloud)
     supported = provider_info_class.IsBenchmarkSupported(benchmark)
     fmt_args = ('', ' not') if support_expected else (' not', '')
-    self.assertEqual(supported, support_expected, (
-        'Expected provider {provider} {0}to support benchmark {benchmark}, but '
-        'it did{1}.'.format(*fmt_args, provider=cloud, benchmark=benchmark)))
+    self.assertEqual(
+        supported,
+        support_expected,
+        (
+            'Expected provider {provider} {0}to support benchmark {benchmark},'
+            ' but it did{1}.'.format(
+                *fmt_args, provider=cloud, benchmark=benchmark
+            )
+        ),
+    )
 
   def testIperfSupport(self):
     expected = {provider_info.GCP: True, provider_info.DIGITALOCEAN: True}
@@ -48,8 +54,9 @@ class ProviderBenchmarkChecks(unittest.TestCase):
   def testMYSQLSupport(self):
     expected = {provider_info.GCP: True, provider_info.DIGITALOCEAN: False}
     for cloud, support_expected in six.iteritems(expected):
-      self._VerifyProviderBenchmarkSupport(cloud, 'mysql_service',
-                                           support_expected)
+      self._VerifyProviderBenchmarkSupport(
+          cloud, 'mysql_service', support_expected
+      )
 
 
 if __name__ == '__main__':

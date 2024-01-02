@@ -15,7 +15,6 @@
 
 import unittest
 from absl import flags
-
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import smb_service
 from tests import pkb_common_test_case
@@ -71,8 +70,9 @@ class SmbServiceTest(pkb_common_test_case.PkbCommonTestCase):
     smb = self._NewSmbResource()
     smb_disk = smb.CreateSmbDisk()
     self.assertEqual('//remote1', smb_disk.device_path)
-    self.assertEqual({'user': 'hello', 'pw': 'world'},
-                     smb_disk.storage_account_and_key)
+    self.assertEqual(
+        {'user': 'hello', 'pw': 'world'}, smb_disk.storage_account_and_key
+    )
     self.assertEqual('3.0', smb_disk.smb_version)
 
   def testDefaultSmbVersion(self):

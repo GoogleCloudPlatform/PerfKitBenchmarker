@@ -1114,9 +1114,7 @@ def _Run(
       pipeline,
   )
 
-  file_name_suffix = '_'.join(
-      filter(None, [str(server_port), unique_id])
-  )
+  file_name_suffix = '_'.join(filter(None, [str(server_port), unique_id]))
   memtier_results_file_name = (
       '_'.join([MEMTIER_RESULTS, file_name_suffix]) + '.log'
   )

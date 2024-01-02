@@ -42,7 +42,7 @@ def gpu(
     memory_quantity: int,
     max_power_limit: float,
     pci_id: str,
-    compute_cm: int
+    compute_cm: int,
 ) -> GPU:
   return GPU(
       name=name,
@@ -54,6 +54,7 @@ def gpu(
       pci_id=pci_id,
       compute_sm=compute_cm,
   )
+
 
 CloudT4 = gpu("Tesla T4", 15, 70.0, "0x1EB810DE", 75)
 CloudL4 = gpu("NVIDIA L4", 22, 72.0, "0x27B810DE", 89)

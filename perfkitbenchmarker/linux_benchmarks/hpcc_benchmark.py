@@ -494,13 +494,11 @@ def RunHpccSource(
   """Returns the parsed output from running the compiled from source HPCC."""
   headnode_vm = vms[0]
   # backup existing HPCC output, if any
-  headnode_vm.RemoteCommand(
-      (
-          'if [ -f hpccoutf.txt ]; then '
-          'mv hpccoutf.txt hpccoutf-$(date +%s).txt; '
-          'fi'
-      )
-  )
+  headnode_vm.RemoteCommand((
+      'if [ -f hpccoutf.txt ]; then '
+      'mv hpccoutf.txt hpccoutf-$(date +%s).txt; '
+      'fi'
+  ))
   num_processes = len(vms) * headnode_vm.NumCpusForBenchmark()
   run_as_root = '--allow-run-as-root' if FLAGS.mpirun_allow_run_as_root else ''
   mpi_flags = (

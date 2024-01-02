@@ -48,9 +48,11 @@ class S3Service(object_storage_service.ObjectStorageService):
 
   def MakeBucket(self, bucket_name, raise_on_failure=True, tag_bucket=True):
     command = [
-        'aws', 's3', 'mb',
+        'aws',
+        's3',
+        'mb',
         's3://%s' % bucket_name,
-        '--region=%s' % self.region
+        '--region=%s' % self.region,
     ]
     _, stderr, ret_code = vm_util.IssueCommand(command, raise_on_failure=False)
     if ret_code and raise_on_failure:
@@ -60,36 +62,49 @@ class S3Service(object_storage_service.ObjectStorageService):
       # Tag the bucket with the persistent timeout flag so that buckets can
       # optionally stick around after PKB runs.
       default_tags = util.MakeFormattedDefaultTags(
-          timeout_minutes=max(FLAGS.timeout_minutes,
-                              FLAGS.persistent_timeout_minutes))
+          timeout_minutes=max(
+              FLAGS.timeout_minutes, FLAGS.persistent_timeout_minutes
+          )
+      )
       tag_set = ','.join('{%s}' % tag for tag in default_tags)
-      vm_util.IssueRetryableCommand(
-          ['aws', 's3api', 'put-bucket-tagging',
-           '--bucket', bucket_name,
-           '--tagging', 'TagSet=[%s]' % tag_set,
-           '--region=%s' % self.region])
+      vm_util.IssueRetryableCommand([
+          'aws',
+          's3api',
+          'put-bucket-tagging',
+          '--bucket',
+          bucket_name,
+          '--tagging',
+          'TagSet=[%s]' % tag_set,
+          '--region=%s' % self.region,
+      ])
 
     if object_storage_service.OBJECT_TTL_DAYS.value:
       # NOTE: buckets created with older APIs may have a different configuration
       # (e.g. Prefix instead of Filter): This needs to stay updated for new
       # buckets.
-      config = json.dumps(
-          {
-              'Rules': [{
-                  'Expiration': {
-                      'Days': object_storage_service.OBJECT_TTL_DAYS.value
-                  },
-                  'ID': 'PKB_OBJECT_TTL',
-                  'Filter': {},
-                  'Status': 'Enabled',
-              }]
-          }
+      config = json.dumps({
+          'Rules': [{
+              'Expiration': {
+                  'Days': object_storage_service.OBJECT_TTL_DAYS.value
+              },
+              'ID': 'PKB_OBJECT_TTL',
+              'Filter': {},
+              'Status': 'Enabled',
+          }]
+      })
+      vm_util.IssueCommand(
+          util.AWS_PREFIX
+          + [
+              's3api',
+              'put-bucket-lifecycle-configuration',
+              '--region',
+              self.region,
+              '--bucket',
+              bucket_name,
+              '--lifecycle-configuration',
+              config,
+          ]
       )
-      vm_util.IssueCommand(util.AWS_PREFIX + [
-          's3api', 'put-bucket-lifecycle-configuration',
-          '--region', self.region,
-          '--bucket', bucket_name,
-          '--lifecycle-configuration', config])
 
   def Copy(self, src_url, dst_url, recursive=False):
     """See base class."""
@@ -104,8 +119,9 @@ class S3Service(object_storage_service.ObjectStorageService):
   def CopyToBucket(self, src_path, bucket, object_path):
     """See base class."""
     dst_url = self.MakeRemoteCliDownloadUrl(bucket, object_path)
-    vm_util.IssueCommand(['aws', 's3', 'cp', src_path, dst_url,
-                          '--region', self.region])
+    vm_util.IssueCommand(
+        ['aws', 's3', 'cp', src_path, dst_url, '--region', self.region]
+    )
 
   def MakeRemoteCliDownloadUrl(self, bucket, object_path):
     """See base class."""
@@ -115,12 +131,16 @@ class S3Service(object_storage_service.ObjectStorageService):
   def GenerateCliDownloadFileCommand(self, src_url, local_path):
     """See base class."""
     return 'aws s3 cp "%s" "%s" --region=%s' % (
-        src_url, local_path, self.region)
+        src_url,
+        local_path,
+        self.region,
+    )
 
   def List(self, bucket):
     """See base class."""
     stdout, _, _ = vm_util.IssueCommand(
-        ['aws', 's3', 'ls', bucket, '--region', self.region])
+        ['aws', 's3', 'ls', bucket, '--region', self.region]
+    )
     return stdout
 
   def ListTopLevelSubfolders(self, bucket):
@@ -155,18 +175,28 @@ class S3Service(object_storage_service.ObjectStorageService):
       return False
 
     vm_util.IssueCommand(
-        ['aws', 's3', 'rb',
-         's3://%s' % bucket,
-         '--region', self.region,
-         '--force'],  # --force deletes even if bucket contains objects.
-        suppress_failure=_SuppressFailure)
+        [
+            'aws',
+            's3',
+            'rb',
+            's3://%s' % bucket,
+            '--region',
+            self.region,
+            '--force',
+        ],  # --force deletes even if bucket contains objects.
+        suppress_failure=_SuppressFailure,
+    )
 
   def EmptyBucket(self, bucket):
-    vm_util.IssueCommand(
-        ['aws', 's3', 'rm',
-         's3://%s' % bucket,
-         '--region', self.region,
-         '--recursive'])
+    vm_util.IssueCommand([
+        'aws',
+        's3',
+        'rm',
+        's3://%s' % bucket,
+        '--region',
+        self.region,
+        '--recursive',
+    ])
 
   def MakeBucketPubliclyReadable(self, bucket, also_make_writable=False):
     """See base class."""
@@ -176,9 +206,15 @@ class S3Service(object_storage_service.ObjectStorageService):
       actions.append(_WRITE)
       logging.warning('Making bucket %s publicly writable!', bucket)
     vm_util.IssueCommand([
-        'aws', 's3api', 'put-bucket-policy', '--region', self.region,
-        '--bucket', bucket, '--policy',
-        _MakeS3BucketPolicy(bucket, actions)
+        'aws',
+        's3api',
+        'put-bucket-policy',
+        '--region',
+        self.region,
+        '--bucket',
+        bucket,
+        '--policy',
+        _MakeS3BucketPolicy(bucket, actions),
     ])
 
   def GetDownloadUrl(self, bucket, object_name, use_https=True):
@@ -194,27 +230,32 @@ class S3Service(object_storage_service.ObjectStorageService):
     vm.Install('boto3')
 
     vm.PushFile(
-        object_storage_service.FindCredentialFile('~/' +
-                                                  AWS_CREDENTIAL_LOCATION),
-        AWS_CREDENTIAL_LOCATION)
-    vm.PushFile(object_storage_service.FindBotoFile(),
-                object_storage_service.DEFAULT_BOTO_LOCATION_USER)
+        object_storage_service.FindCredentialFile(
+            '~/' + AWS_CREDENTIAL_LOCATION
+        ),
+        AWS_CREDENTIAL_LOCATION,
+    )
+    vm.PushFile(
+        object_storage_service.FindBotoFile(),
+        object_storage_service.DEFAULT_BOTO_LOCATION_USER,
+    )
 
   def CleanupVM(self, vm):
     vm.Uninstall('awscli')
 
   def CLIUploadDirectory(self, vm, directory, file_names, bucket):
     return vm.RemoteCommand(
-        'time aws s3 sync %s s3://%s/' % (directory, bucket))
+        'time aws s3 sync %s s3://%s/' % (directory, bucket)
+    )
 
   def CLIDownloadBucket(self, vm, bucket, objects, dest):
-    return vm.RemoteCommand(
-        'time aws s3 sync s3://%s/ %s' % (bucket, dest))
+    return vm.RemoteCommand('time aws s3 sync s3://%s/ %s' % (bucket, dest))
 
   def Metadata(self, vm):
     return {
-        object_storage_service.BOTO_LIB_VERSION:
+        object_storage_service.BOTO_LIB_VERSION: (
             linux_packages.GetPipPackageVersion(vm, 'boto3')
+        )
     }
 
   def APIScriptArgs(self):
@@ -225,18 +266,17 @@ class S3Service(object_storage_service.ObjectStorageService):
     return ['s3.py']
 
 
-def _MakeS3BucketPolicy(bucket: str,
-                        actions: List[str],
-                        object_prefix='') -> str:
+def _MakeS3BucketPolicy(
+    bucket: str, actions: List[str], object_prefix=''
+) -> str:
   # https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_s3_rw-bucket.html
   return json.dumps({
-      'Version':
-          '2012-10-17',
+      'Version': '2012-10-17',
       'Statement': [{
           'Principal': '*',
           'Sid': 'PkbAcl',
           'Effect': 'Allow',
           'Action': actions,
-          'Resource': [f'arn:aws:s3:::{bucket}/{object_prefix}*']
-      }]
+          'Resource': [f'arn:aws:s3:::{bucket}/{object_prefix}*'],
+      }],
   })

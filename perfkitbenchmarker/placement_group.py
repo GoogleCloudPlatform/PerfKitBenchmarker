@@ -28,15 +28,16 @@ FLAGS = flags.FLAGS
 
 PLACEMENT_GROUP_CLOSEST_SUPPORTED = 'closest_supported'
 PLACEMENT_GROUP_NONE = 'none'
-PLACEMENT_GROUP_OPTIONS = frozenset([
-    PLACEMENT_GROUP_CLOSEST_SUPPORTED,
-    PLACEMENT_GROUP_NONE
-])
+PLACEMENT_GROUP_OPTIONS = frozenset(
+    [PLACEMENT_GROUP_CLOSEST_SUPPORTED, PLACEMENT_GROUP_NONE]
+)
 
 # Default placement group style is specified by Cloud Specific Placement Group.
 flags.DEFINE_string(
-    'placement_group_style', None,
-    'The vm placement group option to use. Default set by cloud.')
+    'placement_group_style',
+    None,
+    'The vm placement group option to use. Default set by cloud.',
+)
 
 
 def GetPlacementGroupSpecClass(cloud):
@@ -46,8 +47,7 @@ def GetPlacementGroupSpecClass(cloud):
 
 def GetPlacementGroupClass(cloud):
   """Returns the PlacementGroup class corresponding to 'cloud'."""
-  return resource.GetResourceClass(BasePlacementGroup,
-                                   CLOUD=cloud)
+  return resource.GetResourceClass(BasePlacementGroup, CLOUD=cloud)
 
 
 class BasePlacementGroupSpec(spec.BaseSpec):
@@ -67,10 +67,10 @@ class BasePlacementGroupSpec(spec.BaseSpec):
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super(BasePlacementGroupSpec, cls)._ApplyFlags(config_values, flag_values)
     if FLAGS.placement_group_style:

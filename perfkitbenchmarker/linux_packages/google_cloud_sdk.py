@@ -28,16 +28,21 @@ KUBECTL_PATH = '%s/bin/kubectl' % SDK_DIR
 
 
 def RunGcloud(vm, cmd):
-  return vm.RemoteCommand('export CLOUDSDK_CORE_DISABLE_PROMPTS=1 && %s %s '
-                          '--project %s --format json' % (GCLOUD_PATH, cmd,
-                                                          vm.project))
+  return vm.RemoteCommand(
+      'export CLOUDSDK_CORE_DISABLE_PROMPTS=1 && %s %s '
+      '--project %s --format json' % (GCLOUD_PATH, cmd, vm.project)
+  )
 
 
 def Install(vm):
   """Installs google cloud sdk on the VM."""
   vm.Install('wget')
-  vm.RemoteCommand('cd {0} && wget {1} && tar xzf {2} && rm {2}'.format(
-      vm_util.VM_TMP_DIR, SDK_REPO, os.path.basename(SDK_REPO)))
-  vm.RemoteCommand('%s --disable-installation-options --usage-report=false '
-                   '--path-update=false --bash-completion=false'
-                   % SDK_INSTALL_FILE)
+  vm.RemoteCommand(
+      'cd {0} && wget {1} && tar xzf {2} && rm {2}'.format(
+          vm_util.VM_TMP_DIR, SDK_REPO, os.path.basename(SDK_REPO)
+      )
+  )
+  vm.RemoteCommand(
+      '%s --disable-installation-options --usage-report=false '
+      '--path-update=false --bash-completion=false' % SDK_INSTALL_FILE
+  )

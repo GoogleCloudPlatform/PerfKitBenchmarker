@@ -79,7 +79,8 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        benchmark_name, flag_values=FLAGS, **config_dict)
+        benchmark_name, flag_values=FLAGS, **config_dict
+    )
     return benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec, UID)
 
 
@@ -93,14 +94,18 @@ class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
     self.assertTrue(spec.spark_service is not None)
     self.assertEqual(len(spec.vms), 0)
     machine_type = spec.config.spark_service.worker_group.vm_spec.machine_type
-    self.assertEqual(spec.config.spark_service.worker_group.vm_count, 4,
-                     str(spec.config.spark_service.__dict__))
-    self.assertEqual(spec.config.spark_service.service_type,
-                     spark_service.PROVIDER_MANAGED)
-    self.assertEqual(machine_type,
-                     'n1-standard-4', str(spec.config.spark_service.__dict__))
-    self.assertTrue(isinstance(spec.spark_service,
-                               gcp_dataproc.GcpDataproc))
+    self.assertEqual(
+        spec.config.spark_service.worker_group.vm_count,
+        4,
+        str(spec.config.spark_service.__dict__),
+    )
+    self.assertEqual(
+        spec.config.spark_service.service_type, spark_service.PROVIDER_MANAGED
+    )
+    self.assertEqual(
+        machine_type, 'n1-standard-4', str(spec.config.spark_service.__dict__)
+    )
+    self.assertTrue(isinstance(spec.spark_service, gcp_dataproc.GcpDataproc))
 
   def testEMRConfig(self):
     FLAGS.cloud = provider_info.AWS
@@ -111,21 +116,30 @@ class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
     self.assertTrue(hasattr(spec, 'spark_service'))
     self.assertTrue(spec.spark_service is not None)
     self.assertEqual(len(spec.vms), 0)
-    self.assertEqual(spec.config.spark_service.worker_group.vm_count, 4,
-                     str(spec.config.spark_service.__dict__))
+    self.assertEqual(
+        spec.config.spark_service.worker_group.vm_count,
+        4,
+        str(spec.config.spark_service.__dict__),
+    )
     machine_type = spec.config.spark_service.worker_group.vm_spec.machine_type
-    self.assertEqual(spec.config.spark_service.service_type,
-                     spark_service.PROVIDER_MANAGED)
-    self.assertEqual(machine_type, 'm4.xlarge',
-                     str(spec.config.spark_service.__dict__))
+    self.assertEqual(
+        spec.config.spark_service.service_type, spark_service.PROVIDER_MANAGED
+    )
+    self.assertEqual(
+        machine_type, 'm4.xlarge', str(spec.config.spark_service.__dict__)
+    )
     self.assertTrue(isinstance(spec.spark_service, aws_emr.AwsEMR))
 
   def testPkbManaged(self):
     spec = self._CreateBenchmarkSpecFromYaml(PKB_MANAGED_CONFIG)
-    self.assertEqual(spec.config.spark_service.worker_group.vm_count, 2,
-                     str(spec.config.spark_service.__dict__))
-    self.assertEqual(spec.config.spark_service.service_type,
-                     spark_service.PKB_MANAGED)
+    self.assertEqual(
+        spec.config.spark_service.worker_group.vm_count,
+        2,
+        str(spec.config.spark_service.__dict__),
+    )
+    self.assertEqual(
+        spec.config.spark_service.service_type, spark_service.PKB_MANAGED
+    )
     spec.ConstructSparkService()
     spec.ConstructVirtualMachines()
     self.assertEqual(len(spec.vms), 3)
@@ -133,8 +147,9 @@ class ConstructSparkServiceTestCase(_BenchmarkSpecTestCase):
     self.assertEqual(len(spec.vm_groups['worker_group']), 2)
     self.assertEqual(len(spec.spark_service.vms['worker_group']), 2)
     self.assertEqual(len(spec.spark_service.vms['master_group']), 1)
-    self.assertTrue(isinstance(spec.spark_service,
-                               spark_service.PkbSparkService))
+    self.assertTrue(
+        isinstance(spec.spark_service, spark_service.PkbSparkService)
+    )
 
 
 if __name__ == '__main__':

@@ -15,19 +15,24 @@
 from absl import flags
 
 
-flags.DEFINE_boolean('mesos_privileged_docker', False,
-                     'If set to True, will attempt to create Docker containers '
-                     'in a privileged mode. Note that some benchmarks execute '
-                     'commands which are only allowed in privileged mode.')
+flags.DEFINE_boolean(
+    'mesos_privileged_docker',
+    False,
+    'If set to True, will attempt to create Docker containers '
+    'in a privileged mode. Note that some benchmarks execute '
+    'commands which are only allowed in privileged mode.',
+)
 
-flags.DEFINE_integer('docker_memory_mb', 2048,
-                     'Memory limit for docker containers.')
+flags.DEFINE_integer(
+    'docker_memory_mb', 2048, 'Memory limit for docker containers.'
+)
 
-flags.DEFINE_float('docker_cpus', 1,
-                   'CPU limit for docker containers.')
+flags.DEFINE_float('docker_cpus', 1, 'CPU limit for docker containers.')
 
-flags.DEFINE_string('marathon_address', 'localhost:8080',
-                    'Marathon IP address and port.')
+flags.DEFINE_string(
+    'marathon_address', 'localhost:8080', 'Marathon IP address and port.'
+)
 
-flags.DEFINE_string('marathon_auth', 'root:password',
-                    'Marathon server basic authentication.')
+flags.DEFINE_string(
+    'marathon_auth', 'root:password', 'Marathon server basic authentication.'
+)

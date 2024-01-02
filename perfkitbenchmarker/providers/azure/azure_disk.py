@@ -105,7 +105,8 @@ def _GenerateDrivePathSuffixes():
   """
   character_range = range(ord('a'), ord('z') + 1)
   products = _ProductWithIncreasingLength(
-      character_range, MAX_DRIVE_SUFFIX_LENGTH)
+      character_range, MAX_DRIVE_SUFFIX_LENGTH
+  )
 
   for p in products:
     yield ''.join(chr(c) for c in p)
@@ -116,6 +117,7 @@ REMOTE_DRIVE_PATH_SUFFIXES = list(_GenerateDrivePathSuffixes())
 
 class TooManyAzureDisksError(Exception):
   """Exception raised when too many disks are attached."""
+
   pass
 
 
@@ -129,14 +131,16 @@ def LocalDriveIsNvme(machine_type):
   """Check if the machine type uses NVMe driver."""
   return any(
       re.search(machine_series, machine_type)
-      for machine_series in AZURE_NVME_TYPES)
+      for machine_series in AZURE_NVME_TYPES
+  )
 
 
 def HasTempDrive(machine_type):
   """Check if the machine type has the temp drive (sdb)."""
   return not any(
       re.search(machine_series, machine_type)
-      for machine_series in AZURE_NO_TMP_DISK_TYPES)
+      for machine_series in AZURE_NO_TMP_DISK_TYPES
+  )
 
 
 class AzureDisk(disk.BaseDisk):
@@ -144,11 +148,7 @@ class AzureDisk(disk.BaseDisk):
 
   _lock = threading.Lock()
 
-  def __init__(self,
-               disk_spec,
-               vm,
-               lun,
-               is_image=False):
+  def __init__(self, disk_spec, vm, lun, is_image=False):
     super(AzureDisk, self).__init__(disk_spec)
     self.host_caching = FLAGS.azure_host_caching
     self.vm = vm
@@ -161,9 +161,11 @@ class AzureDisk(disk.BaseDisk):
     self.is_image = is_image
     self._deleted = False
     self.machine_type = vm.machine_type
-    if (self.disk_type == PREMIUM_STORAGE or
-        self.disk_type == PREMIUM_STORAGE_V2 or
-        self.disk_type == ULTRA_STORAGE):
+    if (
+        self.disk_type == PREMIUM_STORAGE
+        or self.disk_type == PREMIUM_STORAGE_V2
+        or self.disk_type == ULTRA_STORAGE
+    ):
       self.metadata.update({
           disk.MEDIA: disk.SSD,
           disk.REPLICATION: disk.ZONE,
@@ -194,43 +196,83 @@ class AzureDisk(disk.BaseDisk):
     assert not self.is_image
 
     if self.disk_type == ULTRA_STORAGE and not self.vm.availability_zone:
-      raise Exception(f'Azure Ultradisk is being created in zone "{self.zone}"'
-                      'which was not specified to have an availability zone. '
-                      'Availability zones are specified with zone-\\d  e.g. '
-                      'eastus1-2 for availability zone 2 in zone eastus1')
+      raise Exception(
+          f'Azure Ultradisk is being created in zone "{self.zone}"'
+          'which was not specified to have an availability zone. '
+          'Availability zones are specified with zone-\\d  e.g. '
+          'eastus1-2 for availability zone 2 in zone eastus1'
+      )
     with self._lock:
-      _, _, retcode = vm_util.IssueCommand([
-          azure.AZURE_PATH, 'vm', 'disk', 'attach', '--new', '--caching',
-          self.host_caching, '--name', self.name, '--lun',
-          str(self.lun), '--sku', self.disk_type, '--vm-name', self.vm_name,
-          '--size-gb',
-          str(self.disk_size)
-      ] + self.resource_group.args, raise_on_failure=False, timeout=600)
+      _, _, retcode = vm_util.IssueCommand(
+          [
+              azure.AZURE_PATH,
+              'vm',
+              'disk',
+              'attach',
+              '--new',
+              '--caching',
+              self.host_caching,
+              '--name',
+              self.name,
+              '--lun',
+              str(self.lun),
+              '--sku',
+              self.disk_type,
+              '--vm-name',
+              self.vm_name,
+              '--size-gb',
+              str(self.disk_size),
+          ]
+          + self.resource_group.args,
+          raise_on_failure=False,
+          timeout=600,
+      )
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
-            'Error creating Azure disk.')
+            'Error creating Azure disk.'
+        )
 
-      _, _, retcode = vm_util.IssueCommand([
-          azure.AZURE_PATH, 'disk', 'update', '--name', self.name, '--set',
-          util.GetTagsJson(self.resource_group.timeout_minutes)
-      ] + self.resource_group.args, raise_on_failure=False)
+      _, _, retcode = vm_util.IssueCommand(
+          [
+              azure.AZURE_PATH,
+              'disk',
+              'update',
+              '--name',
+              self.name,
+              '--set',
+              util.GetTagsJson(self.resource_group.timeout_minutes),
+          ]
+          + self.resource_group.args,
+          raise_on_failure=False,
+      )
 
       if retcode:
         raise errors.Resource.RetryableCreationError(
-            'Error tagging Azure disk.')
+            'Error tagging Azure disk.'
+        )
 
-      if (self.disk_type in [ULTRA_STORAGE, PREMIUM_STORAGE_V2] and (
-          FLAGS.azure_provisioned_iops or FLAGS.azure_provisioned_throughput)):
-        args = ([azure.AZURE_PATH, 'disk', 'update', '--name', self.name] +
-                self.resource_group.args)
+      if self.disk_type in [ULTRA_STORAGE, PREMIUM_STORAGE_V2] and (
+          FLAGS.azure_provisioned_iops or FLAGS.azure_provisioned_throughput
+      ):
+        args = [
+            azure.AZURE_PATH,
+            'disk',
+            'update',
+            '--name',
+            self.name,
+        ] + self.resource_group.args
 
         if FLAGS.azure_provisioned_iops:
-          args = args + ['--disk-iops-read-write',
-                         str(FLAGS.azure_provisioned_iops)]
+          args = args + [
+              '--disk-iops-read-write',
+              str(FLAGS.azure_provisioned_iops),
+          ]
         if FLAGS.azure_provisioned_throughput:
-          args = args + ['--disk-mbps-read-write',
-                         str(FLAGS.azure_provisioned_throughput)]
+          args = args + [
+              '--disk-mbps-read-write',
+              str(FLAGS.azure_provisioned_throughput),
+          ]
 
         _, _, _ = vm_util.IssueCommand(args, raise_on_failure=True)
 
@@ -245,10 +287,19 @@ class AzureDisk(disk.BaseDisk):
     if self._deleted:
       return False
 
-    stdout, _, _ = vm_util.IssueCommand([
-        azure.AZURE_PATH, 'disk', 'show', '--output', 'json', '--name',
-        self.name
-    ] + self.resource_group.args, raise_on_failure=False)
+    stdout, _, _ = vm_util.IssueCommand(
+        [
+            azure.AZURE_PATH,
+            'disk',
+            'show',
+            '--output',
+            'json',
+            '--name',
+            self.name,
+        ]
+        + self.resource_group.args,
+        raise_on_failure=False,
+    )
     try:
       json.loads(stdout)
       return True

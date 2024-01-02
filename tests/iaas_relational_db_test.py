@@ -109,58 +109,37 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
         'cloud': 'GCP',
         'engine': 'mysql',
         'engine_version': '5.7',
-        'db_spec': {
-            'GCP': {
-                'machine_type': 'n1-standard-1'
-            }
-        },
-        'db_disk_spec': {
-            'GCP': {
-                'disk_size': 500
-            }
-        }
+        'db_spec': {'GCP': {'machine_type': 'n1-standard-1'}},
+        'db_disk_spec': {'GCP': {'disk_size': 500}},
     }
 
     self.min_postgres_spec = {
         'cloud': 'GCP',
         'engine': 'postgres',
         'engine_version': '11',
-        'db_spec': {
-            'GCP': {
-                'machine_type': 'n1-standard-1'
-            }
-        },
-        'db_disk_spec': {
-            'GCP': {
-                'disk_size': 500
-            }
-        }
+        'db_spec': {'GCP': {'machine_type': 'n1-standard-1'}},
+        'db_disk_spec': {'GCP': {'disk_size': 500}},
     }
 
     self.min_sqlserver_spec = {
         'cloud': 'GCP',
         'engine': 'sqlserver',
         'engine_version': '2019',
-        'db_spec': {
-            'GCP': {
-                'machine_type': 'n1-standard-1'
-            }
-        },
-        'db_disk_spec': {
-            'GCP': {
-                'disk_size': 500
-            }
-        }
+        'db_spec': {'GCP': {'machine_type': 'n1-standard-1'}},
+        'db_disk_spec': {'GCP': {'disk_size': 500}},
     }
 
     self.mysql_spec = relational_db_spec.RelationalDbSpec(
-        _COMPONENT, flag_values=FLAGS, **self.min_mysql_spec)
+        _COMPONENT, flag_values=FLAGS, **self.min_mysql_spec
+    )
 
     self.postgres_spec = relational_db_spec.RelationalDbSpec(
-        _COMPONENT, flag_values=FLAGS, **self.min_postgres_spec)
+        _COMPONENT, flag_values=FLAGS, **self.min_postgres_spec
+    )
 
     self.sqlserver_spec = relational_db_spec.RelationalDbSpec(
-        _COMPONENT, flag_values=FLAGS, **self.min_sqlserver_spec)
+        _COMPONENT, flag_values=FLAGS, **self.min_sqlserver_spec
+    )
 
   def testMakePostgresClientCommand(self):
     FLAGS['use_managed_db'].parse(False)
@@ -171,8 +150,10 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.server_vm = CreateTestLinuxVm()
     self.assertEqual(
         db.client_vm_query_tools.MakeSqlCommand(
-            'Select 1', database_name='postgresql'),
-        'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker dbname=postgresql\' -c "Select 1"'
+            'Select 1', database_name='postgresql'
+        ),
+        "psql 'host=1.1.1.1 user=root password=perfkitbenchmarker"
+        ' dbname=postgresql\' -c "Select 1"',
     )
 
   def testIssuePostgresClientCommand(self):
@@ -187,10 +168,11 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     command = [
         mock.call(
-            'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker'
+            "psql 'host=1.1.1.1 user=root password=perfkitbenchmarker"
             ' dbname=abc\' -c "Select 1"',
             ignore_failure=False,
-            timeout=None)
+            timeout=None,
+        )
     ]
 
     self.assertCountEqual(remote_command.call_args_list, command)
@@ -208,14 +190,16 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
           session_variables=['Set a=b;'],
           database_name='abc',
           ignore_failure=False,
-          timeout=None)
+          timeout=None,
+      )
 
     command = [
         mock.call(
-            'psql \'host=1.1.1.1 user=root password=perfkitbenchmarker'
+            "psql 'host=1.1.1.1 user=root password=perfkitbenchmarker"
             ' dbname=abc\' -c "Set a=b;" -c "Select 1"',
             ignore_failure=False,
-            timeout=None)
+            timeout=None,
+        )
     ]
     self.assertCountEqual(remote_command.call_args_list, command)
 
@@ -228,8 +212,10 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.port = db.GetDefaultPort()
     self.assertEqual(
         db.server_vm_query_tools.MakeSqlCommand(
-            'Select 1', database_name='postgresql'),
-        'psql \'host=localhost user=root password=perfkitbenchmarker dbname=postgresql\' -c "Select 1"'
+            'Select 1', database_name='postgresql'
+        ),
+        "psql 'host=localhost user=root password=perfkitbenchmarker"
+        ' dbname=postgresql\' -c "Select 1"',
     )
 
   def testMakeMysqlCientCommand(self):
@@ -241,8 +227,8 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.port = db.GetDefaultPort()
     self.assertEqual(
         db.client_vm_query_tools.MakeSqlCommand('Select 1'),
-        'mysql -h 1.1.1.1 -P 3306 -u root'
-        ' -pperfkitbenchmarker -e "Select 1"')
+        'mysql -h 1.1.1.1 -P 3306 -u root -pperfkitbenchmarker -e "Select 1"',
+    )
 
   def testMakeMysqlCommandWithLocalHost(self):
     FLAGS['use_managed_db'].parse(False)
@@ -253,8 +239,8 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.port = db.GetDefaultPort()
     self.assertEqual(
         db.server_vm_query_tools.MakeSqlCommand('Select 1'),
-        'mysql -h localhost -P 3306 -u root '
-        '-pperfkitbenchmarker -e "Select 1"')
+        'mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e "Select 1"',
+    )
 
   def testMakeSqlserverCommand(self):
     FLAGS['use_managed_db'].parse(False)
@@ -265,7 +251,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.port = db.GetDefaultPort()
     self.assertEqual(
         db.client_vm_query_tools.MakeSqlCommand('Select 1'),
-        'sqlcmd -S 1.1.1.1 -U root -P perfkitbenchmarker -Q "Select 1"'
+        'sqlcmd -S 1.1.1.1 -U root -P perfkitbenchmarker -Q "Select 1"',
     )
 
   def testMakeSqlserverCommandWithLocalHost(self):
@@ -277,7 +263,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.port = db.GetDefaultPort()
     self.assertEqual(
         db.server_vm_query_tools.MakeSqlCommand('Select 1'),
-        'sqlcmd -S localhost -U root -P perfkitbenchmarker -Q "Select 1"'
+        'sqlcmd -S localhost -U root -P perfkitbenchmarker -Q "Select 1"',
     )
 
   def testInstallMYSQLServer(self):
@@ -304,32 +290,47 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.call('sudo rsync -avzh /tmp/ /scratch/tmp'),
         mock.call('df'),
         mock.call(
-            'echo "alias /var/lib/mysql -> /scratch/mysql," | sudo tee -a /etc/apparmor.d/tunables/alias'
+            'echo "alias /var/lib/mysql -> /scratch/mysql," | sudo tee -a'
+            ' /etc/apparmor.d/tunables/alias'
         ),
         mock.call(
-            'echo "alias /tmp -> /scratch/tmp," | sudo tee -a /etc/apparmor.d/tunables/alias'
+            'echo "alias /tmp -> /scratch/tmp," | sudo tee -a'
+            ' /etc/apparmor.d/tunables/alias'
         ),
         mock.call(
-            'sudo sed -i "s|# Allow data files dir access|  /scratch/mysql/ r, /scratch/mysql/** rwk, /scratch/tmp/ r, /scratch/tmp/** rwk, /proc/*/status r, /sys/devices/system/node/ r, /sys/devices/system/node/node*/meminfo r, /sys/devices/system/node/*/* r, /sys/devices/system/node/* r, # Allow data files dir access|g" /etc/apparmor.d/usr.sbin.mysqld'
+            'sudo sed -i "s|# Allow data files dir access|  /scratch/mysql/ r,'
+            ' /scratch/mysql/** rwk, /scratch/tmp/ r, /scratch/tmp/** rwk,'
+            ' /proc/*/status r, /sys/devices/system/node/ r,'
+            ' /sys/devices/system/node/node*/meminfo r,'
+            ' /sys/devices/system/node/*/* r, /sys/devices/system/node/* r, #'
+            ' Allow data files dir access|g" /etc/apparmor.d/usr.sbin.mysqld'
         ),
         mock.call('sudo apparmor_parser -r /etc/apparmor.d/usr.sbin.mysqld'),
         mock.call('sudo systemctl restart apparmor'),
         mock.call(
-            'sudo sed -i "s|datadir\t\t= /var/lib/mysql|datadir\t\t= /scratch/mysql|g" None'
+            'sudo sed -i "s|datadir\t\t= /var/lib/mysql|datadir\t\t='
+            ' /scratch/mysql|g" None'
         ),
         mock.call(
-            'sudo sed -i "s|tmpdir\t\t= /tmp|tmpdir\t\t= /scratch/tmp|g" None'),
-        mock.call(
-            'echo "\ninnodb_buffer_pool_size = 100G\ninnodb_flush_method = O_DIRECT\ninnodb_flush_neighbors = 0\ninnodb_log_file_size = 1000M" | sudo tee -a None'
+            'sudo sed -i "s|tmpdir\t\t= /tmp|tmpdir\t\t= /scratch/tmp|g" None'
         ),
         mock.call(
-            'echo "\nskip-name-resolve\nconnect_timeout        = 86400\nwait_timeout        = 86400\ninteractive_timeout        = 86400" | sudo tee -a None'
+            'echo "\ninnodb_buffer_pool_size = 100G\ninnodb_flush_method ='
+            ' O_DIRECT\ninnodb_flush_neighbors = 0\ninnodb_log_file_size ='
+            ' 1000M" | sudo tee -a None'
+        ),
+        mock.call(
+            'echo "\nskip-name-resolve\nconnect_timeout        ='
+            ' 86400\nwait_timeout        = 86400\ninteractive_timeout        ='
+            ' 86400" | sudo tee -a None'
         ),
         mock.call('sudo sed -i "s/^bind-address/#bind-address/g" None'),
         mock.call(
-            'sudo sed -i "s/^mysqlx-bind-address/#mysqlx-bind-address/g" None'),
+            'sudo sed -i "s/^mysqlx-bind-address/#mysqlx-bind-address/g" None'
+        ),
         mock.call(
-            'sudo sed -i "s/max_allowed_packet\t= 16M/max_allowed_packet\t= 1024M/g" None'
+            'sudo sed -i "s/max_allowed_packet\t= 16M/max_allowed_packet\t='
+            ' 1024M/g" None'
         ),
         mock.call('echo "\nlog_error_verbosity        = 3" | sudo tee -a None'),
         mock.call('sudo service None restart'),
@@ -338,23 +339,27 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker '
             '-e "SET GLOBAL max_connections=8000;"',
             ignore_failure=False,
-            timeout=None),
+            timeout=None,
+        ),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
-            '"CREATE USER \'root\'@\'None\' '
-            'IDENTIFIED BY \'perfkitbenchmarker\';"',
+            "\"CREATE USER 'root'@'None' "
+            "IDENTIFIED BY 'perfkitbenchmarker';\"",
             ignore_failure=True,
-            timeout=None),
+            timeout=None,
+        ),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
-            '"GRANT ALL PRIVILEGES ON *.* TO \'root\'@\'None\';"',
+            "\"GRANT ALL PRIVILEGES ON *.* TO 'root'@'None';\"",
             ignore_failure=True,
-            timeout=None),
+            timeout=None,
+        ),
         mock.call(
             'sudo mysql -h localhost -P 3306 -u root -pperfkitbenchmarker -e '
             '"FLUSH PRIVILEGES;"',
             ignore_failure=True,
-            timeout=None)
+            timeout=None,
+        ),
     ]
 
     self.assertCountEqual(remote_command.call_args_list, command)

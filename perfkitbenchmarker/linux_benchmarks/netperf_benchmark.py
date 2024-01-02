@@ -683,8 +683,11 @@ def RunClientServerVMs(client_vm, server_vm):
     for netperf_benchmark in FLAGS.netperf_benchmarks:
       if vm_util.ShouldRunOnExternalIpAddress():
         external_ip_results = RunNetperf(
-            client_vm, netperf_benchmark, [server_vm.ip_address], num_streams,
-            [client_vm.ip_address]
+            client_vm,
+            netperf_benchmark,
+            [server_vm.ip_address],
+            num_streams,
+            [client_vm.ip_address],
         )
         for external_ip_result in external_ip_results:
           external_ip_result.metadata['ip_type'] = (
@@ -699,7 +702,7 @@ def RunClientServerVMs(client_vm, server_vm):
             netperf_benchmark,
             server_vm.GetInternalIPs(),
             num_streams,
-            client_vm.GetInternalIPs()
+            client_vm.GetInternalIPs(),
         )
         for internal_ip_result in internal_ip_results:
           internal_ip_result.metadata.update(metadata)

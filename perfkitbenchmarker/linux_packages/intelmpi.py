@@ -23,22 +23,27 @@ from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import intel_repo
 
-MPI_VERSION = flags.DEFINE_string('intelmpi_version', '2019.6-088',
-                                  'MPI version.')
+MPI_VERSION = flags.DEFINE_string(
+    'intelmpi_version', '2019.6-088', 'MPI version.'
+)
 
 FLAGS = flags.FLAGS
 
 _INTEL_ROOT = '/opt/intel'
 
 PREPROVISIONED_DATA = {
-    'intel-mpi-2018.4-057.rpm.tar.gz':
-        'fbcf98d246760330ef7dd661d2b75e7f90783943dfea1285e5aaeb4f0e1abf9e',
-    'intel-mpi-2018.4-057.deb.tar.gz':
-        '9603b9241287874b5d4fe3ba806d1b672b1da576406a4c6dcd86e9d84e341bd1',
-    'intel-mpi-2019.6-088.rpm.tar.gz':
-        'a4683ff1bd66b57f9002ad63208a77aee172b5b1dc365d892af8d468d96ad8d5',
-    'intel-mpi-2019.6-088.deb.tar.gz':
-        'e5a8126dbc2d1aca889f987117be00dffe4344c58f8e622d3b8f5809cb5493e6',
+    'intel-mpi-2018.4-057.rpm.tar.gz': (
+        'fbcf98d246760330ef7dd661d2b75e7f90783943dfea1285e5aaeb4f0e1abf9e'
+    ),
+    'intel-mpi-2018.4-057.deb.tar.gz': (
+        '9603b9241287874b5d4fe3ba806d1b672b1da576406a4c6dcd86e9d84e341bd1'
+    ),
+    'intel-mpi-2019.6-088.rpm.tar.gz': (
+        'a4683ff1bd66b57f9002ad63208a77aee172b5b1dc365d892af8d468d96ad8d5'
+    ),
+    'intel-mpi-2019.6-088.deb.tar.gz': (
+        'e5a8126dbc2d1aca889f987117be00dffe4344c58f8e622d3b8f5809cb5493e6'
+    ),
 }
 
 
@@ -56,7 +61,8 @@ def MpiVars(vm) -> str:
     return intel_repo.ONEAPI_VARS_FILE
   txt, _ = vm.RemoteCommand(
       f'readlink -f {_INTEL_ROOT}/compilers_and_libraries*/'
-      'linux/mpi/intel64/bin/mpivars.sh | sort | uniq')
+      'linux/mpi/intel64/bin/mpivars.sh | sort | uniq'
+  )
   files = txt.splitlines()
   if not files:
     raise ValueError('Could not find the mpivars.sh file')
@@ -76,7 +82,6 @@ def SourceMpiVarsCommand(vm):
 def FixEnvironment(vm):
   """Changes system settings for optimal Intel MPI conditions.
 
-
   Sets the ptrace_scope to 0, for details see:
     https://www.kernel.org/doc/Documentation/security/Yama.txt
 
@@ -84,14 +89,17 @@ def FixEnvironment(vm):
     vm: The virtual machine to run on.
   """
   if not vm.TryRemoteCommand('ulimit -l | grep unlimited'):
-    ulimit_fix_cmd = (f'echo "{vm.user_name} - memlock unlimited" | '
-                      'sudo tee -a /etc/security/limits.conf')
+    ulimit_fix_cmd = (
+        f'echo "{vm.user_name} - memlock unlimited" | '
+        'sudo tee -a /etc/security/limits.conf'
+    )
     vm.RemoteCommand(ulimit_fix_cmd)
     logging.info('Rebooting to permamently set ulimit')
     vm.Reboot()
     vm.WaitForBootCompletion()
   _, stderr, exitcode = vm.RemoteCommandWithReturnCode(
-      'sudo sysctl -w kernel.yama.ptrace_scope=0', ignore_failure=True)
+      'sudo sysctl -w kernel.yama.ptrace_scope=0', ignore_failure=True
+  )
   if exitcode:
     logging.info('Not setting yama ptrace as %s', stderr)
 
@@ -107,9 +115,11 @@ def _InstallViaPreprovisionedData(vm, version: str) -> bool:
     return False
   vm.InstallPreprovisionedPackageData('intelmpi', [tarball], '.')
   extract_dir = posixpath.join(vm_util.VM_TMP_DIR, 'packages')
-  vm.RemoteCommand(f'mkdir -p {extract_dir}; '
-                   f'tar -C {extract_dir} -xvzf {tarball}; '
-                   f'rm {tarball}')
+  vm.RemoteCommand(
+      f'mkdir -p {extract_dir}; '
+      f'tar -C {extract_dir} -xvzf {tarball}; '
+      f'rm {tarball}'
+  )
   vm.InstallPackages(f'{extract_dir}/*')
   return True
 
@@ -149,7 +159,8 @@ def TestInstall(vms) -> None:
   # 'ip-<ip_addr>.<zone>.compute.internal so just check number of responses
   if len(hosts) != len(expected_hosts):
     raise ValueError(
-        f'Expected hosts {len(expected_hosts)} but have {len(hosts)}')
+        f'Expected hosts {len(expected_hosts)} but have {len(hosts)}'
+    )
   logging.info('Hosts: %s', ','.join(hosts))
 
 

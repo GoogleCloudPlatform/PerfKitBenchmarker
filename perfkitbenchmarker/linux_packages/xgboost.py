@@ -19,10 +19,14 @@ from absl import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
-_ENV = flags.DEFINE_string('xgboost_env', 'PATH=/opt/conda/bin:$PATH',
-                           'The xboost install environment.')
-_VERSION = flags.DEFINE_string('xgboost_version', '1.4.2',
-                               'The XGBoost version.')
+_ENV = flags.DEFINE_string(
+    'xgboost_env',
+    'PATH=/opt/conda/bin:$PATH',
+    'The xboost install environment.',
+)
+_VERSION = flags.DEFINE_string(
+    'xgboost_version', '1.4.2', 'The XGBoost version.'
+)
 FLAGS = flags.FLAGS
 
 
@@ -46,8 +50,10 @@ def Install(vm):
   """Installs XGBoost on the VM."""
   vm.Install('build_tools')
   install_dir = posixpath.join(linux_packages.INSTALL_DIR, 'xgboost')
-  vm.RemoteCommand('git clone --recursive https://github.com/dmlc/xgboost '
-                   f'--branch v{_VERSION.value} {install_dir}')
+  vm.RemoteCommand(
+      'git clone --recursive https://github.com/dmlc/xgboost '
+      f'--branch v{_VERSION.value} {install_dir}'
+  )
   nccl_make_option = ''
   nccl_install_option = ''
   if nvidia_driver.QueryNumberOfGpus(vm) > 1:
@@ -63,9 +69,13 @@ def Install(vm):
   build_dir = posixpath.join(install_dir, 'build')
   package_dir = posixpath.join(install_dir, 'python-package')
   vm.RemoteCommand(f'mkdir -p {build_dir}')
-  vm.RemoteCommand(f'cd {build_dir} && '
-                   f'{cuda_env} cmake .. {cuda_make_option} {nccl_make_option}')
+  vm.RemoteCommand(
+      f'cd {build_dir} && '
+      f'{cuda_env} cmake .. {cuda_make_option} {nccl_make_option}'
+  )
   vm.RemoteCommand(f'cd {build_dir} && make -j4')
-  vm.RemoteCommand(f'cd {package_dir} && '
-                   f'{_ENV.value} python3 setup.py install '
-                   f'{cuda_install_option} {nccl_install_option}')
+  vm.RemoteCommand(
+      f'cd {package_dir} && '
+      f'{_ENV.value} python3 setup.py install '
+      f'{cuda_install_option} {nccl_install_option}'
+  )

@@ -22,7 +22,7 @@ DISK_FLAGS_TO_TRANSLATE = {
     'scratch_disk_type': 'data_disk_type',
     'scratch_disk_iops': 'aws_provisioned_iops',
     'scratch_disk_throughput': 'aws_provisioned_throughput',
-    'scratch_disk_size': 'data_disk_size'
+    'scratch_disk_size': 'data_disk_size',
 }
 
 # Added 10th Nov 2022
@@ -46,15 +46,13 @@ RELATIONAL_DB_FLAGS_TO_TRANSLATE = {
 
 LIST_TO_MULTISTRING_TRANSLATIONS = {'zones': 'zone', 'extra_zones': 'zone'}
 
-SYSBENCH_TRANSLATIONS = {
-    'sysbench_thread_counts': 'sysbench_run_threads'
-}
+SYSBENCH_TRANSLATIONS = {'sysbench_thread_counts': 'sysbench_run_threads'}
 
 ALL_TRANSLATIONS = [
     DISK_FLAGS_TO_TRANSLATE,
     RELATIONAL_DB_FLAGS_TO_TRANSLATE,
     LIST_TO_MULTISTRING_TRANSLATIONS,
-    SYSBENCH_TRANSLATIONS
+    SYSBENCH_TRANSLATIONS,
 ]
 
 # Make sure the regex only matches the argument instead of value
@@ -82,8 +80,8 @@ def _GetMultiStringFromList(flag: str, args: str) -> List[str]:
 
 # pylint: disable=dangerous-default-value
 def AliasFlagsFromArgs(
-    argv: List[str],
-    alias_dict: List[Dict[str, str]] = ALL_TRANSLATIONS) -> List[str]:
+    argv: List[str], alias_dict: List[Dict[str, str]] = ALL_TRANSLATIONS
+) -> List[str]:
   """Alias flags to support backwards compatibility."""
   original_to_translation = _FlattenTranslationsDicts(alias_dict)
   new_argv = []
@@ -114,7 +112,7 @@ def AliasFlagsFromArgs(
 # pylint: disable=dangerous-default-value
 def AliasFlagsFromYaml(
     config: Optional[Dict[str, Any]],
-    alias_dict: List[Dict[str, str]] = ALL_TRANSLATIONS
+    alias_dict: List[Dict[str, str]] = ALL_TRANSLATIONS,
 ) -> Optional[Dict[str, Any]]:
   """Alias flags to support backwards compatibility."""
   if not config:

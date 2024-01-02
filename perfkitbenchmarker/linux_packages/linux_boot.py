@@ -7,7 +7,7 @@ import logging
 import os
 import re
 import time
-from typing import Optional, Tuple, List, Callable
+from typing import Callable, List, Optional, Tuple
 
 from absl import flags
 import datetime_tz
@@ -41,7 +41,8 @@ def PrepareBootScriptVM(aux_vm_ips: str, aux_vm_port: int) -> str:
 
 @vm_util.Retry(log_errors=False, poll_interval=1, timeout=300)
 def GetStartupScriptOutput(
-    vm: virtual_machine.BaseVirtualMachine, output_file: str) -> str:
+    vm: virtual_machine.BaseVirtualMachine, output_file: str
+) -> str:
   """return fastboot script log."""
   return vm.RemoteCommand(f'cat {output_file}')[0]
 
@@ -67,15 +68,16 @@ def CollectBootSamples(
     vm: virtual_machine.VirtualMachine,
     runner_ip: Tuple[str, str],
     create_time: datetime.datetime,
-    include_networking_samples: bool = False) -> List[sample.Sample]:
+    include_networking_samples: bool = False,
+) -> List[sample.Sample]:
   """Collect boot samples.
 
   Args:
     vm: The boot vm.
     runner_ip: Runner ip addresses to collect VM-to-VM metrics.
     create_time: VM creation time.
-    include_networking_samples: Boolean, whether to include samples such as
-      time to first egress/ingress packet.
+    include_networking_samples: Boolean, whether to include samples such as time
+      to first egress/ingress packet.
 
   Returns:
     A list of sample.Sample objects.
@@ -152,7 +154,8 @@ CONSOLE_FIRST_START_MATCHERS = [
 def ScrapeConsoleLogLines(
     log_lines: List[str],
     start_time: datetime.datetime,
-    matchers: List[RegexMatcher]) -> List[sample.Sample]:
+    matchers: List[RegexMatcher],
+) -> List[sample.Sample]:
   """Extract timings from the guest console log lines.
 
   Args:
@@ -180,16 +183,15 @@ def ScrapeConsoleLogLines(
 
   for key, val in times.items():
     samples.append(
-        sample.Sample(
-            key, (val - start_time).total_seconds(), 'second', {}
-        )
+        sample.Sample(key, (val - start_time).total_seconds(), 'second', {})
     )
 
   return samples
 
 
-def CollectGuestSamples(vm: virtual_machine.VirtualMachine,
-                        metric_start_time: float) -> List[sample.Sample]:
+def CollectGuestSamples(
+    vm: virtual_machine.VirtualMachine, metric_start_time: float
+) -> List[sample.Sample]:
   """Collect guest metrics.
 
   All metrics published are normalized against VM creation timestamp, including:
@@ -252,7 +254,8 @@ def CollectGuestSamples(vm: virtual_machine.VirtualMachine,
 
 
 def CollectKernelSamples(
-    vm: virtual_machine.VirtualMachine, offset: float) -> List[sample.Sample]:
+    vm: virtual_machine.VirtualMachine, offset: float
+) -> List[sample.Sample]:
   """Collect kernel metrics.
 
   Args:
@@ -345,9 +348,8 @@ def ParseUserTotalTimes(system_d_string: str) -> Tuple[float, float]:
   Args:
     system_d_string: the string output from systemd-analyze string output. i.e.
       "Startup finished in 2.2s (kernel) + 1min 12.5s (userspace) = 1min
-      14.774s"
-      "Startup finished in 448ms (firmware) + 1.913s (loader) +
-       1.182s (kernel) + 52.438s (initrd) + 30.413s (userspace) = 1min 26.397s"
+      14.774s" "Startup finished in 448ms (firmware) + 1.913s (loader) + 1.182s
+      (kernel) + 52.438s (initrd) + 30.413s (userspace) = 1min 26.397s"
 
   Returns:
     A tuple of user_start and total_time, both in seconds.
@@ -485,7 +487,8 @@ def ParseSystemDCriticalChainServiceTime(systemd_out: str) -> Optional[float]:
 
 
 def WaitForReady(
-    vm: virtual_machine.VirtualMachine, timeout: int) -> Tuple[float, float]:
+    vm: virtual_machine.VirtualMachine, timeout: int
+) -> Tuple[float, float]:
   """Ensure the system is ready for boot metrics inspection.
 
   Args:
@@ -533,8 +536,8 @@ def GetGuestScriptsStart(vm: virtual_machine.VirtualMachine) -> Optional[float]:
 
 
 def GetSystemDCriticalChainMetric(
-    vm: virtual_machine.VirtualMachine,
-    metric: str) -> Optional[float]:
+    vm: virtual_machine.VirtualMachine, metric: str
+) -> Optional[float]:
   stdout, _ = vm.RemoteCommand(f'sudo systemd-analyze critical-chain {metric}')
   return ParseSystemDCriticalChainOutput(stdout)
 
@@ -602,7 +605,8 @@ DMESG_METRICS = [
 def CollectVmToVmSamples(
     vm: virtual_machine.VirtualMachine,
     runner_ip: Tuple[str, str],
-    create_time: datetime.datetime) -> List[sample.Sample]:
+    create_time: datetime.datetime,
+) -> List[sample.Sample]:
   """Collect samples related to vm-to-vm networking."""
   samples = []
   vm_output = GetStartupScriptOutput(vm, BOOT_SCRIPT_OUTPUT)

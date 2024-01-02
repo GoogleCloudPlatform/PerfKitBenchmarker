@@ -17,7 +17,6 @@
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
-
 from perfkitbenchmarker.windows_packages import psping
 
 FLAGS = flags.FLAGS
@@ -60,14 +59,14 @@ def Run(benchmark_spec):
 
   def _RunTest(sending_vm, receiving_vm):
     if vm_util.ShouldRunOnExternalIpAddress():
-      results.extend(psping.RunLatencyTest(sending_vm,
-                                           receiving_vm,
-                                           use_internal_ip=False))
+      results.extend(
+          psping.RunLatencyTest(sending_vm, receiving_vm, use_internal_ip=False)
+      )
 
     if vm_util.ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
-      results.extend(psping.RunLatencyTest(sending_vm,
-                                           receiving_vm,
-                                           use_internal_ip=True))
+      results.extend(
+          psping.RunLatencyTest(sending_vm, receiving_vm, use_internal_ip=True)
+      )
 
   _RunTest(vms[0], vms[1])
   _RunTest(vms[1], vms[0])

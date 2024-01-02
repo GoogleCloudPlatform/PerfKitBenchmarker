@@ -15,7 +15,6 @@
 
 import unittest
 from absl import flags
-
 from perfkitbenchmarker import network
 from tests import pkb_common_test_case
 
@@ -30,7 +29,8 @@ class BaseNetworkTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testGetKeyFromNetworkSpec(self):
     spec = network.BaseNetworkSpec(
-        zone='us-central1-a', cidr=None, machine_type=None)
+        zone='us-central1-a', cidr=None, machine_type=None
+    )
     spec.subnet_name = 'test'
     actual_key = TestNetwork._GetKeyFromNetworkSpec(spec)
     expected_key = ('test_cloud', 'us-central1-a', 'test')

@@ -49,7 +49,6 @@ Latency Count
 class PspingBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def testPspingParsing(self):
-
     minimum = 0.19
     maximum = 0.58
     average = 0.27
@@ -60,8 +59,9 @@ class PspingBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     client = machine(machine_type='cA', zone='cZ')
     server = machine(machine_type='sB', zone='sZ')
 
-    samples = psping.ParsePspingResults(psping_results, client, server,
-                                        use_internal_ip)
+    samples = psping.ParsePspingResults(
+        psping_results, client, server, use_internal_ip
+    )
 
     expected_metadata = {
         'internal_ip_used': use_internal_ip,
@@ -88,8 +88,9 @@ class PspingBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     expected_histogram_metadata = expected_metadata.copy()
     expected_histogram_metadata['histogram'] = histogram
 
-    expected_samples.append(sample.Sample('latency:histogram', 0, 'ms',
-                                          expected_histogram_metadata))
+    expected_samples.append(
+        sample.Sample('latency:histogram', 0, 'ms', expected_histogram_metadata)
+    )
 
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
 

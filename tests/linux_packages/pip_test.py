@@ -4,35 +4,41 @@ from typing import Dict, List
 import unittest
 from absl.testing import parameterized
 import mock
-
 from perfkitbenchmarker.linux_packages import pip
 from perfkitbenchmarker.linux_packages import python
 from tests import pkb_common_test_case
-
 import requests
 
 # executed remote commands
 NEED_PIP_27 = [
-    ('curl https://bootstrap.pypa.io/pip/2.7/get-pip.py -o get_pip.py && '
-     'sudo python get_pip.py'),
+    (
+        'curl https://bootstrap.pypa.io/pip/2.7/get-pip.py -o get_pip.py && '
+        'sudo python get_pip.py'
+    ),
     'pip --version',
-    'mkdir -p /opt/pkb && pip freeze | tee /opt/pkb/requirements.txt'
+    'mkdir -p /opt/pkb && pip freeze | tee /opt/pkb/requirements.txt',
 ]
 NEED_PIP_38 = [
-    ('curl https://bootstrap.pypa.io/pip/get-pip.py -o get_pip.py && '
-     'sudo python3 get_pip.py'),
+    (
+        'curl https://bootstrap.pypa.io/pip/get-pip.py -o get_pip.py && '
+        'sudo python3 get_pip.py'
+    ),
     'pip3 --version',
-    'mkdir -p /opt/pkb && pip3 freeze | tee /opt/pkb/requirements.txt'
+    'mkdir -p /opt/pkb && pip3 freeze | tee /opt/pkb/requirements.txt',
 ]
 EXISTING_PIP_27 = [
-    'echo \'exec python -m pip "$@"\'| sudo tee /usr/bin/pip && '
-    'sudo chmod 755 /usr/bin/pip',
+    (
+        'echo \'exec python -m pip "$@"\'| sudo tee /usr/bin/pip && '
+        'sudo chmod 755 /usr/bin/pip'
+    ),
     'pip --version',
     'mkdir -p /opt/pkb && pip freeze | tee /opt/pkb/requirements.txt',
 ]
 EXISTING_PIP_38 = [
-    'echo \'exec python3 -m pip "$@"\'| sudo tee /usr/bin/pip3 && '
-    'sudo chmod 755 /usr/bin/pip3',
+    (
+        'echo \'exec python3 -m pip "$@"\'| sudo tee /usr/bin/pip3 && '
+        'sudo chmod 755 /usr/bin/pip3'
+    ),
     'pip3 --version',
     'mkdir -p /opt/pkb && pip3 freeze | tee /opt/pkb/requirements.txt',
 ]
@@ -60,22 +66,27 @@ class PipTest(pkb_common_test_case.PkbCommonTestCase):
       ('existing_pip_38', True, '3.8', EXISTING_PIP_38, PYTHON_38_KWARGS),
   )
   @mock.patch.object(requests, 'get', side_effect=VERSIONED_PYPI_RESPONSES.get)
-  def testInstall(self,
-                  already_has_pip: bool,
-                  python_version: str,
-                  expected_commands: List[str],
-                  install_kwargs: Dict[str, str],
-                  requests_get: mock.Mock):
+  def testInstall(
+      self,
+      already_has_pip: bool,
+      python_version: str,
+      expected_commands: List[str],
+      install_kwargs: Dict[str, str],
+      requests_get: mock.Mock,
+  ):
     self.enter_context(
         mock.patch.object(
-            python, 'GetPythonVersion', return_value=python_version))
+            python, 'GetPythonVersion', return_value=python_version
+        )
+    )
     vm = mock.Mock()
     vm.TryRemoteCommand.return_value = already_has_pip
 
     pip.Install(vm, **install_kwargs)
 
     vm.RemoteCommand.assert_has_calls(
-        [mock.call(cmd) for cmd in expected_commands])
+        [mock.call(cmd) for cmd in expected_commands]
+    )
 
     if not already_has_pip:
       requests_get.assert_called_once()

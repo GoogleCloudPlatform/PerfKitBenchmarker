@@ -18,6 +18,7 @@ import threading
 
 
 class _ThreadData(threading.local):
+
   def __init__(self):
     self.benchmark_spec = None
 

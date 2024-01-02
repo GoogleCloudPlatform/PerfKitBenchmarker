@@ -51,7 +51,8 @@ class HadoopVersionsTest(pkb_common_test_case.PkbCommonTestCase):
   def testDefaultHadoopVersion(self, mock_requests):
     mock_requests.get(
         'https://downloads.apache.org/hadoop/common/stable',
-        text=HADOOP_STABLE_DIR)
+        text=HADOOP_STABLE_DIR,
+    )
     for _ in range(5):
       observed = hadoop.HadoopVersion()
       self.assertEqual(version.Version('3.3.3'), observed)
@@ -61,21 +62,25 @@ class HadoopVersionsTest(pkb_common_test_case.PkbCommonTestCase):
   @requests_mock.Mocker()
   def testHadoopVersionConnectionError(self, mock_requests):
     mock_requests.get(
-        'https://downloads.apache.org/hadoop/common/stable', status_code=404)
+        'https://downloads.apache.org/hadoop/common/stable', status_code=404
+    )
     with self.assertRaisesRegex(
         errors.Setup.MissingExecutableError,
-        'Could not load https://downloads.apache.org/hadoop/common/stable'):
+        'Could not load https://downloads.apache.org/hadoop/common/stable',
+    ):
       hadoop.HadoopVersion()
 
   @requests_mock.Mocker()
   def testHadoopVersionParsingError(self, mock_requests):
     mock_requests.get(
         'https://downloads.apache.org/hadoop/common/stable',
-        text='<html><body><a href="foo">bar</a></body></html>')
+        text='<html><body><a href="foo">bar</a></body></html>',
+    )
     with self.assertRaisesRegex(
         errors.Setup.MissingExecutableError,
         'Could not find valid hadoop version at '
-        'https://downloads.apache.org/hadoop/common/stable'):
+        'https://downloads.apache.org/hadoop/common/stable',
+    ):
       hadoop.HadoopVersion()
 
   @requests_mock.Mocker()
@@ -91,6 +96,7 @@ class HadoopVersionsTest(pkb_common_test_case.PkbCommonTestCase):
     observed = hadoop.HadoopVersion()
     self.assertFalse(mock_requests.called)
     self.assertEqual(version.Version('4.2.0'), observed)
+
 
 if __name__ == '__main__':
   unittest.main()

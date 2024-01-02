@@ -52,11 +52,13 @@ def _ReadTestDataFile(filename):
 
 class AwsRelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   """Class that tests the creation of an AwsRelationalDbSpec."""
+
   pass
 
 
 class AwsRelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   """Class that tests the flags defined in AwsRelationalDb."""
+
   pass
 
 
@@ -72,10 +74,10 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     """A context manager that patches a few critical objects with mocks."""
     retval = (stdout, stderr, return_code)
     with mock.patch(
-        vm_util.__name__ + '.IssueCommand',
-        return_value=retval) as issue_command, mock.patch(
-            builtins.__name__ + '.open'), mock.patch(vm_util.__name__ +
-                                                     '.NamedTemporaryFile'):
+        vm_util.__name__ + '.IssueCommand', return_value=retval
+    ) as issue_command, mock.patch(builtins.__name__ + '.open'), mock.patch(
+        vm_util.__name__ + '.NamedTemporaryFile'
+    ):
       yield issue_command
 
   def VmGroupSpec(self):
@@ -84,41 +86,30 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
             'vm_spec': {
                 'GCP': {
                     'zone': 'us-central1-c',
-                    'machine_type': 'n1-standard-1'
+                    'machine_type': 'n1-standard-1',
                 }
             },
-            'disk_spec': {
-                'GCP': {
-                    'disk_size': 500,
-                    'disk_type': 'pd-ssd'
-                }
-            }
+            'disk_spec': {'GCP': {'disk_size': 500, 'disk_type': 'pd-ssd'}},
         },
         'servers': {
             'vm_spec': {
                 'GCP': {
                     'zone': 'us-central1-c',
-                    'machine_type': 'n1-standard-1'
+                    'machine_type': 'n1-standard-1',
                 }
             },
-            'disk_spec': {
-                'GCP': {
-                    'disk_size': 500,
-                    'disk_type': 'pd-ssd'
-                }
-            }
-        }
+            'disk_spec': {'GCP': {'disk_size': 500, 'disk_type': 'pd-ssd'}},
+        },
     }
 
   def CreateMockSpec(self, additional_spec_items=None):
     default_server_db_disk_spec = aws_disk.AwsDiskSpec(
-        _COMPONENT, disk_size=5, disk_type=aws_disk.IO1, iops=1000)
+        _COMPONENT, disk_size=5, disk_type=aws_disk.IO1, iops=1000
+    )
 
     default_server_db_spec = virtual_machine.BaseVmSpec(
-        'NAME', **{
-            'machine_type': 'db.t1.micro',
-            'zone': 'us-west-2b'
-        })
+        'NAME', **{'machine_type': 'db.t1.micro', 'zone': 'us-west-2b'}
+    )
     spec_dict = {
         'engine': MYSQL,
         'engine_version': '5.7.11',
@@ -187,9 +178,11 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     command_string = self.Create()
 
     self.assertTrue(
-        command_string.startswith('%s rds create-db-instance' % _AWS_PREFIX))
-    self.assertIn('--db-instance-identifier=pkb-db-instance-123',
-                  command_string)
+        command_string.startswith('%s rds create-db-instance' % _AWS_PREFIX)
+    )
+    self.assertIn(
+        '--db-instance-identifier=pkb-db-instance-123', command_string
+    )
     self.assertIn('--db-instance-class=db.t1.micro', command_string)
     self.assertIn('--engine=mysql', command_string)
     self.assertIn('--master-user-password=fakepassword', command_string)
@@ -203,10 +196,8 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def CreateAuroraMockSpec(self, additional_spec_items=None):
     default_server_db_spec = virtual_machine.BaseVmSpec(
-        'NAME', **{
-            'machine_type': 'db.t1.micro',
-            'zone': 'us-west-2b'
-        })
+        'NAME', **{'machine_type': 'db.t1.micro', 'zone': 'us-west-2b'}
+    )
 
     spec_dict = {
         'engine': AURORA_POSTGRES,
@@ -303,9 +294,9 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testDiskWithoutIops(self):
     spec_dict = {
-        'db_disk_spec':
-            aws_disk.AwsDiskSpec(
-                _COMPONENT, disk_size=5, disk_type=aws_disk.GP2)
+        'db_disk_spec': aws_disk.AwsDiskSpec(
+            _COMPONENT, disk_size=5, disk_type=aws_disk.GP2
+        )
     }
     command_string = self.Create(spec_dict)
 
@@ -350,7 +341,8 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
       self.assertEqual(
           'pkb-db-instance-a4499926.cqxeajwjbqne.us-west-2.rds.amazonaws.com',
-          db.endpoint)
+          db.endpoint,
+      )
 
   def testDelete(self):
     with self._PatchCriticalObjects() as issue_command:
@@ -361,8 +353,9 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertIn('aws --output json rds delete-db-instance', command_string)
-      self.assertIn('--db-instance-identifier=pkb-db-instance-123',
-                    command_string)
+      self.assertIn(
+          '--db-instance-identifier=pkb-db-instance-123', command_string
+      )
       self.assertIn('--skip-final-snapshot', command_string)
 
   def testCreateUnmanagedDb(self):

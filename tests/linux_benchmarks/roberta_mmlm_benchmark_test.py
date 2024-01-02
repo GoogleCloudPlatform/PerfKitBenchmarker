@@ -15,26 +15,28 @@
 import os
 import unittest
 import mock
-
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import roberta_mmlm_benchmark
 from perfkitbenchmarker.sample import Sample
 
 
-class RobertaMmlmBenchmarkTestCase(unittest.TestCase,
-                                   test_util.SamplesTestMixin):
+class RobertaMmlmBenchmarkTestCase(
+    unittest.TestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super(RobertaMmlmBenchmarkTestCase, self).setUp()
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'roberta_mmlm_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '..', 'data', 'roberta_mmlm_output.txt'
+    )
     with open(path) as fp:
       self.contents = fp.read()
 
   @mock.patch('time.time', mock.MagicMock(return_value=1550279509.59))
   def testTrainResults(self):
     samples = roberta_mmlm_benchmark.MakeSamplesFromOutput(
-        {'num_accelerators': 16}, self.contents)
+        {'num_accelerators': 16}, self.contents
+    )
     self.assertEqual(436, len(samples))
     golden = Sample(
         metric='wps',
@@ -61,7 +63,8 @@ class RobertaMmlmBenchmarkTestCase(unittest.TestCase,
             'wall': '28',
             'train_wall': '27',
         },
-        timestamp=1550279509.59)
+        timestamp=1550279509.59,
+    )
     print(samples[0])
     print(golden)
     self.assertEqual(golden, samples[0])

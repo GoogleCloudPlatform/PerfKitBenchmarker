@@ -51,16 +51,22 @@ class AwsDax(resource.BaseResource):
     self.subnet_id = network.subnet.id
     self.account = util.GetAccount()
     self.iam_role = aws_iam_role.AwsIamRole(
-        self.account, _DAX_ROLE_NAME_TEMPLATE.format(uid=self.benchmark_uid),
-        _DAX_POLICY_NAME_TEMPLATE.format(uid=self.benchmark_uid), _DAX_SERVICE,
+        self.account,
+        _DAX_ROLE_NAME_TEMPLATE.format(uid=self.benchmark_uid),
+        _DAX_POLICY_NAME_TEMPLATE.format(uid=self.benchmark_uid),
+        _DAX_SERVICE,
         _DAX_ACTION,
         _DYNAMODB_RESOURCE_TEMPLATE.format(
-            region=self.region, account=self.account))
+            region=self.region, account=self.account
+        ),
+    )
     self.cluster_endpoint = None
     self.subnet_group_name = _DAX_SUBNET_GROUP_TEMPLATE.format(
-        uid=self.benchmark_uid)
+        uid=self.benchmark_uid
+    )
     self.cluster_name = _DAX_CLUSTER_NAME_TEMPLATE.format(
-        uid=self.benchmark_uid)
+        uid=self.benchmark_uid
+    )
 
   def _CreateDependencies(self):
     """See base class.
@@ -70,8 +76,12 @@ class AwsDax(resource.BaseResource):
 
     self.iam_role.Create()
     cmd = util.AWS_PREFIX + [
-        'dax', 'create-subnet-group', '--subnet-group-name',
-        self.subnet_group_name, '--subnet-ids', self.subnet_id
+        'dax',
+        'create-subnet-group',
+        '--subnet-group-name',
+        self.subnet_group_name,
+        '--subnet-ids',
+        self.subnet_id,
     ]
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
@@ -81,11 +91,22 @@ class AwsDax(resource.BaseResource):
   def _Create(self):
     """See base class."""
     cmd = util.AWS_PREFIX + [
-        'dax', 'create-cluster', '--cluster-name', self.cluster_name,
-        '--node-type', FLAGS.aws_dax_node_type, '--replication-factor',
-        str(FLAGS.aws_dax_replication_factor), '--iam-role-arn',
-        self.iam_role.GetRoleArn(), '--subnet-group', self.subnet_group_name,
-        '--sse-specification', 'Enabled=true', '--region', self.region
+        'dax',
+        'create-cluster',
+        '--cluster-name',
+        self.cluster_name,
+        '--node-type',
+        FLAGS.aws_dax_node_type,
+        '--replication-factor',
+        str(FLAGS.aws_dax_replication_factor),
+        '--iam-role-arn',
+        self.iam_role.GetRoleArn(),
+        '--subnet-group',
+        self.subnet_group_name,
+        '--sse-specification',
+        'Enabled=true',
+        '--region',
+        self.region,
     ]
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
@@ -95,8 +116,10 @@ class AwsDax(resource.BaseResource):
   def _DeleteDependencies(self):
     """See base class."""
     cmd = util.AWS_PREFIX + [
-        'dax', 'delete-subnet-group', '--subnet-group-name',
-        self.subnet_group_name
+        'dax',
+        'delete-subnet-group',
+        '--subnet-group-name',
+        self.subnet_group_name,
     ]
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
@@ -108,7 +131,10 @@ class AwsDax(resource.BaseResource):
   def _Delete(self):
     """See base class."""
     cmd = util.AWS_PREFIX + [
-        'dax', 'delete-cluster', '--cluster-name', self.cluster_name
+        'dax',
+        'delete-cluster',
+        '--cluster-name',
+        self.cluster_name,
     ]
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
@@ -117,7 +143,10 @@ class AwsDax(resource.BaseResource):
   def _Exists(self):
     """See base class."""
     cmd = util.AWS_PREFIX + [
-        'dax', 'describe-clusters', '--cluster-names', self.cluster_name
+        'dax',
+        'describe-clusters',
+        '--cluster-names',
+        self.cluster_name,
     ]
     _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     return not retcode
@@ -129,7 +158,10 @@ class AwsDax(resource.BaseResource):
       True if the DAX cluster is ready.
     """
     cmd = util.AWS_PREFIX + [
-        'dax', 'describe-clusters', '--cluster-names', self.cluster_name
+        'dax',
+        'describe-clusters',
+        '--cluster-names',
+        self.cluster_name,
     ]
 
     stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
@@ -142,8 +174,9 @@ class AwsDax(resource.BaseResource):
 
     if status == _DAX_STATUS_AVAILABLE and not self.cluster_endpoint:
       endpoint = result['Clusters'][0]['ClusterDiscoveryEndpoint']
-      self.cluster_endpoint = '{}:{}'.format(endpoint['Address'],
-                                             endpoint['Port'])
+      self.cluster_endpoint = '{}:{}'.format(
+          endpoint['Address'], endpoint['Port']
+      )
     return status == _DAX_STATUS_AVAILABLE
 
   def _PostCreate(self):
@@ -154,9 +187,14 @@ class AwsDax(resource.BaseResource):
     for security_group in self.vpc.GetSecurityGroups():
       if security_group['GroupName'] == 'default':
         cmd = util.AWS_PREFIX + [
-            'ec2', 'authorize-security-group-ingress', '--group-id',
-            security_group['GroupId'], '--protocol', 'tcp', '--port',
-            str(_DAX_TCP_PORT)
+            'ec2',
+            'authorize-security-group-ingress',
+            '--group-id',
+            security_group['GroupId'],
+            '--protocol',
+            'tcp',
+            '--port',
+            str(_DAX_TCP_PORT),
         ]
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
@@ -167,5 +205,6 @@ class AwsDax(resource.BaseResource):
     """Returns the DAX cluster's endpoint."""
     if not self._IsReady():
       raise errors.Benchmarks.PrepareException(
-          'GetEndpoint when preparing dax cluster: cluster not ready yet.')
+          'GetEndpoint when preparing dax cluster: cluster not ready yet.'
+      )
     return self.cluster_endpoint

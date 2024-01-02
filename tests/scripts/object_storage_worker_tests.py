@@ -20,7 +20,6 @@ import time
 import unittest
 
 import mock
-
 from perfkitbenchmarker.scripts.object_storage_api_test_scripts import object_storage_api_tests
 
 
@@ -62,13 +61,11 @@ class TestMaxSizeInDistribution(unittest.TestCase):
     dist = {10: 100.0}
     dist[10] = 100.0
 
-    self.assertEqual(object_storage_api_tests.MaxSizeInDistribution(dist),
-                     10)
+    self.assertEqual(object_storage_api_tests.MaxSizeInDistribution(dist), 10)
 
   def testTwoElementDistribution(self):
     dist = {1: 50.0, 10: 50.0}
-    self.assertEqual(object_storage_api_tests.MaxSizeInDistribution(dist),
-                     10)
+    self.assertEqual(object_storage_api_tests.MaxSizeInDistribution(dist), 10)
 
 
 class TestIterators(unittest.TestCase):
@@ -80,20 +77,21 @@ class TestIterators(unittest.TestCase):
 
   def testPrefixTimestampSuffixIterator(self):
     iterator = object_storage_api_tests.PrefixTimestampSuffixIterator(
-        'foo', 'bar')
-    with mock.patch(time.__name__ + '.time',
-                    side_effect=[0, 1, 2]):
+        'foo', 'bar'
+    )
+    with mock.patch(time.__name__ + '.time', side_effect=[0, 1, 2]):
       values = list(itertools.islice(iterator, 3))
-    self.assertEqual(values, ['foo_0.000000_bar',
-                              'foo_1.000000_bar',
-                              'foo_2.000000_bar'])
+    self.assertEqual(
+        values, ['foo_0.000000_bar', 'foo_1.000000_bar', 'foo_2.000000_bar']
+    )
 
   def testPrefixHashCountIterator(self):
     iterator = object_storage_api_tests.PrefixHashCountIterator('foo')
     values = list(itertools.islice(iterator, 3))
     self.assertEqual(
-        values,
-        ['857db8c1dd/foo_0', 'a231267a73/foo_1', '538eec728d/foo_2'])
+        values, ['857db8c1dd/foo_0', 'a231267a73/foo_1', '538eec728d/foo_2']
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

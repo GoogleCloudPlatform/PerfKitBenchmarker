@@ -31,22 +31,35 @@ CREATE_RES = {'VpcEndpoint': {'VpcEndpointId': ENDPOINT_ID}}
 DELETE_RES = {'Unsuccessful': []}
 
 QUERY_ENDPOINTS_CMD = [
-    'describe-vpc-endpoints', '--filters',
+    'describe-vpc-endpoints',
+    '--filters',
     'Name=service-name,Values={}'.format(FULL_SERVICE_NAME),
-    'Name=vpc-id,Values={}'.format(VPC_ID), '--query',
-    'VpcEndpoints[].VpcEndpointId'
+    'Name=vpc-id,Values={}'.format(VPC_ID),
+    '--query',
+    'VpcEndpoints[].VpcEndpointId',
 ]
 DESCRIBE_ROUTES_CMD = [
-    'describe-route-tables', '--filters',
-    'Name=vpc-id,Values={}'.format(VPC_ID), '--query',
-    'RouteTables[].RouteTableId'
+    'describe-route-tables',
+    '--filters',
+    'Name=vpc-id,Values={}'.format(VPC_ID),
+    '--query',
+    'RouteTables[].RouteTableId',
 ]
 CREATE_ENDPOINT_CMD = [
-    'create-vpc-endpoint', '--vpc-endpoint-type', 'Gateway', '--vpc-id', VPC_ID,
-    '--service-name', FULL_SERVICE_NAME, '--route-table-ids', ROUTE_TABLE_ID
+    'create-vpc-endpoint',
+    '--vpc-endpoint-type',
+    'Gateway',
+    '--vpc-id',
+    VPC_ID,
+    '--service-name',
+    FULL_SERVICE_NAME,
+    '--route-table-ids',
+    ROUTE_TABLE_ID,
 ]
 DELETE_ENDPOINT_CMD = [
-    'delete-vpc-endpoints', '--vpc-endpoint-ids', ENDPOINT_ID
+    'delete-vpc-endpoints',
+    '--vpc-endpoint-ids',
+    ENDPOINT_ID,
 ]
 
 
@@ -57,7 +70,8 @@ class AwsVpcS3EndpointTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_vpc = mock.Mock()
     self.mock_vpc.region = REGION
     self.mock_run_cmd = self.enter_context(
-        mock.patch.object(aws_vpc_endpoint.AwsVpcS3Endpoint, '_RunCommand'))
+        mock.patch.object(aws_vpc_endpoint.AwsVpcS3Endpoint, '_RunCommand')
+    )
 
   def _InitEndpoint(self, vpc_id):
     self.mock_vpc.id = vpc_id

@@ -18,6 +18,5 @@ from perfkitbenchmarker import provider_info
 
 
 class AzureProviderInfo(provider_info.BaseProviderInfo):
-
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
   CLOUD = provider_info.AZURE

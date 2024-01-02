@@ -17,7 +17,6 @@ import unittest
 from absl import flags
 from absl.testing import parameterized
 import mock
-
 from perfkitbenchmarker.linux_packages import gce_hpc_tools
 from tests import pkb_common_test_case
 
@@ -49,8 +48,10 @@ class GcpHpcToolsTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testMetadataRecorded(self):
     vm = _YumInstall()
-    hpc_tools_tuning_str = ('hpcprofile,limits,nofirewalld,nomitigation,'
-                            'noselinux,nosmt,reboot,tcpmem')
+    hpc_tools_tuning_str = (
+        'hpcprofile,limits,nofirewalld,nomitigation,'
+        'noselinux,nosmt,reboot,tcpmem'
+    )
     expected_metadata = {
         'hpc_tools': True,
         'hpc_tools_tag': 'head',
@@ -71,10 +72,13 @@ class GcpHpcToolsTest(pkb_common_test_case.PkbCommonTestCase):
   def testBashCommandCalled(self):
     vm = _YumInstall()
     base_command = 'cd /tmp/pkb/hpc-tools; sudo bash mpi-tuning.sh'
-    command_flags = ('--hpcprofile --limits --nofirewalld --nomitigation '
-                     '--noselinux --nosmt --reboot --tcpmem')
+    command_flags = (
+        '--hpcprofile --limits --nofirewalld --nomitigation '
+        '--noselinux --nosmt --reboot --tcpmem'
+    )
     vm.RemoteCommand.assert_called_with(
-        f'{base_command} {command_flags}', ignore_failure=True)
+        f'{base_command} {command_flags}', ignore_failure=True
+    )
 
 
 if __name__ == '__main__':

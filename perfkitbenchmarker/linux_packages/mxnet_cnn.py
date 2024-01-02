@@ -13,20 +13,24 @@
 # limitations under the License.
 """Module containing MXNet CNN installation and cleanup functions."""
 from absl import flags
+
 FLAGS = flags.FLAGS
 MXNET_GIT = 'https://github.com/apache/incubator-mxnet.git'
 
-flags.DEFINE_string('mxnet_commit_hash',
-                    '2700ddbbeef212879802f7f0c0812192ec5c2b77',
-                    'git commit hash of desired mxnet commit.')
+flags.DEFINE_string(
+    'mxnet_commit_hash',
+    '2700ddbbeef212879802f7f0c0812192ec5c2b77',
+    'git commit hash of desired mxnet commit.',
+)
 
 
 def Install(vm):
   """Installs MXNet on the VM."""
   vm.InstallPackages('git')
   vm.RemoteCommand('git clone %s' % MXNET_GIT)
-  vm.RemoteCommand('cd incubator-mxnet && git checkout %s' %
-                   FLAGS.mxnet_commit_hash)
+  vm.RemoteCommand(
+      'cd incubator-mxnet && git checkout %s' % FLAGS.mxnet_commit_hash
+  )
 
 
 def Uninstall(vm):

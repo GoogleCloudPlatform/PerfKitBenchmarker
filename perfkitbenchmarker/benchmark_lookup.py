@@ -44,5 +44,6 @@ def BenchmarkModule(benchmark_name):
   """
   if not _global_benchmark_module_function:
     raise errors.Setup.InvalidSetupError(
-        'Cannot call benchmark_lookup.py; Was SetUpPKB called?')
+        'Cannot call benchmark_lookup.py; Was SetUpPKB called?'
+    )
   return _global_benchmark_module_function(benchmark_name)

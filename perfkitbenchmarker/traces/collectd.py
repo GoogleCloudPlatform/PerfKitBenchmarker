@@ -26,8 +26,9 @@ from perfkitbenchmarker import stages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import collectd
 
-flags.DEFINE_boolean('collectd', False,
-                     'Install and run collectd on the guest.')
+flags.DEFINE_boolean(
+    'collectd', False, 'Install and run collectd on the guest.'
+)
 flags.DEFINE_string('collectd_output', None, 'Path to store collectd results.')
 
 
@@ -51,7 +52,7 @@ class _CollectdCollector(object):
 
     Args:
       benchmark_spec: benchmark_spec.BenchmarkSpec. The benchmark currently
-          running.
+        running.
     """
     logging.info('Installing collectd')
     vms = benchmark_spec.vms
@@ -62,7 +63,7 @@ class _CollectdCollector(object):
 
     Args:
       benchmark_spec: benchmark_spec.BenchmarkSpec. The benchmark that stopped
-          running.
+        running.
     """
     logging.info('Stopping collectd')
     vms = benchmark_spec.vms
@@ -78,8 +79,9 @@ def Register(parsed_flags):
 
   output_directory = parsed_flags.collectd_output or vm_util.GetTempDir()
   if not os.path.isdir(output_directory):
-    raise IOError('collectd output directory does not exist: {0}'.format(
-        output_directory))
+    raise IOError(
+        'collectd output directory does not exist: {0}'.format(output_directory)
+    )
   collector = _CollectdCollector(output_directory)
   events.before_phase.connect(collector.Before, stages.RUN, weak=False)
   events.after_phase.connect(collector.After, stages.RUN, weak=False)

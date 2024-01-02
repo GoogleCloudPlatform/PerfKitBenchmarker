@@ -24,14 +24,13 @@ class AWSSQSClientTest(pkb_common_test_case.PkbCommonTestCase):
     aws_client.publish_message(message)
 
     # assert publish was called
-    resource_mock.return_value.get_queue_by_name(
-    ).send_message.assert_called_with(MessageBody=message)
+    resource_mock.return_value.get_queue_by_name().send_message.assert_called_with(
+        MessageBody=message
+    )
 
   def testPullMessage(self, client_mock, resource_mock):
     client_mock.return_value.receive_message.return_value = {
-        'Messages': [{
-            'ReceiptHandle': 'MockedReceipt'
-        }]
+        'Messages': [{'ReceiptHandle': 'MockedReceipt'}]
     }
     aws_client = aws_sqs_client.AwsSqsClient(REGION_NAME, QUEUE_NAME)
     aws_client.pull_message()
@@ -39,9 +38,8 @@ class AWSSQSClientTest(pkb_common_test_case.PkbCommonTestCase):
 
     # assert pull was called
     client_mock.return_value.receive_message.assert_called_with(
-        QueueUrl=queue_url,
-        MaxNumberOfMessages=1,
-        WaitTimeSeconds=TIMEOUT)
+        QueueUrl=queue_url, MaxNumberOfMessages=1, WaitTimeSeconds=TIMEOUT
+    )
 
   def testAcknowledgeReceivedMessage(self, client_mock, resource_mock):
     response = {'ReceiptHandle': 'MockedReceipt'}
@@ -52,7 +50,9 @@ class AWSSQSClientTest(pkb_common_test_case.PkbCommonTestCase):
 
     # assert acknowledge was called
     client_mock.return_value.delete_message.assert_called_with(
-        QueueUrl=queue_url, ReceiptHandle='MockedReceipt')
+        QueueUrl=queue_url, ReceiptHandle='MockedReceipt'
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

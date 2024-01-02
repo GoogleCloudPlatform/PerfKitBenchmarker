@@ -1,9 +1,9 @@
 """Tests for suspend_resume_benchmark."""
+
 import itertools
 import time
 import unittest
 from absl.testing import parameterized
-
 import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
@@ -30,18 +30,21 @@ def create_mock_vm(
   return vm
 
 
-class SuspendResumeBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
-                                 test_util.SamplesTestMixin):
+class SuspendResumeBenchmarkTest(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super(SuspendResumeBenchmarkTest, self).setUp()
     time.time()
     self.enter_context(
-        mock.patch.object(time, 'time', side_effect=itertools.cycle([0, 52])))
+        mock.patch.object(time, 'time', side_effect=itertools.cycle([0, 52]))
+    )
 
   @parameterized.named_parameters(
       dict(testcase_name='get_time_to_suspend', operation='Suspend'),
-      dict(testcase_name='get_time_to_resume', operation='Resume'))
+      dict(testcase_name='get_time_to_resume', operation='Resume'),
+  )
   def testMeasureOperation(self, operation: str):
     """Unit test for Suspend and Resume functions."""
     num_vms = 3
@@ -51,7 +54,8 @@ class SuspendResumeBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
 
     # Call suspend function on mock vms - generates actual samples for the test.
     actual_samples = getattr(suspend_resume_benchmark, f'GetTimeTo{operation}')(
-        vms_to_test)
+        vms_to_test
+    )
 
     # Create expected samples from mock vms.
     expected_times = [50, 51, 52]
@@ -65,23 +69,34 @@ class SuspendResumeBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
 
     for i in range(num_vms):
       expected_samples.append(
-          sample.Sample(f'{operation} Time', expected_times[i], 'seconds', {
-              'machine_instance': i,
-              'num_vms': num_vms,
-              'os_type': f'linux{i}',
-          }))
+          sample.Sample(
+              f'{operation} Time',
+              expected_times[i],
+              'seconds',
+              {
+                  'machine_instance': i,
+                  'num_vms': num_vms,
+                  'os_type': f'linux{i}',
+              },
+          )
+      )
 
     expected_samples.append(
-        sample.Sample(f'Cluster {operation} Time', expected_cluster_time,
-                      'seconds', expected_cluster_metadata))
+        sample.Sample(
+            f'Cluster {operation} Time',
+            expected_cluster_time,
+            'seconds',
+            expected_cluster_metadata,
+        )
+    )
 
     # Assert Suspend() function is called on vms.
     for vm in vms_to_test:
       getattr(vm, f'{operation}').assert_called()
 
     # Assert actual and expected samples are equal.
-    self.assertSampleListsEqualUpToTimestamp(actual_samples,
-                                             expected_samples)
+    self.assertSampleListsEqualUpToTimestamp(actual_samples, expected_samples)
+
 
 if __name__ == '__main__':
   unittest.main()

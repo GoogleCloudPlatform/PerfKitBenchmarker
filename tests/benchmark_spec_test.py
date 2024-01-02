@@ -131,11 +131,13 @@ class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
 
   def testSimpleConfig(self):
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        yaml_string=_SIMPLE_EDW_CONFIG, benchmark_name='edw_benchmark')
+        yaml_string=_SIMPLE_EDW_CONFIG, benchmark_name='edw_benchmark'
+    )
     spec.ConstructEdwService()
     self.assertEqual('snowflake_aws', spec.edw_service.SERVICE_TYPE)
-    self.assertIsInstance(spec.edw_service,
-                          providers.aws.snowflake_aws.Snowflake)
+    self.assertIsInstance(
+        spec.edw_service, providers.aws.snowflake_aws.Snowflake
+    )
 
 
 class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
@@ -155,14 +157,16 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
         create_on_restore_error: True
     """)
     self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        yaml_string=test_spec, benchmark_name='cloud_spanner_ycsb')
+        yaml_string=test_spec, benchmark_name='cloud_spanner_ycsb'
+    )
 
   @flagsaver.flagsaver(run_uri='test_uri')
   def testInitialization(self):
     self.test_bm_spec.ConstructRelationalDb()
     spanner_instance = self.test_bm_spec.relational_db
-    self.assertIsInstance(spanner_instance,
-                          gcp_spanner.GoogleSqlGcpSpannerInstance)
+    self.assertIsInstance(
+        spanner_instance, gcp_spanner.GoogleSqlGcpSpannerInstance
+    )
     self.assertTrue(spanner_instance.enable_freeze_restore)
     self.assertTrue(spanner_instance.delete_on_freeze_error)
     self.assertTrue(spanner_instance.create_on_restore_error)
@@ -180,18 +184,22 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
         engine: spanner-googlesql
     """)
     self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        yaml_string=test_spec, benchmark_name='cloud_spanner_ycsb')
+        yaml_string=test_spec, benchmark_name='cloud_spanner_ycsb'
+    )
 
     self.test_bm_spec.ConstructRelationalDb()
     spanner_instance = self.test_bm_spec.relational_db
-    self.assertIsInstance(spanner_instance,
-                          gcp_spanner.GoogleSqlGcpSpannerInstance)
+    self.assertIsInstance(
+        spanner_instance, gcp_spanner.GoogleSqlGcpSpannerInstance
+    )
     self.assertEqual(spanner_instance.instance_id, 'pkb-instance-test_uri')
     self.assertEqual(spanner_instance.database, 'pkb-database-test_uri')
-    self.assertEqual(spanner_instance._description,
-                     gcp_spanner._DEFAULT_DESCRIPTION)
-    self.assertEqual(spanner_instance._config,
-                     f'regional-{gcp_spanner._DEFAULT_REGION}')
+    self.assertEqual(
+        spanner_instance._description, gcp_spanner._DEFAULT_DESCRIPTION
+    )
+    self.assertEqual(
+        spanner_instance._config, f'regional-{gcp_spanner._DEFAULT_REGION}'
+    )
     self.assertEqual(spanner_instance.nodes, gcp_spanner._DEFAULT_NODES)
     self.assertFalse(spanner_instance.user_managed)
 
@@ -204,8 +212,12 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
         engine: spanner-googlesql
     """)
     # Set up the restore spec Spanner instance
-    self.test_bm_spec.restore_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        yaml_string=restore_spanner_spec, benchmark_name='cloud_spanner_ycsb')
+    self.test_bm_spec.restore_spec = (
+        pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+            yaml_string=restore_spanner_spec,
+            benchmark_name='cloud_spanner_ycsb',
+        )
+    )
     self.test_bm_spec.restore_spec.ConstructRelationalDb()
 
     self.test_bm_spec.ConstructRelationalDb()
@@ -253,14 +265,16 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
 
   def testValidConfigWithDiskSpec(self):
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        VALID_CONFIG_WITH_DISK_SPEC)
+        VALID_CONFIG_WITH_DISK_SPEC
+    )
     spec.ConstructVirtualMachines()
     vms = spec.vm_groups['default']
     self.assertEqual(len(vms), 2)
     for vm in vms:
       self.assertEqual(len(vm.disk_specs), 3)
-      self.assertTrue(all(disk_spec.disk_size == 75
-                          for disk_spec in vm.disk_specs))
+      self.assertTrue(
+          all(disk_spec.disk_size == 75 for disk_spec in vm.disk_specs)
+      )
 
   @flagsaver.flagsaver
   def testZoneFlag(self):
@@ -287,7 +301,8 @@ class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
 
   def createBenchmarkSpec(self, config, benchmark):
     spec = pkb_common_test_case.CreateBenchmarkSpecFromConfigDict(
-        config, benchmark)
+        config, benchmark
+    )
     spec.ConstructVirtualMachines()
     return True
 
@@ -300,8 +315,9 @@ class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
     and returns None if the benchmark isn't in either list.
     """
     FLAGS.cloud = 'Kubernetes'
-    config = configs.LoadConfig(iperf_benchmark.BENCHMARK_CONFIG, {},
-                                ALWAYS_SUPPORTED)
+    config = configs.LoadConfig(
+        iperf_benchmark.BENCHMARK_CONFIG, {}, ALWAYS_SUPPORTED
+    )
     self.assertTrue(self.createBenchmarkSpec(config, ALWAYS_SUPPORTED))
     with self.assertRaises(ValueError):
       self.createBenchmarkSpec(config, NEVER_SUPPORTED)
@@ -309,7 +325,8 @@ class BenchmarkSupportTestCase(_BenchmarkSpecTestCase):
     FLAGS.benchmark_compatibility_checking = 'permissive'
     self.assertTrue(
         self.createBenchmarkSpec(config, ALWAYS_SUPPORTED),
-        'benchmark is supported, mode is permissive')
+        'benchmark is supported, mode is permissive',
+    )
     with self.assertRaises(ValueError):
       self.createBenchmarkSpec(config, NEVER_SUPPORTED)
 
@@ -322,7 +339,8 @@ class RedirectGlobalFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testNoFlagOverride(self):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        NAME, flag_values=FLAGS, vm_groups={})
+        NAME, flag_values=FLAGS, vm_groups={}
+    )
     spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec, UID)
     self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
     with spec.RedirectGlobalFlags():
@@ -331,8 +349,11 @@ class RedirectGlobalFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testFlagOverride(self):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        NAME, flag_values=FLAGS, flags={'benchmark_spec_test_flag': 1},
-        vm_groups={})
+        NAME,
+        flag_values=FLAGS,
+        flags={'benchmark_spec_test_flag': 1},
+        vm_groups={},
+    )
     spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec, UID)
     self.assertEqual(FLAGS.benchmark_spec_test_flag, 0)
     with spec.RedirectGlobalFlags():

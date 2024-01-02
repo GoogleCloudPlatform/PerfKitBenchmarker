@@ -34,10 +34,12 @@ _MVN_DEPENDENCY_PLUGIN_VERSION = '3.3.0'
 _MVN_DEPENDENCY_PLUGIN = 'org.apache.maven.plugins:maven-dependency-plugin'
 _MVN_DEPENDENCY_COPY_GOAL = (
     f'{_MVN_DEPENDENCY_PLUGIN}:{_MVN_DEPENDENCY_PLUGIN_VERSION}'
-    ':copy-dependencies')
+    ':copy-dependencies'
+)
 
 _CLIENT_CONNECTOR_PROJECT_POM_TEMPLATE = (
-    'cloudbigtable/pom-cbt-client-connector.xml.j2')
+    'cloudbigtable/pom-cbt-client-connector.xml.j2'
+)
 
 
 @vm_util.Retry()
@@ -45,7 +47,8 @@ def Install(vm):
   """Installs the Cloud Bigtable YCSB HBase client connector on the VM."""
   if not CLIENT_VERSION.value:
     raise errors.Setup.InvalidFlagConfigurationError(
-        '--google_bigtable_client_version must be set')
+        '--google_bigtable_client_version must be set'
+    )
 
   # Ensure YCSB is set up as that's where we copy the artifacts to.
   vm.Install('ycsb')
@@ -61,15 +64,17 @@ def Install(vm):
   # and all its runtime dependencies the the specified folder.
   pom_template = data.ResourcePath(_CLIENT_CONNECTOR_PROJECT_POM_TEMPLATE)
   remote_pom_path = posixpath.join(
-      ycsb.YCSB_DIR,
-      os.path.basename(pom_template)[:-3])  # strip .j2 suffix
+      ycsb.YCSB_DIR, os.path.basename(pom_template)[:-3]
+  )  # strip .j2 suffix
   vm.RenderTemplate(pom_template, remote_pom_path, context)
 
-  dependency_install_dir = posixpath.join(ycsb.YCSB_DIR,
-                                          f'{FLAGS.hbase_binding}-binding',
-                                          'lib')
+  dependency_install_dir = posixpath.join(
+      ycsb.YCSB_DIR, f'{FLAGS.hbase_binding}-binding', 'lib'
+  )
   maven_args = [
-      '-f', remote_pom_path, _MVN_DEPENDENCY_COPY_GOAL,
-      f'-DoutputDirectory={dependency_install_dir}'
+      '-f',
+      remote_pom_path,
+      _MVN_DEPENDENCY_COPY_GOAL,
+      f'-DoutputDirectory={dependency_install_dir}',
   ]
   vm.RemoteCommand(maven.GetRunCommand(' '.join(maven_args)))

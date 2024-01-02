@@ -16,7 +16,6 @@
 """Module containing psping installation and cleanup functions.
 
 psping is a tool made for benchmarking Windows networking.
-
 """
 
 import json
@@ -36,17 +35,17 @@ PSPING_DIR = 'PSTools'
 PSPING_ZIP = PSPING_DIR + '.zip'
 PSPING_URL = 'https://download.sysinternals.com/files/' + PSPING_ZIP
 
-flags.DEFINE_integer('psping_packet_size', 1,
-                     'The size of the packet to test the ping with.')
+flags.DEFINE_integer(
+    'psping_packet_size', 1, 'The size of the packet to test the ping with.'
+)
 
-flags.DEFINE_integer('psping_bucket_count', 100,
-                     'For the results histogram, number of columns')
+flags.DEFINE_integer(
+    'psping_bucket_count', 100, 'For the results histogram, number of columns'
+)
 
-flags.DEFINE_integer('psping_rr_count', 1000,
-                     'The number of pings to attempt')
+flags.DEFINE_integer('psping_rr_count', 1000, 'The number of pings to attempt')
 
-flags.DEFINE_integer('psping_timeout', 10,
-                     'The time to allow psping to run')
+flags.DEFINE_integer('psping_timeout', 10, 'The time to allow psping to run')
 
 
 def Install(vm):
@@ -62,9 +61,8 @@ def StartPspingServer(vm):
   server_command = (
       'Start-Job -ScriptBlock {{'
       '{psping_exec_dir}\\psping.exe /accepteula -s 0.0.0.0:{port};'
-      '}}').format(
-          psping_exec_dir=vm.temp_dir,
-          port=TEST_PORT)
+      '}}'
+  ).format(psping_exec_dir=vm.temp_dir, port=TEST_PORT)
   vm.RemoteCommand(server_command)
 
 
@@ -91,41 +89,46 @@ def RunLatencyTest(sending_vm, receiving_vm, use_internal_ip=True):
   Returns:
     list of samples representing latency between the two VMs.
   """
-  server_ip = (receiving_vm.internal_ip if use_internal_ip
-               else receiving_vm.ip_address)
+  server_ip = (
+      receiving_vm.internal_ip if use_internal_ip else receiving_vm.ip_address
+  )
 
   client_command = (
       'cd {psping_exec_dir}; '
-      'sleep 2;'  # sleep to make sure the server starts first.
+      'sleep 2;'
       '.\\psping.exe /accepteula -l {packet_size} -i 0 -q '
       '-n {rr_count} -h {bucket_count} {ip}:{port}'
-      ' > {out_file}').format(
-          psping_exec_dir=sending_vm.temp_dir,
-          packet_size=FLAGS.psping_packet_size,
-          rr_count=FLAGS.psping_rr_count,
-          bucket_count=FLAGS.psping_bucket_count,
-          ip=server_ip,
-          port=TEST_PORT,
-          out_file=PSPING_OUTPUT_FILE)
+      ' > {out_file}'  # sleep to make sure the server starts first.
+  ).format(
+      psping_exec_dir=sending_vm.temp_dir,
+      packet_size=FLAGS.psping_packet_size,
+      rr_count=FLAGS.psping_rr_count,
+      bucket_count=FLAGS.psping_bucket_count,
+      ip=server_ip,
+      port=TEST_PORT,
+      out_file=PSPING_OUTPUT_FILE,
+  )
 
   # PSPing does not have a configurable timeout. To get around this, start the
   # server as a background job, then kill it after 10 seconds
   server_command = (
-      '{psping_exec_dir}\\psping.exe /accepteula -s 0.0.0.0:{port};').format(
-          psping_exec_dir=receiving_vm.temp_dir,
-          port=TEST_PORT)
+      '{psping_exec_dir}\\psping.exe /accepteula -s 0.0.0.0:{port};'
+  ).format(psping_exec_dir=receiving_vm.temp_dir, port=TEST_PORT)
 
-  process_args = [(_RunPsping, (receiving_vm, server_command), {}),
-                  (_RunPsping, (sending_vm, client_command), {})]
+  process_args = [
+      (_RunPsping, (receiving_vm, server_command), {}),
+      (_RunPsping, (sending_vm, client_command), {}),
+  ]
 
   background_tasks.RunParallelProcesses(process_args, 200, 1)
 
   cat_command = 'cd {psping_exec_dir}; cat {out_file}'.format(
-      psping_exec_dir=sending_vm.temp_dir,
-      out_file=PSPING_OUTPUT_FILE)
+      psping_exec_dir=sending_vm.temp_dir, out_file=PSPING_OUTPUT_FILE
+  )
 
   output, _ = sending_vm.RemoteCommand(cat_command)
   return ParsePspingResults(output, sending_vm, receiving_vm, use_internal_ip)
+
 
 # example output
 # PsPing v2.10 - PsPing - ping, latency, bandwidth measurement utility
@@ -215,9 +218,9 @@ def ParsePspingResults(results, client_vm, server_vm, internal_ip_used):
     latency = float(entry_data[0])
     count = int(entry_data[1])
 
-    histogram.append({'latency': latency,
-                      'count': count,
-                      'bucket_number': index})
+    histogram.append(
+        {'latency': latency, 'count': count, 'bucket_number': index}
+    )
 
     index += 1
 
@@ -225,6 +228,7 @@ def ParsePspingResults(results, client_vm, server_vm, internal_ip_used):
   histogram_metadata.update({'histogram': json.dumps(histogram)})
 
   samples.append(
-      sample.Sample('latency:histogram', 0, 'ms', histogram_metadata))
+      sample.Sample('latency:histogram', 0, 'ms', histogram_metadata)
+  )
 
   return samples

@@ -26,8 +26,9 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string('nccl_net_plugin', None, 'NCCL network plugin name')
 flags.DEFINE_string('nccl_mpi', '/usr/bin/mpirun', 'MPI binary path')
-flags.DEFINE_string('nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi',
-                    'MPI home')
+flags.DEFINE_string(
+    'nccl_mpi_home', '/usr/lib/x86_64-linux-gnu/openmpi', 'MPI home'
+)
 flags.DEFINE_string('nccl_home', '$HOME/nccl/build', 'NCCL home')
 
 FLAGS = flags.FLAGS
@@ -37,21 +38,28 @@ GIT_REPO = 'https://github.com/NVIDIA/nccl.git'
 
 def _Build(vm):
   """Installs the NCCL package on the VM."""
-  vm.RemoteCommand('[ -d "nccl" ] || git clone {git_repo} --branch {version}'
-                   .format(git_repo=GIT_REPO, version=FLAGS.nccl_version))
+  vm.RemoteCommand(
+      '[ -d "nccl" ] || git clone {git_repo} --branch {version}'.format(
+          git_repo=GIT_REPO, version=FLAGS.nccl_version
+      )
+  )
   cuda_home = cuda_toolkit.CUDA_HOME
   vm.InstallPackages('build-essential devscripts debhelper fakeroot')
 
   env_vars = {}
-  env_vars['PATH'] = (r'{cuda_bin_path}:$PATH'
-                      .format(cuda_bin_path=posixpath.join(cuda_home, 'bin')))
-  env_vars['CUDA_HOME'] = (r'{cuda_home}'.format(cuda_home=cuda_home))
-  env_vars['LD_LIBRARY_PATH'] = (r'{lib_path}:$LD_LIBRARY_PATH'
-                                 .format(lib_path=posixpath.join(
-                                     cuda_home, 'lib64')))
+  env_vars['PATH'] = r'{cuda_bin_path}:$PATH'.format(
+      cuda_bin_path=posixpath.join(cuda_home, 'bin')
+  )
+  env_vars['CUDA_HOME'] = r'{cuda_home}'.format(cuda_home=cuda_home)
+  env_vars['LD_LIBRARY_PATH'] = r'{lib_path}:$LD_LIBRARY_PATH'.format(
+      lib_path=posixpath.join(cuda_home, 'lib64')
+  )
 
-  vm.RemoteCommand('cd nccl && {env} make -j 20 pkg.debian.build'
-                   .format(env=vm_util.DictionaryToEnvString(env_vars)))
+  vm.RemoteCommand(
+      'cd nccl && {env} make -j 20 pkg.debian.build'.format(
+          env=vm_util.DictionaryToEnvString(env_vars)
+      )
+  )
 
 
 def AptInstall(vm):
@@ -61,17 +69,18 @@ def AptInstall(vm):
 
   vm.Install('cuda_toolkit')
   _Build(vm)
-  vm.InstallPackages('--allow-downgrades --allow-change-held-packages '
-                     '{build}libnccl2_*+cuda{cuda}_amd64.deb '
-                     '{build}libnccl-dev_*+cuda{cuda}_amd64.deb'
-                     .format(
-                         build='./nccl/build/pkg/deb/',
-                         cuda=FLAGS.cuda_toolkit_version))
+  vm.InstallPackages(
+      '--allow-downgrades --allow-change-held-packages '
+      '{build}libnccl2_*+cuda{cuda}_amd64.deb '
+      '{build}libnccl-dev_*+cuda{cuda}_amd64.deb'.format(
+          build='./nccl/build/pkg/deb/', cuda=FLAGS.cuda_toolkit_version
+      )
+  )
 
   if FLAGS.nccl_net_plugin:
     vm.RemoteCommand(
-        'echo "deb https://packages.cloud.google.com/apt google-fast-socket main" '
-        '| sudo tee /etc/apt/sources.list.d/google-fast-socket.list'
+        'echo "deb https://packages.cloud.google.com/apt google-fast-socket'
+        ' main" | sudo tee /etc/apt/sources.list.d/google-fast-socket.list'
     )
     vm.RemoteCommand(
         'curl -s -L https://packages.cloud.google.com/apt/doc/apt-key.gpg '
@@ -86,13 +95,15 @@ def AptInstall(vm):
   if FLAGS.aws_efa:
     vm.InstallPackages('libudev-dev libtool autoconf')
     vm.RemoteCommand('git clone https://github.com/aws/aws-ofi-nccl.git -b aws')
-    vm.RemoteCommand('cd aws-ofi-nccl && ./autogen.sh && ./configure '
-                     '--with-mpi={mpi} '
-                     '--with-libfabric=/opt/amazon/efa '
-                     '--with-nccl={nccl} '
-                     '--with-cuda={cuda} && sudo make && '
-                     'sudo make install'.format(
-                         mpi=FLAGS.nccl_mpi_home,
-                         nccl=FLAGS.nccl_home,
-                         cuda='/usr/local/cuda-{}'.format(
-                             FLAGS.cuda_toolkit_version)))
+    vm.RemoteCommand(
+        'cd aws-ofi-nccl && ./autogen.sh && ./configure '
+        '--with-mpi={mpi} '
+        '--with-libfabric=/opt/amazon/efa '
+        '--with-nccl={nccl} '
+        '--with-cuda={cuda} && sudo make && '
+        'sudo make install'.format(
+            mpi=FLAGS.nccl_mpi_home,
+            nccl=FLAGS.nccl_home,
+            cuda='/usr/local/cuda-{}'.format(FLAGS.cuda_toolkit_version),
+        )
+    )

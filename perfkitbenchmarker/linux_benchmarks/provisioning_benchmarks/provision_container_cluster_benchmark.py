@@ -146,6 +146,7 @@ def _BenchmarkClusterResize(
     if new_nodes:
       return new_nodes.pop()
     return ''
+
   new_node = PollForData(
       GetNode,
       poll_message='Node not found waiting...',

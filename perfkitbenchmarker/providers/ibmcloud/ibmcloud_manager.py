@@ -29,12 +29,12 @@ SPEC_PATHS = [
     'public_gateways',
     'security_groups',
     'floating_ips',
-    'network_acls'
+    'network_acls',
 ]
 PLURALS = {
     'bgpconf': 'bgpconf',
     'edgerouter': 'edgerouter',
-    'policy': 'policies'
+    'policy': 'policies',
 }
 
 API_VERSION_DATE = '2022-03-29'
@@ -66,10 +66,20 @@ class IbmCloudRequestError(Exception):
 class IbmCloud:
   """Base object that handles IBM Cloud REST api call requests."""
 
-  def __init__(self, endpoint=None, url=None, account=None, apikey=None,
-               vm_creator=False, token=None, verbose=False, version='v1',
-               silent=False, force=False, trace=False):
-
+  def __init__(
+      self,
+      endpoint=None,
+      url=None,
+      account=None,
+      apikey=None,
+      vm_creator=False,
+      token=None,
+      verbose=False,
+      version='v1',
+      silent=False,
+      force=False,
+      trace=False,
+  ):
     # For Token
     self._endpoint = endpoint or os.environ.get('IBMCLOUD_AUTH_ENDPOINT')
     self._url = url or os.environ.get('IBMCLOUD_ENDPOINT')
@@ -83,23 +93,30 @@ class IbmCloud:
     self._force = force
     self._trace = trace
     self._vm_creator = vm_creator
-    self._generation = ('version=' + API_VERSION_DATE + '&' +
-                        GENERATION +
-                        (os.environ.get('IBMCLOUD_GENERATION') or '2'))
+    self._generation = (
+        'version='
+        + API_VERSION_DATE
+        + '&'
+        + GENERATION
+        + (os.environ.get('IBMCLOUD_GENERATION') or '2')
+    )
 
     if not self._url:
       raise IbmCloudRequestError(
           'url has to specified either in the initialization of the '
-          'client or via an environment variable (\"IBMCLOUD_ENDPOINT\")')
+          'client or via an environment variable ("IBMCLOUD_ENDPOINT")'
+      )
     if not self._acct:
       raise IbmCloudRequestError(
           'acct has to specified either in the initialization of the '
-          'client or via an environment variable (\"IBMCLOUD_ACCOUNT_ID\")')
+          'client or via an environment variable ("IBMCLOUD_ACCOUNT_ID")'
+      )
 
     if not self._apikey:
       raise IbmCloudRequestError(
           'apikey has to specified either in the initialization of the '
-          'client or via an environment variable (\"IBMCLOUD_APIKEY\")')
+          'client or via an environment variable ("IBMCLOUD_APIKEY")'
+      )
 
     parsed_url = urllib.parse.urlparse(self._url)
     self._netloc = parsed_url.netloc or parsed_url.path.split('/', 1)[0]
@@ -107,8 +124,11 @@ class IbmCloud:
     self._search_accts = [self._acct, None, 'system']
 
     # new token if not set, force set or if running for more than 50 min
-    if (not self._token or self._force or self._token_time <
-        (time.time() - 3000)):
+    if (
+        not self._token
+        or self._force
+        or self._token_time < (time.time() - 3000)
+    ):
       self.SetToken()
 
   @vm_util.Retry(max_retries=3, timeout=vm_util.DEFAULT_TIMEOUT)
@@ -118,19 +138,21 @@ class IbmCloud:
     req_data = {
         'grant_type': 'urn:ibm:params:oauth:grant-type:apikey',
         'response_type': 'cloud_iam',
-        'apikey': self._apikey
+        'apikey': self._apikey,
     }
     count = 1
     while token is None:
       if not self._silent:
-        logging.info('Sending a POST request to get a token: %s',
-                     self._endpoint)
+        logging.info(
+            'Sending a POST request to get a token: %s', self._endpoint
+        )
       resp = requests.request(
           'POST',
           self._endpoint,
           data=req_data,
           headers=None,
-          timeout=(HTTP_TIMEOUT_CONNECT, HTTP_TIMEOUT))
+          timeout=(HTTP_TIMEOUT_CONNECT, HTTP_TIMEOUT),
+      )
       if resp is not None:
         if self._verbose:
           logging.info('response=%s', str(resp))
@@ -144,8 +166,12 @@ class IbmCloud:
               logging.info('token: %s', token)
             break
         else:
-          logging.error('POST: %s, response status_code: %s, resp: %s',
-                        self._endpoint, resp.status_code, str(resp))
+          logging.error(
+              'POST: %s, response status_code: %s, resp: %s',
+              self._endpoint,
+              resp.status_code,
+              str(resp),
+          )
       else:
         logging.info('Request POST: %s, no response returned', self._endpoint)
       count += 1
@@ -166,13 +192,9 @@ class IbmCloud:
     except Exception as err:
       raise IbmCloudRequestError('Authorization failed: %s' % err)
 
-  def Request(self,
-              method,
-              path,
-              data=None,
-              headers=None,
-              timeout=None,
-              session=None):
+  def Request(
+      self, method, path, data=None, headers=None, timeout=None, session=None
+  ):
     """Constructs base rest api calls to run against IBM Cloud regional api server.
 
     Args:
@@ -226,33 +248,46 @@ class IbmCloud:
             self._url + path,
             data=data,
             headers=h,
-            timeout=(HTTP_TIMEOUT_CONNECT, data_timeout))  # verify=False
+            timeout=(HTTP_TIMEOUT_CONNECT, data_timeout),
+        )  # verify=False
       else:
         res = session.request(
             method,
             self._url + path,
             data=data,
             headers=h,
-            timeout=(HTTP_TIMEOUT_CONNECT, data_timeout))
+            timeout=(HTTP_TIMEOUT_CONNECT, data_timeout),
+        )
       if res is not None:
         request_id = (
             res.headers['X-Request-Id']
-            if 'X-Request-Id' in res.headers else None)
+            if 'X-Request-Id' in res.headers
+            else None
+        )
         if self._verbose:
-          logging.info('Request %s:, %s, request id: %s ', method, path,
-                       request_id)
+          logging.info(
+              'Request %s:, %s, request id: %s ', method, path, request_id
+          )
           logging.info('response=%s', str(res))
           if res.text:
             logging.info('response text=%s', res.text)
         response_code = res.status_code
         if res.status_code < 200 or res.status_code > 299:
-          logging.error('Request %s:, %s, response status_code: %s, res: %s',
-                        method, path, res.status_code, str(res))
+          logging.error(
+              'Request %s:, %s, response status_code: %s, res: %s',
+              method,
+              path,
+              res.status_code,
+              str(res),
+          )
           try:
             if 'errors' in res.text:
               restext = json.loads(res.text)
-              logging.info('    *** %s -- %s\n\n', restext['errors'][0]['code'],
-                           restext['errors'][0]['message'])
+              logging.info(
+                  '    *** %s -- %s\n\n',
+                  restext['errors'][0]['code'],
+                  restext['errors'][0]['message'],
+              )
           except Exception:  # pylint: disable=broad-except
             pass
           response_text = str(res.text)
@@ -325,8 +360,9 @@ class IbmCloud:
 class BaseManager:
   """Base class that handles IBM Cloud REST api call requests.
 
-    Use the derived classes for each resource type.
+  Use the derived classes for each resource type.
   """
+
   # This value should be overwritten by derived classes.
   _type = 'base'
 
@@ -370,10 +406,23 @@ class InstanceManager(BaseManager):
 
   _type = 'instance'
 
-  def Create(self, name, imageid, profile, vpcid, zone=None, key=None,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
-             subnet=None, networks=None, resource_group=None,
-             iops=None, capacity=None, user_data=None,
-             session=None, **kwargs) -> Dict[str, Any]:
+  def Create(
+      self,
+      name,
+      imageid,
+      profile,
+      vpcid,
+      zone=None,
+      key=None,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
+      subnet=None,
+      networks=None,
+      resource_group=None,
+      iops=None,
+      capacity=None,
+      user_data=None,
+      session=None,
+      **kwargs,
+  ) -> Dict[str, Any]:
     """Construct and send a vm create request.
 
     Args:
@@ -400,15 +449,9 @@ class InstanceManager(BaseManager):
     """
     req_data = {
         'name': name,
-        'image': {
-            'id': imageid
-        },
-        'vpc': {
-            'id': vpcid
-        },
-        'profile': {
-            'name': profile
-        }
+        'image': {'id': imageid},
+        'vpc': {'id': vpcid},
+        'profile': {'name': profile},
     }
     if zone:
       req_data['zone'] = {'name': zone}
@@ -457,14 +500,14 @@ class InstanceManager(BaseManager):
     inst_uri = self.GetUri(instance)
     return self._g.Request('GET', inst_uri)
 
-  def ShowPolling(self,
-                  instance,
-                  timeout_polling=HTTP_TIMEOUT_CONNECT,
-                  session=None) -> Dict[str, Any]:
+  def ShowPolling(
+      self, instance, timeout_polling=HTTP_TIMEOUT_CONNECT, session=None
+  ) -> Dict[str, Any]:
     """Send a vm get request."""
     inst_uri = self.GetUri(instance)
     return self._g.Request(
-        'GET', inst_uri, timeout=timeout_polling, session=session)
+        'GET', inst_uri, timeout=timeout_polling, session=session
+    )
 
   def ShowInitialization(self, instance) -> Dict[str, Any]:
     """Send a vm get initialization request."""
@@ -496,12 +539,9 @@ class InstanceManager(BaseManager):
   def CreateVnic(self, instance, name, subnet) -> Dict[str, Any]:
     """Send a vm vnic create request."""
     inst_uri = self.GetUri(instance) + '/network_interfaces'
-    return self._g.Request('POST', inst_uri, {
-        'name': name,
-        'subnet': {
-            'id': subnet
-        }
-    })
+    return self._g.Request(
+        'POST', inst_uri, {'name': name, 'subnet': {'id': subnet}}
+    )
 
   def ListVnics(self, instance) -> Dict[str, Any]:
     """Send a vm vnic list request."""
@@ -517,13 +557,14 @@ class InstanceManager(BaseManager):
     """Send a volume create request on a vm."""
     inst_uri = self.GetUri(instance) + '/volume_attachments'
     return self._g.Request(
-        'POST', '%s' % inst_uri, {
+        'POST',
+        '%s' % inst_uri,
+        {
             'delete_volume_on_instance_delete': delete,
             'name': name,
-            'volume': {
-                'id': volume
-            }
-        })
+            'volume': {'id': volume},
+        },
+    )
 
   def ListVolumes(self, instance) -> Dict[str, Any]:
     """Send a volume list request on a vm."""
@@ -533,13 +574,15 @@ class InstanceManager(BaseManager):
   def ShowVolume(self, instance, volume_attachment) -> Dict[str, Any]:
     """Send a volume get request on a vm."""
     inst_uri = (
-        self.GetUri(instance) + '/volume_attachments/' + volume_attachment)
+        self.GetUri(instance) + '/volume_attachments/' + volume_attachment
+    )
     return self._g.Request('GET', inst_uri)
 
   def DeleteVolume(self, instance, volume_attachment):
     """Send a volume delete request on a vm."""
     inst_uri = (
-        self.GetUri(instance) + '/volume_attachments/' + volume_attachment)
+        self.GetUri(instance) + '/volume_attachments/' + volume_attachment
+    )
     return self._g.Request('DELETE', inst_uri)
 
   def ListProfiles(self) -> Dict[str, Any]:
@@ -564,24 +607,16 @@ class VolumeManager(BaseManager):
 
     Args:
       zone: zone name.
-      **kwargs:
-        name - volume name.
-        profile - volume profile.
-        capacity - boot volume size.
-        iops - iops on the volume.
-        resource_group - optional.
+      **kwargs: name - volume name. profile - volume profile. capacity - boot
+        volume size. iops - iops on the volume. resource_group - optional.
         encryption_key - key to encrypt, optional.
 
     Returns:
       created volume.
     """
     req_data = {
-        'zone': {
-            'name': zone
-        },
-        'profile': {
-            'name': kwargs.get('profile', 'general-purpose')
-        }
+        'zone': {'name': zone},
+        'profile': {'name': kwargs.get('profile', 'general-purpose')},
     }
     if kwargs.get('capacity', None):
       req_data['capacity'] = kwargs.get('capacity')
@@ -654,27 +689,24 @@ class VPCManager(BaseManager):
 
   def DeletePrefix(self, vpc, prefix):
     """Send a vpc address prefix delete request."""
-    return self._g.Request('DELETE',
-                           'vpcs/%s/address_prefixes/%s' % (vpc, prefix))
+    return self._g.Request(
+        'DELETE', 'vpcs/%s/address_prefixes/%s' % (vpc, prefix)
+    )
 
-  def PatchPrefix(self,
-                  vpc,
-                  prefix,
-                  default=False,
-                  name=None) -> Dict[str, Any]:
+  def PatchPrefix(
+      self, vpc, prefix, default=False, name=None
+  ) -> Dict[str, Any]:
     """Send a vpc address prefix patch request."""
     req_data = {'is_default': default}
     if name:
       req_data['name'] = name
-    return self._g.Request('PATCH',
-                           'vpcs/%s/address_prefixes/%s' % (vpc, prefix),
-                           req_data)
+    return self._g.Request(
+        'PATCH', 'vpcs/%s/address_prefixes/%s' % (vpc, prefix), req_data
+    )
 
-  def CreateRoutingTable(self,
-                         vpc,
-                         name,
-                         routes=None,
-                         session=None) -> Dict[str, Any]:
+  def CreateRoutingTable(
+      self, vpc, name, routes=None, session=None
+  ) -> Dict[str, Any]:
     """Send a vpc routing table create request."""
     req_data = {'name': name}
     if routes:
@@ -685,14 +717,12 @@ class VPCManager(BaseManager):
   def ShowRoutingTable(self, vpc, routing, session=None) -> Dict[str, Any]:
     """Send a vpc routing table get request."""
     return self._g.Request(
-        'GET', 'vpcs/%s/routing_tables/%s' % (vpc, routing), session=session)
+        'GET', 'vpcs/%s/routing_tables/%s' % (vpc, routing), session=session
+    )
 
-  def PatchRoutingTable(self,
-                        vpc,
-                        routing,
-                        ingress,
-                        flag,
-                        session=None) -> Dict[str, Any]:
+  def PatchRoutingTable(
+      self, vpc, routing, ingress, flag, session=None
+  ) -> Dict[str, Any]:
     """Send a vpc routing table patch request."""
     vpc_uri = self.GetUri(vpc) + '/routing_tables/' + routing
     return self._g.Request('PATCH', vpc_uri, {ingress: flag}, session=session)
@@ -705,25 +735,26 @@ class VPCManager(BaseManager):
   def ListRoutingTable(self, vpc, session=None) -> Dict[str, Any]:
     """Send a vpc routing table list request."""
     return self._g.Request(
-        'GET', 'vpcs/%s/routing_tables?limit=100' % vpc, session=session)
+        'GET', 'vpcs/%s/routing_tables?limit=100' % vpc, session=session
+    )
 
-  def CreateRoute(self,
-                  vpc,
-                  routing,
-                  name,
-                  zone,
-                  action,
-                  destination,
-                  nexthop=None,
-                  session=None) -> Dict[str, Any]:
+  def CreateRoute(
+      self,
+      vpc,
+      routing,
+      name,
+      zone,
+      action,
+      destination,
+      nexthop=None,
+      session=None,
+  ) -> Dict[str, Any]:
     """Send a vpc route create request."""
     req_data = {
         'name': name,
         'action': action,
         'destination': destination,
-        'zone': {
-            'name': zone
-        }
+        'zone': {'name': zone},
     }
     if nexthop:
       req_data['next_hop'] = {'address': nexthop}
@@ -732,8 +763,9 @@ class VPCManager(BaseManager):
 
   def DeleteRoute(self, vpc, routing, route, session=None):
     """Send a vpc route delete request."""
-    vpc_uri = self.GetUri(
-        vpc) + '/routing_tables/' + routing + '/routes/' + route
+    vpc_uri = (
+        self.GetUri(vpc) + '/routing_tables/' + routing + '/routes/' + route
+    )
     return self._g.Request('DELETE', '%s' % vpc_uri, session=session)
 
   def ListRoute(self, vpc, routing, session=None) -> Dict[str, Any]:
@@ -741,7 +773,8 @@ class VPCManager(BaseManager):
     return self._g.Request(
         'GET',
         'vpcs/%s/routing_tables/%s/routes?limit=100' % (vpc, routing),
-        session=session)
+        session=session,
+    )
 
 
 class SGManager(BaseManager):
@@ -755,17 +788,14 @@ class SGManager(BaseManager):
     Args:
        resource_group: optional.
        vpcid: vpc id.
-       **kwargs:
-         name - name of the vm.
+       **kwargs: name - name of the vm.
 
     Returns:
       returns created security groups.
     """
     req_data = {'vpc': {'id': vpcid}}
     if resource_group:
-      req_data['resource_group'] = {
-          'id': resource_group
-          }
+      req_data['resource_group'] = {'id': resource_group}
     if kwargs.get('name', None):
       req_data['name'] = kwargs.get('name', None)
 
@@ -795,15 +825,17 @@ class SGManager(BaseManager):
     sg_uri = self.GetUris(sg) + '/rules'
     return self._g.Request('GET', sg_uri)
 
-  def CreateRule(self,
-                 sg,
-                 direction,
-                 ip_version,
-                 cidr_block,
-                 protocol,
-                 port,
-                 port_min=None,
-                 port_max=None) -> Dict[str, Any]:
+  def CreateRule(
+      self,
+      sg,
+      direction,
+      ip_version,
+      cidr_block,
+      protocol,
+      port,
+      port_min=None,
+      port_max=None,
+  ) -> Dict[str, Any]:
     """Send a security group rule create request.
 
     Args:
@@ -823,10 +855,8 @@ class SGManager(BaseManager):
     req_data = {
         'direction': direction,
         'ip_version': ip_version,
-        'remote': {
-            'cidr_block': cidr_block
-        },
-        'protocol': protocol
+        'remote': {'cidr_block': cidr_block},
+        'protocol': protocol,
     }
     if port:
       req_data['port_min'] = port
@@ -854,18 +884,14 @@ class PGManager(BaseManager):
       resource_group: optional.
       vpcid: vpc id.
       zone: zone name.
-      **kwargs:
-        name - name of the vm.
-        floating_ip - optional, floating ip id.
+      **kwargs: name - name of the vm. floating_ip - optional, floating ip id.
 
     Returns:
       returns created public gateways.
     """
     req_data = {'vpc': {'id': vpcid}, 'zone': {'name': zone}}
     if resource_group:
-      req_data['resource_group'] = {
-          'id': resource_group
-          }
+      req_data['resource_group'] = {'id': resource_group}
     if kwargs.get('name', None):
       req_data['name'] = kwargs.get('name', None)
     if kwargs.get('floating_ip', None):
@@ -908,9 +934,7 @@ class KeyManager(BaseManager):
     Args:
        key: public key string.
        key_type: rsa.
-       **kwargs:
-         name - name of the key:
-         resource_group - optional.
+       **kwargs: name - name of the key: resource_group - optional.
 
     Returns:
       returns created key.
@@ -980,20 +1004,15 @@ class SubnetManager(BaseManager):
     Args:
       subnet: subnet
       vpcid: vpc id.
-      **kwargs:
-        name - name of the subnet.
-        zone - zone name.
-        ip_version - ipv4 or 6.
-        ipv4_cidr_block - cidr for subnet.
+      **kwargs: name - name of the subnet. zone - zone name. ip_version - ipv4
+        or 6. ipv4_cidr_block - cidr for subnet.
 
     Returns:
       created subnet.
     """
     req_data = {
         'ipv4_cidr_block': subnet,
-        'vpc': {
-            'id': vpcid
-        },
+        'vpc': {'id': vpcid},
         'ip_version': 'ipv4',
     }
     if kwargs.get('name'):
@@ -1079,9 +1098,7 @@ class FipManager(BaseManager):
     Args:
        resource_group: optional.
        target: id of the vm network interface.
-       **kwargs:
-         name - name of the fip.
-         zone - zone name.
+       **kwargs: name - name of the fip. zone - zone name.
 
     Returns:
       returns floating IP addresses.

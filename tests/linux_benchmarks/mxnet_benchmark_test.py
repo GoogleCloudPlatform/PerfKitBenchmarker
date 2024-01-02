@@ -19,12 +19,12 @@ from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import mxnet_benchmark
 
 
-class MxnetBenchmarkTestCase(unittest.TestCase,
-                             test_util.SamplesTestMixin):
+class MxnetBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'mxnet_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '..', 'data', 'mxnet_output.txt'
+    )
     with open(path, 'r') as fp:
       self.contents = fp.read()
 

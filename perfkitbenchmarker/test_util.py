@@ -31,6 +31,7 @@ _BENCHMARK_UID = 'uid'
 
 class SamplesTestMixin(object):
   """A mixin for unittest.TestCase that adds a type-specific equality
+
   predicate for samples.
   """
 
@@ -42,20 +43,31 @@ class SamplesTestMixin(object):
   def assertSamplesEqualUpToTimestamp(self, a, b, msg=None):
     """Assert that two samples are equal, ignoring timestamp differences."""
 
-    self.assertEqual(a.metric, b.metric, msg or
-                     'Samples %s and %s have different metrics' % (a, b))
+    self.assertEqual(
+        a.metric,
+        b.metric,
+        msg or 'Samples %s and %s have different metrics' % (a, b),
+    )
     if isinstance(a.value, float) and isinstance(b.value, float):
       self.assertAlmostEqual(
-          a.value, b.value, msg=msg or
-          'Samples %s and %s have different values' % (a, b))
+          a.value,
+          b.value,
+          msg=msg or 'Samples %s and %s have different values' % (a, b),
+      )
     else:
       self.assertEqual(
-          a.value, b.value, msg or
-          'Samples %s and %s have different values' % (a, b))
-    self.assertEqual(a.unit, b.unit, msg or
-                     'Samples %s and %s have different units' % (a, b))
-    self.assertDictEqual(a.metadata, b.metadata, msg or
-                         'Samples %s and %s have different metadata' % (a, b))
+          a.value,
+          b.value,
+          msg or 'Samples %s and %s have different values' % (a, b),
+      )
+    self.assertEqual(
+        a.unit, b.unit, msg or 'Samples %s and %s have different units' % (a, b)
+    )
+    self.assertDictEqual(
+        a.metadata,
+        b.metadata,
+        msg or 'Samples %s and %s have different metadata' % (a, b),
+    )
     # Deliberately don't compare the timestamp fields of the samples.
 
   def assertSampleListsEqualUpToTimestamp(self, a, b, msg=None):
@@ -67,21 +79,28 @@ class SamplesTestMixin(object):
     custom test for that.
     """
 
-    self.assertEqual(len(a), len(b),
-                     msg or 'Lists %s and %s are not the same length' % (a, b))
+    self.assertEqual(
+        len(a),
+        len(b),
+        msg or 'Lists %s and %s are not the same length' % (a, b),
+    )
     for i in range(len(a)):
-      self.assertIsInstance(a[i], sample.Sample,
-                            msg or ('%s (item %s in list) is '
-                                    'not a sample.Sample object' %
-                                    (a[i], i)))
-      self.assertIsInstance(b[i], sample.Sample,
-                            msg or ('%s (item %s in list) is '
-                                    'not a sample.Sample object' %
-                                    (b[i], i)))
+      self.assertIsInstance(
+          a[i],
+          sample.Sample,
+          msg
+          or ('%s (item %s in list) is not a sample.Sample object' % (a[i], i)),
+      )
+      self.assertIsInstance(
+          b[i],
+          sample.Sample,
+          msg
+          or ('%s (item %s in list) is not a sample.Sample object' % (b[i], i)),
+      )
       try:
         self.assertSamplesEqualUpToTimestamp(a[i], b[i], msg=msg)
       except self.failureException as ex:
-        ex.message = str(ex) + (' (was item %s in list)' % i)
+        ex.message = str(ex) + ' (was item %s in list)' % i
         ex.args = (ex.message,)
         raise ex
 
@@ -108,9 +127,8 @@ def assertDiskMounts(benchmark_config, mount_point):
   otherwise raises an exception.
 
   Args:
-    benchmark_config: a dict in the format of
-      benchmark_spec.BenchmarkSpec. The config must specify exactly
-      one virtual machine.
+    benchmark_config: a dict in the format of benchmark_spec.BenchmarkSpec. The
+      config must specify exactly one virtual machine.
     mount_point: a path, represented as a string.
 
   Raises:
@@ -127,9 +145,9 @@ def assertDiskMounts(benchmark_config, mount_point):
   m = mock.MagicMock()
   m.BENCHMARK_NAME = _BENCHMARK_NAME
   config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-      _BENCHMARK_NAME, flag_values=flags.FLAGS, **benchmark_config)
-  spec = benchmark_spec.BenchmarkSpec(
-      m, config_spec, _BENCHMARK_UID)
+      _BENCHMARK_NAME, flag_values=flags.FLAGS, **benchmark_config
+  )
+  spec = benchmark_spec.BenchmarkSpec(m, config_spec, _BENCHMARK_UID)
   with spec.RedirectGlobalFlags():
     try:
       spec.ConstructVirtualMachines()

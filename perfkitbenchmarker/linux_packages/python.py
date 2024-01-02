@@ -20,8 +20,9 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 
 # Gets major.minor version of python
-GET_VERSION = ('import sys; '
-               'print(".".join(str(v) for v in sys.version_info[:2]))')
+GET_VERSION = (
+    'import sys; print(".".join(str(v) for v in sys.version_info[:2]))'
+)
 
 
 def Install(vm):
@@ -44,7 +45,8 @@ def _SetDefaultPythonIfNeeded(vm):
   """
 
   @vm_util.Retry(
-      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,))
+      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,)
+  )
   def _RunCommand(command):
     return vm.RemoteCommandWithReturnCode(command, ignore_failure=True)
 
@@ -54,25 +56,30 @@ def _SetDefaultPythonIfNeeded(vm):
   python_found = not return_code
   if python_found:
     logging.info(
-        'Default version of python: %s', (stdout or stderr).strip().split()[-1])
+        'Default version of python: %s', (stdout or stderr).strip().split()[-1]
+    )
     return
   logging.info('Trying to set the default python version')
   _, _, python2_not_found = _RunCommand('ls /usr/bin/python2')
   if python2_not_found:
     raise errors.Setup.PythonPackageRequirementUnfulfilled(
-        'No default version of python set and /usr/bin/python2 does not exist')
+        'No default version of python set and /usr/bin/python2 does not exist'
+    )
   _, _, update_alternatives_failed = _RunCommand(
-      'sudo update-alternatives --set python /usr/bin/python2')
+      'sudo update-alternatives --set python /usr/bin/python2'
+  )
   if update_alternatives_failed:
     # Ubuntu 20 lets you install python2, but not update-alternatives to point
     # python to it. Also some distros might not include update-alternatives.
     # In any case fall back to a symlink
     vm.RemoteCommandWithReturnCode(
-        'sudo ln -s /usr/bin/python2 /usr/bin/python')
+        'sudo ln -s /usr/bin/python2 /usr/bin/python'
+    )
   _, txt, python_not_found = _RunCommand(python_version_cmd)
   if python_not_found:
     raise errors.Setup.PythonPackageRequirementUnfulfilled(
-        "'python' command not working after setting alias.")
+        "'python' command not working after setting alias."
+    )
   logging.info('Set default python version to %s', txt.strip().split()[-1])
 
 

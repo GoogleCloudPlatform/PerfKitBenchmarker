@@ -29,42 +29,75 @@ from perfkitbenchmarker import vm_util
 BEAM_JAVA_SDK = 'java'
 BEAM_PYTHON_SDK = 'python'
 
-flags.DEFINE_string('gradle_binary', None,
-                    'Set to use a different gradle binary than gradle wrapper '
-                    'from the repository')
-flags.DEFINE_string('beam_location', None,
-                    'Location of already checked out Beam codebase.')
-flags.DEFINE_string('beam_it_module', None,
-                    'Gradle module containing integration test. Use full '
-                    'module starting and separated by colon, like :sdk:python')
-flags.DEFINE_boolean('beam_prebuilt', False,
-                     'Set this to indicate that the repo in beam_location '
-                     'does not need to be rebuilt before being used')
+flags.DEFINE_string(
+    'gradle_binary',
+    None,
+    'Set to use a different gradle binary than gradle wrapper '
+    'from the repository',
+)
+flags.DEFINE_string(
+    'beam_location', None, 'Location of already checked out Beam codebase.'
+)
+flags.DEFINE_string(
+    'beam_it_module',
+    None,
+    'Gradle module containing integration test. Use full '
+    'module starting and separated by colon, like :sdk:python',
+)
+flags.DEFINE_boolean(
+    'beam_prebuilt',
+    False,
+    'Set this to indicate that the repo in beam_location '
+    'does not need to be rebuilt before being used',
+)
 flags.DEFINE_integer('beam_it_timeout', 600, 'Integration Test Timeout.')
 flags.DEFINE_string('git_binary', 'git', 'Path to git binary.')
-flags.DEFINE_string('beam_version', None,
-                    'Version of Beam to download. Use tag from Github '
-                    'as value. If not specified, will use HEAD.')
-flags.DEFINE_enum('beam_sdk', None, [BEAM_JAVA_SDK, BEAM_PYTHON_SDK],
-                  'Which BEAM SDK is used to build the benchmark pipeline.')
-flags.DEFINE_string('beam_python_attr', 'IT',
-                    'Test decorator that is used in Beam Python to filter a '
-                    'specific category.')
-flags.DEFINE_string('beam_python_sdk_location', None,
-                    'Python SDK tar ball location. It is a required option to '
-                    'run Python pipeline.')
+flags.DEFINE_string(
+    'beam_version',
+    None,
+    'Version of Beam to download. Use tag from Github '
+    'as value. If not specified, will use HEAD.',
+)
+flags.DEFINE_enum(
+    'beam_sdk',
+    None,
+    [BEAM_JAVA_SDK, BEAM_PYTHON_SDK],
+    'Which BEAM SDK is used to build the benchmark pipeline.',
+)
+flags.DEFINE_string(
+    'beam_python_attr',
+    'IT',
+    'Test decorator that is used in Beam Python to filter a specific category.',
+)
+flags.DEFINE_string(
+    'beam_python_sdk_location',
+    None,
+    'Python SDK tar ball location. It is a required option to '
+    'run Python pipeline.',
+)
 
-flags.DEFINE_string('beam_extra_properties', None,
-                    'Allows to specify list of key-value pairs that will be '
-                    'forwarded to target mvn command as system properties')
+flags.DEFINE_string(
+    'beam_extra_properties',
+    None,
+    'Allows to specify list of key-value pairs that will be '
+    'forwarded to target mvn command as system properties',
+)
 
-flags.DEFINE_string('beam_runner', 'dataflow', 'Defines runner which will be used in tests')
-flags.DEFINE_string('beam_runner_option', None,
-                    'Overrides any pipeline options to specify the runner.')
+flags.DEFINE_string(
+    'beam_runner', 'dataflow', 'Defines runner which will be used in tests'
+)
+flags.DEFINE_string(
+    'beam_runner_option',
+    None,
+    'Overrides any pipeline options to specify the runner.',
+)
 
-flags.DEFINE_string('beam_filesystem', None,
-                    'Defines filesystem which will be used in tests. '
-                    'If not specified it will use runner\'s local filesystem.')
+flags.DEFINE_string(
+    'beam_filesystem',
+    None,
+    'Defines filesystem which will be used in tests. '
+    "If not specified it will use runner's local filesystem.",
+)
 
 FLAGS = flags.FLAGS
 
@@ -83,16 +116,17 @@ def AddRunnerArgument(command, runner_name):
     command.append('-DintegrationTestRunner=dataflow')
 
 
-def AddRunnerPipelineOption(beam_pipeline_options, runner_name,
-                            runner_option_override):
+def AddRunnerPipelineOption(
+    beam_pipeline_options, runner_name, runner_option_override
+):
   """Add runner to pipeline options."""
   runner_pipeline_option = ''
 
   if runner_name == 'dataflow':
-    runner_pipeline_option = ('"--runner=TestDataflowRunner"')
+    runner_pipeline_option = '"--runner=TestDataflowRunner"'
 
   if runner_name == 'direct':
-    runner_pipeline_option = ('"--runner=DirectRunner"')
+    runner_pipeline_option = '"--runner=DirectRunner"'
 
   if runner_option_override:
     runner_pipeline_option = '--runner=' + runner_option_override
@@ -111,8 +145,9 @@ def AddExtraProperties(command, extra_properties):
     return
 
   if 'integrationTestPipelineOptions=' in extra_properties:
-    raise ValueError('integrationTestPipelineOptions must not be in '
-                     'beam_extra_properties')
+    raise ValueError(
+        'integrationTestPipelineOptions must not be in beam_extra_properties'
+    )
 
   extra_properties = extra_properties.rstrip(']').lstrip('[').split(',')
   extra_properties = [p.rstrip('" ').lstrip('" ') for p in extra_properties]
@@ -154,9 +189,11 @@ def InitializeBeamRepo(benchmark_spec):
     vm_util.IssueCommand(git_clone_command, cwd=vm_util.GetTempDir())
 
   elif not os.path.exists(FLAGS.beam_location):
-    raise errors.Config.InvalidValue('Directory indicated by beam_location '
-                                     'does not exist: {}.'.format(
-                                         FLAGS.beam_location))
+    raise errors.Config.InvalidValue(
+        'Directory indicated by beam_location does not exist: {}.'.format(
+            FLAGS.beam_location
+        )
+    )
 
   _PrebuildBeam()
 
@@ -164,7 +201,6 @@ def InitializeBeamRepo(benchmark_spec):
 def _PrebuildBeam():
   """Rebuild beam if it was not build earlier."""
   if not FLAGS.beam_prebuilt:
-
     gradle_prebuild_tasks = ['clean', 'assemble']
     gradle_prebuild_flags = ['--stacktrace', '--info']
     build_command = [_GetGradleCommand()]
@@ -222,7 +258,8 @@ def _BuildGradleCommand(classname, job_arguments):
 
   if not vm_util.ExecutableOnPath(gradle_executable):
     raise errors.Setup.MissingExecutableError(
-        'Could not find required executable "%s"' % gradle_executable)
+        'Could not find required executable "%s"' % gradle_executable
+    )
 
   cmd.append(gradle_executable)
   AddTaskArgument(cmd, 'integrationTest', FLAGS.beam_it_module)
@@ -231,13 +268,15 @@ def _BuildGradleCommand(classname, job_arguments):
   beam_args = job_arguments if job_arguments else []
 
   AddRunnerArgument(cmd, FLAGS.beam_runner)
-  AddRunnerPipelineOption(beam_args, FLAGS.beam_runner,
-                          FLAGS.beam_runner_option)
+  AddRunnerPipelineOption(
+      beam_args, FLAGS.beam_runner, FLAGS.beam_runner_option
+  )
   AddFilesystemArgument(cmd, FLAGS.beam_filesystem)
   AddExtraProperties(cmd, FLAGS.beam_extra_properties)
 
-  cmd.append('-DintegrationTestPipelineOptions='
-             '[{}]'.format(','.join(beam_args)))
+  cmd.append(
+      '-DintegrationTestPipelineOptions=[{}]'.format(','.join(beam_args))
+  )
 
   cmd.append('--stacktrace')
   cmd.append('--info')
@@ -274,7 +313,8 @@ def _BuildPythonCommand(benchmark_spec, classname, job_arguments):
 
   if not vm_util.ExecutableOnPath(gradle_executable):
     raise errors.Setup.MissingExecutableError(
-        'Could not find required executable "%s"' % gradle_executable)
+        'Could not find required executable "%s"' % gradle_executable
+    )
 
   cmd.append(gradle_executable)
   AddTaskArgument(cmd, 'integrationTest', FLAGS.beam_it_module)

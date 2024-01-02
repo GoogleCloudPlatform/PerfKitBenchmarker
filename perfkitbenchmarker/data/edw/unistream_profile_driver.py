@@ -4,7 +4,6 @@ The sequence of scripts is identified by a profile, which is defined in the
 tpc_profile_details module.
 """
 
-
 __author__ = 'p3rf@google.com'
 
 import json
@@ -15,8 +14,9 @@ from absl import flags
 import script_driver
 import tpc_profile_details
 
-flags.DEFINE_string('profile', None, 'Profile to identify the sequence of '
-                                     'scripts.')
+flags.DEFINE_string(
+    'profile', None, 'Profile to identify the sequence of scripts.'
+)
 
 FLAGS = flags.FLAGS
 
@@ -45,8 +45,10 @@ def execute_profile(profile):
     script_performance = script_driver.execute_script(script, logfile_suffix)
     execution_times.update(json.loads(script_performance))
   profile_execution_wall_time = round((time.time() - start_time), 2)
-  execution_times['wall_time'] = {'execution_time': profile_execution_wall_time,
-                                  'job_id': 'undefined_job'}
+  execution_times['wall_time'] = {
+      'execution_time': profile_execution_wall_time,
+      'job_id': 'undefined_job',
+  }
   return json.dumps(execution_times)
 
 

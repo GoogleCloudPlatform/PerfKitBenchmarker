@@ -22,25 +22,34 @@ from tests import pkb_common_test_case
 
 
 class MlperfMultiworkersBenchmarkTestCase(
-    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin):
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super().setUp()
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'mlperf_multiworkers_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '..',
+        'data',
+        'mlperf_multiworkers_output.txt',
+    )
     with open(path) as fp:
       self.contents = fp.read()
 
   def testTrainResults(self):
     samples = mlperf_multiworkers_benchmark.MakeSamplesFromOutput(
-        {'version': 'v2.0'}, self.contents, model='bert')
+        {'version': 'v2.0'}, self.contents, model='bert'
+    )
     self.assertLen(samples, 458)
     self.assertSamplesEqualUpToTimestamp(
         Sample(
             metric='speed',
             value=2427.4356684047016,
             unit='samples/sec',
-            metadata={'version': 'v2.0'}), samples[0])
+            metadata={'version': 'v2.0'},
+        ),
+        samples[0],
+    )
     self.assertSamplesEqualUpToTimestamp(
         Sample(
             metric='run_stop',
@@ -53,8 +62,11 @@ class MlperfMultiworkersBenchmarkTestCase(
                 'version': 'v2.0',
                 'namespace': '',
                 'event_type': 'INTERVAL_END',
-                'value': None
-            }), samples[-1])
+                'value': None,
+            },
+        ),
+        samples[-1],
+    )
 
 
 if __name__ == '__main__':

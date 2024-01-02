@@ -57,7 +57,8 @@ class TestTensorflowServingClientWorkload(unittest.TestCase):
     self.addCleanup(os_patch.stop)
 
     self.client_workload = (
-        tensorflow_serving_client_workload.TfServingClientWorkload())
+        tensorflow_serving_client_workload.TfServingClientWorkload()
+    )
 
   def testPrintOutput(self):
     self.client_workload.num_completed_requests = 10

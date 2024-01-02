@@ -28,12 +28,12 @@ class RackCLICommand(object):
 
   Attributes:
     args: list of strings. Positional args to pass to rack cli, typically
-        specifying an operation to perform (e.g. ['servers', 'images', 'list']
-        to list available images).
+      specifying an operation to perform (e.g. ['servers', 'images', 'list'] to
+      list available images).
     flags: OrderedDict mapping flag name string to flag value. Flags to pass to
-        rack cli (e.g. {'image-id': 'some-image-id'}).
+      rack cli (e.g. {'image-id': 'some-image-id'}).
     additional_flags: list of strings. Additional flags to append unmodified to
-        the end of the rack cli command (e.g. ['--metadata', 'owner=user']).
+      the end of the rack cli command (e.g. ['--metadata', 'owner=user']).
   """
 
   def __init__(self, resource, *args):
@@ -42,8 +42,8 @@ class RackCLICommand(object):
     Args:
       resource: A Rackspace resource of type BaseResource.
       *args: sequence of strings. Positional args to pass to rack cli, typically
-          specifying an operation to perform. (e.g. ['servers', 'image', 'list']
-          to list available images).
+        specifying an operation to perform. (e.g. ['servers', 'image', 'list']
+        to list available images).
     """
     self.resource = resource
     self.args = list(args)
@@ -58,7 +58,7 @@ class RackCLICommand(object):
 
     Args:
       **kwargs: Keyword arguments to forward to vm_util.IssueCommand when
-          issuing the rack cli command.
+        issuing the rack cli command.
 
     Returns:
       A tuple of stdout, stderr, and retcode from running the rack cli command.
@@ -72,7 +72,7 @@ class RackCLICommand(object):
 
     Args:
       **kwargs: Keyword arguments to forward to vm_util.IssueRetryableCommand
-          when issuing the rack cli command.
+        when issuing the rack cli command.
 
     Returns:
       (stdout, stderr) pair of strings from running the rack cli command.

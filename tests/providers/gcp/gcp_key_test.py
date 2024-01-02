@@ -22,8 +22,7 @@ class ConstructKeyTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(run_uri='test_uri')
   def testInitialization(self):
-    test_spec = inspect.cleandoc(
-        """
+    test_spec = inspect.cleandoc("""
         provision_key:
           description: Sample key benchmark
           key:
@@ -32,8 +31,7 @@ class ConstructKeyTestCase(pkb_common_test_case.PkbCommonTestCase):
             algorithm: test_algorithm
             protection_level: software
             location: test_location
-        """
-    )
+        """)
     FLAGS['cloud_kms_keyring_name'].parse('test_keyring')
     key_instance = _ConstructKeyFromSpec(test_spec)
     with self.subTest(name='ClassIsCorrect'):
@@ -51,14 +49,12 @@ class ConstructKeyTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(run_uri='test_uri')
   def testInitializationDefaults(self):
-    test_spec = inspect.cleandoc(
-        """
+    test_spec = inspect.cleandoc("""
         provision_key:
           description: Sample key benchmark
           key:
             cloud: GCP
-        """
-    )
+        """)
     key_instance = _ConstructKeyFromSpec(test_spec)
     with self.subTest(name='ClassIsCorrect'):
       self.assertIsInstance(key_instance, gcp_key.GcpKey)

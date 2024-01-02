@@ -26,8 +26,11 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('wget')
   vm.InstallPackages('bc')
-  vm.RemoteCommand('mkdir -p {0} && '
-                   'cd {0} && wget {1}'.format(linux_packages.INSTALL_DIR, URL))
+  vm.RemoteCommand(
+      'mkdir -p {0} && cd {0} && wget {1}'.format(
+          linux_packages.INSTALL_DIR, URL
+      )
+  )
 
 
 def AptInstall(vm):
@@ -39,5 +42,6 @@ def YumInstall(vm):
 
 
 def Cleanup(vm):
-  vm.RemoteCommand('cd {} && rm -f {}'.format(linux_packages.INSTALL_DIR,
-                                              TARBALL))
+  vm.RemoteCommand(
+      'cd {} && rm -f {}'.format(linux_packages.INSTALL_DIR, TARBALL)
+  )

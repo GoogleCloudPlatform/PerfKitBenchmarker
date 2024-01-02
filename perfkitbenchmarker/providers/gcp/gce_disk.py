@@ -143,6 +143,7 @@ def AddLabels(gcp_resource: resource.BaseResource, disk_name: str):
 
 class GceDiskSpec(disk.BaseDiskSpec):
   """Object holding the information needed to create a GCPDisk."""
+
   interface: str
   num_local_ssds: int
   create_with_vm: bool

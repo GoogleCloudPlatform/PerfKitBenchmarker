@@ -15,8 +15,10 @@
 
 from perfkitbenchmarker import linux_packages
 
-_DACAPO_URL = ('https://sourceforge.net/projects/dacapobench/files/'
-               '9.12-bach-MR1/dacapo-9.12-MR1-bach.jar')
+_DACAPO_URL = (
+    'https://sourceforge.net/projects/dacapobench/files/'
+    '9.12-bach-MR1/dacapo-9.12-MR1-bach.jar'
+)
 
 
 def Install(vm):

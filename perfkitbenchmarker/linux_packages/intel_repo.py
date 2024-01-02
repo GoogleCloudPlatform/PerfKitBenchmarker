@@ -32,17 +32,19 @@ _APT_REPO_FILE = 'intel_repo_list.txt'
 _APT_REMOTE_REPO_FILE = posixpath.join(vm_util.VM_TMP_DIR, 'intel.list')
 # Command to add the GPG key and update the repo list.
 _APT_INSTALL_REPO_CMD = ';'.join([
-    f'sudo apt-key add {_REMOTE_KEY_FILE}', f'rm {_REMOTE_KEY_FILE}',
+    f'sudo apt-key add {_REMOTE_KEY_FILE}',
+    f'rm {_REMOTE_KEY_FILE}',
     f'sudo mv {_APT_REMOTE_REPO_FILE} /etc/apt/sources.list.d/',
-    'sudo apt-get update'
+    'sudo apt-get update',
 ])
 # APT constants for Intel oneAPI
 _ONEAPI_APT_URL = 'https://apt.repos.intel.com/oneapi'
 _ONEAPI_APT_FILE = '/etc/apt/sources.list.d/oneAPI.list'
 _ONEAPI_APT_INSTALL_REPO_CMD = ';'.join([
-    f'sudo apt-key add {_REMOTE_KEY_FILE}', f'rm {_REMOTE_KEY_FILE}',
+    f'sudo apt-key add {_REMOTE_KEY_FILE}',
+    f'rm {_REMOTE_KEY_FILE}',
     f'echo "deb {_ONEAPI_APT_URL} all main" | sudo tee {_ONEAPI_APT_FILE}',
-    'sudo apt-get update'
+    'sudo apt-get update',
 ])
 
 # YUM constants
@@ -68,7 +70,8 @@ FLAGS = flags.FLAGS
 
 def UseOneApi():
   return FLAGS.intelmpi_version.startswith(
-      '2021') or FLAGS.mkl_version.startswith('2021')
+      '2021'
+  ) or FLAGS.mkl_version.startswith('2021')
 
 
 def AptInstall(vm):
@@ -90,7 +93,8 @@ def YumInstall(vm):
     tmp_remote_file = posixpath.basename(_ONEAPI_YUM_INSTALL_REPO_REMOTE_FILE)
     vm.PushDataFile(_ONEAPI_YUM_INSTALL_REPO_FILE, tmp_remote_file)
     vm.RemoteCommand(
-        f'sudo mv {tmp_remote_file} {_ONEAPI_YUM_INSTALL_REPO_REMOTE_FILE}')
+        f'sudo mv {tmp_remote_file} {_ONEAPI_YUM_INSTALL_REPO_REMOTE_FILE}'
+    )
   else:
     vm.RemoteCommand(_YUM_INSTALL_REPO_CMD)
   # the /etc/yum.repos.d/intelproducts.repo file has the gpgkey listed as the
@@ -99,7 +103,8 @@ def YumInstall(vm):
   diff, _, retcode = vm.RemoteCommandWithReturnCode(_YUM_DIFF_KEY_CMD)
   if retcode:
     raise errors.Setup.InvalidConfigurationError(
-        f'Intel GPG key does not match local key: {diff}')
+        f'Intel GPG key does not match local key: {diff}'
+    )
   vm.RemoteCommand(f'rm {_YUM_DOWNLOAD_KEY}')
   # need to update with -y to force import of known GPG key
   vm.RemoteCommand('sudo yum update -y')
@@ -116,8 +121,9 @@ def CopyIntelFiles(source_vm, target_vm) -> None:
     target_vm: Destination VM for the /opt/intel files
   """
   root_dir = '/opt/intel'
-  mkdir_cmd = (f'sudo mkdir {root_dir}; '
-               f'sudo chown {target_vm.user_name} {root_dir}')
+  mkdir_cmd = (
+      f'sudo mkdir {root_dir}; sudo chown {target_vm.user_name} {root_dir}'
+  )
   target_vm.RemoteCommand(mkdir_cmd)
   tar_cmd = f'cd {root_dir}; tar -cf - *'
   untar_cmd = f"ssh {target_vm.internal_ip} '(cd {root_dir} ; tar -xf -)'"

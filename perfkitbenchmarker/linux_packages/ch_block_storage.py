@@ -24,13 +24,14 @@ from perfkitbenchmarker.linux_packages import fio
 
 
 flags.DEFINE_list(
-    'ch_params', [],
+    'ch_params',
+    [],
     'A list of comma seperated "key=value" parameters passed into '
-    'cloud harmony benchmarks.')
+    'cloud harmony benchmarks.',
+)
 
 BENCHMARK = 'block-storage'
-INSTALL_PATH = os.path.join(linux_packages.INSTALL_DIR,
-                            BENCHMARK)
+INSTALL_PATH = os.path.join(linux_packages.INSTALL_DIR, BENCHMARK)
 STEADY_STATE_MEASUREMENT_WINDOW = '-ssmw'
 
 
@@ -39,8 +40,10 @@ def _Install(vm):
   for deps in ['php', 'build_tools']:
     vm.Install(deps)
   vm.RemoteCommand(
-      ('git clone https://github.com/cloudharmony/{benchmark}.git '
-       '{dir}').format(benchmark=BENCHMARK, dir=INSTALL_PATH))
+      (
+          'git clone https://github.com/cloudharmony/{benchmark}.git {dir}'
+      ).format(benchmark=BENCHMARK, dir=INSTALL_PATH)
+  )
 
 
 def YumInstall(vm):
@@ -69,7 +72,8 @@ def _ParseFioJson(fio_json):
     # Remove ssmw suffix from job name.
     try:
       job['jobname'] = regex_util.Substitute(
-          STEADY_STATE_MEASUREMENT_WINDOW, '', job['jobname'])
+          STEADY_STATE_MEASUREMENT_WINDOW, '', job['jobname']
+      )
       additional_metadata['steady_state'] = True
     except regex_util.NoMatchError:
       additional_metadata['steady_state'] = False
@@ -77,7 +81,8 @@ def _ParseFioJson(fio_json):
     # Mock fio_json to reuse fio parser.
     mock_json = {'jobs': [job]}
     new_samples = fio.ParseResults(
-        fio.FioParametersToJob(cmd).__str__(), mock_json)
+        fio.FioParametersToJob(cmd).__str__(), mock_json
+    )
     for s in new_samples:
       s.metadata.update(additional_metadata)
     samples += new_samples
@@ -96,8 +101,10 @@ def _ParseCHResultsJson(results_json):
   """
   metadata = {}
   _ExtractMetadata(metadata)
-  return [sample.Sample(metric, val, '', metadata)
-          for metric, val in json.loads(results_json).items()]
+  return [
+      sample.Sample(metric, val, '', metadata)
+      for metric, val in json.loads(results_json).items()
+  ]
 
 
 def ParseOutput(results_json, fio_json_list):
@@ -106,11 +113,13 @@ def ParseOutput(results_json, fio_json_list):
   Args:
     results_json: string. Json output reported by CloudHarmony.
     fio_json_list: list of string. Json output strings from fio command.
+
   Returns:
      A list of sample.Sample object.
   """
   return _ParseCHResultsJson(results_json) + [
-      s for fio_json in fio_json_list for s in _ParseFioJson(fio_json)]
+      s for fio_json in fio_json_list for s in _ParseFioJson(fio_json)
+  ]
 
 
 def _ExtractMetadata(metadata):

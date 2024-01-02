@@ -23,8 +23,10 @@ from perfkitbenchmarker import test_util
 MOUNT_POINT = '/scratch'
 
 
-@unittest.skipUnless('PERFKIT_INTEGRATION' in os.environ,
-                     'PERFKIT_INTEGRATION not in environment')
+@unittest.skipUnless(
+    'PERFKIT_INTEGRATION' in os.environ,
+    'PERFKIT_INTEGRATION not in environment',
+)
 class GcpScratchDiskIntegrationTest(unittest.TestCase):
   """Integration tests for GCE disks.
 
@@ -35,70 +37,79 @@ class GcpScratchDiskIntegrationTest(unittest.TestCase):
     pkb.SetUpPKB()
 
   def testPDStandard(self):
-    test_util.assertDiskMounts({
-        'vm_groups': {
-            'vm_group_1': {
-                'cloud': 'GCP',
-                'vm_spec': {
-                    'GCP': {
-                        'machine_type': 'n1-standard-2',
-                        'zone': 'us-central1-a'
-                    }
-                },
-                'disk_spec': {
-                    'GCP': {
-                        'disk_type': 'pd-standard',
-                        'disk_size': 2,
-                        'mount_point': MOUNT_POINT
-                    }
+    test_util.assertDiskMounts(
+        {
+            'vm_groups': {
+                'vm_group_1': {
+                    'cloud': 'GCP',
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'n1-standard-2',
+                            'zone': 'us-central1-a',
+                        }
+                    },
+                    'disk_spec': {
+                        'GCP': {
+                            'disk_type': 'pd-standard',
+                            'disk_size': 2,
+                            'mount_point': MOUNT_POINT,
+                        }
+                    },
                 }
             }
-        }
-    }, MOUNT_POINT)
+        },
+        MOUNT_POINT,
+    )
 
   def testPDSSD(self):
-    test_util.assertDiskMounts({
-        'vm_groups': {
-            'vm_group_1': {
-                'cloud': 'GCP',
-                'vm_spec': {
-                    'GCP': {
-                        'machine_type': 'n1-standard-2',
-                        'zone': 'us-central1-a'
-                    }
-                },
-                'disk_spec': {
-                    'GCP': {
-                        'disk_type': 'pd-ssd',
-                        'disk_size': 2,
-                        'mount_point': MOUNT_POINT
-                    }
+    test_util.assertDiskMounts(
+        {
+            'vm_groups': {
+                'vm_group_1': {
+                    'cloud': 'GCP',
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'n1-standard-2',
+                            'zone': 'us-central1-a',
+                        }
+                    },
+                    'disk_spec': {
+                        'GCP': {
+                            'disk_type': 'pd-ssd',
+                            'disk_size': 2,
+                            'mount_point': MOUNT_POINT,
+                        }
+                    },
                 }
             }
-        }
-    }, MOUNT_POINT)
+        },
+        MOUNT_POINT,
+    )
 
   def testLocalSSD(self):
-    test_util.assertDiskMounts({
-        'vm_groups': {
-            'vm_group_1': {
-                'cloud': 'GCP',
-                'vm_spec': {
-                    'GCP': {
-                        'machine_type': 'n1-standard-2',
-                        'zone': 'us-central1-a',
-                        'num_local_ssds': 1
-                    }
-                },
-                'disk_spec': {
-                    'GCP': {
-                        'disk_type': 'local',
-                        'mount_point': MOUNT_POINT
-                    }
+    test_util.assertDiskMounts(
+        {
+            'vm_groups': {
+                'vm_group_1': {
+                    'cloud': 'GCP',
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'n1-standard-2',
+                            'zone': 'us-central1-a',
+                            'num_local_ssds': 1,
+                        }
+                    },
+                    'disk_spec': {
+                        'GCP': {
+                            'disk_type': 'local',
+                            'mount_point': MOUNT_POINT,
+                        }
+                    },
                 }
             }
-        }
-    }, MOUNT_POINT)
+        },
+        MOUNT_POINT,
+    )
 
 
 if __name__ == '__main__':

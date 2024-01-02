@@ -33,9 +33,9 @@ class AzureCliTest(unittest.TestCase):
     expects.
 
     Args:
-      call_args_singles: List of single arguments sent to the mock_method,
-        ie ['x', 'y'] is for when mock_method was called twice: once with
-        x and then with y.
+      call_args_singles: List of single arguments sent to the mock_method, ie
+        ['x', 'y'] is for when mock_method was called twice: once with x and
+        then with y.
       mock_method: Method that was mocked and called with call_args_singles.
     """
     # convert from ['a', 'b'] into [(('a',),), (('b',),)]
@@ -73,14 +73,16 @@ class AzureCliTest(unittest.TestCase):
   def testYumInstall(self):
     azure_cli.YumInstall(self.vm)
     self.assertRemoteCommandsEqual([
-        'echo "[azure-cli]\n'
-        'name=Azure CLI\n'
-        'baseurl=https://packages.microsoft.com/yumrepos/azure-cli\n'
-        'enabled=1\n'
-        'gpgcheck=1\n'
-        'gpgkey=https://packages.microsoft.com/keys/microsoft.asc\n"'
-        ' | sudo tee /etc/yum.repos.d/azure-cli.repo',
-        'sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc'
+        (
+            'echo "[azure-cli]\n'
+            'name=Azure CLI\n'
+            'baseurl=https://packages.microsoft.com/yumrepos/azure-cli\n'
+            'enabled=1\n'
+            'gpgcheck=1\n'
+            'gpgkey=https://packages.microsoft.com/keys/microsoft.asc\n"'
+            ' | sudo tee /etc/yum.repos.d/azure-cli.repo'
+        ),
+        'sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc',
     ])
     self.assertInstallPackageCommandsEqual(['azure-cli'])
     self.assertOnlyKnownMethodsCalled('RemoteCommand', 'InstallPackages')
@@ -94,17 +96,23 @@ class AzureCliTest(unittest.TestCase):
       )
       return
     self.assertRemoteCommandsEqual([
-        'lsb_release -cs', 'echo "deb [arch=amd64] '
-        'https://packages.microsoft.com/repos/azure-cli/ wheezy main" | sudo '
-        'tee /etc/apt/sources.list.d/azure-cli.list',
-        'curl -L https://packages.microsoft.com/keys/microsoft.asc | sudo '
-        'apt-key add -',
-        'sudo apt-get update'
+        'lsb_release -cs',
+        (
+            'echo "deb [arch=amd64]'
+            ' https://packages.microsoft.com/repos/azure-cli/ wheezy main"'
+            ' | sudo tee /etc/apt/sources.list.d/azure-cli.list'
+        ),
+        (
+            'curl -L https://packages.microsoft.com/keys/microsoft.asc |'
+            ' sudo apt-key add -'
+        ),
+        'sudo apt-get update',
     ])
     self.assertInstallPackageCommandsEqual(['apt-transport-https', 'azure-cli'])
     self.assertVmInstallCommandsEqual(['python', 'lsb_release', 'curl'])
-    self.assertOnlyKnownMethodsCalled('RemoteCommand', 'Install',
-                                      'InstallPackages')
+    self.assertOnlyKnownMethodsCalled(
+        'RemoteCommand', 'Install', 'InstallPackages'
+    )
 
 
 if __name__ == '__main__':

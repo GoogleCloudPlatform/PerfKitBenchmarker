@@ -408,6 +408,7 @@ class A10x2HighAccuracyTriton(A10x2Triton):
 )
 class H100x1(ServerGPUBaseConfig):
   """Base DLRM H100 config."""
+
   system = KnownSystem.H100x1
   use_small_tile_gemm_plugin = False
   use_jemalloc = True

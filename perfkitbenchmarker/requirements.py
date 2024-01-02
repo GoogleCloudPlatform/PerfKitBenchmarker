@@ -15,9 +15,8 @@
 
 from collections import deque
 import os
-import pkg_resources
-
 from perfkitbenchmarker import errors
+import pkg_resources
 
 
 # Path of the root of the current git branch.
@@ -44,8 +43,10 @@ def _CheckRequirements(requirements_file_path):
             lines = deque(fp.readlines())
         elif line:
           pkg_resources.require(line)
-  except (pkg_resources.DistributionNotFound,
-          pkg_resources.VersionConflict) as e:
+  except (
+      pkg_resources.DistributionNotFound,
+      pkg_resources.VersionConflict,
+  ) as e:
     # In newer versions of setuptools, these exception classes have a report
     # method that provides a readable description of the error.
     report = getattr(e, 'report', None)
@@ -56,7 +57,9 @@ def _CheckRequirements(requirements_file_path):
         'command:{linesep}pip install -r "{path}"{linesep}To bypass package '
         'requirement checks, run PerfKit Benchmarker with the '
         '--ignore_package_requirements flag.'.format(
-            linesep=os.linesep, msg=err_msg, path=requirements_file_path))
+            linesep=os.linesep, msg=err_msg, path=requirements_file_path
+        )
+    )
 
 
 def CheckBasicRequirements():
@@ -68,8 +71,7 @@ def CheckBasicRequirements():
   directory. If such a file does not exist, then the requirements check is
   skipped.
   """
-  requirements_file_path = os.path.join(_BRANCH_ROOT_DIR,
-                                        'requirements.txt')
+  requirements_file_path = os.path.join(_BRANCH_ROOT_DIR, 'requirements.txt')
   if os.path.isfile(requirements_file_path):
     _CheckRequirements(requirements_file_path)
 
@@ -87,7 +89,11 @@ def CheckProviderRequirements(provider):
     provider: string. Lowercase name of the cloud provider (e.g. 'gcp').
   """
   requirements_file_path = os.path.join(
-      _BRANCH_ROOT_DIR, 'perfkitbenchmarker', 'providers', provider,
-      'requirements.txt')
+      _BRANCH_ROOT_DIR,
+      'perfkitbenchmarker',
+      'providers',
+      provider,
+      'requirements.txt',
+  )
   if os.path.isfile(requirements_file_path):
     _CheckRequirements(requirements_file_path)

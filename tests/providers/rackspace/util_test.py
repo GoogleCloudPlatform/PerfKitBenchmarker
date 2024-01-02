@@ -16,7 +16,6 @@
 
 import unittest
 import mock
-
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.rackspace import util
 import six
@@ -50,16 +49,31 @@ class RackCLICommandTestCase(unittest.TestCase):
   def testCommonFlagsWithoutOptionalFlags(self):
     rack_resource = RackspaceResource(profile=None)
     cmd = util.RackCLICommand(rack_resource, 'servers', 'image', 'list')
-    self.assertEqual(cmd._GetCommand(), [
-        'path/rack', 'servers', 'image', 'list', '--output', 'json'])
+    self.assertEqual(
+        cmd._GetCommand(),
+        ['path/rack', 'servers', 'image', 'list', '--output', 'json'],
+    )
 
   def testCommonFlagsWithOptionalFlags(self):
     rack_resource = RackspaceResource(profile='US', region='DFW')
     cmd = util.RackCLICommand(rack_resource, 'servers', 'keypair', 'list')
     cmd.flags['all-pages'] = True
-    self.assertEqual(cmd._GetCommand(), [
-        'path/rack', 'servers', 'keypair', 'list', '--all-pages',
-        '--output', 'json', '--profile', 'US', '--region', 'DFW'])
+    self.assertEqual(
+        cmd._GetCommand(),
+        [
+            'path/rack',
+            'servers',
+            'keypair',
+            'list',
+            '--all-pages',
+            '--output',
+            'json',
+            '--profile',
+            'US',
+            '--region',
+            'DFW',
+        ],
+    )
 
 
 if __name__ == '__main__':

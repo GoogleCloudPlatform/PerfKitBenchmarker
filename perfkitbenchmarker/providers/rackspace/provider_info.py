@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for Rackspace
-
-"""
+"""Provider info for Rackspace"""
 
 from perfkitbenchmarker import provider_info
 
 
 class RackspaceProviderInfo(provider_info.BaseProviderInfo):
-
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
   CLOUD = provider_info.RACKSPACE

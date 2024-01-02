@@ -34,7 +34,8 @@ class AutoRegisterBackgroundWorkloadMeta(type):
 
 
 class BaseBackgroundWorkload(
-    six.with_metaclass(AutoRegisterBackgroundWorkloadMeta, object)):
+    six.with_metaclass(AutoRegisterBackgroundWorkloadMeta, object)
+):
   """Baseclass for background workloads."""
 
   EXCLUDED_OS_TYPES = []
@@ -81,7 +82,9 @@ class CpuWorkload(BaseBackgroundWorkload):
     """Starts the background workload on this VM."""
     vm.RemoteCommand(
         'nohup sysbench --num-threads=%s --test=cpu --cpu-max-prime=10000000 '
-        'run 1> /dev/null 2> /dev/null &' % vm.background_cpu_threads)
+        'run 1> /dev/null 2> /dev/null &'
+        % vm.background_cpu_threads
+    )
 
   @staticmethod
   def Stop(vm):
@@ -108,8 +111,9 @@ class NetworkWorkload(BaseBackgroundWorkload):
   def Start(vm):
     """Starts the background workload on this VM."""
     vm.AllowPort(BACKGROUND_IPERF_PORT)
-    vm.RemoteCommand('nohup iperf --server --port %s &> /dev/null &' %
-                     BACKGROUND_IPERF_PORT)
+    vm.RemoteCommand(
+        'nohup iperf --server --port %s &> /dev/null &' % BACKGROUND_IPERF_PORT
+    )
     stdout, _ = vm.RemoteCommand('pgrep iperf -n')
     vm.server_pid = stdout.strip()
 
@@ -117,10 +121,15 @@ class NetworkWorkload(BaseBackgroundWorkload):
       ip_address = vm.ip_address
     else:
       ip_address = vm.internal_ip
-    iperf_cmd = ('nohup iperf --client %s --port %s --time %s -u -b %sM '
-                 '&> /dev/null &' % (ip_address, BACKGROUND_IPERF_PORT,
-                                     BACKGROUND_IPERF_SECONDS,
-                                     vm.background_network_mbits_per_sec))
+    iperf_cmd = (
+        'nohup iperf --client %s --port %s --time %s -u -b %sM &> /dev/null &'
+        % (
+            ip_address,
+            BACKGROUND_IPERF_PORT,
+            BACKGROUND_IPERF_SECONDS,
+            vm.background_network_mbits_per_sec,
+        )
+    )
 
     vm.RemoteCommand(iperf_cmd)
     stdout, _ = vm.RemoteCommand('pgrep iperf -n')

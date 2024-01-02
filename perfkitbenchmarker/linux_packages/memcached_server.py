@@ -25,13 +25,12 @@ FLAGS = flags.FLAGS
 
 MEMCACHED_PORT = 11211
 
-flags.DEFINE_integer('memcached_size_mb', 64,
-                     'Size of memcached cache in megabytes.')
+flags.DEFINE_integer(
+    'memcached_size_mb', 64, 'Size of memcached cache in megabytes.'
+)
 
-flags.DEFINE_integer('memcached_num_threads', 4,
-                     'Number of worker threads.')
-flags.DEFINE_string('memcached_version', '1.6.9',
-                    'Memcached version to use.')
+flags.DEFINE_integer('memcached_num_threads', 4, 'Number of worker threads.')
+flags.DEFINE_string('memcached_version', '1.6.9', 'Memcached version to use.')
 
 DIR = linux_packages.INSTALL_DIR
 
@@ -47,7 +46,8 @@ def _Install(vm):
       f'memcached-{FLAGS.memcached_version}.tar.gz --no-check-certificate; '
       f'tar -zxvf memcached-{FLAGS.memcached_version}.tar.gz; '
       f'cd memcached-{FLAGS.memcached_version}; '
-      './configure && make && sudo make install')
+      './configure && make && sudo make install'
+  )
 
 
 def YumInstall(vm):
@@ -60,8 +60,11 @@ def AptInstall(vm):
   _Install(vm)
 
 
-@vm_util.Retry(poll_interval=5, timeout=300,
-               retryable_exceptions=(errors.Resource.RetryableCreationError))
+@vm_util.Retry(
+    poll_interval=5,
+    timeout=300,
+    retryable_exceptions=(errors.Resource.RetryableCreationError),
+)
 def _WaitForServerUp(vm, port=MEMCACHED_PORT):
   """Block until the memcached server is up and responsive.
 
@@ -86,16 +89,19 @@ def _WaitForServerUp(vm, port=MEMCACHED_PORT):
   logging.info('Trying to connect to memcached at %s:%s', address, port)
   try:
     out, _ = vm.RemoteCommand(
-        '(echo -e "stats\n")| netcat -q 1 %s %s' % (address, port))
+        '(echo -e "stats\n")| netcat -q 1 %s %s' % (address, port)
+    )
     if out.startswith('STAT '):
       logging.info('memcached server stats received. Server up and running.')
       return
   except errors.VirtualMachine.RemoteCommandError as e:
     raise errors.Resource.RetryableCreationError(
-        'memcached server not up yet: %s.' % str(e))
+        'memcached server not up yet: %s.' % str(e)
+    )
   else:
     raise errors.Resource.RetryableCreationError(
-        'memcached server not up yet. Expected "STAT" but got "%s".' % out)
+        'memcached server not up yet. Expected "STAT" but got "%s".' % out
+    )
 
 
 def ConfigureAndStart(vm, port=MEMCACHED_PORT, smp_affinity=False):
@@ -124,7 +130,8 @@ def ConfigureAndStart(vm, port=MEMCACHED_PORT, smp_affinity=False):
       # update memory size
       f'-m {FLAGS.memcached_size_mb} '
       # update security config to allow incoming network
-      '-l 0.0.0.0 -v &> log &')
+      '-l 0.0.0.0 -v &> log &'
+  )
 
   _WaitForServerUp(vm, port)
   logging.info('memcached server configured and started.')
@@ -132,8 +139,9 @@ def ConfigureAndStart(vm, port=MEMCACHED_PORT, smp_affinity=False):
 
 def GetVersion(vm):
   """Returns the version of the memcached server installed."""
-  results, _ = vm.RemoteCommand('memcached -help |grep -m 1 "memcached"'
-                                '| tr -d "\n"')
+  results, _ = vm.RemoteCommand(
+      'memcached -help |grep -m 1 "memcached"| tr -d "\n"'
+  )
   return results
 
 
@@ -143,7 +151,8 @@ def StopMemcached(vm):
 
 def FlushMemcachedServer(ip, port):
   vm_util.IssueCommand(
-      ['(echo -e "flush_all\n" ; sleep 1)| netcat %s %s' % (ip, port)])
+      ['(echo -e "flush_all\n" ; sleep 1)| netcat %s %s' % (ip, port)]
+  )
 
 
 def AptUninstall(vm):

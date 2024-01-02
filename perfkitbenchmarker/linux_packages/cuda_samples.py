@@ -16,22 +16,27 @@
 from absl import flags
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 
-_VERSION = flags.DEFINE_enum('cuda_samples_version', None, [
-    '9.0',
-    '10.0',
-    '10.1',
-    '10.2',
-    '11.0',
-    '11.1',
-    '11.2',
-    '11.4',
-    '11.5',
-    '11.6',
-    '11.7',
-    '11.8',
-    '12.0',
-    '12.1',
-], 'Version of CUDA samples to install.')
+_VERSION = flags.DEFINE_enum(
+    'cuda_samples_version',
+    None,
+    [
+        '9.0',
+        '10.0',
+        '10.1',
+        '10.2',
+        '11.0',
+        '11.1',
+        '11.2',
+        '11.4',
+        '11.5',
+        '11.6',
+        '11.7',
+        '11.8',
+        '12.0',
+        '12.1',
+    ],
+    'Version of CUDA samples to install.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -42,8 +47,10 @@ def Install(vm):
   vm.Install('cuda_toolkit')
   vm.InstallPackages('libfreeimage3 libfreeimage-dev')
   version = _VERSION.value or FLAGS.cuda_toolkit_version
-  vm.RemoteCommand(f'git clone --branch v{version} --depth 1 '
-                   'https://github.com/NVIDIA/cuda-samples.git')
+  vm.RemoteCommand(
+      f'git clone --branch v{version} --depth 1 '
+      'https://github.com/NVIDIA/cuda-samples.git'
+  )
   vm.RemoteCommand('cd cuda-samples && make')
 
 
@@ -53,7 +60,9 @@ def GetBandwidthTestPath(vm):
     return BANDWIDTH_TEST_PATH
 
   cpu_arch = cuda_toolkit.GetCpuArchPath(vm)
-  bandwidth_test_path = f'cuda-samples/bin/{cpu_arch}/linux/release/bandwidthTest'
+  bandwidth_test_path = (
+      f'cuda-samples/bin/{cpu_arch}/linux/release/bandwidthTest'
+  )
   if vm.TryRemoteCommand(f'stat {bandwidth_test_path}'):
     return bandwidth_test_path
 

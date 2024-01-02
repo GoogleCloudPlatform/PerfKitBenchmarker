@@ -59,9 +59,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [53.644, 88.0],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
         pkb_sample.Sample(
             metric=asadm.MEMORY_USED_PERCENTAGES_METRIC,
@@ -70,9 +70,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [4.82, 14.82],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
         pkb_sample.Sample(
             metric=asadm.DISK_USED_METRIC,
@@ -81,9 +81,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [898.540, 1200.0],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
         pkb_sample.Sample(
             metric=asadm.DISK_USED_PERCENTAGES_METRIC,
@@ -92,9 +92,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [3.66, 13.66],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
     ]
     self.assertSampleListsEqualUpToTimestamp(samples, expected_samples)
@@ -114,9 +114,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [12.0, 21.0],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
         pkb_sample.Sample(
             metric=asadm.READ_LATENCY_OVER_1_MS_METRIC,
@@ -125,9 +125,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [1.1, 9.1],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
         pkb_sample.Sample(
             metric=asadm.READ_LATENCY_OVER_8_MS_METRIC,
@@ -136,9 +136,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [2.2, 8.2],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
         pkb_sample.Sample(
             metric=asadm.READ_LATENCY_OVER_64_MS_METRIC,
@@ -147,9 +147,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [3.3, 7.3],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
         pkb_sample.Sample(
             metric=asadm.WRITE_IOPS_METRIC,
@@ -158,9 +158,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [10.0, 22.0],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
         pkb_sample.Sample(
             metric=asadm.WRITE_LATENCY_OVER_1_MS_METRIC,
@@ -169,9 +169,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [7.7, 3.7],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
         pkb_sample.Sample(
             metric=asadm.WRITE_LATENCY_OVER_8_MS_METRIC,
@@ -180,9 +180,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [8.8, 2.8],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
         pkb_sample.Sample(
             metric=asadm.WRITE_LATENCY_OVER_64_MS_METRIC,
@@ -191,9 +191,9 @@ class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
             metadata={
                 'values': [9.9, 1.9],
                 'interval': self.interval,
-                'timestamps': expected_timestamps
+                'timestamps': expected_timestamps,
             },
-            timestamp=0
+            timestamp=0,
         ),
     ]
     self.assertSampleListsEqualUpToTimestamp(samples, expected_samples)

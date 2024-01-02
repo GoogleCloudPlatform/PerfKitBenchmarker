@@ -3,7 +3,6 @@
 import unittest
 from absl.testing import flagsaver
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
@@ -15,9 +14,11 @@ from tests import pkb_common_test_case
 def MockBenchmarkSpec():
   benchmark_module = mock.Mock(BENCHMARK_NAME='omb')
   benchmark_config = mock.Mock(
-      vm_groups={}, relational_db=mock.Mock(vm_groups={}))
-  spec = benchmark_spec.BenchmarkSpec(benchmark_module, benchmark_config,
-                                      'abcdefg')
+      vm_groups={}, relational_db=mock.Mock(vm_groups={})
+  )
+  spec = benchmark_spec.BenchmarkSpec(
+      benchmark_module, benchmark_config, 'abcdefg'
+  )
   spec.vms = [mock.Mock(), mock.Mock()]
   return spec
 
@@ -25,13 +26,7 @@ def MockBenchmarkSpec():
 _RUN_RESULT = result = omb.RunResult(
     name='acc_latency',
     metadata={'a': 1},
-    data=[{
-        'latency': 10,
-        'foo': 100
-    }, {
-        'latency': 20,
-        'foo': 200
-    }],
+    data=[{'latency': 10, 'foo': 100}, {'latency': 20, 'foo': 200}],
     full_cmd='mpirun path/to/acc_latency',
     units='usec',
     params={'b': 2},
@@ -42,10 +37,8 @@ _RUN_RESULT = result = omb.RunResult(
     run_time=0,
     pinning=['0:0:0,1,15', '1:1:0,1,15', '2:0:2,16,17', '3:1:2,16,17'],
     perhost=1,
-    mpi_env={
-        'I_MPI_DEBUG': '6',
-        'I_MPI_PIN_PROCESSOR_LIST': '0'
-    })
+    mpi_env={'I_MPI_DEBUG': '6', 'I_MPI_PIN_PROCESSOR_LIST': '0'},
+)
 
 _COMMON_METADATA = {
     'cmd': 'mpirun path/to/acc_latency',
@@ -69,8 +62,9 @@ _EXPECTED_SAMPLES = [
 ]
 
 
-class OmbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
-                       test_util.SamplesTestMixin):
+class OmbBenchmarkTest(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super().setUp()
@@ -107,7 +101,8 @@ class OmbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
         continue
       for size in (1024, 2048):
         expected_calls.append(
-            mock.call(omb.RunRequest(name, bm_spec.vms, size)))
+            mock.call(omb.RunRequest(name, bm_spec.vms, size))
+        )
     mock_run.assert_has_calls(expected_calls)
 
 

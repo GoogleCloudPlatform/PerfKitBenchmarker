@@ -16,7 +16,6 @@
 
 import unittest
 import mock
-
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import utils
@@ -54,39 +53,46 @@ class OpenStackCLICommandTestCase(unittest.TestCase):
   def testCommonFlagsWithoutOptionalFlags(self):
     rack_resource = OpenStackResource()
     cmd = utils.OpenStackCLICommand(rack_resource, 'image', 'list')
-    self.assertEqual(cmd._GetCommand(), [
-        'path/openstack', 'image', 'list', '--format', 'json'])
+    self.assertEqual(
+        cmd._GetCommand(),
+        ['path/openstack', 'image', 'list', '--format', 'json'],
+    )
 
   def testCommonFlagsWithOptionalFlags(self):
     rack_resource = OpenStackResource()
     cmd = utils.OpenStackCLICommand(rack_resource, 'image', 'list')
     cmd.flags['public'] = True
-    self.assertEqual(cmd._GetCommand(), [
-        'path/openstack', 'image', 'list', '--format', 'json', '--public'])
+    self.assertEqual(
+        cmd._GetCommand(),
+        ['path/openstack', 'image', 'list', '--format', 'json', '--public'],
+    )
 
   @mock.patch.object(vm_util, 'IssueCommand')
   def testIssueCommandRaiseOnFailureDefault(self, mock_cmd):
     rack_resource = OpenStackResource()
     cmd = utils.OpenStackCLICommand(rack_resource)
     cmd.Issue()
-    mock_cmd.assert_called_with(['path/openstack', '--format', 'json'],
-                                raise_on_failure=False)
+    mock_cmd.assert_called_with(
+        ['path/openstack', '--format', 'json'], raise_on_failure=False
+    )
 
   @mock.patch.object(vm_util, 'IssueCommand')
   def testIssueCommandRaiseOnFailureTrue(self, mock_cmd):
     rack_resource = OpenStackResource()
     cmd = utils.OpenStackCLICommand(rack_resource)
     cmd.Issue(raise_on_failure=True)
-    mock_cmd.assert_called_with(['path/openstack', '--format', 'json'],
-                                raise_on_failure=True)
+    mock_cmd.assert_called_with(
+        ['path/openstack', '--format', 'json'], raise_on_failure=True
+    )
 
   @mock.patch.object(vm_util, 'IssueCommand')
   def testIssueCommandRaiseOnFailureFalse(self, mock_cmd):
     rack_resource = OpenStackResource()
     cmd = utils.OpenStackCLICommand(rack_resource)
     cmd.Issue(raise_on_failure=False)
-    mock_cmd.assert_called_with(['path/openstack', '--format', 'json'],
-                                raise_on_failure=False)
+    mock_cmd.assert_called_with(
+        ['path/openstack', '--format', 'json'], raise_on_failure=False
+    )
 
 
 if __name__ == '__main__':

@@ -17,7 +17,7 @@ import collections
 import copy
 import logging
 import statistics
-from typing import Any, List, Dict
+from typing import Any, Dict, List
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -182,7 +182,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
         # If more than 1 sequential value is missing from the time series.
         # Distrubute the ops throughout the time series
         if i > 0:
-          time_gap_in_seconds = ((time - time_series[i - 1]) / 1000)
+          time_gap_in_seconds = (time - time_series[i - 1]) / 1000
           missing_entry_count = int((time_gap_in_seconds / interval) - 1)
           if missing_entry_count > 1:
             interval_values.extend(

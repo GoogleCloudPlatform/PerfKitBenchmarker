@@ -23,9 +23,13 @@ separate installer here for 0.5 and later.
 from perfkitbenchmarker import linux_packages
 
 SYSBENCH05PLUS_PATH = '%s/bin/sysbench' % linux_packages.INSTALL_DIR
-PREPARE_SCRIPT_PATH = ('%s/share/doc/sysbench/tests/db/parallel_prepare.lua' %
-                       linux_packages.INSTALL_DIR)
-OLTP_SCRIPT_PATH = '%s/share/doc/sysbench/tests/db/oltp.lua' % linux_packages.INSTALL_DIR
+PREPARE_SCRIPT_PATH = (
+    '%s/share/doc/sysbench/tests/db/parallel_prepare.lua'
+    % linux_packages.INSTALL_DIR
+)
+OLTP_SCRIPT_PATH = (
+    '%s/share/doc/sysbench/tests/db/oltp.lua' % linux_packages.INSTALL_DIR
+)
 
 
 def _Install(vm):
@@ -34,27 +38,36 @@ def _Install(vm):
   vm.InstallPackages('bzr')
   vm.RemoteCommand('cd ~ && bzr branch lp:sysbench')
   vm.RemoteCommand(
-      ('cd ~/sysbench && ./autogen.sh &&'
-       ' ./configure --prefix=%s --mandir=%s/share/man &&'
-       ' make') % (linux_packages.INSTALL_DIR, linux_packages.INSTALL_DIR))
+      (
+          'cd ~/sysbench && ./autogen.sh &&'
+          ' ./configure --prefix=%s --mandir=%s/share/man &&'
+          ' make'
+      )
+      % (linux_packages.INSTALL_DIR, linux_packages.INSTALL_DIR)
+  )
   vm.RemoteCommand('cd ~/sysbench && sudo make install')
-  vm.RemoteCommand('sudo mkdir %s/share/doc/sysbench/tests/db -p' %
-                   linux_packages.INSTALL_DIR)
-  vm.RemoteCommand('sudo cp ~/sysbench/sysbench/tests/db/*'
-                   ' %s/share/doc/sysbench/tests/db/' %
-                   linux_packages.INSTALL_DIR)
+  vm.RemoteCommand(
+      'sudo mkdir %s/share/doc/sysbench/tests/db -p'
+      % linux_packages.INSTALL_DIR
+  )
+  vm.RemoteCommand(
+      'sudo cp ~/sysbench/sysbench/tests/db/* %s/share/doc/sysbench/tests/db/'
+      % linux_packages.INSTALL_DIR
+  )
 
 
 def YumInstall(vm):
-  """ Installs SysBench 0.5 for Rhel/CentOS. We have to build from source!"""
+  """Installs SysBench 0.5 for Rhel/CentOS. We have to build from source!"""
   vm.InstallPackages('mysql mysql-server mysql-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the sysbench 0.5 on the VM."""
-  vm.RemoteCommand('sudo ln -s /usr/lib/x86_64-linux-gnu/libmysqlclient.so '
-                   '/usr/lib/x86_64-linux-gnu/libmysqlclient_r.so')
+  vm.RemoteCommand(
+      'sudo ln -s /usr/lib/x86_64-linux-gnu/libmysqlclient.so '
+      '/usr/lib/x86_64-linux-gnu/libmysqlclient_r.so'
+  )
   vm.InstallPackages('mysql-client mysql-server libmysqlclient-dev')
   _Install(vm)
 

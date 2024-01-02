@@ -21,9 +21,12 @@ from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 
-flags.DEFINE_boolean('openstack_swift_insecure', False,
-                     'Allow swiftclient to access Swift service without \n'
-                     'having to verify the SSL certificate')
+flags.DEFINE_boolean(
+    'openstack_swift_insecure',
+    False,
+    'Allow swiftclient to access Swift service without \n'
+    'having to verify the SSL certificate',
+)
 
 FLAGS = flags.FLAGS
 
@@ -39,19 +42,27 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
     self.swift_command_prefix = ''
 
   def PrepareService(self, location):
-    openstack_creds_set = ('OS_AUTH_URL' in os.environ,
-                           'OS_TENANT_NAME' in os.environ,
-                           'OS_USERNAME' in os.environ,
-                           'OS_PASSWORD' in os.environ,)
+    openstack_creds_set = (
+        'OS_AUTH_URL' in os.environ,
+        'OS_TENANT_NAME' in os.environ,
+        'OS_USERNAME' in os.environ,
+        'OS_PASSWORD' in os.environ,
+    )
     if not all(openstack_creds_set):
       raise errors.Benchmarks.MissingObjectCredentialException(
-          'OpenStack credentials not found in environment variables')
+          'OpenStack credentials not found in environment variables'
+      )
 
     self.swift_command_parts = [
-        '--os-auth-url', os.environ['OS_AUTH_URL'],
-        '--os-tenant-name', os.environ['OS_TENANT_NAME'],
-        '--os-username', os.environ['OS_USERNAME'],
-        '--os-password', os.environ['OS_PASSWORD']]
+        '--os-auth-url',
+        os.environ['OS_AUTH_URL'],
+        '--os-tenant-name',
+        os.environ['OS_TENANT_NAME'],
+        '--os-username',
+        os.environ['OS_USERNAME'],
+        '--os-password',
+        os.environ['OS_PASSWORD'],
+    ]
     if FLAGS.openstack_swift_insecure:
       self.swift_command_parts.append('--insecure')
 
@@ -61,7 +72,8 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
     del tag_bucket
     _, stderr, ret_code = vm_util.IssueCommand(
         ['swift'] + self.swift_command_parts + ['post', bucket],
-        raise_on_failure=False)
+        raise_on_failure=False,
+    )
     if ret_code and raise_on_failure:
       raise errors.Benchmarks.BucketCreationError(stderr)
 
@@ -70,7 +82,8 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
 
     vm_util.IssueCommand(
         ['swift'] + self.swift_command_parts + ['delete', bucket],
-        raise_on_failure=False)
+        raise_on_failure=False,
+    )
 
   def Copy(self, src_url, dst_url):
     """See base class."""
@@ -95,7 +108,8 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
   def EmptyBucket(self, bucket):
     vm_util.IssueCommand(
         ['swift'] + self.swift_command_parts + ['delete', bucket],
-        raise_on_failure=False)
+        raise_on_failure=False,
+    )
 
   def PrepareVM(self, vm):
     vm.Install('swift_client')
@@ -107,13 +121,18 @@ class SwiftStorageService(object_storage_service.ObjectStorageService):
   def CLIUploadDirectory(self, vm, directory, file_names, bucket):
     return vm.RemoteCommand(
         'time swift %s upload %s %s'
-        % (self.swift_command_prefix, bucket, directory))
+        % (self.swift_command_prefix, bucket, directory)
+    )
 
   def CLIDownloadBucket(self, vm, bucket, objects, dest):
     return vm.RemoteCommand(
         'time swift %s download %s -D %s'
-        % (self.swift_command_prefix, bucket, dest))
+        % (self.swift_command_prefix, bucket, dest)
+    )
 
   def Metadata(self, vm):
-    return {SWIFTCLIENT_LIB_VERSION:
-            linux_packages.GetPipPackageVersion(vm, 'python-swiftclient')}
+    return {
+        SWIFTCLIENT_LIB_VERSION: linux_packages.GetPipPackageVersion(
+            vm, 'python-swiftclient'
+        )
+    }

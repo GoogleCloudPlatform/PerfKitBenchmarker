@@ -17,7 +17,6 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
-
 from tests import pkb_common_test_case
 from perfkitbenchmarker.traces import tcpdump
 
@@ -25,8 +24,9 @@ FLAGS = flags.FLAGS
 
 _OUTPUT_FILE = '/tmp/x.pcap'
 # all vm.RemoteCommands to launch tcpdump look like this
-_CMD_FORMAT = ('sudo tcpdump -n -w {output_file} {{command}} '
-               '> /dev/null 2>&1 & echo $!').format(output_file=_OUTPUT_FILE)
+_CMD_FORMAT = (
+    'sudo tcpdump -n -w {output_file} {{command}} > /dev/null 2>&1 & echo $!'
+).format(output_file=_OUTPUT_FILE)
 
 
 class TcpdumpTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -76,7 +76,8 @@ class TcpdumpTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm.RemoteCommand.reset_mock()
     collector._StopOnVm(vm, 'roleA')
     vm.RemoteCommand.assert_called_with(
-        'sudo kill -s INT pid1234; sleep 3', ignore_failure=True)
+        'sudo kill -s INT pid1234; sleep 3', ignore_failure=True
+    )
 
 
 if __name__ == '__main__':

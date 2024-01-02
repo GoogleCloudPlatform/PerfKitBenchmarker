@@ -31,17 +31,20 @@ def AptInstall(vm: virtual_machine.BaseVirtualMachine) -> None:
   tmp_dir = vm.scratch_disks[0].mount_point
   vm.DownloadPreprovisionedData(tmp_dir, 'amdgpu', _AMD_DRIVER)
   vm.RemoteCommand(
-      f'tar -xf {posixpath.join(tmp_dir, _AMD_DRIVER)} -C {tmp_dir}')
+      f'tar -xf {posixpath.join(tmp_dir, _AMD_DRIVER)} -C {tmp_dir}'
+  )
   vm.InstallPackages('linux-modules-extra-$(uname -r)')
-  install_file = posixpath.join(tmp_dir,
-                                'amdgpu-pro-20.20-1184451-ubuntu-18.04',
-                                'amdgpu-pro-install')
+  install_file = posixpath.join(
+      tmp_dir, 'amdgpu-pro-20.20-1184451-ubuntu-18.04', 'amdgpu-pro-install'
+  )
   vm.RemoteCommand(f'{install_file} -y --opencl=pal,legacy')
   vm.RemoteCommand(
-      'echo -e "Section \\\"Device\\\"\n  Identifier  \\\"AMD\\\"\n'
-      '  Driver  \\\"amdgpu\\\"\nEndSection" | sudo tee /etc/X11/xorg.conf')
+      'echo -e "Section \\"Device\\"\n  Identifier  \\"AMD\\"\n'
+      '  Driver  \\"amdgpu\\"\nEndSection" | sudo tee /etc/X11/xorg.conf'
+  )
   vm.RemoteCommand(
-      'echo "allowed_users=anybody" | sudo tee /etc/X11/Xwrapper.config')
+      'echo "allowed_users=anybody" | sudo tee /etc/X11/Xwrapper.config'
+  )
   vm.InstallPackages('x11vnc xorg xserver-xorg-video-amdgpu')
   vm.RemoteCommand(
       'wget https://github.com/GPUOpen-Drivers/AMDVLK/releases/download/v-2021.Q2.5/amdvlk_2021.Q2.5_amd64.deb'
@@ -52,8 +55,10 @@ def AptInstall(vm: virtual_machine.BaseVirtualMachine) -> None:
   vm.RemoteCommand('sudo modprobe amdgpu')
   vm.RemoteCommand('sudo modprobe drm')
   vm.RemoteCommand('sudo chown ubuntu /dev/tty2')
-  vm.RemoteCommand('sudo nohup Xorg :0 -verbose 2 vt2 '
-                   '1> /tmp/stdout.log 2> /tmp/stderr.log &')
+  vm.RemoteCommand(
+      'sudo nohup Xorg :0 -verbose 2 vt2 '
+      '1> /tmp/stdout.log 2> /tmp/stderr.log &'
+  )
 
 
 def YumInstall(vm: virtual_machine.BaseVirtualMachine) -> None:

@@ -17,7 +17,8 @@ class IntelHpcBaseKitTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm.RemoteCommand.assert_called_with(
         'chmod +x 2021.2.0.sh; '
         'sudo ./2021.2.0.sh -a -s --eula accept; '
-        'rm 2021.2.0.sh')
+        'rm 2021.2.0.sh'
+    )
     mock_verify.assert_called_with(vm)
 
   def testVerifyInstall(self):
@@ -26,7 +27,7 @@ class IntelHpcBaseKitTestCase(pkb_common_test_case.PkbCommonTestCase):
     env_1 = ['PATH=/usr/bin']
     env_2 = [
         'PATH=/usr/bin:/opt/intel/oneapi/vtune/2021.2.0/bin64',
-        f'I_MPI_ROOT={mpi_root}'
+        f'I_MPI_ROOT={mpi_root}',
     ]
     vm.RemoteCommand.side_effect = [
         ('\n'.join(env_1), ''),
@@ -38,7 +39,7 @@ class IntelHpcBaseKitTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     vm.RemoteCommand.assert_has_calls([
         mock.call('env'),
-        mock.call('. /opt/intel/oneapi/setvars.sh >/dev/null; env')
+        mock.call('. /opt/intel/oneapi/setvars.sh >/dev/null; env'),
     ])
 
   def testVerifyInstallNoMpiRoot(self):
@@ -52,7 +53,8 @@ class IntelHpcBaseKitTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm = mock.Mock()
     input_vars = {'A': 'B', 'XDG_SESSION_ID': '4'}
     vars_as_text = '\n'.join(
-        f'{key}={value}' for key, value in sorted(input_vars.items()))
+        f'{key}={value}' for key, value in sorted(input_vars.items())
+    )
     vm.RemoteCommand.return_value = vars_as_text, ''
 
     env_vars = intel_oneapi_basekit._GetVariables(vm)

@@ -16,22 +16,27 @@ from tests import pkb_common_test_case
 
 def MockVm():
   return mock.Mock(
-      internal_ip='1.2.3.4', NumCpusForBenchmark=8, BASE_OS_TYPE=os_types.RHEL)
+      internal_ip='1.2.3.4', NumCpusForBenchmark=8, BASE_OS_TYPE=os_types.RHEL
+  )
 
 
 class IntelMpiLibTestCase(pkb_common_test_case.PkbCommonTestCase):
+  MPIVARS_FILE = (
+      '/opt/intel/compilers_and_libraries/linux/mpi/intel64/bin/mpivars.sh'
+  )
 
-  MPIVARS_FILE = ('/opt/intel/compilers_and_libraries/'
-                  'linux/mpi/intel64/bin/mpivars.sh')
-
-  COMPILE_2019 = ('cd mpi-benchmarks; '
-                  '. /opt/intel/mkl/bin/mklvars.sh intel64; '
-                  '. /opt/intel/compilers_and_libraries/'
-                  'linux/bin/compilervars.sh intel64; '
-                  'CC=mpicc CXX=mpicxx make')
-  COMPILE_2021 = ('cd mpi-benchmarks; '
-                  '. /opt/intel/oneapi/setvars.sh; '
-                  'CC=mpicc CXX=mpicxx make')
+  COMPILE_2019 = (
+      'cd mpi-benchmarks; '
+      '. /opt/intel/mkl/bin/mklvars.sh intel64; '
+      '. /opt/intel/compilers_and_libraries/'
+      'linux/bin/compilervars.sh intel64; '
+      'CC=mpicc CXX=mpicxx make'
+  )
+  COMPILE_2021 = (
+      'cd mpi-benchmarks; '
+      '. /opt/intel/oneapi/setvars.sh; '
+      'CC=mpicc CXX=mpicxx make'
+  )
 
   def setUp(self):
     super().setUp()
@@ -42,8 +47,10 @@ class IntelMpiLibTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm = MockVm()
     vm_returns = [
         self.MPIVARS_FILE,
-        ('Intel(R) MPI Library for Linux* OS, '
-         'Version 2018 Update 4 Build 20180823 (id: 18555)')
+        (
+            'Intel(R) MPI Library for Linux* OS, '
+            'Version 2018 Update 4 Build 20180823 (id: 18555)'
+        ),
     ]
     vm.RemoteCommand.side_effect = [(txt, '') for txt in vm_returns]
     return vm
@@ -56,10 +63,15 @@ class IntelMpiLibTestCase(pkb_common_test_case.PkbCommonTestCase):
     # just confirm that the git clone and patch were done
     cmd = ';'.join([cmd[0][0] for cmd in vm.RemoteCommand.call_args_list])
     self.assertRegex(
-        cmd, 'git clone -n https://github.com/intel/mpi-benchmarks.git',
-        'Missing git clone command')
-    self.assertRegex(cmd, 'patch -d mpi-benchmarks -p3 < ~/intelmpi.patch',
-                     'Missing patch command')
+        cmd,
+        'git clone -n https://github.com/intel/mpi-benchmarks.git',
+        'Missing git clone command',
+    )
+    self.assertRegex(
+        cmd,
+        'patch -d mpi-benchmarks -p3 < ~/intelmpi.patch',
+        'Missing patch command',
+    )
 
   def testMpirunMpiVersion(self):
     vm = self.MockVmWithReturnValues()
@@ -84,22 +96,29 @@ class IntelMpiLibTestCase(pkb_common_test_case.PkbCommonTestCase):
     mpirun = imb.MpiRunCommand(vm, hosts, total_processes, 0, [], [], False)
 
     # '-ppn 1' is only seen when running single threaded tests
-    expected_mpirun = (f'mpirun -n {total_processes} -hosts 10.0.0.1,10.0.0.2'
-                       f'{expected_suffix}')
+    expected_mpirun = (
+        f'mpirun -n {total_processes} -hosts 10.0.0.1,10.0.0.2{expected_suffix}'
+    )
     self.assertEqual(f'. {self.MPIVARS_FILE}; {expected_mpirun}', mpirun)
 
   @parameterized.parameters(
       ('2019.6', COMPILE_2019, []),
-      ('2021.2', COMPILE_2021,
-       ['intel-oneapi-compiler-dpcpp-cpp', 'intel-oneapi-mpi-devel']))
-  def testInstall2021(self, intelmpi_version, expected_compile_cmd,
-                      installed_packages):
+      (
+          '2021.2',
+          COMPILE_2021,
+          ['intel-oneapi-compiler-dpcpp-cpp', 'intel-oneapi-mpi-devel'],
+      ),
+  )
+  def testInstall2021(
+      self, intelmpi_version, expected_compile_cmd, installed_packages
+  ):
     vm = MockVm()
     with flagsaver.flagsaver(intelmpi_version=intelmpi_version):
       imb.Install(vm)
     vm.RemoteCommand.assert_any_call(expected_compile_cmd)
     vm.InstallPackages.assert_has_calls(
-        [mock.call(pkb) for pkb in installed_packages])
+        [mock.call(pkb) for pkb in installed_packages]
+    )
 
 
 class OpenMpiLibTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -113,10 +132,15 @@ class OpenMpiLibTestCase(pkb_common_test_case.PkbCommonTestCase):
     imb.Install(vm)
     cmd = ';'.join([cmd[0][0] for cmd in vm.RemoteCommand.call_args_list])
     self.assertRegex(
-        cmd, 'git clone -n https://github.com/intel/mpi-benchmarks.git',
-        'Missing git clone command')
-    self.assertRegex(cmd, 'patch -d mpi-benchmarks -p3 < ~/intelmpi.patch',
-                     'Missing patch command')
+        cmd,
+        'git clone -n https://github.com/intel/mpi-benchmarks.git',
+        'Missing git clone command',
+    )
+    self.assertRegex(
+        cmd,
+        'patch -d mpi-benchmarks -p3 < ~/intelmpi.patch',
+        'Missing patch command',
+    )
 
   @flagsaver.flagsaver(imb_compile_from_source=False)
   def testInstallWithoutImbCompileFromSourceThrows(self) -> None:
@@ -125,7 +149,8 @@ class OpenMpiLibTestCase(pkb_common_test_case.PkbCommonTestCase):
       imb.Install(vm)
     self.assertEqual(
         str(e.exception),
-        '--mpi_vendor=openmpi requires --imb_compile_from_source')
+        '--mpi_vendor=openmpi requires --imb_compile_from_source',
+    )
 
   def testMpiRunCommandEnvVarsExported(self):
     vm = MockVm()
@@ -137,14 +162,16 @@ class OpenMpiLibTestCase(pkb_common_test_case.PkbCommonTestCase):
         'OMPI_MCA_rmaps_base_mapping_policy=node:PE=1',
     ]
 
-    mpirun = imb.MpiRunCommand(vm, hosts, total_proc, ppn, environment, [],
-                               False)
+    mpirun = imb.MpiRunCommand(
+        vm, hosts, total_proc, ppn, environment, [], False
+    )
 
     expected_mpirun = (
         'OMPI_MCA_btl=self,tcp OMPI_MCA_rmaps_base_mapping_policy=node:PE=1 '
         'mpirun -x OMPI_MCA_btl -x OMPI_MCA_rmaps_base_mapping_policy '
         '-report-bindings -display-map -n 2 -npernode 1 --use-hwthread-cpus '
-        '-host 10.0.0.1:slots=2,10.0.0.2:slots=2')
+        '-host 10.0.0.1:slots=2,10.0.0.2:slots=2'
+    )
     self.assertEqual(expected_mpirun, mpirun)
 
   def testMpiRunCommandNoEnvVarsIsFormattedCorrectly(self):
@@ -154,12 +181,14 @@ class OpenMpiLibTestCase(pkb_common_test_case.PkbCommonTestCase):
     hosts = ['10.0.0.1', '10.0.0.2']
     environment = []
 
-    mpirun = imb.MpiRunCommand(vm, hosts, total_proc, ppn, environment, [],
-                               False)
+    mpirun = imb.MpiRunCommand(
+        vm, hosts, total_proc, ppn, environment, [], False
+    )
 
     expected_mpirun = (
         'mpirun -report-bindings -display-map -n 2 -npernode 1 '
-        '--use-hwthread-cpus -host 10.0.0.1:slots=2,10.0.0.2:slots=2')
+        '--use-hwthread-cpus -host 10.0.0.1:slots=2,10.0.0.2:slots=2'
+    )
     self.assertEqual(expected_mpirun, mpirun)
 
   def testMpiRunCommandNoPpnSpecified(self):
@@ -169,12 +198,14 @@ class OpenMpiLibTestCase(pkb_common_test_case.PkbCommonTestCase):
     hosts = ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4']
     environment = []
 
-    mpirun = imb.MpiRunCommand(vm, hosts, total_proc, ppn, environment, [],
-                               False)
+    mpirun = imb.MpiRunCommand(
+        vm, hosts, total_proc, ppn, environment, [], False
+    )
     expected_mpirun = (
         'mpirun -report-bindings -display-map -n 8 -npernode 2 '
         '--use-hwthread-cpus -host '
-        '10.0.0.1:slots=8,10.0.0.2:slots=8,10.0.0.3:slots=8,10.0.0.4:slots=8')
+        '10.0.0.1:slots=8,10.0.0.2:slots=8,10.0.0.3:slots=8,10.0.0.4:slots=8'
+    )
     self.assertEqual(expected_mpirun, mpirun)
 
 

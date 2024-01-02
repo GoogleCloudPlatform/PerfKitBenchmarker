@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""""Module containing classes related to IBM Cloud Networking."""
+""" "Module containing classes related to IBM Cloud Networking."""
 
 import json
 import logging
@@ -30,10 +30,20 @@ from perfkitbenchmarker.providers.ibmcloud import util
 FLAGS = flags.FLAGS
 
 VPC_NAME = 'vpc'
-VPC_PREFIX_RANGES = ['10.101.0.0/16', '10.102.0.0/16', '10.103.0.0/16',
-                     '10.104.0.0/16', '10.105.0.0/16']
-VPC_SUBNETS = ['10.101.0.0/20', '10.102.0.0/20', '10.103.0.0/20',
-               '10.104.0.0/20', '10.105.0.0/20']
+VPC_PREFIX_RANGES = [
+    '10.101.0.0/16',
+    '10.102.0.0/16',
+    '10.103.0.0/16',
+    '10.104.0.0/16',
+    '10.105.0.0/16',
+]
+VPC_SUBNETS = [
+    '10.101.0.0/20',
+    '10.102.0.0/20',
+    '10.103.0.0/20',
+    '10.104.0.0/20',
+    '10.105.0.0/20',
+]
 
 """These constants are used to create extra subnets to support multi vnics on a vm,
   extra subnets are created using predefined cidr's as below.
@@ -49,40 +59,64 @@ SUBNETXS = [SUBNETX1, SUBNETX2, SUBNETX3, SUBNETX4]
 
 SUBNETS_EXTRA = {
     SUBNETX1: [
-        '10.101.20.0/24', '10.102.20.0/24', '10.103.20.0/24', '10.104.20.0/24',
-        '10.105.20.0/24'
+        '10.101.20.0/24',
+        '10.102.20.0/24',
+        '10.103.20.0/24',
+        '10.104.20.0/24',
+        '10.105.20.0/24',
     ],
     SUBNETX2: [
-        '10.101.30.0/24', '10.102.30.0/24', '10.103.30.0/24', '10.104.30.0/24',
-        '10.105.30.0/24'
+        '10.101.30.0/24',
+        '10.102.30.0/24',
+        '10.103.30.0/24',
+        '10.104.30.0/24',
+        '10.105.30.0/24',
     ],
     SUBNETX3: [
-        '10.101.40.0/24', '10.102.40.0/24', '10.103.40.0/24', '10.104.40.0/24',
-        '10.105.40.0/24'
+        '10.101.40.0/24',
+        '10.102.40.0/24',
+        '10.103.40.0/24',
+        '10.104.40.0/24',
+        '10.105.40.0/24',
     ],
     SUBNETX4: [
-        '10.101.50.0/24', '10.102.50.0/24', '10.103.50.0/24', '10.104.50.0/24',
-        '10.105.50.0/24'
-    ]
+        '10.101.50.0/24',
+        '10.102.50.0/24',
+        '10.103.50.0/24',
+        '10.104.50.0/24',
+        '10.105.50.0/24',
+    ],
 }
 
 SUBNETS_EXTRA_GATEWAY = {
     SUBNETX1: [
-        '10.101.20.1', '10.102.20.1', '10.103.20.1', '10.104.20.1',
-        '10.105.20.1'
+        '10.101.20.1',
+        '10.102.20.1',
+        '10.103.20.1',
+        '10.104.20.1',
+        '10.105.20.1',
     ],
     SUBNETX2: [
-        '10.101.30.1', '10.102.30.1', '10.103.30.1', '10.104.30.1',
-        '10.105.30.1'
+        '10.101.30.1',
+        '10.102.30.1',
+        '10.103.30.1',
+        '10.104.30.1',
+        '10.105.30.1',
     ],
     SUBNETX3: [
-        '10.101.40.1', '10.102.40.1', '10.103.40.1', '10.104.40.1',
-        '10.105.40.1'
+        '10.101.40.1',
+        '10.102.40.1',
+        '10.103.40.1',
+        '10.104.40.1',
+        '10.105.40.1',
     ],
     SUBNETX4: [
-        '10.101.50.1', '10.102.50.1', '10.103.50.1', '10.104.50.1',
-        '10.105.50.1'
-    ]
+        '10.101.50.1',
+        '10.102.50.1',
+        '10.103.50.1',
+        '10.104.50.1',
+        '10.105.50.1',
+    ],
 }
 
 _DEFAULT_TIMEOUT = 300
@@ -133,8 +167,10 @@ def GetRouteCommands(data: str, index: int, target_index: int) -> List[str]:
         items = line.split()
         if len(items) > 6 and items[0] == route_entry:
           interface = items[7]
-          route_cmds.append(f'ip route add {target_cidr_block} via '
-                            f'{subnet_gateway} dev {interface}')
+          route_cmds.append(
+              f'ip route add {target_cidr_block} via '
+              f'{subnet_gateway} dev {interface}'
+          )
   return route_cmds
 
 
@@ -146,6 +182,7 @@ class IbmCloudNetwork(resource.BaseResource):
     zone: zone name.
     vpcid: vpc id.
   """
+
   _lock = threading.Lock()
   _lock_vpc = threading.Lock()
 
@@ -173,8 +210,9 @@ class IbmCloudNetwork(resource.BaseResource):
         if resp:
           logging.info('Created vpc prefix range: %s', resp.get('id'))
         else:
-          raise errors.Error('IBM Cloud ERROR: Failed to create '
-                             'vpc address prefix')
+          raise errors.Error(
+              'IBM Cloud ERROR: Failed to create vpc address prefix'
+          )
     else:
       raise errors.Error('IBM Cloud ERROR: Failed to create vpc')
 
@@ -186,9 +224,15 @@ class IbmCloudNetwork(resource.BaseResource):
     cmd.flags.update({
         'vpcid': self.vpcid,
         'zone': self.zone,
-        'name': (self.prefix + VPC_NAME + util.SUBNET_SUFFIX +
-                 str(subnet_index) + util.DELIMITER + self.zone),
-        'cidr': VPC_SUBNETS[subnet_index - 1]
+        'name': (
+            self.prefix
+            + VPC_NAME
+            + util.SUBNET_SUFFIX
+            + str(subnet_index)
+            + util.DELIMITER
+            + self.zone
+        ),
+        'cidr': VPC_SUBNETS[subnet_index - 1],
     })
     logging.info('Creating subnet: %s', cmd.flags)
     resp = cmd.CreateSubnet()
@@ -214,12 +258,17 @@ class IbmCloudNetwork(resource.BaseResource):
       return resp['address'], resp['id']
     else:
       raise errors.Error(
-          f'IBM Cloud ERROR: Failed to create fip for instance {vmid}')
+          f'IBM Cloud ERROR: Failed to create fip for instance {vmid}'
+      )
 
   def DeleteFip(self, vmid: str, fip_address: str, fipid: str):
     """Deletes fip in a IBM Cloud VM instance."""
-    logging.info('Deleting FIP, instanceid: %s, fip address: %s, fip id: %s',
-                 vmid, fip_address, fipid)
+    logging.info(
+        'Deleting FIP, instanceid: %s, fip address: %s, fip id: %s',
+        vmid,
+        fip_address,
+        fipid,
+    )
     cmd = ibm.IbmAPICommand(self)
     cmd.flags['fipid'] = fipid
     cmd.InstanceFipDelete()
@@ -227,11 +276,9 @@ class IbmCloudNetwork(resource.BaseResource):
   def _Exists(self):
     """Returns true if the VPC exists."""
     cmd = ibm.IbmAPICommand(self)
-    cmd.flags.update({
-        'prefix': self.prefix,
-        'zone': self.zone,
-        'items': 'vpcs'
-    })
+    cmd.flags.update(
+        {'prefix': self.prefix, 'zone': self.zone, 'items': 'vpcs'}
+    )
     self.vpcid = cmd.GetResource()
     if self.vpcid:
       return True
@@ -240,33 +287,42 @@ class IbmCloudNetwork(resource.BaseResource):
   def _Delete(self):
     """Deletes the vpc and subnets."""
     with self._lock:
-      if (ibmcloud_virtual_machine.IbmCloudVirtualMachine.validated_subnets > 0
-          and self.subnet):
+      if (
+          ibmcloud_virtual_machine.IbmCloudVirtualMachine.validated_subnets > 0
+          and self.subnet
+      ):
         cmd = ibm.IbmAPICommand(self)
         cmd.flags.update({
             'prefix': self.prefix,
             'zone': self.zone,
             'id': self.subnet,
-            'items': 'subnets'
+            'items': 'subnets',
         })
         logging.info('Deleting subnet: %s', self.subnet)
         cmd.DeleteResource()
         time_to_end = time.time() + _DEFAULT_TIMEOUT
         while cmd.GetResource() is not None and time_to_end < time.time():
-          logging.info('Subnet still exists, waiting to delete subnet: %s',
-                       self.subnet)
+          logging.info(
+              'Subnet still exists, waiting to delete subnet: %s', self.subnet
+          )
           time.sleep(5)
           cmd.DeleteResource()
         ibmcloud_virtual_machine.IbmCloudVirtualMachine.validated_subnets -= 1
 
     # different lock so all threads get a chance to delete its subnet first
     with self._lock_vpc:
-      if (self.subnet and self.vpcid not in ibmcloud_virtual_machine
-          .IbmCloudVirtualMachine.validated_resources_set):
+      if (
+          self.subnet
+          and self.vpcid
+          not in ibmcloud_virtual_machine.IbmCloudVirtualMachine.validated_resources_set
+      ):
         cmd = ibm.IbmAPICommand(self)
         # check till all subnets are gone
         time_to_end = time.time() + _DEFAULT_TIMEOUT
-        while ibmcloud_virtual_machine.IbmCloudVirtualMachine.validated_subnets > 0:
+        while (
+            ibmcloud_virtual_machine.IbmCloudVirtualMachine.validated_subnets
+            > 0
+        ):
           logging.info('Subnets not empty yet')
           if time_to_end < time.time():
             break
@@ -275,7 +331,10 @@ class IbmCloudNetwork(resource.BaseResource):
         cmd.flags['id'] = self.vpcid
         logging.info('Waiting to delete vpc')
         time.sleep(10)
-        (ibmcloud_virtual_machine.IbmCloudVirtualMachine.validated_resources_set
-         .add(self.vpcid))
+        (
+            ibmcloud_virtual_machine.IbmCloudVirtualMachine.validated_resources_set.add(
+                self.vpcid
+            )
+        )
         cmd.DeleteResource()
         self.vpcid = None

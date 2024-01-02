@@ -15,7 +15,6 @@
 from collections import namedtuple
 import unittest
 from absl import flags
-
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.windows_packages import iperf3
@@ -102,7 +101,8 @@ class Iperf3TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     receiving_vm = fake_vm(machine_type='A', zone='B')
 
     samples = iperf3.GetUDPStreamSamples(
-        sending_vm, receiving_vm, iperf3_results, bandwidth, internal_ip_used)
+        sending_vm, receiving_vm, iperf3_results, bandwidth, internal_ip_used
+    )
 
     expected_metadata = {
         'protocol': 'UDP',
@@ -117,18 +117,16 @@ class Iperf3TestCase(unittest.TestCase, test_util.SamplesTestMixin):
     }
 
     expected_samples = [
-        sample.Sample('Loss Rate', 55.836, 'Percent',
-                      expected_metadata),
-        sample.Sample('Bandwidth Achieved', 1380, 'Mbits/sec',
-                      expected_metadata),
-        sample.Sample('Jitter', 0.072, 'ms',
-                      expected_metadata),
+        sample.Sample('Loss Rate', 55.836, 'Percent', expected_metadata),
+        sample.Sample(
+            'Bandwidth Achieved', 1380, 'Mbits/sec', expected_metadata
+        ),
+        sample.Sample('Jitter', 0.072, 'ms', expected_metadata),
     ]
 
     self.assertSampleListsEqualUpToTimestamp(samples, expected_samples)
 
   def testIperfTCPMultiStream(self):
-
     tcp_number_of_streams = 10
 
     fake_vm = namedtuple('fake_vm', 'machine_type zone')
@@ -158,9 +156,13 @@ class Iperf3TestCase(unittest.TestCase, test_util.SamplesTestMixin):
         sample.Sample('Bandwidth', 4670.0, 'Mbits/sec', _Metadata('SUM')),
     ]
 
-    samples = iperf3.ParseTCPMultiStreamOutput(iperf3_tcp_results, sending_vm,
-                                               receiving_vm,
-                                               tcp_number_of_streams, True)
+    samples = iperf3.ParseTCPMultiStreamOutput(
+        iperf3_tcp_results,
+        sending_vm,
+        receiving_vm,
+        tcp_number_of_streams,
+        True,
+    )
 
     self.assertSampleListsEqualUpToTimestamp(samples, expected_samples)
 

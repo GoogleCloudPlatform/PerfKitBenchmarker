@@ -28,9 +28,12 @@ from perfkitbenchmarker import stages
 FLAGS = flags.FLAGS
 
 _TRIGGER_VM_GROUPS = flags.DEFINE_list(
-    'trigger_vm_groups', None, 'Run trigger on all vms in the vm groups.'
+    'trigger_vm_groups',
+    None,
+    'Run trigger on all vms in the vm groups.'
     'By default trigger runs on all VMs, for client and server achitecture,'
-    'specify trace vm groups to servers to only collect metrics on server vms.')
+    'specify trace vm groups to servers to only collect metrics on server vms.',
+)
 
 
 class BaseTimeTrigger(metaclass=abc.ABCMeta):
@@ -48,7 +51,7 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
     self.trigger_time = None
     self.metadata = {
         self.trigger_name: True,
-        self.trigger_name + '_delay': delay
+        self.trigger_name + '_delay': delay,
     }
 
   def CreateAndStartTriggerThread(self, vm) -> None:
@@ -60,6 +63,7 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
     Args:
       vm: A virtual machine.
     """
+
     def TriggerEvent():
       time.sleep(self.delay)
       logging.info('Triggering %s on %s', self.trigger_name, vm.name)
@@ -87,9 +91,9 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
     """Run the trigger event."""
     for vm in self.vms:
       self.CreateAndStartTriggerThread(vm)
-    self.trigger_time = (
-        datetime.datetime.now() +
-        datetime.timedelta(seconds=self.delay))
+    self.trigger_time = datetime.datetime.now() + datetime.timedelta(
+        seconds=self.delay
+    )
     self.metadata[self.trigger_name + '_time'] = str(self.trigger_time)
 
   # pylint: disable=unused-argument
@@ -99,13 +103,10 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
       s.metadata.update(self.metadata)
 
   def Register(self):
-    events.before_phase.connect(
-        self.SetUpTrigger, stages.RUN, weak=False)
-    events.trigger_phase.connect(
-        self.RunTrigger, weak=False)
+    events.before_phase.connect(self.SetUpTrigger, stages.RUN, weak=False)
+    events.trigger_phase.connect(self.RunTrigger, weak=False)
     events.benchmark_samples_created.connect(self.AppendSamples, weak=False)
-    events.all_samples_created.connect(
-        self.UpdateMetadata, weak=False)
+    events.all_samples_created.connect(self.UpdateMetadata, weak=False)
 
   @property
   def trigger_name(self) -> str:
@@ -126,4 +127,3 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
 
 def Register(unused_parsed_flags):
   pass
-

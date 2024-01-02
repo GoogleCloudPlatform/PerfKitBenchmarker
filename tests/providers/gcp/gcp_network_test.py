@@ -19,7 +19,6 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -136,18 +135,21 @@ _REGEX_GCE_FW_NAMES = r'(?:[a-z](?:[-a-z0-9]{0,61}[a-z0-9])?)'
 
 class BaseGceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
-  def _CreateBenchmarkSpecFromYaml(self, yaml_string,
-                                   benchmark_name=_BENCHMARK_NAME):
+  def _CreateBenchmarkSpecFromYaml(
+      self, yaml_string, benchmark_name=_BENCHMARK_NAME
+  ):
     config = configs.LoadConfig(yaml_string, {}, benchmark_name)
     return self._CreateBenchmarkSpecFromConfigDict(config, benchmark_name)
 
   def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        benchmark_name,
-        flag_values=FLAGS,
-        **config_dict)
-    benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
-                             if b.BENCHMARK_NAME == benchmark_name))
+        benchmark_name, flag_values=FLAGS, **config_dict
+    )
+    benchmark_module = next((
+        b
+        for b in linux_benchmarks.BENCHMARKS
+        if b.BENCHMARK_NAME == benchmark_name
+    ))
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, _URI)
 
 
@@ -183,14 +185,17 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
-                                    spec.custom_subnets['vm_1'])
-      self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
-                                    spec.custom_subnets['vm_2'])
+      self.assertDictContainsSubset(
+          {'cidr': '10.0.1.0/24'}, spec.custom_subnets['vm_1']
+      )
+      self.assertDictContainsSubset(
+          {'cidr': '192.168.1.0/24'}, spec.custom_subnets['vm_2']
+      )
       self.assertLen(spec.networks, 2)
       for k in spec.networks.keys():
-        self.assertCountEqual(['192.168.1.0/24', '10.0.1.0/24'],
-                              spec.networks[k].all_nets)
+        self.assertCountEqual(
+            ['192.168.1.0/24', '10.0.1.0/24'], spec.networks[k].all_nets
+        )
 
   def testLoadCustomConfigWithFlags(self):
     FLAGS.gce_subnet_region = 'us-north1-b'
@@ -200,14 +205,17 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
-                                    spec.custom_subnets['vm_1'])
-      self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
-                                    spec.custom_subnets['vm_2'])
+      self.assertDictContainsSubset(
+          {'cidr': '10.0.1.0/24'}, spec.custom_subnets['vm_1']
+      )
+      self.assertDictContainsSubset(
+          {'cidr': '192.168.1.0/24'}, spec.custom_subnets['vm_2']
+      )
       self.assertLen(spec.networks, 2)
       for k in spec.networks.keys():
-        self.assertCountEqual(['192.168.1.0/24', '10.0.1.0/24'],
-                              spec.networks[k].all_nets)
+        self.assertCountEqual(
+            ['192.168.1.0/24', '10.0.1.0/24'], spec.networks[k].all_nets
+        )
 
   def testLoadMixedConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_DEFAULT_MULTI)
@@ -215,12 +223,14 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
       spec.ConstructVirtualMachines()
 
       self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
-      self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
-                                    spec.custom_subnets['vm_2'])
+      self.assertDictContainsSubset(
+          {'cidr': '192.168.1.0/24'}, spec.custom_subnets['vm_2']
+      )
       self.assertLen(spec.networks, 2)
       for k in spec.networks.keys():
-        self.assertCountEqual(['10.0.0.0/8', '192.168.1.0/24'],
-                              spec.networks[k].all_nets)
+        self.assertCountEqual(
+            ['10.0.0.0/8', '192.168.1.0/24'], spec.networks[k].all_nets
+        )
 
   def testLoadMixedConfigWithFlags(self):
     FLAGS.gce_subnet_region = 'us-north1-b'
@@ -231,22 +241,26 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
       spec.ConstructVirtualMachines()
 
       self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
-      self.assertDictContainsSubset({'cidr': '192.168.1.0/24'},
-                                    spec.custom_subnets['vm_2'])
+      self.assertDictContainsSubset(
+          {'cidr': '192.168.1.0/24'}, spec.custom_subnets['vm_2']
+      )
       self.assertLen(spec.networks, 2)
       for k in spec.networks.keys():
-        self.assertCountEqual(['1.2.3.4/33', '192.168.1.0/24'],
-                              spec.networks[k].all_nets)
+        self.assertCountEqual(
+            ['1.2.3.4/33', '192.168.1.0/24'], spec.networks[k].all_nets
+        )
 
   def testLoadSameZoneCidrConfig(self):
     spec = self._CreateBenchmarkSpecFromYaml(_CFG_SAME_ZONE_AND_CIDR)
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
-                                    spec.custom_subnets['vm_1'])
-      self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
-                                    spec.custom_subnets['vm_2'])
+      self.assertDictContainsSubset(
+          {'cidr': '10.0.1.0/24'}, spec.custom_subnets['vm_1']
+      )
+      self.assertDictContainsSubset(
+          {'cidr': '10.0.1.0/24'}, spec.custom_subnets['vm_2']
+      )
       self.assertLen(spec.networks, 1)
       for k in spec.networks.keys():
         self.assertCountEqual(['10.0.1.0/24'], spec.networks[k].all_nets)
@@ -256,14 +270,17 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset({'cidr': '10.0.1.0/24'},
-                                    spec.custom_subnets['vm_1'])
-      self.assertDictContainsSubset({'cidr': '10.0.2.0/24'},
-                                    spec.custom_subnets['vm_2'])
+      self.assertDictContainsSubset(
+          {'cidr': '10.0.1.0/24'}, spec.custom_subnets['vm_1']
+      )
+      self.assertDictContainsSubset(
+          {'cidr': '10.0.2.0/24'}, spec.custom_subnets['vm_2']
+      )
       self.assertLen(spec.networks, 2)
       for k in spec.networks.keys():
-        self.assertCountEqual(['10.0.1.0/24', '10.0.2.0/24'],
-                              spec.networks[k].all_nets)
+        self.assertCountEqual(
+            ['10.0.1.0/24', '10.0.2.0/24'], spec.networks[k].all_nets
+        )
 
 
 class TestGceNetworkNames(BaseGceNetworkTest):
@@ -273,7 +290,8 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     # need a benchmarkspec in the context to run
     FLAGS.run_uri = _URI
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        'cluster_boot', flag_values=FLAGS)
+        'cluster_boot', flag_values=FLAGS
+    )
     benchmark_spec.BenchmarkSpec(mock.Mock(), config_spec, 'uid')
 
   ########
@@ -292,12 +310,15 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     cidr_string = None
     uri = _URI
     expected_netname = '-'.join(
-        i for i in ('pkb-network', net_type, cidr_string, uri) if
-        i and i not in 'default')
+        i
+        for i in ('pkb-network', net_type, cidr_string, uri)
+        if i and i not in 'default'
+    )
 
     self.assertFalse(net.is_existing_network)
-    self.assertEqual(expected_netname,
-                     net_name)  # pkb-network-uri45678 (default)
+    self.assertEqual(
+        expected_netname, net_name
+    )  # pkb-network-uri45678 (default)
     self.assertRegexpMatches(net_name, _REGEX_GCE_NET_NAMES)
 
   def testGetSingleNetworkName(self):
@@ -315,13 +336,15 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     cidr_string = '2-2-3-4-33'
     uri = _URI
     expected_netname = '-'.join(
-        i for i in ('pkb-network', net_type, cidr_string, uri) if
-        i and i not in 'default')
+        i
+        for i in ('pkb-network', net_type, cidr_string, uri)
+        if i and i not in 'default'
+    )
 
     self.assertFalse(net.is_existing_network)
     self.assertEqual(
-        expected_netname,
-        net_name)  # pkb-network-single-2-2-3-4-33-uri45678 (single)
+        expected_netname, net_name
+    )  # pkb-network-single-2-2-3-4-33-uri45678 (single)
     self.assertRegexpMatches(net_name, _REGEX_GCE_NET_NAMES)
 
   def testGetMultiNetworkName(self):
@@ -420,9 +443,17 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     dst_port = None
     uri = _URI
     expected_name = '-'.join(
-        i for i in (
-            net_type, src_cidr_string, dst_cidr_string, src_port,
-            dst_port, uri) if i)
+        i
+        for i in (
+            net_type,
+            src_cidr_string,
+            dst_cidr_string,
+            src_port,
+            dst_port,
+            uri,
+        )
+        if i
+    )
 
     self.assertEqual(expected_name, fw_name)
     self.assertRegexpMatches(fw_name, _REGEX_GCE_FW_NAMES)
@@ -439,8 +470,13 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     vm = mock.Mock(zone=zone, project=project, cidr=cidr)
     net = gce_network.GceNetwork.GetNetwork(vm)
     fw_name = net._MakeGceFWRuleName(
-        net_type=None, src_cidr=None, dst_cidr=None, port_range_lo=lo_port,
-        port_range_hi=hi_port, uri=None)
+        net_type=None,
+        src_cidr=None,
+        dst_cidr=None,
+        port_range_lo=lo_port,
+        port_range_hi=hi_port,
+        uri=None,
+    )
 
     net_type = 'single'
     src_cidr_string = 'internal'
@@ -449,12 +485,21 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     dst_port = None
     uri = _URI
     expected_name = '-'.join(
-        i for i in (net_type, src_cidr_string, dst_cidr_string, src_port,
-                    dst_port, uri)
-        if i)
+        i
+        for i in (
+            net_type,
+            src_cidr_string,
+            dst_cidr_string,
+            src_port,
+            dst_port,
+            uri,
+        )
+        if i
+    )
 
-    self.assertEqual(expected_name,
-                     fw_name)  # single-internal-2-2-3-4-33-uri45678
+    self.assertEqual(
+        expected_name, fw_name
+    )  # single-internal-2-2-3-4-33-uri45678
     self.assertRegexpMatches(fw_name, _REGEX_GCE_FW_NAMES)
 
   def testGetMultiFWNameWithPorts(self):
@@ -469,9 +514,13 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     lo_port = 49152
     hi_port = 65535
     fw_name = net._MakeGceFWRuleName(
-        net_type=None, src_cidr=None, dst_cidr=dst_cidr,
+        net_type=None,
+        src_cidr=None,
+        dst_cidr=dst_cidr,
         port_range_lo=lo_port,
-        port_range_hi=hi_port, uri=None)
+        port_range_hi=hi_port,
+        uri=None,
+    )
 
     prefix = None
     net_type = 'multi'
@@ -481,11 +530,22 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     dst_port = '65535'
     uri = _URI
     expected_name = '-'.join(
-        i for i in (prefix, net_type, src_cidr_string, dst_cidr_string,
-                    src_port, dst_port, uri) if i)
+        i
+        for i in (
+            prefix,
+            net_type,
+            src_cidr_string,
+            dst_cidr_string,
+            src_port,
+            dst_port,
+            uri,
+        )
+        if i
+    )
 
-    self.assertEqual(expected_name,
-                     fw_name)  # multi-internal-1-2-3-4-56-49152-65535-uri45678
+    self.assertEqual(
+        expected_name, fw_name
+    )  # multi-internal-1-2-3-4-56-49152-65535-uri45678
     self.assertRegexpMatches(fw_name, _REGEX_GCE_FW_NAMES)
 
   def testGetMultiFWNameWithPortsDst(self):
@@ -499,9 +559,13 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     lo_port = 49152
     hi_port = 65535
     fw_name = net._MakeGceFWRuleName(
-        net_type=None, src_cidr=None, dst_cidr=dst_cidr,
+        net_type=None,
+        src_cidr=None,
+        dst_cidr=dst_cidr,
         port_range_lo=lo_port,
-        port_range_hi=hi_port, uri=None)
+        port_range_hi=hi_port,
+        uri=None,
+    )
 
     prefix = 'perfkit-firewall'
     net_type = 'multi'
@@ -511,8 +575,18 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     dst_port = '65535'
     uri = _URI
     expected_name = '-'.join(
-        i for i in (prefix, net_type, src_cidr_string, dst_cidr_string,
-                    src_port, dst_port, uri) if i)
+        i
+        for i in (
+            prefix,
+            net_type,
+            src_cidr_string,
+            dst_cidr_string,
+            src_port,
+            dst_port,
+            uri,
+        )
+        if i
+    )
 
     # perfkit-firewall-multi-1-2-3-4-56-123-567-901-13-49152-65535-uri45678
     self.assertEqual(expected_name, fw_name)
@@ -530,10 +604,10 @@ def PatchCriticalObjects(retvals=None):
     return ('', '', 0) if retvals is None else retvals.pop(0)
 
   with mock.patch(
-      vm_util.__name__ + '.IssueCommand',
-      side_effect=ReturnVal) as issue_command, mock.patch(
-          builtins.__name__ + '.open'), mock.patch(vm_util.__name__ +
-                                                   '.NamedTemporaryFile'):
+      vm_util.__name__ + '.IssueCommand', side_effect=ReturnVal
+  ) as issue_command, mock.patch(builtins.__name__ + '.open'), mock.patch(
+      vm_util.__name__ + '.NamedTemporaryFile'
+  ):
     yield issue_command
 
 
@@ -575,42 +649,52 @@ class TestGceNetwork(BaseGceNetworkTest):
 
     self.assertEqual(1500, net.mtu)
     create_network_cmd = mock_issue.call_args_list[0][0][0]
-    self.assertRegex(' '.join(create_network_cmd),
-                     'compute networks create .*--mtu 1500')
+    self.assertRegex(
+        ' '.join(create_network_cmd), 'compute networks create .*--mtu 1500'
+    )
 
 
 class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
 
   @mock.patch('time.sleep', side_effect=lambda _: None)
   def testGceFirewallRuleSuccessfulAfterRateLimited(self, mock_cmd):
-    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'some warning perhaps', 0)]
+    fake_rets = [
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'some warning perhaps', 0),
+    ]
     with PatchCriticalObjects(fake_rets) as issue_command:
-      fr = gce_network.GceFirewallRule('name', 'project', 'allow',
-                                       'network_name')
+      fr = gce_network.GceFirewallRule(
+          'name', 'project', 'allow', 'network_name'
+      )
       fr._Create()
       self.assertEqual(issue_command.call_count, 2)
 
   @mock.patch('time.sleep', side_effect=lambda _: None)
   def testGceFirewallRuleGenericErrorAfterRateLimited(self, mock_cmd):
-    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'some random firewall error', 1)]
+    fake_rets = [
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'some random firewall error', 1),
+    ]
     with PatchCriticalObjects(fake_rets) as issue_command:
       with self.assertRaises(errors.VmUtil.IssueCommandError):
-        fr = gce_network.GceFirewallRule('name', 'project', 'allow',
-                                         'network_name')
+        fr = gce_network.GceFirewallRule(
+            'name', 'project', 'allow', 'network_name'
+        )
         fr._Create()
       self.assertEqual(issue_command.call_count, 3)
 
   @mock.patch('time.sleep', side_effect=lambda _: None)
   def testGceFirewallRuleAlreadyExistsAfterRateLimited(self, mock_cmd):
-    fake_rets = [('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'Rate Limit Exceeded', 1),
-                 ('stdout', 'firewall already exists', 1)]
+    fake_rets = [
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'Rate Limit Exceeded', 1),
+        ('stdout', 'firewall already exists', 1),
+    ]
     with PatchCriticalObjects(fake_rets) as issue_command:
-      fr = gce_network.GceFirewallRule('name', 'project', 'allow',
-                                       'network_name')
+      fr = gce_network.GceFirewallRule(
+          'name', 'project', 'allow', 'network_name'
+      )
       fr._Create()
       self.assertEqual(issue_command.call_count, 3)
 
@@ -619,8 +703,9 @@ class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
     fake_rets = [('stdout', 'some random firewall error', 1)]
     with PatchCriticalObjects(fake_rets) as issue_command:
       with self.assertRaises(errors.VmUtil.IssueCommandError):
-        fr = gce_network.GceFirewallRule('name', 'project', 'allow',
-                                         'network_name')
+        fr = gce_network.GceFirewallRule(
+            'name', 'project', 'allow', 'network_name'
+        )
         fr._Create()
       self.assertEqual(issue_command.call_count, 1)
 

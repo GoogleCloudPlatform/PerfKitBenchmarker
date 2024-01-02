@@ -34,18 +34,24 @@ from perfkitbenchmarker import errors
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
-    'aws_credentials_local_path', os.path.join('~', '.aws'),
-    'Path where the AWS credential files can be found on the local machine.')
+    'aws_credentials_local_path',
+    os.path.join('~', '.aws'),
+    'Path where the AWS credential files can be found on the local machine.',
+)
 
 flags.DEFINE_string(
-    'aws_credentials_remote_path', '.aws',
-    'Path where the AWS credential files will be written on remote machines.')
+    'aws_credentials_remote_path',
+    '.aws',
+    'Path where the AWS credential files will be written on remote machines.',
+)
 
 flags.DEFINE_boolean(
-    'aws_credentials_overwrite', False,
+    'aws_credentials_overwrite',
+    False,
     'When set, if an AWS credential file already exists at the destination '
     'specified by --aws_credentials_remote_path, it will be overwritten during '
-    'AWS credential file installation.')
+    'AWS credential file installation.',
+)
 flags.DEFINE_string('aws_s3_region', None, 'Region for the S3 bucket')
 
 
@@ -89,7 +95,8 @@ def CheckPrerequisites():
   local_path = _GetLocalPath()
   if not os.path.exists(local_path):
     raise data.ResourceNotFound(
-        'AWS credential files were not found at {0}'.format(local_path))
+        'AWS credential files were not found at {0}'.format(local_path)
+    )
 
 
 def Install(vm):

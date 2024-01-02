@@ -43,7 +43,8 @@ def _CreateMpiDataFromDict(data: Dict[str, Any]) -> mpi.MpiData:
     number_bytes = data.pop('bytes', None)
     repetitions = data.pop('repetitions', None)
     return mpi.MpiData(
-        bytes=number_bytes, repetitions=repetitions, data=data['data'])
+        bytes=number_bytes, repetitions=repetitions, data=data['data']
+    )
 
 
 def _CreateMpiResultsFromDict(result_json: Dict[str, Any]) -> mpi.MpiResult:
@@ -60,7 +61,8 @@ def _CreateMpiResultsFromDict(result_json: Dict[str, Any]) -> mpi.MpiResult:
 
 
 def _CreateMpiResponseFromDict(
-    data: List[Dict[str, Any]]) -> List[mpi.MpiResult]:
+    data: List[Dict[str, Any]]
+) -> List[mpi.MpiResult]:
   return [_CreateMpiResultsFromDict(result) for result in data]
 
 
@@ -88,22 +90,16 @@ class MpiTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   # The latency_data_file summarized in a Dict.
   LATENCY_DATA: Dict[int, Dict[float, int]] = {
-      0: {
-          1.12: 1,
-          3.0: 1,
-          42.0: 1
-      },
-      1024: {
-          2.0: 1,
-          3.0: 2
-      }
+      0: {1.12: 1, 3.0: 1, 42.0: 1},
+      1024: {2.0: 1, 3.0: 2},
   }
 
   def setUp(self):
     super(MpiTestCase, self).setUp()
     FLAGS.intelmpi_version = self.MPI_VERSION
     self.enter_context(
-        mock.patch.object(intelmpi, 'MpiVars', return_value=MPI_VARS))
+        mock.patch.object(intelmpi, 'MpiVars', return_value=MPI_VARS)
+    )
 
   @parameterized.parameters(
       # mpirun -n 120 -hosts a,b,c,d -ppn 1 mpi-benchmarks/....
@@ -114,10 +110,12 @@ class MpiTestCase(pkb_common_test_case.PkbCommonTestCase):
       ('mpi_latencies_output.txt', 'mpi_latencies_parsed.json'),
       ('mpi_one_put_all_output.txt', 'mpi_one_put_all_parsed.json'),
   )
-  def testParseMpiOutput(self, mpi_output_file: str,
-                         mpi_parsed_file: str) -> None:
+  def testParseMpiOutput(
+      self, mpi_output_file: str, mpi_parsed_file: str
+  ) -> None:
     found = list(
-        mpi.MpiResultParser(ReadMpiOutput(mpi_output_file).splitlines()))
+        mpi.MpiResultParser(ReadMpiOutput(mpi_output_file).splitlines())
+    )
     expected = ReadParsedOutput(mpi_parsed_file)
     self.assertEqual(expected, found)
 
@@ -125,14 +123,16 @@ class MpiTestCase(pkb_common_test_case.PkbCommonTestCase):
     vms = [_MockVm(ip) for ip in ('a', 'b')]
     vms[0].RobustRemoteCommand.return_value = '', ''
     mpi.VerifyInstall(vms)
-    mpirun_cmd = ('mpirun -n 8 -hosts a,b -ppn 8 mpi-benchmarks/IMB-MPI1 '
-                  '-msglog 10:11 -multi 0 -time 20 -off_cache -1 -iter 100 '
-                  '-iter_policy off -zero_size off -show_tail yes PingPong')
+    mpirun_cmd = (
+        'mpirun -n 8 -hosts a,b -ppn 8 mpi-benchmarks/IMB-MPI1 '
+        '-msglog 10:11 -multi 0 -time 20 -off_cache -1 -iter 100 '
+        '-iter_policy off -zero_size off -show_tail yes PingPong'
+    )
     vms[0].RobustRemoteCommand.assert_called_with(RUN_PREFIX + ' ' + mpirun_cmd)
 
-  def _CreateMpiRequest(self,
-                        record_latencies: bool,
-                        iterations: int = 100000) -> mpi.MpiRequest:
+  def _CreateMpiRequest(
+      self, record_latencies: bool, iterations: int = 100000
+  ) -> mpi.MpiRequest:
     return mpi.MpiRequest(
         vms=[_MockVm('a'), _MockVm('b')],
         total_processes=10,
@@ -148,12 +148,15 @@ class MpiTestCase(pkb_common_test_case.PkbCommonTestCase):
         include_zero_byte=False,
         compile_from_source=True,
         record_latencies=record_latencies,
-        multi=True)
+        multi=True,
+    )
 
   def testRunMpiStats(self) -> None:
     vm = _MockVm('a')
-    vm.RobustRemoteCommand.return_value = ReadMpiOutput(
-        'mpi_pingpong_output.txt'), ''
+    vm.RobustRemoteCommand.return_value = (
+        ReadMpiOutput('mpi_pingpong_output.txt'),
+        '',
+    )
     request = self._CreateMpiRequest(False)
     response = mpi.RunMpiStats(vm, request)
     self.assertEqual(RUN_PREFIX + ' mpirun -n 10 -hosts a,b', response.mpi_run)
@@ -161,31 +164,42 @@ class MpiTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual('2019.2-057', response.version)
     # fully tested in testParseFiles
     self.assertLen(response.results, 1)
-    expected_args = ('mpi-benchmarks/IMB-MPI1 -msglog 10:11 -multi 0 -time 20 '
-                     '-off_cache -1 -iter 100000 -iter_policy off '
-                     '-zero_size off -show_tail yes -map 5x2 PingPong')
+    expected_args = (
+        'mpi-benchmarks/IMB-MPI1 -msglog 10:11 -multi 0 -time 20 '
+        '-off_cache -1 -iter 100000 -iter_policy off '
+        '-zero_size off -show_tail yes -map 5x2 PingPong'
+    )
     self.assertEqual(expected_args, response.args)
 
   @mock.patch.object(mpi, '_GroupLatencyLines')
   @mock.patch.object(uuid, 'uuid4', side_effect=[mock.PropertyMock(hex='abc')])
-  def testRunMpiStatsLatencyFile(self, mock_uuid: mock.Mock,
-                                 mock_create_histo: mock.Mock) -> None:
+  def testRunMpiStatsLatencyFile(
+      self, mock_uuid: mock.Mock, mock_create_histo: mock.Mock
+  ) -> None:
     mock_create_histo.return_value = [[
-        '1024 10.0', '1024 11.0', '2048 11.10', '2048 11.11'
+        '1024 10.0',
+        '1024 11.0',
+        '2048 11.10',
+        '2048 11.11',
     ]]
     vm = _MockVm('a')
     vm.RobustRemoteCommand.return_value = (
-        ReadMpiOutput('mpi_barrier_output.txt'), '')
+        ReadMpiOutput('mpi_barrier_output.txt'),
+        '',
+    )
     request = self._CreateMpiRequest(True, 2)
     response = mpi.RunMpiStats(vm, request)
     # has the -show_tail and -dumpfile flags set
-    expected_args_re = (r'.*-zero_size off -show_tail yes '
-                        r'-dumpfile /tmp/latency\S+ -map 5x2 PingPong$')
+    expected_args_re = (
+        r'.*-zero_size off -show_tail yes '
+        r'-dumpfile /tmp/latency\S+ -map 5x2 PingPong$'
+    )
     self.assertRegex(response.args, expected_args_re)
     mock_create_histo.assert_called_with(vm, '/tmp/latency-PingPong-abc.txt', 2)
 
-  @mock.patch('builtins.open',
-              mock.mock_open(read_data='\n'.join(LATENCY_DATA_FILE)))
+  @mock.patch(
+      'builtins.open', mock.mock_open(read_data='\n'.join(LATENCY_DATA_FILE))
+  )
   def testGroupLatencyLines(self):
     vm = mock.Mock()
     vm.TryRemoteCommand.return_value = True
@@ -206,9 +220,11 @@ class MpiTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.run_uri = '12345678'
     grouped_lines = [['1024 10.0', '1024 11.0', '2048 11.10', '2048 11.11']]
     mpi_data1 = mpi.MpiData(
-        bytes=1024, repetitions=2, data={'p50': 10.5}, is_error=False)
+        bytes=1024, repetitions=2, data={'p50': 10.5}, is_error=False
+    )
     mpi_data2 = mpi.MpiData(
-        bytes=2048, repetitions=2, data={'p50': 11.0}, is_error=False)
+        bytes=2048, repetitions=2, data={'p50': 11.0}, is_error=False
+    )
     parsed_results = [
         mpi.MpiResult(benchmark='PingPong', data=[mpi_data1, mpi_data2])
     ]
@@ -256,7 +272,7 @@ class MpiTestCase(pkb_common_test_case.PkbCommonTestCase):
         'I_MPI_HYDRA_TOPOLIB': 'hwloc',
         'I_MPI_INTERNAL_MEM_POLICY': 'default',
         'I_MPI_MPIRUN': 'mpirun',
-        'I_MPI_ROOT': '/opt/intel/compilers_and_libraries_2020.0.166/linux/mpi'
+        'I_MPI_ROOT': '/opt/intel/compilers_and_libraries_2020.0.166/linux/mpi',
     }
 
     self.assertEqual(expected_mpi_env, mpi.ParseMpiEnv(lines))

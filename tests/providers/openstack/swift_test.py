@@ -1,6 +1,5 @@
 """Tests for perfkitbenchmarker.providers.openstack.swift."""
 
-
 import os
 import unittest
 import mock
@@ -17,25 +16,39 @@ class SwiftTest(unittest.TestCase):
     self.addCleanup(p.stop)
     self.mock_flags.openstack_swift_insecure = False
 
-  @mock.patch.dict(os.environ, {'OS_AUTH_URL': 'OS_AUTH_URL',
-                                'OS_TENANT_NAME': 'OS_TENANT_NAME',
-                                'OS_USERNAME': 'OS_USERNAME',
-                                'OS_PASSWORD': 'OS_PASSWORD'})
+  @mock.patch.dict(
+      os.environ,
+      {
+          'OS_AUTH_URL': 'OS_AUTH_URL',
+          'OS_TENANT_NAME': 'OS_TENANT_NAME',
+          'OS_USERNAME': 'OS_USERNAME',
+          'OS_PASSWORD': 'OS_PASSWORD',
+      },
+  )
   def testMakeBucket(self):
     swift_storage_service = swift.SwiftStorageService()
     swift_storage_service.PrepareService('location')
 
-    with mock.patch(vm_util.__name__ + '.IssueCommand',
-                    return_value=('stdout', 'stderr', 0)) as mock_util:
+    with mock.patch(
+        vm_util.__name__ + '.IssueCommand', return_value=('stdout', 'stderr', 0)
+    ) as mock_util:
       swift_storage_service.MakeBucket('new_bucket')
-      mock_util.assert_called_with(['swift',
-                                    '--os-auth-url', 'OS_AUTH_URL',
-                                    '--os-tenant-name', 'OS_TENANT_NAME',
-                                    '--os-username', 'OS_USERNAME',
-                                    '--os-password', 'OS_PASSWORD',
-                                    'post',
-                                    'new_bucket'],
-                                   raise_on_failure=False)
+      mock_util.assert_called_with(
+          [
+              'swift',
+              '--os-auth-url',
+              'OS_AUTH_URL',
+              '--os-tenant-name',
+              'OS_TENANT_NAME',
+              '--os-username',
+              'OS_USERNAME',
+              '--os-password',
+              'OS_PASSWORD',
+              'post',
+              'new_bucket',
+          ],
+          raise_on_failure=False,
+      )
 
 
 if __name__ == '__main__':

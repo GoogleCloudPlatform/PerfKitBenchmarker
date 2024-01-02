@@ -1,4 +1,5 @@
 """Module containing class for BaseAppService and BaseAppServiceSpec."""
+
 import logging
 import threading
 import time

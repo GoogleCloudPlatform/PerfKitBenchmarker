@@ -27,8 +27,9 @@ class SampleTestCase(unittest.TestCase):
 
   def testProvidedMetadataSet(self):
     metadata = {'origin': 'unit test'}
-    instance = sample.Sample(metric='Test', value=1.0, unit='Mbps',
-                             metadata=metadata.copy())
+    instance = sample.Sample(
+        metric='Test', value=1.0, unit='Mbps', metadata=metadata.copy()
+    )
     self.assertDictEqual(metadata, instance.metadata)
 
   def testNoneValueShouldBeZero(self):
@@ -58,8 +59,9 @@ class TestPercentileCalculator(unittest.TestCase):
 
   def testPercentileCalculator(self):
     numbers = list(range(0, 1001))
-    percentiles = sample.PercentileCalculator(numbers,
-                                              percentiles=[0, 1, 99.9, 100])
+    percentiles = sample.PercentileCalculator(
+        numbers, percentiles=[0, 1, 99.9, 100]
+    )
 
     self.assertEqual(percentiles['p0'], 0)
     self.assertEqual(percentiles['p1'], 10)

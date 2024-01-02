@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.scripts.database_scripts.plot_sysbench_results.
-"""
+"""Tests for perfkitbenchmarker.scripts.database_scripts.plot_sysbench_results."""
 import os
 import unittest
 from perfkitbenchmarker.scripts.database_scripts import plot_sysbench_results
@@ -28,16 +27,19 @@ class PlotterTestCase(unittest.TestCase):
 
   def setUp(self):
     self.plotter = plot_sysbench_results.Plotter(
-        TEST_FILE_1_RUN_SECONDS, TEST_FILE_1_REPORT_INTERVAL, TEST_RUN_URI)
+        TEST_FILE_1_RUN_SECONDS, TEST_FILE_1_REPORT_INTERVAL, TEST_RUN_URI
+    )
 
   def testadd_file(self):
-    self.assertRaises(plot_sysbench_results.STDERRFileDoesNotExistError,
-                      self.plotter.add_file, '')
+    self.assertRaises(
+        plot_sysbench_results.STDERRFileDoesNotExistError,
+        self.plotter.add_file,
+        '',
+    )
 
   def testparse_file(self):
     # TODO(user): Implement test that will raise PatternNotFoundError.
-    path1 = os.path.join(
-        os.path.dirname(__file__), TEST_FILE_1)
+    path1 = os.path.join(os.path.dirname(__file__), TEST_FILE_1)
     with open(path1) as file1:
       results = self.plotter._parse_file(file1)
       self.assertEqual(len(results), self.plotter.data_entries_per_file)

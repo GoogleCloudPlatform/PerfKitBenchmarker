@@ -28,23 +28,39 @@ MEASUREMENTS_END_TO_END_RUNTIME = 'end_to_end_runtime'
 MEASUREMENTS_RUNTIMES = 'runtimes'
 MEASUREMENTS_TIMESTAMPS = 'timestamps'
 MEASUREMENTS_ALL = OrderedDict([
-    (MEASUREMENTS_NONE, (
-        'No measurements included (same as providing an empty list, and cannot '
-        'be combined with other options).')),
-    (MEASUREMENTS_END_TO_END_RUNTIME, (
-        'Includes an end-to-end runtime measurement.')),
-    (MEASUREMENTS_RUNTIMES, (
-        'Includes runtimes of all measured intervals, including the end-to-end '
-        'runtime, the time taken by the benchmark module Prepare, Run, and '
-        'Cleanup functions, and other important intervals.')),
-    (MEASUREMENTS_TIMESTAMPS, (
-        'Includes start and stop timestamps of all measured intervals.'))])
+    (
+        MEASUREMENTS_NONE,
+        (
+            'No measurements included (same as providing an empty list, and'
+            ' cannot be combined with other options).'
+        ),
+    ),
+    (
+        MEASUREMENTS_END_TO_END_RUNTIME,
+        'Includes an end-to-end runtime measurement.',
+    ),
+    (
+        MEASUREMENTS_RUNTIMES,
+        (
+            'Includes runtimes of all measured intervals, including the'
+            ' end-to-end runtime, the time taken by the benchmark module'
+            ' Prepare, Run, and Cleanup functions, and other important'
+            ' intervals.'
+        ),
+    ),
+    (
+        MEASUREMENTS_TIMESTAMPS,
+        'Includes start and stop timestamps of all measured intervals.',
+    ),
+])
 
 
 def EndToEndRuntimeMeasurementEnabled():
   """Returns whether end-to-end runtime measurement is globally enabled."""
-  return (MEASUREMENTS_END_TO_END_RUNTIME in flags.FLAGS.timing_measurements or
-          RuntimeMeasurementsEnabled())
+  return (
+      MEASUREMENTS_END_TO_END_RUNTIME in flags.FLAGS.timing_measurements
+      or RuntimeMeasurementsEnabled()
+  )
 
 
 def RuntimeMeasurementsEnabled():
@@ -64,8 +80,7 @@ def ValidateMeasurementsFlag(options_list):
   must be valid. The NONE option cannot be combined with other options.
 
   Args:
-    options_list: A list of strings parsed from the provided value for the
-      flag.
+    options_list: A list of strings parsed from the provided value for the flag.
 
   Returns:
     True if the list of options provided as the value for the flag meets all
@@ -78,24 +93,31 @@ def ValidateMeasurementsFlag(options_list):
   for option in options_list:
     if option not in MEASUREMENTS_ALL:
       raise flags.ValidationError(
-          '%s: Invalid value for --%s' % (option, MEASUREMENTS_FLAG_NAME))
+          '%s: Invalid value for --%s' % (option, MEASUREMENTS_FLAG_NAME)
+      )
     if option == MEASUREMENTS_NONE and len(options_list) != 1:
       raise flags.ValidationError(
-          '%s: Cannot combine with other --%s options' % (
-              option, MEASUREMENTS_FLAG_NAME))
+          '%s: Cannot combine with other --%s options'
+          % (option, MEASUREMENTS_FLAG_NAME)
+      )
   return True
 
 
 flags.DEFINE_list(
-    MEASUREMENTS_FLAG_NAME, MEASUREMENTS_END_TO_END_RUNTIME,
+    MEASUREMENTS_FLAG_NAME,
+    MEASUREMENTS_END_TO_END_RUNTIME,
     'Comma-separated list of values from <%s> that selects which timing '
     'measurements to enable. Measurements will be included as samples in the '
-    'benchmark results. %s' % ('|'.join(MEASUREMENTS_ALL), ' '.join([
-        '%s: %s' % (option, description)
-        for option, description in MEASUREMENTS_ALL.items()
-    ])))
-flags.register_validator(
-    MEASUREMENTS_FLAG_NAME, ValidateMeasurementsFlag)
+    'benchmark results. %s'
+    % (
+        '|'.join(MEASUREMENTS_ALL),
+        ' '.join([
+            '%s: %s' % (option, description)
+            for option, description in MEASUREMENTS_ALL.items()
+        ]),
+    ),
+)
+flags.register_validator(MEASUREMENTS_FLAG_NAME, ValidateMeasurementsFlag)
 
 
 def _GenerateIntervalSamples(interval, include_timestamps):
@@ -118,10 +140,12 @@ def _GenerateIntervalSamples(interval, include_timestamps):
   elapsed_time = stop_time - start_time
   samples.append(sample.Sample(name + ' Runtime', elapsed_time, 'seconds'))
   if include_timestamps:
-    samples.append(sample.Sample(
-        name + ' Start Timestamp', start_time, 'seconds'))
-    samples.append(sample.Sample(
-        name + ' Stop Timestamp', stop_time, 'seconds'))
+    samples.append(
+        sample.Sample(name + ' Start Timestamp', start_time, 'seconds')
+    )
+    samples.append(
+        sample.Sample(name + ' Stop Timestamp', stop_time, 'seconds')
+    )
   return samples
 
 
@@ -160,5 +184,7 @@ class IntervalTimer(object):
     """
     include_timestamps = TimestampMeasurementsEnabled()
     return [
-        sample for interval in self.intervals for sample in
-        _GenerateIntervalSamples(interval, include_timestamps)]
+        sample
+        for interval in self.intervals
+        for sample in _GenerateIntervalSamples(interval, include_timestamps)
+    ]

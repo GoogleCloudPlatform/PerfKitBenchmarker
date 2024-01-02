@@ -42,8 +42,10 @@ class RunStageParserTestCase(unittest.TestCase):
       self._parser.parse('teardown,provision')
 
   def testAll(self):
-    self.assertEqual(self._parser.parse('all'),
-                     ['provision', 'prepare', 'run', 'cleanup', 'teardown'])
+    self.assertEqual(
+        self._parser.parse('all'),
+        ['provision', 'prepare', 'run', 'cleanup', 'teardown'],
+    )
 
   def testIndividual(self):
     self.assertEqual(self._parser.parse('prepare'), ['prepare'])

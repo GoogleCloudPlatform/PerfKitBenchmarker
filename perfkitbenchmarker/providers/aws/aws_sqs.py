@@ -15,7 +15,8 @@ from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 MESSAGING_SERVICE_SCRIPTS_VM_AWS_DIR = os.path.join(
-    msgsvc.MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'aws')
+    msgsvc.MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'aws'
+)
 MESSAGING_SERVICE_SCRIPTS_AWS_PREFIX = 'messaging_service_scripts/aws'
 MESSAGING_SERVICE_SCRIPTS_AWS_FILES = ['__init__.py', 'aws_sqs_client.py']
 MESSAGING_SERVICE_SCRIPTS_AWS_BIN = 'messaging_service_scripts/aws_benchmark.py'
@@ -38,8 +39,10 @@ class AwsSqs(msgsvc.BaseMessagingService):
     cmd = util.AWS_PREFIX + [
         'sqs',
         'create-queue',
-        '--queue-name', self.queue_name,
-        '--region', self.region
+        '--queue-name',
+        self.queue_name,
+        '--region',
+        self.region,
     ]
     vm_util.IssueCommand(cmd)
 
@@ -48,8 +51,10 @@ class AwsSqs(msgsvc.BaseMessagingService):
     cmd = util.AWS_PREFIX + [
         'sqs',
         'get-queue-url',
-        '--queue-name', self.queue_name,
-        '--region', self.region
+        '--queue-name',
+        self.queue_name,
+        '--region',
+        self.region,
     ]
     _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     return retcode == 0
@@ -59,8 +64,10 @@ class AwsSqs(msgsvc.BaseMessagingService):
     cmd = util.AWS_PREFIX + [
         'sqs',
         'delete-queue',
-        '--queue-url', self._GetQueue(),
-        '--region', self.region
+        '--queue-url',
+        self._GetQueue(),
+        '--region',
+        self.region,
     ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
@@ -77,30 +84,39 @@ class AwsSqs(msgsvc.BaseMessagingService):
 
   def _InstallCloudClients(self):
     self.client_vm.RemoteCommand(
-        'sudo pip3 install boto3', ignore_failure=False)
+        'sudo pip3 install boto3', ignore_failure=False
+    )
 
     self._CopyFiles(
         MESSAGING_SERVICE_SCRIPTS_AWS_PREFIX,
         MESSAGING_SERVICE_SCRIPTS_AWS_FILES,
-        MESSAGING_SERVICE_SCRIPTS_VM_AWS_DIR)
+        MESSAGING_SERVICE_SCRIPTS_VM_AWS_DIR,
+    )
     self.client_vm.PushDataFile(MESSAGING_SERVICE_SCRIPTS_AWS_BIN)
 
     # copy AWS creds
     self.client_vm.Install('aws_credentials')
 
-  def Run(self, benchmark_scenario: str, number_of_messages: int,
-          message_size: int, warmup_messages: int,
-          streaming_pull: bool = False) -> Dict[str, Any]:
+  def Run(
+      self,
+      benchmark_scenario: str,
+      number_of_messages: int,
+      message_size: int,
+      warmup_messages: int,
+      streaming_pull: bool = False,
+  ) -> Dict[str, Any]:
     """Runs remote commands on client VM - benchmark's run phase."""
     if streaming_pull:
       raise ValueError('Unsupported StreamingPull in AWS SQS.')
-    command = (f'python3 -m aws_benchmark '
-               f'--queue_name={self.queue_name} '
-               f'--region={self.region} '
-               f'--benchmark_scenario={benchmark_scenario} '
-               f'--number_of_messages={number_of_messages} '
-               f'--message_size={message_size} '
-               f'--warmup_messages={warmup_messages}')
+    command = (
+        'python3 -m aws_benchmark '
+        f'--queue_name={self.queue_name} '
+        f'--region={self.region} '
+        f'--benchmark_scenario={benchmark_scenario} '
+        f'--number_of_messages={number_of_messages} '
+        f'--message_size={message_size} '
+        f'--warmup_messages={warmup_messages}'
+    )
     stdout, _ = self.client_vm.RemoteCommand(command)
     results = json.loads(stdout)
     return results
@@ -114,8 +130,10 @@ class AwsSqs(msgsvc.BaseMessagingService):
     cmd = util.AWS_PREFIX + [
         'sqs',
         'get-queue-url',
-        '--queue-name', self.queue_name,
-        '--region', self.region
+        '--queue-name',
+        self.queue_name,
+        '--region',
+        self.region,
     ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     return json.loads(stdout)['QueueUrl']

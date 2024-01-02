@@ -34,42 +34,61 @@ import six
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('ntttcp_threads', 1,
-                     'The number of client and server threads for NTttcp '
-                     'to run with.')
+flags.DEFINE_integer(
+    'ntttcp_threads',
+    1,
+    'The number of client and server threads for NTttcp to run with.',
+)
 
-flags.DEFINE_integer('ntttcp_time', 60,
-                     'The number of seconds for NTttcp to run.')
+flags.DEFINE_integer(
+    'ntttcp_time', 60, 'The number of seconds for NTttcp to run.'
+)
 
 flags.DEFINE_bool('ntttcp_udp', False, 'Whether to run a UDP test.')
 
-flags.DEFINE_integer('ntttcp_cooldown_time', 60,
-                     'Time to wait between the test runs.')
+flags.DEFINE_integer(
+    'ntttcp_cooldown_time', 60, 'Time to wait between the test runs.'
+)
 
-flags.DEFINE_integer('ntttcp_packet_size', None,
-                     'The size of the packet being used in the test.')
+flags.DEFINE_integer(
+    'ntttcp_packet_size', None, 'The size of the packet being used in the test.'
+)
 
-flags.DEFINE_integer('ntttcp_sender_sb', -1,
-                     'The size of the send buffer, in Kilo Bytes, on the '
-                     'sending VM. The default is the OS default.')
+flags.DEFINE_integer(
+    'ntttcp_sender_sb',
+    -1,
+    'The size of the send buffer, in Kilo Bytes, on the '
+    'sending VM. The default is the OS default.',
+)
 
-flags.DEFINE_integer('ntttcp_sender_rb', -1,
-                     'The size of the receive buffer, in Kilo Bytes, on the '
-                     'sending VM. The default is the OS default.')
+flags.DEFINE_integer(
+    'ntttcp_sender_rb',
+    -1,
+    'The size of the receive buffer, in Kilo Bytes, on the '
+    'sending VM. The default is the OS default.',
+)
 
-flags.DEFINE_integer('ntttcp_receiver_sb', -1,
-                     'The size of the send buffer, in Kilo Bytes, on the '
-                     'receiving VM. The default is the OS default.')
+flags.DEFINE_integer(
+    'ntttcp_receiver_sb',
+    -1,
+    'The size of the send buffer, in Kilo Bytes, on the '
+    'receiving VM. The default is the OS default.',
+)
 
-flags.DEFINE_integer('ntttcp_receiver_rb', -1,
-                     'The size of the receive buffer, in Kilo Bytes, on the '
-                     'receiving VM. The default is the OS default.')
+flags.DEFINE_integer(
+    'ntttcp_receiver_rb',
+    -1,
+    'The size of the receive buffer, in Kilo Bytes, on the '
+    'receiving VM. The default is the OS default.',
+)
 
 flags.DEFINE_list(
-    'ntttcp_config_list', '',
+    'ntttcp_config_list',
+    '',
     'comma separated list of configs to run with ntttcp. The '
     'format for a single config is UDP:THREADS:RUNTIME_S:IP_TYPE:PACKET_SIZE, '
-    'for example True:4:60:INTERNAL:0,False:8:60:EXTERNAL:150')
+    'for example True:4:60:INTERNAL:0,False:8:60:EXTERNAL:150',
+)
 
 # When adding new configs to ntttcp_config_list, increase this value
 _NUM_PARAMS_IN_CONFIG = 5
@@ -79,14 +98,19 @@ BASE_DATA_PORT = 5001
 NTTTCP_RETRIES = 10
 NTTTCP_VERSION = 'v5.36'
 NTTTCP_EXE = 'NTttcp.exe'
-NTTTCP_URL = ('https://github.com/microsoft/ntttcp/releases/download/' +
-              NTTTCP_VERSION + '/' + NTTTCP_EXE)
+NTTTCP_URL = (
+    'https://github.com/microsoft/ntttcp/releases/download/'
+    + NTTTCP_VERSION
+    + '/'
+    + NTTTCP_EXE
+)
 TRUE_VALS = ['True', 'true', 't']
 FALSE_VALS = ['False', 'false', 'f']
 
 # named tuple used in passing configs around
-NtttcpConf = collections.namedtuple('NtttcpConf',
-                                    'udp threads time_s ip_type packet_size')
+NtttcpConf = collections.namedtuple(
+    'NtttcpConf', 'udp threads time_s ip_type packet_size'
+)
 
 
 def NtttcpConfigListValidator(value):
@@ -122,15 +146,17 @@ def NtttcpConfigListValidator(value):
 
     # verify the ip type
     if ip_type not in [
-        vm_util.IpAddressSubset.EXTERNAL, vm_util.IpAddressSubset.INTERNAL
+        vm_util.IpAddressSubset.EXTERNAL,
+        vm_util.IpAddressSubset.INTERNAL,
     ]:
       return False
 
   return True
 
 
-flags.register_validator('ntttcp_config_list', NtttcpConfigListValidator,
-                         'malformed config list')
+flags.register_validator(
+    'ntttcp_config_list', NtttcpConfigListValidator, 'malformed config list'
+)
 
 
 def ParseConfigList():
@@ -143,7 +169,8 @@ def ParseConfigList():
             threads=FLAGS.ntttcp_threads,
             time_s=FLAGS.ntttcp_time,
             ip_type=FLAGS.ip_addresses,
-            packet_size=FLAGS.ntttcp_packet_size)
+            packet_size=FLAGS.ntttcp_packet_size,
+        )
     ]
 
   conf_list = []
@@ -156,7 +183,9 @@ def ParseConfigList():
             threads=int(confs[1]),
             time_s=int(confs[2]),
             ip_type=confs[3],
-            packet_size=int(confs[4])))
+            packet_size=int(confs[4]),
+        )
+    )
 
   return conf_list
 
@@ -179,14 +208,16 @@ def _RunNtttcp(vm, options):
   command = 'cd {ntttcp_exe_dir}; .\\{ntttcp_exe} {ntttcp_options}'.format(
       ntttcp_exe=NTTTCP_EXE,
       ntttcp_exe_dir=ntttcp_exe_dir,
-      ntttcp_options=options)
+      ntttcp_options=options,
+  )
   vm.RobustRemoteCommand(command, timeout=timeout_duration)
 
 
 def _RemoveXml(vm):
   ntttcp_exe_dir = vm.temp_dir
   rm_command = 'cd {ntttcp_exe_dir}; rm xml.txt'.format(
-      ntttcp_exe_dir=ntttcp_exe_dir)
+      ntttcp_exe_dir=ntttcp_exe_dir
+  )
   vm.RemoteCommand(rm_command, ignore_failure=True)
 
 
@@ -194,7 +225,8 @@ def _RemoveXml(vm):
 def _CatXml(vm):
   ntttcp_exe_dir = vm.temp_dir
   cat_command = 'cd {ntttcp_exe_dir}; cat xml.txt'.format(
-      ntttcp_exe_dir=ntttcp_exe_dir)
+      ntttcp_exe_dir=ntttcp_exe_dir
+  )
   ntttcp_xml, _ = vm.RemoteCommand(cat_command, timeout=10)
   return ntttcp_xml
 
@@ -204,8 +236,17 @@ def _GetSockBufferSize(sock_buff_size):
 
 
 @vm_util.Retry(max_retries=NTTTCP_RETRIES)
-def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type, udp,
-              threads, time_s, packet_size, cooldown):
+def RunNtttcp(
+    sending_vm,
+    receiving_vm,
+    receiving_ip_address,
+    ip_type,
+    udp,
+    threads,
+    time_s,
+    packet_size,
+    cooldown,
+):
   """Run NTttcp and return the samples collected from the run."""
 
   if cooldown:
@@ -220,22 +261,27 @@ def RunNtttcp(sending_vm, receiving_vm, receiving_ip_address, ip_type, udp,
     packet_size_string = ' -l %d ' % packet_size
 
   shared_options = '-xml -t {time} -p {port} {packet_size}'.format(
-      time=time_s, port=BASE_DATA_PORT, packet_size=packet_size_string)
+      time=time_s, port=BASE_DATA_PORT, packet_size=packet_size_string
+  )
 
   udp_string = '-u' if udp else ''
   sending_options = shared_options + (
-      '-s {udp} -m \'{threads},*,{ip}\' -rb {rb} -sb {sb}').format(
-          udp=udp_string,
-          threads=threads,
-          ip=receiving_ip_address,
-          rb=_GetSockBufferSize(FLAGS.ntttcp_sender_rb),
-          sb=_GetSockBufferSize(FLAGS.ntttcp_sender_sb))
+      "-s {udp} -m '{threads},*,{ip}' -rb {rb} -sb {sb}"
+  ).format(
+      udp=udp_string,
+      threads=threads,
+      ip=receiving_ip_address,
+      rb=_GetSockBufferSize(FLAGS.ntttcp_sender_rb),
+      sb=_GetSockBufferSize(FLAGS.ntttcp_sender_sb),
+  )
   receiving_options = shared_options + (
-      '-r {udp} -m \'{threads},*,0.0.0.0\' -rb {rb} -sb {sb}').format(
-          udp=udp_string,
-          threads=threads,
-          rb=_GetSockBufferSize(FLAGS.ntttcp_receiver_rb),
-          sb=_GetSockBufferSize(FLAGS.ntttcp_receiver_sb))
+      "-r {udp} -m '{threads},*,0.0.0.0' -rb {rb} -sb {sb}"
+  ).format(
+      udp=udp_string,
+      threads=threads,
+      rb=_GetSockBufferSize(FLAGS.ntttcp_receiver_rb),
+      sb=_GetSockBufferSize(FLAGS.ntttcp_receiver_sb),
+  )
 
   # NTttcp will append to the xml file when it runs, which causes parsing
   # to fail if there was a preexisting xml file. To be safe, try deleting
@@ -311,8 +357,10 @@ def ParseNtttcpResults(sender_xml_results, receiver_xml_results, metadata):
 
   throughput_element = sender_xml_root.find('./throughput[@metric="mbps"]')
   samples.append(
-      sample.Sample('Total Throughput', float(throughput_element.text), 'Mbps',
-                    metadata))
+      sample.Sample(
+          'Total Throughput', float(throughput_element.text), 'Mbps', metadata
+      )
+  )
 
   thread_elements = sender_xml_root.findall('./thread')
   if len(thread_elements) > 1:
@@ -320,8 +368,12 @@ def ParseNtttcpResults(sender_xml_results, receiver_xml_results, metadata):
       throughput_element = element.find('./throughput[@metric="mbps"]')
       metadata = metadata.copy()
       metadata['thread_index'] = element.attrib['index']
-      samples.append(sample.Sample('Thread Throughput',
-                                   float(throughput_element.text),
-                                   'Mbps',
-                                   metadata))
+      samples.append(
+          sample.Sample(
+              'Thread Throughput',
+              float(throughput_element.text),
+              'Mbps',
+              metadata,
+          )
+      )
   return samples

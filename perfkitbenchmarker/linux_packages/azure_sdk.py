@@ -16,8 +16,11 @@
 
 from absl import flags
 
-flags.DEFINE_string('azure_lib_version', '1.0.3',
-                    'Use a particular version of azure client lib, e.g.: 1.0.2')
+flags.DEFINE_string(
+    'azure_lib_version',
+    '1.0.3',
+    'Use a particular version of azure client lib, e.g.: 1.0.2',
+)
 FLAGS = flags.FLAGS
 
 

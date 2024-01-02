@@ -34,12 +34,25 @@ _HPC_REMOTE_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'hpc-tools')
 # HPC tools tuning script
 _HPC_SCRIPT = 'mpi-tuning.sh'
 
-flags.DEFINE_string('gce_hpc_tools_tag', None,
-                    'Github tag of hpc-tools to use.  Default is latest.')
-flags.DEFINE_list('gce_hpc_tools_tuning', [
-    'hpcprofile', 'tcpmem', 'limits', 'nosmt', 'nofirewalld', 'noselinux',
-    'nomitigation', 'reboot'
-], 'List of HPC tunings.  `bash mpi-tuning.sh` for description.')
+flags.DEFINE_string(
+    'gce_hpc_tools_tag',
+    None,
+    'Github tag of hpc-tools to use.  Default is latest.',
+)
+flags.DEFINE_list(
+    'gce_hpc_tools_tuning',
+    [
+        'hpcprofile',
+        'tcpmem',
+        'limits',
+        'nosmt',
+        'nofirewalld',
+        'noselinux',
+        'nomitigation',
+        'reboot',
+    ],
+    'List of HPC tunings.  `bash mpi-tuning.sh` for description.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -74,10 +87,12 @@ def YumInstall(vm):
 def _CloneRepo(vm, hpc_tools_tag):
   """Clones git repo, switches to tag, and returns current commit."""
   vm.InstallPackages('git')
-  vm.RemoteCommand(f'rm -rf {_HPC_REMOTE_DIR}; '
-                   f'git clone {_HPC_URL} {_HPC_REMOTE_DIR}')
+  vm.RemoteCommand(
+      f'rm -rf {_HPC_REMOTE_DIR}; git clone {_HPC_URL} {_HPC_REMOTE_DIR}'
+  )
   if hpc_tools_tag:
     vm.RemoteCommand(f'cd {_HPC_REMOTE_DIR}; git checkout {hpc_tools_tag}')
   stdout, _ = vm.RemoteCommand(
-      f'cd {_HPC_REMOTE_DIR}; git log --pretty=format:"%h" -n 1')
+      f'cd {_HPC_REMOTE_DIR}; git log --pretty=format:"%h" -n 1'
+  )
   return stdout.splitlines()[-1]

@@ -24,8 +24,9 @@ from tests import pkb_common_test_case
 flags.FLAGS.mark_as_parsed()
 
 
-class TestParseOpenSSLOutput(pkb_common_test_case.PkbCommonTestCase,
-                             test_util.SamplesTestMixin):
+class TestParseOpenSSLOutput(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def testParseOpenSSLOutput(self):
     raw_results = """
@@ -36,38 +37,92 @@ compiler: gcc -fPIC -pthread -m64 -Wa,--noexecstack -Wall -Wa,--noexecstack -g -
 evp            7928414.04k 24973982.48k 64151343.18k 100449384.11k 117555948.61k 118711951.91k
     """
     results = openssl_speed_benchmark.ParseOpenSSLOutput(
-        raw_results, 'fake_version', 10)
+        raw_results, 'fake_version', 10
+    )
     print(results)
-    self.assertSampleListsEqualUpToTimestamp(results, [
-        sample.Sample(metric='Throughput', value=7928414.04, unit='k',
-                      metadata={'duration': 60, 'algorithm': 'aes-256-ctr',
-                                'parallelism': 10, 'version': 'fake_version',
-                                'blocksize': 16}, timestamp=1627597373.5422955),
-        sample.Sample(metric='Throughput', value=24973982.48, unit='k',
-                      metadata={'duration': 60, 'algorithm': 'aes-256-ctr',
-                                'parallelism': 10, 'version': 'fake_version',
-                                'blocksize': 64}, timestamp=1627597909.9372606),
-        sample.Sample(metric='Throughput', value=64151343.18, unit='k',
-                      metadata={'duration': 60, 'algorithm': 'aes-256-ctr',
-                                'parallelism': 10, 'version': 'fake_version',
-                                'blocksize': 256},
-                      timestamp=1627597909.9372814),
-        sample.Sample(metric='Throughput', value=100449384.11, unit='k',
-                      metadata={'duration': 60, 'algorithm': 'aes-256-ctr',
-                                'parallelism': 10, 'version': 'fake_version',
-                                'blocksize': 1024},
-                      timestamp=1627597909.9372985),
-        sample.Sample(metric='Throughput', value=117555948.61, unit='k',
-                      metadata={'duration': 60, 'algorithm': 'aes-256-ctr',
-                                'parallelism': 10, 'version': 'fake_version',
-                                'blocksize': 8192},
-                      timestamp=1627597909.937315),
-        sample.Sample(metric='Throughput', value=118711951.91, unit='k',
-                      metadata={'duration': 60, 'algorithm': 'aes-256-ctr',
-                                'parallelism': 10, 'version': 'fake_version',
-                                'blocksize': 16384},
-                      timestamp=1627597909.9373317)
-    ])
+    self.assertSampleListsEqualUpToTimestamp(
+        results,
+        [
+            sample.Sample(
+                metric='Throughput',
+                value=7928414.04,
+                unit='k',
+                metadata={
+                    'duration': 60,
+                    'algorithm': 'aes-256-ctr',
+                    'parallelism': 10,
+                    'version': 'fake_version',
+                    'blocksize': 16,
+                },
+                timestamp=1627597373.5422955,
+            ),
+            sample.Sample(
+                metric='Throughput',
+                value=24973982.48,
+                unit='k',
+                metadata={
+                    'duration': 60,
+                    'algorithm': 'aes-256-ctr',
+                    'parallelism': 10,
+                    'version': 'fake_version',
+                    'blocksize': 64,
+                },
+                timestamp=1627597909.9372606,
+            ),
+            sample.Sample(
+                metric='Throughput',
+                value=64151343.18,
+                unit='k',
+                metadata={
+                    'duration': 60,
+                    'algorithm': 'aes-256-ctr',
+                    'parallelism': 10,
+                    'version': 'fake_version',
+                    'blocksize': 256,
+                },
+                timestamp=1627597909.9372814,
+            ),
+            sample.Sample(
+                metric='Throughput',
+                value=100449384.11,
+                unit='k',
+                metadata={
+                    'duration': 60,
+                    'algorithm': 'aes-256-ctr',
+                    'parallelism': 10,
+                    'version': 'fake_version',
+                    'blocksize': 1024,
+                },
+                timestamp=1627597909.9372985,
+            ),
+            sample.Sample(
+                metric='Throughput',
+                value=117555948.61,
+                unit='k',
+                metadata={
+                    'duration': 60,
+                    'algorithm': 'aes-256-ctr',
+                    'parallelism': 10,
+                    'version': 'fake_version',
+                    'blocksize': 8192,
+                },
+                timestamp=1627597909.937315,
+            ),
+            sample.Sample(
+                metric='Throughput',
+                value=118711951.91,
+                unit='k',
+                metadata={
+                    'duration': 60,
+                    'algorithm': 'aes-256-ctr',
+                    'parallelism': 10,
+                    'version': 'fake_version',
+                    'blocksize': 16384,
+                },
+                timestamp=1627597909.9373317,
+            ),
+        ],
+    )
 
 
 if __name__ == '__main__':

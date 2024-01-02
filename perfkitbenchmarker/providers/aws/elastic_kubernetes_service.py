@@ -45,8 +45,9 @@ class EksCluster(container_service.KubernetesCluster):
   def __init__(self, spec):
     # EKS requires a region and optionally a list of one or zones.
     # Interpret the zone as a comma separated list of zones or a region.
-    self.control_plane_zones = (
-        spec.vm_spec.zone and spec.vm_spec.zone.split(','))
+    self.control_plane_zones = spec.vm_spec.zone and spec.vm_spec.zone.split(
+        ','
+    )
     # Do this before super, because commas in zones confuse EC2 virtual machines
     if len(self.control_plane_zones) > 1:
       # This will become self.zone
@@ -54,7 +55,8 @@ class EksCluster(container_service.KubernetesCluster):
     super().__init__(spec)
     if not self.control_plane_zones:
       raise errors.Config.MissingOption(
-          'container_cluster.vm_spec.AWS.zone is required.')
+          'container_cluster.vm_spec.AWS.zone is required.'
+      )
     elif len(self.control_plane_zones) == 1 and util.IsRegion(self.zone):
       self.region = self.zone
       self.control_plane_zones = []
@@ -63,15 +65,15 @@ class EksCluster(container_service.KubernetesCluster):
       self.region = util.GetRegionFromZones(self.control_plane_zones)
     # control_plane_zones must be a superset of the node zones
     for nodepool in self.nodepools.values():
-      if (nodepool.zone and
-          nodepool.zone not in self.control_plane_zones):
+      if nodepool.zone and nodepool.zone not in self.control_plane_zones:
         self.control_plane_zones.append(nodepool.zone)
     if len(self.control_plane_zones) == 1:
       # eksctl essentially requires you pass --zones if you pass --node-zones
       # and --zones must have at least 2 zones
       # https://github.com/weaveworks/eksctl/issues/4735
-      self.control_plane_zones.append(self.region +
-                                      ('b' if self.zone.endswith('a') else 'a'))
+      self.control_plane_zones.append(
+          self.region + ('b' if self.zone.endswith('a') else 'a')
+      )
     self.cluster_version = FLAGS.container_cluster_version
     # TODO(user) support setting boot disk type if EKS does.
     self.account = util.GetAccount()
@@ -123,13 +125,14 @@ class EksCluster(container_service.KubernetesCluster):
           'nodes-min': self.min_nodes,
           'nodes-max': self.max_nodes,
       })
-    eksctl_flags.update(
-        self._GetNodeFlags(self.default_nodepool))
+    eksctl_flags.update(self._GetNodeFlags(self.default_nodepool))
 
     cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(
-        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v)
+        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v
+    )
     stdout, _, retcode = vm_util.IssueCommand(
-        cmd, timeout=1800, raise_on_failure=False)
+        cmd, timeout=1800, raise_on_failure=False
+    )
     if retcode:
       # TODO(pclay): add other quota errors
       if 'The maximum number of VPCs has been reached' in stdout:
@@ -147,7 +150,9 @@ class EksCluster(container_service.KubernetesCluster):
     ebs_csi_driver_role = f'AmazonEKS_EBS_CSI_DriverRole_{self.name}'
 
     cmd = [
-        FLAGS.eksctl, 'create', 'iamserviceaccount',
+        FLAGS.eksctl,
+        'create',
+        'iamserviceaccount',
         '--name=ebs-csi-controller-sa',
         '--namespace=kube-system',
         f'--region={self.region}',
@@ -160,7 +165,9 @@ class EksCluster(container_service.KubernetesCluster):
     vm_util.IssueCommand(cmd)
 
     cmd = [
-        FLAGS.eksctl, 'create', 'addon',
+        FLAGS.eksctl,
+        'create',
+        'addon',
         '--name=aws-ebs-csi-driver',
         f'--region={self.region}',
         f'--cluster={self.name}',
@@ -190,38 +197,41 @@ class EksCluster(container_service.KubernetesCluster):
     """Get common flags for creating clusters and node_groups."""
     tags = util.MakeDefaultTags()
     return {
-        'nodes':
-            nodepool_config.num_nodes,
-        'node-labels':
-            f'pkb_nodepool={nodepool_config.name}',
-        'node-type':
-            nodepool_config.machine_type,
-        'node-volume-size':
-            nodepool_config.disk_size,
+        'nodes': nodepool_config.num_nodes,
+        'node-labels': f'pkb_nodepool={nodepool_config.name}',
+        'node-type': nodepool_config.machine_type,
+        'node-volume-size': nodepool_config.disk_size,
         # zone may be split a comma separated list
-        'node-zones':
-            nodepool_config.zone,
-        'region':
-            self.region,
-        'tags':
-            ','.join(f'{k}={v}' for k, v in tags.items()),
-        'ssh-public-key':
-            aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),
+        'node-zones': nodepool_config.zone,
+        'region': self.region,
+        'tags': ','.join(f'{k}={v}' for k, v in tags.items()),
+        'ssh-public-key': (
+            aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun()
+        ),
     }
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""
     super()._Delete()
-    cmd = [FLAGS.eksctl, 'delete', 'cluster',
-           '--name', self.name,
-           '--region', self.region]
+    cmd = [
+        FLAGS.eksctl,
+        'delete',
+        'cluster',
+        '--name',
+        self.name,
+        '--region',
+        self.region,
+    ]
     vm_util.IssueCommand(cmd, timeout=1800)
 
   def _IsReady(self):
     """Returns True if the workers are ready, else False."""
     get_cmd = [
-        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-        'get', 'nodes',
+        FLAGS.kubectl,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+        'get',
+        'nodes',
     ]
     stdout, _, _ = vm_util.IssueCommand(get_cmd)
     ready_nodes = len(re.findall('Ready', stdout))
@@ -237,7 +247,10 @@ class EksCluster(container_service.KubernetesCluster):
   ):
     """Change the number of nodes in the node group."""
     cmd = [
-        FLAGS.eksctl, 'scale', 'nodegroup', node_pool,
+        FLAGS.eksctl,
+        'scale',
+        'nodegroup',
+        node_pool,
         f'--nodes={new_size}',
         f'--nodes-min={new_size}',
         f'--nodes-max={new_size}',

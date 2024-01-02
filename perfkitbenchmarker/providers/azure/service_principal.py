@@ -48,17 +48,21 @@ class ServicePrincipal(resource.BaseResource):
     """Loads a service principal from a file."""
     with open(
         object_storage_service.FindCredentialFile(
-            azure_credentials.PROFILE_FILE),
-        encoding='utf-8-sig') as profile_fp:
+            azure_credentials.PROFILE_FILE
+        ),
+        encoding='utf-8-sig',
+    ) as profile_fp:
       subscriptions = json.load(profile_fp)['subscriptions']
       subscription = [sub for sub in subscriptions if sub['isDefault']][0]
       subscription_type = subscription['user']['type']
       if subscription_type != 'servicePrincipal':
         # We are using user auth, and will probably have permission to create a
         # service principal.
-        logging.info("Azure credentials are of type '%s'. "
-                     'Will try to create a new service principal.',
-                     subscription_type)
+        logging.info(
+            "Azure credentials are of type '%s'. "
+            'Will try to create a new service principal.',
+            subscription_type,
+        )
         return cls()
       # name and id are backwards
       name = subscription['id']
@@ -68,16 +72,22 @@ class ServicePrincipal(resource.BaseResource):
       # will exist.
       with open(
           object_storage_service.FindCredentialFile(
-              azure_credentials.SERVICE_PRINCIPAL_FILE)
+              azure_credentials.SERVICE_PRINCIPAL_FILE
+          )
       ) as service_principals_fp:
         for sp in json.load(service_principals_fp):
           if sp['client_id'] == app_id:
-            logging.info("Azure credentials are of type 'servicePrincipal'. "
-                         'Will reuse them for benchmarking.')
+            logging.info(
+                "Azure credentials are of type 'servicePrincipal'. "
+                'Will reuse them for benchmarking.'
+            )
             return cls(
-                name, app_id, password=sp['client_secret'], user_managed=True)
-        logging.warning('No access tokens found matching Azure defaultProfile '
-                        'Will try to create a new service principal.')
+                name, app_id, password=sp['client_secret'], user_managed=True
+            )
+        logging.warning(
+            'No access tokens found matching Azure defaultProfile '
+            'Will try to create a new service principal.'
+        )
         return cls()
 
   def __init__(self, name=None, app_id=None, password=None, user_managed=False):
@@ -93,8 +103,13 @@ class ServicePrincipal(resource.BaseResource):
   def _Create(self):
     """Creates the service principal."""
     cmd = [
-        azure.AZURE_PATH, 'ad', 'sp', 'create-for-rbac', '--name', self.name,
-        '--skip-assignment'
+        azure.AZURE_PATH,
+        'ad',
+        'sp',
+        'create-for-rbac',
+        '--name',
+        self.name,
+        '--skip-assignment',
     ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     response = json.loads(stdout)
@@ -104,7 +119,9 @@ class ServicePrincipal(resource.BaseResource):
       if not self.app_id or not self.password:
         raise errors.Resource.CreationError(
             'Invalid creation response when creating service principal. '
-            'Expected appId and password. Received:\n' + stdout)
+            'Expected appId and password. Received:\n'
+            + stdout
+        )
       return True
     return False
 

@@ -28,7 +28,6 @@ def CreateDisks(disk_specs, vm_name):
 
   scratch_disks = []
   for disk_num, disk_spec in enumerate(disk_specs):
-
     logging.info('Creating Disk number: %d', disk_num)
 
     volume_disk = DockerDisk(disk_spec, disk_num, vm_name)

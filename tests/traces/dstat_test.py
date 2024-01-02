@@ -16,7 +16,6 @@
 import os
 import unittest
 from absl import flags
-
 from perfkitbenchmarker import events
 from perfkitbenchmarker.sample import Sample
 from tests import pkb_common_test_case
@@ -46,61 +45,52 @@ class DstatTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(self.samples, [])
 
   def testAnalyzeValidEventSingleRow(self):
-    events.AddEvent('sender', 'event', 1475708693, 1475708694,
-                    {'label1': 123})
+    events.AddEvent('sender', 'event', 1475708693, 1475708694, {'label1': 123})
     self.collector.Analyze('testSender', None, self.samples)
     # 61 metrics
     self.assertTrue(len(self.samples), 61)
-    expected = Sample(metric='usr__total cpu usage',
-                      value=6.4000000000000004,
-                      unit='',
-                      metadata={'vm_role': 'test_vm0',
-                                'label1': 123, 'event': 'event'},
-                      timestamp=0.0)
-    self.assertEqual(
-        expected.metric, self.samples[0].metric)
-    self.assertEqual(
-        expected.value, self.samples[0].value)
-    self.assertEqual(
-        expected.metadata, self.samples[0].metadata)
+    expected = Sample(
+        metric='usr__total cpu usage',
+        value=6.4000000000000004,
+        unit='',
+        metadata={'vm_role': 'test_vm0', 'label1': 123, 'event': 'event'},
+        timestamp=0.0,
+    )
+    self.assertEqual(expected.metric, self.samples[0].metric)
+    self.assertEqual(expected.value, self.samples[0].value)
+    self.assertEqual(expected.metadata, self.samples[0].metadata)
 
   def testAnalyzeValidEventTwoRows(self):
-    events.AddEvent('sender', 'event', 1475708693, 1475708695,
-                    {'label1': 123})
+    events.AddEvent('sender', 'event', 1475708693, 1475708695, {'label1': 123})
     self.collector.Analyze('testSender', None, self.samples)
     # 61 metrics
     self.assertTrue(len(self.samples), 61)
-    expected = Sample(metric='usr__total cpu usage',
-                      value=3.200000000000000,
-                      unit='',
-                      metadata={'vm_role': 'test_vm0',
-                                'label1': 123, 'event': 'event'},
-                      timestamp=0.0)
-    self.assertEqual(
-        expected.metric, self.samples[0].metric)
-    self.assertEqual(
-        expected.value, self.samples[0].value)
-    self.assertEqual(
-        expected.metadata, self.samples[0].metadata)
+    expected = Sample(
+        metric='usr__total cpu usage',
+        value=3.200000000000000,
+        unit='',
+        metadata={'vm_role': 'test_vm0', 'label1': 123, 'event': 'event'},
+        timestamp=0.0,
+    )
+    self.assertEqual(expected.metric, self.samples[0].metric)
+    self.assertEqual(expected.value, self.samples[0].value)
+    self.assertEqual(expected.metadata, self.samples[0].metadata)
 
   def testAnalyzeValidEventEntireFile(self):
-    events.AddEvent('sender', 'event', 1475708693, 1475709076,
-                    {'label1': 123})
+    events.AddEvent('sender', 'event', 1475708693, 1475709076, {'label1': 123})
     self.collector.Analyze('testSender', None, self.samples)
     # 61 metrics
     self.assertTrue(len(self.samples), 61)
-    expected = Sample(metric='usr__total cpu usage',
-                      value=10.063689295039159,
-                      unit='',
-                      metadata={'vm_role': 'test_vm0',
-                                'label1': 123, 'event': 'event'},
-                      timestamp=0.0)
-    self.assertEqual(
-        expected.metric, self.samples[0].metric)
-    self.assertEqual(
-        expected.value, self.samples[0].value)
-    self.assertEqual(
-        expected.metadata, self.samples[0].metadata)
+    expected = Sample(
+        metric='usr__total cpu usage',
+        value=10.063689295039159,
+        unit='',
+        metadata={'vm_role': 'test_vm0', 'label1': 123, 'event': 'event'},
+        timestamp=0.0,
+    )
+    self.assertEqual(expected.metric, self.samples[0].metric)
+    self.assertEqual(expected.value, self.samples[0].value)
+    self.assertEqual(expected.metadata, self.samples[0].metadata)
 
 
 if __name__ == '__main__':

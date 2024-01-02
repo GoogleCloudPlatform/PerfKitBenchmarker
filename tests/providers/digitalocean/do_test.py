@@ -15,40 +15,46 @@
 
 import unittest
 import mock
-
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.digitalocean import util
 
 
 class TestDoctlAndParse(unittest.TestCase):
+
   def testCommandSucceeds(self):
-    with mock.patch(vm_util.__name__ + '.IssueCommand',
-                    return_value=('{"a": 1, "b": 2}', '', 0)):
+    with mock.patch(
+        vm_util.__name__ + '.IssueCommand',
+        return_value=('{"a": 1, "b": 2}', '', 0),
+    ):
       response, retval = util.DoctlAndParse(['foo', 'bar', 'baz'])
 
       self.assertEqual(response, {'a': 1, 'b': 2})
       self.assertEqual(retval, 0)
 
   def testCommandFailsWithNull(self):
-    with mock.patch(vm_util.__name__ + '.IssueCommand',
-                    return_value=(
-                        'null{"errors": [{"detail": "foo"}]}', '', 1)):
+    with mock.patch(
+        vm_util.__name__ + '.IssueCommand',
+        return_value=('null{"errors": [{"detail": "foo"}]}', '', 1),
+    ):
       response, retval = util.DoctlAndParse(['foo', 'bar', 'baz'])
 
       self.assertEqual(response, {'errors': [{'detail': 'foo'}]})
       self.assertEqual(retval, 1)
 
   def testCommandFailsWithoutNull(self):
-    with mock.patch(vm_util.__name__ + '.IssueCommand',
-                    return_value=('{"errors": [{"detail": "foo"}]}', '', 1)):
+    with mock.patch(
+        vm_util.__name__ + '.IssueCommand',
+        return_value=('{"errors": [{"detail": "foo"}]}', '', 1),
+    ):
       response, retval = util.DoctlAndParse(['foo', 'bar', 'baz'])
 
       self.assertEqual(response, {'errors': [{'detail': 'foo'}]})
       self.assertEqual(retval, 1)
 
   def testCommandSucceedsNoOutput(self):
-    with mock.patch(vm_util.__name__ + '.IssueCommand',
-                    return_value=('', '', 0)):
+    with mock.patch(
+        vm_util.__name__ + '.IssueCommand', return_value=('', '', 0)
+    ):
       response, retval = util.DoctlAndParse(['foo', 'bar', 'baz'])
 
       self.assertEqual(response, None)

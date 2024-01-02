@@ -20,31 +20,38 @@ tunnel between two endpoints. Related: perfkitbenchmarker.network
 module includes the BaseVpnGateway class to manage VPN gateway endpoints.
 """
 
+from enum import Enum
 import itertools
 import json
 import logging
 import re
 import threading
-import uuid
-from enum import Enum
-
 from typing import List, Tuple
+import uuid
+from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
-from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 
-flags.DEFINE_integer('vpn_service_tunnel_count', None,
-                     'Number of tunnels to create for each VPN Gateway pair.')
-flags.DEFINE_integer('vpn_service_gateway_count', None,
-                     'Number of VPN Gateways to create for each vm_group.')
-flags.DEFINE_string('vpn_service_name', None,
-                    'If set, use this name for VPN Service.')
-flags.DEFINE_string('vpn_service_shared_key', None,
-                    'If set, use this PSK for VPNs.')
+flags.DEFINE_integer(
+    'vpn_service_tunnel_count',
+    None,
+    'Number of tunnels to create for each VPN Gateway pair.',
+)
+flags.DEFINE_integer(
+    'vpn_service_gateway_count',
+    None,
+    'Number of VPN Gateways to create for each vm_group.',
+)
+flags.DEFINE_string(
+    'vpn_service_name', None, 'If set, use this name for VPN Service.'
+)
+flags.DEFINE_string(
+    'vpn_service_shared_key', None, 'If set, use this PSK for VPNs.'
+)
 flags.DEFINE_integer('vpn_service_ike_version', None, 'IKE version')
 
 
@@ -52,10 +59,13 @@ class VPN_ROUTING_TYPE(Enum):
   STATIC = 'static'
   DYNAMIC = 'dynamic'
 
+
 flags.DEFINE_enum(
-    'vpn_service_routing_type', None,
+    'vpn_service_routing_type',
+    None,
     [VPN_ROUTING_TYPE.STATIC.value, VPN_ROUTING_TYPE.DYNAMIC.value],
-    'static or dynamic(BGP)')
+    'static or dynamic(BGP)',
+)
 
 FLAGS = flags.FLAGS
 
@@ -79,8 +89,9 @@ class VPN(object):
 
   def __init__(self, *args, **kwargs):
     # set by Create
-    self.gateway_pair: Tuple[network.BaseVpnGateway,
-                             network.BaseVpnGateway] = None
+    self.gateway_pair: Tuple[network.BaseVpnGateway, network.BaseVpnGateway] = (
+        None
+    )
     self.tunnel_config: TunnelConfig = None
     return object.__init__(self, *args, **kwargs)
 
@@ -93,10 +104,13 @@ class VPN(object):
 
     Returns:
       string. The VPN key.
-
     """
-    key = 'vpn' + ''.join(
-        gateway for gateway in gateway_pair) + suffix + FLAGS.run_uri
+    key = (
+        'vpn'
+        + ''.join(gateway for gateway in gateway_pair)
+        + suffix
+        + FLAGS.run_uri
+    )
     return key
 
   def Create(self, gateway_pair, suffix=''):
@@ -111,13 +125,13 @@ class VPN(object):
     """Gets a VPN object for the gateway_pair or creates one if none exists.
 
     Args:
+
     gateway_pair: a tuple of two VpnGateways
     """
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
-      raise errors.Error('GetVPN called in a thread without a '
-                         'BenchmarkSpec.')
+      raise errors.Error('GetVPN called in a thread without a BenchmarkSpec.')
     with benchmark_spec.vpns_lock:
       key = self.getKeyFromGatewayPair(gateway_pair, suffix)
       if key not in benchmark_spec.vpns:
@@ -132,8 +146,10 @@ class VPN(object):
     vpn_gateway_0 = benchmark_spec.vpn_gateways[self.gateway_pair[0]]
     vpn_gateway_1 = benchmark_spec.vpn_gateways[self.gateway_pair[1]]
 
-    both_gateways_are_passive = (vpn_gateway_0.require_target_to_init
-                                 and vpn_gateway_1.require_target_to_init)
+    both_gateways_are_passive = (
+        vpn_gateway_0.require_target_to_init
+        and vpn_gateway_1.require_target_to_init
+    )
     assert not both_gateways_are_passive, 'Cant connect 2 passive VPN Gateways'
 
     tunnel_config_hash = None
@@ -161,9 +177,12 @@ class VPN(object):
     """
     is_tunnel_configured = False
     if len(self.tunnel_config.endpoints) == 2:
-      if (self.tunnel_config.endpoints[self.gateway_pair[0]]['is_configured']
-          and
-          self.tunnel_config.endpoints[self.gateway_pair[1]]['is_configured']):
+      if (
+          self.tunnel_config.endpoints[self.gateway_pair[0]]['is_configured']
+          and self.tunnel_config.endpoints[self.gateway_pair[1]][
+              'is_configured'
+          ]
+      ):
         logging.debug('Tunnel is configured.')
         is_tunnel_configured = True
     return is_tunnel_configured
@@ -177,11 +196,11 @@ class VPN(object):
     """
     benchmark_spec = context.GetThreadBenchmarkSpec()
     logging.debug('Tunnel endpoints configured. Waiting for tunnel...')
-    ready = (
-        benchmark_spec.vpn_gateways[self.gateway_pair[0]].IsTunnelReady(
-            self.tunnel_config.endpoints[self.gateway_pair[0]]['tunnel_id']) and
-        benchmark_spec.vpn_gateways[self.gateway_pair[1]].IsTunnelReady(
-            self.tunnel_config.endpoints[self.gateway_pair[1]]['tunnel_id']))
+    ready = benchmark_spec.vpn_gateways[self.gateway_pair[0]].IsTunnelReady(
+        self.tunnel_config.endpoints[self.gateway_pair[0]]['tunnel_id']
+    ) and benchmark_spec.vpn_gateways[self.gateway_pair[1]].IsTunnelReady(
+        self.tunnel_config.endpoints[self.gateway_pair[1]]['tunnel_id']
+    )
     if not ready:
       raise errors.Resource.RetryableCreationError()
 
@@ -207,7 +226,6 @@ class TunnelConfig(object):
 
   }
   }
-
   """
 
   _tunnelconfig_lock = threading.Lock()
@@ -234,7 +252,6 @@ class TunnelConfig(object):
 
     Returns:
       int: An integer that changes if any properties have changes.
-
     """
     return hash(json.dumps(self.__dict__, sort_keys=True, default=str))
 
@@ -292,11 +309,13 @@ class VPNService(resource.BaseResource):
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
-      raise errors.Error('CreateVPN Service. called in a thread without a '
-                         'BenchmarkSpec.')
+      raise errors.Error(
+          'CreateVPN Service. called in a thread without a BenchmarkSpec.'
+      )
 
     self.vpn_gateway_pairs = self.GetVpnGatewayPairs(
-        benchmark_spec.vpn_gateways)
+        benchmark_spec.vpn_gateways
+    )
 
     for gateway_pair in self.vpn_gateway_pairs:
       # creates the vpn if it doesn't exist and registers in bm_spec.vpns
@@ -349,14 +368,15 @@ class VPNService(resource.BaseResource):
 
     Returns:
       list. The list of tuples of gateway pairs to create VPNs for.
-
     """
     vpn_gateway_pairs = itertools.combinations(vpn_gateways, 2)
     r = re.compile(
-        r'(?P<gateway_prefix>.*-.*-.*)?-(?P<gateway_tnum>[0-9])-(?P<run_id>.*)')
+        r'(?P<gateway_prefix>.*-.*-.*)?-(?P<gateway_tnum>[0-9])-(?P<run_id>.*)'
+    )
 
     def filterGateways(gateway_pair):
       return r.search(gateway_pair[0]).group('gateway_prefix') != r.search(
-          gateway_pair[1]).group('gateway_prefix')
+          gateway_pair[1]
+      ).group('gateway_prefix')
 
     return list(filter(filterGateways, vpn_gateway_pairs))

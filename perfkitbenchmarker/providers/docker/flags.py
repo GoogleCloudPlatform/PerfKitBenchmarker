@@ -14,14 +14,19 @@
 
 from absl import flags
 
-flags.DEFINE_string('docker_custom_image', None,
-                    'Custom docker image location')
+flags.DEFINE_string('docker_custom_image', None, 'Custom docker image location')
 
-flags.DEFINE_boolean('privileged_docker', False,
-                     'If True, will attempt to create Docker containers '
-                     'in a privileged mode. Note that some benchmarks execute '
-                     'commands which are only allowed in privileged mode.')
+flags.DEFINE_boolean(
+    'privileged_docker',
+    False,
+    'If True, will attempt to create Docker containers '
+    'in a privileged mode. Note that some benchmarks execute '
+    'commands which are only allowed in privileged mode.',
+)
 
-flags.DEFINE_string('docker_cli', 'docker',
-                    'Path to docker cli. You can set it here if it is'
-                    'not in your system PATH or not at a default location')
+flags.DEFINE_string(
+    'docker_cli',
+    'docker',
+    'Path to docker cli. You can set it here if it is'
+    'not in your system PATH or not at a default location',
+)

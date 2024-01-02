@@ -16,7 +16,6 @@
 import os
 import unittest
 import mock
-
 from perfkitbenchmarker.linux_benchmarks import pgbench_benchmark
 from perfkitbenchmarker.linux_packages import pgbench
 
@@ -28,8 +27,9 @@ class PgbenchBenchmarkTestCase(unittest.TestCase):
     p.start()
     self.addCleanup(p.stop)
 
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'pgbench.stderr.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '../data', 'pgbench.stderr.txt'
+    )
     with open(path) as fp:
       self.stderr_output = fp.read()
 
@@ -51,7 +51,8 @@ class PgbenchBenchmarkTestCase(unittest.TestCase):
     })
 
     actual = pgbench.MakeSamplesFromOutput(
-        self.stderr_output, num_clients, num_jobs, testMetadata)
+        self.stderr_output, num_clients, num_jobs, testMetadata
+    )
     self.assertEqual(2, len(actual))
 
     tps_sample = [x for x in actual if x.metric == 'tps_array'][0]

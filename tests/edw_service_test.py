@@ -16,7 +16,6 @@
 import copy
 import unittest
 from absl import flags
-
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker.configs import benchmark_config_spec
 from tests import pkb_common_test_case
@@ -38,7 +37,7 @@ _BASE_REDSHIFT_SPEC = {
     'user': _USERNAME,
     'password': _PASSWORD,
     'node_type': _REDSHIFT_NODE_TYPE,
-    'node_count': 1
+    'node_count': 1,
 }
 
 FLAGS = flags.FLAGS
@@ -80,10 +79,9 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.zones = [_AWS_ZONE_US_EAST_1A]
 
   def testIsUserManaged(self):
-    kwargs = copy.copy({
-        'cluster_identifier': _PKB_CLUSTER,
-        'db': _PKB_CLUSTER_DATABASE
-    })
+    kwargs = copy.copy(
+        {'cluster_identifier': _PKB_CLUSTER, 'db': _PKB_CLUSTER_DATABASE}
+    )
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
     edw_local = FakeEdwService(spec)
     self.assertTrue(edw_local.IsUserManaged(spec))
@@ -95,10 +93,9 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertFalse(edw_local.IsUserManaged(spec))
 
   def testUserManagedGetClusterIdentifier(self):
-    kwargs = copy.copy({
-        'cluster_identifier': _PKB_CLUSTER,
-        'db': _PKB_CLUSTER_DATABASE
-    })
+    kwargs = copy.copy(
+        {'cluster_identifier': _PKB_CLUSTER, 'db': _PKB_CLUSTER_DATABASE}
+    )
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
     edw_local = FakeEdwService(spec)
     self.assertEqual(_PKB_CLUSTER, edw_local.GetClusterIdentifier(spec))
@@ -108,8 +105,9 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
     kwargs = copy.copy({'db': _PKB_CLUSTER_DATABASE})
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
     edw_local = FakeEdwService(spec)
-    self.assertEqual('pkb-' + FLAGS.run_uri,
-                     edw_local.GetClusterIdentifier(spec))
+    self.assertEqual(
+        'pkb-' + FLAGS.run_uri, edw_local.GetClusterIdentifier(spec)
+    )
     self.assertEqual('pkb-' + FLAGS.run_uri, edw_local.cluster_identifier)
 
 

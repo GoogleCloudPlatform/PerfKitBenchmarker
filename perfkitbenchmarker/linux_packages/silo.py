@@ -20,10 +20,14 @@ from perfkitbenchmarker import linux_packages
 GIT_REPO = 'https://github.com/stephentu/silo.git'
 GIT_TAG = '62d2d498984bf69d3b46a74e310e1fd12fd1f692'
 SILO_DIR = '%s/silo' % linux_packages.INSTALL_DIR
-APT_PACKAGES = ('libjemalloc-dev libnuma-dev libdb++-dev '
-                'libmysqld-dev libaio-dev libssl-dev')
-YUM_PACKAGES = ('jemalloc-devel numactl-devel libdb-cxx-devel mysql-devel '
-                'libaio-devel openssl-devel')
+APT_PACKAGES = (
+    'libjemalloc-dev libnuma-dev libdb++-dev '
+    'libmysqld-dev libaio-dev libssl-dev'
+)
+YUM_PACKAGES = (
+    'jemalloc-devel numactl-devel libdb-cxx-devel mysql-devel '
+    'libaio-devel openssl-devel'
+)
 
 
 def _Install(vm):
@@ -31,19 +35,20 @@ def _Install(vm):
   nthreads = vm.NumCpusForBenchmark() * 2
   vm.Install('build_tools')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, SILO_DIR))
-  vm.RemoteCommand('cd {0} && git checkout {1}'.format(SILO_DIR,
-                                                       GIT_TAG))
+  vm.RemoteCommand('cd {0} && git checkout {1}'.format(SILO_DIR, GIT_TAG))
   # This is due to a failing clone command when executing behind a proxy.
   # Replacing the protocol to https instead of git fixes the issue.
   vm.RemoteCommand('git config --global url."https://".insteadOf git://')
   # Disable -Wmaybe-uninitialized errors when GCC has the option to workaround
   # a spurious error in masstree.
-  cxx = '"g++ -std=gnu++0x \
-          $(echo | gcc -Wmaybe-uninitialized -E - >/dev/null 2>&1 && \
-            echo -Wno-error=maybe-uninitialized)"'
+  cxx = (
+      '"g++ -std=gnu++0x           $(echo | gcc -Wmaybe-uninitialized -E -'
+      ' >/dev/null 2>&1 &&             echo -Wno-error=maybe-uninitialized)"'
+  )
   vm.RemoteCommand(
       'cd {0} && CXX={2} MODE=perf DEBUG=0 CHECK_INVARIANTS=0 make -j{1} dbtest'
-      .format(SILO_DIR, nthreads, cxx))
+      .format(SILO_DIR, nthreads, cxx)
+  )
 
 
 def YumInstall(vm):

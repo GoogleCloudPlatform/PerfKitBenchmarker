@@ -68,19 +68,24 @@ class BaseVPNServiceTest(pkb_common_test_case.PkbCommonTestCase):
     super(BaseVPNServiceTest, self).setUp()
     if not sys.warnoptions:  # https://bugs.python.org/issue33154
       import warnings
+
       warnings.simplefilter('ignore', ResourceWarning)
 
-  def _CreateBenchmarkSpecFromYaml(self, yaml_string,
-                                   benchmark_name=BENCHMARK_NAME):
+  def _CreateBenchmarkSpecFromYaml(
+      self, yaml_string, benchmark_name=BENCHMARK_NAME
+  ):
     config = configs.LoadConfig(yaml_string, {}, benchmark_name)
     return self._CreateBenchmarkSpecFromConfigDict(config, benchmark_name)
 
   def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
-    config_spec = benchmark_config_spec.BenchmarkConfigSpec(benchmark_name,
-                                                            flag_values=FLAGS,
-                                                            **config_dict)
-    benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS if
-                             b.BENCHMARK_NAME == benchmark_name))
+    config_spec = benchmark_config_spec.BenchmarkConfigSpec(
+        benchmark_name, flag_values=FLAGS, **config_dict
+    )
+    benchmark_module = next((
+        b
+        for b in linux_benchmarks.BENCHMARKS
+        if b.BENCHMARK_NAME == benchmark_name
+    ))
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, URI)
 
   def extractDictAFromB(self, A, B):  # assertDictContainsSubset deprecated
@@ -161,7 +166,7 @@ class TunnelConfigTestCase(BaseVPNServiceTest):
         'ike_version': '3',
         'routing': 'static',
         'psk': 'private',
-        'endpoints': endpoints
+        'endpoints': endpoints,
     }
 
     tunnel_config = TunnelConfig()

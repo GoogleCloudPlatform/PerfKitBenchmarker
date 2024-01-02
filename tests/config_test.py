@@ -71,14 +71,14 @@ a:
 class ConfigsTestCase(unittest.TestCase):
 
   def testLoadAllDefaultConfigs(self):
-    all_benchmarks = (linux_benchmarks.BENCHMARKS +
-                      windows_benchmarks.BENCHMARKS)
+    all_benchmarks = linux_benchmarks.BENCHMARKS + windows_benchmarks.BENCHMARKS
     for benchmark_module in all_benchmarks:
       self.assertIsInstance(benchmark_module.GetConfig({}), dict)
 
   def testLoadValidConfig(self):
     self.assertIsInstance(
-        configs.LoadMinimalConfig(VALID_CONFIG, CONFIG_NAME), dict)
+        configs.LoadMinimalConfig(VALID_CONFIG, CONFIG_NAME), dict
+    )
 
   def testWrongName(self):
     with self.assertRaises(KeyError):
@@ -113,7 +113,8 @@ class ConfigsTestCase(unittest.TestCase):
 
   def testLoadConfigWithExternalReference(self):
     self.assertIsInstance(
-        configs.LoadMinimalConfig(REF_CONFIG, CONFIG_NAME), dict)
+        configs.LoadMinimalConfig(REF_CONFIG, CONFIG_NAME), dict
+    )
 
   def testLoadConfigWithBadReference(self):
     with self.assertRaises(errors.Config.ParseError):
@@ -123,11 +124,10 @@ class ConfigsTestCase(unittest.TestCase):
     p = mock.patch(configs.__name__ + '.FLAGS')
     self.addCleanup(p.stop)
     mock_flags = p.start()
-    config_override = [
-        'a.vm_groups.default.vm_count=5',
-        'a.flags.flag=value']
-    mock_flags.configure_mock(config_override=config_override,
-                              benchmark_config_file=None)
+    config_override = ['a.vm_groups.default.vm_count=5', 'a.flags.flag=value']
+    mock_flags.configure_mock(
+        config_override=config_override, benchmark_config_file=None
+    )
     config = configs.GetUserConfig()
     self.assertEqual(config['a']['vm_groups']['default']['vm_count'], 5)
     self.assertEqual(config['a']['flags']['flag'], 'value')

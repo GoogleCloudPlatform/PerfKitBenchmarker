@@ -46,17 +46,35 @@ class PrettyPrintStreamPublisherTestCase(unittest.TestCase):
     instance = publisher.PrettyPrintStreamPublisher(stream)
     instance.PublishSamples([])
     self.assertRegexpMatches(
-        stream.getvalue(), r'^\s*-+PerfKitBenchmarker\sResults\sSummary-+\s*$')
+        stream.getvalue(), r'^\s*-+PerfKitBenchmarker\sResults\sSummary-+\s*$'
+    )
 
   def testWritesToStream(self):
     stream = six.StringIO()
     instance = publisher.PrettyPrintStreamPublisher(stream)
-    samples = [{'test': 'testb', 'metric': '1', 'value': 1.0, 'unit': 'MB',
-                'metadata': {}},
-               {'test': 'testb', 'metric': '2', 'value': 14.0, 'unit': 'MB',
-                'metadata': {}},
-               {'test': 'testa', 'metric': '3', 'value': 47.0, 'unit': 'us',
-                'metadata': {}}]
+    samples = [
+        {
+            'test': 'testb',
+            'metric': '1',
+            'value': 1.0,
+            'unit': 'MB',
+            'metadata': {},
+        },
+        {
+            'test': 'testb',
+            'metric': '2',
+            'value': 14.0,
+            'unit': 'MB',
+            'metadata': {},
+        },
+        {
+            'test': 'testa',
+            'metric': '3',
+            'value': 47.0,
+            'unit': 'us',
+            'metadata': {},
+        },
+    ]
     instance.PublishSamples(samples)
 
     value = stream.getvalue()
@@ -78,9 +96,9 @@ class LogPublisherTestCase(unittest.TestCase):
 class NewlineDelimitedJSONPublisherTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.fp = tempfile.NamedTemporaryFile(mode='w+',
-                                          prefix='perfkit-test-',
-                                          suffix='.json')
+    self.fp = tempfile.NamedTemporaryFile(
+        mode='w+', prefix='perfkit-test-', suffix='.json'
+    )
     self.addCleanup(self.fp.close)
     self.instance = publisher.NewlineDelimitedJSONPublisher(self.fp.name)
 
@@ -89,24 +107,32 @@ class NewlineDelimitedJSONPublisherTestCase(unittest.TestCase):
     self.assertEqual('', self.fp.read())
 
   def testMetadataConvertedToLabels(self):
-    samples = [{'test': 'testa',
-                'metadata': collections.OrderedDict([('key', 'value'),
-                                                     ('foo', 'bar')])}]
+    samples = [{
+        'test': 'testa',
+        'metadata': collections.OrderedDict([('key', 'value'), ('foo', 'bar')]),
+    }]
     self.instance.PublishSamples(samples)
     d = json.load(self.fp)
-    self.assertDictEqual({'test': 'testa', 'labels': '|foo:bar|,|key:value|'},
-                         d)
+    self.assertDictEqual(
+        {'test': 'testa', 'labels': '|foo:bar|,|key:value|'}, d
+    )
 
   def testJSONRecordPerLine(self):
-    samples = [{'test': 'testa', 'metadata': {'key': 'val'}},
-               {'test': 'testb', 'metadata': {'key2': 'val2'}}]
+    samples = [
+        {'test': 'testa', 'metadata': {'key': 'val'}},
+        {'test': 'testb', 'metadata': {'key2': 'val2'}},
+    ]
     self.instance.PublishSamples(samples)
     self.assertRaises(ValueError, json.load, self.fp)
     self.fp.seek(0)
     result = [json.loads(i) for i in self.fp]
-    self.assertListEqual([{u'test': u'testa', u'labels': u'|key:val|'},
-                          {u'test': u'testb', u'labels': u'|key2:val2|'}],
-                         result)
+    self.assertListEqual(
+        [
+            {'test': 'testa', 'labels': '|key:val|'},
+            {'test': 'testb', 'labels': '|key2:val2|'},
+        ],
+        result,
+    )
 
 
 class BigQueryPublisherTestCase(unittest.TestCase):
@@ -118,8 +144,10 @@ class BigQueryPublisherTestCase(unittest.TestCase):
     self.mock_vm_util.GetTempDir.return_value = tempfile.gettempdir()
     self.addCleanup(p.stop)
 
-    self.samples = [{'test': 'testa', 'metadata': {}},
-                    {'test': 'testb', 'metadata': {}}]
+    self.samples = [
+        {'test': 'testa', 'metadata': {}},
+        {'test': 'testb', 'metadata': {}},
+    ]
     self.table = 'samples_mart.results'
 
   def testNoSamples(self):
@@ -130,31 +158,37 @@ class BigQueryPublisherTestCase(unittest.TestCase):
   def testNoProject(self):
     instance = publisher.BigQueryPublisher(self.table)
     instance.PublishSamples(self.samples)
-    self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(
-        ['bq',
-         'load',
-         '--autodetect',
-         '--source_format=NEWLINE_DELIMITED_JSON',
-         self.table,
-         mock.ANY])
+    self.mock_vm_util.IssueRetryableCommand.assert_called_once_with([
+        'bq',
+        'load',
+        '--autodetect',
+        '--source_format=NEWLINE_DELIMITED_JSON',
+        self.table,
+        mock.ANY,
+    ])
 
   def testServiceAccountFlags_MissingPrivateKey(self):
-    self.assertRaises(ValueError,
-                      publisher.BigQueryPublisher,
-                      self.table,
-                      service_account=mock.MagicMock())
+    self.assertRaises(
+        ValueError,
+        publisher.BigQueryPublisher,
+        self.table,
+        service_account=mock.MagicMock(),
+    )
 
   def testServiceAccountFlags_MissingServiceAccount(self):
-    self.assertRaises(ValueError,
-                      publisher.BigQueryPublisher,
-                      self.table,
-                      service_account_private_key_file=mock.MagicMock())
+    self.assertRaises(
+        ValueError,
+        publisher.BigQueryPublisher,
+        self.table,
+        service_account_private_key_file=mock.MagicMock(),
+    )
 
   def testServiceAccountFlags_BothSpecified(self):
     instance = publisher.BigQueryPublisher(
         self.table,
         service_account=mock.MagicMock(),
-        service_account_private_key_file=mock.MagicMock())
+        service_account_private_key_file=mock.MagicMock(),
+    )
     instance.PublishSamples(self.samples)  # No error
     self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(mock.ANY)
 
@@ -165,11 +199,13 @@ class BigQueryPublisherTestCase(unittest.TestCase):
         self.table,
         service_account=mock.MagicMock(),
         service_account_private_key_file=mock.MagicMock(),
-        application_default_credential_file=mock.MagicMock())
+        application_default_credential_file=mock.MagicMock(),
+    )
 
   def testApplicationCredentialsFlag_WorkingNormal(self):
     instance = publisher.BigQueryPublisher(
-        self.table, application_default_credential_file=mock.MagicMock())
+        self.table, application_default_credential_file=mock.MagicMock()
+    )
     instance.PublishSamples(self.samples)  # No error
     self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(mock.ANY)
 
@@ -191,18 +227,21 @@ class CloudStoragePublisherTestCase(unittest.TestCase):
     self.mock_uuid = p.start()
     self.addCleanup(p.stop)
 
-    self.samples = [{'test': 'testa', 'metadata': {}},
-                    {'test': 'testb', 'metadata': {}}]
+    self.samples = [
+        {'test': 'testa', 'metadata': {}},
+        {'test': 'testb', 'metadata': {}},
+    ]
 
   def testPublishSamples(self):
     self.mock_time.time.return_value = 1417647763.387665
     self.mock_uuid.uuid4.return_value = uuid.UUID(
-        'be428eb3-a54a-4615-b7ca-f962b729c7ab')
+        'be428eb3-a54a-4615-b7ca-f962b729c7ab'
+    )
     instance = publisher.CloudStoragePublisher('test-bucket')
     instance.PublishSamples(self.samples)
     self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(
-        ['gsutil', 'cp', mock.ANY,
-         'gs://test-bucket/141764776338_be428eb'])
+        ['gsutil', 'cp', mock.ANY, 'gs://test-bucket/141764776338_be428eb']
+    )
 
 
 class SampleCollectorTestCase(unittest.TestCase):
@@ -232,9 +271,10 @@ class SampleCollectorTestCase(unittest.TestCase):
             'metric': 'widgets',
             'unit': 'oz',
             'test': self.benchmark,
-            'product_name': 'PerfKitBenchmarker'
+            'product_name': 'PerfKitBenchmarker',
         },
-        collector_sample)
+        collector_sample,
+    )
     if contains_metadata:
       self.assertDictContainsSubset({'foo': 'bar'}, metadata)
     else:
@@ -249,11 +289,7 @@ class SampleCollectorTestCase(unittest.TestCase):
     timestamp_sample = sample.Sample('widgets', 100, 'oz', {}, 1.0)
     samples = [timestamp_sample]
     self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
-    self.assertDictContainsSubset(
-        {
-            'timestamp': 1.0
-        },
-        self.instance.samples[0])
+    self.assertDictContainsSubset({'timestamp': 1.0}, self.instance.samples[0])
 
 
 def CreateMockVM(hostname='Hostname', vm_id='12345', ip_address='1.2.3.4'):
@@ -282,16 +318,17 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
   def setUp(self):
     p = mock.patch(publisher.__name__ + '.FLAGS')
     self.mock_flags = p.start()
-    self.mock_flags.configure_mock(metadata=[],
-                                   num_striped_disks=1,
-                                   sysctl=[],
-                                   set_files=[],
-                                   simulate_maintenance=False)
+    self.mock_flags.configure_mock(
+        metadata=[],
+        num_striped_disks=1,
+        sysctl=[],
+        set_files=[],
+        simulate_maintenance=False,
+    )
     self.addCleanup(p.stop)
 
     self.maxDiff = None
-    p = mock.patch(publisher.__name__ + '.version',
-                   VERSION='v1')
+    p = mock.patch(publisher.__name__ + '.version', VERSION='v1')
     p.start()
     self.addCleanup(p.stop)
 
@@ -299,9 +336,9 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     # mock_disk.iops returns a mock.MagicMock, which is not None,
     # which defeats the getattr check in
     # publisher.DefaultMetadataProvider.
-    self.mock_disk = mock.MagicMock(disk_type='disk-type',
-                                    disk_size=20, num_striped_disks=1,
-                                    iops=None)
+    self.mock_disk = mock.MagicMock(
+        disk_type='disk-type', disk_size=20, num_striped_disks=1, iops=None
+    )
     self.disk_metadata = {
         'type': self.mock_disk.disk_type,
         'size': self.mock_disk.disk_size,
@@ -310,31 +347,34 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     self.mock_disk.GetResourceMetadata.return_value = self.disk_metadata
 
     self.mock_vm = CreateMockVM()
-    self.mock_spec = mock.MagicMock(vm_groups={'default': [self.mock_vm]},
-                                    vms=[self.mock_vm])
+    self.mock_spec = mock.MagicMock(
+        vm_groups={'default': [self.mock_vm]}, vms=[self.mock_vm]
+    )
 
-    self.default_meta = {'perfkitbenchmarker_version': 'v1',
-                         'cloud': self.mock_vm.CLOUD,
-                         'zone': 'us-central1-a',
-                         'machine_type': self.mock_vm.machine_type,
-                         'image': self.mock_vm.image,
-                         'vm_count': 1,
-                         'hostnames': 'Hostname',
-                         'vm_ids': '12345',
-                         'vm_names': 'Hostname',
-                         'vm_ip_addresses': '1.2.3.4',
-                         'default_vm_ids': '12345',
-                         'default_vm_names': 'Hostname',
-                         'default_vm_ip_addresses': '1.2.3.4',
-                         }
+    self.default_meta = {
+        'perfkitbenchmarker_version': 'v1',
+        'cloud': self.mock_vm.CLOUD,
+        'zone': 'us-central1-a',
+        'machine_type': self.mock_vm.machine_type,
+        'image': self.mock_vm.image,
+        'vm_count': 1,
+        'hostnames': 'Hostname',
+        'vm_ids': '12345',
+        'vm_names': 'Hostname',
+        'vm_ip_addresses': '1.2.3.4',
+        'default_vm_ids': '12345',
+        'default_vm_names': 'Hostname',
+        'default_vm_ip_addresses': '1.2.3.4',
+    }
 
   def _RunTest(self, spec, expected):
     input_metadata = {'some_key': 'some_value'}
     expected = expected | input_metadata
     instance = publisher.DefaultMetadataProvider()
     result = instance.AddMetadata(input_metadata, spec)
-    self.assertIsNot(input_metadata, result,
-                     msg='Input metadata was not copied.')
+    self.assertIsNot(
+        input_metadata, result, msg='Input metadata was not copied.'
+    )
     self.assertEqual(expected, result)
 
   def testAddMetadata_ScratchDiskUndefined(self):
@@ -347,10 +387,12 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
   def testAddMetadata_WithScratchDisk(self):
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(data_disk_0_size=20,
-                    data_disk_0_type='disk-type',
-                    data_disk_count=1,
-                    data_disk_0_num_stripes=1)
+    expected.update(
+        data_disk_0_size=20,
+        data_disk_0_type='disk-type',
+        data_disk_count=1,
+        data_disk_0_num_stripes=1,
+    )
     self._RunTest(self.mock_spec, expected)
 
   def testAddMetadata_DiskSizeNone(self):
@@ -358,32 +400,38 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
     self.disk_metadata['size'] = None
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(data_disk_0_size=None,
-                    data_disk_0_type='disk-type',
-                    data_disk_count=1,
-                    data_disk_0_num_stripes=1)
+    expected.update(
+        data_disk_0_size=None,
+        data_disk_0_type='disk-type',
+        data_disk_count=1,
+        data_disk_0_num_stripes=1,
+    )
     self._RunTest(self.mock_spec, expected)
 
   def testAddMetadata_PIOPS(self):
     self.disk_metadata['iops'] = 1000
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(data_disk_0_size=20,
-                    data_disk_0_type='disk-type',
-                    data_disk_count=1,
-                    data_disk_0_num_stripes=1,
-                    data_disk_0_iops=1000)
+    expected.update(
+        data_disk_0_size=20,
+        data_disk_0_type='disk-type',
+        data_disk_count=1,
+        data_disk_0_num_stripes=1,
+        data_disk_0_iops=1000,
+    )
     self._RunTest(self.mock_spec, expected)
 
   def testDiskMetadata(self):
     self.disk_metadata['foo'] = 'bar'
     self.mock_vm.configure_mock(scratch_disks=[self.mock_disk])
     expected = self.default_meta.copy()
-    expected.update(data_disk_0_size=20,
-                    data_disk_0_type='disk-type',
-                    data_disk_count=1,
-                    data_disk_0_num_stripes=1,
-                    data_disk_0_foo='bar')
+    expected.update(
+        data_disk_0_size=20,
+        data_disk_0_type='disk-type',
+        data_disk_count=1,
+        data_disk_0_num_stripes=1,
+        data_disk_0_foo='bar',
+    )
     self._RunTest(self.mock_spec, expected)
 
   def testMultipleVms(self):
@@ -419,19 +467,36 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
 class CSVPublisherTestCase(unittest.TestCase):
 
   def setUp(self):
-    self.tf = tempfile.NamedTemporaryFile(mode='w+',
-                                          prefix='perfkit-csv-publisher',
-                                          suffix='.csv')
+    self.tf = tempfile.NamedTemporaryFile(
+        mode='w+', prefix='perfkit-csv-publisher', suffix='.csv'
+    )
     self.addCleanup(self.tf.close)
 
   def testWritesToStream(self):
     instance = publisher.CSVPublisher(self.tf.name)
-    samples = [{'test': 'testb', 'metric': '1', 'value': 1.0, 'unit': 'MB',
-                'metadata': {}},
-               {'test': 'testb', 'metric': '2', 'value': 14.0, 'unit': 'MB',
-                'metadata': {}},
-               {'test': 'testa', 'metric': '3', 'value': 47.0, 'unit': 'us',
-                'metadata': {}}]
+    samples = [
+        {
+            'test': 'testb',
+            'metric': '1',
+            'value': 1.0,
+            'unit': 'MB',
+            'metadata': {},
+        },
+        {
+            'test': 'testb',
+            'metric': '2',
+            'value': 14.0,
+            'unit': 'MB',
+            'metadata': {},
+        },
+        {
+            'test': 'testa',
+            'metric': '3',
+            'value': 47.0,
+            'unit': 'us',
+            'metadata': {},
+        },
+    ]
     instance.PublishSamples(samples)
     self.tf.seek(0)
     rows = list(csv.DictReader(self.tf))
@@ -439,12 +504,29 @@ class CSVPublisherTestCase(unittest.TestCase):
 
   def testUsesUnionOfMetaKeys(self):
     instance = publisher.CSVPublisher(self.tf.name)
-    samples = [{'test': 'testb', 'metric': '1', 'value': 1.0, 'unit': 'MB',
-                'metadata': {'key1': 'value1'}},
-               {'test': 'testb', 'metric': '2', 'value': 14.0, 'unit': 'MB',
-                'metadata': {'key1': 'value2'}},
-               {'test': 'testa', 'metric': '3', 'value': 47.0, 'unit': 'us',
-                'metadata': {'key3': 'value3'}}]
+    samples = [
+        {
+            'test': 'testb',
+            'metric': '1',
+            'value': 1.0,
+            'unit': 'MB',
+            'metadata': {'key1': 'value1'},
+        },
+        {
+            'test': 'testb',
+            'metric': '2',
+            'value': 14.0,
+            'unit': 'MB',
+            'metadata': {'key1': 'value2'},
+        },
+        {
+            'test': 'testa',
+            'metric': '3',
+            'value': 47.0,
+            'unit': 'us',
+            'metadata': {'key3': 'value3'},
+        },
+    ]
     instance.PublishSamples(samples)
     self.tf.seek(0)
     reader = csv.DictReader(self.tf)
@@ -461,25 +543,61 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
     self.test_db = publisher.InfluxDBPublisher(self.db_uri, self.db_name)
 
   def testFormatToKeyValue(self):
-    sample_1 = {'test': 'testa', 'metric': '3', 'official': 47.0,
-                'value': 'non', 'unit': 'us', 'owner': 'Rackspace',
-                'run_uri': '5rtw', 'sample_uri': '5r', 'timestamp': 123}
-    sample_2 = {'test': 'testb', 'metric': '2', 'official': 14.0,
-                'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
-                'run_uri': 'bba3', 'sample_uri': 'bb',
-                'timestamp': 55}
-    sample_3 = {'test': 'testc', 'metric': '1', 'official': 1.0,
-                'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
-                'run_uri': '323', 'sample_uri': '33',
-                'timestamp': 123}
-    sample_4 = {'test': 'testc', 'metric': 'some,metric', 'official': 1.0,
-                'value': 'non', 'unit': 'Some MB', 'owner': 'Rackspace',
-                'run_uri': '323', 'sample_uri': '33',
-                'timestamp': 123}
-    sample_5 = {'test': 'testc', 'metric': 'some,metric', 'official': 1.0,
-                'value': 'non', 'unit': '', 'owner': 'Rackspace',
-                'run_uri': '323', 'sample_uri': '',
-                'timestamp': 123}
+    sample_1 = {
+        'test': 'testa',
+        'metric': '3',
+        'official': 47.0,
+        'value': 'non',
+        'unit': 'us',
+        'owner': 'Rackspace',
+        'run_uri': '5rtw',
+        'sample_uri': '5r',
+        'timestamp': 123,
+    }
+    sample_2 = {
+        'test': 'testb',
+        'metric': '2',
+        'official': 14.0,
+        'value': 'non',
+        'unit': 'MB',
+        'owner': 'Rackspace',
+        'run_uri': 'bba3',
+        'sample_uri': 'bb',
+        'timestamp': 55,
+    }
+    sample_3 = {
+        'test': 'testc',
+        'metric': '1',
+        'official': 1.0,
+        'value': 'non',
+        'unit': 'MB',
+        'owner': 'Rackspace',
+        'run_uri': '323',
+        'sample_uri': '33',
+        'timestamp': 123,
+    }
+    sample_4 = {
+        'test': 'testc',
+        'metric': 'some,metric',
+        'official': 1.0,
+        'value': 'non',
+        'unit': 'Some MB',
+        'owner': 'Rackspace',
+        'run_uri': '323',
+        'sample_uri': '33',
+        'timestamp': 123,
+    }
+    sample_5 = {
+        'test': 'testc',
+        'metric': 'some,metric',
+        'official': 1.0,
+        'value': 'non',
+        'unit': '',
+        'owner': 'Rackspace',
+        'run_uri': '323',
+        'sample_uri': '',
+        'timestamp': 123,
+    }
 
     sample_1_formatted_key_value = self.test_db._FormatToKeyValue(sample_1)
     sample_2_formatted_key_value = self.test_db._FormatToKeyValue(sample_2)
@@ -487,21 +605,61 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
     sample_4_formatted_key_value = self.test_db._FormatToKeyValue(sample_4)
     sample_5_formatted_key_value = self.test_db._FormatToKeyValue(sample_5)
 
-    expected_sample_1 = ['owner=Rackspace', 'unit=us', 'run_uri=5rtw',
-                         'test=testa', 'timestamp=123', 'metric=3',
-                         'official=47.0', 'value=non', 'sample_uri=5r']
-    expected_sample_2 = ['owner=Rackspace', 'unit=MB', 'run_uri=bba3',
-                         'test=testb', 'timestamp=55', 'metric=2',
-                         'official=14.0', 'value=non', 'sample_uri=bb']
-    expected_sample_3 = ['owner=Rackspace', 'unit=MB', 'run_uri=323',
-                         'test=testc', 'timestamp=123', 'metric=1',
-                         'official=1.0', 'value=non', 'sample_uri=33']
-    expected_sample_4 = ['owner=Rackspace', 'unit=Some\ MB', 'run_uri=323',
-                         'test=testc', 'timestamp=123', 'metric=some\,metric',
-                         'official=1.0', 'value=non', 'sample_uri=33']
-    expected_sample_5 = ['owner=Rackspace', 'unit=\\"\\"', 'run_uri=323',
-                         'test=testc', 'timestamp=123', 'metric=some\,metric',
-                         'official=1.0', 'value=non', 'sample_uri=\\"\\"']
+    expected_sample_1 = [
+        'owner=Rackspace',
+        'unit=us',
+        'run_uri=5rtw',
+        'test=testa',
+        'timestamp=123',
+        'metric=3',
+        'official=47.0',
+        'value=non',
+        'sample_uri=5r',
+    ]
+    expected_sample_2 = [
+        'owner=Rackspace',
+        'unit=MB',
+        'run_uri=bba3',
+        'test=testb',
+        'timestamp=55',
+        'metric=2',
+        'official=14.0',
+        'value=non',
+        'sample_uri=bb',
+    ]
+    expected_sample_3 = [
+        'owner=Rackspace',
+        'unit=MB',
+        'run_uri=323',
+        'test=testc',
+        'timestamp=123',
+        'metric=1',
+        'official=1.0',
+        'value=non',
+        'sample_uri=33',
+    ]
+    expected_sample_4 = [
+        'owner=Rackspace',
+        'unit=Some\ MB',
+        'run_uri=323',
+        'test=testc',
+        'timestamp=123',
+        'metric=some\,metric',
+        'official=1.0',
+        'value=non',
+        'sample_uri=33',
+    ]
+    expected_sample_5 = [
+        'owner=Rackspace',
+        'unit=\\"\\"',
+        'run_uri=323',
+        'test=testc',
+        'timestamp=123',
+        'metric=some\,metric',
+        'official=1.0',
+        'value=non',
+        'sample_uri=\\"\\"',
+    ]
 
     six.assertCountEqual(self, sample_1_formatted_key_value, expected_sample_1)
     six.assertCountEqual(self, sample_2_formatted_key_value, expected_sample_2)
@@ -511,21 +669,27 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
 
   def testConstructSample(self):
     sample_with_metadata = {
-        'test': 'testc', 'metric': '1', 'official': 1.0,
-        'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
+        'test': 'testc',
+        'metric': '1',
+        'official': 1.0,
+        'value': 'non',
+        'unit': 'MB',
+        'owner': 'Rackspace',
         'product_name': 'PerfKitBenchmarker',
-        'run_uri': '323', 'sample_uri': '33',
+        'run_uri': '323',
+        'sample_uri': '33',
         'timestamp': 123,
-        'metadata': collections.OrderedDict([('info', '1'),
-                                             ('more_info', '2'),
-                                             ('bar', 'foo')])}
+        'metadata': collections.OrderedDict(
+            [('info', '1'), ('more_info', '2'), ('bar', 'foo')]
+        ),
+    }
 
     constructed_sample = self.test_db._ConstructSample(sample_with_metadata)
 
-    sample_results = ('perfkitbenchmarker,test=testc,official=1.0,'
-                      'owner=Rackspace,run_uri=323,sample_uri=33,'
-                      'metric=1,unit=MB,product_name=PerfKitBenchmarker,info=1,more_info=2,bar=foo '
-                      'value=non 123000000000')
+    sample_results = (
+        'perfkitbenchmarker,test=testc,official=1.0,owner=Rackspace,run_uri=323,sample_uri=33,metric=1,unit=MB,product_name=PerfKitBenchmarker,info=1,more_info=2,bar=foo'
+        ' value=non 123000000000'
+    )
 
     self.assertEqual(constructed_sample, sample_results)
 
@@ -533,34 +697,57 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
   def testPublishSamples(self, mock_publish_method):
     samples = [
         {
-            'test': 'testc', 'metric': '1', 'official': 1.0,
-            'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
-            'run_uri': '323', 'sample_uri': '33', 'timestamp': 123,
-            'metadata': collections.OrderedDict([('info', '1'),
-                                                 ('more_info', '2'),
-                                                 ('bar', 'foo')])
+            'test': 'testc',
+            'metric': '1',
+            'official': 1.0,
+            'value': 'non',
+            'unit': 'MB',
+            'owner': 'Rackspace',
+            'run_uri': '323',
+            'sample_uri': '33',
+            'timestamp': 123,
+            'metadata': collections.OrderedDict(
+                [('info', '1'), ('more_info', '2'), ('bar', 'foo')]
+            ),
         },
         {
-            'test': 'testb', 'metric': '2', 'official': 14.0,
-            'value': 'non', 'unit': 'MB', 'owner': 'Rackspace',
-            'run_uri': 'bba3', 'sample_uri': 'bb', 'timestamp': 55,
-            'metadata': collections.OrderedDict()
+            'test': 'testb',
+            'metric': '2',
+            'official': 14.0,
+            'value': 'non',
+            'unit': 'MB',
+            'owner': 'Rackspace',
+            'run_uri': 'bba3',
+            'sample_uri': 'bb',
+            'timestamp': 55,
+            'metadata': collections.OrderedDict(),
         },
         {
-            'test': 'testa', 'metric': '3', 'official': 47.0,
-            'value': 'non', 'unit': 'us', 'owner': 'Rackspace',
-            'run_uri': '5rtw', 'sample_uri': '5r', 'timestamp': 123
-        }
+            'test': 'testa',
+            'metric': '3',
+            'official': 47.0,
+            'value': 'non',
+            'unit': 'us',
+            'owner': 'Rackspace',
+            'run_uri': '5rtw',
+            'sample_uri': '5r',
+            'timestamp': 123,
+        },
     ]
 
     expected = [
-        ('perfkitbenchmarker,test=testc,official=1.0,owner=Rackspace,'
-         'run_uri=323,sample_uri=33,metric=1,unit=MB,product_name=PerfKitBenchmarker,info=1,more_info=2,'
-         'bar=foo value=non 123000000000'),
-        ('perfkitbenchmarker,test=testb,official=14.0,owner=Rackspace,'
-         'run_uri=bba3,sample_uri=bb,metric=2,unit=MB,product_name=PerfKitBenchmarker value=non 55000000000'),
-        ('perfkitbenchmarker,test=testa,official=47.0,owner=Rackspace,'
-         'run_uri=5rtw,sample_uri=5r,metric=3,unit=us,product_name=PerfKitBenchmarker value=non 123000000000')
+        (
+            'perfkitbenchmarker,test=testc,official=1.0,owner=Rackspace,run_uri=323,sample_uri=33,metric=1,unit=MB,product_name=PerfKitBenchmarker,info=1,more_info=2,bar=foo'
+            ' value=non 123000000000'
+        ),
+        (
+            'perfkitbenchmarker,test=testb,official=14.0,owner=Rackspace,run_uri=bba3,sample_uri=bb,metric=2,unit=MB,product_name=PerfKitBenchmarker'
+            ' value=non 55000000000'
+        ),
+        (
+            'perfkitbenchmarker,test=testa,official=47.0,owner=Rackspace,run_uri=5rtw,sample_uri=5r,metric=3,unit=us,product_name=PerfKitBenchmarker'
+            ' value=non 123000000000'
+        ),
     ]
 
     mock_publish_method.return_value = None
@@ -571,24 +758,32 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
   @mock.patch.object(publisher.InfluxDBPublisher, '_CreateDB')
   def testPublish(self, mock_create_db, mock_write_data):
     formatted_samples = [
-        ('perfkitbenchmarker,test=testc,official=1.0,owner=Rackspace,'
-         'run_uri=323,sample_uri=33,metric=1,unit=MB,info=1,more_info=2,'
-         'bar=foo value=non 123000000000'),
-        ('perfkitbenchmarker,test=testb,official=14.0,owner=Rackspace,'
-         'run_uri=bba3,sample_uri=bb,metric=2,unit=MB value=non 55000000000'),
-        ('perfkitbenchmarker,test=testa,official=47.0,owner=Rackspace,'
-         'run_uri=5rtw,sample_uri=5r,metric=3,unit=us value=non 123000000000')
+        (
+            'perfkitbenchmarker,test=testc,official=1.0,owner=Rackspace,'
+            'run_uri=323,sample_uri=33,metric=1,unit=MB,info=1,more_info=2,'
+            'bar=foo value=non 123000000000'
+        ),
+        (
+            'perfkitbenchmarker,test=testb,official=14.0,owner=Rackspace,'
+            'run_uri=bba3,sample_uri=bb,metric=2,unit=MB value=non 55000000000'
+        ),
+        (
+            'perfkitbenchmarker,test=testa,official=47.0,owner=Rackspace,'
+            'run_uri=5rtw,sample_uri=5r,metric=3,unit=us value=non 123000000000'
+        ),
     ]
 
-    expected_output = ('perfkitbenchmarker,test=testc,official=1.0,'
-                       'owner=Rackspace,run_uri=323,sample_uri=33,metric=1,'
-                       'unit=MB,info=1,more_info=2,bar=foo value=non '
-                       '123000000000\nperfkitbenchmarker,test=testb,'
-                       'official=14.0,owner=Rackspace,run_uri=bba3,'
-                       'sample_uri=bb,metric=2,unit=MB value=non 55000000000\n'
-                       'perfkitbenchmarker,test=testa,official=47.0,'
-                       'owner=Rackspace,run_uri=5rtw,sample_uri=5r,'
-                       'metric=3,unit=us value=non 123000000000')
+    expected_output = (
+        'perfkitbenchmarker,test=testc,official=1.0,'
+        'owner=Rackspace,run_uri=323,sample_uri=33,metric=1,'
+        'unit=MB,info=1,more_info=2,bar=foo value=non '
+        '123000000000\nperfkitbenchmarker,test=testb,'
+        'official=14.0,owner=Rackspace,run_uri=bba3,'
+        'sample_uri=bb,metric=2,unit=MB value=non 55000000000\n'
+        'perfkitbenchmarker,test=testa,official=47.0,'
+        'owner=Rackspace,run_uri=5rtw,sample_uri=5r,'
+        'metric=3,unit=us value=non 123000000000'
+    )
 
     mock_create_db.return_value = None
     mock_write_data.return_value = None

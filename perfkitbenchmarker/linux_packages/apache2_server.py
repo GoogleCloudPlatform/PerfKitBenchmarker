@@ -31,14 +31,14 @@ def SetupServer(vm: virtual_machine.VirtualMachine, content_bytes: int) -> None:
   Args:
     vm: The VM that will have the apache server set up.
     content_bytes: The number of bytes the content that the apache server will
-    serve will be.
+      serve will be.
   """
   # Set up access to vm/var/www
   vm.RemoteCommand('sudo chown -R $USER:$USER /var/www')
 
   # Set up basic HTML webpage
   with tempfile.NamedTemporaryFile() as tmp:
-    tmp.write(f'''
+    tmp.write(f"""
     <!DOCTYPE html>
     <html>
       <head>
@@ -50,7 +50,7 @@ def SetupServer(vm: virtual_machine.VirtualMachine, content_bytes: int) -> None:
         <p> {'a' * content_bytes} </p>
       </body>
     </html>
-    '''.encode())
+    """.encode())
     vm.PushFile(tmp.name, '/var/www/html/index.html')
 
   # Set up read access to index.html
@@ -58,7 +58,8 @@ def SetupServer(vm: virtual_machine.VirtualMachine, content_bytes: int) -> None:
 
   # Download sample image to serve
   vm.RemoteCommand(
-      'wget --output-document=/var/www/html/image.png https://http.cat/100')
+      'wget --output-document=/var/www/html/image.png https://http.cat/100'
+  )
 
   # Enable status module if not already enabled for Apache server monitoring
   output, _ = vm.RemoteCommand('ls /etc/apache2/mods-enabled | grep status*')
@@ -81,8 +82,7 @@ def StartServer(vm: virtual_machine.VirtualMachine) -> None:
 def GetApacheCPUSeconds(vm: virtual_machine.VirtualMachine) -> float:
   """Returns the total number of CPU seconds Apache has used."""
   output, _ = vm.RemoteCommand(
-      'curl -s http://localhost/server-status?auto | '
-      'grep \'CPUSystem\\|CPUUser\''
+      "curl -s http://localhost/server-status?auto | grep 'CPUSystem\\|CPUUser'"
   )
 
   cpu_use = 0.0

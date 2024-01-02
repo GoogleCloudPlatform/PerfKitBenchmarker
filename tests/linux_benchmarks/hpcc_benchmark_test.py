@@ -13,16 +13,15 @@
 # limitations under the License.
 """Tests for HPCC benchmark."""
 
+import dataclasses
 import inspect
 import os
 from typing import Optional
 import unittest
 from absl import flags
 from absl.testing import parameterized
-import dataclasses
 import jinja2
 import mock
-
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -44,8 +43,9 @@ def ReadTestDataFile(file_name: str) -> str:
     return fp.read()
 
 
-def DefaultHpccDimensions(problem_size: int, num_rows: int,
-                          num_columns: int) -> hpcc_benchmark.HpccDimensions:
+def DefaultHpccDimensions(
+    problem_size: int, num_rows: int, num_columns: int
+) -> hpcc_benchmark.HpccDimensions:
   return hpcc_benchmark.HpccDimensions(
       problem_size=problem_size,
       block_size=hpcc_benchmark.BLOCK_SIZE,
@@ -59,16 +59,18 @@ def DefaultHpccDimensions(problem_size: int, num_rows: int,
       swap=2,
       l1=0,
       u=0,
-      equilibration=1)
+      equilibration=1,
+  )
+
 
 # the HPL.out Intel HPL output file contents
-_INTEL_MPIRUN_FILE_OUT = '''
+_INTEL_MPIRUN_FILE_OUT = """
  T/V       N       NB      P     Q   Time     Gflops
 ---------------------------------------------------------
 WR11C2R4   81792   192     1     2   621.92   5.86567e+02
-'''
+"""
 
-_INTEL_MPIRUN_STDOUT = '''
+_INTEL_MPIRUN_STDOUT = """
  I_MPI_ROOT=/opt/intel/compilers_and_libraries_2018.5.274/linux/mpi
  I_MPI_HYDRA_UUID=9d260000-7c26-e807-8fb4-050000430af0
  this should be ignored key=value
@@ -77,11 +79,12 @@ _INTEL_MPIRUN_STDOUT = '''
  pkb-123-0  : Column=000576 Fraction=0.005 Kernel=    0.58 Mflops=1265648.19
  pkb-123-0  : Column=001152 Fraction=0.010 Kernel=969908.14 Mflops=1081059.81
  pkb-123-0  : Column=001728 Fraction=0.015 Kernel=956391.64 Mflops=1040609.60
-'''
+"""
 
 ENV_METADATA = (
     'I_MPI_PIN_MAPPING=4:0 0,1 1,2 2,3 3,4 4;'
-    'I_MPI_ROOT=/opt/intel/compilers_and_libraries_2018.5.274/linux/mpi')
+    'I_MPI_ROOT=/opt/intel/compilers_and_libraries_2018.5.274/linux/mpi'
+)
 
 
 class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -171,38 +174,49 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     # Spot check a few benchmark-specific metrics.
     self.assertContainsSubDict(
-        results['PTRANS_time'], {
+        results['PTRANS_time'],
+        {
             'PTRANS_n': 19776.0,
             'PTRANS_nb': 192.0,
             'PTRANS_npcol': 2.0,
             'PTRANS_nprow': 2.0,
-            'PTRANS_residual': 0.0
-        })
-    self.assertContainsSubDict(results['SingleRandomAccess_GUPs'],
-                               {'RandomAccess_N': 268435456.0})
+            'PTRANS_residual': 0.0,
+        },
+    )
     self.assertContainsSubDict(
-        results['MPIRandomAccess_LCG_GUPs'], {
+        results['SingleRandomAccess_GUPs'], {'RandomAccess_N': 268435456.0}
+    )
+    self.assertContainsSubDict(
+        results['MPIRandomAccess_LCG_GUPs'],
+        {
             'MPIRandomAccess_LCG_Algorithm': 0.0,
             'MPIRandomAccess_LCG_Errors': 0.0,
             'MPIRandomAccess_LCG_ErrorsFraction': 0.0,
             'MPIRandomAccess_LCG_N': 1073741824.0,
-            'MPIRandomAccess_LCG_TimeBound': 60.0
-        })
-    self.assertContainsSubDict(results['StarRandomAccess_LCG_GUPs'],
-                               {'RandomAccess_LCG_N': 268435456.0})
-    self.assertContainsSubDict(results['MPIFFT_time6'], {
-        'MPIFFT_N': 134217728.0,
-        'MPIFFT_Procs': 4.0,
-        'MPIFFT_maxErr': 2.31089e-15
-    })
+            'MPIRandomAccess_LCG_TimeBound': 60.0,
+        },
+    )
+    self.assertContainsSubDict(
+        results['StarRandomAccess_LCG_GUPs'],
+        {'RandomAccess_LCG_N': 268435456.0},
+    )
+    self.assertContainsSubDict(
+        results['MPIFFT_time6'],
+        {
+            'MPIFFT_N': 134217728.0,
+            'MPIFFT_Procs': 4.0,
+            'MPIFFT_maxErr': 2.31089e-15,
+        },
+    )
     self.assertContainsSubDict(results['StarFFT_Gflops'], {'FFT_N': 67108864.0})
-    self.assertContainsSubDict(results['SingleSTREAM_Copy'], {
-        'STREAM_Threads': 1.0,
-        'STREAM_VectorSize': 130363392.0
-    })
+    self.assertContainsSubDict(
+        results['SingleSTREAM_Copy'],
+        {'STREAM_Threads': 1.0, 'STREAM_VectorSize': 130363392.0},
+    )
     self.assertContainsSubDict(results['AvgPingPongLatency_usec'], {})
-    self.assertContainsSubDict(results['StarRandomAccess_GUPs'],
-                               {'RandomAccess_N': 268435456.0})
+    self.assertContainsSubDict(
+        results['StarRandomAccess_GUPs'], {'RandomAccess_N': 268435456.0}
+    )
 
   def testCreateHpccConfig(self):
     vm = mock.Mock(total_free_memory_kb=526536216)
@@ -225,10 +239,12 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
         'equilibration': 1,
     }
     vm.RenderTemplate.assert_called_with(
-        mock.ANY, remote_path='hpccinf.txt', context=context)
+        mock.ANY, remote_path='hpccinf.txt', context=context
+    )
     # Test that the template_path file name is correct
-    self.assertEqual('hpccinf.j2',
-                     os.path.basename(vm.RenderTemplate.call_args[0][0]))
+    self.assertEqual(
+        'hpccinf.j2', os.path.basename(vm.RenderTemplate.call_args[0][0])
+    )
 
   def testMpiRunErrorsOut(self):
     vm = mock.Mock()
@@ -240,17 +256,24 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
   @parameterized.named_parameters(
       ('nomem_set_large', 2, 32, 74, None, 124416, 8, 8),
       ('mem_set', 2, 32, 74, 36000, 86784, 8, 8),
-      ('nomem_set', 1, 48, 48, None, 70656, 6, 8))
-  def testCreateHpccDimensions(self, num_vms: int, num_vcpus: int,
-                               memory_size_gb: int,
-                               flag_memory_size_mb: Optional[int],
-                               problem_size: int, num_rows: int,
-                               num_columns: int) -> None:
+      ('nomem_set', 1, 48, 48, None, 70656, 6, 8),
+  )
+  def testCreateHpccDimensions(
+      self,
+      num_vms: int,
+      num_vcpus: int,
+      memory_size_gb: int,
+      flag_memory_size_mb: Optional[int],
+      problem_size: int,
+      num_rows: int,
+      num_columns: int,
+  ) -> None:
     if flag_memory_size_mb:
       FLAGS.memory_size_mb = flag_memory_size_mb
     expected = DefaultHpccDimensions(problem_size, num_rows, num_columns)
     actual = hpcc_benchmark._CalculateHpccDimensions(
-        num_vms, num_vcpus, memory_size_gb * 1000 * 1024)
+        num_vms, num_vcpus, memory_size_gb * 1000 * 1024
+    )
     self.assertEqual(dataclasses.asdict(expected), dataclasses.asdict(actual))
 
   def testRenderHpcConfig(self):
@@ -262,7 +285,8 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testParseIntelLinpackStdout(self):
     tflops, metadata = hpcc_benchmark._ParseIntelLinpackStdout(
-        _INTEL_MPIRUN_STDOUT)
+        _INTEL_MPIRUN_STDOUT
+    )
     expected_metadata = {
         'fractions': '0.01,0.015',
         'kernel_tflops': '0.96990814,0.95639164',
@@ -275,22 +299,24 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateIntelMpiRunCommand(self):
     mock_run_file = self.enter_context(
-        mock.patch.object(vm_util, 'CreateRemoteFile'))
+        mock.patch.object(vm_util, 'CreateRemoteFile')
+    )
     mpivars = '/opt/intel/compilers_and_libraries/linux/mpi/bin64/mpivars.sh'
     vm = mock.Mock(internal_ip='10.0.0.2', numa_node_count=2)
     vm.RemoteCommand.return_value = mpivars, ''
     num_rows, num_cols = 3, 4
     dim = DefaultHpccDimensions(100, num_rows, num_cols)
     mpi_cmd, num_processes = hpcc_benchmark._CreateIntelMpiRunCommand([vm], dim)
-    expected_mpi_cmd = (f'. {mpivars}; '
-                        'mpirun -perhost 2  -np 12 -host 10.0.0.2 ./hpl_run')
+    expected_mpi_cmd = (
+        f'. {mpivars}; mpirun -perhost 2  -np 12 -host 10.0.0.2 ./hpl_run'
+    )
     self.assertEqual(1 * num_rows * num_cols, num_processes)
     self.assertEqual(expected_mpi_cmd, mpi_cmd)
-    run_file_text = inspect.cleandoc('''
+    run_file_text = inspect.cleandoc("""
     #!/bin/bash
     export HPL_HOST_NODE=$((PMI_RANK % 2))
     /opt/intel/mkl/benchmarks/mp_linpack/xhpl_intel64_static
-    ''')
+    """)
     mock_run_file.assert_called_with(vm, run_file_text + '\n', './hpl_run')
 
   def testRunIntelLinpack(self):
@@ -311,8 +337,10 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
         'intel_mpi_env': ENV_METADATA,
         'kernel_tflops': '0.96990814,0.95639164',
         'last_fraction_completed': 0.015,
-        'mpi_cmd': f'. {mpi_dir}/bin64/mpivars.sh; '
-                   'mpirun -perhost 2  -np 12 -host 10.0.0.2 ./hpl_run',
+        'mpi_cmd': (
+            f'. {mpi_dir}/bin64/mpivars.sh; '
+            'mpirun -perhost 2  -np 12 -host 10.0.0.2 ./hpl_run'
+        ),
         'num_processes': 12,
         'per_host': 2,
         'tflops': '1.08105981,1.0406096',

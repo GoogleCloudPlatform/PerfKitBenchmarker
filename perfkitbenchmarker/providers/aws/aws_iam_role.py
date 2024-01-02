@@ -67,14 +67,16 @@ _ROLE_POLICY_TEMPLATE = """{{
 class AwsIamRole(resource.BaseResource):
   """Class representing an AWS IAM role."""
 
-  def __init__(self,
-               account,
-               role_name,
-               policy_name,
-               service,
-               action,
-               resource_arn,
-               policy_version=None):
+  def __init__(
+      self,
+      account,
+      role_name,
+      policy_name,
+      service,
+      action,
+      resource_arn,
+      policy_version=None,
+  ):
     super(AwsIamRole, self).__init__()
     self.account = account
     self.role_name = role_name
@@ -84,9 +86,11 @@ class AwsIamRole(resource.BaseResource):
     self.resource_arn = resource_arn
     self.policy_version = policy_version or _POLICY_VERSION
     self.role_arn = _ROLE_ARN_TEMPLATE.format(
-        account=self.account, role_name=self.role_name)
+        account=self.account, role_name=self.role_name
+    )
     self.policy_arn = _POLICY_ARN_TEMPLATE.format(
-        account=self.account, policy_name=self.policy_name)
+        account=self.account, policy_name=self.policy_name
+    )
 
   def _Create(self):
     """See base class."""
@@ -94,12 +98,17 @@ class AwsIamRole(resource.BaseResource):
       with open(_TRUST_RELATIONSHIP_FILE, 'w+') as relationship_file:
         relationship_file.write(
             _TRUST_RELATIONSHIP_TEMPLATE.format(
-                version=self.policy_version, service=self.service))
+                version=self.policy_version, service=self.service
+            )
+        )
 
       cmd = util.AWS_PREFIX + [
-          'iam', 'create-role', '--role-name', self.role_name,
+          'iam',
+          'create-role',
+          '--role-name',
+          self.role_name,
           '--assume-role-policy-document',
-          'file://{}'.format(_TRUST_RELATIONSHIP_FILE)
+          'file://{}'.format(_TRUST_RELATIONSHIP_FILE),
       ]
 
       _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
@@ -112,10 +121,16 @@ class AwsIamRole(resource.BaseResource):
             _ROLE_POLICY_TEMPLATE.format(
                 version=self.policy_version,
                 action=self.action,
-                resource_arn=self.resource_arn))
+                resource_arn=self.resource_arn,
+            )
+        )
       cmd = util.AWS_PREFIX + [
-          'iam', 'create-policy', '--policy-name', 'PolicyFor' + self.role_name,
-          '--policy-document', 'file://{}'.format(_ROLE_POLICY_FILE)
+          'iam',
+          'create-policy',
+          '--policy-name',
+          'PolicyFor' + self.role_name,
+          '--policy-document',
+          'file://{}'.format(_ROLE_POLICY_FILE),
       ]
 
       _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
@@ -123,8 +138,12 @@ class AwsIamRole(resource.BaseResource):
         logging.warning('Failed to create policy! %s', stderror)
 
     cmd = util.AWS_PREFIX + [
-        'iam', 'attach-role-policy', '--role-name', self.role_name,
-        '--policy-arn', self.policy_arn
+        'iam',
+        'attach-role-policy',
+        '--role-name',
+        self.role_name,
+        '--policy-arn',
+        self.policy_arn,
     ]
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
@@ -139,8 +158,12 @@ class AwsIamRole(resource.BaseResource):
   def _Delete(self):
     """See base class."""
     cmd = util.AWS_PREFIX + [
-        'iam', 'detach-role-policy', '--role-name', self.role_name,
-        '--policy-arn', self.policy_arn
+        'iam',
+        'detach-role-policy',
+        '--role-name',
+        self.role_name,
+        '--policy-arn',
+        self.policy_arn,
     ]
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
@@ -148,7 +171,10 @@ class AwsIamRole(resource.BaseResource):
       logging.warning('Failed to delete role policy! %s', stderror)
 
     cmd = util.AWS_PREFIX + [
-        'iam', 'delete-policy', '--policy-arn', self.policy_arn
+        'iam',
+        'delete-policy',
+        '--policy-arn',
+        self.policy_arn,
     ]
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
@@ -156,7 +182,10 @@ class AwsIamRole(resource.BaseResource):
       logging.warning('Failed to delete policy! %s', stderror)
 
     cmd = util.AWS_PREFIX + [
-        'iam', 'delete-role', '--role-name', self.role_name
+        'iam',
+        'delete-role',
+        '--role-name',
+        self.role_name,
     ]
 
     _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
@@ -176,7 +205,10 @@ class AwsIamRole(resource.BaseResource):
   def _PolicyExists(self):
     """Returns true if the IAM policy used by the role exists."""
     cmd = util.AWS_PREFIX + [
-        'iam', 'get-policy', '--policy-arn', self.policy_arn
+        'iam',
+        'get-policy',
+        '--policy-arn',
+        self.policy_arn,
     ]
     stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     return retcode == 0 and stdout and json.loads(stdout)['Policy']

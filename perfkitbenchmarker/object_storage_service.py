@@ -25,13 +25,17 @@ from absl import flags
 from perfkitbenchmarker import errors
 import six
 
-flags.DEFINE_string('object_storage_credential_file', None,
-                    'Directory of credential file.')
-flags.DEFINE_string('boto_file_location', None,
-                    'The location of the boto file.')
+flags.DEFINE_string(
+    'object_storage_credential_file', None, 'Directory of credential file.'
+)
+flags.DEFINE_string(
+    'boto_file_location', None, 'The location of the boto file.'
+)
 OBJECT_TTL_DAYS = flags.DEFINE_integer(
-    'object_ttl_days', None,
-    'The object TTL in days to set on any bucket created.')
+    'object_ttl_days',
+    None,
+    'The object TTL in days to set on any bucket created.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -44,6 +48,7 @@ _OBJECT_STORAGE_REGISTRY = {}
 
 class AutoRegisterObjectStorageMeta(abc.ABCMeta):
   """Metaclass for auto registration."""
+
   STORAGE_NAME = None
 
   def __init__(cls, name, bases, dct):
@@ -51,13 +56,17 @@ class AutoRegisterObjectStorageMeta(abc.ABCMeta):
     if cls.STORAGE_NAME in _OBJECT_STORAGE_REGISTRY:
       logging.info(
           "Duplicate storage implementations for name '%s'. "
-          'Replacing %s with %s', cls.STORAGE_NAME,
-          _OBJECT_STORAGE_REGISTRY[cls.STORAGE_NAME].__name__, cls.__name__)
+          'Replacing %s with %s',
+          cls.STORAGE_NAME,
+          _OBJECT_STORAGE_REGISTRY[cls.STORAGE_NAME].__name__,
+          cls.__name__,
+      )
     _OBJECT_STORAGE_REGISTRY[cls.STORAGE_NAME] = cls
 
 
 class ObjectStorageService(
-    six.with_metaclass(AutoRegisterObjectStorageMeta, object)):
+    six.with_metaclass(AutoRegisterObjectStorageMeta, object)
+):
   """Base class for ObjectStorageServices."""
 
   # Keeping the location in the service object is not very clean, but
@@ -97,7 +106,7 @@ class ObjectStorageService(
     Args:
       bucket: the name of the bucket to create.
       raise_on_failure: Whether to raise errors.Benchmarks.BucketCreationError
-          if the bucket fails to be created.
+        if the bucket fails to be created.
       tag_bucket: Whether to put default labels like timeout on the bucket.
     """
     pass
@@ -285,10 +294,9 @@ class ObjectStorageService(
     """
     pass
 
-  def GetDownloadUrl(self,
-                     bucket: str,
-                     object_name: str,
-                     use_https=True) -> str:
+  def GetDownloadUrl(
+      self, bucket: str, object_name: str, use_https=True
+  ) -> str:
     """Get the URL to download objects over HTTP(S).
 
     Args:
@@ -358,13 +366,12 @@ def GetObjectStorageClass(storage_name) -> type(ObjectStorageService):
 def FindCredentialFile(default_location):
   """Return the path to the credential file."""
 
-  credential_file = (
-      FLAGS.object_storage_credential_file or default_location)
+  credential_file = FLAGS.object_storage_credential_file or default_location
   credential_file = os.path.expanduser(credential_file)
-  if not (os.path.isfile(credential_file) or
-          os.path.isdir(credential_file)):
+  if not (os.path.isfile(credential_file) or os.path.isdir(credential_file)):
     raise errors.Benchmarks.MissingObjectCredentialException(
-        'Credential cannot be found in %s' % credential_file)
+        'Credential cannot be found in %s' % credential_file
+    )
 
   return credential_file
 
@@ -385,4 +392,5 @@ def FindBotoFile() -> str:
       return str(path)
 
   raise errors.Benchmarks.MissingObjectCredentialException(
-      'Boto file cannot be found in %s.' % paths_to_check)
+      'Boto file cannot be found in %s.' % paths_to_check
+  )

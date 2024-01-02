@@ -33,8 +33,10 @@ class LoadStageTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super().setUp()
     self.enter_context(
-        mock.patch.object(aws_dynamodb_ycsb_benchmark,
-                          'GetRemoteVMCredentialsFullPath'))
+        mock.patch.object(
+            aws_dynamodb_ycsb_benchmark, 'GetRemoteVMCredentialsFullPath'
+        )
+    )
     self.enter_context(mock.patch.object(background_tasks, 'RunThreaded'))
     self.enter_context(mock.patch.object(ycsb.YCSBExecutor, 'Load'))
     self.mock_spec = mock.MagicMock()
@@ -44,22 +46,23 @@ class LoadStageTest(pkb_common_test_case.PkbCommonTestCase):
     # Arrange
     instance = aws_dynamodb.AwsDynamoDBInstance(rcu=1000, wcu=1000)
     mock_set_throughput = self.enter_context(
-        mock.patch.object(instance, 'SetThroughput'))
+        mock.patch.object(instance, 'SetThroughput')
+    )
     self.mock_spec.non_relational_db = instance
 
     # Act
     aws_dynamodb_ycsb_benchmark.Prepare(self.mock_spec)
 
     # Assert
-    mock_set_throughput.assert_has_calls(
-        [mock.call(wcu=10000), mock.call()])
+    mock_set_throughput.assert_has_calls([mock.call(wcu=10000), mock.call()])
 
   def testLoadThroughputStaysSame(self):
     # WCU stays the same during loading if > 10k.
     # Arrange
     instance = aws_dynamodb.AwsDynamoDBInstance(rcu=1000, wcu=30000)
     mock_set_throughput = self.enter_context(
-        mock.patch.object(instance, 'SetThroughput'))
+        mock.patch.object(instance, 'SetThroughput')
+    )
     self.mock_spec.non_relational_db = instance
 
     # Act
@@ -72,11 +75,13 @@ class LoadStageTest(pkb_common_test_case.PkbCommonTestCase):
       aws_dynamodb_autoscaling_target=50,
       aws_dynamodb_autoscaling_wcu_max=100,
       aws_dynamodb_autoscaling_rcu_max=200,
-      aws_dynamodb_ycsb_provision_wcu=10000)
+      aws_dynamodb_ycsb_provision_wcu=10000,
+  )
   def testLoadPhaseWithAutoscalingDoesNotSetThroughput(self):
     instance = aws_dynamodb.AwsDynamoDBInstance(rcu=1000, wcu=3000)
     mock_set_throughput = self.enter_context(
-        mock.patch.object(instance, 'SetThroughput'))
+        mock.patch.object(instance, 'SetThroughput')
+    )
     self.mock_spec.non_relational_db = instance
 
     aws_dynamodb_ycsb_benchmark.Prepare(self.mock_spec)
@@ -85,9 +90,7 @@ class LoadStageTest(pkb_common_test_case.PkbCommonTestCase):
 
   @parameterized.parameters((100, 100, True, 200), (100, 100, False, 300))
   @flagsaver.flagsaver()
-  def testTargetQpsIsCorrect(
-      self, rcu, wcu, strong_consistency, expected_qps
-  ):
+  def testTargetQpsIsCorrect(self, rcu, wcu, strong_consistency, expected_qps):
     FLAGS.aws_dynamodb_ycsb_consistentReads = strong_consistency
     instance = aws_dynamodb.AwsDynamoDBInstance(rcu=rcu, wcu=wcu)
     actual_qps = aws_dynamodb_ycsb_benchmark._GetTargetQps(instance)

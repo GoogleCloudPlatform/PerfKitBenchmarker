@@ -34,27 +34,41 @@ class GceWindowsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(GceWindowsVirtualMachineTestCase, self).setUp()
     self.spec = gce_virtual_machine.GceVmSpec(
-        'test_component', machine_type='test_machine_type', project='p')
-    p = mock.patch(gce_virtual_machine.__name__ +
-                   '.gce_network.GceNetwork.GetNetwork')
+        'test_component', machine_type='test_machine_type', project='p'
+    )
+    p = mock.patch(
+        gce_virtual_machine.__name__ + '.gce_network.GceNetwork.GetNetwork'
+    )
     self.mock_get_network = p.start()
     self.addCleanup(p.stop)
-    p = mock.patch(gce_virtual_machine.__name__ +
-                   '.gce_network.GceFirewall.GetFirewall')
+    p = mock.patch(
+        gce_virtual_machine.__name__ + '.gce_network.GceFirewall.GetFirewall'
+    )
     self.mock_get_firewall = p.start()
     self.addCleanup(p.stop)
 
     get_tmp_dir_mock = mock.patch(
-        vm_util.__name__ + '.GetTempDir', return_value='TempDir')
+        vm_util.__name__ + '.GetTempDir', return_value='TempDir'
+    )
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
 
   @parameterized.named_parameters(
-      ('WINDOWS2022_DESKTOP', os_types.WINDOWS2022_DESKTOP, True,
-       'windows-2022', 'windows-cloud'),
-      ('WINDOWS2022_SQLSERVER_2019_ENTERPRISE',
-       os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE, True,
-       'sql-ent-2019-win-2022', 'windows-sql-cloud'))
+      (
+          'WINDOWS2022_DESKTOP',
+          os_types.WINDOWS2022_DESKTOP,
+          True,
+          'windows-2022',
+          'windows-cloud',
+      ),
+      (
+          'WINDOWS2022_SQLSERVER_2019_ENTERPRISE',
+          os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE,
+          True,
+          'sql-ent-2019-win-2022',
+          'windows-sql-cloud',
+      ),
+  )
   def testWindowsConfig(self, os_type, gvnic, family, project):
     vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_type)
     vm = vm_class(self.spec)

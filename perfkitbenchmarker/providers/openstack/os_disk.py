@@ -44,8 +44,9 @@ def CreateBootVolume(resource, name, image):
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'create', name)
   vol_cmd.flags['availability-zone'] = resource.zone
   vol_cmd.flags['image'] = image
-  vol_cmd.flags['size'] = (resource.disk_size or
-                           GetImageMinDiskSize(resource, image))
+  vol_cmd.flags['size'] = resource.disk_size or GetImageMinDiskSize(
+      resource, image
+  )
   stdout, _, _ = vol_cmd.Issue()
   vol_resp = json.loads(stdout)
   return vol_resp
@@ -56,21 +57,29 @@ def GetImageMinDiskSize(resource, image):
   image_cmd = os_utils.OpenStackCLICommand(resource, 'image', 'show', image)
   stdout, _, _ = image_cmd.Issue()
   image_resp = json.loads(stdout)
-  volume_size = max((int(image_resp['min_disk']),
-                     resource.disk_size,))
+  volume_size = max((
+      int(image_resp['min_disk']),
+      resource.disk_size,
+  ))
   return volume_size
 
 
 def DeleteVolume(resource, volume_id):
   """Deletes a remote (Cinder) block volume."""
-  vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'delete',
-                                         volume_id)
+  vol_cmd = os_utils.OpenStackCLICommand(
+      resource, 'volume', 'delete', volume_id
+  )
   del vol_cmd.flags['format']  # volume delete does not support json output
   vol_cmd.Issue()
 
 
-@vm_util.Retry(poll_interval=5, max_retries=-1, timeout=300, log_errors=False,
-               retryable_exceptions=errors.Resource.RetryableCreationError)
+@vm_util.Retry(
+    poll_interval=5,
+    max_retries=-1,
+    timeout=300,
+    log_errors=False,
+    retryable_exceptions=errors.Resource.RetryableCreationError,
+)
 def WaitForVolumeCreation(resource, volume_id):
   """Waits until volume is available"""
   vol_cmd = os_utils.OpenStackCLICommand(resource, 'volume', 'show', volume_id)
@@ -88,9 +97,8 @@ class OpenStackDiskSpec(disk.BaseDiskSpec):
 
   Attributes:
     disk_size: None or int. Size of the disk in GB.
-    volume_type: None or string. Volume type to be used to create a
-       block storage volume.
-
+    volume_type: None or string. Volume type to be used to create a block
+      storage volume.
   """
 
   CLOUD = provider_info.OPENSTACK
@@ -102,14 +110,16 @@ class OpenStackDiskSpec(disk.BaseDiskSpec):
     Can be overridden by derived classes to add support for specific flags.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super(OpenStackDiskSpec, cls)._ApplyFlags(config_values, flag_values)
-    if (flag_values['openstack_volume_size'].present
-            and not flag_values['data_disk_size'].present):
+    if (
+        flag_values['openstack_volume_size'].present
+        and not flag_values['data_disk_size'].present
+    ):
       config_values['disk_size'] = flag_values.openstack_volume_size
     else:
       config_values['disk_size'] = flag_values.data_disk_size
@@ -119,12 +129,12 @@ class OpenStackDiskSpec(disk.BaseDiskSpec):
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     decoders = super(OpenStackDiskSpec, cls)._GetOptionDecoderConstructions()
-    decoders.update(
-        {
-            'volume_type': (option_decoders.StringDecoder,
-                            {'default': None, 'none_ok': True},)
-        }
-    )
+    decoders.update({
+        'volume_type': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        )
+    })
     return decoders
 
 
@@ -173,18 +183,26 @@ class OpenStackDisk(disk.BaseDisk):
     if self.id is None:
       raise errors.Error('Cannot attach remote volume %s' % self.name)
     if vm.id is None:
-      msg = 'Cannot attach remote volume %s to non-existing %s VM' % (self.name,
-                                                                      vm.name)
+      msg = 'Cannot attach remote volume %s to non-existing %s VM' % (
+          self.name,
+          vm.name,
+      )
       raise errors.Error(msg)
     cmd = os_utils.OpenStackCLICommand(
-        self, 'server', 'add', 'volume', vm.id, self.id)
+        self, 'server', 'add', 'volume', vm.id, self.id
+    )
     del cmd.flags['format']
     _, stderr, _ = cmd.Issue()
     if stderr:
       raise errors.Error(stderr)
 
-  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
-                 retryable_exceptions=errors.Resource.RetryableCreationError)
+  @vm_util.Retry(
+      poll_interval=1,
+      max_retries=-1,
+      timeout=300,
+      log_errors=False,
+      retryable_exceptions=errors.Resource.RetryableCreationError,
+  )
   def _WaitForVolumeAttachment(self, vm):
     if self.id is None:
       return
@@ -214,14 +232,20 @@ class OpenStackDisk(disk.BaseDisk):
     if self.attached_vm_id is None:
       raise errors.Error('Cannot detach remote volume from a non-existing VM.')
     cmd = os_utils.OpenStackCLICommand(
-        self, 'server', 'remove', 'volume', self.attached_vm_id, self.id)
+        self, 'server', 'remove', 'volume', self.attached_vm_id, self.id
+    )
     del cmd.flags['format']
     _, stderr, _ = cmd.Issue()
     if stderr:
       raise errors.Error(stderr)
 
-  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
-                 retryable_exceptions=errors.Resource.RetryableDeletionError)
+  @vm_util.Retry(
+      poll_interval=1,
+      max_retries=-1,
+      timeout=300,
+      log_errors=False,
+      retryable_exceptions=errors.Resource.RetryableDeletionError,
+  )
   def _WaitForVolumeDeletion(self):
     if self.id is None:
       return
@@ -230,7 +254,14 @@ class OpenStackDisk(disk.BaseDisk):
     if stderr.strip():
       return  # Volume could not be found, inferred that has been deleted.
     resp = json.loads(stdout)
-    if resp['status'] in ('building', 'available', 'in-use', 'deleting',):
-      msg = ('Volume %s has not yet been deleted. Retrying to check status.'
-             % self.id)
+    if resp['status'] in (
+        'building',
+        'available',
+        'in-use',
+        'deleting',
+    ):
+      msg = (
+          'Volume %s has not yet been deleted. Retrying to check status.'
+          % self.id
+      )
       raise errors.Resource.RetryableDeletionError(msg)

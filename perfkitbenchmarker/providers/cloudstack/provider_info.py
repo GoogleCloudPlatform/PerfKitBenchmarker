@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for CloudStack
-
-"""
+"""Provider info for CloudStack"""
 
 from perfkitbenchmarker import provider_info
 
 
 class CloudStackProviderInfo(provider_info.BaseProviderInfo):
-
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
   CLOUD = provider_info.CLOUDSTACK

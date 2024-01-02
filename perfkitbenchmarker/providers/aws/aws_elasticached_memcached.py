@@ -46,8 +46,10 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
 
   @staticmethod
   def CheckPrerequisites(benchmark_config):
-    if (FLAGS.managed_memory_store_version and
-        FLAGS.managed_memory_store_version not in MEMCACHED_VERSIONS):
+    if (
+        FLAGS.managed_memory_store_version
+        and FLAGS.managed_memory_store_version not in MEMCACHED_VERSIONS
+    ):
       raise errors.Config.InvalidValue('Invalid Memcached version.')
 
   def GetResourceMetadata(self):
@@ -65,31 +67,56 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
   def _CreateDependencies(self):
     """Create the subnet dependencies."""
     subnet_id = self.spec.vms[0].network.subnet.id
-    cmd = ['aws', 'elasticache', 'create-cache-subnet-group',
-           '--region', self.region,
-           '--cache-subnet-group-name', self.subnet_group_name,
-           '--cache-subnet-group-description', '"memcached benchmark subnet"',
-           '--subnet-ids', subnet_id]
+    cmd = [
+        'aws',
+        'elasticache',
+        'create-cache-subnet-group',
+        '--region',
+        self.region,
+        '--cache-subnet-group-name',
+        self.subnet_group_name,
+        '--cache-subnet-group-description',
+        '"memcached benchmark subnet"',
+        '--subnet-ids',
+        subnet_id,
+    ]
 
     vm_util.IssueCommand(cmd)
 
   def _DeleteDependencies(self):
     """Delete the subnet dependencies."""
-    cmd = ['aws', 'elasticache', 'delete-cache-subnet-group',
-           '--region', self.region,
-           '--cache-subnet-group-name', self.subnet_group_name]
+    cmd = [
+        'aws',
+        'elasticache',
+        'delete-cache-subnet-group',
+        '--region',
+        self.region,
+        '--cache-subnet-group-name',
+        self.subnet_group_name,
+    ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Create(self):
     """Creates the cache cluster."""
-    cmd = ['aws', 'elasticache', 'create-cache-cluster',
-           '--engine', 'memcached',
-           '--region', self.region,
-           '--cache-cluster-id', self.name,
-           '--preferred-availability-zone', self.zone,
-           '--num-cache-nodes', str(managed_memory_store.MEMCACHED_NODE_COUNT),
-           '--cache-node-type', self.node_type,
-           '--cache-subnet-group-name', self.subnet_group_name]
+    cmd = [
+        'aws',
+        'elasticache',
+        'create-cache-cluster',
+        '--engine',
+        'memcached',
+        '--region',
+        self.region,
+        '--cache-cluster-id',
+        self.name,
+        '--preferred-availability-zone',
+        self.zone,
+        '--num-cache-nodes',
+        str(managed_memory_store.MEMCACHED_NODE_COUNT),
+        '--cache-node-type',
+        self.node_type,
+        '--cache-subnet-group-name',
+        self.subnet_group_name,
+    ]
 
     if self.version:
       cmd += ['--engine-version', self.version]
@@ -100,9 +127,15 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
 
   def _Delete(self):
     """Deletes the cache cluster."""
-    cmd = ['aws', 'elasticache', 'delete-cache-cluster',
-           '--region', self.region,
-           '--cache-cluster-id', self.name]
+    cmd = [
+        'aws',
+        'elasticache',
+        'delete-cache-cluster',
+        '--region',
+        self.region,
+        '--cache-cluster-id',
+        self.name,
+    ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _IsDeleting(self):
@@ -122,7 +155,10 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     """Returns true if the cluster exists and is not being deleted."""
     cluster_info = self._DescribeInstance()
     return cluster_info.get('CacheClusterStatus', '') not in [
-        '', 'deleting', 'create-failed']
+        '',
+        'deleting',
+        'create-failed',
+    ]
 
   def _DescribeInstance(self):
     """Calls describe on cluster.
@@ -130,9 +166,15 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     Returns:
       dict mapping string cluster_info property key to value.
     """
-    cmd = ['aws', 'elasticache', 'describe-cache-clusters',
-           '--region', self.region,
-           '--cache-cluster-id', self.name]
+    cmd = [
+        'aws',
+        'elasticache',
+        'describe-cache-clusters',
+        '--region',
+        self.region,
+        '--cache-cluster-id',
+        self.name,
+    ]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not find cluster %s, %s', self.name, stderr)
@@ -153,7 +195,8 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     cluster_info = self._DescribeInstance()
     if not cluster_info:
       raise errors.Resource.RetryableGetError(
-          'Failed to retrieve information on {0}.'.format(self.name))
+          'Failed to retrieve information on {0}.'.format(self.name)
+      )
 
     endpoint = cluster_info['ConfigurationEndpoint']
     self._ip = endpoint['Address']

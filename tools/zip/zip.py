@@ -27,15 +27,22 @@ def main(argv):
   zip_file_path = argv[1]
 
   version = subprocess.check_output(
-      (os.path.join(os.getcwd(), 'pkb.py'), '--version')).rstrip()
+      (os.path.join(os.getcwd(), 'pkb.py'), '--version')
+  ).rstrip()
 
   with zipfile.ZipFile(zip_file_path, 'w') as zip_file:
     for dir_path, _, file_names in os.walk('perfkitbenchmarker'):
       for file_name in file_names:
         if not file_name.endswith('.pyc'):
           zip_file.write(os.path.join(dir_path, file_name))
-    for file_name in ('AUTHORS', 'CHANGES.md', 'CONTRIBUTING.md', 'LICENSE',
-                      'README.md', 'requirements.txt'):
+    for file_name in (
+        'AUTHORS',
+        'CHANGES.md',
+        'CONTRIBUTING.md',
+        'LICENSE',
+        'README.md',
+        'requirements.txt',
+    ):
       zip_file.write(file_name)
     zip_file.write('pkb.py', '__main__.py')
     zip_file.writestr('perfkitbenchmarker/version.txt', version)

@@ -26,12 +26,14 @@ def InstallCoremark(remote_command):
 
   Args:
     remote_command: Function to run a remote command on the VM. This allows this
-    function to be reused by the windows/cygwin version of the coremark test.
+      function to be reused by the windows/cygwin version of the coremark test.
   """
-  remote_command('wget %s -P %s' %
-                 (COREMARK_TAR_URL, linux_packages.INSTALL_DIR))
-  remote_command('cd %s && tar xvfz %s' %
-                 (linux_packages.INSTALL_DIR, COREMARK_TAR))
+  remote_command(
+      'wget %s -P %s' % (COREMARK_TAR_URL, linux_packages.INSTALL_DIR)
+  )
+  remote_command(
+      'cd %s && tar xvfz %s' % (linux_packages.INSTALL_DIR, COREMARK_TAR)
+  )
 
 
 def Install(vm):

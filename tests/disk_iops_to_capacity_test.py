@@ -61,25 +61,48 @@ class DiskIOPSToCapacityTest(unittest.TestCase):
     self.assertEqual(GCPconfig2.GetSize(), 1000)
 
   def testValidateProvider(self):
-    self.assertRaises(disk_iops_to_capacity.InvalidProviderError,
-                      disk_iops_to_capacity.DiskIOPSToCapacity, 300,
-                      'NONPROVIDER')
+    self.assertRaises(
+        disk_iops_to_capacity.InvalidProviderError,
+        disk_iops_to_capacity.DiskIOPSToCapacity,
+        300,
+        'NONPROVIDER',
+    )
 
   def testValidateIOPS(self):
-    self.assertRaises(disk_iops_to_capacity.InvalidIOPSError,
-                      disk_iops_to_capacity.DiskIOPSToCapacity, 0, 'AWS')
-    self.assertRaises(disk_iops_to_capacity.InvalidIOPSError,
-                      disk_iops_to_capacity.DiskIOPSToCapacity, 50000, 'GCP')
-    self.assertRaises(disk_iops_to_capacity.InvalidIOPSError,
-                      disk_iops_to_capacity.DiskIOPSToCapacity, 90000, 'AWS')
+    self.assertRaises(
+        disk_iops_to_capacity.InvalidIOPSError,
+        disk_iops_to_capacity.DiskIOPSToCapacity,
+        0,
+        'AWS',
+    )
+    self.assertRaises(
+        disk_iops_to_capacity.InvalidIOPSError,
+        disk_iops_to_capacity.DiskIOPSToCapacity,
+        50000,
+        'GCP',
+    )
+    self.assertRaises(
+        disk_iops_to_capacity.InvalidIOPSError,
+        disk_iops_to_capacity.DiskIOPSToCapacity,
+        90000,
+        'AWS',
+    )
 
   def testValidateStorageType(self):
-    self.assertRaises(disk_iops_to_capacity.InvalidStorageTypeError,
-                      disk_iops_to_capacity.DiskIOPSToCapacity, 100, 'AWS',
-                      'ebs-piops')
-    self.assertRaises(disk_iops_to_capacity.InvalidStorageTypeError,
-                      disk_iops_to_capacity.DiskIOPSToCapacity, 100, 'GCP',
-                      'pd-hhd')
+    self.assertRaises(
+        disk_iops_to_capacity.InvalidStorageTypeError,
+        disk_iops_to_capacity.DiskIOPSToCapacity,
+        100,
+        'AWS',
+        'ebs-piops',
+    )
+    self.assertRaises(
+        disk_iops_to_capacity.InvalidStorageTypeError,
+        disk_iops_to_capacity.DiskIOPSToCapacity,
+        100,
+        'GCP',
+        'pd-hhd',
+    )
 
 
 if __name__ == '__main__':

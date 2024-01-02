@@ -67,6 +67,7 @@ class AWSMysqlIAASRelationalDb(mysql_iaas_relational_db.MysqlIAASRelationalDb):
 
 class AwsRelationalDbParameterError(Exception):
   """Exceptions for invalid Db parameters."""
+
   pass
 
 
@@ -152,14 +153,24 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     self._CreateDbSubnetGroup(self.subnets_used_by_db)
 
     open_port_cmd = util.AWS_PREFIX + [
-        'ec2', 'authorize-security-group-ingress', '--group-id',
-        self.security_group_id, '--source-group', self.security_group_id,
-        '--protocol', 'tcp', '--port={0}'.format(
-            self.port), '--region', self.region
+        'ec2',
+        'authorize-security-group-ingress',
+        '--group-id',
+        self.security_group_id,
+        '--source-group',
+        self.security_group_id,
+        '--protocol',
+        'tcp',
+        '--port={0}'.format(self.port),
+        '--region',
+        self.region,
     ]
     stdout, stderr, _ = vm_util.IssueCommand(open_port_cmd)
-    logging.info('Granted DB port ingress, stdout is:\n%s\nstderr is:\n%s',
-                 stdout, stderr)
+    logging.info(
+        'Granted DB port ingress, stdout is:\n%s\nstderr is:\n%s',
+        stdout,
+        stderr,
+    )
 
   def _DeleteDependencies(self):
     """Method that will be called once after _DeleteResource() is called.
@@ -182,13 +193,13 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     """
     cidr = self.client_vm.network.regional_network.vpc.NextSubnetCidrBlock()
     logging.info('Attempting to create a subnet in zone %s', new_subnet_zone)
-    new_subnet = (
-        aws_network.AwsSubnet(new_subnet_zone,
-                              self.client_vm.network.regional_network.vpc.id,
-                              cidr))
+    new_subnet = aws_network.AwsSubnet(
+        new_subnet_zone, self.client_vm.network.regional_network.vpc.id, cidr
+    )
     new_subnet.Create()
-    logging.info('Successfully created a new subnet, subnet id is: %s',
-                 new_subnet.id)
+    logging.info(
+        'Successfully created a new subnet, subnet id is: %s', new_subnet.id
+    )
     return new_subnet
 
   def _CreateDbSubnetGroup(self, subnets):
@@ -200,38 +211,53 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     """
     db_subnet_group_name = 'pkb-db-subnet-group-{0}'.format(FLAGS.run_uri)
 
-    create_db_subnet_group_cmd = util.AWS_PREFIX + ([
-        'rds', 'create-db-subnet-group', '--db-subnet-group-name',
-        db_subnet_group_name, '--db-subnet-group-description',
-        'pkb_subnet_group_for_db', '--region', self.region, '--subnet-ids'
-    ] + [subnet.id
-         for subnet in subnets] + ['--tags'] + util.MakeFormattedDefaultTags())
+    create_db_subnet_group_cmd = util.AWS_PREFIX + (
+        [
+            'rds',
+            'create-db-subnet-group',
+            '--db-subnet-group-name',
+            db_subnet_group_name,
+            '--db-subnet-group-description',
+            'pkb_subnet_group_for_db',
+            '--region',
+            self.region,
+            '--subnet-ids',
+        ]
+        + [subnet.id for subnet in subnets]
+        + ['--tags']
+        + util.MakeFormattedDefaultTags()
+    )
 
     vm_util.IssueCommand(create_db_subnet_group_cmd)
 
     # save for cleanup
     self.db_subnet_group_name = db_subnet_group_name
     self.security_group_id = (
-        self.client_vm.network.regional_network.vpc.default_security_group_id)
+        self.client_vm.network.regional_network.vpc.default_security_group_id
+    )
 
   def _ApplyDbFlags(self):
     """Apply managed flags on RDS."""
     if self.spec.db_flags:
       self.parameter_group = 'pkb-parameter-group-' + FLAGS.run_uri
       cmd = util.AWS_PREFIX + [
-          'rds', 'create-db-parameter-group',
+          'rds',
+          'create-db-parameter-group',
           '--db-parameter-group-name=%s' % self.parameter_group,
           '--db-parameter-group-family=%s' % self._GetParameterGroupFamily(),
-          '--region=%s' % self.region, '--description="AWS pkb option group"'
+          '--region=%s' % self.region,
+          '--description="AWS pkb option group"',
       ]
 
       vm_util.IssueCommand(cmd)
 
       cmd = util.AWS_PREFIX + [
-          'rds', 'modify-db-instance',
+          'rds',
+          'modify-db-instance',
           '--db-instance-identifier=%s' % self.instance_id,
           '--db-parameter-group-name=%s' % self.parameter_group,
-          '--region=%s' % self.region, '--apply-immediately'
+          '--region=%s' % self.region,
+          '--apply-immediately',
       ]
 
       vm_util.IssueCommand(cmd)
@@ -241,11 +267,12 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
         if len(key_value_pair) != 2:
           raise AwsRelationalDbParameterError('Malformed parameter %s' % flag)
         cmd = util.AWS_PREFIX + [
-            'rds', 'modify-db-parameter-group',
+            'rds',
+            'modify-db-parameter-group',
             '--db-parameter-group-name=%s' % self.parameter_group,
             '--parameters=ParameterName=%s,ParameterValue=%s,ApplyMethod=pending-reboot'
             % (key_value_pair[0], key_value_pair[1]),
-            '--region=%s' % self.region
+            '--region=%s' % self.region,
         ]
 
         vm_util.IssueCommand(cmd)
@@ -264,14 +291,16 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
       NotImplementedError: If there is no supported ParameterGroupFamiliy.
     """
     all_supported_versions = (
-        MYSQL_SUPPORTED_MAJOR_VERSIONS + POSTGRES_SUPPORTED_MAJOR_VERSIONS)
+        MYSQL_SUPPORTED_MAJOR_VERSIONS + POSTGRES_SUPPORTED_MAJOR_VERSIONS
+    )
     for version in all_supported_versions:
       if self.spec.engine_version.startswith(version):
         return self.spec.engine + version
 
-    raise NotImplementedError('The parameter group of engine %s,'
-                              ' version %s is not supported' %
-                              (self.spec.engine, self.spec.engine_version))
+    raise NotImplementedError(
+        'The parameter group of engine %s, version %s is not supported'
+        % (self.spec.engine, self.spec.engine_version)
+    )
 
   def _TeardownNetworking(self):
     """Tears down all network resources that were created for the database."""
@@ -279,8 +308,12 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
       subnet_for_db.Delete()
     if hasattr(self, 'db_subnet_group_name'):
       delete_db_subnet_group_cmd = util.AWS_PREFIX + [
-          'rds', 'delete-db-subnet-group', '--db-subnet-group-name',
-          self.db_subnet_group_name, '--region', self.region
+          'rds',
+          'delete-db-subnet-group',
+          '--db-subnet-group-name',
+          self.db_subnet_group_name,
+          '--region',
+          self.region,
       ]
       vm_util.IssueCommand(delete_db_subnet_group_cmd, raise_on_failure=False)
 
@@ -288,17 +321,23 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     """Tears down all parameter group that were created for the database."""
     if self.parameter_group:
       delete_db_parameter_group_cmd = util.AWS_PREFIX + [
-          'rds', 'delete-db-parameter-group', '--db-parameter-group-name',
-          self.parameter_group, '--region', self.region
+          'rds',
+          'delete-db-parameter-group',
+          '--db-parameter-group-name',
+          self.parameter_group,
+          '--region',
+          self.region,
       ]
       vm_util.IssueCommand(
-          delete_db_parameter_group_cmd, raise_on_failure=False)
+          delete_db_parameter_group_cmd, raise_on_failure=False
+      )
 
   def _DescribeInstance(self, instance_id):
     cmd = util.AWS_PREFIX + [
-        'rds', 'describe-db-instances',
+        'rds',
+        'describe-db-instances',
         '--db-instance-identifier=%s' % instance_id,
-        '--region=%s' % self.region
+        '--region=%s' % self.region,
     ]
     stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
@@ -330,10 +369,15 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
       if json_output:
         try:
           state = json_output['DBInstances'][0]['DBInstanceStatus']
-          pending_values = (
-              json_output['DBInstances'][0]['PendingModifiedValues'])
-          waiting_param = json_output['DBInstances'][0]['DBParameterGroups'][0][
-              'ParameterApplyStatus'] == 'applying'
+          pending_values = json_output['DBInstances'][0][
+              'PendingModifiedValues'
+          ]
+          waiting_param = (
+              json_output['DBInstances'][0]['DBParameterGroups'][0][
+                  'ParameterApplyStatus'
+              ]
+              == 'applying'
+          )
           logging.info('Instance state: %s', state)
           if pending_values:
             logging.info('Pending values: %s', (str(pending_values)))
@@ -350,7 +394,8 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
 
         except:  # pylint: disable=bare-except
           logging.exception(
-              'Error attempting to read stdout. Creation failure.')
+              'Error attempting to read stdout. Creation failure.'
+          )
           return False
       time.sleep(5)
 
@@ -363,9 +408,10 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
       raise RuntimeError('Instance is not in a state that can reboot')
 
     cmd = util.AWS_PREFIX + [
-        'rds', 'reboot-db-instance',
+        'rds',
+        'reboot-db-instance',
         '--db-instance-identifier=%s' % self.instance_id,
-        '--region=%s' % self.region
+        '--region=%s' % self.region,
     ]
 
     vm_util.IssueCommand(cmd)
@@ -377,7 +423,8 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     self.primary_zone = self.subnets_used_by_db[0].zone
     if self.spec.high_availability:
       self.secondary_zone = ','.join(
-          [x.zone for x in self.subnets_used_by_db[1:]])
+          [x.zone for x in self.subnets_used_by_db[1:]]
+      )
 
   def _DeleteInstance(self, instance_id):
     cmd = util.AWS_PREFIX + [
@@ -438,9 +485,13 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     be called multiple times, even if the resource has already been
     deleted.
     """
-    @vm_util.Retry(poll_interval=60, fuzz=0, timeout=3600,
-                   retryable_exceptions=(
-                       errors.Resource.RetryableDeletionError,))
+
+    @vm_util.Retry(
+        poll_interval=60,
+        fuzz=0,
+        timeout=3600,
+        retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+    )
     def WaitUntilInstanceDeleted(instance_id):
       if self._InstanceExists(instance_id):
         raise errors.Resource.RetryableDeletionError('Not yet deleted')

@@ -16,8 +16,7 @@
 import logging
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers import profitbricks
-from perfkitbenchmarker.providers.profitbricks import \
-    profitbricks_machine_types
+from perfkitbenchmarker.providers.profitbricks import profitbricks_machine_types
 import requests
 
 # Global Values
@@ -40,8 +39,7 @@ def PerformRequest(action, url, header, json=None):
   if r.status_code >= 300:
     action = action.upper()
     logging.info(r.text)
-    raise errors.Error('%s call to %s failed, see log.' % (action,
-                                                           url))
+    raise errors.Error('%s call to %s failed, see log.' % (action, url))
 
   return r
 
@@ -57,8 +55,10 @@ def ReturnImage(header, location):
 
   # Search for Ubuntu image in preferred zone
   for image in response['items']:
-    if('Ubuntu-14' in image['properties']['name'] and
-       image['properties']['location'] == location):
+    if (
+        'Ubuntu-14' in image['properties']['name']
+        and image['properties']['location'] == location
+    ):
       return image['id']
 
 
@@ -67,7 +67,7 @@ def ReturnFlavor(machine_type):
 
   logging.info('Fetching flavor specs for new VM.')
   for flavor in FLAVORS:
-    if(machine_type == flavor['name']):
+    if machine_type == flavor['name']:
       return flavor['ram'], flavor['cores']
 
 
@@ -83,8 +83,10 @@ def CreateDatacenter(header, location):
   }
 
   # Make call
-  logging.info('Creating Datacenter: %s in Location: %s' %
-               (new_dc['properties']['name'], location))
+  logging.info(
+      'Creating Datacenter: %s in Location: %s'
+      % (new_dc['properties']['name'], location)
+  )
   url = '%s/datacenters' % PROFITBRICKS_API
   r = PerformRequest('post', url, header, json=new_dc)
 

@@ -26,8 +26,10 @@ def _Install(vm):
   """Installs the Lmbench package on the VM."""
 
   vm.Install('build_tools')
-  vm.RemoteCommand('cd %s && git clone %s && cd %s && git checkout %s' %
-                   (linux_packages.INSTALL_DIR, GIT, 'lmbench', COMMIT))
+  vm.RemoteCommand(
+      'cd %s && git clone %s && cd %s && git checkout %s'
+      % (linux_packages.INSTALL_DIR, GIT, 'lmbench', COMMIT)
+  )
 
 
 def YumInstall(vm):

@@ -78,6 +78,7 @@ def CreateTestVmSpec() -> TestVmSpec:
 
 class TestOsMixin(virtual_machine.BaseOsMixin):
   """Test class that provides dummy implementations of abstract functions."""
+
   OS_TYPE = 'test_os_type'
   BASE_OS_TYPE = 'debian'
 
@@ -161,8 +162,10 @@ class TestResource(resource.BaseResource):
 
 
 class TestVirtualMachine(
-    TestResource, TestOsMixin, virtual_machine.BaseVirtualMachine):
+    TestResource, TestOsMixin, virtual_machine.BaseVirtualMachine
+):
   """Test class that has dummy methods for a base virtual machine."""
+
   CLOUD = 'test_vm_cloud'
 
   def _Start(self):
@@ -180,8 +183,9 @@ class TestVirtualMachine(
 
 # Need to provide implementations for all of the abstract methods in
 # order to instantiate linux_virtual_machine.BaseLinuxMixin.
-class TestLinuxVirtualMachine(linux_virtual_machine.BaseLinuxVirtualMachine,
-                              TestVirtualMachine):
+class TestLinuxVirtualMachine(
+    linux_virtual_machine.BaseLinuxVirtualMachine, TestVirtualMachine
+):
 
   def InstallPackages(self, packages):
     pass
@@ -207,19 +211,23 @@ cluster_boot:
 
 
 def CreateBenchmarkSpecFromYaml(
-    yaml_string: str = SIMPLE_CONFIG,
-    benchmark_name: str = 'cluster_boot') -> benchmark_spec.BenchmarkSpec:
+    yaml_string: str = SIMPLE_CONFIG, benchmark_name: str = 'cluster_boot'
+) -> benchmark_spec.BenchmarkSpec:
   config = configs.LoadConfig(yaml_string, {}, benchmark_name)
   return CreateBenchmarkSpecFromConfigDict(config, benchmark_name)
 
 
 def CreateBenchmarkSpecFromConfigDict(
-    config_dict: Dict[str, Any],
-    benchmark_name: str) -> benchmark_spec.BenchmarkSpec:
+    config_dict: Dict[str, Any], benchmark_name: str
+) -> benchmark_spec.BenchmarkSpec:
   config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-      benchmark_name, flag_values=FLAGS, **config_dict)
-  benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
-                           if b.BENCHMARK_NAME == benchmark_name))
+      benchmark_name, flag_values=FLAGS, **config_dict
+  )
+  benchmark_module = next((
+      b
+      for b in linux_benchmarks.BENCHMARKS
+      if b.BENCHMARK_NAME == benchmark_name
+  ))
   return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, 'name0')
 
 
@@ -245,8 +253,8 @@ class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
     p = mock.patch(
-        util.__name__ + '.GetDefaultProject',
-        return_value='test_project')
+        util.__name__ + '.GetDefaultProject', return_value='test_project'
+    )
     self.enter_context(p)
 
   # TODO(user): Extend MockIssueCommand to support multiple calls to
@@ -264,8 +272,7 @@ class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
       retcode: Int. Return code from running the command.
     """
 
-    p = mock.patch(
-        'subprocess.Popen', spec=subprocess.Popen)
+    p = mock.patch('subprocess.Popen', spec=subprocess.Popen)
     cmd_output = mock.patch.object(vm_util, '_ReadIssueCommandOutput')
 
     self.addCleanup(p.stop)

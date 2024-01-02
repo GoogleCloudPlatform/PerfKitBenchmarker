@@ -19,9 +19,7 @@ FLAGS = flags.FLAGS
 
 
 class MesosDisk(disk.BaseDisk):
-  """
-  Base class for Mesos Disks.
-  """
+  """Base class for Mesos Disks."""
 
   def __init__(self, disk_spec):
     super(MesosDisk, self).__init__(disk_spec)
@@ -44,9 +42,10 @@ class MesosDisk(disk.BaseDisk):
 
 
 class LocalDisk(MesosDisk):
-  """
-  Represents DAS (direct-attached storage). For each disk, a new directory
-  on a host is created and then mounted as a volume to a Docker instance.
+  """Represents DAS (direct-attached storage).
+
+  For each disk, a new directory on a host is created and then mounted as a
+  volume to a Docker instance.
   """
 
   def __init__(self, disk_num, disk_spec, name):
@@ -58,8 +57,5 @@ class LocalDisk(MesosDisk):
     # create local volumes automatically - when empty hostPath is passed to
     # Marathon's API then the sandbox path is used as a host path. However,
     # new directory should be created and used for this specific purpose.
-    volume_param = {
-        'key': 'volume',
-        'value': self.mount_point
-    }
+    volume_param = {'key': 'volume', 'value': self.mount_point}
     container_body['docker']['parameters'].append(volume_param)

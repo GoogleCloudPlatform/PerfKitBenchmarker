@@ -15,7 +15,8 @@ def main():
     sys.exit(1)
 
   latency_histogram_by_label = collections.defaultdict(
-      lambda: collections.defaultdict(int))
+      lambda: collections.defaultdict(int)
+  )
   total_samples = collections.defaultdict(int)
   with open(sys.argv[1]) as samples_file:
     for line in samples_file:
@@ -25,7 +26,8 @@ def main():
         regex = r'\|%s:(.*?)\|' % sys.argv[3]
         label = re.search(regex, labels).group(1)
         histogram = json.loads(
-            re.search(r'\|histogram:(.*?)\|', labels).group(1))
+            re.search(r'\|histogram:(.*?)\|', labels).group(1)
+        )
         for bucket, count in histogram.iteritems():
           latency_histogram_by_label[label][float(bucket)] += int(count)
           total_samples[label] += int(count)

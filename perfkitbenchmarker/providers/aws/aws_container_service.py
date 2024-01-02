@@ -51,11 +51,16 @@ class EcrRepository(resource.BaseResource):
       self.user_managed = True
       return
     create_cmd = util.AWS_PREFIX + [
-        'ecr', 'create-repository', '--region', self.region,
-        '--repository-name', self.name
+        'ecr',
+        'create-repository',
+        '--region',
+        self.region,
+        '--repository-name',
+        self.name,
     ]
     _, stderr, retcode = vm_util.IssueCommand(
-        create_cmd, raise_on_failure=False)
+        create_cmd, raise_on_failure=False
+    )
     if retcode:
       if 'InsufficientInstanceCapacity' in stderr:
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
@@ -63,13 +68,19 @@ class EcrRepository(resource.BaseResource):
         raise errors.Benchmarks.QuotaFailure(stderr)
       raise errors.Resource.CreationError(
           'Failed to create EKS Cluster: {} return code: {}'.format(
-              retcode, stderr))
+              retcode, stderr
+          )
+      )
 
   def _Exists(self):
     """Returns True if the repository exists."""
     describe_cmd = util.AWS_PREFIX + [
-        'ecr', 'describe-repositories', '--region', self.region,
-        '--repository-names', self.name
+        'ecr',
+        'describe-repositories',
+        '--region',
+        self.region,
+        '--repository-names',
+        self.name,
     ]
     stdout, _, _ = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
     if not stdout or not json.loads(stdout)['repositories']:
@@ -79,8 +90,13 @@ class EcrRepository(resource.BaseResource):
   def _Delete(self):
     """Deletes the repository."""
     delete_cmd = util.AWS_PREFIX + [
-        'ecr', 'delete-repository', '--region', self.region,
-        '--repository-name', self.name, '--force'
+        'ecr',
+        'delete-repository',
+        '--region',
+        self.region,
+        '--repository-name',
+        self.name,
+        '--force',
     ]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
@@ -104,7 +120,8 @@ class ElasticContainerRegistry(container_service.BaseContainerRegistry):
   def PrePush(self, image):
     """Prepares registry to push a given image."""
     repository_name = '{namespace}/{name}'.format(
-        namespace=self.name, name=image.name)
+        namespace=self.name, name=image.name
+    )
     repository = EcrRepository(repository_name, self.region)
     self.repositories.append(repository)
     repository.Create()
@@ -165,13 +182,23 @@ class TaskDefinition(resource.BaseResource):
   def _Create(self):
     """Create the task definition."""
     register_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecs', 'register-task-definition', '--family',
-        self.name, '--execution-role-arn', 'ecsTaskExecutionRole',
-        '--network-mode', 'awsvpc', '--requires-compatibilities=FARGATE',
+        '--region',
+        self.region,
+        'ecs',
+        'register-task-definition',
+        '--family',
+        self.name,
+        '--execution-role-arn',
+        'ecsTaskExecutionRole',
+        '--network-mode',
+        'awsvpc',
+        '--requires-compatibilities=FARGATE',
         '--cpu',
-        str(int(1024 * self.cpus)), '--memory',
-        str(self.memory), '--container-definitions',
-        self._GetContainerDefinitions()
+        str(int(1024 * self.cpus)),
+        '--memory',
+        str(self.memory),
+        '--container-definitions',
+        self._GetContainerDefinitions(),
     ]
     stdout, _, _ = vm_util.IssueCommand(register_cmd)
     response = json.loads(stdout)
@@ -182,8 +209,12 @@ class TaskDefinition(resource.BaseResource):
     if self.arn is None:
       return
     deregister_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecs', 'deregister-task-definition',
-        '--task-definition', self.arn
+        '--region',
+        self.region,
+        'ecs',
+        'deregister-task-definition',
+        '--task-definition',
+        self.arn,
     ]
     vm_util.IssueCommand(deregister_cmd)
 
@@ -195,16 +226,16 @@ class TaskDefinition(resource.BaseResource):
         'essential': True,
         'portMappings': [{
             'containerPort': self.container_port,
-            'protocol': 'TCP'
+            'protocol': 'TCP',
         }],
         'logConfiguration': {
             'logDriver': 'awslogs',
             'options': {
                 'awslogs-group': 'pkb',
                 'awslogs-region': self.region,
-                'awslogs-stream-prefix': 'pkb'
-            }
-        }
+                'awslogs-stream-prefix': 'pkb',
+            },
+        },
     }]
     return json.dumps(definitions)
 
@@ -222,7 +253,8 @@ class EcsTask(container_service.BaseContainer):
     self.subnet_id = cluster.network.subnet.id
     self.ip_address = None
     self.security_group_id = (
-        cluster.network.regional_network.vpc.default_security_group_id)
+        cluster.network.regional_network.vpc.default_security_group_id
+    )
 
   def _GetNetworkConfig(self):
     network_config = {
@@ -254,11 +286,20 @@ class EcsTask(container_service.BaseContainer):
   def _Create(self):
     """Creates the task."""
     run_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecs', 'run-task', '--cluster',
-        self.cluster_name, '--task-definition', self.task_def.arn,
-        '--launch-type', 'FARGATE', '--network-configuration',
-        self._GetNetworkConfig(), '--overrides',
-        self._GetOverrides()
+        '--region',
+        self.region,
+        'ecs',
+        'run-task',
+        '--cluster',
+        self.cluster_name,
+        '--task-definition',
+        self.task_def.arn,
+        '--launch-type',
+        'FARGATE',
+        '--network-configuration',
+        self._GetNetworkConfig(),
+        '--overrides',
+        self._GetOverrides(),
     ]
     stdout, _, _ = vm_util.IssueCommand(run_cmd)
     response = json.loads(stdout)
@@ -278,16 +319,28 @@ class EcsTask(container_service.BaseContainer):
     if self.arn is None:
       return
     stop_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecs', 'stop-task', '--cluster',
-        self.cluster_name, '--task', self.arn
+        '--region',
+        self.region,
+        'ecs',
+        'stop-task',
+        '--cluster',
+        self.cluster_name,
+        '--task',
+        self.arn,
     ]
     vm_util.IssueCommand(stop_cmd)
 
   def _GetTask(self):
     """Returns a dictionary representation of the task."""
     describe_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecs', 'describe-tasks', '--cluster',
-        self.cluster_name, '--tasks', self.arn
+        '--region',
+        self.region,
+        'ecs',
+        'describe-tasks',
+        '--cluster',
+        self.cluster_name,
+        '--tasks',
+        self.arn,
     ]
     stdout, _, _ = vm_util.IssueCommand(describe_cmd)
     response = json.loads(stdout)
@@ -302,12 +355,14 @@ class EcsTask(container_service.BaseContainer):
 
     @vm_util.Retry(
         timeout=timeout,
-        retryable_exceptions=(container_service.RetriableContainerException,))
+        retryable_exceptions=(container_service.RetriableContainerException,),
+    )
     def _WaitForExit():
       task = self._GetTask()
       if task['lastStatus'] != 'STOPPED':
         raise container_service.RetriableContainerException(
-            'Task is not STOPPED.')
+            'Task is not STOPPED.'
+        )
       return task
 
     return _WaitForExit()
@@ -318,7 +373,8 @@ class EcsTask(container_service.BaseContainer):
     task_id = self.arn.split('/')[-1]
     log_stream = 'pkb/{name}/{task_id}'.format(name=self.name, task_id=task_id)
     return six.text_type(
-        aws_logs.GetLogStreamAsString(self.region, log_stream, 'pkb'))
+        aws_logs.GetLogStreamAsString(self.region, log_stream, 'pkb')
+    )
 
 
 class EcsService(container_service.BaseContainerService):
@@ -334,19 +390,23 @@ class EcsService(container_service.BaseContainerService):
     self.cluster_name = cluster.name
     self.subnet_id = cluster.network.subnet.id
     self.security_group_id = (
-        cluster.network.regional_network.vpc.default_security_group_id)
+        cluster.network.regional_network.vpc.default_security_group_id
+    )
     self.load_balancer = aws_load_balancer.LoadBalancer(
-        [cluster.network.subnet])
+        [cluster.network.subnet]
+    )
     self.target_group = aws_load_balancer.TargetGroup(
-        cluster.network.regional_network.vpc, self.container_port)
+        cluster.network.regional_network.vpc, self.container_port
+    )
     self.port = 80
 
   def _CreateDependencies(self):
     """Creates the load balancer for the service."""
     self.load_balancer.Create()
     self.target_group.Create()
-    listener = aws_load_balancer.Listener(self.load_balancer, self.target_group,
-                                          self.port)
+    listener = aws_load_balancer.Listener(
+        self.load_balancer, self.target_group, self.port
+    )
     listener.Create()
     self.ip_address = self.load_balancer.dns_name
 
@@ -386,13 +446,27 @@ class EcsService(container_service.BaseContainerService):
   def _Delete(self):
     """Deletes the service."""
     update_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecs', 'update-service', '--cluster',
-        self.cluster_name, '--service', self.name, '--desired-count', '0'
+        '--region',
+        self.region,
+        'ecs',
+        'update-service',
+        '--cluster',
+        self.cluster_name,
+        '--service',
+        self.name,
+        '--desired-count',
+        '0',
     ]
     vm_util.IssueCommand(update_cmd)
     delete_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecs', 'delete-service', '--cluster',
-        self.cluster_name, '--service', self.name
+        '--region',
+        self.region,
+        'ecs',
+        'delete-service',
+        '--cluster',
+        self.cluster_name,
+        '--service',
+        self.name,
     ]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
@@ -445,8 +519,12 @@ class FargateCluster(container_service.BaseContainerCluster):
   def _Create(self):
     """Creates the cluster."""
     create_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecs', 'create-cluster', '--cluster-name',
-        self.name
+        '--region',
+        self.region,
+        'ecs',
+        'create-cluster',
+        '--cluster-name',
+        self.name,
     ]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
@@ -457,8 +535,12 @@ class FargateCluster(container_service.BaseContainerCluster):
     if not self.arn:
       return False
     describe_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecs', 'describe-clusters', '--clusters',
-        self.arn
+        '--region',
+        self.region,
+        'ecs',
+        'describe-clusters',
+        '--clusters',
+        self.arn,
     ]
     stdout, _, _ = vm_util.IssueCommand(describe_cmd)
     response = json.loads(stdout)
@@ -470,7 +552,12 @@ class FargateCluster(container_service.BaseContainerCluster):
   def _Delete(self):
     """Deletes the cluster."""
     delete_cmd = util.AWS_PREFIX + [
-        '--region', self.region, 'ecs', 'delete-cluster', '--cluster', self.name
+        '--region',
+        self.region,
+        'ecs',
+        'delete-cluster',
+        '--cluster',
+        self.name,
     ]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
@@ -492,9 +579,9 @@ class FargateCluster(container_service.BaseContainerCluster):
       task_def.Create()
     service = EcsService(name, container_spec, self)
     self.services[name] = service
-    self.firewall.AllowPortInSecurityGroup(service.region,
-                                           service.security_group_id,
-                                           service.container_port)
+    self.firewall.AllowPortInSecurityGroup(
+        service.region, service.security_group_id, service.container_port
+    )
     service.Create()
 
 
@@ -524,11 +611,13 @@ class AwsKopsCluster(container_service.KubernetesCluster):
     """Creates the cluster."""
     # Create the cluster spec but don't provision any resources.
     create_cmd = [
-        FLAGS.kops, 'create', 'cluster',
+        FLAGS.kops,
+        'create',
+        'cluster',
         '--name=%s' % self.name,
         '--zones=%s' % self.default_node_pool.zone,
         '--node-count=%s' % self.default_node_pool.num_nodes,
-        '--node-size=%s' % self.default_node_pool.machine_type
+        '--node-size=%s' % self.default_node_pool.machine_type,
     ]
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
@@ -547,7 +636,7 @@ class AwsKopsCluster(container_service.KubernetesCluster):
         'perfkitbenchmarker-run': FLAGS.run_uri,
         'benchmark': benchmark_spec.name,
         'perfkit_uuid': benchmark_spec.uuid,
-        'benchmark_uid': benchmark_spec.uid
+        'benchmark_uid': benchmark_spec.uid,
     }
 
     # Replace the cluster spec.
@@ -565,21 +654,27 @@ class AwsKopsCluster(container_service.KubernetesCluster):
     """Deletes the cluster."""
     super()._Delete()
     delete_cmd = [
-        FLAGS.kops, 'delete', 'cluster',
+        FLAGS.kops,
+        'delete',
+        'cluster',
         '--name=%s' % self.name,
-        '--state=s3://%s' % self.config_bucket, '--yes'
+        '--state=s3://%s' % self.config_bucket,
+        '--yes',
     ]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _IsReady(self):
     """Returns True if the cluster is ready, else False."""
     validate_cmd = [
-        FLAGS.kops, 'validate', 'cluster',
+        FLAGS.kops,
+        'validate',
+        'cluster',
         '--name=%s' % self.name,
-        '--state=s3://%s' % self.config_bucket
+        '--state=s3://%s' % self.config_bucket,
     ]
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     _, _, retcode = vm_util.IssueCommand(
-        validate_cmd, env=env, raise_on_failure=False)
+        validate_cmd, env=env, raise_on_failure=False
+    )
     return not retcode

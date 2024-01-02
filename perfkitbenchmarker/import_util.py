@@ -35,6 +35,7 @@ def LoadModulesForPath(path, package_prefix=None):
   """
 
   prefix = package_prefix + '.' if package_prefix else ''
+
   def LogImportError(modname):
     logging.exception('Error importing module %s', modname)
 

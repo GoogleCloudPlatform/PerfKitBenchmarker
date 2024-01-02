@@ -33,51 +33,66 @@ ALL_MODE = 'all'
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
-    'runspec_tar', None,
+    'runspec_tar',
+    None,
     'Used by the PKB speccpu benchmarks. Name of the .tgz file to use. '
-    'Defaults to None. ')
+    'Defaults to None. ',
+)
 flags.DEFINE_string(
-    'runspec_config', None,
+    'runspec_config',
+    None,
     'Used by the PKB speccpu benchmarks. Name of the cfg file to use as the '
     'SPEC CPU config file provided to the runspec binary via its --config '
     'flag. If the benchmark is run using an .iso file, then the '
     'cfg file must be placed in the local PKB data directory and will be '
     'copied to the remote machine prior to executing runspec/runcpu. Defaults '
     'to None. '
-    'See README.md for instructions if running with a repackaged .tgz file.')
+    'See README.md for instructions if running with a repackaged .tgz file.',
+)
 flags.DEFINE_string(
-    'runspec_build_tool_version', None,
+    'runspec_build_tool_version',
+    None,
     'Version of gcc/g++/gfortran. This should match runspec_config. Note, if '
     'neither runspec_config and runspec_build_tool_version is set, the test '
     'install gcc/g++/gfortran-4.7, since that matches default config version. '
     'If runspec_config is set, but not runspec_build_tool_version, default '
     'version of build tools will be installed. Also this flag only works with '
-    'debian.')
+    'debian.',
+)
 flags.DEFINE_integer(
-    'runspec_iterations', 3,
+    'runspec_iterations',
+    3,
     'Used by the PKB speccpu benchmarks. The number of benchmark iterations '
-    'to execute, provided to the runspec binary via its --iterations flag.')
+    'to execute, provided to the runspec binary via its --iterations flag.',
+)
 flags.DEFINE_string(
-    'runspec_define', '',
+    'runspec_define',
+    '',
     'Used by the PKB speccpu benchmarks. Optional comma-separated list of '
     'SYMBOL[=VALUE] preprocessor macros provided to the runspec binary via '
-    'repeated --define flags. Example: numa,smt,sse=SSE4.2')
+    'repeated --define flags. Example: numa,smt,sse=SSE4.2',
+)
 flags.DEFINE_boolean(
-    'runspec_enable_32bit', False,
+    'runspec_enable_32bit',
+    False,
     'Used by the PKB speccpu benchmarks. If set, multilib packages will be '
     'installed on the remote machine to enable use of 32-bit SPEC CPU '
     'binaries. This may be useful when running on memory-constrained instance '
     'types (i.e. less than 2 GiB memory/core), where 64-bit execution may be '
-    'problematic.')
+    'problematic.',
+)
 flags.DEFINE_boolean(
-    'runspec_keep_partial_results', False,
+    'runspec_keep_partial_results',
+    False,
     'Used by the PKB speccpu benchmarks. If set, the benchmark will report '
     'an aggregate score even if some of the SPEC CPU component tests '
     'failed with status "NR". Available results will be saved, and PKB samples '
     'will be marked with a metadata value of partial=true. If unset, partial '
-    'failures are treated as errors.')
+    'failures are treated as errors.',
+)
 flags.DEFINE_boolean(
-    'runspec_estimate_spec', False,
+    'runspec_estimate_spec',
+    False,
     'Used by the PKB speccpu benchmarks. If set, the benchmark will report '
     'an estimated aggregate score even if SPEC CPU did not compute one. '
     'This usually occurs when --runspec_iterations is less than 3.  '
@@ -86,13 +101,20 @@ flags.DEFINE_boolean(
     'estimated_SPECfp(R)_rate_base.  Available results will be saved, '
     'and PKB samples will be marked with a metadata value of partial=true. If '
     'unset, SPECint(R)_rate_base20** and SPECfp(R)_rate_base20** are listed '
-    'in the metadata under missing_results.')
-flags.DEFINE_enum('spec_runmode', BASE_MODE, [BASE_MODE, PEAK_MODE, ALL_MODE],
-                  'Run mode to use. Defaults to base. ')
+    'in the metadata under missing_results.',
+)
+flags.DEFINE_enum(
+    'spec_runmode',
+    BASE_MODE,
+    [BASE_MODE, PEAK_MODE, ALL_MODE],
+    'Run mode to use. Defaults to base. ',
+)
 flags.DEFINE_string(
-    'runspec_script', None,
+    'runspec_script',
+    None,
     'Used by the PKB speccpu benchmarks. If set, the benchmark will execute '
-    'this script instead of invoking runspec binary directly.')
+    'this script instead of invoking runspec binary directly.',
+)
 
 VM_STATE_ATTR = 'speccpu_vm_state'
 
@@ -119,7 +141,8 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
         'Invalid runspec_config value: {0}{1}When running speccpu with a '
         'tar file, runspec_config cannot specify a file in a sub-directory. '
         'See README.md for information about running speccpu with a tar '
-        'file.'.format(runspec_config, os.linesep))
+        'file.'.format(runspec_config, os.linesep)
+    )
   if not examine_members:
     return
 
@@ -128,15 +151,18 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
   vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
 
   scratch_dir = vm.GetScratchDir()
-  cfg_member = '{0}/config/{1}'.format(speccpu_vm_state.base_spec_dir,
-                                       runspec_config)
-  required_members = itertools.chain(speccpu_vm_state.required_members,
-                                     [cfg_member])
+  cfg_member = '{0}/config/{1}'.format(
+      speccpu_vm_state.base_spec_dir, runspec_config
+  )
+  required_members = itertools.chain(
+      speccpu_vm_state.required_members, [cfg_member]
+  )
   missing_members = []
   for member in required_members:
     stdout, _ = vm.RemoteCommand(
         'cd {scratch_dir} && (test -f {member} || test -d {member}) ; echo $?'
-        .format(scratch_dir=scratch_dir, member=member))
+        .format(scratch_dir=scratch_dir, member=member)
+    )
     if stdout.strip() != '0':
       missing_members.append(member)
 
@@ -146,8 +172,9 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
         '{linesep}This is an indication that the tar file is formatted '
         'incorrectly. See README.md for information about the expected format '
         'of the tar file.'.format(
-            linesep=os.linesep,
-            members=os.linesep.join(sorted(missing_members))))
+            linesep=os.linesep, members=os.linesep.join(sorted(missing_members))
+        )
+    )
 
 
 def _CheckIsoAndCfgFile(runspec_config, spec_iso, clang_flag):
@@ -170,7 +197,8 @@ def _CheckIsoAndCfgFile(runspec_config, spec_iso, clang_flag):
         'in the perfkitbenchmarker/data directory (or one of the specified '
         'data directories if the --data_search_paths flag is used). Visit '
         'https://www.spec.org/ to learn more about purchasing %(iso)s.',
-        {'iso': spec_iso})
+        {'iso': spec_iso},
+    )
     raise
 
   # Search for the cfg.
@@ -183,7 +211,9 @@ def _CheckIsoAndCfgFile(runspec_config, spec_iso, clang_flag):
         'perfkitbenchmarker/data directory (or one of the specified data '
         'directories if the --data_search_paths flag is used). Visit '
         'https://www.spec.org/cpu2006/docs/runspec.html#about_config to learn '
-        'more about config files.', runspec_config)
+        'more about config files.',
+        runspec_config,
+    )
     raise
 
   if not clang_flag:  # 2017 ISO does not contain clang.xml
@@ -198,7 +228,9 @@ def _CheckIsoAndCfgFile(runspec_config, spec_iso, clang_flag):
         'must be in the perfkitbenchmarker/data directory (or one of the '
         'specified data directories if the --data_search_paths flag is '
         'used). Visit https://www.spec.org/cpu2017/docs/flag-description.html '
-        'to learn more about flag files.', clang_flag)
+        'to learn more about flag files.',
+        clang_flag,
+    )
     raise
 
 
@@ -269,16 +301,20 @@ class SpecInstallConfigurations(object):
       scratch_dir: The scratch directory on the VM that SPEC is installed on.
     """
     self.spec_dir = posixpath.join(scratch_dir, self.base_spec_dir)
-    self.cfg_file_path = posixpath.join(self.spec_dir, 'config',
-                                        os.path.basename(self.runspec_config))
+    self.cfg_file_path = posixpath.join(
+        self.spec_dir, 'config', os.path.basename(self.runspec_config)
+    )
     if self.base_iso_file_path:
       self.iso_file_path = posixpath.join(scratch_dir, self.base_iso_file_path)
     if self.base_mount_dir:
       self.mount_dir = posixpath.join(scratch_dir, self.base_mount_dir)
     if self.base_clang_flag_file_path:
       self.clang_flag_file_path = posixpath.join(
-          self.spec_dir, 'config', 'flags',
-          os.path.basename(self.base_clang_flag_file_path))
+          self.spec_dir,
+          'config',
+          'flags',
+          os.path.basename(self.base_clang_flag_file_path),
+      )
 
 
 def InstallSPECCPU(vm, speccpu_vm_state):
@@ -294,12 +330,18 @@ def InstallSPECCPU(vm, speccpu_vm_state):
     # Since this will override 'build_tools' installation, install this
     # before we install 'build_tools' package
     _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state)
-    _CheckTarFile(vm, speccpu_vm_state.runspec_config, stages.PROVISION
-                  in FLAGS.run_stage, speccpu_vm_state)
+    _CheckTarFile(
+        vm,
+        speccpu_vm_state.runspec_config,
+        stages.PROVISION in FLAGS.run_stage,
+        speccpu_vm_state,
+    )
   except errors.Setup.BadPreprovisionedDataError:
-    _CheckIsoAndCfgFile(speccpu_vm_state.runspec_config,
-                        speccpu_vm_state.base_iso_file_path,
-                        speccpu_vm_state.base_clang_flag_file_path)
+    _CheckIsoAndCfgFile(
+        speccpu_vm_state.runspec_config,
+        speccpu_vm_state.base_iso_file_path,
+        speccpu_vm_state.base_clang_flag_file_path,
+    )
     _PrepareWithIsoFile(vm, speccpu_vm_state)
   vm.Install('speccpu')
 
@@ -332,11 +374,16 @@ def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
     speccpu_vm_state: SpecInstallConfigurations. Install configuration for spec.
   """
   scratch_dir = vm.GetScratchDir()
-  vm.InstallPreprovisionedPackageData(speccpu_vm_state.package_name,
-                                      [speccpu_vm_state.base_tar_file_path],
-                                      scratch_dir)
-  vm.RemoteCommand('cd {dir} && tar xvfz {tar}'.format(
-      dir=scratch_dir, tar=speccpu_vm_state.base_tar_file_path))
+  vm.InstallPreprovisionedPackageData(
+      speccpu_vm_state.package_name,
+      [speccpu_vm_state.base_tar_file_path],
+      scratch_dir,
+  )
+  vm.RemoteCommand(
+      'cd {dir} && tar xvfz {tar}'.format(
+          dir=scratch_dir, tar=speccpu_vm_state.base_tar_file_path
+      )
+  )
 
 
 def _PrepareWithIsoFile(vm, speccpu_vm_state):
@@ -361,18 +408,28 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
 
   # Extract files from the iso to the cpu2006 or cpu2017 directory.
   vm.RemoteCommand('mkdir {0}'.format(speccpu_vm_state.mount_dir))
-  vm.RemoteCommand('sudo mount -t iso9660 -o loop {0} {1}'.format(
-      speccpu_vm_state.iso_file_path, speccpu_vm_state.mount_dir))
-  vm.RemoteCommand('cp -r {0}/* {1}'.format(speccpu_vm_state.mount_dir,
-                                            speccpu_vm_state.spec_dir))
+  vm.RemoteCommand(
+      'sudo mount -t iso9660 -o loop {0} {1}'.format(
+          speccpu_vm_state.iso_file_path, speccpu_vm_state.mount_dir
+      )
+  )
+  vm.RemoteCommand(
+      'cp -r {0}/* {1}'.format(
+          speccpu_vm_state.mount_dir, speccpu_vm_state.spec_dir
+      )
+  )
 
   # cpu2017 iso does not come with config directory nor clang.xml
   if speccpu_vm_state.clang_flag_file_path:
-    vm.RemoteCommand('mkdir -p {0}'.format(
-        os.path.dirname(speccpu_vm_state.clang_flag_file_path)))
+    vm.RemoteCommand(
+        'mkdir -p {0}'.format(
+            os.path.dirname(speccpu_vm_state.clang_flag_file_path)
+        )
+    )
     vm.PushFile(
         data.ResourcePath(speccpu_vm_state.base_clang_flag_file_path),
-        speccpu_vm_state.clang_flag_file_path)
+        speccpu_vm_state.clang_flag_file_path,
+    )
 
   vm.RemoteCommand('chmod -R 755 {0}'.format(speccpu_vm_state.spec_dir))
 
@@ -516,8 +573,9 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
     # Skip over failed runs, but count them since they make the overall
     # result invalid.
     not_reported = benchmark.count('NR')
-    if not_reported > 1 or (not_reported == 1 and
-                            FLAGS.spec_runmode != PEAK_MODE):
+    if not_reported > 1 or (
+        not_reported == 1 and FLAGS.spec_runmode != PEAK_MODE
+    ):
       logging.warning('SPEC CPU missing result: %s', benchmark)
       missing_results.append(str(benchmark.split()[0]))
       continue
@@ -542,7 +600,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
     if peak_score_str:
       peak_score_float = float(peak_score_str)
       results.append(
-          sample.Sample(str(name) + ':peak', peak_score_float, '', metadata))
+          sample.Sample(str(name) + ':peak', peak_score_float, '', metadata)
+      )
 
   if spec_score is None and FLAGS.spec_runmode != PEAK_MODE:
     missing_results.append(spec_name)
@@ -552,16 +611,19 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       metadata['partial'] = 'true'
       metadata['missing_results'] = ','.join(missing_results)
     else:
-      raise errors.Benchmarks.RunError('speccpu: results missing, see log: ' +
-                                       ','.join(missing_results))
+      raise errors.Benchmarks.RunError(
+          'speccpu: results missing, see log: ' + ','.join(missing_results)
+      )
 
   if spec_score:
     results.append(sample.Sample(spec_name, spec_score, '', metadata))
   elif FLAGS.runspec_estimate_spec:
     estimated_spec_score = _GeometricMean(scores)
     results.append(
-        sample.Sample('estimated_' + spec_name, estimated_spec_score, '',
-                      metadata))
+        sample.Sample(
+            'estimated_' + spec_name, estimated_spec_score, '', metadata
+        )
+    )
   if peak_score:
     results.append(sample.Sample(peak_name, float(peak_score), '', metadata))
 
@@ -573,14 +635,12 @@ def _GeometricMean(arr):
   product = 1
   for val in arr:
     product *= val
-  return product**(1.0 / len(arr))
+  return product ** (1.0 / len(arr))
 
 
-def ParseOutput(vm,
-                log_files,
-                is_partial_results,
-                runspec_metric,
-                results_directory=None):
+def ParseOutput(
+    vm, log_files, is_partial_results, runspec_metric, results_directory=None
+):
   """Retrieves the SPEC CPU output from the VM and parses it.
 
   Args:
@@ -600,11 +660,15 @@ def ParseOutput(vm,
 
   for log in log_files:
     results_dir = results_directory or '%s/result' % speccpu_vm_state.spec_dir
-    stdout, _ = vm.RemoteCommand(
-        'cat %s/%s' % (results_dir, log))
+    stdout, _ = vm.RemoteCommand('cat %s/%s' % (results_dir, log))
     results.extend(
-        _ExtractScore(stdout, vm, FLAGS.runspec_keep_partial_results or
-                      is_partial_results, runspec_metric))
+        _ExtractScore(
+            stdout,
+            vm,
+            FLAGS.runspec_keep_partial_results or is_partial_results,
+            runspec_metric,
+        )
+    )
 
   return results
 
@@ -622,10 +686,12 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
     A Tuple of (stdout, stderr) the run output.
   """
   speccpu_vm_state = getattr(vm, VM_STATE_ATTR, None)
-  runspec_flags = [('config',
-                    posixpath.basename(speccpu_vm_state.cfg_file_path)),
-                   ('tune', FLAGS.spec_runmode), ('size', 'ref'),
-                   ('iterations', FLAGS.runspec_iterations)]
+  runspec_flags = [
+      ('config', posixpath.basename(speccpu_vm_state.cfg_file_path)),
+      ('tune', FLAGS.spec_runmode),
+      ('size', 'ref'),
+      ('iterations', FLAGS.runspec_iterations),
+  ]
   if FLAGS.runspec_define:
     for runspec_define in FLAGS.runspec_define.split(','):
       runspec_flags.append(('define', runspec_define))
@@ -639,10 +705,16 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
     runspec_cmd = f'sudo bash {FLAGS.runspec_script}'
   else:
     runspec_cmd = '{cmd} --noreportable {flags} {subset}'.format(
-        cmd=cmd, flags=fl, subset=benchmark_subset)
+        cmd=cmd, flags=fl, subset=benchmark_subset
+    )
 
-  cmd = ' && '.join(('cd {0}'.format(speccpu_vm_state.spec_dir),
-                     'rm -rf result', '. ./shrc', '. ./shrc', runspec_cmd))
+  cmd = ' && '.join((
+      'cd {0}'.format(speccpu_vm_state.spec_dir),
+      'rm -rf result',
+      '. ./shrc',
+      '. ./shrc',
+      runspec_cmd,
+  ))
   return vm.RobustRemoteCommand(cmd)
 
 

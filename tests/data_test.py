@@ -19,7 +19,6 @@ import tempfile
 import unittest
 
 import mock
-
 from perfkitbenchmarker import data
 
 
@@ -40,9 +39,9 @@ class FileResourceLoaderTestCase(unittest.TestCase):
 
   def testResourcePath_NonExistantResource(self):
     self.assertListEqual([], os.listdir(self.temp_dir))
-    self.assertRaises(data.ResourceNotFound,
-                      self.instance.ResourcePath,
-                      'fake.txt')
+    self.assertRaises(
+        data.ResourceNotFound, self.instance.ResourcePath, 'fake.txt'
+    )
 
   def testResourcePath_ExtantResource(self):
     file_name = 'test.txt'
@@ -64,9 +63,9 @@ class PackageResourceLoaderTestCase(unittest.TestCase):
     self.instance = data.PackageResourceLoader(data.__name__)
 
   def testResourcePath_NonExistantResource(self):
-    self.assertRaises(data.ResourceNotFound,
-                      self.instance.ResourcePath,
-                      'fake.txt')
+    self.assertRaises(
+        data.ResourceNotFound, self.instance.ResourcePath, 'fake.txt'
+    )
 
   def testResourcePath_ExtantResource(self):
     file_name = '__init__.py'
@@ -92,13 +91,15 @@ class ResourcePathTestCase(unittest.TestCase):
     mock_not_found_loader = mock.MagicMock(spec=data.ResourceLoader)
     mock_not_found_loader.ResourceExists.return_value = False
 
-    p = mock.patch(data.__name__ + '._GetResourceLoaders',
-                   return_value=[mock_found_loader])
+    p = mock.patch(
+        data.__name__ + '._GetResourceLoaders', return_value=[mock_found_loader]
+    )
     self.mock_get_resource_loaders = p.start()
     self.addCleanup(p.stop)
 
-    p = mock.patch(data.__name__ + '.DEFAULT_RESOURCE_LOADERS',
-                   [mock_not_found_loader])
+    p = mock.patch(
+        data.__name__ + '.DEFAULT_RESOURCE_LOADERS', [mock_not_found_loader]
+    )
     p.start()
     self.addCleanup(p.stop)
 

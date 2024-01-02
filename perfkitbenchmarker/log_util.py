@@ -35,7 +35,7 @@ LOG_LEVELS = {
     DEBUG: logging.DEBUG,
     INFO: logging.INFO,
     WARNING: logging.WARNING,
-    ERROR: logging.ERROR
+    ERROR: logging.ERROR,
 }
 
 # Paths for log writing and exporting.
@@ -45,15 +45,18 @@ LOG_FILE_NAME = 'pkb.log'
 
 
 _PKB_LOG_BUCKET = flags.DEFINE_string(
-    'pkb_log_bucket', None,
+    'pkb_log_bucket',
+    None,
     'Name of the GCS bucket that PKB logs should route to. If this is not '
     'specified, then PKB logs will remain on the VM. This bucket must exist '
     'and the caller must have write permissions on the bucket for a successful '
-    'export.')
+    'export.',
+)
 
 
 class ThreadLogContext(object):
   """Per-thread context for log message prefix labels."""
+
   def __init__(self, thread_log_context=None):
     """Constructs a ThreadLogContext by copying a previous ThreadLogContext.
 
@@ -97,8 +100,10 @@ class ThreadLogContext(object):
 
 
 class _ThreadData(threading.local):
+
   def __init__(self):
     self.pkb_thread_log_context = ThreadLogContext()
+
 
 thread_local = _ThreadData()
 
@@ -127,6 +132,7 @@ class PkbLogFilter(logging.Filter):
 
   Sets the LogRecord's pkb_label attribute with the ThreadLogContext label.
   """
+
   def filter(self, record):
     record.pkb_label = GetThreadLogContext().label
     return True
@@ -137,8 +143,9 @@ def ConfigureBasicLogging():
   logging.basicConfig(format='%(levelname)-8s %(message)s', level=logging.INFO)
 
 
-def ConfigureLogging(stderr_log_level, log_path, run_uri,
-                     file_log_level=logging.DEBUG):
+def ConfigureLogging(
+    stderr_log_level, log_path, run_uri, file_log_level=logging.DEBUG
+):
   """Configure logging.
 
   Note that this will destroy existing logging configuration!
@@ -160,19 +167,26 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
   # Set the GCS destination path global variable so it can be used by PKB.
   global log_cloud_path
   run_date = datetime.date.today()
-  log_cloud_path = (f'gs://{_PKB_LOG_BUCKET.value}/'
-                    + f'{run_date.year:04d}/{run_date.month:02d}/'
-                    + f'{run_date.day:02d}/'
-                    + f'{run_uri}-{LOG_FILE_NAME}')
+  log_cloud_path = (
+      f'gs://{_PKB_LOG_BUCKET.value}/'
+      + f'{run_date.year:04d}/{run_date.month:02d}/'
+      + f'{run_date.day:02d}/'
+      + f'{run_uri}-{LOG_FILE_NAME}'
+  )
 
   # Build the format strings for the stderr and log file message formatters.
-  stderr_format = ('%(asctime)s {} %(threadName)s %(pkb_label)s'
-                   '%(levelname)-8s %(message)s').format(run_uri)
-  stderr_color_format = ('%(log_color)s%(asctime)s {} %(threadName)s '
-                         '%(pkb_label)s%(levelname)-8s%(reset)s '
-                         '%(message)s').format(run_uri)
-  file_format = ('%(asctime)s {} %(threadName)s %(pkb_label)s'
-                 '%(filename)s:%(lineno)d %(levelname)-8s %(message)s')
+  stderr_format = (
+      '%(asctime)s {} %(threadName)s %(pkb_label)s%(levelname)-8s %(message)s'
+  ).format(run_uri)
+  stderr_color_format = (
+      '%(log_color)s%(asctime)s {} %(threadName)s '
+      '%(pkb_label)s%(levelname)-8s%(reset)s '
+      '%(message)s'
+  ).format(run_uri)
+  file_format = (
+      '%(asctime)s {} %(threadName)s %(pkb_label)s'
+      '%(filename)s:%(lineno)d %(levelname)-8s %(message)s'
+  )
   file_format = file_format.format(run_uri)
 
   # Reset root logger settings.
@@ -210,5 +224,12 @@ def ConfigureLogging(stderr_log_level, log_path, run_uri,
 def CollectPKBLogs() -> None:
   """Move PKB log files over to a GCS bucket (`pkb_log_bucket` flag)."""
   if _PKB_LOG_BUCKET.value:
-    vm_util.IssueRetryableCommand(['gsutil', '-h', 'Content-Type:text/plain',
-                                   'mv', '-Z', log_local_path, log_cloud_path])
+    vm_util.IssueRetryableCommand([
+        'gsutil',
+        '-h',
+        'Content-Type:text/plain',
+        'mv',
+        '-Z',
+        log_local_path,
+        log_cloud_path,
+    ])

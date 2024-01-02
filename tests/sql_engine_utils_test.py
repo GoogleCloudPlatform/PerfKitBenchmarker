@@ -10,13 +10,13 @@ class SqlEngineUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testGetDbEngineType(self):
     self.assertEqual(
-        sql_engine_utils.GetDbEngineType('aurora-postgresql'), 'postgres')
+        sql_engine_utils.GetDbEngineType('aurora-postgresql'), 'postgres'
+    )
+    self.assertEqual(sql_engine_utils.GetDbEngineType('aurora-mysql'), 'mysql')
     self.assertEqual(
-        sql_engine_utils.GetDbEngineType('aurora-mysql'), 'mysql')
-    self.assertEqual(
-        sql_engine_utils.GetDbEngineType('sqlserver-ex'), 'sqlserver')
-    self.assertEqual(
-        sql_engine_utils.GetDbEngineType('mysql'), 'mysql')
+        sql_engine_utils.GetDbEngineType('sqlserver-ex'), 'sqlserver'
+    )
+    self.assertEqual(sql_engine_utils.GetDbEngineType('mysql'), 'mysql')
     with self.assertRaises(TypeError):
       sql_engine_utils.GetDbEngineType('abc')
 

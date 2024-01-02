@@ -15,7 +15,6 @@
 
 import unittest
 from absl import flags
-
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.aws import aws_disk
 from tests import pkb_common_test_case
@@ -39,9 +38,16 @@ class AwsDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testProvidedValid(self):
     spec = aws_disk.AwsDiskSpec(
-        _COMPONENT, device_path='test_device_path', disk_number=1,
-        disk_size=75, disk_type='test_disk_type', iops=1000, throughput=100,
-        mount_point='/mountpoint', num_striped_disks=2)
+        _COMPONENT,
+        device_path='test_device_path',
+        disk_number=1,
+        disk_size=75,
+        disk_type='test_disk_type',
+        iops=1000,
+        throughput=100,
+        mount_point='/mountpoint',
+        num_striped_disks=2,
+    )
     self.assertEqual(spec.device_path, 'test_device_path')
     self.assertEqual(spec.disk_number, 1)
     self.assertEqual(spec.disk_size, 75)
@@ -65,7 +71,8 @@ class AwsDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.aws_provisioned_throughput = 200
     FLAGS.data_disk_size = 100
     spec = aws_disk.AwsDiskSpec(
-        _COMPONENT, FLAGS, disk_size=75, iops=1000, throughput=150)
+        _COMPONENT, FLAGS, disk_size=75, iops=1000, throughput=150
+    )
     self.assertEqual(spec.disk_size, 75)
     self.assertEqual(spec.iops, 1000)
     self.assertEqual(spec.throughput, 150)
@@ -75,7 +82,8 @@ class AwsDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['aws_provisioned_throughput'].parse(200)
     FLAGS['data_disk_size'].parse(100)
     spec = aws_disk.AwsDiskSpec(
-        _COMPONENT, FLAGS, disk_size=75, iops=1000, throughput=150)
+        _COMPONENT, FLAGS, disk_size=75, iops=1000, throughput=150
+    )
     self.assertEqual(spec.disk_size, 100)
     self.assertEqual(spec.iops, 2000)
     self.assertEqual(spec.throughput, 200)

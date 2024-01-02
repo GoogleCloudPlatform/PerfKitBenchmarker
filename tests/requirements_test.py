@@ -111,13 +111,28 @@ class CheckRequirementsTestCase(unittest.TestCase):
       with mock.patch.object(pkg_resources, 'require') as mocked_require:
         requirements._CheckRequirements(_PATH)
     mocked_open.assert_has_calls((
-        mock.call('dir/file', 'r'), mock.call('dir/subfile0', 'r'),
+        mock.call('dir/file', 'r'),
+        mock.call('dir/subfile0', 'r'),
         mock.call('dir/subdir/subfile2', 'r'),
-        mock.call('dir/../subfile3', 'r'), mock.call('dir/subfile1', 'r')))
+        mock.call('dir/../subfile3', 'r'),
+        mock.call('dir/subfile1', 'r'),
+    ))
     mocked_require.assert_has_calls(
         list(
-            map(mock.call, ('package-0', 'package-3', 'package-4', 'package-5',
-                            'package-1>=2.0', 'package-6', 'package-2'))))
+            map(
+                mock.call,
+                (
+                    'package-0',
+                    'package-3',
+                    'package-4',
+                    'package-5',
+                    'package-1>=2.0',
+                    'package-6',
+                    'package-2',
+                ),
+            )
+        )
+    )
 
 
 class CheckBasicRequirementsTestCase(unittest.TestCase):

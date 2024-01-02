@@ -16,5 +16,6 @@ class SysbenchTest(pkb_common_test_case.PkbCommonTestCase):
     sysbench._Install(vm)
     self.assertIn('P0001', vm.RemoteCommand.call_args_list[1][0][0])
 
+
 if __name__ == '__main__':
   unittest.main()

@@ -41,7 +41,7 @@ def LoadProviderFlags(providers):
 
   Args:
     providers: series of strings. Each element is a value from VALID_CLOUDS
-        indicating a cloud provider for which to import the flags module.
+      indicating a cloud provider for which to import the flags module.
   """
   for provider_name in providers:
     normalized_name = _GetProviderPackageName(provider_name)
@@ -55,7 +55,8 @@ LoadProviderFlags(provider_info.VALID_CLOUDS)
 
 def LoadProviderUtils(cloud: str) -> types.ModuleType:
   util_module_name = '.'.join(
-      (__name__, _GetProviderPackageName(cloud), 'util'))
+      (__name__, _GetProviderPackageName(cloud), 'util')
+  )
   return importlib.import_module(util_module_name)
 
 
@@ -69,9 +70,9 @@ def LoadProvider(provider_name, ignore_package_requirements=True):
 
   Args:
     provider_name: string chosen from VALID_CLOUDS. The name of the provider
-        whose modules should be loaded.
+      whose modules should be loaded.
     ignore_package_requirements: boolean. If True, the provider's Python package
-        requirements file is ignored.
+      requirements file is ignored.
   """
   if provider_name in _imported_providers:
     return
@@ -86,8 +87,11 @@ def LoadProvider(provider_name, ignore_package_requirements=True):
   # themselves so that they can be instantiated during resource provisioning.
   provider_package_path = os.path.join(__path__[0], normalized_name)
   try:
-    modules = tuple(import_util.LoadModulesForPath(
-        [provider_package_path], __name__ + '.' + normalized_name))
+    modules = tuple(
+        import_util.LoadModulesForPath(
+            [provider_package_path], __name__ + '.' + normalized_name
+        )
+    )
     if not modules:
       raise ImportError('No modules found for provider %s.' % provider_name)
   except Exception:

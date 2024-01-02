@@ -31,7 +31,8 @@ _NONE_OK = {'default': None, 'none_ok': True}
 def GetRelationalDbSpecClass(engine):
   """Get the RelationalDbSpec class corresponding to 'engine'."""
   if engine in [
-      sql_engine_utils.SPANNER_GOOGLESQL, sql_engine_utils.SPANNER_POSTGRES
+      sql_engine_utils.SPANNER_GOOGLESQL,
+      sql_engine_utils.SPANNER_POSTGRES,
   ]:
     return spec.GetSpecClass(RelationalDbSpec, SERVICE_TYPE='spanner')
   return RelationalDbSpec
@@ -53,6 +54,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     db_disk_spec: disk.BaseDiskSpec: Configurable disk options.
     db_spec: virtual_machine.BaseVmSpec: Configurable VM options.
   """
+
   SPEC_TYPE = 'RelationalDbSpec'
   SPEC_ATTRS = ['SERVICE_TYPE']
 
@@ -70,13 +72,16 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super(RelationalDbSpec, self).__init__(
-        component_full_name, flag_values=flag_values, **kwargs)
+        component_full_name, flag_values=flag_values, **kwargs
+    )
     # TODO(user): This is a lot of boilerplate, and is repeated
     # below in VmGroupSpec. See if some can be consolidated. Maybe we can
     # specify a VmGroupSpec instead of both vm_spec and disk_spec.
     ignore_package_requirements = (
         getattr(flag_values, 'ignore_package_requirements', True)
-        if flag_values else True)
+        if flag_values
+        else True
+    )
     providers.LoadProvider(self.cloud, ignore_package_requirements)
 
     if self.db_disk_spec:
@@ -84,26 +89,30 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       if disk_config is None:
         raise errors.Config.MissingOption(
             '{0}.cloud is "{1}", but {0}.db_disk_spec does not contain a '
-            'configuration for "{1}".'.format(component_full_name, self.cloud))
+            'configuration for "{1}".'.format(component_full_name, self.cloud)
+        )
       disk_spec_class = disk.GetDiskSpecClass(
           self.cloud, disk_config.get('disk_type', None)
       )
       self.db_disk_spec = disk_spec_class(
           '{0}.db_disk_spec.{1}'.format(component_full_name, self.cloud),
           flag_values=flag_values,
-          **disk_config)
+          **disk_config
+      )
 
     if self.db_spec:
       db_vm_config = getattr(self.db_spec, self.cloud, None)
       if db_vm_config is None:
         raise errors.Config.MissingOption(
             '{0}.cloud is "{1}", but {0}.db_spec does not contain a '
-            'configuration for "{1}".'.format(component_full_name, self.cloud))
+            'configuration for "{1}".'.format(component_full_name, self.cloud)
+        )
       db_vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
       self.db_spec = db_vm_spec_class(
           '{0}.db_spec.{1}'.format(component_full_name, self.cloud),
           flag_values=flag_values,
-          **db_vm_config)
+          **db_vm_config
+      )
 
     # Set defaults that were not able to be set in
     # GetOptionDecoderConstructions()
@@ -148,7 +157,9 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
             {'default': False},
         ),
         'high_availability_type': (
-            option_decoders.StringDecoder, {'default': None}),
+            option_decoders.StringDecoder,
+            {'default': None},
+        ),
         'backup_enabled': (option_decoders.BooleanDecoder, {'default': True}),
         'backup_start_time': (
             option_decoders.StringDecoder,
@@ -199,24 +210,29 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       raise errors.Config.UnrecognizedOption(
           'db_cpus/db_memory can not be specified with '
           'db_machine_type.   Either specify a custom machine '
-          'with cpus and memory or specify a predefined machine type.')
+          'with cpus and memory or specify a predefined machine type.'
+      )
 
-    if (not has_custom_machine_type and (has_db_cpus or has_db_memory)):
+    if not has_custom_machine_type and (has_db_cpus or has_db_memory):
       raise errors.Config.MissingOption(
           'To specify a custom database machine instance, both db_cpus '
-          'and db_memory must be specified.')
+          'and db_memory must be specified.'
+      )
 
     if has_client_custom_machine_type and has_client_machine_type:
       raise errors.Config.UnrecognizedOption(
           'client_vm_cpus/client_vm_memory can not be specified with '
           'client_vm_machine_type.   Either specify a custom machine '
-          'with cpus and memory or specify a predefined machine type.')
+          'with cpus and memory or specify a predefined machine type.'
+      )
 
-    if (not has_client_custom_machine_type and
-        (has_client_vm_cpus or has_client_vm_memory)):
+    if not has_client_custom_machine_type and (
+        has_client_vm_cpus or has_client_vm_memory
+    ):
       raise errors.Config.MissingOption(
           'To specify a custom client VM, both client_vm_cpus '
-          'and client_vm_memory must be specified.')
+          'and client_vm_memory must be specified.'
+      )
 
     if flag_values['use_managed_db'].present:
       config_values['is_managed_db'] = flag_values.use_managed_db
@@ -230,48 +246,49 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     if flag_values['database_name'].present:
       config_values['database_name'] = flag_values.database_name
     if flag_values['database_username'].present:
-      config_values['database_username'] = (
-          flag_values.database_username)
+      config_values['database_username'] = flag_values.database_username
     if flag_values['database_password'].present:
-      config_values['database_password'] = (
-          flag_values.database_password)
+      config_values['database_password'] = flag_values.database_password
     if flag_values['db_high_availability'].present:
-      config_values['high_availability'] = (
-          flag_values.db_high_availability)
+      config_values['high_availability'] = flag_values.db_high_availability
     if flag_values['db_high_availability_type'].present:
       config_values['high_availability_type'] = (
-          flag_values.db_high_availability_type)
+          flag_values.db_high_availability_type
+      )
     if flag_values['db_backup_enabled'].present:
-      config_values['backup_enabled'] = (flag_values.db_backup_enabled)
+      config_values['backup_enabled'] = flag_values.db_backup_enabled
     if flag_values['db_backup_start_time'].present:
-      config_values['backup_start_time'] = (
-          flag_values.db_backup_start_time)
+      config_values['backup_start_time'] = flag_values.db_backup_start_time
     if flag_values['db_flags'].present:
       config_values['db_flags'] = flag_values.db_flags
     cloud = config_values['cloud']
-    has_unmanaged_dbs = ('vm_groups' in config_values and
-                         'servers' in config_values['vm_groups'])
+    has_unmanaged_dbs = (
+        'vm_groups' in config_values and 'servers' in config_values['vm_groups']
+    )
 
     if flag_values['db_zone'].present:
       config_values['db_spec'][cloud]['zone'] = flag_values.db_zone[0]
       config_values['zones'] = flag_values.db_zone
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['vm_spec'][cloud]['zone'] = (
-            flag_values.db_zone[0])
+            flag_values.db_zone[0]
+        )
     if flag_values['client_vm_zone'].present:
-      config_values['vm_groups']['clients']['vm_spec'][cloud]['zone'] = (
-          flag_values.client_vm_zone)
+      config_values['vm_groups']['clients']['vm_spec'][cloud][
+          'zone'
+      ] = flag_values.client_vm_zone
     if has_db_machine_type:
-      config_values['db_spec'][cloud]['machine_type'] = (
-          flag_values.db_machine_type)
+      config_values['db_spec'][cloud][
+          'machine_type'
+      ] = flag_values.db_machine_type
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['vm_spec'][cloud][
-            'machine_type'] = (
-                flag_values.db_machine_type)
+            'machine_type'
+        ] = flag_values.db_machine_type
     if has_custom_machine_type:
       config_values['db_spec'][cloud]['machine_type'] = {
           'cpus': flag_values.db_cpus,
-          'memory': flag_values.db_memory
+          'memory': flag_values.db_memory,
       }
       # tox and pylint have contradictory closing brace rules, so avoid having
       # opening and closing brackets on different lines.
@@ -279,74 +296,92 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       if has_unmanaged_dbs:
         config_values_vm_groups['servers']['vm_spec'][cloud]['machine_type'] = {
             'cpus': flag_values.db_cpus,
-            'memory': flag_values.db_memory
+            'memory': flag_values.db_memory,
         }
     if flag_values['managed_db_azure_compute_units'].present:
-      config_values['db_spec'][cloud]['machine_type']['compute_units'] = (
-          flag_values.managed_db_azure_compute_units)
+      config_values['db_spec'][cloud]['machine_type'][
+          'compute_units'
+      ] = flag_values.managed_db_azure_compute_units
     if flag_values['managed_db_tier'].present:
       config_values['db_tier'] = flag_values.managed_db_tier
     if has_client_machine_type:
       config_values['vm_groups']['clients']['vm_spec'][cloud][
-          'machine_type'] = (
-              flag_values.client_vm_machine_type)
+          'machine_type'
+      ] = flag_values.client_vm_machine_type
     if has_client_custom_machine_type:
       config_values_vm_groups = config_values['vm_groups']
       config_values_vm_groups['clients']['vm_spec'][cloud]['machine_type'] = {
           'cpus': flag_values.client_vm_cpus,
-          'memory': flag_values.client_vm_memory
+          'memory': flag_values.client_vm_memory,
       }
     if flag_values['db_num_striped_disks'].present and has_unmanaged_dbs:
       config_values['vm_groups']['servers']['disk_spec'][cloud][
-          'num_striped_disks'] = flag_values.db_num_striped_disks
+          'num_striped_disks'
+      ] = flag_values.db_num_striped_disks
     if flag_values['db_disk_size'].present:
-      config_values['db_disk_spec'][cloud]['disk_size'] = (
-          flag_values.db_disk_size)
+      config_values['db_disk_spec'][cloud][
+          'disk_size'
+      ] = flag_values.db_disk_size
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['disk_spec'][cloud][
-            'disk_size'] = flag_values.db_disk_size
+            'disk_size'
+        ] = flag_values.db_disk_size
     if flag_values['db_disk_type'].present:
-      config_values['db_disk_spec'][cloud]['disk_type'] = (
-          flag_values.db_disk_type)
+      config_values['db_disk_spec'][cloud][
+          'disk_type'
+      ] = flag_values.db_disk_type
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['disk_spec'][cloud][
-            'disk_type'] = flag_values.db_disk_type
+            'disk_type'
+        ] = flag_values.db_disk_type
     if flag_values['managed_db_disk_iops'].present:
       # This value will be used in aws_relation_db.py druing db creation
-      config_values['db_disk_spec'][cloud]['iops'] = (
-          flag_values.managed_db_disk_iops)
+      config_values['db_disk_spec'][cloud][
+          'iops'
+      ] = flag_values.managed_db_disk_iops
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['disk_spec'][cloud][
-            'iops'] = flag_values.managed_db_disk_iops
+            'iops'
+        ] = flag_values.managed_db_disk_iops
 
     if flag_values['client_vm_os_type'].present:
       config_values['vm_groups']['clients'][
-          'os_type'] = flag_values.client_vm_os_type
+          'os_type'
+      ] = flag_values.client_vm_os_type
     if flag_values['server_vm_os_type'].present:
       config_values['vm_groups']['servers'][
-          'os_type'] = flag_values.server_vm_os_type
+          'os_type'
+      ] = flag_values.server_vm_os_type
 
     if flag_values['client_gcp_min_cpu_platform'].present:
       config_values['vm_groups']['clients']['vm_spec'][cloud][
-          'min_cpu_platform'] = flag_values.client_gcp_min_cpu_platform
+          'min_cpu_platform'
+      ] = flag_values.client_gcp_min_cpu_platform
     if flag_values['server_gcp_min_cpu_platform'].present:
       config_values['vm_groups']['servers']['vm_spec'][cloud][
-          'min_cpu_platform'] = flag_values.server_gcp_min_cpu_platform
+          'min_cpu_platform'
+      ] = flag_values.server_gcp_min_cpu_platform
     if flag_values['server_gce_num_local_ssds'].present and has_unmanaged_dbs:
       config_values['vm_groups']['servers']['vm_spec'][cloud][
-          'num_local_ssds'] = flag_values.server_gce_num_local_ssds
+          'num_local_ssds'
+      ] = flag_values.server_gce_num_local_ssds
     if flag_values['server_gce_ssd_interface'].present and has_unmanaged_dbs:
       config_values['vm_groups']['servers']['vm_spec'][cloud][
-          'ssd_interface'] = flag_values.server_gce_ssd_interface
+          'ssd_interface'
+      ] = flag_values.server_gce_ssd_interface
       config_values['vm_groups']['servers']['disk_spec'][cloud][
-          'interface'] = flag_values.server_gce_ssd_interface
+          'interface'
+      ] = flag_values.server_gce_ssd_interface
     if flag_values['client_vm_disk_size'].present:
-      config_values['vm_groups']['clients']['disk_spec'][cloud]['disk_size'] = (
-          flag_values.client_vm_disk_size)
+      config_values['vm_groups']['clients']['disk_spec'][cloud][
+          'disk_size'
+      ] = flag_values.client_vm_disk_size
     if flag_values['client_vm_disk_type'].present:
-      config_values['vm_groups']['clients']['disk_spec'][cloud]['disk_type'] = (
-          flag_values.client_vm_disk_type)
+      config_values['vm_groups']['clients']['disk_spec'][cloud][
+          'disk_type'
+      ] = flag_values.client_vm_disk_type
     if flag_values['client_vm_disk_iops'].present:
-      config_values['vm_groups']['clients']['disk_spec'][cloud]['disk_iops'] = (
-          flag_values.client_vm_disk_iops)
+      config_values['vm_groups']['clients']['disk_spec'][cloud][
+          'disk_iops'
+      ] = flag_values.client_vm_disk_iops
     logging.warning('Relational db config values: %s', config_values)

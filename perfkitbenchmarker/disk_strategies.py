@@ -47,8 +47,12 @@ class CreateDiskStrategy:
     disk_specs: Duplicated disk_spec by disk_count
   """
 
-  def __init__(self, vm: 'virtual_machine. BaseVirtualMachine',
-               disk_spec: disk.BaseDiskSpec, disk_count: int):
+  def __init__(
+      self,
+      vm: 'virtual_machine. BaseVirtualMachine',
+      disk_spec: disk.BaseDiskSpec,
+      disk_count: int,
+  ):
     self.vm = vm
     self.disk_spec = disk_spec
     self.disk_count = disk_count
@@ -99,7 +103,7 @@ class EmptyCreateDiskStrategy(CreateDiskStrategy):
     """Does nothing."""
     return
 
-  def DiskCreatedOnVMCreation(self)-> bool:
+  def DiskCreatedOnVMCreation(self) -> bool:
     return True
 
 

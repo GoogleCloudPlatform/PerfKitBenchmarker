@@ -463,14 +463,10 @@ def RunWithVMs(vms, extra_envs=None):
     run_command += (
         'DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py '
     )
-    run_command += ' '.join(
-        [
-            '--{}'.format(key)
-            if value is None
-            else '--{}={}'.format(key, value)
-            for key, value in sorted(run_flags.items())
-        ]
-    )
+    run_command += ' '.join([
+        '--{}'.format(key) if value is None else '--{}={}'.format(key, value)
+        for key, value in sorted(run_flags.items())
+    ])
   elif FLAGS.horovod_model == 'resnext-101':
     run_flags = {
         'arch': 'resnext101-32x4d',
@@ -500,14 +496,10 @@ def RunWithVMs(vms, extra_envs=None):
     run_command += (
         'DeepLearningExamples/TensorFlow/Classification/ConvNets/main.py '
     )
-    run_command += ' '.join(
-        [
-            '--{}'.format(key)
-            if value is None
-            else '--{}={}'.format(key, value)
-            for key, value in sorted(run_flags.items())
-        ]
-    )
+    run_command += ' '.join([
+        '--{}'.format(key) if value is None else '--{}={}'.format(key, value)
+        for key, value in sorted(run_flags.items())
+    ])
   elif FLAGS.horovod_model.startswith('bert'):  # bert
     if not FLAGS.horovod_bert_finetune:
       raise NotImplementedError('BERT pretraining is not supported.')
@@ -540,14 +532,10 @@ def RunWithVMs(vms, extra_envs=None):
     run_command += (
         'DeepLearningExamples/TensorFlow/LanguageModeling/BERT/run_squad.py '
     )
-    run_command += ' '.join(
-        [
-            '--{}'.format(key)
-            if value is None
-            else '--{}={}'.format(key, value)
-            for key, value in sorted(run_flags.items())
-        ]
-    )
+    run_command += ' '.join([
+        '--{}'.format(key) if value is None else '--{}={}'.format(key, value)
+        for key, value in sorted(run_flags.items())
+    ])
   else:
     run_command += (
         'tensorpack/examples/FasterRCNN/train.py --config '

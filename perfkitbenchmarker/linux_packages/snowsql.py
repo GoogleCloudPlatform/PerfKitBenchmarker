@@ -15,7 +15,10 @@
 
 SNOWSQL_INSTALL_LOCATION = '~/bin'
 SNOWSQL_VERSION = '1.2.5'
-SNOWSQL_DOWNLOAD_URL = 'https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-%s-linux_x86_64.bash' % SNOWSQL_VERSION
+SNOWSQL_DOWNLOAD_URL = (
+    'https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.2/linux_x86_64/snowsql-%s-linux_x86_64.bash'
+    % SNOWSQL_VERSION
+)
 
 
 def AptInstall(vm):
@@ -26,7 +29,8 @@ def AptInstall(vm):
   vm.RemoteCommand(
       'SNOWSQL_DEST=%s SNOWSQL_LOGIN_SHELL=~/.profile '
       'bash snowsql-%s-linux_x86_64.bash'
-      % (SNOWSQL_INSTALL_LOCATION, SNOWSQL_VERSION))
+      % (SNOWSQL_INSTALL_LOCATION, SNOWSQL_VERSION)
+  )
   vm.RemoteCommand('chmod +x %s/snowsql' % SNOWSQL_INSTALL_LOCATION)
 
 
@@ -35,7 +39,8 @@ def YumInstall(vm):
   del vm
   raise NotImplementedError(
       'PKB currently only supports the installation of snowsql on '
-      'Debian-based VMs')
+      'Debian-based VMs'
+  )
 
 
 def AptUninstall(vm):

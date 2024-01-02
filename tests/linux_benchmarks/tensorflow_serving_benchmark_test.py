@@ -41,7 +41,8 @@ class TensorflowServingBenchmarkTestCase(unittest.TestCase):
     benchmark_spec = mock.MagicMock()
     num_client_threads = 12
     samples = tensorflow_serving_benchmark._MakeSamplesFromClientOutput(
-        benchmark_spec, self.test_output, num_client_threads)
+        benchmark_spec, self.test_output, num_client_threads
+    )
 
     expected_metadata = {
         'client_thread_count': num_client_threads,

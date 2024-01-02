@@ -388,13 +388,11 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
         'gcs_client': str(FLAGS.gcs_client),
     }
     if FLAGS.gcs_client == GCS_CLIENT_BOTO:
-      metadata.update(
-          {
-              object_storage_service.BOTO_LIB_VERSION: (
-                  linux_packages.GetPipPackageVersion(vm, 'boto')
-              )
-          }
-      )
+      metadata.update({
+          object_storage_service.BOTO_LIB_VERSION: (
+              linux_packages.GetPipPackageVersion(vm, 'boto')
+          )
+      })
     return metadata
 
   def APIScriptArgs(self):

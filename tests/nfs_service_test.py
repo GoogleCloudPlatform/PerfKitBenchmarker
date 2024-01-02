@@ -110,15 +110,17 @@ class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     super(UnmanagedNfsServiceTest, self).setUp()
     self._setUpDiskSpec()
     self._setUpMockServerVm()
-    self.nfs_service = nfs_service.UnmanagedNfsService(self.disk_spec,
-                                                       self.mock_server_vm)
+    self.nfs_service = nfs_service.UnmanagedNfsService(
+        self.disk_spec, self.mock_server_vm
+    )
 
   def testNewUnmanagedNfsService(self):
     self.assertIsNotNone(self.nfs_service)
     self.assertIsNotNone(self.nfs_service.server_vm)
     self.assertIsNotNone(self.nfs_service.disk_spec)
-    self.assertEqual(self.nfs_service.server_directory,
-                     self.disk_spec.device_path)
+    self.assertEqual(
+        self.nfs_service.server_directory, self.disk_spec.device_path
+    )
 
   def testCreateNfsDisk(self):
     nfs_disk = self.nfs_service.CreateNfsDisk()
@@ -154,20 +156,23 @@ class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testNfsExportAndMount(self):
     mock_nfs_create = self.enter_context(
-        mock.patch.object(nfs_service, 'UnmanagedNfsService'))
+        mock.patch.object(nfs_service, 'UnmanagedNfsService')
+    )
     headnode = mock.Mock(internal_ip='10.0.1.11')
     vm1 = mock.Mock(user_name='perfkit')
     vm2 = mock.Mock(user_name='perfkit')
 
-    nfs_service.NfsExportAndMount([headnode, vm1, vm2], '/client_path',
-                                  '/server_path')
+    nfs_service.NfsExportAndMount(
+        [headnode, vm1, vm2], '/client_path', '/server_path'
+    )
 
     mock_nfs_create.assert_called_with(None, headnode, False, '/server_path')
     mount_cmd = (
         'sudo mkdir -p /client_path; '
         'sudo chown perfkit /client_path; '
         'echo "10.0.1.11:/server_path /client_path nfs defaults 0 0\n" '
-        '| sudo tee -a /etc/fstab; sudo mount -a')
+        '| sudo tee -a /etc/fstab; sudo mount -a'
+    )
     for vm in (vm1, vm2):
       vm.Install.assert_called_with('nfs_utils')
       vm.RemoteCommand.assert_called_with(mount_cmd)

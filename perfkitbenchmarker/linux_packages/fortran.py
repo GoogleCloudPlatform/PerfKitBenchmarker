@@ -16,8 +16,9 @@
 import logging
 from absl import flags
 
-VERSION = flags.DEFINE_integer('fortran_version', None,
-                               'Version of gfortran to install')
+VERSION = flags.DEFINE_integer(
+    'fortran_version', None, 'Version of gfortran to install'
+)
 
 
 def GetLibPath(vm):
@@ -57,7 +58,8 @@ def _YumInstallVersion(vm, version):
   sym_link = f'/usr/bin/gfortran-{version}'
   real_path = f'/opt/rh/{devtoolset}/root/usr/bin/gfortran'
   vm.RemoteCommand(
-      f'sudo alternatives --install {sym_link} fortran {real_path} 100')
+      f'sudo alternatives --install {sym_link} fortran {real_path} 100'
+  )
 
 
 def _AptInstallVersion(vm, version):
@@ -65,8 +67,10 @@ def _AptInstallVersion(vm, version):
   vm.Install('ubuntu_toolchain')
   vm.InstallPackages(f'gfortran-{version}')
   # make symlink so that 'gfortran' will use the newly installed version
-  vm.RemoteCommand('sudo update-alternatives --install /usr/bin/gfortran '
-                   f'gfortran /usr/bin/gfortran-{version} 100')
+  vm.RemoteCommand(
+      'sudo update-alternatives --install /usr/bin/gfortran '
+      f'gfortran /usr/bin/gfortran-{version} 100'
+  )
 
 
 def _LogFortranVersion(vm):

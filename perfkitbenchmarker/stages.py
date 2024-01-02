@@ -26,18 +26,22 @@ TEARDOWN = 'teardown'
 
 STAGES = [PROVISION, PREPARE, RUN, CLEANUP, TEARDOWN]
 
-_NEXT_STAGE = {PROVISION: [PREPARE, TEARDOWN],
-               PREPARE: [RUN, CLEANUP], RUN: [CLEANUP],
-               CLEANUP: [TEARDOWN]}
+_NEXT_STAGE = {
+    PROVISION: [PREPARE, TEARDOWN],
+    PREPARE: [RUN, CLEANUP],
+    RUN: [CLEANUP],
+    CLEANUP: [TEARDOWN],
+}
 _ALL = 'all'
 _VALID_FLAG_VALUES = PROVISION, PREPARE, RUN, CLEANUP, TEARDOWN, _ALL
 
 
 _SYNTACTIC_HELP = (
-    "A complete benchmark execution consists of {0} stages: {1}. Possible flag "
-    "values include an individual stage, a comma-separated list of stages, or "
+    'A complete benchmark execution consists of {0} stages: {1}. Possible flag '
+    'values include an individual stage, a comma-separated list of stages, or '
     "'all'. If a list of stages is provided, they must be in order without "
-    "skipping any stage.".format(len(STAGES), ', '.join(STAGES)))
+    'skipping any stage.'.format(len(STAGES), ', '.join(STAGES))
+)
 
 
 class RunStageParser(flags.ListParser):
@@ -66,39 +70,54 @@ class RunStageParser(flags.ListParser):
     stage_list = super(RunStageParser, self).parse(argument)
 
     if not stage_list:
-      raise ValueError('Unable to parse {0}. Stage list cannot be '
-                       'empty.'.format(repr(argument)))
+      raise ValueError(
+          'Unable to parse {0}. Stage list cannot be empty.'.format(
+              repr(argument)
+          )
+      )
 
     invalid_items = set(stage_list).difference(_VALID_FLAG_VALUES)
     if invalid_items:
       raise ValueError(
           'Unable to parse {0}. Unrecognized stages were found: {1}'.format(
-              repr(argument), ', '.join(sorted(invalid_items))))
+              repr(argument), ', '.join(sorted(invalid_items))
+          )
+      )
 
     if _ALL in stage_list:
       if len(stage_list) > 1:
         raise ValueError(
             "Unable to parse {0}. If 'all' stages are specified, individual "
-            "stages cannot also be specified.".format(repr(argument)))
+            'stages cannot also be specified.'.format(repr(argument))
+        )
       return list(STAGES)
 
     previous_stage = stage_list[0]
     for stage in itertools.islice(stage_list, 1, None):
       expected_stages = _NEXT_STAGE.get(previous_stage)
       if not expected_stages:
-        raise ValueError("Unable to parse {0}. '{1}' should be the last "
-                         "stage.".format(repr(argument), previous_stage))
+        raise ValueError(
+            "Unable to parse {0}. '{1}' should be the last stage.".format(
+                repr(argument), previous_stage
+            )
+        )
       if stage not in expected_stages:
         raise ValueError(
             "Unable to parse {0}. The stage after '{1}' should be one of '{2}',"
             " not '{3}'.".format(
-                repr(argument), previous_stage, expected_stages, stage))
+                repr(argument), previous_stage, expected_stages, stage
+            )
+        )
       previous_stage = stage
 
     return stage_list
 
 
 flags.DEFINE(
-    RunStageParser(), 'run_stage', STAGES,
+    RunStageParser(),
+    'run_stage',
+    STAGES,
     'The stage or stages of perfkitbenchmarker to run.',
-    flags.FLAGS, flags.ListSerializer(','))
+    flags.FLAGS,
+    flags.ListSerializer(','),
+)

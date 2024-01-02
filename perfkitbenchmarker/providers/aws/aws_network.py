@@ -38,24 +38,32 @@ from perfkitbenchmarker.providers.aws import aws_vpc_endpoint
 from perfkitbenchmarker.providers.aws import util
 
 _AWS_VPC = flags.DEFINE_string(
-    'aws_vpc', None,
-    'The static AWS VPC id to use. If unset, creates a new VPC.')
+    'aws_vpc',
+    None,
+    'The static AWS VPC id to use. If unset, creates a new VPC.',
+)
 _AWS_SUBNET = flags.DEFINE_string(
-    'aws_subnet', None,
+    'aws_subnet',
+    None,
     'The static AWS subnet id to use.  Set value to "default" to use '
-    'default subnet. If unset, creates a new subnet.')
+    'default subnet. If unset, creates a new subnet.',
+)
 AWS_ENI_COUNT = flags.DEFINE_integer(
-    'aws_eni_count', 1,
-    'The number of ENIs per instance.')
+    'aws_eni_count', 1, 'The number of ENIs per instance.'
+)
 AWS_NETWORK_CARD_COUNT = flags.DEFINE_integer(
-    'aws_network_card_count', 1,
-    'The number of network cards per instance.')
+    'aws_network_card_count', 1, 'The number of network cards per instance.'
+)
 flags.DEFINE_bool('aws_efa', False, 'Whether to use an Elastic Fiber Adapter.')
-flags.DEFINE_string('aws_efa_version', '1.12.1',
-                    'Version of AWS EFA to use (must also pass in --aws_efa).')
+flags.DEFINE_string(
+    'aws_efa_version',
+    '1.12.1',
+    'Version of AWS EFA to use (must also pass in --aws_efa).',
+)
 flags.DEFINE_integer('aws_efa_count', 1, 'The number of EFAs per instance.')
-flags.DEFINE_multi_enum('aws_endpoint', [], ['s3'],
-                        'List of AWS endpoints to create')
+flags.DEFINE_multi_enum(
+    'aws_endpoint', [], ['s3'], 'List of AWS endpoints to create'
+)
 
 FLAGS = flags.FLAGS
 
@@ -127,9 +135,9 @@ class AwsFirewall(network.BaseFirewall):
           '--group-id=%s' % vm.group_id,
           '--protocol=icmp',
           '--port=-1',
-          '--cidr=%s' % source]
-      util.IssueRetryableCommand(
-          authorize_cmd)
+          '--cidr=%s' % source,
+      ]
+      util.IssueRetryableCommand(authorize_cmd)
       self.firewall_icmp_set.add(entry)
 
   def AllowPort(self, vm, start_port, end_port=None, source_range=None):
@@ -145,15 +153,13 @@ class AwsFirewall(network.BaseFirewall):
     """
     if vm.is_static or vm.network.is_static:
       return
-    self.AllowPortInSecurityGroup(vm.region, vm.group_id, start_port, end_port,
-                                  source_range)
+    self.AllowPortInSecurityGroup(
+        vm.region, vm.group_id, start_port, end_port, source_range
+    )
 
-  def AllowPortInSecurityGroup(self,
-                               region,
-                               security_group,
-                               start_port,
-                               end_port=None,
-                               source_range=None):
+  def AllowPortInSecurityGroup(
+      self, region, security_group, start_port, end_port=None, source_range=None
+  ):
     """Opens a port on the firewall for a security group.
 
     Args:
@@ -238,14 +244,17 @@ class AwsVpc(resource.BaseResource):
         'ec2',
         'create-vpc',
         '--region=%s' % self.region,
-        '--cidr-block=%s' % self.cidr]
+        '--cidr-block=%s' % self.cidr,
+    ]
     stdout, stderr, retcode = vm_util.IssueCommand(
-        create_cmd, raise_on_failure=False)
+        create_cmd, raise_on_failure=False
+    )
     if 'VpcLimitExceeded' in stderr:
       raise errors.Benchmarks.QuotaFailure(stderr)
     if retcode:
       raise errors.Resource.CreationError(
-          'Failed to create Vpc: %s return code: %s' % (retcode, stderr))
+          'Failed to create Vpc: %s return code: %s' % (retcode, stderr)
+      )
 
     response = json.loads(stdout)
     self.id = response['Vpc']['VpcId']
@@ -261,11 +270,15 @@ class AwsVpc(resource.BaseResource):
     """Looks up the VPC default security group."""
     groups = self.GetSecurityGroups('default')
     if len(groups) != 1:
-      raise ValueError('Expected one security group, got {} in {}'.format(
-          len(groups), groups))
+      raise ValueError(
+          'Expected one security group, got {} in {}'.format(
+              len(groups), groups
+          )
+      )
     self.default_security_group_id = groups[0]['GroupId']
-    logging.info('Default security group ID: %s',
-                 self.default_security_group_id)
+    logging.info(
+        'Default security group ID: %s', self.default_security_group_id
+    )
     if FLAGS.aws_efa:
       self._AllowSelfOutBound()
 
@@ -273,9 +286,11 @@ class AwsVpc(resource.BaseResource):
     cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-security-groups',
-        '--region', self.region,
+        '--region',
+        self.region,
         '--filters',
-        'Name=vpc-id,Values=' + self.id]
+        'Name=vpc-id,Values=' + self.id,
+    ]
     if group_name:
       cmd.append('Name=group-name,Values={}'.format(group_name))
     stdout, _, _ = vm_util.IssueCommand(cmd)
@@ -287,7 +302,8 @@ class AwsVpc(resource.BaseResource):
         'ec2',
         'describe-vpcs',
         '--region=%s' % self.region,
-        '--filter=Name=vpc-id,Values=%s' % self.id]
+        '--filter=Name=vpc-id,Values=%s' % self.id,
+    ]
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     vpcs = response['Vpcs']
@@ -306,9 +322,11 @@ class AwsVpc(resource.BaseResource):
         'ec2',
         'modify-vpc-attribute',
         '--region=%s' % self.region,
-        '--vpc-id', self.id,
+        '--vpc-id',
+        self.id,
         '--enable-dns-hostnames',
-        '{ "Value": true }']
+        '{ "Value": true }',
+    ]
 
     util.IssueRetryableCommand(enable_hostnames_command)
 
@@ -326,7 +344,8 @@ class AwsVpc(resource.BaseResource):
         'ec2',
         'delete-vpc',
         '--region=%s' % self.region,
-        '--vpc-id=%s' % self.id]
+        '--vpc-id=%s' % self.id,
+    ]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def NextSubnetCidrBlock(self):
@@ -343,10 +362,12 @@ class AwsVpc(resource.BaseResource):
     """
     with self._subnet_index_lock:
       if self._subnet_index >= (1 << 8) - 1:
-        raise ValueError('Exceeded subnet limit ({0}).'.format(
-            self._subnet_index))
-      cidr = network.GetCidrBlock(self.regional_network_index,
-                                  self._subnet_index)
+        raise ValueError(
+            'Exceeded subnet limit ({0}).'.format(self._subnet_index)
+        )
+      cidr = network.GetCidrBlock(
+          self.regional_network_index, self._subnet_index
+      )
       self._subnet_index += 1
     return cidr
 
@@ -357,9 +378,16 @@ class AwsVpc(resource.BaseResource):
     Details: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/efa-start.html
     """
     cmd = util.AWS_PREFIX + [
-        'ec2', 'authorize-security-group-egress',
-        '--region', self.region, '--group-id', self.default_security_group_id,
-        '--protocol', 'all', '--source-group', self.default_security_group_id
+        'ec2',
+        'authorize-security-group-egress',
+        '--region',
+        self.region,
+        '--group-id',
+        self.default_security_group_id,
+        '--protocol',
+        'all',
+        '--source-group',
+        self.default_security_group_id,
     ]
     try:
       vm_util.IssueCommand(cmd)
@@ -375,11 +403,12 @@ class AwsVpc(resource.BaseResource):
       peer_vpc: AwsVpc. Peer vpc to allow inbound traffic from.
     """
     cmd = util.AWS_PREFIX + [
-        'ec2', 'authorize-security-group-ingress',
+        'ec2',
+        'authorize-security-group-ingress',
         '--region=%s' % self.region,
         '--group-id=%s' % self.default_security_group_id,
         '--protocol=%s' % 'all',
-        '--cidr=%s' % peer_vpc.cidr
+        '--cidr=%s' % peer_vpc.cidr,
     ]
     vm_util.IssueRetryableCommand(cmd)
 
@@ -403,7 +432,8 @@ class AwsSubnet(resource.BaseResource):
         'create-subnet',
         '--region=%s' % self.region,
         '--vpc-id=%s' % self.vpc_id,
-        '--cidr-block=%s' % self.cidr_block]
+        '--cidr-block=%s' % self.cidr_block,
+    ]
     if not util.IsRegion(self.zone):
       create_cmd.append('--availability-zone=%s' % self.zone)
 
@@ -414,14 +444,17 @@ class AwsSubnet(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the subnet."""
-    logging.info('Deleting subnet %s. This may fail if all instances in the '
-                 'subnet have not completed termination, but will be retried.',
-                 self.id)
+    logging.info(
+        'Deleting subnet %s. This may fail if all instances in the '
+        'subnet have not completed termination, but will be retried.',
+        self.id,
+    )
     delete_cmd = util.AWS_PREFIX + [
         'ec2',
         'delete-subnet',
         '--region=%s' % self.region,
-        '--subnet-id=%s' % self.id]
+        '--subnet-id=%s' % self.id,
+    ]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _Exists(self):
@@ -438,9 +471,10 @@ class AwsSubnet(resource.BaseResource):
       AssertionError: If there is more than one subnet.
     """
     describe_cmd = util.AWS_PREFIX + [
-        'ec2', 'describe-subnets',
+        'ec2',
+        'describe-subnets',
         '--region=%s' % self.region,
-        '--filter=Name=vpc-id,Values=%s' % self.vpc_id
+        '--filter=Name=vpc-id,Values=%s' % self.vpc_id,
     ]
     if self.id:
       describe_cmd.append('--filter=Name=subnet-id,Values=%s' % self.id)
@@ -471,7 +505,8 @@ class AwsInternetGateway(resource.BaseResource):
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'create-internet-gateway',
-        '--region=%s' % self.region]
+        '--region=%s' % self.region,
+    ]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
     self.id = response['InternetGateway']['InternetGatewayId']
@@ -483,7 +518,8 @@ class AwsInternetGateway(resource.BaseResource):
         'ec2',
         'delete-internet-gateway',
         '--region=%s' % self.region,
-        '--internet-gateway-id=%s' % self.id]
+        '--internet-gateway-id=%s' % self.id,
+    ]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _Exists(self):
@@ -505,16 +541,18 @@ class AwsInternetGateway(resource.BaseResource):
         '--region=%s' % self.region,
     ]
     if self.id:
-      describe_cmd.append('--filter=Name=internet-gateway-id,Values=%s' %
-                          self.id)
+      describe_cmd.append(
+          '--filter=Name=internet-gateway-id,Values=%s' % self.id
+      )
     elif self.vpc_id:
       # Only query with self.vpc_id if the self.id is NOT set -- after calling
       # Detach() this object will set still have a vpc_id but will be filtered
       # out in a query if using attachment.vpc-id.
       # Using self.vpc_id instead of self.attached as the init phase always
       # sets it to False.
-      describe_cmd.append('--filter=Name=attachment.vpc-id,Values=%s' %
-                          self.vpc_id)
+      describe_cmd.append(
+          '--filter=Name=attachment.vpc-id,Values=%s' % self.vpc_id
+      )
     else:
       raise errors.Error('Must have a VPC id or a gateway id')
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
@@ -532,7 +570,8 @@ class AwsInternetGateway(resource.BaseResource):
           'attach-internet-gateway',
           '--region=%s' % self.region,
           '--internet-gateway-id=%s' % self.id,
-          '--vpc-id=%s' % self.vpc_id]
+          '--vpc-id=%s' % self.vpc_id,
+      ]
       util.IssueRetryableCommand(attach_cmd)
       self.attached = True
 
@@ -542,8 +581,10 @@ class AwsInternetGateway(resource.BaseResource):
     def _suppress_failure(stdout, stderr, retcode):
       """Suppresses Detach failure when internet gateway is in a bad state."""
       del stdout  # unused
-      if retcode and ('InvalidInternetGatewayID.NotFound' in stderr or
-                      'Gateway.NotAttached' in stderr):
+      if retcode and (
+          'InvalidInternetGatewayID.NotFound' in stderr
+          or 'Gateway.NotAttached' in stderr
+      ):
         return True
       return False
 
@@ -553,7 +594,8 @@ class AwsInternetGateway(resource.BaseResource):
           'detach-internet-gateway',
           '--region=%s' % self.region,
           '--internet-gateway-id=%s' % self.id,
-          '--vpc-id=%s' % self.vpc_id]
+          '--vpc-id=%s' % self.vpc_id,
+      ]
       util.IssueRetryableCommand(detach_cmd, suppress_failure=_suppress_failure)
       self.attached = False
 
@@ -592,7 +634,8 @@ class AwsRouteTable(resource.BaseResource):
         'ec2',
         'describe-route-tables',
         '--region=%s' % self.region,
-        '--filters=Name=vpc-id,Values=%s' % self.vpc_id]
+        '--filters=Name=vpc-id,Values=%s' % self.vpc_id,
+    ]
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     return json.loads(stdout)['RouteTables']
 
@@ -617,7 +660,8 @@ class AwsRouteTable(resource.BaseResource):
         '--region=%s' % self.region,
         '--route-table-id=%s' % self.id,
         '--gateway-id=%s' % internet_gateway_id,
-        '--destination-cidr-block=0.0.0.0/0']
+        '--destination-cidr-block=0.0.0.0/0',
+    ]
     util.IssueRetryableCommand(create_cmd)
 
   def CreateVpcPeeringRoute(self, vpc_peering_id, destination_cidr):
@@ -628,7 +672,8 @@ class AwsRouteTable(resource.BaseResource):
         '--region=%s' % self.region,
         '--route-table-id=%s' % self.id,
         '--vpc-peering-connection-id=%s' % vpc_peering_id,
-        '--destination-cidr-block=%s' % destination_cidr]
+        '--destination-cidr-block=%s' % destination_cidr,
+    ]
     util.IssueRetryableCommand(create_cmd)
 
 
@@ -671,10 +716,12 @@ class _AwsRegionalNetwork(network.BaseNetwork):
 
     # Each regional network needs unique cidr_block for VPC peering.
     with _AwsRegionalNetwork._regional_network_lock:
-      self.vpc = AwsVpc(self.region, vpc_id,
-                        _AwsRegionalNetwork._regional_network_count)
+      self.vpc = AwsVpc(
+          self.region, vpc_id, _AwsRegionalNetwork._regional_network_count
+      )
       self.cidr_block = network.GetCidrBlock(
-          _AwsRegionalNetwork._regional_network_count)
+          _AwsRegionalNetwork._regional_network_count
+      )
       _AwsRegionalNetwork._regional_network_count += 1
 
   @classmethod
@@ -692,8 +739,9 @@ class _AwsRegionalNetwork(network.BaseNetwork):
     """
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
-      raise errors.Error('GetNetwork called in a thread without a '
-                         'BenchmarkSpec.')
+      raise errors.Error(
+          'GetNetwork called in a thread without a BenchmarkSpec.'
+      )
     key = cls.CLOUD, REGION, region
     # Because this method is only called from the AwsNetwork constructor, which
     # is only called from AwsNetwork.GetNetwork, we already hold the
@@ -749,14 +797,19 @@ class AwsNetworkSpec(network.BaseNetworkSpec):
     super(AwsNetworkSpec, self).__init__(zone)
     self.machine_type = machine_type
     if vpc_id or subnet_id:
-      logging.info('Confirming vpc (%s) and subnet (%s) selections', vpc_id,
-                   subnet_id)
+      logging.info(
+          'Confirming vpc (%s) and subnet (%s) selections', vpc_id, subnet_id
+      )
       my_subnet = AwsSubnet(self.zone, vpc_id, subnet_id=subnet_id).GetDict()
       self.vpc_id = my_subnet['VpcId']
       self.subnet_id = my_subnet['SubnetId']
       self.cidr_block = my_subnet['CidrBlock']
-      logging.info('Using vpc %s subnet %s cidr %s', self.vpc_id,
-                   self.subnet_id, self.cidr_block)
+      logging.info(
+          'Using vpc %s subnet %s cidr %s',
+          self.vpc_id,
+          self.subnet_id,
+          self.cidr_block,
+      )
     else:
       self.vpc_id = None
       self.subnet_id = None
@@ -779,21 +832,28 @@ def _get_default_vpc_id(region: str) -> str:
       created.
   """
   vpc_cmd = util.AWS_PREFIX + [
-      'ec2', 'describe-vpcs',
-      '--region', region,
-      '--filters', 'Name=isDefault,Values=true'
+      'ec2',
+      'describe-vpcs',
+      '--region',
+      region,
+      '--filters',
+      'Name=isDefault,Values=true',
   ]
   stdout, _ = vm_util.IssueRetryableCommand(vpc_cmd)
   vpcs = json.loads(stdout)['Vpcs']
   if vpcs:
     return vpcs[0]['VpcId']
   create_cmd = util.AWS_PREFIX + [
-      'ec2', 'create-default-vpc', '--region', region,
+      'ec2',
+      'create-default-vpc',
+      '--region',
+      region,
   ]
   stdout, _, ret = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
   if ret:
     raise errors.Benchmarks.UnsupportedConfigError(
-        f'AWS default VPC does not exist for region {region}.')
+        f'AWS default VPC does not exist for region {region}.'
+    )
   return json.loads(stdout)['Vpc']['VpcId']
 
 
@@ -814,24 +874,31 @@ def _get_default_subnet_id(zone: str) -> str:
   """
   region = util.GetRegionFromZone(zone)
   subnet_cmd = util.AWS_PREFIX + [
-      'ec2', 'describe-subnets',
-      '--region', region, '--filter',
+      'ec2',
+      'describe-subnets',
+      '--region',
+      region,
+      '--filter',
       f'Name=availabilityZone,Values={zone}',
-      'Name=defaultForAz,Values=true'
+      'Name=defaultForAz,Values=true',
   ]
   stdout, _ = vm_util.IssueRetryableCommand(subnet_cmd)
   subnets = json.loads(stdout)['Subnets']
   if subnets:
     return subnets[0]['SubnetId']
   create_cmd = util.AWS_PREFIX + [
-      'ec2', 'create-default-subnet',
-      '--region', region,
-      '--availability-zone', zone
+      'ec2',
+      'create-default-subnet',
+      '--region',
+      region,
+      '--availability-zone',
+      zone,
   ]
   stdout, _, ret = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
   if ret:
     raise errors.Benchmarks.UnsupportedConfigError(
-        f'AWS default subnet does not exist for zone {zone}.')
+        f'AWS default subnet does not exist for zone {zone}.'
+    )
   return json.loads(stdout)['Subnet']['SubnetId']
 
 
@@ -865,23 +932,30 @@ class AwsNetwork(network.BaseNetwork):
     super(AwsNetwork, self).__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
     self.regional_network = _AwsRegionalNetwork.GetForRegion(
-        self.region, spec.vpc_id)
+        self.region, spec.vpc_id
+    )
     self.subnet = None
     self.vpc_peering = None
 
     # Placement Group
     no_placement_group = (
-        not FLAGS.placement_group_style or
-        FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE)
-    has_optional_pg = (FLAGS.placement_group_style ==
-                       placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED)
+        not FLAGS.placement_group_style
+        or FLAGS.placement_group_style == placement_group.PLACEMENT_GROUP_NONE
+    )
+    has_optional_pg = (
+        FLAGS.placement_group_style
+        == placement_group.PLACEMENT_GROUP_CLOSEST_SUPPORTED
+    )
     if no_placement_group:
       self.placement_group = None
     elif has_optional_pg and not _is_placement_group_compatible(
-        spec.machine_type):
+        spec.machine_type
+    ):
       logging.warning(
           'machine type %s does not support placement groups. '
-          'Placement group style set to none.', spec.machine_type)
+          'Placement group style set to none.',
+          spec.machine_type,
+      )
       self.placement_group = None
     elif has_optional_pg and len(set(FLAGS.zone)) > 1:
       logging.warning(
@@ -892,16 +966,20 @@ class AwsNetwork(network.BaseNetwork):
     elif not _is_placement_group_compatible(spec.machine_type):
       raise errors.Benchmarks.UnsupportedConfigError(
           f'machine type {spec.machine_type} does not support '
-          f'placement groups. Use placement group style none.')
+          'placement groups. Use placement group style none.'
+      )
     elif len(set(FLAGS.zone)) > 1:
       raise errors.Benchmarks.UnsupportedConfigError(
           'inter-zone/inter-region tests do not support placement groups. '
-          'Use placement group style closest_supported.')
+          'Use placement group style closest_supported.'
+      )
     else:
       placement_group_spec = aws_placement_group.AwsPlacementGroupSpec(
-          'AwsPlacementGroupSpec', flag_values=FLAGS, zone=spec.zone)
+          'AwsPlacementGroupSpec', flag_values=FLAGS, zone=spec.zone
+      )
       self.placement_group = aws_placement_group.AwsPlacementGroup(
-          placement_group_spec)
+          placement_group_spec
+      )
     self.is_static = False
     if spec.vpc_id:
       self.is_static = True
@@ -909,7 +987,8 @@ class AwsNetwork(network.BaseNetwork):
           self.zone,
           spec.vpc_id,
           cidr_block=self.regional_network.cidr_block,
-          subnet_id=spec.subnet_id)
+          subnet_id=spec.subnet_id,
+      )
 
   @staticmethod
   def _GetNetworkSpecFromVm(vm):
@@ -928,8 +1007,9 @@ class AwsNetwork(network.BaseNetwork):
 
     if self.subnet is None:
       cidr = self.regional_network.vpc.NextSubnetCidrBlock()
-      self.subnet = AwsSubnet(self.zone, self.regional_network.vpc.id,
-                              cidr_block=cidr)
+      self.subnet = AwsSubnet(
+          self.zone, self.regional_network.vpc.id, cidr_block=cidr
+      )
       self.subnet.Create()
     if self.placement_group:
       self.placement_group.Create()
@@ -957,8 +1037,9 @@ class AwsNetwork(network.BaseNetwork):
     if self.regional_network is peering_network.regional_network:
       return
 
-    spec = network.BaseVPCPeeringSpec(self.regional_network,
-                                      peering_network.regional_network)
+    spec = network.BaseVPCPeeringSpec(
+        self.regional_network, peering_network.regional_network
+    )
     self.vpc_peering = AwsVpcPeering(spec)
     peering_network.vpc_peering = self.vpc_peering
     self.vpc_peering.Create()
@@ -985,31 +1066,37 @@ class AwsVpcPeering(network.BaseVPCPeering):
         '--region=%s' % self.network_a.region,
         '--peer-region=%s' % self.network_b.region,
         '--vpc-id=%s' % self.network_a.vpc.id,
-        '--peer-vpc-id=%s' % self.network_b.vpc.id]
+        '--peer-vpc-id=%s' % self.network_b.vpc.id,
+    ]
 
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
     response = json.loads(stdout)
 
-    self.id = response['VpcPeeringConnection'][
-        'VpcPeeringConnectionId']
+    self.id = response['VpcPeeringConnection']['VpcPeeringConnectionId']
 
     # Accepts Peering Connection
     accept_cmd = util.AWS_PREFIX + [
         'ec2',
         'accept-vpc-peering-connection',
         '--region=%s' % self.network_b.region,
-        '--vpc-peering-connection-id=%s' % self.id]
+        '--vpc-peering-connection-id=%s' % self.id,
+    ]
     vm_util.IssueRetryableCommand(accept_cmd)
 
     util.AddDefaultTags(self.id, self.network_a.region)
-    logging.info('Creating VPC peering between %s and %s',
-                 self.network_a.vpc.cidr, self.network_b.vpc.cidr)
+    logging.info(
+        'Creating VPC peering between %s and %s',
+        self.network_a.vpc.cidr,
+        self.network_b.vpc.cidr,
+    )
 
     # Adds VPC peering to both networks' route tables
-    self.network_a.route_table.CreateVpcPeeringRoute(self.id,
-                                                     self.network_b.vpc.cidr)
-    self.network_b.route_table.CreateVpcPeeringRoute(self.id,
-                                                     self.network_a.vpc.cidr)
+    self.network_a.route_table.CreateVpcPeeringRoute(
+        self.id, self.network_b.vpc.cidr
+    )
+    self.network_b.route_table.CreateVpcPeeringRoute(
+        self.id, self.network_a.vpc.cidr
+    )
 
     # Updates security group to allow inbound traffic from peering networks
     self.network_a.vpc.AllowVpcPeerInBound(self.network_b.vpc)
@@ -1021,5 +1108,6 @@ class AwsVpcPeering(network.BaseVPCPeering):
         'ec2',
         'delete-vpc-peering-connection',
         '--region=%s' % self.network_a.region,
-        '--vpc-peering-connection-id=%s' % self.id]
+        '--vpc-peering-connection-id=%s' % self.id,
+    ]
     vm_util.IssueCommand(delete_cmd)

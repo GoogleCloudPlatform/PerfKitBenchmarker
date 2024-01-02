@@ -40,9 +40,9 @@ class MavenTest(pkb_common_test_case.PkbCommonTestCase):
     to be converted into the tuple of positional arguments tuple that mock
     expects.
     Args:
-      call_args_singles: List of single arguments sent to the mock_method,
-        ie ['x', 'y'] is for when mock_method was called twice: once with
-        x and then with y.
+      call_args_singles: List of single arguments sent to the mock_method, ie
+        ['x', 'y'] is for when mock_method was called twice: once with x and
+        then with y.
       mock_method: Method that was mocked and called with call_args_singles.
     """
     # convert from ['a', 'b'] into [(('a',),), (('b',),)]
@@ -128,9 +128,9 @@ class MavenTest(pkb_common_test_case.PkbCommonTestCase):
         f'echo "{maven_env}" | sudo tee -a {maven.MVN_ENV_PATH}',
     ])
     self.assertVmInstallCommandsEqual(['openjdk', 'curl'])
-    self.assertOnlyKnownMethodsCalled('RemoteCommand',
-                                      'InstallPreprovisionedPackageData',
-                                      'Install')
+    self.assertOnlyKnownMethodsCalled(
+        'RemoteCommand', 'InstallPreprovisionedPackageData', 'Install'
+    )
 
 
 if __name__ == '__main__':

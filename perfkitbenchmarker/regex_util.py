@@ -25,11 +25,13 @@ FLOAT_REGEX = r'[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?'
 
 class NoMatchError(ValueError):
   """Raised when no matches for a regex are found within a string."""
+
   pass
 
 
 class TooManyMatchesError(ValueError):
   """Raised when a regex matches a string more times than expected."""
+
   pass
 
 
@@ -42,6 +44,7 @@ def ExtractGroup(regex, text, group=1, flags=0):
     group: int. Group containing a floating point value. Use '0' for the whole
       string.
     flags: int. Flags to pass to re.search().
+
   Returns:
     A string matched by 'regex' on 'text'.
   Raises:
@@ -50,8 +53,9 @@ def ExtractGroup(regex, text, group=1, flags=0):
   """
   match = re.search(regex, text, flags=flags)
   if not match:
-    raise NoMatchError('No match for pattern "{0}" in "{1}"'.format(
-        regex, text))
+    raise NoMatchError(
+        'No match for pattern "{0}" in "{1}"'.format(regex, text)
+    )
 
   try:
     return match.group(group)
@@ -69,28 +73,29 @@ def ExtractInt(regex, text, group=1):
   return int(ExtractGroup(regex, text, group=group))
 
 
-def ExtractAllFloatMetrics(text,
-                           metric_regex=r'\w+',
-                           value_regex=FLOAT_REGEX,
-                           delimiter_regex='='):
+def ExtractAllFloatMetrics(
+    text, metric_regex=r'\w+', value_regex=FLOAT_REGEX, delimiter_regex='='
+):
   """Extracts metrics and their values into a dict.
 
   Args:
     text: The text to parse to find metric and values.
     metric_regex: A regular expression to find metric names. The metric regex
-        should not contain any parenthesized groups.
+      should not contain any parenthesized groups.
     value_regex: A regular expression to find float values. By default, this
-        works well for floating-point numbers found via scanf.
+      works well for floating-point numbers found via scanf.
     delimiter_regex: A regular expression between the metric name and value.
 
   Returns:
     A dict mapping metrics to values.
   """
   if '(' in metric_regex:
-    raise NotImplementedError('ExtractAllFloatMetrics does not support a '
-                              'metric regex with groups.')
-  matches = re.findall('(%s)%s(%s)' % (metric_regex, delimiter_regex,
-                                       value_regex), text)
+    raise NotImplementedError(
+        'ExtractAllFloatMetrics does not support a metric regex with groups.'
+    )
+  matches = re.findall(
+      '(%s)%s(%s)' % (metric_regex, delimiter_regex, value_regex), text
+  )
   return {match[0]: float(match[1]) for match in matches}
 
 
@@ -99,6 +104,7 @@ def ExtractIpv4Addresses(text):
 
   Args:
     text: string. Text to search.
+
   Returns:
     A list of ipv4 strings.
   Raises:
@@ -123,6 +129,7 @@ def ExtractAllMatches(regex: Union[str, re.Pattern[str]], text, flags=0):
     regex: string. Regular expression.
     text: string. Text to search.
     flags: int. Flags to pass to re.findall().
+
   Returns:
     A list of tuples of strings that matched by 'regex' within 'text'.
   Raises:
@@ -130,8 +137,9 @@ def ExtractAllMatches(regex: Union[str, re.Pattern[str]], text, flags=0):
   """
   match = re.findall(regex, text, flags=flags)
   if not match:
-    raise NoMatchError('No match for pattern "{0}" in "{1}"'.format(
-        regex, text))
+    raise NoMatchError(
+        'No match for pattern "{0}" in "{1}"'.format(regex, text)
+    )
   return match
 
 
@@ -154,7 +162,8 @@ def ExtractExactlyOneMatch(regex, text):
   matches = ExtractAllMatches(regex, text)
   if len(matches) > 1:
     raise TooManyMatchesError(
-        'Pattern "{0}" matched "{1}" non-uniquely.'.format(regex, text))
+        'Pattern "{0}" matched "{1}" non-uniquely.'.format(regex, text)
+    )
   return matches[0]
 
 
@@ -165,12 +174,14 @@ def Substitute(pattern, repl, text):
     pattern: string. Pattern to be replaced.
     repl: string. Replacement pattern.
     text: string. Text to search.
+
   Returns:
     A string after replacing all patterns with repl.
   Raises:
     NoMatchError: when 'pattern' isn't found in string.
   """
   if not re.search(pattern, text):
-    raise NoMatchError('No match for pattern "{0}" in "{1}"'.format(
-        pattern, text))
+    raise NoMatchError(
+        'No match for pattern "{0}" in "{1}"'.format(pattern, text)
+    )
   return re.sub(pattern, repl, text)

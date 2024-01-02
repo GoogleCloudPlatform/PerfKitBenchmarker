@@ -24,11 +24,14 @@ from absl import flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import virtual_machine
 
-VERSION = flags.DEFINE_string('docker_version', None,
-                              'Version of docker to install.')
+VERSION = flags.DEFINE_string(
+    'docker_version', None, 'Version of docker to install.'
+)
 
-DOCKER_RPM_URL = ('https://get.docker.com/rpm/1.7.0/centos-6/'
-                  'RPMS/x86_64/docker-engine-1.7.0-1.el6.x86_64.rpm')
+DOCKER_RPM_URL = (
+    'https://get.docker.com/rpm/1.7.0/centos-6/'
+    'RPMS/x86_64/docker-engine-1.7.0-1.el6.x86_64.rpm'
+)
 
 
 # Docker images that VMs are allowed to install.
@@ -81,11 +84,14 @@ def YumInstall(vm):
   """Installs the docker package on the VM."""
   if IsInstalled(vm):
     return
-  vm.RemoteHostCommand('curl -o %s/docker.rpm -sSL %s' %
-                       (linux_packages.INSTALL_DIR, DOCKER_RPM_URL))
-  vm.RemoteHostCommand('sudo yum localinstall '
-                       '--nogpgcheck %s/docker.rpm -y' %
-                       linux_packages.INSTALL_DIR)
+  vm.RemoteHostCommand(
+      'curl -o %s/docker.rpm -sSL %s'
+      % (linux_packages.INSTALL_DIR, DOCKER_RPM_URL)
+  )
+  vm.RemoteHostCommand(
+      'sudo yum localinstall --nogpgcheck %s/docker.rpm -y'
+      % linux_packages.INSTALL_DIR
+  )
   vm.RemoteHostCommand('sudo service docker start')
 
 
@@ -93,8 +99,9 @@ def AptInstall(vm):
   """Installs the docker package on the VM."""
   if IsInstalled(vm):
     return
-  vm.RemoteHostCommand('curl -sSL https://get.docker.com/ | '
-                       f'VERSION={VERSION.value or ""} sh')
+  vm.RemoteHostCommand(
+      f'curl -sSL https://get.docker.com/ | VERSION={VERSION.value or ""} sh'
+  )
 
 
 def IsInstalled(vm):

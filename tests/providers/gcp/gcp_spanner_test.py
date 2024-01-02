@@ -12,7 +12,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_spanner
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
-
 import requests
 
 FLAGS = flags.FLAGS
@@ -21,10 +20,12 @@ FLAGS = flags.FLAGS
 def GetTestSpannerInstance(engine='spanner-googlesql'):
   spec_args = {'cloud': 'GCP', 'engine': engine}
   spanner_spec = gcp_spanner.SpannerSpec(
-      'test_component', flag_values=FLAGS, **spec_args)
+      'test_component', flag_values=FLAGS, **spec_args
+  )
   spanner_spec.spanner_database_name = 'test_database'
   spanner_class = relational_db.GetRelationalDbClass(
-      cloud='GCP', is_managed_db=True, engine=engine)
+      cloud='GCP', is_managed_db=True, engine=engine
+  )
   return spanner_class(spanner_spec)
 
 
@@ -67,8 +68,8 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(test_instance, '_WaitUntilInstanceReady')
     )
     cmd = self.enter_context(
-        mock.patch.object(
-            vm_util, 'IssueCommand', return_value=[None, None, 0]))
+        mock.patch.object(vm_util, 'IssueCommand', return_value=[None, None, 0])
+    )
 
     test_instance._SetNodes(3)
 
@@ -93,7 +94,8 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
   def testFreezeUsesCorrectNodeCount(self):
     instance = GetTestSpannerInstance()
     mock_set_nodes = self.enter_context(
-        mock.patch.object(instance, '_SetNodes', autospec=True))
+        mock.patch.object(instance, '_SetNodes', autospec=True)
+    )
 
     instance._Freeze()
 
@@ -103,7 +105,8 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     instance = GetTestSpannerInstance()
     instance.nodes = 5
     mock_set_nodes = self.enter_context(
-        mock.patch.object(instance, '_SetNodes', autospec=True))
+        mock.patch.object(instance, '_SetNodes', autospec=True)
+    )
 
     instance._Restore()
 
@@ -129,13 +132,20 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             util.GcloudCommand,
             'Issue',
-            side_effect=[(mock_endpoint_response, '', 0),
-                         (mock_labels_response, '', 0)]))
+            side_effect=[
+                (mock_endpoint_response, '', 0),
+                (mock_labels_response, '', 0),
+            ],
+        )
+    )
     self.enter_context(
-        mock.patch.object(util, 'GetAccessToken', return_value='test_token'))
+        mock.patch.object(util, 'GetAccessToken', return_value='test_token')
+    )
     mock_request = self.enter_context(
         mock.patch.object(
-            requests, 'patch', return_value=mock.Mock(status_code=200)))
+            requests, 'patch', return_value=mock.Mock(status_code=200)
+        )
+    )
 
     # Act
     new_labels = {
@@ -153,11 +163,12 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
                 'labels': {
                     'benchmark': 'test_benchmark_2',
                     'timeout_minutes': '10',
-                    'metadata': 'test_metadata'
+                    'metadata': 'test_metadata',
                 }
             },
-            'fieldMask': 'labels'
-        })
+            'fieldMask': 'labels',
+        },
+    )
 
   @parameterized.named_parameters([
       {
@@ -179,15 +190,17 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
           'expected_qps': 10000,
       },
   ])
-  def testCalculateStartingThroughput(self, write_proportion, read_proportion,
-                                      expected_qps):
+  def testCalculateStartingThroughput(
+      self, write_proportion, read_proportion, expected_qps
+  ):
     # Arrange
     test_spanner = GetTestSpannerInstance()
     test_spanner.nodes = 3
 
     # Act
     actual_qps = test_spanner.CalculateTheoreticalMaxThroughput(
-        read_proportion, write_proportion)
+        read_proportion, write_proportion
+    )
 
     # Assert
     self.assertEqual(expected_qps, actual_qps)

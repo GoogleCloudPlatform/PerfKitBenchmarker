@@ -18,9 +18,11 @@ from absl import flags
 from perfkitbenchmarker import os_types
 
 _CMAKE_KITWARE = flags.DEFINE_bool(
-    'cmake_kitware', False,
+    'cmake_kitware',
+    False,
     'Whether to install cmake from the Kitware repo. Default is to install '
-    'from the (possibily outdated) OS distro.')
+    'from the (possibily outdated) OS distro.',
+)
 
 # Needed to configure the kitware debian repo
 _UBUNTU_VERSION_NAMES = {
@@ -55,8 +57,10 @@ def AptInstall(vm):
 
 def _AddCmakeAptRepo(vm):
   vm.Install('curl')
-  vm.RemoteCommand(f'curl --silent {_KITWARE_KEY_URL} | gpg --dearmor | '
-                   'sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null')
+  vm.RemoteCommand(
+      f'curl --silent {_KITWARE_KEY_URL} | gpg --dearmor | '
+      'sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null'
+  )
   repo = _KITWARE_DEB_CONFIG.format(version=_UBUNTU_VERSION_NAMES[vm.OS_TYPE])
   vm.RemoteCommand(f'sudo apt-add-repository "{repo}"')
   vm.AptUpdate()

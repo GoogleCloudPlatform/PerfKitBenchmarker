@@ -17,7 +17,9 @@ PGAdapter allows the VM to communicate with a PostgreSQL-enabled Spanner
 database. See https://cloud.google.com/spanner/docs/pgadapter.
 """
 
-PGADAPTER_URL = 'https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz'
+PGADAPTER_URL = (
+    'https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz'
+)
 
 
 def AptInstall(vm):

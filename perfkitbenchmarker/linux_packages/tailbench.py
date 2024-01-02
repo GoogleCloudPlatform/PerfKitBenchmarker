@@ -17,6 +17,7 @@ import os
 from typing import List
 
 from perfkitbenchmarker import sample
+
 PACKAGE_NAME = 'tailbench'
 TAILBENCH = 'tailbench-v0.9'
 
@@ -28,14 +29,16 @@ TAILBENCH_URL = 'http://tailbench.csail.mit.edu/' + TAILBENCH_TAR
 TAILBENCH_INPUT_TAR = 'tailbench.inputs.tgz'
 TAILBENCH_INPUT_URL = 'http://tailbench.csail.mit.edu/' + TAILBENCH_INPUT_TAR
 PREPROVISIONED_DATA = {
-    TAILBENCH_TAR:
-        'b26ead61a857e4f6cb904d0b0d1af07b3b509ea0c62685d696f8a26883ee94a5',
-    TAILBENCH_INPUT_TAR:
+    TAILBENCH_TAR: (
+        'b26ead61a857e4f6cb904d0b0d1af07b3b509ea0c62685d696f8a26883ee94a5'
+    ),
+    TAILBENCH_INPUT_TAR: (
         '783b743e3d0d0b162bf92b93e219f67baa7c99666cb528a353d95721019817dd'
+    ),
 }
 PACKAGE_DATA_URL = {
     TAILBENCH_TAR: TAILBENCH_URL,
-    TAILBENCH_INPUT_TAR: TAILBENCH_INPUT_URL
+    TAILBENCH_INPUT_TAR: TAILBENCH_INPUT_URL,
 }
 
 BENCHMARK_NAME = 'tailbench'
@@ -151,10 +154,9 @@ def _ParseResultsFile(input_file, name='') -> List[_TestResult]:
   return test_results
 
 
-def BuildHistogramSamples(input_file,
-                          name='',
-                          metric='',
-                          additional_metadata=None) -> List[sample.Sample]:
+def BuildHistogramSamples(
+    input_file, name='', metric='', additional_metadata=None
+) -> List[sample.Sample]:
   """Builds a list of samples for a the results of a test.
 
   Args:
@@ -170,9 +172,15 @@ def BuildHistogramSamples(input_file,
 
   test_results = _ParseResultsFile(input_file, name)
   return [
-      sample.CreateHistogramSample(result.histogram, result.name,
-                                   result.subname, 'ms', additional_metadata,
-                                   metric) for result in test_results
+      sample.CreateHistogramSample(
+          result.histogram,
+          result.name,
+          result.subname,
+          'ms',
+          additional_metadata,
+          metric,
+      )
+      for result in test_results
   ]
 
 
@@ -191,6 +199,8 @@ def RunTailbench(vm, tailbench_tests):
     vm.RemoteCommand(
         f'cd {INSTALL_DIR} && '
         f'sudo python3 {INSTALL_DIR}/{TAILBENCH}/utilities/parselats.py '
-        f'{INSTALL_DIR}/{TAILBENCH}/{test}/lats.bin')
-    vm.RemoteCommand(f'sudo mv {INSTALL_DIR}/lats.txt '
-                     f'{INSTALL_DIR}/results/{test}.txt')
+        f'{INSTALL_DIR}/{TAILBENCH}/{test}/lats.bin'
+    )
+    vm.RemoteCommand(
+        f'sudo mv {INSTALL_DIR}/lats.txt {INSTALL_DIR}/results/{test}.txt'
+    )

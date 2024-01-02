@@ -21,32 +21,42 @@
 
 def YumInstall(vm):
   """Installs the ms sql package on the RedHat VM."""
-  vm.RemoteCommand('sudo curl -o /etc/yum.repos.d/mssql-server.repo '
-                   'https://packages.microsoft.com/config/rhel/8/'
-                   'mssql-server-2022.repo')
-  vm.RemoteCommand('sudo curl -o /etc/yum.repos.d/msprod.repo '
-                   'https://packages.microsoft.com/config/rhel/8/prod.repo')
+  vm.RemoteCommand(
+      'sudo curl -o /etc/yum.repos.d/mssql-server.repo '
+      'https://packages.microsoft.com/config/rhel/8/'
+      'mssql-server-2022.repo'
+  )
+  vm.RemoteCommand(
+      'sudo curl -o /etc/yum.repos.d/msprod.repo '
+      'https://packages.microsoft.com/config/rhel/8/prod.repo'
+  )
 
   vm.InstallPackages('mssql-server')
 
-  vm.RemoteCommand('sudo ACCEPT_EULA=Y yum install -y '
-                   'mssql-tools unixODBC-devel')
   vm.RemoteCommand(
-      r'echo PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bash_profile')
+      'sudo ACCEPT_EULA=Y yum install -y mssql-tools unixODBC-devel'
+  )
+  vm.RemoteCommand(r'echo PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bash_profile')
   vm.RemoteCommand(
-      r'echo export PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bashrc')
+      r'echo export PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bashrc'
+  )
   vm.RemoteCommand('source ~/.bashrc')
-  vm.RemoteCommand('sudo firewall-cmd --zone=public '
-                   '--add-port=1433/tcp --permanent')
+  vm.RemoteCommand(
+      'sudo firewall-cmd --zone=public --add-port=1433/tcp --permanent'
+  )
   vm.RemoteCommand('sudo firewall-cmd --reload')
 
 
 def AptInstall(vm):
-  vm.RemoteCommand('wget -qO- https://packages.microsoft.com/keys/microsoft.asc'
-                   ' | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc')
-  vm.RemoteCommand('sudo add-apt-repository "$(wget -qO- '
-                   'https://packages.microsoft.com/config/ubuntu/20.04/'
-                   'mssql-server-2022.list)"')
+  vm.RemoteCommand(
+      'wget -qO- https://packages.microsoft.com/keys/microsoft.asc'
+      ' | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc'
+  )
+  vm.RemoteCommand(
+      'sudo add-apt-repository "$(wget -qO- '
+      'https://packages.microsoft.com/config/ubuntu/20.04/'
+      'mssql-server-2022.list)"'
+  )
 
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('mssql-server')

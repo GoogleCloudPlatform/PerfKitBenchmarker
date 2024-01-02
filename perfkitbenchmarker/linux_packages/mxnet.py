@@ -34,11 +34,11 @@ def GetEnvironmentVars(vm):
   long_bit = output.strip()
   lib_name = 'lib' if long_bit == '32' else 'lib64'
   return ' '.join([
-      'PATH=%s${PATH:+:${PATH}}' %
-      posixpath.join(cuda_toolkit.CUDA_HOME, 'bin'),
+      'PATH=%s${PATH:+:${PATH}}'
+      % posixpath.join(cuda_toolkit.CUDA_HOME, 'bin'),
       'CUDA_HOME=%s' % cuda_toolkit.CUDA_HOME,
-      'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' %
-      posixpath.join(cuda_toolkit.CUDA_HOME, lib_name),
+      'LD_LIBRARY_PATH=%s${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}'
+      % posixpath.join(cuda_toolkit.CUDA_HOME, lib_name),
   ])
 
 
@@ -51,10 +51,11 @@ def GetMXNetVersion(vm):
   Returns:
     installed python MXNet version as a string
   """
-  stdout, _ = vm.RemoteCommand(
-      ('echo -e "import mxnet\nprint(mxnet.__version__)" | {0} python'
-       .format(GetEnvironmentVars(vm)))
-  )
+  stdout, _ = vm.RemoteCommand((
+      'echo -e "import mxnet\nprint(mxnet.__version__)" | {0} python'.format(
+          GetEnvironmentVars(vm)
+      )
+  ))
   return stdout.strip()
 
 
@@ -66,15 +67,17 @@ def Install(vm):
     vm.Install('cuda_toolkit')
     if float(FLAGS.cuda_toolkit_version) < 11:
       cuda_version = FLAGS.cuda_toolkit_version.replace('.', '')
-      vm.RemoteCommand('sudo pip install mxnet-cu{}=={}'.format(
-          cuda_version, FLAGS.mx_version))
+      vm.RemoteCommand(
+          'sudo pip install mxnet-cu{}=={}'.format(
+              cuda_version, FLAGS.mx_version
+          )
+      )
     else:
       # mxnet-cu110 starts in version 1.8, which requires Python 3.
       # TODO(tohaowu). Migrate mxnet to version 1.8 and Python 3.
       raise cuda_toolkit.UnsupportedCudaVersionError()
   elif FLAGS.mx_device == 'cpu':
-    vm.RemoteCommand('sudo pip install mxnet=={}'.format(
-        FLAGS.mx_version))
+    vm.RemoteCommand('sudo pip install mxnet=={}'.format(FLAGS.mx_version))
 
 
 def Uninstall(vm):

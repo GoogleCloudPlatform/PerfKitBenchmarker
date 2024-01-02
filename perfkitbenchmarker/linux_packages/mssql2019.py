@@ -21,19 +21,24 @@
 
 def YumInstall(vm):
   """Installs the ms sql package on the RedHat VM."""
-  vm.RemoteCommand('sudo curl -o /etc/yum.repos.d/mssql-server.repo '
-                   'https://packages.microsoft.com/config/rhel/8/'
-                   'mssql-server-2019.repo')
-  vm.RemoteCommand('sudo curl -o /etc/yum.repos.d/msprod.repo '
-                   'https://packages.microsoft.com/config/rhel/8/prod.repo')
+  vm.RemoteCommand(
+      'sudo curl -o /etc/yum.repos.d/mssql-server.repo '
+      'https://packages.microsoft.com/config/rhel/8/'
+      'mssql-server-2019.repo'
+  )
+  vm.RemoteCommand(
+      'sudo curl -o /etc/yum.repos.d/msprod.repo '
+      'https://packages.microsoft.com/config/rhel/8/prod.repo'
+  )
 
   vm.InstallPackages('mssql-server')
 
   vm.RemoteCommand('sudo yum remove unixODBC-utf16 unixODBC-utf16-devel')
-  vm.RemoteCommand('sudo ACCEPT_EULA=Y yum install -y '
-                   'mssql-tools unixODBC-devel')
   vm.RemoteCommand(
-      r'echo PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bash_profile')
+      'sudo ACCEPT_EULA=Y yum install -y mssql-tools unixODBC-devel'
+  )
+  vm.RemoteCommand(r'echo PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bash_profile')
   vm.RemoteCommand(
-      r'echo export PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bashrc')
+      r'echo export PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bashrc'
+  )
   vm.RemoteCommand('source ~/.bashrc')

@@ -17,14 +17,19 @@
 from absl import flags
 from perfkitbenchmarker import vm_util
 
-flags.DEFINE_boolean('mpirun_allow_run_as_root', False,
-                     'Whether to allow mpirun to be run by the root user.')
+flags.DEFINE_boolean(
+    'mpirun_allow_run_as_root',
+    False,
+    'Whether to allow mpirun to be run by the root user.',
+)
 
 
-def CreateMachineFile(vms,
-                      num_slots=lambda vm: vm.NumCpusForBenchmark(),
-                      remote_path='MACHINEFILE',
-                      mpi_vendor='openmpi'):
+def CreateMachineFile(
+    vms,
+    num_slots=lambda vm: vm.NumCpusForBenchmark(),
+    remote_path='MACHINEFILE',
+    mpi_vendor='openmpi',
+):
   """Create a file with the IP of each machine in the cluster on its own line.
 
   The file is then pushed to the provided path on the master vm.
@@ -39,8 +44,8 @@ def CreateMachineFile(vms,
 
   Args:
     vms: The list of vms which will be in the cluster.
-    num_slots: The function to use to calculate the number of slots
-      for each vm. Defaults to vm.NumCpusForBenchmark()
+    num_slots: The function to use to calculate the number of slots for each vm.
+      Defaults to vm.NumCpusForBenchmark()
     remote_path: remote path of the machine file. Defaults to MACHINEFILE
     mpi_vendor: Implementation of MPI.  Can be openmpi or intel.
   """

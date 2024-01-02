@@ -28,15 +28,17 @@ class WrkParseOutputTestCase(unittest.TestCase):
       self.wrk_results = result_file.read()
 
   def testParsesSample(self):
-    expected = [('p5 latency', 0.162, 'ms'),
-                ('p50 latency', 0.187, 'ms'),
-                ('p90 latency', 0.256, 'ms'),
-                ('p99 latency', 0.519, 'ms'),
-                ('p99.9 latency', 5.196, 'ms'),
-                ('bytes transferred', 150068000.0, 'bytes'),
-                ('errors', 0.0, 'n'),
-                ('requests', 577297.0, 'n'),
-                ('throughput', 9605.69, 'requests/sec')]
+    expected = [
+        ('p5 latency', 0.162, 'ms'),
+        ('p50 latency', 0.187, 'ms'),
+        ('p90 latency', 0.256, 'ms'),
+        ('p99 latency', 0.519, 'ms'),
+        ('p99.9 latency', 5.196, 'ms'),
+        ('bytes transferred', 150068000.0, 'bytes'),
+        ('errors', 0.0, 'n'),
+        ('requests', 577297.0, 'n'),
+        ('throughput', 9605.69, 'requests/sec'),
+    ]
 
     actual = list(wrk._ParseOutput(self.wrk_results))
     six.assertCountEqual(self, expected, actual)

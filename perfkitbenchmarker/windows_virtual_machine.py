@@ -36,14 +36,18 @@ import winrm
 FLAGS = flags.FLAGS
 
 flags.DEFINE_bool(
-    'log_windows_password', False,
+    'log_windows_password',
+    False,
     'Whether to log passwords for Windows machines. This can be useful in '
-    'the event of needing to manually RDP to the instance.')
+    'the event of needing to manually RDP to the instance.',
+)
 
 flags.DEFINE_bool(
-    'set_cpu_priority_high', False,
+    'set_cpu_priority_high',
+    False,
     'Allows executables to be set to High (up from Normal) CPU priority '
-    'through the SetProcessPriorityToHigh function.')
+    'through the SetProcessPriorityToHigh function.',
+)
 
 # Windows disk letter starts from C, use a larger disk letter for attached disk
 # to avoid conflict. On Azure, D is reserved for DvD drive.
@@ -73,7 +77,9 @@ netsh advfirewall firewall add rule name='Allow WinRM' dir=in action=allow `
 """.format(winrm_port=WINRM_PORT)
 STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
     encoded_command=six.ensure_str(
-        base64.b64encode(_STARTUP_SCRIPT.encode('utf-16-le'))))
+        base64.b64encode(_STARTUP_SCRIPT.encode('utf-16-le'))
+    )
+)
 
 
 class WaitTimeoutError(Exception):
@@ -148,9 +154,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     start_command_time = time.time()
     try:
       self.RemoteCommand(
-          logged_command,
-          ignore_failure=ignore_failure,
-          timeout=timeout)
+          logged_command, ignore_failure=ignore_failure, timeout=timeout
+      )
     except errors.VirtualMachine.RemoteCommandError:
       logging.exception(
           'Exception while running %s on %s, waiting for command to finish',
@@ -200,8 +205,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       command: A valid powershell command.
       ignore_failure: Ignore any failure if set to true.
       timeout: Float. A timeout in seconds for the command. If None is passed,
-          no timeout is applied. Timeout kills the winrm session which then
-          kills the process being executed.
+        no timeout is applied. Timeout kills the winrm session which then kills
+        the process being executed.
 
     Returns:
       A tuple of stdout and stderr from running the command.
@@ -214,9 +219,11 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     s = winrm.Session(
         'https://%s:%s' % (self.GetConnectionIp(), self.winrm_port),
         auth=(self.user_name, self.password),
-        server_cert_validation='ignore')
+        server_cert_validation='ignore',
+    )
     encoded_command = six.ensure_str(
-        base64.b64encode(command.encode('utf_16_le')))
+        base64.b64encode(command.encode('utf_16_le'))
+    )
 
     @timeout_decorator.timeout(
         timeout,
@@ -227,17 +234,26 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       return s.run_cmd('powershell -encodedcommand %s' % encoded_command)
 
     r = run_command()
-    retcode, stdout, stderr = r.status_code, six.ensure_str(
-        r.std_out), six.ensure_str(r.std_err)
+    retcode, stdout, stderr = (
+        r.status_code,
+        six.ensure_str(r.std_out),
+        six.ensure_str(r.std_err),
+    )
 
-    debug_text = ('Ran %s on %s. Return code (%s).\nSTDOUT: %s\nSTDERR: %s' %
-                  (command, self, retcode, stdout, stderr))
+    debug_text = 'Ran %s on %s. Return code (%s).\nSTDOUT: %s\nSTDERR: %s' % (
+        command,
+        self,
+        retcode,
+        stdout,
+        stderr,
+    )
     logging.info(debug_text, stacklevel=2)
 
     if retcode and not ignore_failure:
-      error_text = ('Got non-zero return code (%s) executing %s\n'
-                    'STDOUT: %sSTDERR: %s' %
-                    (retcode, command, stdout, stderr))
+      error_text = (
+          'Got non-zero return code (%s) executing %s\nSTDOUT: %sSTDERR: %s'
+          % (retcode, command, stdout, stderr)
+      )
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
     return stdout, stderr
@@ -281,8 +297,9 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     else:
       self._SmbclientRemoteCopy(local_path, remote_path, copy_to, network_drive)
 
-  def _SmbclientRemoteCopy(self, local_path, remote_path,
-                           copy_to, network_drive):
+  def _SmbclientRemoteCopy(
+      self, local_path, remote_path, copy_to, network_drive
+  ):
     """Copies a file to or from the VM using smbclient.
 
     Args:
@@ -290,7 +307,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       remote_path: Optional path of where to copy file on remote host.
       copy_to: True to copy to vm, False to copy from vm.
       network_drive: The smb specification for the remote drive
-          (//{ip_address}/{share_name}).
+        (//{ip_address}/{share_name}).
 
     Raises:
       RemoteCommandError: If there was a problem copying the file.
@@ -304,22 +321,28 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     else:
       smb_command += 'get %s %s' % (remote_file, local_file)
     smb_copy = [
-        'smbclient', network_drive,
-        '--max-protocol', 'SMB3',
-        '--user', '%s%%%s' % (self.user_name, self.password),
-        '--port', str(self.smb_port),
-        '--command', smb_command
+        'smbclient',
+        network_drive,
+        '--max-protocol',
+        'SMB3',
+        '--user',
+        '%s%%%s' % (self.user_name, self.password),
+        '--port',
+        str(self.smb_port),
+        '--command',
+        smb_command,
     ]
-    stdout, stderr, retcode = vm_util.IssueCommand(smb_copy,
-                                                   raise_on_failure=False)
+    stdout, stderr, retcode = vm_util.IssueCommand(
+        smb_copy, raise_on_failure=False
+    )
     if retcode:
-      error_text = ('Got non-zero return code (%s) executing %s\n'
-                    'STDOUT: %sSTDERR: %s' %
-                    (retcode, smb_copy, stdout, stderr))
+      error_text = (
+          'Got non-zero return code (%s) executing %s\nSTDOUT: %sSTDERR: %s'
+          % (retcode, smb_copy, stdout, stderr)
+      )
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-  def _PsDriveRemoteCopy(self, local_path, remote_path,
-                         copy_to, network_drive):
+  def _PsDriveRemoteCopy(self, local_path, remote_path, copy_to, network_drive):
     """Copies a file to or from the VM using New-PSDrive and Copy-Item.
 
     Args:
@@ -327,7 +350,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       remote_path: Optional path of where to copy file on remote host.
       copy_to: True to copy to vm, False to copy from vm.
       network_drive: The smb specification for the remote drive
-          (//{ip_address}/{share_name}).
+        (//{ip_address}/{share_name}).
 
     Raises:
       RemoteCommandError: If there was a problem copying the file.
@@ -336,14 +359,16 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     password = self.password.replace("'", "''")
     create_cred = (
-        '$pw = convertto-securestring -AsPlainText -Force \'%s\';'
+        "$pw = convertto-securestring -AsPlainText -Force '%s';"
         '$cred = new-object -typename System.Management.Automation'
-        '.PSCredential -argumentlist %s,$pw' % (password, self.user_name))
+        '.PSCredential -argumentlist %s,$pw' % (password, self.user_name)
+    )
 
     psdrive_name = self.name
     create_psdrive = (
-        'New-PSDrive -Name %s -PSProvider filesystem -Root '
-        '%s -Credential $cred' % (psdrive_name, network_drive))
+        'New-PSDrive -Name %s -PSProvider filesystem -Root %s -Credential $cred'
+        % (psdrive_name, network_drive)
+    )
 
     remote_path = '%s:%s' % (psdrive_name, remote_path)
     if copy_to:
@@ -355,16 +380,23 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     delete_connection = 'net use %s /delete' % network_drive
 
-    cmd = ';'.join([set_error_pref, create_cred, create_psdrive,
-                    copy_item, delete_connection])
+    cmd = ';'.join([
+        set_error_pref,
+        create_cred,
+        create_psdrive,
+        copy_item,
+        delete_connection,
+    ])
 
     stdout, stderr, retcode = vm_util.IssueCommand(
-        ['powershell', '-Command', cmd], timeout=None, raise_on_failure=False)
+        ['powershell', '-Command', cmd], timeout=None, raise_on_failure=False
+    )
 
     if retcode:
-      error_text = ('Got non-zero return code (%s) executing %s\n'
-                    'STDOUT: %sSTDERR: %s' %
-                    (retcode, cmd, stdout, stderr))
+      error_text = (
+          'Got non-zero return code (%s) executing %s\nSTDOUT: %sSTDERR: %s'
+          % (retcode, cmd, stdout, stderr)
+      )
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
   def WaitForBootCompletion(self):
@@ -373,7 +405,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     if FLAGS.cluster_boot_test_rdp_port_listening:
       to_wait_for.append(self._WaitForRdpPort)
     background_tasks.RunParallelThreads(
-        [(method, [], {}) for method in to_wait_for], 2)
+        [(method, [], {}) for method in to_wait_for], 2
+    )
 
   @vm_util.Retry(log_errors=False, poll_interval=1, timeout=2400)
   def _WaitForRdpPort(self):
@@ -386,8 +419,10 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     """Waits for WinRM command and optionally for the WinRM port to listen."""
     # Test for listening on the port first, because this will happen strictly
     # first.
-    if (FLAGS.cluster_boot_test_port_listening and
-        self.port_listening_time is None):
+    if (
+        FLAGS.cluster_boot_test_port_listening
+        and self.port_listening_time is None
+    ):
       self.TestConnectRemoteAccessPort()
       self.port_listening_time = time.time()
 
@@ -494,11 +529,12 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       WaitTimeoutError: raised if the process does not run within "timeout"
                         seconds.
     """
-    command = ('$count={timeout};'
-               'while( (ps | select-string {process} | measure-object).Count '
-               '-eq 0 -and $count -gt 0) {{sleep 1; $count=$count-1}}; '
-               'if ($count -eq 0) {{echo "FAIL"}}').format(
-                   timeout=timeout, process=process)
+    command = (
+        '$count={timeout};'
+        'while( (ps | select-string {process} | measure-object).Count '
+        '-eq 0 -and $count -gt 0) {{sleep 1; $count=$count-1}}; '
+        'if ($count -eq 0) {{echo "FAIL"}}'
+    ).format(timeout=timeout, process=process)
     stdout, _ = self.RemoteCommand(command)
     if 'FAIL' in stdout:
       raise WaitTimeoutError()
@@ -525,7 +561,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     """
     stdout, _ = self.RemoteCommand(
         'Get-WmiObject -class Win32_processor | '
-        'Select-Object -ExpandProperty NumberOfLogicalProcessors')
+        'Select-Object -ExpandProperty NumberOfLogicalProcessors'
+    )
     # In the case that there are multiple Win32_processor instances, the result
     # of this command can be a string like '4  4  '.
     return sum(int(i) for i in stdout.split())
@@ -540,8 +577,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     This method does not cache results (unlike "total_memory_kb").
     """
     stdout, _ = self.RemoteCommand(
-        'Get-WmiObject -class Win32_PhysicalMemory | '
-        'select -exp Capacity')
+        'Get-WmiObject -class Win32_PhysicalMemory | select -exp Capacity'
+    )
     result = sum(int(capacity) for capacity in stdout.split('\n') if capacity)
     return result / 1024
 
@@ -561,18 +598,21 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     # Allow more security protocols to make it easier to download from
     # sites where we don't know the security protocol beforehand
-    command = ('[Net.ServicePointManager]::SecurityProtocol = '
-               '[System.Net.SecurityProtocolType] '
-               '"tls, tls11, tls12";'
-               'Invoke-WebRequest {url} -OutFile {dest}').format(
-                   url=url, dest=dest)
+    command = (
+        '[Net.ServicePointManager]::SecurityProtocol = '
+        '[System.Net.SecurityProtocolType] '
+        '"tls, tls11, tls12";'
+        'Invoke-WebRequest {url} -OutFile {dest}'
+    ).format(url=url, dest=dest)
     self.RemoteCommand(command)
 
   def UnzipFile(self, zip_file, dest):
     """Unzips the file with the given path."""
-    command = ('Add-Type -A System.IO.Compression.FileSystem; '
-               '[IO.Compression.ZipFile]::ExtractToDirectory(\'{zip_file}\', '
-               '\'{dest}\')').format(zip_file=zip_file, dest=dest)
+    command = (
+        'Add-Type -A System.IO.Compression.FileSystem; '
+        "[IO.Compression.ZipFile]::ExtractToDirectory('{zip_file}', "
+        "'{dest}')"
+    ).format(zip_file=zip_file, dest=dest)
     self.RemoteCommand(command)
 
   def DisableGuestFirewall(self):
@@ -593,8 +633,9 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
       tf.close()
       script_path = ntpath.join(self.temp_dir, os.path.basename(tf.name))
       self.RemoteCopy(tf.name, script_path)
-      self.RemoteCommand('diskpart /s {script_path}'.format(
-          script_path=script_path))
+      self.RemoteCommand(
+          'diskpart /s {script_path}'.format(script_path=script_path)
+      )
 
   def DiskDriveIsLocal(self, device, model):
     """Helper method to determine if a disk drive is a local ssd to stripe."""
@@ -642,59 +683,71 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
 class Windows2016CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2016 Server Core VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2016_CORE
 
 
 class Windows2019CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2019 Server Core VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2019_CORE
 
 
 class Windows2022CoreMixin(BaseWindowsMixin):
   """Class holding Windows Server 2022 Server Core VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2022_CORE
 
 
 class Windows2016DesktopMixin(BaseWindowsMixin):
   """Class holding Windows Server 2016 with Desktop Experience VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2016_DESKTOP
 
 
 class Windows2019DesktopMixin(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2019_DESKTOP
 
 
 class Windows2022DesktopMixin(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2022_DESKTOP
 
 
 class Windows2019SQLServer2017Standard(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2017_STANDARD
 
 
 class Windows2019SQLServer2017Enterprise(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2017_ENTERPRISE
 
 
 class Windows2019SQLServer2019Standard(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2019_STANDARD
 
 
 class Windows2019SQLServer2019Enterprise(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2019_ENTERPRISE
 
 
 class Windows2022SQLServer2019Standard(BaseWindowsMixin):
   """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2022_SQLSERVER_2019_STANDARD
 
 
 class Windows2022SQLServer2019Enterprise(BaseWindowsMixin):
   """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
+
   OS_TYPE = os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE

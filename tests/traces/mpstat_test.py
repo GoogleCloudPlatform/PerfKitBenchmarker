@@ -38,9 +38,10 @@ _AGGREGATE_SAMPLES = [
             'event': 'mpstat',
             'sender': 'run',
             'mpstat_cpu_id': -1,
-            'nodename': 'instance-3'
+            'nodename': 'instance-3',
         },
-        timestamp=1621447265.0),
+        timestamp=1621447265.0,
+    ),
     sample.Sample(
         metric='mpstat_avg_irq',
         value=0.0,
@@ -49,9 +50,10 @@ _AGGREGATE_SAMPLES = [
             'event': 'mpstat',
             'sender': 'run',
             'mpstat_cpu_id': -1,
-            'nodename': 'instance-3'
+            'nodename': 'instance-3',
         },
-        timestamp=1621447265.0),
+        timestamp=1621447265.0,
+    ),
     sample.Sample(
         metric='mpstat_avg_soft',
         value=0.01,
@@ -60,9 +62,10 @@ _AGGREGATE_SAMPLES = [
             'event': 'mpstat',
             'sender': 'run',
             'mpstat_cpu_id': -1,
-            'nodename': 'instance-3'
+            'nodename': 'instance-3',
         },
-        timestamp=1621447265.0),
+        timestamp=1621447265.0,
+    ),
     sample.Sample(
         metric='mpstat_avg_intr',
         value=264.5,
@@ -71,9 +74,10 @@ _AGGREGATE_SAMPLES = [
             'event': 'mpstat',
             'sender': 'run',
             'mpstat_cpu_id': 0,
-            'nodename': 'instance-3'
+            'nodename': 'instance-3',
         },
-        timestamp=1621447265.0),
+        timestamp=1621447265.0,
+    ),
     sample.Sample(
         metric='mpstat_avg_intr',
         value=14.375,
@@ -82,9 +86,10 @@ _AGGREGATE_SAMPLES = [
             'event': 'mpstat',
             'sender': 'run',
             'mpstat_cpu_id': 1,
-            'nodename': 'instance-3'
+            'nodename': 'instance-3',
         },
-        timestamp=1621447265.0)
+        timestamp=1621447265.0,
+    ),
 ]
 
 # Besides verifying that per-interval samples are produced, the
@@ -101,9 +106,10 @@ _PER_INTERVAL_SAMPLES = [
             'sender': 'run',
             'mpstat_cpu_id': -1,
             'ordinal': 0,
-            'nodename': 'instance-3'
+            'nodename': 'instance-3',
         },
-        timestamp=1621447265.0),
+        timestamp=1621447265.0,
+    ),
     sample.Sample(
         metric='mpstat_avg_idle',
         value=49.98,
@@ -113,9 +119,10 @@ _PER_INTERVAL_SAMPLES = [
             'sender': 'run',
             'mpstat_cpu_id': -1,
             'ordinal': 1,
-            'nodename': 'instance-3'
+            'nodename': 'instance-3',
         },
-        timestamp=1621447325.0)
+        timestamp=1621447325.0,
+    ),
 ]
 
 
@@ -130,7 +137,8 @@ class MpstatTestCase(parameterized.TestCase):
     # export S_TIME_FORMAT=ISO
     # mpstat -I ALL -u -P ALL 60 2 -o JSON
     path = os.path.join(
-        os.path.dirname(__file__), '../data', 'mpstat_output.json')
+        os.path.dirname(__file__), '../data', 'mpstat_output.json'
+    )
     with open(path) as fp:
       self.contents = json.loads(fp.read())
 
@@ -142,14 +150,21 @@ class MpstatTestCase(parameterized.TestCase):
           60,
           93,
           _AGGREGATE_SAMPLES + _PER_INTERVAL_SAMPLES,
-      ))
-  def testMpstatParse(self, per_interval_samples, interval,
-                      expected_number_of_samples, expected_samples):
+      ),
+  )
+  def testMpstatParse(
+      self,
+      per_interval_samples,
+      interval,
+      expected_number_of_samples,
+      expected_samples,
+  ):
     actual_samples = mpstat._MpstatResults(
         MPSTAT_METADATA,
         self.contents,
         per_interval_samples=per_interval_samples,
-        interval=interval)
+        interval=interval,
+    )
 
     self.assertLen(actual_samples, expected_number_of_samples)
 
@@ -157,7 +172,8 @@ class MpstatTestCase(parameterized.TestCase):
       if expected_sample not in actual_samples:
         sample_not_found_message = (
             f'Expected sample:\n{expected_sample}\nnot found in actual samples:'
-            f'\n{actual_samples}')
+            f'\n{actual_samples}'
+        )
         raise Exception(sample_not_found_message)
 
 

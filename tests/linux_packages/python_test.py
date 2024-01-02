@@ -43,18 +43,18 @@ class PythonTest(pkb_common_test_case.PkbCommonTestCase):
     super(PythonTest, self).setUp()
     FLAGS['default_timeout'].parse(0)  # due to @retry
 
-  def RunSetDefault(self,
-                    responses,
-                    expected_last_call=None):
+  def RunSetDefault(self, responses, expected_last_call=None):
     vm = mock.Mock()
     vm.PYTHON_2_PACKAGE = 'python2'
     vm.RemoteCommandWithReturnCode.side_effect = responses
     python._SetDefaultPythonIfNeeded(vm)
     if expected_last_call:
       vm.RemoteCommandWithReturnCode.assert_called_with(
-          expected_last_call, ignore_failure=True)
-    self.assertLen(vm.RemoteCommandWithReturnCode.call_args_list,
-                   len(responses))
+          expected_last_call, ignore_failure=True
+      )
+    self.assertLen(
+        vm.RemoteCommandWithReturnCode.call_args_list, len(responses)
+    )
 
   @mock.patch.object(python, '_SetDefaultPythonIfNeeded')
   def testYumCall(self, mock_set_default):
@@ -76,8 +76,11 @@ class PythonTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testBadAlternativesResponse(self):
     responses = [
-        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_CALL_BAD, SYMLINK_SET,
-        PYTHON_VERSION_2
+        PYTHON_MISSING,
+        PYTHON2_PATH_FOUND,
+        ALTERNATIVES_CALL_BAD,
+        SYMLINK_SET,
+        PYTHON_VERSION_2,
     ]
     expected = 'python --version'
     self.RunSetDefault(responses, expected)
@@ -89,16 +92,20 @@ class PythonTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testNoPythonVersionAfterSet(self):
     responses = [
-        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_CALL_GOOD,
-        PYTHON_VERSION_CALL_BAD
+        PYTHON_MISSING,
+        PYTHON2_PATH_FOUND,
+        ALTERNATIVES_CALL_GOOD,
+        PYTHON_VERSION_CALL_BAD,
     ]
     with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
       self.RunSetDefault(responses)
 
   def testPythonVersionAfterSet(self):
     responses = [
-        PYTHON_MISSING, PYTHON2_PATH_FOUND, ALTERNATIVES_CALL_GOOD,
-        PYTHON_VERSION_2
+        PYTHON_MISSING,
+        PYTHON2_PATH_FOUND,
+        ALTERNATIVES_CALL_GOOD,
+        PYTHON_VERSION_2,
     ]
     expected = 'python --version'
     self.RunSetDefault(responses, expected)

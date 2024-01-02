@@ -15,7 +15,6 @@
 import os
 import unittest
 
-
 from perfkitbenchmarker.traces import sar
 
 
@@ -23,8 +22,7 @@ class SarTestCase(unittest.TestCase):
 
   def setUp(self):
     super(SarTestCase, self).setUp()
-    path = os.path.join(
-        os.path.dirname(__file__), '../data', 'sar_output.txt')
+    path = os.path.join(os.path.dirname(__file__), '../data', 'sar_output.txt')
     with open(path) as fp:
       self.contents = fp.read()
 
@@ -42,8 +40,17 @@ class SarTestCase(unittest.TestCase):
     metadata = samples[0].metadata
 
     expected_steal_values = [
-        0.150000, 0.220000, 0.300000, 0.190000, 0.370000, 0.300000, 0.250000,
-        0.350000, 0.210000, 0.170000, 17.990000
+        0.150000,
+        0.220000,
+        0.300000,
+        0.190000,
+        0.370000,
+        0.300000,
+        0.250000,
+        0.350000,
+        0.210000,
+        0.170000,
+        17.990000,
     ]
 
     for i in range(0, 11):
@@ -55,6 +62,7 @@ class SarTestCase(unittest.TestCase):
 
     last_sample = samples[-1]
     self.assertEqual('average_steal', last_sample.metric)
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -34,16 +34,23 @@ class RedshiftClusterParameterGroup(resource.BaseResource):
 
   def _Create(self):
     cmd = self.cmd_prefix + [
-        'redshift', 'create-cluster-parameter-group', '--parameter-group-name',
-        self.name, '--parameter-group-family', 'redshift-1.0', '--description',
-        'Cluster Parameter group for run uri {}'.format(FLAGS.run_uri)
+        'redshift',
+        'create-cluster-parameter-group',
+        '--parameter-group-name',
+        self.name,
+        '--parameter-group-family',
+        'redshift-1.0',
+        '--description',
+        'Cluster Parameter group for run uri {}'.format(FLAGS.run_uri),
     ]
     vm_util.IssueCommand(cmd)
 
   def _Delete(self):
     """Delete a redshift cluster parameter group."""
     cmd = self.cmd_prefix + [
-        'redshift', 'delete-cluster-parameter-group', '--parameter-group-name',
-        self.name
+        'redshift',
+        'delete-cluster-parameter-group',
+        '--parameter-group-name',
+        self.name,
     ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)

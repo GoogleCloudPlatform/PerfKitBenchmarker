@@ -78,7 +78,8 @@ aws_dynamodb_ycsb:
 def GetTestDynamoDBInstance(minimal=False):
   spec = _MINIMAL_TEST_BENCHMARK_SPEC if minimal else _TEST_BENCHMARK_SPEC
   test_benchmark_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-      yaml_string=spec, benchmark_name='aws_dynamodb_ycsb')
+      yaml_string=spec, benchmark_name='aws_dynamodb_ycsb'
+  )
   test_benchmark_spec.ConstructNonRelationalDb()
   return test_benchmark_spec.non_relational_db
 
@@ -90,7 +91,9 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             test_instance,
             '_HasAutoscalingPolicies',
-            return_value=policies_exist))
+            return_value=policies_exist,
+        )
+    )
 
   def assertArgumentInCommand(self, mock_cmd, arg):
     """Given an AWS command, checks that the argument is present."""
@@ -135,15 +138,20 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertEqual(
         test_instance._PrimaryKeyJson(),
-        '{"AttributeName": "test_primary_key", "KeyType": "HASH"}')
-    self.assertEqual(test_instance._SortKeyJson(),
-                     '{"AttributeName": "test_sort_key", "KeyType": "RANGE"}')
+        '{"AttributeName": "test_primary_key", "KeyType": "HASH"}',
+    )
+    self.assertEqual(
+        test_instance._SortKeyJson(),
+        '{"AttributeName": "test_sort_key", "KeyType": "RANGE"}',
+    )
     self.assertEqual(
         test_instance._PrimaryAttrsJson(),
-        '{"AttributeName": "test_primary_key", "AttributeType": "S"}')
+        '{"AttributeName": "test_primary_key", "AttributeType": "S"}',
+    )
     self.assertEqual(
         test_instance._SortAttrsJson(),
-        '{"AttributeName": "test_sort_key", "AttributeType": "S"}')
+        '{"AttributeName": "test_sort_key", "AttributeType": "S"}',
+    )
 
   @flagsaver.flagsaver
   def testInitThroughput(self):
@@ -152,8 +160,9 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
 
     test_instance = GetTestDynamoDBInstance()
 
-    self.assertEqual(test_instance.throughput,
-                     'ReadCapacityUnits=1,WriteCapacityUnits=2')
+    self.assertEqual(
+        test_instance.throughput, 'ReadCapacityUnits=1,WriteCapacityUnits=2'
+    )
 
   def testInitThroughputWithOnDemandRaises(self):
     FLAGS['aws_dynamodb_read_capacity'].parse(1)
@@ -235,16 +244,15 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
       {
           'testcase_name': 'ValidOutput',
           'output': json.loads(_DESCRIBE_TABLE_OUTPUT)['Table'],
-          'expected': True
-      }, {
-          'testcase_name': 'EmptyOutput',
-          'output': {},
-          'expected': False
-      })
+          'expected': True,
+      },
+      {'testcase_name': 'EmptyOutput', 'output': {}, 'expected': False},
+  )
   def testExists(self, output, expected):
     test_instance = GetTestDynamoDBInstance()
     self.enter_context(
-        mock.patch.object(test_instance, '_DescribeTable', return_value=output))
+        mock.patch.object(test_instance, '_DescribeTable', return_value=output)
+    )
 
     actual = test_instance._Exists()
 
@@ -256,7 +264,8 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     cmd = self.enter_context(mock.patch.object(util, 'IssueRetryableCommand'))
     self.enter_context(mock.patch.object(test_instance, '_IsReady'))
     self.enter_context(
-        mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5)))
+        mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5))
+    )
 
     # Act
     test_instance.SetThroughput(5, 5)
@@ -270,7 +279,8 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     cmd = self.enter_context(mock.patch.object(util, 'IssueRetryableCommand'))
     self.enter_context(mock.patch.object(test_instance, '_IsReady'))
     self.enter_context(
-        mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5)))
+        mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5))
+    )
 
     # Act
     test_instance.SetThroughput(10, 10)
@@ -280,13 +290,15 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertArgumentInCommand(cmd, '--region us-east-1')
     self.assertArgumentInCommand(
         cmd,
-        '--provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=10')
+        '--provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=10',
+    )
 
   def testGetThroughput(self):
     test_instance = GetTestDynamoDBInstance()
     output = json.loads(_DESCRIBE_TABLE_OUTPUT)['Table']
     self.enter_context(
-        mock.patch.object(test_instance, '_DescribeTable', return_value=output))
+        mock.patch.object(test_instance, '_DescribeTable', return_value=output)
+    )
 
     actual_rcu, actual_wcu = test_instance._GetThroughput()
 
@@ -297,7 +309,8 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     test_instance = GetTestDynamoDBInstance()
     # Mark instance as non-existing.
     self.enter_context(
-        mock.patch.object(test_instance, '_Exists', return_value=False))
+        mock.patch.object(test_instance, '_Exists', return_value=False)
+    )
 
     with self.assertRaises(vm_util.RetriesExceededRetryError) as e:
       test_instance._GetTagResourceCommand(['test', 'tag'])
@@ -309,7 +322,8 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     cmd = self.enter_context(mock.patch.object(util, 'IssueRetryableCommand'))
     # Mark instance as existing.
     self.enter_context(
-        mock.patch.object(test_instance, '_Exists', return_value=True))
+        mock.patch.object(test_instance, '_Exists', return_value=True)
+    )
 
     test_instance.UpdateWithDefaultTags()
 
@@ -325,12 +339,15 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
             util,
             'MakeDefaultTags',
             autospec=True,
-            return_value={'timeout_utc': 60}))
+            return_value={'timeout_utc': 60},
+        )
+    )
     # Mock the actual call to the CLI
     cmd = self.enter_context(mock.patch.object(util, 'IssueRetryableCommand'))
     # Mark instance as existing.
     self.enter_context(
-        mock.patch.object(test_instance, '_Exists', return_value=True))
+        mock.patch.object(test_instance, '_Exists', return_value=True)
+    )
 
     test_instance.UpdateTimeout(timeout_minutes=60)
 
@@ -341,36 +358,45 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
           'testcase_name': 'OnlyRcu',
           'rcu': 5,
           'wcu': 500,
-      }, {
+      },
+      {
           'testcase_name': 'OnlyWcu',
           'rcu': 500,
           'wcu': 5,
-      }, {
+      },
+      {
           'testcase_name': 'Both',
           'rcu': 500,
           'wcu': 500,
-      })
+      },
+  )
   def testFreezeLowersThroughputToFreeTier(self, rcu, wcu):
     test_instance = GetTestDynamoDBInstance()
     self._MockHasAutoscalingPolicies(test_instance, False)
     self.enter_context(
         mock.patch.object(
-            test_instance, '_GetThroughput', return_value=(rcu, wcu)))
+            test_instance, '_GetThroughput', return_value=(rcu, wcu)
+        )
+    )
     mock_set_throughput = self.enter_context(
-        mock.patch.object(test_instance, 'SetThroughput', autospec=True))
+        mock.patch.object(test_instance, 'SetThroughput', autospec=True)
+    )
 
     test_instance._Freeze()
 
     mock_set_throughput.assert_called_once_with(
-        rcu=aws_dynamodb._FREE_TIER_RCU, wcu=aws_dynamodb._FREE_TIER_WCU)
+        rcu=aws_dynamodb._FREE_TIER_RCU, wcu=aws_dynamodb._FREE_TIER_WCU
+    )
 
   def testFreezeDoesNotLowerThroughputIfAlreadyAtFreeTier(self):
     test_instance = GetTestDynamoDBInstance()
     self._MockHasAutoscalingPolicies(test_instance, False)
     self.enter_context(
-        mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5)))
+        mock.patch.object(test_instance, '_GetThroughput', return_value=(5, 5))
+    )
     mock_set_throughput = self.enter_context(
-        mock.patch.object(test_instance, 'SetThroughput', autospec=True))
+        mock.patch.object(test_instance, 'SetThroughput', autospec=True)
+    )
 
     test_instance._Freeze()
 
@@ -379,20 +405,28 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
   @flagsaver.flagsaver(
       aws_dynamodb_autoscaling_target=50,
       aws_dynamodb_autoscaling_wcu_max=100,
-      aws_dynamodb_autoscaling_rcu_max=200)
+      aws_dynamodb_autoscaling_rcu_max=200,
+  )
   def testFreezeAutoscalingUsesFreeTierAsMin(self):
     test_instance = GetTestDynamoDBInstance()
     self._MockHasAutoscalingPolicies(test_instance, True)
     mock_autoscale = self.enter_context(
-        mock.patch.object(test_instance, '_CreateScalableTarget'))
+        mock.patch.object(test_instance, '_CreateScalableTarget')
+    )
 
     test_instance._Freeze()
 
     mock_autoscale.assert_has_calls([
-        mock.call(aws_dynamodb._RCU_SCALABLE_DIMENSION,
-                  aws_dynamodb._FREE_TIER_RCU, 200),
-        mock.call(aws_dynamodb._WCU_SCALABLE_DIMENSION,
-                  aws_dynamodb._FREE_TIER_WCU, 100)
+        mock.call(
+            aws_dynamodb._RCU_SCALABLE_DIMENSION,
+            aws_dynamodb._FREE_TIER_RCU,
+            200,
+        ),
+        mock.call(
+            aws_dynamodb._WCU_SCALABLE_DIMENSION,
+            aws_dynamodb._FREE_TIER_WCU,
+            100,
+        ),
     ])
 
   def testRestoreSetsThroughputBackToOriginalLevels(self):
@@ -400,7 +434,8 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
     test_instance.rcu = 5000
     test_instance.wcu = 1000
     mock_set_throughput = self.enter_context(
-        mock.patch.object(test_instance, 'SetThroughput', autospec=True))
+        mock.patch.object(test_instance, 'SetThroughput', autospec=True)
+    )
     self._MockHasAutoscalingPolicies(test_instance, False)
 
     test_instance._Restore()
@@ -410,32 +445,37 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
   @flagsaver.flagsaver(
       aws_dynamodb_autoscaling_target=50,
       aws_dynamodb_autoscaling_wcu_max=100,
-      aws_dynamodb_autoscaling_rcu_max=200)
+      aws_dynamodb_autoscaling_rcu_max=200,
+  )
   def testRestoreAutoscalingUsesOriginalThroughputLevels(self):
     test_instance = GetTestDynamoDBInstance()
 
     mock_set_throughput = self.enter_context(
-        mock.patch.object(test_instance, 'SetThroughput', autospec=True))
+        mock.patch.object(test_instance, 'SetThroughput', autospec=True)
+    )
     self._MockHasAutoscalingPolicies(test_instance, True)
     mock_autoscale = self.enter_context(
-        mock.patch.object(test_instance, '_CreateScalableTarget'))
+        mock.patch.object(test_instance, '_CreateScalableTarget')
+    )
 
     test_instance._Restore()
 
     mock_autoscale.assert_has_calls([
         mock.call(aws_dynamodb._RCU_SCALABLE_DIMENSION, 5, 200),
-        mock.call(aws_dynamodb._WCU_SCALABLE_DIMENSION, 25, 100)
+        mock.call(aws_dynamodb._WCU_SCALABLE_DIMENSION, 25, 100),
     ])
     mock_set_throughput.assert_not_called()
 
   @flagsaver.flagsaver(
       aws_dynamodb_autoscaling_target=50,
       aws_dynamodb_autoscaling_wcu_max=100,
-      aws_dynamodb_autoscaling_rcu_max=100)
+      aws_dynamodb_autoscaling_rcu_max=100,
+  )
   def testPostCreateAutoscalingPoliciesCreatedCorrectly(self):
     test_instance = GetTestDynamoDBInstance()
     mock_create_policy = self.enter_context(
-        mock.patch.object(test_instance, '_CreateAutoscalingPolicy'))
+        mock.patch.object(test_instance, '_CreateAutoscalingPolicy')
+    )
 
     test_instance._PostCreate()
 
@@ -444,7 +484,8 @@ class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):
   def testShouldNotAutoscale(self):
     test_instance = GetTestDynamoDBInstance()
     mock_create_policy = self.enter_context(
-        mock.patch.object(test_instance, '_CreateAutoscalingPolicy'))
+        mock.patch.object(test_instance, '_CreateAutoscalingPolicy')
+    )
 
     test_instance._PostCreate()
 

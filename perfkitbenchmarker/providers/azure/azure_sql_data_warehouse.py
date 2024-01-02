@@ -39,8 +39,12 @@ SYNAPSE_JDBC_JAR = 'synapse-jdbc-client-1.0.jar'
 
 
 def GetSqlDataWarehouseClientInterface(
-    server_name: str, database: str, user: str, password: str,
-    resource_group: str) -> edw_service.EdwClientInterface:
+    server_name: str,
+    database: str,
+    user: str,
+    password: str,
+    resource_group: str,
+) -> edw_service.EdwClientInterface:
   """Builds and Returns the requested SqlDataWarehouse client Interface.
 
   Args:
@@ -58,11 +62,13 @@ def GetSqlDataWarehouseClientInterface(
       requested.
   """
   if FLAGS.sqldatawarehouse_client_interface == 'CLI':
-    return CliClientInterface(server_name, database, user, password,
-                              resource_group)
+    return CliClientInterface(
+        server_name, database, user, password, resource_group
+    )
   if FLAGS.sqldatawarehouse_client_interface == 'JDBC':
-    return JdbcClientInterface(server_name, database, user, password,
-                               resource_group)
+    return JdbcClientInterface(
+        server_name, database, user, password, resource_group
+    )
   raise RuntimeError('Unknown SqlDataWarehouse Client Interface requested.')
 
 
@@ -80,8 +86,14 @@ class CliClientInterface(edw_service.EdwClientInterface):
     resource_group: Azure resource group used to whitelist the VM's IP address.
   """
 
-  def __init__(self, server_name: str, database: str, user: str, password: str,
-               resource_group: str):
+  def __init__(
+      self,
+      server_name: str,
+      database: str,
+      user: str,
+      password: str,
+      resource_group: str,
+  ):
     self.server_name = server_name
     self.database = database
     self.user = user
@@ -103,27 +115,45 @@ class CliClientInterface(edw_service.EdwClientInterface):
     self.whitelist_ip = self.client_vm.ip_address
 
     cmd = [
-        azure.AZURE_PATH, 'sql', 'server', 'firewall-rule', 'create', '--name',
-        self.whitelist_ip, '--resource-group', self.resource_group, '--server',
-        self.server_name, '--end-ip-address', self.whitelist_ip,
-        '--start-ip-address', self.whitelist_ip
+        azure.AZURE_PATH,
+        'sql',
+        'server',
+        'firewall-rule',
+        'create',
+        '--name',
+        self.whitelist_ip,
+        '--resource-group',
+        self.resource_group,
+        '--server',
+        self.server_name,
+        '--end-ip-address',
+        self.whitelist_ip,
+        '--start-ip-address',
+        self.whitelist_ip,
     ]
     vm_util.IssueCommand(cmd)
 
     # Push the framework to execute a sql query and gather performance details
-    service_specific_dir = os.path.join('edw',
-                                        Azuresqldatawarehouse.SERVICE_TYPE)
+    service_specific_dir = os.path.join(
+        'edw', Azuresqldatawarehouse.SERVICE_TYPE
+    )
     self.client_vm.PushFile(
         data.ResourcePath(
-            os.path.join(service_specific_dir, 'script_runner.sh')))
+            os.path.join(service_specific_dir, 'script_runner.sh')
+        )
+    )
     runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
     self.client_vm.RemoteCommand(runner_permission_update_cmd)
     self.client_vm.PushFile(
-        data.ResourcePath(os.path.join('edw', 'script_driver.py')))
+        data.ResourcePath(os.path.join('edw', 'script_driver.py'))
+    )
     self.client_vm.PushFile(
         data.ResourcePath(
-            os.path.join(service_specific_dir,
-                         'provider_specific_script_driver.py')))
+            os.path.join(
+                service_specific_dir, 'provider_specific_script_driver.py'
+            )
+        )
+    )
 
   def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
@@ -140,9 +170,15 @@ class CliClientInterface(edw_service.EdwClientInterface):
     """
     query_command = (
         'python script_driver.py --script={} --server={} --database={} '
-        '--user={} --password={} --query_timeout={}').format(
-            query_name, self.server_name, self.database, self.user,
-            self.password, FLAGS.query_timeout)
+        '--user={} --password={} --query_timeout={}'
+    ).format(
+        query_name,
+        self.server_name,
+        self.database,
+        self.user,
+        self.password,
+        FLAGS.query_timeout,
+    )
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
@@ -165,8 +201,14 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     resource_group: Azure resource group used to whitelist the VM's IP address.
   """
 
-  def __init__(self, server_name: str, database: str, user: str, password: str,
-               resource_group: str):
+  def __init__(
+      self,
+      server_name: str,
+      database: str,
+      user: str,
+      password: str,
+      resource_group: str,
+  ):
     self.server_name = server_name
     self.database = database
     self.user = user
@@ -188,16 +230,28 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.whitelist_ip = self.client_vm.ip_address
 
     cmd = [
-        azure.AZURE_PATH, 'sql', 'server', 'firewall-rule', 'create', '--name',
-        self.whitelist_ip, '--resource-group', self.resource_group, '--server',
-        self.server_name, '--end-ip-address', self.whitelist_ip,
-        '--start-ip-address', self.whitelist_ip
+        azure.AZURE_PATH,
+        'sql',
+        'server',
+        'firewall-rule',
+        'create',
+        '--name',
+        self.whitelist_ip,
+        '--resource-group',
+        self.resource_group,
+        '--server',
+        self.server_name,
+        '--end-ip-address',
+        self.whitelist_ip,
+        '--start-ip-address',
+        self.whitelist_ip,
     ]
     vm_util.IssueCommand(cmd)
 
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(package_name,
-                                                    [SYNAPSE_JDBC_JAR], '')
+    self.client_vm.InstallPreprovisionedPackageData(
+        package_name, [SYNAPSE_JDBC_JAR], ''
+    )
 
   def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
@@ -212,11 +266,13 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         successful query the value is expected to be positive.
       performance_details: A dictionary of query execution attributes eg. job_id
     """
-    query_command = (f'java -cp {SYNAPSE_JDBC_JAR} '
-                     f'com.google.cloud.performance.edw.Single '
-                     f'--server {self.server_name} --database {self.database} '
-                     f'--query_timeout {FLAGS.query_timeout} '
-                     f'--query_file {query_name}')
+    query_command = (
+        f'java -cp {SYNAPSE_JDBC_JAR} '
+        'com.google.cloud.performance.edw.Single '
+        f'--server {self.server_name} --database {self.database} '
+        f'--query_timeout {FLAGS.query_timeout} '
+        f'--query_file {query_name}'
+    )
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
@@ -226,8 +282,9 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
       details.update(performance['details'])
     return performance['query_wall_time_in_secs'], details
 
-  def ExecuteSimultaneous(self, submission_interval: int,
-                          queries: List[str]) -> str:
+  def ExecuteSimultaneous(
+      self, submission_interval: int, queries: List[str]
+  ) -> str:
     """Executes queries simultaneously on client and return performance details.
 
     Simultaneous app expects queries as white space separated query file names.
@@ -241,11 +298,13 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
       A serialized dictionary of execution details.
     """
     query_list = ' '.join(queries)
-    cmd = (f'java -cp {SYNAPSE_JDBC_JAR} '
-           f'com.google.cloud.performance.edw.Simultaneous '
-           f'--server {self.server_name} --database {self.database} '
-           f'--submission_interval {submission_interval} --query_timeout '
-           f'{FLAGS.query_timeout} --query_files {query_list}')
+    cmd = (
+        f'java -cp {SYNAPSE_JDBC_JAR} '
+        'com.google.cloud.performance.edw.Simultaneous '
+        f'--server {self.server_name} --database {self.database} '
+        f'--submission_interval {submission_interval} --query_timeout '
+        f'{FLAGS.query_timeout} --query_files {query_list}'
+    )
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
@@ -262,9 +321,10 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     query_list = ' '.join([','.join(stream) for stream in concurrency_streams])
     cmd = (
         f'java -cp {SYNAPSE_JDBC_JAR} '
-        f'com.google.cloud.performance.edw.Throughput '
+        'com.google.cloud.performance.edw.Throughput '
         f'--server {self.server_name} --database {self.database} '
-        f'--query_timeout {FLAGS.query_timeout} --query_streams {query_list}')
+        f'--query_timeout {FLAGS.query_timeout} --query_streams {query_list}'
+    )
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
@@ -285,42 +345,46 @@ class Azuresqldatawarehouse(edw_service.EdwService):
     self.resource_group = edw_service_spec.resource_group
     self.server_name = edw_service_spec.server_name
     self.client_interface = GetSqlDataWarehouseClientInterface(
-        self.server_name, self.db, self.user, self.password,
-        self.resource_group)
+        self.server_name, self.db, self.user, self.password, self.resource_group
+    )
 
   def WhitelistIPAddress(self, ip_address):
     """To whitelist the IP address on the cluster."""
     self.whitelist_ip = ip_address
 
-    cmd = [azure.AZURE_PATH,
-           'sql',
-           'server',
-           'firewall-rule',
-           'create',
-           '--name',
-           self.whitelist_ip,
-           '--resource-group',
-           self.resource_group,
-           '--server',
-           self.server_name,
-           '--end-ip-address',
-           self.whitelist_ip,
-           '--start-ip-address',
-           self.whitelist_ip]
+    cmd = [
+        azure.AZURE_PATH,
+        'sql',
+        'server',
+        'firewall-rule',
+        'create',
+        '--name',
+        self.whitelist_ip,
+        '--resource-group',
+        self.resource_group,
+        '--server',
+        self.server_name,
+        '--end-ip-address',
+        self.whitelist_ip,
+        '--start-ip-address',
+        self.whitelist_ip,
+    ]
     vm_util.IssueCommand(cmd)
 
   def __DescribeCluster(self):
     """Describe cluster."""
-    cmd = [azure.AZURE_PATH,
-           'sql',
-           'dw',
-           'show',
-           '--name',
-           self.db,
-           '--resource-group',
-           self.resource_group,
-           '--server',
-           self.server_name]
+    cmd = [
+        azure.AZURE_PATH,
+        'sql',
+        'dw',
+        'show',
+        '--name',
+        self.db,
+        '--resource-group',
+        self.resource_group,
+        '--server',
+        self.server_name,
+    ]
     return vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Exists(self):
@@ -342,16 +406,18 @@ class Azuresqldatawarehouse(edw_service.EdwService):
 
   def _Create(self):
     """Resuming the cluster."""
-    cmd = [azure.AZURE_PATH,
-           'sql',
-           'dw',
-           'resume',
-           '--name',
-           self.db,
-           '--resource-group',
-           self.resource_group,
-           '--server',
-           self.server_name]
+    cmd = [
+        azure.AZURE_PATH,
+        'sql',
+        'dw',
+        'resume',
+        '--name',
+        self.db,
+        '--resource-group',
+        self.resource_group,
+        '--server',
+        self.server_name,
+    ]
     vm_util.IssueCommand(cmd, timeout=420)
 
   def _IsDeleting(self):
@@ -364,25 +430,35 @@ class Azuresqldatawarehouse(edw_service.EdwService):
 
   def _Delete(self):
     """Pausing cluster."""
-    cmd = [azure.AZURE_PATH,
-           'sql',
-           'dw',
-           'pause',
-           '--name',
-           self.db,
-           '--resource-group',
-           self.resource_group,
-           '--server',
-           self.server_name]
+    cmd = [
+        azure.AZURE_PATH,
+        'sql',
+        'dw',
+        'pause',
+        '--name',
+        self.db,
+        '--resource-group',
+        self.resource_group,
+        '--server',
+        self.server_name,
+    ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _DeleteDependencies(self):
     """Delete dependencies of the cluster."""
     if self.client_interface.whitelist_ip is not None:
       cmd = [
-          azure.AZURE_PATH, 'sql', 'server', 'firewall-rule', 'delete',
-          '--name', self.client_interface.whitelist_ip, '--resource-group',
-          self.resource_group, '--server', self.server_name
+          azure.AZURE_PATH,
+          'sql',
+          'server',
+          'firewall-rule',
+          'delete',
+          '--name',
+          self.client_interface.whitelist_ip,
+          '--resource-group',
+          self.resource_group,
+          '--server',
+          self.server_name,
       ]
       vm_util.IssueCommand(cmd, raise_on_failure=False)
 

@@ -24,13 +24,16 @@ FLAGS = flags.FLAGS
 # Histogram results from reading MPI output file
 histogram1 = {'12.5': 50000, '10.0': 50000}
 histogram2 = {'6.0': 50000, '50.0': 50000}
-histogram_text = """\
+histogram_text = (
+    """\
 1024 12.51
 1024 10.01
-""" * 50000 + """\
+""" * 50000
+    + """\
 2048 6.00
 2048 50.0
 """ * 50000
+)
 
 MPI_VARS = '/opt/intel/compilers_and_libraries/linux/mpi/intel64/bin/mpivars.sh'
 
@@ -38,34 +41,37 @@ MPI_VARS = '/opt/intel/compilers_and_libraries/linux/mpi/intel64/bin/mpivars.sh'
 # All VMs have num_cpus=32
 class Vm(pkb_common_test_case.TestLinuxVirtualMachine):
 
-  def __init__(self,
-               smt_enabled=True,
-               ip='10.0.0.2',
-               robust_remote_command_text=None) -> None:
+  def __init__(
+      self, smt_enabled=True, ip='10.0.0.2', robust_remote_command_text=None
+  ) -> None:
     super(Vm, self).__init__(vm_spec=pkb_common_test_case.CreateTestVmSpec())
     self.internal_ip = ip
     self.num_cpus = 32
     # pylint: disable=invalid-name
     self.IsSmtEnabled = mock.PropertyMock(return_value=smt_enabled)
     self.RemoteCommand = mock.PropertyMock(
-        return_value=('Version 2019 Update 2 Build 2019.2-057', ''))
+        return_value=('Version 2019 Update 2 Build 2019.2-057', '')
+    )
     self.RobustRemoteCommand = mock.PropertyMock(
-        return_value=((mpi_test.ReadMpiOutput('mpi_pingpong_output.txt'), '')))
+        return_value=((mpi_test.ReadMpiOutput('mpi_pingpong_output.txt'), ''))
+    )
 
 
 def MpiRun(vms) -> List[sample.Sample]:
   benchmark_module = mock.Mock(BENCHMARK_NAME='mpi')
   benchmark_config = mock.Mock(
-      vm_groups={}, relational_db=mock.Mock(vm_groups={}))
-  spec = benchmark_spec.BenchmarkSpec(benchmark_module, benchmark_config,
-                                      'abcdefg')
+      vm_groups={}, relational_db=mock.Mock(vm_groups={})
+  )
+  spec = benchmark_spec.BenchmarkSpec(
+      benchmark_module, benchmark_config, 'abcdefg'
+  )
   spec.vms = vms
   return mpi_benchmark.Run(spec)
 
 
-class MpiBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
-                           test_util.SamplesTestMixin):
-
+class MpiBenchmarkTestCase(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
   _METRIC_ERR = 'Metric values should be equal %s != %s'
   _VALUE_ERR = 'Values should be equal %s != %s'
   _UNIT_ERR = 'Unit values should be equal %s != %s'
@@ -77,10 +83,12 @@ class MpiBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
     FLAGS.mpi_benchmarks = ['PingPong']
     FLAGS.intelmpi_version = '2019.2-057'
     self.mock_histo = self.enter_context(
-        mock.patch.object(mpi, '_GroupLatencyLines'))
+        mock.patch.object(mpi, '_GroupLatencyLines')
+    )
     self.mock_histo.return_value = [histogram_text.splitlines()]
     self.enter_context(
-        mock.patch.object(intelmpi, 'MpiVars', return_value=MPI_VARS))
+        mock.patch.object(intelmpi, 'MpiVars', return_value=MPI_VARS)
+    )
 
   @mock.patch.object(uuid, 'uuid4', side_effect=_MOCK_UUIDS)
   def testRun(self, mock_uuid) -> None:
@@ -100,16 +108,8 @@ class MpiBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
     self.assertEqual(2, self.mock_histo.call_count)
 
   @parameterized.parameters(
-      {
-          'threads': [0],
-          'num_vms': 1,
-          'expected_threads': [16]
-      },
-      {
-          'threads': [2, 6, 18],
-          'num_vms': 2,
-          'expected_threads': [4, 12, 36]
-      },
+      {'threads': [0], 'num_vms': 1, 'expected_threads': [16]},
+      {'threads': [2, 6, 18], 'num_vms': 2, 'expected_threads': [4, 12, 36]},
       {
           'threads': [0],
           'num_vms': 1,
@@ -118,22 +118,27 @@ class MpiBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
       },
   )
   @mock.patch.object(mpi_benchmark, '_RunTest')
-  def testRunTestCommand(self,
-                         mock_run: mock.Mock,
-                         num_vms: int,
-                         expected_threads: List[int],
-                         threads: List[int],
-                         smt_enabled: bool = True) -> None:
+  def testRunTestCommand(
+      self,
+      mock_run: mock.Mock,
+      num_vms: int,
+      expected_threads: List[int],
+      threads: List[int],
+      smt_enabled: bool = True,
+  ) -> None:
     FLAGS.mpi_threads = threads
     MpiRun([Vm(smt_enabled) for _ in range(num_vms)])
-    for total_processes, found in zip(expected_threads,
-                                      mock_run.call_args_list):
+    for total_processes, found in zip(
+        expected_threads, mock_run.call_args_list
+    ):
       _, found_total_processes, found_ppn, _ = found[0]
       self.assertEqual(total_processes, found_total_processes)
       self.assertEqual(0, found_ppn)
     self.assertLen(
-        mock_run.call_args_list, len(expected_threads),
-        'Missing / extra calls in {}'.format(mock_run.call_args_list))
+        mock_run.call_args_list,
+        len(expected_threads),
+        'Missing / extra calls in {}'.format(mock_run.call_args_list),
+    )
     self.mock_histo.assert_not_called()
 
   @mock.patch.object(mpi, 'RunMpiStats')
@@ -167,7 +172,9 @@ class MpiBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
             compile_from_source=True,
             record_latencies=True,
             environment=['I_MPI_DEBUG=6'],
-            multi=True))
+            multi=True,
+        ),
+    )
     self.mock_histo.assert_not_called()
 
   @parameterized.parameters((True, 16), (False, 32))
@@ -192,14 +199,14 @@ class MpiBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
         'bytes': 1024,
         'mpi_groups': 2,
         'mpi_processes_per_group': 2,
-        'histogram': histogram1
+        'histogram': histogram1,
     }
     self.assertDictContainsSubset(meta1, histogram_data[0].metadata)
     meta2 = {
         'bytes': 2048,
         'mpi_groups': 2,
         'mpi_processes_per_group': 2,
-        'histogram': histogram2
+        'histogram': histogram2,
     }
     self.assertDictContainsSubset(meta2, histogram_data[1].metadata)
     self.assertEqual(4, self.mock_histo.call_count)
@@ -207,8 +214,9 @@ class MpiBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
   @flagsaver.flagsaver(mpi_benchmarks=['Qubert', 'Broadcast', 'allTOaLL'])
   def testGetConfigBadBenchmark(self):
     # Alltoall is a valid benchmark
-    with self.assertRaisesRegex(errors.Setup.InvalidFlagConfigurationError,
-                                '"broadcast,qubert"'):
+    with self.assertRaisesRegex(
+        errors.Setup.InvalidFlagConfigurationError, '"broadcast,qubert"'
+    ):
       mpi_benchmark.GetConfig({})
 
   @flagsaver.flagsaver(mpi_benchmarks=['Bcast'], mpi_msglog_sizes=[20])
@@ -229,7 +237,8 @@ class MpiBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
     # Mock response with no results as not testing that functionality
     response = mpi.MpiResponse('a', 'b', 'c', 'd', [], [], {})
     mpirun_mock = self.enter_context(
-        mock.patch.object(mpi, 'RunMpiStats', return_value=response))
+        mock.patch.object(mpi, 'RunMpiStats', return_value=response)
+    )
     vm = Vm()
 
     mpi_benchmark._RunTest([vm], 2, 1, True)
@@ -253,7 +262,8 @@ class MpiBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
         record_latencies=True,
         npmin=None,
         tune=False,
-        multi=True)
+        multi=True,
+    )
     # Test the last one called
     mpirun_mock.assert_called_with(vm, expected_request)
     # It was called len(IMB-MT suite tests) times

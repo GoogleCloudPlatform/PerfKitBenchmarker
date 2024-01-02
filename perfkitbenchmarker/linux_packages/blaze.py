@@ -21,8 +21,7 @@ from perfkitbenchmarker import vm_util
 BLAZE_VERSION = '3.0'
 BLAZE_TAR = 'blaze-%s.tar.gz' % BLAZE_VERSION
 BLAZE_DIR = '%s/blaze-%s' % (vm_util.VM_TMP_DIR, BLAZE_VERSION)
-BLAZE_TAR_URL = (
-    'https://bitbucket.org/blaze-lib/blaze/downloads/%s' % BLAZE_TAR)
+BLAZE_TAR_URL = 'https://bitbucket.org/blaze-lib/blaze/downloads/%s' % BLAZE_TAR
 CONFIG_TEMPLATE = 'blaze_config.j2'
 CONFIG = 'config'
 MAX_BLAZE_CACHE_SIZE_IN_B = 100000000
@@ -37,30 +36,42 @@ def _Configure(vm):
   vm.RenderTemplate(
       data.ResourcePath(CONFIG_TEMPLATE),
       os.path.join(BLAZE_DIR, CONFIG),
-      {'compiler': 'g++-5',
-       'compile_flags': ' -DBLAZE_USE_BOOST_THREADS --std=c++14'})
+      {
+          'compiler': 'g++-5',
+          'compile_flags': ' -DBLAZE_USE_BOOST_THREADS --std=c++14',
+      },
+  )
   # Adjust cache size
   cache_in_KB, _ = vm.RemoteCommand(
-      'cat /proc/cpuinfo | grep "cache size" | awk \'{print $4}\'')
+      'cat /proc/cpuinfo | grep "cache size" | awk \'{print $4}\''
+  )
   cache_in_B = int(1024 * float(cache_in_KB.split()[0]))
   vm.RemoteCommand(
-      'sed -i \'s/constexpr size_t cacheSize = 3145728UL;/constexpr '
-      'size_t cacheSize = %sUL;/g\' %s' % (
-          min(cache_in_B, MAX_BLAZE_CACHE_SIZE_IN_B - 1), os.path.join(
-              BLAZE_DIR, 'blaze', 'config', 'CacheSize.h')))
-  vm.RemoteCommand('cd %s; ./configure %s; make -j %s' % (
-      BLAZE_DIR, CONFIG, vm.NumCpusForBenchmark()))
+      "sed -i 's/constexpr size_t cacheSize = 3145728UL;/constexpr "
+      "size_t cacheSize = %sUL;/g' %s"
+      % (
+          min(cache_in_B, MAX_BLAZE_CACHE_SIZE_IN_B - 1),
+          os.path.join(BLAZE_DIR, 'blaze', 'config', 'CacheSize.h'),
+      )
+  )
+  vm.RemoteCommand(
+      'cd %s; ./configure %s; make -j %s'
+      % (BLAZE_DIR, CONFIG, vm.NumCpusForBenchmark())
+  )
 
 
 def _Install(vm):
   """Installs the blaze package on the VM."""
   vm.RemoteCommand(
       'cd {tmp_dir}; wget {tar_url}; tar xzvf {tar}'.format(
-          tmp_dir=vm_util.VM_TMP_DIR,
-          tar_url=BLAZE_TAR_URL,
-          tar=BLAZE_TAR))
-  vm.RemoteCommand('sudo cp -r {blaze_dir}/blaze /usr/local/include'.format(
-      blaze_dir=BLAZE_DIR))
+          tmp_dir=vm_util.VM_TMP_DIR, tar_url=BLAZE_TAR_URL, tar=BLAZE_TAR
+      )
+  )
+  vm.RemoteCommand(
+      'sudo cp -r {blaze_dir}/blaze /usr/local/include'.format(
+          blaze_dir=BLAZE_DIR
+      )
+  )
   _Configure(vm)
 
 

@@ -21,7 +21,8 @@ FLAGS = flags.FLAGS
 
 
 class TensorflowBenchmarkBatchSizesTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   def setUp(self):
     super(TensorflowBenchmarkBatchSizesTestCase, self).setUp()
@@ -29,121 +30,145 @@ class TensorflowBenchmarkBatchSizesTestCase(
 
   def testFlagOverridesDefaultBatchSize(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'alexnet', tensorflow_benchmark.CPU)
+        'alexnet', tensorflow_benchmark.CPU
+    )
     self.assertEqual([99], batch_size)
 
 
 class TensorflowBenchmarkDefaultBatchSizesTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   def testUnknownGpuTypeReturnsDefaultBatchSize(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'alexnet', 'unknown_gpu_type')
+        'alexnet', 'unknown_gpu_type'
+    )
     self.assertEqual([64], batch_size)
 
   def testUnknownModelReturnsDefaultBatchSize(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'unknown_model', tensorflow_benchmark.CPU)
+        'unknown_model', tensorflow_benchmark.CPU
+    )
     self.assertEqual([64], batch_size)
 
   def testCpuAlexnetDefault(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'alexnet', tensorflow_benchmark.CPU)
+        'alexnet', tensorflow_benchmark.CPU
+    )
     self.assertEqual([512], batch_size)
 
   def testCpuInception3Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'inception3', tensorflow_benchmark.CPU)
+        'inception3', tensorflow_benchmark.CPU
+    )
     self.assertEqual([64], batch_size)
 
   def testCpuResnet50Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'resnet50', tensorflow_benchmark.CPU)
+        'resnet50', tensorflow_benchmark.CPU
+    )
     self.assertEqual([64], batch_size)
 
   def testCpuResnet152Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'resnet152', tensorflow_benchmark.CPU)
+        'resnet152', tensorflow_benchmark.CPU
+    )
     self.assertEqual([32], batch_size)
 
   def testCpuVgg16Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'vgg16', tensorflow_benchmark.CPU)
+        'vgg16', tensorflow_benchmark.CPU
+    )
     self.assertEqual([32], batch_size)
 
   def testK80AlexnetDefault(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'alexnet', tensorflow_benchmark.NVIDIA_TESLA_K80)
+        'alexnet', tensorflow_benchmark.NVIDIA_TESLA_K80
+    )
     self.assertEqual([512], batch_size)
 
   def testK80Inception3Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'inception3', tensorflow_benchmark.NVIDIA_TESLA_K80)
+        'inception3', tensorflow_benchmark.NVIDIA_TESLA_K80
+    )
     self.assertEqual([64], batch_size)
 
   def testK80Resnet50Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'resnet50', tensorflow_benchmark.NVIDIA_TESLA_K80)
+        'resnet50', tensorflow_benchmark.NVIDIA_TESLA_K80
+    )
     self.assertEqual([64], batch_size)
 
   def testK80Resnet152Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'resnet152', tensorflow_benchmark.NVIDIA_TESLA_K80)
+        'resnet152', tensorflow_benchmark.NVIDIA_TESLA_K80
+    )
     self.assertEqual([32], batch_size)
 
   def testK80Vgg16Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'vgg16', tensorflow_benchmark.NVIDIA_TESLA_K80)
+        'vgg16', tensorflow_benchmark.NVIDIA_TESLA_K80
+    )
     self.assertEqual([32], batch_size)
 
   def testP100AlexnetDefault(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'alexnet', tensorflow_benchmark.NVIDIA_TESLA_P100)
+        'alexnet', tensorflow_benchmark.NVIDIA_TESLA_P100
+    )
     self.assertEqual([512], batch_size)
 
   def testP100Inception3Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'inception3', tensorflow_benchmark.NVIDIA_TESLA_P100)
+        'inception3', tensorflow_benchmark.NVIDIA_TESLA_P100
+    )
     self.assertEqual([256], batch_size)
 
   def testP100Resnet50Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'resnet50', tensorflow_benchmark.NVIDIA_TESLA_P100)
+        'resnet50', tensorflow_benchmark.NVIDIA_TESLA_P100
+    )
     self.assertEqual([256], batch_size)
 
   def testP100Resnet152Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'resnet152', tensorflow_benchmark.NVIDIA_TESLA_P100)
+        'resnet152', tensorflow_benchmark.NVIDIA_TESLA_P100
+    )
     self.assertEqual([128], batch_size)
 
   def testP100Vgg16Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'vgg16', tensorflow_benchmark.NVIDIA_TESLA_P100)
+        'vgg16', tensorflow_benchmark.NVIDIA_TESLA_P100
+    )
     self.assertEqual([128], batch_size)
 
   def testV100AlexnetDefault(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'alexnet', tensorflow_benchmark.NVIDIA_TESLA_V100)
+        'alexnet', tensorflow_benchmark.NVIDIA_TESLA_V100
+    )
     self.assertEqual([512], batch_size)
 
   def testV100Inception3Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'inception3', tensorflow_benchmark.NVIDIA_TESLA_V100)
+        'inception3', tensorflow_benchmark.NVIDIA_TESLA_V100
+    )
     self.assertEqual([256], batch_size)
 
   def testV100Resnet50Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'resnet50', tensorflow_benchmark.NVIDIA_TESLA_V100)
+        'resnet50', tensorflow_benchmark.NVIDIA_TESLA_V100
+    )
     self.assertEqual([256], batch_size)
 
   def testV100Resnet152Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'resnet152', tensorflow_benchmark.NVIDIA_TESLA_V100)
+        'resnet152', tensorflow_benchmark.NVIDIA_TESLA_V100
+    )
     self.assertEqual([128], batch_size)
 
   def testV100Vgg16Default(self):
     batch_size = tensorflow_benchmark._GetBatchSizes(
-        'vgg16', tensorflow_benchmark.NVIDIA_TESLA_V100)
+        'vgg16', tensorflow_benchmark.NVIDIA_TESLA_V100
+    )
     self.assertEqual([128], batch_size)
 
 

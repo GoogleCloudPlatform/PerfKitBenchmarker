@@ -21,7 +21,6 @@ from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -43,7 +42,12 @@ _COMPONENT = 'test_component'
 
 def _AwsCommand(region, topic, *args):
   return [
-      'aws', '--output', 'json', 'ec2', topic, '--region={}'.format(region)
+      'aws',
+      '--output',
+      'json',
+      'ec2',
+      topic,
+      '--region={}'.format(region),
   ] + list(args)
 
 
@@ -56,22 +60,28 @@ class AwsVolumeExistsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.addCleanup(p.stop)
     self.disk = aws_disk.AwsDisk(
         aws_disk.AwsDiskSpec(_COMPONENT, disk_type='standard'),
-        'us-east-1', 'm4.2xlarge')
+        'us-east-1',
+        'm4.2xlarge',
+    )
     self.disk.id = 'vol-foo'
 
   def testVolumePresent(self):
-    response = ('{"Volumes":[{"Size":500,"Attachments":[],"SnapshotId":null,'
-                '"CreateTime": "2015-05-04T23:47:31.726Z","VolumeId":'
-                '"vol-5859691f","AvailabilityZone":"us-east-1a","VolumeType":'
-                '"standard","State":"creating"}]}')
+    response = (
+        '{"Volumes":[{"Size":500,"Attachments":[],"SnapshotId":null,'
+        '"CreateTime": "2015-05-04T23:47:31.726Z","VolumeId":'
+        '"vol-5859691f","AvailabilityZone":"us-east-1a","VolumeType":'
+        '"standard","State":"creating"}]}'
+    )
     util.IssueRetryableCommand.side_effect = [(response, None)]
     self.assertTrue(self.disk._Exists())
 
   def testVolumeDeleted(self):
-    response = ('{"Volumes":[{"VolumeId":"vol-e45b6ba3","Size": 500,'
-                '"AvailabilityZone": "us-east-1a","CreateTime":'
-                '"2015-05-04T23:53:42.952Z","Attachments":[],"State":'
-                '"deleting","SnapshotId":null,"VolumeType": "standard"}]}')
+    response = (
+        '{"Volumes":[{"VolumeId":"vol-e45b6ba3","Size": 500,'
+        '"AvailabilityZone": "us-east-1a","CreateTime":'
+        '"2015-05-04T23:53:42.952Z","Attachments":[],"State":'
+        '"deleting","SnapshotId":null,"VolumeType": "standard"}]}'
+    )
     util.IssueRetryableCommand.side_effect = [(response, None)]
     self.assertFalse(self.disk._Exists())
 
@@ -80,8 +90,9 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super(AwsVpcTestCase, self).setUp()
-    p = mock.patch('perfkitbenchmarker.providers.aws.'
-                   'util.IssueRetryableCommand')
+    p = mock.patch(
+        'perfkitbenchmarker.providers.aws.util.IssueRetryableCommand'
+    )
     p.start()
     self.addCleanup(p.stop)
     self.vpc = aws_network.AwsVpc('region')
@@ -93,8 +104,10 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     res1 = {'Vpc': {'VpcId': vpc_id}}
     res2 = {'Vpcs': [1]}
     res3 = {'SecurityGroups': [{'GroupId': security_group_id}]}
-    mock_cmd.side_effect = [(json.dumps(res1), '', 0),
-                            (json.dumps(res3), '', 0)]
+    mock_cmd.side_effect = [
+        (json.dumps(res1), '', 0),
+        (json.dumps(res3), '', 0),
+    ]
     util.IssueRetryableCommand.return_value = json.dumps(res2), ''
     self.assertFalse(self.vpc.user_managed)
     self.vpc.Create()
@@ -102,15 +115,17 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(security_group_id, self.vpc.default_security_group_id)
 
   def testInstanceVpcQuotaExceededDuringCreate(self):
-    stderr = ('An error occurred (VpcLimitExceeded) when calling the CreateVpc '
-              'operation: The maximum number of VPCs has been reached.')
+    stderr = (
+        'An error occurred (VpcLimitExceeded) when calling the CreateVpc '
+        'operation: The maximum number of VPCs has been reached.'
+    )
     self.MockIssueCommand(None, stderr, 255)
     with self.assertRaises(errors.Benchmarks.QuotaFailure) as e:
       self.vpc.Create()
     self.assertEqual(str(e.exception), stderr)
 
   def testVpcCreateError(self):
-    stderr = ('An unknown error occurred when calling the CreateVpc opeartion.')
+    stderr = 'An unknown error occurred when calling the CreateVpc opeartion.'
     retcode = 1
     error_msg = 'Failed to create Vpc: %s return code: %s' % (retcode, stderr)
     self.MockIssueCommand(None, stderr, retcode)
@@ -124,10 +139,12 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertFalse(self.vpc._Exists())
 
   def testVpcPresent(self):
-    response = ('{"Vpcs":[{"InstanceTenancy":"default","CidrBlock":'
-                '"10.0.0.0/16","IsDefault":false,"DhcpOptionsId":'
-                '"dopt-59b12f38","State":"available","VpcId":"vpc-2289a647"'
-                '}]}')
+    response = (
+        '{"Vpcs":[{"InstanceTenancy":"default","CidrBlock":'
+        '"10.0.0.0/16","IsDefault":false,"DhcpOptionsId":'
+        '"dopt-59b12f38","State":"available","VpcId":"vpc-2289a647"'
+        '}]}'
+    )
     util.IssueRetryableCommand.side_effect = [(response, None)]
     self.assertTrue(self.vpc._Exists())
 
@@ -149,10 +166,15 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     delete_response = {}
     create_cmd = _AwsCommand(region, 'create-internet-gateway')
     describe_cmd = _AwsCommand(
-        region, 'describe-internet-gateways',
-        '--filter=Name=internet-gateway-id,Values={}'.format(gateway_id))
-    delete_cmd = _AwsCommand(region, 'delete-internet-gateway',
-                             '--internet-gateway-id={}'.format(gateway_id))
+        region,
+        'describe-internet-gateways',
+        '--filter=Name=internet-gateway-id,Values={}'.format(gateway_id),
+    )
+    delete_cmd = _AwsCommand(
+        region,
+        'delete-internet-gateway',
+        '--internet-gateway-id={}'.format(gateway_id),
+    )
 
     # Test the Create() command
     mock_cmd.side_effect = [(json.dumps(create_response), '', 0)]
@@ -170,7 +192,7 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     mock_cmd.side_effect = [(json.dumps(delete_response), '', 0)] * 2
     util.IssueRetryableCommand.side_effect = [
         (json.dumps(exists_response), ''),
-        (json.dumps(exists_response_no_resources), '')
+        (json.dumps(exists_response_no_resources), ''),
     ]
     gateway.Delete()
     mock_cmd.assert_called_with(delete_cmd, raise_on_failure=False)
@@ -186,16 +208,22 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     exists_response = {'Subnets': [{'SubnetId': subnet_id, 'VpcId': vpc_id}]}
     exists_response_no_resources = {'Subnets': []}
     delete_response = {}
-    create_cmd = _AwsCommand(region, 'create-subnet',
-                             '--vpc-id={}'.format(vpc_id),
-                             '--cidr-block=10.0.0.0/24',
-                             '--availability-zone={}'.format(zone))
+    create_cmd = _AwsCommand(
+        region,
+        'create-subnet',
+        '--vpc-id={}'.format(vpc_id),
+        '--cidr-block=10.0.0.0/24',
+        '--availability-zone={}'.format(zone),
+    )
     describe_cmd = _AwsCommand(
-        region, 'describe-subnets',
+        region,
+        'describe-subnets',
         '--filter=Name=vpc-id,Values={}'.format(vpc_id),
-        '--filter=Name=subnet-id,Values={}'.format(subnet_id))
-    delete_cmd = _AwsCommand(region, 'delete-subnet',
-                             '--subnet-id={}'.format(subnet_id))
+        '--filter=Name=subnet-id,Values={}'.format(subnet_id),
+    )
+    delete_cmd = _AwsCommand(
+        region, 'delete-subnet', '--subnet-id={}'.format(subnet_id)
+    )
 
     # Test the Create() command
     mock_cmd.side_effect = [(json.dumps(create_response), '', 0)]
@@ -209,9 +237,10 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     mock_cmd.reset_mock()
     util.IssueRetryableCommand.reset_mock()
     mock_cmd.side_effect = [(json.dumps(delete_response), '', 0)]
-    util.IssueRetryableCommand.side_effect = [
-        (json.dumps(exists_response_no_resources), '')
-    ]
+    util.IssueRetryableCommand.side_effect = [(
+        json.dumps(exists_response_no_resources),
+        '',
+    )]
     subnet.Delete()
     mock_cmd.assert_called_with(delete_cmd, raise_on_failure=False)
     util.IssueRetryableCommand.assert_called_with(describe_cmd)
@@ -224,9 +253,10 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     does_exist_res = {'Vpcs': [1]}
     does_not_exist_res = {'Vpcs': []}
     mock_cmd.return_value = json.dumps(security_group_res), '', 0
-    util.IssueRetryableCommand.side_effect = [(json.dumps(does_exist_res), ''),
-                                              (json.dumps(does_not_exist_res),
-                                               '')]
+    util.IssueRetryableCommand.side_effect = [
+        (json.dumps(does_exist_res), ''),
+        (json.dumps(does_not_exist_res), ''),
+    ]
     vpc = aws_network.AwsVpc('region', vpc_id)
     self.assertTrue(vpc.user_managed)
     # show Create() works
@@ -242,11 +272,7 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     subnet_id = 'subnet-1234'
     cidr = '10.0.0.0/24'
     res = {
-        'Subnets': [{
-            'VpcId': vpc_id,
-            'SubnetId': subnet_id,
-            'CidrBlock': cidr
-        }]
+        'Subnets': [{'VpcId': vpc_id, 'SubnetId': subnet_id, 'CidrBlock': cidr}]
     }
     util.IssueRetryableCommand.return_value = json.dumps(res), None
     spec = aws_network.AwsNetworkSpec(zone, vpc_id)
@@ -256,8 +282,9 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(cidr, spec.cidr_block)
 
 
-class TestAwsVirtualMachine(pkb_common_test_case.TestOsMixin,
-                            aws_virtual_machine.AwsVirtualMachine):
+class TestAwsVirtualMachine(
+    pkb_common_test_case.TestOsMixin, aws_virtual_machine.AwsVirtualMachine
+):
   pass
 
 
@@ -266,12 +293,12 @@ def TestVmSpec():
       'test_vm_spec.AWS',
       zone='us-east-1a',
       machine_type='c3.large',
-      spot_price=123.45)
+      spot_price=123.45,
+  )
 
 
 def OpenJSONData(filename):
-  path = os.path.join(os.path.dirname(__file__),
-                      'data', filename)
+  path = os.path.join(os.path.dirname(__file__), 'data', filename)
   with open(path) as f:
     return f.read()
 
@@ -287,20 +314,22 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.cloud = provider_info.AWS
     FLAGS.run_uri = 'aaaaaa'
     FLAGS.temp_dir = 'tmp'
-    p = mock.patch('perfkitbenchmarker.providers.aws.'
-                   'util.IssueRetryableCommand')
+    p = mock.patch(
+        'perfkitbenchmarker.providers.aws.util.IssueRetryableCommand'
+    )
     p.start()
     self.addCleanup(p.stop)
-    p2 = mock.patch('perfkitbenchmarker.'
-                    'vm_util.IssueCommand')
+    p2 = mock.patch('perfkitbenchmarker.vm_util.IssueCommand')
     p2.start()
     self.addCleanup(p2.stop)
 
     # VM Creation depends on there being a BenchmarkSpec.
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={})
-    self.spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec,
-                                             _BENCHMARK_UID)
+        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={}
+    )
+    self.spec = benchmark_spec.BenchmarkSpec(
+        mock.MagicMock(), config_spec, _BENCHMARK_UID
+    )
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
     self.vm = CreateTestAwsVm()
@@ -317,8 +346,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.vm.placement_group = placement_group
 
     self.response = OpenJSONData('aws-describe-instance.json')
-    self.sir_response = OpenJSONData(
-        'aws-describe-spot-instance-requests.json')
+    self.sir_response = OpenJSONData('aws-describe-spot-instance-requests.json')
     self.vm.network.is_static = False
     self.vm.network.regional_network.vpc.default_security_group_id = 'sg-1234'
 
@@ -387,7 +415,7 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
               'does not exist'
           ),
           'expected_error': errors.Benchmarks.KnownIntermittentError,
-      }
+      },
   )
   def testVMCreationError(self, stderr, expected_error):
     vm_util.IssueCommand.side_effect = [('', '', 0)]
@@ -401,14 +429,17 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       {
           'testcase_name': 'retry_rate_limited',
           'retry_rate_limited': True,
-          'expected_error': errors.Resource.RetryableCreationError
-      }, {
+          'expected_error': errors.Resource.RetryableCreationError,
+      },
+      {
           'testcase_name': 'do_not_retry_rate_limited',
           'retry_rate_limited': False,
-          'expected_error': errors.Benchmarks.QuotaFailure
-      })
-  def testInstanceRequestLimitExceededCreate(self, retry_rate_limited,
-                                             expected_error):
+          'expected_error': errors.Benchmarks.QuotaFailure,
+      },
+  )
+  def testInstanceRequestLimitExceededCreate(
+      self, retry_rate_limited, expected_error
+  ):
     FLAGS.retry_on_rate_limited = retry_rate_limited
     stderr = (
         'An error occurred (RequestLimitExceeded) when calling the RunInstances'
@@ -429,10 +460,14 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     response = OpenJSONData('aws-describe-instance-stockout.json')
     util.IssueRetryableCommand.side_effect = [(response, None)]
     with self.assertRaises(
-        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
+        errors.Benchmarks.InsufficientCapacityCloudFailure
+    ) as e:
       self.vm._Exists()
-    self.assertEqual(str(e.exception), 'Server.InsufficientInstanceCapacity:'
-                     ' Insufficient capacity to satisfy instance request')
+    self.assertEqual(
+        str(e.exception),
+        'Server.InsufficientInstanceCapacity:'
+        ' Insufficient capacity to satisfy instance request',
+    )
 
   def testInternalServerErrorAfterCreate(self):
     """This tests when run-instances succeeds and returns a pending instance.
@@ -500,44 +535,55 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm_util.IssueCommand.side_effect = [(None, '', None)]
     self.vm._Create()
 
-    vm_util.IssueCommand.assert_called_with([
-        'aws',
-        '--output',
-        'json',
-        'ec2',
-        'run-instances',
-        '--region=us-east-1',
-        '--client-token=00000000-1111-2222-3333-444444444444',
-        '--image-id=ami-12345',
-        '--instance-type=c3.large',
-        '--key-name=perfkit-key-aaaaaa',
-        '--tag-specifications=foobar',
-        '--associate-public-ip-address',
-        '--subnet-id=subnet-id',
-        ('--placement=AvailabilityZone=us-east-1a,'
-         'GroupName=placement_group_name'),
-        ('--instance-market-options={"MarketType": "spot", '
-         '"SpotOptions": {"SpotInstanceType": "one-time", '
-         '"InstanceInterruptionBehavior": "terminate", "MaxPrice": "123.45"}}')
-    ],
-                                            raise_on_failure=False)
+    vm_util.IssueCommand.assert_called_with(
+        [
+            'aws',
+            '--output',
+            'json',
+            'ec2',
+            'run-instances',
+            '--region=us-east-1',
+            '--client-token=00000000-1111-2222-3333-444444444444',
+            '--image-id=ami-12345',
+            '--instance-type=c3.large',
+            '--key-name=perfkit-key-aaaaaa',
+            '--tag-specifications=foobar',
+            '--associate-public-ip-address',
+            '--subnet-id=subnet-id',
+            (
+                '--placement=AvailabilityZone=us-east-1a,'
+                'GroupName=placement_group_name'
+            ),
+            (
+                '--instance-market-options={"MarketType": "spot",'
+                ' "SpotOptions": {"SpotInstanceType": "one-time",'
+                ' "InstanceInterruptionBehavior": "terminate", "MaxPrice":'
+                ' "123.45"}}'
+            ),
+        ],
+        raise_on_failure=False,
+    )
     self.vm.use_spot_instance = False
 
   def testCreateSpotFailure(self):
-    stderr = ('An error occurred (InsufficientInstanceCapacity) when calling '
-              'the RunInstances operation (reached max retries: 4): '
-              'Insufficient capacity.')
+    stderr = (
+        'An error occurred (InsufficientInstanceCapacity) when calling '
+        'the RunInstances operation (reached max retries: 4): '
+        'Insufficient capacity.'
+    )
     vm_util.IssueCommand.side_effect = [('', '', 0)]
 
     self.vm._CreateDependencies()
     vm_util.IssueCommand.side_effect = [(None, stderr, None)]
     with self.assertRaises(
-        errors.Benchmarks.InsufficientCapacityCloudFailure) as e:
+        errors.Benchmarks.InsufficientCapacityCloudFailure
+    ) as e:
       self.vm.use_spot_instance = True
       self.vm._Create()
     self.assertEqual(str(e.exception), stderr)
-    self.assertEqual(self.vm.spot_status_code,
-                     'InsufficientSpotInstanceCapacity')
+    self.assertEqual(
+        self.vm.spot_status_code, 'InsufficientSpotInstanceCapacity'
+    )
     self.assertTrue(self.vm.spot_early_termination)
     self.vm.use_spot_instance = False
 
@@ -547,14 +593,17 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.vm._Delete()
 
     vm_util.IssueCommand.assert_called_with(
-        ['aws',
-         '--output',
-         'json',
-         '--region=us-east-1',
-         'ec2',
-         'cancel-spot-instance-requests',
-         '--spot-instance-request-ids=sir-abc'],
-        raise_on_failure=False)
+        [
+            'aws',
+            '--output',
+            'json',
+            '--region=us-east-1',
+            'ec2',
+            'cancel-spot-instance-requests',
+            '--spot-instance-request-ids=sir-abc',
+        ],
+        raise_on_failure=False,
+    )
     self.vm.use_spot_instance = False
 
   def testFirewallAllowPortNonStatic(self):
@@ -562,9 +611,14 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     util.IssueRetryableCommand.return_value = json.dumps(check_firewall), ''
     self.vm.firewall.AllowPort(self.vm, 22)
     # only checking that the 2nd of the tcp/udp calls are done
-    cmd = _AwsCommand('us-east-1', 'authorize-security-group-ingress',
-                      '--group-id=sg-1234', '--port=22-22', '--cidr=0.0.0.0/0',
-                      '--protocol=udp')
+    cmd = _AwsCommand(
+        'us-east-1',
+        'authorize-security-group-ingress',
+        '--group-id=sg-1234',
+        '--port=22-22',
+        '--cidr=0.0.0.0/0',
+        '--protocol=udp',
+    )
     util.IssueRetryableCommand.assert_called_with(cmd)
 
   def testFirewallAllowPortStaticVm(self):
@@ -607,15 +661,19 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm = InitCentosVm()
     vm._ConfigureElasticIp = mock.Mock()
     vm._PostCreate()
-    aws_cmd = '; '.join([
-        cmd[0][0] for cmd in vm.RemoteHostCommandWithReturnCode.call_args_list
-    ])
+    aws_cmd = '; '.join(
+        [cmd[0][0] for cmd in vm.RemoteHostCommandWithReturnCode.call_args_list]
+    )
     self.assertRegex(
-        aws_cmd, '.*'.join([
-            'curl -O https://s3-us-west-2', 'yum upgrade -y kernel',
-            'yum install -y kernel-devel', 'efa_installer.sh -y',
-            './efa_test.sh'
-        ]))
+        aws_cmd,
+        '.*'.join([
+            'curl -O https://s3-us-west-2',
+            'yum upgrade -y kernel',
+            'yum install -y kernel-devel',
+            'efa_installer.sh -y',
+            './efa_test.sh',
+        ]),
+    )
     vm.Reboot.assert_called_once()
 
 
@@ -640,9 +698,7 @@ def InitCentosVm():
           'Instances': [{
               'PublicIpAddress': '10.0.0.1',
               'PrivateIpAddress': '10.0.0.2',
-              'SecurityGroups': [{
-                  'GroupId': None
-              }]
+              'SecurityGroups': [{'GroupId': None}],
           }]
       }]
   }
@@ -692,13 +748,16 @@ class AwsGetBlockDeviceMapTestCase(pkb_common_test_case.PkbCommonTestCase):
     p.start()
     self.addCleanup(p.stop)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={})
-    self.spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec,
-                                             _BENCHMARK_UID)
+        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={}
+    )
+    self.spec = benchmark_spec.BenchmarkSpec(
+        mock.MagicMock(), config_spec, _BENCHMARK_UID
+    )
     self.aws_vm = CreateTestAwsVm()
 
-    path = os.path.join(os.path.dirname(__file__),
-                        'data', 'describe_image_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), 'data', 'describe_image_output.txt'
+    )
     with open(path) as fp:
       self.describe_image_output = fp.read()
 
@@ -712,23 +771,30 @@ class AwsGetBlockDeviceMapTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsNone(actual)
 
   def testValidMachineTypeWithSpecifiedRootVolumeSize(self):
-    util.IssueRetryableCommand.side_effect = [(self.describe_image_output,
-                                               None)]
+    util.IssueRetryableCommand.side_effect = [(
+        self.describe_image_output,
+        None,
+    )]
     self.aws_vm.boot_disk_size = 35
     self.aws_vm.machine_type = 'c1.medium'
     self.aws_vm.image = 'ami-a9d276c9'
     self.aws_vm.region = 'us-west-2'
-    expected = [{'DeviceName': '/dev/sda1',
-                 'Ebs': {'SnapshotId': 'snap-826344d5',
-                         'DeleteOnTermination': True,
-                         'VolumeType': 'gp2',
-                         'VolumeSize': 35}}]
+    expected = [{
+        'DeviceName': '/dev/sda1',
+        'Ebs': {
+            'SnapshotId': 'snap-826344d5',
+            'DeleteOnTermination': True,
+            'VolumeType': 'gp2',
+            'VolumeSize': 35,
+        },
+    }]
     actual = json.loads(aws_virtual_machine.GetBlockDeviceMap(self.aws_vm))
     self.assertEqual(actual, expected)
 
 
 class AwsGetRootBlockDeviceSpecForImageTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   def setUp(self):
     super(AwsGetRootBlockDeviceSpecForImageTestCase, self).setUp()
@@ -736,14 +802,17 @@ class AwsGetRootBlockDeviceSpecForImageTestCase(
     p.start()
     self.addCleanup(p.stop)
 
-    path = os.path.join(os.path.dirname(__file__),
-                        'data', 'describe_image_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), 'data', 'describe_image_output.txt'
+    )
     with open(path) as fp:
       self.describe_image_output = fp.read()
 
   def testOk(self):
-    util.IssueRetryableCommand.side_effect = [(self.describe_image_output,
-                                               None)]
+    util.IssueRetryableCommand.side_effect = [(
+        self.describe_image_output,
+        None,
+    )]
     image_id = 'ami-a9d276c9'
     region = 'us-west-2'
     expected = {
@@ -753,11 +822,12 @@ class AwsGetRootBlockDeviceSpecForImageTestCase(
             'DeleteOnTermination': True,
             'VolumeType': 'gp2',
             'VolumeSize': 8,
-            'Encrypted': False
-        }
+            'Encrypted': False,
+        },
     }
-    actual = aws_virtual_machine.GetRootBlockDeviceSpecForImage(image_id,
-                                                                region)
+    actual = aws_virtual_machine.GetRootBlockDeviceSpecForImage(
+        image_id, region
+    )
     self.assertEqual(actual, expected)
 
 
@@ -767,10 +837,14 @@ class AwsKeyFileManagerTestCase(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch.object(vm_util, 'IssueCommand')
   def testKeyPairLimitExceeded(self, import_cmd, cat_cmd):
     cat_cmd.side_effect = [('key_content', None)]
-    import_cmd.side_effect = [('', (
-        'An error occurred (KeyPairLimitExceeded) when calling the '
-        'ImportKeyPair operation: Maximum of 5000 keypairs reached.'
-    ), 255)]
+    import_cmd.side_effect = [(
+        '',
+        (
+            'An error occurred (KeyPairLimitExceeded) when calling the '
+            'ImportKeyPair operation: Maximum of 5000 keypairs reached.'
+        ),
+        255,
+    )]
     with self.assertRaises(errors.Benchmarks.QuotaFailure):
       aws_virtual_machine.AwsKeyFileManager.ImportKeyfile('region')
 

@@ -134,6 +134,7 @@ def _IsNonIncreasing(result, val):
   Args:
     result: list integers and/or range tuples.
     val: integer or range tuple to append.
+
   Returns:
     bool indicating if the appended list is non-increasing.
   """
@@ -170,8 +171,10 @@ class IntegerListParser(flags.ArgumentParser):
   to [-3, -1, 1, 3].
   """
 
-  syntactic_help = ('A comma-separated list of integers or integer '
-                    'ranges. Ex: -1,3,5:7 is read as -1,3,5,6,7.')
+  syntactic_help = (
+      'A comma-separated list of integers or integer '
+      'ranges. Ex: -1,3,5:7 is read as -1,3,5,6,7.'
+  )
 
   WARN = 'warn'
   EXCEPTION = 'exception'
@@ -212,7 +215,8 @@ class IntegerListParser(flags.ArgumentParser):
 
     for group in groups:
       match = INTEGER_GROUP_REGEXP.match(
-          group) or INTEGER_GROUP_REGEXP_COLONS.match(group)
+          group
+      ) or INTEGER_GROUP_REGEXP_COLONS.match(group)
       if match is None:
         raise ValueError('Invalid integer list %s' % inp)
       elif match.group(2) is None:
@@ -246,13 +250,17 @@ class IntegerListSerializer(flags.ArgumentSerializer):
     return separator.join(str(item) for item in val)
 
   def serialize(self, il):
-    return ','.join([str(val) if isinstance(val, six.integer_types)
-                     else self._SerializeRange(val)
-                     for val in il.groups])
+    return ','.join([
+        str(val)
+        if isinstance(val, six.integer_types)
+        else self._SerializeRange(val)
+        for val in il.groups
+    ])
 
 
-def DEFINE_integerlist(name, default, help, on_nonincreasing=None,
-                       flag_values=FLAGS, **kwargs):
+def DEFINE_integerlist(
+    name, default, help, on_nonincreasing=None, flag_values=FLAGS, **kwargs
+):
   """Register a flag whose value must be an integer list."""
 
   parser = IntegerListParser(on_nonincreasing=on_nonincreasing)
@@ -264,15 +272,16 @@ def DEFINE_integerlist(name, default, help, on_nonincreasing=None,
 class OverrideFlags(object):
   """Context manager that applies any config_dict overrides to flag_values."""
 
-  def __init__(self, flag_values, config_dict,
-               alias=flag_alias.ALL_TRANSLATIONS):
+  def __init__(
+      self, flag_values, config_dict, alias=flag_alias.ALL_TRANSLATIONS
+  ):
     """Initializes an OverrideFlags context manager.
 
     Args:
       flag_values: FlagValues that is temporarily modified so that any options
         in config_dict that are not 'present' in flag_values are applied to
-        flag_values.
-        Upon exit, flag_values will be restored to its original state.
+        flag_values. Upon exit, flag_values will be restored to its original
+        state.
       config_dict: Merged config flags from the benchmark config and benchmark
         configuration yaml file.
       alias: Alias to rename the flags to.
@@ -290,7 +299,8 @@ class OverrideFlags(object):
       if key not in self._flag_values:
         raise errors.Config.UnrecognizedOption(
             'Unrecognized option {0}.{1}. Each option within {0} must '
-            'correspond to a valid command-line flag.'.format('flags', key))
+            'correspond to a valid command-line flag.'.format('flags', key)
+        )
       if not self._flag_values[key].present:
         self._flags_to_reapply[key] = self._flag_values[key].value
         try:
@@ -298,8 +308,9 @@ class OverrideFlags(object):
         except flags.IllegalFlagValueError as e:
           raise errors.Config.InvalidValue(
               'Invalid {0}.{1} value: "{2}" (of type "{3}").{4}{5}'.format(
-                  'flags', key, value,
-                  value.__class__.__name__, os.linesep, e))
+                  'flags', key, value, value.__class__.__name__, os.linesep, e
+              )
+          )
 
   def __exit__(self, *unused_args, **unused_kwargs):
     """Restores flag_values to its original state."""
@@ -315,23 +326,22 @@ class UnitsParser(flags.ArgumentParser):
 
   Attributes:
     convertible_to: list of units.Unit instances. A parsed expression must be
-        convertible to at least one of the Units in this list. For example,
-        if the parser requires that its inputs are convertible to bits, then
-        values expressed in KiB and GB are valid, but values expressed in meters
-        are not.
+      convertible to at least one of the Units in this list. For example, if the
+      parser requires that its inputs are convertible to bits, then values
+      expressed in KiB and GB are valid, but values expressed in meters are not.
   """
 
-  syntactic_help = ('A quantity with a unit. Ex: 12.3MB.')
+  syntactic_help = 'A quantity with a unit. Ex: 12.3MB.'
 
   def __init__(self, convertible_to):
     """Initialize the UnitsParser.
 
     Args:
       convertible_to: Either an individual unit specification or a series of
-          unit specifications, where each unit specification is either a string
-          (e.g. 'byte') or a units.Unit. The parser input must be convertible to
-          at least one of the specified Units, or the parse() method will raise
-          a ValueError.
+        unit specifications, where each unit specification is either a string
+        (e.g. 'byte') or a units.Unit. The parser input must be convertible to
+        at least one of the specified Units, or the parse() method will raise a
+        ValueError.
     """
     if isinstance(convertible_to, (six.string_types, units.Unit)):
       self.convertible_to = [units.Unit(convertible_to)]
@@ -343,7 +353,7 @@ class UnitsParser(flags.ArgumentParser):
 
     Args:
       inp: a string or a units.Quantity. If a string, it has the format
-          "<number><units>", as in "12KB", or "2.5GB".
+        "<number><units>", as in "12KB", or "2.5GB".
 
     Returns:
       A units.Quantity.
@@ -358,8 +368,9 @@ class UnitsParser(flags.ArgumentParser):
       try:
         quantity = units.ParseExpression(inp)
       except Exception as e:
-        raise ValueError("Couldn't parse unit expression %r: %s" %
-                         (inp, str(e)))
+        raise ValueError(
+            "Couldn't parse unit expression %r: %s" % (inp, str(e))
+        )
       if not isinstance(quantity, units.Quantity):
         raise ValueError('Expression %r evaluates to a unitless value.' % inp)
 
@@ -372,18 +383,21 @@ class UnitsParser(flags.ArgumentParser):
     else:
       raise ValueError(
           'Expression {0!r} is not convertible to an acceptable unit '
-          '({1}).'.format(inp, ', '.join(str(u) for u in self.convertible_to)))
+          '({1}).'.format(inp, ', '.join(str(u) for u in self.convertible_to))
+      )
 
     return quantity
 
 
 class UnitsSerializer(flags.ArgumentSerializer):
+
   def serialize(self, units):
     return str(units)
 
 
-def DEFINE_units(name, default, help, convertible_to,
-                 flag_values=flags.FLAGS, **kwargs):
+def DEFINE_units(
+    name, default, help, convertible_to, flag_values=flags.FLAGS, **kwargs
+):
   """Register a flag whose value is a units expression.
 
   Args:
@@ -391,9 +405,9 @@ def DEFINE_units(name, default, help, convertible_to,
     default: units.Quantity. The default value.
     help: string. A help message for the user.
     convertible_to: Either an individual unit specification or a series of unit
-        specifications, where each unit specification is either a string (e.g.
-        'byte') or a units.Unit. The flag value must be convertible to at least
-        one of the specified Units to be considered valid.
+      specifications, where each unit specification is either a string (e.g.
+      'byte') or a units.Unit. The flag value must be convertible to at least
+      one of the specified Units to be considered valid.
     flag_values: the absl.flags.FlagValues object to define the flag in.
   """
   parser = UnitsParser(convertible_to=convertible_to)
@@ -426,14 +440,15 @@ def StringToBytes(string):
   try:
     bytes = quantity.m_as(units.byte)
   except units.DimensionalityError:
-    raise ValueError("Quantity %s is not a size" % string)
+    raise ValueError('Quantity %s is not a size' % string)
 
   if bytes != int(bytes):
-    raise ValueError("Size %s has a non-integer number (%s) of bytes!" %
-                     (string, bytes))
+    raise ValueError(
+        'Size %s has a non-integer number (%s) of bytes!' % (string, bytes)
+    )
 
   if bytes < 0:
-    raise ValueError("Size %s has a negative number of bytes!" % string)
+    raise ValueError('Size %s has a negative number of bytes!' % string)
 
   return int(bytes)
 
@@ -480,8 +495,8 @@ class YAMLParser(flags.ArgumentParser):
     """Parse the input.
 
     Args:
-      inp: A string or the result of yaml.safe_load. If a string, should be
-           a valid YAML document.
+      inp: A string or the result of yaml.safe_load. If a string, should be a
+        valid YAML document.
     """
 
     if isinstance(inp, six.string_types):
@@ -496,8 +511,7 @@ class YAMLParser(flags.ArgumentParser):
       try:
         return yaml.safe_load(inp)
       except yaml.YAMLError as e:
-        raise ValueError("Couldn't parse YAML string '%s': %s" %
-                         (inp, str(e)))
+        raise ValueError("Couldn't parse YAML string '%s': %s" % (inp, str(e)))
     else:
       return inp
 
@@ -555,6 +569,7 @@ def GetProvidedCommandLineFlags():
   Returns:
     A dictionary of provided flags in the form: {flag_name: flag_value}.
   """
+
   def _GetSerializeableValue(v):
     if isinstance(v, enum.Enum):
       return v.name

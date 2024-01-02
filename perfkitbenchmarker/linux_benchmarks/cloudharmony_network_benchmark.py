@@ -437,12 +437,10 @@ def _Run(benchmark_spec, test):
     vms = vm_groups['server']
     # use GCP zonal internal DNS,
     # but maybe should add domain to vm's data attributes?
-    endpoints = ' '.join(
-        [
-            f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal'
-            for vm in vms
-        ]
-    )
+    endpoints = ' '.join([
+        f'--test_endpoint={vm.name}.{vm.zone}.c.{vm.project}.internal'
+        for vm in vms
+    ])
     _AddComputeMetadata(client, vms[0], metadata)
 
   if FLAGS.ch_network_throughput_https:

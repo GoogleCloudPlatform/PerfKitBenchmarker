@@ -67,13 +67,19 @@ class AwsSecurityGroup(resource.BaseResource):
     self.cmd_prefix = cmd_prefix
 
   def _Delete(self):
-    cmd = self.cmd_prefix + ['ec2', 'delete-security-group',
-                             '--group-id=' + self.group_id]
+    cmd = self.cmd_prefix + [
+        'ec2',
+        'delete-security-group',
+        '--group-id=' + self.group_id,
+    ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Exists(self):
-    cmd = self.cmd_prefix + ['ec2', 'describe-security-groups',
-                             '--group-id=' + self.group_id]
+    cmd = self.cmd_prefix + [
+        'ec2',
+        'describe-security-groups',
+        '--group-id=' + self.group_id,
+    ]
     _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     # if the security group doesn't exist, the describe command gives an error.
     return retcode == 0
@@ -91,8 +97,7 @@ class AwsEMR(spark_service.BaseSparkService):
     project: Enclosing project for the cluster.
     cmd_prefix: emr prefix, including region
     network: network to use; set if needed by machine type
-    bucket_to_delete: bucket name to delete when cluster is
-    terminated.
+    bucket_to_delete: bucket name to delete when cluster is terminated.
   """
 
   CLOUD = provider_info.AWS
@@ -111,11 +116,13 @@ class AwsEMR(spark_service.BaseSparkService):
       self.cmd_prefix += ['--region', region]
 
     # Certain machine types require subnets.
-    if (self.spec.static_cluster_id is None and
-        (worker_machine_type[0:2] in NEEDS_SUBNET or
-         leader_machine_type[0:2] in NEEDS_SUBNET)):
+    if self.spec.static_cluster_id is None and (
+        worker_machine_type[0:2] in NEEDS_SUBNET
+        or leader_machine_type[0:2] in NEEDS_SUBNET
+    ):
       vm_config = virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
-          self.spec.master_group.vm_spec)
+          self.spec.master_group.vm_spec
+      )
       self.network = aws_network.AwsNetwork.GetNetwork(vm_config)
     else:
       self.network = None
@@ -138,35 +145,49 @@ class AwsEMR(spark_service.BaseSparkService):
     instance_groups = []
     for group_type, group_spec in [
         ('CORE', self.spec.worker_group),
-        ('MASTER', self.spec.master_group)]:
-      instance_properties = {'InstanceCount': group_spec.vm_count,
-                             'InstanceGroupType': group_type,
-                             'InstanceType': group_spec.vm_spec.machine_type,
-                             'Name': group_type + ' group'}
+        ('MASTER', self.spec.master_group),
+    ]:
+      instance_properties = {
+          'InstanceCount': group_spec.vm_count,
+          'InstanceGroupType': group_type,
+          'InstanceType': group_spec.vm_spec.machine_type,
+          'Name': group_type + ' group',
+      }
       if group_spec.disk_spec:
         # Make sure nothing we are ignoring is included in the disk spec
         assert group_spec.disk_spec.device_path is None
         assert group_spec.disk_spec.disk_number is None
         assert group_spec.disk_spec.mount_point is None
         assert group_spec.disk_spec.iops is None
-        ebs_configuration = {'EbsBlockDeviceConfigs': [
-            {'VolumeSpecification':
-             {'SizeInGB': group_spec.disk_spec.disk_size,
-              'VolumeType': group_spec.disk_spec.disk_type},
-             'VolumesPerInstance':
-             group_spec.disk_spec.num_striped_disks}]}
+        ebs_configuration = {
+            'EbsBlockDeviceConfigs': [{
+                'VolumeSpecification': {
+                    'SizeInGB': group_spec.disk_spec.disk_size,
+                    'VolumeType': group_spec.disk_spec.disk_type,
+                },
+                'VolumesPerInstance': group_spec.disk_spec.num_striped_disks,
+            }]
+        }
         instance_properties.update({'EbsConfiguration': ebs_configuration})
       instance_groups.append(instance_properties)
 
     # we need to store the cluster id.
-    cmd = self.cmd_prefix + ['emr', 'create-cluster', '--name', name,
-                             '--release-label', RELEASE_LABEL,
-                             '--use-default-roles',
-                             '--instance-groups',
-                             json.dumps(instance_groups),
-                             '--application', 'Name=Spark',
-                             'Name=Hadoop',
-                             '--log-uri', logs_bucket]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'create-cluster',
+        '--name',
+        name,
+        '--release-label',
+        RELEASE_LABEL,
+        '--use-default-roles',
+        '--instance-groups',
+        json.dumps(instance_groups),
+        '--application',
+        'Name=Spark',
+        'Name=Hadoop',
+        '--log-uri',
+        logs_bucket,
+    ]
     if self.network:
       cmd += ['--ec2-attributes', 'SubnetId=' + self.network.subnet.id]
     stdout, _, _ = vm_util.IssueCommand(cmd)
@@ -178,16 +199,24 @@ class AwsEMR(spark_service.BaseSparkService):
 
   def _AddTag(self, key, value):
     """Add the key value pair as a tag to the emr cluster."""
-    cmd = self.cmd_prefix + ['emr', 'add-tags',
-                             '--resource-id', self.cluster_id,
-                             '--tag',
-                             '{}={}'.format(key, value)]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'add-tags',
+        '--resource-id',
+        self.cluster_id,
+        '--tag',
+        '{}={}'.format(key, value),
+    ]
     vm_util.IssueCommand(cmd)
 
   def _DeleteSecurityGroups(self):
     """Delete the security groups associated with this cluster."""
-    cmd = self.cmd_prefix + ['emr', 'describe-cluster',
-                             '--cluster-id', self.cluster_id]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'describe-cluster',
+        '--cluster-id',
+        self.cluster_id,
+    ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     cluster_desc = json.loads(stdout)
     sec_object = cluster_desc['Cluster']['Ec2InstanceAttributes']
@@ -202,11 +231,14 @@ class AwsEMR(spark_service.BaseSparkService):
     # remove all references to the manager group from the worker group.
     for proto, port in [('tcp', '0-65535'), ('udp', '0-65535'), ('icmp', '-1')]:
       for group1, group2 in [(worker_sg, manager_sg), (manager_sg, worker_sg)]:
-        cmd = self.cmd_prefix + ['ec2', 'revoke-security-group-ingress',
-                                 '--group-id=' + group1,
-                                 '--source-group=' + group2,
-                                 '--protocol=' + proto,
-                                 '--port=' + port]
+        cmd = self.cmd_prefix + [
+            'ec2',
+            'revoke-security-group-ingress',
+            '--group-id=' + group1,
+            '--source-group=' + group2,
+            '--protocol=' + proto,
+            '--port=' + port,
+        ]
         vm_util.IssueCommand(cmd)
 
     # Now we need to delete the manager, then the worker.
@@ -217,22 +249,34 @@ class AwsEMR(spark_service.BaseSparkService):
   def _Delete(self):
     """Deletes the cluster."""
 
-    cmd = self.cmd_prefix + ['emr', 'terminate-clusters', '--cluster-ids',
-                             self.cluster_id]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'terminate-clusters',
+        '--cluster-ids',
+        self.cluster_id,
+    ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _DeleteDependencies(self):
     if self.network:
       self._DeleteSecurityGroups()
     if self.bucket_to_delete:
-      bucket_del_cmd = self.cmd_prefix + ['s3', 'rb', '--force',
-                                          self.bucket_to_delete]
+      bucket_del_cmd = self.cmd_prefix + [
+          's3',
+          'rb',
+          '--force',
+          self.bucket_to_delete,
+      ]
       vm_util.IssueCommand(bucket_del_cmd)
 
   def _Exists(self):
     """Check to see whether the cluster exists."""
-    cmd = self.cmd_prefix + ['emr', 'describe-cluster',
-                             '--cluster-id', self.cluster_id]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'describe-cluster',
+        '--cluster-id',
+        self.cluster_id,
+    ]
     stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
       return False
@@ -244,26 +288,36 @@ class AwsEMR(spark_service.BaseSparkService):
 
   def _IsReady(self):
     """Check to see if the cluster is ready."""
-    cmd = self.cmd_prefix + ['emr', 'describe-cluster', '--cluster-id',
-                             self.cluster_id]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'describe-cluster',
+        '--cluster-id',
+        self.cluster_id,
+    ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     if result['Cluster']['Status']['State'] == 'TERMINATED_WITH_ERRORS':
       reason = result['Cluster']['Status']['StateChangeReason']['Message']
       message = reason
       if reason.startswith('Subnet is required'):
-        message = ('Cluster creation failed because this machine type requires '
-                   'a subnet.  To ensure PKB creates a subnet for this machine '
-                   'type, update the NEEDS_SUBNET variable of '
-                   'providers/aws/aws_emr.py to contain prefix of this machine '
-                   'type. Raw AWS message={0}'.format(reason))
+        message = (
+            'Cluster creation failed because this machine type requires '
+            'a subnet.  To ensure PKB creates a subnet for this machine '
+            'type, update the NEEDS_SUBNET variable of '
+            'providers/aws/aws_emr.py to contain prefix of this machine '
+            'type. Raw AWS message={0}'.format(reason)
+        )
         raise Exception(message)
     return result['Cluster']['Status']['State'] == READY_STATE
 
   def _GetLogBase(self):
     """Gets the base uri for the logs."""
-    cmd = self.cmd_prefix + ['emr', 'describe-cluster', '--cluster-id',
-                             self.cluster_id]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'describe-cluster',
+        '--cluster-id',
+        self.cluster_id,
+    ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     if 'LogUri' in result['Cluster']:
@@ -286,13 +340,20 @@ class AwsEMR(spark_service.BaseSparkService):
 
     Args:
       step_id: The step id to query.
+
     Returns:
       A dictionary describing the step if the step the step is complete,
           None otherwise.
     """
 
-    cmd = self.cmd_prefix + ['emr', 'describe-step', '--cluster-id',
-                             self.cluster_id, '--step-id', step_id]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'describe-step',
+        '--cluster-id',
+        self.cluster_id,
+        '--step-id',
+        step_id,
+    ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     state = result['Step']['Status']['State']
@@ -319,9 +380,15 @@ class AwsEMR(spark_service.BaseSparkService):
     step_list = ['Type=Spark', 'Args=' + arg_string]
     return step_list
 
-  def SubmitJob(self, jarfile, classname, job_poll_interval=JOB_WAIT_SLEEP,
-                job_arguments=None, job_stdout_file=None,
-                job_type=spark_service.SPARK_JOB_TYPE):
+  def SubmitJob(
+      self,
+      jarfile,
+      classname,
+      job_poll_interval=JOB_WAIT_SLEEP,
+      job_arguments=None,
+      job_stdout_file=None,
+      job_type=spark_service.SPARK_JOB_TYPE,
+  ):
     """Submit the job.
 
     Submit the job and wait for it to complete.  If job_stdout_file is not
@@ -331,12 +398,11 @@ class AwsEMR(spark_service.BaseSparkService):
     Args:
       jarfile: Jar file containing the class to submit.
       classname: Name of the class.
-      job_poll_interval: Submit job will poll until the job is done; this is
-          the time between checks.
+      job_poll_interval: Submit job will poll until the job is done; this is the
+        time between checks.
       job_arguments: Arguments to pass to the job.
-      job_stdout_file: Name of a file in which to put the job's standard out.
-          If there is data here already, it will be overwritten.
-
+      job_stdout_file: Name of a file in which to put the job's standard out. If
+        there is data here already, it will be overwritten.
     """
 
     @vm_util.Retry(poll_interval=job_poll_interval, fuzz=0)
@@ -344,8 +410,11 @@ class AwsEMR(spark_service.BaseSparkService):
       if not self._CheckForFile(filename):
         raise Exception('File not found yet')
 
-    @vm_util.Retry(timeout=FLAGS.aws_emr_job_wait_time,
-                   poll_interval=job_poll_interval, fuzz=0)
+    @vm_util.Retry(
+        timeout=FLAGS.aws_emr_job_wait_time,
+        poll_interval=job_poll_interval,
+        fuzz=0,
+    )
     def WaitForStep(step_id):
       result = self._IsStepDone(step_id)
       if result is None:
@@ -359,8 +428,14 @@ class AwsEMR(spark_service.BaseSparkService):
     else:
       raise Exception('Job type %s unsupported for EMR' % job_type)
     step_string = ','.join(step_list)
-    cmd = self.cmd_prefix + ['emr', 'add-steps', '--cluster-id',
-                             self.cluster_id, '--steps', step_string]
+    cmd = self.cmd_prefix + [
+        'emr',
+        'add-steps',
+        '--cluster-id',
+        self.cluster_id,
+        '--steps',
+        step_string,
+    ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     step_id = result['StepIds'][0]
@@ -380,14 +455,16 @@ class AwsEMR(spark_service.BaseSparkService):
     if job_stdout_file:
       log_base = self._GetLogBase()
       if log_base is None:
-        logging.warning('SubmitJob requested output, but EMR cluster was not '
-                        'created with logging')
+        logging.warning(
+            'SubmitJob requested output, but EMR cluster was not '
+            'created with logging'
+        )
         return metrics
 
       # log_base ends in a slash.
-      s3_stdout = '{0}{1}/steps/{2}/stdout.gz'.format(log_base,
-                                                      self.cluster_id,
-                                                      step_id)
+      s3_stdout = '{0}{1}/steps/{2}/stdout.gz'.format(
+          log_base, self.cluster_id, step_id
+      )
       WaitForFile(s3_stdout)
       dest_file = '{0}.gz'.format(job_stdout_file)
       cp_cmd = ['aws', 's3', 'cp', s3_stdout, dest_file]

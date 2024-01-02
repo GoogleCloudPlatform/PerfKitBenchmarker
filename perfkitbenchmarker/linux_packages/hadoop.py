@@ -38,17 +38,23 @@ FLAGS = flags.FLAGS
 
 _VERSION = flags.DEFINE_string('hadoop_version', None, 'Version of Hadoop.')
 _URL_OVERRIDE = flags.DEFINE_string(
-    'hadoop_bin_url', None, 'Specify to override url from HADOOP_URL_BASE.')
+    'hadoop_bin_url', None, 'Specify to override url from HADOOP_URL_BASE.'
+)
 
 _BLOCKSIZE_OVERRIDE = flags.DEFINE_integer(
-    'hadoop_hdfs_blocksize', 128,
+    'hadoop_hdfs_blocksize',
+    128,
     'Blocksize in MiB to be used by the HDFS filesystem. '
-    'This is the chunksize in which the HDFS file will be divided into.')
+    'This is the chunksize in which the HDFS file will be divided into.',
+)
 
 DATA_FILES = [
-    'hadoop/core-site.xml.j2', 'hadoop/yarn-site.xml.j2',
-    'hadoop/hdfs-site.xml.j2', 'hadoop/mapred-site.xml.j2',
-    'hadoop/hadoop-env.sh.j2', 'hadoop/workers.j2'
+    'hadoop/core-site.xml.j2',
+    'hadoop/yarn-site.xml.j2',
+    'hadoop/hdfs-site.xml.j2',
+    'hadoop/mapred-site.xml.j2',
+    'hadoop/hadoop-env.sh.j2',
+    'hadoop/workers.j2',
 ]
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
@@ -76,17 +82,20 @@ def HadoopVersion() -> version.Version:
     return version.Version(_VERSION.value)
   if _URL_OVERRIDE.value:
     extracted_version = re.search(
-        r'[0-9]+\.[0-9]+\.[0-9]+', _URL_OVERRIDE.value)
+        r'[0-9]+\.[0-9]+\.[0-9]+', _URL_OVERRIDE.value
+    )
     if extracted_version:
       return version.Version(extracted_version.group(0))
     else:
       raise errors.Config.InvalidValue(
           'Cannot parse version out of --hadoop_bin_url please pass '
-          '--hadoop_version as well.')
+          '--hadoop_version as well.'
+      )
   response = requests.get(HADOOP_STABLE_URL)
   if not response.ok:
     raise errors.Setup.MissingExecutableError(
-        'Could not load ' + HADOOP_STABLE_URL)
+        'Could not load ' + HADOOP_STABLE_URL
+    )
   soup = bs4.BeautifulSoup(response.content, 'html.parser')
   link = soup.find('a', href=HADOOP_TAR_PATTERN)
   if link:
@@ -94,7 +103,8 @@ def HadoopVersion() -> version.Version:
     if match:
       return version.Version(match.group(1))
   raise errors.Setup.MissingExecutableError(
-      'Could not find valid hadoop version at ' + HADOOP_STABLE_URL)
+      'Could not find valid hadoop version at ' + HADOOP_STABLE_URL
+  )
 
 
 def _GetHadoopURL():
@@ -106,8 +116,9 @@ def _GetHadoopURL():
     The Hadoop download url.
   """
 
-  return '{0}/hadoop-{1}/hadoop-{1}.tar.gz'.format(HADOOP_URL_BASE,
-                                                   HadoopVersion())
+  return '{0}/hadoop-{1}/hadoop-{1}.tar.gz'.format(
+      HADOOP_URL_BASE, HadoopVersion()
+  )
 
 
 def CheckPrerequisites():
@@ -128,8 +139,10 @@ def _Install(vm):
   hadoop_url = FLAGS.hadoop_bin_url or _GetHadoopURL()
 
   vm.RemoteCommand(
-      ('mkdir {0} && curl -L {1} | '
-       'tar -C {0} --strip-components=1 -xzf -').format(HADOOP_DIR, hadoop_url))
+      (
+          'mkdir {0} && curl -L {1} | tar -C {0} --strip-components=1 -xzf -'
+      ).format(HADOOP_DIR, hadoop_url)
+  )
 
 
 def YumInstall(vm):
@@ -150,9 +163,10 @@ def AptInstall(vm):
 
 def InstallGcsConnector(vm, install_dir=HADOOP_LIB_DIR):
   """Install the GCS connector for Hadoop, which allows I/O to GCS."""
-  connector_url = ('https://storage.googleapis.com/hadoop-lib/gcs/'
-                   'gcs-connector-hadoop{}-latest.jar'.format(
-                       HadoopVersion().major))
+  connector_url = (
+      'https://storage.googleapis.com/hadoop-lib/gcs/'
+      'gcs-connector-hadoop{}-latest.jar'.format(HadoopVersion().major)
+  )
   vm.RemoteCommand('cd {0} && curl -O {1}'.format(install_dir, connector_url))
 
 
@@ -173,11 +187,13 @@ MAP_SLOTS_PER_CORE = 1.5
 REDUCE_SLOTS_PER_CORE = 4 / 3
 
 
-def _RenderConfig(vm,
-                  master,
-                  workers,
-                  memory_fraction=YARN_MEMORY_FRACTION,
-                  configure_s3=False):
+def _RenderConfig(
+    vm,
+    master,
+    workers,
+    memory_fraction=YARN_MEMORY_FRACTION,
+    configure_s3=False,
+):
   """Load Hadoop Condfiguration on VM."""
   # Use first worker to get worker configuration
   worker = workers[0]
@@ -239,13 +255,14 @@ def _RenderConfig(vm,
       'aws_access_key': aws_access_key,
       'aws_secret_key': aws_secret_key,
       'optional_tools': optional_tools,
-      'block_size': block_size
+      'block_size': block_size,
   }
 
   for file_name in DATA_FILES:
     file_path = data.ResourcePath(file_name)
-    if (file_name == 'hadoop/workers.j2' and
-        HadoopVersion() < version.Version('3')):
+    if file_name == 'hadoop/workers.j2' and HadoopVersion() < version.Version(
+        '3'
+    ):
       file_name = 'hadoop/slaves.j2'
     remote_path = posixpath.join(HADOOP_CONF_DIR, os.path.basename(file_name))
     if file_name.endswith('.j2'):
@@ -274,7 +291,7 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
     master: VM. Master VM - will be the HDFS NameNode, YARN ResourceManager.
     workers: List of VMs. Each VM will run an HDFS DataNode, YARN node.
     start_yarn: bool. Start YARN and JobHistory server? Set to False if HDFS is
-        the only service required. Default: True.
+      the only service required. Default: True.
     configure_s3: Whether to configure Hadoop to access S3.
   """
   vms = [master] + workers
@@ -282,11 +299,15 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   # node runs the worker daemons.
   workers = workers or [master]
   fn = functools.partial(
-      _RenderConfig, master=master, workers=workers, configure_s3=configure_s3)
+      _RenderConfig, master=master, workers=workers, configure_s3=configure_s3
+  )
   background_tasks.RunThreaded(fn, vms)
 
-  master.RemoteCommand("rm -f {0} && ssh-keygen -q -t rsa -N '' -f {0}".format(
-      HADOOP_PRIVATE_KEY))
+  master.RemoteCommand(
+      "rm -f {0} && ssh-keygen -q -t rsa -N '' -f {0}".format(
+          HADOOP_PRIVATE_KEY
+      )
+  )
 
   public_key = master.RemoteCommand('cat {0}.pub'.format(HADOOP_PRIVATE_KEY))[0]
 
@@ -298,13 +319,14 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   context = {
       'hadoop_dir': HADOOP_DIR,
       'vm_ips': [vm.internal_ip for vm in vms],
-      'start_yarn': start_yarn
+      'start_yarn': start_yarn,
   }
 
   # HDFS setup and formatting, YARN startup
   script_path = posixpath.join(HADOOP_DIR, 'start-hadoop.sh')
   master.RenderTemplate(
-      data.ResourcePath(START_HADOOP_SCRIPT), script_path, context=context)
+      data.ResourcePath(START_HADOOP_SCRIPT), script_path, context=context
+  )
   master.RemoteCommand('bash {0}'.format(script_path))
 
   logging.info('Sleeping 10s for Hadoop nodes to join.')
@@ -313,8 +335,11 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   logging.info('Checking HDFS status.')
   hdfs_online_count = _GetHDFSOnlineNodeCount(master)
   if hdfs_online_count != len(workers):
-    raise ValueError('Not all nodes running HDFS: {0} < {1}'.format(
-        hdfs_online_count, len(workers)))
+    raise ValueError(
+        'Not all nodes running HDFS: {0} < {1}'.format(
+            hdfs_online_count, len(workers)
+        )
+    )
   else:
     logging.info('HDFS running on all %d workers', len(workers))
 
@@ -322,7 +347,10 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
     logging.info('Checking YARN status.')
     yarn_online_count = _GetYARNOnlineNodeCount(master)
     if yarn_online_count != len(workers):
-      raise ValueError('Not all nodes running YARN: {0} < {1}'.format(
-          yarn_online_count, len(workers)))
+      raise ValueError(
+          'Not all nodes running YARN: {0} < {1}'.format(
+              yarn_online_count, len(workers)
+          )
+      )
     else:
       logging.info('YARN running on all %d workers', len(workers))

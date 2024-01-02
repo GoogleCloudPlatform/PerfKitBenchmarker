@@ -1,10 +1,8 @@
 """Tests for perfkitbenchmarker.tests.providers.azure_disk."""
 
-
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker.providers.azure import azure_disk
 from tests import pkb_common_test_case
 

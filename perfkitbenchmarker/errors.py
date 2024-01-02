@@ -26,34 +26,42 @@ class Setup(object):
 
   class PythonPackageRequirementUnfulfilled(Error):
     """Error raised when a Python package requirement is unfulfilled."""
+
     pass
 
   class MissingExecutableError(Error):
     """Error raised when we cannot find an executable we need."""
+
     pass
 
   class NoRunURIError(Error):
     """Error raised when we were not given a run_uri and cannot infer it."""
+
     pass
 
   class BadRunURIError(Error):
     """Error raised when the given run_uri is invalid."""
+
     pass
 
   class BadPreprovisionedDataError(Error):
     """Error raised when the pre-provisioned data is invalid."""
+
     pass
 
   class InvalidSetupError(Error):
     """Error raised when SetUpPKB was not called correctly."""
+
     pass
 
   class InvalidFlagConfigurationError(Error):
     """Error raised when the set of command line flags is invalid."""
+
     pass
 
   class InvalidConfigurationError(Error):
     """Error raised when configuration is invalid."""
+
     pass
 
 
@@ -62,6 +70,7 @@ class VirtualMachine(object):
 
   class RemoteCommandError(Error):
     """Error raised when a Remote Command or Remote Copy fails."""
+
     pass
 
   class RemoteExceptionError(Error):
@@ -69,6 +78,7 @@ class VirtualMachine(object):
 
   class AuthError(Error):
     """Error raised when one VM cannot access another VM."""
+
     pass
 
   class VirtualMachineError(Error):
@@ -80,7 +90,7 @@ class VirtualMachine(object):
 
       Args:
         info: A dictionary containing debug information (such as traceroute
-            info).
+          info).
         error_message: the error message from the originating code.
 
       Returns:
@@ -91,10 +101,12 @@ class VirtualMachine(object):
       """
       if isinstance(info, dict):
         info = VirtualMachine.VirtualMachineError.FormatDebugInfo(
-            info, error_message)
+            info, error_message
+        )
         return cls(info)
-      raise TypeError('The argument of FromDebugInfo should be an instance '
-                      'of dictionary.')
+      raise TypeError(
+          'The argument of FromDebugInfo should be an instance of dictionary.'
+      )
 
     @staticmethod
     def FormatDebugInfo(info, error_message):
@@ -102,7 +114,7 @@ class VirtualMachine(object):
 
       Args:
         info: A dictionary containing debug information (such as traceroute
-            info).
+          info).
         error_message: the error message from the originating code.
 
       Returns:
@@ -112,7 +124,8 @@ class VirtualMachine(object):
 
       def AddHeader(error, header, message):
         error += '{sep}{header}\n{message}\n'.format(
-            sep=sep, header=header, message=message)
+            sep=sep, header=header, message=message
+        )
         return error
 
       def AddKeyIfExists(result, header, key):
@@ -121,8 +134,11 @@ class VirtualMachine(object):
           del info[key]
         return result
 
-      result = AddHeader('', 'error_message:',
-                         error_message) if error_message else ''
+      result = (
+          AddHeader('', 'error_message:', error_message)
+          if error_message
+          else ''
+      )
       result = AddKeyIfExists(result, 'traceroute:', 'traceroute')
       return AddHeader(result, 'Debug Info:', pprint.pformat(info))
 
@@ -191,6 +207,7 @@ class Benchmarks(object):
 
     This is a retryable error when --zone=any.
     """
+
     pass
 
 
@@ -199,6 +216,7 @@ class Resource(object):
 
   class CreationError(Error):
     """An error on creation which is not retryable."""
+
     pass
 
   class CreationInternalError(Error):
@@ -207,6 +225,7 @@ class Resource(object):
     These errors should not be retried, but instead cleanly retry creating the
     resource (probably by rerunning the benchmark).
     """
+
     pass
 
   class CleanupError(Error):
@@ -220,6 +239,7 @@ class Resource(object):
 
   class GetError(Error):
     """An error on get which is not retryable."""
+
     pass
 
   class RetryableGetError(Error):
@@ -227,6 +247,7 @@ class Resource(object):
 
   class UpdateError(Error):
     """An error on update."""
+
     pass
 
   class SubclassNotFoundError(Error):
@@ -234,14 +255,17 @@ class Resource(object):
 
   class RestoreError(Error):
     """Errors while restoring a resource."""
+
     pass
 
   class FreezeError(Error):
     """Errors while freezing a resource."""
+
     pass
 
   class ProvisionTimeoutError(Error):
     """Timeout errors while provisioning a resource."""
+
     pass
 
 
@@ -250,18 +274,22 @@ class Config(object):
 
   class InvalidValue(Error):
     """User provided an invalid value for a config option."""
+
     pass
 
   class MissingOption(Error):
     """User did not provide a value for a required config option."""
+
     pass
 
   class ParseError(Error):
     """Error raised when a config can't be loaded properly."""
+
     pass
 
   class UnrecognizedOption(Error):
     """User provided a value for an unrecognized config option."""
+
     pass
 
 

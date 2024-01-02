@@ -14,6 +14,7 @@ FLAGS = flags.FLAGS
 
 
 class GetResourceClassTest(pkb_common_test_case.PkbCommonTestCase):
+
   class BaseTestClassForAttributes(resource.BaseResource):
     REQUIRED_ATTRS = ['SERVICE_TYPE']
     RESOURCE_TYPE = 'BaseTestClassForAttributes'
@@ -41,12 +42,15 @@ class GetResourceClassTest(pkb_common_test_case.PkbCommonTestCase):
   def test_list_of_attributes(self, service):
     self.assertEqual(
         resource.GetResourceClass(
-            self.BaseTestClassForAttributes, SERVICE_TYPE=service),
-        self.TestClassForAttributes)
+            self.BaseTestClassForAttributes, SERVICE_TYPE=service
+        ),
+        self.TestClassForAttributes,
+    )
 
   def test_pickle(self):
     base = resource.GetResourceClass(
-        self.BaseTestClassForAttributes, SERVICE_TYPE='Base')('spec')
+        self.BaseTestClassForAttributes, SERVICE_TYPE='Base'
+    )('spec')
 
     base = pickle.loads(pickle.dumps(base))
     self.assertEqual(base.SERVICE_TYPE, 'Base')
@@ -95,7 +99,8 @@ class ResourceTest(pkb_common_test_case.PkbCommonTestCase):
   def testDeleteResourceBadCreate(self):
     test_resource = CreateRaisesNonFreezeRestoreResource()
     mock_delete = self.enter_context(
-        mock.patch.object(test_resource, '_Delete'))
+        mock.patch.object(test_resource, '_Delete')
+    )
 
     with self.assertRaises(errors.Resource.CreationError):
       test_resource.Create()
@@ -136,7 +141,9 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
     test_resource = _CreateFreezeRestoreResource()
     self.enter_context(
         mock.patch.object(
-            test_resource, 'Freeze', side_effect=errors.Resource.FreezeError()))
+            test_resource, 'Freeze', side_effect=errors.Resource.FreezeError()
+        )
+    )
 
     with self.assertRaises(errors.Resource.FreezeError):
       test_resource.Delete(freeze=True)
@@ -146,7 +153,9 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
     test_resource.delete_on_freeze_error = True
     self.enter_context(
         mock.patch.object(
-            test_resource, 'Freeze', side_effect=errors.Resource.FreezeError()))
+            test_resource, 'Freeze', side_effect=errors.Resource.FreezeError()
+        )
+    )
 
     # At the start of the test the resource is not deleted.
     self.assertFalse(test_resource.deleted)
@@ -160,9 +169,9 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
     test_resource = _CreateFreezeRestoreResource()
     self.enter_context(
         mock.patch.object(
-            test_resource,
-            'Restore',
-            side_effect=errors.Resource.RestoreError()))
+            test_resource, 'Restore', side_effect=errors.Resource.RestoreError()
+        )
+    )
 
     with self.assertRaises(errors.Resource.RestoreError):
       test_resource.Create(restore=True)
@@ -172,9 +181,9 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
     test_resource.create_on_restore_error = True
     self.enter_context(
         mock.patch.object(
-            test_resource,
-            'Restore',
-            side_effect=errors.Resource.RestoreError()))
+            test_resource, 'Restore', side_effect=errors.Resource.RestoreError()
+        )
+    )
 
     # At the start of the test the resource is not deleted.
     self.assertFalse(test_resource.created)
@@ -187,16 +196,19 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
     # Ensures that generic exceptions in _Freeze raised as FreezeError.
     test_resource = _CreateFreezeRestoreResource()
     self.enter_context(
-        mock.patch.object(test_resource, '_Freeze', side_effect=Exception()))
+        mock.patch.object(test_resource, '_Freeze', side_effect=Exception())
+    )
     with self.assertRaises(errors.Resource.FreezeError):
       test_resource.Freeze()
 
   def testDeleteWithSuccessfulFreeze(self):
     test_resource = _CreateFreezeRestoreResource()
     mock_freeze = self.enter_context(
-        mock.patch.object(test_resource, '_Freeze'))
+        mock.patch.object(test_resource, '_Freeze')
+    )
     mock_update_timeout = self.enter_context(
-        mock.patch.object(test_resource, '_UpdateTimeout'))
+        mock.patch.object(test_resource, '_UpdateTimeout')
+    )
 
     test_resource.Delete(freeze=True)
 
@@ -207,9 +219,11 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
   def testCreateWithSuccessfulRestore(self):
     test_resource = _CreateFreezeRestoreResource()
     mock_restore = self.enter_context(
-        mock.patch.object(test_resource, '_Restore'))
+        mock.patch.object(test_resource, '_Restore')
+    )
     mock_create_resource = self.enter_context(
-        mock.patch.object(test_resource, '_CreateResource'))
+        mock.patch.object(test_resource, '_CreateResource')
+    )
 
     test_resource.Create(restore=True)
 
@@ -220,9 +234,11 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
   def testCreateWithRestoreErrorRaisesInsteadOfCreating(self):
     test_resource = _CreateFreezeRestoreResource()
     self.enter_context(
-        mock.patch.object(test_resource, '_Restore', side_effect=Exception()))
+        mock.patch.object(test_resource, '_Restore', side_effect=Exception())
+    )
     mock_create_resource = self.enter_context(
-        mock.patch.object(test_resource, '_CreateResource'))
+        mock.patch.object(test_resource, '_CreateResource')
+    )
 
     with self.assertRaises(errors.Resource.RestoreError):
       test_resource.Create(restore=True)
@@ -232,7 +248,8 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
   def testRestoreNotEnabled(self):
     test_resource = CompleteFreezeRestoreResource(enable_freeze_restore=False)
     mock_restore = self.enter_context(
-        mock.patch.object(test_resource, 'Restore'))
+        mock.patch.object(test_resource, 'Restore')
+    )
 
     test_resource.Create(restore=True)
 

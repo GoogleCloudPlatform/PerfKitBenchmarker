@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Class to represent a ProfitBricks Virtual Machine object.
-"""
+"""Class to represent a ProfitBricks Virtual Machine object."""
 
 import base64
 import logging
@@ -54,8 +53,10 @@ class CustomMachineTypeSpec(spec.BaseSpec):
           arguments to construct in order to decode the named option.
     """
     result = super(CustomMachineTypeSpec, cls)._GetOptionDecoderConstructions()
-    result.update({'cores': (option_decoders.IntDecoder, {'min': 1}),
-                   'ram': (option_decoders.IntDecoder, {'min': 1024})})
+    result.update({
+        'cores': (option_decoders.IntDecoder, {'min': 1}),
+        'ram': (option_decoders.IntDecoder, {'min': 1024}),
+    })
     return result
 
 
@@ -70,11 +71,11 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
 
     Args:
       value: Either a string name of a PB machine type or a dict containing
-          'cores' and 'ram' keys describing a custom VM.
+        'cores' and 'ram' keys describing a custom VM.
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
+        BaseSpec constructors.
 
     Returns:
       If value is a string, returns it unmodified. Otherwise, returns the
@@ -83,16 +84,21 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    super(MachineTypeDecoder, self).Decode(value, component_full_name,
-                                           flag_values)
+    super(MachineTypeDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
     if isinstance(value, six.string_types):
       return value
-    return CustomMachineTypeSpec(self._GetOptionFullName(component_full_name),
-                                 flag_values=flag_values, **value)
+    return CustomMachineTypeSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **value
+    )
 
 
 class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a
+
   ProfitBricksVirtualMachine.
 
   Attributes:
@@ -108,22 +114,22 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
       logging.info('Using custom hardware configuration.')
       self.cores = self.machine_type.cores
       self.ram = self.machine_type.ram
-      self.machine_type = 'Custom (RAM: {}, Cores: {})'.format(self.ram,
-                                                               self.cores)
+      self.machine_type = 'Custom (RAM: {}, Cores: {})'.format(
+          self.ram, self.cores
+      )
     else:
       logging.info('Using preset hardware configuration.')
       self.ram, self.cores = util.ReturnFlavor(self.machine_type)
-
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     """Modifies config options based on runtime flag values.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super(ProfitBricksVmSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['machine_type'].present:
@@ -131,11 +137,13 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
     if flag_values['profitbricks_location'].present:
       config_values['location'] = flag_values.profitbricks_location
     if flag_values['profitbricks_boot_volume_type'].present:
-      config_values['boot_volume_type'] = \
+      config_values['boot_volume_type'] = (
           flag_values.profitbricks_boot_volume_type
+      )
     if flag_values['profitbricks_boot_volume_size'].present:
-      config_values['boot_volume_size'] = \
+      config_values['boot_volume_size'] = (
           flag_values.profitbricks_boot_volume_size
+      )
     if flag_values['availability_zone'].present:
       config_values['availability_zone'] = flag_values.availability_zone
     if flag_values['profitbricks_image_alias'].present:
@@ -155,11 +163,19 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
         'machine_type': (MachineTypeDecoder, {}),
         'location': (option_decoders.StringDecoder, {'default': 'us/las'}),
         'image_alias': (option_decoders.StringDecoder, {'default': None}),
-        'boot_volume_type': (option_decoders.StringDecoder, {'default': 'HDD'}),
-        'boot_volume_size': (option_decoders.IntDecoder, {'default': 10,
-                                                          'min': 10}),
-        'availability_zone': (option_decoders.StringDecoder,
-                              {'default': 'AUTO'})})
+        'boot_volume_type': (
+            option_decoders.StringDecoder,
+            {'default': 'HDD'},
+        ),
+        'boot_volume_size': (
+            option_decoders.IntDecoder,
+            {'default': 10, 'min': 10},
+        ),
+        'availability_zone': (
+            option_decoders.StringDecoder,
+            {'default': 'AUTO'},
+        ),
+    })
     return result
 
 
@@ -173,6 +189,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Initialize a ProfitBricks virtual machine.
 
     Args:
+
     vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
     super(ProfitBricksVirtualMachine, self).__init__(vm_spec)
@@ -229,29 +246,20 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
         },
         'entities': {
             'volumes': {
-                'items': [
-                    {
-                        'properties': {
-                            'size': self.boot_volume_size,
-                            'name': 'boot volume',
-                            'image': self.image,
-                            'imageAlias': self.image_alias,
-                            'type': self.boot_volume_type,
-                            'sshKeys': [public_key],
-                            'availabilityZone': self.availability_zone,
-                        }
+                'items': [{
+                    'properties': {
+                        'size': self.boot_volume_size,
+                        'name': 'boot volume',
+                        'image': self.image,
+                        'imageAlias': self.image_alias,
+                        'type': self.boot_volume_type,
+                        'sshKeys': [public_key],
+                        'availabilityZone': self.availability_zone,
                     }
-                ]
+                }]
             },
             'nics': {
-                'items': [
-                    {
-                        'properties': {
-                            'name': 'nic1',
-                            'lan': self.lan_id
-                            }
-                        }
-                    ]
+                'items': [{'properties': {'name': 'nic1', 'lan': self.lan_id}}]
             },
         },
     }
@@ -280,9 +288,11 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Get the instance's public IP address."""
 
     # Build URL
-    url = '%s/datacenters/%s/servers/%s?depth=5' % (PROFITBRICKS_API,
-                                                    self.dc_id,
-                                                    self.server_id)
+    url = '%s/datacenters/%s/servers/%s?depth=5' % (
+        PROFITBRICKS_API,
+        self.dc_id,
+        self.server_id,
+    )
 
     # Perform Request
     r = util.PerformRequest('get', url, self.header)
@@ -294,8 +304,11 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Delete a ProfitBricks VM."""
 
     # Build URL
-    url = '%s/datacenters/%s/servers/%s' % (PROFITBRICKS_API, self.dc_id,
-                                            self.server_id)
+    url = '%s/datacenters/%s/servers/%s' % (
+        PROFITBRICKS_API,
+        self.dc_id,
+        self.server_id,
+    )
 
     # Make call
     logging.info('Deleting VM: %s', self.server_id)
@@ -310,14 +323,14 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Create a data center and LAN prior to creating VM."""
 
     # Create data center
-    self.dc_id, self.dc_status = util.CreateDatacenter(self.header,
-                                                       self.location)
+    self.dc_id, self.dc_status = util.CreateDatacenter(
+        self.header, self.location
+    )
     if not self._WaitUntilReady(self.dc_status):
       raise errors.Error('Data center creation failed, see log.')
 
     # Create LAN
-    self.lan_id, self.lan_status = util.CreateLan(self.header,
-                                                  self.dc_id)
+    self.lan_id, self.lan_status = util.CreateLan(self.header, self.dc_id)
     if not self._WaitUntilReady(self.lan_status):
       raise errors.Error('LAN creation failed, see log.')
 
@@ -359,16 +372,19 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
     if disk_spec.disk_type != disk.STANDARD:
-      raise errors.Error('ProfitBricks does not support disk type %s.' %
-                         disk_spec.disk_type)
+      raise errors.Error(
+          'ProfitBricks does not support disk type %s.' % disk_spec.disk_type
+      )
 
     if self.scratch_disks:
       # We have a "disk" already, don't add more.
-      raise errors.Error('ProfitBricks does not require '
-                         'a separate disk.')
+      raise errors.Error('ProfitBricks does not require a separate disk.')
 
     # Just create a local directory at the specified path, don't mount
     # anything.
-    self.RemoteCommand('sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'
-                       .format(disk_spec.mount_point))
+    self.RemoteCommand(
+        'sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'.format(
+            disk_spec.mount_point
+        )
+    )
     self.scratch_disks.append(profitbricks_disk.ProfitBricksDisk(disk_spec))

@@ -27,8 +27,8 @@ def DoctlAndParse(arg_list):
   """Run a doctl command and parse the output.
 
   Args:
-    arg_list: a list of arguments for doctl. Will be formated with
-      str() before being sent to the process.
+    arg_list: a list of arguments for doctl. Will be formated with str() before
+      being sent to the process.
 
   Returns:
     A tuple of
@@ -40,10 +40,9 @@ def DoctlAndParse(arg_list):
   """
 
   stdout, _, retcode = vm_util.IssueCommand(
-      ['doctl'] +
-      [str(arg) for arg in arg_list] +
-      ['--output=json'],
-      raise_on_failure=False)
+      ['doctl'] + [str(arg) for arg in arg_list] + ['--output=json'],
+      raise_on_failure=False,
+  )
 
   # In case of error, doctl sometimes prints "null" before printing a
   # JSON error string to stdout. TODO(user): improve parsing of
@@ -61,26 +60,30 @@ def DoctlAndParse(arg_list):
 
 class ActionInProgressException(Exception):
   """Exception to indicate that a DigitalOcean action is in-progress."""
+
   pass
 
 
 class ActionFailedError(Exception):
   """Exception raised when a DigitalOcean action fails."""
+
   pass
 
 
 class UnknownStatusError(Exception):
   """Exception raised for an unknown status message."""
+
   pass
 
 
-@vm_util.Retry(poll_interval=DEFAULT_ACTION_WAIT_SECONDS,
-               max_retries=DEFAULT_ACTION_MAX_TRIES,
-               retryable_exceptions=ActionInProgressException)
+@vm_util.Retry(
+    poll_interval=DEFAULT_ACTION_WAIT_SECONDS,
+    max_retries=DEFAULT_ACTION_MAX_TRIES,
+    retryable_exceptions=ActionInProgressException,
+)
 def WaitForAction(action_id):
   """Wait until a VM action completes."""
-  response, retcode = DoctlAndParse(
-      ['compute', 'action', 'get', action_id])
+  response, retcode = DoctlAndParse(['compute', 'action', 'get', action_id])
   if retcode:
     logging.warn('Unexpected action lookup failure.')
     raise ActionFailedError('Failed to get action %s' % action_id)
@@ -94,5 +97,6 @@ def WaitForAction(action_id):
   elif status == 'errored':
     raise ActionFailedError('Action %s errored' % action_id)
   else:
-    raise UnknownStatusError('Action %s had unknown status "%s"' %
-                             (action_id, status))
+    raise UnknownStatusError(
+        'Action %s had unknown status "%s"' % (action_id, status)
+    )

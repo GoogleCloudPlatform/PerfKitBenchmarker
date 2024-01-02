@@ -89,7 +89,7 @@ class AciContainer(container_service.BaseContainer):
   @property
   def ip_address(self):
     """Container instances don't have private ips yet."""
-    raise NotImplementedError('ACI containers don\'t have private ips.')
+    raise NotImplementedError("ACI containers don't have private ips.")
 
   @ip_address.setter
   def ip_address(self, value):
@@ -98,8 +98,13 @@ class AciContainer(container_service.BaseContainer):
 
   def _GetContainerInstance(self):
     """Gets a representation of the container and returns it."""
-    show_cmd = [azure.AZURE_PATH, 'container', 'show', '--name', self.name
-               ] + self.resource_group.args
+    show_cmd = [
+        azure.AZURE_PATH,
+        'container',
+        'show',
+        '--name',
+        self.name,
+    ] + self.resource_group.args
     stdout, _, _ = vm_util.IssueCommand(show_cmd)
     return json.loads(stdout)
 
@@ -113,21 +118,28 @@ class AciContainer(container_service.BaseContainer):
 
     @vm_util.Retry(
         timeout=timeout,
-        retryable_exceptions=(container_service.RetriableContainerException,))
+        retryable_exceptions=(container_service.RetriableContainerException,),
+    )
     def _WaitForExit():
       container = self._GetContainerInstance()['containers'][0]
       state = container['instanceView']['currentState']['state']
       if state != 'Terminated':
         raise container_service.RetriableContainerException(
-            f'Container in ({state}). Not yet in expected state Terminated.')
+            f'Container in ({state}). Not yet in expected state Terminated.'
+        )
       return container
 
     return _WaitForExit()
 
   def GetLogs(self):
     """Returns the logs from the container."""
-    logs_cmd = [azure.AZURE_PATH, 'container', 'logs', '--name', self.name
-               ] + self.resource_group.args
+    logs_cmd = [
+        azure.AZURE_PATH,
+        'container',
+        'logs',
+        '--name',
+        self.name,
+    ] + self.resource_group.args
     stdout, _, _ = vm_util.IssueCommand(logs_cmd)
     return stdout
 

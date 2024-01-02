@@ -273,9 +273,7 @@ class GkeCluster(container_service.KubernetesCluster):
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
 
-  def _AddNodeParamsToCmd(
-      self, nodepool_config, cmd
-  ):
+  def _AddNodeParamsToCmd(self, nodepool_config, cmd):
     """Modifies cmd to include node specific command arguments."""
     # Apply labels to all nodepools.
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()

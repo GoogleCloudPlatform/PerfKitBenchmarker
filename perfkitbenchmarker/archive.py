@@ -24,10 +24,13 @@ import tarfile
 from perfkitbenchmarker.providers.aws.util import AWS_PATH
 
 
-def ArchiveRun(run_temp_directory, target_bucket,
-               prefix='',
-               gsutil_path='gsutil',
-               aws_path=AWS_PATH):
+def ArchiveRun(
+    run_temp_directory,
+    target_bucket,
+    prefix='',
+    gsutil_path='gsutil',
+    aws_path=AWS_PATH,
+):
   """Archive a run directory to GCS or S3.
 
   Args:
@@ -45,24 +48,25 @@ def ArchiveRun(run_temp_directory, target_bucket,
     raise ValueError('{0} is not a directory.'.format(run_temp_directory))
 
   tar_file_name = '{}{}.tar.gz'.format(
-      prefix, datetime.datetime.now().strftime('%Y%m%d%H%M%S'))
+      prefix, datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+  )
 
   prefix_len = 5
-  prefixes = {
-      's3://': [aws_path, 's3', 'cp'],
-      'gs://': [gsutil_path, 'cp']
-  }
+  prefixes = {'s3://': [aws_path, 's3', 'cp'], 'gs://': [gsutil_path, 'cp']}
 
   assert all(len(key) == prefix_len for key in prefixes), prefixes
 
   try:
-    cmd = (prefixes[target_bucket[:prefix_len]] +
-           ['-', posixpath.join(target_bucket, tar_file_name)])
+    cmd = prefixes[target_bucket[:prefix_len]] + [
+        '-',
+        posixpath.join(target_bucket, tar_file_name),
+    ]
   except KeyError:
     raise ValueError('Unsupported bucket name: {0}'.format(target_bucket))
 
-  logging.info('Streaming %s to %s\n%s', run_temp_directory, tar_file_name,
-               ' '.join(cmd))
+  logging.info(
+      'Streaming %s to %s\n%s', run_temp_directory, tar_file_name, ' '.join(cmd)
+  )
   p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
   with p.stdin:

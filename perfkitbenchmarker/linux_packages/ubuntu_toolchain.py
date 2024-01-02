@@ -19,5 +19,6 @@ def AptInstall(vm):
     vm.RemoteCommand(
         'curl -sL '
         f'"http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x{key}"'
-        ' | sudo apt-key add')
+        ' | sudo apt-key add'
+    )
   vm.RemoteCommand('sudo apt update')

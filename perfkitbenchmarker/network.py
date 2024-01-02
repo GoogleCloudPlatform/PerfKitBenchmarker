@@ -30,8 +30,9 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import resource
 
 
-flags.DEFINE_integer('mtu', None,
-                     'Network MTU to set, if any.  Only enabled for GCP.')
+flags.DEFINE_integer(
+    'mtu', None, 'Network MTU to set, if any.  Only enabled for GCP.'
+)
 
 
 class NetType(enum.Enum):
@@ -59,8 +60,9 @@ class BaseFirewall(object):
       raise errors.Error('Firewalls should have CLOUD attributes.')
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
-      raise errors.Error('GetFirewall called in a thread without a '
-                         'BenchmarkSpec.')
+      raise errors.Error(
+          'GetFirewall called in a thread without a BenchmarkSpec.'
+      )
     with benchmark_spec.firewalls_lock:
       key = cls.CLOUD
       if key not in benchmark_spec.firewalls:
@@ -112,6 +114,7 @@ class BaseNetworkSpec(object):
 
 class BaseVpnGateway(object, metaclass=abc.ABCMeta):
   """An object representing the Base VPN Gateway."""
+
   CLOUD = None
 
   def __init__(self, zone=None, cidr=None):
@@ -177,7 +180,8 @@ class BaseNetwork(object):
   def _GetNetworkSpecFromVm(vm):
     """Returns a BaseNetworkSpec created from VM attributes."""
     return BaseNetworkSpec(
-        zone=vm.zone, cidr=vm.cidr, machine_type=vm.machine_type)
+        zone=vm.zone, cidr=vm.cidr, machine_type=vm.machine_type
+    )
 
   @classmethod
   def _GetKeyFromNetworkSpec(cls, spec):
@@ -212,6 +216,7 @@ class BaseNetwork(object):
 
     Args:
       cidr_raw: The unformatted CIDR string.
+
     Returns:
       A CIDR string suitable for use in resource names.
     Raises:
@@ -240,8 +245,9 @@ class BaseNetwork(object):
     """
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if benchmark_spec is None:
-      raise errors.Error('GetNetwork called in a thread without a '
-                         'BenchmarkSpec.')
+      raise errors.Error(
+          'GetNetwork called in a thread without a BenchmarkSpec.'
+      )
     key = cls._GetKeyFromNetworkSpec(spec)
 
     #  Grab the list of other networks to setup firewalls, forwarding, etc.
@@ -329,9 +335,8 @@ def GetCidrBlock(regional_index=0, subnet_index=0, mask_size=24):
   Args:
     regional_index: Int. The IP Address allocation dependent on the region.
       Default index is 0.
-    subnet_index: Int. The IP Address section dependent on the subnet.
-      Default index is 0.
-    mask_size: Int. Mask size to request from cidr block.
-      Default index is 24.
+    subnet_index: Int. The IP Address section dependent on the subnet. Default
+      index is 0.
+    mask_size: Int. Mask size to request from cidr block. Default index is 24.
   """
   return '10.{}.{}.0/{}'.format(regional_index, subnet_index, mask_size)

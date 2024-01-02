@@ -17,7 +17,6 @@
 import unittest
 
 import mock
-
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from six.moves import range
@@ -51,15 +50,19 @@ class BaseSpecFixedDecodeOrderTestCase(unittest.TestCase):
     expected_decode_call_order = sorted(self.config_option_names)
     observed_decode_call_order = []
     callback = observed_decode_call_order.append
-    config = {config_option_name: callback
-              for config_option_name in self.config_option_names}
+    config = {
+        config_option_name: callback
+        for config_option_name in self.config_option_names
+    }
     _TestFixedDecodeOrderSpec(_COMPONENT, **config)
     self.assertEqual(observed_decode_call_order, expected_decode_call_order)
 
   def testFailedDecode(self):
     callback = mock.MagicMock(side_effect=ValueError)
-    config = {config_option_name: callback
-              for config_option_name in self.config_option_names}
+    config = {
+        config_option_name: callback
+        for config_option_name in self.config_option_names
+    }
     # Only the first OptionDecoder's Decode method should be called.
     with self.assertRaises(ValueError):
       _TestFixedDecodeOrderSpec(_COMPONENT, **config)

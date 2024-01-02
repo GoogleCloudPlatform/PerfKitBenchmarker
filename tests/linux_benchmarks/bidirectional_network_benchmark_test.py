@@ -32,21 +32,24 @@ TOLERANCE = 0.000001
 
 
 class BidirectionalNetworkBenchmarkTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   def setUp(self):
     super(BidirectionalNetworkBenchmarkTestCase, self).setUp()
     # Load netperf stdout data
-    path = os.path.join(os.path.dirname(__file__),
-                        '..', 'data',
-                        'bidirectional_network_results.json')
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '..',
+        'data',
+        'bidirectional_network_results.json',
+    )
     with open(path) as fp:
       remote_stdouts = json.load(fp)
-      self.expected_stdout = [json.dumps(stdout)
-                              for stdout in remote_stdouts]
+      self.expected_stdout = [json.dumps(stdout) for stdout in remote_stdouts]
 
   def _AssertSamples(self, results, delta, values):
-    """"Asserts that the samples matching delta correspond to values."""
+    """ "Asserts that the samples matching delta correspond to values."""
 
     delta_metric = [r for r in results if r[1] == delta]
     self.assertEqual(1, len(delta_metric), delta)
@@ -55,9 +58,10 @@ class BidirectionalNetworkBenchmarkTestCase(
     # <test number>_<test name>.  This can vary due to the parallel nature of
     # the tests, so we grab all samples with the header that matches the header
     # of the delta sample.
-    delta_header = delta_metric[0][0][:len('0_TCP_STREAM_')]
-    netperf_run = [r for r in results
-                   if r[0][:len(delta_header)] == delta_header]
+    delta_header = delta_metric[0][0][: len('0_TCP_STREAM_')]
+    netperf_run = [
+        r for r in results if r[0][: len(delta_header)] == delta_header
+    ]
 
     header = delta_header + 'Throughput_'
 
@@ -66,24 +70,36 @@ class BidirectionalNetworkBenchmarkTestCase(
     values.sort()
     self._AssertSample(netperf_run, header + 'max', values[7], MBPS)
     self._AssertSample(netperf_run, header + 'min', values[0], MBPS)
-    self._AssertSample(netperf_run, header + 'stddev',
-                       numpy.std(values, ddof=1), MBPS)
+    self._AssertSample(
+        netperf_run, header + 'stddev', numpy.std(values, ddof=1), MBPS
+    )
     self._AssertSample(netperf_run, header + 'p90', values[7], MBPS)
-    self._AssertSample(netperf_run, header + 'average', numpy.mean(values),
-                       MBPS)
+    self._AssertSample(
+        netperf_run, header + 'average', numpy.mean(values), MBPS
+    )
     self._AssertSample(netperf_run, header + 'p50', values[4], MBPS)
     self._AssertSample(netperf_run, header + 'total', sum(values), MBPS)
     self._AssertSample(netperf_run, header + 'p99', values[7], MBPS)
 
   def _AssertSample(self, results, metric, value, unit):
     """Asserts results contains a sample matching metric/value/unit."""
-    match = [r for r in results if (r.metric == metric and r.unit == unit and
-                                    abs(r.value - value) < TOLERANCE)]
+    match = [
+        r
+        for r in results
+        if (
+            r.metric == metric
+            and r.unit == unit
+            and abs(r.value - value) < TOLERANCE
+        )
+    ]
     self.assertEqual(1, len(match))
 
   def testRun(self):
     FLAGS.bidirectional_network_tests = [
-        'TCP_STREAM', 'TCP_MAERTS', 'TCP_MAERTS', 'TCP_MAERTS'
+        'TCP_STREAM',
+        'TCP_MAERTS',
+        'TCP_MAERTS',
+        'TCP_MAERTS',
     ]
     FLAGS.bidirectional_network_test_length = 60
     FLAGS.bidirectional_stream_num_streams = 8
@@ -91,10 +107,7 @@ class BidirectionalNetworkBenchmarkTestCase(
     # Helper for GetNetperfStdOut whichs holds the last returned index for the
     # given test. Used to ensure the mocked stdout is returned matching the
     # requested netperf test and each is returned exactly once.
-    last_returned = {
-        'TCP_STREAM': -1,
-        'TCP_MAERTS': -1
-    }
+    last_returned = {'TCP_STREAM': -1, 'TCP_MAERTS': -1}
 
     stdout_lock = threading.Lock()
 
@@ -114,8 +127,13 @@ class BidirectionalNetworkBenchmarkTestCase(
             return (self.expected_stdout[i], '')
 
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
-    vm_spec.vms = [mock.MagicMock(), mock.MagicMock(), mock.MagicMock(),
-                   mock.MagicMock(), mock.MagicMock()]
+    vm_spec.vms = [
+        mock.MagicMock(),
+        mock.MagicMock(),
+        mock.MagicMock(),
+        mock.MagicMock(),
+        mock.MagicMock(),
+    ]
     vm_spec.vms[0].RemoteCommand.side_effect = GetNetperfStdOut
 
     results = bidirectional_network_benchmark.Run(vm_spec)
@@ -185,10 +203,18 @@ class BidirectionalNetworkBenchmarkTestCase(
 
     # summary metrics
     self._AssertSample(results, 'outbound_network_total', sum(samples0), MBPS)
-    self._AssertSample(results, 'inbound_network_total',
-                       sum(samples1 + samples2 + samples3), MBPS)
-    self._AssertSample(results, 'all_streams_start_delta',
-                       1508187617.100678 - 1508187614.93243, 'seconds')
+    self._AssertSample(
+        results,
+        'inbound_network_total',
+        sum(samples1 + samples2 + samples3),
+        MBPS,
+    )
+    self._AssertSample(
+        results,
+        'all_streams_start_delta',
+        1508187617.100678 - 1508187614.93243,
+        'seconds',
+    )
 
     metrics_per_test = 9  # 8 throughput samples, 1 delta
     num_tests = 4

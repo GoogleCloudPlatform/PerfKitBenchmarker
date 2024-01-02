@@ -22,7 +22,6 @@ from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sql_engine_utils
-
 from perfkitbenchmarker.windows_packages import hammerdb
 
 

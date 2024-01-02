@@ -1,4 +1,5 @@
 """Tests for dino_benchmark."""
+
 import os
 import unittest
 

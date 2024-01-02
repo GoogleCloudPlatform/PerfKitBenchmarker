@@ -40,42 +40,38 @@ BOOT = 'boot'
 LOCAL = 'local'
 CBS_SATA = 'cbs-sata'
 CBS_SSD = 'cbs-ssd'
-REMOTE_TYPES = (CBS_SSD, CBS_SATA,)
-REMOTE_TYPES_TRANSLATION = {
-    CBS_SATA: 'SATA',
-    CBS_SSD: 'SSD'
-}
+REMOTE_TYPES = (
+    CBS_SSD,
+    CBS_SATA,
+)
+REMOTE_TYPES_TRANSLATION = {CBS_SATA: 'SATA', CBS_SSD: 'SSD'}
 
 DISK_METADATA = {
-    BOOT: {
-        disk.REPLICATION: RAID10,
-        DURABILITY: EPHEMERAL
-    },
-    LOCAL: {
-        disk.REPLICATION: RAID10,
-        DURABILITY: EPHEMERAL
-    },
+    BOOT: {disk.REPLICATION: RAID10, DURABILITY: EPHEMERAL},
+    LOCAL: {disk.REPLICATION: RAID10, DURABILITY: EPHEMERAL},
     CBS_SSD: {
         disk.REPLICATION: disk.REGION,
         DURABILITY: PERSISTENT,
-        disk.MEDIA: disk.SSD
+        disk.MEDIA: disk.SSD,
     },
     CBS_SATA: {
         disk.REPLICATION: disk.REGION,
         DURABILITY: PERSISTENT,
-        disk.MEDIA: disk.HDD
-    }
+        disk.MEDIA: disk.HDD,
+    },
 }
 
 
 class RackspaceDiskSpec(disk.BaseDiskSpec):
   """Object containing the information needed to create a
+
   RackspaceDisk.
 
   Attributes:
     rackspace_region: None or string. Rackspace region to build VM resources.
     rack_profile: None or string. Rack CLI profile configuration.
   """
+
   CLOUD = provider_info.RACKSPACE
 
   @classmethod
@@ -90,8 +86,12 @@ class RackspaceDiskSpec(disk.BaseDiskSpec):
   def _GetOptionDecoderConstructions(cls):
     result = super(RackspaceDiskSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'rackspace_region': (option_decoders.StringDecoder, {'default': 'IAD'}),
-        'rack_profile': (option_decoders.StringDecoder, {'default': None})})
+        'rackspace_region': (
+            option_decoders.StringDecoder,
+            {'default': 'IAD'},
+        ),
+        'rack_profile': (option_decoders.StringDecoder, {'default': None}),
+    })
     return result
 
 
@@ -128,12 +128,14 @@ class RackspaceDisk(disk.BaseDisk):
 
 class RackspaceLocalDisk(RackspaceDisk):
   """RackspaceLocalDisk is a disk object to represent an ephemeral storage disk
+
   locally attached to an instance.
   """
 
   def __init__(self, disk_spec, name, region, project, device_path, image=None):
-    super(RackspaceLocalDisk, self).__init__(disk_spec, name, region, project,
-                                             image)
+    super(RackspaceLocalDisk, self).__init__(
+        disk_spec, name, region, project, image
+    )
     self.exists = False
     self.device_path = device_path
     self.name = name
@@ -150,25 +152,29 @@ class RackspaceLocalDisk(RackspaceDisk):
 
 class RackspaceBootDisk(RackspaceLocalDisk):
   """RackspaceBootDisk is a disk object to represent the root (boot) disk of an
+
   instance. Boot disk provides a directory path as a scratch disk space for a
   benchmark, but does not allow its backing block device to be formatted, or
   its mount point to be changed.
   """
 
   def __init__(self, disk_spec, zone, project, device_path, image):
-    super(RackspaceBootDisk, self).__init__(disk_spec, 'boot-disk', zone,
-                                            project, device_path, image)
+    super(RackspaceBootDisk, self).__init__(
+        disk_spec, 'boot-disk', zone, project, device_path, image
+    )
     self.mount_point = disk_spec.mount_point
 
 
 class RackspaceRemoteDisk(RackspaceDisk):
   """RackspaceRemoteDisk is a RackspaceDisk object to represent a remotely
+
   attached Cloud Block Storage Volume.
   """
 
   def __init__(self, disk_spec, name, region, project, image=None, media=None):
-    super(RackspaceRemoteDisk, self).__init__(disk_spec, name, region, project,
-                                              image)
+    super(RackspaceRemoteDisk, self).__init__(
+        disk_spec, name, region, project, image
+    )
     self.media = media
     self.id = None
 
@@ -213,20 +219,27 @@ class RackspaceRemoteDisk(RackspaceDisk):
       raise errors.Error('Cannot attach remote disk %s' % self.name)
     if vm.id is None:
       raise errors.VirtualMachine.VmStateError(
-          'Cannot attach remote disk %s to non-existing %s VM' % (self.name,
-                                                                  vm.name))
+          'Cannot attach remote disk %s to non-existing %s VM'
+          % (self.name, vm.name)
+      )
     cmd = util.RackCLICommand(self, 'servers', 'volume-attachment', 'create')
     cmd.flags['volume-id'] = self.id
     cmd.flags['server-id'] = vm.id
     stdout, stderr, _ = cmd.Issue()
     if stderr:
       raise errors.Error(
-          'Failed to attach remote disk %s to %s' % (self.name, vm.name))
+          'Failed to attach remote disk %s to %s' % (self.name, vm.name)
+      )
     resp = json.loads(stdout)
     self.device_path = resp['Device']
 
-  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
-                 retryable_exceptions=(errors.Resource.RetryableCreationError,))
+  @vm_util.Retry(
+      poll_interval=1,
+      max_retries=-1,
+      timeout=300,
+      log_errors=False,
+      retryable_exceptions=(errors.Resource.RetryableCreationError,),
+  )
   def _WaitForRemoteDiskAttached(self, vm):
     cmd = util.RackCLICommand(self, 'block-storage', 'volume', 'get')
     cmd.flags['id'] = self.id
@@ -238,14 +251,16 @@ class RackspaceRemoteDisk(RackspaceDisk):
         logging.info('Disk: %s has been attached to %s.' % (self.name, vm.id))
         return
     raise errors.Resource.RetryableCreationError(
-        'Disk: %s is not yet attached. Retrying to check status.' % self.name)
+        'Disk: %s is not yet attached. Retrying to check status.' % self.name
+    )
 
   def _DetachRemoteDisk(self):
     if self.id is None:
       raise errors.Error('Cannot detach remote disk %s' % self.name)
     if self.attached_vm_id is None:
       raise errors.VirtualMachine.VmStateError(
-          'Cannot detach remote disk %s from a non-existing VM' % self.name)
+          'Cannot detach remote disk %s from a non-existing VM' % self.name
+      )
     cmd = util.RackCLICommand(self, 'servers', 'volume-attachment', 'delete')
     cmd.flags['id'] = self.id
     cmd.flags['server-id'] = self.attached_vm_id
@@ -256,8 +271,13 @@ class RackspaceRemoteDisk(RackspaceDisk):
         return
     raise errors.Resource.RetryableDeletionError(stderr)
 
-  @vm_util.Retry(poll_interval=1, max_retries=-1, timeout=300, log_errors=False,
-                 retryable_exceptions=(errors.Resource.RetryableDeletionError,))
+  @vm_util.Retry(
+      poll_interval=1,
+      max_retries=-1,
+      timeout=300,
+      log_errors=False,
+      retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+  )
   def _WaitForRemoteDiskDeletion(self):
     cmd = util.RackCLICommand(self, 'block-storage', 'volume', 'get')
     cmd.flags['id'] = self.id
@@ -266,4 +286,5 @@ class RackspaceRemoteDisk(RackspaceDisk):
       logging.info('Disk: %s has been successfully deleted.' % self.name)
       return
     raise errors.Resource.RetryableDeletionError(
-        'Disk: %s has not been deleted. Retrying to check status.' % self.name)
+        'Disk: %s has not been deleted. Retrying to check status.' % self.name
+    )

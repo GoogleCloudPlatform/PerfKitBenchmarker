@@ -24,38 +24,52 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 import six
 
-flags.DEFINE_boolean('nfs_timeout_hard', True,
-                     'Whether to use hard or soft for NFS mount.')
+flags.DEFINE_boolean(
+    'nfs_timeout_hard', True, 'Whether to use hard or soft for NFS mount.'
+)
 flags.DEFINE_integer('nfs_rsize', 1048576, 'NFS read size.')
 flags.DEFINE_integer('nfs_wsize', 1048576, 'NFS write size.')
 flags.DEFINE_integer('nfs_timeout', 60, 'NFS timeout.')
 flags.DEFINE_integer('nfs_retries', 2, 'NFS Retries.')
 flags.DEFINE_integer(
-    'nfs_nconnect', None, 'Number of connections that each NFS client should '
-    'establish to the server.')
+    'nfs_nconnect',
+    None,
+    'Number of connections that each NFS client should '
+    'establish to the server.',
+)
 flags.DEFINE_boolean(
-    'nfs_noresvport', False,
+    'nfs_noresvport',
+    False,
     'Whether the NFS client should use a non-privileged '
-    'source port. Suggested to use with EFS')
+    'source port. Suggested to use with EFS',
+)
 flags.DEFINE_boolean(
-    'nfs_managed', True,
+    'nfs_managed',
+    True,
     'Use a managed NFS service if using NFS disks. Otherwise '
-    'start an NFS server on the first VM.')
+    'start an NFS server on the first VM.',
+)
 flags.DEFINE_string(
-    'nfs_ip_address', None,
+    'nfs_ip_address',
+    None,
     'If specified, PKB will target this ip address when '
     'mounting NFS "disks" rather than provisioning an NFS '
-    'Service for the corresponding cloud.')
+    'Service for the corresponding cloud.',
+)
 flags.DEFINE_string(
-    'nfs_directory', None,
+    'nfs_directory',
+    None,
     'Directory to mount if using a StaticNfsService. This '
     'corresponds to the "VOLUME_NAME" of other NfsService '
-    'classes.')
+    'classes.',
+)
 flags.DEFINE_string('smb_version', '3.0', 'SMB version.')
-flags.DEFINE_list('mount_options', [],
-                  'Additional arguments to supply when mounting.')
-flags.DEFINE_list('fstab_options', [],
-                  'Additional arguments to supply to fstab.')
+flags.DEFINE_list(
+    'mount_options', [], 'Additional arguments to supply when mounting.'
+)
+flags.DEFINE_list(
+    'fstab_options', [], 'Additional arguments to supply to fstab.'
+)
 
 FLAGS = flags.FLAGS
 
@@ -476,7 +490,8 @@ class NetworkDisk(BaseDisk):
   def mount_options(self):
     opts = []
     for key, value in sorted(
-        six.iteritems(self._GetNetworkDiskMountOptionsDict())):
+        six.iteritems(self._GetNetworkDiskMountOptionsDict())
+    ):
       opts.append('%s' % key if value is None else '%s=%s' % (key, value))
     return ','.join(opts)
 
@@ -509,11 +524,13 @@ class NfsDisk(NetworkDisk):
     nfs_tier: The NFS tier / performance level of the server.
   """
 
-  def __init__(self,
-               disk_spec,
-               remote_mount_address,
-               default_nfs_version=None,
-               nfs_tier=None):
+  def __init__(
+      self,
+      disk_spec,
+      remote_mount_address,
+      default_nfs_version=None,
+      nfs_tier=None,
+  ):
     super(NfsDisk, self).__init__(disk_spec)
     self.nfs_version = disk_spec.nfs_version or default_nfs_version
     self.nfs_timeout_hard = disk_spec.nfs_timeout_hard
@@ -564,12 +581,14 @@ class SmbDisk(NetworkDisk):
     smb_tier: The SMB tier / performance level of the server.
   """
 
-  def __init__(self,
-               disk_spec,
-               remote_mount_address,
-               storage_account_and_key,
-               default_smb_version=None,
-               smb_tier=None):
+  def __init__(
+      self,
+      disk_spec,
+      remote_mount_address,
+      storage_account_and_key,
+      default_smb_version=None,
+      smb_tier=None,
+  ):
     super(SmbDisk, self).__init__(disk_spec)
     self.smb_version = disk_spec.smb_version
     self.device_path = remote_mount_address

@@ -17,9 +17,11 @@ from perfkitbenchmarker import resource
 MESSAGING_SERVICE_SCRIPTS_VM_PKB = os.path.join('~', 'perfkitbenchmarker')
 MESSAGING_SERVICE_SCRIPTS_VM_BIN_DIR = '~'
 MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR = os.path.join(
-    '~', 'perfkitbenchmarker', 'scripts', 'messaging_service_scripts')
+    '~', 'perfkitbenchmarker', 'scripts', 'messaging_service_scripts'
+)
 MESSAGING_SERVICE_SCRIPTS_VM_COMMON_DIR = os.path.join(
-    MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'common')
+    MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'common'
+)
 MESSAGING_SERVICE_SCRIPTS_COMMON_PREFIX = 'messaging_service_scripts/common/'
 MESSAGING_SERVICE_SCRIPTS_COMMON_FILES = [
     '__init__.py',
@@ -42,7 +44,8 @@ MESSAGING_SERVICE_SCRIPTS_COMMON_FILES = [
 def GetMessagingServiceClass(cloud, delivery):
   """Gets the underlying Messaging Service class."""
   return resource.GetResourceClass(
-      BaseMessagingService, CLOUD=cloud, DELIVERY=delivery)
+      BaseMessagingService, CLOUD=cloud, DELIVERY=delivery
+  )
 
 
 class BaseMessagingService(resource.BaseResource):
@@ -67,8 +70,9 @@ class BaseMessagingService(resource.BaseResource):
     return cls()
 
   def setVms(self, vm_groups):
-    self.client_vm = vm_groups['clients' if 'clients' in
-                               vm_groups else 'default'][0]
+    self.client_vm = vm_groups[
+        'clients' if 'clients' in vm_groups else 'default'
+    ][0]
 
   def PrepareClientVm(self):
     self._InstallCommonClientPackages()
@@ -83,23 +87,33 @@ class BaseMessagingService(resource.BaseResource):
 
     # Upload common scripts
     self.client_vm.RemoteCommand(
-        f'mkdir -p {MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR}')
-    self.client_vm.RemoteCommand(' '.join([
-        'find', MESSAGING_SERVICE_SCRIPTS_VM_PKB, '-type', 'd', '-exec',
-        'touch', "'{}/__init__.py'", '\\;'
-    ]))
+        f'mkdir -p {MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR}'
+    )
+    self.client_vm.RemoteCommand(
+        ' '.join([
+            'find',
+            MESSAGING_SERVICE_SCRIPTS_VM_PKB,
+            '-type',
+            'd',
+            '-exec',
+            'touch',
+            "'{}/__init__.py'",
+            '\\;',
+        ])
+    )
     self._CopyFiles(
         MESSAGING_SERVICE_SCRIPTS_COMMON_PREFIX,
         MESSAGING_SERVICE_SCRIPTS_COMMON_FILES,
-        MESSAGING_SERVICE_SCRIPTS_VM_COMMON_DIR)
+        MESSAGING_SERVICE_SCRIPTS_VM_COMMON_DIR,
+    )
 
   def _CopyFiles(self, prefix, data_srcs, vm_dest_dir):
     for subpath in data_srcs:
       dirname = os.path.dirname(os.path.join(vm_dest_dir, subpath))
       self.client_vm.RemoteCommand(f'mkdir -p {dirname}')
       self.client_vm.PushDataFile(
-          os.path.join(prefix, subpath),
-          os.path.join(vm_dest_dir, subpath))
+          os.path.join(prefix, subpath), os.path.join(vm_dest_dir, subpath)
+      )
 
   @abc.abstractmethod
   def _InstallCloudClients(self):
@@ -111,9 +125,14 @@ class BaseMessagingService(resource.BaseResource):
     raise NotImplementedError
 
   @abc.abstractmethod
-  def Run(self, benchmark_scenario: str, number_of_messages: int,
-          message_size: int, warmup_messages: int,
-          streaming_pull: bool = False) -> Dict[str, Any]:
+  def Run(
+      self,
+      benchmark_scenario: str,
+      number_of_messages: int,
+      message_size: int,
+      warmup_messages: int,
+      streaming_pull: bool = False,
+  ) -> Dict[str, Any]:
     """Runs remote commands on client VM - benchmark's run phase.
 
     Runs a benchmark that consists of first publishing messages and then

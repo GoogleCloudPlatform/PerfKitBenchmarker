@@ -32,6 +32,7 @@ node   0   1
 
 def MockVm(run_cmd_response: dict[str, str]):
   vm = mock.Mock()
+
   def FakeRemoteHostCommand(cmd, **_):
     if isinstance(run_cmd_response, dict):
       if cmd not in run_cmd_response:
@@ -61,13 +62,8 @@ class NumactlTest(parameterized.TestCase):
     self.assertEqual(cpus, numactl.GetNuma(MockVm(responses)))
 
   @parameterized.named_parameters(
-      ('singlenode', SINGLE_NUMA_NODE, {
-          0: 32116
-      }),
-      ('twonode', TWO_NUMA_NODES, {
-          0: 120889,
-          1: 120931
-      }),
+      ('singlenode', SINGLE_NUMA_NODE, {0: 32116}),
+      ('twonode', TWO_NUMA_NODES, {0: 120889, 1: 120931}),
   )
   def testGetNumaMemory(self, numactl_text, cpus):
     responses = {'numactl --hardware': numactl_text}

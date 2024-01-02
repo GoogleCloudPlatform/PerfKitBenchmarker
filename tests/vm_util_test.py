@@ -21,7 +21,6 @@ import time
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from tests import pkb_common_test_case
@@ -31,7 +30,8 @@ FLAGS = flags.FLAGS
 
 
 class ShouldRunOnInternalIpAddressTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   def setUp(self):
     super(ShouldRunOnInternalIpAddressTestCase, self).setUp()
@@ -44,7 +44,9 @@ class ShouldRunOnInternalIpAddressTestCase(
     self.assertEqual(
         expectation,
         vm_util.ShouldRunOnInternalIpAddress(
-            self.sending_vm, self.receiving_vm))
+            self.sending_vm, self.receiving_vm
+        ),
+    )
 
   def testExternal_Reachable(self):
     self._RunTest(False, vm_util.IpAddressSubset.EXTERNAL, True)
@@ -68,8 +70,7 @@ class ShouldRunOnInternalIpAddressTestCase(
     self._RunTest(True, vm_util.IpAddressSubset.REACHABLE, True)
 
   def testReachable_Unreachable(self):
-    self._RunTest(
-        False, vm_util.IpAddressSubset.REACHABLE, False)
+    self._RunTest(False, vm_util.IpAddressSubset.REACHABLE, False)
 
 
 def HaveSleepSubprocess():
@@ -134,15 +135,19 @@ class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch('threading.Timer', new=WaitUntilSleepTimer)
   def testTimeoutReachedThrows(self):
     with self.assertRaises(errors.VmUtil.IssueCommandTimeoutError):
-      _, _, _ = vm_util.IssueCommand(['sleep', '2s'], timeout=1,
-                                     raise_on_failure=False)
+      _, _, _ = vm_util.IssueCommand(
+          ['sleep', '2s'], timeout=1, raise_on_failure=False
+      )
     self.assertFalse(HaveSleepSubprocess())
 
   @mock.patch('threading.Timer', new=WaitUntilSleepTimer)
   def testTimeoutReached(self):
-    _, _, retcode = vm_util.IssueCommand(['sleep', '2s'], timeout=1,
-                                         raise_on_failure=False,
-                                         raise_on_timeout=False)
+    _, _, retcode = vm_util.IssueCommand(
+        ['sleep', '2s'],
+        timeout=1,
+        raise_on_failure=False,
+        raise_on_timeout=False,
+    )
     self.assertEqual(retcode, -9)
     self.assertFalse(HaveSleepSubprocess())
 
@@ -177,13 +182,15 @@ class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
       del stdout  # unused
       del stderr  # unused
       self.assertNotEqual(
-          retcode, 0,
-          '_SuppressFailure should not have been called for retcode=0.')
+          retcode,
+          0,
+          '_SuppressFailure should not have been called for retcode=0.',
+      )
       return True
 
     stdout, stderr, retcode = vm_util.IssueCommand(
-        ['cat', 'non_existent_file'],
-        suppress_failure=_SuppressFailure)
+        ['cat', 'non_existent_file'], suppress_failure=_SuppressFailure
+    )
 
     # Ideally our command would produce stdout that we could verify is preserved
     # but that's hard with the way IssueCommand creates local files for getting
@@ -198,29 +205,36 @@ class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(retcode, 0)
 
   def testRaiseOnFailureUnsuppressed_ExceptionRaised(self):
-
     def _DoNotSuppressFailure(stdout, stderr, retcode):
       del stdout  # unused
       del stderr  # unused
       self.assertNotEqual(
-          retcode, 0,
-          '_DoNotSuppressFailure should not have been called for retcode=0.')
+          retcode,
+          0,
+          '_DoNotSuppressFailure should not have been called for retcode=0.',
+      )
       return False
 
     with self.assertRaises(errors.VmUtil.IssueCommandError) as cm:
-      vm_util.IssueCommand(['cat', 'non_existent_file'],
-                           raise_on_failure=True,
-                           suppress_failure=_DoNotSuppressFailure)
-    self.assertIn('cat: non_existent_file: No such file or directory',
-                  str(cm.exception))
+      vm_util.IssueCommand(
+          ['cat', 'non_existent_file'],
+          raise_on_failure=True,
+          suppress_failure=_DoNotSuppressFailure,
+      )
+    self.assertIn(
+        'cat: non_existent_file: No such file or directory', str(cm.exception)
+    )
 
   def testRaiseOnFailureWithNoSuppression_ExceptionRaised(self):
     with self.assertRaises(errors.VmUtil.IssueCommandError) as cm:
-      vm_util.IssueCommand(['cat', 'non_existent_file'],
-                           raise_on_failure=True,
-                           suppress_failure=None)
-    self.assertIn('cat: non_existent_file: No such file or directory',
-                  str(cm.exception))
+      vm_util.IssueCommand(
+          ['cat', 'non_existent_file'],
+          raise_on_failure=True,
+          suppress_failure=None,
+      )
+    self.assertIn(
+        'cat: non_existent_file: No such file or directory', str(cm.exception)
+    )
 
 
 class VmUtilTest(pkb_common_test_case.PkbCommonTestCase):
@@ -232,15 +246,18 @@ class VmUtilTest(pkb_common_test_case.PkbCommonTestCase):
   def testReplaceTextUsesCorrectCommand(self):
     """Test of vm_util.ReplaceText()."""
     vm_util.ReplaceText(
-        self.mock_vm, 'current', 'new', 'test_file', regex_char='|')
+        self.mock_vm, 'current', 'new', 'test_file', regex_char='|'
+    )
     self.mock_vm.RemoteCommand.assert_called_with(
-        'sed -i -r "s|current|new|" test_file')
+        'sed -i -r "s|current|new|" test_file'
+    )
 
   def testDictionaryToEnvString(self):
     self.assertEqual('', vm_util.DictionaryToEnvString({}))
     test_dict = {'a': 'b', 'c': 'd'}
     self.assertEqual('a=b c=d', vm_util.DictionaryToEnvString(test_dict))
     self.assertEqual('a=b;c=d', vm_util.DictionaryToEnvString(test_dict, ';'))
+
 
 if __name__ == '__main__':
   unittest.main()

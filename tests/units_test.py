@@ -27,8 +27,9 @@ class UnitRegistryTestCase(unittest.TestCase):
     self.assertFalse(units.byte != units.Unit('byte'))
 
   def testKB(self):
-    self.assertEqual(units.ParseExpression('12KB'),
-                     units.ParseExpression('12000 bytes'))
+    self.assertEqual(
+        units.ParseExpression('12KB'), units.ParseExpression('12000 bytes')
+    )
 
   def testIntPercent(self):
     q = units.ParseExpression('10%')
@@ -41,8 +42,7 @@ class UnitRegistryTestCase(unittest.TestCase):
     self.assertEqual(q.units, units.percent)
 
   def testKubernetes(self):
-    self.assertEqual(units.ParseExpression('2048Ki'),
-                     2 * units.mebibyte)
+    self.assertEqual(units.ParseExpression('2048Ki'), 2 * units.mebibyte)
 
 
 class TestPintPickling(unittest.TestCase):

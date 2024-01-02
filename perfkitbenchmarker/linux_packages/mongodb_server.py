@@ -29,22 +29,26 @@ def _GetConfigPath():
 def _Setup(vm):
   """Setup mongodb."""
   vm.RemoteCommand(
-      'sudo sed -i "s|bindIp|# bindIp|" {}'.format(_GetConfigPath()))
+      'sudo sed -i "s|bindIp|# bindIp|" {}'.format(_GetConfigPath())
+  )
 
 
 def YumInstall(vm):
   """Installs the mongodb package on the VM."""
   vm.RemoteCommand('sudo setenforce 0')
   releasever, _ = vm.RemoteCommand(
-      'distro=$(sed -n \'s/^distroverpkg=//p\' /etc/yum.conf);'
-      'echo $(rpm -q --qf "%{version}" -f /etc/$distro)')
+      "distro=$(sed -n 's/^distroverpkg=//p' /etc/yum.conf);"
+      'echo $(rpm -q --qf "%{version}" -f /etc/$distro)'
+  )
   mongodb_repo = (
       '[mongodb-org-3.0]\nname=MongoDB Repository\nbaseurl='
       'https://repo.mongodb.org/yum/redhat/{0}/mongodb-org/3.0/x86_64/'
-      '\ngpgcheck=0\nenabled=1').format(releasever.strip())
+      '\ngpgcheck=0\nenabled=1'
+  ).format(releasever.strip())
   vm.RemoteCommand(
-      'echo "%s" | sudo tee /etc/yum.repos.d/mongodb-org-3.0.repo' %
-      mongodb_repo)
+      'echo "%s" | sudo tee /etc/yum.repos.d/mongodb-org-3.0.repo'
+      % mongodb_repo
+  )
   vm.InstallPackages('mongodb-org')
   _Setup(vm)
 
@@ -53,11 +57,13 @@ def AptInstall(vm):
   """Installs the mongodb package on the VM."""
   vm.RemoteCommand(
       'wget -qO - https://www.mongodb.org/static/pgp/server-3.0.asc'
-      ' | sudo apt-key add -')
+      ' | sudo apt-key add -'
+  )
   vm.RemoteCommand(
       'echo "deb https://repo.mongodb.org/apt/ubuntu '
       '$(lsb_release -c -s)/mongodb-org/3.0 multiverse" | '
-      'sudo tee /etc/apt/sources.list.d/mongodb-org-3.0.list')
+      'sudo tee /etc/apt/sources.list.d/mongodb-org-3.0.list'
+  )
   vm.AptUpdate()
   vm.RemoteCommand('sudo apt-get install mongodb-org -y --force-yes')
   _Setup(vm)

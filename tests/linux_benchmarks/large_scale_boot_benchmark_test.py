@@ -17,7 +17,6 @@ import copy
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import large_scale_boot_benchmark
@@ -30,7 +29,8 @@ FLAGS = flags.FLAGS
 class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   @mock.patch.object(
-      large_scale_boot_benchmark, '_GetExpectedBoots', return_value=4)
+      large_scale_boot_benchmark, '_GetExpectedBoots', return_value=4
+  )
   def testWaitForResponsesSuccess(self, mock_func):
     vm1 = mock.Mock()
     vm1.RemoteCommand.side_effect = [('', ''), ('2', '')]
@@ -38,12 +38,15 @@ class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     vm2.RemoteCommand.side_effect = [('', ''), ('2', '')]
     large_scale_boot_benchmark._WaitForResponses([vm1, vm2])
     vm1.RemoteCommand.assert_called_with(
-        'grep -c Pass /tmp/pkb/results', ignore_failure=True)
+        'grep -c Pass /tmp/pkb/results', ignore_failure=True
+    )
     vm2.RemoteCommand.assert_called_with(
-        'grep -c Pass /tmp/pkb/results', ignore_failure=True)
+        'grep -c Pass /tmp/pkb/results', ignore_failure=True
+    )
 
   @mock.patch.object(
-      large_scale_boot_benchmark, '_GetExpectedBoots', return_value=4)
+      large_scale_boot_benchmark, '_GetExpectedBoots', return_value=4
+  )
   def testWaitForResponsesDeadServer(self, mock_func):
     vm1 = mock.Mock()
     vm1.RemoteCommand.side_effect = [('Error: Failed', ''), ('2', '')]
@@ -51,11 +54,11 @@ class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
       large_scale_boot_benchmark._WaitForResponses([vm1])
 
   @mock.patch.object(
-      large_scale_boot_benchmark, '_GetExpectedBoots', return_value=5)
+      large_scale_boot_benchmark, '_GetExpectedBoots', return_value=5
+  )
   def testWaitForResponsesTwice(self, mock_func):
     vm1 = mock.Mock()
-    vm1.RemoteCommand.side_effect = [
-        ('', ''), ('2', ''), ('', ''), ('5', '')]
+    vm1.RemoteCommand.side_effect = [('', ''), ('2', ''), ('', ''), ('5', '')]
     large_scale_boot_benchmark._WaitForResponses([vm1])
     self.assertEqual(vm1.RemoteCommand.call_count, 4)
 
@@ -65,12 +68,16 @@ class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['zone'].value = 'zone'
 
     vm1 = mock.Mock()
-    vm1.RemoteCommand.side_effect = [('6', ''),
-                                     ('Pass:a:8\nPass:b:9\nPass:c:13', '')]
+    vm1.RemoteCommand.side_effect = [
+        ('6', ''),
+        ('Pass:a:8\nPass:b:9\nPass:c:13', ''),
+    ]
     vm1.zone = 'zone'
     vm2 = mock.Mock()
-    vm2.RemoteCommand.side_effect = [('2', ''),
-                                     ('Pass:d:4\nFail:e:5\nPass:f:6', '')]
+    vm2.RemoteCommand.side_effect = [
+        ('2', ''),
+        ('Pass:d:4\nFail:e:5\nPass:f:6', ''),
+    ]
     vm2.zone = 'zone'
     results = large_scale_boot_benchmark._ParseResult([vm1, vm2])
 
@@ -90,65 +97,81 @@ class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         'zone': 'zone',
         'launcher_successes': 3,
         'launcher_boot_durations_ns': [2, 3, 7],
-        'launcher_closed_incoming': 0
+        'launcher_closed_incoming': 0,
     })
     metadata2 = copy.deepcopy(common_metadata)
     metadata2.update({
         'zone': 'zone',
         'launcher_successes': 2,
         'launcher_boot_durations_ns': [2, 4],
-        'launcher_closed_incoming': 1
+        'launcher_closed_incoming': 1,
     })
     expected = [
         sample.Sample(
             metric='Launcher Boot Details',
             value=-1,
             unit='',
-            metadata=metadata1),
+            metadata=metadata1,
+        ),
         sample.Sample(
             metric='Launcher Boot Details',
             value=-1,
             unit='',
-            metadata=metadata2),
+            metadata=metadata2,
+        ),
         sample.Sample(
             metric='Cluster Max Boot Time',
             value=7,
             unit='nanoseconds',
-            metadata=common_metadata),
+            metadata=common_metadata,
+        ),
         sample.Sample(
             metric='Cluster Max Boot Sec',
             value=0.000000007,
             unit='seconds',
-            metadata=common_metadata),
+            metadata=common_metadata,
+        ),
         sample.Sample(
             metric='Cluster Mean Boot Sec',
             value=0.000000003,
             unit='seconds',
-            metadata=common_metadata),
+            metadata=common_metadata,
+        ),
         sample.Sample(
             metric='Cluster Median Boot Sec',
             value=0.000000003,
             unit='seconds',
-            metadata=common_metadata),
+            metadata=common_metadata,
+        ),
         sample.Sample(
             metric='Cluster Expected Boots',
             value=6,
             unit='',
-            metadata=common_metadata),
+            metadata=common_metadata,
+        ),
         sample.Sample(
-            metric='Cluster Success Boots', value=5, unit='',
-            metadata=common_metadata)
+            metric='Cluster Success Boots',
+            value=5,
+            unit='',
+            metadata=common_metadata,
+        ),
     ]
     for result, expected in zip(results, expected):
-      self.assertEqual(result.metric, expected.metric,
-                       'Metric name for {} is not equal.'.format(
-                           expected.metric))
-      self.assertEqual(result.value, expected.value,
-                       'Metric value for {} is not equal.'.format(
-                           expected.metric))
-      self.assertDictEqual(result.metadata, expected.metadata,
-                           'Metadata for {} is not equal'.format(
-                               expected.metric))
+      self.assertEqual(
+          result.metric,
+          expected.metric,
+          'Metric name for {} is not equal.'.format(expected.metric),
+      )
+      self.assertEqual(
+          result.value,
+          expected.value,
+          'Metric value for {} is not equal.'.format(expected.metric),
+      )
+      self.assertDictEqual(
+          result.metadata,
+          expected.metadata,
+          'Metadata for {} is not equal'.format(expected.metric),
+      )
 
 
 if __name__ == '__main__':

@@ -30,8 +30,10 @@ def _LoadPackages():
   This imports all package modules in this directory and then creates a
   mapping from module names to the modules themselves and returns it.
   """
-  return {module.__name__.split('.')[-1]: module for module in
-          import_util.LoadModulesForPath(__path__, __name__)}
+  return {
+      module.__name__.split('.')[-1]: module
+      for module in import_util.LoadModulesForPath(__path__, __name__)
+  }
 
 
 PACKAGES = _LoadPackages()

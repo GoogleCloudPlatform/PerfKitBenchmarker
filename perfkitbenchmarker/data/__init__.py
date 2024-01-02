@@ -34,16 +34,20 @@ import six
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_multi_string('data_search_paths', ['.'],
-                          'Additional paths to search for data files. '
-                          'These paths will be searched prior to using files '
-                          'bundled with PerfKitBenchmarker.')
+flags.DEFINE_multi_string(
+    'data_search_paths',
+    ['.'],
+    'Additional paths to search for data files. '
+    'These paths will be searched prior to using files '
+    'bundled with PerfKitBenchmarker.',
+)
 
 _RESOURCES = 'resources'
 
 
 class ResourceNotFound(ValueError):
   """Error raised when a resource could not be found on the search path."""
+
   pass
 
 
@@ -142,23 +146,28 @@ class PackageResourceLoader(ResourceLoader):
           if not os.path.isdir(dir_path):
             raise
         with open(path, 'wb') as extracted_file:
-          shutil.copyfileobj(pkg_resources.resource_stream(self.package, name),
-                             extracted_file)
+          shutil.copyfileobj(
+              pkg_resources.resource_stream(self.package, name), extracted_file
+          )
     return path
 
 
 DATA_PACKAGE_NAME = 'perfkitbenchmarker.data'
 YCSB_WORKLOAD_DIR_NAME = os.path.join(
-    os.path.dirname(perfkitbenchmarker.__file__), 'data/ycsb')
+    os.path.dirname(perfkitbenchmarker.__file__), 'data/ycsb'
+)
 EDW_SCRIPT_DIR_NAME = os.path.join(
-    os.path.dirname(perfkitbenchmarker.__file__), 'data/edw')
+    os.path.dirname(perfkitbenchmarker.__file__), 'data/edw'
+)
 SCRIPT_PACKAGE_NAME = 'perfkitbenchmarker.scripts'
 CONFIG_PACKAGE_NAME = 'perfkitbenchmarker.configs'
-DEFAULT_RESOURCE_LOADERS = [PackageResourceLoader(DATA_PACKAGE_NAME),
-                            FileResourceLoader(YCSB_WORKLOAD_DIR_NAME),
-                            FileResourceLoader(EDW_SCRIPT_DIR_NAME),
-                            PackageResourceLoader(SCRIPT_PACKAGE_NAME),
-                            PackageResourceLoader(CONFIG_PACKAGE_NAME)]
+DEFAULT_RESOURCE_LOADERS = [
+    PackageResourceLoader(DATA_PACKAGE_NAME),
+    FileResourceLoader(YCSB_WORKLOAD_DIR_NAME),
+    FileResourceLoader(EDW_SCRIPT_DIR_NAME),
+    PackageResourceLoader(SCRIPT_PACKAGE_NAME),
+    PackageResourceLoader(CONFIG_PACKAGE_NAME),
+]
 
 
 def _GetResourceLoaders():
@@ -198,6 +207,7 @@ def ResourcePath(resource_name, search_user_paths=True):
     resource_name: string. Name of a resource.
     search_user_paths: boolean. Whether paths from "--data_search_paths" should
       be searched before the default paths.
+
   Returns:
     A path to the resource on the filesystem.
   Raises:
@@ -211,8 +221,7 @@ def ResourcePath(resource_name, search_user_paths=True):
     if loader.ResourceExists(resource_name):
       return loader.ResourcePath(resource_name)
 
-  raise ResourceNotFound(
-      '{0} (Searched: {1})'.format(resource_name, loaders))
+  raise ResourceNotFound('{0} (Searched: {1})'.format(resource_name, loaders))
 
 
 def ResourceExists(resource_name, search_user_paths=True):
@@ -228,6 +237,7 @@ def ResourceExists(resource_name, search_user_paths=True):
     resource_name: string. Name of a resource.
     search_user_paths: boolean. Whether paths from "--data_search_paths" should
       be searched before the default paths.
+
   Returns:
     Whether the resource exists.
   """

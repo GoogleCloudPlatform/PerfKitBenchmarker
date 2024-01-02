@@ -529,12 +529,10 @@ def _CreateTable(benchmark_spec: bm_spec.BenchmarkSpec):
   """
   instance: _Bigtable = benchmark_spec.non_relational_db
   vm = benchmark_spec.vms[0]
-  splits = ','.join(
-      [
-          f'user{1000 + i * (9999 - 1000) // hbase_ycsb.TABLE_SPLIT_COUNT}'
-          for i in range(hbase_ycsb.TABLE_SPLIT_COUNT)
-      ]
-  )
+  splits = ','.join([
+      f'user{1000 + i * (9999 - 1000) // hbase_ycsb.TABLE_SPLIT_COUNT}'
+      for i in range(hbase_ycsb.TABLE_SPLIT_COUNT)
+  ])
   command = [
       google_cloud_cbt.CBT_BIN,
       f'-project={FLAGS.project or _GetDefaultProject()}',

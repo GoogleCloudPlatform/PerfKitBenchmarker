@@ -80,8 +80,9 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
         self._BuildImageLocally()
 
     create_command = self._FormatCreateCommand()
-    container_info, _, _ = vm_util.IssueCommand(create_command,
-                                                raise_on_failure=False)
+    container_info, _, _ = vm_util.IssueCommand(
+        create_command, raise_on_failure=False
+    )
     self.container_id = container_info.encode('ascii')
 
   def _FormatCreateCommand(self):
@@ -127,13 +128,23 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     self._GetIpAddresses()
 
     # Copy ssh key to container to enable ssh login
-    copy_ssh_command = ['docker', 'cp', self.ssh_public_key,
-                        '%s:/root/.ssh/authorized_keys' % self.name]
+    copy_ssh_command = [
+        'docker',
+        'cp',
+        self.ssh_public_key,
+        '%s:/root/.ssh/authorized_keys' % self.name,
+    ]
     vm_util.IssueCommand(copy_ssh_command, raise_on_failure=False)
 
     # change ownership of authorized_key file to root in container
-    chown_command = ['docker', 'exec', self.name, 'chown',
-                     'root:root', '/root/.ssh/authorized_keys']
+    chown_command = [
+        'docker',
+        'exec',
+        self.name,
+        'chown',
+        'root:root',
+        '/root/.ssh/authorized_keys',
+    ]
     vm_util.IssueCommand(chown_command, raise_on_failure=False)
     self._ConfigureProxy()
 
@@ -209,8 +220,9 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     """
     logging.info('Checking Container Information')
     inspect_cmd = ['docker', 'inspect', self.name]
-    info, _, return_code = vm_util.IssueCommand(inspect_cmd,
-                                                raise_on_failure=False)
+    info, _, return_code = vm_util.IssueCommand(
+        inspect_cmd, raise_on_failure=False
+    )
     info = json.loads(info)
     return info, return_code
 
@@ -247,8 +259,9 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
   def _LocalImageExists(self, docker_image_name):
     """Returns whether a Docker image exists locally."""
     inspect_cmd = ['docker', 'image', 'inspect', docker_image_name]
-    info, _, return_code = vm_util.IssueCommand(inspect_cmd,
-                                                raise_on_failure=False)
+    info, _, return_code = vm_util.IssueCommand(
+        inspect_cmd, raise_on_failure=False
+    )
     info = json.loads(info)
     logging.info('Checking if Docker Image Exists')
     if info and return_code == 0:
@@ -264,12 +277,20 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     PerfKitBenchmarker/data/docker/pkb/<containerImage>/Dockerfile
     """
     directory = os.path.dirname(
-        data.ResourcePath(os.path.join(DOCKERFILE_DIRECTORY,
-                                       self.container_image,
-                                       'Dockerfile')))
+        data.ResourcePath(
+            os.path.join(
+                DOCKERFILE_DIRECTORY, self.container_image, 'Dockerfile'
+            )
+        )
+    )
     build_cmd = [
-        'docker', 'build', '--no-cache',
-        '-t', self.container_image, directory]
+        'docker',
+        'build',
+        '--no-cache',
+        '-t',
+        self.container_image,
+        directory,
+    ]
 
     vm_util.IssueCommand(build_cmd, raise_on_failure=False)
 
@@ -285,8 +306,9 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     return result
 
 
-class DebianBasedDockerContainer(DockerContainer,
-                                 linux_virtual_machine.BaseDebianMixin):
+class DebianBasedDockerContainer(
+    DockerContainer, linux_virtual_machine.BaseDebianMixin
+):
 
   def _GetNumCpus(self):
     return self.cpus
@@ -298,18 +320,22 @@ class DebianBasedDockerContainer(DockerContainer,
     Args:
       sysctl_params: dict - the keys and values to write
     """
-    logging.warn('sysctl flags are applied when container is created. '
-                 'Not all sysctl flags work with Docker. It does not '
-                 'support flags that modify the host system')
+    logging.warn(
+        'sysctl flags are applied when container is created. '
+        'Not all sysctl flags work with Docker. It does not '
+        'support flags that modify the host system'
+    )
 
   def _RebootIfNecessary(self):
     """Override RebootIfNecessary for Docker Provider."""
     logging.warn('Docker Containers cannot be rebooted to apply flags')
 
 
-class Ubuntu1604BasedDockerContainer(DebianBasedDockerContainer,
-                                     linux_virtual_machine.Ubuntu1604Mixin):
+class Ubuntu1604BasedDockerContainer(
+    DebianBasedDockerContainer, linux_virtual_machine.Ubuntu1604Mixin
+):
   DEFAULT_IMAGE = UBUNTU16_IMAGE
+
 
 # Note: to add support for ubuntu 14 and ubuntu 18, we simply need to
 #       create/test Dockerfiles for those distros. This should be

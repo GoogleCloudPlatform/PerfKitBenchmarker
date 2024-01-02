@@ -19,12 +19,16 @@ from perfkitbenchmarker.providers.azure import azure_network
 
 FLAGS = flags.FLAGS
 MESSAGING_SERVICE_SCRIPTS_VM_AZURE_DIR = os.path.join(
-    msgsvc.MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'azure')
+    msgsvc.MESSAGING_SERVICE_SCRIPTS_VM_LIB_DIR, 'azure'
+)
 MESSAGING_SERVICE_SCRIPTS_AZURE_PREFIX = 'messaging_service_scripts/azure'
 MESSAGING_SERVICE_SCRIPTS_AZURE_FILES = [
-    '__init__.py', 'azure_service_bus_client.py'
+    '__init__.py',
+    'azure_service_bus_client.py',
 ]
-MESSAGING_SERVICE_SCRIPTS_AZURE_BIN = 'messaging_service_scripts/azure_benchmark.py'
+MESSAGING_SERVICE_SCRIPTS_AZURE_BIN = (
+    'messaging_service_scripts/azure_benchmark.py'
+)
 
 
 class AzureServiceBus(msgsvc.BaseMessagingService):
@@ -46,8 +50,11 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
     self._CreateSubscription()
 
   def _Exists(self):
-    return (self._NamespaceExists() and self._TopicExists() and
-            self._SubscriptionExists())
+    return (
+        self._NamespaceExists()
+        and self._TopicExists()
+        and self._SubscriptionExists()
+    )
 
   def _Delete(self):
     self._DeleteSubscription()
@@ -63,23 +70,33 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
     Returns:
       A bool. True if the resource is not yet deleted, else False.
     """
-    return (self._NamespaceExists() or self._TopicExists() or
-            self._SubscriptionExists())
+    return (
+        self._NamespaceExists()
+        or self._TopicExists()
+        or self._SubscriptionExists()
+    )
 
-  def Run(self, benchmark_scenario: str, number_of_messages: int,
-          message_size: int, warmup_messages: int,
-          streaming_pull: bool = False) -> Dict[str, Any]:
+  def Run(
+      self,
+      benchmark_scenario: str,
+      number_of_messages: int,
+      message_size: int,
+      warmup_messages: int,
+      streaming_pull: bool = False,
+  ) -> Dict[str, Any]:
     if streaming_pull:
       raise ValueError('Unsupported StreamingPull in AWS SQS.')
     connection_str = self._GetPrimaryConnectionString()
-    command = (f'python3 -m azure_benchmark '
-               f'--topic_name={self.topic_name} '
-               f'--subscription_name={self.subscription_name} '
-               f'--benchmark_scenario={benchmark_scenario} '
-               f'--number_of_messages={number_of_messages} '
-               f'--message_size={message_size} '
-               f'--warmup_messages={warmup_messages} '
-               f'--connection_str="{connection_str}"')
+    command = (
+        'python3 -m azure_benchmark '
+        f'--topic_name={self.topic_name} '
+        f'--subscription_name={self.subscription_name} '
+        f'--benchmark_scenario={benchmark_scenario} '
+        f'--number_of_messages={number_of_messages} '
+        f'--message_size={message_size} '
+        f'--warmup_messages={warmup_messages} '
+        f'--connection_str="{connection_str}"'
+    )
     results = self.client_vm.RemoteCommand(command)
     results = json.loads(results[0])
     return results
@@ -87,11 +104,14 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
   def _InstallCloudClients(self):
     # Install/uploads Azure specific modules/files.
     self.client_vm.RemoteCommand(
-        'sudo pip3 install azure-servicebus', ignore_failure=False)
+        'sudo pip3 install azure-servicebus', ignore_failure=False
+    )
 
-    self._CopyFiles(MESSAGING_SERVICE_SCRIPTS_AZURE_PREFIX,
-                    MESSAGING_SERVICE_SCRIPTS_AZURE_FILES,
-                    MESSAGING_SERVICE_SCRIPTS_VM_AZURE_DIR)
+    self._CopyFiles(
+        MESSAGING_SERVICE_SCRIPTS_AZURE_PREFIX,
+        MESSAGING_SERVICE_SCRIPTS_AZURE_FILES,
+        MESSAGING_SERVICE_SCRIPTS_VM_AZURE_DIR,
+    )
     self.client_vm.PushDataFile(MESSAGING_SERVICE_SCRIPTS_AZURE_BIN)
 
   @property
@@ -101,16 +121,28 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
   def _CreateTopic(self):
     """Creates Service Bus topic."""
     cmd = [
-        azure.AZURE_PATH, 'servicebus', 'topic', 'create', '--name',
-        self.topic_name, '--namespace-name', self.namespace_name
+        azure.AZURE_PATH,
+        'servicebus',
+        'topic',
+        'create',
+        '--name',
+        self.topic_name,
+        '--namespace-name',
+        self.namespace_name,
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd)
 
   def _TopicExists(self) -> bool:
     """Checks whether Service Bus topic already exists."""
     cmd = [
-        azure.AZURE_PATH, 'servicebus', 'topic', 'show', '--name',
-        self.topic_name, '--namespace-name', self.namespace_name
+        azure.AZURE_PATH,
+        'servicebus',
+        'topic',
+        'show',
+        '--name',
+        self.topic_name,
+        '--namespace-name',
+        self.namespace_name,
     ] + self.resource_group.args
     _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     return retcode == 0
@@ -118,26 +150,48 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
   def _DeleteTopic(self):
     """Handle Service Bus topic deletion."""
     cmd = [
-        azure.AZURE_PATH, 'servicebus', 'topic', 'delete', '--name',
-        self.topic_name, '--namespace-name', self.namespace_name
+        azure.AZURE_PATH,
+        'servicebus',
+        'topic',
+        'delete',
+        '--name',
+        self.topic_name,
+        '--namespace-name',
+        self.namespace_name,
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _CreateSubscription(self):
     """Creates Service Bus subscription."""
     cmd = [
-        azure.AZURE_PATH, 'servicebus', 'topic', 'subscription', 'create',
-        '--name', self.subscription_name, '--topic-name', self.topic_name,
-        '--namespace-name', self.namespace_name
+        azure.AZURE_PATH,
+        'servicebus',
+        'topic',
+        'subscription',
+        'create',
+        '--name',
+        self.subscription_name,
+        '--topic-name',
+        self.topic_name,
+        '--namespace-name',
+        self.namespace_name,
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd)
 
   def _SubscriptionExists(self) -> bool:
     """Checks whether Service Bus subscription already exists."""
     cmd = [
-        azure.AZURE_PATH, 'servicebus', 'topic', 'subscription', 'show',
-        '--name', self.subscription_name, '--topic-name', self.topic_name,
-        '--namespace-name', self.namespace_name
+        azure.AZURE_PATH,
+        'servicebus',
+        'topic',
+        'subscription',
+        'show',
+        '--name',
+        self.subscription_name,
+        '--topic-name',
+        self.topic_name,
+        '--namespace-name',
+        self.namespace_name,
     ] + self.resource_group.args
     _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     return retcode == 0
@@ -145,25 +199,43 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
   def _DeleteSubscription(self):
     """Handle Service Bus subscription deletion."""
     cmd = [
-        azure.AZURE_PATH, 'servicebus', 'topic', 'subscription', 'delete',
-        '--name', self.subscription_name, '--topic-name', self.topic_name,
-        '--namespace-name', self.namespace_name
+        azure.AZURE_PATH,
+        'servicebus',
+        'topic',
+        'subscription',
+        'delete',
+        '--name',
+        self.subscription_name,
+        '--topic-name',
+        self.topic_name,
+        '--namespace-name',
+        self.namespace_name,
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _CreateNamespace(self):
     """Creates an Azure Service Bus Namespace."""
     cmd = [
-        azure.AZURE_PATH, 'servicebus', 'namespace', 'create', '--name',
-        self.namespace_name, '--location', self.location
+        azure.AZURE_PATH,
+        'servicebus',
+        'namespace',
+        'create',
+        '--name',
+        self.namespace_name,
+        '--location',
+        self.location,
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd)
 
   def _NamespaceExists(self) -> bool:
     """Checks if our Service Bus Namespace exists."""
     cmd = [
-        azure.AZURE_PATH, 'servicebus', 'namespace', 'show', '--name',
-        self.namespace_name
+        azure.AZURE_PATH,
+        'servicebus',
+        'namespace',
+        'show',
+        '--name',
+        self.namespace_name,
     ] + self.resource_group.args
     _, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     return retcode == 0
@@ -171,21 +243,35 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
   def _DeleteNamespace(self):
     """Deletes the Azure Service Bus namespace."""
     cmd = [
-        azure.AZURE_PATH, 'servicebus', 'namespace', 'delete', '--name',
-        self.namespace_name
+        azure.AZURE_PATH,
+        'servicebus',
+        'namespace',
+        'delete',
+        '--name',
+        self.namespace_name,
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _GetPrimaryConnectionString(self):
     """Gets Azure Service Bus Namespace connection string."""
     cmd = [
-        azure.AZURE_PATH, 'servicebus', 'namespace', 'authorization-rule',
-        'keys', 'list', '--name=RootManageSharedAccessKey', '--namespace-name',
-        self.namespace_name, '--query=primaryConnectionString', '-o=tsv'
+        azure.AZURE_PATH,
+        'servicebus',
+        'namespace',
+        'authorization-rule',
+        'keys',
+        'list',
+        '--name=RootManageSharedAccessKey',
+        '--namespace-name',
+        self.namespace_name,
+        '--query=primaryConnectionString',
+        '-o=tsv',
     ] + self.resource_group.args
     output, stderror, retcode = vm_util.IssueCommand(
-        cmd, raise_on_failure=False)
+        cmd, raise_on_failure=False
+    )
     if retcode:
       logging.warning(
-          'Failed to get Service Bus Namespace connection string! %s', stderror)
+          'Failed to get Service Bus Namespace connection string! %s', stderror
+      )
     return output.strip()

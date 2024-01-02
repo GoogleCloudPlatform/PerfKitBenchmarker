@@ -55,5 +55,6 @@ def AptInstall(vm):
 
   # Separate commands since $WM_PROJECT_DIR comes from the OpenFOAM bashrc.
   vm.RemoteCommand(f'cat {openfoam_bash_path} | tee $HOME/.bashrc')
-  vm.RemoteCommand('cat $WM_PROJECT_DIR/bin/tools/RunFunctions | '
-                   'tee -a $HOME/.bashrc')
+  vm.RemoteCommand(
+      'cat $WM_PROJECT_DIR/bin/tools/RunFunctions | tee -a $HOME/.bashrc'
+  )

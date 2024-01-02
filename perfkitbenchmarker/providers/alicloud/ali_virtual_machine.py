@@ -53,7 +53,8 @@ NUM_LOCAL_VOLUMES = {
     'ecs.m1.medium': 4,
 }
 INSTANCE_EXISTS_STATUSES = frozenset(
-    ['Starting', 'Running', 'Stopping', 'Stopped'])
+    ['Starting', 'Running', 'Stopping', 'Stopped']
+)
 INSTANCE_DELETED_STATUSES = frozenset([])
 INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 
@@ -92,13 +93,15 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry(poll_interval=1, log_errors=False)
   def _WaitForInstanceStatus(self, status_list):
     """Waits until the instance's status is in status_list."""
-    logging.info('Waits until the instance\'s status is one of statuses: %s',
-                 status_list)
+    logging.info(
+        "Waits until the instance's status is one of statuses: %s", status_list
+    )
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
         'DescribeInstances',
         '--RegionId %s' % self.region,
-        '--InstanceIds \'["%s"]\'' % self.id]
+        '--InstanceIds \'["%s"]\'' % self.id,
+    ]
     describe_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
@@ -110,13 +113,15 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
   @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
   def _WaitForEipStatus(self, status_list):
     """Waits until the instance's status is in status_list."""
-    logging.info('Waits until the eip\'s status is one of statuses: %s',
-                 status_list)
+    logging.info(
+        "Waits until the eip's status is one of statuses: %s", status_list
+    )
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
         'DescribeEipAddresses',
         '--RegionId %s' % self.region,
-        '--AllocationId %s' % self.eip_id]
+        '--AllocationId %s' % self.eip_id,
+    ]
     describe_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
@@ -133,7 +138,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
           'AllocateEipAddress',
           '--RegionId %s' % region,
           '--InternetChargeType PayByTraffic',
-          '--Bandwidth %s' % self.eip_address_bandwidth]
+          '--Bandwidth %s' % self.eip_address_bandwidth,
+      ]
       allocatip_cmd = util.GetEncodedCmd(allocatip_cmd)
       stdout, _ = vm_util.IssueRetryableCommand(allocatip_cmd)
       response = json.loads(stdout)
@@ -148,7 +154,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--RegionId %s' % region,
           '--AllocationId  %s' % self.eip_id,
           '--InstanceId %s' % instance_id,
-          '--InstanceType EcsInstance']
+          '--InstanceType EcsInstance',
+      ]
       associate_cmd = util.GetEncodedCmd(associate_cmd)
       vm_util.IssueRetryableCommand(associate_cmd)
 
@@ -159,7 +166,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
           'ecs',
           'AllocatePublicIpAddress',
           '--RegionId %s' % region,
-          '--InstanceId %s' % instance_id]
+          '--InstanceId %s' % instance_id,
+      ]
       allocatip_cmd = util.GetEncodedCmd(allocatip_cmd)
       stdout, _ = vm_util.IssueRetryableCommand(allocatip_cmd)
       response = json.loads(stdout)
@@ -178,7 +186,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
         'ecs',
         'DescribeImages',
         '--RegionId %s' % region,
-        '--ImageName \'%s\'' % cls.IMAGE_NAME_FILTER]
+        "--ImageName '%s'" % cls.IMAGE_NAME_FILTER,
+    ]
     describe_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
 
@@ -198,17 +207,22 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
         'ecs',
         'DescribeInstances',
         '--RegionId %s' % self.region,
-        '--InstanceIds \'["%s"]\'' % self.id]
-    logging.info('Getting instance %s public IP. This will fail until '
-                 'a public IP is available, but will be retried.', self.id)
+        '--InstanceIds \'["%s"]\'' % self.id,
+    ]
+    logging.info(
+        'Getting instance %s public IP. This will fail until '
+        'a public IP is available, but will be retried.',
+        self.id,
+    )
     describe_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     instance = response['Instances']['Instance'][0]
     if self.network.use_vpc:
       pub_ip_address = instance['EipAddress']['IpAddress']
-      self.internal_ip = \
-          instance['VpcAttributes']['PrivateIpAddress']['IpAddress'][0]
+      self.internal_ip = instance['VpcAttributes']['PrivateIpAddress'][
+          'IpAddress'
+      ][0]
     else:
       pub_ip_address = instance['PublicIpAddress']['IpAddress'][0]
       self.internal_ip = instance['InnerIpAddress']['IpAddress'][0]
@@ -227,7 +241,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
         'DescribeDisks',
-        '--InstanceId %s' % self.id]
+        '--InstanceId %s' % self.id,
+    ]
 
     describe_cmd_encoded = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd_encoded)
@@ -236,7 +251,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     while response['NextToken']:
       describe_cmd_encoded = util.GetEncodedCmd(
-          describe_cmd + ['--NextToken', response['NextToken']])
+          describe_cmd + ['--NextToken', response['NextToken']]
+      )
 
       stdout, _ = vm_util.IssueRetryableCommand(describe_cmd_encoded)
       response = json.loads(stdout)
@@ -248,10 +264,12 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       util.AddDefaultTags(disk_id, util.ResourceTypes.DISK, self.region)
 
     # Tag KeyPair
-    util.AddTags(self.key_pair_name, util.ResourceTypes.KEYPAIR, self.region,
-                 **tags)
-    util.AddDefaultTags(self.key_pair_name, util.ResourceTypes.KEYPAIR,
-                        self.region)
+    util.AddTags(
+        self.key_pair_name, util.ResourceTypes.KEYPAIR, self.region, **tags
+    )
+    util.AddDefaultTags(
+        self.key_pair_name, util.ResourceTypes.KEYPAIR, self.region
+    )
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
@@ -281,14 +299,16 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--SecurityGroupId %s' % self.network.security_group.group_id,
         '--KeyPairName %s' % self.key_pair_name,
         '--SystemDisk.Category %s' % self.system_disk_type,
-        '--SystemDisk.Size %s' % self.system_disk_size]
+        '--SystemDisk.Size %s' % self.system_disk_size,
+    ]
 
     if FLAGS.data_disk_type == disk.LOCAL:
       disk_cmd = [
           '--DataDisk1Category ephemeral_ssd',
           '--DataDisk1Size %s' % self.scratch_disk_size,
-          '--DataDisk1Device %s%s' % (util.GetDrivePathPrefix(),
-                                      DRIVE_START_LETTER)]
+          '--DataDisk1Device %s%s'
+          % (util.GetDrivePathPrefix(), DRIVE_START_LETTER),
+      ]
       create_cmd.extend(disk_cmd)
 
     if FLAGS.ali_io_optimized is not None:
@@ -300,15 +320,19 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.extend([
           '--InternetChargeType PayByTraffic',
           '--InternetMaxBandwidthIn %s' % self.bandwidth_in,
-          '--InternetMaxBandwidthOut %s' % self.bandwidth_out])
+          '--InternetMaxBandwidthOut %s' % self.bandwidth_out,
+      ])
 
     # Create user and add SSH key
     public_key = AliCloudKeyFileManager.GetPublicKey()
-    user_data = util.ADD_USER_TEMPLATE.format(user_name=self.user_name,
-                                              public_key=public_key)
+    user_data = util.ADD_USER_TEMPLATE.format(
+        user_name=self.user_name, public_key=public_key
+    )
     logging.debug('encoding startup script: %s', user_data)
-    create_cmd.extend(['--UserData', six.ensure_str(
-        base64.b64encode(user_data.encode('utf-8')))])
+    create_cmd.extend([
+        '--UserData',
+        six.ensure_str(base64.b64encode(user_data.encode('utf-8'))),
+    ])
 
     create_cmd = util.GetEncodedCmd(create_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(create_cmd)
@@ -320,7 +344,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     start_cmd = util.ALI_PREFIX + [
         'ecs',
         'StartInstance',
-        '--InstanceId %s' % self.id]
+        '--InstanceId %s' % self.id,
+    ]
     start_cmd = util.GetEncodedCmd(start_cmd)
     vm_util.IssueRetryableCommand(start_cmd)
 
@@ -329,7 +354,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     stop_cmd = util.ALI_PREFIX + [
         'ecs',
         'StopInstance',
-        '--InstanceId %s' % self.id]
+        '--InstanceId %s' % self.id,
+    ]
     stop_cmd = util.GetEncodedCmd(stop_cmd)
     vm_util.IssueRetryableCommand(stop_cmd)
 
@@ -338,7 +364,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     delete_cmd = util.ALI_PREFIX + [
         'ecs',
         'DeleteInstance',
-        '--InstanceId %s' % self.id]
+        '--InstanceId %s' % self.id,
+    ]
     delete_cmd = util.GetEncodedCmd(delete_cmd)
     vm_util.IssueRetryableCommand(delete_cmd)
 
@@ -348,7 +375,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
           'ecs',
           'ReleaseEipAddress',
           '--RegionId %s' % self.region,
-          '--AllocationId %s' % self.eip_id]
+          '--AllocationId %s' % self.eip_id,
+      ]
       release_eip_cmd = util.GetEncodedCmd(release_eip_cmd)
       vm_util.IssueRetryableCommand(release_eip_cmd)
 
@@ -358,7 +386,8 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
         'ecs',
         'DescribeInstances',
         '--RegionId %s' % self.region,
-        '--InstanceIds \'["%s"]\'' % str(self.id)]
+        '--InstanceIds \'["%s"]\'' % str(self.id),
+    ]
     describe_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
@@ -388,9 +417,13 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       data_disk.device_letter = DRIVE_START_LETTER
 
     self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)
-    self.MountDisk(data_disk.GetDevicePath(), disk_spec.mount_point,
-                   disk_spec.disk_type, data_disk.mount_options,
-                   data_disk.fstab_options)
+    self.MountDisk(
+        data_disk.GetDevicePath(),
+        disk_spec.mount_point,
+        disk_spec.disk_type,
+        data_disk.mount_options,
+        data_disk.fstab_options,
+    )
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""
@@ -399,6 +432,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
 class AliCloudKeyFileManager(object):
   """Object for managing AliCloud Keyfiles."""
+
   _lock = threading.Lock()
   imported_keyfile_set = set()
   deleted_keyfile_set = set()
@@ -415,9 +449,13 @@ class AliCloudKeyFileManager(object):
       import_cmd = util.ALI_PREFIX + [
           'ecs',
           'ImportKeyPair',
-          '--RegionId', region,
-          '--KeyPairName', key_name,
-          '--PublicKeyBody', json.dumps(public_key)]
+          '--RegionId',
+          region,
+          '--KeyPairName',
+          key_name,
+          '--PublicKeyBody',
+          json.dumps(public_key),
+      ]
       vm_util.IssueRetryableCommand(import_cmd)
       cls.run_uri_key_names[FLAGS.run_uri] = key_name
       return key_name
@@ -431,8 +469,11 @@ class AliCloudKeyFileManager(object):
       delete_cmd = util.ALI_PREFIX + [
           'ecs',
           'DeleteKeyPairs',
-          '--RegionId', region,
-          '--KeyPairNames', json.dumps([key_name])]
+          '--RegionId',
+          region,
+          '--KeyPairNames',
+          json.dumps([key_name]),
+      ]
       vm_util.IssueRetryableCommand(delete_cmd)
       del cls.run_uri_key_names[FLAGS.run_uri]
 
@@ -442,27 +483,30 @@ class AliCloudKeyFileManager(object):
 
   @classmethod
   def GetPublicKey(cls):
-    cat_cmd = ['cat',
-               vm_util.GetPublicKeyPath()]
+    cat_cmd = ['cat', vm_util.GetPublicKeyPath()]
     keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
     return keyfile.strip()
 
 
-class Debian113BasedAliVirtualMachine(AliVirtualMachine,
-                                      linux_virtual_machine.Debian11Mixin):
+class Debian113BasedAliVirtualMachine(
+    AliVirtualMachine, linux_virtual_machine.Debian11Mixin
+):
   IMAGE_NAME_FILTER = 'debian_11_3_x64_20G*alibase*.vhd'
 
 
-class Ubuntu1604BasedAliVirtualMachine(AliVirtualMachine,
-                                       linux_virtual_machine.Ubuntu1604Mixin):
+class Ubuntu1604BasedAliVirtualMachine(
+    AliVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin
+):
   IMAGE_NAME_FILTER = 'ubuntu_16_04_x64*alibase*.vhd'
 
 
-class Ubuntu1804BasedAliVirtualMachine(AliVirtualMachine,
-                                       linux_virtual_machine.Ubuntu1804Mixin):
+class Ubuntu1804BasedAliVirtualMachine(
+    AliVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin
+):
   IMAGE_NAME_FILTER = 'ubuntu_18_04_x64*alibase*.vhd'
 
 
-class CentOs7BasedAliVirtualMachine(AliVirtualMachine,
-                                    linux_virtual_machine.CentOs7Mixin):
+class CentOs7BasedAliVirtualMachine(
+    AliVirtualMachine, linux_virtual_machine.CentOs7Mixin
+):
   IMAGE_NAME_FILTER = 'centos_7_05_x64*alibase*.vhd'

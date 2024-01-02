@@ -21,20 +21,26 @@ from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import sysbench_memory_benchmark
 
 
-class SysBenchMemoryBenchmarkTestCase(unittest.TestCase,
-                                      test_util.SamplesTestMixin):
+class SysBenchMemoryBenchmarkTestCase(
+    unittest.TestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super(SysBenchMemoryBenchmarkTestCase, self).setUp()
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'sysbench-memory-output-sample.txt')
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '..',
+        'data',
+        'sysbench-memory-output-sample.txt',
+    )
     with open(path) as fp:
       self.contents = fp.read()
 
   def testParseSysbenchMemoryResult(self):
     metadata = {}
     results = sysbench_memory_benchmark.GenerateMetricsForSysbenchMemoryOutput(
-        self.contents, metadata)
+        self.contents, metadata
+    )
     logging.info('results are, %s', results)
     expected_results = [
         sample.Sample('Minimum_throughput', 3803.18, 'MiB/sec', {}),
@@ -43,8 +49,8 @@ class SysBenchMemoryBenchmarkTestCase(unittest.TestCase,
         sample.Sample('vcpu_variation', 774.26, 'MiB/sec', {}),
         sample.Sample('Range_throughput', 1549.88, 'MiB/sec', {}),
         sample.Sample('Difference_from_all_max', 3101.12, 'MiB/sec', {}),
-        sample.Sample('Difference_from_all_median', -1.36, 'MiB/sec', {})
-        ]
+        sample.Sample('Difference_from_all_median', -1.36, 'MiB/sec', {}),
+    ]
     self.assertSampleListsEqualUpToTimestamp(results, expected_results)
 
 

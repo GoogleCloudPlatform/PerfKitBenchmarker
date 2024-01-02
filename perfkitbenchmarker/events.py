@@ -34,70 +34,99 @@ FLAGS = flags.FLAGS
 _events = blinker.Namespace()
 
 
-initialization_complete = _events.signal('system-ready', doc="""
+initialization_complete = _events.signal(
+    'system-ready',
+    doc="""
 Signal sent once after the system is initialized (command-line flags
 parsed, temporary directory initialized, run_uri set).
 
 Sender: None
-Payload: parsed_flags, the parsed FLAGS object.""")
+Payload: parsed_flags, the parsed FLAGS object.""",
+)
 
-provider_imported = _events.signal('provider-imported', doc="""
+provider_imported = _events.signal(
+    'provider-imported',
+    doc="""
 Signal sent after a cloud provider's modules have been imported.
 
-Sender: string. Cloud provider name chosen from provider_info.VALID_CLOUDS.""")
+Sender: string. Cloud provider name chosen from provider_info.VALID_CLOUDS.""",
+)
 
-benchmark_start = _events.signal('benchmark-start', doc="""
+benchmark_start = _events.signal(
+    'benchmark-start',
+    doc="""
 Signal sent at the beginning of a benchmark before any resources are
 provisioned.
 
 Sender: None
-Payload: benchmark_spec.""")
+Payload: benchmark_spec.""",
+)
 
-on_vm_startup = _events.signal('on-vm-startup', doc="""
+on_vm_startup = _events.signal(
+    'on-vm-startup',
+    doc="""
 Signal sent on vm startup.
 
 Sender: None
-Payload: vm (VirtualMachine object).""")
+Payload: vm (VirtualMachine object).""",
+)
 
 
-benchmark_end = _events.signal('benchmark-end', doc="""
+benchmark_end = _events.signal(
+    'benchmark-end',
+    doc="""
 Signal sent at the end of a benchmark after any resources have been
 torn down (if run_stage includes teardown).
 
 Sender: None
-Payload: benchmark_spec.""")
+Payload: benchmark_spec.""",
+)
 
-before_phase = _events.signal('before-phase', doc="""
+before_phase = _events.signal(
+    'before-phase',
+    doc="""
 Signal sent before run phase and trigger phase.
 
 Sender: the stage.
-Payload: benchmark_spec.""")
+Payload: benchmark_spec.""",
+)
 
-trigger_phase = _events.signal('trigger-phase', doc="""
+trigger_phase = _events.signal(
+    'trigger-phase',
+    doc="""
 Signal sent immediately before run phase.
 This is used for short running command right before the run phase.
 Before run phase can be slow, time sensitive function should use
 this event insteand.
 
-Payload: benchmark_spec.""")
+Payload: benchmark_spec.""",
+)
 
-after_phase = _events.signal('after-phase', doc="""
+after_phase = _events.signal(
+    'after-phase',
+    doc="""
 Signal sent immediately after a phase runs, regardless of whether it was
 successful.
 
 Sender: the stage.
-Payload: benchmark_spec.""")
+Payload: benchmark_spec.""",
+)
 
-benchmark_samples_created = _events.signal('benchmark-samples-created', doc="""
+benchmark_samples_created = _events.signal(
+    'benchmark-samples-created',
+    doc="""
 Called with samples list and benchmark spec.
 
 Signal sent immediately after a sample is created.
 Sample's should be added into this phase. Any global metadata should be
 added in the samples finalized.
 
-Payload: benchmark_spec (BenchmarkSpec), samples (list of sample.Sample).""")
+Payload: benchmark_spec (BenchmarkSpec), samples (list of sample.Sample).""",
+)
 
-all_samples_created = _events.signal('all_samples_created', doc="""
+all_samples_created = _events.signal(
+    'all_samples_created',
+    doc="""
 Called with samples list and benchmark spec.
 
 Signal sent immediately after a benchmark_samples_created is called.
@@ -107,9 +136,12 @@ be added during this phase.
 
 
 Sender: the phase. Currently only stages.RUN.
-Payload: benchmark_spec (BenchmarkSpec), samples (list of sample.Sample).""")
+Payload: benchmark_spec (BenchmarkSpec), samples (list of sample.Sample).""",
+)
 
-record_event = _events.signal('record-event', doc="""
+record_event = _events.signal(
+    'record-event',
+    doc="""
 Signal sent when an event is recorded.
 
 Signal sent after an event occurred. Record start, end timestamp and metadata
@@ -117,7 +149,8 @@ of the event for analysis.
 
 Sender: None
 Payload: event (string), start_timestamp (float), end_timestamp (float),
-metadata (dict).""")
+metadata (dict).""",
+)
 
 
 def RegisterTracingEvents():
@@ -148,7 +181,8 @@ class TracingEvent(object):
 def AddEvent(sender, event, start_timestamp, end_timestamp, metadata):
   """Record a TracingEvent."""
   TracingEvent.events.append(
-      TracingEvent(sender, event, start_timestamp, end_timestamp, metadata))
+      TracingEvent(sender, event, start_timestamp, end_timestamp, metadata)
+  )
 
 
 @on_vm_startup.connect
@@ -157,20 +191,34 @@ def _RunStartupScript(unused_sender, vm):
   if FLAGS.startup_script:
     vm.RemoteCopy(data.ResourcePath(FLAGS.startup_script))
     vm.startup_script_output = vm.RemoteCommand(
-        './%s' % os.path.basename(FLAGS.startup_script))
+        './%s' % os.path.basename(FLAGS.startup_script)
+    )
 
 
 @benchmark_samples_created.connect
 def _AddScriptSamples(unused_sender, benchmark_spec, samples):
   def _ScriptResultToMetadata(out):
     return {'stdout': out[0], 'stderr': out[1]}
+
   for vm in benchmark_spec.vms:
     if FLAGS.startup_script:
-      samples.append(sample.Sample(
-          'startup', 0, '', _ScriptResultToMetadata(vm.startup_script_output)))
+      samples.append(
+          sample.Sample(
+              'startup',
+              0,
+              '',
+              _ScriptResultToMetadata(vm.startup_script_output),
+          )
+      )
     if FLAGS.postrun_script:
-      samples.append(sample.Sample(
-          'postrun', 0, '', _ScriptResultToMetadata(vm.postrun_script_output)))
+      samples.append(
+          sample.Sample(
+              'postrun',
+              0,
+              '',
+              _ScriptResultToMetadata(vm.postrun_script_output),
+          )
+      )
 
 
 @after_phase.connect
@@ -178,9 +226,12 @@ def _RunPostRunScript(sender, benchmark_spec):
   if sender != stages.RUN:
     logging.info(
         'Receive after_phase signal from :%s, not '
-        'triggering _RunPostRunScript.', sender)
+        'triggering _RunPostRunScript.',
+        sender,
+    )
   if FLAGS.postrun_script:
     for vm in benchmark_spec.vms:
       vm.RemoteCopy(FLAGS.postrun_script)
       vm.postrun_script_output = vm.RemoteCommand(
-          './%s' % os.path.basename(FLAGS.postrun_script))
+          './%s' % os.path.basename(FLAGS.postrun_script)
+      )

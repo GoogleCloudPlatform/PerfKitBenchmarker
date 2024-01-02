@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing google.cloud go package installation and cleanup.
-"""
+"""Module containing google.cloud go package installation and cleanup."""
 
 
 def Install(vm):

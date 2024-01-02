@@ -84,9 +84,17 @@ class RackspaceSecurityGroup(resource.BaseResource):
 class RackspaceSecurityGroupRule(resource.BaseResource):
   """An object representing a Security Group Rule."""
 
-  def __init__(self, sec_group_rule_name, sec_group_id, direction=INGRESS,
-               ip_ver=IPV4, protocol=TCP, port_range_min=PORT_RANGE_MIN,
-               port_range_max=PORT_RANGE_MAX, source_cidr=None):
+  def __init__(
+      self,
+      sec_group_rule_name,
+      sec_group_id,
+      direction=INGRESS,
+      ip_ver=IPV4,
+      protocol=TCP,
+      port_range_min=PORT_RANGE_MIN,
+      port_range_max=PORT_RANGE_MAX,
+      source_cidr=None,
+  ):
     super(RackspaceSecurityGroupRule, self).__init__()
     self.id = None
     self.name = sec_group_rule_name
@@ -97,20 +105,22 @@ class RackspaceSecurityGroupRule(resource.BaseResource):
     self.ip_ver = ip_ver
     assert protocol in SEC_GROUP_PROTOCOLS
     self.protocol = protocol
-    assert (int(PORT_RANGE_MIN) <= int(port_range_min) <= int(PORT_RANGE_MAX))
+    assert int(PORT_RANGE_MIN) <= int(port_range_min) <= int(PORT_RANGE_MAX)
     self.port_range_min = port_range_min
-    assert (int(PORT_RANGE_MIN) <= int(port_range_max) <= int(PORT_RANGE_MAX))
+    assert int(PORT_RANGE_MIN) <= int(port_range_max) <= int(PORT_RANGE_MAX)
     self.port_range_max = port_range_max
     assert int(port_range_min) <= int(port_range_max)
     self.source_cidr = source_cidr
 
   def __eq__(self, other):
     # Name does not matter
-    return (self.sec_group_id == other.sec_group_id and
-            self.direction == other.direction and
-            self.ip_ver == other.ip_ver and
-            self.protocol == other.protocol and
-            self.source_cidr == other.source_cidr)
+    return (
+        self.sec_group_id == other.sec_group_id
+        and self.direction == other.direction
+        and self.ip_ver == other.ip_ver
+        and self.protocol == other.protocol
+        and self.source_cidr == other.source_cidr
+    )
 
   def _Create(self):
     cmd = util.RackCLICommand(self, 'networks', 'security-group-rule', 'create')
@@ -237,9 +247,13 @@ class RackspaceNetwork(network.BaseNetwork):
     self.tenant_id = network_spec.tenant_id
     name = FLAGS.rackspace_network_name or 'pkb-network-%s' % FLAGS.run_uri
     self.network_resource = RackspaceNetworkResource(name, self.tenant_id)
-    self.subnet = RackspaceSubnet(self.network_resource.id, DEFAULT_SUBNET_CIDR,
-                                  ip_ver='4', name='subnet-%s' % name,
-                                  tenant_id=self.tenant_id)
+    self.subnet = RackspaceSubnet(
+        self.network_resource.id,
+        DEFAULT_SUBNET_CIDR,
+        ip_ver='4',
+        name='subnet-%s' % name,
+        tenant_id=self.tenant_id,
+    )
     self.security_group = RackspaceSecurityGroup('default-internal-%s' % name)
     self.default_firewall_rules = []
 
@@ -257,7 +271,8 @@ class RackspaceNetwork(network.BaseNetwork):
       self.subnet.Create()
       self.security_group.Create()
       self.default_firewall_rules = self._GenerateDefaultRules(
-          self.security_group.id, self.network_resource.name)
+          self.security_group.id, self.network_resource.name
+      )
       for rule in self.default_firewall_rules:
         rule.Create()
 
@@ -276,23 +291,31 @@ class RackspaceNetwork(network.BaseNetwork):
             sec_group_id=sec_group_id,
             direction=INGRESS,
             ip_ver=IPV4,
-            protocol=TCP),
+            protocol=TCP,
+        ),
         RackspaceSecurityGroupRule(
             sec_group_rule_name='udp-default-internal-%s' % network_name,
             sec_group_id=sec_group_id,
             direction=INGRESS,
-            ip_ver=IPV4, protocol=UDP),
+            ip_ver=IPV4,
+            protocol=UDP,
+        ),
         RackspaceSecurityGroupRule(
             sec_group_rule_name='icmp-default-internal-%s' % network_name,
             sec_group_id=sec_group_id,
             direction=INGRESS,
-            ip_ver=IPV4, protocol=ICMP)]
+            ip_ver=IPV4,
+            protocol=ICMP,
+        ),
+    ]
     return firewall_rules
 
 
 class RackspaceFirewall(network.BaseFirewall):
   """An object representing a Rackspace Security Group applied to PublicNet and
-  ServiceNet."""
+
+  ServiceNet.
+  """
 
   CLOUD = provider_info.RACKSPACE
 

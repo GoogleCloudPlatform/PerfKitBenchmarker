@@ -16,7 +16,6 @@
 
 This contains the BaseProviderInfo class which is
 used for IsBenchmarkSupported
-
 """
 
 import six
@@ -37,8 +36,21 @@ PROFITBRICKS = 'ProfitBricks'
 # for performing on premise to cloud benchmarks
 DOCKER = 'Docker'
 
-VALID_CLOUDS = (GCP, AZURE, AWS, IBMCLOUD, DIGITALOCEAN, KUBERNETES, OPENSTACK,
-                RACKSPACE, CLOUDSTACK, ALICLOUD, MESOS, PROFITBRICKS, DOCKER)
+VALID_CLOUDS = (
+    GCP,
+    AZURE,
+    AWS,
+    IBMCLOUD,
+    DIGITALOCEAN,
+    KUBERNETES,
+    OPENSTACK,
+    RACKSPACE,
+    CLOUDSTACK,
+    ALICLOUD,
+    MESOS,
+    PROFITBRICKS,
+    DOCKER,
+)
 
 _PROVIDER_INFO_REGISTRY = {}
 

@@ -25,8 +25,10 @@ from perfkitbenchmarker.providers.azure import flags as azure_flags
 MOUNT_POINT = '/scratch'
 
 
-@unittest.skipUnless('PERFKIT_INTEGRATION' in os.environ,
-                     'PERFKIT_INTEGRATION not in environment')
+@unittest.skipUnless(
+    'PERFKIT_INTEGRATION' in os.environ,
+    'PERFKIT_INTEGRATION not in environment',
+)
 class AzureScratchDiskIntegrationTest(unittest.TestCase):
   """Integration tests for Azure disks.
 
@@ -37,76 +39,81 @@ class AzureScratchDiskIntegrationTest(unittest.TestCase):
     pkb.SetUpPKB()
 
   def testPremiumStorage(self):
-    test_util.assertDiskMounts({
-        'flags': {
-            'azure_storage_type': azure_flags.PLRS
-        },
-        'vm_groups': {
-            'vm_group_1': {
-                'cloud': 'Azure',
-                'vm_spec': {
-                    'Azure': {
-                        'machine_type': 'Standard_DS2',
-                        'zone': 'eastus'
-                    }
-                },
-                'disk_spec': {
-                    'Azure': {
-                        'disk_type': azure_disk.PREMIUM_STORAGE,
-                        'disk_size': 10,  # disk size must be between
-                                          # 10 and 1024 GB.
-                        'mount_point': MOUNT_POINT
-                    }
+    test_util.assertDiskMounts(
+        {
+            'flags': {'azure_storage_type': azure_flags.PLRS},
+            'vm_groups': {
+                'vm_group_1': {
+                    'cloud': 'Azure',
+                    'vm_spec': {
+                        'Azure': {
+                            'machine_type': 'Standard_DS2',
+                            'zone': 'eastus',
+                        }
+                    },
+                    'disk_spec': {
+                        'Azure': {
+                            'disk_type': azure_disk.PREMIUM_STORAGE,
+                            'disk_size': 10,  # disk size must be between
+                            # 10 and 1024 GB.
+                            'mount_point': MOUNT_POINT,
+                        }
+                    },
                 }
-            }
-        }
-    }, MOUNT_POINT)
+            },
+        },
+        MOUNT_POINT,
+    )
 
   def testStandardDisk(self):
-    test_util.assertDiskMounts({
-        'flags': {
-            'azure_storage_type': azure_flags.LRS
-        },
-        'vm_groups': {
-            'vm_group_1': {
-                'cloud': 'Azure',
-                'vm_spec': {
-                    'Azure': {
-                        'machine_type': 'Standard_D2',
-                        'zone': 'eastus'
-                    }
-                },
-                'disk_spec': {
-                    'Azure': {
-                        'disk_type': azure_disk.STANDARD_DISK,
-                        'disk_size': 2,
-                        'mount_point': MOUNT_POINT
-                    }
+    test_util.assertDiskMounts(
+        {
+            'flags': {'azure_storage_type': azure_flags.LRS},
+            'vm_groups': {
+                'vm_group_1': {
+                    'cloud': 'Azure',
+                    'vm_spec': {
+                        'Azure': {
+                            'machine_type': 'Standard_D2',
+                            'zone': 'eastus',
+                        }
+                    },
+                    'disk_spec': {
+                        'Azure': {
+                            'disk_type': azure_disk.STANDARD_DISK,
+                            'disk_size': 2,
+                            'mount_point': MOUNT_POINT,
+                        }
+                    },
                 }
-            }
-        }
-    }, MOUNT_POINT)
+            },
+        },
+        MOUNT_POINT,
+    )
 
   def testLocalSSD(self):
-    test_util.assertDiskMounts({
-        'vm_groups': {
-            'vm_group_1': {
-                'cloud': 'Azure',
-                'vm_spec': {
-                    'Azure': {
-                        'machine_type': 'Standard_D1',
-                        'zone': 'eastus'
-                    }
-                },
-                'disk_spec': {
-                    'Azure': {
-                        'disk_type': 'local',
-                        'mount_point': MOUNT_POINT
-                    }
+    test_util.assertDiskMounts(
+        {
+            'vm_groups': {
+                'vm_group_1': {
+                    'cloud': 'Azure',
+                    'vm_spec': {
+                        'Azure': {
+                            'machine_type': 'Standard_D1',
+                            'zone': 'eastus',
+                        }
+                    },
+                    'disk_spec': {
+                        'Azure': {
+                            'disk_type': 'local',
+                            'mount_point': MOUNT_POINT,
+                        }
+                    },
                 }
             }
-        }
-    }, MOUNT_POINT)
+        },
+        MOUNT_POINT,
+    )
 
 
 if __name__ == '__main__':

@@ -33,98 +33,144 @@ import six
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer('diskspd_duration', 20,
-                     'The number of seconds to run diskspd test.'
-                     'Defaults to 30s. Unit: seconds.')
+flags.DEFINE_integer(
+    'diskspd_duration',
+    20,
+    'The number of seconds to run diskspd test.Defaults to 30s. Unit: seconds.',
+)
 
-flags.DEFINE_integer('diskspd_warmup', 5,
-                     'The warm up time for diskspd, the time needed to enter'
-                     'steady state of I/O operation. '
-                     'Defaults to 5s. Unit: seconds.')
+flags.DEFINE_integer(
+    'diskspd_warmup',
+    5,
+    'The warm up time for diskspd, the time needed to enter'
+    'steady state of I/O operation. '
+    'Defaults to 5s. Unit: seconds.',
+)
 
-flags.DEFINE_integer('diskspd_cooldown', 5,
-                     'The cool down time for diskspd, the time to ensure that'
-                     'each instance of diskspd is active during each'
-                     'measurement period of each instance. '
-                     'Defaults: 5s. Unit: seconds')
+flags.DEFINE_integer(
+    'diskspd_cooldown',
+    5,
+    'The cool down time for diskspd, the time to ensure that'
+    'each instance of diskspd is active during each'
+    'measurement period of each instance. '
+    'Defaults: 5s. Unit: seconds',
+)
 
-flags.DEFINE_integer('diskspd_thread_number_per_file', 1,
-                     'The thread number created per file to'
-                     'perform read and write. '
-                     'Defaults: 1.')
+flags.DEFINE_integer(
+    'diskspd_thread_number_per_file',
+    1,
+    'The thread number created per file toperform read and write. Defaults: 1.',
+)
 
-flags.DEFINE_enum('diskspd_access_pattern', 's', ['s', 'r'],
-                  'the access patten of the read and write'
-                  'the performance will be downgrade a little bit if use'
-                  'different hints'
-                  'available option: r|s, '
-                  'r: random access'
-                  's: sequential access. '
-                  'Defaults: s.')
+flags.DEFINE_enum(
+    'diskspd_access_pattern',
+    's',
+    ['s', 'r'],
+    'the access patten of the read and write'
+    'the performance will be downgrade a little bit if use'
+    'different hints'
+    'available option: r|s, '
+    'r: random access'
+    's: sequential access. '
+    'Defaults: s.',
+)
 
-flags.DEFINE_integer('diskspd_write_read_ratio', 0,
-                     'The ratio of write workload to read workload.'
-                     'Example: 50 means 50%, and write and read each takes'
-                     '50% of the total I/O data.'
-                     'To test read speed, set this value to 0. '
-                     'To test write speed, set this value to 100. '
-                     'Defaults: 0. Unit: percent.')
+flags.DEFINE_integer(
+    'diskspd_write_read_ratio',
+    0,
+    'The ratio of write workload to read workload.'
+    'Example: 50 means 50%, and write and read each takes'
+    '50% of the total I/O data.'
+    'To test read speed, set this value to 0. '
+    'To test write speed, set this value to 100. '
+    'Defaults: 0. Unit: percent.',
+)
 
-flags.DEFINE_integer('diskspd_block_size', 64,
-                     'The block size used when reading and writing data. '
-                     'Defaults: 64K. Unit: KB, '
-                     'can be set via --diskspd_block_unit')
+flags.DEFINE_integer(
+    'diskspd_block_size',
+    64,
+    'The block size used when reading and writing data. '
+    'Defaults: 64K. Unit: KB, '
+    'can be set via --diskspd_block_unit',
+)
 
-flags.DEFINE_enum('diskspd_block_unit', 'K', ['K', 'M', 'G'],
-                  'The unit of the block size, available option: K|M|G. '
-                  'Will be used as the unit for --diskspd_block_size '
-                  'Defaults: K.')
+flags.DEFINE_enum(
+    'diskspd_block_unit',
+    'K',
+    ['K', 'M', 'G'],
+    'The unit of the block size, available option: K|M|G. '
+    'Will be used as the unit for --diskspd_block_size '
+    'Defaults: K.',
+)
 
-flags.DEFINE_integer('diskspd_stride_or_alignment', 64,
-                     'If the access pattern is sequential, then this value'
-                     'means the stride for the access'
-                     'If the access pattern is random, then this value means'
-                     'the specified number of bytes that random I/O aligns to.'
-                     'Defaults: 64K. Unit: KB, can be set')
+flags.DEFINE_integer(
+    'diskspd_stride_or_alignment',
+    64,
+    'If the access pattern is sequential, then this value'
+    'means the stride for the access'
+    'If the access pattern is random, then this value means'
+    'the specified number of bytes that random I/O aligns to.'
+    'Defaults: 64K. Unit: KB, can be set',
+)
 
-flags.DEFINE_enum('diskspd_stride_or_alignment_unit', 'K', ['K', 'M', 'G', 'b'],
-                  'The unit of the stride_or_alignment,'
-                  'available option: K|M|G|b'
-                  'Defaults: K.')
+flags.DEFINE_enum(
+    'diskspd_stride_or_alignment_unit',
+    'K',
+    ['K', 'M', 'G', 'b'],
+    'The unit of the stride_or_alignment,available option: K|M|G|bDefaults: K.',
+)
 
-flags.DEFINE_bool('diskspd_large_page', False,
-                  'Whether use large page for IO buffers. '
-                  'Defaults: False')
+flags.DEFINE_bool(
+    'diskspd_large_page',
+    False,
+    'Whether use large page for IO buffers. Defaults: False',
+)
 
-flags.DEFINE_bool('diskspd_latency_stats', False,
-                  'Whether measure the latency statistics'
-                  'Defaults: False')
+flags.DEFINE_bool(
+    'diskspd_latency_stats',
+    False,
+    'Whether measure the latency statisticsDefaults: False',
+)
 
-flags.DEFINE_bool('diskspd_disable_affinity', False,
-                  'Whether to diable the group affinity,'
-                  'group affinity is to round robin tasks. '
-                  'across processor group. '
-                  'Defaults: False')
+flags.DEFINE_bool(
+    'diskspd_disable_affinity',
+    False,
+    'Whether to diable the group affinity,'
+    'group affinity is to round robin tasks. '
+    'across processor group. '
+    'Defaults: False',
+)
 
-flags.DEFINE_bool('diskspd_write_through', True,
-                  'Whether to enable write through IO. '
-                  'Defaults: True')
+flags.DEFINE_bool(
+    'diskspd_write_through',
+    True,
+    'Whether to enable write through IO. Defaults: True',
+)
 
-flags.DEFINE_bool('diskspd_software_cache', True,
-                  'Whether to disable software caching'
-                  'Defaults: True')
+flags.DEFINE_bool(
+    'diskspd_software_cache',
+    True,
+    'Whether to disable software cachingDefaults: True',
+)
 
-flags.DEFINE_integer('diskspd_outstanding_io', '2',
-                     'The number of outstanding I/O per thread per target.'
-                     'Defaults: 2.')
+flags.DEFINE_integer(
+    'diskspd_outstanding_io',
+    '2',
+    'The number of outstanding I/O per thread per target.Defaults: 2.',
+)
 
-flags.DEFINE_integer('diskspd_throughput_per_ms', None,
-                     'The throughput per thread per target. '
-                     'Defaults: None. Unit: bytes per ms.')
+flags.DEFINE_integer(
+    'diskspd_throughput_per_ms',
+    None,
+    'The throughput per thread per target. Defaults: None. Unit: bytes per ms.',
+)
 
-flags.DEFINE_integer('diskspd_file_size', 819200,
-                     'The file size DiskSpd will create when testing. '
-                     'Defaults: 819200. Unit: KB.')
+flags.DEFINE_integer(
+    'diskspd_file_size',
+    819200,
+    'The file size DiskSpd will create when testing. '
+    'Defaults: 819200. Unit: KB.',
+)
 
 flags.DEFINE_list(
     'diskspd_config_list',
@@ -134,13 +180,17 @@ flags.DEFINE_list(
     'for example FALSE:TRUE:64. '
     'Default Behavior: diskspd benchmark test will try to combine'
     '--diskspd_access_pattern, --diskspd_write_read_ratio, '
-    '--diskspd_block_size together and form a set a config to run.')
+    '--diskspd_block_size together and form a set a config to run.',
+)
 
 DISKSPD_RETRIES = 10
 DISKSPD_DIR = 'DiskSpd-2.0.21a'
 DISKSPD_ZIP = DISKSPD_DIR + '.zip'
-DISKSPD_URL = ('https://gallery.technet.microsoft.com/DiskSpd-A-Robust-Storage'
-               '-6ef84e62/file/199535/2/' + DISKSPD_ZIP)
+DISKSPD_URL = (
+    'https://gallery.technet.microsoft.com/DiskSpd-A-Robust-Storage'
+    '-6ef84e62/file/199535/2/'
+    + DISKSPD_ZIP
+)
 DISKSPD_TMPFILE = 'testfile.dat'
 DISKSPD_XMLFILE = 'result.xml'
 DISKSPD_TIMEOUT_MULTIPLIER = 3
@@ -152,9 +202,9 @@ FALSE_VALS = ['False', 'false', 'f', 'FALSE']
 _NUM_PARAMS_IN_CONFIG = 3
 
 # named tuple used in passing configs around
-DiskspdConf = collections.namedtuple('DiskspdConf',
-                                     ['access_pattern', 'write_ratio',
-                                      'block_size'])
+DiskspdConf = collections.namedtuple(
+    'DiskspdConf', ['access_pattern', 'write_ratio', 'block_size']
+)
 
 
 def DiskspdConfigListValidator(value):
@@ -183,8 +233,9 @@ def DiskspdConfigListValidator(value):
   return True
 
 
-flags.register_validator('diskspd_config_list', DiskspdConfigListValidator,
-                         'malformed config list')
+flags.register_validator(
+    'diskspd_config_list', DiskspdConfigListValidator, 'malformed config list'
+)
 
 
 def ParseConfigList():
@@ -196,7 +247,8 @@ def ParseConfigList():
         DiskspdConf(
             access_pattern=FLAGS.diskspd_access_pattern,
             write_ratio=FLAGS.diskspd_write_read_ratio,
-            block_size=FLAGS.diskspd_block_size)
+            block_size=FLAGS.diskspd_block_size,
+        )
     ]
 
   for config in FLAGS.diskspd_config_list:
@@ -206,7 +258,9 @@ def ParseConfigList():
         DiskspdConf(
             access_pattern='r' if (confs[0] in TRUE_VALS) else 's',
             write_ratio=0 if (confs[1] in TRUE_VALS) else 100,
-            block_size=int(confs[2])))
+            block_size=int(confs[2]),
+        )
+    )
   return conf_list
 
 
@@ -218,27 +272,31 @@ def Install(vm):
 
 
 def _RunDiskSpdWithOptions(vm, options):
-  total_runtime = FLAGS.diskspd_warmup + FLAGS.diskspd_cooldown + \
-      FLAGS.diskspd_duration
+  total_runtime = (
+      FLAGS.diskspd_warmup + FLAGS.diskspd_cooldown + FLAGS.diskspd_duration
+  )
   timeout_duration = total_runtime * DISKSPD_TIMEOUT_MULTIPLIER
 
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
   command = 'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'.format(
-      diskspd_exe_dir=diskspd_exe_dir, diskspd_options=options)
+      diskspd_exe_dir=diskspd_exe_dir, diskspd_options=options
+  )
   vm.RobustRemoteCommand(command, timeout=timeout_duration)
 
 
 def _RemoveXml(vm):
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
   rm_command = 'cd {diskspd_exe_dir}; rm xml.txt'.format(
-      diskspd_exe_dir=diskspd_exe_dir)
+      diskspd_exe_dir=diskspd_exe_dir
+  )
   vm.RemoteCommand(rm_command, ignore_failure=True)
 
 
 def _CatXml(vm):
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
   cat_command = 'cd {diskspd_exe_dir}; cat {result_xml}'.format(
-      diskspd_exe_dir=diskspd_exe_dir, result_xml=DISKSPD_XMLFILE)
+      diskspd_exe_dir=diskspd_exe_dir, result_xml=DISKSPD_XMLFILE
+  )
   diskspd_xml, _ = vm.RemoteCommand(cat_command)
   return diskspd_xml
 
@@ -246,16 +304,18 @@ def _CatXml(vm):
 def _RemoveTempFile(vm):
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
   rm_command = 'cd {diskspd_exe_dir}; rm .\\{tmp_file_name}'.format(
-      diskspd_exe_dir=diskspd_exe_dir, tmp_file_name=DISKSPD_TMPFILE)
+      diskspd_exe_dir=diskspd_exe_dir, tmp_file_name=DISKSPD_TMPFILE
+  )
   vm.RemoteCommand(rm_command, ignore_failure=True)
 
 
-def _RunDiskSpd(running_vm, access_pattern,
-                diskspd_write_read_ratio, block_size, metadata):
+def _RunDiskSpd(
+    running_vm, access_pattern, diskspd_write_read_ratio, block_size, metadata
+):
   """Run single iteration of Diskspd test."""
-  sending_options = _GenerateOption(access_pattern,
-                                    diskspd_write_read_ratio,
-                                    block_size)
+  sending_options = _GenerateOption(
+      access_pattern, diskspd_write_read_ratio, block_size
+  )
   process_args = [(_RunDiskSpdWithOptions, (running_vm, sending_options), {})]
   background_tasks.RunParallelProcesses(process_args, 200)
   result_xml = _CatXml(running_vm)
@@ -284,38 +344,43 @@ def _GenerateOption(access_pattern, diskspd_write_read_ratio, block_size):
   software_cache_string = '-Su' if FLAGS.diskspd_software_cache else ''
   write_through_string = '-Sw' if FLAGS.diskspd_write_through else ''
   block_size_string = str(block_size) + str(FLAGS.diskspd_block_unit)
-  access_pattern_string = str(access_pattern) + \
-      str(FLAGS.diskspd_stride_or_alignment) + \
-      str(FLAGS.diskspd_stride_or_alignment_unit)
+  access_pattern_string = (
+      str(access_pattern)
+      + str(FLAGS.diskspd_stride_or_alignment)
+      + str(FLAGS.diskspd_stride_or_alignment_unit)
+  )
   throughput_per_ms_string = ''
   if FLAGS.diskspd_throughput_per_ms:
     throughput_per_ms_string = '-g' + str(FLAGS.diskspd_throughput_per_ms)
 
-  sending_options = ('-c{filesize}K -d{duration} -t{threadcount} '
-                     '-W{warmup} -C{cooldown} -Rxml -w{ratio} '
-                     '{large_page} {latency_stats} {disable_affinity} '
-                     '{software_cache} {write_through} {throughput}'
-                     '-b{block_size} -f{hint_string} -{access_pattern} '
-                     '-o{outstanding_io} -L '
-                     'C:\\scratch\\{tempfile} > {xmlfile}').format(
-                         filesize=FLAGS.diskspd_file_size,
-                         duration=FLAGS.diskspd_duration,
-                         threadcount=FLAGS.diskspd_thread_number_per_file,
-                         warmup=FLAGS.diskspd_warmup,
-                         cooldown=FLAGS.diskspd_cooldown,
-                         ratio=diskspd_write_read_ratio,
-                         tempfile=DISKSPD_TMPFILE,
-                         xmlfile=DISKSPD_XMLFILE,
-                         large_page=large_page_string,
-                         latency_stats=latency_stats_string,
-                         disable_affinity=disable_affinity_string,
-                         software_cache=software_cache_string,
-                         write_through=write_through_string,
-                         access_pattern=access_pattern_string,
-                         block_size=block_size_string,
-                         hint_string=access_pattern,
-                         throughput=throughput_per_ms_string,
-                         outstanding_io=FLAGS.diskspd_outstanding_io)
+  sending_options = (
+      '-c{filesize}K -d{duration} -t{threadcount} '
+      '-W{warmup} -C{cooldown} -Rxml -w{ratio} '
+      '{large_page} {latency_stats} {disable_affinity} '
+      '{software_cache} {write_through} {throughput}'
+      '-b{block_size} -f{hint_string} -{access_pattern} '
+      '-o{outstanding_io} -L '
+      'C:\\scratch\\{tempfile} > {xmlfile}'
+  ).format(
+      filesize=FLAGS.diskspd_file_size,
+      duration=FLAGS.diskspd_duration,
+      threadcount=FLAGS.diskspd_thread_number_per_file,
+      warmup=FLAGS.diskspd_warmup,
+      cooldown=FLAGS.diskspd_cooldown,
+      ratio=diskspd_write_read_ratio,
+      tempfile=DISKSPD_TMPFILE,
+      xmlfile=DISKSPD_XMLFILE,
+      large_page=large_page_string,
+      latency_stats=latency_stats_string,
+      disable_affinity=disable_affinity_string,
+      software_cache=software_cache_string,
+      write_through=write_through_string,
+      access_pattern=access_pattern_string,
+      block_size=block_size_string,
+      hint_string=access_pattern,
+      throughput=throughput_per_ms_string,
+      outstanding_io=FLAGS.diskspd_outstanding_io,
+  )
   return sending_options
 
 
@@ -331,7 +396,9 @@ def RunDiskSpd(running_vm):
   # some of the flags information has been included in the xml file
   metadata['diskspd_block_size_unit'] = FLAGS.diskspd_block_unit
   metadata['diskspd_stride_or_alignment'] = FLAGS.diskspd_stride_or_alignment
-  metadata['diskspd_stride_or_alignment_unit'] = FLAGS.diskspd_stride_or_alignment_unit
+  metadata['diskspd_stride_or_alignment_unit'] = (
+      FLAGS.diskspd_stride_or_alignment_unit
+  )
   metadata['diskspd_large_page'] = FLAGS.diskspd_large_page
   metadata['diskspd_latency_stats'] = FLAGS.diskspd_latency_stats
   metadata['diskspd_disable_affinity'] = FLAGS.diskspd_disable_affinity
@@ -345,9 +412,15 @@ def RunDiskSpd(running_vm):
 
   # run diskspd in four different scenario, will generate a metadata list
   for conf in conf_list:
-    sample_list.append(_RunDiskSpd(running_vm, conf.access_pattern,
-                                   conf.write_ratio, conf.block_size,
-                                   metadata))
+    sample_list.append(
+        _RunDiskSpd(
+            running_vm,
+            conf.access_pattern,
+            conf.write_ratio,
+            conf.block_size,
+            metadata,
+        )
+    )
 
   return sample_list
 
@@ -436,5 +509,4 @@ def ParseDiskSpdResults(result_xml, metadata, main_metric):
   metadata['TotalSpeed'] = total_speed
   metadata['TotalIops'] = total_iops
 
-  return sample.Sample(main_metric, metadata[main_metric], 'MB/s',
-                       metadata)
+  return sample.Sample(main_metric, metadata[main_metric], 'MB/s', metadata)

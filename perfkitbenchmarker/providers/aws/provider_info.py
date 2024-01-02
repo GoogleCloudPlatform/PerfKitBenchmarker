@@ -17,5 +17,4 @@ from perfkitbenchmarker import provider_info
 
 
 class AWSProviderInfo(provider_info.BaseProviderInfo):
-
   CLOUD = provider_info.AWS

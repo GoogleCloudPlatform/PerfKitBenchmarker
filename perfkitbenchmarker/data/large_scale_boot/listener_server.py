@@ -53,20 +53,25 @@ NANO = 1e9
 def ConfirmIPAccessible(client_host, port, timeout=MAX_TIME_SECONDS):
   """Confirm the given host's port is accessible and return the access time."""
   netcat_command = 'nc -zv -w 1 {client} {port}'.format(
-      client=client_host,
-      port=port)
+      client=client_host, port=port
+  )
   start_time = time.time()
   while time.time() <= (start_time + timeout):
-    p = subprocess.Popen(netcat_command, shell=True, stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
+    p = subprocess.Popen(
+        netcat_command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     _, stderr = p.communicate()
     # different versions of netcat uses different stderr strings.
     if any(word in stderr.decode('utf-8') for word in ['open', 'succeeded']):
       # return the system time in nanoseconds
       return 'Pass:%s:%d' % (client_host, time.time() * NANO)
 
-  logging.warning('Could not netcat to port %s on client vm %s.',
-                  port, client_host)
+  logging.warning(
+      'Could not netcat to port %s on client vm %s.', port, client_host
+  )
   return 'Fail:%s:%d' % (client_host, time.time() * NANO)
 
 
@@ -86,8 +91,13 @@ def WaitForRunningStatus(client_host, timeout=MAX_TIME_SECONDS):
     command = reader.read()
   start_time = time.time()
   while time.time() <= (start_time + timeout):
-    p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
-                         universal_newlines=True, stderr=subprocess.PIPE)
+    p = subprocess.Popen(
+        command,
+        shell=True,
+        stdout=subprocess.PIPE,
+        universal_newlines=True,
+        stderr=subprocess.PIPE,
+    )
     status, _ = p.communicate()
     if 'running' in status.lower():
       return 'Running:%s:%d' % (client_host, time.time() * NANO)
@@ -134,14 +144,18 @@ def BuildHostNames(name_pattern, count, use_public_ip):
     public_dns = name_pattern.split('_')[-2]
     start_vm_index = int(name_pattern.split('_')[-1])
     if public_dns:
-      return [public_dns.replace('VMID', str(vm_id))
-              for vm_id in range(start_vm_index, count + start_vm_index)]
+      return [
+          public_dns.replace('VMID', str(vm_id))
+          for vm_id in range(start_vm_index, count + start_vm_index)
+      ]
     else:
       return GenerateHostIPs(start_vm_index, count)
 
   else:
-    return [name_pattern.replace('VM_ID', str(vm_id))
-            for vm_id in range(1, count + 1)]
+    return [
+        name_pattern.replace('VM_ID', str(vm_id))
+        for vm_id in range(1, count + 1)
+    ]
 
 
 def WaitForHostNames(use_public_ip, timeout=MAX_TIME_SECONDS_NO_CALLING):
@@ -159,6 +173,7 @@ def WaitForHostNames(use_public_ip, timeout=MAX_TIME_SECONDS_NO_CALLING):
   Args:
     use_public_ip: whether to use public_ip hostname.
     timeout: Amount of time in seconds to wait for boot.
+
   Returns:
     hosts to netcat.
   """
@@ -180,17 +195,19 @@ def WaitForHostNames(use_public_ip, timeout=MAX_TIME_SECONDS_NO_CALLING):
         if not use_public_ip and 'PRIVATEIPADDRESSES' in line:
           hostnames.append(line.split()[2])
     return set(hostnames)
-  raise ValueError('Boot did not complete successfully before timeout of %s '
-                   'seconds.' % MAX_TIME_SECONDS_NO_CALLING)
+  raise ValueError(
+      'Boot did not complete successfully before timeout of %s seconds.'
+      % MAX_TIME_SECONDS_NO_CALLING
+  )
 
 
 def GenerateHostIPs(boot_vm_index, count):
   """Logic must be aligned with large_scale_boot/boot_script.sh."""
   hostnames = []
   for vm_id in range(boot_vm_index, boot_vm_index + count):
-    hostnames.append('10.0.{octet3}.{octet4}'.format(
-        octet3=vm_id // 256,
-        octet4=vm_id % 256))
+    hostnames.append(
+        '10.0.{octet3}.{octet4}'.format(octet3=vm_id // 256, octet4=vm_id % 256)
+    )
   return hostnames
 
 
@@ -201,14 +218,23 @@ def ActAsClient(pool, queue, port, name_pattern, vms_count, use_public_ip):
   for host_name in BuildHostNames(name_pattern, vms_count, use_public_ip):
     job = pool.apply_async(
         ConfirmIPAccessible,
-        args=(host_name, port, MAX_TIME_SECONDS_NO_CALLING,),
-        callback=store_results)
+        args=(
+            host_name,
+            port,
+            MAX_TIME_SECONDS_NO_CALLING,
+        ),
+        callback=store_results,
+    )
     all_jobs.append(job)
     if vms_count == 1:
       status_job = pool.apply_async(
           WaitForRunningStatus,
-          args=(host_name, MAX_TIME_SECONDS_NO_CALLING,),
-          callback=store_results)
+          args=(
+              host_name,
+              MAX_TIME_SECONDS_NO_CALLING,
+          ),
+          callback=store_results,
+      )
       all_jobs.append(status_job)
   logging.info([async_job.get() for async_job in all_jobs])
   queue.put(_STOP_QUEUE_ENTRY)
@@ -267,9 +293,14 @@ class RequestHandler(server.BaseHTTPRequestHandler):
     # Process this client
     logging.info(client_host)
     store_results_func = functools.partial(StoreResult, queue=self.timing_queue)
-    self.process_pool.apply_async(ConfirmIPAccessible,
-                                  args=(client_host, self.access_port,),
-                                  callback=store_results_func)
+    self.process_pool.apply_async(
+        ConfirmIPAccessible,
+        args=(
+            client_host,
+            self.access_port,
+        ),
+        callback=store_results_func,
+    )
 
   def shutdown(self):
     """Shut down the server."""
@@ -281,16 +312,18 @@ class RequestHandler(server.BaseHTTPRequestHandler):
 if __name__ == '__main__':
   logging.basicConfig(level=logging.INFO)
   if len(sys.argv) != 9:
-    raise ValueError('Got unexpected number of command-line arguments. '
-                     'There should be at most 7 command-line arguments: '
-                     '1. name of the server vm, '
-                     '2. server port, '
-                     '3. results file, '
-                     '4. port to access the boot VMs, '
-                     '5. whether to use the listening server, '
-                     '6. launched vm naming pattern, '
-                     '7. number of launched vms.'
-                     '8. whether to use public ip address.')
+    raise ValueError(
+        'Got unexpected number of command-line arguments. '
+        'There should be at most 7 command-line arguments: '
+        '1. name of the server vm, '
+        '2. server port, '
+        '3. results file, '
+        '4. port to access the boot VMs, '
+        '5. whether to use the listening server, '
+        '6. launched vm naming pattern, '
+        '7. number of launched vms.'
+        '8. whether to use public ip address.'
+    )
   hostname = sys.argv[1]
   server_address = ('', int(sys.argv[2]))
   results_file_path = sys.argv[3]
@@ -304,13 +337,25 @@ if __name__ == '__main__':
   timing_queue = multiprocessing_manager.Queue()
 
   # Start the worker to move results from queue to file first.
-  process_pool.apply_async(WriteResultsToFile,
-                           args=(results_file_path, timing_queue,))
+  process_pool.apply_async(
+      WriteResultsToFile,
+      args=(
+          results_file_path,
+          timing_queue,
+      ),
+  )
   if use_listening_server:
-    ActAsServer(process_pool, timing_queue, clients_port, hostname,
-                server_address)
+    ActAsServer(
+        process_pool, timing_queue, clients_port, hostname, server_address
+    )
 
   # The start the server to listen and put results on queue.
   else:
-    ActAsClient(process_pool, timing_queue, clients_port,
-                vms_name_pattern, num_vms, using_public_ip)
+    ActAsClient(
+        process_pool,
+        timing_queue,
+        clients_port,
+        vms_name_pattern,
+        num_vms,
+        using_public_ip,
+    )

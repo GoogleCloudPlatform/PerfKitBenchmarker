@@ -4,7 +4,6 @@ Driver compiles the provider specific script execution command and returns the
 time taken to execute the script in seconds or -1 if the script fails.
 """
 
-
 import json
 import logging
 from subprocess import call
@@ -17,11 +16,14 @@ import provider_specific_script_driver
 __author__ = 'p3rf@google.com'
 
 flags.DEFINE_string('script', None, 'SQL script which contains the query.')
-flags.DEFINE_string('logfile_suffix', 'log', 'Suffix to use for the output and '
-                                             'error files.')
-flags.DEFINE_multi_string('failing_scripts', [],
-                          'List of failing scripts whose execution should be '
-                          'skipped.')
+flags.DEFINE_string(
+    'logfile_suffix', 'log', 'Suffix to use for the output and error files.'
+)
+flags.DEFINE_multi_string(
+    'failing_scripts',
+    [],
+    'List of failing scripts whose execution should be skipped.',
+)
 
 
 FLAGS = flags.FLAGS
@@ -56,11 +58,13 @@ def execute_script(script, logfile_suffix):
   if script not in FLAGS.failing_scripts:
     output, error = default_logfile_names(script, logfile_suffix)
     cmd = provider_specific_script_driver.generate_provider_specific_cmd_list(
-        script, DRIVER_NAME, output, error)
+        script, DRIVER_NAME, output, error
+    )
     start_time = time.time()
     response_status = call(cmd)
-  execution_time = -1 if (response_status != 0) else round((time.time() -
-                                                            start_time), 2)
+  execution_time = (
+      -1 if (response_status != 0) else round((time.time() - start_time), 2)
+  )
   try:
     with open(API_LOG_FILE) as fp:
       line = fp.readline()
@@ -80,8 +84,10 @@ def execute_script(script, logfile_suffix):
   except IOError:
     pass
 
-  script_execution_details = {'execution_time': execution_time,
-                              'job_id': job_id}
+  script_execution_details = {
+      'execution_time': execution_time,
+      'job_id': job_id,
+  }
 
   try:
     with open(ATHENA_ERROR_FILE) as fp:

@@ -34,8 +34,10 @@ from perfkitbenchmarker.linux_packages.ant import ANT_HOME_DIR
 from six.moves import range
 
 
-JNA_JAR_URL = ('https://maven.java.net/content/repositories/releases/'
-               'net/java/dev/jna/jna/4.1.0/jna-4.1.0.jar')
+JNA_JAR_URL = (
+    'https://maven.java.net/content/repositories/releases/'
+    'net/java/dev/jna/jna/4.1.0/jna-4.1.0.jar'
+)
 CASSANDRA_GIT_REPRO = 'https://github.com/apache/cassandra.git'
 CASSANDRA_VERSION = 'cassandra-2.1'
 CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
@@ -60,14 +62,18 @@ artifact.remoteRepository.apache: {0}
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('cassandra_replication_factor', 3, 'Num of replicas.')
-flags.DEFINE_integer('cassandra_concurrent_reads', 32,
-                     'Concurrent read requests each server accepts.')
+flags.DEFINE_integer(
+    'cassandra_concurrent_reads',
+    32,
+    'Concurrent read requests each server accepts.',
+)
 # Partial list of known mirrors:
 # https://repo.maven.apache.org/maven2/.meta/repository-metadata.xml
 # See instructions for setting up own mirror:
 # https://maven.apache.org/guides/mini/guide-mirror-settings.html
-flags.DEFINE_boolean('cassandra_maven_repo_url', None,
-                     'Optional maven repo mirror to use.')
+flags.DEFINE_boolean(
+    'cassandra_maven_repo_url', None, 'Optional maven repo mirror to use.'
+)
 
 
 def CheckPrerequisites():
@@ -76,8 +82,7 @@ def CheckPrerequisites():
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  for resource in (CASSANDRA_YAML_TEMPLATE,
-                   CASSANDRA_ENV_TEMPLATE):
+  for resource in (CASSANDRA_YAML_TEMPLATE, CASSANDRA_ENV_TEMPLATE):
     data.ResourcePath(resource)
 
 
@@ -87,19 +92,27 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('openjdk')
   vm.Install('curl')
-  vm.RemoteCommand('cd {0}; git clone {1}; cd {2}; git checkout {3}'.format(
-      linux_packages.INSTALL_DIR, CASSANDRA_GIT_REPRO, CASSANDRA_DIR,
-      CASSANDRA_VERSION))
+  vm.RemoteCommand(
+      'cd {0}; git clone {1}; cd {2}; git checkout {3}'.format(
+          linux_packages.INSTALL_DIR,
+          CASSANDRA_GIT_REPRO,
+          CASSANDRA_DIR,
+          CASSANDRA_VERSION,
+      )
+  )
   if FLAGS.cassandra_maven_repo_url:
     # sets maven repo properties in the build.properties
     file_contents = _MAVEN_REPO_PARAMS.format(FLAGS.cassandra_maven_repo_url)
-    vm.RemoteCommand('echo "{}" > {}/build.properties'.format(
-        file_contents, CASSANDRA_DIR))
+    vm.RemoteCommand(
+        'echo "{}" > {}/build.properties'.format(file_contents, CASSANDRA_DIR)
+    )
   vm.RemoteCommand('cd {}; {}/bin/ant'.format(CASSANDRA_DIR, ANT_HOME_DIR))
   # Add JNA
-  vm.RemoteCommand('cd {0} && curl -LJO {1}'.format(
-      posixpath.join(CASSANDRA_DIR, 'lib'),
-      JNA_JAR_URL))
+  vm.RemoteCommand(
+      'cd {0} && curl -LJO {1}'.format(
+          posixpath.join(CASSANDRA_DIR, 'lib'), JNA_JAR_URL
+      )
+  )
 
 
 def YumInstall(vm):
@@ -119,23 +132,24 @@ def JujuInstall(vm, vm_group_name):
   # The charm defaults to Cassandra 2.2.x, which has deprecated
   # cassandra-cli. Specify the sources to downgrade to Cassandra 2.1.x
   # to match the cassandra benchmark(s) expectations.
-  sources = ['deb https://www.apache.org/dist/cassandra/debian 21x main',
-             'ppa:openjdk-r/ppa',
-             'ppa:stub/cassandra']
+  sources = [
+      'deb https://www.apache.org/dist/cassandra/debian 21x main',
+      'ppa:openjdk-r/ppa',
+      'ppa:stub/cassandra',
+  ]
 
-  keys = ['F758CE318D77295D',
-          'null',
-          'null']
+  keys = ['F758CE318D77295D', 'null', 'null']
 
   vm.JujuSet(
       'cassandra',
       [
           # Allow authentication from all units
           'authenticator=AllowAllAuthenticator',
-          'install_sources="[%s]"' %
-          ', '.join(["'" + x + "'" for x in sources]),
-          'install_keys="[%s]"' % ', '.join(keys)
-      ])
+          'install_sources="[%s]"'
+          % ', '.join(["'" + x + "'" for x in sources]),
+          'install_keys="[%s]"' % ', '.join(keys),
+      ],
+  )
 
   # Wait for cassandra to be installed and configured
   vm.JujuWait()
@@ -154,18 +168,22 @@ def Configure(vm, seed_vms):
     vm: VirtualMachine. The VM to configure.
     seed_vms: List of VirtualMachine. The seed virtual machine(s).
   """
-  context = {'ip_address': vm.internal_ip,
-             'data_path': posixpath.join(vm.GetScratchDir(), 'cassandra'),
-             'seeds': ','.join(vm.internal_ip for vm in seed_vms),
-             'num_cpus': vm.NumCpusForBenchmark(),
-             'cluster_name': 'Test cluster',
-             'concurrent_reads': FLAGS.cassandra_concurrent_reads}
+  context = {
+      'ip_address': vm.internal_ip,
+      'data_path': posixpath.join(vm.GetScratchDir(), 'cassandra'),
+      'seeds': ','.join(vm.internal_ip for vm in seed_vms),
+      'num_cpus': vm.NumCpusForBenchmark(),
+      'cluster_name': 'Test cluster',
+      'concurrent_reads': FLAGS.cassandra_concurrent_reads,
+  }
 
   for config_file in [CASSANDRA_ENV_TEMPLATE, CASSANDRA_YAML_TEMPLATE]:
     local_path = data.ResourcePath(config_file)
     remote_path = posixpath.join(
-        CASSANDRA_DIR, 'conf',
-        os.path.splitext(os.path.basename(config_file))[0])
+        CASSANDRA_DIR,
+        'conf',
+        os.path.splitext(os.path.basename(config_file))[0],
+    )
     vm.RenderTemplate(local_path, remote_path, context=context)
 
 
@@ -180,7 +198,9 @@ def Start(vm):
 
   vm.RemoteCommand(
       'nohup {0}/bin/cassandra -p "{1}" 1> {2} 2> {3} &'.format(
-          CASSANDRA_DIR, CASSANDRA_PID, CASSANDRA_OUT, CASSANDRA_ERR))
+          CASSANDRA_DIR, CASSANDRA_PID, CASSANDRA_OUT, CASSANDRA_ERR
+      )
+  )
 
 
 def Stop(vm):
@@ -188,14 +208,14 @@ def Stop(vm):
   if vm.OS_TYPE == os_types.JUJU:
     return
 
-  vm.RemoteCommand('kill $(cat {0})'.format(CASSANDRA_PID),
-                   ignore_failure=True)
+  vm.RemoteCommand('kill $(cat {0})'.format(CASSANDRA_PID), ignore_failure=True)
 
 
 def IsRunning(vm):
   """Returns a boolean indicating whether Cassandra is running on 'vm'."""
-  cassandra_pid = vm.RemoteCommand(
-      'cat {0} || true'.format(CASSANDRA_PID))[0].strip()
+  cassandra_pid = vm.RemoteCommand('cat {0} || true'.format(CASSANDRA_PID))[
+      0
+  ].strip()
   if not cassandra_pid:
     return False
 
@@ -203,11 +223,12 @@ def IsRunning(vm):
     vm.RemoteCommand('kill -0 {0}'.format(cassandra_pid))
     return True
   except errors.VirtualMachine.RemoteCommandError:
-    logging.warn('%s: Cassandra is not running. '
-                 'Startup STDOUT:\n%s\n\nSTDERR:\n%s',
-                 vm,
-                 vm.RemoteCommand('cat ' + CASSANDRA_OUT),
-                 vm.RemoteCommand('cat ' + CASSANDRA_ERR))
+    logging.warn(
+        '%s: Cassandra is not running. Startup STDOUT:\n%s\n\nSTDERR:\n%s',
+        vm,
+        vm.RemoteCommand('cat ' + CASSANDRA_OUT),
+        vm.RemoteCommand('cat ' + CASSANDRA_ERR),
+    )
     return False
 
 
@@ -237,8 +258,7 @@ def GetCassandraCliPath(vm):
     # installed by the cassandra charm.
     return '/usr/bin/cassandra-cli'
 
-  return posixpath.join(CASSANDRA_DIR, 'bin',
-                        'cassandra-cli')
+  return posixpath.join(CASSANDRA_DIR, 'bin', 'cassandra-cli')
 
 
 def GetCassandraStressPath(vm):
@@ -247,8 +267,7 @@ def GetCassandraStressPath(vm):
     # installed by the cassandra-stress charm.
     return '/usr/bin/cassandra-stress'
 
-  return posixpath.join(CASSANDRA_DIR, 'tools', 'bin',
-                        'cassandra-stress')
+  return posixpath.join(CASSANDRA_DIR, 'tools', 'bin', 'cassandra-stress')
 
 
 def GetNumberOfNodesUp(vm):
@@ -257,8 +276,9 @@ def GetNumberOfNodesUp(vm):
   Args:
     vm: VirtualMachine. The VM to use to check the cluster status.
   """
-  vms_up = vm.RemoteCommand(
-      '{0} status | grep -c "^UN"'.format(NODETOOL))[0].strip()
+  vms_up = vm.RemoteCommand('{0} status | grep -c "^UN"'.format(NODETOOL))[
+      0
+  ].strip()
   return int(vms_up)
 
 
@@ -288,8 +308,12 @@ def StartCluster(seed_vm, vms):
   time.sleep(NODE_START_SLEEP)
   for i in range(5):
     if not IsRunning(seed_vm):
-      logging.warn('Seed %s: Cassandra not running yet (try %d). Waiting %ds.',
-                   seed_vm, i, NODE_START_SLEEP)
+      logging.warn(
+          'Seed %s: Cassandra not running yet (try %d). Waiting %ds.',
+          seed_vm,
+          i,
+          NODE_START_SLEEP,
+      )
       time.sleep(NODE_START_SLEEP)
     else:
       break
@@ -315,8 +339,13 @@ def StartCluster(seed_vm, vms):
       logging.info('All %d nodes up!', vm_count)
       break
 
-    logging.warn('Try %d: only %s of %s up. Restarting and sleeping %ds', i,
-                 vms_up, vm_count, NODE_START_SLEEP)
+    logging.warn(
+        'Try %d: only %s of %s up. Restarting and sleeping %ds',
+        i,
+        vms_up,
+        vm_count,
+        NODE_START_SLEEP,
+    )
     background_tasks.RunThreaded(_StartCassandraIfNotRunning, vms)
     time.sleep(NODE_START_SLEEP)
   else:

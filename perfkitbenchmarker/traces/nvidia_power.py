@@ -31,17 +31,24 @@ from perfkitbenchmarker.traces import base_collector
 import six
 
 _NVIDIA_POWER = flags.DEFINE_boolean(
-    'nvidia_power', False, 'Run nvidia power on each VM to collect power in '
-    'each benchmark run.')
-_INTERVAL = flags.DEFINE_integer('nvidia_power_interval', 1,
-                                 'Nvidia power sample collection frequency.')
-_PUBLISH = flags.DEFINE_boolean('nvidia_power_publish', True,
-                                'Whether to publish Nvidia Power.')
-_SELECTIONS = flags.DEFINE_string('nvidia_power_selections', 'power',
-                                  'Choice(s) of data to collect; all or any '
-                                  'combinations of power, pstate, utilization, '
-                                  'temperature, clocks, and '
-                                  'clocks_throttle_reasons.')
+    'nvidia_power',
+    False,
+    'Run nvidia power on each VM to collect power in each benchmark run.',
+)
+_INTERVAL = flags.DEFINE_integer(
+    'nvidia_power_interval', 1, 'Nvidia power sample collection frequency.'
+)
+_PUBLISH = flags.DEFINE_boolean(
+    'nvidia_power_publish', True, 'Whether to publish Nvidia Power.'
+)
+_SELECTIONS = flags.DEFINE_string(
+    'nvidia_power_selections',
+    'power',
+    'Choice(s) of data to collect; all or any '
+    'combinations of power, pstate, utilization, '
+    'temperature, clocks, and '
+    'clocks_throttle_reasons.',
+)
 FLAGS = flags.FLAGS
 
 # queries to give to 'nvidia-smi --query-gpu='; refer to the output of
@@ -142,8 +149,10 @@ def _NvidiaPowerResults(
   for line in output:
     gpu_metadata = line.copy()
     timestamp = datetime.datetime.timestamp(
-        datetime.datetime.strptime(gpu_metadata[' timestamp'],
-                                   ' %Y/%m/%d %H:%M:%S.%f'))
+        datetime.datetime.strptime(
+            gpu_metadata[' timestamp'], ' %Y/%m/%d %H:%M:%S.%f'
+        )
+    )
     gpu_metadata.update(metadata)
     for query_item in query_items:
       if query_item in ['index', 'timestamp']:
@@ -162,7 +171,9 @@ def _NvidiaPowerResults(
               value=value,
               unit=table_row['unit'],
               metadata=new_metadata,
-              timestamp=timestamp))
+              timestamp=timestamp,
+          )
+      )
 
 
 class _NvidiaPowerCollector(base_collector.BaseCollector):
@@ -171,9 +182,12 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
   Runs Nvidia on the VMs.
   """
 
-  def __init__(self, selections: str = 'power',
-               interval: float = 1.0,
-               output_directory: str = '') -> None:
+  def __init__(
+      self,
+      selections: str = 'power',
+      interval: float = 1.0,
+      output_directory: str = '',
+  ) -> None:
     super(_NvidiaPowerCollector, self).__init__(interval, output_directory)
     self.selections = selections
     self.query_items = ['index', 'timestamp']
@@ -193,8 +207,9 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
     """See base class."""
     return 'nvidia_power'
 
-  def _CollectorRunCommand(self, vm: virtual_machine.BaseVirtualMachine,
-                           collector_file: str) -> str:
+  def _CollectorRunCommand(
+      self, vm: virtual_machine.BaseVirtualMachine, collector_file: str
+  ) -> str:
     """See base class."""
     interval_ms = int(self.interval * 1000 + 1e-6)
     return (
@@ -213,14 +228,16 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
     def _Analyze(role: str, collector_file: str) -> None:
       with open(
           os.path.join(self.output_directory, os.path.basename(collector_file)),
-          'r') as fp:
+          'r',
+      ) as fp:
         metadata = {
             'event': 'nvidia_power',
             'nvidia_interval': self.interval,
-            'role': role
+            'role': role,
         }
-        _NvidiaPowerResults(metadata, csv.DictReader(fp), samples,
-                            self.query_items)
+        _NvidiaPowerResults(
+            metadata, csv.DictReader(fp), samples, self.query_items
+        )
 
     background_tasks.RunThreaded(
         _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
@@ -233,8 +250,10 @@ def Register(parsed_flags: flags) -> None:
     return
 
   collector = _NvidiaPowerCollector(
-      selections=_SELECTIONS.value, interval=_INTERVAL.value,
-      output_directory=vm_util.GetTempDir())
+      selections=_SELECTIONS.value,
+      interval=_INTERVAL.value,
+      output_directory=vm_util.GetTempDir(),
+  )
   events.before_phase.connect(collector.Start, stages.RUN, weak=False)
   events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
   if _PUBLISH.value:

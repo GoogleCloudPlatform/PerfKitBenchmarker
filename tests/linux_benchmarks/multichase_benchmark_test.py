@@ -62,8 +62,9 @@ class TranslateMemorySizeTestCase(unittest.TestCase):
 class IterMemorySizesTestCase(unittest.TestCase):
 
   def setUp(self):
-    self._func = functools.partial(multichase_benchmark._IterMemorySizes,
-                                   lambda: 1024)
+    self._func = functools.partial(
+        multichase_benchmark._IterMemorySizes, lambda: 1024
+    )
 
   def testHitsUpperBound(self):
     result = list(self._func(1 * units.byte, 32 * units.byte))

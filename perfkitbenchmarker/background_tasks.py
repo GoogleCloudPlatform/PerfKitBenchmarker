@@ -77,7 +77,7 @@ from six.moves import zip
 # For situations where an interruptable wait is necessary, a loop of waits with
 # long timeouts is used instead. This is because some of Python's built-in wait
 # methods are non-interruptable without a timeout.
-_LONG_TIMEOUT = 1000.
+_LONG_TIMEOUT = 1000.0
 
 # Constants used for polling waits. See _WaitForCondition.
 _WAIT_MIN_RECHECK_DELAY = 0.001  # 1 ms
@@ -95,8 +95,10 @@ MAX_CONCURRENT_THREADS = 200
 # important for the cluster_boot benchmark where we want to launch all of the
 # VMs in parallel.
 flags.DEFINE_integer(
-    'max_concurrent_threads', None, 'Maximum number of concurrent threads to '
-    'use when running a benchmark.')
+    'max_concurrent_threads',
+    None,
+    'Maximum number of concurrent threads to use when running a benchmark.',
+)
 FLAGS = flags.FLAGS
 
 
@@ -111,8 +113,9 @@ def _GetCallString(target_arg_tuple):
     target = target.func
   arg_strings = [str(a) for a in args]
   arg_strings.extend(['{0}={1}'.format(k, v) for k, v in six.iteritems(kwargs)])
-  return '{0}({1})'.format(getattr(target, '__name__', target),
-                           ', '.join(arg_strings))
+  return '{0}({1})'.format(
+      getattr(target, '__name__', target), ', '.join(arg_strings)
+  )
 
 
 def _WaitForCondition(condition_callback, timeout=None):
@@ -124,10 +127,10 @@ def _WaitForCondition(condition_callback, timeout=None):
 
   Args:
     condition_callback: Callable that returns a value that evaluates True to end
-        the wait or evaluates False to continue the wait.
+      the wait or evaluates False to continue the wait.
     timeout: Optional float. Number of seconds to wait before giving up. If
-        provided, the condition is still checked at least once before giving up.
-        If not provided, the wait does not time out.
+      provided, the condition is still checked at least once before giving up.
+      If not provided, the wait does not time out.
 
   Returns:
     True if condition_callback returned a value that evaluated True. False if
@@ -139,8 +142,9 @@ def _WaitForCondition(condition_callback, timeout=None):
   while True:
     if condition_callback():
       return True
-    remaining_time = (_WAIT_MAX_RECHECK_DELAY if deadline is None
-                      else deadline - time.time())
+    remaining_time = (
+        _WAIT_MAX_RECHECK_DELAY if deadline is None else deadline - time.time()
+    )
     if remaining_time <= 0:
       return False
     time.sleep(delay)
@@ -230,11 +234,11 @@ class _BackgroundTask(object):
     args: Series of unnamed arguments to be passed to the target.
     kwargs: dict. Keyword arguments to be passed to the target.
     context: _BackgroundTaskThreadContext. Thread-specific state to be inherited
-        from parent to child thread.
+      from parent to child thread.
     return_value: Return value if the call was executed successfully, or None
-        otherwise.
+      otherwise.
     traceback: The traceback string if the call raised an exception, or None
-        otherwise.
+      otherwise.
   """
 
   def __init__(self, target, args, kwargs, thread_context):
@@ -259,7 +263,7 @@ class _BackgroundTaskManager(six.with_metaclass(abc.ABCMeta, object)):
 
   Attributes:
     tasks: list of _BackgroundTask instances. Contains one _BackgroundTask per
-        started task, in the order that they were started.
+      started task, in the order that they were started.
   """
 
   def __init__(self, max_concurrency):
@@ -283,7 +287,7 @@ class _BackgroundTaskManager(six.with_metaclass(abc.ABCMeta, object)):
       args: Series of unnamed arguments to be passed to the target.
       kwargs: dict. Keyword arguments to be passed to the target.
       thread_context: _BackgroundTaskThreadContext. Thread-specific state to be
-          inherited from parent to child thread.
+        inherited from parent to child thread.
     """
     raise NotImplementedError()
 
@@ -313,17 +317,17 @@ def _ExecuteBackgroundThreadTasks(worker_id, task_queue, response_queue):
 
   Args:
     worker_id: int. Identifier for the child thread relative to other child
-        threads.
+      threads.
     task_queue: _NonPollingSingleReaderQueue. Queue from which input is read.
-        Each value in the queue can be one of three types of values. If it is a
-        (task_id, _BackgroundTask) pair, the task is executed on this thread.
-        If it is _THREAD_STOP_PROCESSING, the thread stops executing. If it is
-        _THREAD_WAIT_FOR_KEYBOARD_INTERRUPT, the thread waits for a
-        KeyboardInterrupt.
+      Each value in the queue can be one of three types of values. If it is a
+      (task_id, _BackgroundTask) pair, the task is executed on this thread. If
+      it is _THREAD_STOP_PROCESSING, the thread stops executing. If it is
+      _THREAD_WAIT_FOR_KEYBOARD_INTERRUPT, the thread waits for a
+      KeyboardInterrupt.
     response_queue: _SingleReaderQueue. Queue to which output is written. It
-        receives worker_id when this thread's bootstrap code has completed and
-        receives a (worker_id, task_id) pair for each task completed on this
-        thread.
+      receives worker_id when this thread's bootstrap code has completed and
+      receives a (worker_id, task_id) pair for each task completed on this
+      thread.
   """
   try:
     response_queue.Put(worker_id)
@@ -341,8 +345,11 @@ def _ExecuteBackgroundThreadTasks(worker_id, task_queue, response_queue):
     # TODO(user): Detect when the log would be unhelpful (e.g. if the
     # current thread was spinning in the _THREAD_WAIT_FOR_KEYBOARD_INTERRUPT
     # sub-loop). Only log in helpful cases, like when the task is interrupted.
-    logging.debug('Child thread %s received a KeyboardInterrupt from its '
-                  'parent.', worker_id, exc_info=True)
+    logging.debug(
+        'Child thread %s received a KeyboardInterrupt from its parent.',
+        worker_id,
+        exc_info=True,
+    )
 
 
 class _BackgroundThreadTaskManager(_BackgroundTaskManager):
@@ -360,7 +367,8 @@ class _BackgroundThreadTaskManager(_BackgroundTaskManager):
       self._task_queues.append(task_queue)
       thread = threading.Thread(
           target=_ExecuteBackgroundThreadTasks,
-          args=(worker_id, task_queue, self._response_queue))
+          args=(worker_id, task_queue, self._response_queue),
+      )
       thread.daemon = True
       self._threads.append(thread)
       thread.start()
@@ -380,8 +388,9 @@ class _BackgroundThreadTaskManager(_BackgroundTaskManager):
       _WaitForCondition(lambda: not thread.is_alive())
 
   def StartTask(self, target, args, kwargs, thread_context):
-    assert self._available_worker_ids, ('StartTask called when no threads were '
-                                        'available')
+    assert (
+        self._available_worker_ids
+    ), 'StartTask called when no threads were available'
     task = _BackgroundTask(target, args, kwargs, thread_context)
     task_id = len(self.tasks)
     self.tasks.append(task)
@@ -397,7 +406,8 @@ class _BackgroundThreadTaskManager(_BackgroundTaskManager):
     # Raise a KeyboardInterrupt in each child thread.
     for thread in self._threads:
       ctypes.pythonapi.PyThreadState_SetAsyncExc(
-          ctypes.c_long(thread.ident), ctypes.py_object(KeyboardInterrupt))
+          ctypes.c_long(thread.ident), ctypes.py_object(KeyboardInterrupt)
+      )
     # Wake threads up from possible non-interruptable wait states so they can
     # actually see the KeyboardInterrupt.
     for task_queue, thread in zip(self._task_queues, self._threads):
@@ -425,12 +435,14 @@ def _ExecuteProcessTask(task):
     element is the exception traceback string, or None if the function
     succeeded.
   """
+
   def handle_sigint(signum, frame):
     # Ignore any new SIGINTs since we are already tearing down.
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     # Execute the default SIGINT handler which throws a KeyboardInterrupt
     # in the main thread of the process.
     signal.default_int_handler(signum, frame)
+
   signal.signal(signal.SIGINT, handle_sigint)
   task.Run()
   return task.return_value, task.traceback
@@ -470,8 +482,10 @@ class _BackgroundProcessTaskManager(_BackgroundTaskManager):
     completed_tasks = None
     while not completed_tasks:
       completed_tasks, _ = futures.wait(
-          self._active_futures, timeout=_LONG_TIMEOUT,
-          return_when=futures.FIRST_COMPLETED)
+          self._active_futures,
+          timeout=_LONG_TIMEOUT,
+          return_when=futures.FIRST_COMPLETED,
+      )
     future = completed_tasks.pop()
     task_id = self._active_futures.pop(future)
     task = self.tasks[task_id]
@@ -486,19 +500,24 @@ class _BackgroundProcessTaskManager(_BackgroundTaskManager):
     self._executor.shutdown(wait=True)
 
 
-def _RunParallelTasks(target_arg_tuples, max_concurrency, get_task_manager,
-                      parallel_exception_class, post_task_delay=0):
+def _RunParallelTasks(
+    target_arg_tuples,
+    max_concurrency,
+    get_task_manager,
+    parallel_exception_class,
+    post_task_delay=0,
+):
   """Executes function calls concurrently in separate threads or processes.
 
   Args:
     target_arg_tuples: list of (target, args, kwargs) tuples. Each tuple
-        contains the function to call and the arguments to pass it.
-    max_concurrency: int or None. The maximum number of concurrent new
-        threads or processes.
+      contains the function to call and the arguments to pass it.
+    max_concurrency: int or None. The maximum number of concurrent new threads
+      or processes.
     get_task_manager: Callable that accepts an int max_concurrency arg and
-        returns a _TaskManager.
+      returns a _TaskManager.
     parallel_exception_class: Type of exception to raise upon an exception in
-        one of the called functions.
+      one of the called functions.
     post_task_delay: Delay in seconds between parallel task invocations.
 
   Returns:
@@ -517,8 +536,10 @@ def _RunParallelTasks(target_arg_tuples, max_concurrency, get_task_manager,
   with get_task_manager(max_concurrency) as task_manager:
     try:
       while started_task_count < len(target_arg_tuples) or active_task_count:
-        if (started_task_count < len(target_arg_tuples) and
-            active_task_count < max_concurrency):
+        if (
+            started_task_count < len(target_arg_tuples)
+            and active_task_count < max_concurrency
+        ):
           # Start a new task.
           target, args, kwargs = target_arg_tuples[started_task_count]
           task_manager.StartTask(target, args, kwargs, thread_context)
@@ -536,16 +557,18 @@ def _RunParallelTasks(target_arg_tuples, max_concurrency, get_task_manager,
         # for other tasks.
         stacktrace = task_manager.tasks[task_id].traceback
         if stacktrace:
-          msg = ('Exception occurred while calling {0}:{1}{2}'.format(
-              _GetCallString(target_arg_tuples[task_id]), os.linesep,
-              stacktrace))
+          msg = 'Exception occurred while calling {0}:{1}{2}'.format(
+              _GetCallString(target_arg_tuples[task_id]), os.linesep, stacktrace
+          )
           logging.error(msg)
           error_strings.append(msg)
 
     except KeyboardInterrupt:
       logging.error(
           'Received KeyboardInterrupt while executing parallel tasks. Waiting '
-          'for %s tasks to clean up.', active_task_count)
+          'for %s tasks to clean up.',
+          active_task_count,
+      )
       task_manager.HandleKeyboardInterrupt()
       raise
 
@@ -555,7 +578,8 @@ def _RunParallelTasks(target_arg_tuples, max_concurrency, get_task_manager,
     # type.
     raise parallel_exception_class(
         'The following exceptions occurred during parallel execution:'
-        '{0}{1}'.format(os.linesep, os.linesep.join(error_strings)))
+        '{0}{1}'.format(os.linesep, os.linesep.join(error_strings))
+    )
   results = [task.return_value for task in task_manager.tasks]
   assert len(target_arg_tuples) == len(results), (target_arg_tuples, results)
   return results
@@ -566,9 +590,8 @@ def RunParallelThreads(target_arg_tuples, max_concurrency, post_task_delay=0):
 
   Args:
     target_arg_tuples: list of (target, args, kwargs) tuples. Each tuple
-        contains the function to call and the arguments to pass it.
-    max_concurrency: int or None. The maximum number of concurrent new
-        threads.
+      contains the function to call and the arguments to pass it.
+    max_concurrency: int or None. The maximum number of concurrent new threads.
     post_task_delay: Delay in seconds between parallel task invocations.
 
   Returns:
@@ -580,23 +603,26 @@ def RunParallelThreads(target_arg_tuples, max_concurrency, post_task_delay=0):
         called functions.
   """
   return _RunParallelTasks(
-      target_arg_tuples, max_concurrency, _BackgroundThreadTaskManager,
-      errors.VmUtil.ThreadException, post_task_delay)
+      target_arg_tuples,
+      max_concurrency,
+      _BackgroundThreadTaskManager,
+      errors.VmUtil.ThreadException,
+      post_task_delay,
+  )
 
 
-def RunThreaded(target,
-                thread_params,
-                max_concurrent_threads=None,
-                post_task_delay=0):
+def RunThreaded(
+    target, thread_params, max_concurrent_threads=None, post_task_delay=0
+):
   """Runs the target method in parallel threads.
 
   The method starts up threads with one arg from thread_params as the first arg.
 
   Args:
     target: The method to invoke in the thread.
-    thread_params: A thread is launched for each value in the list. The items
-        in the list can either be a singleton or a (args, kwargs) tuple/list.
-        Usually this is a list of VMs.
+    thread_params: A thread is launched for each value in the list. The items in
+      the list can either be a singleton or a (args, kwargs) tuple/list. Usually
+      this is a list of VMs.
     max_concurrent_threads: The maximum number of concurrent threads to allow.
     post_task_delay: Delay in seconds between commands.
 
@@ -626,7 +652,8 @@ def RunThreaded(target,
   """
   if max_concurrent_threads is None:
     max_concurrent_threads = (
-        FLAGS.max_concurrent_threads or MAX_CONCURRENT_THREADS)
+        FLAGS.max_concurrent_threads or MAX_CONCURRENT_THREADS
+    )
 
   if not isinstance(thread_params, list):
     raise ValueError('Param "thread_params" must be a list')
@@ -637,28 +664,33 @@ def RunThreaded(target,
 
   if not isinstance(thread_params[0], tuple):
     target_arg_tuples = [(target, (arg,), {}) for arg in thread_params]
-  elif (not isinstance(thread_params[0][0], tuple) or
-        not isinstance(thread_params[0][1], dict)):
+  elif not isinstance(thread_params[0][0], tuple) or not isinstance(
+      thread_params[0][1], dict
+  ):
     raise ValueError('If Param is a tuple, the tuple must be (tuple, dict)')
   else:
-    target_arg_tuples = [(target, args, kwargs)
-                         for args, kwargs in thread_params]
+    target_arg_tuples = [
+        (target, args, kwargs) for args, kwargs in thread_params
+    ]
 
-  return RunParallelThreads(target_arg_tuples,
-                            max_concurrency=max_concurrent_threads,
-                            post_task_delay=post_task_delay)
+  return RunParallelThreads(
+      target_arg_tuples,
+      max_concurrency=max_concurrent_threads,
+      post_task_delay=post_task_delay,
+  )
 
 
-def RunParallelProcesses(target_arg_tuples, max_concurrency,
-                         post_process_delay=0):
+def RunParallelProcesses(
+    target_arg_tuples, max_concurrency, post_process_delay=0
+):
   """Executes function calls concurrently in separate processes.
 
   Args:
     target_arg_tuples: list of (target, args, kwargs) tuples. Each tuple
-        contains the function to call and the arguments to pass it.
+      contains the function to call and the arguments to pass it.
     max_concurrency: int or None. The maximum number of concurrent new
-        processes. If None, it will default to the number of processors on the
-        machine.
+      processes. If None, it will default to the number of processors on the
+      machine.
     post_process_delay: Delay in seconds between parallel process invocations.
 
   Returns:
@@ -669,18 +701,25 @@ def RunParallelProcesses(target_arg_tuples, max_concurrency,
     errors.VmUtil.CalledProcessException: When an exception occurred in any
         of the called functions.
   """
+
   def handle_sigint(signum, frame):
     # Ignore any SIGINTS in the parent process, but let users know
     # that the child processes are getting cleaned up.
-    logging.error('Got SIGINT while executing parallel tasks. '
-                  'Waiting for tasks to clean up.')
+    logging.error(
+        'Got SIGINT while executing parallel tasks. '
+        'Waiting for tasks to clean up.'
+    )
+
   old_handler = None
   try:
     old_handler = signal.signal(signal.SIGINT, handle_sigint)
     ret_val = _RunParallelTasks(
-        target_arg_tuples, max_concurrency, _BackgroundProcessTaskManager,
+        target_arg_tuples,
+        max_concurrency,
+        _BackgroundProcessTaskManager,
         errors.VmUtil.CalledProcessException,
-        post_task_delay=post_process_delay)
+        post_task_delay=post_process_delay,
+    )
   finally:
     if old_handler:
       signal.signal(signal.SIGINT, old_handler)

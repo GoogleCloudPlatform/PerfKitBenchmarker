@@ -29,23 +29,32 @@ FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/aerospike/act.git'
 ACT_DIR = '%s/act' % linux_packages.INSTALL_DIR
-flags.DEFINE_list('act_load', ['1.0'],
-                  'Load multiplier for act test per device.')
-flags.DEFINE_boolean('act_parallel', False,
-                     'Run act tools in parallel. One copy per device.')
+flags.DEFINE_list(
+    'act_load', ['1.0'], 'Load multiplier for act test per device.'
+)
+flags.DEFINE_boolean(
+    'act_parallel', False, 'Run act tools in parallel. One copy per device.'
+)
 flags.DEFINE_integer('act_duration', 86400, 'Duration of act test in seconds.')
-flags.DEFINE_integer('act_reserved_partitions', 0,
-                     'Number of partitions reserved (not being used by act).')
 flags.DEFINE_integer(
-    'act_service_threads', None,
+    'act_reserved_partitions',
+    0,
+    'Number of partitions reserved (not being used by act).',
+)
+flags.DEFINE_integer(
+    'act_service_threads',
+    None,
     'Total number of service threads on which requests are '
-    'generated and done. Default is 5x the number of CPUs.')
+    'generated and done. Default is 5x the number of CPUs.',
+)
 flags.DEFINE_integer(
-    'act_max_lags_sec', 10,
+    'act_max_lags_sec',
+    10,
     'How much the large-block operations (act_storage) or '
     'cache-thread operations (act_index) are allowed to lag '
     'behind their target rates before the ACT test fails. '
-    'Default is 10.')
+    'Default is 10.',
+)
 # TODO(user): Support user provided config file.
 ACT_CONFIG_TEMPLATE = """
 device-names: {devices}
@@ -64,8 +73,9 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('openssl')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, ACT_DIR))
-  vm.RemoteCommand('cd {0} && git checkout {1} && make'.format(
-      ACT_DIR, ACT_COMMIT))
+  vm.RemoteCommand(
+      'cd {0} && git checkout {1} && make'.format(ACT_DIR, ACT_COMMIT)
+  )
 
 
 def YumInstall(vm):
@@ -88,11 +98,15 @@ def RunActPrep(vm):
   """Runs actprep binary to initialize the drive."""
 
   def _RunActPrep(device):
-    vm.RobustRemoteCommand('cd {0} && sudo ./target/bin/act_prep {1}'.format(
-        ACT_DIR, device.GetDevicePath()))
+    vm.RobustRemoteCommand(
+        'cd {0} && sudo ./target/bin/act_prep {1}'.format(
+            ACT_DIR, device.GetDevicePath()
+        )
+    )
 
-  assert len(vm.scratch_disks) > FLAGS.act_reserved_partitions, (
-      'More reserved partition than total partitions available.')
+  assert (
+      len(vm.scratch_disks) > FLAGS.act_reserved_partitions
+  ), 'More reserved partition than total partitions available.'
   # Only salt partitions will be used.
   background_tasks.RunThreaded(
       _RunActPrep, vm.scratch_disks[FLAGS.act_reserved_partitions :]
@@ -104,7 +118,7 @@ def PrepActConfig(vm, load, index=None):
   if index is None:
     disk_lst = vm.scratch_disks
     # Treat first few partitions as reserved.
-    disk_lst = disk_lst[FLAGS.act_reserved_partitions:]
+    disk_lst = disk_lst[FLAGS.act_reserved_partitions :]
     config_file = 'actconfig_{0}.txt'.format(load)
   else:
     disk_lst = [vm.scratch_disks[index]]
@@ -117,7 +131,8 @@ def PrepActConfig(vm, load, index=None):
       duration=FLAGS.act_duration,
       read_iops=_CalculateReadIops(num_disk, load),
       write_iops=_CalculateWriteIops(num_disk, load),
-      max_lags=FLAGS.act_max_lags_sec)
+      max_lags=FLAGS.act_max_lags_sec,
+  )
   if FLAGS.act_service_threads:
     content += 'service-threads: %d\n' % FLAGS.act_service_threads
   logging.info('ACT config: %s', content)
@@ -140,21 +155,26 @@ def RunAct(vm, load, index=None):
   # Push config file to remote VM.
   vm.RobustRemoteCommand(
       'cd {0} && sudo ./target/bin/act_storage ~/{1} > ~/{2}'.format(
-          ACT_DIR, config, output))
+          ACT_DIR, config, output
+      )
+  )
   # Shows 1,2,4,8,..,64.
   out, _ = vm.RemoteCommand(
       'cd {0} ; python3 ./analysis/act_latency.py -n 7 -e 1 -x -l ~/{1}; '
       'exit 0'.format(ACT_DIR, output),
-      ignore_failure=True)
+      ignore_failure=True,
+  )
   samples = ParseRunAct(out)
   last_output_block, _ = vm.RemoteCommand('tail -n 100 ~/{0}'.format(output))
 
   # Early termination.
-  if 'drive(s) can\'t keep up - test stopped' in last_output_block:
+  if "drive(s) can't keep up - test stopped" in last_output_block:
     act_config_metadata['ERROR'] = 'cannot keep up'
   act_config_metadata.update(
       GetActMetadata(
-          len(vm.scratch_disks) - FLAGS.act_reserved_partitions, load))
+          len(vm.scratch_disks) - FLAGS.act_reserved_partitions, load
+      )
+  )
   for s in samples:
     s.metadata.update(act_config_metadata)
   return samples
@@ -183,8 +203,7 @@ def ParseRunAct(out):
   """
   ret = []
   if 'could not find 3600 seconds of data' in out:
-    ret.append(sample.Sample('Failed:NotEnoughSample', 0, '',
-                             {}))
+    ret.append(sample.Sample('Failed:NotEnoughSample', 0, '', {}))
     return ret
   lines = out.split('\n')
   buckets = []
@@ -204,13 +223,21 @@ def ParseRunAct(out):
     num_buckets = len(vals) - 1
     for i in range(num_buckets - 1):
       ret.append(
-          sample.Sample('reads' + matrix, float(vals[i + 1]), '%>(ms)',
-                        {'slice': vals[0],
-                         'bucket': int(buckets[i])}))
+          sample.Sample(
+              'reads' + matrix,
+              float(vals[i + 1]),
+              '%>(ms)',
+              {'slice': vals[0], 'bucket': int(buckets[i])},
+          )
+      )
     ret.append(
-        sample.Sample('read_rate' + matrix,
-                      float(vals[num_buckets]), 'iops',
-                      {'slice': vals[0]}))
+        sample.Sample(
+            'read_rate' + matrix,
+            float(vals[num_buckets]),
+            'iops',
+            {'slice': vals[0]},
+        )
+    )
   return ret
 
 
@@ -230,7 +257,7 @@ def GetActMetadata(num_disk, load):
       'write-reqs-per-sec': _CalculateWriteIops(num_disk, load),
       'max-lag-sec': FLAGS.act_max_lags_sec,
       'microsecond-histograms': 'no',
-      'scheduler-mode': 'noop'
+      'scheduler-mode': 'noop',
   }
   metadata['service-threads'] = FLAGS.act_service_threads or 'default'
   # num-queues & threads-per-queues are deprecated in act v6+,

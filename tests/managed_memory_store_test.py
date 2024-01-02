@@ -23,18 +23,17 @@ class ManagedMemoryStoreTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testReadableVersion(self):
     """Test normal cases work as they should."""
-    self.assertEqual(
-        managed_memory_store.ParseReadableVersion('6.x'), '6.x')
-    self.assertEqual(
-        managed_memory_store.ParseReadableVersion('4.0.10'), '4.0')
+    self.assertEqual(managed_memory_store.ParseReadableVersion('6.x'), '6.x')
+    self.assertEqual(managed_memory_store.ParseReadableVersion('4.0.10'), '4.0')
 
   def testReadableVersionExtraneous(self):
     """Test weird cases just return the version number as is."""
     self.assertEqual(
-        managed_memory_store.ParseReadableVersion('redis.8'), 'redis.8')
+        managed_memory_store.ParseReadableVersion('redis.8'), 'redis.8'
+    )
     self.assertEqual(
-        managed_memory_store.ParseReadableVersion('redis 9_7_5'),
-        'redis 9_7_5')
+        managed_memory_store.ParseReadableVersion('redis 9_7_5'), 'redis 9_7_5'
+    )
 
 
 if __name__ == '__main__':

@@ -21,28 +21,32 @@ from perfkitbenchmarker.sample import Sample
 from tests import pkb_common_test_case
 
 
-class MlperfBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
-                              test_util.SamplesTestMixin):
+class MlperfBenchmarkTestCase(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super(MlperfBenchmarkTestCase, self).setUp()
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'mlperf_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '..', 'data', 'mlperf_output.txt'
+    )
     with open(path) as fp:
       self.contents = fp.read()
 
   def testTrainResults(self):
-    samples = mlperf_benchmark.MakeSamplesFromOutput({'version': 'v1.0'},
-                                                     self.contents,
-                                                     use_tpu=False,
-                                                     model='resnet')
+    samples = mlperf_benchmark.MakeSamplesFromOutput(
+        {'version': 'v1.0'}, self.contents, use_tpu=False, model='resnet'
+    )
     self.assertLen(samples, 1123)
     self.assertSamplesEqualUpToTimestamp(
         Sample(
             metric='speed',
             value=17651.66,
             unit='samples/sec',
-            metadata={'version': 'v1.0'}), samples[0])
+            metadata={'version': 'v1.0'},
+        ),
+        samples[0],
+    )
     print(samples[-1])
     self.assertSamplesEqualUpToTimestamp(
         Sample(
@@ -56,9 +60,12 @@ class MlperfBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
                 'version': 'v1.0',
                 'namespace': '',
                 'event_type': 'INTERVAL_END',
-                'value': None
+                'value': None,
             },
-            timestamp=1627332194930), samples[-1])
+            timestamp=1627332194930,
+        ),
+        samples[-1],
+    )
 
 
 if __name__ == '__main__':

@@ -31,15 +31,17 @@ _network_external = {'router:external': 'External'}
 _network_fail = {'router:external': 'Fail'}
 
 
-class TestOpenStackVirtualMachine(pkb_common_test_case.TestOsMixin,
-                                  os_virtual_machine.OpenStackVirtualMachine):
+class TestOpenStackVirtualMachine(
+    pkb_common_test_case.TestOsMixin, os_virtual_machine.OpenStackVirtualMachine
+):
   pass
 
 
 class BaseOpenStackNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
-  def _CreateBenchmarkSpecFromYaml(self, yaml_string,
-                                   benchmark_name=_BENCHMARK_NAME):
+  def _CreateBenchmarkSpecFromYaml(
+      self, yaml_string, benchmark_name=_BENCHMARK_NAME
+  ):
     config = configs.LoadConfig(yaml_string, {}, benchmark_name)
     spec = self._CreateBenchmarkSpecFromConfigDict(config, benchmark_name)
     spec.disable_interrupt_moderation = False
@@ -61,11 +63,13 @@ class BaseOpenStackNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        benchmark_name,
-        flag_values=FLAGS,
-        **config_dict)
-    benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
-                             if b.BENCHMARK_NAME == benchmark_name))
+        benchmark_name, flag_values=FLAGS, **config_dict
+    )
+    benchmark_module = next((
+        b
+        for b in linux_benchmarks.BENCHMARKS
+        if b.BENCHMARK_NAME == benchmark_name
+    ))
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, _URI)
 
   def _CreateTestOpenStackVm(self):
@@ -77,9 +81,11 @@ class OpenStackVirtualMachineTest(BaseOpenStackNetworkTest):
 
   def setUp(self):
     super(OpenStackVirtualMachineTest, self).setUp()
-    self.mock_check_network_exists = self.enter_context(mock.patch.object(
-        os_virtual_machine.OpenStackVirtualMachine,
-        '_CheckNetworkExists'))
+    self.mock_check_network_exists = self.enter_context(
+        mock.patch.object(
+            os_virtual_machine.OpenStackVirtualMachine, '_CheckNetworkExists'
+        )
+    )
     FLAGS.ignore_package_requirements = True
     self.openstack_vm = self._CreateTestOpenStackVm()
 

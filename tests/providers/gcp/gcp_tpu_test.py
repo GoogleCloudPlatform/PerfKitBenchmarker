@@ -17,7 +17,6 @@ import contextlib
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -44,7 +43,7 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
         'tpu_network': 'default',
         'tpu_tf_version': 'nightly',
         'tpu_zone': 'us-central1-a',
-        'tpu_preemptible': True
+        'tpu_preemptible': True,
     }
 
   def setUp(self):
@@ -55,8 +54,7 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.gcloud_path = 'gcloud'
 
     mock_tpu_spec_attrs = self.CreateTpuSpecDict()
-    self.mock_tpu_spec = mock.Mock(
-        spec=benchmark_config_spec._TpuGroupSpec)
+    self.mock_tpu_spec = mock.Mock(spec=benchmark_config_spec._TpuGroupSpec)
     self.mock_tpu_spec.configure_mock(**mock_tpu_spec_attrs)
 
   @contextlib.contextmanager
@@ -64,13 +62,12 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
     """A context manager that patches a few critical objects with mocks."""
     retval = (stdout, stderr, return_code)
     with mock.patch(
-        vm_util.__name__ + '.IssueCommand',
-        return_value=retval) as issue_command, mock.patch(
-            builtins.__name__ +
-            '.open'), mock.patch(vm_util.__name__ +
-                                 '.NamedTemporaryFile'), mock.patch(
-                                     util.__name__ + '.GetDefaultProject',
-                                     return_value='fakeproject'):
+        vm_util.__name__ + '.IssueCommand', return_value=retval
+    ) as issue_command, mock.patch(builtins.__name__ + '.open'), mock.patch(
+        vm_util.__name__ + '.NamedTemporaryFile'
+    ), mock.patch(
+        util.__name__ + '.GetDefaultProject', return_value='fakeproject'
+    ):
       yield issue_command
 
   def testCreate(self):
@@ -80,9 +77,9 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
-          command_string.startswith(
-              'gcloud compute tpus create pkb-tpu-123'),
-          command_string)
+          command_string.startswith('gcloud compute tpus create pkb-tpu-123'),
+          command_string,
+      )
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--range 192.168.0.0/29', command_string)
       self.assertIn('--accelerator-type tpu-v2', command_string)
@@ -101,7 +98,8 @@ ERROR: (gcloud.compute.tpus.create) {
 }"""
     with self._PatchCriticalObjects(stderr=stderr, return_code=1):
       with self.assertRaises(
-          errors.Benchmarks.InsufficientCapacityCloudFailure):
+          errors.Benchmarks.InsufficientCapacityCloudFailure
+      ):
         tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
         tpu._Create()
 
@@ -112,8 +110,8 @@ ERROR: (gcloud.compute.tpus.create) {
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
-          command_string.startswith(
-              'gcloud compute tpus delete pkb-tpu-123'))
+          command_string.startswith('gcloud compute tpus delete pkb-tpu-123')
+      )
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--zone us-central1-a', command_string)
 
@@ -124,8 +122,8 @@ ERROR: (gcloud.compute.tpus.create) {
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
-          command_string.startswith(
-              'gcloud compute tpus describe pkb-tpu-123'))
+          command_string.startswith('gcloud compute tpus describe pkb-tpu-123')
+      )
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--zone us-central1-a', command_string)
 
@@ -136,8 +134,11 @@ ERROR: (gcloud.compute.tpus.create) {
       self.assertEqual(name, 'pkb-tpu-123')
 
   def testGetNumShards(self):
-    with self._PatchCriticalObjects(stdout='{"networkEndpoints": [{"ipAddress":'
-                                    ' "10.199.12.2", "port": 8470}]}'):
+    with self._PatchCriticalObjects(
+        stdout=(
+            '{"networkEndpoints": [{"ipAddress": "10.199.12.2", "port": 8470}]}'
+        )
+    ):
       tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
       num_shards = tpu.GetNumShards()
       self.assertEqual(num_shards, 8)

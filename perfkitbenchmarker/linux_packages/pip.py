@@ -29,13 +29,14 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import python
-
 import requests
 
 # NOTE: versionless (latest) URL is in root directory and versions have their
 # own subdirectories.
 GET_PIP_URL = 'https://bootstrap.pypa.io/pip/get-pip.py'
-GET_PIP_VERSIONED_URL = 'https://bootstrap.pypa.io/pip/{python_version}/get-pip.py'
+GET_PIP_VERSIONED_URL = (
+    'https://bootstrap.pypa.io/pip/{python_version}/get-pip.py'
+)
 
 
 def Install(vm, pip_cmd='pip', python_cmd='python'):
@@ -51,8 +52,9 @@ def Install(vm, pip_cmd='pip', python_cmd='python'):
     pip_path = '/usr/bin/' + pip_cmd
     # Create an sh shim that redirects to python -m pip
     vm.RemoteCommand(
-        f"echo 'exec {python_cmd} -m pip \"$@\"'| sudo tee {pip_path} "
-        f'&& sudo chmod 755 {pip_path}')
+        f'echo \'exec {python_cmd} -m pip "$@"\'| sudo tee {pip_path} '
+        f'&& sudo chmod 755 {pip_path}'
+    )
   else:
     # get-pip.py has the appropriate latest version of pip for all Python
     # versions. Prefer it over linux packages or easy_install
@@ -68,13 +70,16 @@ def Install(vm, pip_cmd='pip', python_cmd='python'):
       get_pip_url = versioned_url
     else:
       get_pip_url = GET_PIP_URL
+
     # get_pip can suffer from various network issues.
     @vm_util.Retry(
         max_retries=5,
-        retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,))
+        retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,),
+    )
     def GetPipWithRetries():
       vm.RemoteCommand(
-          f'curl {get_pip_url} -o get_pip.py && sudo {python_cmd} get_pip.py')
+          f'curl {get_pip_url} -o get_pip.py && sudo {python_cmd} get_pip.py'
+      )
 
     GetPipWithRetries()
 
@@ -83,13 +88,17 @@ def Install(vm, pip_cmd='pip', python_cmd='python'):
 
   # Record installed Python packages
   install_dir = linux_packages.INSTALL_DIR
-  vm.RemoteCommand(f'mkdir -p {install_dir} '
-                   f'&& {pip_cmd} freeze | tee {install_dir}/requirements.txt')
+  vm.RemoteCommand(
+      f'mkdir -p {install_dir} '
+      f'&& {pip_cmd} freeze | tee {install_dir}/requirements.txt'
+  )
 
 
 def Uninstall(vm, pip_cmd='pip'):
   """Uninstalls the pip package on the VM."""
   install_dir = linux_packages.INSTALL_DIR
-  vm.RemoteCommand(f'{pip_cmd} freeze | grep --fixed-strings --line-regexp '
-                   f'--invert-match --file {install_dir}/requirements.txt | '
-                   f'xargs --no-run-if-empty sudo {pip_cmd} uninstall -y')
+  vm.RemoteCommand(
+      f'{pip_cmd} freeze | grep --fixed-strings --line-regexp '
+      f'--invert-match --file {install_dir}/requirements.txt | '
+      f'xargs --no-run-if-empty sudo {pip_cmd} uninstall -y'
+  )

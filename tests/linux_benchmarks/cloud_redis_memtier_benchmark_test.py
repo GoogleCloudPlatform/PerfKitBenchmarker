@@ -84,18 +84,23 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     redis_instance = mock.Mock()
     benchmark_spec.vm_groups = {'clients': [vm]}
     memory_store_patch = self.enter_context(
-        mock.patch.object(cloud_redis_memtier_benchmark,
-                          '_GetManagedMemoryStore'))
+        mock.patch.object(
+            cloud_redis_memtier_benchmark, '_GetManagedMemoryStore'
+        )
+    )
     memory_store_patch.return_value = redis_instance
 
     ip_patch = self.enter_context(
-        mock.patch.object(redis_instance, 'GetMemoryStoreIp'))
+        mock.patch.object(redis_instance, 'GetMemoryStoreIp')
+    )
     ip_patch.return_value = '0.0.0'
     port_patch = self.enter_context(
-        mock.patch.object(redis_instance, 'GetMemoryStorePort'))
+        mock.patch.object(redis_instance, 'GetMemoryStorePort')
+    )
     port_patch.return_value = '1234'
     password_patch = self.enter_context(
-        mock.patch.object(redis_instance, 'GetMemoryStorePassword'))
+        mock.patch.object(redis_instance, 'GetMemoryStorePassword')
+    )
     password_patch.return_value = 'password'
     load_patch = self.enter_context(mock.patch.object(memtier, 'Load'))
 
@@ -108,7 +113,8 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     benchmark_spec = mock.Mock()
     benchmark_spec.vm_groups = {'clients': [vm]}
     samples = self.enter_context(
-        mock.patch.object(memtier, 'RunOverAllThreadsPipelinesAndClients'))
+        mock.patch.object(memtier, 'RunOverAllThreadsPipelinesAndClients')
+    )
     samples.return_value = []
     self.assertEqual([], cloud_redis_memtier_benchmark.Run(benchmark_spec))
 
@@ -119,7 +125,8 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     benchmark_spec = mock.Mock()
     benchmark_spec.vm_groups = {'clients': [client_vm, measure_latency_vm]}
     samples = self.enter_context(
-        mock.patch.object(memtier, 'RunGetLatencyAtCpu'))
+        mock.patch.object(memtier, 'RunGetLatencyAtCpu')
+    )
     samples.return_value = []
     self.assertEqual([], cloud_redis_memtier_benchmark.Run(benchmark_spec))
 

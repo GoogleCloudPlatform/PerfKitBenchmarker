@@ -101,12 +101,10 @@ class Plotter(object):
     try:
       f = open(filename, 'r')
     except:
-      raise STDERRFileDoesNotExistError(
-          (
-              'Unable to open file (%s). Assume this is because run failed.'
-              ' Will raise exception to kill run now.' % filename
-          )
-      )
+      raise STDERRFileDoesNotExistError((
+          'Unable to open file (%s). Assume this is because run failed.'
+          ' Will raise exception to kill run now.' % filename
+      ))
     data = self._parse_file(f)
     f.close()
     self._add_data(data)

@@ -67,19 +67,20 @@ class ScratchDiskTestMixin(object):
     self.patches = []
 
     vm_prefix = linux_virtual_machine.__name__ + '.BaseLinuxMixin'
-    self.patches.append(
-        mock.patch(vm_prefix + '.FormatDisk'))
-    self.patches.append(
-        mock.patch(vm_prefix + '.MountDisk'))
+    self.patches.append(mock.patch(vm_prefix + '.FormatDisk'))
+    self.patches.append(mock.patch(vm_prefix + '.MountDisk'))
     self.patches.append(
         mock.patch(
-            util.__name__ + '.GetDefaultProject', side_effect='test_project'))
+            util.__name__ + '.GetDefaultProject', side_effect='test_project'
+        )
+    )
 
     # Patch subprocess.Popen to make sure we don't issue any commands to spin up
     # resources.
     self.patches.append(mock.patch('subprocess.Popen'))
     self.patches.append(
-        mock.patch(vm_util.__name__ + '.GetTempDir', return_value='/tmp/dir'))
+        mock.patch(vm_util.__name__ + '.GetTempDir', return_value='/tmp/dir')
+    )
 
     self._PatchCloudSpecific()
 
@@ -89,14 +90,17 @@ class ScratchDiskTestMixin(object):
 
     # We need the disk class mocks to return new mocks each time they are
     # called. Otherwise all "disks" instantiated will be the same object.
-    self._GetDiskClass().side_effect = (
-        lambda *args, **kwargs: mock.MagicMock(is_striped=False))
+    self._GetDiskClass().side_effect = lambda *args, **kwargs: mock.MagicMock(
+        is_striped=False
+    )
 
     # VM Creation depends on there being a BenchmarkSpec.
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={})
-    self.spec = benchmark_spec.BenchmarkSpec(mock.MagicMock(), config_spec,
-                                             _BENCHMARK_UID)
+        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={}
+    )
+    self.spec = benchmark_spec.BenchmarkSpec(
+        mock.MagicMock(), config_spec, _BENCHMARK_UID
+    )
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
     self.addCleanup(flagsaver.restore_flag_values, self.saved_flag_values)
 
@@ -168,7 +172,8 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _CreateVm(self):
     vm_spec = azure_virtual_machine.AzureVmSpec(
-        'test_vm_spec.Azure', zone='eastus2', machine_type='test_machine_type')
+        'test_vm_spec.Azure', zone='eastus2', machine_type='test_machine_type'
+    )
     return azure_virtual_machine.Ubuntu2004BasedAzureVirtualMachine(vm_spec)
 
   def _GetDiskClass(self):
@@ -218,30 +223,37 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     # platform.system(). It is called by RemoteCommand() in
     # _GetNvmeBootIndex() so we'll mock that instead.
     self.patches.append(
-        mock.patch(aws_virtual_machine.__name__ +
-                   '.AwsVirtualMachine._GetNvmeBootIndex'))
+        mock.patch(
+            aws_virtual_machine.__name__
+            + '.AwsVirtualMachine._GetNvmeBootIndex'
+        )
+    )
     self.patches.append(
-        mock.patch(aws_virtual_machine.__name__ +
-                   '.AwsVirtualMachine.GetVolumeIdByDevice'))
+        mock.patch(
+            aws_virtual_machine.__name__
+            + '.AwsVirtualMachine.GetVolumeIdByDevice'
+        )
+    )
     self.patches.append(
-        mock.patch(aws_virtual_machine.__name__ +
-                   '.AwsVirtualMachine.GetPathByDevice'))
+        mock.patch(
+            aws_virtual_machine.__name__ + '.AwsVirtualMachine.GetPathByDevice'
+        )
+    )
 
   def _CreateVm(self):
     vm_spec = aws_virtual_machine.AwsVmSpec(
-        'test_vm_spec.AWS', zone='us-east-1a', machine_type='test_machine_type')
+        'test_vm_spec.AWS', zone='us-east-1a', machine_type='test_machine_type'
+    )
     vm = aws_virtual_machine.Ubuntu2004BasedAwsVirtualMachine(vm_spec)
 
     vm.LogDeviceByDiskSpecId('0_0', 'foobar_1')
     vm.LogDeviceByName('foobar_1', 'vol67890', None)
     vm.GetNVMEDeviceInfo = mock.Mock()
-    vm.GetNVMEDeviceInfo.return_value = [
-        {
-            'DevicePath': '/dev/nvme1n2',
-            'SerialNumber': 'vol67890',
-            'ModelNumber': 'Amazon Elastic Block Store',
-        }
-    ]
+    vm.GetNVMEDeviceInfo.return_value = [{
+        'DevicePath': '/dev/nvme1n2',
+        'SerialNumber': 'vol67890',
+        'ModelNumber': 'Amazon Elastic Block Store',
+    }]
     return vm
 
   def _GetDiskClass(self):
@@ -254,10 +266,8 @@ class GceDeviceIdTest(unittest.TestCase):
     with mock.patch(disk.__name__ + '.FLAGS') as disk_flags:
       disk_flags.os_type = 'windows'
       disk_spec = gce_disk.GceDiskSpec(
-          _COMPONENT,
-          disk_number=1,
-          disk_size=2,
-          disk_type=gce_disk.PD_STANDARD)
+          _COMPONENT, disk_number=1, disk_size=2, disk_type=gce_disk.PD_STANDARD
+      )
       disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
       self.assertEqual(disk_obj.GetDeviceId(), r'\\.\PHYSICALDRIVE1')
 

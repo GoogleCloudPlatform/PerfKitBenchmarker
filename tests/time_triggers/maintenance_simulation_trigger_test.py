@@ -17,7 +17,6 @@ import datetime
 import unittest
 from unittest import mock
 from absl import flags
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.sample import Sample
@@ -69,7 +68,8 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     trigger.vms = [vm]
     trigger.AppendSamples(None, vm_spec, s)
     self.assertEqual(
-        s, [Sample('LM Total Time', 10, 'seconds', time_dic, timestamp=0)])
+        s, [Sample('LM Total Time', 10, 'seconds', time_dic, timestamp=0)]
+    )
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionWithDegradationPercent(self):
@@ -431,96 +431,125 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
     trigger.capture_live_migration_timestamps = False
-    s = sample.CreateTimeSeriesSample([1, 1, 1, 1, 0, 0.1, 0.2, 0.3],
-                                      [1000 * i for i in range(1, 9)],
-                                      sample.TPM_TIME_SERIES, 'TPM', 1)
+    s = sample.CreateTimeSeriesSample(
+        [1, 1, 1, 1, 0, 0.1, 0.2, 0.3],
+        [1000 * i for i in range(1, 9)],
+        sample.TPM_TIME_SERIES,
+        'TPM',
+        1,
+    )
     samples = [s]
     trigger.trigger_time = datetime.datetime.fromtimestamp(4)
     trigger.AppendSamples(None, vm_spec, samples)
-    self.assertEqual(samples, [
-        Sample(
-            metric='TPM_time_series',
-            value=0.0,
-            unit='TPM',
-            metadata={
-                'values': [1, 1, 1, 1, 0, 0.1, 0.2, 0.3],
-                'timestamps': [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000],
-                'interval': 1
-            },
-            timestamp=0),
-        Sample(
-            metric='seconds_dropped_below_0_percent',
-            value=1.0,
-            unit='s',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='seconds_dropped_below_10_percent',
-            value=2.0,
-            unit='s',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='seconds_dropped_below_20_percent',
-            value=3.0,
-            unit='s',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='seconds_dropped_below_30_percent',
-            value=4.0,
-            unit='s',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='seconds_dropped_below_40_percent',
-            value=4.0,
-            unit='s',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='seconds_dropped_below_50_percent',
-            value=4.0,
-            unit='s',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='seconds_dropped_below_60_percent',
-            value=4.0,
-            unit='s',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='seconds_dropped_below_70_percent',
-            value=4.0,
-            unit='s',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='seconds_dropped_below_80_percent',
-            value=4.0,
-            unit='s',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='seconds_dropped_below_90_percent',
-            value=4.0,
-            unit='s',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='unresponsive_metric',
-            value=2.584,
-            unit='metric',
-            metadata={},
-            timestamp=0),
-        Sample(
-            metric='total_loss_seconds',
-            value=3.4,
-            unit='seconds',
-            metadata={},
-            timestamp=0)
-    ])
+    self.assertEqual(
+        samples,
+        [
+            Sample(
+                metric='TPM_time_series',
+                value=0.0,
+                unit='TPM',
+                metadata={
+                    'values': [1, 1, 1, 1, 0, 0.1, 0.2, 0.3],
+                    'timestamps': [
+                        1000,
+                        2000,
+                        3000,
+                        4000,
+                        5000,
+                        6000,
+                        7000,
+                        8000,
+                    ],
+                    'interval': 1,
+                },
+                timestamp=0,
+            ),
+            Sample(
+                metric='seconds_dropped_below_0_percent',
+                value=1.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='seconds_dropped_below_10_percent',
+                value=2.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='seconds_dropped_below_20_percent',
+                value=3.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='seconds_dropped_below_30_percent',
+                value=4.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='seconds_dropped_below_40_percent',
+                value=4.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='seconds_dropped_below_50_percent',
+                value=4.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='seconds_dropped_below_60_percent',
+                value=4.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='seconds_dropped_below_70_percent',
+                value=4.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='seconds_dropped_below_80_percent',
+                value=4.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='seconds_dropped_below_90_percent',
+                value=4.0,
+                unit='s',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='unresponsive_metric',
+                value=2.584,
+                unit='metric',
+                metadata={},
+                timestamp=0,
+            ),
+            Sample(
+                metric='total_loss_seconds',
+                value=3.4,
+                unit='seconds',
+                metadata={},
+                timestamp=0,
+            ),
+        ],
+    )
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionSamplesWithNotification(self):
@@ -529,7 +558,11 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     trigger.capture_live_migration_timestamps = True
     s = sample.CreateTimeSeriesSample(
         [1, 1, 1, 1, 0, 0.1, 0.2, 0.3, 0.95, 0.95, 0.95, 0.95],
-        [1000 * i for i in range(1, 13)], sample.TPM_TIME_SERIES, 'TPM', 1)
+        [1000 * i for i in range(1, 13)],
+        sample.TPM_TIME_SERIES,
+        'TPM',
+        1,
+    )
     samples = [s]
     trigger.trigger_time = datetime.datetime.fromtimestamp(4)
     vm = mock.MagicMock()
@@ -690,7 +723,8 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         sample.TPM_TIME_SERIES,
         'TPM',
         1,
-        additional_metadata={'random': 'random'})
+        additional_metadata={'random': 'random'},
+    )
     samples = [s]
     trigger.trigger_time = datetime.datetime.fromtimestamp(4)
     vm = mock.MagicMock()
@@ -855,7 +889,8 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         sample.TPM_TIME_SERIES,
         'TPM',
         1,
-        additional_metadata={'random': 'random'})
+        additional_metadata={'random': 'random'},
+    )
     samples = [s]
     trigger.trigger_time = datetime.datetime.fromtimestamp(4)
     vm = mock.MagicMock()

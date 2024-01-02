@@ -13,20 +13,24 @@
 # limitations under the License.
 """Module containing TensorFlow models installation and cleanup functions."""
 from absl import flags
+
 FLAGS = flags.FLAGS
 TF_MODELS_GIT = 'https://github.com/tensorflow/models.git'
 
-flags.DEFINE_string('tensorflow_models_commit_hash',
-                    '4fa82ae1cb08c374a44e2713e731f57d44bf7e61',
-                    'git commit hash of desired TensorFlow models commit.')
+flags.DEFINE_string(
+    'tensorflow_models_commit_hash',
+    '4fa82ae1cb08c374a44e2713e731f57d44bf7e61',
+    'git commit hash of desired TensorFlow models commit.',
+)
 
 
 def Install(vm):
   """Installs TensorFlow models on the VM."""
   vm.InstallPackages('git')
   vm.RemoteCommand('git clone {}'.format(TF_MODELS_GIT))
-  vm.RemoteCommand('cd models && git checkout {}'.format(
-      FLAGS.tensorflow_models_commit_hash))
+  vm.RemoteCommand(
+      'cd models && git checkout {}'.format(FLAGS.tensorflow_models_commit_hash)
+  )
 
 
 def Uninstall(vm):

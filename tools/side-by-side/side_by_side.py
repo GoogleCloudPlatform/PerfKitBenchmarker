@@ -38,8 +38,11 @@ import tempfile
 import jinja2
 
 
-DEFAULT_FLAGS = ('--cloud=GCP', '--machine_type=n1-standard-4',
-                 '--benchmarks=netperf')
+DEFAULT_FLAGS = (
+    '--cloud=GCP',
+    '--machine_type=n1-standard-4',
+    '--benchmarks=netperf',
+)
 # Keys in the sample JSON we expect to vary between runs.
 # These will be removed prior to diffing samples.
 VARYING_KEYS = 'run_uri', 'sample_uri', 'timestamp', 'value'
@@ -54,7 +57,8 @@ LARGE_CHANGE_THRESHOLD = 25
 
 PerfKitBenchmarkerResult = collections.namedtuple(
     'PerfKitBenchmarkerResult',
-    ['name', 'description', 'sha1', 'samples', 'flags'])
+    ['name', 'description', 'sha1', 'samples', 'flags'],
+)
 
 
 @contextlib.contextmanager
@@ -98,15 +102,17 @@ def _GitCommandPrefix():
 
 def _GitRevParse(revision):
   """Returns the output of 'git rev-parse' for 'revision'."""
-  output = subprocess.check_output(_GitCommandPrefix() +
-                                   ['rev-parse', revision])
+  output = subprocess.check_output(
+      _GitCommandPrefix() + ['rev-parse', revision]
+  )
   return output.rstrip()
 
 
 def _GitDescribe(revision):
   """Returns the output of 'git describe' for 'revision'."""
-  output = subprocess.check_output(_GitCommandPrefix() +
-                                   ['describe', '--always', revision])
+  output = subprocess.check_output(
+      _GitCommandPrefix() + ['describe', '--always', revision]
+  )
   return output.rstrip()
 
 
@@ -151,8 +157,13 @@ def RunPerfKitBenchmarker(revision, flags):
       logging.info('Running %s in %s', cmd, td)
       subprocess.check_call(cmd, cwd=td)
       samples = [json.loads(line) for line in tf]
-      return PerfKitBenchmarkerResult(name=revision, sha1=sha1, flags=flags,
-                                      samples=samples, description=description)
+      return PerfKitBenchmarkerResult(
+          name=revision,
+          sha1=sha1,
+          flags=flags,
+          samples=samples,
+          description=description,
+      )
 
 
 def _SplitLabels(labels):
@@ -183,6 +194,7 @@ def _CompareSamples(a, b, context=True, numlines=1):
     context: boolean. Show context in diff? If False, all lines are output, even
       those which are equal.
     numlines: int. Passed to difflib.Htmldiff.make_table.
+
   Returns:
     string or None. An HTML table, or None if there are no differences.
   """
@@ -218,6 +230,7 @@ def _MatchSamples(base_samples, head_samples):
   Returns:
     List of pairs, each item of the pair containing either a dict or None.
   """
+
   def ExtractKeys(samples):
     return [(i['test'], i['metric'], i['unit']) for i in samples]
 
@@ -230,26 +243,45 @@ def _MatchSamples(base_samples, head_samples):
 
   for opcode, base_begin, base_end, head_begin, head_end in sm.get_opcodes():
     if opcode == 'equal':
-      result.extend(zip(base_samples[base_begin:base_end],
-                        head_samples[head_begin:head_end]))
+      result.extend(
+          zip(
+              base_samples[base_begin:base_end],
+              head_samples[head_begin:head_end],
+          )
+      )
     elif opcode == 'replace':
-      result.extend(zip(base_samples[base_begin:base_end],
-                        [None] * (base_end - base_begin)))
-      result.extend(zip([None] * (head_end - head_begin),
-                        head_samples[head_begin:head_end]))
+      result.extend(
+          zip(
+              base_samples[base_begin:base_end],
+              [None] * (base_end - base_begin),
+          )
+      )
+      result.extend(
+          zip(
+              [None] * (head_end - head_begin),
+              head_samples[head_begin:head_end],
+          )
+      )
     elif opcode == 'delete':
-      result.extend(zip(base_samples[base_begin:base_end],
-                        [None] * (base_end - base_begin)))
+      result.extend(
+          zip(
+              base_samples[base_begin:base_end],
+              [None] * (base_end - base_begin),
+          )
+      )
     elif opcode == 'insert':
-      result.extend(zip([None] * (head_end - head_begin),
-                        head_samples[head_begin:head_end]))
+      result.extend(
+          zip(
+              [None] * (head_end - head_begin),
+              head_samples[head_begin:head_end],
+          )
+      )
     else:
       raise AssertionError('Unknown op: ' + opcode)
   return result
 
 
-def RenderResults(base_result, head_result, template_name=TEMPLATE,
-                  **kwargs):
+def RenderResults(base_result, head_result, template_name=TEMPLATE, **kwargs):
   """Render the results of a comparison as an HTML page.
 
   Args:
@@ -263,6 +295,7 @@ def RenderResults(base_result, head_result, template_name=TEMPLATE,
   Returns:
     String. The HTML template.
   """
+
   def _ClassForPercentDifference(percent_diff):
     """Crude highlighting of differences between runs.
 
@@ -292,14 +325,14 @@ def RenderResults(base_result, head_result, template_name=TEMPLATE,
 
   env = jinja2.Environment(
       loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
-      undefined=jinja2.StrictUndefined)
+      undefined=jinja2.StrictUndefined,
+  )
   env.globals['class_for_percent_diff'] = _ClassForPercentDifference
   env.globals['izip_longest'] = itertools.izip_longest
 
   template = env.get_template('side_by_side.html.j2')
 
-  matched = _MatchSamples(base_result.samples,
-                          head_result.samples)
+  matched = _MatchSamples(base_result.samples, head_result.samples)
 
   # Generate sample diffs
   sample_context_diffs = []
@@ -308,63 +341,98 @@ def RenderResults(base_result, head_result, template_name=TEMPLATE,
     if not base_sample or not head_sample:
       # Sample inserted or deleted.
       continue
-    sample_context_diffs.append(
-        _CompareSamples(base_sample, head_sample))
+    sample_context_diffs.append(_CompareSamples(base_sample, head_sample))
     sample_diffs.append(
-        _CompareSamples(base_sample, head_sample, context=False))
+        _CompareSamples(base_sample, head_sample, context=False)
+    )
 
   # Generate flag diffs
   flag_diffs = difflib.HtmlDiff().make_table(
-      base_result.flags, head_result.flags, context=False)
+      base_result.flags, head_result.flags, context=False
+  )
 
   # Used for generating a chart with differences.
-  matched_json = json.dumps(matched)\
-      .replace(u'<', u'\\u003c') \
-      .replace(u'>', u'\\u003e') \
-      .replace(u'&', u'\\u0026') \
-      .replace(u"'", u'\\u0027')
+  matched_json = (
+      json.dumps(matched)
+      .replace('<', '\\u003c')
+      .replace('>', '\\u003e')
+      .replace('&', '\\u0026')
+      .replace("'", '\\u0027')
+  )
 
-  return template.render(base=base_result,
-                         head=head_result,
-                         matched_samples=matched,
-                         matched_samples_json=matched_json,
-                         sample_diffs=sample_diffs,
-                         sample_context_diffs=sample_context_diffs,
-                         flag_diffs=flag_diffs,
-                         infinity=float('inf'),
-                         **kwargs)
+  return template.render(
+      base=base_result,
+      head=head_result,
+      matched_samples=matched,
+      matched_samples_json=matched_json,
+      sample_diffs=sample_diffs,
+      sample_context_diffs=sample_context_diffs,
+      flag_diffs=flag_diffs,
+      infinity=float('inf'),
+      **kwargs
+  )
 
 
 def main():
   p = argparse.ArgumentParser(
       formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-      description=__doc__)
-  p.add_argument('-t', '--title', default='PerfKitBenchmarker Comparison',
-                 help="""HTML report title""")
+      description=__doc__,
+  )
+  p.add_argument(
+      '-t',
+      '--title',
+      default='PerfKitBenchmarker Comparison',
+      help="""HTML report title""",
+  )
   p.add_argument('--base', default='master', help="""Base revision.""")
   p.add_argument('--head', default='dev', help="""Head revision.""")
-  p.add_argument('--base-flags', default=None, help="""Flags for run against
+  p.add_argument(
+      '--base-flags',
+      default=None,
+      help="""Flags for run against
                  '--base' revision. Will be combined with --flags.""",
-                 type=shlex.split)
-  p.add_argument('--head-flags', default=None, help="""Flags for run against
+      type=shlex.split,
+  )
+  p.add_argument(
+      '--head-flags',
+      default=None,
+      help="""Flags for run against
                  '--head' revision. Will be combined with --flags.""",
-                 type=shlex.split)
-  p.add_argument('-f', '--flags', type=shlex.split,
-                 help="""Command line flags (Default: {0})""".format(
-                     ' '.join(DEFAULT_FLAGS)))
-  p.add_argument('-p', '--parallel', default=False, action='store_true',
-                 help="""Run concurrently""")
-  p.add_argument('--rerender', help="""Re-render the HTML report from a JSON
-                 file [for developers].""", action='store_true')
+      type=shlex.split,
+  )
+  p.add_argument(
+      '-f',
+      '--flags',
+      type=shlex.split,
+      help="""Command line flags (Default: {0})""".format(
+          ' '.join(DEFAULT_FLAGS)
+      ),
+  )
+  p.add_argument(
+      '-p',
+      '--parallel',
+      default=False,
+      action='store_true',
+      help="""Run concurrently""",
+  )
+  p.add_argument(
+      '--rerender',
+      help="""Re-render the HTML report from a JSON
+                 file [for developers].""",
+      action='store_true',
+  )
   p.add_argument('json_output', help="""JSON output path.""")
   p.add_argument('html_output', help="""HTML output path.""")
   a = p.parse_args()
 
-  if (a.base_flags or a.head_flags):
+  if a.base_flags or a.head_flags:
     if not (a.base_flags and a.head_flags):
-      p.error('--base-flags and --head-flags must be specified together.\n'
-              '\tbase flags={0}\n\thead flags={1}'.format(
-                  a.base_flags, a.head_flags))
+      p.error(
+          '--base-flags and --head-flags must be specified together.\n'
+          '\tbase flags={0}\n\thead flags={1}'.format(
+              a.base_flags, a.head_flags
+          )
+      )
     a.base_flags = a.base_flags + (a.flags or [])
     a.head_flags = a.head_flags + (a.flags or [])
   else:
@@ -377,11 +445,14 @@ def main():
   if not a.rerender:
     if a.parallel:
       from concurrent import futures
+
       with futures.ThreadPoolExecutor(max_workers=2) as executor:
-        base_res_fut = executor.submit(RunPerfKitBenchmarker, a.base,
-                                       a.base_flags)
-        head_res_fut = executor.submit(RunPerfKitBenchmarker, a.head,
-                                       a.head_flags)
+        base_res_fut = executor.submit(
+            RunPerfKitBenchmarker, a.base, a.base_flags
+        )
+        head_res_fut = executor.submit(
+            RunPerfKitBenchmarker, a.head, a.head_flags
+        )
         base_res = base_res_fut.result()
         head_res = head_res_fut.result()
     else:
@@ -393,10 +464,11 @@ def main():
 
     with argparse.FileType('w')(a.json_output) as json_fp:
       logging.info('Writing JSON to %s', a.json_output)
-      json.dump({'head': head_res._asdict(),
-                 'base': base_res._asdict()},
-                json_fp,
-                indent=2)
+      json.dump(
+          {'head': head_res._asdict(), 'base': base_res._asdict()},
+          json_fp,
+          indent=2,
+      )
       json_fp.write('\n')
   else:
     logging.info('Loading results from %s', a.json_output)
@@ -407,10 +479,14 @@ def main():
 
   with argparse.FileType('w')(a.html_output) as html_fp:
     logging.info('Writing HTML to %s', a.html_output)
-    html_fp.write(RenderResults(base_result=base_res,
-                                head_result=head_res,
-                                varying_keys=VARYING_KEYS,
-                                title=a.title))
+    html_fp.write(
+        RenderResults(
+            base_result=base_res,
+            head_result=head_res,
+            varying_keys=VARYING_KEYS,
+            title=a.title,
+        )
+    )
 
 
 if __name__ == '__main__':

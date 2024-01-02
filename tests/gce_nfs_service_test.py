@@ -50,21 +50,24 @@ def _DescribeResult(tier='STANDARD'):
       'networks': [{
           'ipAddresses': ['10.198.13.2'],
           'network': 'default2',
-          'reservedIpRange': '10.198.13.0/29'
+          'reservedIpRange': '10.198.13.0/29',
       }],
       'state': 'READY',
       'tier': tier,
-      'volumes': [{
-          'capacityGb': '1024',
-          'name': 'vol0'
-      }]
+      'volumes': [{'capacityGb': '1024', 'name': 'vol0'}],
   }
 
 
 def _FullGcloud(args, location):
   prefix = [
-      'gcloud', '--quiet', '--format', 'json', '--project', _PROJECT,
-      'filestore', 'instances'
+      'gcloud',
+      '--quiet',
+      '--format',
+      'json',
+      '--project',
+      _PROJECT,
+      'filestore',
+      'instances',
   ]
   postfix = ['--location', location]
   return prefix + list(args) + postfix
@@ -110,7 +113,8 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def assertCommandCalled(self, *args, location=_ZONE):
     self.issue_cmd.assert_called_with(
-        _FullGcloud(args, location), raise_on_failure=False, timeout=1800)
+        _FullGcloud(args, location), raise_on_failure=False, timeout=1800
+    )
 
   def assertMultipleCommands(self, *cmds, location=_ZONE):
     expected_calls = []
@@ -119,7 +123,9 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
           mock.call(
               _FullGcloud(cmd, location=location),
               raise_on_failure=False,
-              timeout=1800))
+              timeout=1800,
+          )
+      )
     self.assertEqual(expected_calls, self.issue_cmd.call_args_list)
 
   def testCreate(self):

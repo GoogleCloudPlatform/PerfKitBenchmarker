@@ -39,11 +39,13 @@ import requests
 FLAGS = flags.FLAGS
 
 _SPARK_VERSION_FLAG = flags.DEFINE_string(
-    'spark_version', None,
-    'Version of spark. Defaults to latest.')
+    'spark_version', None, 'Version of spark. Defaults to latest.'
+)
 
 DATA_FILES = [
-    'spark/spark-defaults.conf.j2', 'spark/spark-env.sh.j2', 'spark/workers.j2'
+    'spark/spark-defaults.conf.j2',
+    'spark/spark-env.sh.j2',
+    'spark/workers.j2',
 ]
 
 SPARK_DOWNLOADS = 'https://downloads.apache.org/spark'
@@ -68,7 +70,8 @@ def SparkVersion() -> version.Version:
   response = requests.get(SPARK_DOWNLOADS)
   if not response.ok:
     raise errors.Setup.MissingExecutableError(
-        'Could not load ' + SPARK_DOWNLOADS)
+        'Could not load ' + SPARK_DOWNLOADS
+    )
   soup = bs4.BeautifulSoup(response.content, 'html.parser')
   found_versions = []
   for link in soup.find_all('a', href=SPARK_VERSION_DIR_PATTERN):
@@ -77,7 +80,8 @@ def SparkVersion() -> version.Version:
       found_versions.append(version.Version(match.group(1)))
   if not found_versions:
     raise errors.Setup.MissingExecutableError(
-        'Could not find valid spark versions at ' + SPARK_DOWNLOADS)
+        'Could not find valid spark versions at ' + SPARK_DOWNLOADS
+    )
   return max(found_versions)
 
 
@@ -92,8 +96,10 @@ def _ScalaVersion() -> version.Version:
 
 def SparkExamplesJarPath() -> str:
   return posixpath.join(
-      SPARK_DIR, 'examples/jars/',
-      f'spark-examples_{_ScalaVersion()}-{SparkVersion()}.jar')
+      SPARK_DIR,
+      'examples/jars/',
+      f'spark-examples_{_ScalaVersion()}-{SparkVersion()}.jar',
+  )
 
 
 def CheckPrerequisites():
@@ -115,11 +121,15 @@ def Install(vm):
   # Also used on Spark's classpath to support s3a client.
   vm.Install('hadoop')
   spark_version = SparkVersion()
-  spark_url = (f'{SPARK_DOWNLOADS}/spark-{spark_version}/'
-               f'spark-{spark_version}-bin-without-hadoop.tgz')
+  spark_url = (
+      f'{SPARK_DOWNLOADS}/spark-{spark_version}/'
+      f'spark-{spark_version}-bin-without-hadoop.tgz'
+  )
   vm.RemoteCommand(
-      ('mkdir {0} && curl -L {1} | '
-       'tar -C {0} --strip-components=1 -xzf -').format(SPARK_DIR, spark_url))
+      (
+          'mkdir {0} && curl -L {1} | tar -C {0} --strip-components=1 -xzf -'
+      ).format(SPARK_DIR, spark_url)
+  )
 
 
 # Scheduling constants.
@@ -131,11 +141,13 @@ SPARK_WORKER_MEMORY = 'spark.executor.memory'
 SPARK_WORKER_VCPUS = 'spark.executor.cores'
 
 
-def GetConfiguration(driver_memory_mb: int,
-                     worker_memory_mb: int,
-                     worker_cores: int,
-                     num_workers: int,
-                     configure_s3: bool = False) -> Dict[str, str]:
+def GetConfiguration(
+    driver_memory_mb: int,
+    worker_memory_mb: int,
+    worker_cores: int,
+    num_workers: int,
+    configure_s3: bool = False,
+) -> Dict[str, str]:
   """Calculate Spark configuration. Shared between VMs and k8s."""
   conf = {
       SPARK_DRIVER_MEMORY: f'{driver_memory_mb}m',
@@ -144,7 +156,7 @@ def GetConfiguration(driver_memory_mb: int,
       'spark.executor.instances': str(num_workers),
       # Tell spark not to run job if it can't schedule all workers. This would
       # silently degrade performance.
-      'spark.scheduler.minRegisteredResourcesRatio': '1'
+      'spark.scheduler.minRegisteredResourcesRatio': '1',
   }
   if configure_s3:
     # Configure S3A Hadoop's S3 filesystem
@@ -158,11 +170,13 @@ def GetConfiguration(driver_memory_mb: int,
   return conf
 
 
-def _RenderConfig(vm,
-                  leader,
-                  workers,
-                  memory_fraction=SPARK_MEMORY_FRACTION,
-                  configure_s3=False):
+def _RenderConfig(
+    vm,
+    leader,
+    workers,
+    memory_fraction=SPARK_MEMORY_FRACTION,
+    configure_s3=False,
+):
   """Load Spark Condfiguration on VM."""
   # Use first worker to get worker configuration
   worker = workers[0]
@@ -175,7 +189,8 @@ def _RenderConfig(vm,
       worker_memory_mb=worker_memory_mb,
       worker_cores=worker_cores,
       num_workers=len(workers),
-      configure_s3=configure_s3)
+      configure_s3=configure_s3,
+  )
 
   if vm.scratch_disks:
     # TODO(pclay): support multiple scratch disks. A current suboptimal
@@ -198,7 +213,7 @@ def _RenderConfig(vm,
       'worker_memory': spark_conf[SPARK_WORKER_MEMORY],
       'hadoop_cmd': hadoop.HADOOP_CMD,
       'python_cmd': 'python3',
-      'optional_tools': optional_tools
+      'optional_tools': optional_tools,
   }
 
   for file_name in DATA_FILES:
@@ -215,9 +230,7 @@ def _RenderConfig(vm,
 
 def _GetOnlineWorkerCount(leader):
   """Curl Spark Master Web UI for worker status."""
-  cmd = ('curl http://localhost:8080 '
-         "| grep 'Alive Workers' "
-         "| grep -o '[0-9]\\+'")
+  cmd = "curl http://localhost:8080 | grep 'Alive Workers' | grep -o '[0-9]\\+'"
   stdout = leader.RemoteCommand(cmd)[0]
   return int(stdout)
 
@@ -238,11 +251,13 @@ def ConfigureAndStart(leader, workers, configure_s3=False):
   # node runs the worker daemons.
   workers = workers or [leader]
   fn = functools.partial(
-      _RenderConfig, leader=leader, workers=workers, configure_s3=configure_s3)
+      _RenderConfig, leader=leader, workers=workers, configure_s3=configure_s3
+  )
   background_tasks.RunThreaded(fn, vms)
 
-  leader.RemoteCommand("rm -f {0} && ssh-keygen -q -t rsa -N '' -f {0}".format(
-      SPARK_PRIVATE_KEY))
+  leader.RemoteCommand(
+      "rm -f {0} && ssh-keygen -q -t rsa -N '' -f {0}".format(SPARK_PRIVATE_KEY)
+  )
 
   public_key = leader.RemoteCommand('cat {0}.pub'.format(SPARK_PRIVATE_KEY))[0]
 
@@ -252,8 +267,7 @@ def ConfigureAndStart(leader, workers, configure_s3=False):
   background_tasks.RunThreaded(AddKey, vms)
 
   # HDFS setup and formatting, Spark startup
-  leader.RemoteCommand(
-      'bash {0}/start-all.sh'.format(SPARK_SBIN))
+  leader.RemoteCommand('bash {0}/start-all.sh'.format(SPARK_SBIN))
 
   logging.info('Sleeping 10s for Spark nodes to join.')
   time.sleep(10)
@@ -261,7 +275,10 @@ def ConfigureAndStart(leader, workers, configure_s3=False):
   logging.info('Checking Spark status.')
   worker_online_count = _GetOnlineWorkerCount(leader)
   if worker_online_count != len(workers):
-    raise ValueError('Not all nodes running Spark: {0} < {1}'.format(
-        worker_online_count, len(workers)))
+    raise ValueError(
+        'Not all nodes running Spark: {0} < {1}'.format(
+            worker_online_count, len(workers)
+        )
+    )
   else:
     logging.info('Spark running on all %d workers', len(workers))

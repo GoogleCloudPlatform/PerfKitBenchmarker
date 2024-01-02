@@ -51,7 +51,7 @@ from six.moves import zip
 
 FLAGS = flags.FLAGS
 
-CLOUD_CONFIG_TEMPLATE = '''#cloud-config
+CLOUD_CONFIG_TEMPLATE = """#cloud-config
 users:
   - name: {0}
     ssh-authorized-keys:
@@ -60,25 +60,27 @@ users:
     groups: sudo
     shell: /bin/bash
 
-'''
+"""
 
-BLOCK_DEVICE_TEMPLATE = '''
+BLOCK_DEVICE_TEMPLATE = """
 source-type=image,
 source-id={0},
 dest=volume,
 size={1},
 shutdown=remove,
 bootindex=0
-'''
+"""
 
-LSBLK_REGEX = (r'NAME="(.*)"\s+MODEL="(.*)"\s+SIZE="(.*)"'
-               r'\s+TYPE="(.*)"\s+MOUNTPOINT="(.*)"\s+LABEL="(.*)"')
+LSBLK_REGEX = (
+    r'NAME="(.*)"\s+MODEL="(.*)"\s+SIZE="(.*)"'
+    r'\s+TYPE="(.*)"\s+MOUNTPOINT="(.*)"\s+LABEL="(.*)"'
+)
 LSBLK_PATTERN = re.compile(LSBLK_REGEX)
 
 INSTANCE_EXISTS_STATUSES = frozenset(
-    ['BUILD', 'ACTIVE', 'PAUSED', 'SHUTOFF', 'ERROR'])
-INSTANCE_DELETED_STATUSES = frozenset(
-    ['DELETED'])
+    ['BUILD', 'ACTIVE', 'PAUSED', 'SHUTOFF', 'ERROR']
+)
+INSTANCE_DELETED_STATUSES = frozenset(['DELETED'])
 INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 
 REMOTE_BOOT_DISK_SIZE_GB = 50
@@ -95,12 +97,14 @@ def RenderBlockDeviceTemplate(image, volume_size):
     string value for block-device parameter used when creating a VM.
   """
   blk_params = BLOCK_DEVICE_TEMPLATE.replace('\n', '').format(
-      image, str(volume_size))
+      image, str(volume_size)
+  )
   return blk_params
 
 
 class RackspaceVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a
+
   RackspaceVirtualMachine.
 
   Attributes:
@@ -116,10 +120,10 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
     """Modifies config options based on runtime flag values.
 
     Args:
-      config_values: dict mapping config option names to provided values. May
-          be modified by this function.
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
       flag_values: flags.FlagValues. Runtime flags that may override the
-          provided config values.
+        provided config values.
     """
     super(RackspaceVmSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['project'].present:
@@ -141,8 +145,12 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
     result = super(RackspaceVmSpec, cls)._GetOptionDecoderConstructions()
     result.update({
         'project': (option_decoders.StringDecoder, {'default': None}),
-        'rackspace_region': (option_decoders.StringDecoder, {'default': 'IAD'}),
-        'rack_profile': (option_decoders.StringDecoder, {'default': None})})
+        'rackspace_region': (
+            option_decoders.StringDecoder,
+            {'default': 'IAD'},
+        ),
+        'rack_profile': (option_decoders.StringDecoder, {'default': None}),
+    })
     return result
 
 
@@ -217,15 +225,18 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _DeleteDependencies(self):
     """Deletes dependencies that were need for the VM after the VM has been
-    deleted."""
+
+    deleted.
+    """
     # TODO(meteorfox) Delete security group (if applies)
     self._DeleteSSHPublicKey()
 
   def _UploadSSHPublicKey(self):
     """Uploads SSH public key to the VM's region. 1 key per VM per Region."""
     cmd = util.RackCLICommand(self, 'servers', 'keypair', 'upload')
-    cmd.flags = OrderedDict([
-        ('name', self.name), ('file', self.ssh_public_key)])
+    cmd.flags = OrderedDict(
+        [('name', self.name), ('file', self.ssh_public_key)]
+    )
     cmd.Issue()
 
   def _DeleteSSHPublicKey(self):
@@ -236,8 +247,9 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CreateInstance(self):
     """Generates and execute command for creating a Rackspace VM."""
-    with tempfile.NamedTemporaryFile(dir=vm_util.GetTempDir(),
-                                     prefix='user-data') as tf:
+    with tempfile.NamedTemporaryFile(
+        dir=vm_util.GetTempDir(), prefix='user-data'
+    ) as tf:
       with open(self.ssh_public_key) as f:
         public_key = f.read().rstrip('\n')
       tf.write(CLOUD_CONFIG_TEMPLATE.format(self.user_name, public_key))
@@ -246,9 +258,12 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       stdout, stderr, _ = create_cmd.Issue()
     if stderr:
       resp = json.loads(stderr)
-      raise errors.Error(''.join(
-          ('Non-recoverable error has occurred: %s\n' % str(resp),
-           'Following command caused the error: %s' % repr(create_cmd),)))
+      raise errors.Error(
+          ''.join((
+              'Non-recoverable error has occurred: %s\n' % str(resp),
+              'Following command caused the error: %s' % repr(create_cmd),
+          ))
+      )
     resp = json.loads(stdout)
     self.id = resp['ID']
 
@@ -272,8 +287,10 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.flags['image-id'] = self.image
     if FLAGS.rackspace_network_id is not None:
       create_cmd.flags['networks'] = ','.join([
-          rackspace_network.PUBLIC_NET_ID, rackspace_network.SERVICE_NET_ID,
-          FLAGS.rackspace_network_id])
+          rackspace_network.PUBLIC_NET_ID,
+          rackspace_network.SERVICE_NET_ID,
+          FLAGS.rackspace_network_id,
+      ])
     create_cmd.flags['user-data'] = tf.name
     metadata = ['owner=%s' % FLAGS.owner]
     for key, value in six.iteritems(self.boot_metadata):
@@ -281,8 +298,12 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_cmd.flags['metadata'] = ','.join(metadata)
     return create_cmd
 
-  @vm_util.Retry(poll_interval=5, max_retries=720, log_errors=False,
-                 retryable_exceptions=(errors.Resource.RetryableCreationError,))
+  @vm_util.Retry(
+      poll_interval=5,
+      max_retries=720,
+      log_errors=False,
+      retryable_exceptions=(errors.Resource.RetryableCreationError,),
+  )
   def _WaitForInstanceUntilActive(self):
     """Waits until instance achieves non-transient state."""
     get_cmd = util.RackCLICommand(self, 'servers', 'instance', 'get')
@@ -297,7 +318,8 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
         logging.error('VM: %s failed to boot.' % self.name)
         raise errors.VirtualMachine.VmStateError()
     raise errors.Resource.RetryableCreationError(
-        'VM: %s is not running. Retrying to check status.' % self.name)
+        'VM: %s is not running. Retrying to check status.' % self.name
+    )
 
   def _DeleteInstance(self):
     """Executes delete command for removing a Rackspace VM."""
@@ -308,9 +330,13 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if 'result' not in resp or 'Deleting' not in resp['result']:
       raise errors.Resource.RetryableDeletionError()
 
-  @vm_util.Retry(poll_interval=5, max_retries=-1, timeout=300,
-                 log_errors=False,
-                 retryable_exceptions=(errors.Resource.RetryableDeletionError,))
+  @vm_util.Retry(
+      poll_interval=5,
+      max_retries=-1,
+      timeout=300,
+      log_errors=False,
+      retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+  )
   def _WaitForInstanceUntilDeleted(self):
     """Waits until instance has been fully removed, or deleted."""
     get_cmd = util.RackCLICommand(self, 'servers', 'instance', 'get')
@@ -330,7 +356,8 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       logging.info('VM: %s has been successfully deleted.', self.name)
     else:
       raise errors.Resource.RetryableDeletionError(
-          'VM: %s has not been deleted. Retrying to check status.' % self.name)
+          'VM: %s has not been deleted. Retrying to check status.' % self.name
+      )
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM via RackCLI update-metadata command."""
@@ -338,8 +365,9 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       return
     cmd = util.RackCLICommand(self, 'servers', 'instance', 'update-metadata')
     cmd.flags['id'] = self.id
-    cmd.flags['metadata'] = ','.join('{0}={1}'.format(key, value)
-                                     for key, value in six.iteritems(kwargs))
+    cmd.flags['metadata'] = ','.join(
+        '{0}={1}'.format(key, value) for key, value in six.iteritems(kwargs)
+    )
     cmd.Issue()
 
   def OnStartup(self):
@@ -385,7 +413,8 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise errors.Error('Only one boot disk can be created per VM')
     device_path = '/dev/%s' % self.boot_device['name']
     scratch_disk = rackspace_disk.RackspaceBootDisk(
-        disk_spec, self.zone, self.project, device_path, self.image)
+        disk_spec, self.zone, self.project, device_path, self.image
+    )
     self.boot_disk_allocated = True
     self.scratch_disks.append(scratch_disk)
     scratch_disk.Create()
@@ -409,13 +438,15 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       disk_name = '%s-local-disk-%d' % (self.name, i)
       device_path = '/dev/%s' % local_device['name']
       local_disk = rackspace_disk.RackspaceLocalDisk(
-          disk_spec, disk_name, self.zone, self.project, device_path)
+          disk_spec, disk_name, self.zone, self.project, device_path
+      )
       self.allocated_disks.add(local_disk)
       disks.append(local_disk)
     self._CreateScratchDiskFromDisks(disk_spec, disks)
 
   def _AllocateRemoteDisks(self, disk_spec):
     """Creates and allocates Rackspace Cloud Block Storage volumes as
+
     as data disks.
 
     Args:
@@ -425,8 +456,12 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     for disk_num in range(disk_spec.num_striped_disks):
       volume_name = '%s-volume-%d' % (self.name, disk_num)
       scratch_disk = rackspace_disk.RackspaceRemoteDisk(
-          disk_spec, volume_name, self.zone, self.project,
-          media=disk_spec.disk_type)
+          disk_spec,
+          volume_name,
+          self.zone,
+          self.project,
+          media=disk_spec.disk_type,
+      )
       scratch_disks.append(scratch_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, scratch_disks)
@@ -436,11 +471,12 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _GetFreeBlockDevices(self, block_devices, disk_spec):
     """Returns available block devices that are not in used as data disk or as
+
     a boot disk.
 
     Args:
       block_devices: list of dict containing information about all block devices
-          in the VM.
+        in the VM.
       disk_spec: virtual_machine.BaseDiskSpec of the disk.
 
     Returns:
@@ -455,13 +491,18 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
         free_blk_devices.append(dev)
     if not free_blk_devices:
       raise errors.Error(
-          ''.join(('Machine type %s does not include' % self.machine_type,
-                   ' local disks. Please use a different disk_type,',
-                   ' or a machine_type that provides local disks.')))
+          ''.join((
+              'Machine type %s does not include' % self.machine_type,
+              ' local disks. Please use a different disk_type,',
+              ' or a machine_type that provides local disks.',
+          ))
+      )
     elif len(free_blk_devices) < disk_spec.num_striped_disks:
-      raise errors.Error('Not enough local data disks. '
-                         'Requesting %d disk(s) but only %d available.'
-                         % (disk_spec.num_striped_disks, len(free_blk_devices)))
+      raise errors.Error(
+          'Not enough local data disks. '
+          'Requesting %d disk(s) but only %d available.'
+          % (disk_spec.num_striped_disks, len(free_blk_devices))
+      )
     return free_blk_devices
 
   def _GetBlockDevices(self):
@@ -471,11 +512,19 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       list of dicts block devices in the VM.
     """
     stdout, _ = self.RemoteCommand(
-        'sudo lsblk -o NAME,MODEL,SIZE,TYPE,MOUNTPOINT,LABEL -n -b -P')
+        'sudo lsblk -o NAME,MODEL,SIZE,TYPE,MOUNTPOINT,LABEL -n -b -P'
+    )
     lines = stdout.splitlines()
     groups = [LSBLK_PATTERN.match(line) for line in lines]
     tuples = [g.groups() for g in groups if g]
-    colnames = ('name', 'model', 'size_bytes', 'type', 'mountpoint', 'label',)
+    colnames = (
+        'name',
+        'model',
+        'size_bytes',
+        'type',
+        'mountpoint',
+        'label',
+    )
     blk_devices = [dict(list(zip(colnames, t))) for t in tuples]
     for d in blk_devices:
       d['model'] = d['model'].rstrip()
@@ -518,18 +567,22 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     An available disk, is a disk that has not been allocated previously as
     a data disk, or is not being used as boot disk.
     """
-    return (blk_device['type'] != 'part' and
-            blk_device['name'] != self.boot_device['name'] and
-            'config' not in blk_device['label'] and
-            blk_device['name'] not in self.allocated_disks)
+    return (
+        blk_device['type'] != 'part'
+        and blk_device['name'] != self.boot_device['name']
+        and 'config' not in blk_device['label']
+        and blk_device['name'] not in self.allocated_disks
+    )
 
 
-class Rhel7BasedRackspaceVirtualMachine(RackspaceVirtualMachine,
-                                        linux_virtual_machine.Rhel7Mixin):
+class Rhel7BasedRackspaceVirtualMachine(
+    RackspaceVirtualMachine, linux_virtual_machine.Rhel7Mixin
+):
   DEFAULT_IMAGE = '92f8a8b8-6019-4c27-949b-cf9910b84ffb'
 
 
 class VersionlessRhelBasedRackspaceVirtualMachine(
     linux_virtual_machine.VersionlessRhelMixin,
-    Rhel7BasedRackspaceVirtualMachine):
+    Rhel7BasedRackspaceVirtualMachine,
+):
   pass

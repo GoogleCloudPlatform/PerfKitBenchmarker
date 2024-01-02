@@ -14,27 +14,37 @@
 
 from absl import flags
 
-flags.DEFINE_string('ali_user_name', 'ubuntu',
-                    'This determines the user name that Perfkit will '
-                    'attempt to use. This must be changed in order to '
-                    'use any image other than ubuntu.')
+flags.DEFINE_string(
+    'ali_user_name',
+    'ubuntu',
+    'This determines the user name that Perfkit will '
+    'attempt to use. This must be changed in order to '
+    'use any image other than ubuntu.',
+)
 flags.DEFINE_integer('ali_bandwidth_in', 100, 'Inbound Bandwidth')
 flags.DEFINE_integer('ali_bandwidth_out', 100, 'Outbound Bandwidth')
-flags.DEFINE_string('ali_io_optimized', None,
-                    'IO optimized for disk in AliCloud. The default is '
-                    'None which means no IO optimized '
-                    '"optimized" means use IO optimized. If you '
-                    'choose optimized, you must specify the system disk type')
-flags.DEFINE_string('ali_system_disk_type', 'cloud_ssd',
-                    'System disk category for AliCloud. The default is '
-                    '"cloud" for General cloud disk, '
-                    '"cloud_ssd" for cloud ssd disk, '
-                    '"cloud_essd" for enhanced cloud ssd disk, '
-                    '"cloud_efficiency" for efficiency cloud disk, '
-                    '"ephemeral_ssd" for local ssd disk')
-flags.DEFINE_integer('ali_system_disk_size', 50,
-                     'System disk size in GB. Default is 50 GB.')
-flags.DEFINE_boolean('ali_use_vpc', True,
-                     'Use VPC to create networks')
-flags.DEFINE_integer('ali_eip_address_bandwidth', 100,
-                     'The rate limit of the EIP in Mbps.')
+flags.DEFINE_string(
+    'ali_io_optimized',
+    None,
+    'IO optimized for disk in AliCloud. The default is '
+    'None which means no IO optimized '
+    '"optimized" means use IO optimized. If you '
+    'choose optimized, you must specify the system disk type',
+)
+flags.DEFINE_string(
+    'ali_system_disk_type',
+    'cloud_ssd',
+    'System disk category for AliCloud. The default is '
+    '"cloud" for General cloud disk, '
+    '"cloud_ssd" for cloud ssd disk, '
+    '"cloud_essd" for enhanced cloud ssd disk, '
+    '"cloud_efficiency" for efficiency cloud disk, '
+    '"ephemeral_ssd" for local ssd disk',
+)
+flags.DEFINE_integer(
+    'ali_system_disk_size', 50, 'System disk size in GB. Default is 50 GB.'
+)
+flags.DEFINE_boolean('ali_use_vpc', True, 'Use VPC to create networks')
+flags.DEFINE_integer(
+    'ali_eip_address_bandwidth', 100, 'The rate limit of the EIP in Mbps.'
+)

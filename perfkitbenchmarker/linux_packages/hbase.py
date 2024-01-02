@@ -32,15 +32,19 @@ from perfkitbenchmarker.linux_packages import hadoop
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('hbase_version', '1.3.5', 'HBase version.')
-flags.DEFINE_string('hbase_bin_url', None,
-                    'Specify to override url from HBASE_URL_BASE.')
+flags.DEFINE_string(
+    'hbase_bin_url', None, 'Specify to override url from HBASE_URL_BASE.'
+)
 
 HBASE_URL_BASE = 'https://www-us.apache.org/dist/hbase'
 HBASE_PATTERN = r'>(hbase-([\d\.]+)-bin.tar.gz)<'
 HBASE_VERSION_PATTERN = re.compile('HBase (.*)$', re.IGNORECASE | re.MULTILINE)
 
-DATA_FILES = ['hbase/hbase-site.xml.j2', 'hbase/regionservers.j2',
-              'hbase/hbase-env.sh.j2']
+DATA_FILES = [
+    'hbase/hbase-site.xml.j2',
+    'hbase/regionservers.j2',
+    'hbase/hbase-env.sh.j2',
+]
 
 HBASE_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'hbase')
 HBASE_BIN = posixpath.join(HBASE_DIR, 'bin')
@@ -57,7 +61,8 @@ def _GetHBaseURL():
     The HBase download url.
   """
   return '{0}/{1}/hbase-{1}-bin.tar.gz'.format(
-      HBASE_URL_BASE, FLAGS.hbase_version)
+      HBASE_URL_BASE, FLAGS.hbase_version
+  )
 
 
 def GetHBaseVersion(vm):
@@ -86,8 +91,10 @@ def _Install(vm):
   vm.Install('curl')
   hbase_url = FLAGS.hbase_bin_url or _GetHBaseURL()
   vm.RemoteCommand(
-      ('mkdir -p {0} && curl -L {1} | '
-       'tar -C {0} --strip-components=1 -xzf -').format(HBASE_DIR, hbase_url))
+      (
+          'mkdir -p {0} && curl -L {1} | tar -C {0} --strip-components=1 -xzf -'
+      ).format(HBASE_DIR, hbase_url)
+  )
 
 
 def YumInstall(vm):
@@ -103,8 +110,7 @@ def AptInstall(vm):
 def _RenderConfig(vm, master_ip, zk_ips, regionserver_ips):
   # Use the same heap configuration as Cassandra
   memory_mb = vm.total_memory_kb // 1024
-  hbase_memory_mb = max(min(memory_mb // 2, 1024),
-                        min(memory_mb // 4, 8192))
+  hbase_memory_mb = max(min(memory_mb // 2, 1024), min(memory_mb // 4, 8192))
   context = {
       'master_ip': master_ip,
       'worker_ips': regionserver_ips,
@@ -116,8 +122,7 @@ def _RenderConfig(vm, master_ip, zk_ips, regionserver_ips):
 
   for file_name in DATA_FILES:
     file_path = data.ResourcePath(file_name)
-    remote_path = posixpath.join(HBASE_CONF_DIR,
-                                 os.path.basename(file_name))
+    remote_path = posixpath.join(HBASE_CONF_DIR, os.path.basename(file_name))
     if file_name.endswith('.j2'):
       vm.RenderTemplate(file_path, os.path.splitext(remote_path)[0], context)
     else:
@@ -134,19 +139,26 @@ def ConfigureAndStart(master, regionservers, zk_nodes):
   vms = [master] + regionservers
 
   def LinkNativeLibraries(vm):
-    vm.RemoteCommand(('mkdir {0}/lib/native && '
-                      'ln -s {1} {0}/lib/native/Linux-amd64-64').format(
-                          HBASE_DIR,
-                          posixpath.join(hadoop.HADOOP_DIR, 'lib', 'native')))
+    vm.RemoteCommand(
+        (
+            'mkdir {0}/lib/native && ln -s {1} {0}/lib/native/Linux-amd64-64'
+        ).format(HBASE_DIR, posixpath.join(hadoop.HADOOP_DIR, 'lib', 'native'))
+    )
+
   background_tasks.RunThreaded(LinkNativeLibraries, vms)
-  fn = functools.partial(_RenderConfig, master_ip=master.internal_ip,
-                         zk_ips=[vm.internal_ip for vm in zk_nodes],
-                         regionserver_ips=[regionserver.internal_ip
-                                           for regionserver in regionservers])
+  fn = functools.partial(
+      _RenderConfig,
+      master_ip=master.internal_ip,
+      zk_ips=[vm.internal_ip for vm in zk_nodes],
+      regionserver_ips=[
+          regionserver.internal_ip for regionserver in regionservers
+      ],
+  )
   background_tasks.RunThreaded(fn, vms)
 
-  master.RemoteCommand('{0} dfs -mkdir /hbase'.format(
-      posixpath.join(hadoop.HADOOP_BIN, 'hdfs')))
+  master.RemoteCommand(
+      '{0} dfs -mkdir /hbase'.format(posixpath.join(hadoop.HADOOP_BIN, 'hdfs'))
+  )
 
   master.RemoteCommand(posixpath.join(HBASE_BIN, 'start-hbase.sh'))
 

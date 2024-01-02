@@ -20,69 +20,80 @@ from perfkitbenchmarker import beam_pipeline_options
 
 
 class BeamArgsOptionsTestCase(unittest.TestCase):
+
   def testNoFlagsPassed(self):
     options_list = beam_pipeline_options.GenerateAllPipelineOptions(
-        None, None, [], [])
+        None, None, [], []
+    )
     self.assertListEqual(options_list, [])
 
   def testAllFlagsPassed(self):
     options_list = beam_pipeline_options.GenerateAllPipelineOptions(
         "--itargone=anarg,--itargtwo=anotherarg",
-        "[\"--project=testProj\","
-        "\"--gcpTempLocation=gs://test-bucket/staging\"]",
+        '["--project=testProj","--gcpTempLocation=gs://test-bucket/staging"]',
         [{"postgresUsername": "postgres"}, {"postgresPassword": "mypass"}],
-        [{"name": "aTestVal", "type": "TestValue", "value": "this_is_a_test"},
-         {"name": "testier", "type": "TestValue", "value": "another_test"}]
+        [
+            {
+                "name": "aTestVal",
+                "type": "TestValue",
+                "value": "this_is_a_test",
+            },
+            {"name": "testier", "type": "TestValue", "value": "another_test"},
+        ],
     )
 
-    self.assertListEqual(options_list,
-                         ["\"--itargone=anarg\"",
-                          "\"--itargtwo=anotherarg\"",
-                          "\"--project=testProj\"",
-                          "\"--gcpTempLocation=gs://test-bucket/staging\"",
-                          "\"--aTestVal=this_is_a_test\"",
-                          "\"--testier=another_test\"",
-                          "\"--postgresUsername=postgres\"",
-                          "\"--postgresPassword=mypass\""])
+    self.assertListEqual(
+        options_list,
+        [
+            '"--itargone=anarg"',
+            '"--itargtwo=anotherarg"',
+            '"--project=testProj"',
+            '"--gcpTempLocation=gs://test-bucket/staging"',
+            '"--aTestVal=this_is_a_test"',
+            '"--testier=another_test"',
+            '"--postgresUsername=postgres"',
+            '"--postgresPassword=mypass"',
+        ],
+    )
 
   def testItOptionsWithSpaces(self):
     options_list = beam_pipeline_options.GenerateAllPipelineOptions(
         None,
-        "[\"--project=testProj\", "
-        "\"--gcpTempLocation=gs://test-bucket/staging\"]",
+        '["--project=testProj", "--gcpTempLocation=gs://test-bucket/staging"]',
         [],
-        [])
+        [],
+    )
 
-    self.assertListEqual(options_list,
-                         ["\"--project=testProj\"",
-                          "\"--gcpTempLocation=gs://test-bucket/staging\""])
+    self.assertListEqual(
+        options_list,
+        [
+            '"--project=testProj"',
+            '"--gcpTempLocation=gs://test-bucket/staging"',
+        ],
+    )
 
   def testDynamicPipelineOpionsWithFormat(self):
-      dynamic_options = [
-          {
-              "name": "test_value_A",
-              "type": "TestValue",
-              "value": "a_value",
-              "format": "other representation of {{TestValue}}",
-          },
-          {
-              "name": "test_value_B",
-              "type": "TestValue",
-              "value": "b_value"
-          }
-      ]
+    dynamic_options = [
+        {
+            "name": "test_value_A",
+            "type": "TestValue",
+            "value": "a_value",
+            "format": "other representation of {{TestValue}}",
+        },
+        {"name": "test_value_B", "type": "TestValue", "value": "b_value"},
+    ]
 
-      self.assertListEqual(
-          beam_pipeline_options.EvaluateDynamicPipelineOptions(dynamic_options),
-          [
-              ("test_value_A", "other representation of a_value"),
-              ("test_value_B", "b_value"),
-          ]
-      )
+    self.assertListEqual(
+        beam_pipeline_options.EvaluateDynamicPipelineOptions(dynamic_options),
+        [
+            ("test_value_A", "other representation of a_value"),
+            ("test_value_B", "b_value"),
+        ],
+    )
 
   def dynamicPipelineOptions(self):
     beam_pipeline_options.EvaluateDynamicPipelineOptions()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   unittest.main()

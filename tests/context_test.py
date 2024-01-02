@@ -18,7 +18,6 @@
 import unittest
 
 import mock
-
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context
 from tests import pkb_common_test_case
@@ -45,8 +44,7 @@ class ThreadLocalBenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
       new_benchmark_spec = mock.MagicMock()
       context.SetThreadBenchmarkSpec(new_benchmark_spec)
       self.assertNotEqual(benchmark_spec, context.GetThreadBenchmarkSpec())
-      self.assertEqual(new_benchmark_spec,
-                       context.GetThreadBenchmarkSpec())
+      self.assertEqual(new_benchmark_spec, context.GetThreadBenchmarkSpec())
 
     background_tasks.RunThreaded(_DoWork, list(range(10)))
 

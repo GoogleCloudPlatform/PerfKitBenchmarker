@@ -38,7 +38,7 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
     docker_cpus: None or float. Number of CPUs for Docker instances.
     docker_memory_mb: None or int. Memory limit (in MB) for Docker instances.
     mesos_privileged_docker: None of boolean. Indicates if Docker container
-        should be run in privileged mode.
+      should be run in privileged mode.
   """
 
   CLOUD = provider_info.MESOS
@@ -49,8 +49,11 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
     result.update({
         'docker_cpus': (option_decoders.FloatDecoder, {'default': 1}),
         'docker_memory_mb': (option_decoders.IntDecoder, {'default': 2048}),
-        'mesos_privileged_docker': (option_decoders.BooleanDecoder,
-                                    {'default': False})})
+        'mesos_privileged_docker': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
+        ),
+    })
     return result
 
   def _ApplyFlags(self, config_values, flag_values):
@@ -60,14 +63,13 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
     if flag_values['docker_memory_mb'].present:
       config_values['docker_memory_mb'] = flag_values.docker_memory_mb
     if flag_values['mesos_privileged_docker'].present:
-      config_values['mesos_privileged_docker'] =\
+      config_values['mesos_privileged_docker'] = (
           flag_values.mesos_privileged_docker
+      )
 
 
 class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
-  """
-  Represents a Docker instance spawned by Marathon framework on a Mesos cluster
-  """
+  """Represents a Docker instance spawned by Marathon framework on a Mesos cluster"""
 
   CLOUD = provider_info.MESOS
 
@@ -77,10 +79,11 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     self.cpus = vm_spec.docker_cpus
     self.memory_mb = vm_spec.docker_memory_mb
     self.privileged = vm_spec.mesos_privileged_docker
-    self.api_url = six.moves.urllib.parse.urljoin(FLAGS.marathon_address,
-                                                  MARATHON_API_PREFIX)
+    self.api_url = six.moves.urllib.parse.urljoin(
+        FLAGS.marathon_address, MARATHON_API_PREFIX
+    )
     self.app_url = six.moves.urllib.parse.urljoin(self.api_url, self.name)
-    auth = FLAGS.marathon_auth.split(":")
+    auth = FLAGS.marathon_auth.split(':')
     if len(auth) == 2:
       self.auth = HTTPBasicAuth(auth[0], auth[1])
     else:
@@ -102,60 +105,61 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     self._DeleteApp()
 
   def _CheckPrerequisites(self):
-    """
-    Exits if any of the prerequisites is not met.
-    """
+    """Exits if any of the prerequisites is not met."""
     if self.disk_specs and self.disk_specs[0].disk_type == disk.STANDARD:
-      raise Exception('Currently only local disks are supported. Please '
-                      're-run the benchmark with "--data_disk_type=local".')
+      raise Exception(
+          'Currently only local disks are supported. Please '
+          're-run the benchmark with "--data_disk_type=local".'
+      )
     if not FLAGS.marathon_address:
-      raise Exception('Please provide the address and port of Marathon '
-                      'framework. Example: 10:20:30:40:8080')
+      raise Exception(
+          'Please provide the address and port of Marathon '
+          'framework. Example: 10:20:30:40:8080'
+      )
 
   def _CreateVolumes(self):
-    """
-    Creates volumes for scratch disks.
-    """
+    """Creates volumes for scratch disks."""
     for disk_num, disk_spec in enumerate(self.disk_specs):
       if disk_spec.disk_type == disk.LOCAL:
         scratch_disk = LocalDisk(disk_num, disk_spec, self.name)
       else:
-        raise Exception('Currently only local disks are supported. Please '
-                        're-run the benchmark with "--data_disk_type=local"')
+        raise Exception(
+            'Currently only local disks are supported. Please '
+            're-run the benchmark with "--data_disk_type=local"'
+        )
       scratch_disk._Create()
       self.scratch_disks.append(scratch_disk)
 
   def _CreateApp(self):
-    """
-    Creates Marathon's App (Docker instance).
-    """
-    logging.info("Attempting to create App: %s" % self.name)
+    """Creates Marathon's App (Docker instance)."""
+    logging.info('Attempting to create App: %s' % self.name)
     body = self._BuildAppBody()
     headers = {'content-type': 'application/json'}
-    output = requests.post(self.api_url, data=body, headers=headers,
-                           auth=self.auth)
+    output = requests.post(
+        self.api_url, data=body, headers=headers, auth=self.auth
+    )
     if output.status_code != requests.codes.CREATED:
-      raise Exception("Unable to create App: %s" % output.text)
-    logging.info("App %s created successfully." % self.name)
+      raise Exception('Unable to create App: %s' % output.text)
+    logging.info('App %s created successfully.' % self.name)
 
   @vm_util.Retry(poll_interval=10, max_retries=600, log_errors=False)
   def _WaitForBootCompletion(self):
-    """
-    Periodically asks Marathon if the instance is already running.
-    """
-    logging.info("Waiting for App %s to get up and running. It may take a while"
-                 " if a Docker image is being downloaded for the first time."
-                 % self.name)
+    """Periodically asks Marathon if the instance is already running."""
+    logging.info(
+        'Waiting for App %s to get up and running. It may take a while'
+        ' if a Docker image is being downloaded for the first time.'
+        % self.name
+    )
     output = requests.get(self.app_url, auth=self.auth)
     output = json.loads(output.text)
     tasks_running = output['app']['tasksRunning']
     if not tasks_running:
-      raise Exception("Container is not booted yet. Retrying.")
+      raise Exception('Container is not booted yet. Retrying.')
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=True)
   def _SetupSSH(self):
-    """
-    Setup SSH connection details for each instance:
+    """Setup SSH connection details for each instance:
+
     - IP address of the instance is the address of a host which instance
     is running on,
     - SSH port is drawn by Marathon and is unique for each instance.
@@ -164,18 +168,22 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
     output = json.loads(output.text)
     tasks = output['app']['tasks']
     if not tasks or not tasks[0]['ports']:
-      raise Exception("Unable to figure out where the container is running."
-                      "Retrying to retrieve host and port.")
+      raise Exception(
+          'Unable to figure out where the container is running.'
+          'Retrying to retrieve host and port.'
+      )
     self.ip_address = tasks[0]['host']
     self.ssh_port = tasks[0]['ports'][0]
-    internal_ip, _ = self.RemoteCommand("ifconfig eth0 | grep 'inet addr' | awk"
-                                        " -F: '{print $2}' | awk '{print $1}'")
+    internal_ip, _ = self.RemoteCommand(
+        "ifconfig eth0 | grep 'inet addr' | awk"
+        " -F: '{print $2}' | awk '{print $1}'"
+    )
     self.internal_ip = internal_ip.rstrip()
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=True)
   def _ConfigureProxy(self):
-    """
-    In Docker containers environment variables from /etc/environment
+    """In Docker containers environment variables from /etc/environment
+
     are not sourced - this results in connection problems when running
     behind proxy. Prepending proxy environment variables to bashrc
     solves the problem. Note: APPENDING to bashrc will not work because
@@ -193,26 +201,26 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
 
   @vm_util.Retry(poll_interval=10, max_retries=100, log_errors=True)
   def _DeleteApp(self):
-    """
-    Deletes an App.
-    """
+    """Deletes an App."""
     logging.info('Attempting to delete App: %s' % self.name)
     output = requests.delete(self.app_url, auth=self.auth)
     if output.status_code == requests.codes.NOT_FOUND:
       logging.info('App %s has been already deleted.' % self.name)
       return
     if output.status_code != requests.codes.OK:
-      raise Exception("Deleting App: %s failed. Reattempting." % self.name)
+      raise Exception('Deleting App: %s failed. Reattempting.' % self.name)
 
   def _BuildAppBody(self):
-    """
-    Builds JSON which will be passed as a body of POST request to Marathon
+    """Builds JSON which will be passed as a body of POST request to Marathon
+
     API in order to create App.
     """
     cat_cmd = ['cat', vm_util.GetPublicKeyPath()]
     key_file, _ = vm_util.IssueRetryableCommand(cat_cmd)
-    cmd = "/bin/mkdir /root/.ssh; echo '%s' >> /root/.ssh/authorized_keys; " \
-          "/usr/sbin/sshd -D" % key_file
+    cmd = (
+        "/bin/mkdir /root/.ssh; echo '%s' >> /root/.ssh/authorized_keys; "
+        '/usr/sbin/sshd -D' % key_file
+    )
     body = {
         'id': self.name,
         'mem': self.memory_mb,
@@ -223,17 +231,15 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
             'docker': {
                 'image': self.image,
                 'network': 'BRIDGE',
-                'portMappings': [
-                    {
-                        'containerPort': 22,
-                        'hostPort': 0,
-                        'protocol': 'tcp'
-                    }
-                ],
+                'portMappings': [{
+                    'containerPort': 22,
+                    'hostPort': 0,
+                    'protocol': 'tcp',
+                }],
                 'privileged': self.privileged,
-                'parameters': [{'key': 'hostname', 'value': self.name}]
-            }
-        }
+                'parameters': [{'key': 'hostname', 'value': self.name}],
+            },
+        },
     }
 
     for scratch_disk in self.scratch_disks:

@@ -16,7 +16,6 @@
 import os
 import unittest
 import mock
-
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import nvidia_driver
 
@@ -29,8 +28,9 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
     super(NvidiaDriverTestCase, self).setUp()
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'nvidia_smi_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '../data', 'nvidia_smi_output.txt'
+    )
     with open(path) as fp:
       self.nvidia_smi_output = fp.read()
 
@@ -42,30 +42,36 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
   def testQueryGpuClockSpeed(self):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock(
-        return_value=('clocks.applications.graphics [MHz], '
-                      'clocks.applications.memory [Mhz]\n'
-                      '324 MHz, 527 MHz', None))
+        return_value=(
+            (
+                'clocks.applications.graphics [MHz], '
+                'clocks.applications.memory [Mhz]\n'
+                '324 MHz, 527 MHz'
+            ),
+            None,
+        )
+    )
     self.assertEqual(('324', '527'), nvidia_driver.QueryGpuClockSpeed(vm, 3))
     vm.RemoteCommand.assert_called_with(
         'sudo nvidia-smi '
         '--query-gpu=clocks.applications.memory,'
-        'clocks.applications.graphics --format=csv --id=3')
+        'clocks.applications.graphics --format=csv --id=3'
+    )
 
   def testGetDriverVersion(self):
     vm = mock.MagicMock()
-    vm.RemoteCommand = mock.MagicMock(
-        return_value=(self.nvidia_smi_output, ''))
+    vm.RemoteCommand = mock.MagicMock(return_value=(self.nvidia_smi_output, ''))
     self.assertEqual('375.66', nvidia_driver.GetDriverVersion(vm))
 
   def testGetPeerToPeerTopology(self):
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'nvidia_smi_topo_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '../data', 'nvidia_smi_topo_output.txt'
+    )
     with open(path) as fp:
       nvidia_smi_output = fp.read()
 
     vm = mock.MagicMock()
-    vm.RemoteCommand = mock.MagicMock(
-        return_value=(nvidia_smi_output, ''))
+    vm.RemoteCommand = mock.MagicMock(return_value=(nvidia_smi_output, ''))
 
     expected = 'Y Y N N;Y Y N N;N N Y Y;N N Y Y'
     actual = nvidia_driver.GetPeerToPeerTopology(vm)
@@ -73,67 +79,84 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm.RemoteCommand.assert_called_with('nvidia-smi topo -p2p r')
 
   def testQueryAutoboostNull(self):
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'nvidia_smi_describe_clocks_p100.txt')
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '../data',
+        'nvidia_smi_describe_clocks_p100.txt',
+    )
     with open(path) as fp:
       nvidia_smi_output = fp.read()
     vm = mock.MagicMock()
-    vm.RemoteCommand = mock.MagicMock(
-        return_value=(nvidia_smi_output, ''))
-    self.assertEqual({'autoboost': None, 'autoboost_default': None},
-                     nvidia_driver.QueryAutoboostPolicy(vm, 0))
+    vm.RemoteCommand = mock.MagicMock(return_value=(nvidia_smi_output, ''))
+    self.assertEqual(
+        {'autoboost': None, 'autoboost_default': None},
+        nvidia_driver.QueryAutoboostPolicy(vm, 0),
+    )
 
   def testQueryAutoboostOn(self):
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'nvidia_smi_describe_clocks_k80.txt')
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '../data',
+        'nvidia_smi_describe_clocks_k80.txt',
+    )
     with open(path) as fp:
       nvidia_smi_output = fp.read()
     vm = mock.MagicMock()
-    vm.RemoteCommand = mock.MagicMock(
-        return_value=(nvidia_smi_output, ''))
-    self.assertEqual({'autoboost': False, 'autoboost_default': True},
-                     nvidia_driver.QueryAutoboostPolicy(vm, 0))
+    vm.RemoteCommand = mock.MagicMock(return_value=(nvidia_smi_output, ''))
+    self.assertEqual(
+        {'autoboost': False, 'autoboost_default': True},
+        nvidia_driver.QueryAutoboostPolicy(vm, 0),
+    )
 
   def testGetGpuTypeP100(self):
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'list_gpus_output_p100.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '../data', 'list_gpus_output_p100.txt'
+    )
     with open(path) as fp:
       nvidia_smi_output = fp.read()
     vm = mock.MagicMock()
-    vm.RemoteCommand = mock.MagicMock(
-        return_value=(nvidia_smi_output, ''))
-    self.assertEqual(nvidia_driver.NVIDIA_TESLA_P100,
-                     nvidia_driver.GetGpuType(vm))
+    vm.RemoteCommand = mock.MagicMock(return_value=(nvidia_smi_output, ''))
+    self.assertEqual(
+        nvidia_driver.NVIDIA_TESLA_P100, nvidia_driver.GetGpuType(vm)
+    )
 
   def testGetGpuTypeK80(self):
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'list_gpus_output_k80.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '../data', 'list_gpus_output_k80.txt'
+    )
     with open(path) as fp:
       nvidia_smi_output = fp.read()
     vm = mock.MagicMock()
-    vm.RemoteCommand = mock.MagicMock(
-        return_value=(nvidia_smi_output, ''))
-    self.assertEqual(nvidia_driver.NVIDIA_TESLA_K80,
-                     nvidia_driver.GetGpuType(vm))
+    vm.RemoteCommand = mock.MagicMock(return_value=(nvidia_smi_output, ''))
+    self.assertEqual(
+        nvidia_driver.NVIDIA_TESLA_K80, nvidia_driver.GetGpuType(vm)
+    )
 
   def testHetergeneousGpuTypes(self):
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'list_gpus_output_heterogeneous.txt')
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '../data',
+        'list_gpus_output_heterogeneous.txt',
+    )
     with open(path) as fp:
       nvidia_smi_output = fp.read()
     vm = mock.MagicMock()
-    vm.RemoteCommand = mock.MagicMock(
-        return_value=(nvidia_smi_output, ''))
-    self.assertRaisesRegexp(nvidia_driver.HeterogeneousGpuTypesError,  # pytype: disable=wrong-arg-count
-                            'PKB only supports one type of gpu per VM',
-                            nvidia_driver.GetGpuType, vm)
+    vm.RemoteCommand = mock.MagicMock(return_value=(nvidia_smi_output, ''))
+    self.assertRaisesRegexp(
+        nvidia_driver.HeterogeneousGpuTypesError,  # pytype: disable=wrong-arg-count
+        'PKB only supports one type of gpu per VM',
+        nvidia_driver.GetGpuType,
+        vm,
+    )
 
   @mock.patch(nvidia_driver.__name__ + '.QueryNumberOfGpus', return_value=2)
-  @mock.patch(nvidia_driver.__name__ + '.QueryAutoboostPolicy',
-              return_value=AUTOBOOST_ENABLED_DICT)
-  def testSetAutoboostPolicyWhenValuesAreTheSame(self,
-                                                 query_autoboost_mock,
-                                                 num_gpus_mock):
+  @mock.patch(
+      nvidia_driver.__name__ + '.QueryAutoboostPolicy',
+      return_value=AUTOBOOST_ENABLED_DICT,
+  )
+  def testSetAutoboostPolicyWhenValuesAreTheSame(
+      self, query_autoboost_mock, num_gpus_mock
+  ):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock()
 
@@ -142,11 +165,13 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm.RemoteCommand.assert_not_called()
 
   @mock.patch(nvidia_driver.__name__ + '.QueryNumberOfGpus', return_value=2)
-  @mock.patch(nvidia_driver.__name__ + '.QueryAutoboostPolicy',
-              return_value=AUTOBOOST_DISABLED_DICT)
-  def testSetAutoboostPolicyWhenValuesAreDifferent(self,
-                                                   query_autoboost_mock,
-                                                   num_gpus_mock):
+  @mock.patch(
+      nvidia_driver.__name__ + '.QueryAutoboostPolicy',
+      return_value=AUTOBOOST_DISABLED_DICT,
+  )
+  def testSetAutoboostPolicyWhenValuesAreDifferent(
+      self, query_autoboost_mock, num_gpus_mock
+  ):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock()
 
@@ -155,11 +180,12 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     self.assertEqual(2, vm.RemoteCommand.call_count)
 
   @mock.patch(nvidia_driver.__name__ + '.QueryNumberOfGpus', return_value=2)
-  @mock.patch(nvidia_driver.__name__ + '.QueryGpuClockSpeed',
-              return_value=(2505, 875))
-  def testSetClockSpeedWhenValuesAreTheSame(self,
-                                            query_clock_speed_mock,
-                                            num_gpus_mock):
+  @mock.patch(
+      nvidia_driver.__name__ + '.QueryGpuClockSpeed', return_value=(2505, 875)
+  )
+  def testSetClockSpeedWhenValuesAreTheSame(
+      self, query_clock_speed_mock, num_gpus_mock
+  ):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock()
 
@@ -168,17 +194,19 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm.RemoteCommand.assert_not_called()
 
   @mock.patch(nvidia_driver.__name__ + '.QueryNumberOfGpus', return_value=2)
-  @mock.patch(nvidia_driver.__name__ + '.QueryGpuClockSpeed',
-              return_value=(2505, 875))
-  def testSetClockSpeedWhenValuesAreDifferent(self,
-                                              query_clock_speed_mock,
-                                              num_gpus_mock):
+  @mock.patch(
+      nvidia_driver.__name__ + '.QueryGpuClockSpeed', return_value=(2505, 875)
+  )
+  def testSetClockSpeedWhenValuesAreDifferent(
+      self, query_clock_speed_mock, num_gpus_mock
+  ):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock()
 
     nvidia_driver.SetGpuClockSpeed(vm, 2505, 562)
     query_clock_speed_mock.assetCalled()
     self.assertEqual(2, vm.RemoteCommand.call_count)
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -26,8 +26,8 @@ class DockerContainerSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a Docker Instance.
 
   Attributes:
-    privileged_docker: None of boolean. Indicates if Docker container
-        should be run in privileged mode.
+    privileged_docker: None of boolean. Indicates if Docker container should be
+      run in privileged mode.
   """
 
   CLOUD = provider_info.DOCKER
@@ -36,11 +36,14 @@ class DockerContainerSpec(virtual_machine.BaseVmSpec):
   def _GetOptionDecoderConstructions(cls):
     result = super(DockerContainerSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'privileged_docker': (option_decoders.BooleanDecoder,
-                              {'default': False}),
-        'machine_type': (custom_virtual_machine_spec.MachineTypeDecoder, {
-            'default': None
-        })
+        'privileged_docker': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
+        ),
+        'machine_type': (
+            custom_virtual_machine_spec.MachineTypeDecoder,
+            {'default': None},
+        ),
     })
     logging.warn(result)
     return result

@@ -19,19 +19,30 @@ from perfkitbenchmarker.linux_packages import speccpu
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_list('spec17_subset', ['intspeed', 'fpspeed', 'intrate', 'fprate'],
-                  'Specify which speccpu2017 tests to run. Accepts a list of '
-                  'benchmark suites (intspeed, fpspeed, intrate, fprate) '
-                  'or individual benchmark names. Defaults to all suites.')
-flags.DEFINE_integer('spec17_copies', None,
-                     'Number of copies to run for rate tests. If not set '
-                     'default to number of cpu cores using lscpu.')
-flags.DEFINE_integer('spec17_threads', None,
-                     'Number of threads to run for speed tests. If not set '
-                     'default to number of cpu threads using lscpu.')
-flags.DEFINE_boolean('spec17_fdo', False,
-                     'Run with feedback directed optimization on peak. '
-                     'Default to False.')
+flags.DEFINE_list(
+    'spec17_subset',
+    ['intspeed', 'fpspeed', 'intrate', 'fprate'],
+    'Specify which speccpu2017 tests to run. Accepts a list of '
+    'benchmark suites (intspeed, fpspeed, intrate, fprate) '
+    'or individual benchmark names. Defaults to all suites.',
+)
+flags.DEFINE_integer(
+    'spec17_copies',
+    None,
+    'Number of copies to run for rate tests. If not set '
+    'default to number of cpu cores using lscpu.',
+)
+flags.DEFINE_integer(
+    'spec17_threads',
+    None,
+    'Number of threads to run for speed tests. If not set '
+    'default to number of cpu threads using lscpu.',
+)
+flags.DEFINE_boolean(
+    'spec17_fdo',
+    False,
+    'Run with feedback directed optimization on peak. Default to False.',
+)
 
 _PACKAGE_NAME = 'speccpu2017'
 _MOUNT_DIR = 'cpu2017_mnt'
@@ -64,13 +75,14 @@ def GetSpecInstallConfig(scratch_dir):
   install_config.package_name = _PACKAGE_NAME
   install_config.base_mount_dir = _MOUNT_DIR
   install_config.base_spec_dir = _SPECCPU2017_DIR
-  install_config.base_tar_file_path = (FLAGS.runspec_tar or _SPECCPU2017_TAR)
+  install_config.base_tar_file_path = FLAGS.runspec_tar or _SPECCPU2017_TAR
   install_config.base_iso_file_path = _SPECCPU2017_ISO
   install_config.base_clang_flag_file_path = _DEFAULT_CLANG_FLAG
   install_config.required_members = _TAR_REQUIRED_MEMBERS
   install_config.log_format = _LOG_FORMAT
-  install_config.runspec_config = (FLAGS.runspec_config or
-                                   _DEFAULT_RUNSPEC_CONFIG)
+  install_config.runspec_config = (
+      FLAGS.runspec_config or _DEFAULT_RUNSPEC_CONFIG
+  )
   install_config.UpdateConfig(scratch_dir)
   return install_config
 
@@ -82,13 +94,15 @@ def Install(vm):
   # But because we may have x86 or arm architecture machines, just rerun the
   # install script to regenerate the runner scripts based on what spec detects
   # to be the vm architecture.
-  vm.RemoteCommand('echo yes | {0}/cpu2017/install.sh'.format(
-      vm.GetScratchDir()))
+  vm.RemoteCommand(
+      'echo yes | {0}/cpu2017/install.sh'.format(vm.GetScratchDir())
+  )
 
   # Updates SPECCPU 2017.
   # spec17 had several updates, hence let's ensure to run the latest version
   vm.RemoteCommand(
-      'echo yes | {0}/cpu2017/bin/runcpu --update'.format(vm.GetScratchDir()))
+      'echo yes | {0}/cpu2017/bin/runcpu --update'.format(vm.GetScratchDir())
+  )
 
 
 def AptInstall(vm):

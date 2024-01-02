@@ -40,8 +40,14 @@ def AddTags(resource_arn, region):
     region: The AWS region resource was created in.
   """
   cmd_prefix = util.AWS_PREFIX
-  tag_cmd = cmd_prefix + ['redshift', 'create-tags', '--region=%s' % region,
-                          '--resource-name', resource_arn, '--tags']
+  tag_cmd = cmd_prefix + [
+      'redshift',
+      'create-tags',
+      '--region=%s' % region,
+      '--resource-name',
+      resource_arn,
+      '--tags',
+  ]
   tag_cmd += util.MakeFormattedDefaultTags()
   vm_util.IssueCommand(tag_cmd)
 
@@ -61,12 +67,14 @@ class AddingIAMRole(object):
     self.cmd_prefix = cmd_prefix
     self.cluster_identifier = cluster_identifier
     self.iam_role_name = iam_role_name
-    cmd = self.cmd_prefix + ['redshift',
-                             'modify-cluster-iam-roles',
-                             '--cluster-identifier',
-                             self.cluster_identifier,
-                             '--add-iam-roles',
-                             self.iam_role_name]
+    cmd = self.cmd_prefix + [
+        'redshift',
+        'modify-cluster-iam-roles',
+        '--cluster-identifier',
+        self.cluster_identifier,
+        '--add-iam-roles',
+        self.iam_role_name,
+    ]
     vm_util.IssueCommand(cmd)
 
 
@@ -96,15 +104,25 @@ class Spectrum(redshift.Redshift):
 
   def __DescribeCluster(self):
     """Describe a spectrum cluster."""
-    cmd = self.cmd_prefix + ['redshift', 'describe-clusters',
-                             '--cluster-identifier', self.cluster_identifier]
+    cmd = self.cmd_prefix + [
+        'redshift',
+        'describe-clusters',
+        '--cluster-identifier',
+        self.cluster_identifier,
+    ]
     return vm_util.IssueCommand(cmd)
 
   def _IsSnapshotRestored(self):
     """Method to return if the cluster snapshot is completed restoring."""
-    stdout, _, _, = self.__DescribeCluster()
-    return (json.loads(stdout)['Clusters'][0]['RestoreStatus']['Status'] in
-            SNAPSHOT_READY_STATUSES)
+    (
+        stdout,
+        _,
+        _,
+    ) = self.__DescribeCluster()
+    return (
+        json.loads(stdout)['Clusters'][0]['RestoreStatus']['Status']
+        in SNAPSHOT_READY_STATUSES
+    )
 
   def _PostCreate(self):
     """Perform general post create operations on the cluster.
@@ -112,10 +130,13 @@ class Spectrum(redshift.Redshift):
     Get the endpoint to be used for interacting with the cluster and apply
     tags on the cluster.
     """
-    @vm_util.Retry(poll_interval=self.POLL_INTERVAL, fuzz=0,
-                   timeout=self.READY_TIMEOUT,
-                   retryable_exceptions=(
-                       errors.Resource.RetryableCreationError,))
+
+    @vm_util.Retry(
+        poll_interval=self.POLL_INTERVAL,
+        fuzz=0,
+        timeout=self.READY_TIMEOUT,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
     def WaitUntilReady():
       if not self._IsReady():
         raise errors.Resource.RetryableCreationError('Adding IAM Role')
@@ -123,15 +144,15 @@ class Spectrum(redshift.Redshift):
     stdout, _, _ = self.__DescribeCluster()
     self.adding_iam_role = None
     if self.iam_role is not None:
-      self.adding_iam_role = AddingIAMRole(self.cluster_identifier,
-                                           self.iam_role,
-                                           self.cmd_prefix)
+      self.adding_iam_role = AddingIAMRole(
+          self.cluster_identifier, self.iam_role, self.cmd_prefix
+      )
       WaitUntilReady()
 
     stdout, _, _ = self.__DescribeCluster()
     self.endpoint = json.loads(stdout)['Clusters'][0]['Endpoint']['Address']
     account = util.GetAccount()
-    self.arn = 'arn:aws:redshift:{}:{}:cluster:{}'.format(self.region, account,
-                                                          self.
-                                                          cluster_identifier)
+    self.arn = 'arn:aws:redshift:{}:{}:cluster:{}'.format(
+        self.region, account, self.cluster_identifier
+    )
     AddTags(self.arn, self.region)

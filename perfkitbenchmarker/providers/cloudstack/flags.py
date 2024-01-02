@@ -16,25 +16,28 @@ import os
 
 from absl import flags
 
-flags.DEFINE_string('CS_API_URL',
-                    os.environ.get('CS_API_URL'),
-                    'API endpoint for Cloudstack.')
+flags.DEFINE_string(
+    'CS_API_URL', os.environ.get('CS_API_URL'), 'API endpoint for Cloudstack.'
+)
 
-flags.DEFINE_string('CS_API_KEY',
-                    os.environ.get('CS_API_KEY'),
-                    'Key for API authentication')
+flags.DEFINE_string(
+    'CS_API_KEY', os.environ.get('CS_API_KEY'), 'Key for API authentication'
+)
 
-flags.DEFINE_string('CS_API_SECRET',
-                    os.environ.get('CS_API_SECRET'),
-                    'Secret for API authentication')
+flags.DEFINE_string(
+    'CS_API_SECRET',
+    os.environ.get('CS_API_SECRET'),
+    'Secret for API authentication',
+)
 
-flags.DEFINE_string('cs_network_offering',
-                    'DefaultIsolatedNetworkOfferingForVpcNetworksNoLB',
-                    'Name of the network offering')
+flags.DEFINE_string(
+    'cs_network_offering',
+    'DefaultIsolatedNetworkOfferingForVpcNetworksNoLB',
+    'Name of the network offering',
+)
 
-flags.DEFINE_string('cs_vpc_offering',
-                    'Default VPC offering',
-                    'Name of the VPC offering')
+flags.DEFINE_string(
+    'cs_vpc_offering', 'Default VPC offering', 'Name of the VPC offering'
+)
 
-flags.DEFINE_boolean('cs_use_vpc', True,
-                     'Use VPC to create networks')
+flags.DEFINE_boolean('cs_use_vpc', True, 'Use VPC to create networks')

@@ -28,26 +28,27 @@ class OpenStackCLICommand(object):
 
   Attributes:
     args: list of strings. Positional args to pass to openstack, typically
-        specifying an operation to perform (e.g. ['image', 'list'] to list
-        available images).
+      specifying an operation to perform (e.g. ['image', 'list'] to list
+      available images).
     flags: OrderedDict mapping flag name string to flag value. Flags to pass to
-        openstack cli (e.g. {'os-compute-api-version': '2'}). If a provided
-        value is True, the flag is passed to openstack cli without a value. If
-        a provided value is a list, the flag is passed to openstack cli multiple
-        times, once with each value in the list.
+      openstack cli (e.g. {'os-compute-api-version': '2'}). If a provided value
+      is True, the flag is passed to openstack cli without a value. If a
+      provided value is a list, the flag is passed to openstack cli multiple
+      times, once with each value in the list.
     additional_flags: list of strings. Additional flags to append unmodified to
-        the end of the openstack cli command.
+      the end of the openstack cli command.
   """
 
   def __init__(self, resource, *args):
     """Initializes an OpenStackCLICommand with the provided args and common
+
     flags.
 
     Args:
       resource: An OpenStack resource of type BaseResource.
       *args: sequence of strings. Positional args to pass to openstack cli,
-          typically specifying an operation to perform (e.g. ['image', 'list']
-          to list available images).
+        typically specifying an operation to perform (e.g. ['image', 'list'] to
+        list available images).
     """
     self.args = list(args)
     self.flags = OrderedDict()
@@ -82,7 +83,7 @@ class OpenStackCLICommand(object):
 
     Args:
       **kwargs: Keyword arguments to forward to vm_util.IssueCommand when
-          issuing the openstack cli command.
+        issuing the openstack cli command.
 
     Returns:
       A tuple of stdout, stderr, and retcode from running the openstack command.
@@ -96,7 +97,7 @@ class OpenStackCLICommand(object):
 
     Args:
       **kwargs: Keyword arguments to forward to vm_util.IssueRetryableCommand
-          when issuing the openstack cli command.
+        when issuing the openstack cli command.
 
     Returns:
       (stdout, stderr) pair of strings from running the openstack command.

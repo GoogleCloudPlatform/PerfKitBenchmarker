@@ -30,8 +30,9 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 PATH = 'aerospike-tools-7.0.5-ubuntu20.04'
 TAR_FILE = f'{PATH}.tgz'
-DOWNLOAD_URL = ('https://download.aerospike.com/'
-                f'artifacts/aerospike-tools/7.0.5/{TAR_FILE}')
+DOWNLOAD_URL = (
+    f'https://download.aerospike.com/artifacts/aerospike-tools/7.0.5/{TAR_FILE}'
+)
 STDOUT_START = 'Stage 1: default config'
 SUM = lambda x, y: x + y
 METADATA_AGGREGATOR = {
@@ -78,7 +79,7 @@ def YumInstall(vm):
 def _ExtractResultLines(lines):
   for line_idx in range(len(lines)):
     if lines[line_idx].startswith(STDOUT_START):  # ignore everyhing before.
-      return lines[line_idx + 1:]
+      return lines[line_idx + 1 :]
 
 
 def ParseDate(date: str) -> datetime.datetime:
@@ -140,7 +141,7 @@ def ParseAsbenchStdout(output):
           f'{op}_p90': float(values[8][:-1]),
           f'{op}_p99': float(values[9][:-1]),
           f'{op}_p99.9': float(values[10][:-1]),
-          f'{op}_p99.99': float(values[11])
+          f'{op}_p99.99': float(values[11]),
       })
     elif 'AEROSPIKE_ERR_TIMEOUT' in line or 'AEROSPIKE_ERR_CONNECTION' in line:
       continue
@@ -148,7 +149,8 @@ def ParseAsbenchStdout(output):
       continue
     else:
       aggregation_metrics = regex_util.ExtractAllFloatMetrics(
-          regex_util.ExtractExactlyOneMatch(r'total\(.*\)', line))
+          regex_util.ExtractExactlyOneMatch(r'total\(.*\)', line)
+      )
 
       metadata.update(aggregation_metrics)
       samples.append(
@@ -156,7 +158,9 @@ def ParseAsbenchStdout(output):
               'throughput',
               aggregation_metrics['tps'],
               'transaction_per_second',
-              metadata=copy.deepcopy(metadata)))
+              metadata=copy.deepcopy(metadata),
+          )
+      )
       metadata.clear()
   return samples
 
@@ -181,11 +185,13 @@ def AggregateAsbenchSamples(raw_samples):
     else:
       new_value = aggregated_samples[timestamp].value + s.value
       current_sample = aggregated_samples[timestamp]
-      aggregated_samples[timestamp] = sample.Sample(current_sample.metric,
-                                                    new_value,
-                                                    current_sample.unit,
-                                                    current_sample.metadata,
-                                                    current_sample.timestamp)
+      aggregated_samples[timestamp] = sample.Sample(
+          current_sample.metric,
+          new_value,
+          current_sample.unit,
+          current_sample.metadata,
+          current_sample.timestamp,
+      )
 
       def _AggregateMetadata(agg_metadata, metadata):
         # Iterate on the copy of metadata, so we can drop keys at runtime.
@@ -193,8 +199,9 @@ def AggregateAsbenchSamples(raw_samples):
           # find aggregator
           for regex in METADATA_AGGREGATOR:
             if re.search(regex, key):
-              agg_metadata[key] = METADATA_AGGREGATOR[regex](value,
-                                                             metadata[key])
+              agg_metadata[key] = METADATA_AGGREGATOR[regex](
+                  value, metadata[key]
+              )
               break
             else:
               # drop metadata if we do not know how to aggregate
@@ -395,6 +402,7 @@ def ParseAsbenchHistogram(result_files: List[str]) -> List[sample.Sample]:
 @dataclasses.dataclass
 class AsbenchResult:
   """Class that represents Asbench results."""
+
   ops: float
   timestamp: float
   read_min: float
@@ -405,8 +413,9 @@ class AsbenchResult:
   def __init__(self, s: sample.Sample):
     super(AsbenchResult, self).__init__()
     self.ops = s.value
-    self.timestamp = (s.metadata['start_timestamp'] + s.metadata['window'] -
-                      1) * 1000
+    self.timestamp = (
+        s.metadata['start_timestamp'] + s.metadata['window'] - 1
+    ) * 1000
     self.read_min = s.metadata.get('read_min', None)
     self.read_max = s.metadata.get('read_max', None)
     self.write_min = s.metadata.get('write_min', None)
@@ -430,51 +439,61 @@ def CreateTimeSeriesSample(samples: List[sample.Sample]) -> List[sample.Sample]:
   results = sorted(results, key=lambda r: r.timestamp)
   rampup_end_time = min(r.timestamp for r in results) + RAMPUP_TIME_IN_MS
   ts_samples = [
-      sample.CreateTimeSeriesSample([r.ops for r in results],
-                                    [r.timestamp for r in results],
-                                    sample.OPS_TIME_SERIES,
-                                    'ops',
-                                    1,
-                                    ramp_up_ends=rampup_end_time,
-                                    additional_metadata={})
+      sample.CreateTimeSeriesSample(
+          [r.ops for r in results],
+          [r.timestamp for r in results],
+          sample.OPS_TIME_SERIES,
+          'ops',
+          1,
+          ramp_up_ends=rampup_end_time,
+          additional_metadata={},
+      )
   ]
-  total_ops = sample.Sample('total_ops',
-                            sum([r.ops for r in results]) / len(results), 'ops',
-                            {})
+  total_ops = sample.Sample(
+      'total_ops', sum([r.ops for r in results]) / len(results), 'ops', {}
+  )
   if results[0].read_min:
     # the workload does read operations
     ts_samples.extend([
-        sample.CreateTimeSeriesSample([r.read_min for r in results],
-                                      [r.timestamp for r in results],
-                                      f'Read_Min_{sample.LATENCY_TIME_SERIES}',
-                                      'us',
-                                      1,
-                                      ramp_up_ends=rampup_end_time,
-                                      additional_metadata={}),
-        sample.CreateTimeSeriesSample([r.read_max for r in results],
-                                      [r.timestamp for r in results],
-                                      f'Read_Max_{sample.LATENCY_TIME_SERIES}',
-                                      'us',
-                                      1,
-                                      ramp_up_ends=rampup_end_time,
-                                      additional_metadata={})
+        sample.CreateTimeSeriesSample(
+            [r.read_min for r in results],
+            [r.timestamp for r in results],
+            f'Read_Min_{sample.LATENCY_TIME_SERIES}',
+            'us',
+            1,
+            ramp_up_ends=rampup_end_time,
+            additional_metadata={},
+        ),
+        sample.CreateTimeSeriesSample(
+            [r.read_max for r in results],
+            [r.timestamp for r in results],
+            f'Read_Max_{sample.LATENCY_TIME_SERIES}',
+            'us',
+            1,
+            ramp_up_ends=rampup_end_time,
+            additional_metadata={},
+        ),
     ])
   if results[0].write_min:
     # The workload has write operations
     ts_samples.extend([
-        sample.CreateTimeSeriesSample([r.write_min for r in results],
-                                      [r.timestamp for r in results],
-                                      f'Write_Min_{sample.LATENCY_TIME_SERIES}',
-                                      'us',
-                                      1,
-                                      ramp_up_ends=rampup_end_time,
-                                      additional_metadata={}),
-        sample.CreateTimeSeriesSample([r.write_max for r in results],
-                                      [r.timestamp for r in results],
-                                      f'Write_Max_{sample.LATENCY_TIME_SERIES}',
-                                      'us',
-                                      1,
-                                      ramp_up_ends=rampup_end_time,
-                                      additional_metadata={})
+        sample.CreateTimeSeriesSample(
+            [r.write_min for r in results],
+            [r.timestamp for r in results],
+            f'Write_Min_{sample.LATENCY_TIME_SERIES}',
+            'us',
+            1,
+            ramp_up_ends=rampup_end_time,
+            additional_metadata={},
+        ),
+        sample.CreateTimeSeriesSample(
+            [r.write_max for r in results],
+            [r.timestamp for r in results],
+            f'Write_Max_{sample.LATENCY_TIME_SERIES}',
+            'us',
+            1,
+            ramp_up_ends=rampup_end_time,
+            additional_metadata={},
+        ),
     ])
   return ts_samples + [total_ops]

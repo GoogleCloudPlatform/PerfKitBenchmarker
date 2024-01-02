@@ -46,10 +46,11 @@ def _Install(vm):
   vm.Install('curl')
   vm.Install('openssl')
 
-  vm.RemoteCommand(('mkdir -p {0} && curl -L {1} '
-                    '| tar --strip-components=1 -C {0} -xzf -').format(
-                        WRK_DIR,
-                        WRK_URL))
+  vm.RemoteCommand(
+      (
+          'mkdir -p {0} && curl -L {1} | tar --strip-components=1 -C {0} -xzf -'
+      ).format(WRK_DIR, WRK_URL)
+  )
   vm.RemoteCommand('cd {} && make'.format(WRK_DIR))
   vm.PushDataFile(_LUA_SCRIPT_NAME, _LUA_SCRIPT_PATH)
 
@@ -74,8 +75,7 @@ def _ParseOutput(output_text):
     raise ValueError('{0} not found in\n{1}'.format(_CSV_PREFIX, output_text))
   csv_fp = six.StringIO(str(output_text).rsplit(_CSV_PREFIX, 1)[-1])
   reader = csv.DictReader(csv_fp)
-  if (frozenset(reader.fieldnames) !=
-      frozenset(['variable', 'value', 'unit'])):
+  if frozenset(reader.fieldnames) != frozenset(['variable', 'value', 'unit']):
     raise ValueError('Unexpected fields: {}'.format(reader.fieldnames))
   for row in reader:
     yield row['variable'], float(row['value']), row['unit']
@@ -89,20 +89,34 @@ def Run(vm, target, connections=1, duration=60):
     target: URL to fetch.
     connections: Number of concurrent connections.
     duration: Duration of the test, in seconds.
+
   Yields:
     sample.Sample objects with results.
   """
   threads = min(connections, vm.NumCpusForBenchmark())
-  cmd = ('{wrk} --connections={connections} --threads={threads} '
-         '--duration={duration} '
-         '--timeout={timeout} '
-         '--script={script} {target}').format(
-             wrk=WRK_PATH, connections=connections, threads=threads,
-             script=_LUA_SCRIPT_PATH, target=target,
-             duration=duration, timeout=_TIMEOUT)
+  cmd = (
+      '{wrk} --connections={connections} --threads={threads} '
+      '--duration={duration} '
+      '--timeout={timeout} '
+      '--script={script} {target}'
+  ).format(
+      wrk=WRK_PATH,
+      connections=connections,
+      threads=threads,
+      script=_LUA_SCRIPT_PATH,
+      target=target,
+      duration=duration,
+      timeout=_TIMEOUT,
+  )
   stdout, _ = vm.RemoteCommand(cmd)
   for variable, value, unit in _ParseOutput(stdout):
-    yield sample.Sample(variable, value, unit,
-                        metadata={'connections': connections,
-                                  'threads': threads,
-                                  'duration': duration})
+    yield sample.Sample(
+        variable,
+        value,
+        unit,
+        metadata={
+            'connections': connections,
+            'threads': threads,
+            'duration': duration,
+        },
+    )

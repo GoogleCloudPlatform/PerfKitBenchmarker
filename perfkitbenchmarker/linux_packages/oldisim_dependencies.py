@@ -16,10 +16,8 @@
 
 import os
 
-YUM_PACKAGES = ('bc gengetopt libevent-devel '
-                'google-perftools-devel scons')
-APT_PACKAGES = ('bc gengetopt libevent-dev '
-                'libgoogle-perftools-dev scons')
+YUM_PACKAGES = 'bc gengetopt libevent-devel google-perftools-devel scons'
+APT_PACKAGES = 'bc gengetopt libevent-dev libgoogle-perftools-dev scons'
 
 OLDISIM_GIT = 'https://github.com/GoogleCloudPlatform/oldisim.git'
 OLDISIM_DIR = 'oldisim'
@@ -31,9 +29,11 @@ def _Install(vm, packages):
   vm.Install('build_tools')
   vm.InstallPackages(packages)
   vm.RemoteCommand('git clone --recursive %s' % OLDISIM_GIT)
-  vm.RemoteCommand('cd %s && git checkout %s && '
-                   'scons -j$(cat /proc/cpuinfo | grep processor | wc -l)' %
-                   (OLDISIM_DIR, OLDISIM_VERSION))
+  vm.RemoteCommand(
+      'cd %s && git checkout %s && '
+      'scons -j$(cat /proc/cpuinfo | grep processor | wc -l)'
+      % (OLDISIM_DIR, OLDISIM_VERSION)
+  )
 
 
 def YumInstall(vm):

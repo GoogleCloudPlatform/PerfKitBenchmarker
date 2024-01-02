@@ -36,9 +36,7 @@ HPCC_URL = 'https://icl.cs.utk.edu/projectsfiles/hpcc/download/' + HPCC_TAR
 PREPROVISIONED_DATA = {
     HPCC_TAR: '0a6fef7ab9f3347e549fed65ebb98234feea9ee18aea0c8f59baefbe3cf7ffb8'
 }
-PACKAGE_DATA_URL = {
-    HPCC_TAR: HPCC_URL
-}
+PACKAGE_DATA_URL = {HPCC_TAR: HPCC_URL}
 
 HPCC_DIR = '%s/hpcc-1.5.0' % linux_packages.INSTALL_DIR
 HPCC_VERSION = '1.5.0'
@@ -208,19 +206,30 @@ HPCC_BENCHMARKS = sorted(HPCC_METRIC_MAP)
 
 
 flags.DEFINE_enum(
-    'hpcc_math_library', HPCC_MATH_LIBRARY_OPEN_BLAS, [
-        HPCC_MATH_LIBRARY_OPEN_BLAS, HPCC_MATH_LIBRARY_MKL,
-        HPCC_MATH_LIBRARY_AMD_BLIS
-    ], 'The math library to use when compiling hpcc: openblas, mkl, or '
-    'amdblis. The default is openblas.')
+    'hpcc_math_library',
+    HPCC_MATH_LIBRARY_OPEN_BLAS,
+    [
+        HPCC_MATH_LIBRARY_OPEN_BLAS,
+        HPCC_MATH_LIBRARY_MKL,
+        HPCC_MATH_LIBRARY_AMD_BLIS,
+    ],
+    'The math library to use when compiling hpcc: openblas, mkl, or '
+    'amdblis. The default is openblas.',
+)
 flags.DEFINE_list(
-    'hpcc_benchmarks', [], 'A list of benchmarks in HPCC to run. If none are '
+    'hpcc_benchmarks',
+    [],
+    'A list of benchmarks in HPCC to run. If none are '
     'specified (the default), then all of the benchmarks are run. In 1.5.0, '
-    'the benchmarks may include the following: %s' % ', '.join(HPCC_BENCHMARKS))
+    'the benchmarks may include the following: %s'
+    % ', '.join(HPCC_BENCHMARKS),
+)
 
 USE_INTEL_COMPILED_HPL = flags.DEFINE_boolean(
-    'hpcc_use_intel_compiled_hpl', False,
-    'Whether to use the intel compiled HPL')
+    'hpcc_use_intel_compiled_hpl',
+    False,
+    'Whether to use the intel compiled HPL',
+)
 
 
 def CheckUseIntelCompiled(myflags: Dict[str, Any]) -> bool:
@@ -240,11 +249,14 @@ def CheckUseIntelCompiled(myflags: Dict[str, Any]) -> bool:
 
 flags.register_validator(
     'hpcc_benchmarks',
-    lambda hpcc_benchmarks: set(hpcc_benchmarks).issubset(set(HPCC_BENCHMARKS)))
+    lambda hpcc_benchmarks: set(hpcc_benchmarks).issubset(set(HPCC_BENCHMARKS)),
+)
 flags.register_multi_flags_validator(
-    ['hpcc_math_library', 'hpcc_use_intel_compiled_hpl'], CheckUseIntelCompiled,
+    ['hpcc_math_library', 'hpcc_use_intel_compiled_hpl'],
+    CheckUseIntelCompiled,
     'With --hpcc_use_intel_compiled_hpl must specify '
-    f'--hpcc_math_library={HPCC_MATH_LIBRARY_MKL}')
+    f'--hpcc_math_library={HPCC_MATH_LIBRARY_MKL}',
+)
 
 FLAGS = flags.FLAGS
 
@@ -295,10 +307,12 @@ def Install(vm):
     # Using a pre-compiled HPL, no need to continue
     return
   vm.Install('openmpi')
-  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, PREPROVISIONED_DATA.keys(),
-                                      linux_packages.INSTALL_DIR)
-  vm.RemoteCommand('cd %s && tar xvfz %s' %
-                   (linux_packages.INSTALL_DIR, HPCC_TAR))
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), linux_packages.INSTALL_DIR
+  )
+  vm.RemoteCommand(
+      'cd %s && tar xvfz %s' % (linux_packages.INSTALL_DIR, HPCC_TAR)
+  )
 
   if FLAGS.hpcc_benchmarks:
     _LimitBenchmarksToRun(vm, set(FLAGS.hpcc_benchmarks))
@@ -311,21 +325,25 @@ def Install(vm):
     _CompileHpccAmdBlis(vm)
   else:
     raise errors.Setup.InvalidFlagConfigurationError(
-        'Unexpected hpcc_math_library option encountered.')
+        'Unexpected hpcc_math_library option encountered.'
+    )
 
 
 def _CompileHpccOpenblas(vm):
   """Compile HPCC with OpenBlas."""
   vm.Install('openblas')
   vm.RemoteCommand(
-      'cp %s/hpl/setup/%s %s' %
-      (HPCC_DIR, HPCC_MAKEFILE_CBLAS, HPCC_MAKEFILE_PATH_OPEN_BLAS))
-  sed_cmd = ('sed -i -e "/^MP/d" -e "s|gcc|mpicc|" -e "s|g77|mpicc|" '
-             '-e "s|\\$(HOME)/netlib/ARCHIVES/Linux_PII|%s|" '
-             '-e "s|libcblas.*|libopenblas.a|" '
-             '-e "s|-funroll-loops|-funroll-loops -std=c99|" '
-             '-e "s|\\-lm|\\-lgfortran \\-lm|" %s' %
-             (re.escape(openblas.OPENBLAS_DIR), HPCC_MAKEFILE_PATH_OPEN_BLAS))
+      'cp %s/hpl/setup/%s %s'
+      % (HPCC_DIR, HPCC_MAKEFILE_CBLAS, HPCC_MAKEFILE_PATH_OPEN_BLAS)
+  )
+  sed_cmd = (
+      'sed -i -e "/^MP/d" -e "s|gcc|mpicc|" -e "s|g77|mpicc|" '
+      '-e "s|\\$(HOME)/netlib/ARCHIVES/Linux_PII|%s|" '
+      '-e "s|libcblas.*|libopenblas.a|" '
+      '-e "s|-funroll-loops|-funroll-loops -std=c99|" '
+      '-e "s|\\-lm|\\-lgfortran \\-lm|" %s'
+      % (re.escape(openblas.OPENBLAS_DIR), HPCC_MAKEFILE_PATH_OPEN_BLAS)
+  )
   vm.RemoteCommand(sed_cmd)
   vm.RemoteCommand('cd %s; make arch=OPEN_BLAS' % HPCC_DIR)
 
@@ -333,14 +351,18 @@ def _CompileHpccOpenblas(vm):
 def _CompileHpccAmdBlis(vm):
   """Compile HPCC with AMD BLIS."""
   vm.Install('amdblis')
-  vm.RemoteCommand('cp %s/hpl/setup/%s %s' %
-                   (HPCC_DIR, HPCC_MAKEFILE_CBLAS, HPCC_MAKEFILE_PATH_AMD_BLIS))
-  sed_cmd = ('sed -i -e "/^MP/d" -e "s|gcc|mpicc|" -e "s|g77|mpicc|" '
-             '-e "s|\\$(HOME)/netlib/ARCHIVES/Linux_PII|%s|" '
-             '-e "s|libcblas.*|lib/zen/libblis.a|" '
-             '-e "s|-funroll-loops|-funroll-loops -std=c99|" '
-             '-e "s|\\-lm|\\-lgfortran \\-lm|" %s' %
-             (re.escape(amdblis.AMDBLIS_DIR), HPCC_MAKEFILE_PATH_AMD_BLIS))
+  vm.RemoteCommand(
+      'cp %s/hpl/setup/%s %s'
+      % (HPCC_DIR, HPCC_MAKEFILE_CBLAS, HPCC_MAKEFILE_PATH_AMD_BLIS)
+  )
+  sed_cmd = (
+      'sed -i -e "/^MP/d" -e "s|gcc|mpicc|" -e "s|g77|mpicc|" '
+      '-e "s|\\$(HOME)/netlib/ARCHIVES/Linux_PII|%s|" '
+      '-e "s|libcblas.*|lib/zen/libblis.a|" '
+      '-e "s|-funroll-loops|-funroll-loops -std=c99|" '
+      '-e "s|\\-lm|\\-lgfortran \\-lm|" %s'
+      % (re.escape(amdblis.AMDBLIS_DIR), HPCC_MAKEFILE_PATH_AMD_BLIS)
+  )
   vm.RemoteCommand(sed_cmd)
   vm.RemoteCommand('cd %s; make arch=AMD_BLIS' % HPCC_DIR)
 
@@ -362,26 +384,35 @@ def _CompileHpccMKL(vm):
   _CompileHpccOpenblas(vm)
   vm.RemoteCommand('cd %s; rm hpcc' % HPCC_DIR)
   vm.Install('mkl')
-  vm.RemoteCommand('cp %s/hpl/setup/%s %s' % (HPCC_DIR, HPCC_MAKEFILE_CBLAS,
-                                              HPCC_MAKEFILE_PATH_MKL))
-  mkl_lalib = ('-Wl,--start-group $(LAdir)/libfftw2xc_double_gnu.a '
-               '$(LAdir)/libfftw2xf_double_gnu.a '
-               '$(LAdir)/libmkl_intel_lp64.a '
-               '$(LAdir)/libmkl_intel_thread.a '
-               '$(LAdir)/libmkl_core.a '
-               '$(LAdir)/libmkl_blas95_lp64.a '
-               '-Wl,--end-group')
-  mkl_ccflags = (' -Wl,--no-as-needed -ldl -lmpi -liomp5 -lpthread -lm '
-                 '-DUSING_FFTW -DMKL_INT=long -DLONG_IS_64BITS')
+  vm.RemoteCommand(
+      'cp %s/hpl/setup/%s %s'
+      % (HPCC_DIR, HPCC_MAKEFILE_CBLAS, HPCC_MAKEFILE_PATH_MKL)
+  )
+  mkl_lalib = (
+      '-Wl,--start-group $(LAdir)/libfftw2xc_double_gnu.a '
+      '$(LAdir)/libfftw2xf_double_gnu.a '
+      '$(LAdir)/libmkl_intel_lp64.a '
+      '$(LAdir)/libmkl_intel_thread.a '
+      '$(LAdir)/libmkl_core.a '
+      '$(LAdir)/libmkl_blas95_lp64.a '
+      '-Wl,--end-group'
+  )
+  mkl_ccflags = (
+      ' -Wl,--no-as-needed -ldl -lmpi -liomp5 -lpthread -lm '
+      '-DUSING_FFTW -DMKL_INT=long -DLONG_IS_64BITS'
+  )
   sed_cmd_mkl = (
       'sed -i -e "/^MP/d" -e "s|gcc|mpicc|" -e "s|g77|mpicc|" '
       '-e "s|\\$(HOME)/netlib/ARCHIVES/Linux_PII|'
       '/opt/intel/mkl/lib/intel64|" '
       '-e "s|\\$(LAdir)/libcblas.*|%s|" '
       '-e "s|\\-lm|\\-lgfortran \\-lm|" '
-      '-e "/CCFLAGS / s|$|%s|" %s' %
-      (re.escape(mkl_lalib), re.escape(mkl_ccflags), HPCC_MAKEFILE_PATH_MKL))
+      '-e "/CCFLAGS / s|$|%s|" %s'
+      % (re.escape(mkl_lalib), re.escape(mkl_ccflags), HPCC_MAKEFILE_PATH_MKL)
+  )
   vm.RemoteCommand(sed_cmd_mkl)
-  vm.RemoteCommand('source /opt/intel/compilers_and_libraries/linux/bin/'
-                   'compilervars.sh -arch intel64 -platform linux && '
-                   'cd %s; make arch=intel64' % HPCC_DIR)
+  vm.RemoteCommand(
+      'source /opt/intel/compilers_and_libraries/linux/bin/'
+      'compilervars.sh -arch intel64 -platform linux && '
+      'cd %s; make arch=intel64' % HPCC_DIR
+  )

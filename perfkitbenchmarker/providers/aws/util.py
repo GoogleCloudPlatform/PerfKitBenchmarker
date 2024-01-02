@@ -29,15 +29,18 @@ import six
 AWS_PATH = 'aws'
 AWS_PREFIX = [AWS_PATH, '--output', 'json']
 FLAGS = flags.FLAGS
-STOCKOUT_MESSAGE = ('Creation failed due to insufficient capacity indicating a '
-                    'potential stockout scenario.')
+STOCKOUT_MESSAGE = (
+    'Creation failed due to insufficient capacity indicating a '
+    'potential stockout scenario.'
+)
 
 
 def IsRegion(zone_or_region):
   """Returns whether "zone_or_region" is a region."""
   if not re.match(r'[a-z]{2}-[a-z]+-[0-9][a-z]?$', zone_or_region):
     raise ValueError(
-        '%s is not a valid AWS zone or region name' % zone_or_region)
+        '%s is not a valid AWS zone or region name' % zone_or_region
+    )
   return zone_or_region[-1] in string.digits
 
 
@@ -53,6 +56,7 @@ def GetRegionFromZones(zones):
 
   Args:
     zones: A set of zones.
+
   Raises:
     Exception: if the zones are in different regions.
   """
@@ -63,9 +67,10 @@ def GetRegionFromZones(zones):
       region = current_region
     else:
       if region != current_region:
-        raise Exception('Not All zones are in the same region %s not same as '
-                        '%s. zones: %s' %
-                        (region, current_region, ','.join(zones)))
+        raise Exception(
+            'Not All zones are in the same region %s not same as %s. zones: %s'
+            % (region, current_region, ','.join(zones))
+        )
   return region
 
 
@@ -74,7 +79,7 @@ def GetZonesInRegion(region: str) -> Set[str]:
   get_zones_cmd = AWS_PREFIX + [
       'ec2',
       'describe-availability-zones',
-      '--region={0}'.format(region)
+      '--region={0}'.format(region),
   ]
   stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
   response = json.loads(stdout)
@@ -89,10 +94,16 @@ def GetZonesFromMachineType(machine_type: str) -> Set[str]:
   """Returns all available zones for a given machine type."""
   zones = set()
   for region in GetAllRegions():
-    get_zones_cmd = AWS_PREFIX + [
-        'ec2', 'describe-instance-type-offerings',
-        '--location-type=availability-zone', f'--region={region}'
-    ] + AwsFilter({'instance-type': machine_type})
+    get_zones_cmd = (
+        AWS_PREFIX
+        + [
+            'ec2',
+            'describe-instance-type-offerings',
+            '--location-type=availability-zone',
+            f'--region={region}',
+        ]
+        + AwsFilter({'instance-type': machine_type})
+    )
     stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
     response = json.loads(stdout)
     for item in response['InstanceTypeOfferings']:
@@ -166,8 +177,9 @@ def FormatTagSpecifications(resource_type, tags_dict):
   Returns:
     A list of tags formatted as arguments for 'tag-specifications' parameter.
   """
-  tags = ','.join('{Key=%s,Value=%s}' %
-                  (k, v) for k, v in six.iteritems(tags_dict))
+  tags = ','.join(
+      '{Key=%s,Value=%s}' % (k, v) for k, v in six.iteritems(tags_dict)
+  )
   return 'ResourceType=%s,Tags=[%s]' % (resource_type, tags)
 
 
@@ -182,12 +194,18 @@ def AddTags(resource_id, region, **kwargs):
   if not kwargs:
     return
 
-  tag_cmd = AWS_PREFIX + [
-      'ec2',
-      'create-tags',
-      '--region=%s' % region,
-      '--resources', resource_id,
-      '--tags'] + FormatTags(kwargs)
+  tag_cmd = (
+      AWS_PREFIX
+      + [
+          'ec2',
+          'create-tags',
+          '--region=%s' % region,
+          '--resources',
+          resource_id,
+          '--tags',
+      ]
+      + FormatTags(kwargs)
+  )
   IssueRetryableCommand(tag_cmd)
 
 
@@ -259,7 +277,7 @@ def IssueRetryableCommand(cmd, env=None, suppress_failure=None):
 
   Args:
     cmd: A list of strings such as is given to the subprocess.Popen()
-        constructor.
+      constructor.
     env: An alternate environment to pass to the Popen command.
     suppress_failure: A function to pass to vm_util.IssueCommand()
 
@@ -267,13 +285,16 @@ def IssueRetryableCommand(cmd, env=None, suppress_failure=None):
     A tuple of stdout and stderr from running the provided command.
   """
   stdout, stderr, retcode = vm_util.IssueCommand(
-      cmd, env=env, raise_on_failure=False, suppress_failure=suppress_failure)
+      cmd, env=env, raise_on_failure=False, suppress_failure=suppress_failure
+  )
   if retcode:
     raise errors.VmUtil.CalledProcessException(
-        'Command returned a non-zero exit code.\n')
+        'Command returned a non-zero exit code.\n'
+    )
   if stderr:
     raise errors.VmUtil.CalledProcessException(
-        'The command had output on stderr:\n%s' % stderr)
+        'The command had output on stderr:\n%s' % stderr
+    )
   return stdout, stderr
 
 

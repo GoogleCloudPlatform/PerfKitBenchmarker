@@ -18,6 +18,5 @@ from perfkitbenchmarker import provider_info
 
 
 class IBMCloudProviderInfo(provider_info.BaseProviderInfo):
-
   UNSUPPORTED_BENCHMARKS = []
   CLOUD = provider_info.IBMCLOUD

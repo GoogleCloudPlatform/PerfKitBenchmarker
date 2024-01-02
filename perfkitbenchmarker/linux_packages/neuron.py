@@ -18,8 +18,10 @@ from absl import flags
 from perfkitbenchmarker import virtual_machine
 
 ENV = flags.DEFINE_string(
-    'neuron_env', 'aws_neuron_venv_pytorch',
-    'The Python virtual environment to install Neuron pip package.')
+    'neuron_env',
+    'aws_neuron_venv_pytorch',
+    'The Python virtual environment to install Neuron pip package.',
+)
 FLAGS = flags.FLAGS
 
 
@@ -38,7 +40,8 @@ enabled=1
 metadata_expire=0
 EOF""")
   vm.RemoteCommand(
-      'sudo rpm --import https://yum.repos.neuron.amazonaws.com/GPG-PUB-KEY-AMAZON-AWS-NEURON.PUB'
+      'sudo rpm --import'
+      ' https://yum.repos.neuron.amazonaws.com/GPG-PUB-KEY-AMAZON-AWS-NEURON.PUB'
   )
 
   # Update OS packages
@@ -78,7 +81,8 @@ EOF""")
 
   # Install packages from repos
   vm.RemoteCommand(
-      f'{path} pip3 config set global.extra-index-url "https://pip.repos.neuron.amazonaws.com"'
+      f'{path} pip3 config set global.extra-index-url'
+      ' "https://pip.repos.neuron.amazonaws.com"'
   )
 
   # Install Neuron packages

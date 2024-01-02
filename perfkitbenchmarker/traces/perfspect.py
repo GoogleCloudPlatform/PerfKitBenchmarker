@@ -39,22 +39,27 @@ from six.moves.urllib.parse import urlparse
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_boolean('perfspect', False,
-                     'Install and run perfspect on the target system.')
-flags.DEFINE_string('perfspect_tarball', None,
-                    'Local path to perfspect tarball.')
-flags.DEFINE_string('perfspect_url', None,
-                    'URL for downloading perfspect tarball.')
+flags.DEFINE_boolean(
+    'perfspect', False, 'Install and run perfspect on the target system.'
+)
+flags.DEFINE_string(
+    'perfspect_tarball', None, 'Local path to perfspect tarball.'
+)
+flags.DEFINE_string(
+    'perfspect_url', None, 'URL for downloading perfspect tarball.'
+)
 
 PERFSPECT_ARCHIVE_URL = 'https://github.com/intel/PerfSpect/releases/download/v1.1.0/perfspect_1.1.0.tgz'
 PREREQ_UBUNTU = [
-    'linux-tools-common', 'linux-tools-generic', 'linux-tools-`uname -r`'
+    'linux-tools-common',
+    'linux-tools-generic',
+    'linux-tools-`uname -r`',
 ]
 PREREQ_CENTOS = ['perf']
 PREREQ_PKGS = ['python3-pip']
 
 
-class PerfspectCollector():
+class PerfspectCollector:
   """Manages running telemetry during a test, and fetching the results folder."""
 
   telemetry_dir = '/opt/perf_telemetry'
@@ -89,12 +94,12 @@ class PerfspectCollector():
     except errors.VirtualMachine.RemoteCommandError as ex:
       logging.exception('Failed executing perf. Is it installed?')
       raise ex
-    perf_collect_file = posixpath.join(self.telemetry_dir, 'perfspect',
-                                       'perf-collect.sh')
+    perf_collect_file = posixpath.join(
+        self.telemetry_dir, 'perfspect', 'perf-collect.sh'
+    )
     vm.RemoteCommand(f'sudo chmod +x {perf_collect_file}')
     perf_dir = posixpath.join(self.telemetry_dir, 'perfspect')
-    stdout, _ = vm.RemoteCommand(
-        f'cd {perf_dir} && sudo ./perf-collect.sh')
+    stdout, _ = vm.RemoteCommand(f'cd {perf_dir} && sudo ./perf-collect.sh')
     self.pid = stdout.strip()
     logging.debug('fpid of PerfSpect collector process: %s', self.pid)
 
@@ -106,7 +111,8 @@ class PerfspectCollector():
     logging.info('Post processing PerfSpect raw metrics')
     perf_dir = posixpath.join(self.telemetry_dir, 'perfspect')
     vm.RemoteCommand(
-        f'cd {perf_dir} && sudo ./perf-postprocess -r results/perfstat.csv')
+        f'cd {perf_dir} && sudo ./perf-postprocess -r results/perfstat.csv'
+    )
 
   def _FetchResults(self, vm):
     """Fetches PerfSpect telemetry results."""
@@ -136,8 +142,9 @@ class PerfspectCollector():
       logging.info('downloading PerfSpect from: %s', url)
       filename = os.path.basename(urlparse(url).path)
       local_archive_path = posixpath.join(vm_util.GetTempDir(), filename)
-      vm_util.IssueCommand(['curl', '-k', '-L', '-o', local_archive_path, url],
-                           timeout=None)
+      vm_util.IssueCommand(
+          ['curl', '-k', '-L', '-o', local_archive_path, url], timeout=None
+      )
     return local_archive_path
 
   def Before(self, unused_sender, benchmark_spec):
@@ -154,12 +161,12 @@ class PerfspectCollector():
     self.perf_dir = posixpath.join(vm_util.GetTempDir(), 'perfspect')
     self.perfspect_archive = self._GetLocalArchive()
     vm_util.IssueCommand(
-        ['tar', '-C',
-         vm_util.GetTempDir(), '-xf', self.perfspect_archive])
+        ['tar', '-C', vm_util.GetTempDir(), '-xf', self.perfspect_archive]
+    )
     vm_util.IssueCommand([
         'cp',
         data.ResourcePath(posixpath.join('perfspect', 'perf-collect.sh')),
-        self.perf_dir + '/'
+        self.perf_dir + '/',
     ])
     background_tasks.RunThreaded(self._InstallTelemetry, vms)
 
@@ -187,9 +194,11 @@ def Register(parsed_flags):
   logging.info('Registering PerfSpect telemetry collector')
   telemetry_collector = PerfspectCollector()
   events.before_phase.connect(
-      telemetry_collector.Before, events.RUN_PHASE, weak=False)
+      telemetry_collector.Before, events.RUN_PHASE, weak=False
+  )
   events.after_phase.connect(
-      telemetry_collector.After, events.RUN_PHASE, weak=False)
+      telemetry_collector.After, events.RUN_PHASE, weak=False
+  )
 
 
 def IsEnabled():

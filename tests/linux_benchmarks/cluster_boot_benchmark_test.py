@@ -27,13 +27,15 @@ def vm_mock(index: int, timestamp: float) -> mock.Mock:
   return mock.Mock(
       delete_start_time=timestamp,
       delete_end_time=timestamp + index + 5,
-      OS_TYPE=f'linux{index}')
+      OS_TYPE=f'linux{index}',
+  )
 
 
 def vm_mock_given_delete_times(
     index: int,
     delete_start_time: Optional[float] = None,
-    delete_end_time: Optional[float] = None) -> mock.Mock:
+    delete_end_time: Optional[float] = None,
+) -> mock.Mock:
   """Creates a mock vm with a provided delete_start_time and delete_end_time.
 
   Args:
@@ -49,11 +51,13 @@ def vm_mock_given_delete_times(
   return mock.Mock(
       delete_start_time=delete_start_time,
       delete_end_time=delete_end_time,
-      OS_TYPE=f'linux{index}')
+      OS_TYPE=f'linux{index}',
+  )
 
 
-class ClusterBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
-                               test_util.SamplesTestMixin):
+class ClusterBootBenchmarkTest(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def testMeasureDelete(self):
     """Unit test for Measuredelete function."""
@@ -77,15 +81,26 @@ class ClusterBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     expected_cluster_delete_time = 7
     for i in range(num_vms):
       expected_samples.append(
-          sample.Sample('Delete Time', expected_delete_times[i], 'seconds', {
-              'machine_instance': i,
-              'num_vms': num_vms,
-              'os_type': f'linux{i}',
-          }))
+          sample.Sample(
+              'Delete Time',
+              expected_delete_times[i],
+              'seconds',
+              {
+                  'machine_instance': i,
+                  'num_vms': num_vms,
+                  'os_type': f'linux{i}',
+              },
+          )
+      )
 
     expected_samples.append(
-        sample.Sample('Cluster Delete Time', expected_cluster_delete_time,
-                      'seconds', expected_cluster_delete_metadata))
+        sample.Sample(
+            'Cluster Delete Time',
+            expected_cluster_delete_time,
+            'seconds',
+            expected_cluster_delete_metadata,
+        )
+    )
 
     # assert actual and expected samples are equal
     self.assertSampleListsEqualUpToTimestamp(actual_samples, expected_samples)
@@ -95,12 +110,14 @@ class ClusterBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     timestamp = 1625863325.003580
     vm_with_neither = vm_mock_given_delete_times(index=0)
     vm_with_start_only = vm_mock_given_delete_times(
-        index=1, delete_start_time=timestamp)
+        index=1, delete_start_time=timestamp
+    )
     # We never expect to see this in production, but it does ensure that
     # the conditional measurement of delete times works for all combinations
     # of missing attributes.
     vm_with_end_only = vm_mock_given_delete_times(
-        index=2, delete_end_time=timestamp + 5)
+        index=2, delete_end_time=timestamp + 5
+    )
     vms_to_test = [vm_with_neither, vm_with_start_only, vm_with_end_only]
 
     # invoke MeasureDelete
@@ -113,11 +130,12 @@ class ClusterBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     """MeasureDelete test where some VMs do not have valid delete measurements."""
     timestamp = 1625863325.003580
     vm_with_neither = vm_mock_given_delete_times(index=0)
-    vm_with_start_only = vm_mock_given_delete_times(index=1,
-                                                    delete_start_time=timestamp)
-    vm_with_both = vm_mock_given_delete_times(index=2,
-                                              delete_start_time=timestamp,
-                                              delete_end_time=timestamp + 5)
+    vm_with_start_only = vm_mock_given_delete_times(
+        index=1, delete_start_time=timestamp
+    )
+    vm_with_both = vm_mock_given_delete_times(
+        index=2, delete_start_time=timestamp, delete_end_time=timestamp + 5
+    )
     vms_to_test = [vm_with_neither, vm_with_start_only, vm_with_both]
     # invoke MeasureDelete
     actual_samples = cluster_boot_benchmark.MeasureDelete(vms_to_test)
@@ -130,11 +148,14 @@ class ClusterBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     expected_num_vms = 1
     expected_samples = [
         sample.Sample(
-            'Delete Time', expected_delete_time, 'seconds', {
+            'Delete Time',
+            expected_delete_time,
+            'seconds',
+            {
                 'machine_instance': 0,
                 'num_vms': expected_num_vms,
                 'os_type': f'linux{expected_instance_index}',
-            }
+            },
         )
     ]
 
@@ -144,8 +165,13 @@ class ClusterBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
         'os_type': f'linux{expected_instance_index}',
     }
     expected_samples.append(
-        sample.Sample('Cluster Delete Time', expected_cluster_delete_time,
-                      'seconds', expected_cluster_delete_metadata))
+        sample.Sample(
+            'Cluster Delete Time',
+            expected_cluster_delete_time,
+            'seconds',
+            expected_cluster_delete_metadata,
+        )
+    )
     # assert actual and expected samples are equal
     self.assertSampleListsEqualUpToTimestamp(actual_samples, expected_samples)
 

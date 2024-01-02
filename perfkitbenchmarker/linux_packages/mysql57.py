@@ -23,21 +23,23 @@ MYSQL_PSWD = 'perfkitbenchmarker'
 MYSQL_URL = 'https://dev.mysql.com/get/' + MYSQL_RPM
 PACKAGE_NAME = 'mysql'
 PREPROVISIONED_DATA = {
-    MYSQL_RPM:
+    MYSQL_RPM: (
         '81b2256f778bb3972054257edda2c2a82fcec455cae3d45ba9c8778a46aa8eb3'
+    )
 }
-PACKAGE_DATA_URL = {
-    MYSQL_RPM: MYSQL_URL
-}
+PACKAGE_DATA_URL = {MYSQL_RPM: MYSQL_URL}
 
 
 def YumInstall(vm):
   """Installs the mysql package on the VM."""
   vm.RemoteCommand('sudo setenforce 0')
-  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, PREPROVISIONED_DATA.keys(),
-                                      linux_packages.INSTALL_DIR)
-  vm.RemoteCommand('sudo rpm -ivh --force %s' %
-                   posixpath.join(linux_packages.INSTALL_DIR, MYSQL_RPM))
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), linux_packages.INSTALL_DIR
+  )
+  vm.RemoteCommand(
+      'sudo rpm -ivh --force %s'
+      % posixpath.join(linux_packages.INSTALL_DIR, MYSQL_RPM)
+  )
   vm.InstallPackages('mysql-server')
   vm.RemoteCommand('sudo service mysqld start')
   vm.RemoteCommand('/usr/bin/mysqladmin -u root password "%s"' % MYSQL_PSWD)
@@ -45,10 +47,14 @@ def YumInstall(vm):
 
 def AptInstall(vm):
   """Installs the mysql package on the VM."""
-  vm.RemoteCommand('echo "mysql-server-5.7 mysql-server/root_password password '
-                   '%s" | sudo debconf-set-selections' % MYSQL_PSWD)
-  vm.RemoteCommand('echo "mysql-server-5.7 mysql-server/root_password_again '
-                   'password %s" | sudo debconf-set-selections' % MYSQL_PSWD)
+  vm.RemoteCommand(
+      'echo "mysql-server-5.7 mysql-server/root_password password '
+      '%s" | sudo debconf-set-selections' % MYSQL_PSWD
+  )
+  vm.RemoteCommand(
+      'echo "mysql-server-5.7 mysql-server/root_password_again '
+      'password %s" | sudo debconf-set-selections' % MYSQL_PSWD
+  )
   vm.InstallPackages('mysql-server')
 
 

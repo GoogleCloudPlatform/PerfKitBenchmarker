@@ -27,5 +27,5 @@ gpus_per_vm = {
     'p2.16xlarge': 16,
     'Standard_NC6': 1,
     'Standard_NC12': 2,
-    'Standard_NC24': 4
+    'Standard_NC24': 4,
 }

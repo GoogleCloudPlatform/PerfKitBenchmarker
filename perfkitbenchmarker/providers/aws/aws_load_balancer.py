@@ -44,13 +44,20 @@ class TargetGroup(resource.BaseResource):
   def _Create(self):
     """Create the target group."""
     create_cmd = util.AWS_PREFIX + [
-        '--region', self.region,
-        'elbv2', 'create-target-group',
-        '--target-type', 'ip',
-        '--name', self.name,
-        '--protocol', self.protocol,
-        '--port', str(self.port),
-        '--vpc-id', self.vpc_id
+        '--region',
+        self.region,
+        'elbv2',
+        'create-target-group',
+        '--target-type',
+        'ip',
+        '--name',
+        self.name,
+        '--protocol',
+        self.protocol,
+        '--port',
+        str(self.port),
+        '--vpc-id',
+        self.vpc_id,
     ]
     stdout, _, _ = vm_util.IssueCommand(create_cmd)
     response = json.loads(stdout)
@@ -61,9 +68,12 @@ class TargetGroup(resource.BaseResource):
     if self.arn is None:
       return
     delete_cmd = util.AWS_PREFIX + [
-        '--region', self.region,
-        'elbv2', 'delete-target-group',
-        '--target-group-arn', self.arn
+        '--region',
+        self.region,
+        'elbv2',
+        'delete-target-group',
+        '--target-group-arn',
+        self.arn,
     ]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
@@ -87,12 +97,21 @@ class LoadBalancer(resource.BaseResource):
 
   def _Create(self):
     """Create the load balancer."""
-    create_cmd = util.AWS_PREFIX + [
-        '--region', self.region,
-        'elbv2', 'create-load-balancer',
-        '--name', self.name,
-        '--type', self.type,
-        '--tags'] + util.MakeFormattedDefaultTags()
+    create_cmd = (
+        util.AWS_PREFIX
+        + [
+            '--region',
+            self.region,
+            'elbv2',
+            'create-load-balancer',
+            '--name',
+            self.name,
+            '--type',
+            self.type,
+            '--tags',
+        ]
+        + util.MakeFormattedDefaultTags()
+    )
     # Add --subnets argument to the command.
     create_cmd.append('--subnets')
     create_cmd.extend(self.subnet_ids)
@@ -107,9 +126,12 @@ class LoadBalancer(resource.BaseResource):
     if self.arn is None:
       return
     delete_cmd = util.AWS_PREFIX + [
-        '--region', self.region,
-        'elbv2', 'delete-load-balancer',
-        '--load-balancer-arn', self.arn
+        '--region',
+        self.region,
+        'elbv2',
+        'delete-load-balancer',
+        '--load-balancer-arn',
+        self.arn,
     ]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
@@ -127,21 +149,24 @@ class Listener(resource.BaseResource):
 
   def _GetDefaultActions(self):
     """Returns a JSON representation of the default actions for the listener."""
-    actions = [{
-        'Type': 'forward',
-        'TargetGroupArn': self.target_group_arn
-    }]
+    actions = [{'Type': 'forward', 'TargetGroupArn': self.target_group_arn}]
     return json.dumps(actions)
 
   def _Create(self):
     """Create the listener."""
     create_cmd = util.AWS_PREFIX + [
-        '--region', self.region,
-        'elbv2', 'create-listener',
-        '--load-balancer-arn', self.load_balancer_arn,
-        '--protocol', self.protocol,
-        '--port', str(self.port),
-        '--default-actions', self._GetDefaultActions()
+        '--region',
+        self.region,
+        'elbv2',
+        'create-listener',
+        '--load-balancer-arn',
+        self.load_balancer_arn,
+        '--protocol',
+        self.protocol,
+        '--port',
+        str(self.port),
+        '--default-actions',
+        self._GetDefaultActions(),
     ]
     vm_util.IssueCommand(create_cmd)
 

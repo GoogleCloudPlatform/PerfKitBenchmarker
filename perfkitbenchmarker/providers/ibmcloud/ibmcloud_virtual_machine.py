@@ -93,8 +93,11 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     logging.info('Creating rias key')
     with open(vm_util.GetPublicKeyPath(), 'r') as keyfile:
       pubkey = keyfile.read()
-    logging.info('ssh private key file: %s, public key file: %s',
-                 vm_util.GetPrivateKeyPath(), vm_util.GetPublicKeyPath())
+    logging.info(
+        'ssh private key file: %s, public key file: %s',
+        vm_util.GetPrivateKeyPath(),
+        vm_util.GetPublicKeyPath(),
+    )
     cmd = ibm.IbmAPICommand(self)
     cmd.flags['name'] = self.prefix + str(flags.FLAGS.run_uri) + 'key'
     cmd.flags['pubkey'] = pubkey
@@ -127,11 +130,9 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Looks up the resources needed, if not found, creates new."""
     logging.info('Checking resources')
     cmd = ibm.IbmAPICommand(self)
-    cmd.flags.update({
-        'prefix': self.prefix,
-        'zone': self.zone,
-        'items': 'vpcs'
-    })
+    cmd.flags.update(
+        {'prefix': self.prefix, 'zone': self.zone, 'items': 'vpcs'}
+    )
     self.vpcid = cmd.GetResource()
     logging.info('Vpc found: %s', self.vpcid)
     cmd.flags['items'] = 'subnets'
@@ -190,7 +191,8 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CreateInstance()
     if self.subnet:  # this is for the primary vnic and fip
       self.fip_address, self.fip_id = self.network.CreateFip(
-          self.name + 'fip', self.vmid)
+          self.name + 'fip', self.vmid
+      )
       self.ip_address = self.fip_address
       self.internal_ip = self._WaitForIPAssignment(self.subnet)
       logging.info('Fip: %s, ip: %s', self.ip_address, self.internal_ip)
@@ -202,15 +204,25 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       for subnet_name in self.subnets.keys():
         cmd.flags['name'] = subnet_name
         cmd.flags['subnet'] = self.subnets[subnet_name]['id']  # subnet id
-        logging.info('Creating extra vnic for vmid: %s, subnet: %s',
-                     self.vmid, cmd.flags['subnet'])
+        logging.info(
+            'Creating extra vnic for vmid: %s, subnet: %s',
+            self.vmid,
+            cmd.flags['subnet'],
+        )
         vnicid, ip_addr = cmd.InstanceVnicCreate()
-        logging.info('Extra vnic created for vmid: %s, vnicid: %s, ip_addr: %s',
-                     self.vmid, vnicid, ip_addr)
+        logging.info(
+            'Extra vnic created for vmid: %s, vnicid: %s, ip_addr: %s',
+            self.vmid,
+            vnicid,
+            ip_addr,
+        )
         self.subnets[subnet_name]['vnicid'] = vnicid
         self.subnets[subnet_name]['ip_addr'] = ip_addr
-      logging.info('Extra vnics created for vmid: %s, subnets: %s',
-                   self.vmid, self.subnets)
+      logging.info(
+          'Extra vnics created for vmid: %s, subnets: %s',
+          self.vmid,
+          self.subnets,
+      )
 
   def _Delete(self):
     """Delete all the resources that were created."""
@@ -265,7 +277,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
         'vpcid': self.vpcid,
         'subnet': self.subnet,
         'key': self.key,
-        'zone': self.zone
+        'zone': self.zone,
     })
     cmd.user_data = self.user_data
     if self.boot_volume_size > 0:
@@ -301,14 +313,17 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Finds the IP address assigned to the vm."""
     ip_v4_address = '0.0.0.0'
     count = 0
-    while (ip_v4_address == '0.0.0.0' and
-           count * FLAGS.ibmcloud_polling_delay < 240):
+    while (
+        ip_v4_address == '0.0.0.0'
+        and count * FLAGS.ibmcloud_polling_delay < 240
+    ):
       time.sleep(FLAGS.ibmcloud_polling_delay)
       count += 1
       cmd = ibm.IbmAPICommand(self)
       cmd.flags['instanceid'] = self.vmid
-      logging.info('Looking for IP for instance %s, networkid: %s',
-                   self.vmid, networkid)
+      logging.info(
+          'Looking for IP for instance %s, networkid: %s', self.vmid, networkid
+      )
 
       resp = cmd.InstanceShow()
       for network in resp['network_interfaces']:
@@ -343,12 +358,16 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       disk_spec: virtual_machine.BaseDiskSpec object of the disk.
     """
-    disks_names = ('%s-data-%d-%d'
-                   % (self.name, len(self.scratch_disks), i)
-                   for i in range(disk_spec.num_striped_disks))
-    disks = [ibmcloud_disk.IbmCloudDisk(disk_spec, name, self.zone,
-                                        encryption_key=self.data_encryption_key)
-             for name in disks_names]
+    disks_names = (
+        '%s-data-%d-%d' % (self.name, len(self.scratch_disks), i)
+        for i in range(disk_spec.num_striped_disks)
+    )
+    disks = [
+        ibmcloud_disk.IbmCloudDisk(
+            disk_spec, name, self.zone, encryption_key=self.data_encryption_key
+        )
+        for name in disks_names
+    ]
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
     disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
@@ -373,8 +392,9 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     return False
 
 
-class DebianBasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
-                                        linux_virtual_machine.BaseDebianMixin):
+class DebianBasedIbmCloudVirtualMachine(
+    IbmCloudVirtualMachine, linux_virtual_machine.BaseDebianMixin
+):
 
   def PrepareVMEnvironment(self):
     time.sleep(_WAIT_TIME_DEBIAN)
@@ -383,23 +403,27 @@ class DebianBasedIbmCloudVirtualMachine(IbmCloudVirtualMachine,
     super(DebianBasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
 
 
-class Debian9BasedIbmCloudVirtualMachine(DebianBasedIbmCloudVirtualMachine,
-                                         linux_virtual_machine.Debian9Mixin):
+class Debian9BasedIbmCloudVirtualMachine(
+    DebianBasedIbmCloudVirtualMachine, linux_virtual_machine.Debian9Mixin
+):
   IMAGE_NAME_PREFIX = 'ibm-debian-9-'
 
 
-class Debian10BasedIbmCloudVirtualMachine(DebianBasedIbmCloudVirtualMachine,
-                                          linux_virtual_machine.Debian10Mixin):
+class Debian10BasedIbmCloudVirtualMachine(
+    DebianBasedIbmCloudVirtualMachine, linux_virtual_machine.Debian10Mixin
+):
   IMAGE_NAME_PREFIX = 'ibm-debian-10-'
 
 
-class Debian11BasedIbmCloudVirtualMachine(DebianBasedIbmCloudVirtualMachine,
-                                          linux_virtual_machine.Debian11Mixin):
+class Debian11BasedIbmCloudVirtualMachine(
+    DebianBasedIbmCloudVirtualMachine, linux_virtual_machine.Debian11Mixin
+):
   IMAGE_NAME_PREFIX = 'ibm-debian-11-'
 
 
 class Ubuntu1604BasedIbmCloudVirtualMachine(
-    IbmCloudVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
+    IbmCloudVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin
+):
   IMAGE_NAME_PREFIX = 'ibm-ubuntu-16-04-'
 
   def PrepareVMEnvironment(self):
@@ -408,7 +432,8 @@ class Ubuntu1604BasedIbmCloudVirtualMachine(
 
 
 class Ubuntu1804BasedIbmCloudVirtualMachine(
-    IbmCloudVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin):
+    IbmCloudVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin
+):
   IMAGE_NAME_PREFIX = 'ibm-ubuntu-18-04-'
 
   def PrepareVMEnvironment(self):
@@ -482,8 +507,13 @@ class WindowsIbmCloudVirtualMachine(
       tf.write(decoded_password_data)
       tf.close()
       decrypt_cmd = [
-          'openssl', 'rsautl', '-decrypt', '-in', tf.name, '-inkey',
-          vm_util.GetPrivateKeyPath()
+          'openssl',
+          'rsautl',
+          '-decrypt',
+          '-in',
+          tf.name,
+          '-inkey',
+          vm_util.GetPrivateKeyPath(),
       ]
       password, _ = vm_util.IssueRetryableCommand(decrypt_cmd)
       self.password = password
@@ -491,12 +521,12 @@ class WindowsIbmCloudVirtualMachine(
 
 
 class Windows2016CoreIbmCloudVirtualMachine(
-    WindowsIbmCloudVirtualMachine,
-    windows_virtual_machine.Windows2016CoreMixin):
+    WindowsIbmCloudVirtualMachine, windows_virtual_machine.Windows2016CoreMixin
+):
   IMAGE_NAME_PREFIX = 'ibm-windows-server-2016-full'
 
 
 class Windows2019CoreIbmCloudVirtualMachine(
-    WindowsIbmCloudVirtualMachine,
-    windows_virtual_machine.Windows2019CoreMixin):
+    WindowsIbmCloudVirtualMachine, windows_virtual_machine.Windows2019CoreMixin
+):
   IMAGE_NAME_PREFIX = 'ibm-windows-server-2019-full'

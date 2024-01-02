@@ -37,9 +37,10 @@ unixbench:
 URI = 'ibmuri123'
 
 
-class TestIbmCloudVirtualMachine(pkb_common_test_case.TestOsMixin,
-                                 ibmcloud_virtual_machine.IbmCloudVirtualMachine
-                                ):
+class TestIbmCloudVirtualMachine(
+    pkb_common_test_case.TestOsMixin,
+    ibmcloud_virtual_machine.IbmCloudVirtualMachine,
+):
   pass
 
 
@@ -48,24 +49,32 @@ class IbmCloudVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(IbmCloudVirtualMachineTest, self).setUp()
     self.mock_create_instance = self.enter_context(
-        mock.patch.object(ibm_api.IbmAPICommand, 'CreateInstance'))
+        mock.patch.object(ibm_api.IbmAPICommand, 'CreateInstance')
+    )
     self.mock_instance_status = self.enter_context(
-        mock.patch.object(ibm_api.IbmAPICommand, 'InstanceStatus'))
+        mock.patch.object(ibm_api.IbmAPICommand, 'InstanceStatus')
+    )
     self.mock_get_resource = self.enter_context(
-        mock.patch.object(ibm_api.IbmAPICommand, 'GetResource'))
+        mock.patch.object(ibm_api.IbmAPICommand, 'GetResource')
+    )
     self.mock_create_vpc = self.enter_context(
-        mock.patch.object(ibm_api.IbmAPICommand, 'CreateVpc'))
+        mock.patch.object(ibm_api.IbmAPICommand, 'CreateVpc')
+    )
     self.mock_create_subnet = self.enter_context(
-        mock.patch.object(ibm_api.IbmAPICommand, 'CreateSubnet'))
+        mock.patch.object(ibm_api.IbmAPICommand, 'CreateSubnet')
+    )
     self.mock_check_environment = self.enter_context(
-        mock.patch.object(ibm_api.IbmAPICommand, '_CheckEnvironment'))
-    with mock.patch.object(ibm_api.IbmAPICommand, '__init__',
-                           lambda self: None):
+        mock.patch.object(ibm_api.IbmAPICommand, '_CheckEnvironment')
+    )
+    with mock.patch.object(
+        ibm_api.IbmAPICommand, '__init__', lambda self: None
+    ):
       self.cmd = ibm_api.IbmAPICommand()
     self.vm = self._CreateTestIbmCloudVirtualMachine()
 
-  def _CreateBenchmarkSpecFromYaml(self, yaml_string,
-                                   benchmark_name=BENCHMARK_NAME):
+  def _CreateBenchmarkSpecFromYaml(
+      self, yaml_string, benchmark_name=BENCHMARK_NAME
+  ):
     config = configs.LoadConfig(yaml_string, {}, benchmark_name)
     spec = self._CreateBenchmarkSpecFromConfigDict(config, benchmark_name)
     spec.disable_interrupt_moderation = False
@@ -87,11 +96,13 @@ class IbmCloudVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _CreateBenchmarkSpecFromConfigDict(self, config_dict, benchmark_name):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        benchmark_name,
-        flag_values=FLAGS,
-        **config_dict)
-    benchmark_module = next((b for b in linux_benchmarks.BENCHMARKS
-                             if b.BENCHMARK_NAME == benchmark_name))
+        benchmark_name, flag_values=FLAGS, **config_dict
+    )
+    benchmark_module = next((
+        b
+        for b in linux_benchmarks.BENCHMARKS
+        if b.BENCHMARK_NAME == benchmark_name
+    ))
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, URI)
 
   def _CreateTestIbmCloudVirtualMachine(self):

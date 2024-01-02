@@ -16,13 +16,11 @@
 # pylint: disable=not-context-manager
 
 import os
-
 import unittest
 from unittest import mock
 
 from absl import flags as flgs
 import contextlib2
-
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -33,17 +31,22 @@ from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 from six.moves import builtins
+
 FLAGS = flgs.FLAGS
 
 _COMPONENT = 'test_component'
 _RUN_URI = 'fake-urn-uri'
 _NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
-_NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = 'nvidia_unrestricted_permissions_daemonset.yml'
+_NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = (
+    'nvidia_unrestricted_permissions_daemonset.yml'
+)
 
 _INSTANCE_GROUPS_LIST_OUTPUT = (
-    '../../../tests/data/gcloud_compute_instance_groups_list_instances.json')
+    '../../../tests/data/gcloud_compute_instance_groups_list_instances.json'
+)
 _NODE_POOLS_LIST_OUTPUT = (
-    '../../../tests/data/gcloud_container_node_pools_list.json')
+    '../../../tests/data/gcloud_container_node_pools_list.json'
+)
 _KUBECTL_VERSION = """\
 serverVersion:
   gitVersion: v1.2.3"""
@@ -66,35 +69,45 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
     stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
     stack.enter_context(mock.patch(vm_util.__name__ + '.NamedTemporaryFile'))
     stack.enter_context(
-        mock.patch(
-            util.__name__ + '.GetDefaultUser', return_value='fakeuser'))
+        mock.patch(util.__name__ + '.GetDefaultUser', return_value='fakeuser')
+    )
     stack.enter_context(
         mock.patch(
             util.__name__ + '.MakeFormattedDefaultTags',
-            return_value='foo=bar,timeout=yesterday'))
+            return_value='foo=bar,timeout=yesterday',
+        )
+    )
     stack.enter_context(
         mock.patch(
             gce_network.__name__ + '.GceFirewall.GetFirewall',
-            return_value='fakefirewall'))
+            return_value='fakefirewall',
+        )
+    )
     stack.enter_context(
         mock.patch(
             gce_network.__name__ + '.GceNetwork.GetNetwork',
             return_value=gce_network.GceNetwork(
-                gce_network.GceNetworkSpec('fakeproject'))))
+                gce_network.GceNetworkSpec('fakeproject')
+            ),
+        )
+    )
 
     retval = (stdout, stderr, return_code)
     issue_command = stack.enter_context(
-        mock.patch(vm_util.__name__ + '.IssueCommand', return_value=retval))
+        mock.patch(vm_util.__name__ + '.IssueCommand', return_value=retval)
+    )
     yield issue_command
 
 
 class GoogleKubernetesEngineCustomMachineTypeTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   @staticmethod
   def create_kubernetes_engine_spec():
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
-        'NAME', **{
+        'NAME',
+        **{
             'cloud': 'GCP',
             'vm_spec': {
                 'GCP': {
@@ -105,7 +118,8 @@ class GoogleKubernetesEngineCustomMachineTypeTestCase(
                     'zone': 'us-west1-a',
                 },
             },
-        })
+        },
+    )
     return kubernetes_engine_spec
 
   def testCreate(self):
@@ -125,7 +139,8 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
   @staticmethod
   def create_kubernetes_engine_spec():
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
-        'NAME', **{
+        'NAME',
+        **{
             'cloud': 'GCP',
             'vm_spec': {
                 'GCP': {
@@ -139,7 +154,8 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
                 },
             },
             'vm_count': 2,
-        })
+        },
+    )
     return kubernetes_engine_spec
 
   def testCreate(self):
@@ -169,10 +185,10 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
         stderr="""
         message=Insufficient regional quota to satisfy request: resource "CPUS":
         request requires '6400.0' and is short '5820.0'""",
-        return_code=1) as issue_command:
+        return_code=1,
+    ) as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
-      with self.assertRaises(
-          errors.Benchmarks.QuotaFailure):
+      with self.assertRaises(errors.Benchmarks.QuotaFailure):
         cluster._Create()
       self.assertEqual(issue_command.call_count, 1)
 
@@ -184,17 +200,20 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
         Instance 'test' creation failed: The zone
         'projects/artemis-prod/zones/us-central1-a' does not have enough
         resources available to fulfill the request.""",
-        return_code=1) as issue_command:
+        return_code=1,
+    ) as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       with self.assertRaises(
-          errors.Benchmarks.InsufficientCapacityCloudFailure):
+          errors.Benchmarks.InsufficientCapacityCloudFailure
+      ):
         cluster._Create()
       self.assertEqual(issue_command.call_count, 1)
 
   def testPostCreate(self):
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command, mock.patch.object(
-        container_service, 'RunKubectlCommand') as mock_kubectl_command:
+        container_service, 'RunKubectlCommand'
+    ) as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -202,7 +221,8 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
           'gcloud container clusters get-credentials pkb-{0}'.format(_RUN_URI),
-          command_string)
+          command_string,
+      )
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
 
       self.assertEqual(mock_kubectl_command.call_count, 1)
@@ -215,8 +235,10 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertEqual(issue_command.call_count, 3)
-      self.assertIn('gcloud container clusters delete pkb-{0}'.format(_RUN_URI),
-                    command_string)
+      self.assertIn(
+          'gcloud container clusters delete pkb-{0}'.format(_RUN_URI),
+          command_string,
+      )
       self.assertIn('--zone us-central1-a', command_string)
 
   def testExists(self):
@@ -229,7 +251,8 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
           'gcloud container clusters describe pkb-{0}'.format(_RUN_URI),
-          command_string)
+          command_string,
+      )
 
   def testGetResourceMetadata(self):
     spec = self.create_kubernetes_engine_spec()
@@ -251,7 +274,9 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
               'zone': 'us-central1-a',
               'size': 2,
               'container_cluster_version': 'v1.2.3',
-          }, metadata)
+          },
+          metadata,
+      )
 
   def testCidrCalculations(self):
     self.assertEqual(google_kubernetes_engine._CalculateCidrSize(1), 19)
@@ -263,12 +288,14 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
 
 class GoogleKubernetesEngineAutoscalingTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   @staticmethod
   def create_kubernetes_engine_spec():
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
-        'NAME', **{
+        'NAME',
+        **{
             'cloud': 'GCP',
             'vm_spec': {
                 'GCP': {
@@ -280,7 +307,8 @@ class GoogleKubernetesEngineAutoscalingTestCase(
             'min_vm_count': 1,
             'vm_count': 2,
             'max_vm_count': 30,
-        })
+        },
+    )
     return kubernetes_engine_spec
 
   def testCreate(self):
@@ -312,8 +340,10 @@ class GoogleKubernetesEngineAutoscalingTestCase(
               'cluster_type': 'Kubernetes',
               'min_size': 1,
               'size': 2,
-              'max_size': 30
-          }, metadata)
+              'max_size': 30,
+          },
+          metadata,
+      )
 
   def testLabelDisks(self):
     with patch_critical_objects(stdout=_PVC_LIST) as issue_command:
@@ -331,12 +361,14 @@ class GoogleKubernetesEngineAutoscalingTestCase(
 
 
 class GoogleKubernetesEngineVersionFlagTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   @staticmethod
   def create_kubernetes_engine_spec():
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
-        'NAME', **{
+        'NAME',
+        **{
             'cloud': 'GCP',
             'vm_spec': {
                 'GCP': {
@@ -344,7 +376,8 @@ class GoogleKubernetesEngineVersionFlagTestCase(
                     'zone': 'us-west1-a',
                 },
             },
-        })
+        },
+    )
     return kubernetes_engine_spec
 
   def testCreateCustomVersion(self):
@@ -387,12 +420,14 @@ class GoogleKubernetesEngineVersionFlagTestCase(
 
 
 class GoogleKubernetesEngineGvnicFlagTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   @staticmethod
   def create_kubernetes_engine_spec():
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
-        'NAME', **{
+        'NAME',
+        **{
             'cloud': 'GCP',
             'vm_spec': {
                 'GCP': {
@@ -400,7 +435,8 @@ class GoogleKubernetesEngineGvnicFlagTestCase(
                     'zone': 'us-west1-a',
                 },
             },
-        })
+        },
+    )
     return kubernetes_engine_spec
 
   def testCreateEnableGvnic(self):
@@ -427,12 +463,14 @@ class GoogleKubernetesEngineGvnicFlagTestCase(
 
 
 class GoogleKubernetesEngineWithGpusTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   @staticmethod
   def create_kubernetes_engine_spec():
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
-        'NAME', **{
+        'NAME',
+        **{
             'cloud': 'GCP',
             'vm_spec': {
                 'GCP': {
@@ -443,7 +481,8 @@ class GoogleKubernetesEngineWithGpusTestCase(
                 },
             },
             'vm_count': 2,
-        })
+        },
+    )
     return kubernetes_engine_spec
 
   def testCreate(self):
@@ -457,14 +496,16 @@ class GoogleKubernetesEngineWithGpusTestCase(
       self.assertIn('gcloud container clusters create', command_string)
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
-      self.assertIn('--accelerator type=nvidia-tesla-k80,count=2',
-                    command_string)
+      self.assertIn(
+          '--accelerator type=nvidia-tesla-k80,count=2', command_string
+      )
 
   @mock.patch('perfkitbenchmarker.kubernetes_helper.CreateFromFile')
   def testPostCreate(self, create_from_file_patch):
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command, mock.patch.object(
-        container_service, 'RunKubectlCommand') as mock_kubectl_command:
+        container_service, 'RunKubectlCommand'
+    ) as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
       command_string = ' '.join(issue_command.call_args[0][0])
@@ -472,18 +513,19 @@ class GoogleKubernetesEngineWithGpusTestCase(
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
           'gcloud container clusters get-credentials pkb-{0}'.format(_RUN_URI),
-          command_string)
+          command_string,
+      )
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
 
       self.assertEqual(mock_kubectl_command.call_count, 1)
 
       expected_args_to_create_from_file = (
           _NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT,
-          data.ResourcePath(
-              _NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET)
+          data.ResourcePath(_NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET),
       )
-      expected_calls = [mock.call(arg)
-                        for arg in expected_args_to_create_from_file]
+      expected_calls = [
+          mock.call(arg) for arg in expected_args_to_create_from_file
+      ]
 
       # Assert that create_from_file was called twice,
       # and that the args were as expected (should be the NVIDIA
@@ -509,18 +551,20 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
 
       expected = set([
           'gke-pkb-0c47e6fa-default-pool-167d73ee-grp',
-          'gke-pkb-0c47e6fa-test-efea7796-grp'
+          'gke-pkb-0c47e6fa-test-efea7796-grp',
       ])
       self.assertEqual(expected, set(instance_groups))  # order doesn't matter
 
 
 class GoogleKubernetesEngineRegionalTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   @staticmethod
   def create_kubernetes_engine_spec(use_zonal_nodepools=False):
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
-        'NAME', **{
+        'NAME',
+        **{
             'cloud': 'GCP',
             'vm_spec': {
                 'GCP': {
@@ -532,29 +576,31 @@ class GoogleKubernetesEngineRegionalTestCase(
                 'nodepool1': {
                     'vm_spec': {
                         'GCP': {
-                            'machine_type':
-                                'machine-type-1',
-                            'zone':
+                            'machine_type': 'machine-type-1',
+                            'zone': (
                                 'us-west1-a,us-west1-b'
-                                if use_zonal_nodepools else None,
+                                if use_zonal_nodepools
+                                else None
+                            ),
                         },
                     }
                 },
                 'nodepool2': {
                     'vm_spec': {
                         'GCP': {
-                            'machine_type':
-                                'machine-type-2',
-                            'zone':
-                                'us-west1-c' if use_zonal_nodepools else None,
+                            'machine_type': 'machine-type-2',
+                            'zone': (
+                                'us-west1-c' if use_zonal_nodepools else None
+                            ),
                         },
                     },
                     'sandbox_config': {
                         'type': 'gvisor',
                     },
                 },
-            }
-        })
+            },
+        },
+    )
     return kubernetes_engine_spec
 
   def testCreateRegionalCluster(self):
@@ -563,36 +609,47 @@ class GoogleKubernetesEngineRegionalTestCase(
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
       create_cluster, create_nodepool1, create_nodepool2 = (
-          call[0][0] for call in issue_command.call_args_list)
+          call[0][0] for call in issue_command.call_args_list
+      )
       self.assertNotIn('--zone', create_cluster)
       self.assertContainsSubsequence(create_cluster, ['--region', 'us-west1'])
-      self.assertContainsSubsequence(create_cluster,
-                                     ['--machine-type', 'fake-machine-type'])
       self.assertContainsSubsequence(
-          create_cluster, ['--labels', 'foo=bar,timeout=yesterday'])
+          create_cluster, ['--machine-type', 'fake-machine-type']
+      )
+      self.assertContainsSubsequence(
+          create_cluster, ['--labels', 'foo=bar,timeout=yesterday']
+      )
 
       self.assertContainsSubsequence(
           create_nodepool1,
-          ['gcloud', 'container', 'node-pools', 'create', 'nodepool1'])
-      self.assertContainsSubsequence(create_nodepool1,
-                                     ['--cluster', 'pkb-fake-urn-uri'])
-      self.assertContainsSubsequence(create_nodepool1,
-                                     ['--machine-type', 'machine-type-1'])
+          ['gcloud', 'container', 'node-pools', 'create', 'nodepool1'],
+      )
       self.assertContainsSubsequence(
-          create_nodepool1, ['--node-labels', 'pkb_nodepool=nodepool1'])
+          create_nodepool1, ['--cluster', 'pkb-fake-urn-uri']
+      )
       self.assertContainsSubsequence(
-          create_nodepool1, ['--labels', 'foo=bar,timeout=yesterday'])
+          create_nodepool1, ['--machine-type', 'machine-type-1']
+      )
+      self.assertContainsSubsequence(
+          create_nodepool1, ['--node-labels', 'pkb_nodepool=nodepool1']
+      )
+      self.assertContainsSubsequence(
+          create_nodepool1, ['--labels', 'foo=bar,timeout=yesterday']
+      )
       self.assertNotIn('--node-locations', create_nodepool1)
       self.assertNotIn('--sandbox', create_nodepool1)
       self.assertContainsSubsequence(create_nodepool1, ['--region', 'us-west1'])
 
       self.assertContainsSubsequence(
           create_nodepool2,
-          ['gcloud', 'container', 'node-pools', 'create', 'nodepool2'])
-      self.assertContainsSubsequence(create_nodepool2,
-                                     ['--machine-type', 'machine-type-2'])
-      self.assertContainsSubsequence(create_nodepool2,
-                                     ['--sandbox', 'type=gvisor'])
+          ['gcloud', 'container', 'node-pools', 'create', 'nodepool2'],
+      )
+      self.assertContainsSubsequence(
+          create_nodepool2, ['--machine-type', 'machine-type-2']
+      )
+      self.assertContainsSubsequence(
+          create_nodepool2, ['--sandbox', 'type=gvisor']
+      )
       self.assertNotIn('--node-locations', create_nodepool2)
 
   def testCreateRegionalClusterZonalNodepool(self):
@@ -601,28 +658,37 @@ class GoogleKubernetesEngineRegionalTestCase(
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
       create_cluster, create_nodepool1, create_nodepool2 = (
-          call[0][0] for call in issue_command.call_args_list)
+          call[0][0] for call in issue_command.call_args_list
+      )
       self.assertNotIn('--zone', create_cluster)
       self.assertContainsSubsequence(create_cluster, ['--region', 'us-west1'])
-      self.assertContainsSubsequence(create_cluster,
-                                     ['--machine-type', 'fake-machine-type'])
+      self.assertContainsSubsequence(
+          create_cluster, ['--machine-type', 'fake-machine-type']
+      )
 
       self.assertContainsSubsequence(
           create_nodepool1,
-          ['gcloud', 'container', 'node-pools', 'create', 'nodepool1'])
-      self.assertContainsSubsequence(create_nodepool1,
-                                     ['--cluster', 'pkb-fake-urn-uri'])
+          ['gcloud', 'container', 'node-pools', 'create', 'nodepool1'],
+      )
       self.assertContainsSubsequence(
-          create_nodepool1, ['--node-labels', 'pkb_nodepool=nodepool1'])
+          create_nodepool1, ['--cluster', 'pkb-fake-urn-uri']
+      )
       self.assertContainsSubsequence(
-          create_nodepool1, ['--node-locations', 'us-west1-a,us-west1-b'])
+          create_nodepool1, ['--node-labels', 'pkb_nodepool=nodepool1']
+      )
+      self.assertContainsSubsequence(
+          create_nodepool1, ['--node-locations', 'us-west1-a,us-west1-b']
+      )
       self.assertContainsSubsequence(create_nodepool1, ['--region', 'us-west1'])
 
       self.assertContainsSubsequence(
           create_nodepool2,
-          ['gcloud', 'container', 'node-pools', 'create', 'nodepool2'])
-      self.assertContainsSubsequence(create_nodepool2,
-                                     ['--node-locations', 'us-west1-c'])
+          ['gcloud', 'container', 'node-pools', 'create', 'nodepool2'],
+      )
+      self.assertContainsSubsequence(
+          create_nodepool2, ['--node-locations', 'us-west1-c']
+      )
+
 
 if __name__ == '__main__':
   unittest.main()

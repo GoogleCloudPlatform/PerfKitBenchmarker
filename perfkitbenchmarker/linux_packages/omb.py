@@ -18,39 +18,54 @@ FLAGS = flags.FLAGS
 flags.DEFINE_enum('mpi_vendor', 'intel', ['intel', 'openmpi'], 'MPI provider.')
 
 flags.DEFINE_list(
-    'omb_mpi_env', [], 'Comma separated list of environment variables, e.g. '
-    '--omb_mpi_env=FI_PROVIDER=tcp,FI_LOG_LEVEL=info')
+    'omb_mpi_env',
+    [],
+    'Comma separated list of environment variables, e.g. '
+    '--omb_mpi_env=FI_PROVIDER=tcp,FI_LOG_LEVEL=info',
+)
 
 flags.DEFINE_list(
-    'omb_mpi_genv', [], 'Comma separated list of global environment variables, '
+    'omb_mpi_genv',
+    [],
+    'Comma separated list of global environment variables, '
     'i.e. environment variables to be applied to all nodes, e.g. '
     '--omb_mpi_genv=I_MPI_PIN_PROCESSOR_LIST=0,I_MPI_PIN=1 '
     'When running with Intel MPI, these translate to -genv mpirun options. '
     'When running with OpenMPI, both --omb_mpi_env and --omb_mpi_genv are '
-    'treated the same via the -x mpirun option')
+    'treated the same via the -x mpirun option',
+)
 
 flags.register_validator(
     'omb_mpi_env',
     lambda env_params: all('=' in param for param in env_params),
-    message='--omb_mpi_env values must be in format "key=value" or "key="')
+    message='--omb_mpi_env values must be in format "key=value" or "key="',
+)
 
 flags.register_validator(
     'omb_mpi_genv',
     lambda genv_params: all('=' in param for param in genv_params),
-    message='--omb_mpi_genv values must be in format "key=value" or "key="')
+    message='--omb_mpi_genv values must be in format "key=value" or "key="',
+)
 
 VERSION = '5.7.1'
 _PKG_NAME = 'osu-micro-benchmarks'
-_DATA_URL = ('http://mvapich.cse.ohio-state.edu/download/mvapich/'
-             f'{_PKG_NAME}-{VERSION}.tgz')
+_DATA_URL = (
+    'http://mvapich.cse.ohio-state.edu/download/mvapich/'
+    f'{_PKG_NAME}-{VERSION}.tgz'
+)
 _SRC_DIR = f'{_PKG_NAME}-{VERSION}'
 _TARBALL = f'{_PKG_NAME}-{VERSION}.tgz'
 _RUN_DIR = f'/usr/local/libexec/{_PKG_NAME}/mpi'
 
 # Benchmarks that can only be run with a single thread per host
 _SINGLE_THREADED_BENCHMARKS = frozenset({
-    'acc_latency', 'bibw', 'bw', 'cas_latency', 'fop_latency', 'get_bw',
-    'get_latency'
+    'acc_latency',
+    'bibw',
+    'bw',
+    'cas_latency',
+    'fop_latency',
+    'get_bw',
+    'get_latency',
 })
 
 PREPROVISIONED_DATA = {
@@ -64,41 +79,57 @@ _HEADERS = [
     re.compile(r'^# Synchronization: (?P<sync>.*)'),
     re.compile(r'^# Number of Sender threads: (?P<sender_threads>\d+)'),
     re.compile(r'^# Number of Receiver threads: (?P<receiver_threads>\d+)'),
-    re.compile(r'# \[ pairs: (?P<pairs>\d+) \] '
-               r'\[ window size: (?P<window_size>\d+) \]'),
+    re.compile(
+        r'# \[ pairs: (?P<pairs>\d+) \] '
+        r'\[ window size: (?P<window_size>\d+) \]'
+    ),
 ]
 
-_LATENCY_RE = re.compile(r'^(?P<size>\d+)\s+'
-                         r'(?P<value>[\d\.]+)\s*$', re.X | re.MULTILINE)
+_LATENCY_RE = re.compile(
+    r'^(?P<size>\d+)\s+' r'(?P<value>[\d\.]+)\s*$', re.X | re.MULTILINE
+)
 # the "overall" value is the metric recorded.  Others are put into metadata
 _COMPUTE_RE = re.compile(
     r'^(?P<size>^\d+)\s+'
     r'(?P<value>[\d\.]+)\s+'
     r'(?P<compute>[\d\.]+)\s+'
     r'(?P<comm>[\d\.]+)\s+'
-    r'(?P<overlap>[\d\.]+)\s*$', re.X | re.MULTILINE)
+    r'(?P<overlap>[\d\.]+)\s*$',
+    re.X | re.MULTILINE,
+)
 
 # parse MPI pinning
 _MPI_STARTUP_PREFIX = r'^\[(?P<unused_cpuid>\d+)\] MPI startup\(\):\s+'
-_MPI_PIN_RE = re.compile(_MPI_STARTUP_PREFIX + (r'(?P<rank>\d+)\s+'
-                                                r'(?P<pid>\d+)\s+'
-                                                r'(?P<nodename>\S+)\s+'
-                                                r'.*?(?P<cpuids>[\d,-]+)'))
+_MPI_PIN_RE = re.compile(
+    _MPI_STARTUP_PREFIX
+    + (
+        r'(?P<rank>\d+)\s+'
+        r'(?P<pid>\d+)\s+'
+        r'(?P<nodename>\S+)\s+'
+        r'.*?(?P<cpuids>[\d,-]+)'
+    )
+)
 _PKB_NODE_RE = re.compile(r'pkb-(?P<pkbid>.*?)-(?P<nodeindex>\d+)')
 
 # parameters to pass into the benchmark
 _NUMBER_ITERATIONS = flags.DEFINE_integer(
-    'omb_iterations', None, 'Number of iterations to run in a test.')
-_SYNC_OPTION = flags.DEFINE_string('omb_sync_option', None,
-                                   '--sync-option value to pass in')
+    'omb_iterations', None, 'Number of iterations to run in a test.'
+)
+_SYNC_OPTION = flags.DEFINE_string(
+    'omb_sync_option', None, '--sync-option value to pass in'
+)
 
-_NUM_SERVER_THREADS = flags.DEFINE_integer('omb_server_threads', None,
-                                           'Number of server threads to use.')
+_NUM_SERVER_THREADS = flags.DEFINE_integer(
+    'omb_server_threads', None, 'Number of server threads to use.'
+)
 _NUM_RECEIVER_THREADS = flags.DEFINE_integer(
-    'omb_receiver_threads', None, 'Number of server threads to use.')
+    'omb_receiver_threads', None, 'Number of server threads to use.'
+)
 flag_util.DEFINE_integerlist(
-    'omb_mpi_processes', flag_util.IntegerList([1, 0]),
-    'MPI processes to use per host.  1=One process, 0=only real cores')
+    'omb_mpi_processes',
+    flag_util.IntegerList([1, 0]),
+    'MPI processes to use per host.  1=One process, 0=only real cores',
+)
 
 _MPI_PERHOST = flags.DEFINE_integer('omb_perhost', 1, 'MPI option -perhost.')
 
@@ -114,6 +145,7 @@ class _RunType:
     supports_full: Whether this benchmark supports --full.
     long_running: Whether this benchmark takes a long time to run.
   """
+
   columns: Tuple[str]
   value_column: str
   units: str = 'usec'
@@ -123,24 +155,51 @@ class _RunType:
 
 # Benchmarks that support --full
 _LATENCY = _RunType(
-    ('size', 'latency', 'min_latency', 'max_latency', 'iterations'), 'latency')
+    ('size', 'latency', 'min_latency', 'max_latency', 'iterations'), 'latency'
+)
 _LATENCY_NOSIZE = _RunType(
-    ('latency', 'min_latency', 'max_latency', 'iterations'), 'latency')
+    ('latency', 'min_latency', 'max_latency', 'iterations'), 'latency'
+)
 _COMPUTE = _RunType(
-    ('size', 'overall', 'compute', 'collection_init', 'mpi_test', 'mpi_wait',
-     'min_comm', 'max_comm', 'pure_comm', 'overlap'), 'mpi_wait')
+    (
+        'size',
+        'overall',
+        'compute',
+        'collection_init',
+        'mpi_test',
+        'mpi_wait',
+        'min_comm',
+        'max_comm',
+        'pure_comm',
+        'overlap',
+    ),
+    'mpi_wait',
+)
 _COMPUTE_NOSIZE = _RunType(
-    ('overall', 'compute', 'collection_init', 'mpi_test', 'mpi_wait',
-     'pure_comm', 'min_comm', 'max_comm', 'overlap'), 'mpi_wait')
+    (
+        'overall',
+        'compute',
+        'collection_init',
+        'mpi_test',
+        'mpi_wait',
+        'pure_comm',
+        'min_comm',
+        'max_comm',
+        'overlap',
+    ),
+    'mpi_wait',
+)
 
 # Benchmarks that do not support --full
 _LATENCY_SIZE_ONLY = _RunType(('size', 'latency'), 'latency', 'usec', False)
 _BANDWIDTH = _RunType(('size', 'bandwidth'), 'bandwidth', 'MB/s', False)
-_BANDWIDTH_MESSAGES = _RunType(('size', 'bandwidth', 'messages_per_second'),
-                               'bandwidth', 'MB/s', False)
+_BANDWIDTH_MESSAGES = _RunType(
+    ('size', 'bandwidth', 'messages_per_second'), 'bandwidth', 'MB/s', False
+)
 # The get_acc_latency and latency_mt take a really long time to finish
-_LATENCY_LONG_RUNNING = _RunType(('size', 'latency'), 'latency', 'usec', False,
-                                 True)
+_LATENCY_LONG_RUNNING = _RunType(
+    ('size', 'latency'), 'latency', 'usec', False, True
+)
 
 BENCHMARKS: Dict[str, _RunType] = {
     'acc_latency': _LATENCY_SIZE_ONLY,
@@ -184,7 +243,7 @@ BENCHMARKS: Dict[str, _RunType] = {
     'reduce': _LATENCY,
     'reduce_scatter': _LATENCY,
     'scatter': _LATENCY,
-    'scatterv': _LATENCY
+    'scatterv': _LATENCY,
 }
 
 
@@ -209,6 +268,7 @@ class RunResult:
     perhost: MPI option -perhost.
     mpi_env: environment variables to set for mpirun command.
   """
+
   name: str
   metadata: Dict[str, Any]
   data: List[Dict[str, float]]
@@ -229,8 +289,9 @@ class RunResult:
 class RunRequest:
   test_name: str
   vms: List[Any]  # virtual machine
-  message_size: Optional[
-      Union[str, int]] = None  # default: run all message sizes
+  message_size: Optional[Union[str, int]] = (
+      None  # default: run all message sizes
+  )
 
 
 FLAGS = flags.FLAGS
@@ -239,15 +300,18 @@ FLAGS = flags.FLAGS
 def _InstallForIntelMpi(vm) -> None:
   """Installs the omb package with IntelMPI lib on the VM."""
   vm.Install('intelmpi')
-  txt, _ = vm.RemoteCommand(f'{intelmpi.SourceMpiVarsCommand(vm)}; '
-                            'which mpicc mpicxx')
+  txt, _ = vm.RemoteCommand(
+      f'{intelmpi.SourceMpiVarsCommand(vm)}; which mpicc mpicxx'
+  )
   mpicc_path, mpicxx_path = txt.splitlines()
   vm.Install('build_tools')
   vm.InstallPreprovisionedPackageData('omb', [_TARBALL], '.')
   vm.RemoteCommand(f'tar -xvf {_TARBALL}')
-  vm.RemoteCommand(f'cd {_SRC_DIR}; {intelmpi.SourceMpiVarsCommand(vm)}; '
-                   f'./configure CC={mpicc_path} CXX={mpicxx_path}; '
-                   'make; sudo make install')
+  vm.RemoteCommand(
+      f'cd {_SRC_DIR}; {intelmpi.SourceMpiVarsCommand(vm)}; '
+      f'./configure CC={mpicc_path} CXX={mpicxx_path}; '
+      'make; sudo make install'
+  )
   _TestInstall([vm])
 
 
@@ -259,8 +323,10 @@ def _InstallForOpenMpi(vm) -> None:
   vm.Install('build_tools')
   vm.InstallPreprovisionedPackageData('omb', [_TARBALL], '.')
   vm.RemoteCommand(f'tar -xvf {_TARBALL}')
-  vm.RemoteCommand(f'cd {_SRC_DIR}; ./configure CC={mpicc_path} '
-                   f'CXX={mpicxx_path}; make; sudo make install')
+  vm.RemoteCommand(
+      f'cd {_SRC_DIR}; ./configure CC={mpicc_path} '
+      f'CXX={mpicxx_path}; make; sudo make install'
+  )
   _TestInstall([vm])
 
 
@@ -319,12 +385,16 @@ def RunBenchmark(request: RunRequest) -> Iterator[RunResult]:
     number_processes = processes_per_host * len(vms)
     try:
       start_time = time.time()
-      txt, full_cmd = _RunBenchmark(vms[0], name, _MPI_PERHOST.value,
-                                    number_processes, vms, params)
+      txt, full_cmd = _RunBenchmark(
+          vms[0], name, _MPI_PERHOST.value, number_processes, vms, params
+      )
       run_time = time.time() - start_time
     except errors.VirtualMachine.RemoteCommandError:
-      logging.exception('Error running %s benchmark with %s MPI proccesses',
-                        name, number_processes)
+      logging.exception(
+          'Error running %s benchmark with %s MPI proccesses',
+          name,
+          number_processes,
+      )
       continue
 
     yield RunResult(
@@ -342,11 +412,13 @@ def RunBenchmark(request: RunRequest) -> Iterator[RunResult]:
         pinning=ParseMpiPinning(txt.splitlines()),
         perhost=_MPI_PERHOST.value,
         mpi_env={
-            k: v for k, v in [
+            k: v
+            for k, v in [
                 envvar.split('=', 1)
                 for envvar in FLAGS.omb_mpi_env + FLAGS.omb_mpi_genv
             ]
-        })
+        },
+    )
 
 
 def _GetMpiVersion(vm) -> Optional[str]:
@@ -365,7 +437,8 @@ def _RunBenchmarkWithIntelMpi(
     global_environment: List[str],
     number_processes: int = None,
     hosts: List[Any] = None,
-    options: Dict[str, Any] = None) -> Tuple[str, str]:
+    options: Dict[str, Any] = None,
+) -> Tuple[str, str]:
   """Runs the microbenchmark using Intel MPI library."""
   # Create the mpirun command
   full_benchmark_path = _PathToBenchmark(vm, name)
@@ -373,7 +446,8 @@ def _RunBenchmarkWithIntelMpi(
   mpirun_cmd.extend(sorted(environment))
   mpirun_cmd.append('mpirun')
   mpirun_cmd.extend(
-      f'-genv {variable}' for variable in sorted(global_environment))
+      f'-genv {variable}' for variable in sorted(global_environment)
+  )
   if perhost:
     mpirun_cmd.append(f'-perhost {perhost}')
   if number_processes:
@@ -394,14 +468,16 @@ def _RunBenchmarkWithIntelMpi(
   return txt, full_cmd
 
 
-def _RunBenchmarkWithOpenMpi(vm,
-                             name: str,
-                             perhost: int,
-                             environment: List[str],
-                             global_environment: List[str],
-                             number_processes: int = None,
-                             hosts: List[Any] = None,
-                             options: Dict[str, Any] = None) -> Tuple[str, str]:
+def _RunBenchmarkWithOpenMpi(
+    vm,
+    name: str,
+    perhost: int,
+    environment: List[str],
+    global_environment: List[str],
+    number_processes: int = None,
+    hosts: List[Any] = None,
+    options: Dict[str, Any] = None,
+) -> Tuple[str, str]:
   """Runs the microbenchmark using OpenMPI library."""
   # Create the mpirun command
   full_env = sorted(environment + global_environment)
@@ -421,7 +497,8 @@ def _RunBenchmarkWithOpenMpi(vm,
   mpirun_cmd.append('--use-hwthread-cpus')
   if hosts:
     host_ips = ','.join(
-        [f'{vm.internal_ip}:slots={number_processes}' for vm in hosts])
+        [f'{vm.internal_ip}:slots={number_processes}' for vm in hosts]
+    )
     mpirun_cmd.append(f'-host {host_ips}')
   mpirun_cmd.append(full_benchmark_path)
   if options:
@@ -436,12 +513,14 @@ def _RunBenchmarkWithOpenMpi(vm,
   return txt, full_cmd
 
 
-def _RunBenchmark(vm,
-                  name: str,
-                  perhost: int,
-                  number_processes: int = None,
-                  hosts: List[Any] = None,
-                  options: Dict[str, Any] = None) -> Tuple[str, str]:
+def _RunBenchmark(
+    vm,
+    name: str,
+    perhost: int,
+    number_processes: int = None,
+    hosts: List[Any] = None,
+    options: Dict[str, Any] = None,
+) -> Tuple[str, str]:
   """Runs the microbenchmark.
 
   Args:
@@ -458,8 +537,16 @@ def _RunBenchmark(vm,
   run_impl = _RunBenchmarkWithIntelMpi
   if FLAGS.mpi_vendor == 'openmpi':
     run_impl = _RunBenchmarkWithOpenMpi
-  return run_impl(vm, name, perhost, FLAGS.omb_mpi_env, FLAGS.omb_mpi_genv,
-                  number_processes, hosts, options)
+  return run_impl(
+      vm,
+      name,
+      perhost,
+      FLAGS.omb_mpi_env,
+      FLAGS.omb_mpi_genv,
+      number_processes,
+      hosts,
+      options,
+  )
 
 
 def _PathToBenchmark(vm, name: str) -> str:
@@ -516,8 +603,9 @@ def _LinesAfterMarker(line_re: Pattern[str], txt: str) -> List[str]:
   return lines[1:] if lines else []
 
 
-def _ParseBenchmarkData(benchmark_name: str,
-                        txt: str) -> List[Dict[str, float]]:
+def _ParseBenchmarkData(
+    benchmark_name: str, txt: str
+) -> List[Dict[str, float]]:
   """Returns the parsed metrics from the benchmark stdout.
 
   Text for benchmark_name='bw':
@@ -542,7 +630,8 @@ def _ParseBenchmarkData(benchmark_name: str,
     if len(columns) != len(row_data):
       raise ValueError(
           f'Expected {len(columns)} columns ({columns}) in the '
-          f'{benchmark_name} benchmark, received {len(row_data)} ({row_data})')
+          f'{benchmark_name} benchmark, received {len(row_data)} ({row_data})'
+      )
     row_with_headers = dict(zip(columns, row_data))
     for int_column in ('size', 'iterations'):
       if int_column in row_with_headers:

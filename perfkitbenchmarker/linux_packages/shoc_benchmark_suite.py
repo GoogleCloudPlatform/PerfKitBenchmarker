@@ -14,7 +14,8 @@
 
 
 """Module containing SHOC Benchmark Suite installation and
-   cleanup functions.
+
+cleanup functions.
 """
 
 
@@ -33,7 +34,7 @@ def _IsShocInstalled(vm):
   """Returns whether shoc is installed or not"""
   command = os.path.join(SHOC_BIN_DIR, 'shocdriver')
   resp, _ = vm.RemoteHostCommand('command -v %s' % command, ignore_failure=True)
-  if resp.rstrip() == "":
+  if resp.rstrip() == '':
     return False
   return True
 
@@ -46,17 +47,23 @@ def AptInstall(vm):
   vm.InstallPackages(APT_PACKAGES)
   vm.Install('cuda_toolkit')
 
-  vm.RemoteCommand('cd %s && git clone %s' %
-                   (linux_packages.INSTALL_DIR, SHOC_GIT_URL))
-  vm.RemoteCommand(('cd %s && ./configure '
-                    'CUDA_CPPFLAGS=-gencode=arch=compute_37,code=compute_37 '
-                    'NVCC=/usr/local/cuda/bin/nvcc')
-                   % SHOC_DIR)
+  vm.RemoteCommand(
+      'cd %s && git clone %s' % (linux_packages.INSTALL_DIR, SHOC_GIT_URL)
+  )
+  vm.RemoteCommand(
+      (
+          'cd %s && ./configure '
+          'CUDA_CPPFLAGS=-gencode=arch=compute_37,code=compute_37 '
+          'NVCC=/usr/local/cuda/bin/nvcc'
+      )
+      % SHOC_DIR
+  )
   vm.RemoteCommand('cd %s && make -j8 && make install' % SHOC_DIR)
 
 
 def YumInstall(vm):
   """TODO: PKB currently only supports the installation of SHOC
-     on Ubuntu.
+
+  on Ubuntu.
   """
   raise NotImplementedError()

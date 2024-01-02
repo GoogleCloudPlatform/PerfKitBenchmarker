@@ -72,10 +72,12 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.image = self.image or self.DEFAULT_IMAGE
     # FIXME(meteorfox): Remove --openstack_public_network and
     # --openstack_private_network once depreciation time has expired
-    self.network_name = (FLAGS.openstack_network or
-                         FLAGS.openstack_private_network)
-    self.floating_ip_pool_name = (FLAGS.openstack_floating_ip_pool or
-                                  FLAGS.openstack_public_network)
+    self.network_name = (
+        FLAGS.openstack_network or FLAGS.openstack_private_network
+    )
+    self.floating_ip_pool_name = (
+        FLAGS.openstack_floating_ip_pool or FLAGS.openstack_public_network
+    )
     self.id = None
     self.boot_volume_id = None
     self.server_group_id = None
@@ -95,11 +97,13 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CheckPrerequisites()
     self.firewall = os_network.OpenStackFirewall.GetFirewall()
     self.public_network = os_network.OpenStackFloatingIPPool(
-        OpenStackVirtualMachine.floating_network_id)
+        OpenStackVirtualMachine.floating_network_id
+    )
     self._UploadSSHPublicKey()
     source_range = self._GetInternalNetworkCIDR()
-    self.firewall.AllowPort(self, os_network.MIN_PORT, os_network.MAX_PORT,
-                            source_range)
+    self.firewall.AllowPort(
+        self, os_network.MIN_PORT, os_network.MAX_PORT, source_range
+    )
     self.firewall.AllowICMP(self)  # Allowing ICMP traffic (i.e. ping)
     self.AllowRemoteAccessPorts()
 
@@ -130,7 +134,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _DeleteDependencies(self):
     """Delete dependencies that were needed for the VM after the VM has been
-    deleted."""
+
+    deleted.
+    """
     self._DeleteSSHPublicKey()
 
   def _Exists(self):
@@ -165,7 +171,8 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       if stderr:
         raise errors.Config.InvalidValue(
             'OpenStack CLI test command failed. Please make sure the OpenStack '
-            'CLI client is installed and properly configured')
+            'CLI client is installed and properly configured'
+        )
       OpenStackVirtualMachine.command_works = True
 
   def _CheckPrerequisites(self):
@@ -191,8 +198,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _CheckFlavor(self):
     """Tries to get flavor, if found continues execution otherwise aborts."""
-    cmd = os_utils.OpenStackCLICommand(self, 'flavor', 'show',
-                                       self.machine_type)
+    cmd = os_utils.OpenStackCLICommand(
+        self, 'flavor', 'show', self.machine_type
+    )
     err_msg = VALIDATION_ERROR_MESSAGE.format('Machine type', self.machine_type)
     self._IssueCommandCheck(cmd, err_msg)
 
@@ -200,32 +208,39 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Tries to get network, if found continues execution otherwise aborts."""
     if not self.network_name:
       if self.floating_ip_pool_name:
-        msg = ('Cannot associate floating-ip address from pool %s without '
-               'an internally routable network. Make sure '
-               '--openstack_network flag is set.')
+        msg = (
+            'Cannot associate floating-ip address from pool %s without '
+            'an internally routable network. Make sure '
+            '--openstack_network flag is set.'
+        )
       else:
-        msg = ('Cannot build instance without a network. Make sure to set '
-               'either just --openstack_network or both '
-               '--openstack_network and --openstack_floating_ip_pool flags.')
+        msg = (
+            'Cannot build instance without a network. Make sure to set '
+            'either just --openstack_network or both '
+            '--openstack_network and --openstack_floating_ip_pool flags.'
+        )
       raise errors.Error(msg)
 
     self._CheckNetworkExists(self.network_name)
 
     if self.floating_ip_pool_name:
       floating_network_dict = self._CheckFloatingIPNetworkExists(
-          self.floating_ip_pool_name)
+          self.floating_ip_pool_name
+      )
       OpenStackVirtualMachine.floating_network_id = floating_network_dict['id']
 
   def _CheckFloatingIPNetworkExists(self, floating_network_name_or_id):
     network = self._CheckNetworkExists(floating_network_name_or_id)
     if network['router:external'] not in ('External', True):
-      raise errors.Config.InvalidValue('Network "%s" is not External'
-                                       % self.floating_ip_pool_name)
+      raise errors.Config.InvalidValue(
+          'Network "%s" is not External' % self.floating_ip_pool_name
+      )
     return network
 
   def _CheckNetworkExists(self, network_name_or_id):
-    cmd = os_utils.OpenStackCLICommand(self, 'network', 'show',
-                                       network_name_or_id)
+    cmd = os_utils.OpenStackCLICommand(
+        self, 'network', 'show', network_name_or_id
+    )
     err_msg = VALIDATION_ERROR_MESSAGE.format('Network', network_name_or_id)
     stdout = self._IssueCommandCheck(cmd, err_msg)
     network = json.loads(stdout)
@@ -233,6 +248,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _IssueCommandCheck(self, cmd, err_msg=None):
     """Issues command and, if stderr is non-empty, raises an error message
+
     Args:
         cmd: The command to be issued.
         err_msg: string. Error message if command fails.
@@ -249,8 +265,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     with self._lock:
       if self.zone in self.uploaded_keypair_set:
         return
-      cmd = os_utils.OpenStackCLICommand(self, 'keypair', 'create',
-                                         self.key_name)
+      cmd = os_utils.OpenStackCLICommand(
+          self, 'keypair', 'create', self.key_name
+      )
       cmd.flags['public-key'] = self.ssh_public_key
       cmd.IssueRetryable()
       self.uploaded_keypair_set.add(self.zone)
@@ -262,8 +279,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     with self._lock:
       if self.zone in self.deleted_keypair_set:
         return
-      cmd = os_utils.OpenStackCLICommand(self, 'keypair', 'delete',
-                                         self.key_name)
+      cmd = os_utils.OpenStackCLICommand(
+          self, 'keypair', 'delete', self.key_name
+      )
       del cmd.flags['format']  # keypair delete does not support json output
       cmd.Issue()
       self.deleted_keypair_set.add(self.zone)
@@ -323,8 +341,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
       return hint_temp % server_group['id']
 
   def _CreateServerGroup(self, group_name):
-    cmd = os_utils.OpenStackCLICommand(self, 'server group', 'create',
-                                       group_name)
+    cmd = os_utils.OpenStackCLICommand(
+        self, 'server group', 'create', group_name
+    )
     cmd.flags['policy'] = FLAGS.openstack_scheduler_policy
     stdout, stderr, _ = cmd.Issue()
     if stderr:
@@ -336,8 +355,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     with self._lock:
       if self.zone in self.deleted_server_group_set:
         return
-      cmd = os_utils.OpenStackCLICommand(self, 'server group', 'delete',
-                                         self.server_group_id)
+      cmd = os_utils.OpenStackCLICommand(
+          self, 'server group', 'delete', self.server_group_id
+      )
       del cmd.flags['format']  # delete does not support json output
       cmd.Issue()
       self.deleted_server_group_set.add(self.zone)
@@ -370,8 +390,9 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _GetInternalNetworkCIDR(self):
     """Returns IP addresses source range of internal network."""
-    net_cmd = os_utils.OpenStackCLICommand(self, 'network', 'show',
-                                           self.network_name)
+    net_cmd = os_utils.OpenStackCLICommand(
+        self, 'network', 'show', self.network_name
+    )
     net_stdout, _, _ = net_cmd.Issue()
     network = json.loads(net_stdout)
 
@@ -380,24 +401,29 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       self.subnet_id = network['subnets']
 
-    subnet_cmd = os_utils.OpenStackCLICommand(self, 'subnet', 'show',
-                                              self.subnet_id)
+    subnet_cmd = os_utils.OpenStackCLICommand(
+        self, 'subnet', 'show', self.subnet_id
+    )
     stdout, _, _ = subnet_cmd.Issue()
     subnet_dict = json.loads(stdout)
     return subnet_dict['cidr']
 
   def _AllocateFloatingIP(self):
     floating_ip = self.public_network.associate(self)
-    logging.info('floating-ip associated: {}'.format(
-        floating_ip.floating_ip_address))
+    logging.info(
+        'floating-ip associated: {}'.format(floating_ip.floating_ip_address)
+    )
     return floating_ip
 
   def CreateScratchDisk(self, _, disk_spec):
-    disks_names = ('%s_data_%d_%d'
-                   % (self.name, len(self.scratch_disks), i)
-                   for i in range(disk_spec.num_striped_disks))
-    disks = [os_disk.OpenStackDisk(disk_spec, name, self.zone)
-             for name in disks_names]
+    disks_names = (
+        '%s_data_%d_%d' % (self.name, len(self.scratch_disks), i)
+        for i in range(disk_spec.num_striped_disks)
+    )
+    disks = [
+        os_disk.OpenStackDisk(disk_spec, name, self.zone)
+        for name in disks_names
+    ]
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
     disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
@@ -416,16 +442,19 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     return result
 
 
-class Rhel7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
-                                        linux_virtual_machine.Rhel7Mixin):
+class Rhel7BasedOpenStackVirtualMachine(
+    OpenStackVirtualMachine, linux_virtual_machine.Rhel7Mixin
+):
   DEFAULT_IMAGE = 'rhel-7.2'
 
 
-class CentOs7BasedOpenStackVirtualMachine(OpenStackVirtualMachine,
-                                          linux_virtual_machine.CentOs7Mixin):
+class CentOs7BasedOpenStackVirtualMachine(
+    OpenStackVirtualMachine, linux_virtual_machine.CentOs7Mixin
+):
   DEFAULT_IMAGE = 'centos7'
 
 
-class ClearBasedOpenStackVirtualMachine(OpenStackVirtualMachine,
-                                        linux_virtual_machine.ClearMixin):
+class ClearBasedOpenStackVirtualMachine(
+    OpenStackVirtualMachine, linux_virtual_machine.ClearMixin
+):
   DEFAULT_IMAGE = 'upstream-clear'

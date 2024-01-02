@@ -38,18 +38,21 @@ _MAP_ENGINE_TO_DEFAULT_VERSION = {
 _SQL_SERVER_ENGINES = (
     sql_engine_utils.SQLSERVER_EXPRESS,
     sql_engine_utils.SQLSERVER_STANDARD,
-    sql_engine_utils.SQLSERVER_ENTERPRISE)
+    sql_engine_utils.SQLSERVER_ENTERPRISE,
+)
 
 _RDS_ENGINES = [
     sql_engine_utils.MYSQL,
     sql_engine_utils.POSTGRES,
     sql_engine_utils.SQLSERVER_EXPRESS,
     sql_engine_utils.SQLSERVER_STANDARD,
-    sql_engine_utils.SQLSERVER_ENTERPRISE]
+    sql_engine_utils.SQLSERVER_ENTERPRISE,
+]
 
 
 class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   """Implements the RDS database for AWS."""
+
   CLOUD = 'AWS'
   IS_MANAGED = True
   ENGINE = _RDS_ENGINES
@@ -146,9 +149,11 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   def _FailoverHA(self):
     """Fail over from master to replica."""
     cmd = util.AWS_PREFIX + [
-        'rds', 'reboot-db-instance',
-        '--db-instance-identifier=%s' % self.instance_id, '--force-failover',
-        '--region=%s' % self.region
+        'rds',
+        'reboot-db-instance',
+        '--db-instance-identifier=%s' % self.instance_id,
+        '--force-failover',
+        '--region=%s' % self.region,
     ]
     vm_util.IssueCommand(cmd)
 
@@ -158,6 +163,7 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
     Args:
       engine (string): type of database (my_sql or postgres).
+
     Returns:
       (string): Default engine version.
     Raises:

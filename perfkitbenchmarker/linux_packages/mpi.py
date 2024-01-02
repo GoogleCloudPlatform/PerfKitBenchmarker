@@ -41,6 +41,7 @@ class MpiData:
     "time_min":186.85
   }
   """
+
   bytes: Optional[int] = None
   repetitions: Optional[int] = None
   data: Optional[Dict[str, Union[int, float]]] = None
@@ -54,6 +55,7 @@ class MpiResult:
 
   For example this could be the PingPong run results.
   """
+
   benchmark: str
   data: List[MpiData]
   groups: Optional[int] = None
@@ -65,6 +67,7 @@ class MpiResult:
 @dataclasses.dataclass
 class MpiResponse:
   """Response to the RunMpiStats call."""
+
   mpi_run: str
   args: str
   vendor: str
@@ -80,6 +83,7 @@ class MpiRequest:
 
   See the FLAGS.mpi_XXX definitions in mpi_benchmark.py for the definitions.
   """
+
   # TODO(andytzhu): Get rid of Any, and handle importing linux_virtual_machine
   # without encountering circular dependencies
   vms: List[Any]  # virtual machine
@@ -105,15 +109,25 @@ class MpiRequest:
 
 # The same order as the output in the print_tail function in the patched code
 LATENCY_HEADERS: List[str] = [
-    'latency_min', 'latency_p10', 'latency_p25', 'latency_p50', 'latency_p75',
-    'latency_p90', 'latency_p95', 'latency_p99', 'latency_p99.5',
-    'latency_p99.9', 'latency_p99.99', 'latency_max'
+    'latency_min',
+    'latency_p10',
+    'latency_p25',
+    'latency_p50',
+    'latency_p75',
+    'latency_p90',
+    'latency_p95',
+    'latency_p99',
+    'latency_p99.5',
+    'latency_p99.9',
+    'latency_p99.99',
+    'latency_max',
 ]
 
 # Regexs for parsing I_MPI_DEBUG=4 and higher output
 _MPI_STARTUP_PREFIX = r'^\[(?P<unused_cpuid>\d+)\] MPI startup\(\):\s+'
-_MPI_ENV_RE = re.compile(_MPI_STARTUP_PREFIX +
-                         r'(?P<mpi_var>I_MPI.*?)=(?P<mpi_value>.*)')
+_MPI_ENV_RE = re.compile(
+    _MPI_STARTUP_PREFIX + r'(?P<mpi_var>I_MPI.*?)=(?P<mpi_value>.*)'
+)
 
 
 def Install(vm) -> None:
@@ -146,7 +160,8 @@ def VerifyInstall(vms) -> None:
       include_zero_byte=False,
       compile_from_source=True,
       record_latencies=False,
-      multi=True)
+      multi=True,
+  )
   RunMpiStats(vms[0], request)
 
 
@@ -174,16 +189,24 @@ def RunMpiStats(vm, request: MpiRequest) -> MpiResponse:
   """
   hosts = [vm.internal_ip for vm in request.vms]
 
-  mpirun = imb.MpiRunCommand(vm, hosts, request.total_processes, request.ppn,
-                             request.environment, request.global_environment,
-                             request.tune)
+  mpirun = imb.MpiRunCommand(
+      vm,
+      hosts,
+      request.total_processes,
+      request.ppn,
+      request.environment,
+      request.global_environment,
+      request.tune,
+  )
   if request.record_latencies:
-    latency_file = '/tmp/latency-{}-{}.txt'.format(request.tests[0],
-                                                   uuid.uuid4().hex[:8])
+    latency_file = '/tmp/latency-{}-{}.txt'.format(
+        request.tests[0], uuid.uuid4().hex[:8]
+    )
   else:
     latency_file = None
   common = ' '.join(
-      BuildMpiBenchmarkArgs(request, latency_file, bool(request.ppn)))
+      BuildMpiBenchmarkArgs(request, latency_file, bool(request.ppn))
+  )
   try:
     stdout, stderr = vm.RobustRemoteCommand(mpirun + ' ' + common)
   except errors.VirtualMachine.RemoteCommandError:
@@ -191,7 +214,8 @@ def RunMpiStats(vm, request: MpiRequest) -> MpiResponse:
     for client_vm in request.vms:
       logging.info('VM syslog for %s', client_vm.name)
       client_vm.RemoteCommand(
-          'sudo tail -n 100 /var/log/syslog /var/log/messages || exit')
+          'sudo tail -n 100 /var/log/syslog /var/log/messages || exit'
+      )
     raise
   if stderr:
     # SSH displays a warning but this could also contain mpirun errors
@@ -209,7 +233,8 @@ def RunMpiStats(vm, request: MpiRequest) -> MpiResponse:
       version=GetMpiVersion(vm),
       results=results,
       mpi_pinning=omb.ParseMpiPinning(lines),
-      mpi_env=ParseMpiEnv(lines))
+      mpi_env=ParseMpiEnv(lines),
+  )
 
 
 class MpiResultParser(Iterable[MpiResult]):
@@ -217,9 +242,11 @@ class MpiResultParser(Iterable[MpiResult]):
 
   This is an iterator where each next item is an MpiResult.
   """
+
   _NAME = re.compile('^# Benchmarking (.*)')
   _GROUP1 = re.compile(
-      r'.*?(?P<groups>\d+) groups of (?P<processes>\d+) processes')
+      r'.*?(?P<groups>\d+) groups of (?P<processes>\d+) processes'
+  )
   _GROUP2 = re.compile(r'# #processes = (?P<processes>\d+)')
   _GROUP_LAYOUT = re.compile(r'# Group\s+(\d+):\s+(.*)')
   _GROUP_LAYOUT_FOLLOWON = re.compile(r'#\s+(\d+[\s\d]*)')
@@ -375,8 +402,9 @@ class MpiResultParser(Iterable[MpiResult]):
         ]
         percentiles: Dict[str, float] = dict(zip(LATENCY_HEADERS, values))
         if not on_deck:
-          logging.warning('Have percentiles but no previous mpidata %s',
-                          percentiles)
+          logging.warning(
+              'Have percentiles but no previous mpidata %s', percentiles
+          )
           continue
         if sum(values) == 0.0:
           # only tests that have been patched have the percentile metrics
@@ -393,13 +421,15 @@ class MpiResultParser(Iterable[MpiResult]):
         number_bytes = data.pop('bytes', 0)
         repetitions = data.pop('repetitions', -1)
         on_deck = MpiData(
-            bytes=number_bytes, repetitions=repetitions, data=data)
+            bytes=number_bytes, repetitions=repetitions, data=data
+        )
     if on_deck:
       # Last record in this stanza was a normal MPI row.
       yield on_deck
 
-  def _DataIntoMap(self, headers: Sequence[str],
-                   data: Sequence[str]) -> Dict[str, Union[int, float]]:
+  def _DataIntoMap(
+      self, headers: Sequence[str], data: Sequence[str]
+  ) -> Dict[str, Union[int, float]]:
     """Converts the a row of data from the MPI results into a dict.
 
     Args:
@@ -419,8 +449,9 @@ class MpiResultParser(Iterable[MpiResult]):
     return int(value) if header in self._INT_COLUMNS else float(value)
 
 
-def BuildMpiBenchmarkArgs(request: MpiRequest, latency_file: Optional[str],
-                          ppn_set: bool) -> List[str]:
+def BuildMpiBenchmarkArgs(
+    request: MpiRequest, latency_file: Optional[str], ppn_set: bool
+) -> List[str]:
   """Creates the common arguments to pass to mpirun.
 
   See https://software.intel.com/en-us/imb-user-guide-command-line-control
@@ -440,8 +471,10 @@ def BuildMpiBenchmarkArgs(request: MpiRequest, latency_file: Optional[str],
   else:
     args.append(request.suite)
   # only add -msglog if told to do so
-  if request.suite in ('IMB-MPI1', 'IMB-RMA',
-                       'IMB-NBC') and request.msglog_max is not None:
+  if (
+      request.suite in ('IMB-MPI1', 'IMB-RMA', 'IMB-NBC')
+      and request.msglog_max is not None
+  ):
     if request.msglog_min is None:
       arg = request.msglog_max
     else:
@@ -478,8 +511,9 @@ def BuildMpiBenchmarkArgs(request: MpiRequest, latency_file: Optional[str],
   return args
 
 
-def _CreateMpiDataForHistogram(grouped_lines: List[List[str]],
-                               results: List[MpiResult]) -> None:
+def _CreateMpiDataForHistogram(
+    grouped_lines: List[List[str]], results: List[MpiResult]
+) -> None:
   """Adds histogram data from the histogram file to existing data.
 
   The MPI parsed results are passed in as some benchmarks runs can do many
@@ -494,7 +528,8 @@ def _CreateMpiDataForHistogram(grouped_lines: List[List[str]],
   # MPI runs that time out should not have histogram data associated with it.
   for result in results:
     acceptable_mpi_data.extend(
-        mpi_data for mpi_data in result.data if not mpi_data.is_error)
+        mpi_data for mpi_data in result.data if not mpi_data.is_error
+    )
   histograms: List[MpiData] = []
   for lines in grouped_lines:
     histograms.extend(_CombineHistogramEntries(lines))
@@ -503,8 +538,9 @@ def _CreateMpiDataForHistogram(grouped_lines: List[List[str]],
       mpi_data.histogram = histogram.histogram
 
 
-def _MpiHistogramAcceptable(mpi_data: List[MpiData],
-                            histograms: List[MpiData]) -> bool:
+def _MpiHistogramAcceptable(
+    mpi_data: List[MpiData], histograms: List[MpiData]
+) -> bool:
   """Returns whether the parsed MpiResults MpiData matches with the histograms.
 
   Criteria:
@@ -517,15 +553,21 @@ def _MpiHistogramAcceptable(mpi_data: List[MpiData],
     histograms: List of MpiData histograms parsed for this run.
   """
   if len(mpi_data) != len(histograms):
-    logging.warning('Have %s parsed MPI data but only %s histograms',
-                    len(mpi_data), len(histograms))
+    logging.warning(
+        'Have %s parsed MPI data but only %s histograms',
+        len(mpi_data),
+        len(histograms),
+    )
     return False
   for mpi_data, histogram in zip(mpi_data, histograms):
     bytes_same = mpi_data.bytes == histogram.bytes
     repetitions_same = mpi_data.repetitions == histogram.repetitions
     if not bytes_same or not repetitions_same:
-      logging.warning('Parsed MPI data %s does not match with histogram %s',
-                      mpi_data, histogram)
+      logging.warning(
+          'Parsed MPI data %s does not match with histogram %s',
+          mpi_data,
+          histogram,
+      )
       return False
   return True
 
@@ -580,11 +622,13 @@ def _CombineHistogramEntries(lines: Iterable[str]) -> Iterator[MpiData]:
     yield MpiData(
         bytes=number_bytes,
         histogram=dict(histogram),
-        repetitions=sum(histogram.values()))
+        repetitions=sum(histogram.values()),
+    )
 
 
-def _GroupLatencyLines(vm, latency_file: str,
-                       packets_per_run: int) -> List[List[str]]:
+def _GroupLatencyLines(
+    vm, latency_file: str, packets_per_run: int
+) -> List[List[str]]:
   r"""Parses the histogram latency file copied from the remote VM.
 
   The latency file contains multiple sub-runs concatenated together.  Each of
@@ -602,23 +646,29 @@ def _GroupLatencyLines(vm, latency_file: str,
     List of lists of strings of length packets_per_run or an empty list if there
     is a problem dividing up the lines into groups.
   """
-  local_file: str = os.path.join(temp_dir.GetRunDirPath(),
-                                 os.path.basename(latency_file))
+  local_file: str = os.path.join(
+      temp_dir.GetRunDirPath(), os.path.basename(latency_file)
+  )
   if vm.TryRemoteCommand(f'test -f {latency_file}'):
     vm.PullFile(local_file, latency_file)
   else:
-    logging.warning('Skipping gathering latency as %s file missing',
-                    latency_file)
+    logging.warning(
+        'Skipping gathering latency as %s file missing', latency_file
+    )
     return []
   with open(local_file) as reader:
     lines = [line.strip() for line in reader.readlines()]
   number_groups = len(lines) // packets_per_run
   if packets_per_run * number_groups != len(lines):
-    logging.warning('File %s has %s lines, cannot be divided into size %s',
-                    local_file, len(lines), packets_per_run)
+    logging.warning(
+        'File %s has %s lines, cannot be divided into size %s',
+        local_file,
+        len(lines),
+        packets_per_run,
+    )
     return []
   return [
-      lines[i:i + packets_per_run]
+      lines[i : i + packets_per_run]
       for i in range(0, len(lines), packets_per_run)
   ]
 

@@ -20,7 +20,6 @@ FLAGS = flags.FLAGS
 
 
 class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
-
   sqs: aws_sqs.AwsSqs
   client: mock.Mock
 
@@ -35,7 +34,8 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _MockIssueCommand(self, return_value):
     return self.enter_context(
-        mock.patch.object(vm_util, 'IssueCommand', return_value=return_value))
+        mock.patch.object(vm_util, 'IssueCommand', return_value=return_value)
+    )
 
   def testGetQueue(self):
     # Don't actually issue a command.
@@ -45,8 +45,12 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
     actual_result = self.sqs._GetQueue()
     cmd = ' '.join(cmd.call_args[0][0])
     self.assertIn(
-        'sqs get-queue-url --queue-name ' + self.sqs.queue_name + ' --region ' +
-        self.sqs.region, cmd)
+        'sqs get-queue-url --queue-name '
+        + self.sqs.queue_name
+        + ' --region '
+        + self.sqs.region,
+        cmd,
+    )
     self.assertEqual(actual_result, 'mocked_queue_url')
 
   def testCreate(self):
@@ -57,8 +61,12 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
     self.sqs._Create()
     cmd = ' '.join(cmd.call_args[0][0])
     self.assertIn(
-        'sqs create-queue --queue-name ' + self.sqs.queue_name + ' --region ' +
-        self.sqs.region, cmd)
+        'sqs create-queue --queue-name '
+        + self.sqs.queue_name
+        + ' --region '
+        + self.sqs.region,
+        cmd,
+    )
 
   def testExists(self):
     # Don't actually issue a command.
@@ -68,8 +76,12 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
     result = self.sqs._Exists()
     cmd = ' '.join(cmd.call_args[0][0])
     self.assertIn(
-        'sqs get-queue-url --queue-name ' + self.sqs.queue_name + ' --region ' +
-        self.sqs.region, cmd)
+        'sqs get-queue-url --queue-name '
+        + self.sqs.queue_name
+        + ' --region '
+        + self.sqs.region,
+        cmd,
+    )
     self.assertTrue(result)
 
   def testDoesntExist(self):
@@ -80,8 +92,12 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
     result = self.sqs._Exists()
     cmd = ' '.join(cmd.call_args[0][0])
     self.assertIn(
-        'sqs get-queue-url --queue-name ' + self.sqs.queue_name + ' --region ' +
-        self.sqs.region, cmd)
+        'sqs get-queue-url --queue-name '
+        + self.sqs.queue_name
+        + ' --region '
+        + self.sqs.region,
+        cmd,
+    )
     self.assertFalse(result)
 
   @mock.patch.object(aws_sqs.AwsSqs, '_GetQueue')
@@ -94,8 +110,12 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
     self.sqs._Delete()
     cmd = ' '.join(cmd.call_args[0][0])
     self.assertIn(
-        'sqs delete-queue --queue-url ' + get_queue_mock.return_value +
-        ' --region ' + self.sqs.region, cmd)
+        'sqs delete-queue --queue-url '
+        + get_queue_mock.return_value
+        + ' --region '
+        + self.sqs.region,
+        cmd,
+    )
 
   def testPrepareClientVm(self):
     # Don't actually issue a command.
@@ -105,20 +125,23 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
     self.sqs.PrepareClientVm()
     self.client.assert_has_calls([
         mock.call.RemoteCommand(
-            'sudo pip3 install boto3', ignore_failure=False),
+            'sudo pip3 install boto3', ignore_failure=False
+        ),
         mock.call.RemoteCommand(
-            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/aws'
+            'mkdir -p'
+            ' ~/perfkitbenchmarker/scripts/messaging_service_scripts/aws'
         ),
         mock.call.PushDataFile(
             'messaging_service_scripts/aws/__init__.py',
-            '~/perfkitbenchmarker/scripts/messaging_service_scripts/aws/__init__.py'
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/aws/__init__.py',
         ),
         mock.call.RemoteCommand(
-            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/aws'
+            'mkdir -p'
+            ' ~/perfkitbenchmarker/scripts/messaging_service_scripts/aws'
         ),
         mock.call.PushDataFile(
             'messaging_service_scripts/aws/aws_sqs_client.py',
-            '~/perfkitbenchmarker/scripts/messaging_service_scripts/aws/aws_sqs_client.py'
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/aws/aws_sqs_client.py',
         ),
         mock.call.PushDataFile('messaging_service_scripts/aws_benchmark.py'),
     ])
@@ -127,16 +150,22 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
   def testRun(self):
     return_value = ['{"mock1": 1}', None]
     self.client.RemoteCommand.return_value = return_value
-    remote_run_cmd = (f'python3 -m aws_benchmark '
-                      f'--queue_name={self.sqs.queue_name} '
-                      f'--region={self.sqs.region} '
-                      f'--benchmark_scenario={_BENCHMARK_SCENARIO} '
-                      f'--number_of_messages={_NUMBER_OF_MESSAGES} '
-                      f'--message_size={_MESSAGE_SIZE} '
-                      f'--warmup_messages={_WARMUP_MESSAGES}')
+    remote_run_cmd = (
+        'python3 -m aws_benchmark '
+        f'--queue_name={self.sqs.queue_name} '
+        f'--region={self.sqs.region} '
+        f'--benchmark_scenario={_BENCHMARK_SCENARIO} '
+        f'--number_of_messages={_NUMBER_OF_MESSAGES} '
+        f'--message_size={_MESSAGE_SIZE} '
+        f'--warmup_messages={_WARMUP_MESSAGES}'
+    )
 
-    self.sqs.Run(_BENCHMARK_SCENARIO, _NUMBER_OF_MESSAGES, _MESSAGE_SIZE,
-                 _WARMUP_MESSAGES)
+    self.sqs.Run(
+        _BENCHMARK_SCENARIO,
+        _NUMBER_OF_MESSAGES,
+        _MESSAGE_SIZE,
+        _WARMUP_MESSAGES,
+    )
     self.client.RemoteCommand.assert_called_with(remote_run_cmd)
 
 

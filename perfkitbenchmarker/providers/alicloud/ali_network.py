@@ -53,7 +53,8 @@ class AliVpc(resource.BaseResource):
         'CreateVpc',
         '--VpcName %s' % self.name,
         '--RegionId %s' % self.region,
-        '--CidrBlock 10.0.0.0/16']
+        '--CidrBlock 10.0.0.0/16',
+    ]
     create_cmd = util.GetEncodedCmd(create_cmd)
     stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
     response = json.loads(stdout)
@@ -69,7 +70,8 @@ class AliVpc(resource.BaseResource):
         'ecs',
         'DescribeVpcs',
         '--RegionId %s' % self.region,
-        '--VpcId %s' % self.id]
+        '--VpcId %s' % self.id,
+    ]
     describe_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
@@ -80,13 +82,15 @@ class AliVpc(resource.BaseResource):
   @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
   def _WaitForVpcStatus(self, status_list):
     """Waits until VPC's status is in status_list"""
-    logging.info('Waits until the status of VPC is in status_list: %s',
-                 status_list)
+    logging.info(
+        'Waits until the status of VPC is in status_list: %s', status_list
+    )
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
         'DescribeVpcs',
         '--RegionId %s' % self.region,
-        '--VpcId %s' % self.id]
+        '--VpcId %s' % self.id,
+    ]
     describe_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
@@ -101,7 +105,8 @@ class AliVpc(resource.BaseResource):
         'ecs',
         'DeleteVpc',
         '--RegionId %s' % self.region,
-        '--VpcId %s' % self.id]
+        '--VpcId %s' % self.id,
+    ]
     delete_cmd = util.GetEncodedCmd(delete_cmd)
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
@@ -143,7 +148,8 @@ class AliVSwitch(resource.BaseResource):
         'ecs',
         'DeleteVSwitch',
         '--RegionId %s' % self.region,
-        '--VSwitchId %s' % self.id]
+        '--VSwitchId %s' % self.id,
+    ]
     delete_cmd = util.GetEncodedCmd(delete_cmd)
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
@@ -154,7 +160,8 @@ class AliVSwitch(resource.BaseResource):
         'DescribeVSwitches',
         '--RegionId %s' % self.region,
         '--VpcId %s' % self.vpc_id,
-        '--ZoneId %s' % self.zone]
+        '--ZoneId %s' % self.zone,
+    ]
     describe_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
@@ -179,7 +186,8 @@ class AliSecurityGroup(resource.BaseResource):
         'ecs',
         'CreateSecurityGroup',
         '--SecurityGroupName %s' % self.name,
-        '--RegionId %s' % self.region]
+        '--RegionId %s' % self.region,
+    ]
     if self.use_vpc:
       create_cmd.append('--VpcId %s' % self.vpc_id)
     create_cmd = util.GetEncodedCmd(create_cmd)
@@ -188,8 +196,9 @@ class AliSecurityGroup(resource.BaseResource):
 
   def _PostCreate(self):
     """Tag security group with default tags."""
-    util.AddDefaultTags(self.group_id, util.ResourceTypes.SECURITYGROUP,
-                        self.region)
+    util.AddDefaultTags(
+        self.group_id, util.ResourceTypes.SECURITYGROUP, self.region
+    )
 
   def _Delete(self):
     """Deletes the security group."""
@@ -197,7 +206,8 @@ class AliSecurityGroup(resource.BaseResource):
         'ecs',
         'DeleteSecurityGroup',
         '--RegionId %s' % self.region,
-        '--SecurityGroupId %s' % self.group_id]
+        '--SecurityGroupId %s' % self.group_id,
+    ]
     delete_cmd = util.GetEncodedCmd(delete_cmd)
     vm_util.IssueRetryableCommand(delete_cmd)
 
@@ -207,7 +217,8 @@ class AliSecurityGroup(resource.BaseResource):
         'ecs',
         'DescribeSecurityGroups',
         '--RegionId %s' % self.region,
-        '--SecurityGroupId %s' % self.group_id]
+        '--SecurityGroupId %s' % self.group_id,
+    ]
     show_cmd = util.GetEncodedCmd(show_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(show_cmd)
     response = json.loads(stdout)
@@ -243,7 +254,8 @@ class AliFirewall(network.BaseFirewall):
           '--PortRange -1/-1',
           '--SourceCidrIp 0.0.0.0/0',
           '--RegionId %s' % vm.region,
-          '--SecurityGroupId %s' % vm.group_id]
+          '--SecurityGroupId %s' % vm.group_id,
+      ]
       if FLAGS.ali_use_vpc:
         authorize_cmd.append('--NicType intranet')
       authorize_cmd = util.GetEncodedCmd(authorize_cmd)
@@ -289,7 +301,8 @@ class AliFirewall(network.BaseFirewall):
             '--PortRange %s/%s' % (port, port),
             '--SourceCidrIp 0.0.0.0/0',
             '--RegionId %s' % vm.region,
-            '--SecurityGroupId %s' % vm.group_id]
+            '--SecurityGroupId %s' % vm.group_id,
+        ]
         if FLAGS.ali_use_vpc:
           authorize_cmd.append('--NicType intranet')
         authorize_cmd = util.GetEncodedCmd(authorize_cmd)
@@ -308,8 +321,7 @@ class AliNetwork(network.BaseNetwork):
 
   def __init__(self, spec):
     super(AliNetwork, self).__init__(spec)
-    self.name = (
-        'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:]))
+    self.name = 'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:])
     self.region = util.GetRegionByZone(spec.zone)
     self.use_vpc = FLAGS.ali_use_vpc
     if self.use_vpc:
@@ -317,8 +329,9 @@ class AliNetwork(network.BaseNetwork):
       self.vswitch = None
       self.security_group = None
     else:
-      self.security_group = \
-          AliSecurityGroup(self.name, self.region, use_vpc=False)
+      self.security_group = AliSecurityGroup(
+          self.name, self.region, use_vpc=False
+      )
 
   @vm_util.Retry()
   def Create(self):
@@ -331,10 +344,9 @@ class AliNetwork(network.BaseNetwork):
       self.vswitch.Create()
 
       if self.security_group is None:
-        self.security_group = AliSecurityGroup(self.name,
-                                               self.region,
-                                               use_vpc=True,
-                                               vpc_id=self.vpc.id)
+        self.security_group = AliSecurityGroup(
+            self.name, self.region, use_vpc=True, vpc_id=self.vpc.id
+        )
       self.security_group.Create()
     else:
       self.security_group.Create()

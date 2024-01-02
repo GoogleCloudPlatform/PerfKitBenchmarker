@@ -25,7 +25,8 @@ class NvidiaPowerTestCase(unittest.TestCase):
   def setUp(self):
     super(NvidiaPowerTestCase, self).setUp()
     path = os.path.join(
-        os.path.dirname(__file__), '../data', 'nvidia_power_output.txt')
+        os.path.dirname(__file__), '../data', 'nvidia_power_output.txt'
+    )
     with open(path, 'r') as fp:
       self.contents = fp.read()
 
@@ -34,14 +35,16 @@ class NvidiaPowerTestCase(unittest.TestCase):
         'event': 'nvidia_power',
         'sender': 'run',
         'nvidia_power_interval': '1',
-        'role': 'default_0'
+        'role': 'default_0',
     }
 
     samples = []
-    nvidia_power._NvidiaPowerResults(metadata,
-                                     csv.DictReader(io.StringIO(self.contents)),
-                                     samples,
-                                     ['index', 'timestamp', 'power.draw'])
+    nvidia_power._NvidiaPowerResults(
+        metadata,
+        csv.DictReader(io.StringIO(self.contents)),
+        samples,
+        ['index', 'timestamp', 'power.draw'],
+    )
 
     expected_values = [
         16.48,

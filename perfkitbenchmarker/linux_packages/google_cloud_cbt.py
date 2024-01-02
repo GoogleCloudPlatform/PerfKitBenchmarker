@@ -25,8 +25,10 @@ from perfkitbenchmarker.linux_packages import go_lang
 FLAGS = flags.FLAGS
 
 CBT_CLI_VERSION = flags.DEFINE_string(
-    'google_cloud_cbt_cli_version', '9c4f438e783f3af6e8900e80e834725640f1c6a9',
-    'Google Cloud Bigtable `cbt` CLI version')
+    'google_cloud_cbt_cli_version',
+    '9c4f438e783f3af6e8900e80e834725640f1c6a9',
+    'Google Cloud Bigtable `cbt` CLI version',
+)
 CBT_BIN = os.path.join(linux_packages.INSTALL_DIR, 'cbt/cbt')
 
 
@@ -35,6 +37,8 @@ def Install(vm):
   """Installs the cbt CLI."""
   vm.Install('go_lang')
   vm.RemoteCommand(f'cd {linux_packages.INSTALL_DIR} && mkdir -p cbt')
-  vm.RemoteCommand(f'{go_lang.GO_BIN} install '
-                   f'cloud.google.com/go/cbt@{CBT_CLI_VERSION.value}')
+  vm.RemoteCommand(
+      f'{go_lang.GO_BIN} install '
+      f'cloud.google.com/go/cbt@{CBT_CLI_VERSION.value}'
+  )
   vm.RemoteCommand(f'cp go/bin/cbt {CBT_BIN}')

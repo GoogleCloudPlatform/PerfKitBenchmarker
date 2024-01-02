@@ -24,77 +24,57 @@ AGGREGATE_E2E_METRICS = {
     'e2e_acknowledge_latency_cold': {
         'value': 1000,
         'unit': 'milliseconds',
-        'metadata': {}
+        'metadata': {},
     },
-    'e2e_latency_failure_counter': {
-        'value': 0,
-        'unit': '',
-        'metadata': {}
-    },
+    'e2e_latency_failure_counter': {'value': 0, 'unit': '', 'metadata': {}},
     'e2e_latency_mean': {
         'value': 500.0,
         'unit': 'milliseconds',
-        'metadata': {
-            'samples': [500]
-        }
+        'metadata': {'samples': [500]},
     },
-    'e2e_latency_p50': {
-        'value': 500.0,
-        'unit': 'milliseconds',
-        'metadata': {}
-    },
-    'e2e_latency_p99': {
-        'value': 500.0,
-        'unit': 'milliseconds',
-        'metadata': {}
-    },
+    'e2e_latency_p50': {'value': 500.0, 'unit': 'milliseconds', 'metadata': {}},
+    'e2e_latency_p99': {'value': 500.0, 'unit': 'milliseconds', 'metadata': {}},
     'e2e_latency_p99_9': {
         'value': 500.0,
         'unit': 'milliseconds',
-        'metadata': {}
+        'metadata': {},
     },
     'e2e_latency_percentage_received': {
         'value': 100.0,
         'unit': '%',
-        'metadata': {}
+        'metadata': {},
     },
-    'e2e_latency_cold': {
-        'value': 500,
-        'unit': 'milliseconds',
-        'metadata': {}
-    },
+    'e2e_latency_cold': {'value': 500, 'unit': 'milliseconds', 'metadata': {}},
     'e2e_acknowledge_latency_failure_counter': {
         'value': 0,
         'unit': '',
-        'metadata': {}
+        'metadata': {},
     },
     'e2e_acknowledge_latency_mean': {
         'value': 1000.0,
         'unit': 'milliseconds',
-        'metadata': {
-            'samples': [1000]
-        }
+        'metadata': {'samples': [1000]},
     },
     'e2e_acknowledge_latency_p50': {
         'value': 1000.0,
         'unit': 'milliseconds',
-        'metadata': {}
+        'metadata': {},
     },
     'e2e_acknowledge_latency_p99': {
         'value': 1000.0,
         'unit': 'milliseconds',
-        'metadata': {}
+        'metadata': {},
     },
     'e2e_acknowledge_latency_p99_9': {
         'value': 1000.0,
         'unit': 'milliseconds',
-        'metadata': {}
+        'metadata': {},
     },
     'e2e_acknowledge_latency_percentage_received': {
         'value': 100.0,
         'unit': '%',
-        'metadata': {}
-    }
+        'metadata': {},
+    },
 }
 
 
@@ -118,12 +98,14 @@ def GetMockCoro(return_value=None):
 
 
 class MessagingServiceScriptsE2EMainProcessTest(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   def setUp(self):
     super().setUp()
     self.pipe_mock = self.enter_context(
-        mock.patch.object(mp, 'Pipe', side_effect=self._GetPipeMocks))
+        mock.patch.object(mp, 'Pipe', side_effect=self._GetPipeMocks)
+    )
     self.process_mock = self.enter_context(mock.patch.object(mp, 'Process'))
     self.subprocess_mock = self.process_mock.return_value
     self.flags_mock = self.enter_context(mock.patch('absl.flags.FLAGS'))
@@ -147,20 +129,23 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(main_process.BaseWorker, '_join_subprocess')
   @mock.patch.object(main_process.BaseWorker, '_read_subprocess_output')
   @AsyncTest
-  async def testStartStop(self, read_subprocess_output_mock,
-                          join_subprocess_mock):
+  async def testStartStop(
+      self, read_subprocess_output_mock, join_subprocess_mock
+  ):
     worker = main_process.PublisherWorker()
     self.assertEqual(self.pipe_mock.call_count, 2)
     self.assertEqual(
-        self._GetSubprocessInWriter(worker)._extract_mock_name(), 'pipe_writer')
+        self._GetSubprocessInWriter(worker)._extract_mock_name(), 'pipe_writer'
+    )
     self.assertEqual(
-        self._GetSubprocessInReader(worker)._extract_mock_name(), 'pipe_reader')
+        self._GetSubprocessInReader(worker)._extract_mock_name(), 'pipe_reader'
+    )
     self.assertEqual(
-        self._GetSubprocessOutWriter(worker)._extract_mock_name(),
-        'pipe_writer')
+        self._GetSubprocessOutWriter(worker)._extract_mock_name(), 'pipe_writer'
+    )
     self.assertEqual(
-        self._GetSubprocessOutReader(worker)._extract_mock_name(),
-        'pipe_reader')
+        self._GetSubprocessOutReader(worker)._extract_mock_name(), 'pipe_reader'
+    )
     self.assertEqual(worker.subprocess_func, publisher.main)
     await worker.start()
     self.process_mock.assert_called_once_with(
@@ -171,7 +156,8 @@ class MessagingServiceScriptsE2EMainProcessTest(
             'serialized_flags': self.flags_mock.flags_into_string(),
             'app': self.app_mock.get_instance.return_value,
             'pinned_cpus': None,
-        })
+        },
+    )
     read_subprocess_output_mock.assert_called_once_with(protocol.Ready, None)
     await worker.stop()
     self.subprocess_mock.terminate.assert_called_once_with()
@@ -191,17 +177,20 @@ class MessagingServiceScriptsE2EMainProcessTest(
             'serialized_flags': self.flags_mock.flags_into_string(),
             'app': self.app_mock.get_instance.return_value,
             'pinned_cpus': {3, 1, 4},
-        })
+        },
+    )
     await worker.stop()
 
   @mock.patch.object(
       main_process.BaseWorker,
       '_join_subprocess',
-      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None))
+      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None),
+  )
   @mock.patch.object(main_process.BaseWorker, '_read_subprocess_output')
   @AsyncTest
-  async def testStopKill(self, read_subprocess_output_mock,
-                         join_subprocess_mock):
+  async def testStopKill(
+      self, read_subprocess_output_mock, join_subprocess_mock
+  ):
     worker = main_process.PublisherWorker()
     await worker.start()
     read_subprocess_output_mock.assert_called_once_with(protocol.Ready, None)
@@ -214,7 +203,8 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_join_subprocess',
-      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None))
+      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None),
+  )
   @AsyncTest
   async def testReadSubprocessOutput(self, _, sleep_mock):
     worker = main_process.PublisherWorker()
@@ -231,7 +221,8 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_join_subprocess',
-      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None))
+      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None),
+  )
   @AsyncTest
   async def testReadSubprocessOutputTimeout(self, _):
     worker = main_process.PublisherWorker()
@@ -246,7 +237,8 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_join_subprocess',
-      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None))
+      side_effect=(errors.EndToEnd.SubprocessTimeoutError, None),
+  )
   @AsyncTest
   async def testReadSubprocessUnexpectedObject(self, _):
     worker = main_process.PublisherWorker()
@@ -264,17 +256,22 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_read_subprocess_output',
-      return_value=protocol.AckPublish(seq=1, publish_timestamp=1000))
+      return_value=protocol.AckPublish(seq=1, publish_timestamp=1000),
+  )
   @AsyncTest
   async def testPublish(self, read_subprocess_output_mock, *_):
     worker = main_process.PublisherWorker()
     await worker.start()
-    self.assertEqual(await worker.publish(1),
-                     protocol.AckPublish(seq=1, publish_timestamp=1000))
+    self.assertEqual(
+        await worker.publish(1),
+        protocol.AckPublish(seq=1, publish_timestamp=1000),
+    )
     self._GetSubprocessInWriter(worker).send.assert_called_once_with(
-        protocol.Publish(seq=1))
-    read_subprocess_output_mock.assert_called_once_with(protocol.AckPublish,
-                                                        None)
+        protocol.Publish(seq=1)
+    )
+    read_subprocess_output_mock.assert_called_once_with(
+        protocol.AckPublish, None
+    )
     await worker.stop()
 
   @mock.patch.object(main_process.BaseWorker, 'start')
@@ -282,7 +279,8 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_read_subprocess_output',
-      return_value=protocol.AckPublish(publish_error='blahblah'))
+      return_value=protocol.AckPublish(publish_error='blahblah'),
+  )
   @AsyncTest
   async def testPublishError(self, *_):
     worker = main_process.PublisherWorker()
@@ -300,9 +298,11 @@ class MessagingServiceScriptsE2EMainProcessTest(
     await worker.start()
     await worker.start_consumption(1)
     self._GetSubprocessInWriter(worker).send.assert_called_once_with(
-        protocol.Consume(1))
-    read_subprocess_output_mock.assert_called_once_with(protocol.AckConsume,
-                                                        None)
+        protocol.Consume(1)
+    )
+    read_subprocess_output_mock.assert_called_once_with(
+        protocol.AckConsume, None
+    )
     await worker.stop()
 
   @mock.patch.object(main_process.BaseWorker, 'start')
@@ -310,7 +310,8 @@ class MessagingServiceScriptsE2EMainProcessTest(
   @mock.patch.object(
       main_process.BaseWorker,
       '_read_subprocess_output',
-      return_value=protocol.ReceptionReport(receive_error='blahblah'))
+      return_value=protocol.ReceptionReport(receive_error='blahblah'),
+  )
   @AsyncTest
   async def testReceive(self, *_):
     worker = main_process.ReceiverWorker()
@@ -321,22 +322,26 @@ class MessagingServiceScriptsE2EMainProcessTest(
 
 
 class MessagingServiceScriptsEndToEndLatencyRunnerTest(
-    pkb_common_test_case.PkbCommonTestCase):
-
+    pkb_common_test_case.PkbCommonTestCase
+):
   mock_coro = GetMockCoro()
   mock_sleep_coro = GetMockCoro()
 
   def setUp(self):
     super().setUp()
     self.publisher_mock = self.enter_context(
-        mock.patch.object(main_process, 'PublisherWorker', autospec=True))
+        mock.patch.object(main_process, 'PublisherWorker', autospec=True)
+    )
     self.receiver_mock = self.enter_context(
         mock.patch.object(
             latency_runner.EndToEndLatencyRunner,
             'RECEIVER_WORKER',
-            autospec=True))
+            autospec=True,
+        )
+    )
     self.set_start_method_mock = self.enter_context(
-        mock.patch.object(mp, 'set_start_method'))
+        mock.patch.object(mp, 'set_start_method')
+    )
 
     self.publisher_instance_mock = self.publisher_mock.return_value
 
@@ -346,17 +351,21 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
     self.parent_mock.attach_mock(self.publisher_instance_mock, 'publisher')
     self.parent_mock.attach_mock(self.publisher_instance_mock, 'receiver')
 
-  def _SetupWorkerMocks(self, publish_timestamp, receive_timestamp,
-                        ack_timestamp):
+  def _SetupWorkerMocks(
+      self, publish_timestamp, receive_timestamp, ack_timestamp
+  ):
     self.publisher_instance_mock.publish.return_value = protocol.AckPublish(
-        seq=0, publish_timestamp=publish_timestamp)
+        seq=0, publish_timestamp=publish_timestamp
+    )
 
     self.receiver_instance_mock.receive.return_value = protocol.ReceptionReport(
-        seq=0, receive_timestamp=receive_timestamp, ack_timestamp=ack_timestamp)
+        seq=0, receive_timestamp=receive_timestamp, ack_timestamp=ack_timestamp
+    )
 
   @mock.patch.object(asyncio, 'run')
   @mock.patch.object(
-      latency_runner.EndToEndLatencyRunner, '_async_run_phase', new=mock_coro)
+      latency_runner.EndToEndLatencyRunner, '_async_run_phase', new=mock_coro
+  )
   def testRunPhase(self, asyncio_run_mock):
     runner = latency_runner.EndToEndLatencyRunner(mock.Mock())
     runner.run_phase(13, 14)
@@ -378,8 +387,9 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
   @mock.patch.object(os, 'sched_getaffinity', return_value={1, 2, 3, 4, 5, 6})
   @mock.patch.object(os, 'sched_setaffinity')
   @AsyncTest
-  async def testPinnedCpus(self, sched_setaffinity_mock, sched_getaffinity_mock,
-                           *_):
+  async def testPinnedCpus(
+      self, sched_setaffinity_mock, sched_getaffinity_mock, *_
+  ):
     runner_cls = latency_runner.EndToEndLatencyRunner
     try:
       self._SetupWorkerMocks(1_000_000_000, 1_500_000_000, 2_000_000_000)
@@ -398,8 +408,11 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
       self.assertLess(receiver_pinned_cpus, {1, 2, 3, 4, 5, 6})
       self.assertLen(
           main_pinned_cpus | publisher_pinned_cpus | receiver_pinned_cpus,
-          len(main_pinned_cpus) + len(publisher_pinned_cpus) +
-          len(receiver_pinned_cpus), 'test for disjointness')
+          len(main_pinned_cpus)
+          + len(publisher_pinned_cpus)
+          + len(receiver_pinned_cpus),
+          'test for disjointness',
+      )
       sched_setaffinity_mock.assert_called_once_with(0, main_pinned_cpus)
       runner = latency_runner.EndToEndLatencyRunner(mock.Mock())
       await runner._async_run_phase(1)
@@ -415,8 +428,9 @@ class MessagingServiceScriptsEndToEndLatencyRunnerTest(
   @mock.patch.object(os, 'sched_getaffinity', return_value={1, 2})
   @mock.patch.object(os, 'sched_setaffinity')
   @AsyncTest
-  async def testPinnedCpusNotEnoughCpus(self, sched_setaffinity_mock,
-                                        sched_getaffinity_mock, *_):
+  async def testPinnedCpusNotEnoughCpus(
+      self, sched_setaffinity_mock, sched_getaffinity_mock, *_
+  ):
     self._SetupWorkerMocks(1_000_000_000, 1_500_000_000, 2_000_000_000)
     self.publisher_mock.CPUS_REQUIRED = 1
     self.receiver_mock.CPUS_REQUIRED = 1

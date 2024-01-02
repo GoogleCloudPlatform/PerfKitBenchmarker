@@ -200,26 +200,22 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       )
       vm.RemoteCommand(f'cd {input_videos_dir} && rm -rf *.out.mkv')
 
-      samples.extend(
-          [
-              sample.Sample(
-                  'Total Transcode Time',
-                  total_runtime,
-                  'seconds',
-                  metadata={
-                      'test': 'upload',
-                      'codec': codec,
-                      'num_files': 15,  # TODO(spencerkim): Count *.out* files.
-                      'parallelism': jobs,
-                      'threads': threads,
-                      'ffmpeg_compiled_from_source': (
-                          FLAGS.build_ffmpeg_from_source
-                      ),
-                      'video_copies': 1,
-                  },
-              )
-          ]
-      )
+      samples.extend([
+          sample.Sample(
+              'Total Transcode Time',
+              total_runtime,
+              'seconds',
+              metadata={
+                  'test': 'upload',
+                  'codec': codec,
+                  'num_files': 15,  # TODO(spencerkim): Count *.out* files.
+                  'parallelism': jobs,
+                  'threads': threads,
+                  'ffmpeg_compiled_from_source': FLAGS.build_ffmpeg_from_source,
+                  'video_copies': 1,
+              },
+          )
+      ])
   return samples
 
 

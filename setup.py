@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 setup(
     name='perfkitbenchmarker',
@@ -20,6 +20,5 @@ setup(
     license='Apache 2.0',
     packages=find_packages(exclude=['tests']),
     scripts=['pkb.py'],
-    install_requires=['absl-py',
-                      'jinja2>=2.7',
-                      'setuptools'])
+    install_requires=['absl-py', 'jinja2>=2.7', 'setuptools'],
+)

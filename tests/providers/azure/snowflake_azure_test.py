@@ -47,7 +47,9 @@ class SnowflakeTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.cloud = 'AZURE'
     FLAGS.run_uri = _TEST_RUN_URI
     FLAGS.zones = [_AZURE_ZONE_EAST_US_2]
-    FLAGS.snowflake_snowsql_config_override_file = 'snowflake_snowsql_config_override_file'
+    FLAGS.snowflake_snowsql_config_override_file = (
+        'snowflake_snowsql_config_override_file'
+    )
     FLAGS.snowflake_connection = 'fake_connection'
 
   def testCreateRequestError(self):

@@ -21,7 +21,6 @@ def GetBigquerySlotsTestInstance(spec=TEST_SPEC):
 
 
 class BigquerySlotsTestCase(pkb_common_test_case.PkbCommonTestCase):
-
   SLOT_NUM = 500
   TEST_PROJECT = 'test_project'
   TEST_REGION = 'aws-fake-region'
@@ -109,6 +108,7 @@ class BigquerySlotsTestCase(pkb_common_test_case.PkbCommonTestCase):
     command_string = ' '.join(mock_issue.call_args[0][0])
     self.assertIn(f'--project_id={self.TEST_PROJECT}', command_string)
     self.assertIn(f'--location={self.TEST_REGION}', command_string)
+
 
 if __name__ == '__main__':
   unittest.main()

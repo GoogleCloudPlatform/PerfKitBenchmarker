@@ -35,7 +35,8 @@ def YumInstall(vm):
   """Raises exception when trying to install on yum-based VMs."""
   raise NotImplementedError(
       'PKB currently only supports the installation of pgbench on '
-      'Debian-based VMs')
+      'Debian-based VMs'
+  )
 
 
 def AptUninstall(vm):
@@ -45,8 +46,9 @@ def AptUninstall(vm):
     vm.RemoteCommand(remove_str + package)
 
 
-def MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
-                          additional_metadata):
+def MakeSamplesFromOutput(
+    pgbench_stderr, num_clients, num_jobs, additional_metadata
+):
   """Creates sample objects from the given pgbench output and metadata.
 
   Two samples will be returned, one containing a latency list and
@@ -80,17 +82,19 @@ def MakeSamplesFromOutput(pgbench_stderr, num_clients, num_jobs,
   return [tps_sample, latency_sample]
 
 
-def RunPgBench(benchmark_spec,
-               relational_db,
-               vm,
-               test_db_name,
-               client_counts,
-               job_counts,
-               seconds_to_pause,
-               seconds_per_test,
-               metadata,
-               file=None,
-               path=None):
+def RunPgBench(
+    benchmark_spec,
+    relational_db,
+    vm,
+    test_db_name,
+    client_counts,
+    job_counts,
+    seconds_to_pause,
+    seconds_per_test,
+    metadata,
+    file=None,
+    path=None,
+):
   """Run Pgbench on the client VM.
 
   Args:

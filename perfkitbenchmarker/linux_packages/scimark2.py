@@ -40,13 +40,14 @@ C_CFLAGS = '-O3 -march=native'
 PACKAGE_NAME = 'scimark2'
 
 PREPROVISIONED_DATA = {
-    JAVA_JAR:
-        '6f84f949c3167b385da1a9957ecd53fe0111b42e981e0c481be53dba0504305f',
-    C_ZIP: '223464cd7e90b4c22e2af08dbae6f6faa33e65b01e1c58e5a176837bc67958be'
+    JAVA_JAR: (
+        '6f84f949c3167b385da1a9957ecd53fe0111b42e981e0c481be53dba0504305f'
+    ),
+    C_ZIP: '223464cd7e90b4c22e2af08dbae6f6faa33e65b01e1c58e5a176837bc67958be',
 }
 PACKAGE_DATA_URL = {
     JAVA_JAR: posixpath.join(BASE_URL, JAVA_JAR),
-    C_ZIP: posixpath.join(BASE_URL, C_ZIP)
+    C_ZIP: posixpath.join(BASE_URL, C_ZIP),
 }
 
 
@@ -58,7 +59,8 @@ def Install(vm):
   vm.Install('unzip')
   vm.RemoteCommand('rm -rf {0} && mkdir {0}'.format(PATH))
   vm.InstallPreprovisionedPackageData(
-      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), PATH)
+      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), PATH
+  )
   cmds = [
       '(mkdir {0} && cd {0} && unzip {1}/{2})'.format(C_SRC, PATH, C_ZIP),
       '(cd {0} && make CFLAGS="{1}")'.format(C_SRC, C_CFLAGS),

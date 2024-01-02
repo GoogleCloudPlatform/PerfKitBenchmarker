@@ -42,47 +42,63 @@ class ElastiCacheMemcacheService(MemcacheService):
 
     self.vpc_id = network.subnet.vpc_id
     self.security_group_id = (
-        network.regional_network.vpc.default_security_group_id)
+        network.regional_network.vpc.default_security_group_id
+    )
     self.subnet_id = network.subnet.id
     self.subnet_group_name = '%ssubnet' % cluster_id
 
   def Create(self):
     # Open the port memcached needs
     aws_network.AwsFirewall.GetFirewall().AllowPortInSecurityGroup(
-        self.region, self.security_group_id, ELASTICACHE_PORT)
+        self.region, self.security_group_id, ELASTICACHE_PORT
+    )
 
     # Create a cache subnet group
-    cmd = ['aws', 'elasticache', 'create-cache-subnet-group',
-           '--region=%s' % self.region,
-           '--cache-subnet-group-name=%s' % self.subnet_group_name,
-           '--cache-subnet-group-description="PKB memcached_ycsb benchmark"',
-           '--subnet-ids=%s' % self.subnet_id]
+    cmd = [
+        'aws',
+        'elasticache',
+        'create-cache-subnet-group',
+        '--region=%s' % self.region,
+        '--cache-subnet-group-name=%s' % self.subnet_group_name,
+        '--cache-subnet-group-description="PKB memcached_ycsb benchmark"',
+        '--subnet-ids=%s' % self.subnet_id,
+    ]
     vm_util.IssueCommand(cmd)
 
     # Create the cluster
-    cmd = ['aws', 'elasticache', 'create-cache-cluster',
-           '--engine=memcached',
-           '--cache-subnet-group-name=%s' % self.subnet_group_name,
-           '--cache-cluster-id=%s' % self.cluster_id,
-           '--num-cache-nodes=%s' % self.num_servers,
-           '--region=%s' % self.region,
-           '--cache-node-type=%s' % self.node_type,
-           '--tags'] + util.MakeFormattedDefaultTags()
+    cmd = [
+        'aws',
+        'elasticache',
+        'create-cache-cluster',
+        '--engine=memcached',
+        '--cache-subnet-group-name=%s' % self.subnet_group_name,
+        '--cache-cluster-id=%s' % self.cluster_id,
+        '--num-cache-nodes=%s' % self.num_servers,
+        '--region=%s' % self.region,
+        '--cache-node-type=%s' % self.node_type,
+        '--tags',
+    ] + util.MakeFormattedDefaultTags()
     vm_util.IssueCommand(cmd)
 
     # Wait for the cluster to come up
     cluster_info = self._WaitForClusterUp()
 
     # Parse out the hosts
-    self.hosts = [(node['Endpoint']['Address'], node['Endpoint']['Port'])
-                  for node in cluster_info['CacheNodes']]
+    self.hosts = [
+        (node['Endpoint']['Address'], node['Endpoint']['Port'])
+        for node in cluster_info['CacheNodes']
+    ]
     assert len(self.hosts) == self.num_servers
 
   def Destroy(self):
     # Delete the ElastiCache cluster
-    cmd = ['aws', 'elasticache', 'delete-cache-cluster',
-           '--cache-cluster-id=%s' % self.cluster_id,
-           '--region=%s' % self.region]
+    cmd = [
+        'aws',
+        'elasticache',
+        'delete-cache-cluster',
+        '--cache-cluster-id=%s' % self.cluster_id,
+        '--region=%s' % self.region,
+    ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
     # Don't have to delete the subnet group. It will be deleted with the subnet.
 
@@ -95,9 +111,11 @@ class ElastiCacheMemcacheService(MemcacheService):
     return ['%s:%s' % (ip, port) for ip, port in self.hosts]
 
   def GetMetadata(self):
-    return {'num_servers': self.num_servers,
-            'elasticache_region': self.region,
-            'elasticache_node_type': self.node_type}
+    return {
+        'num_servers': self.num_servers,
+        'elasticache_region': self.region,
+        'elasticache_node_type': self.node_type,
+    }
 
   def _GetClusterInfo(self):
     cmd = ['aws', 'elasticache', 'describe-cache-clusters']
@@ -107,8 +125,11 @@ class ElastiCacheMemcacheService(MemcacheService):
     out, _, _ = vm_util.IssueCommand(cmd)
     return json.loads(out)['CacheClusters'][0]
 
-  @vm_util.Retry(poll_interval=15, timeout=300,
-                 retryable_exceptions=(errors.Resource.RetryableCreationError))
+  @vm_util.Retry(
+      poll_interval=15,
+      timeout=300,
+      retryable_exceptions=(errors.Resource.RetryableCreationError),
+  )
   def _WaitForClusterUp(self):
     """Block until the ElastiCache memcached cluster is up.
 
@@ -125,8 +146,9 @@ class ElastiCacheMemcacheService(MemcacheService):
         if there is an error connecting to the port or otherwise running the
         remote check command.
     """
-    logging.info('Trying to get ElastiCache cluster info for %s',
-                 self.cluster_id)
+    logging.info(
+        'Trying to get ElastiCache cluster info for %s', self.cluster_id
+    )
     cluster_status = None
     try:
       cluster_info = self._GetClusterInfo()
@@ -136,8 +158,10 @@ class ElastiCacheMemcacheService(MemcacheService):
         return cluster_info
     except errors.VirtualMachine.RemoteCommandError as e:
       raise errors.Resource.RetryableCreationError(
-          'ElastiCache memcached cluster not up yet: %s.' % str(e))
+          'ElastiCache memcached cluster not up yet: %s.' % str(e)
+      )
     else:
       raise errors.Resource.RetryableCreationError(
-          'ElastiCache memcached cluster not up yet. Status: %s' %
-          cluster_status)
+          'ElastiCache memcached cluster not up yet. Status: %s'
+          % cluster_status
+      )

@@ -31,20 +31,20 @@ FLAGS.mark_as_parsed()
 
 
 class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
-
   maxDiff = None
 
   def setUp(self):
     super(NetperfBenchmarkTestCase, self).setUp()
     # Load data
-    path = os.path.join(os.path.dirname(__file__),
-                        '..', 'data',
-                        'netperf_results.json')
+    path = os.path.join(
+        os.path.dirname(__file__), '..', 'data', 'netperf_results.json'
+    )
 
     with open(path) as fp:
       stdouts = ['\n'.join(i) for i in json.load(fp)]
-      self.expected_stdout = [json.dumps(([stdout], [''], [0]))
-                              for stdout in stdouts]
+      self.expected_stdout = [
+          json.dumps(([stdout], [''], [0])) for stdout in stdouts
+      ]
 
     p = mock.patch(vm_util.__name__ + '.ShouldRunOnExternalIpAddress')
     self.should_run_external = p.start()
@@ -62,7 +62,8 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
   def testHistogramStatsCalculator(self):
     histogram = {1: 5, 2: 10, 5: 5}
     stats = netperf_benchmark._HistogramStatsCalculator(
-        histogram, [0, 20, 30, 74, 80, 100])
+        histogram, [0, 20, 30, 74, 80, 100]
+    )
     self.assertEqual(stats['p0'], 1)
     self.assertEqual(stats['p20'], 1)
     self.assertEqual(stats['p30'], 2)
@@ -77,7 +78,8 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     vm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
     vm_spec.vms[0].RobustRemoteCommand.side_effect = [
-        (i, '') for i in self.expected_stdout]
+        (i, '') for i in self.expected_stdout
+    ]
     vm_spec.vms[1].GetInternalIPs.return_value = ['test_ip']
     vm_spec.vms[0].GetInternalIPs.return_value = ['test_ip']
     run_result = netperf_benchmark.Run(vm_spec)
@@ -156,20 +158,30 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
       self.assertDictContainsSubset(meta, result[i][3])
 
   @parameterized.named_parameters(
-      ('no_times_up',
-       'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to '
-       '10.0.0.137 () port 20157 AF_INET : histogram\nrecv_response_timed_n: no'
-       ' response received. errno 110 counter 0\n'),
-      ('has_times_up',
-       'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to '
-       '10.0.0.172 () port 20169 AF_INET : histogram\ncatcher: timer popped '
-       'with times_up != 0\nrecv_response_timed_n: no response received. errno '
-       '4 counter -1\n'))
+      (
+          'no_times_up',
+          (
+              'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET'
+              ' to 10.0.0.137 () port 20157 AF_INET :'
+              ' histogram\nrecv_response_timed_n: no response received. errno'
+              ' 110 counter 0\n'
+          ),
+      ),
+      (
+          'has_times_up',
+          (
+              'MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET'
+              ' to 10.0.0.172 () port 20169 AF_INET : histogram\ncatcher: timer'
+              ' popped with times_up != 0\nrecv_response_timed_n: no response'
+              ' received. errno 4 counter -1\n'
+          ),
+      ),
+  )
   def testParseNetperfOutputError(self, output):
-    with self.assertRaises(
-        errors.Benchmarks.KnownIntermittentError) as e:
-      netperf_benchmark.ParseNetperfOutput(output, {}, 'fake_benchmark_name',
-                                           False)
+    with self.assertRaises(errors.Benchmarks.KnownIntermittentError) as e:
+      netperf_benchmark.ParseNetperfOutput(
+          output, {}, 'fake_benchmark_name', False
+      )
     self.assertIn('Failed to parse stdout', str(e.exception))
 
   @flagsaver.flagsaver(netperf_benchmarks=[netperf_benchmark.TCP_STREAM])

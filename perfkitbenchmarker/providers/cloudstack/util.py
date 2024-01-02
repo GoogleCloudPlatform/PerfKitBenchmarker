@@ -18,6 +18,7 @@ from six.moves import urllib
 
 try:
   from requests.packages import urllib3
+
   urllib3.disable_warnings()
 except ImportError:
   pass
@@ -28,17 +29,10 @@ FLAGS = flags.FLAGS
 class CsClient(object):
 
   def __init__(self, url, api_key, secret):
-
-    self._cs = API(api_key,
-                   secret,
-                   url,
-                   logging=False)
+    self._cs = API(api_key, secret, url, logging=False)
 
   def get_zone(self, zone_name):
-
-    cs_args = {
-        'command': 'listZones'
-    }
+    cs_args = {'command': 'listZones'}
 
     zones = self._cs.request(cs_args)
 
@@ -50,15 +44,10 @@ class CsClient(object):
     return None
 
   def get_template(self, template_name, project_id=None):
-
-    cs_args = {
-        'command': 'listTemplates',
-        'templatefilter': 'executable'
-    }
+    cs_args = {'command': 'listTemplates', 'templatefilter': 'executable'}
 
     if project_id:
       cs_args.update({'projectid': project_id})
-
 
     templates = self._cs.request(cs_args)
 
@@ -70,7 +59,6 @@ class CsClient(object):
     return None
 
   def get_serviceoffering(self, service_offering_name):
-
     cs_args = {
         'command': 'listServiceOfferings',
     }
@@ -84,12 +72,8 @@ class CsClient(object):
 
     return None
 
-
   def get_project(self, project_name):
-
-    cs_args = {
-        'command': 'listProjects'
-    }
+    cs_args = {'command': 'listProjects'}
 
     projects = self._cs.request(cs_args)
 
@@ -101,16 +85,15 @@ class CsClient(object):
     return None
 
   def get_network(self, network_name, project_id=None, vpc_id=None):
-
     cs_args = {
         'command': 'listNetworks',
     }
 
     if project_id:
-      cs_args.update({"projectid": project_id})
+      cs_args.update({'projectid': project_id})
 
     if vpc_id:
-      cs_args.update({"vpcid": vpc_id})
+      cs_args.update({'vpcid': vpc_id})
 
     networks = self._cs.request(cs_args)
 
@@ -136,13 +119,12 @@ class CsClient(object):
     return None
 
   def get_vpc(self, vpc_name, project_id=None):
-
     cs_args = {
         'command': 'listVPCs',
     }
 
     if project_id:
-      cs_args.update({"projectid": project_id})
+      cs_args.update({'projectid': project_id})
 
     vpcs = self._cs.request(cs_args)
 
@@ -154,7 +136,6 @@ class CsClient(object):
     return None
 
   def get_vpc_offering(self, vpc_offering_name):
-
     cs_args = {
         'command': 'listVPCOfferings',
     }
@@ -169,13 +150,12 @@ class CsClient(object):
     return None
 
   def get_virtual_machine(self, vm_name, project_id=None):
-
     cs_args = {
         'command': 'listVirtualMachines',
     }
 
     if project_id:
-      cs_args.update({"projectid": project_id})
+      cs_args.update({'projectid': project_id})
 
     vms = self._cs.request(cs_args)
 
@@ -186,15 +166,16 @@ class CsClient(object):
 
     return None
 
-  def create_vm(self,
-                name,
-                zone_id,
-                service_offering_id,
-                template_id,
-                network_ids=None,
-                keypair=None,
-                project_id=None):
-
+  def create_vm(
+      self,
+      name,
+      zone_id,
+      service_offering_id,
+      template_id,
+      network_ids=None,
+      keypair=None,
+      project_id=None,
+  ):
     create_vm_args = {
         'command': 'deployVirtualMachine',
         'serviceofferingid': service_offering_id,
@@ -204,31 +185,29 @@ class CsClient(object):
     }
 
     if network_ids:
-      create_vm_args.update({"networkids": network_ids})
+      create_vm_args.update({'networkids': network_ids})
 
     if keypair:
       create_vm_args.update({'keypair': keypair})
 
     if project_id:
-      create_vm_args.update({"projectid": project_id})
+      create_vm_args.update({'projectid': project_id})
 
     vm = self._cs.request(create_vm_args)
 
     return vm
 
   def delete_vm(self, vm_id):
-
     cs_args = {
         'command': 'destroyVirtualMachine',
         'id': vm_id,
-        'expunge': 'true'  # Requres root/domain admin
+        'expunge': 'true',  # Requres root/domain admin
     }
 
     res = self._cs.request(cs_args)
     return res
 
   def create_vpc(self, name, zone_id, cidr, vpc_offering_id, project_id=None):
-
     cs_args = {
         'command': 'createVPC',
         'name': name,
@@ -239,7 +218,7 @@ class CsClient(object):
     }
 
     if project_id:
-      cs_args.update({"projectid": project_id})
+      cs_args.update({'projectid': project_id})
 
     vpc = self._cs.request(cs_args)
 
@@ -249,26 +228,23 @@ class CsClient(object):
     return None
 
   def delete_vpc(self, vpc_id):
-
-    cs_args = {
-        'command': 'deleteVPC',
-        'id': vpc_id
-    }
+    cs_args = {'command': 'deleteVPC', 'id': vpc_id}
 
     res = self._cs.request(cs_args)
 
     return res
 
-  def create_network(self,
-                     name,
-                     network_offering_id,
-                     zone_id,
-                     project_id=None,
-                     vpc_id=None,
-                     gateway=None,
-                     netmask=None,
-                     acl_id=None):
-
+  def create_network(
+      self,
+      name,
+      network_offering_id,
+      zone_id,
+      project_id=None,
+      vpc_id=None,
+      gateway=None,
+      netmask=None,
+      acl_id=None,
+  ):
     cs_args = {
         'command': 'createNetwork',
         'name': name,
@@ -278,14 +254,14 @@ class CsClient(object):
     }
 
     if project_id:
-      cs_args.update({"projectid": project_id})
+      cs_args.update({'projectid': project_id})
 
     if vpc_id:
       cs_args.update({
           'vpcid': vpc_id,
           'gateway': gateway,
           'netmask': netmask,
-          'aclid': acl_id
+          'aclid': acl_id,
       })
 
     nw = self._cs.request(cs_args)
@@ -296,7 +272,6 @@ class CsClient(object):
     return nw
 
   def delete_network(self, network_id):
-
     cs_args = {
         'command': 'deleteNetwork',
         'id': network_id,
@@ -306,7 +281,6 @@ class CsClient(object):
     return res
 
   def alloc_public_ip(self, network_id, is_vpc=False):
-
     cs_args = {
         'command': 'associateIpAddress',
     }
@@ -324,22 +298,17 @@ class CsClient(object):
     return None
 
   def release_public_ip(self, ipaddress_id):
-
-    cs_args = {
-        'command': 'disassociateIpAddress',
-        'id': ipaddress_id
-    }
+    cs_args = {'command': 'disassociateIpAddress', 'id': ipaddress_id}
 
     res = self._cs.request(cs_args)
 
     return res
 
   def enable_static_nat(self, ip_address_id, vm_id, network_id):
-
     cs_args = {
         'command': 'enableStaticNat',
         'ipaddressid': ip_address_id,
-        'virtualmachineid': vm_id
+        'virtualmachineid': vm_id,
     }
 
     if network_id:
@@ -353,29 +322,23 @@ class CsClient(object):
     return None
 
   def snat_rule_exists(self, ip_address_id, vm_id):
-
-    cs_args = {
-        'command': 'listPublicIpAddresses',
-        'id': ip_address_id
-    }
+    cs_args = {'command': 'listPublicIpAddresses', 'id': ip_address_id}
 
     res = self._cs.request(cs_args)
 
-    assert 'publicipaddress' in res, "No public IP address found"
-    assert len(res['publicipaddress']) == 1, "More than One\
-                Public IP address"
+    assert 'publicipaddress' in res, 'No public IP address found'
+    assert (
+        len(res['publicipaddress']) == 1
+    ), 'More than One                Public IP address'
 
     res = res['publicipaddress'][0]
 
-    if res and 'virtualmachineid' in res and \
-       res['virtualmachineid'] == vm_id:
+    if res and 'virtualmachineid' in res and res['virtualmachineid'] == vm_id:
       return True
 
     return False
 
-
   def register_ssh_keypair(self, name, public_key, project_id=None):
-
     cs_args = {
         'command': 'registerSSHKeyPair',
         'name': name,
@@ -383,34 +346,31 @@ class CsClient(object):
     }
 
     if project_id:
-      cs_args.update({"projectid": project_id})
+      cs_args.update({'projectid': project_id})
 
     res = self._cs.request(cs_args, method='post')
     return res
 
-
   def unregister_ssh_keypair(self, name, project_id=None):
-
     cs_args = {
         'command': 'deleteSSHKeyPair',
         'name': name,
     }
 
     if project_id:
-      cs_args.update({"projectid": project_id})
+      cs_args.update({'projectid': project_id})
 
     res = self._cs.request(cs_args)
     return res
 
   def get_ssh_keypair(self, name, project_id=None):
-
     cs_args = {
         'command': 'listSSHKeyPairs',
         'name': name,
     }
 
     if project_id:
-      cs_args.update({"projectid": project_id})
+      cs_args.update({'projectid': project_id})
 
     kps = self._cs.request(cs_args)
 
@@ -422,13 +382,12 @@ class CsClient(object):
     return None
 
   def get_network_acl(self, name, project_id=None):
-
     cs_args = {
         'command': 'listNetworkACLLists',
     }
 
     if project_id:
-      cs_args.update({"projectid": project_id})
+      cs_args.update({'projectid': project_id})
 
     acllist = self._cs.request(cs_args)
 
@@ -439,12 +398,11 @@ class CsClient(object):
     return None
 
   def create_volume(self, name, diskoffering_id, zone_id, project_id=None):
-
     cs_args = {
         'command': 'createVolume',
         'diskofferingid': diskoffering_id,
         'zoneid': zone_id,
-        'name': name
+        'name': name,
     }
 
     if project_id:
@@ -457,15 +415,13 @@ class CsClient(object):
 
     return None
 
-
   def get_volume(self, name, project_id=None):
-
     cs_args = {
         'command': 'listVolumes',
     }
 
     if project_id:
-      cs_args.update({"projectid": project_id})
+      cs_args.update({'projectid': project_id})
 
     vols = self._cs.request(cs_args)
 
@@ -477,21 +433,16 @@ class CsClient(object):
     return None
 
   def delete_volume(self, volume_id):
-
-    cs_args = {
-        'command': 'deleteVolume',
-        'id': volume_id
-    }
+    cs_args = {'command': 'deleteVolume', 'id': volume_id}
 
     res = self._cs.request(cs_args)
     return res
 
   def attach_volume(self, vol_id, vm_id):
-
     cs_args = {
         'command': 'attachVolume',
         'id': vol_id,
-        'virtualmachineid': vm_id
+        'virtualmachineid': vm_id,
     }
 
     res = self._cs.request(cs_args)
@@ -501,9 +452,7 @@ class CsClient(object):
 
     return None
 
-
   def detach_volume(self, vol_id):
-
     cs_args = {
         'command': 'detachVolume',
         'id': vol_id,
@@ -513,7 +462,6 @@ class CsClient(object):
     return res
 
   def list_disk_offerings(self):
-
     cs_args = {
         'command': 'listDiskOfferings',
     }

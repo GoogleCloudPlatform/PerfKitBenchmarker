@@ -44,6 +44,7 @@ chmod 600 /home/{user_name}/.ssh/authorized_keys
 
 class ResourceTypes:
   """AliCloud resource types."""
+
   INSTANCE = 'instance'
   IMAGE = 'image'
   SNAPSHOT = 'snapshot'
@@ -79,8 +80,10 @@ def _BuildTagsList(**kwargs):
   tags_list = []
   for index, (key, value) in enumerate(six.iteritems(kwargs)):
     tags_list.extend([
-        '--Tag.{0}.Key'.format(index + 1), str(key),
-        '--Tag.{0}.Value'.format(index + 1), str(value)
+        '--Tag.{0}.Key'.format(index + 1),
+        str(key),
+        '--Tag.{0}.Value'.format(index + 1),
+        str(value),
     ])
 
   return tags_list
@@ -99,10 +102,14 @@ def AddTags(resource_id, resource_type, region, **kwargs):
     return
 
   tag_cmd = ALI_PREFIX + [
-      'ecs', 'AddTags',
-      '--RegionId', region,
-      '--ResourceId', resource_id,
-      '--ResourceType', resource_type
+      'ecs',
+      'AddTags',
+      '--RegionId',
+      region,
+      '--ResourceId',
+      resource_id,
+      '--ResourceType',
+      resource_type,
   ]
   tag_cmd.extend(_BuildTagsList(**kwargs))
   vm_util.IssueRetryableCommand(tag_cmd)
@@ -153,10 +160,14 @@ def VPCAddDefaultTags(resource_id, resource_type, region, timeout_minutes=None):
     return
 
   tag_cmd = ALI_PREFIX + [
-      'vpc', 'TagResources',
-      '--RegionId', region,
-      '--ResourceId.1', resource_id,
-      '--ResourceType', resource_type
+      'vpc',
+      'TagResources',
+      '--RegionId',
+      region,
+      '--ResourceId.1',
+      resource_id,
+      '--ResourceType',
+      resource_type,
   ]
   tag_cmd.extend(_BuildTagsList(**tags))
   vm_util.IssueRetryableCommand(tag_cmd)

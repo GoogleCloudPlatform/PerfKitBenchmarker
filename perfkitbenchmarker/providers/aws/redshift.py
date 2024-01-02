@@ -38,7 +38,9 @@ FLAGS = flags.FLAGS
 VALID_EXIST_STATUSES = ['creating', 'available']
 DELETION_STATUSES = ['deleting']
 READY_STATUSES = ['available']
-ELIMINATE_AUTOMATED_SNAPSHOT_RETENTION = '--automated-snapshot-retention-period=0'
+ELIMINATE_AUTOMATED_SNAPSHOT_RETENTION = (
+    '--automated-snapshot-retention-period=0'
+)
 DEFAULT_DATABASE_NAME = 'dev'
 BOOTSTRAP_DB = 'sample'
 REDSHIFT_JDBC_JAR = 'redshift-jdbc-client-1.1.jar'
@@ -52,8 +54,14 @@ def AddTags(resource_arn, region):
     region: The AWS region resource was created in.
   """
   cmd_prefix = util.AWS_PREFIX
-  tag_cmd = cmd_prefix + ['redshift', 'create-tags', '--region=%s' % region,
-                          '--resource-name', resource_arn, '--tags']
+  tag_cmd = cmd_prefix + [
+      'redshift',
+      'create-tags',
+      '--region=%s' % region,
+      '--resource-name',
+      resource_arn,
+      '--tags',
+  ]
   tag_cmd += util.MakeFormattedDefaultTags()
   vm_util.IssueCommand(tag_cmd)
 
@@ -66,8 +74,9 @@ def GetDefaultRegion():
   return stdout
 
 
-def GetRedshiftClientInterface(database: str, user: str,
-                               password: str) -> edw_service.EdwClientInterface:
+def GetRedshiftClientInterface(
+    database: str, user: str, password: str
+) -> edw_service.EdwClientInterface:
   """Builds and Returns the requested Redshift client Interface.
 
   Args:
@@ -131,15 +140,21 @@ class CliClientInterface(edw_service.EdwClientInterface):
     service_specific_dir = os.path.join('edw', Redshift.SERVICE_TYPE)
     self.client_vm.PushFile(
         data.ResourcePath(
-            os.path.join(service_specific_dir, 'script_runner.sh')))
+            os.path.join(service_specific_dir, 'script_runner.sh')
+        )
+    )
     runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
     self.client_vm.RemoteCommand(runner_permission_update_cmd)
     self.client_vm.PushFile(
-        data.ResourcePath(os.path.join('edw', 'script_driver.py')))
+        data.ResourcePath(os.path.join('edw', 'script_driver.py'))
+    )
     self.client_vm.PushFile(
         data.ResourcePath(
-            os.path.join(service_specific_dir,
-                         'provider_specific_script_driver.py')))
+            os.path.join(
+                service_specific_dir, 'provider_specific_script_driver.py'
+            )
+        )
+    )
 
   def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
@@ -154,10 +169,10 @@ class CliClientInterface(edw_service.EdwClientInterface):
         successful query the value is expected to be positive.
       performance_details: A dictionary of query execution attributes eg. job_id
     """
-    query_command = ('python script_driver.py --script={} --host={} '
-                     '--database={} --user={} --password={}').format(
-                         query_name, self.host, self.database, self.user,
-                         self.password)
+    query_command = (
+        'python script_driver.py --script={} --host={} '
+        '--database={} --user={} --password={}'
+    ).format(query_name, self.host, self.database, self.user, self.password)
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
@@ -209,8 +224,9 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.client_vm.Install('openjdk')
 
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(package_name,
-                                                    [REDSHIFT_JDBC_JAR], '')
+    self.client_vm.InstallPreprovisionedPackageData(
+        package_name, [REDSHIFT_JDBC_JAR], ''
+    )
 
   def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
@@ -225,9 +241,10 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         successful query the value is expected to be positive.
       performance_details: A dictionary of query execution attributes eg. job_id
     """
-    query_command = ('java -cp {} com.google.cloud.performance.edw.Single '
-                     '--endpoint {} --query_file {}').format(
-                         REDSHIFT_JDBC_JAR, self.host, query_name)
+    query_command = (
+        'java -cp {} com.google.cloud.performance.edw.Single '
+        '--endpoint {} --query_file {}'
+    ).format(REDSHIFT_JDBC_JAR, self.host, query_name)
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
@@ -237,8 +254,9 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
       details.update(performance['details'])
     return performance['query_wall_time_in_secs'], details
 
-  def ExecuteSimultaneous(self, submission_interval: int,
-                          queries: List[str]) -> str:
+  def ExecuteSimultaneous(
+      self, submission_interval: int, queries: List[str]
+  ) -> str:
     """Executes queries simultaneously on client and return performance details.
 
     Simultaneous app expects queries as white space separated query file names.
@@ -251,10 +269,12 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     Returns:
       A serialized dictionary of execution details.
     """
-    cmd = ('java -cp {} com.google.cloud.performance.edw.Simultaneous '
-           '--endpoint {} --submission_interval {} --query_files {}'.format(
-               REDSHIFT_JDBC_JAR, self.host, submission_interval,
-               ' '.join(queries)))
+    cmd = (
+        'java -cp {} com.google.cloud.performance.edw.Simultaneous '
+        '--endpoint {} --submission_interval {} --query_files {}'.format(
+            REDSHIFT_JDBC_JAR, self.host, submission_interval, ' '.join(queries)
+        )
+    )
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
@@ -268,10 +288,14 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     Returns:
       A serialized dictionary of execution details.
     """
-    cmd = ('java -cp {} com.google.cloud.performance.edw.Throughput '
-           '--endpoint {} --query_streams {}'.format(
-               REDSHIFT_JDBC_JAR, self.host,
-               ' '.join([','.join(stream) for stream in concurrency_streams])))
+    cmd = (
+        'java -cp {} com.google.cloud.performance.edw.Throughput '
+        '--endpoint {} --query_streams {}'.format(
+            REDSHIFT_JDBC_JAR,
+            self.host,
+            ' '.join([','.join(stream) for stream in concurrency_streams]),
+        )
+    )
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
@@ -309,15 +333,20 @@ class Redshift(edw_service.EdwService):
     self.cluster_subnet_group = None
     self.cluster_parameter_group = None
     self.arn = ''
-    self.cluster_subnet_group = aws_cluster_subnet_group.RedshiftClusterSubnetGroup(
-        self.cmd_prefix)
-    self.cluster_parameter_group = aws_cluster_parameter_group.RedshiftClusterParameterGroup(
-        self.cmd_prefix)
+    self.cluster_subnet_group = (
+        aws_cluster_subnet_group.RedshiftClusterSubnetGroup(self.cmd_prefix)
+    )
+    self.cluster_parameter_group = (
+        aws_cluster_parameter_group.RedshiftClusterParameterGroup(
+            self.cmd_prefix
+        )
+    )
 
     if self.db is None:
       self.db = DEFAULT_DATABASE_NAME
-    self.client_interface = GetRedshiftClientInterface(self.db, self.user,
-                                                       self.password)
+    self.client_interface = GetRedshiftClientInterface(
+        self.db, self.user, self.password
+    )
 
   def _CreateDependencies(self):
     self.cluster_subnet_group.Create()
@@ -328,12 +357,26 @@ class Redshift(edw_service.EdwService):
     if self.snapshot:
       self.Restore(self.snapshot, self.cluster_identifier)
     else:
-      self.Initialize(self.cluster_identifier, self.node_type, self.node_count,
-                      self.user, self.password, self.cluster_parameter_group,
-                      self.cluster_subnet_group)
+      self.Initialize(
+          self.cluster_identifier,
+          self.node_type,
+          self.node_count,
+          self.user,
+          self.password,
+          self.cluster_parameter_group,
+          self.cluster_subnet_group,
+      )
 
-  def Initialize(self, cluster_identifier, node_type, node_count, user,
-                 password, cluster_parameter_group, cluster_subnet_group):
+  def Initialize(
+      self,
+      cluster_identifier,
+      node_type,
+      node_count,
+      user,
+      password,
+      cluster_parameter_group,
+      cluster_subnet_group,
+  ):
     """Method to initialize a Redshift cluster from an configuration parameters.
 
     The cluster is initialized in the EC2-VPC platform, that runs it in a
@@ -347,9 +390,9 @@ class Redshift(edw_service.EdwService):
 
     Args:
       cluster_identifier: A unique identifier for the cluster.
-      node_type: The node type to be provisioned for the cluster.
-       Valid Values: ds2.xlarge | ds2.8xlarge | ds2.xlarge | ds2.8xlarge |
-         dc1.large | dc1.8xlarge | dc2.large | dc2.8xlarge
+      node_type: The node type to be provisioned for the cluster. Valid Values:
+        ds2.xlarge | ds2.8xlarge | ds2.xlarge | ds2.8xlarge | dc1.large |
+        dc1.8xlarge | dc2.large | dc2.8xlarge
       node_count: The number of compute nodes in the cluster.
       user: The user name associated with the master user account for the
         cluster that is being created.
@@ -367,11 +410,16 @@ class Redshift(edw_service.EdwService):
       MissingOption: If any of the required parameters is missing.
     """
     if not (cluster_identifier and node_type and user and password):
-      raise errors.Config.MissingOption('Need cluster_identifier, user and '
-                                        'password set for creating a cluster.')
+      raise errors.Config.MissingOption(
+          'Need cluster_identifier, user and '
+          'password set for creating a cluster.'
+      )
 
     prefix = [
-        'redshift', 'create-cluster', '--cluster-identifier', cluster_identifier
+        'redshift',
+        'create-cluster',
+        '--cluster-identifier',
+        cluster_identifier,
     ]
 
     if node_count == 1:
@@ -380,36 +428,53 @@ class Redshift(edw_service.EdwService):
       worker_count_cmd = ['--number-of-nodes', str(node_count)]
 
     postfix = [
-        '--node-type', node_type, '--master-username', user,
-        '--master-user-password', password, '--cluster-parameter-group-name',
-        cluster_parameter_group.name, '--cluster-subnet-group-name',
-        cluster_subnet_group.name, '--publicly-accessible',
-        ELIMINATE_AUTOMATED_SNAPSHOT_RETENTION
+        '--node-type',
+        node_type,
+        '--master-username',
+        user,
+        '--master-user-password',
+        password,
+        '--cluster-parameter-group-name',
+        cluster_parameter_group.name,
+        '--cluster-subnet-group-name',
+        cluster_subnet_group.name,
+        '--publicly-accessible',
+        ELIMINATE_AUTOMATED_SNAPSHOT_RETENTION,
     ]
 
     cmd = self.cmd_prefix + prefix + worker_count_cmd + postfix
     stdout, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if not stdout:
-      raise errors.Resource.CreationError('Cluster creation failure: '
-                                          '{}'.format(stderr))
+      raise errors.Resource.CreationError(
+          'Cluster creation failure: {}'.format(stderr)
+      )
 
   def _ValidateSnapshot(self, snapshot_identifier):
     """Validate the presence of a cluster snapshot based on its metadata."""
-    cmd = self.cmd_prefix + ['redshift', 'describe-cluster-snapshots',
-                             '--snapshot-identifier', snapshot_identifier]
+    cmd = self.cmd_prefix + [
+        'redshift',
+        'describe-cluster-snapshots',
+        '--snapshot-identifier',
+        snapshot_identifier,
+    ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     if not stdout:
-      raise errors.Config.InvalidValue('Cluster snapshot indicated by '
-                                       'edw_service_cluster_snapshot does not'
-                                       ' exist: {}.'
-                                       .format(snapshot_identifier))
+      raise errors.Config.InvalidValue(
+          'Cluster snapshot indicated by '
+          'edw_service_cluster_snapshot does not'
+          ' exist: {}.'.format(snapshot_identifier)
+      )
     result = json.loads(stdout)
     return result['Snapshots'][0]['Status'] == 'available'
 
   def _SnapshotDetails(self, snapshot_identifier):
     """Delete a redshift cluster and disallow creation of a snapshot."""
-    cmd = self.cmd_prefix + ['redshift', 'describe-cluster-snapshots',
-                             '--snapshot-identifier', snapshot_identifier]
+    cmd = self.cmd_prefix + [
+        'redshift',
+        'describe-cluster-snapshots',
+        '--snapshot-identifier',
+        snapshot_identifier,
+    ]
     stdout, _, _ = vm_util.IssueCommand(cmd)
     result = json.loads(stdout)
     node_type = result['Snapshots'][0]['NodeType']
@@ -432,13 +497,15 @@ class Redshift(edw_service.EdwService):
     Args:
       snapshot_identifier: Identifier of the snapshot to restore
       cluster_identifier:  Identifier of the restored cluster
+
     Returns:
       None
     """
 
     if not (self.user and self.password and self.db):
       raise errors.Config.MissingOption(
-          'Need the db, user and password set for restoring a cluster')
+          'Need the db, user and password set for restoring a cluster'
+      )
 
     if self._ValidateSnapshot(snapshot_identifier):
       node_type, node_count = self._SnapshotDetails(snapshot_identifier)
@@ -446,24 +513,34 @@ class Redshift(edw_service.EdwService):
       # snapshot's configuration
       self.node_type = node_type
       self.node_count = node_count
-      cmd = self.cmd_prefix + ['redshift', 'restore-from-cluster-snapshot',
-                               '--cluster-identifier', cluster_identifier,
-                               '--snapshot-identifier', snapshot_identifier,
-                               '--cluster-subnet-group-name',
-                               self.cluster_subnet_group.name,
-                               '--cluster-parameter-group-name',
-                               self.cluster_parameter_group.name,
-                               '--publicly-accessible',
-                               '--automated-snapshot-retention-period=1']
+      cmd = self.cmd_prefix + [
+          'redshift',
+          'restore-from-cluster-snapshot',
+          '--cluster-identifier',
+          cluster_identifier,
+          '--snapshot-identifier',
+          snapshot_identifier,
+          '--cluster-subnet-group-name',
+          self.cluster_subnet_group.name,
+          '--cluster-parameter-group-name',
+          self.cluster_parameter_group.name,
+          '--publicly-accessible',
+          '--automated-snapshot-retention-period=1',
+      ]
       stdout, stderr, _ = vm_util.IssueCommand(cmd)
       if not stdout:
-        raise errors.Resource.CreationError('Cluster creation failure: '
-                                            '{}'.format(stderr))
+        raise errors.Resource.CreationError(
+            'Cluster creation failure: {}'.format(stderr)
+        )
 
   def __DescribeCluster(self):
     """Describe a redshift cluster."""
-    cmd = self.cmd_prefix + ['redshift', 'describe-clusters',
-                             '--cluster-identifier', self.cluster_identifier]
+    cmd = self.cmd_prefix + [
+        'redshift',
+        'describe-clusters',
+        '--cluster-identifier',
+        self.cluster_identifier,
+    ]
     return vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _Exists(self):
@@ -480,8 +557,10 @@ class Redshift(edw_service.EdwService):
       Boolean value indicating the existence of a cluster.
     """
     stdout, _, _ = self.__DescribeCluster()
-    if (not stdout or (json.loads(stdout)['Clusters'][0]['ClusterStatus'] not in
-                       VALID_EXIST_STATUSES)):
+    if not stdout or (
+        json.loads(stdout)['Clusters'][0]['ClusterStatus']
+        not in VALID_EXIST_STATUSES
+    ):
       return False
     else:
       return True
@@ -500,16 +579,20 @@ class Redshift(edw_service.EdwService):
     stdout, _, _ = self.__DescribeCluster()
     self.endpoint = json.loads(stdout)['Clusters'][0]['Endpoint']['Address']
     account = util.GetAccount()
-    self.arn = 'arn:aws:redshift:{}:{}:cluster:{}'.format(self.region, account,
-                                                          self.
-                                                          cluster_identifier)
+    self.arn = 'arn:aws:redshift:{}:{}:cluster:{}'.format(
+        self.region, account, self.cluster_identifier
+    )
     AddTags(self.arn, self.region)
 
   def _Delete(self):
     """Delete a redshift cluster and disallow creation of a snapshot."""
-    cmd = self.cmd_prefix + ['redshift', 'delete-cluster',
-                             '--cluster-identifier', self.cluster_identifier,
-                             '--skip-final-cluster-snapshot']
+    cmd = self.cmd_prefix + [
+        'redshift',
+        'delete-cluster',
+        '--cluster-identifier',
+        self.cluster_identifier,
+        '--skip-final-cluster-snapshot',
+    ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
   def _IsDeleting(self):
@@ -518,8 +601,10 @@ class Redshift(edw_service.EdwService):
     if not stdout:
       return False
     else:
-      return (json.loads(stdout)['Clusters'][0]['ClusterStatus'] in
-              DELETION_STATUSES)
+      return (
+          json.loads(stdout)['Clusters'][0]['ClusterStatus']
+          in DELETION_STATUSES
+      )
 
   def _DeleteDependencies(self):
     """Delete dependencies of a redshift cluster."""

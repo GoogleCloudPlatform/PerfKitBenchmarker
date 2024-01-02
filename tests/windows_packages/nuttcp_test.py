@@ -28,11 +28,13 @@ nuttcp_results = """1416.3418 MB /  10.00 sec = 1188.1121 Mbps 85 %TX 26 \
 %RX 104429 / 1554763 drop/pkt 6.72 %loss
 """
 
-cpu_results = ('\r\nInstanceName      CookedValue\r\n------------     '
-               ' -----------\r\n0            22.7976893740141\r\n1    '
-               '        32.6422793196096\r\n2            18.6525988706'
-               '054\r\n3            44.5594145169094\r\n_total       2'
-               '9.6629938622484\r\n\r\n\r\n')
+cpu_results = (
+    '\r\nInstanceName      CookedValue\r\n------------     '
+    ' -----------\r\n0            22.7976893740141\r\n1    '
+    '        32.6422793196096\r\n2            18.6525988706'
+    '054\r\n3            44.5594145169094\r\n_total       2'
+    '9.6629938622484\r\n\r\n\r\n'
+)
 
 
 class NuttcpTestCase(unittest.TestCase, test_util.SamplesTestMixin):
@@ -47,8 +49,16 @@ class NuttcpTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     server = machine(machine_type='sB', zone='sZ')
 
     result_sample = [
-        nuttcp.GetUDPStreamSample(nuttcp_results, cpu_results, cpu_results,
-                                  client, server, bandwidth, 'external', 1)
+        nuttcp.GetUDPStreamSample(
+            nuttcp_results,
+            cpu_results,
+            cpu_results,
+            client,
+            server,
+            bandwidth,
+            'external',
+            1,
+        )
     ]
 
     expected_metadata = {

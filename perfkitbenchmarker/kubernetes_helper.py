@@ -21,32 +21,51 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('k8s_get_retry_count', 18,
-                     'Maximum number of waits for getting LoadBalancer external IP')
-flags.DEFINE_integer('k8s_get_wait_interval', 10,
-                     'Wait interval for getting LoadBalancer external IP')
+flags.DEFINE_integer(
+    'k8s_get_retry_count',
+    18,
+    'Maximum number of waits for getting LoadBalancer external IP',
+)
+flags.DEFINE_integer(
+    'k8s_get_wait_interval',
+    10,
+    'Wait interval for getting LoadBalancer external IP',
+)
 
 
 def checkKubernetesFlags():
   if not FLAGS.kubectl:
-    raise Exception('Please provide path to kubectl tool using --kubectl '
-                    'flag. Exiting.')
+    raise Exception(
+        'Please provide path to kubectl tool using --kubectl flag. Exiting.'
+    )
   if not FLAGS.kubeconfig:
-    raise Exception('Please provide path to kubeconfig using --kubeconfig '
-                    'flag. Exiting.')
+    raise Exception(
+        'Please provide path to kubeconfig using --kubeconfig flag. Exiting.'
+    )
 
 
 def CreateFromFile(file_name):
   checkKubernetesFlags()
-  create_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'create',
-                '-f', file_name]
+  create_cmd = [
+      FLAGS.kubectl,
+      '--kubeconfig=%s' % FLAGS.kubeconfig,
+      'create',
+      '-f',
+      file_name,
+  ]
   vm_util.IssueRetryableCommand(create_cmd)
 
 
 def DeleteFromFile(file_name):
   checkKubernetesFlags()
-  delete_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig, 'delete',
-                '-f', file_name, '--ignore-not-found']
+  delete_cmd = [
+      FLAGS.kubectl,
+      '--kubeconfig=%s' % FLAGS.kubeconfig,
+      'delete',
+      '-f',
+      file_name,
+      '--ignore-not-found',
+  ]
   vm_util.IssueRetryableCommand(delete_cmd)
 
 
@@ -62,8 +81,12 @@ def CreateAllFiles(file_list):
 
 def Get(resource, resourceInstanceName, labelFilter, jsonSelector):
   checkKubernetesFlags()
-  get_pod_cmd = [FLAGS.kubectl, '--kubeconfig=%s' % FLAGS.kubeconfig,
-                 'get', resource]
+  get_pod_cmd = [
+      FLAGS.kubectl,
+      '--kubeconfig=%s' % FLAGS.kubeconfig,
+      'get',
+      resource,
+  ]
   if len(resourceInstanceName) > 0:
     get_pod_cmd.append(resourceInstanceName)
   if len(labelFilter) > 0:
@@ -71,7 +94,7 @@ def Get(resource, resourceInstanceName, labelFilter, jsonSelector):
   get_pod_cmd.append('-ojsonpath={{{}}}'.format(jsonSelector))
   stdout, stderr, _ = vm_util.IssueCommand(get_pod_cmd, raise_on_failure=False)
   if len(stderr) > 0:
-    raise Exception("Error received from kubectl get: " + stderr)
+    raise Exception('Error received from kubectl get: ' + stderr)
   return stdout
 
 

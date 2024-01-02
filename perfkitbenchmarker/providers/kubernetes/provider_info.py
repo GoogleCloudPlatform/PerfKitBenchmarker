@@ -12,19 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for Kubernetes
-
-"""
+"""Provider info for Kubernetes"""
 
 from perfkitbenchmarker import provider_info
 
 
 class KubernetesProviderInfo(provider_info.BaseProviderInfo):
-
-  SUPPORTED_BENCHMARKS = ['block_storage_workload', 'cassandra_ycsb',
-                          'cassandra_stress', 'cluster_boot', 'fio',
-                          'iperf', 'mesh_network', 'mongodb_ycsb',
-                          'netperf', 'redis']
+  SUPPORTED_BENCHMARKS = [
+      'block_storage_workload',
+      'cassandra_ycsb',
+      'cassandra_stress',
+      'cluster_boot',
+      'fio',
+      'iperf',
+      'mesh_network',
+      'mongodb_ycsb',
+      'netperf',
+      'redis',
+  ]
   UNSUPPORTED_BENCHMARKS = ['bonnieplusplus', 'sysbench']
 
   CLOUD = provider_info.KUBERNETES

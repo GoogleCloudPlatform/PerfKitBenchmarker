@@ -17,7 +17,6 @@ import os
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import xgboost_benchmark
@@ -28,19 +27,23 @@ from tests import pkb_common_test_case
 FLAGS = flags.FLAGS
 
 
-class XgboostBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
-                           test_util.SamplesTestMixin):
+class XgboostBenchmarkTest(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self) -> None:
     super(XgboostBenchmarkTest, self).setUp()
-    self.enter_context(mock.patch.object(
-        nvidia_driver, 'QueryNumberOfGpus', return_value=1))
-    self.enter_context(mock.patch.object(
-        cuda_toolkit, 'GetMetadata', return_value={}))
+    self.enter_context(
+        mock.patch.object(nvidia_driver, 'QueryNumberOfGpus', return_value=1)
+    )
+    self.enter_context(
+        mock.patch.object(cuda_toolkit, 'GetMetadata', return_value={})
+    )
 
   def CudaOutput(self) -> str:
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'xgboost_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '..', 'data', 'xgboost_output.txt'
+    )
     with open(path) as reader:
       return reader.read()
 

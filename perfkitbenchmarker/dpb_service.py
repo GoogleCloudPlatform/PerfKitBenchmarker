@@ -290,7 +290,6 @@ class BaseDpbService(resource.BaseResource):
     pass
 
   def _WaitForJob(self, job_id, timeout, poll_interval):
-
     if poll_interval is None:
       poll_interval = FLAGS.dpb_job_poll_interval_secs
 

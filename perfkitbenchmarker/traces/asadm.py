@@ -57,8 +57,9 @@ GB_CONVERSION_FACTOR = {
     'TB': 1000.0,
     'GB': 1.0,
     'MB': 1 / 1000.0,
-    'KB': 1 / (1000.0 ** 2),
-    'B': 1 / (1000.0 ** 3)}
+    'KB': 1 / (1000.0**2),
+    'B': 1 / (1000.0**3),
+}
 
 
 class _AsadmSummaryCollector(base_collector.BaseCollector):
@@ -384,7 +385,7 @@ def _AnalyzeAsadmLatencyResults(metadata, output, samples):
         len(write_iops),
         len(write_lat_1_ms),
         len(write_lat_8_ms),
-        len(write_lat_64_ms)
+        len(write_lat_64_ms),
     )
   effective_metric_length = min(effective_read_length, effective_write_length)
   samples.extend([

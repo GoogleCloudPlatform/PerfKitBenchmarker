@@ -16,7 +16,6 @@ import re
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker import timing_util
@@ -53,7 +52,8 @@ class ValidateMeasurementsFlagTestCase(unittest.TestCase):
     self.assertIs(validate(['end_to_end_runtime', 'timestamps']), True)
     self.assertIs(validate(['runtimes', 'timestamps']), True)
     self.assertIs(
-        validate(['end_to_end_runtime', 'runtimes', 'timestamps']), True)
+        validate(['end_to_end_runtime', 'runtimes', 'timestamps']), True
+    )
 
 
 class IntervalTimerTestCase(unittest.TestCase, test_util.SamplesTestMixin):
@@ -130,7 +130,8 @@ class IntervalTimerTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     samples = timer.GenerateSamples()
     exp_samples = [
         sample.Sample('First Runtime', stop0 - start0, 'seconds'),
-        sample.Sample('Second Runtime', stop1 - start1, 'seconds')]
+        sample.Sample('Second Runtime', stop1 - start1, 'seconds'),
+    ]
     self.assertSampleListsEqualUpToTimestamp(samples, exp_samples)
 
   def testGenerateSamplesRuntimeAndTimestamps(self):
@@ -146,7 +147,8 @@ class IntervalTimerTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     stop1 = timer.intervals[1][2]
     with mock.patch(
         'perfkitbenchmarker.timing_util.TimestampMeasurementsEnabled',
-        return_value=True):
+        return_value=True,
+    ):
       samples = timer.GenerateSamples()
     exp_samples = [
         sample.Sample('First Runtime', stop0 - start0, 'seconds'),
@@ -154,7 +156,8 @@ class IntervalTimerTestCase(unittest.TestCase, test_util.SamplesTestMixin):
         sample.Sample('First Stop Timestamp', stop0, 'seconds'),
         sample.Sample('Second Runtime', stop1 - start1, 'seconds'),
         sample.Sample('Second Start Timestamp', start1, 'seconds'),
-        sample.Sample('Second Stop Timestamp', stop1, 'seconds')]
+        sample.Sample('Second Stop Timestamp', stop1, 'seconds'),
+    ]
     self.assertSampleListsEqualUpToTimestamp(samples, exp_samples)
 
 

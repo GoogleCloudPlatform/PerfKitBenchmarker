@@ -34,24 +34,29 @@ OS_TYPE_MAPPING = {
     os_types.UBUNTU1604: '16.04',
     os_types.UBUNTU1804: '18.04',
     os_types.UBUNTU2004: '20.04',
-    os_types.UBUNTU2204: '22.04'
+    os_types.UBUNTU2204: '22.04',
 }
 
 
 def YumInstall(vm):
   """Installs the ms sql package on the RedHat VM."""
-  vm.RemoteCommand('sudo curl -o /etc/yum.repos.d/mssql-server.repo '
-                   'https://packages.microsoft.com/config/rhel/8/'
-                   'mssql-server-2022.repo')
-  vm.RemoteCommand('sudo curl -o /etc/yum.repos.d/msprod.repo '
-                   'https://packages.microsoft.com/config/rhel/8/prod.repo')
+  vm.RemoteCommand(
+      'sudo curl -o /etc/yum.repos.d/mssql-server.repo '
+      'https://packages.microsoft.com/config/rhel/8/'
+      'mssql-server-2022.repo'
+  )
+  vm.RemoteCommand(
+      'sudo curl -o /etc/yum.repos.d/msprod.repo '
+      'https://packages.microsoft.com/config/rhel/8/prod.repo'
+  )
 
-  vm.RemoteCommand('sudo ACCEPT_EULA=Y yum install -y mssql-tools '
-                   'unixODBC-devel')
   vm.RemoteCommand(
-      r'echo PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bash_profile')
+      'sudo ACCEPT_EULA=Y yum install -y mssql-tools unixODBC-devel'
+  )
+  vm.RemoteCommand(r'echo PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bash_profile')
   vm.RemoteCommand(
-      r'echo export PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bashrc')
+      r'echo export PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bashrc'
+  )
   vm.RemoteCommand('source ~/.bashrc')
 
 
@@ -62,16 +67,19 @@ def AptInstall(vm):
     vm: Virtual Machine to install on.
   """
   vm.Install('unixodbc_dev')
-  vm.RemoteCommand(
-      'curl {key} | sudo apt-key add -'.format(key=_DEB_REPO_KEY))
+  vm.RemoteCommand('curl {key} | sudo apt-key add -'.format(key=_DEB_REPO_KEY))
   deb_repro_file = _DEB_REPO_FILE.format(os=OS_TYPE_MAPPING[vm.OS_TYPE])
   vm.RemoteCommand(
-      'curl {file} | sudo tee {location}'.format(file=deb_repro_file,
-                                                 location=_DEB_FILE_LOCATION))
+      'curl {file} | sudo tee {location}'.format(
+          file=deb_repro_file, location=_DEB_FILE_LOCATION
+      )
+  )
   vm.RemoteCommand('sudo apt-get update')
   vm.RemoteCommand('sudo ACCEPT_EULA=Y /usr/bin/apt-get -y install mssql-tools')
   vm.RemoteCommand(
-      r'sudo sed -i "1 i\export PATH=$PATH:/opt/mssql-tools/bin/" ~/.bashrc')
+      r'sudo sed -i "1 i\export PATH=$PATH:/opt/mssql-tools/bin/" ~/.bashrc'
+  )
   vm.RemoteCommand(
       r'sudo sed -i "1 i\export PATH=$PATH:/opt/mssql-tools/bin/" '
-      '/etc/bash.bashrc')
+      '/etc/bash.bashrc'
+  )

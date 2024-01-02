@@ -1,4 +1,5 @@
 """Tests for scripts/messaging_service_scripts/common/factories.py."""
+
 import sys
 import unittest
 from unittest import mock
@@ -22,15 +23,20 @@ class MessagingServiceScriptsAppTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super().setUp()
     self.gcp_client_mock = self.enter_context(
-        mock.patch.object(gcp_pubsub_client, 'GCPPubSubClient'))
+        mock.patch.object(gcp_pubsub_client, 'GCPPubSubClient')
+    )
     self.aws_client_mock = self.enter_context(
-        mock.patch.object(aws_sqs_client, 'AwsSqsClient'))
+        mock.patch.object(aws_sqs_client, 'AwsSqsClient')
+    )
     self.azure_client_mock = self.enter_context(
-        mock.patch.object(azure_service_bus_client, 'AzureServiceBusClient'))
+        mock.patch.object(azure_service_bus_client, 'AzureServiceBusClient')
+    )
     self.pull_runner_mock = self.enter_context(
-        mock.patch.object(runners, 'PullLatencyRunner'))
+        mock.patch.object(runners, 'PullLatencyRunner')
+    )
     self.publish_runner_mock = self.enter_context(
-        mock.patch.object(runners, 'PublishLatencyRunner'))
+        mock.patch.object(runners, 'PublishLatencyRunner')
+    )
 
   def testRegisterRunner(self, benchmark_scenario_flag, *_):
     foo_runner = mock.Mock()
@@ -63,13 +69,20 @@ class MessagingServiceScriptsAppTest(pkb_common_test_case.PkbCommonTestCase):
     self.gcp_client_mock.from_flags.assert_called_once()
     self.pull_runner_mock.run_class_startup.assert_called_once()
     self.pull_runner_mock.assert_called_once_with(
-        self.gcp_client_mock.from_flags.return_value)
+        self.gcp_client_mock.from_flags.return_value
+    )
     self.assertEqual(runner, self.pull_runner_mock.return_value)
 
   @mock.patch.object(app.App, '_register_runners')
   @mock.patch.object(app.App, 'get_runner')
-  def testCall(self, get_runner_mock, register_runners_mock, _,
-               number_of_messages_mock, message_size_mock):
+  def testCall(
+      self,
+      get_runner_mock,
+      register_runners_mock,
+      _,
+      number_of_messages_mock,
+      message_size_mock,
+  ):
     my_app = app.App.get_instance()
     parent_mock = mock.Mock()
     parent_mock.attach_mock(register_runners_mock, 'register_runners')
@@ -78,8 +91,9 @@ class MessagingServiceScriptsAppTest(pkb_common_test_case.PkbCommonTestCase):
     parent_mock.assert_has_calls([
         mock.call.register_runners(),
         mock.call.get_runner(),
-        mock.call.get_runner().run_phase(number_of_messages_mock.value,
-                                         message_size_mock.value),
+        mock.call.get_runner().run_phase(
+            number_of_messages_mock.value, message_size_mock.value
+        ),
         mock.call.get_runner().close(),
     ])
 

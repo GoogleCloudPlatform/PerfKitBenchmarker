@@ -28,11 +28,13 @@ FLAGS = flags.FLAGS
 
 class Snowflake(snowflake.Snowflake):
   """Class representing a Snowflake Data Warehouse Instance hosted on AWS."""
+
   CLOUD = provider_info.AWS
   SERVICE_TYPE = 'snowflake_aws'
 
 
 class Snowflakeexternal(snowflake.Snowflake):
   """Class representing Snowflake External Warehouses on AWS."""
+
   CLOUD = provider_info.AWS
   SERVICE_TYPE = 'snowflakeexternal_aws'

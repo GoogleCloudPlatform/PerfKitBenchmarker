@@ -41,9 +41,13 @@ class ConfigOptionDecoderTestCase(unittest.TestCase):
     self.assertIs(decoder.required, True)
     with self.assertRaises(AssertionError) as cm:
       decoder.default
-    self.assertEqual(str(cm.exception), (
-        'Attempted to get the default value of required config option '
-        '"test_option".'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Attempted to get the default value of required config option '
+            '"test_option".'
+        ),
+    )
 
   def testDefaultValue(self):
     decoder = _PassThroughDecoder(default=None, option=_OPTION)
@@ -58,6 +62,7 @@ class ConfigOptionDecoderTestCase(unittest.TestCase):
   def testIncompleteDerivedClass(self):
     class IncompleteDerivedClass(option_decoders.ConfigOptionDecoder):
       pass
+
     with self.assertRaises(TypeError):
       IncompleteDerivedClass(option=_OPTION)  # pytype: disable=not-instantiable
 
@@ -65,26 +70,36 @@ class ConfigOptionDecoderTestCase(unittest.TestCase):
 class TypeVerifierTestCase(unittest.TestCase):
 
   def testRejectNone(self):
-    decoder = option_decoders.TypeVerifier((int, float), default=None,
-                                           option=_OPTION)
+    decoder = option_decoders.TypeVerifier(
+        (int, float), default=None, option=_OPTION
+    )
     self.assertIs(decoder.required, False)
     self.assertIsNone(decoder.default)
     self.assertIs(decoder.Decode(5, _COMPONENT, _FLAGS), 5)
     self.assertIs(decoder.Decode(5.5, _COMPONENT, _FLAGS), 5.5)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode(None, _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "None" (of type '
-        '"NoneType"). Value must be one of the following types: int, float.'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "None" (of type '
+            '"NoneType"). Value must be one of the following types: int, float.'
+        ),
+    )
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode('red', _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "red" (of type "str"). '
-        'Value must be one of the following types: int, float.'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "red" (of type "str"). '
+            'Value must be one of the following types: int, float.'
+        ),
+    )
 
   def testAcceptNone(self):
-    decoder = option_decoders.TypeVerifier((int, float), default=None,
-                                           none_ok=True, option=_OPTION)
+    decoder = option_decoders.TypeVerifier(
+        (int, float), default=None, none_ok=True, option=_OPTION
+    )
     self.assertIs(decoder.required, False)
     self.assertIsNone(decoder.default)
     self.assertIs(decoder.Decode(5, _COMPONENT, _FLAGS), 5)
@@ -92,9 +107,13 @@ class TypeVerifierTestCase(unittest.TestCase):
     self.assertIsNone(decoder.Decode(None, _COMPONENT, _FLAGS))
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode('red', _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "red" (of type "str"). '
-        'Value must be one of the following types: NoneType, int, float.'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "red" (of type "str"). '
+            'Value must be one of the following types: NoneType, int, float.'
+        ),
+    )
 
 
 class BooleanDecoderTestCase(unittest.TestCase):
@@ -115,9 +134,13 @@ class BooleanDecoderTestCase(unittest.TestCase):
     decoder = option_decoders.BooleanDecoder(option=_OPTION)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode(5, _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "5" (of type "int"). '
-        'Value must be one of the following types: bool.'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "5" (of type "int"). '
+            'Value must be one of the following types: bool.'
+        ),
+    )
 
   def testValidBoolean(self):
     decoder = option_decoders.BooleanDecoder(option=_OPTION)
@@ -142,9 +165,13 @@ class IntDecoderTestCase(unittest.TestCase):
     decoder = option_decoders.IntDecoder(option=_OPTION)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode('5', _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "5" (of type "str"). '
-        'Value must be one of the following types: int.'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "5" (of type "str"). '
+            'Value must be one of the following types: int.'
+        ),
+    )
 
   def testValidInt(self):
     decoder = option_decoders.IntDecoder(option=_OPTION)
@@ -154,9 +181,13 @@ class IntDecoderTestCase(unittest.TestCase):
     decoder = option_decoders.IntDecoder(max=2, option=_OPTION)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode(5, _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "5". Value must be at '
-        'most 2.'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "5". Value must be at '
+            'most 2.'
+        ),
+    )
     self.assertIs(decoder.Decode(2, _COMPONENT, _FLAGS), 2)
     self.assertIs(decoder.Decode(1, _COMPONENT, _FLAGS), 1)
 
@@ -164,9 +195,13 @@ class IntDecoderTestCase(unittest.TestCase):
     decoder = option_decoders.IntDecoder(min=10, option=_OPTION)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode(5, _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "5". Value must be at '
-        'least 10.'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "5". Value must be at '
+            'least 10.'
+        ),
+    )
     self.assertIs(decoder.Decode(10, _COMPONENT, _FLAGS), 10)
     self.assertIs(decoder.Decode(15, _COMPONENT, _FLAGS), 15)
 
@@ -197,10 +232,14 @@ class StringDecoderTestCase(unittest.TestCase):
     decoder = option_decoders.StringDecoder(option=_OPTION)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode(5, _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "5" (of type "int"). '
-        'Value must be one of the following types: %s.' %
-        six.string_types[0].__name__))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "5" (of type "int"). '
+            'Value must be one of the following types: %s.'
+            % six.string_types[0].__name__
+        ),
+    )
 
   def testValidString(self):
     decoder = option_decoders.StringDecoder(option=_OPTION)
@@ -225,9 +264,13 @@ class FloatDecoderTestCase(unittest.TestCase):
     decoder = option_decoders.FloatDecoder(option=_OPTION)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode('5', _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "5" (of type "str"). '
-        'Value must be one of the following types: float, int.'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "5" (of type "str"). '
+            'Value must be one of the following types: float, int.'
+        ),
+    )
 
   def testValidFloat(self):
     decoder = option_decoders.FloatDecoder(option=_OPTION)
@@ -242,9 +285,13 @@ class FloatDecoderTestCase(unittest.TestCase):
     decoder = option_decoders.FloatDecoder(max=MAX, option=_OPTION)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode(5, _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "5". Value must be at '
-        'most %s.' % MAX))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "5". Value must be at '
+            'most %s.' % MAX
+        ),
+    )
     self.assertIs(decoder.Decode(MAX, _COMPONENT, _FLAGS), MAX)
     self.assertIs(decoder.Decode(2, _COMPONENT, _FLAGS), 2)
     self.assertIs(decoder.Decode(1, _COMPONENT, _FLAGS), 1)
@@ -254,9 +301,13 @@ class FloatDecoderTestCase(unittest.TestCase):
     decoder = option_decoders.FloatDecoder(max=MAX, option=_OPTION)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode(2.01, _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "2.01". Value must be at '
-        'most %s.' % MAX))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "2.01". Value must be at'
+            ' most %s.' % MAX
+        ),
+    )
     self.assertIs(decoder.Decode(MAX, _COMPONENT, _FLAGS), MAX)
     self.assertIs(decoder.Decode(2.0, _COMPONENT, _FLAGS), 2.0)
     self.assertIs(decoder.Decode(1, _COMPONENT, _FLAGS), 1)
@@ -266,9 +317,13 @@ class FloatDecoderTestCase(unittest.TestCase):
     decoder = option_decoders.FloatDecoder(min=MIN, option=_OPTION)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode(0, _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "0". Value must be at '
-        'least %s.' % MIN))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "0". Value must be at '
+            'least %s.' % MIN
+        ),
+    )
     self.assertIs(decoder.Decode(MIN, _COMPONENT, _FLAGS), MIN)
     self.assertIs(decoder.Decode(2, _COMPONENT, _FLAGS), 2)
     self.assertIs(decoder.Decode(5, _COMPONENT, _FLAGS), 5)
@@ -278,9 +333,13 @@ class FloatDecoderTestCase(unittest.TestCase):
     decoder = option_decoders.FloatDecoder(min=MIN, option=_OPTION)
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode(0, _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "0". Value must be at '
-        'least %s.' % MIN))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "0". Value must be at '
+            'least %s.' % MIN
+        ),
+    )
     self.assertIs(decoder.Decode(MIN, _COMPONENT, _FLAGS), MIN)
     self.assertIs(decoder.Decode(2.0, _COMPONENT, _FLAGS), 2.0)
     self.assertIs(decoder.Decode(5, _COMPONENT, _FLAGS), 5)
@@ -301,27 +360,38 @@ class ListDecoderTestCase(unittest.TestCase):
     self._int_decoder = option_decoders.IntDecoder()
 
   def testNonListInputType(self):
-    decoder = option_decoders.ListDecoder(item_decoder=self._int_decoder,
-                                          option=_OPTION)
+    decoder = option_decoders.ListDecoder(
+        item_decoder=self._int_decoder, option=_OPTION
+    )
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode(5, _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option value: "5" (of type "int"). '
-        'Value must be one of the following types: list.'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option value: "5" (of type "int"). '
+            'Value must be one of the following types: list.'
+        ),
+    )
 
   def testNone(self):
-    decoder = option_decoders.ListDecoder(item_decoder=self._int_decoder,
-                                          none_ok=True, option=_OPTION)
+    decoder = option_decoders.ListDecoder(
+        item_decoder=self._int_decoder, none_ok=True, option=_OPTION
+    )
     self.assertIsNone(decoder.Decode(None, _COMPONENT, _FLAGS))
 
   def testInvalidItem(self):
-    decoder = option_decoders.ListDecoder(item_decoder=self._int_decoder,
-                                          option=_OPTION)
+    decoder = option_decoders.ListDecoder(
+        item_decoder=self._int_decoder, option=_OPTION
+    )
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       decoder.Decode([5, 4, 3.5], _COMPONENT, _FLAGS)
-    self.assertEqual(str(cm.exception), (
-        'Invalid test_component.test_option[2] value: "3.5" (of type "float"). '
-        'Value must be one of the following types: int.'))
+    self.assertEqual(
+        str(cm.exception),
+        (
+            'Invalid test_component.test_option[2] value: "3.5" (of type'
+            ' "float"). Value must be one of the following types: int.'
+        ),
+    )
 
 
 if __name__ == '__main__':

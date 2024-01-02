@@ -33,37 +33,53 @@ ZONE_1 = 'ZONE_1'
 ZONE_2 = 'ZONE_2'
 ZONE_3 = 'ZONE_3'
 
-flags.DEFINE_string('profitbricks_config',
-                    os.getenv('PROFITBRICKS_CONFIG',
-                              '~/.config/profitbricks-auth.cfg'),
-                    ('Path to config file containing your email and password. '
-                     'Can also be set via $PROFITBRICKS_CONFIG environment '
-                     'variable.\n(File format: email:password)'))
+flags.DEFINE_string(
+    'profitbricks_config',
+    os.getenv('PROFITBRICKS_CONFIG', '~/.config/profitbricks-auth.cfg'),
+    (
+        'Path to config file containing your email and password. '
+        'Can also be set via $PROFITBRICKS_CONFIG environment '
+        'variable.\n(File format: email:password)'
+    ),
+)
 
-flags.DEFINE_string('profitbricks_image_alias', None,
-                    'An alias to a ProfitBricks public image. If given, '
-                    'it will be used instead of a default Ubuntu 14 image. '
-                    'E.g., "ubuntu:latest" indicates the latest version of '
-                    'Ubuntu is to be used to provision a volume.')
+flags.DEFINE_string(
+    'profitbricks_image_alias',
+    None,
+    'An alias to a ProfitBricks public image. If given, '
+    'it will be used instead of a default Ubuntu 14 image. '
+    'E.g., "ubuntu:latest" indicates the latest version of '
+    'Ubuntu is to be used to provision a volume.',
+)
 
-flags.DEFINE_enum('profitbricks_location',
-                  US_LAS,
-                  [US_LAS, US_EWR, DE_FKB, DE_FRA],
-                  ('Location of data center to be provisioned (us/las, '
-                   'us/ewr, de/fkb, de/fra)'))
+flags.DEFINE_enum(
+    'profitbricks_location',
+    US_LAS,
+    [US_LAS, US_EWR, DE_FKB, DE_FRA],
+    (
+        'Location of data center to be provisioned (us/las, '
+        'us/ewr, de/fkb, de/fra)'
+    ),
+)
 
-flags.DEFINE_enum('profitbricks_boot_volume_type',
-                  HDD,
-                  [HDD, SSD],
-                  ('Choose between HDD or SSD boot volume types.'))
+flags.DEFINE_enum(
+    'profitbricks_boot_volume_type',
+    HDD,
+    [HDD, SSD],
+    'Choose between HDD or SSD boot volume types.',
+)
 
-flags.DEFINE_integer('profitbricks_boot_volume_size',
-                     10,
-                     ('Choose the boot volume size in GB.'))
+flags.DEFINE_integer(
+    'profitbricks_boot_volume_size', 10, 'Choose the boot volume size in GB.'
+)
 
-flags.DEFINE_enum('availability_zone',
-                  AUTO,
-                  [AUTO, ZONE_1, ZONE_2, ZONE_3],
-                  ('Direct a storage volume to be created in one of three '
-                   'zones per data center (AUTO, '
-                   'ZONE_1, ZONE_2, ZONE_3)'))
+flags.DEFINE_enum(
+    'availability_zone',
+    AUTO,
+    [AUTO, ZONE_1, ZONE_2, ZONE_3],
+    (
+        'Direct a storage volume to be created in one of three '
+        'zones per data center (AUTO, '
+        'ZONE_1, ZONE_2, ZONE_3)'
+    ),
+)

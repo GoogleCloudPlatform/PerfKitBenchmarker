@@ -114,20 +114,23 @@ class TestParseIntegerList(unittest.TestCase):
     self.assertEqual(list(self.ilp.parse('-3:1:2')), [-3, -1, 1])
 
   def testIntegerList(self):
-    self.assertEqual(list(self.ilp.parse('3-5,8,10-12')),
-                     [3, 4, 5, 8, 10, 11, 12])
-    self.assertEqual(list(self.ilp.parse('3:5,8,10:12')),
-                     [3, 4, 5, 8, 10, 11, 12])
+    self.assertEqual(
+        list(self.ilp.parse('3-5,8,10-12')), [3, 4, 5, 8, 10, 11, 12]
+    )
+    self.assertEqual(
+        list(self.ilp.parse('3:5,8,10:12')), [3, 4, 5, 8, 10, 11, 12]
+    )
 
   def testIntegerListWithRangeAndStep(self):
-    self.assertEqual(list(self.ilp.parse('3-5,8,10-15-2')),
-                     [3, 4, 5, 8, 10, 12, 14])
-    self.assertEqual(list(self.ilp.parse('3:5,8,10:15:2')),
-                     [3, 4, 5, 8, 10, 12, 14])
+    self.assertEqual(
+        list(self.ilp.parse('3-5,8,10-15-2')), [3, 4, 5, 8, 10, 12, 14]
+    )
+    self.assertEqual(
+        list(self.ilp.parse('3:5,8,10:15:2')), [3, 4, 5, 8, 10, 12, 14]
+    )
 
   def testIncreasingIntegerLists(self):
-    self.assertEqual(list(self.ilp.parse('1-5-2,6-8')),
-                     [1, 3, 5, 6, 7, 8])
+    self.assertEqual(list(self.ilp.parse('1-5-2,6-8')), [1, 3, 5, 6, 7, 8])
 
   def testAnyNegativeValueRequiresNewFormat(self):
     for str_range in ('-1-5', '3--5', '3-1--1'):
@@ -179,13 +182,15 @@ class TestParseIntegerList(unittest.TestCase):
 
   def testNonIncreasingEntries(self):
     ilp = flag_util.IntegerListParser(
-        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
+        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION
+    )
     with self.assertRaises(ValueError):
       ilp.parse('3,2,1')
 
   def testNonIncreasingRange(self):
     ilp = flag_util.IntegerListParser(
-        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
+        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION
+    )
     with self.assertRaises(ValueError):
       ilp.parse('3-1')
     with self.assertRaises(ValueError):
@@ -193,7 +198,8 @@ class TestParseIntegerList(unittest.TestCase):
 
   def testNonIncreasingRangeWithStep(self):
     ilp = flag_util.IntegerListParser(
-        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
+        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION
+    )
     with self.assertRaises(ValueError):
       ilp.parse('3-1-2')
     with self.assertRaises(ValueError):
@@ -203,11 +209,13 @@ class TestParseIntegerList(unittest.TestCase):
 
   def testIntegerListsWhichAreNotIncreasing(self):
     ilp = flag_util.IntegerListParser(
-        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION)
+        on_nonincreasing=flag_util.IntegerListParser.EXCEPTION
+    )
     with self.assertRaises(ValueError) as cm:
       ilp.parse('1-5,3-7')
-    self.assertEqual('Integer list 1-5,3-7 is not increasing',
-                     str(cm.exception))
+    self.assertEqual(
+        'Integer list 1-5,3-7 is not increasing', str(cm.exception)
+    )
 
 
 class TestIntegerListSerializer(unittest.TestCase):
@@ -216,8 +224,7 @@ class TestIntegerListSerializer(unittest.TestCase):
     ser = flag_util.IntegerListSerializer()
     il = flag_util.IntegerList([1, (2, 5), 9])
 
-    self.assertEqual(ser.serialize(il),
-                     '1,2-5,9')
+    self.assertEqual(ser.serialize(il), '1,2-5,9')
     self.assertEqual(str(il), '1,2-5,9')
     # previously was <perfkitbenchmarker.flag_util.IntegerList object at ...>
     self.assertEqual(repr(il), 'IntegerList([1,2-5,9])')
@@ -253,8 +260,7 @@ class TestIntegerListSerializer(unittest.TestCase):
     ser = flag_util.IntegerListSerializer()
     il = flag_util.IntegerList([1, (2, 5, 2), 9])
 
-    self.assertEqual(ser.serialize(il),
-                     '1,2-5-2,9')
+    self.assertEqual(ser.serialize(il), '1,2-5-2,9')
 
 
 class OverrideFlagsTestCase(unittest.TestCase):
@@ -271,8 +277,9 @@ class OverrideFlagsTestCase(unittest.TestCase):
     flag_values_overrides = {}
     flag_values_overrides['test_flag_2'] = 1
     self.assertFlagState(flag_values, 0, False)
-    with flag_util.OverrideFlags(flag_values, flag_values_overrides,
-                                 [{'test_flag_2': 'test_flag'}]):
+    with flag_util.OverrideFlags(
+        flag_values, flag_values_overrides, [{'test_flag_2': 'test_flag'}]
+    ):
       self.assertFlagState(flag_values, 1, True)
     self.assertFlagState(flag_values, 0, False)
 
@@ -363,8 +370,7 @@ class TestUnitsParser(unittest.TestCase):
 class TestStringToBytes(unittest.TestCase):
 
   def testValidString(self):
-    self.assertEqual(flag_util.StringToBytes('100KB'),
-                     100000)
+    self.assertEqual(flag_util.StringToBytes('100KB'), 100000)
 
   def testUnparseableString(self):
     with self.assertRaises(ValueError) as cm:
@@ -387,8 +393,7 @@ class TestStringToBytes(unittest.TestCase):
 class TestStringToRawPct(unittest.TestCase):
 
   def testValidPct(self):
-    self.assertEqual(flag_util.StringToRawPercent('50.5%'),
-                     50.5)
+    self.assertEqual(flag_util.StringToRawPercent('50.5%'), 50.5)
 
   def testNullString(self):
     with self.assertRaises(ValueError):
@@ -417,12 +422,10 @@ class TestYAMLParser(unittest.TestCase):
     self.parser = flag_util.YAMLParser()
 
   def testValidString(self):
-    self.assertEqual(self.parser.parse('[1, 2, 3]'),
-                     [1, 2, 3])
+    self.assertEqual(self.parser.parse('[1, 2, 3]'), [1, 2, 3])
 
   def testPreParsedYAML(self):
-    self.assertEqual(self.parser.parse([1, 2, 3]),
-                     [1, 2, 3])
+    self.assertEqual(self.parser.parse([1, 2, 3]), [1, 2, 3])
 
   def testBadYAML(self):
     with self.assertRaises(ValueError) as cm:
@@ -430,7 +433,7 @@ class TestYAMLParser(unittest.TestCase):
     self.assertIn("Couldn't parse YAML string '{a': ", str(cm.exception))
 
 
-class MockFlag():
+class MockFlag:
 
   def __init__(self, name, value, present):
     self.name = name
@@ -455,11 +458,14 @@ class TestGetProvidedCommandLineFlags(unittest.TestCase):
     flag_util.FLAGS = {}
 
   def testGetProvidedCommandLineFlags(self):
-    self.assertDictEqual({
-        'flag_int': 1,
-        'flag_str': 'str',
-        'flag_enum': 'BOTH',
-    }, flag_util.GetProvidedCommandLineFlags())
+    self.assertDictEqual(
+        {
+            'flag_int': 1,
+            'flag_str': 'str',
+            'flag_enum': 'BOTH',
+        },
+        flag_util.GetProvidedCommandLineFlags(),
+    )
 
 
 if __name__ == '__main__':

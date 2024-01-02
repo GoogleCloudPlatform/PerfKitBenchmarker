@@ -32,42 +32,57 @@ class LogGroup(resource.BaseResource):
   def _Create(self):
     """Create the log group."""
     create_cmd = util.AWS_PREFIX + [
-        '--region', self.region,
-        'logs', 'create-log-group',
-        '--log-group-name', self.name
+        '--region',
+        self.region,
+        'logs',
+        'create-log-group',
+        '--log-group-name',
+        self.name,
     ]
     vm_util.IssueCommand(create_cmd)
 
   def _Delete(self):
     """Delete the log group."""
     delete_cmd = util.AWS_PREFIX + [
-        '--region', self.region,
-        'logs', 'delete-log-group',
-        '--log-group-name', self.name
+        '--region',
+        self.region,
+        'logs',
+        'delete-log-group',
+        '--log-group-name',
+        self.name,
     ]
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def Exists(self):
     """Returns True if the log group exists."""
     describe_cmd = util.AWS_PREFIX + [
-        '--region', self.region,
-        'logs', 'describe-log-groups',
-        '--log-group-name-prefix', self.name,
-        '--no-paginate'
+        '--region',
+        self.region,
+        'logs',
+        'describe-log-groups',
+        '--log-group-name-prefix',
+        self.name,
+        '--no-paginate',
     ]
     stdout, _, _ = vm_util.IssueCommand(describe_cmd)
     log_groups = json.loads(stdout)['logGroups']
-    group = next((group for group in log_groups
-                  if group['logGroupName'] == self.name), None)
+    group = next(
+        (group for group in log_groups if group['logGroupName'] == self.name),
+        None,
+    )
     return bool(group)
 
   def _PostCreate(self):
     """Set the retention policy."""
     put_cmd = util.AWS_PREFIX + [
-        '--region', self.region,
-        'logs', 'put-retention-policy',
-        '--log-group-name', self.name,
-        '--retention-in-days', str(self.retention_in_days)
+        '--region',
+        self.region,
+        'logs',
+        'put-retention-policy',
+        '--log-group-name',
+        self.name,
+        '--retention-in-days',
+        str(self.retention_in_days),
     ]
     vm_util.IssueCommand(put_cmd)
 
@@ -75,11 +90,15 @@ class LogGroup(resource.BaseResource):
 def GetLogs(region, stream_name, group_name, token=None):
   """Fetches the JSON formatted log stream starting at the token."""
   get_cmd = util.AWS_PREFIX + [
-      '--region', region,
-      'logs', 'get-log-events',
+      '--region',
+      region,
+      'logs',
+      'get-log-events',
       '--start-from-head',
-      '--log-group-name', group_name,
-      '--log-stream-name', stream_name,
+      '--log-group-name',
+      group_name,
+      '--log-stream-name',
+      stream_name,
   ]
   if token:
     get_cmd.extend(['--next-token', token])

@@ -86,16 +86,25 @@ class BaseSmbService(resource.BaseResource):
       # SMB service does not have to have a list of smb_tiers nor does it have
       # to be implemented by a provider
       raise errors.Config.InvalidValue(
-          ('smb_tier "%s" not in acceptable list "%s" '
-           'for cloud %s') % (self.smb_tier, self.SMB_TIERS, self.CLOUD))
-    logging.debug('%s SMB service with smb_tier %s zone %s default version %s',
-                  self.CLOUD, self.smb_tier, self.zone,
-                  self.DEFAULT_SMB_VERSION)
+          'smb_tier "%s" not in acceptable list "%s" for cloud %s'
+          % (self.smb_tier, self.SMB_TIERS, self.CLOUD)
+      )
+    logging.debug(
+        '%s SMB service with smb_tier %s zone %s default version %s',
+        self.CLOUD,
+        self.smb_tier,
+        self.zone,
+        self.DEFAULT_SMB_VERSION,
+    )
 
   def CreateSmbDisk(self):
-    return disk.SmbDisk(self.disk_spec, self.GetRemoteAddress(),
-                        self.GetStorageAccountAndKey(),
-                        self.DEFAULT_SMB_VERSION, self.smb_tier)
+    return disk.SmbDisk(
+        self.disk_spec,
+        self.GetRemoteAddress(),
+        self.GetStorageAccountAndKey(),
+        self.DEFAULT_SMB_VERSION,
+        self.smb_tier,
+    )
 
   @abc.abstractmethod
   def _IsReady(self):

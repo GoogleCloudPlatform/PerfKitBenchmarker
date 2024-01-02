@@ -61,10 +61,12 @@ def ParseCsvFile(fp: TextIO) -> Tuple[List[str], np.ndarray]:
     raise ValueError(f'Expected 4 header lines got {len(headers)}\n{headers}')
   if not headers[0] or 'pcp-dstat' not in headers[0][0]:
     raise ValueError(
-        f'Expected first header cell to contain "pcp-dstat"\n{headers[0]}')
+        f'Expected first header cell to contain "pcp-dstat"\n{headers[0]}'
+    )
   if not headers[2] or 'Host:' not in headers[2][0]:
     raise ValueError(
-        f'Expected first cell in third line to be "Host:"\n{headers[2]}')
+        f'Expected first cell in third line to be "Host:"\n{headers[2]}'
+    )
 
   categories = next(reader)
   if not categories:
@@ -72,8 +74,9 @@ def ParseCsvFile(fp: TextIO) -> Tuple[List[str], np.ndarray]:
     categories = next(reader)
 
   if not categories or categories[0] != 'epoch':
-    raise ValueError('Expected first category to "epoch". '
-                     f'Categories were:\n{categories}')
+    raise ValueError(
+        f'Expected first category to "epoch". Categories were:\n{categories}'
+    )
 
   # Categories are not repeated; copy category name across columns in the
   # same category
@@ -86,7 +89,8 @@ def ParseCsvFile(fp: TextIO) -> Tuple[List[str], np.ndarray]:
   if len(labels) != len(categories):
     raise ValueError(
         f'Number of categories ({len(categories)}) does not match number of '
-        f'labels ({len(labels)}\nCategories: {categories}\nLabels:{labels}')
+        f'labels ({len(labels)}\nCategories: {categories}\nLabels:{labels}'
+    )
 
   # Generate new column names
   labels = [f'{label}__{cat}' for label, cat in zip(labels, categories)]
@@ -96,8 +100,10 @@ def ParseCsvFile(fp: TextIO) -> Tuple[List[str], np.ndarray]:
     # Remove the trailing comma
     if len(row) == len(labels) + 1:
       if row[-1]:
-        raise ValueError(f'Expected the last element of row {row} to be empty,'
-                         f' found {row[-1]}')
+        raise ValueError(
+            f'Expected the last element of row {row} to be empty,'
+            f' found {row[-1]}'
+        )
       row = row[:-1]
 
     if len(labels) != len(row):
@@ -105,7 +111,8 @@ def ParseCsvFile(fp: TextIO) -> Tuple[List[str], np.ndarray]:
         continue
       raise ValueError(
           f'Number of labels ({len(labels)}) does not match number of '
-          f'columns ({len(row)}) in row {i}:\n{row}')
+          f'columns ({len(row)}) in row {i}:\n{row}'
+      )
     data.append(row)
   return labels, np.array(data, dtype=float)
 

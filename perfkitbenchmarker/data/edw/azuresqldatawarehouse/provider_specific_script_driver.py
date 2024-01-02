@@ -47,6 +47,13 @@ def generate_provider_specific_cmd_list(script, driver, output, error):
     Command list to execute the supplied script.
   """
   return [
-      driver, FLAGS.server, FLAGS.database, FLAGS.user, FLAGS.password,
-      FLAGS.query_timeout, script, output, error
+      driver,
+      FLAGS.server,
+      FLAGS.database,
+      FLAGS.user,
+      FLAGS.password,
+      FLAGS.query_timeout,
+      script,
+      output,
+      error,
   ]

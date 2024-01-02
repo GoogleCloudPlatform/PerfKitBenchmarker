@@ -82,13 +82,13 @@ CLOUD_PROVIDERS_INFO = {
     AWS: {
         MAX_IOPS: 75000,
         DEFAULT_STORAGE_TYPE: 'ebs-gp2',
-        VALID_STORAGE_TYPES: ['ebs-gp2']
+        VALID_STORAGE_TYPES: ['ebs-gp2'],
     },
     GCP: {
         MAX_IOPS: 30000,
         DEFAULT_STORAGE_TYPE: 'pd-ssd',
         VALID_STORAGE_TYPES: ['pd-ssd'],
-    }
+    },
 }
 
 
@@ -135,16 +135,18 @@ class DiskIOPSToCapacity(object):
     TODO: When support other types of storage types (i.e. when this class
     supports ebs-piops for AWS or pd-hhd for gcp), will need to update
     VALID_STORAGE_TYPES in CLOUD_PROVIDERS_INFO dictionary.
-
     """
     if self._storage_type:
       self._storage_type = self._storage_type.lower()
-      if (self._storage_type is
-          not CLOUD_PROVIDERS_INFO[self._provider][DEFAULT_STORAGE_TYPE]):
+      if (
+          self._storage_type
+          is not CLOUD_PROVIDERS_INFO[self._provider][DEFAULT_STORAGE_TYPE]
+      ):
         raise InvalidStorageTypeError()
     else:
       self._storage_type = CLOUD_PROVIDERS_INFO[self._provider][
-          DEFAULT_STORAGE_TYPE]
+          DEFAULT_STORAGE_TYPE
+      ]
 
   def _ValidateProvider(self):
     """Validate provider to be GCP or AWS, throw exception if invalid.
@@ -153,8 +155,9 @@ class DiskIOPSToCapacity(object):
       InvalidProviderError: Incorrect provider type given.
     """
     if self._provider not in list(CLOUD_PROVIDERS_INFO.keys()):
-      raise InvalidProviderError('Provider given is not supported by '
-                                 'storage_utility.')
+      raise InvalidProviderError(
+          'Provider given is not supported by storage_utility.'
+      )
 
   def _ValidateIOPS(self):
     """Validate IOPS to be within valid limits, throw exception if invalid.
@@ -165,13 +168,17 @@ class DiskIOPSToCapacity(object):
     Raises:
       InvalidIOPSError: Invalid IOPS parameter given.
     """
-    if (self._iops < 1 or
-        self._iops > CLOUD_PROVIDERS_INFO[self._provider][MAX_IOPS]):
+    if (
+        self._iops < 1
+        or self._iops > CLOUD_PROVIDERS_INFO[self._provider][MAX_IOPS]
+    ):
       raise InvalidIOPSError(
           'Invalid IOPS parameter, must be positive number less than '
           'the maximum achievable for given cloud provider. '
           'The maximum for {} is {}.'.format(
-              self._provider, CLOUD_PROVIDERS_INFO[self._provider][MAX_IOPS]))
+              self._provider, CLOUD_PROVIDERS_INFO[self._provider][MAX_IOPS]
+          )
+      )
 
   def _PopulateConfigs(self):
     """Populate Storage Configurations."""
@@ -181,11 +188,17 @@ class DiskIOPSToCapacity(object):
 
   def PrintConfigs(self):
     """Print out necessary configs."""
-    vm_config = ('For {} IOPS using {}, the following is required:\n\tStorage '
-                 'Size (GB): {}\n\tCPU Count: {}\n\tNumber of '
-                 'Disks: {}').format(self._iops,
-                                     self._provider.upper(), self._size,
-                                     self._cpu_count, self._number_disks)
+    vm_config = (
+        'For {} IOPS using {}, the following is required:\n\tStorage '
+        'Size (GB): {}\n\tCPU Count: {}\n\tNumber of '
+        'Disks: {}'
+    ).format(
+        self._iops,
+        self._provider.upper(),
+        self._size,
+        self._cpu_count,
+        self._number_disks,
+    )
     print(vm_config)
 
   def _SetSize(self):
@@ -207,11 +220,20 @@ class DiskIOPSToCapacity(object):
       value = self._iops
       value = numpy.array(value)
       self._size = int(
-          numpy.piecewise([value], [[value <= 100], [(value > 100) & (
-              value <= 9999)], [value > 9999]], [
+          numpy.piecewise(
+              [value],
+              [
+                  [value <= 100],
+                  [(value > 100) & (value <= 9999)],
+                  [value > 9999],
+              ],
+              [
                   lambda x: int(math.ceil(1.07374)),
                   lambda x: int(math.ceil(3 * value)),
-                  lambda x: int(math.ceil(3579.855))]))
+                  lambda x: int(math.ceil(3579.855)),
+              ],
+          )
+      )
 
   def GetSize(self):
     """Return storage size.
@@ -231,14 +253,20 @@ class DiskIOPSToCapacity(object):
     optimized is *.large VM types (e.g., c4.large), those comes with 2 cores.
     ratings from
     http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSOptimized.html
-
     """
     if self._provider == GCP:
       value = self._iops
       self._cpu_count = int(
-          numpy.piecewise([value], [[value <= 15000], [
-              (value > 15000) & (value <= 25000)
-          ], [value > 25000]], [lambda x: 1, lambda x: 16, lambda x: 32]))
+          numpy.piecewise(
+              [value],
+              [
+                  [value <= 15000],
+                  [(value > 15000) & (value <= 25000)],
+                  [value > 25000],
+              ],
+              [lambda x: 1, lambda x: 16, lambda x: 32],
+          )
+      )
     elif self._provider == AWS:
       self._cpu_count = 2
 

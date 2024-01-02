@@ -28,20 +28,24 @@ flags.DEFINE_boolean('ops_agent', False, 'Run Ops Agent on VMs.')
 flags.DEFINE_string(
     'ops_agent_debian_rapture_repo',
     'google-cloud-ops-agent-${CODENAME}-${REPO_SUFFIX:-all}',
-    'The Cloud Rapture repo name used by ops agent installation bash script Debian distribution.'
+    'The Cloud Rapture repo name used by ops agent installation bash script'
+    ' Debian distribution.',
 )
 flags.DEFINE_string(
     'ops_agent_rpm_rapture_repo',
     r'google-cloud-ops-agent-${CODENAME}-\$basearch-${REPO_SUFFIX:-all}',
-    'The Cloud Rapture repo name used by ops agent installation bash script for RPM distribution .'
+    'The Cloud Rapture repo name used by ops agent installation bash script for'
+    ' RPM distribution .',
 )
 flags.DEFINE_string(
     'ops_agent_suse_rapture_repo',
     r'google-cloud-ops-agent-${CODENAME}-\$basearch-${REPO_SUFFIX:-all}',
-    'The Cloud Rapture repo name used by ops agent installation bash script for SUSE distribution.'
+    'The Cloud Rapture repo name used by ops agent installation bash script for'
+    ' SUSE distribution.',
 )
-flags.DEFINE_string('ops_agent_config_file', '',
-                    'Path of the configuration file for Ops Agent.')
+flags.DEFINE_string(
+    'ops_agent_config_file', '', 'Path of the configuration file for Ops Agent.'
+)
 
 OPS_AGENT_BASH_SCRIPT_PATH = './ops_agent/add-google-cloud-ops-agent-repo.sh'
 FLAGS = flags.FLAGS
@@ -69,19 +73,25 @@ class _OpsAgentCollector(base_collector.BaseCollector):
             'DEBIAN_REPO_NAME': str(FLAGS.ops_agent_debian_rapture_repo),
             'RPM_REPO_NAME': str(FLAGS.ops_agent_rpm_rapture_repo),
             'SUSE_REPO_NAME': str(FLAGS.ops_agent_suse_rapture_repo),
-        })
+        },
+    )
 
     vm.RobustRemoteCommand(
-        f'sudo bash {OPS_AGENT_BASH_SCRIPT_PATH} --also-install')
+        f'sudo bash {OPS_AGENT_BASH_SCRIPT_PATH} --also-install'
+    )
 
     if FLAGS.ops_agent_config_file:
       vm.PushFile(FLAGS.ops_agent_config_file, '/tmp/config.yaml')
       vm.RemoteCommand(
-          'sudo cp /tmp/config.yaml /etc/google-cloud-ops-agent/config.yaml')
+          'sudo cp /tmp/config.yaml /etc/google-cloud-ops-agent/config.yaml'
+      )
 
   def _CollectorRunCommand(self, vm, collector_file):
     """See base class."""
-    return f'sudo service google-cloud-ops-agent restart > {collector_file} 2>&1 & echo $!'
+    return (
+        f'sudo service google-cloud-ops-agent restart > {collector_file} 2>&1 &'
+        ' echo $!'
+    )
 
 
 def Register(parsed_flags):

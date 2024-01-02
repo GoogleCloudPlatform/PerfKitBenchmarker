@@ -18,7 +18,6 @@ import tempfile
 import unittest
 
 import mock
-
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hpcc
 
@@ -122,7 +121,8 @@ class HpccTest(unittest.TestCase):
   def testLimitBenchmarksToRunToMultipleBenchmarks(self):
     """Tests limiting the benchmarks to run to the first benchmark."""
     self._RunLimitBenchmarksToRun(
-        set(['StarRandomAccess', 'SingleRandomAccess']))
+        set(['StarRandomAccess', 'SingleRandomAccess'])
+    )
     self._ValidateRunLimitBenchmarksToRun([
         '  MPI_Init( &argc, &argv );',
         '  if (redacted)',

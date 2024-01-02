@@ -39,17 +39,23 @@ class RedshiftClusterSubnetGroup(resource.BaseResource):
 
   def _Create(self):
     cmd = self.cmd_prefix + [
-        'redshift', 'create-cluster-subnet-group',
-        '--cluster-subnet-group-name', self.name, '--description',
-        'Cluster Subnet Group for run uri {}'.format(
-            FLAGS.run_uri), '--subnet-ids', self.subnet_id
+        'redshift',
+        'create-cluster-subnet-group',
+        '--cluster-subnet-group-name',
+        self.name,
+        '--description',
+        'Cluster Subnet Group for run uri {}'.format(FLAGS.run_uri),
+        '--subnet-ids',
+        self.subnet_id,
     ]
     vm_util.IssueCommand(cmd)
 
   def _Delete(self):
     """Delete a redshift cluster subnet group."""
     cmd = self.cmd_prefix + [
-        'redshift', 'delete-cluster-subnet-group',
-        '--cluster-subnet-group-name', self.name
+        'redshift',
+        'delete-cluster-subnet-group',
+        '--cluster-subnet-group-name',
+        self.name,
     ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)

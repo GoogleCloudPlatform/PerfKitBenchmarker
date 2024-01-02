@@ -20,20 +20,25 @@ from perfkitbenchmarker.linux_benchmarks import huggingface_bert_pretraining_ben
 from tests import pkb_common_test_case
 
 
-class HuggingfaceBertPretrainingTestCase(pkb_common_test_case.PkbCommonTestCase,
-                                         test_util.SamplesTestMixin):
+class HuggingfaceBertPretrainingTestCase(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super(HuggingfaceBertPretrainingTestCase, self).setUp()
     path = os.path.join(
-        os.path.dirname(__file__), '..', 'data',
-        'huggingface_bert_pretraining_output.txt')
+        os.path.dirname(__file__),
+        '..',
+        'data',
+        'huggingface_bert_pretraining_output.txt',
+    )
     with open(path) as fp:
       self.contents = fp.read()
 
   def testTrainResults(self):
     samples = huggingface_bert_pretraining_benchmark.MakeSamplesFromOutput(
-        self.contents)
+        self.contents
+    )
     self.assertLen(samples, 24)
     self.assertEqual(samples[0].metric, 'throughput')
     self.assertAlmostEqual(samples[0].value, 1.78)

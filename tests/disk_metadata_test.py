@@ -18,7 +18,6 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
@@ -50,90 +49,100 @@ class _DiskMetadataTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.addCleanup(p.stop)
 
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={})
+        _BENCHMARK_NAME, flag_values=FLAGS, vm_groups={}
+    )
     self.benchmark_spec = benchmark_spec.BenchmarkSpec(
-        mock.MagicMock(), config_spec, _BENCHMARK_UID)
+        mock.MagicMock(), config_spec, _BENCHMARK_UID
+    )
 
 
 class GcpDiskMetadataTest(_DiskMetadataTestCase):
 
   def testPDStandard(self):
     disk_spec = gce_disk.GceDiskSpec(
-        _COMPONENT, disk_size=2, disk_type=gce_disk.PD_STANDARD)
+        _COMPONENT, disk_size=2, disk_type=gce_disk.PD_STANDARD
+    )
     disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
     self.assertDictContainsSubset(
-        {disk.MEDIA: disk.HDD, disk.REPLICATION: disk.ZONE},
-        disk_obj.metadata
+        {disk.MEDIA: disk.HDD, disk.REPLICATION: disk.ZONE}, disk_obj.metadata
     )
 
   def testLocalSSD(self):
     disk_spec = gce_disk.GceDiskSpec(
-        _COMPONENT, disk_size=2, disk_type=disk.LOCAL,
-        interface=gce_disk.NVME)
+        _COMPONENT, disk_size=2, disk_type=disk.LOCAL, interface=gce_disk.NVME
+    )
     disk_obj = gce_disk.GceLocalDisk(disk_spec, 'name')
     self.assertDictContainsSubset(
-        {disk.MEDIA: disk.SSD, disk.REPLICATION: 'none',
-         'interface': gce_disk.NVME},
-        disk_obj.metadata
+        {
+            disk.MEDIA: disk.SSD,
+            disk.REPLICATION: 'none',
+            'interface': gce_disk.NVME,
+        },
+        disk_obj.metadata,
     )
 
 
 class AwsDiskMetadataTest(_DiskMetadataTestCase):
 
-  def DoAwsDiskTest(self, disk_type, machine_type,
-                    goal_media, goal_replication):
-    disk_spec = aws_disk.AwsDiskSpec(_COMPONENT, disk_size=2,
-                                     disk_type=disk_type)
+  def DoAwsDiskTest(
+      self, disk_type, machine_type, goal_media, goal_replication
+  ):
+    disk_spec = aws_disk.AwsDiskSpec(
+        _COMPONENT, disk_size=2, disk_type=disk_type
+    )
 
     vm_spec = aws_virtual_machine.AwsVmSpec(
-        'test_vm_spec.AWS', zone='us-east-1a', machine_type=machine_type)
+        'test_vm_spec.AWS', zone='us-east-1a', machine_type=machine_type
+    )
     vm = aws_virtual_machine.Ubuntu2004BasedAwsVirtualMachine(vm_spec)
     vm.GetNVMEDeviceInfo = mock.Mock()
-    vm.GetNVMEDeviceInfo.return_value = [
-        {
-            'DevicePath': '/dev/nvme1n2',
-            'SerialNumber': 'vol67890',
-            'ModelNumber': 'Amazon EC2 NVMe Instance Storage',
-        }
-    ]
+    vm.GetNVMEDeviceInfo.return_value = [{
+        'DevicePath': '/dev/nvme1n2',
+        'SerialNumber': 'vol67890',
+        'ModelNumber': 'Amazon EC2 NVMe Instance Storage',
+    }]
     vm.LogDeviceByDiskSpecId('0_0', 'foobar_1')
     vm.LogDeviceByName('foobar_1', 'vol67890', None)
     vm.CreateScratchDisk(0, disk_spec)
 
     self.assertDictContainsSubset(
         {disk.MEDIA: goal_media, disk.REPLICATION: goal_replication},
-        vm.scratch_disks[0].metadata
+        vm.scratch_disks[0].metadata,
     )
 
   def testLocalSSD(self):
-    self.DoAwsDiskTest(
-        disk.LOCAL,
-        'c3.2xlarge',
-        disk.SSD,
-        disk.NONE)
+    self.DoAwsDiskTest(disk.LOCAL, 'c3.2xlarge', disk.SSD, disk.NONE)
 
   def testLocalHDD(self):
-    self.DoAwsDiskTest(
-        disk.LOCAL,
-        'd2.2xlarge',
-        disk.HDD,
-        disk.NONE)
+    self.DoAwsDiskTest(disk.LOCAL, 'd2.2xlarge', disk.HDD, disk.NONE)
 
 
 class AzureDiskMetadataTest(_DiskMetadataTestCase):
 
-  def DoAzureDiskTest(self, storage_type, disk_type, machine_type,
-                      goal_media, goal_replication,
-                      goal_host_caching, disk_size=2,
-                      goal_size=2, goal_stripes=1):
+  def DoAzureDiskTest(
+      self,
+      storage_type,
+      disk_type,
+      machine_type,
+      goal_media,
+      goal_replication,
+      goal_host_caching,
+      disk_size=2,
+      goal_size=2,
+      goal_stripes=1,
+  ):
     FLAGS.azure_storage_type = storage_type
     FLAGS.azure_host_caching = goal_host_caching
-    disk_spec = disk.BaseDiskSpec(_COMPONENT, disk_size=disk_size,
-                                  disk_type=disk_type,
-                                  num_striped_disks=goal_stripes)
+    disk_spec = disk.BaseDiskSpec(
+        _COMPONENT,
+        disk_size=disk_size,
+        disk_type=disk_type,
+        num_striped_disks=goal_stripes,
+    )
 
     vm_spec = azure_virtual_machine.AzureVmSpec(
-        'test_vm_spec.AZURE', zone='eastus2', machine_type=machine_type)
+        'test_vm_spec.AZURE', zone='eastus2', machine_type=machine_type
+    )
     vm = azure_virtual_machine.Ubuntu2004BasedAzureVirtualMachine(vm_spec)
 
     azure_disk.AzureDisk.Create = mock.Mock()
@@ -141,61 +150,63 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
     vm.StripeDisks = mock.Mock()
     vm.CreateScratchDisk(0, disk_spec)
 
-    expected = {disk.MEDIA: goal_media,
-                disk.REPLICATION: goal_replication,
-                'num_stripes': goal_stripes,
-                'size': goal_size}
+    expected = {
+        disk.MEDIA: goal_media,
+        disk.REPLICATION: goal_replication,
+        'num_stripes': goal_stripes,
+        'size': goal_size,
+    }
     if goal_host_caching:
       expected[azure_disk.HOST_CACHING] = goal_host_caching
     self.assertDictContainsSubset(expected, vm.scratch_disks[0].metadata)
 
   @flagsaver.flagsaver(azure_version_log=False)
   def testPremiumStorage(self):
-    self.DoAzureDiskTest(azure_flags.PLRS,
-                         azure_disk.PREMIUM_STORAGE,
-                         'Standard_D1',
-                         disk.SSD,
-                         disk.ZONE,
-                         azure_flags.READ_ONLY)
+    self.DoAzureDiskTest(
+        azure_flags.PLRS,
+        azure_disk.PREMIUM_STORAGE,
+        'Standard_D1',
+        disk.SSD,
+        disk.ZONE,
+        azure_flags.READ_ONLY,
+    )
 
   @flagsaver.flagsaver(azure_version_log=False)
   def testStandardDisk(self):
-    self.DoAzureDiskTest(azure_flags.ZRS,
-                         azure_disk.STANDARD_DISK,
-                         'Standard_D1',
-                         disk.HDD,
-                         disk.REGION,
-                         azure_flags.NONE)
+    self.DoAzureDiskTest(
+        azure_flags.ZRS,
+        azure_disk.STANDARD_DISK,
+        'Standard_D1',
+        disk.HDD,
+        disk.REGION,
+        azure_flags.NONE,
+    )
 
   @flagsaver.flagsaver(azure_version_log=False)
   def testLocalHDD(self):
-    self.DoAzureDiskTest(azure_flags.LRS,
-                         disk.LOCAL,
-                         'Standard_A1',
-                         disk.HDD,
-                         disk.NONE,
-                         None)
+    self.DoAzureDiskTest(
+        azure_flags.LRS, disk.LOCAL, 'Standard_A1', disk.HDD, disk.NONE, None
+    )
 
   @flagsaver.flagsaver(azure_version_log=False)
   def testLocalSSD(self):
-    self.DoAzureDiskTest(azure_flags.LRS,
-                         disk.LOCAL,
-                         'Standard_DS2',
-                         disk.SSD,
-                         disk.NONE,
-                         None)
+    self.DoAzureDiskTest(
+        azure_flags.LRS, disk.LOCAL, 'Standard_DS2', disk.SSD, disk.NONE, None
+    )
 
   @flagsaver.flagsaver(azure_version_log=False)
   def testStripedDisk(self):
-    self.DoAzureDiskTest(azure_flags.LRS,
-                         azure_disk.STANDARD_DISK,
-                         'Standard_D1',
-                         disk.HDD,
-                         disk.ZONE,
-                         azure_flags.READ_ONLY,
-                         disk_size=5,
-                         goal_size=10,
-                         goal_stripes=2)
+    self.DoAzureDiskTest(
+        azure_flags.LRS,
+        azure_disk.STANDARD_DISK,
+        'Standard_D1',
+        disk.HDD,
+        disk.ZONE,
+        azure_flags.READ_ONLY,
+        disk_size=5,
+        goal_size=10,
+        goal_stripes=2,
+    )
 
 
 if __name__ == '__main__':

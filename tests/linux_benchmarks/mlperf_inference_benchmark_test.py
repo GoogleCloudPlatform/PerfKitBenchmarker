@@ -21,8 +21,9 @@ from perfkitbenchmarker.sample import Sample
 from tests import pkb_common_test_case
 
 
-class MlperfInferenceBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
-                                       test_util.SamplesTestMixin):
+class MlperfInferenceBenchmarkTestCase(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super(MlperfInferenceBenchmarkTestCase, self).setUp()

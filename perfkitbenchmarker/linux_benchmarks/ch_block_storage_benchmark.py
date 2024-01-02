@@ -90,12 +90,10 @@ def _LocateFioJson(vm, outdir, test):
 def Run(benchmark_spec):
   """Runs cloudharmony block storage and reports the results."""
   vm = benchmark_spec.vms[0]
-  target = ' '.join(
-      [
-          '--target=%s' % _PrepareDevicePath(vm, dev.GetDevicePath())
-          for dev in vm.scratch_disks
-      ]
-  )
+  target = ' '.join([
+      '--target=%s' % _PrepareDevicePath(vm, dev.GetDevicePath())
+      for dev in vm.scratch_disks
+  ])
   tests = ' '.join(['--test=%s' % test for test in FLAGS.ch_block_tests])
   args = ' '.join(['--%s' % param for param in FLAGS.ch_params])
   outdir = vm_util.VM_TMP_DIR

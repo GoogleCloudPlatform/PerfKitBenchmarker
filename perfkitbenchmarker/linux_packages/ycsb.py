@@ -1038,6 +1038,7 @@ class YCSBExecutor:
       for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList(
           len(vms)
       ):
+
         @vm_util.Retry(
             retryable_exceptions=ycsb_stats.CombineHdrLogError,
             timeout=-1,
@@ -1207,10 +1208,7 @@ class YCSBExecutor:
       samples = self._RunLowestLatencyMode(vms, workloads, run_kwargs, database)
     else:
       samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
-    if (
-        FLAGS.ycsb_sleep_after_load_in_sec > 0
-        and not SKIP_LOAD_STAGE.value
-    ):
+    if FLAGS.ycsb_sleep_after_load_in_sec > 0 and not SKIP_LOAD_STAGE.value:
       for s in samples:
         s.metadata['sleep_after_load_in_sec'] = (
             FLAGS.ycsb_sleep_after_load_in_sec

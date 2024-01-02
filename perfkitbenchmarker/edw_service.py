@@ -22,86 +22,150 @@ from typing import Dict, List, Text, Tuple
 from absl import flags
 from perfkitbenchmarker import resource
 
-flags.DEFINE_integer('edw_service_cluster_concurrency', 5,
-                     'Number of queries to run concurrently on the cluster.')
-flags.DEFINE_string('edw_service_cluster_snapshot', None,
-                    'If set, the snapshot to restore as cluster.')
-flags.DEFINE_string('edw_service_cluster_identifier', None,
-                    'If set, the preprovisioned edw cluster.')
-flags.DEFINE_string('edw_service_endpoint', None,
-                    'If set, the preprovisioned edw cluster endpoint.')
+flags.DEFINE_integer(
+    'edw_service_cluster_concurrency',
+    5,
+    'Number of queries to run concurrently on the cluster.',
+)
 flags.DEFINE_string(
-    'edw_service_cluster_db', None,
+    'edw_service_cluster_snapshot',
+    None,
+    'If set, the snapshot to restore as cluster.',
+)
+flags.DEFINE_string(
+    'edw_service_cluster_identifier',
+    None,
+    'If set, the preprovisioned edw cluster.',
+)
+flags.DEFINE_string(
+    'edw_service_endpoint',
+    None,
+    'If set, the preprovisioned edw cluster endpoint.',
+)
+flags.DEFINE_string(
+    'edw_service_cluster_db',
+    None,
     'If set, the db on cluster to use during the benchmark ('
-    'only applicable when using snapshots).')
+    'only applicable when using snapshots).',
+)
 flags.DEFINE_string(
-    'edw_service_cluster_user', None,
+    'edw_service_cluster_user',
+    None,
     'If set, the user authorized on cluster (only applicable '
-    'when using snapshots).')
+    'when using snapshots).',
+)
 flags.DEFINE_string(
-    'edw_service_cluster_password', None,
+    'edw_service_cluster_password',
+    None,
     'If set, the password authorized on cluster (only '
-    'applicable when using snapshots).')
-flags.DEFINE_string('snowflake_snowsql_config_override_file', None,
-                    'The SnowSQL configuration to use.'
-                    'https://docs.snowflake.net/manuals/user-guide/snowsql-config.html#snowsql-config-file')  # pylint: disable=line-too-long
-flags.DEFINE_string('snowflake_connection', None,
-                    'Named Snowflake connection defined in SnowSQL config file.'
-                    'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections')  # pylint: disable=line-too-long
-flags.DEFINE_integer('edw_suite_iterations', 1,
-                     'Number of suite iterations to perform.')
-flags.DEFINE_integer('edw_suite_warmup_iterations', None,
-                     'Number of suite warmup iterations to perform.')
+    'applicable when using snapshots).',
+)
+flags.DEFINE_string(
+    'snowflake_snowsql_config_override_file',
+    None,
+    'The SnowSQL configuration to use.'
+    'https://docs.snowflake.net/manuals/user-guide/snowsql-config.html#snowsql-config-file',
+)  # pylint: disable=line-too-long
+flags.DEFINE_string(
+    'snowflake_connection',
+    None,
+    'Named Snowflake connection defined in SnowSQL config file.'
+    'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections',
+)  # pylint: disable=line-too-long
+flags.DEFINE_integer(
+    'edw_suite_iterations', 1, 'Number of suite iterations to perform.'
+)
+flags.DEFINE_integer(
+    'edw_suite_warmup_iterations',
+    None,
+    'Number of suite warmup iterations to perform.',
+)
 # TODO(user): Revisit flags for accepting query lists.
-flags.DEFINE_string('edw_simultaneous_queries', None,
-                    'CSV list of simultaneous queries to benchmark.')
-flags.DEFINE_integer('edw_simultaneous_query_submission_interval', '0',
-                     'Simultaneous query submission interval in milliseconds.')
-flags.DEFINE_string('edw_power_queries', None,
-                    'CSV list of power queries to benchmark.')
+flags.DEFINE_string(
+    'edw_simultaneous_queries',
+    None,
+    'CSV list of simultaneous queries to benchmark.',
+)
+flags.DEFINE_integer(
+    'edw_simultaneous_query_submission_interval',
+    '0',
+    'Simultaneous query submission interval in milliseconds.',
+)
+flags.DEFINE_string(
+    'edw_power_queries', None, 'CSV list of power queries to benchmark.'
+)
 flags.DEFINE_multi_string(
-    'concurrency_streams', [], 'List of all query streams to execute. Each '
+    'concurrency_streams',
+    [],
+    'List of all query streams to execute. Each '
     'stream should be passed in separately and the queries should be comma '
-    'separated, e.g. --concurrency_streams=1,2,3 --concurrency_streams=3,2,1')
-flags.DEFINE_string('snowflake_warehouse', None,
-                    'A virtual warehouse, often referred to simply as a - '
-                    'warehouse, is a cluster of compute in Snowflake. '
-                    'https://docs.snowflake.com/en/user-guide/warehouses.html')  # pylint: disable=line-too-long
+    'separated, e.g. --concurrency_streams=1,2,3 --concurrency_streams=3,2,1',
+)
 flags.DEFINE_string(
-    'snowflake_database', None,
-    'The hosted snowflake database to use during the benchmark.')
+    'snowflake_warehouse',
+    None,
+    'A virtual warehouse, often referred to simply as a - '
+    'warehouse, is a cluster of compute in Snowflake. '
+    'https://docs.snowflake.com/en/user-guide/warehouses.html',
+)  # pylint: disable=line-too-long
 flags.DEFINE_string(
-    'snowflake_schema', None,
-    'The schema of the hosted snowflake database to use during the benchmark.')
+    'snowflake_database',
+    None,
+    'The hosted snowflake database to use during the benchmark.',
+)
+flags.DEFINE_string(
+    'snowflake_schema',
+    None,
+    'The schema of the hosted snowflake database to use during the benchmark.',
+)
 flags.DEFINE_enum(
-    'snowflake_client_interface', 'JDBC', ['JDBC'],
-    'The Runtime Interface used when interacting with Snowflake.')
+    'snowflake_client_interface',
+    'JDBC',
+    ['JDBC'],
+    'The Runtime Interface used when interacting with Snowflake.',
+)
 
 FLAGS = flags.FLAGS
 
-TYPE_2_PROVIDER = dict([('athena', 'aws'), ('redshift', 'aws'),
-                        ('spectrum', 'aws'), ('snowflake_aws', 'aws'),
-                        ('snowflake_azure', 'azure'),
-                        ('snowflakeexternal_aws', 'aws'),
-                        ('snowflakeexternal_azure', 'azure'),
-                        ('bigquery', 'gcp'), ('endor', 'gcp'),
-                        ('endorazure', 'gcp'), ('bqfederated', 'gcp'),
-                        ('azuresqldatawarehouse', 'azure')])
+TYPE_2_PROVIDER = dict([
+    ('athena', 'aws'),
+    ('redshift', 'aws'),
+    ('spectrum', 'aws'),
+    ('snowflake_aws', 'aws'),
+    ('snowflake_azure', 'azure'),
+    ('snowflakeexternal_aws', 'aws'),
+    ('snowflakeexternal_azure', 'azure'),
+    ('bigquery', 'gcp'),
+    ('endor', 'gcp'),
+    ('endorazure', 'gcp'),
+    ('bqfederated', 'gcp'),
+    ('azuresqldatawarehouse', 'azure'),
+])
 TYPE_2_MODULE = dict([
     ('athena', 'perfkitbenchmarker.providers.aws.athena'),
     ('redshift', 'perfkitbenchmarker.providers.aws.redshift'),
     ('spectrum', 'perfkitbenchmarker.providers.aws.spectrum'),
     ('snowflake_aws', 'perfkitbenchmarker.providers.aws.snowflake_aws'),
-    ('snowflake_azure', 'perfkitbenchmarker.providers.azure.snowflake_azure'),
-    ('snowflakeexternal_aws', 'perfkitbenchmarker.providers.aws.snowflake_aws'),
-    ('snowflakeexternal_azure',
-     'perfkitbenchmarker.providers.azure.snowflake_azure'),
+    (
+        'snowflake_azure',
+        'perfkitbenchmarker.providers.azure.snowflake_azure',
+    ),
+    (
+        'snowflakeexternal_aws',
+        'perfkitbenchmarker.providers.aws.snowflake_aws',
+    ),
+    (
+        'snowflakeexternal_azure',
+        'perfkitbenchmarker.providers.azure.snowflake_azure',
+    ),
     ('bigquery', 'perfkitbenchmarker.providers.gcp.bigquery'),
     ('endor', 'perfkitbenchmarker.providers.gcp.bigquery'),
     ('endorazure', 'perfkitbenchmarker.providers.gcp.bigquery'),
     ('bqfederated', 'perfkitbenchmarker.providers.gcp.bigquery'),
-    ('azuresqldatawarehouse',
-     'perfkitbenchmarker.providers.azure.azure_sql_data_warehouse')
+    (
+        'azuresqldatawarehouse',
+        'perfkitbenchmarker.providers.azure.azure_sql_data_warehouse',
+    ),
 ])
 DEFAULT_NUMBER_OF_NODES = 1
 # The order of stages is important to the successful lifecycle completion.
@@ -132,8 +196,9 @@ class EdwClientInterface(object):
   def SetProvisionedAttributes(self, benchmark_spec):
     """Sets any attributes that were unknown during initialization."""
     self.client_vm = benchmark_spec.vms[0]
-    self.client_vm.RemoteCommand('echo "\nMaxSessions 100" | '
-                                 'sudo tee -a /etc/ssh/sshd_config')
+    self.client_vm.RemoteCommand(
+        'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config'
+    )
 
   def Prepare(self, package_name: Text) -> None:
     """Prepares the client vm to execute query.
@@ -162,8 +227,9 @@ class EdwClientInterface(object):
     """
     raise NotImplementedError
 
-  def ExecuteSimultaneous(self, submission_interval: int,
-                          queries: List[str]) -> str:
+  def ExecuteSimultaneous(
+      self, submission_interval: int, queries: List[str]
+  ) -> str:
     """Executes queries simultaneously on client and return performance details.
 
     Simultaneous app expects queries as white space separated query file names.
@@ -318,7 +384,7 @@ class EdwService(resource.BaseResource):
         'edw_service_type': self.spec.type,
         'edw_cluster_identifier': self.cluster_identifier,
         'edw_cluster_node_type': self.node_type,
-        'edw_cluster_node_count': self.node_count
+        'edw_cluster_node_count': self.node_count,
     }
     return basic_data
 
@@ -332,7 +398,8 @@ class EdwService(resource.BaseResource):
       script name for implementing the argument lifecycle_stage.
     """
     return os.path.basename(
-        os.path.normpath('database_%s.sql' % lifecycle_stage))
+        os.path.normpath('database_%s.sql' % lifecycle_stage)
+    )
 
   def Cleanup(self):
     """Cleans up any temporary resources created for the service."""
@@ -342,11 +409,9 @@ class EdwService(resource.BaseResource):
     """Get the formatted last modified timestamp of the dataset."""
     raise NotImplementedError
 
-  def ExtractDataset(self,
-                     dest_bucket,
-                     dataset=None,
-                     tables=None,
-                     dest_format='CSV'):
+  def ExtractDataset(
+      self, dest_bucket, dataset=None, tables=None, dest_format='CSV'
+  ):
     """Extract all tables in a dataset to object storage.
 
     Args:

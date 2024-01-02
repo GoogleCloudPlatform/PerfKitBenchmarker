@@ -195,9 +195,9 @@ def _ParseSections(lmbench_output, parse_section_func_dict, metadata, results):
     if title is None:
       break
     function = parse_section_func_dict[title]
-    reading_buffer = list(itertools.takewhile(
-            lambda line: line != stop_parsing, lines_iter
-        ))
+    reading_buffer = list(
+        itertools.takewhile(lambda line: line != stop_parsing, lines_iter)
+    )
     function(reading_buffer, title, metadata, results)
 
 

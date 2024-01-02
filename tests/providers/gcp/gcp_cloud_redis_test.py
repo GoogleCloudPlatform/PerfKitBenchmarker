@@ -27,7 +27,8 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(GcpCloudRedisTestCase, self).setUp()
     with mock.patch.object(
-        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)):
+        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)
+    ):
       FLAGS.project = 'project'
       FLAGS.zone = ['us-central1-a']
       mock_spec = mock.Mock()
@@ -35,25 +36,29 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreate(self):
     with mock.patch.object(
-        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)) as gcloud:
+        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)
+    ) as gcloud:
       self.redis._Create()
       gcloud.assert_called_once_with(timeout=1200)
       self.assertTrue(self.redis._Exists())
 
   def testDelete(self):
     with mock.patch.object(
-        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)) as gcloud:
+        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)
+    ) as gcloud:
       self.redis._Delete()
       gcloud.assert_called_with(raise_on_failure=False, timeout=1200)
 
   def testExistTrue(self):
     with mock.patch.object(
-        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)):
+        util.GcloudCommand, 'Issue', return_value=('{}', '', 0)
+    ):
       self.assertTrue(self.redis._Exists())
 
   def testExistFalse(self):
     with mock.patch.object(
-        util.GcloudCommand, 'Issue', return_value=('{}', '', 1)):
+        util.GcloudCommand, 'Issue', return_value=('{}', '', 1)
+    ):
       self.assertFalse(self.redis._Exists())
 
   def testReadableVersion(self):
@@ -63,19 +68,20 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testReadableVersionExtraneous(self):
     self.assertEqual(self.redis.ParseReadableVersion('redis_8'), 'redis_8')
     self.assertEqual(
-        self.redis.ParseReadableVersion('redis 9.7.5'), 'redis 9.7.5')
+        self.redis.ParseReadableVersion('redis 9.7.5'), 'redis 9.7.5'
+    )
 
-  class TimeSeries():
+  class TimeSeries:
 
     def __init__(self, points):
       self.points = [self.TimeSeriesValue(value) for value in points]
 
-    class TimeSeriesValue():
+    class TimeSeriesValue:
 
       def __init__(self, value):
         self.value = self.TimeSeriesDoubleValue(value)
 
-      class TimeSeriesDoubleValue():
+      class TimeSeriesDoubleValue:
 
         def __init__(self, value):
           self.double_value = value
@@ -85,7 +91,7 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
         self.TimeSeries([1, 2]),
         self.TimeSeries([2, 1]),
         self.TimeSeries([0, 0]),
-        self.TimeSeries([3, 3])
+        self.TimeSeries([3, 3]),
     ])
     self.assertEqual(avg_cpu, 0.1)
 
@@ -94,7 +100,7 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
         self.TimeSeries([4.05, 2.12, 3.21, 1.58]),
         self.TimeSeries([2.83, 2.27, 4.71, 5.11]),
         self.TimeSeries([0, 0, 0, 0]),
-        self.TimeSeries([3.91, 3.11, 4.00, 1.65])
+        self.TimeSeries([3.91, 3.11, 4.00, 1.65]),
     ])
     self.assertEqual(avg_cpu, 0.160625)
 
@@ -103,7 +109,7 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
         self.TimeSeries([12, 32, 62, 51, 12, 103, 54, 85]),
         self.TimeSeries([81, 32, 84, 91, 25, 62, 31, 1]),
         self.TimeSeries([12, 93, 101, 70, 32, 58, 18, 10]),
-        self.TimeSeries([77, 34, 29, 83, 11, 8, 38, 68])
+        self.TimeSeries([77, 34, 29, 83, 11, 8, 38, 68]),
     ])
     self.assertEqual(avg_cpu, 3.25)
 

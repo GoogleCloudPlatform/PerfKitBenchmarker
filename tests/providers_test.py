@@ -39,9 +39,11 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.addCleanup(p.stop)
 
   # TODO(user): See if this can be fixed.
-  @unittest.skip('This fails because modules are being imported multiple '
-                 'times in the instance of this process. Not sure how this '
-                 'ever worked.')
+  @unittest.skip(
+      'This fails because modules are being imported multiple '
+      'times in the instance of this process. Not sure how this '
+      'ever worked.'
+  )
   def testImportAllProviders(self):
     # Test that all modules can be imported successfully, but mock out the
     # import of CloudStack's csapi.
@@ -57,14 +59,15 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch(requirements.__name__ + '.CheckProviderRequirements'):
       providers.LoadProvider('GCP', ignore_package_requirements=False)
       typing.cast(
-          mock.MagicMock,
-          requirements.CheckProviderRequirements).assert_called_once_with('gcp')
+          mock.MagicMock, requirements.CheckProviderRequirements
+      ).assert_called_once_with('gcp')
 
   def testLoadProviderIgnoresRequirements(self):
     with mock.patch(requirements.__name__ + '.CheckProviderRequirements'):
       providers.LoadProvider('GCP')
-      typing.cast(mock.MagicMock,
-                  requirements.CheckProviderRequirements).assert_not_called()
+      typing.cast(
+          mock.MagicMock, requirements.CheckProviderRequirements
+      ).assert_not_called()
 
   def testBenchmarkConfigSpecLoadsProvider(self):
     p = mock.patch(providers.__name__ + '.LoadProvider')
@@ -76,14 +79,16 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
                 'cloud': 'AWS',
                 'os_type': 'ubuntu2004',
                 'vm_count': 0,
-                'vm_spec': {'AWS': {}}
+                'vm_spec': {'AWS': {}},
             }
         }
     }
     benchmark_config_spec.BenchmarkConfigSpec(
-        'name', flag_values=FLAGS, **config)
-    typing.cast(mock.MagicMock,
-                providers.LoadProvider).assert_called_with('AWS', True)
+        'name', flag_values=FLAGS, **config
+    )
+    typing.cast(mock.MagicMock, providers.LoadProvider).assert_called_with(
+        'AWS', True
+    )
 
   def testLoadProviderUtils(self):
     test_cloud = provider_info.GCP
@@ -92,6 +97,7 @@ class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     expected_utils_module = gcp_util
     self.assertEqual(expected_utils_module, actual_utils_module)
+
 
 if __name__ == '__main__':
   unittest.main()

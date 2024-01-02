@@ -23,12 +23,8 @@ from perfkitbenchmarker import os_types
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer(
-    'gluster_replicas', 3,
-    'The number of Gluster replicas.')
-flags.DEFINE_integer(
-    'gluster_stripes', 1,
-    'The number of Gluster stripes.')
+flags.DEFINE_integer('gluster_replicas', 3, 'The number of Gluster replicas.')
+flags.DEFINE_integer('gluster_stripes', 1, 'The number of Gluster stripes.')
 
 
 def YumInstall(vm):
@@ -37,7 +33,8 @@ def YumInstall(vm):
   if FLAGS.os_type != os_types.CENTOS7:
     raise NotImplementedError(
         'PKB currently only supports installation of gluster on centos7 or '
-        'Debian-based VMs.')
+        'Debian-based VMs.'
+    )
   vm.InstallPackages('centos-release-gluster')
   vm.InstallPackages('glusterfs-server')
   vm.RemoteCommand('sudo glusterd')
@@ -61,10 +58,14 @@ def MountGluster(vm, gluster_server, volume_name, mount_point):
   """
   vm.Install('gluster')
   volume = '{ip}:/{volume_name}'.format(
-      ip=gluster_server.internal_ip, volume_name=volume_name)
+      ip=gluster_server.internal_ip, volume_name=volume_name
+  )
   vm.RemoteCommand('sudo mkdir -p %s' % mount_point)
-  vm.RemoteCommand('sudo mount -t glusterfs {volume} {mount_point}'.format(
-      volume=volume, mount_point=mount_point))
+  vm.RemoteCommand(
+      'sudo mount -t glusterfs {volume} {mount_point}'.format(
+          volume=volume, mount_point=mount_point
+      )
+  )
 
 
 def _CreateVolume(vm, bricks, volume_name):
@@ -72,24 +73,38 @@ def _CreateVolume(vm, bricks, volume_name):
 
   Args:
     vm: The Virtual Machine to create the volume from.
-    bricks: A list of strings of the form "ip_address:/path/to/brick" which
-      will be combined to form the Gluster volume.
+    bricks: A list of strings of the form "ip_address:/path/to/brick" which will
+      be combined to form the Gluster volume.
     volume_name: The name of the volume which is being created.
   """
-  replicas = ('replica %s' % FLAGS.gluster_replicas
-              if FLAGS.gluster_replicas > 1 else '')
-  stripes = ('stripe %s' % FLAGS.gluster_stripes
-             if FLAGS.gluster_stripes > 1 else '')
+  replicas = (
+      'replica %s' % FLAGS.gluster_replicas
+      if FLAGS.gluster_replicas > 1
+      else ''
+  )
+  stripes = (
+      'stripe %s' % FLAGS.gluster_stripes if FLAGS.gluster_stripes > 1 else ''
+  )
 
-  vm.RemoteCommand(('sudo gluster volume create {volume_name} '
-                    '{stripes} {replicas} {bricks}').format(
-                        volume_name=volume_name, replicas=replicas,
-                        stripes=stripes, bricks=' '.join(bricks)))
+  vm.RemoteCommand(
+      (
+          'sudo gluster volume create {volume_name} '
+          '{stripes} {replicas} {bricks}'
+      ).format(
+          volume_name=volume_name,
+          replicas=replicas,
+          stripes=stripes,
+          bricks=' '.join(bricks),
+      )
+  )
 
 
 def _ProbePeer(vm1, vm2):
-  vm1.RemoteCommand('sudo gluster peer probe {internal_ip}'.format(
-      internal_ip=vm2.internal_ip))
+  vm1.RemoteCommand(
+      'sudo gluster peer probe {internal_ip}'.format(
+          internal_ip=vm2.internal_ip
+      )
+  )
 
 
 def ConfigureServers(gluster_servers, volume_name):
@@ -119,8 +134,11 @@ def ConfigureServers(gluster_servers, volume_name):
   for vm in gluster_servers:
     for disk in vm.scratch_disks:
       brick_path = posixpath.join(disk.mount_point, 'gluster_brick')
-      bricks.append('{internal_ip}:{brick_path}'.format(
-          internal_ip=vm.internal_ip, brick_path=brick_path))
+      bricks.append(
+          '{internal_ip}:{brick_path}'.format(
+              internal_ip=vm.internal_ip, brick_path=brick_path
+          )
+      )
       vm.RemoteCommand('mkdir -p %s' % brick_path)
 
   # Gluster servers need to be added to the trusted storage pool
@@ -135,13 +153,15 @@ def ConfigureServers(gluster_servers, volume_name):
 
   _CreateVolume(gluster_servers[0], bricks, volume_name)
   gluster_servers[0].RemoteCommand(
-      'sudo gluster volume start {volume_name}'.format(
-          volume_name=volume_name))
+      'sudo gluster volume start {volume_name}'.format(volume_name=volume_name)
+  )
 
 
 def DeleteVolume(gluster_server, volume_name):
   """Stops and deletes a Gluster volume."""
   gluster_server.RemoteCommand(
-      'yes | sudo gluster volume stop %s' % volume_name)
+      'yes | sudo gluster volume stop %s' % volume_name
+  )
   gluster_server.RemoteCommand(
-      'yes | sudo gluster volume delete %s' % volume_name)
+      'yes | sudo gluster volume delete %s' % volume_name
+  )

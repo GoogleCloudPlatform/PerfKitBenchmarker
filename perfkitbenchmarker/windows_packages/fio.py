@@ -22,9 +22,9 @@ FIO_URL = 'https://bsdio.com/fio/releases/' + FIO_ZIP
 
 
 def GetFioExec(vm):
-  return ntpath.join(vm.temp_dir,
-                     '{fio_dir}\\fio.exe --thread'.format(
-                         fio_dir=WINDOWS_FIO_DIR))
+  return ntpath.join(
+      vm.temp_dir, '{fio_dir}\\fio.exe --thread'.format(fio_dir=WINDOWS_FIO_DIR)
+  )
 
 
 def GetRemoteJobFilePath(vm):

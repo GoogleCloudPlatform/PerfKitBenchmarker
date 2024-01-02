@@ -34,16 +34,41 @@ AWS_ATHENA_CMD_PREFIX = ['aws', 'athena']
 AWS_ATHENA_CMD_POSTFIX = ['--output', 'json']
 # TODO(user): Derive the full table set from the TPC suite.
 TPC_H_TABLES = [
-    'customer', 'lineitem', 'nation', 'orders', 'part', 'partsupp', 'region',
-    'supplier'
+    'customer',
+    'lineitem',
+    'nation',
+    'orders',
+    'part',
+    'partsupp',
+    'region',
+    'supplier',
 ]
 TPC_DS_TABLES = [
-    'call_center', 'catalog_page', 'catalog_returns', 'catalog_sales',
-    'customer', 'customer_address', 'customer_demographics', 'date_dim',
-    'dbgen_version', 'household_demographics', 'income_band', 'inventory',
-    'item', 'promotion', 'reason', 'ship_mode', 'store', 'store_returns',
-    'store_sales', 'time_dim', 'warehouse', 'web_page', 'web_returns',
-    'web_sales', 'web_site'
+    'call_center',
+    'catalog_page',
+    'catalog_returns',
+    'catalog_sales',
+    'customer',
+    'customer_address',
+    'customer_demographics',
+    'date_dim',
+    'dbgen_version',
+    'household_demographics',
+    'income_band',
+    'inventory',
+    'item',
+    'promotion',
+    'reason',
+    'ship_mode',
+    'store',
+    'store_returns',
+    'store_sales',
+    'time_dim',
+    'warehouse',
+    'web_page',
+    'web_returns',
+    'web_sales',
+    'web_site',
 ]
 
 FLAGS = flags.FLAGS
@@ -53,8 +78,9 @@ class AthenaQueryError(RuntimeError):
   pass
 
 
-def GetAthenaClientInterface(database: str, output_bucket: str,
-                             region: str) -> edw_service.EdwClientInterface:
+def GetAthenaClientInterface(
+    database: str, output_bucket: str, region: str
+) -> edw_service.EdwClientInterface:
   """Builds and Returns the requested Athena client Interface.
 
   Args:
@@ -71,8 +97,10 @@ def GetAthenaClientInterface(database: str, output_bucket: str,
   """
   if FLAGS.athena_client_interface == 'JAVA':
     return JavaClientInterface(database, output_bucket, region)
-  raise RuntimeError('Unknown Athena Client Interface requested.' +
-                     FLAGS.athena_client_interface)
+  raise RuntimeError(
+      'Unknown Athena Client Interface requested.'
+      + FLAGS.athena_client_interface
+  )
 
 
 class GenericClientInterface(edw_service.EdwClientInterface):
@@ -96,13 +124,12 @@ class GenericClientInterface(edw_service.EdwClientInterface):
     client_workgroup = FLAGS.athena_workgroup or 'dynamic'
     return {
         'client': f'{FLAGS.athena_client_interface}_{client_workgroup}',
-        'client_region': self.region
+        'client_region': self.region,
     }
 
 
 class JavaClientInterface(GenericClientInterface):
-  """Java Client Interface class for Athena.
-  """
+  """Java Client Interface class for Athena."""
 
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
@@ -120,7 +147,8 @@ class JavaClientInterface(GenericClientInterface):
     self.client_vm.Install('openjdk')
     # Push the executable jar to the working directory on client vm
     self.client_vm.InstallPreprovisionedPackageData(
-        package_name, [LATEST_CLIENT_JAR], '')
+        package_name, [LATEST_CLIENT_JAR], ''
+    )
 
   def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
@@ -135,14 +163,16 @@ class JavaClientInterface(GenericClientInterface):
         successful query the value is expected to be positive.
       run_metadata: A dictionary of query execution attributes eg. script name
     """
-    query_command = (f'java -cp {LATEST_CLIENT_JAR} '
-                     'com.google.cloud.performance.edw.Single '
-                     f'--region {self.region} '
-                     f'--database {self.database} '
-                     f'--output_location {self.output_bucket} '
-                     f'--query_file {query_name} '
-                     f'--query_timeout_secs {FLAGS.athena_query_timeout} '
-                     f'--collect_metrics {FLAGS.athena_metrics_collection}')
+    query_command = (
+        f'java -cp {LATEST_CLIENT_JAR} '
+        'com.google.cloud.performance.edw.Single '
+        f'--region {self.region} '
+        f'--database {self.database} '
+        f'--output_location {self.output_bucket} '
+        f'--query_file {query_name} '
+        f'--query_timeout_secs {FLAGS.athena_query_timeout} '
+        f'--collect_metrics {FLAGS.athena_metrics_collection}'
+    )
 
     if not FLAGS.athena_metrics_collection:
       # execute the query in requested persistent workgroup
@@ -150,8 +180,9 @@ class JavaClientInterface(GenericClientInterface):
       query_command = f'{query_command} --delete_workgroup False'
     else:
       # the dynamic workgroup may have to live beyond the benchmark
-      query_command = (f'{query_command} '
-                       f'--delete_workgroup {FLAGS.athena_workgroup_delete}')
+      query_command = (
+          f'{query_command} --delete_workgroup {FLAGS.athena_workgroup_delete}'
+      )
 
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
@@ -209,7 +240,8 @@ def RunScriptCommand(script_command):
   """
   start_time = datetime.datetime.now()
   stdout, _, retcode = vm_util.IssueCommand(
-      script_command, raise_on_failure=False)
+      script_command, raise_on_failure=False
+  )
   if retcode:
     raise AthenaQueryError
   end_time = datetime.datetime.now()
@@ -226,17 +258,19 @@ class Athena(edw_service.EdwService):
     super(Athena, self).__init__(edw_service_spec)
     self.region = util.GetRegionFromZone(FLAGS.zone[0])
     self.output_bucket = '-'.join(
-        [FLAGS.athena_output_location_prefix, self.region, FLAGS.run_uri])
-    self.client_interface = GetAthenaClientInterface(self.cluster_identifier,
-                                                     self.output_bucket,
-                                                     self.region)
+        [FLAGS.athena_output_location_prefix, self.region, FLAGS.run_uri]
+    )
+    self.client_interface = GetAthenaClientInterface(
+        self.cluster_identifier, self.output_bucket, self.region
+    )
     self.s3_service = s3.S3Service()
     self.s3_service.PrepareService(self.region)
     self.s3_service.MakeBucket(self.output_bucket)
     if FLAGS.provision_athena:
       self.data_bucket = 'pkb' + self.cluster_identifier.replace('_', '')
       self.tables = (
-          TPC_H_TABLES if FLAGS.edw_tpc_dsb_type == 'tpc_h' else TPC_DS_TABLES)
+          TPC_H_TABLES if FLAGS.edw_tpc_dsb_type == 'tpc_h' else TPC_DS_TABLES
+      )
       self.athena_db_create_time = 0
       self.athena_table_create_time = 0
 
@@ -253,15 +287,17 @@ class Athena(edw_service.EdwService):
     cmd = []
     cmd.extend(AWS_ATHENA_CMD_PREFIX)
     cmd.extend([
-        '--region', self.region,
+        '--region',
+        self.region,
         'start-query-execution',
-        '--query-string', query_string
+        '--query-string',
+        query_string,
     ])
     if database:
-      cmd.extend(['--query-execution-context', ('Database=%s' % database)])
+      cmd.extend(['--query-execution-context', 'Database=%s' % database])
     cmd.extend([
         '--result-configuration',
-        ('OutputLocation=s3://%s' % self.output_bucket)
+        ('OutputLocation=s3://%s' % self.output_bucket),
     ])
     cmd.extend(AWS_ATHENA_CMD_POSTFIX)
     return cmd
@@ -275,45 +311,58 @@ class Athena(edw_service.EdwService):
       If the database and/or tables don't already exist, the drop commands
       will simply fail, which won't raise errors.
       """
-      drop_script_path = data.ResourcePath('edw/athena/%s/ddl/drop.sql' %
-                                           FLAGS.edw_tpc_dsb_type)
+      drop_script_path = data.ResourcePath(
+          'edw/athena/%s/ddl/drop.sql' % FLAGS.edw_tpc_dsb_type
+      )
       drop_script_contents = ReadScript(drop_script_path)
       # Drop all tables so the database can be dropped.
       for table in self.tables:
         # Remove the folder backing each parquet table so they can be refreshed.
-        vm_util.IssueCommand([
-            'aws', 's3', 'rm',
-            's3://%s/%s_parquet' % (self.data_bucket, table), '--recursive'
-        ], raise_on_failure=False)
+        vm_util.IssueCommand(
+            [
+                'aws',
+                's3',
+                'rm',
+                's3://%s/%s_parquet' % (self.data_bucket, table),
+                '--recursive',
+            ],
+            raise_on_failure=False,
+        )
         # The parquet tables don't have the type suffix so that the queries can
         # run as written without having to change the table names.
         for suffix in ['_csv', '']:
-          script_contents = PrepareQueryString(drop_script_contents,
-                                               {'{table}': table + suffix})
+          script_contents = PrepareQueryString(
+              drop_script_contents, {'{table}': table + suffix}
+          )
           script_command = self.BuildAthenaCommand(
-              script_contents, database=self.cluster_identifier)
+              script_contents, database=self.cluster_identifier
+          )
           RunScriptCommand(script_command)
 
       drop_database_query_string = PrepareQueryString(
           'drop database database_name',
-          {'database_name': self.cluster_identifier})
+          {'database_name': self.cluster_identifier},
+      )
       script_command = self.BuildAthenaCommand(drop_database_query_string)
       RunScriptCommand(script_command)
 
     def _CreateDatabase():
       create_database_query_string = PrepareQueryString(
           'create database database_name',
-          {'database_name': self.cluster_identifier})
+          {'database_name': self.cluster_identifier},
+      )
       script_command = self.BuildAthenaCommand(create_database_query_string)
       return RunScriptCommand(script_command)
 
     def _CreateTable(table_create_sql_template):
       template_script_path = data.ResourcePath(table_create_sql_template)
       template_script_contents = ReadScript(template_script_path)
-      script_contents = PrepareQueryString(template_script_contents,
-                                           {'{bucket}': self.data_bucket})
+      script_contents = PrepareQueryString(
+          template_script_contents, {'{bucket}': self.data_bucket}
+      )
       script_command = self.BuildAthenaCommand(
-          script_contents, database=self.cluster_identifier)
+          script_contents, database=self.cluster_identifier
+      )
       return RunScriptCommand(script_command)
 
     def _CreateAllTables():
@@ -321,8 +370,10 @@ class Athena(edw_service.EdwService):
       cumulative_table_create_time = 0
       for table in self.tables:
         for suffix in ['_csv', '_parquet']:
-          script = 'edw/athena/%s/ddl/%s.sql' % (FLAGS.edw_tpc_dsb_type,
-                                                 table + suffix)
+          script = 'edw/athena/%s/ddl/%s.sql' % (
+              FLAGS.edw_tpc_dsb_type,
+              table + suffix,
+          )
           _, table_create_time = _CreateTable(script)
           cumulative_table_create_time += table_create_time
       return cumulative_table_create_time

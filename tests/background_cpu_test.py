@@ -20,7 +20,6 @@ import unittest
 from absl import flags
 import contextlib2
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
@@ -70,32 +69,51 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
   def _CreateBenchmarkSpec(self, benchmark_config_yaml):
     config = configs.LoadConfig(benchmark_config_yaml, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        NAME, flag_values=FLAGS, **config)
+        NAME, flag_values=FLAGS, **config
+    )
     return benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
 
-  def _CheckVmCallCounts(self, spec, working_groups, working_expected_counts,
-                         non_working_groups, non_working_expected_counts):
+  def _CheckVmCallCounts(
+      self,
+      spec,
+      working_groups,
+      working_expected_counts,
+      non_working_groups,
+      non_working_expected_counts,
+  ):
     # TODO(user): This is also used in TestBackgroundNetworkWorkload.
     # Consider moving to a shared function or base class.
-    expected_call_counts = {group: working_expected_counts
-                            for group in working_groups}
-    expected_call_counts.update({group: non_working_expected_counts
-                                 for group in non_working_groups})
+    expected_call_counts = {
+        group: working_expected_counts for group in working_groups
+    }
+    expected_call_counts.update(
+        {group: non_working_expected_counts for group in non_working_groups}
+    )
     for group_name, vm_expected_call_counts in six.iteritems(
-        expected_call_counts):
+        expected_call_counts
+    ):
       group_vms = spec.vm_groups[group_name]
-      self.assertEqual(len(group_vms), 1,
-                       msg='VM group "{0}" had {1} VMs'.format(group_name,
-                                                               len(group_vms)))
+      self.assertEqual(
+          len(group_vms),
+          1,
+          msg='VM group "{0}" had {1} VMs'.format(group_name, len(group_vms)),
+      )
       vm = group_vms[0]
-      iter_mocked_functions = zip_longest(_MOCKED_VM_FUNCTIONS,
-                                          vm_expected_call_counts)
+      iter_mocked_functions = zip_longest(
+          _MOCKED_VM_FUNCTIONS, vm_expected_call_counts
+      )
       for function_name, expected_call_count in iter_mocked_functions:
         call_count = getattr(vm, function_name).call_count
-        self.assertEqual(call_count, expected_call_count, msg=(
-            'Expected {0} from VM group "{1}" to be called {2} times, but it '
-            'was called {3} times.'.format(function_name, group_name,
-                                           expected_call_count, call_count)))
+        self.assertEqual(
+            call_count,
+            expected_call_count,
+            msg=(
+                'Expected {0} from VM group "{1}" to be called {2} times, but'
+                ' it was called {3} times.'.format(
+                    function_name, group_name, expected_call_count, call_count
+                )
+            ),
+        )
 
   def _CheckVMFromSpec(self, spec, working_groups=(), non_working_groups=()):
     with contextlib2.ExitStack() as stack:
@@ -171,8 +189,9 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
       self.assertIsNone(vm.background_cpu_threads)
     for vm in spec.vm_groups[_GROUP_2]:
       self.assertEqual(vm.background_cpu_threads, 3)
-    self._CheckVMFromSpec(spec, working_groups=[_GROUP_2],
-                          non_working_groups=[_GROUP_1])
+    self._CheckVMFromSpec(
+        spec, working_groups=[_GROUP_2], non_working_groups=[_GROUP_1]
+    )
 
 
 if __name__ == '__main__':

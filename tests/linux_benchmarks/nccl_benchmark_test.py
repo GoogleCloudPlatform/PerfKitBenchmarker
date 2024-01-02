@@ -16,7 +16,6 @@
 import os
 import unittest
 import mock
-
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import nccl_benchmark
 from perfkitbenchmarker.sample import Sample
@@ -26,8 +25,9 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
     super(NcclBenchmarkTest, self).setUp()
-    path = os.path.join(os.path.dirname(__file__), '..', 'data',
-                        'nccl_output.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '..', 'data', 'nccl_output.txt'
+    )
     with open(path) as fp:
       self.contents = fp.read()
 
@@ -57,13 +57,14 @@ class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
         'validation': '0',
         'graph': '0',
         'Rank  0': 'Pid   9192 on pkb-2b6a393d-2 device  0 [0x00] Tesla K80',
-        'Rank  1': 'Pid   9178 on pkb-2b6a393d-3 device  0 [0x00] Tesla K80'
+        'Rank  1': 'Pid   9178 on pkb-2b6a393d-3 device  0 [0x00] Tesla K80',
     }
     golden = Sample(
         metric='In place algorithm bandwidth',
         value=0.39,
         unit='GB/s',
-        metadata=metadata)
+        metadata=metadata,
+    )
     self.assertIn(golden, samples)
     self.assertAlmostEqual(bandwidth, 0.63)
 

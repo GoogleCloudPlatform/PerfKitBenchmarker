@@ -40,14 +40,20 @@ from perfkitbenchmarker import windows_virtual_machine
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_list('static_vm_tags', None,
-                  'The tags of static VMs for PKB to run with. Even if other '
-                  'VMs are specified in a config, if they aren\'t in this list '
-                  'they will be skipped during VM creation.')
+flags.DEFINE_list(
+    'static_vm_tags',
+    None,
+    'The tags of static VMs for PKB to run with. Even if other '
+    "VMs are specified in a config, if they aren't in this list "
+    'they will be skipped during VM creation.',
+)
 
-flags.DEFINE_bool('copy_ssh_private_keys_into_static_vms', False,
-                  'A flag to allow the VM to copy ssh private key to '
-                  'authenticate static VMs.')
+flags.DEFINE_bool(
+    'copy_ssh_private_keys_into_static_vms',
+    False,
+    'A flag to allow the VM to copy ssh private key to '
+    'authenticate static VMs.',
+)
 
 
 class StaticVmSpec(virtual_machine.BaseVmSpec):
@@ -55,28 +61,39 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
 
   CLOUD = 'Static'
 
-  def __init__(self, component_full_name, ip_address=None, user_name=None,
-               ssh_private_key=None, internal_ip=None, ssh_port=22,
-               password=None, disk_specs=None, os_type=None, tag=None,
-               zone=None, **kwargs):
+  def __init__(
+      self,
+      component_full_name,
+      ip_address=None,
+      user_name=None,
+      ssh_private_key=None,
+      internal_ip=None,
+      ssh_port=22,
+      password=None,
+      disk_specs=None,
+      os_type=None,
+      tag=None,
+      zone=None,
+      **kwargs
+  ):
     """Initialize the StaticVmSpec object.
 
     Args:
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config options.
+        component containing the config options.
       ip_address: The public ip address of the VM.
       user_name: The username of the VM that the keyfile corresponds to.
-      ssh_private_key: The absolute path to the private keyfile to use to ssh
-          to the VM.
+      ssh_private_key: The absolute path to the private keyfile to use to ssh to
+        the VM.
       internal_ip: The internal ip address of the VM.
       ssh_port: The port number to use for SSH and SCP commands.
       password: The password used to log into the VM (Windows Only).
       disk_specs: None or a list of dictionaries containing kwargs used to
-          create disk.BaseDiskSpecs.
+        create disk.BaseDiskSpecs.
       os_type: The OS type of the VM. See the flag of the same name for more
-          information.
-      tag: A string that allows the VM to be included or excluded from a run
-          by using the 'static_vm_tags' flag.
+        information.
+      tag: A string that allows the VM to be included or excluded from a run by
+        using the 'static_vm_tags' flag.
       zone: The VM's zone.
       **kwargs: Other args for the superclass.
     """
@@ -93,8 +110,11 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
     self.disk_specs = [
         disk.BaseDiskSpec(
             '{0}.disk_specs[{1}]'.format(component_full_name, i),
-            flag_values=kwargs.get('flag_values'), **disk_spec)
-        for i, disk_spec in enumerate(disk_specs or ())]
+            flag_values=kwargs.get('flag_values'),
+            **disk_spec
+        )
+        for i, disk_spec in enumerate(disk_specs or ())
+    ]
 
 
 class StaticDisk(disk.BaseDisk):
@@ -136,8 +156,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.user_name = vm_spec.user_name
     self.ssh_private_key = vm_spec.ssh_private_key
     self.internal_ip = vm_spec.internal_ip
-    self.zone = self.zone or ('Static - %s@%s' % (self.user_name,
-                                                  self.ip_address))
+    self.zone = self.zone or (
+        'Static - %s@%s' % (self.user_name, self.ip_address)
+    )
     self.ssh_port = vm_spec.ssh_port
     self.password = vm_spec.password
     self.disk_specs = vm_spec.disk_specs
@@ -213,8 +234,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     vm_arr = json.load(file_obj)
 
     if not isinstance(vm_arr, list):
-      raise ValueError('Invalid static VM file. Expected array, got: %s.' %
-                       type(vm_arr))
+      raise ValueError(
+          'Invalid static VM file. Expected array, got: %s.' % type(vm_arr)
+      )
 
     required_keys = frozenset(['ip_address', 'user_name'])
 
@@ -231,9 +253,15 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     # assume linux_required_keys for unknown os_type
     required_keys = required_keys_by_os.get(FLAGS.os_type, linux_required_keys)
 
-    optional_keys = frozenset(['internal_ip', 'zone', 'local_disks',
-                               'scratch_disk_mountpoints', 'os_type',
-                               'ssh_port', 'install_packages'])
+    optional_keys = frozenset([
+        'internal_ip',
+        'zone',
+        'local_disks',
+        'scratch_disk_mountpoints',
+        'os_type',
+        'ssh_port',
+        'install_packages',
+    ])
     allowed_keys = required_keys | optional_keys
 
     def VerifyItemFormat(item):
@@ -244,8 +272,9 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       if extra_keys:
         raise ValueError('Unexpected keys: {0}'.format(', '.join(extra_keys)))
       elif missing_keys:
-        raise ValueError('Missing required keys: {0}'.format(
-            ', '.join(missing_keys)))
+        raise ValueError(
+            'Missing required keys: {0}'.format(', '.join(missing_keys))
+        )
 
     for item in vm_arr:
       VerifyItemFormat(item)
@@ -259,21 +288,27 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       password = item.get('password')
 
       if not isinstance(local_disks, list):
-        raise ValueError('Expected a list of local disks, got: {0}'.format(
-            local_disks))
+        raise ValueError(
+            'Expected a list of local disks, got: {0}'.format(local_disks)
+        )
       scratch_disk_mountpoints = item.get('scratch_disk_mountpoints', [])
       if not isinstance(scratch_disk_mountpoints, list):
         raise ValueError(
             'Expected a list of disk mount points, got: {0}'.format(
-                scratch_disk_mountpoints))
+                scratch_disk_mountpoints
+            )
+        )
       ssh_port = item.get('ssh_port', 22)
       os_type = item.get('os_type')
       install_packages = item.get('install_packages', True)
 
-      if ((os_type == os_types.WINDOWS and FLAGS.os_type != os_types.WINDOWS) or
-          (os_type != os_types.WINDOWS and FLAGS.os_type == os_types.WINDOWS)):
-        raise ValueError('Please only use Windows VMs when using '
-                         '--os_type=windows and vice versa.')
+      if (
+          os_type == os_types.WINDOWS and FLAGS.os_type != os_types.WINDOWS
+      ) or (os_type != os_types.WINDOWS and FLAGS.os_type == os_types.WINDOWS):
+        raise ValueError(
+            'Please only use Windows VMs when using '
+            '--os_type=windows and vice versa.'
+        )
 
       disk_kwargs_list = []
       for path in scratch_disk_mountpoints:
@@ -282,11 +317,18 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         disk_kwargs_list.append({'device_path': local_disk})
 
       vm_spec = StaticVmSpec(
-          'static_vm_file', ip_address=ip_address, user_name=user_name,
-          ssh_port=ssh_port, install_packages=install_packages,
-          ssh_private_key=keyfile_path, internal_ip=internal_ip, zone=zone,
-          disk_specs=disk_kwargs_list, password=password,
-          flag_values=flags.FLAGS)
+          'static_vm_file',
+          ip_address=ip_address,
+          user_name=user_name,
+          ssh_port=ssh_port,
+          install_packages=install_packages,
+          ssh_private_key=keyfile_path,
+          internal_ip=internal_ip,
+          zone=zone,
+          disk_specs=disk_kwargs_list,
+          password=password,
+          flag_values=flags.FLAGS,
+      )
 
       vm_class = GetStaticVmClass(os_type)
       vm = vm_class(vm_spec)  # pytype: disable=not-instantiable
@@ -316,28 +358,34 @@ def GetStaticVmClass(os_type) -> type[virtual_machine.BaseVirtualMachine]:
   if not os_type:
     os_type = os_types.DEFAULT
     logging.warning('Could not find os type for VM. Defaulting to %s.', os_type)
-  return resource.GetResourceClass(virtual_machine.BaseVirtualMachine,
-                                   CLOUD=StaticVirtualMachine.CLOUD,
-                                   OS_TYPE=os_type)
+  return resource.GetResourceClass(
+      virtual_machine.BaseVirtualMachine,
+      CLOUD=StaticVirtualMachine.CLOUD,
+      OS_TYPE=os_type,
+  )
 
 
 class Ubuntu1604BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin):
+    StaticVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin
+):
   pass
 
 
 class Ubuntu1804BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin):
+    StaticVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin
+):
   pass
 
 
 class Ubuntu2004BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin):
+    StaticVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
+):
   pass
 
 
 class Ubuntu2204BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Ubuntu2204Mixin):
+    StaticVirtualMachine, linux_virtual_machine.Ubuntu2204Mixin
+):
   pass
 
 
@@ -347,63 +395,75 @@ class Ubuntu2304BasedStaticVirtualMachine(
   pass
 
 
-class ClearBasedStaticVirtualMachine(StaticVirtualMachine,
-                                     linux_virtual_machine.ClearMixin):
+class ClearBasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.ClearMixin
+):
   pass
 
 
-class Rhel7BasedStaticVirtualMachine(StaticVirtualMachine,
-                                     linux_virtual_machine.Rhel7Mixin):
+class Rhel7BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Rhel7Mixin
+):
   pass
 
 
-class Rhel8BasedStaticVirtualMachine(StaticVirtualMachine,
-                                     linux_virtual_machine.Rhel8Mixin):
+class Rhel8BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Rhel8Mixin
+):
   pass
 
 
-class Rhel9BasedStaticVirtualMachine(StaticVirtualMachine,
-                                     linux_virtual_machine.Rhel9Mixin):
+class Rhel9BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Rhel9Mixin
+):
   pass
 
 
-class Fedora36BasedStaticVirtualMachine(StaticVirtualMachine,
-                                        linux_virtual_machine.Fedora36Mixin):
+class Fedora36BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Fedora36Mixin
+):
   pass
 
 
-class Fedora37BasedStaticVirtualMachine(StaticVirtualMachine,
-                                        linux_virtual_machine.Fedora37Mixin):
+class Fedora37BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Fedora37Mixin
+):
   pass
 
 
-class CentOs7BasedStaticVirtualMachine(StaticVirtualMachine,
-                                       linux_virtual_machine.CentOs7Mixin):
+class CentOs7BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.CentOs7Mixin
+):
   pass
 
 
-class CentOs8BasedStaticVirtualMachine(StaticVirtualMachine,
-                                       linux_virtual_machine.CentOs8Mixin):
+class CentOs8BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.CentOs8Mixin
+):
   pass
 
 
-class Debian9BasedStaticVirtualMachine(StaticVirtualMachine,
-                                       linux_virtual_machine.Debian9Mixin):
+class Debian9BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Debian9Mixin
+):
   pass
 
 
-class Debian10BasedStaticVirtualMachine(StaticVirtualMachine,
-                                        linux_virtual_machine.Debian10Mixin):
+class Debian10BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Debian10Mixin
+):
   pass
 
 
-class Debian11BasedStaticVirtualMachine(StaticVirtualMachine,
-                                        linux_virtual_machine.Debian11Mixin):
+class Debian11BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Debian11Mixin
+):
   pass
 
 
-class Debian12BasedStaticVirtualMachine(StaticVirtualMachine,
-                                        linux_virtual_machine.Debian12Mixin):
+class Debian12BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Debian12Mixin
+):
   pass
 
 

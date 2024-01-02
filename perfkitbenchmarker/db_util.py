@@ -19,6 +19,6 @@ def GenerateRandomDbPassword():
   prefix = [
       random.choice(string.ascii_lowercase),
       random.choice(string.ascii_uppercase),
-      random.choice(string.digits)
+      random.choice(string.digits),
   ]
   return ''.join(prefix) + str(uuid.uuid4())[:10]

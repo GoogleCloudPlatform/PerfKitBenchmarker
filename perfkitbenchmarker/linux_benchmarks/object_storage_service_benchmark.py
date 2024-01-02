@@ -718,14 +718,12 @@ def ProcessMultiStreamResults(
   results.append(
       sample.Sample(
           'Multi-stream ' + operation + ' net throughput',
-          np.sum(
-              (
-                  size / active_time * 8
-                  for size, active_time in zip(
-                      total_active_sizes, total_active_times
-                  )
+          np.sum((
+              size / active_time * 8
+              for size, active_time in zip(
+                  total_active_sizes, total_active_times
               )
-          ),
+          )),
           'bit / second',
           metadata=distribution_metadata,
       )
@@ -733,14 +731,10 @@ def ProcessMultiStreamResults(
   results.append(
       sample.Sample(
           'Multi-stream ' + operation + ' net throughput (with gap)',
-          np.sum(
-              (
-                  size / duration * 8
-                  for size, duration in zip(
-                      total_active_sizes, active_durations
-                  )
-              )
-          ),
+          np.sum((
+              size / duration * 8
+              for size, duration in zip(total_active_sizes, active_durations)
+          )),
           'bit / second',
           metadata=distribution_metadata,
       )
@@ -775,14 +769,12 @@ def ProcessMultiStreamResults(
   )
 
   # Statistics about benchmarking overhead
-  gap_time = sum(
-      (
-          active_duration - active_time
-          for active_duration, active_time in zip(
-              active_durations, total_active_times
-          )
+  gap_time = sum((
+      active_duration - active_time
+      for active_duration, active_time in zip(
+          active_durations, total_active_times
       )
-  )
+  ))
   results.append(
       sample.Sample(
           'Multi-stream ' + operation + ' total gap time',

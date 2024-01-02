@@ -12,44 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 FLAVORS = [
-    {
-        'name': 'Micro',
-        'ram': 1024,
-        'cores': 1
-    },
-    {
-        'name': 'Small',
-        'ram': 2048,
-        'cores': 1
-    },
-    {
-        'name': 'Medium',
-        'ram': 4096,
-        'cores': 2
-    },
-    {
-        'name': 'Large',
-        'ram': 7168,
-        'cores': 4
-    },
-    {
-        'name': 'ExtraLarge',
-        'ram': 14336,
-        'cores': 8
-    },
-    {
-        'name': 'MemoryIntensiveSmall',
-        'ram': 16384,
-        'cores': 2
-    },
-    {
-        'name': 'MemoryIntensiveMedium',
-        'ram': 28672,
-        'cores': 2
-    },
-    {
-        'name': 'MemoryIntensiveLarge',
-        'ram': 57344,
-        'cores': 2
-    },
+    {'name': 'Micro', 'ram': 1024, 'cores': 1},
+    {'name': 'Small', 'ram': 2048, 'cores': 1},
+    {'name': 'Medium', 'ram': 4096, 'cores': 2},
+    {'name': 'Large', 'ram': 7168, 'cores': 4},
+    {'name': 'ExtraLarge', 'ram': 14336, 'cores': 8},
+    {'name': 'MemoryIntensiveSmall', 'ram': 16384, 'cores': 2},
+    {'name': 'MemoryIntensiveMedium', 'ram': 28672, 'cores': 2},
+    {'name': 'MemoryIntensiveLarge', 'ram': 57344, 'cores': 2},
 ]

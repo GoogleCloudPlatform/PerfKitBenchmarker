@@ -41,7 +41,6 @@ hypervisor was servicing another virtual processor.
 outstanding disk I/O request.
 
 For more details, see https://linux.die.net/man/1/mpstat.
-
 """
 
 
@@ -60,30 +59,43 @@ from perfkitbenchmarker.traces import base_collector
 import six
 
 _MPSTAT = flags.DEFINE_boolean(
-    'mpstat', False, 'Run mpstat (https://linux.die.net/man/1/mpstat) '
-    'to collect system performance metrics during benchmark run.')
+    'mpstat',
+    False,
+    'Run mpstat (https://linux.die.net/man/1/mpstat) '
+    'to collect system performance metrics during benchmark run.',
+)
 _MPSTAT_BREAKDOWN = flags.DEFINE_enum(
-    'mpstat_breakdown', 'SUM', ['SUM', 'CPU', 'ALL'],
+    'mpstat_breakdown',
+    'SUM',
+    ['SUM', 'CPU', 'ALL'],
     'Level of aggregation for statistics. Accepted '
     'values are "SUM", "CPU", "ALL". Defaults to SUM. See '
-    'https://linux.die.net/man/1/mpstat for details.')
+    'https://linux.die.net/man/1/mpstat for details.',
+)
 _MPSTAT_CPUS = flags.DEFINE_string(
-    'mpstat_cpus', 'ALL', 'Comma delimited string of CPU ids or ALL. '
-    'Defaults to ALL.')
+    'mpstat_cpus',
+    'ALL',
+    'Comma delimited string of CPU ids or ALL. Defaults to ALL.',
+)
 _MPSTAT_INTERVAL = flags.DEFINE_integer(
-    'mpstat_interval', 1,
-    'The amount of time in seconds between each mpstat report.'
-    'Defaults to 1.')
+    'mpstat_interval',
+    1,
+    'The amount of time in seconds between each mpstat report.Defaults to 1.',
+)
 _MPSTAT_COUNT = flags.DEFINE_integer(
-    'mpstat_count', 1, 'The number of reports generated at interval apart.'
-    'Defaults to 1.')
+    'mpstat_count',
+    1,
+    'The number of reports generated at interval apart.Defaults to 1.',
+)
 _MPSTAT_PUBLISH = flags.DEFINE_boolean(
-    'mpstat_publish', False,
-    'Whether to publish mpstat statistics.')
+    'mpstat_publish', False, 'Whether to publish mpstat statistics.'
+)
 _MPSTAT_PUBLISH_PER_INTERVAL_SAMPLES = flags.DEFINE_boolean(
-    'mpstat_publish_per_interval_samples', False,
+    'mpstat_publish_per_interval_samples',
+    False,
     'Whether to publish a separate mpstat statistics sample '
-    'for each interval. If True, --mpstat_publish must be True.')
+    'for each interval. If True, --mpstat_publish must be True.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -92,15 +104,21 @@ _TWENTY_THREE_HOURS_IN_SECONDS = 23 * 60 * 60
 flags.register_validator(
     _MPSTAT_INTERVAL.name,
     lambda value: value < _TWENTY_THREE_HOURS_IN_SECONDS,
-    message=('If --mpstat_interval must be less than 23 hours (if it\'s set '
-             'near or above 24 hours, it becomes hard to infer sample '
-             'timestamp from mpstat output.'))
+    message=(
+        "If --mpstat_interval must be less than 23 hours (if it's set "
+        'near or above 24 hours, it becomes hard to infer sample '
+        'timestamp from mpstat output.'
+    ),
+)
 
 flags.register_validator(
     _MPSTAT_PUBLISH_PER_INTERVAL_SAMPLES.name,
     lambda value: FLAGS.mpstat_publish or not value,
-    message=('If --mpstat_publish_per_interval is True, --mpstat_publish must '
-             'be True.'))
+    message=(
+        'If --mpstat_publish_per_interval is True, --mpstat_publish must '
+        'be True.'
+    ),
+)
 
 
 def _ParseStartTime(output: str) -> float:
@@ -115,7 +133,6 @@ def _ParseStartTime(output: str) -> float:
 
   Example input:
     third_party/py/perfkitbenchmarker/tests/data/mpstat_output.json
-
   """
   hosts = output['sysstat']['hosts']
   date = hosts[0]['date']
@@ -124,8 +141,8 @@ def _ParseStartTime(output: str) -> float:
   start_datetime_string = ' '.join([date, time])
   # As a sysstat utility, this is printed in UTC by default
   start_datetime = datetime.datetime.strptime(
-      start_datetime_string,
-      '%Y-%m-%d %H:%M:%S').replace(tzinfo=datetime.timezone.utc)
+      start_datetime_string, '%Y-%m-%d %H:%M:%S'
+  ).replace(tzinfo=datetime.timezone.utc)
   return start_datetime.timestamp()
 
 
@@ -151,7 +168,8 @@ def _GetCPUAverageMetrics(
     host_stats: List[Dict[str, Any]],
     number_of_cpus: int,
     metadata: Dict[str, Any],
-    timestamp: Optional[float] = None):
+    timestamp: Optional[float] = None,
+):
   """Get average metrics for all CPUs.
 
   Args:
@@ -208,12 +226,15 @@ def _GetCPUAverageMetrics(
       metric_name = 'mpstat_avg_' + cpu_metric
       meta = metadata.copy()
       meta['mpstat_cpu_id'] = cpu_id
-      samples.append(sample.Sample(
-          metric=metric_name,
-          value=average,
-          unit='%',
-          metadata=meta,
-          timestamp=timestamp))
+      samples.append(
+          sample.Sample(
+              metric=metric_name,
+              value=average,
+              unit='%',
+              metadata=meta,
+              timestamp=timestamp,
+          )
+      )
   return samples
 
 
@@ -221,7 +242,8 @@ def _GetCPUAverageInterruptions(
     host_stats: List[Dict[str, Any]],
     number_of_cpus: int,
     metadata: Dict[str, Any],
-    timestamp: Optional[float] = None):
+    timestamp: Optional[float] = None,
+):
   """Get average interruption for all CPUs.
 
   Args:
@@ -255,21 +277,24 @@ def _GetCPUAverageInterruptions(
   ]
   """
   samples = []
-  for cpu_id in range(number_of_cpus+1):
+  for cpu_id in range(number_of_cpus + 1):
     measurements = []
     for report in host_stats:
       value = report['sum-interrupts'][cpu_id]['intr']
       measurements.append(value)
-    average = sum(measurements)/len(measurements)
+    average = sum(measurements) / len(measurements)
     metric_name = 'mpstat_avg_intr'
     meta = metadata.copy()
-    meta['mpstat_cpu_id'] = cpu_id-1
-    samples.append(sample.Sample(
-        metric=metric_name,
-        value=average,
-        unit='interrupts/sec',
-        metadata=meta,
-        timestamp=timestamp))
+    meta['mpstat_cpu_id'] = cpu_id - 1
+    samples.append(
+        sample.Sample(
+            metric=metric_name,
+            value=average,
+            unit='interrupts/sec',
+            metadata=meta,
+            timestamp=timestamp,
+        )
+    )
   return samples
 
 
@@ -277,7 +302,8 @@ def _GetPerIntervalSamples(
     host_stats: List[Dict[str, Any]],
     metadata: Dict[str, Any],
     start_timestamp: int,
-    interval: int) -> List[sample.Sample]:
+    interval: int,
+) -> List[sample.Sample]:
   """Generate samples for all CPU related metrics in every run of mpstat.
 
   Args:
@@ -306,12 +332,15 @@ def _GetPerIntervalSamples(
         meta = metadata.copy()
         meta['mpstat_cpu_id'] = cpu_id
         meta['ordinal'] = ordinal
-        samples.append(sample.Sample(
-            metric=metric_name,
-            value=metric_value,
-            unit='%',
-            metadata=meta,
-            timestamp=sample_timestamp))
+        samples.append(
+            sample.Sample(
+                metric=metric_name,
+                value=metric_value,
+                unit='%',
+                metadata=meta,
+                timestamp=sample_timestamp,
+            )
+        )
   return samples
 
 
@@ -320,7 +349,7 @@ def _MpstatResults(
     output: Dict[str, Any],
     interval: int,
     per_interval_samples: bool = False,
-    ):
+):
   """Parses and appends mpstat results to the samples list.
 
   Args:
@@ -343,23 +372,17 @@ def _MpstatResults(
     metadata['nodename'] = host['nodename']
 
     samples += _GetCPUAverageMetrics(
-        host_stats,
-        number_of_cpus,
-        metadata,
-        start_timestamp)
+        host_stats, number_of_cpus, metadata, start_timestamp
+    )
 
     samples += _GetCPUAverageInterruptions(
-        host_stats,
-        number_of_cpus,
-        metadata,
-        start_timestamp)
+        host_stats, number_of_cpus, metadata, start_timestamp
+    )
 
     if per_interval_samples:
       samples += _GetPerIntervalSamples(
-          host_stats,
-          metadata,
-          start_timestamp,
-          interval)
+          host_stats, metadata, start_timestamp, interval
+      )
 
   return samples
 
@@ -371,10 +394,8 @@ class MpstatCollector(base_collector.BaseCollector):
   """
 
   def __init__(
-      self,
-      interval=None,
-      output_directory=None,
-      per_interval_samples=False):
+      self, interval=None, output_directory=None, per_interval_samples=False
+  ):
     super().__init__(interval, output_directory=output_directory)
     self.per_interval_samples = per_interval_samples
 
@@ -387,14 +408,17 @@ class MpstatCollector(base_collector.BaseCollector):
   def _CollectorRunCommand(self, vm, collector_file):
     # We set the environment variable S_TIME_FORMAT=ISO to ensure consistent
     # time formatting from mpstat
-    return ('export S_TIME_FORMAT=ISO; mpstat -I {breakdown} -u -P '
-            '{processor_number} {interval} {count} -o JSON > {output} 2>&1 &'
-            .format(
-                breakdown=FLAGS.mpstat_breakdown,
-                processor_number=FLAGS.mpstat_cpus,
-                interval=self.interval,
-                count=FLAGS.mpstat_count,
-                output=collector_file))
+    return (
+        'export S_TIME_FORMAT=ISO; mpstat -I {breakdown} -u -P '
+        '{processor_number} {interval} {count} -o JSON > {output} 2>&1 &'
+        .format(
+            breakdown=FLAGS.mpstat_breakdown,
+            processor_number=FLAGS.mpstat_cpus,
+            interval=self.interval,
+            count=FLAGS.mpstat_count,
+            output=collector_file,
+        )
+    )
 
   def Analyze(self, unused_sender, benchmark_spec, samples):
     """Analyze mpstat file and record samples.
@@ -407,8 +431,8 @@ class MpstatCollector(base_collector.BaseCollector):
     def _Analyze(role, output):
       """Parse file and record samples."""
       with open(
-          os.path.join(self.output_directory, os.path.basename(output)),
-          'r') as fp:
+          os.path.join(self.output_directory, os.path.basename(output)), 'r'
+      ) as fp:
         output = json.loads(fp.read())
         metadata = {
             'event': 'mpstat',
@@ -420,7 +444,8 @@ class MpstatCollector(base_collector.BaseCollector):
                 output,
                 self.interval,
                 per_interval_samples=self.per_interval_samples,
-                ))
+            )
+        )
 
     background_tasks.RunThreaded(
         _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
@@ -436,7 +461,8 @@ def Register(parsed_flags):
 
   collector = MpstatCollector(
       interval=parsed_flags.mpstat_interval,
-      per_interval_samples=parsed_flags.mpstat_publish_per_interval_samples)
+      per_interval_samples=parsed_flags.mpstat_publish_per_interval_samples,
+  )
   events.before_phase.connect(collector.Start, stages.RUN, weak=False)
   events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
   if parsed_flags.mpstat_publish:

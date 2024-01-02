@@ -20,10 +20,12 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
 from six.moves.urllib.parse import urlparse
 
-flags.DEFINE_string('maven_version', '3.6.3',
-                    'The version of maven')
-flags.DEFINE_string('maven_mirror_url', None,
-                    'If specified, this URL will be used as a Maven mirror')
+flags.DEFINE_string('maven_version', '3.6.3', 'The version of maven')
+flags.DEFINE_string(
+    'maven_mirror_url',
+    None,
+    'If specified, this URL will be used as a Maven mirror',
+)
 FLAGS = flags.FLAGS
 MVN_URL = 'https://archive.apache.org/dist/maven/maven-{0}/{1}/binaries/apache-maven-{1}-bin.tar.gz'
 MVN_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'maven')
@@ -38,14 +40,16 @@ export PATH={maven_home}/bin:$PATH
 
 PACKAGE_NAME = 'maven'
 PREPROVISIONED_DATA = {
-    'apache-maven-{0}-bin.tar.gz'.format('3.6.1'):
-        '2528c35a99c30f8940cc599ba15d34359d58bec57af58c1075519b8cd33b69e7',
-    'apache-maven-{0}-bin.tar.gz'.format('3.6.3'):
-        '26ad91d751b3a9a53087aefa743f4e16a17741d3915b219cf74112bf87a438c5'
+    'apache-maven-{0}-bin.tar.gz'.format(
+        '3.6.1'
+    ): '2528c35a99c30f8940cc599ba15d34359d58bec57af58c1075519b8cd33b69e7',
+    'apache-maven-{0}-bin.tar.gz'.format(
+        '3.6.3'
+    ): '26ad91d751b3a9a53087aefa743f4e16a17741d3915b219cf74112bf87a438c5',
 }
 PACKAGE_DATA_URL = {
     'apache-maven-{0}-bin.tar.gz'.format('3.6.1'): MVN_URL.format('3', '3.6.1'),
-    'apache-maven-{0}-bin.tar.gz'.format('3.6.3'): MVN_URL.format('3', '3.6.3')
+    'apache-maven-{0}-bin.tar.gz'.format('3.6.3'): MVN_URL.format('3', '3.6.3'),
 }
 
 
@@ -70,13 +74,15 @@ def GetRunCommand(arguments):
     parsed_url = urlparse(FLAGS.http_proxy)
     http_proxy_params = ' -Dhttp.proxyHost={host} -Dhttp.proxyPort={port}'
     command += http_proxy_params.format(
-        host=parsed_url.hostname, port=parsed_url.port)
+        host=parsed_url.hostname, port=parsed_url.port
+    )
 
   if FLAGS['https_proxy'].present:
     parsed_url = urlparse(FLAGS.https_proxy)
     https_proxy_params = ' -Dhttps.proxyHost={host} -Dhttps.proxyPort={port}'
     command += https_proxy_params.format(
-        host=parsed_url.hostname, port=parsed_url.port)
+        host=parsed_url.hostname, port=parsed_url.port
+    )
 
   maven_major_ver, maven_minor_ver, maven_patch_ver = _MavenVersionParts()
   # Don't output download progress.
@@ -89,11 +95,13 @@ def GetRunCommand(arguments):
 
 
 def _GetJavaHome(vm):
-  out, _ = vm.RemoteCommand("java -XshowSettings:properties 2>&1 > /dev/null "
-                            "| awk '/java.home/{print $3}'")
+  out, _ = vm.RemoteCommand(
+      'java -XshowSettings:properties 2>&1 > /dev/null '
+      "| awk '/java.home/{print $3}'"
+  )
   out = out.strip()
   if '/jre' in out:
-    return out[:out.index('/jre')]
+    return out[: out.index('/jre')]
   else:
     return out
 
@@ -121,11 +129,14 @@ def _Install(vm):
     PREPROVISIONED_DATA[maven_tar] = ''
     PACKAGE_DATA_URL[maven_tar] = maven_url
   maven_remote_path = posixpath.join(linux_packages.INSTALL_DIR, maven_tar)
-  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, [maven_tar],
-                                      linux_packages.INSTALL_DIR)
-  vm.RemoteCommand(('mkdir -p {0} && '
-                    'tar -C {0} --strip-components=1 -xzf {1}').format(
-                        MVN_DIR, maven_remote_path))
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, [maven_tar], linux_packages.INSTALL_DIR
+  )
+  vm.RemoteCommand(
+      ('mkdir -p {0} && tar -C {0} --strip-components=1 -xzf {1}').format(
+          MVN_DIR, maven_remote_path
+      )
+  )
 
   java_home = _GetJavaHome(vm)
 
@@ -135,12 +146,11 @@ def _Install(vm):
   vm.RemoteCommand(cmd)
 
   if FLAGS.maven_mirror_url:
-    settings_local_path = data.ResourcePath(os.path.join(
-        'maven', 'settings.xml.j2'))
+    settings_local_path = data.ResourcePath(
+        os.path.join('maven', 'settings.xml.j2')
+    )
     settings_remote_path = '~/.m2/settings.xml'
-    context = {
-        'maven_mirror_url': FLAGS.maven_mirror_url
-    }
+    context = {'maven_mirror_url': FLAGS.maven_mirror_url}
     vm.RemoteCommand('mkdir -p ~/.m2')
     vm.RenderTemplate(settings_local_path, settings_remote_path, context)
 

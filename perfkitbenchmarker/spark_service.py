@@ -36,12 +36,17 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.linux_packages import hadoop
 
-flags.DEFINE_string('spark_static_cluster_id', None,
-                    'If set, the name of the Spark cluster, assumed to be '
-                    'ready.')
-flags.DEFINE_enum('spark_service_log_level', 'INFO', ['DEBUG', 'INFO', 'FATAL'],
-                  'Supported log levels when submitting jobs to spark service'
-                  ' clusters.')
+flags.DEFINE_string(
+    'spark_static_cluster_id',
+    None,
+    'If set, the name of the Spark cluster, assumed to be ready.',
+)
+flags.DEFINE_enum(
+    'spark_service_log_level',
+    'INFO',
+    ['DEBUG', 'INFO', 'FATAL'],
+    'Supported log levels when submitting jobs to spark service clusters.',
+)
 
 
 # Cloud to use for pkb-created Spark service.
@@ -79,11 +84,13 @@ class BaseSparkService(resource.BaseResource):
   CLOUD = None
   SERVICE_NAME = None
 
-  SPARK_SAMPLE_LOCATION = ('file:///usr/lib/spark/examples/jars/'
-                           'spark-examples.jar')
+  SPARK_SAMPLE_LOCATION = (
+      'file:///usr/lib/spark/examples/jars/spark-examples.jar'
+  )
 
-  HADOOP_SAMPLE_LOCATION = ('file:///usr/lib/hadoop-mapreduce/'
-                            'hadoop-mapreduce-examples.jar')
+  HADOOP_SAMPLE_LOCATION = (
+      'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar'
+  )
 
   def __init__(self, spark_service_spec):
     """Initialize the Apache Spark Service object.
@@ -100,16 +107,23 @@ class BaseSparkService(resource.BaseResource):
       self.spec.master_group = copy.copy(self.spec.worker_group)
       self.spec.master_group.vm_count = 1
     self.cluster_id = spark_service_spec.static_cluster_id
-    assert (spark_service_spec.master_group.vm_spec.zone ==
-            spark_service_spec.worker_group.vm_spec.zone)
+    assert (
+        spark_service_spec.master_group.vm_spec.zone
+        == spark_service_spec.worker_group.vm_spec.zone
+    )
     self.zone = spark_service_spec.master_group.vm_spec.zone
 
   @abc.abstractmethod
-  def SubmitJob(self, job_jar, class_name,
-                job_script=None,
-                job_poll_interval=None,
-                job_stdout_file=None, job_arguments=None,
-                job_type=SPARK_JOB_TYPE):
+  def SubmitJob(
+      self,
+      job_jar,
+      class_name,
+      job_script=None,
+      job_poll_interval=None,
+      job_stdout_file=None,
+      job_arguments=None,
+      job_type=SPARK_JOB_TYPE,
+  ):
     """Submit a job to the spark service.
 
     Submits a job and waits for it to complete.
@@ -118,14 +132,12 @@ class BaseSparkService(resource.BaseResource):
       job_jar: Jar file to execute.
       class_name: Name of the main class.
       job_script: PySpark script to run. job_jar and class_name must be None.
-      job_poll_interval: integer saying how often to poll for job
-        completion.  Not used by providers for which submit job is a
-        synchronous operation.
-      job_stdout_file: String giving the location of the file in
-        which to put the standard out of the job.
-      job_arguments: Arguments to pass to class_name.  These are
-        not the arguments passed to the wrapper that submits the
-        job.
+      job_poll_interval: integer saying how often to poll for job completion.
+        Not used by providers for which submit job is a synchronous operation.
+      job_stdout_file: String giving the location of the file in which to put
+        the standard out of the job.
+      job_arguments: Arguments to pass to class_name.  These are not the
+        arguments passed to the wrapper that submits the job.
       job_type: The type of the job.
 
     Returns:
@@ -162,13 +174,16 @@ class BaseSparkService(resource.BaseResource):
         'spark_service': self.SERVICE_NAME,
         'spark_svc_cloud': self.CLOUD,
         'spark_cluster_id': self.cluster_id,
-        'spark_cluster_zone': getattr(self, 'zone', None) or 'unknown'
+        'spark_cluster_zone': getattr(self, 'zone', None) or 'unknown',
     }
     # TODO grab this information for user_managed clusters.
     if not self.user_managed:
-      basic_data.update({'num_workers': str(self.spec.worker_group.vm_count),
-                         'worker_machine_type':
-                         str(self.spec.worker_group.vm_spec.machine_type)})
+      basic_data.update({
+          'num_workers': str(self.spec.worker_group.vm_count),
+          'worker_machine_type': str(
+              self.spec.worker_group.vm_spec.machine_type
+          ),
+      })
     return basic_data
 
   @classmethod
@@ -209,26 +224,31 @@ class PkbSparkService(BaseSparkService):
 
     if 'worker_group' not in self.vms:
       raise errors.Resource.CreationError(
-          'PkbSparkService requires worker_group VMs.')
+          'PkbSparkService requires worker_group VMs.'
+      )
     background_tasks.RunThreaded(
         InstallHadoop, self.vms['worker_group'] + self.vms['master_group']
     )
     self.leader = self.vms['master_group'][0]
-    hadoop.ConfigureAndStart(self.leader,
-                             self.vms['worker_group'])
+    hadoop.ConfigureAndStart(self.leader, self.vms['worker_group'])
 
   def _Delete(self):
     pass
 
-  def SubmitJob(self, jar_file, class_name, job_poll_interval=None,  # pytype: disable=signature-mismatch  # overriding-default-value-checks
-                job_stdout_file=None, job_arguments=None,
-                job_type=SPARK_JOB_TYPE):
+  def SubmitJob(
+      self,
+      jar_file,
+      class_name,
+      job_poll_interval=None,  # pytype: disable=signature-mismatch  # overriding-default-value-checks
+      job_stdout_file=None,
+      job_arguments=None,
+      job_type=SPARK_JOB_TYPE,
+  ):
     """Submit the jar file."""
     if job_type == SPARK_JOB_TYPE:
       raise NotImplementedError()
 
-    cmd_list = [posixpath.join(hadoop.HADOOP_BIN, 'hadoop'),
-                'jar', jar_file]
+    cmd_list = [posixpath.join(hadoop.HADOOP_BIN, 'hadoop'), 'jar', jar_file]
     if class_name:
       cmd_list.append(class_name)
     if job_arguments:
@@ -240,15 +260,18 @@ class PkbSparkService(BaseSparkService):
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
         f.write(stdout)
-    return {SUCCESS: True,
-            RUNTIME: (end_time - start_time).total_seconds()}
+    return {SUCCESS: True, RUNTIME: (end_time - start_time).total_seconds()}
 
   @classmethod
   def GetExampleJar(cls, job_type):
     if job_type == HADOOP_JOB_TYPE:
       return posixpath.join(
-          hadoop.HADOOP_DIR, 'share', 'hadoop', 'mapreduce',
-          'hadoop-mapreduce-examples-{0}.jar'.format(FLAGS.hadoop_version))
+          hadoop.HADOOP_DIR,
+          'share',
+          'hadoop',
+          'mapreduce',
+          'hadoop-mapreduce-examples-{0}.jar'.format(FLAGS.hadoop_version),
+      )
     else:
       raise NotImplementedError()
 

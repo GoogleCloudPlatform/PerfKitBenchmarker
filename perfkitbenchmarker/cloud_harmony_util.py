@@ -15,34 +15,52 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_boolean('ch_store_results', False,
-                     'Whether to store cloudharmony benchmark reports. '
-                     'Defaults to False, can be turned on for production runs. '
-                     'This flag is used to produce benchmark reports.')
-STORE = flags.DEFINE_string('ch_results_store', None,
-                            'Storage to store cloudharmony benchmark reports. '
-                            'Used if ch_store_results is set to True.')
-BUCKET = flags.DEFINE_string('ch_results_bucket', None,
-                             'Bucket to store cloudharmony benchmark reports. '
-                             'Used if ch_store_results is set to True.')
+flags.DEFINE_boolean(
+    'ch_store_results',
+    False,
+    'Whether to store cloudharmony benchmark reports. '
+    'Defaults to False, can be turned on for production runs. '
+    'This flag is used to produce benchmark reports.',
+)
+STORE = flags.DEFINE_string(
+    'ch_results_store',
+    None,
+    'Storage to store cloudharmony benchmark reports. '
+    'Used if ch_store_results is set to True.',
+)
+BUCKET = flags.DEFINE_string(
+    'ch_results_bucket',
+    None,
+    'Bucket to store cloudharmony benchmark reports. '
+    'Used if ch_store_results is set to True.',
+)
 KEY = flags.DEFINE_string(
-    'ch_results_key', None,
+    'ch_results_key',
+    None,
     'Access key to store cloudharmony benchmark reports. '
-    'Used in conjunction with ch_results_bucket')
+    'Used in conjunction with ch_results_bucket',
+)
 SECRET = flags.DEFINE_string(
-    'ch_results_secret', None,
+    'ch_results_secret',
+    None,
     'Access secret to store cloudharmony benchmark reports. '
-    'Used in conjunction with ch_results_bucket')
+    'Used in conjunction with ch_results_bucket',
+)
 
 ITERATIONS = flags.DEFINE_integer(
-    'ch_iterations', 1, 'The number of times to run the test. Multiple test '
-    'iterations will be grouped and saved in the same results resport.')
+    'ch_iterations',
+    1,
+    'The number of times to run the test. Multiple test '
+    'iterations will be grouped and saved in the same results resport.',
+)
 
 
 def GetSaveCommand() -> str:
   """Returns the cloudharmony command to save benchmark reports."""
-  return (f' --db_and_csv --store {STORE.value} --store_key {KEY.value} '
-          f' --store_secret {SECRET.value} --store_container {BUCKET.value} ')
+  return (
+      f' --db_and_csv --store {STORE.value} --store_key {KEY.value} '
+      f' --store_secret {SECRET.value} --store_container {BUCKET.value} '
+  )
 
 
 def GetRegionFromZone(zone: str) -> str:
@@ -53,8 +71,9 @@ def GetRegionFromZone(zone: str) -> str:
     return zone
 
 
-def ParseCsvResultsIntoMetadata(vm: virtual_machine.BaseVirtualMachine,
-                                path: str) -> List[Dict[str, Any]]:
+def ParseCsvResultsIntoMetadata(
+    vm: virtual_machine.BaseVirtualMachine, path: str
+) -> List[Dict[str, Any]]:
   """Loads the CSV created by cloud harmony at path in the VM into metadata.
 
   The CSV located by path inside of virtual machine VM will be loaded. For each
@@ -64,6 +83,7 @@ def ParseCsvResultsIntoMetadata(vm: virtual_machine.BaseVirtualMachine,
   Args:
      vm: the Virtual Machine that has run a cloud harmony benchmark
      path: The path inside of VM which has the CSV file which should be loaded
+
   Returns:
      A list of metadata outputs that should be appended to the samples that are
      produced by a cloud harmony benchmark.
@@ -73,8 +93,9 @@ def ParseCsvResultsIntoMetadata(vm: virtual_machine.BaseVirtualMachine,
   return ParseCsvResultsFromString(csv_string)
 
 
-def ParseCsvResultsFromString(csv_string: str,
-                              prefix: str = '') -> List[Dict[str, Any]]:
+def ParseCsvResultsFromString(
+    csv_string: str, prefix: str = ''
+) -> List[Dict[str, Any]]:
   """Loads the CSV created by cloud harmony in csv_string.
 
   The CSV will be loaded into a pandas data frame.
@@ -85,8 +106,9 @@ def ParseCsvResultsFromString(csv_string: str,
   Args:
      csv_string:  a string of the CSV which was produced by cloud_harmony
      prefix: a string prefix to attach to the metadata. Defaults to empty
-     string. It can be set to a unique string if cloudharmony data is
-     attached to every sample instead of being its own sample.
+       string. It can be set to a unique string if cloudharmony data is attached
+       to every sample instead of being its own sample.
+
   Returns:
      A list of metadata dictionaries, where each dict represents one row of
      results (an iteration) in the csv string.
@@ -118,7 +140,8 @@ def GetCommonMetadata(custom_metadata: Optional[Dict[str, Any]] = None) -> str:
 
   Args:
      custom_metadata: a dictionary of metadata key value pairs that should
-     override any flag chosen in the function, or should also be included.
+       override any flag chosen in the function, or should also be included.
+
   Returns:
      A string of metadata that should be appended to the cloudharmony
      benchmark run.
@@ -145,7 +168,8 @@ def GetCommonMetadata(custom_metadata: Optional[Dict[str, Any]] = None) -> str:
 
 
 def GetMetadataSamples(
-    cloud_harmony_metadata: List[Dict[Any, Any]]) -> List[sample.Sample]:
+    cloud_harmony_metadata: List[Dict[Any, Any]]
+) -> List[sample.Sample]:
   """Returns the cloudharmony metadata as a list of samples.
 
   This function is commonly used across all cloudharmony benchmarks.
@@ -156,7 +180,6 @@ def GetMetadataSamples(
   Returns:
     A list of sample.Sample objects of cloudharmony metadata, where one sample
     represents one row of csv results (one row = one test iteration).
-
   """
   samples = []
   for result in cloud_harmony_metadata:

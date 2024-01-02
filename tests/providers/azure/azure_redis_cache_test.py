@@ -15,7 +15,6 @@
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import azure_redis_cache
@@ -32,8 +31,9 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.zones = ['eastus']
     mock_spec = mock.Mock()
     mock_resource_group = mock.Mock()
-    self.resource_group_patch = mock.patch.object(azure_network,
-                                                  'GetResourceGroup').start()
+    self.resource_group_patch = mock.patch.object(
+        azure_network, 'GetResourceGroup'
+    ).start()
     self.resource_group_patch.return_value = mock_resource_group
     mock_resource_group.name = 'az_resource'
     self.redis = azure_redis_cache.AzureRedisCache(mock_spec)
@@ -42,9 +42,20 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCreate(self):
     self.mock_command.return_value = (None, '', None)
     expected_output = [
-        'az', 'redis', 'create', '--resource-group', 'az_resource',
-        '--location', 'us-central1', '--name', 'pkb-None', '--sku', 'Basic',
-        '--vm-size', 'C3', '--enable-non-ssl-port'
+        'az',
+        'redis',
+        'create',
+        '--resource-group',
+        'az_resource',
+        '--location',
+        'us-central1',
+        '--name',
+        'pkb-None',
+        '--sku',
+        'Basic',
+        '--vm-size',
+        'C3',
+        '--enable-non-ssl-port',
     ]
     self.redis._Create()
     self.mock_command.assert_called_once_with(expected_output, timeout=900)
@@ -52,8 +63,14 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testDelete(self):
     self.mock_command.return_value = (None, '', None)
     expected_output = [
-        'az', 'redis', 'delete', '--resource-group', 'az_resource', '--name',
-        'pkb-None', '--yes'
+        'az',
+        'redis',
+        'delete',
+        '--resource-group',
+        'az_resource',
+        '--name',
+        'pkb-None',
+        '--yes',
     ]
     self.redis._Delete()
     self.mock_command.assert_called_once_with(expected_output, timeout=900)
@@ -61,12 +78,18 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testExistTrue(self):
     self.mock_command.return_value = (None, '', 0)
     expected_output = [
-        'az', 'redis', 'show', '--resource-group', 'az_resource', '--name',
-        'pkb-None'
+        'az',
+        'redis',
+        'show',
+        '--resource-group',
+        'az_resource',
+        '--name',
+        'pkb-None',
     ]
     self.redis._Exists()
     self.mock_command.assert_called_once_with(
-        expected_output, raise_on_failure=False)
+        expected_output, raise_on_failure=False
+    )
 
 
 if __name__ == '__main__':

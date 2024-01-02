@@ -1,4 +1,5 @@
 r"""Installs MPI library (Intel or OpenMPI) and compiles Intel MPI benchmarks (IMB) from source."""
+
 import logging
 import posixpath
 from typing import List, Optional
@@ -10,21 +11,26 @@ from perfkitbenchmarker.linux_packages import intelmpi
 FLAGS = flags.FLAGS
 
 COMPILE_FROM_SOURCE = flags.DEFINE_bool(
-    'imb_compile_from_source', True,
-    'Whether to compile the Intel MPI benchmarks from source.')
+    'imb_compile_from_source',
+    True,
+    'Whether to compile the Intel MPI benchmarks from source.',
+)
 
 _INTEL_DIR = '/opt/intel'
-_INTEL_COMPILER_DIR = posixpath.join(_INTEL_DIR,
-                                     'compilers_and_libraries/linux')
-_INTEL_COMPILER_DIR_2020 = posixpath.join(_INTEL_DIR,
-                                          'compilers_and_libraries_2020/linux')
+_INTEL_COMPILER_DIR = posixpath.join(
+    _INTEL_DIR, 'compilers_and_libraries/linux'
+)
+_INTEL_COMPILER_DIR_2020 = posixpath.join(
+    _INTEL_DIR, 'compilers_and_libraries_2020/linux'
+)
 
 # TBB: Intel's "Thread Building Blocks" for multithreaded programs
 # https://en.wikipedia.org/wiki/Threading_Building_Blocks
 _INTEL_FIX_TBBROOT_CMD = (
     "sudo sed -i 's"
     "#TBBROOT=SUBSTITUTE_INSTALL_DIR_HERE#TBBROOT={compiler_dir}/tbb#' "
-    '{compiler_dir}/tbb/bin/tbbvars.sh')
+    '{compiler_dir}/tbb/bin/tbbvars.sh'
+)
 
 # Source for the Intel MPI benchmarks
 _GITHUB_URL = 'https://github.com/intel/mpi-benchmarks.git'
@@ -32,52 +38,58 @@ _GITHUB_COMMIT = '2d752544461f04111efef0926efe46826d90f720'
 # Directory for the MPI benchmarks
 _MPI_BENCHMARK_DIR = 'mpi-benchmarks'
 # Checks out the Intel MPI benchmarks
-_GIT_CHECKOUT_CMD = (f'git clone -n {_GITHUB_URL}; cd mpi-benchmarks; '
-                     f'git checkout {_GITHUB_COMMIT}')
+_GIT_CHECKOUT_CMD = (
+    f'git clone -n {_GITHUB_URL}; cd mpi-benchmarks; '
+    f'git checkout {_GITHUB_COMMIT}'
+)
 
 # Patch file and command to add latency histogram to Intel test code
 _PATCH_FILE = 'intelmpi.patch'
 _GIT_PATCH_CMD = f'patch -d {_MPI_BENCHMARK_DIR} -p3 < ~/{_PATCH_FILE}'
 
 # Enable verbose logging when mpirun fails due to a segfault
-_ENABLE_VERBOSE_SEGFAULT_LOGS = ('echo 1 | sudo tee -a '
-                                 '/proc/sys/kernel/print-fatal-signals')
+_ENABLE_VERBOSE_SEGFAULT_LOGS = (
+    'echo 1 | sudo tee -a /proc/sys/kernel/print-fatal-signals'
+)
 
 
-def _InstallForIntelMpiLibrary(
-    vm) -> None:
+def _InstallForIntelMpiLibrary(vm) -> None:
   """Compiles the Intel MPI benchmarks for Intel MPI library."""
   if intel_repo.UseOneApi():
     vm.InstallPackages('intel-oneapi-compiler-dpcpp-cpp')
     vm.InstallPackages('intel-oneapi-mpi-devel')  # for mpi.h
     source_cmds = f'. {intel_repo.ONEAPI_VARS_FILE}'
   else:
-    source_cmds = (f'. {_INTEL_DIR}/mkl/bin/mklvars.sh intel64; '
-                   f'. {_INTEL_COMPILER_DIR}/bin/compilervars.sh intel64')
+    source_cmds = (
+        f'. {_INTEL_DIR}/mkl/bin/mklvars.sh intel64; '
+        f'. {_INTEL_COMPILER_DIR}/bin/compilervars.sh intel64'
+    )
     for compiler_dir in (_INTEL_COMPILER_DIR, _INTEL_COMPILER_DIR_2020):
       vm.RemoteCommand(
           _INTEL_FIX_TBBROOT_CMD.format(compiler_dir=compiler_dir),
-          ignore_failure=True)
+          ignore_failure=True,
+      )
   vm.RemoteCommand(_GIT_CHECKOUT_CMD)
   vm.PushDataFile(_PATCH_FILE)
   vm.RemoteCommand(_GIT_PATCH_CMD)
   # Default make uses the Intel compiler (mpiicc) not available in repos
   # {source_cmds} filled in at runtime due to differences in 2018/19 vs 2021
   compile_benchmark_cmd = (
-      f'cd {_MPI_BENCHMARK_DIR}; {source_cmds}; CC=mpicc CXX=mpicxx make')
+      f'cd {_MPI_BENCHMARK_DIR}; {source_cmds}; CC=mpicc CXX=mpicxx make'
+  )
   vm.RemoteCommand(compile_benchmark_cmd)
   vm.RemoteCommand(_ENABLE_VERBOSE_SEGFAULT_LOGS)
 
 
-def _InstallForOpenMpiLibrary(
-    vm) -> None:
+def _InstallForOpenMpiLibrary(vm) -> None:
   """Compiles the Intel MPI benchmarks for OpenMPI library."""
   vm.RemoteCommand(_GIT_CHECKOUT_CMD)
   vm.PushDataFile(_PATCH_FILE)
   vm.RemoteCommand(_GIT_PATCH_CMD)
   # When installing OpenMPI, openmpi.py runs ./configure.sh with --prefix=/usr.
   compile_benchmark_cmd = (
-      f'cd {_MPI_BENCHMARK_DIR}; CC=/usr/bin/mpicc CXX=/usr/bin/mpicxx make')
+      f'cd {_MPI_BENCHMARK_DIR}; CC=/usr/bin/mpicc CXX=/usr/bin/mpicxx make'
+  )
   vm.RemoteCommand(compile_benchmark_cmd)
   vm.RemoteCommand(_ENABLE_VERBOSE_SEGFAULT_LOGS)
 
@@ -94,7 +106,8 @@ def Install(vm) -> None:
   elif FLAGS.mpi_vendor == 'openmpi':
     if not COMPILE_FROM_SOURCE.value:
       raise ValueError(
-          f'--mpi_vendor=openmpi requires --{COMPILE_FROM_SOURCE.name}')
+          f'--mpi_vendor=openmpi requires --{COMPILE_FROM_SOURCE.name}'
+      )
     mpilib = 'openmpi'
     install_benchmarks = _InstallForOpenMpiLibrary
 
@@ -107,9 +120,14 @@ def Install(vm) -> None:
 
 
 def _MpiRunCommandForIntelMpiLibrary(
-    vm, hosts: List[str],
-    total_processes: int, ppn: int, environment: List[str],
-    global_environment: List[str], tune: bool) -> str:
+    vm,
+    hosts: List[str],
+    total_processes: int,
+    ppn: int,
+    environment: List[str],
+    global_environment: List[str],
+    tune: bool,
+) -> str:
   """String command to call mpirun using Intel MPI library.
 
   See Intel docs for details:
@@ -143,7 +161,8 @@ def _MpiRunCommandForIntelMpiLibrary(
   if tune:
     cmd_elements.append('-tune')
   cmd_elements.extend(
-      f'-genv {variable}' for variable in sorted(global_environment))
+      f'-genv {variable}' for variable in sorted(global_environment)
+  )
   cmd_elements.append(f'-n {total_processes}')
   # hosts MUST remain in same order so that latency file created on first host
   hosts_str = ','.join(hosts)
@@ -156,9 +175,12 @@ def _MpiRunCommandForIntelMpiLibrary(
   return ' '.join(cmd_elements)
 
 
-def _MpiRunCommandForOpenMpiLibrary(hosts: List[str], total_processes: int,
-                                    npernode: int,
-                                    environment: List[str]) -> str:
+def _MpiRunCommandForOpenMpiLibrary(
+    hosts: List[str],
+    total_processes: int,
+    npernode: int,
+    environment: List[str],
+) -> str:
   """String command to call mpirun using OpenMPI library.
 
   Args:
@@ -177,7 +199,8 @@ def _MpiRunCommandForOpenMpiLibrary(hosts: List[str], total_processes: int,
   cmd_elements = [f'{env_var}' for env_var in environment]
   cmd_elements.append('mpirun')
   cmd_elements.extend(
-      [f'-x {env_var.split("=", 1)[0]}' for env_var in environment])
+      [f'-x {env_var.split("=", 1)[0]}' for env_var in environment]
+  )
 
   # Useful for verifying process mapping.
   cmd_elements.append('-report-bindings')
@@ -195,15 +218,21 @@ def _MpiRunCommandForOpenMpiLibrary(hosts: List[str], total_processes: int,
   return ' '.join(cmd_elements)
 
 
-def MpiRunCommand(vm,
-                  hosts: List[str], total_processes: int, ppn: int,
-                  environment: List[str], global_environment: List[str],
-                  tune: bool) -> Optional[str]:
+def MpiRunCommand(
+    vm,
+    hosts: List[str],
+    total_processes: int,
+    ppn: int,
+    environment: List[str],
+    global_environment: List[str],
+    tune: bool,
+) -> Optional[str]:
   """String command to call mpirun."""
   if FLAGS.mpi_vendor == 'intel':
-    return _MpiRunCommandForIntelMpiLibrary(vm, hosts, total_processes, ppn,
-                                            environment, global_environment,
-                                            tune)
+    return _MpiRunCommandForIntelMpiLibrary(
+        vm, hosts, total_processes, ppn, environment, global_environment, tune
+    )
   elif FLAGS.mpi_vendor == 'openmpi':
-    return _MpiRunCommandForOpenMpiLibrary(hosts, total_processes, ppn,
-                                           environment)
+    return _MpiRunCommandForOpenMpiLibrary(
+        hosts, total_processes, ppn, environment
+    )

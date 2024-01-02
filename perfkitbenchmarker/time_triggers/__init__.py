@@ -31,5 +31,3 @@ def RegisterAll(unused_sender, parsed_flags):
     module.Register(parsed_flags)
 
   events.RegisterTracingEvents()
-
-

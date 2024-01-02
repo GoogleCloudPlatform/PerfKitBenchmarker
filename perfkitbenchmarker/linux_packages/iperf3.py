@@ -22,7 +22,8 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.InstallPackages('lib32z1')
   vm.RemoteCommand(
-      'wget https://downloads.es.net/pub/iperf/iperf-3.9.tar.gz --no-check-certificate'
+      'wget https://downloads.es.net/pub/iperf/iperf-3.9.tar.gz'
+      ' --no-check-certificate'
   )
   vm.RemoteCommand('tar -xf iperf-3.9.tar.gz')
   vm.RemoteCommand('cd iperf-3.9 && ./configure')

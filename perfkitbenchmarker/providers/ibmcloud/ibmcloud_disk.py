@@ -17,7 +17,6 @@ import json
 import logging
 import re
 import time
-
 from typing import Any, Dict, Optional
 
 from absl import flags
@@ -72,7 +71,7 @@ class IbmCloudDisk(disk.BaseDisk):
         'zone': self.zone,
         'iops': FLAGS.ibmcloud_volume_iops,
         'profile': FLAGS.ibmcloud_volume_profile,
-        'capacity': self.data_disk_size
+        'capacity': self.data_disk_size,
     })
     if self.encryption_key is not None:
       volcmd.flags['encryption_key'] = self.encryption_key
@@ -116,15 +115,17 @@ class IbmCloudDisk(disk.BaseDisk):
     if self.vol_id is None:
       raise errors.Error(f'Cannot attach remote volume {self.name}')
     if vm.vmid is None:
-      raise errors.Error(f'Cannot attach remote volume {self.name} '
-                         'to non-existing {vm.name} VM')
+      raise errors.Error(
+          f'Cannot attach remote volume {self.name} '
+          'to non-existing {vm.name} VM'
+      )
 
     volcmd = ibm.IbmAPICommand(self)
     volcmd.flags.update({
         'name': self.name,
         'instanceid': vm.vmid,
         'volume': self.vol_id,
-        'delete': True
+        'delete': True,
     })
 
     # wait till volume is PROVISIONED before attach
@@ -145,8 +146,12 @@ class IbmCloudDisk(disk.BaseDisk):
     resp = json.loads(volcmd.InstanceCreateVolume())
     logging.info('Attached volume, volcmd.flags %s', volcmd.flags)
     volume = resp['id']
-    logging.info('VDISK ID: %s, vdiskname: %s, instanceid: %s', volume,
-                 self.name, vm.vmid)
+    logging.info(
+        'VDISK ID: %s, vdiskname: %s, instanceid: %s',
+        volume,
+        self.name,
+        vm.vmid,
+    )
     self.attached_vdisk_uri = volume
     self.attached_vm = vm
     self._WaitForVolumeAttachment(vm)
@@ -157,18 +162,19 @@ class IbmCloudDisk(disk.BaseDisk):
       max_retries=-1,
       timeout=_MAX_DISK_ATTACH_SECONDS,
       log_errors=False,
-      retryable_exceptions=errors.Resource.RetryableCreationError)
+      retryable_exceptions=errors.Resource.RetryableCreationError,
+  )
   def _WaitForVolumeAttachment(self, vm):
     """Waits and checks until the volume status is attached."""
     if self.vol_id is None:
       return
     volcmd = ibm.IbmAPICommand(self)
-    volcmd.flags.update({
-        'instanceid': self.attached_vm.vmid,
-        'volume': self.vol_id
-    })
-    logging.info('Checking volume on instance %s, volume: %s', vm.vmid,
-                 self.vol_id)
+    volcmd.flags.update(
+        {'instanceid': self.attached_vm.vmid, 'volume': self.vol_id}
+    )
+    logging.info(
+        'Checking volume on instance %s, volume: %s', vm.vmid, self.vol_id
+    )
     status = None
     endtime = time.time() + _MAX_DISK_ATTACH_SECONDS
     while time.time() < endtime:
@@ -178,8 +184,9 @@ class IbmCloudDisk(disk.BaseDisk):
         status = resp.get('status', 'unknown')
         logging.info('Checking instance volume status: %s', status)
         if status == ibm.States.ATTACHED:
-          logging.info('Remote volume %s has been attached to %s', self.name,
-                       vm.name)
+          logging.info(
+              'Remote volume %s has been attached to %s', self.name, vm.name
+          )
           break
       time.sleep(2)
     if status != ibm.States.ATTACHED:

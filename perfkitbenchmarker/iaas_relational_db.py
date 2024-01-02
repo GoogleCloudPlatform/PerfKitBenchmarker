@@ -30,6 +30,7 @@ MSSQL_PID = 'developer'  # Edition of SQL server on Linux
 
 class IAASRelationalDb(relational_db.BaseRelationalDb):
   """Object representing a IAAS relational database Service."""
+
   IS_MANAGED = False
   REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
   DEFAULT_ENGINE_VERSION = None
@@ -59,8 +60,9 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
       The server_vm.
     """
     if not hasattr(self, '_server_vm'):
-      raise relational_db.RelationalDbPropertyNotSetError('server_vm is '
-                                                          'not set')
+      raise relational_db.RelationalDbPropertyNotSetError(
+          'server_vm is not set'
+      )
     return self._server_vm
 
   @server_vm.setter
@@ -71,10 +73,16 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
   def server_vm_query_tools(self):
     if not hasattr(self, '_server_vm_query_tools'):
       connection_properties = sql_engine_utils.DbConnectionProperties(
-          self.spec.engine, self.spec.engine_version, 'localhost', self.port,
-          self.spec.database_username, self.spec.database_password)
+          self.spec.engine,
+          self.spec.engine_version,
+          'localhost',
+          self.port,
+          self.spec.database_username,
+          self.spec.database_password,
+      )
       self._server_vm_query_tools = sql_engine_utils.GetQueryToolsByEngine(
-          self.server_vm, connection_properties)
+          self.server_vm, connection_properties
+      )
     return self._server_vm_query_tools
 
   def SetVms(self, vm_groups):

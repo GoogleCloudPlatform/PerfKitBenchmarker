@@ -19,9 +19,12 @@ from perfkitbenchmarker import resource
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_bool('use_capacity_reservations', False,
-                  'Whether to use capacity reservations for virtual '
-                  'machines. Only supported on AWS.')
+flags.DEFINE_bool(
+    'use_capacity_reservations',
+    False,
+    'Whether to use capacity reservations for virtual '
+    'machines. Only supported on AWS.',
+)
 
 
 def GetResourceClass(cloud):

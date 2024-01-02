@@ -16,7 +16,6 @@
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_cluster_subnet_group
 from perfkitbenchmarker.providers.aws import util
@@ -30,7 +29,8 @@ FLAGS = flags.FLAGS
 
 
 class RedshiftClusterSubnetGroupTestCase(
-    pkb_common_test_case.PkbCommonTestCase):
+    pkb_common_test_case.PkbCommonTestCase
+):
 
   def setUp(self):
     super(RedshiftClusterSubnetGroupTestCase, self).setUp()
@@ -39,33 +39,51 @@ class RedshiftClusterSubnetGroupTestCase(
 
   def testValidClusterParameterGroupCreation(self):
     csg = aws_cluster_subnet_group.RedshiftClusterSubnetGroup(
-        list(util.AWS_PREFIX))
+        list(util.AWS_PREFIX)
+    )
     csg.subnet_id = CLUSTER_SUBNET_ID
     self.assertEqual(csg.name, 'pkb-%s' % TEST_RUN_URI)
     with mock.patch(
-        vm_util.__name__ + '.IssueCommand',
-        return_value=('out_', 'err_', 0)) as mock_issue:
+        vm_util.__name__ + '.IssueCommand', return_value=('out_', 'err_', 0)
+    ) as mock_issue:
       csg._Create()
       mock_issue.assert_called_once()
       mock_issue.assert_called_with([
-          'aws', '--output', 'json', 'redshift', 'create-cluster-subnet-group',
-          '--cluster-subnet-group-name', 'pkb-%s' % TEST_RUN_URI,
-          '--description', 'Cluster Subnet Group for run uri %s' % TEST_RUN_URI,
-          '--subnet-ids', CLUSTER_SUBNET_ID])
+          'aws',
+          '--output',
+          'json',
+          'redshift',
+          'create-cluster-subnet-group',
+          '--cluster-subnet-group-name',
+          'pkb-%s' % TEST_RUN_URI,
+          '--description',
+          'Cluster Subnet Group for run uri %s' % TEST_RUN_URI,
+          '--subnet-ids',
+          CLUSTER_SUBNET_ID,
+      ])
 
   def testValidClusterParameterGroupDeletion(self):
     csg = aws_cluster_subnet_group.RedshiftClusterSubnetGroup(
-        list(util.AWS_PREFIX))
+        list(util.AWS_PREFIX)
+    )
     self.assertEqual(csg.name, 'pkb-%s' % TEST_RUN_URI)
     with mock.patch(
-        vm_util.__name__ + '.IssueCommand',
-        return_value=('out_', 'err_', 0)) as mock_issue:
+        vm_util.__name__ + '.IssueCommand', return_value=('out_', 'err_', 0)
+    ) as mock_issue:
       csg._Delete()
       mock_issue.assert_called_once()
       mock_issue.assert_called_with(
-          ['aws', '--output', 'json', 'redshift', 'delete-cluster-subnet-group',
-           '--cluster-subnet-group-name', 'pkb-%s' % TEST_RUN_URI],
-          raise_on_failure=False)
+          [
+              'aws',
+              '--output',
+              'json',
+              'redshift',
+              'delete-cluster-subnet-group',
+              '--cluster-subnet-group-name',
+              'pkb-%s' % TEST_RUN_URI,
+          ],
+          raise_on_failure=False,
+      )
 
 
 if __name__ == '__main__':

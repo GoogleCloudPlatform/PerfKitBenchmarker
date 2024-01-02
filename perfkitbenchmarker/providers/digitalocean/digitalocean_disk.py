@@ -77,18 +77,16 @@ class DigitalOceanBlockStorageDisk(disk.BaseDisk):
   def _Create(self):
     self.volume_name = 'pkb-%s-%s' % (FLAGS.run_uri, self.disk_number)
 
-    response, retcode = util.DoctlAndParse(
-        [
-            'compute',
-            'volume',
-            'create',
-            self.volume_name,
-            '--region',
-            self.zone,
-            '--size',
-            str(self.disk_size) + 'gb',
-        ]
-    )
+    response, retcode = util.DoctlAndParse([
+        'compute',
+        'volume',
+        'create',
+        self.volume_name,
+        '--region',
+        self.zone,
+        '--size',
+        str(self.disk_size) + 'gb',
+    ])
     if retcode:
       raise errors.Resource.RetryableCreationError(
           'Error creating disk: %s' % (response,)

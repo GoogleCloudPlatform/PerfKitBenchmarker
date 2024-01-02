@@ -13,7 +13,8 @@ def _MockIssueCommand(file_name_text_response):
   with open(path) as f:
     output = f.read()
   return mock.patch.object(
-      vm_util, 'IssueCommand', autospec=True, return_value=[output, None, None])
+      vm_util, 'IssueCommand', autospec=True, return_value=[output, None, None]
+  )
 
 
 class AwsUtilTest(pkb_common_test_case.PkbCommonTestCase):
@@ -21,19 +22,25 @@ class AwsUtilTest(pkb_common_test_case.PkbCommonTestCase):
   def testGetZonesInRegion(self):
     test_region = 'us-east-1'
     self.enter_context(
-        _MockIssueCommand('aws-ec2-describe-availability-zones-output.json'))
+        _MockIssueCommand('aws-ec2-describe-availability-zones-output.json')
+    )
 
     actual_zones = util.GetZonesInRegion(test_region)
 
     expected_zones = {
-        'us-east-1a', 'us-east-1b', 'us-east-1c', 'us-east-1d', 'us-east-1e',
-        'us-east-1f'
+        'us-east-1a',
+        'us-east-1b',
+        'us-east-1c',
+        'us-east-1d',
+        'us-east-1e',
+        'us-east-1f',
     }
     self.assertEqual(expected_zones, actual_zones)
 
   def testGetAllRegions(self):
     self.enter_context(
-        _MockIssueCommand('aws-ec2-describe-regions-output.json'))
+        _MockIssueCommand('aws-ec2-describe-regions-output.json')
+    )
 
     actual_regions = util.GetAllRegions()
 
@@ -50,7 +57,8 @@ class AwsUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testGetRegionsInGeo(self):
     self.enter_context(
-        _MockIssueCommand('aws-ec2-describe-regions-output.json'))
+        _MockIssueCommand('aws-ec2-describe-regions-output.json')
+    )
 
     actual_regions = util.GetRegionsInGeo('us')
 

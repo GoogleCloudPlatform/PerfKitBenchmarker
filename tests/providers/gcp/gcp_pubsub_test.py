@@ -33,7 +33,8 @@ class GcpPubsubTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _MockIssueCommand(self, return_value):
     return self.enter_context(
-        mock.patch.object(vm_util, 'IssueCommand', return_value=return_value))
+        mock.patch.object(vm_util, 'IssueCommand', return_value=return_value)
+    )
 
   def testCreateTopic(self):
     # Don't actually issue a command.
@@ -102,8 +103,9 @@ class GcpPubsubTest(pkb_common_test_case.PkbCommonTestCase):
     return_value = ['', '', 1]
     cmd = self._MockIssueCommand(return_value)
 
-    self.assertRaises(errors.Resource.CreationError,
-                      self.pubsub._CreateSubscription)
+    self.assertRaises(
+        errors.Resource.CreationError, self.pubsub._CreateSubscription
+    )
     cmd = ' '.join(cmd.call_args[0][0])
     self.assertIn('gcloud pubsub subscriptions create ' + SUBSCRIPTION, cmd)
 
@@ -155,40 +157,46 @@ class GcpPubsubTest(pkb_common_test_case.PkbCommonTestCase):
     self.pubsub.PrepareClientVm()
     self.client.assert_has_calls([
         mock.call.RemoteCommand(
-            'sudo pip3 install --upgrade --ignore-installed google-cloud-pubsub',
-            ignore_failure=False),
+            'sudo pip3 install --upgrade --ignore-installed'
+            ' google-cloud-pubsub',
+            ignore_failure=False,
+        ),
         mock.call.RemoteCommand(
-            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp'
+            'mkdir -p'
+            ' ~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp'
         ),
         mock.call.PushDataFile(
             'messaging_service_scripts/gcp/__init__.py',
-            '~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp/__init__.py'
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp/__init__.py',
         ),
         mock.call.RemoteCommand(
-            'mkdir -p ~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp'
+            'mkdir -p'
+            ' ~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp'
         ),
         mock.call.PushDataFile(
             'messaging_service_scripts/gcp/gcp_pubsub_client.py',
-            '~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp/gcp_pubsub_client.py'
+            '~/perfkitbenchmarker/scripts/messaging_service_scripts/gcp/gcp_pubsub_client.py',
         ),
         mock.call.PushDataFile('messaging_service_scripts/gcp_benchmark.py'),
     ])
 
   def testRun(self):
-
     return_value = ['{"mock1": 1}', None]
     self.client.RemoteCommand.return_value = return_value
-    remote_run_cmd = (f'python3 -m gcp_benchmark '
-                      f'--pubsub_project={PROJECT} '
-                      f'--pubsub_topic={TOPIC} '
-                      f'--pubsub_subscription={SUBSCRIPTION} '
-                      f'--benchmark_scenario={BENCHMARK_SCENARIO} '
-                      f'--number_of_messages={NUMBER_OF_MESSAGES} '
-                      f'--message_size={MESSAGE_SIZE} '
-                      f'--warmup_messages={WARMUP_MESSAGES}')
+    remote_run_cmd = (
+        'python3 -m gcp_benchmark '
+        f'--pubsub_project={PROJECT} '
+        f'--pubsub_topic={TOPIC} '
+        f'--pubsub_subscription={SUBSCRIPTION} '
+        f'--benchmark_scenario={BENCHMARK_SCENARIO} '
+        f'--number_of_messages={NUMBER_OF_MESSAGES} '
+        f'--message_size={MESSAGE_SIZE} '
+        f'--warmup_messages={WARMUP_MESSAGES}'
+    )
 
-    self.pubsub.Run(BENCHMARK_SCENARIO, NUMBER_OF_MESSAGES, MESSAGE_SIZE,
-                    WARMUP_MESSAGES)
+    self.pubsub.Run(
+        BENCHMARK_SCENARIO, NUMBER_OF_MESSAGES, MESSAGE_SIZE, WARMUP_MESSAGES
+    )
     self.client.RemoteCommand.assert_called_with(remote_run_cmd)
 
   @mock.patch.object(pubsub.GCPCloudPubSub, '_DeleteSubscription')

@@ -17,7 +17,6 @@
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker.providers.ibmcloud import ibmcloud_disk
 from tests import pkb_common_test_case
 
@@ -31,15 +30,19 @@ class IbmcloudDiskGetDevicePathTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(IbmcloudDiskGetDevicePathTest, self).setUp()
     # Patch the __init__ method for simplicity.
-    with mock.patch.object(ibmcloud_disk.IbmCloudDisk, '__init__',
-                           lambda self: None):
+    with mock.patch.object(
+        ibmcloud_disk.IbmCloudDisk, '__init__', lambda self: None
+    ):
       self.disk = ibmcloud_disk.IbmCloudDisk()
 
   def run_cmd(self, cmd):
     return (
-        'Disk /dev/vde: 8589.9 GB, 8589934592000 bytes, 16777216000 '
-        'sectors\nUnits = sectors of 1 * 512 = 512 bytes\n',
-        None)
+        (
+            'Disk /dev/vde: 8589.9 GB, 8589934592000 bytes, 16777216000 '
+            'sectors\nUnits = sectors of 1 * 512 = 512 bytes\n'
+        ),
+        None,
+    )
 
   def testGetDeviceFromVDisk(self):
     vm = mock.Mock()

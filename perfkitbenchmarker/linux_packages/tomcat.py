@@ -27,8 +27,10 @@ from absl import flags
 from perfkitbenchmarker import linux_packages
 
 
-TOMCAT_URL = ('https://archive.apache.org/dist/tomcat/tomcat-8/v8.0.28/bin/'
-              'apache-tomcat-8.0.28.tar.gz')
+TOMCAT_URL = (
+    'https://archive.apache.org/dist/tomcat/tomcat-8/v8.0.28/bin/'
+    'apache-tomcat-8.0.28.tar.gz'
+)
 TOMCAT_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'tomcat')
 TOMCAT_HTTP_PORT = 8080
 
@@ -50,29 +52,38 @@ def _Install(vm):
   vm.Install('openjdk')
   vm.Install('curl')
   vm.RemoteCommand(
-      ('mkdir -p {0} && curl -L {1} | '
-       'tar -C {0} --strip-components 1 -xzf -').format(TOMCAT_DIR,
-                                                        FLAGS.tomcat_url))
+      (
+          'mkdir -p {0} && curl -L {1} | tar -C {0} --strip-components 1 -xzf -'
+      ).format(TOMCAT_DIR, FLAGS.tomcat_url)
+  )
 
   # Use a non-blocking protocool, and disable access logging (which isn't very
   # helpful during load tests).
   vm.RemoteCommand(
-      ("""sed -i.bak -e '/Connector port="8080"/ """
-       's/protocol="[^"]\\+"/protocol="{0}"/\' '
-       '-e "/org.apache.catalina.valves.AccessLogValve/,+3d" '
-       '{1}').format(
-           _TOMCAT_PROTOCOL, _TOMCAT_SERVER_CONF))
+      (
+          """sed -i.bak -e '/Connector port="8080"/ """
+          's/protocol="[^"]\\+"/protocol="{0}"/\' '
+          '-e "/org.apache.catalina.valves.AccessLogValve/,+3d" '
+          '{1}'
+      ).format(_TOMCAT_PROTOCOL, _TOMCAT_SERVER_CONF)
+  )
   # Quiet down localhost logs.
   vm.RemoteCommand(
-      ("sed -i.bak "
-       r"-e 's/\(2localhost.org.apache.*.level\)\s\+=.*$/\1 = WARN/' "
-       ' {0}').format(_TOMCAT_LOGGING_CONF))
+      (
+          'sed -i.bak '
+          r"-e 's/\(2localhost.org.apache.*.level\)\s\+=.*$/\1 = WARN/' "
+          ' {0}'
+      ).format(_TOMCAT_LOGGING_CONF)
+  )
 
   # Expire sessions quickly.
   vm.RemoteCommand(
-      ("sed -i.bak "
-       r"-e 's,\(<session-timeout>\)30\(</session-timeout>\),\11\2,' "
-       " {0}").format(_TOMCAT_WEB_CONF))
+      (
+          'sed -i.bak '
+          r"-e 's,\(<session-timeout>\)30\(</session-timeout>\),\11\2,' "
+          ' {0}'
+      ).format(_TOMCAT_WEB_CONF)
+  )
 
 
 def YumInstall(vm):

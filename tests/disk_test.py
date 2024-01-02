@@ -16,7 +16,6 @@
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from tests import pkb_common_test_case
@@ -46,7 +45,8 @@ class BaseDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         disk_size=75,
         disk_type='test_disk_type',
         mount_point='/mountpoint',
-        num_striped_disks=2)
+        num_striped_disks=2,
+    )
     self.assertEqual(spec.device_path, 'test_device_path')
     self.assertEqual(spec.disk_number, 1)
     self.assertEqual(spec.disk_size, 75)
@@ -61,7 +61,8 @@ class BaseDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         disk_number=None,
         disk_size=None,
         disk_type=None,
-        mount_point=None)
+        mount_point=None,
+    )
     self.assertIsNone(spec.device_path)
     self.assertIsNone(spec.disk_number)
     self.assertIsNone(spec.disk_size)
@@ -74,8 +75,11 @@ class BaseDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
       disk.BaseDiskSpec(_COMPONENT, color='red', flavor='cherry', texture=None)
     self.assertEqual(
         str(cm.exception),
-        ('Unrecognized options were found in test_component: color, flavor, '
-         'texture.'))
+        (
+            'Unrecognized options were found in test_component: color, flavor, '
+            'texture.'
+        ),
+    )
 
   def testInvalidOptionTypes(self):
     with self.assertRaises(errors.Config.InvalidValue):
@@ -108,7 +112,8 @@ class BaseDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         disk_size=75,
         disk_type='config_disk_type',
         mount_point='/mountpoint',
-        num_striped_disks=2)
+        num_striped_disks=2,
+    )
     self.assertEqual(spec.device_path, 'config_device_path')
     self.assertEqual(spec.disk_number, 1)
     self.assertEqual(spec.disk_size, 75)
@@ -129,7 +134,8 @@ class BaseDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         disk_size=75,
         disk_type='config_disk_type',
         mount_point='/mountpoint',
-        num_striped_disks=2)
+        num_striped_disks=2,
+    )
     self.assertEqual(spec.device_path, 'config_device_path')
     self.assertEqual(spec.disk_number, 1)
     self.assertEqual(spec.disk_size, 100)
@@ -145,8 +151,9 @@ class _NfsDisk(disk.NfsDisk):
       disk_spec = disk.BaseNFSDiskSpec(_COMPONENT, flags)
     else:
       disk_spec = disk.BaseNFSDiskSpec(_COMPONENT)
-    super(_NfsDisk, self).__init__(disk_spec, 'host1:/volume1',
-                                   default_nfs_version)
+    super(_NfsDisk, self).__init__(
+        disk_spec, 'host1:/volume1', default_nfs_version
+    )
 
 
 class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -157,7 +164,7 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
         'retrans': 2,
         'rsize': 1048576,
         'timeo': 600,
-        'wsize': 1048576
+        'wsize': 1048576,
     }
     mount_options.update(overrides)
     return mount_options
@@ -175,8 +182,9 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testDefaults(self):
     nfs_disk = _NfsDisk()
     self.assertEqual('host1:/volume1', nfs_disk.GetDevicePath())
-    self.assertEqual(self.MountOptions(),
-                     self.MountOptionsAsDict(nfs_disk.mount_options))
+    self.assertEqual(
+        self.MountOptions(), self.MountOptionsAsDict(nfs_disk.mount_options)
+    )
     self.assertEqual(nfs_disk.mount_options, nfs_disk.fstab_options)
     disk_meta = {}
     for key, value in six.iteritems(self.MountOptions()):
@@ -201,10 +209,12 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
         timeo=30,
         wsize=2,
         nfsvers='4.1',
-        nconnect=5)
+        nconnect=5,
+    )
     mount_options.pop('hard')
-    self.assertEqual(mount_options,
-                     self.MountOptionsAsDict(nfs_disk.mount_options))
+    self.assertEqual(
+        mount_options, self.MountOptionsAsDict(nfs_disk.mount_options)
+    )
 
   def testDefaultNfsVersion(self):
     nfs_disk = _NfsDisk(default_nfs_version='4.1')
@@ -229,10 +239,12 @@ class _SmbDisk(disk.SmbDisk):
       disk_spec = disk.BaseSMBDiskSpec(_COMPONENT, FLAGS)
     else:
       disk_spec = disk.BaseSMBDiskSpec(_COMPONENT)
-    super(_SmbDisk, self).__init__(disk_spec, 'host1', {
-        'user': 'username',
-        'pw': 'password'
-    }, default_smb_version)
+    super(_SmbDisk, self).__init__(
+        disk_spec,
+        'host1',
+        {'user': 'username', 'pw': 'password'},
+        default_smb_version,
+    )
 
 
 class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -253,7 +265,8 @@ class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
   def MountOptionsAsDict(self, mount_options_str):
     options = dict()
     string_values = set(
-        ['vers', 'username', 'password', 'dir_mode', 'file_mode'])
+        ['vers', 'username', 'password', 'dir_mode', 'file_mode']
+    )
     for entry in mount_options_str.split(','):
       parts = entry.split('=', 1)
       key = parts[0]
@@ -264,8 +277,9 @@ class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testDefaults(self):
     smb_disk = _SmbDisk()
     self.assertEqual('host1', smb_disk.GetDevicePath())
-    self.assertEqual(self.MountOptions(),
-                     self.MountOptionsAsDict(smb_disk.mount_options))
+    self.assertEqual(
+        self.MountOptions(), self.MountOptionsAsDict(smb_disk.mount_options)
+    )
     self.assertEqual(smb_disk.mount_options, smb_disk.fstab_options)
     disk_meta = {}
     disk_meta.update({'num_stripes': 1, 'size': None, 'type': None})
@@ -276,9 +290,11 @@ class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['smb_version'].parse('3.0')
     smb_disk = _SmbDisk(FLAGS)
     mount_options = self.MountOptions(
-        vers='3.0', dir_mode='0777', file_mode='0777')
-    self.assertEqual(mount_options,
-                     self.MountOptionsAsDict(smb_disk.mount_options))
+        vers='3.0', dir_mode='0777', file_mode='0777'
+    )
+    self.assertEqual(
+        mount_options, self.MountOptionsAsDict(smb_disk.mount_options)
+    )
 
   def testDefaultSmbVersion(self):
     smb_disk = _SmbDisk(default_smb_version='3.0')
@@ -294,6 +310,7 @@ class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
     smb_disk = _SmbDisk()
     smb_disk.Attach(vm)
     vm.InstallPackages.assert_called_with('cifs-utils')
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -23,6 +23,7 @@ import numpy as np
 
 
 class DraggableXRange:
+
   def __init__(self, figure, updater):
     self.figure = figure
     self.span = None
@@ -34,11 +35,14 @@ class DraggableXRange:
   def connect(self):
     'connect to all the events we need'
     self.cidpress = self.figure.canvas.mpl_connect(
-        'button_press_event', self.on_press)
+        'button_press_event', self.on_press
+    )
     self.cidrelease = self.figure.canvas.mpl_connect(
-        'button_release_event', self.on_release)
+        'button_release_event', self.on_release
+    )
     self.cidmotion = self.figure.canvas.mpl_connect(
-        'motion_notify_event', self.on_motion)
+        'motion_notify_event', self.on_motion
+    )
 
   def on_press(self, event):
     'on button press we will see if the mouse is over us and store some data'
@@ -117,6 +121,7 @@ class DraggableXRange:
 
 
 class SelectionUpdate:
+
   def __init__(self, figure, ax, start_times, latencies):
     self.text = None
     self.figure = figure
@@ -152,8 +157,9 @@ class SelectionUpdate:
           active_stop_indexes.append(i + 1)
           break
     active_latencies = [
-        self.latencies[i][active_start_indexes[i]:active_stop_indexes[i]]
-        for i in range(len(self.latencies))]
+        self.latencies[i][active_start_indexes[i] : active_stop_indexes[i]]
+        for i in range(len(self.latencies))
+    ]
     all_active_latencies = np.concatenate(active_latencies)
 
     qps = len(all_active_latencies) / (end - start)
@@ -162,16 +168,30 @@ class SelectionUpdate:
     latency_avg = sum(all_active_latencies) / len(all_active_latencies)
     latency_stddev = np.std(all_active_latencies)
 
-    text_str = ('Duration: %s\nQPS: %s\nlatency min: %s\nlatency max: %s\n'
-                'latency avg: %s\nlatency stddev: %s'
-                % (end - start, qps, latency_min, latency_max,
-                   latency_avg, latency_stddev))
+    text_str = (
+        'Duration: %s\nQPS: %s\nlatency min: %s\nlatency max: %s\n'
+        'latency avg: %s\nlatency stddev: %s'
+        % (
+            end - start,
+            qps,
+            latency_min,
+            latency_max,
+            latency_avg,
+            latency_stddev,
+        )
+    )
 
     # place a text box in upper left in axes coords
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    self.text = self.ax.text(0.05, 0.95, text_str,
-                             transform=self.ax.transAxes, fontsize=14,
-                             verticalalignment='top', bbox=props)
+    self.text = self.ax.text(
+        0.05,
+        0.95,
+        text_str,
+        transform=self.ax.transAxes,
+        fontsize=14,
+        verticalalignment='top',
+        bbox=props,
+    )
     # redraw just the text
     self.text.axes.draw_artist(self.text)
     # blit just the redrawn area
@@ -179,26 +199,31 @@ class SelectionUpdate:
 
 
 def GenerateObjectTimeline(file_name, start_times, latencies):
-  print("Generating object timeline")
+  print('Generating object timeline')
   assert len(start_times) == len(latencies)
   rects = []
   for i, worker_times in enumerate(zip(start_times, latencies)):
     for j, (start_time, latency) in enumerate(np.vstack(worker_times).T):
-      rect = mpl_patches.Rectangle((start_time, i + 0.5), latency, 1.0,
-                                   color=(0.5 * (j % 2) + 0.5, 0, 0),
-                                   linewidth=0)
+      rect = mpl_patches.Rectangle(
+          (start_time, i + 0.5),
+          latency,
+          1.0,
+          color=(0.5 * (j % 2) + 0.5, 0, 0),
+          linewidth=0,
+      )
       rects.append(rect)
   pc = mplc.PatchCollection(rects, match_original=True)
   fig, ax = plt.subplots(figsize=(30, 5))
   ax.add_collection(pc)
   ax.autoscale()
   ax.margins(0.1)
-  print("Saving figure as %s" % file_name)
+  print('Saving figure as %s' % file_name)
   plt.savefig(file_name, bbox_inches='tight', dpi=1200)
-  print("Figured saved. Rendering figure...")
+  print('Figured saved. Rendering figure...')
 
-  selection = DraggableXRange(fig, SelectionUpdate(fig, ax, start_times,
-                                                   latencies))
+  selection = DraggableXRange(
+      fig, SelectionUpdate(fig, ax, start_times, latencies)
+  )
   selection.connect()
   plt.show()
   selection.disconnect()
@@ -253,12 +278,13 @@ def LoadWorkerOutput(output):
 
 def main():
   worker_output = None
-  print("Reading worker output")
+  print('Reading worker output')
   with open(sys.argv[1], 'r') as worker_out_file:
     worker_output = json.loads(worker_out_file.read())
-  print("Parsing worker output")
+  print('Parsing worker output')
   start_times, latencies, _ = LoadWorkerOutput(worker_output)
   GenerateObjectTimeline(sys.argv[2], start_times, latencies)
+
 
 ########################################
 

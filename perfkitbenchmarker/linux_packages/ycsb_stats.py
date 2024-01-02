@@ -276,13 +276,11 @@ class YcsbResult:
     stats_to_write = set()
     for _, status_result in sorted(self.status_time_series.items()):
       for op_result in status_result.op_results:
-        stats_to_write.update(
-            [
-                stat
-                for stat in op_result.statistics.keys()
-                if _IsStatusLatencyStatistic(stat) or stat == 'Count'
-            ]
-        )
+        stats_to_write.update([
+            stat
+            for stat in op_result.statistics.keys()
+            if _IsStatusLatencyStatistic(stat) or stat == 'Count'
+        ])
     return list(stats_to_write)
 
   def WriteStatusTimeSeriesToFile(self) -> None:

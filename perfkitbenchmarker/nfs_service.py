@@ -94,16 +94,22 @@ class BaseNfsService(resource.BaseResource):
       # NFS service does not have to have a list of nfs_tiers nor does it have
       # to be implemented by a provider
       raise errors.Config.InvalidValue(
-          ('nfs_tier "%s" not in acceptable list "%s" '
-           'for cloud %s') % (self.nfs_tier, self.NFS_TIERS, self.CLOUD))
-    logging.debug('%s NFS service with nfs_tier %s zone %s default version %s',
-                  self.CLOUD, self.nfs_tier, self.zone,
-                  self.DEFAULT_NFS_VERSION)
+          'nfs_tier "%s" not in acceptable list "%s" for cloud %s'
+          % (self.nfs_tier, self.NFS_TIERS, self.CLOUD)
+      )
+    logging.debug(
+        '%s NFS service with nfs_tier %s zone %s default version %s',
+        self.CLOUD,
+        self.nfs_tier,
+        self.zone,
+        self.DEFAULT_NFS_VERSION,
+    )
 
   def CreateNfsDisk(self):
     mount_point = '%s:%s' % (self.GetRemoteAddress(), self.server_directory)
-    return disk.NfsDisk(self.disk_spec, mount_point, self.DEFAULT_NFS_VERSION,
-                        self.nfs_tier)
+    return disk.NfsDisk(
+        self.disk_spec, mount_point, self.DEFAULT_NFS_VERSION, self.nfs_tier
+    )
 
   @abc.abstractmethod
   def _IsReady(self):
@@ -118,6 +124,7 @@ class BaseNfsService(resource.BaseResource):
 
 class StaticNfsService(BaseNfsService):
   """Object allowing VMs to connect to a preprovisioned NFS endpoint."""
+
   CLOUD = 'Static'
 
   def __init__(self, disk_spec):
@@ -146,6 +153,7 @@ class StaticNfsService(BaseNfsService):
 
 class UnmanagedNfsService(BaseNfsService):
   """Object allowing VMs to connect to a local NFS disk."""
+
   CLOUD = UNMANAGED
 
   # Allows anybody to write to the NFS mount.
@@ -153,8 +161,10 @@ class UnmanagedNfsService(BaseNfsService):
       'sudo mkdir -p {export_dir}',
       'sudo chown $USER:$USER {export_dir}',
       'sudo chmod 755 {export_dir}',
-      ('echo "{export_dir} *(rw,sync,no_subtree_check,no_root_squash)" | '
-       'sudo tee -a /etc/exports'),
+      (
+          'echo "{export_dir} *(rw,sync,no_subtree_check,no_root_squash)" | '
+          'sudo tee -a /etc/exports'
+      ),
       'sudo exportfs -a',
   ])
 
@@ -182,8 +192,9 @@ class UnmanagedNfsService(BaseNfsService):
       self.server_directory = '/pkb-nfs-server-directory'
     logging.info('Exporting server directory %s', self.server_directory)
     if check_export_not_same_mount and disk_spec:
-      assert self.server_directory != disk_spec.mount_point, (
-          'export server directory must be different from mount point')
+      assert (
+          self.server_directory != disk_spec.mount_point
+      ), 'export server directory must be different from mount point'
 
   def GetRemoteAddress(self):
     """The NFS server's address."""
@@ -196,14 +207,17 @@ class UnmanagedNfsService(BaseNfsService):
       export_dir_path: Path to the directory to export.
     """
     if self.server_vm.TryRemoteCommand(
-        f'grep "^{export_dir_path} " /etc/exports'):
+        f'grep "^{export_dir_path} " /etc/exports'
+    ):
       logging.info('Already NFS exported directory %s', export_dir_path)
     else:
       self.server_vm.RemoteCommand(
-          self._EXPORT_FS_COMMAND.format(export_dir=export_dir_path))
+          self._EXPORT_FS_COMMAND.format(export_dir=export_dir_path)
+      )
     nfs_name = self._NFS_NAME[self.server_vm.BASE_OS_TYPE]
     self.server_vm.RemoteCommand(
-        self._NFS_RESTART_CMD.format(nfs_name=nfs_name))
+        self._NFS_RESTART_CMD.format(nfs_name=nfs_name)
+    )
 
   def _Create(self):
     assert self.server_vm, 'NFS server VM not created.'
@@ -211,7 +225,8 @@ class UnmanagedNfsService(BaseNfsService):
     self._ExportNfsDir(self.server_directory)
     # Restart NFS service upon reboot if required (Centos7)
     self.server_vm.RemoteCommand(
-        'sudo systemctl enable nfs', ignore_failure=True)
+        'sudo systemctl enable nfs', ignore_failure=True
+    )
 
   def _Delete(self):
     pass
@@ -238,12 +253,15 @@ def NfsMount(server_ip, client_vm, client_path, server_path=None) -> None:
       as the client_path.
   """
   client_vm.Install('nfs_utils')
-  fstab_line = (f'{server_ip}:{server_path or client_path} '
-                f'{client_path} nfs defaults 0 0')
-  client_vm.RemoteCommand(f'sudo mkdir -p {client_path}; '
-                          f'sudo chown {client_vm.user_name} {client_path}; '
-                          f'echo "{fstab_line}\n" | sudo tee -a /etc/fstab; '
-                          'sudo mount -a')
+  fstab_line = (
+      f'{server_ip}:{server_path or client_path} {client_path} nfs defaults 0 0'
+  )
+  client_vm.RemoteCommand(
+      f'sudo mkdir -p {client_path}; '
+      f'sudo chown {client_vm.user_name} {client_path}; '
+      f'echo "{fstab_line}\n" | sudo tee -a /etc/fstab; '
+      'sudo mount -a'
+  )
 
 
 def NfsExportAndMount(vms, client_path, server_path=None) -> None:

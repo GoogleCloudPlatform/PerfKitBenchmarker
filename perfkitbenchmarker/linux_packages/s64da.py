@@ -15,7 +15,6 @@
 import collections
 import dataclasses
 import datetime
-
 from typing import List, Tuple
 
 from perfkitbenchmarker import relational_db as r_db
@@ -63,19 +62,26 @@ def AptInstall(vm: virtual_machine.BaseVirtualMachine) -> None:
   """Installs the s64da package on the VM."""
   vm.Install('pip3')
   cmds = [
-      'wget '
-      f'https://github.com/swarm64/s64da-benchmark-toolkit/archive/refs/tags/{S64DA_VERSION}.tar.gz',
+      (
+          'wget '
+          f'https://github.com/swarm64/s64da-benchmark-toolkit/archive/refs/tags/{S64DA_VERSION}.tar.gz'
+      ),
       f'tar -xf v{S64DA_VERSION}.tar.gz',
       f'mv s64da-benchmark-toolkit-{S64DA_VERSION} {WORKING_DIRECTORY_NAME}',
-      f'python3 -m pip install -r {WORKING_DIRECTORY_NAME}/requirements.txt'
+      f'python3 -m pip install -r {WORKING_DIRECTORY_NAME}/requirements.txt',
   ]
   for cmd in cmds:
     vm.RemoteCommand(cmd)
 
 
-def PrepareBenchmark(vm: virtual_machine.BaseVirtualMachine,
-                     db: r_db.BaseRelationalDb, benchmark: str, schema: str,
-                     scale_factor: int, max_jobs: int) -> None:
+def PrepareBenchmark(
+    vm: virtual_machine.BaseVirtualMachine,
+    db: r_db.BaseRelationalDb,
+    benchmark: str,
+    schema: str,
+    scale_factor: int,
+    max_jobs: int,
+) -> None:
   """Load a database with a dataset."""
   vm.RemoteCommand(
       InLocalDir(
@@ -83,36 +89,47 @@ def PrepareBenchmark(vm: virtual_machine.BaseVirtualMachine,
           f'--dsn={db.client_vm_query_tools.GetDSNConnectionString(DB_NAME)} '
           f'--benchmark={benchmark} --schema={schema} '
           f'--scale-factor={scale_factor} '
-          f'--max-jobs {max_jobs}'))
+          f'--max-jobs {max_jobs}'
+      )
+  )
 
 
-def RunBenchmark(vm: virtual_machine.BaseVirtualMachine,
-                 db: r_db.BaseRelationalDb, benchmark: str, oltp_workers: int,
-                 olap_workers: int, duration: int, olap_timeout: str,
-                 ramp_up_duration: int,
-                 run_on_replica: bool) -> List[sample.Sample]:
+def RunBenchmark(
+    vm: virtual_machine.BaseVirtualMachine,
+    db: r_db.BaseRelationalDb,
+    benchmark: str,
+    oltp_workers: int,
+    olap_workers: int,
+    duration: int,
+    olap_timeout: str,
+    ramp_up_duration: int,
+    run_on_replica: bool,
+) -> List[sample.Sample]:
   """Runs the benchmark and gathers the data."""
   olap_query_tools = db.client_vm_query_tools
   if run_on_replica:
     olap_query_tools = db.client_vm_query_tools_for_replica
   vm.RemoteCommand(
       InLocalDir(
-          f'./run_benchmark '
+          './run_benchmark '
           f'--dsn={db.client_vm_query_tools.GetDSNConnectionString(DB_NAME)} '
           f'{benchmark} '
-          f'--dont-wait-until-enough-data '
+          '--dont-wait-until-enough-data '
           f'--oltp-workers={oltp_workers} '
           f'--olap-workers={olap_workers} '
           f'--duration={duration} '
-          f'--output=csv '
-          f'--csv-interval=1 '
+          '--output=csv '
+          '--csv-interval=1 '
           f'--olap-dsns={olap_query_tools.GetDSNConnectionString(DB_NAME)} '
-          f'--olap-timeout={olap_timeout} '))
+          f'--olap-timeout={olap_timeout} '
+      )
+  )
 
   olap_results, _ = vm.RemoteCommand(InLocalDir(f'cat {OLAP_RESULT_PATH}'))
   oltp_results, _ = vm.RemoteCommand(InLocalDir(f'cat {OLTP_RESULT_PATH}'))
   return ParseOLAPResults(olap_results) + ParseOLTPResults(
-      oltp_results, ramp_up_duration)
+      oltp_results, ramp_up_duration
+  )
 
 
 def ParseTime(time: str) -> datetime.datetime:
@@ -125,8 +142,8 @@ def ParseSamples(stdout: str) -> List[List[str]]:
 
 
 def SplitRampUpSamples(
-    rows: List[OLTPRow],
-    ramp_up_duration: int) -> Tuple[List[OLTPRow], List[OLTPRow]]:
+    rows: List[OLTPRow], ramp_up_duration: int
+) -> Tuple[List[OLTPRow], List[OLTPRow]]:
   """Splits samples before ramp up and after ramp up.
 
   The samples returned from the s64da benchmarks are in chronological order.
@@ -188,8 +205,10 @@ def ParseOLAPResults(stdout: str) -> List[sample.Sample]:
   ]
 
   results.append(
-      sample.Sample('query_times_geomean',
-                    sample.GeoMean(averaged_result.values()), 's'))
+      sample.Sample(
+          'query_times_geomean', sample.GeoMean(averaged_result.values()), 's'
+      )
+  )
 
   results.append(sample.Sample(TPCH_FAILURE_RATE, failure_rate, '%'))
   return results
@@ -211,31 +230,39 @@ def ParseOLTPResults(stdout: str, ramp_up_duration: int) -> List[sample.Sample]:
             transaction_type=row[1],
             time=ParseTime(row[0]),
             total_transactions=float(row[2]),
-            successful_transactions=float(row[3])))
+            successful_transactions=float(row[3]),
+        )
+    )
 
   oltp_rows = [row for row in oltp_rows if row.transaction_type == ALL_TYPES]
 
   before_ramp_up_rows, after_ramp_up_rows = SplitRampUpSamples(
-      oltp_rows, ramp_up_duration)
+      oltp_rows, ramp_up_duration
+  )
   successful_transactions_before_ramp_up = 0
   if before_ramp_up_rows:
     # Get the number of total transaction before ramp up.
     last_metrics_before_ramp_up = before_ramp_up_rows[-1]
     successful_transactions_before_ramp_up = (
-        last_metrics_before_ramp_up.successful_transactions)
+        last_metrics_before_ramp_up.successful_transactions
+    )
 
   # Get total the transaction number
   last_metrics = after_ramp_up_rows[-1]
-  failure_rate = (last_metrics.total_transactions -
-                  last_metrics.successful_transactions
-                 ) / last_metrics.total_transactions * 100
+  failure_rate = (
+      (last_metrics.total_transactions - last_metrics.successful_transactions)
+      / last_metrics.total_transactions
+      * 100
+  )
 
   successful_transactions_after_ramp_up = (
-      last_metrics.successful_transactions -
-      successful_transactions_before_ramp_up)
+      last_metrics.successful_transactions
+      - successful_transactions_before_ramp_up
+  )
 
   tpm = int(
-      (successful_transactions_after_ramp_up * 60.0) / len(after_ramp_up_rows))
+      (successful_transactions_after_ramp_up * 60.0) / len(after_ramp_up_rows)
+  )
   results.append(sample.Sample(TPM, tpm, TPM))
   results.append(sample.Sample(TPCC_FAILURE_RATE, failure_rate, '%'))
   return results

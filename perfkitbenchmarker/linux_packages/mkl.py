@@ -31,16 +31,19 @@ BENCHMARK_NAME = 'hpcc'
 
 # Default installs MKL as it was previously done via preprovisioned data
 _USE_MKL_REPO = flags.DEFINE_bool(
-    'mkl_install_from_repo', False,
+    'mkl_install_from_repo',
+    False,
     'Whether to install MKL from the Intel repo.  Default is to use '
     'preprovisioned data.  Passing in True uses the Intel MPI repo or the '
-    'Intel oneAPI repo if --mkl_version is 2021 or later.')
+    'Intel oneAPI repo if --mkl_version is 2021 or later.',
+)
 
 # File contains MKL specific environment variables
 _MKL_VARS_FILE = '/opt/intel/mkl/bin/mklvars.sh'
 
-MKL_VERSION = flags.DEFINE_string('mkl_version', _MKL_VERSION_REPO,
-                                  'Version of Intel MKL to use')
+MKL_VERSION = flags.DEFINE_string(
+    'mkl_version', _MKL_VERSION_REPO, 'Version of Intel MKL to use'
+)
 
 FLAGS = flags.FLAGS
 
@@ -63,8 +66,10 @@ def UseMklRepo():
   if FLAGS['mkl_install_from_repo'].present:
     if not _USE_MKL_REPO.value and MKL_VERSION.value != MKL_VERSION.default:
       # Need to check as caller expects to use the MKL version they specified
-      raise ValueError('To use preprovisioned data do not change '
-                       f'--mkl_version={MKL_VERSION.default}')
+      raise ValueError(
+          'To use preprovisioned data do not change '
+          f'--mkl_version={MKL_VERSION.default}'
+      )
     return _USE_MKL_REPO.value
   return MKL_VERSION.value != MKL_VERSION.default
 
@@ -93,10 +98,14 @@ def Install(vm):
 def _LogEnvVariables(vm):
   """Logs the MKL associated environment variables."""
   env_vars = []
-  for env_var in ('CPATH', 'LD_LIBRARY_PATH', 'MKLROOT', 'NLSPATH',
-                  'PKG_CONFIG_PATH'):
-    txt, _ = vm.RemoteCommand(
-        f'{SourceVarsCommand()}; echo ${env_var}')
+  for env_var in (
+      'CPATH',
+      'LD_LIBRARY_PATH',
+      'MKLROOT',
+      'NLSPATH',
+      'PKG_CONFIG_PATH',
+  ):
+    txt, _ = vm.RemoteCommand(f'{SourceVarsCommand()}; echo ${env_var}')
     env_vars.append(f'{env_var}={txt.strip()}')
   logging.info('MKL environment variables: %s', ' '.join(env_vars))
 
@@ -107,21 +116,27 @@ def _InstallFromPreprovisionedData(vm):
   vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, [MKL_TGZ], MKL_DIR)
   vm.RemoteCommand('cd {0} && tar zxvf {1}'.format(MKL_DIR, MKL_TGZ))
   vm.RemoteCommand(
-      ('cd {0}/{1} && '
-       'sed -i "s/decline/accept/g" silent.cfg && '
-       'sudo ./install.sh --silent ./silent.cfg').format(MKL_DIR, MKL_TAG))
-  vm.RemoteCommand('sudo chmod 755 /etc/bash.bashrc && '
-                   'sudo chown ' + vm.user_name + ' /etc/bash.bashrc && '
-                   'echo "source /opt/intel/mkl/bin/mklvars.sh intel64" '
-                   '>>/etc/bash.bashrc && '
-                   'echo "export PATH=/opt/intel/bin:$PATH" '
-                   '>>/etc/bash.bashrc && '
-                   'echo "export LD_LIBRARY_PATH=/opt/intel/lib/intel64:'
-                   '/opt/intel/mkl/lib/intel64:$LD_LIBRARY_PATH" '
-                   '>>/etc/bash.bashrc && '
-                   'echo "source /opt/intel/compilers_and_libraries/linux/bin/'
-                   'compilervars.sh -arch intel64 -platform linux" '
-                   '>>/etc/bash.bashrc')
+      (
+          'cd {0}/{1} && '
+          'sed -i "s/decline/accept/g" silent.cfg && '
+          'sudo ./install.sh --silent ./silent.cfg'
+      ).format(MKL_DIR, MKL_TAG)
+  )
+  vm.RemoteCommand(
+      'sudo chmod 755 /etc/bash.bashrc && sudo chown '
+      + vm.user_name
+      + ' /etc/bash.bashrc && '
+      'echo "source /opt/intel/mkl/bin/mklvars.sh intel64" '
+      '>>/etc/bash.bashrc && '
+      'echo "export PATH=/opt/intel/bin:$PATH" '
+      '>>/etc/bash.bashrc && '
+      'echo "export LD_LIBRARY_PATH=/opt/intel/lib/intel64:'
+      '/opt/intel/mkl/lib/intel64:$LD_LIBRARY_PATH" '
+      '>>/etc/bash.bashrc && '
+      'echo "source /opt/intel/compilers_and_libraries/linux/bin/'
+      'compilervars.sh -arch intel64 -platform linux" '
+      '>>/etc/bash.bashrc'
+  )
 
 
 def _CompileInterfaces(vm):
@@ -132,11 +147,12 @@ def _CompileInterfaces(vm):
   """
   vm.Install('build_tools')
   mpi_lib = 'openmpi'
-  make_options = ('PRECISION=MKL_DOUBLE '
-                  'interface=ilp64 '
-                  f'mpi={mpi_lib} '
-                  'compiler=gnu')
+  make_options = (
+      f'PRECISION=MKL_DOUBLE interface=ilp64 mpi={mpi_lib} compiler=gnu'
+  )
   for interface in ('fftw2xc', 'fftw2xf', 'fftw3xc', 'fftw3xf'):
-    cmd = (f'cd /opt/intel/mkl/interfaces/{interface} && '
-           f'sudo make libintel64 {make_options}')
+    cmd = (
+        f'cd /opt/intel/mkl/interfaces/{interface} && '
+        f'sudo make libintel64 {make_options}'
+    )
     vm.RemoteCommand(cmd)

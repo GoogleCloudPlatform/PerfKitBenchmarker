@@ -17,7 +17,6 @@ import os
 import unittest
 
 import mock
-
 from perfkitbenchmarker.linux_benchmarks import hpcg_benchmark
 
 
@@ -28,13 +27,15 @@ class HpcgBenchmarkTestCase(unittest.TestCase):
     p.start()
     self.addCleanup(p.stop)
 
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'hpcg_results.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '../data', 'hpcg_results.txt'
+    )
     with open(path) as fp:
       self.test_output = fp.read()
 
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        'hpcg_results2.txt')
+    path = os.path.join(
+        os.path.dirname(__file__), '../data', 'hpcg_results2.txt'
+    )
     with open(path) as fp:
       self.test_output2 = fp.read()
 
@@ -47,8 +48,9 @@ class HpcgBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(62.3, throughput)
 
   def testExtractProblemSize(self):
-    self.assertEqual([64, 128, 256],
-                     hpcg_benchmark._ExtractProblemSize(self.test_output))
+    self.assertEqual(
+        [64, 128, 256], hpcg_benchmark._ExtractProblemSize(self.test_output)
+    )
 
 
 if __name__ == '__main__':

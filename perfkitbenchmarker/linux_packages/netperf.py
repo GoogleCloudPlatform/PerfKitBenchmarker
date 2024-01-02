@@ -24,13 +24,15 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import regex_util
 
 flags.DEFINE_integer(
-    'netperf_histogram_buckets', 100,
+    'netperf_histogram_buckets',
+    100,
     'The number of buckets per bucket array in a netperf histogram. Netperf '
     'keeps one array for latencies in the single usec range, one for the '
     '10-usec range, one for the 100-usec range, and so on until the 10-sec '
     'range. The default value that netperf uses is 100. Using more will '
     'increase the precision of the histogram samples that the netperf '
-    'benchmark produces.')
+    'benchmark produces.',
+)
 FLAGS = flags.FLAGS
 NETPERF_TAR = 'netperf-2.7.0.tar.gz'
 NETPERF_URL = f'https://github.com/HewlettPackard/netperf/archive/{NETPERF_TAR}'
@@ -63,10 +65,13 @@ def _Install(vm):
       f'CFLAGS=-DHIST_NUM_OF_BUCKET={FLAGS.netperf_histogram_buckets} '
       './configure --enable-burst '
       '--enable-demo --enable-histogram '
-      '&& make && sudo make install')
+      '&& make && sudo make install'
+  )
 
-  vm.RemoteCommand(f'cd {NETPERF_EXAMPLE_DIR} && chmod +x runemomniaggdemo.sh'
-                   '&& chmod +x find_max_burst.sh')
+  vm.RemoteCommand(
+      f'cd {NETPERF_EXAMPLE_DIR} && chmod +x runemomniaggdemo.sh'
+      '&& chmod +x find_max_burst.sh'
+  )
 
   # Set keepalive to a low value to ensure that the control connection
   # is not closed by the cloud networking infrastructure.
@@ -99,13 +104,15 @@ def _CopyTar(vm):
   if vm.CLOUD != provider_info.KUBERNETES:
     try:
       vm.PushDataFile(
-          NETPERF_TAR, remote_path=(linux_packages.INSTALL_DIR + '/'))
+          NETPERF_TAR, remote_path=(linux_packages.INSTALL_DIR + '/')
+      )
       return
     except data.ResourceNotFound:
       pass
   vm.Install('curl')
   vm.RemoteCommand(
-      f'curl {NETPERF_URL} -L -o {linux_packages.INSTALL_DIR}/{NETPERF_TAR}')
+      f'curl {NETPERF_URL} -L -o {linux_packages.INSTALL_DIR}/{NETPERF_TAR}'
+  )
 
 
 def YumInstall(vm):
@@ -142,7 +149,8 @@ def ParseHistogram(netperf_stdout):
   # >100_SECS: 0
   # HIST_TOTAL:      444658
   histogram_text = regex_util.ExtractGroup(
-      '(UNIT_USEC.*?)>100_SECS', netperf_stdout, flags=re.S)
+      '(UNIT_USEC.*?)>100_SECS', netperf_stdout, flags=re.S
+  )
 
   # The total number of usecs that this row of the histogram represents.
   row_size = 10.0
@@ -151,8 +159,9 @@ def ParseHistogram(netperf_stdout):
   for l in histogram_text.splitlines():
     buckets = [int(b) for b in l.split(':')[1:]]
     bucket_size = row_size / len(buckets)
-    hist.update({(i * bucket_size): count
-                 for i, count in enumerate(buckets) if count})
+    hist.update(
+        {(i * bucket_size): count for i, count in enumerate(buckets) if count}
+    )
     # Each row is 10x larger than the previous row.
     row_size *= 10
 

@@ -32,17 +32,21 @@ class Wrk2Test(unittest.TestCase):
     wrk_output = _ReadOutputFile('wrk2_output.txt')
     result = list(wrk2._ParseOutput(wrk_output))
     self.assertEqual(
-        [('p50 latency', .05331, 'ms'),
-         ('p75 latency', 56.99, 'ms'),
-         ('p90 latency', 62.62, 'ms'),
-         ('p99 latency', 223.23, 'ms'),
-         ('p99.9 latency', 244.22, 'ms'),
-         ('p99.99 latency', 244.22, 'ms'),
-         ('p99.999 latency', 36000., 'ms'),
-         ('p100 latency', 54000., 'ms'),
-         ('requests', 600, ''),
-         ('error_rate', 0, ''),
-         ('errors', 0, '')], result)
+        [
+            ('p50 latency', 0.05331, 'ms'),
+            ('p75 latency', 56.99, 'ms'),
+            ('p90 latency', 62.62, 'ms'),
+            ('p99 latency', 223.23, 'ms'),
+            ('p99.9 latency', 244.22, 'ms'),
+            ('p99.99 latency', 244.22, 'ms'),
+            ('p99.999 latency', 36000.0, 'ms'),
+            ('p100 latency', 54000.0, 'ms'),
+            ('requests', 600, ''),
+            ('error_rate', 0, ''),
+            ('errors', 0, ''),
+        ],
+        result,
+    )
 
   def testParseAllRequestsFailed(self):
     wrk_output = _ReadOutputFile('wrk2_output_all_error.txt')
@@ -53,7 +57,7 @@ class Wrk2Test(unittest.TestCase):
     wrk_output = _ReadOutputFile('wrk2_output_errors.txt')
     res = list(wrk2._ParseOutput(wrk_output))
     self.assertIn(('errors', 14, ''), res)
-    self.assertIn(('error_rate', 14. / 600, ''), res)
+    self.assertIn(('error_rate', 14.0 / 600, ''), res)
 
 
 if __name__ == '__main__':

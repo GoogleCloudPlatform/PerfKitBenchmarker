@@ -10,8 +10,11 @@ __author__ = 'p3rf@google.com'
 from absl import flags
 
 flags.DEFINE_string(
-    'connection', None,
-    'Named Snowflake connection to use. See https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections for more details.'
+    'connection',
+    None,
+    'Named Snowflake connection to use. See'
+    ' https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections'
+    ' for more details.',
 )
 
 FLAGS = flags.FLAGS

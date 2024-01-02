@@ -34,7 +34,8 @@ from perfkitbenchmarker.providers.aws import util
 def GetAwsVpcEndpointClass(aws_service):
   """Returns the AwsVpcEndpoint class for the given service."""
   return resource.GetResourceClass(
-      AwsVpcEndpoint, CLOUD=provider_info.AWS, AWS_SERVICE=aws_service)
+      AwsVpcEndpoint, CLOUD=provider_info.AWS, AWS_SERVICE=aws_service
+  )
 
 
 def CreateEndpointService(aws_service, vpc):
@@ -59,6 +60,7 @@ class AwsVpcEndpoint(resource.BaseResource):
     vpc: The aws_network.AwsVpc object to make the connection in.  The VPC does
       not initially need an ID but does when Create() is called.
   """
+
   REQUIRED_ATTRS = ['CLOUD', 'AWS_SERVICE']
   RESOURCE_TYPE = 'AwsVpcEndpoint'
   CLOUD = provider_info.AWS
@@ -70,8 +72,9 @@ class AwsVpcEndpoint(resource.BaseResource):
     self._vpc = vpc
     self.region = self._vpc.region
     assert self.region, 'VPC region must be set'
-    self._service_name = 'com.amazonaws.{}.{}'.format(self.region,
-                                                      self.AWS_SERVICE)
+    self._service_name = 'com.amazonaws.{}.{}'.format(
+        self.region, self.AWS_SERVICE
+    )
     # in the Create() method query to see if an endpoint already defined
     self.id = None
 
@@ -86,10 +89,13 @@ class AwsVpcEndpoint(resource.BaseResource):
     if not self.vpc_id:
       # When creating an SDDC there will not be a VPC to have an endpoint
       return None
-    ids = self._RunCommand(['describe-vpc-endpoints'] + util.AwsFilter({
-        'vpc-id': self.vpc_id,
-        'service-name': self._service_name
-    }) + ['--query', 'VpcEndpoints[].VpcEndpointId'])
+    ids = self._RunCommand(
+        ['describe-vpc-endpoints']
+        + util.AwsFilter(
+            {'vpc-id': self.vpc_id, 'service-name': self._service_name}
+        )
+        + ['--query', 'VpcEndpoints[].VpcEndpointId']
+    )
     if not ids:
       # There is a VPC but no endpoint
       return None
@@ -105,9 +111,11 @@ class AwsVpcEndpoint(resource.BaseResource):
         routing tables found.
     """
     assert self.vpc_id, 'No defined VPC id.'
-    table_ids = self._RunCommand(['describe-route-tables'] +
-                                 util.AwsFilter({'vpc-id': self.vpc_id}) +
-                                 ['--query', 'RouteTables[].RouteTableId'])
+    table_ids = self._RunCommand(
+        ['describe-route-tables']
+        + util.AwsFilter({'vpc-id': self.vpc_id})
+        + ['--query', 'RouteTables[].RouteTableId']
+    )
     assert len(table_ids) == 1, 'Only want 1 route table: {}'.format(table_ids)
     return table_ids[0]
 
@@ -123,9 +131,15 @@ class AwsVpcEndpoint(resource.BaseResource):
       # Endpoint already created
       return
     create_response = self._RunCommand([
-        'create-vpc-endpoint', '--vpc-endpoint-type', 'Gateway', '--vpc-id',
-        self.vpc_id, '--service-name', self._service_name, '--route-table-ids',
-        self.route_table_id
+        'create-vpc-endpoint',
+        '--vpc-endpoint-type',
+        'Gateway',
+        '--vpc-id',
+        self.vpc_id,
+        '--service-name',
+        self._service_name,
+        '--route-table-ids',
+        self.route_table_id,
     ])
     self.id = create_response['VpcEndpoint']['VpcEndpointId']
 
@@ -142,7 +156,8 @@ class AwsVpcEndpoint(resource.BaseResource):
     endpoint_id = self.id or self.endpoint_id
     if endpoint_id:
       self._RunCommand(
-          ['delete-vpc-endpoints', '--vpc-endpoint-ids', endpoint_id])
+          ['delete-vpc-endpoints', '--vpc-endpoint-ids', endpoint_id]
+      )
 
   def _RunCommand(self, cmds):
     """Runs the AWS ec2 command in the defined region.
@@ -166,4 +181,5 @@ class AwsVpcS3Endpoint(AwsVpcEndpoint):
     vpc: The aws_network.AwsVpc object to make the connection in.  The VPC does
       not initially need an ID but does when Create() is called.
   """
+
   AWS_SERVICE = 's3'

@@ -28,7 +28,7 @@ _GCP_ZONE_US_CENTRAL_1_C = 'us-central1-c'
 
 _BASE_BIGQUERY_SPEC = {
     'type': 'bigquery',
-    'cluster_identifier': 'bigquerypkb.tpcds_100G'
+    'cluster_identifier': 'bigquerypkb.tpcds_100G',
 }
 
 FLAGS = flags.FLAGS
@@ -48,10 +48,12 @@ class FakeRemoteVMForCliClientInterfacePrepare(object):
     self.valid_install_package_list = ['pip', 'google_cloud_sdk']
     self.valid_remote_command_list = [
         'sudo pip install absl-py',
-        '/tmp/pkb/google-cloud-sdk/bin/gcloud auth activate-service-account '
-        'SERVICE_ACCOUNT --key-file=SERVICE_ACCOUNT_KEY_FILE',
+        (
+            '/tmp/pkb/google-cloud-sdk/bin/gcloud auth activate-service-account'
+            ' SERVICE_ACCOUNT --key-file=SERVICE_ACCOUNT_KEY_FILE'
+        ),
         'chmod 755 script_runner.sh',
-        'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config'
+        'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config',
     ]
 
   def Install(self, package_name):
@@ -62,8 +64,9 @@ class FakeRemoteVMForCliClientInterfacePrepare(object):
     if command not in self.valid_remote_command_list:
       raise RuntimeError
 
-  def InstallPreprovisionedPackageData(self, package_name, filenames,
-                                       install_path):
+  def InstallPreprovisionedPackageData(
+      self, package_name, filenames, install_path
+  ):
     if package_name != 'PACKAGE_NAME':
       raise RuntimeError
 
@@ -78,9 +81,10 @@ class FakeRemoteVMForCliClientInterfaceExecuteQuery(object):
     if command == 'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config':
       return None, None
 
-    expected_command = ('python script_driver.py --script={} --bq_project_id={}'
-                        ' --bq_dataset_id={}').format(QUERY_NAME, PROJECT_ID,
-                                                      DATASET_ID)
+    expected_command = (
+        'python script_driver.py --script={} --bq_project_id={}'
+        ' --bq_dataset_id={}'
+    ).format(QUERY_NAME, PROJECT_ID, DATASET_ID)
     if command != expected_command:
       raise RuntimeError
     response_object = {QUERY_NAME: {'job_id': 'JOB_ID', 'execution_time': 1.0}}
@@ -104,8 +108,9 @@ class FakeRemoteVMForJavaClientInterfacePrepare(object):
     else:
       raise RuntimeError
 
-  def InstallPreprovisionedPackageData(self, package_name, filenames,
-                                       install_path):
+  def InstallPreprovisionedPackageData(
+      self, package_name, filenames, install_path
+  ):
     if package_name != 'PACKAGE_NAME':
       raise RuntimeError
 
@@ -117,15 +122,18 @@ class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
     if command == 'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config':
       return None, None
 
-    expected_command = ('java -cp bq-java-client-2.7.jar '
-                        'com.google.cloud.performance.edw.Single --project {} '
-                        '--credentials_file {} --dataset {} --query_file '
-                        '{}').format(PROJECT_ID, 'SERVICE_ACCOUNT_KEY_FILE',
-                                     DATASET_ID, QUERY_NAME)
+    expected_command = (
+        'java -cp bq-java-client-2.7.jar '
+        'com.google.cloud.performance.edw.Single --project {} '
+        '--credentials_file {} --dataset {} --query_file '
+        '{}'
+    ).format(PROJECT_ID, 'SERVICE_ACCOUNT_KEY_FILE', DATASET_ID, QUERY_NAME)
     if command != expected_command:
       raise RuntimeError
-    response_object = {'query_wall_time_in_secs': 1.0,
-                       'details': {'job_id': 'JOB_ID'}}
+    response_object = {
+        'query_wall_time_in_secs': 1.0,
+        'details': {'job_id': 'JOB_ID'},
+    }
     response = json.dumps(response_object)
     return response, None
 
@@ -206,7 +214,8 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsInstance(interface, bigquery.JavaClientInterface)
 
     bm_spec = FakeBenchmarkSpec(
-        FakeRemoteVMForJavaClientInterfaceExecuteQuery())
+        FakeRemoteVMForJavaClientInterfaceExecuteQuery()
+    )
     interface.SetProvisionedAttributes(bm_spec)
     performance, details = interface.ExecuteQuery(QUERY_NAME)
     self.assertEqual(performance, 1.0)

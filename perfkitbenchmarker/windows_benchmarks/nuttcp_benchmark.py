@@ -17,7 +17,6 @@
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
-
 from perfkitbenchmarker.windows_packages import nuttcp
 from six.moves import range
 
@@ -62,12 +61,26 @@ def RunNuttcp(vms, exec_path):
   def _RunNuttcpTest(sending_vm, receiving_vm, iteration):
     if vm_util.ShouldRunOnExternalIpAddress():
       results.extend(
-          nuttcp.RunNuttcp(sending_vm, receiving_vm, exec_path,
-                           receiving_vm.ip_address, 'external', iteration))
+          nuttcp.RunNuttcp(
+              sending_vm,
+              receiving_vm,
+              exec_path,
+              receiving_vm.ip_address,
+              'external',
+              iteration,
+          )
+      )
     if vm_util.ShouldRunOnInternalIpAddress(sending_vm, receiving_vm):
       results.extend(
-          nuttcp.RunNuttcp(sending_vm, receiving_vm, exec_path,
-                           receiving_vm.internal_ip, 'internal', iteration))
+          nuttcp.RunNuttcp(
+              sending_vm,
+              receiving_vm,
+              exec_path,
+              receiving_vm.internal_ip,
+              'internal',
+              iteration,
+          )
+      )
 
   # run in both directions just for completeness
   for iteration in range(FLAGS.nuttcp_udp_iterations):

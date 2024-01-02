@@ -11,33 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module containing classes related to ProfitBricks disks.
-"""
+"""Module containing classes related to ProfitBricks disks."""
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 
 
 class ProfitBricksDisk(disk.BaseDisk):
-    """Dummy Object representing a ProfitBricks Disk."""
+  """Dummy Object representing a ProfitBricks Disk."""
 
-    def __init__(self, disk_spec):
-        super(ProfitBricksDisk, self).__init__(disk_spec)
+  def __init__(self, disk_spec):
+    super(ProfitBricksDisk, self).__init__(disk_spec)
 
-    def Attach(self, vm):
-        pass
+  def Attach(self, vm):
+    pass
 
-    def Detach(self):
-        pass
+  def Detach(self):
+    pass
 
-    def GetDevicePath(self):
-        # ProfitBricks VMs only have a single disk block device which is
-        # in use for the live filesystem, so it's not usable as a scratch
-        # disk device.
-        raise errors.Error('GetDevicePath not supported for ProfitBricks.')
+  def GetDevicePath(self):
+    # ProfitBricks VMs only have a single disk block device which is
+    # in use for the live filesystem, so it's not usable as a scratch
+    # disk device.
+    raise errors.Error('GetDevicePath not supported for ProfitBricks.')
 
-    def _Create(self):
-        pass
+  def _Create(self):
+    pass
 
-    def _Delete(self):
-        pass
+  def _Delete(self):
+    pass

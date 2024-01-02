@@ -22,8 +22,8 @@ FLAGS = flags.FLAGS
 
 
 def GetStaticPipelineOptions(options_list):
-  """
-  Takes the dictionary loaded from the yaml configuration file and returns it
+  """Takes the dictionary loaded from the yaml configuration file and returns it
+
   in a form consistent with the others in GenerateAllPipelineOptions: a list of
   (pipeline_option_name, pipeline_option_value) tuples.
 
@@ -34,21 +34,23 @@ def GetStaticPipelineOptions(options_list):
   options = []
   for option in options_list:
     if len(list(option.keys())) != 1:
-      raise Exception('Each item in static_pipeline_options should only have'
-                      ' 1 key/value')
+      raise Exception(
+          'Each item in static_pipeline_options should only have 1 key/value'
+      )
     option_kv = list(option.items())[0]
     options.append((option_kv[0], option_kv[1]))
   return options
 
 
 def EvaluateDynamicPipelineOptions(dynamic_options):
-  """
-  Takes the user's dynamic args and retrieves the information to fill them in.
+  """Takes the user's dynamic args and retrieves the information to fill them in.
 
-  dynamic_args is a python map of argument name -> {type, kubernetesSelector, *format}
+  dynamic_args is a python map of argument name -> {type, kubernetesSelector,
+  *format}
   returns a list of tuples containing (argName, argValue)
 
-  if optional format it passed, argValue is equal to format with "{{type}}" being replaced with actual value.
+  if optional format it passed, argValue is equal to format with "{{type}}"
+  being replaced with actual value.
   """
   filledOptions = []
   for optionDescriptor in dynamic_options:
@@ -58,7 +60,8 @@ def EvaluateDynamicPipelineOptions(dynamic_options):
 
     if not fillType:
       raise errors.Config.InvalidValue(
-          'For dynamic arguments, you must provide a "type"')
+          'For dynamic arguments, you must provide a "type"'
+      )
 
     if fillType == 'NodePortIp':
       argValue = RetrieveNodePortIp(optionDescriptor)
@@ -68,19 +71,21 @@ def EvaluateDynamicPipelineOptions(dynamic_options):
       argValue = optionDescriptor['value']
     else:
       raise errors.Config.InvalidValue(
-          'Unknown dynamic argument type: %s' % (fillType))
+          'Unknown dynamic argument type: %s' % (fillType)
+      )
 
     if valueFormat:
-      argValue = valueFormat.replace("{{" + fillType + "}}", argValue)
+      argValue = valueFormat.replace('{{' + fillType + '}}', argValue)
     filledOptions.append((optionName, argValue))
 
   return filledOptions
 
 
-def GenerateAllPipelineOptions(it_args, it_options, static_pipeline_options,
-                               dynamic_pipeline_options):
-  """
-  :param it_args: options list passed in via FLAGS.beam_it_args
+def GenerateAllPipelineOptions(
+    it_args, it_options, static_pipeline_options, dynamic_pipeline_options
+):
+  """:param it_args: options list passed in via FLAGS.beam_it_args
+
   :param it_options: options list passed in via FLAGS.beam_it_options
   :param static_pipeline_options: options list loaded from the yaml config file
   :param dynamic_pipeline_options: options list loaded from the yaml config file
@@ -90,29 +95,34 @@ def GenerateAllPipelineOptions(it_args, it_options, static_pipeline_options,
   user_option_list = []
   if it_options is not None and len(it_options) > 0:
     user_option_list = it_options.rstrip(']').lstrip('[').split(',')
-    user_option_list = [option.rstrip('" ').lstrip('" ')
-                        for option in user_option_list]
+    user_option_list = [
+        option.rstrip('" ').lstrip('" ') for option in user_option_list
+    ]
 
   # Add static options from the benchmark_spec
-  benchmark_spec_option_list = (
-      EvaluateDynamicPipelineOptions(dynamic_pipeline_options))
+  benchmark_spec_option_list = EvaluateDynamicPipelineOptions(
+      dynamic_pipeline_options
+  )
   benchmark_spec_option_list.extend(
-      GetStaticPipelineOptions(static_pipeline_options))
-  option_list = ['--{}={}'.format(t[0], t[1])
-                 for t in benchmark_spec_option_list]
+      GetStaticPipelineOptions(static_pipeline_options)
+  )
+  option_list = [
+      '--{}={}'.format(t[0], t[1]) for t in benchmark_spec_option_list
+  ]
 
   # beam_it_args is the old way of passing parameters
   args_list = []
   if it_args is not None and len(it_args) > 0:
     args_list = it_args.split(',')
 
-  return ['"{}"'.format(arg)
-          for arg in args_list + user_option_list + option_list]
+  return [
+      '"{}"'.format(arg) for arg in args_list + user_option_list + option_list
+  ]
 
 
 def ReadPipelineOptionConfigFile():
-  """
-  Reads the path to the config file from FLAGS, then loads the static and
+  """Reads the path to the config file from FLAGS, then loads the static and
+
   dynamic pipeline options from it.
   """
   dynamic_pipeline_options = []
@@ -130,24 +140,28 @@ def ReadPipelineOptionConfigFile():
 def RetrieveNodePortIp(argDescriptor):
   jsonSelector = argDescriptor['podLabel']
   if not jsonSelector:
-    raise errors.Config.InvalidValue('For NodePortIp arguments, you must'
-                                     ' provide a "selector"')
+    raise errors.Config.InvalidValue(
+        'For NodePortIp arguments, you must provide a "selector"'
+    )
   ip = kubernetes_helper.GetWithWaitForContents(
-      'pods', '', jsonSelector, '.items[0].status.podIP')
+      'pods', '', jsonSelector, '.items[0].status.podIP'
+  )
   if len(ip) == 0:
-    raise "Could not retrieve NodePort IP address"
-  logging.info("Using NodePort IP Address: " + ip)
+    raise 'Could not retrieve NodePort IP address'
+  logging.info('Using NodePort IP Address: ' + ip)
   return ip
 
 
 def RetrieveLoadBalancerIp(argDescriptor):
   serviceName = argDescriptor['serviceName']
   if not serviceName:
-    raise errors.Config.InvalidValue('For LoadBalancerIp arguments, you must'
-                                     'provide a "serviceName"')
+    raise errors.Config.InvalidValue(
+        'For LoadBalancerIp arguments, you mustprovide a "serviceName"'
+    )
   ip = kubernetes_helper.GetWithWaitForContents(
-      'svc', serviceName, '', '.status.loadBalancer.ingress[0].ip')
+      'svc', serviceName, '', '.status.loadBalancer.ingress[0].ip'
+  )
   if len(ip) == 0:
-    raise "Could not retrieve LoadBalancer IP address"
-  logging.info("Using LoadBalancer IP Address: " + ip)
+    raise 'Could not retrieve LoadBalancer IP address'
+  logging.info('Using LoadBalancer IP Address: ' + ip)
   return ip

@@ -18,8 +18,10 @@
 Installation: https://github.com/NVIDIA/nvidia-docker
 """
 from absl import flags
-_VERSION = flags.DEFINE_string('nvidia_docker_version', None,
-                               'The version of nvidia docker to install.')
+
+_VERSION = flags.DEFINE_string(
+    'nvidia_docker_version', None, 'The version of nvidia docker to install.'
+)
 
 
 def CheckNvidiaDockerExists(vm):
@@ -34,12 +36,16 @@ def AptInstall(vm):
   if CheckNvidiaDockerExists(vm):
     return
   vm.Install('docker')
-  vm.RemoteCommand('curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey '
-                   '| sudo apt-key add -')
-  vm.RemoteCommand('curl -s -L https://nvidia.github.io/nvidia-docker/'
-                   '$(. /etc/os-release;echo $ID$VERSION_ID)'
-                   '/nvidia-docker.list | sudo tee '
-                   '/etc/apt/sources.list.d/nvidia-container-toolkit.list')
+  vm.RemoteCommand(
+      'curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey '
+      '| sudo apt-key add -'
+  )
+  vm.RemoteCommand(
+      'curl -s -L https://nvidia.github.io/nvidia-docker/'
+      '$(. /etc/os-release;echo $ID$VERSION_ID)'
+      '/nvidia-docker.list | sudo tee '
+      '/etc/apt/sources.list.d/nvidia-container-toolkit.list'
+  )
   vm.RemoteCommand('sudo apt-get update')
   version = f'={_VERSION.value}' if _VERSION.value else ''
   vm.InstallPackages(f'nvidia-docker2{version}')
@@ -52,10 +58,12 @@ def YumInstall(vm):
   if CheckNvidiaDockerExists(vm):
     return
   vm.Install('docker')
-  vm.RemoteCommand('curl -s -L https://nvidia.github.io/'
-                   'nvidia-container-runtime/'
-                   '$(. /etc/os-release;echo $ID$VERSION_ID)/'
-                   'nvidia-container-runtime.repo | sudo tee /etc/yum.repos.d/'
-                   'nvidia-container-runtime.repo')
+  vm.RemoteCommand(
+      'curl -s -L https://nvidia.github.io/'
+      'nvidia-container-runtime/'
+      '$(. /etc/os-release;echo $ID$VERSION_ID)/'
+      'nvidia-container-runtime.repo | sudo tee /etc/yum.repos.d/'
+      'nvidia-container-runtime.repo'
+  )
   vm.RemoteCommand('sudo tee /etc/yum.repos.d/nvidia-container-runtime.repo')
   vm.InstallPackages('nvidia-container-runtime-hook')

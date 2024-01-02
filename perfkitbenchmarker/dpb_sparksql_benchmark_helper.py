@@ -26,79 +26,105 @@ from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
 
-BENCHMARK_NAMES = {
-    'tpcds_2_4': 'TPC-DS',
-    'tpch': 'TPC-H'
-}
+BENCHMARK_NAMES = {'tpcds_2_4': 'TPC-DS', 'tpch': 'TPC-H'}
 
 
 flags.DEFINE_string(
-    'dpb_sparksql_data', None,
-    'The HCFS based dataset to run Spark SQL query '
-    'against')
-flags.DEFINE_bool('dpb_sparksql_create_hive_tables', False,
-                  'Whether to load dpb_sparksql_data into external hive tables '
-                  'or not.')
-flags.DEFINE_bool('dpb_sparksql_simultaneous', False,
-                  'Run all queries simultaneously instead of one by one. '
-                  'Depending on the service type and cluster shape, it might '
-                  'fail if too many queries are to be run. This flag and '
-                  '--dpb_sparksql_streams are mutually exclusive.')
+    'dpb_sparksql_data',
+    None,
+    'The HCFS based dataset to run Spark SQL query against',
+)
+flags.DEFINE_bool(
+    'dpb_sparksql_create_hive_tables',
+    False,
+    'Whether to load dpb_sparksql_data into external hive tables or not.',
+)
+flags.DEFINE_bool(
+    'dpb_sparksql_simultaneous',
+    False,
+    'Run all queries simultaneously instead of one by one. '
+    'Depending on the service type and cluster shape, it might '
+    'fail if too many queries are to be run. This flag and '
+    '--dpb_sparksql_streams are mutually exclusive.',
+)
 flags.DEFINE_string(
-    'dpb_sparksql_database', None,
+    'dpb_sparksql_database',
+    None,
     'Name of preprovisioned Hive database to look for data in '
-    '(https://spark.apache.org/docs/latest/sql-data-sources-hive-tables.html).')
+    '(https://spark.apache.org/docs/latest/sql-data-sources-hive-tables.html).',
+)
 flags.DEFINE_string(
-    'dpb_sparksql_data_format', None,
+    'dpb_sparksql_data_format',
+    None,
     "Format of data to load. Assumed to be 'parquet' for HCFS "
-    "and 'bigquery' for bigquery if unspecified.")
+    "and 'bigquery' for bigquery if unspecified.",
+)
 flags.DEFINE_string(
-    'dpb_sparksql_data_compression', None,
+    'dpb_sparksql_data_compression',
+    None,
     'Compression format of the data to load. Since for most formats available '
     'in Spark this may only be specified when writing data, for most cases '
     'this option is a no-op and only serves the purpose of tagging the results '
     'reported by PKB with the appropriate compression format. One notable '
     'exception though is when the dpb_sparksql_copy_to_hdfs flag is passed. In '
     'that case the compression data passed will be used to write data into '
-    'HDFS.')
-flags.DEFINE_string('dpb_sparksql_csv_delimiter', ',',
-                    'CSV delimiter to load the CSV file.')
-flags.DEFINE_enum('dpb_sparksql_query', 'tpcds_2_4', BENCHMARK_NAMES.keys(),
-                  'A list of query to run on dpb_sparksql_data')
+    'HDFS.',
+)
+flags.DEFINE_string(
+    'dpb_sparksql_csv_delimiter', ',', 'CSV delimiter to load the CSV file.'
+)
+flags.DEFINE_enum(
+    'dpb_sparksql_query',
+    'tpcds_2_4',
+    BENCHMARK_NAMES.keys(),
+    'A list of query to run on dpb_sparksql_data',
+)
 flags.DEFINE_list(
-    'dpb_sparksql_order', [],
+    'dpb_sparksql_order',
+    [],
     'The names (numbers) of the queries to run in order in a POWER run or all '
     'at the same time in a SIMULTANEOUS run. For DPB SparkSQL benchmarks '
-    'either this flag or --dpb_sparksql_streams must be set.')
+    'either this flag or --dpb_sparksql_streams must be set.',
+)
 _STREAMS = flags.DEFINE_multi_string(
-    'dpb_sparksql_streams', [],
+    'dpb_sparksql_streams',
+    [],
     'List of all query streams to execute for a TPC-DS/H THROUGHPUT run. Each '
     'stream should be passed in separately and the queries should be comma '
     'separated, e.g. --dpb_sparksql_streams=1,2,3 '
     '--dpb_sparksql_streams=3,2,1. For DPB SparkSQL benchmarks either this '
-    'flag or --dpb_sparksql_order must be set.')
+    'flag or --dpb_sparksql_order must be set.',
+)
 flags.DEFINE_bool(
-    'dpb_sparksql_copy_to_hdfs', False,
-    'Instead of reading the data directly, copy into HDFS and read from there.')
+    'dpb_sparksql_copy_to_hdfs',
+    False,
+    'Instead of reading the data directly, copy into HDFS and read from there.',
+)
 flags.DEFINE_enum(
-    'dpb_sparksql_table_cache', None, ['eager', 'lazy'],
+    'dpb_sparksql_table_cache',
+    None,
+    ['eager', 'lazy'],
     'Optionally tell Spark to cache all tables to memory and spilling to disk. '
     'Eager cache will prefetch all tables in lexicographic order. '
     'Lazy will cache tables as they are read. This might have some '
     'counter-intuitive results and Spark reads more data than necessary to '
-    "populate it's cache.")
+    "populate it's cache.",
+)
 _QUERIES_URL = flags.DEFINE_string(
-    'dpb_sparksql_queries_url', None,
+    'dpb_sparksql_queries_url',
+    None,
     'Object Storage (e.g. GCS or S3) directory URL where the benchmark query '
     'files are contained. Their name must be their query number alone (e.g: '
     '"1" or "14a") without any prefix or extension. If omitted, queries will '
     'be fetched from databricks/spark-sql-perf Github repo and use the '
     '--dpb_sparksql_query flag to decide whether to get TPC-DS or TPC-H '
-    'queries.')
+    'queries.',
+)
 DUMP_SPARK_CONF = flags.DEFINE_bool(
-    'dpb_sparksql_dump_spark_conf', False,
+    'dpb_sparksql_dump_spark_conf',
+    False,
     "Dump job's spark configuration properties to the DPB service's bucket. "
-    'For debugging purposes.'
+    'For debugging purposes.',
 )
 
 FLAGS = flags.FLAGS
@@ -151,15 +177,18 @@ def GetTableMetadata(benchmark_spec):
         option_params['header'] = 'true'
         option_params['delimiter'] = FLAGS.dpb_sparksql_csv_delimiter
 
-      metadata[subdir] = (FLAGS.dpb_sparksql_data_format or
-                          'parquet', option_params)
+      metadata[subdir] = (
+          FLAGS.dpb_sparksql_data_format or 'parquet',
+          option_params,
+      )
   return metadata
 
 
 def StageMetadata(
     json_metadata: Any,
     storage_service: object_storage_service.ObjectStorageService,
-    staged_file: str):
+    staged_file: str,
+):
   """Write JSON metadata to object storage."""
   # Write computed metadata to object storage.
   temp_run_dir = temp_dir.GetRunDirPath()
@@ -181,11 +210,14 @@ def Prepare(benchmark_spec):
   cluster = benchmark_spec.dpb_service
   storage_service = cluster.storage_service
   benchmark_spec.query_dir = LoadAndStageQueries(
-      storage_service, cluster.base_dir)
+      storage_service, cluster.base_dir
+  )
   benchmark_spec.query_streams = GetStreams()
 
   scripts_to_upload = [
-      SPARK_SQL_DISTCP_SCRIPT, SPARK_TABLE_SCRIPT, SPARK_SQL_RUNNER_SCRIPT
+      SPARK_SQL_DISTCP_SCRIPT,
+      SPARK_TABLE_SCRIPT,
+      SPARK_SQL_RUNNER_SCRIPT,
   ] + cluster.GetServiceWrapperScriptsToUpload()
   for script in scripts_to_upload:
     src_url = data.ResourcePath(script)
@@ -199,14 +231,15 @@ def Prepare(benchmark_spec):
       # GCS will sometimes list the directory itself.
       if line and line != table_dir:
         benchmark_spec.table_subdirs.append(
-            re.split(' |/', line.rstrip('/')).pop())
+            re.split(' |/', line.rstrip('/')).pop()
+        )
 
     benchmark_spec.data_dir = FLAGS.dpb_sparksql_data
 
 
 def LoadAndStageQueries(
-    storage_service: object_storage_service.ObjectStorageService,
-    base_dir: str) -> str:
+    storage_service: object_storage_service.ObjectStorageService, base_dir: str
+) -> str:
   """Loads queries stages them in object storage if needed.
 
   Queries are selected using --dpb_sparksql_query and --dpb_sparksql_order.
@@ -232,7 +265,8 @@ def LoadAndStageQueries(
 
 def _GetQueryFilesFromUrl(
     storage_service: object_storage_service.ObjectStorageService,
-    queries_url: str) -> None:
+    queries_url: str,
+) -> None:
   """Checks if relevant query files from queries_url exist.
 
   Args:
@@ -240,9 +274,7 @@ def _GetQueryFilesFromUrl(
     queries_url: Object Storage directory URL where the benchmark queries are
       contained.
   """
-  query_paths = {
-      q: os.path.join(queries_url, q) for q in GetQueryIdsToStage()
-  }
+  query_paths = {q: os.path.join(queries_url, q) for q in GetQueryIdsToStage()}
   queries_missing = set()
   for q in query_paths:
     try:
@@ -251,12 +283,13 @@ def _GetQueryFilesFromUrl(
       queries_missing.add(q)
   if queries_missing:
     raise errors.Benchmarks.PrepareException(
-        'Could not find queries {}'.format(', '.join(sorted(queries_missing))))
+        'Could not find queries {}'.format(', '.join(sorted(queries_missing)))
+    )
 
 
 def _StageQueriesFromRepo(
-    storage_service: object_storage_service.ObjectStorageService,
-    base_dir: str) -> None:
+    storage_service: object_storage_service.ObjectStorageService, base_dir: str
+) -> None:
   """Copies queries from default Github repo to object storage.
 
   Args:
@@ -268,10 +301,12 @@ def _StageQueriesFromRepo(
 
   # Clone repo
   vm_util.IssueCommand(['git', 'clone', SPARK_SQL_PERF_GIT, spark_sql_perf_dir])
-  vm_util.IssueCommand(['git', 'checkout', SPARK_SQL_PERF_GIT_COMMIT],
-                       cwd=spark_sql_perf_dir)
-  query_dir = os.path.join(spark_sql_perf_dir, 'src', 'main', 'resources',
-                           FLAGS.dpb_sparksql_query)
+  vm_util.IssueCommand(
+      ['git', 'checkout', SPARK_SQL_PERF_GIT_COMMIT], cwd=spark_sql_perf_dir
+  )
+  query_dir = os.path.join(
+      spark_sql_perf_dir, 'src', 'main', 'resources', FLAGS.dpb_sparksql_query
+  )
 
   # Search repo for queries
   query_file = {}  # map query -> staged file
@@ -292,4 +327,5 @@ def _StageQueriesFromRepo(
   missing_queries = set(queries_to_stage) - set(query_file.keys())
   if missing_queries:
     raise errors.Benchmarks.PrepareException(
-        'Could not find queries {}'.format(missing_queries))
+        'Could not find queries {}'.format(missing_queries)
+    )

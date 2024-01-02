@@ -16,7 +16,6 @@ import os
 import unittest
 
 import mock
-
 from perfkitbenchmarker.linux_benchmarks import lmbench_benchmark
 
 
@@ -28,7 +27,8 @@ class LmbenchTestCase(unittest.TestCase):
     self.addCleanup(p.stop)
 
     path = os.path.join(
-        os.path.dirname(__file__), '../data', 'lmbench_output.txt')
+        os.path.dirname(__file__), '../data', 'lmbench_output.txt'
+    )
     with open(path) as fp:
       self.contents = fp.read()
 
@@ -52,44 +52,70 @@ class LmbenchTestCase(unittest.TestCase):
     self.assertAlmostEqual(0.6888, processor_results['stat'])
     self.assertAlmostEqual(0.3669, processor_results['fstat'])
     self.assertAlmostEqual(1.5541, processor_results['open/close'])
-    self.assertAlmostEqual(0.3226,
-                           processor_results['Signal handler installation'])
+    self.assertAlmostEqual(
+        0.3226, processor_results['Signal handler installation']
+    )
     self.assertAlmostEqual(1.1736, processor_results['Signal handler overhead'])
     self.assertAlmostEqual(0.7491, processor_results['Protection fault'])
     self.assertAlmostEqual(25.5437, processor_results['Pipe latency'])
     self.assertAlmostEqual(121.7399, processor_results['Process fork+exit'])
     self.assertAlmostEqual(318.6445, processor_results['Process fork+execve'])
-    self.assertAlmostEqual(800.2188,
-                           processor_results['Process fork+/bin/sh -c'])
+    self.assertAlmostEqual(
+        800.2188, processor_results['Process fork+/bin/sh -c']
+    )
 
-    sample = next(x for x in samples if x.metric == 'context_switching_time' and
-                  x.metadata['num_of_processes'] == 96 and
-                  x.metadata['memory_size'] == '64k')
+    sample = next(
+        x
+        for x in samples
+        if x.metric == 'context_switching_time'
+        and x.metadata['num_of_processes'] == 96
+        and x.metadata['memory_size'] == '64k'
+    )
     self.assertAlmostEqual(15.45, sample.value)
 
-    sample = next(x for x in samples if x.metric == 'context_switching_time' and
-                  x.metadata['num_of_processes'] == 4 and
-                  x.metadata['memory_size'] == '32k')
+    sample = next(
+        x
+        for x in samples
+        if x.metric == 'context_switching_time'
+        and x.metadata['num_of_processes'] == 4
+        and x.metadata['memory_size'] == '32k'
+    )
     self.assertAlmostEqual(13.96, sample.value)
 
-    sample = next(x for x in samples if x.metric == 'context_switching_time' and
-                  x.metadata['num_of_processes'] == 2 and
-                  x.metadata['memory_size'] == '16k')
+    sample = next(
+        x
+        for x in samples
+        if x.metric == 'context_switching_time'
+        and x.metadata['num_of_processes'] == 2
+        and x.metadata['memory_size'] == '16k'
+    )
     self.assertAlmostEqual(14.21, sample.value)
 
-    sample = next(x for x in samples if x.metric == 'context_switching_time' and
-                  x.metadata['num_of_processes'] == 16 and
-                  x.metadata['memory_size'] == '8k')
+    sample = next(
+        x
+        for x in samples
+        if x.metric == 'context_switching_time'
+        and x.metadata['num_of_processes'] == 16
+        and x.metadata['memory_size'] == '8k'
+    )
     self.assertAlmostEqual(13.02, sample.value)
 
-    sample = next(x for x in samples if x.metric == 'context_switching_time' and
-                  x.metadata['num_of_processes'] == 8 and
-                  x.metadata['memory_size'] == '4k')
+    sample = next(
+        x
+        for x in samples
+        if x.metric == 'context_switching_time'
+        and x.metadata['num_of_processes'] == 8
+        and x.metadata['memory_size'] == '4k'
+    )
     self.assertAlmostEqual(12.40, sample.value)
 
-    sample = next(x for x in samples if x.metric == 'context_switching_time' and
-                  x.metadata['num_of_processes'] == 32 and
-                  x.metadata['memory_size'] == '0k')
+    sample = next(
+        x
+        for x in samples
+        if x.metric == 'context_switching_time'
+        and x.metadata['num_of_processes'] == 32
+        and x.metadata['memory_size'] == '0k'
+    )
     self.assertAlmostEqual(12.63, sample.value)
 
 

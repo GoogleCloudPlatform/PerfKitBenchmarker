@@ -12,21 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Provider info for Mesos.
-
-"""
+"""Provider info for Mesos."""
 
 from perfkitbenchmarker import provider_info
 
 
 class MesosProviderInfo(provider_info.BaseProviderInfo):
-
-  SUPPORTED_BENCHMARKS = ['block_storage_workload',
-                          'cassandra_stress', 'cassandra_ycsb', 'cluster_boot',
-                          'copy_throughput', 'fio', 'hbase_ycsb', 'hpcc',
-                          'iperf', 'mongodb_ycsb', 'netperf', 'oldisim', 'ping',
-                          'redis', 'redis_ycsb', 'scimark2', 'silo',
-                          'sysbench_oltp']
+  SUPPORTED_BENCHMARKS = [
+      'block_storage_workload',
+      'cassandra_stress',
+      'cassandra_ycsb',
+      'cluster_boot',
+      'copy_throughput',
+      'fio',
+      'hbase_ycsb',
+      'hpcc',
+      'iperf',
+      'mongodb_ycsb',
+      'netperf',
+      'oldisim',
+      'ping',
+      'redis',
+      'redis_ycsb',
+      'scimark2',
+      'silo',
+      'sysbench_oltp',
+  ]
   UNSUPPORTED_BENCHMARKS = ['bonnieplusplus', 'mysql_service']
 
   CLOUD = provider_info.MESOS

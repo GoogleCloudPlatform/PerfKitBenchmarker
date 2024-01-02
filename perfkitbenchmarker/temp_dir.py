@@ -57,8 +57,7 @@ def GetAllRunsDirPath():
 @functools.lru_cache()
 def GetRunDirPath():
   """Gets path to the directory containing files specific to a PKB run."""
-  return os.path.join(
-      FLAGS.temp_dir, _RUNS, str(flags.FLAGS.run_uri))
+  return os.path.join(FLAGS.temp_dir, _RUNS, str(flags.FLAGS.run_uri))
 
 
 def GetSshConnectionsDir():

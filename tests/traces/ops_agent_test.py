@@ -18,14 +18,16 @@ from absl import flags
 from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import data
-
 from tests import pkb_common_test_case
 from perfkitbenchmarker.traces import ops_agent
 
 FLAGS = flags.FLAGS
 
 _COLLECTOR_FILE = 'collector.stdout'
-_RUN_COMMAND = f'sudo service google-cloud-ops-agent restart > {_COLLECTOR_FILE} 2>&1 & echo $!'
+_RUN_COMMAND = (
+    f'sudo service google-cloud-ops-agent restart > {_COLLECTOR_FILE} 2>&1 &'
+    ' echo $!'
+)
 OPS_AGENT_BASH_SCRIPT_PATH = './ops_agent/add-google-cloud-ops-agent-repo.sh'
 
 
@@ -48,7 +50,8 @@ class OpsAgentTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm = mock.Mock()
     self.collector._InstallCollector(vm)
     vm.RemoteCommand.assert_called_with(
-        'sudo rm -rf ops_agent && mkdir ops_agent')
+        'sudo rm -rf ops_agent && mkdir ops_agent'
+    )
     vm.RenderTemplate.assert_called_with(
         data.ResourcePath(OPS_AGENT_BASH_SCRIPT_PATH),
         OPS_AGENT_BASH_SCRIPT_PATH,
@@ -56,9 +59,11 @@ class OpsAgentTestCase(pkb_common_test_case.PkbCommonTestCase):
             'DEBIAN_REPO_NAME': str(FLAGS.ops_agent_debian_rapture_repo),
             'RPM_REPO_NAME': str(FLAGS.ops_agent_rpm_rapture_repo),
             'SUSE_REPO_NAME': str(FLAGS.ops_agent_suse_rapture_repo),
-        })
+        },
+    )
     vm.RobustRemoteCommand.assert_called_with(
-        f'sudo bash {OPS_AGENT_BASH_SCRIPT_PATH} --also-install')
+        f'sudo bash {OPS_AGENT_BASH_SCRIPT_PATH} --also-install'
+    )
 
     vm.PushFile.assert_not_called()
 
@@ -69,7 +74,8 @@ class OpsAgentTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm = mock.Mock()
     self.collector._InstallCollector(vm)
     vm.RemoteCommand.assert_called_with(
-        'sudo rm -rf ops_agent && mkdir ops_agent')
+        'sudo rm -rf ops_agent && mkdir ops_agent'
+    )
     vm.RenderTemplate.assert_called_with(
         data.ResourcePath(OPS_AGENT_BASH_SCRIPT_PATH),
         OPS_AGENT_BASH_SCRIPT_PATH,
@@ -77,9 +83,11 @@ class OpsAgentTestCase(pkb_common_test_case.PkbCommonTestCase):
             'DEBIAN_REPO_NAME': 'debian_repo',
             'RPM_REPO_NAME': 'rpm_repo',
             'SUSE_REPO_NAME': 'suse_repo',
-        })
+        },
+    )
     vm.RobustRemoteCommand.assert_called_with(
-        f'sudo bash {OPS_AGENT_BASH_SCRIPT_PATH} --also-install')
+        f'sudo bash {OPS_AGENT_BASH_SCRIPT_PATH} --also-install'
+    )
 
     vm.PushFile.assert_not_called()
 
@@ -89,7 +97,8 @@ class OpsAgentTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.collector._InstallCollector(vm)
     vm.PushFile.assert_called_with('config.yaml', '/tmp/config.yaml')
     vm.RemoteCommand.assert_called_with(
-        'sudo cp /tmp/config.yaml /etc/google-cloud-ops-agent/config.yaml')
+        'sudo cp /tmp/config.yaml /etc/google-cloud-ops-agent/config.yaml'
+    )
 
 
 if __name__ == '__main__':

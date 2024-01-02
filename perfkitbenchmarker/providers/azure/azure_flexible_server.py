@@ -56,12 +56,14 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
 
   Note that the client VM's region and the region requested for the database
   must be the same.
-
   """
+
   SERVER_TYPE = 'flexible-server'
   CLOUD = provider_info.AZURE
-  ENGINE = [sql_engine_utils.FLEXIBLE_SERVER_POSTGRES,
-            sql_engine_utils.FLEXIBLE_SERVER_MYSQL]
+  ENGINE = [
+      sql_engine_utils.FLEXIBLE_SERVER_POSTGRES,
+      sql_engine_utils.FLEXIBLE_SERVER_MYSQL,
+  ]
 
   @staticmethod
   def GetDefaultEngineVersion(engine: str):
@@ -129,9 +131,7 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
     return engine
 
   def _PostCreate(self):
-    """Perform general post create operations on the cluster.
-
-    """
+    """Perform general post create operations on the cluster."""
     # Calling the grand parent class.
     super(azure_relational_db.AzureRelationalDb, self)._PostCreate()
     cmd = [

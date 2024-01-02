@@ -1,13 +1,11 @@
 """Tests for perfkitbenchmarker.tests.providers.aws.aws_capacity_reservation."""
 
-
 import datetime
 import unittest
 
 from absl import flags
 import freezegun
 import mock
-
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_capacity_reservation
 from perfkitbenchmarker.providers.aws import util
@@ -63,29 +61,34 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
 
     self._create_patch(
         util.__name__ + '.GetZonesInRegion',
-        return_val=['us-west-1a', 'us-west-1b'])
+        return_val=['us-west-1a', 'us-west-1b'],
+    )
 
   @freezegun.freeze_time(FAKE_DATETIME_NOW)
   def test_create(self):
     vm_group = [FakeAwsVirtualMachine()]
     capacity_reservation = aws_capacity_reservation.AwsCapacityReservation(
-        vm_group)
+        vm_group
+    )
 
     with mock.patch(
         vm_util.__name__ + '.IssueCommand',
-        return_value=(CREATE_STDOUT_SUCCESSFUL, '', 0)) as issue_command:
+        return_value=(CREATE_STDOUT_SUCCESSFUL, '', 0),
+    ) as issue_command:
       capacity_reservation._Create()
       command_string = ' '.join(issue_command.call_args[0][0])
 
       expected_end_date = FAKE_DATETIME_NOW + datetime.timedelta(
-          minutes=FLAGS.timeout_minutes)
+          minutes=FLAGS.timeout_minutes
+      )
       expected_command = (
           'aws --output json ec2 create-capacity-reservation '
           '--instance-type=fake_machine_type '
           '--instance-platform=Linux/UNIX --availability-zone=us-west-1a '
           '--instance-count=1 --instance-match-criteria=targeted '
-          '--region=us-west-1 --end-date-type=limited --end-date=%s' %
-          expected_end_date.isoformat())
+          '--region=us-west-1 --end-date-type=limited --end-date=%s'
+          % expected_end_date.isoformat()
+      )
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(expected_command, command_string)
@@ -93,15 +96,18 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
   def test_delete(self):
     vm_group = [FakeAwsVirtualMachine()]
     capacity_reservation = aws_capacity_reservation.AwsCapacityReservation(
-        vm_group)
+        vm_group
+    )
     capacity_reservation.capacity_reservation_id = 'foo'
 
     with mock.patch(vm_util.__name__ + '.IssueCommand') as issue_command:
       capacity_reservation._Delete()
       command_string = ' '.join(issue_command.call_args[0][0])
 
-      expected_command = ('aws --output json ec2 cancel-capacity-reservation '
-                          '--capacity-reservation-id=foo --region=us-west-1')
+      expected_command = (
+          'aws --output json ec2 cancel-capacity-reservation '
+          '--capacity-reservation-id=foo --region=us-west-1'
+      )
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(expected_command, command_string)
 
@@ -112,7 +118,8 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
     vm_group = [vm_1, vm_2, vm_3]
 
     capacity_reservation = aws_capacity_reservation.AwsCapacityReservation(
-        vm_group)
+        vm_group
+    )
     capacity_reservation.capacity_reservation_id = 'foo'
 
     capacity_reservation._UpdateVmsInGroup('foo', 'us-west-1z')

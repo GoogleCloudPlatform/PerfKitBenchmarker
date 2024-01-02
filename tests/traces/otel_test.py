@@ -46,14 +46,19 @@ class OtelTestCase(unittest.TestCase):
     metric_names = self.contents.keys()
     for sample in samples:
       self.assertIn(sample.metric, metric_names)
-      self.assertEqual(sample.metadata['values'],
-                       self.contents[sample.metric]['values'])
-      self.assertEqual(sample.metadata['values'],
-                       self.contents[sample.metric]['values'])
-      self.assertEqual(sample.metadata['timestamps'],
-                       self.contents[sample.metric]['timestamps'])
-      self.assertEqual(sample.metadata['unit'],
-                       self.contents[sample.metric]['unit'])
+      self.assertEqual(
+          sample.metadata['values'], self.contents[sample.metric]['values']
+      )
+      self.assertEqual(
+          sample.metadata['values'], self.contents[sample.metric]['values']
+      )
+      self.assertEqual(
+          sample.metadata['timestamps'],
+          self.contents[sample.metric]['timestamps'],
+      )
+      self.assertEqual(
+          sample.metadata['unit'], self.contents[sample.metric]['unit']
+      )
       self.assertEqual(sample.metadata['vm_role'], TEST_VM)
 
 

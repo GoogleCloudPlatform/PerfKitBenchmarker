@@ -24,7 +24,8 @@ from tests import pkb_common_test_case
 
 
 _SAMPLE_OUTPUT_FILE = os.path.join(
-    os.path.dirname(__file__), '../data/coremark_sample_output.txt')
+    os.path.dirname(__file__), '../data/coremark_sample_output.txt'
+)
 
 
 class CoremarkBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
@@ -36,16 +37,20 @@ class CoremarkBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     samples = coremark_benchmark._ParseOutputForSamples(output, 2)
     self.assertEqual('Coremark Score', samples[0].metric)
     self.assertAlmostEqual(29504.182218, samples[0].value)
-    self.assertEqual('CoreMark 1.0 : 29504.182218 / GCC7.3.0 -O2 -g -O2 '
-                     '-DMULTITHREAD=2 -DUSE_PTHREAD -DPERFORMANCE_RUN=1 '
-                     '-DPERFORMANCE_RUN=1  -lrt -lpthread / Heap / 2:PThreads',
-                     samples[0].metadata['summary'])
+    self.assertEqual(
+        'CoreMark 1.0 : 29504.182218 / GCC7.3.0 -O2 -g -O2 '
+        '-DMULTITHREAD=2 -DUSE_PTHREAD -DPERFORMANCE_RUN=1 '
+        '-DPERFORMANCE_RUN=1  -lrt -lpthread / Heap / 2:PThreads',
+        samples[0].metadata['summary'],
+    )
     self.assertEqual(666, samples[0].metadata['size'])
     self.assertEqual(67787, samples[0].metadata['total_ticks'])
     self.assertAlmostEqual(67.787000, samples[0].metadata['total_time_sec'])
     self.assertEqual(2000000, samples[0].metadata['iterations'])
-    self.assertEqual(coremark_benchmark.ITERATIONS_PER_CPU,
-                     samples[0].metadata['iterations_per_cpu'])
+    self.assertEqual(
+        coremark_benchmark.ITERATIONS_PER_CPU,
+        samples[0].metadata['iterations_per_cpu'],
+    )
     self.assertEqual('PTHREAD', samples[0].metadata['parallelism_method'])
     self.assertEqual(2, samples[0].metadata['thread_count'])
 

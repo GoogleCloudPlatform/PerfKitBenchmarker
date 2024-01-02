@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Classes relating to decoding a Kubernetes resource limits or requests.
-"""
+"""Classes relating to decoding a Kubernetes resource limits or requests."""
 
 from typing import Optional
 
@@ -27,7 +26,7 @@ class KubernetesResourcesSpec(spec.BaseSpec):
   Attributes:
     cpus: float. Number of vCPUs.
     memory: string. Representation of the size of memory, expressed in MiB or
-        GiB. Must be an integer number of MiB (e.g. "1280MiB", "7.5GiB").
+      GiB. Must be an integer number of MiB (e.g. "1280MiB", "7.5GiB").
   """
 
   def __init__(self, *args, **kwargs):
@@ -45,9 +44,12 @@ class KubernetesResourcesSpec(spec.BaseSpec):
           arguments to construct in order to decode the named option.
     """
     result = super(
-        KubernetesResourcesSpec, cls)._GetOptionDecoderConstructions()
-    result.update({'cpus': (option_decoders.FloatDecoder, {'min': 0.1}),
-                   'memory': (custom_virtual_machine_spec.MemoryDecoder, {})})
+        KubernetesResourcesSpec, cls
+    )._GetOptionDecoderConstructions()
+    result.update({
+        'cpus': (option_decoders.FloatDecoder, {'min': 0.1}),
+        'memory': (custom_virtual_machine_spec.MemoryDecoder, {}),
+    })
     return result
 
 
@@ -63,14 +65,18 @@ class KubernetesResourcesDecoder(option_decoders.TypeVerifier):
     Args:
       value: a dict containing 'cpus' and 'memory' keys.
       component_full_name: string. Fully qualified name of the configurable
-          component containing the config option.
+        component containing the config option.
       flag_values: flags.FlagValues. Runtime flag values to be propagated to
-          BaseSpec constructors.
+        BaseSpec constructors.
 
     Returns:
       The decoded KubernetesResourcesSpec.
     """
-    super(KubernetesResourcesDecoder, self).Decode(value, component_full_name,
-                                                   flag_values)
-    return KubernetesResourcesSpec(self._GetOptionFullName(component_full_name),
-                                   flag_values=flag_values, **value)
+    super(KubernetesResourcesDecoder, self).Decode(
+        value, component_full_name, flag_values
+    )
+    return KubernetesResourcesSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **value
+    )

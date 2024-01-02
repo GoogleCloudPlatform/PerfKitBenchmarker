@@ -1,4 +1,5 @@
 """Tests for perfkitbenchmarker.cloud_harmony_util."""
+
 import os
 import unittest
 
@@ -23,8 +24,9 @@ class CloudHarmonyTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_ParseCsvResultsIntoMetadata(self):
     prefix = 'foobar'
-    path = os.path.join(os.path.dirname(__file__),
-                        'data/cloud_harmony_sample.csv')
+    path = os.path.join(
+        os.path.dirname(__file__), 'data/cloud_harmony_sample.csv'
+    )
     with open(path, mode='r') as fp:
       sample_csv = fp.read()
     metadata = cloud_harmony_util.ParseCsvResultsFromString(sample_csv, prefix)
@@ -47,7 +49,7 @@ class CloudHarmonyTest(pkb_common_test_case.PkbCommonTestCase):
         '--meta_region us-east3 '
         '--meta_zone us-east3 '
         '--meta_test_id None'
-        )
+    )
     self.assertEqual(no_override, expected_no_override)
 
     expected_override = (
@@ -59,10 +61,12 @@ class CloudHarmonyTest(pkb_common_test_case.PkbCommonTestCase):
         '--meta_region us-east3 '
         '--meta_zone us-east3 '
         '--meta_test_id None'
-        )
+    )
     override = cloud_harmony_util.GetCommonMetadata(
-        {'meta_instance_id': 'n1-standard-8'})
+        {'meta_instance_id': 'n1-standard-8'}
+    )
     self.assertEqual(override, expected_override)
+
 
 if __name__ == '__main__':
   unittest.main()

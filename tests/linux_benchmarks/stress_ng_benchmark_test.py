@@ -16,7 +16,6 @@ import os
 import unittest
 
 import mock
-
 from perfkitbenchmarker.linux_benchmarks import stress_ng_benchmark
 
 
@@ -29,19 +28,16 @@ class StressngTestCase(unittest.TestCase):
     self.addCleanup(p.stop)
 
     path = os.path.join(
-        os.path.dirname(__file__), '../data', 'stress_ng_output.txt')
+        os.path.dirname(__file__), '../data', 'stress_ng_output.txt'
+    )
     with open(path) as fp:
       self.contents = fp.read()
 
   def testParseStressngResult(self):
-    metadata = {
-        'duration_sec': 10,
-        'threads': 16
-    }
+    metadata = {'duration_sec': 10, 'threads': 16}
 
     samples = []
-    result = stress_ng_benchmark._ParseStressngResult(
-        metadata, self.contents)
+    result = stress_ng_benchmark._ParseStressngResult(metadata, self.contents)
     self.assertIsNotNone(result)
     samples.append(result)
 
@@ -49,9 +45,7 @@ class StressngTestCase(unittest.TestCase):
     metadata = samples[0].metadata
 
     # Test metric and value
-    expected = {
-        'context': 4485.820000
-    }
+    expected = {'context': 4485.820000}
 
     for sample in samples:
       self.assertEqual(expected[sample.metric], sample.value)
@@ -61,7 +55,10 @@ class StressngTestCase(unittest.TestCase):
 
   def testGeoMean(self):
     floats = [1.0, 3.0, 5.0]
-    self.assertAlmostEqual(stress_ng_benchmark._GeoMeanOverflow(floats),
-                           2.466212074)
+    self.assertAlmostEqual(
+        stress_ng_benchmark._GeoMeanOverflow(floats), 2.466212074
+    )
+
+
 if __name__ == '__main__':
   unittest.main()

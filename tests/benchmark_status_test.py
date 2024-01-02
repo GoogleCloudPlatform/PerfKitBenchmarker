@@ -17,7 +17,6 @@ import os
 import unittest
 
 from absl.testing import parameterized
-
 import mock
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import errors
@@ -42,9 +41,13 @@ class MockSpec(object):
 _BENCHMARK_SPECS = [
     MockSpec('iperf', 'iperf0', benchmark_status.SUCCEEDED),
     MockSpec('iperf', 'iperf1', benchmark_status.FAILED),
-    MockSpec('iperf', 'iperf2', benchmark_status.FAILED,
-             benchmark_status.FailedSubstatus.QUOTA),
-    MockSpec('cluster_boot', 'cluster_boot0', benchmark_status.SKIPPED)
+    MockSpec(
+        'iperf',
+        'iperf2',
+        benchmark_status.FAILED,
+        benchmark_status.FailedSubstatus.QUOTA,
+    ),
+    MockSpec('cluster_boot', 'cluster_boot0', benchmark_status.SKIPPED),
 ]
 _STATUS_TABLE = os.linesep.join((
     '--------------------------------------------------------',
@@ -54,7 +57,8 @@ _STATUS_TABLE = os.linesep.join((
     'iperf         iperf1         FAILED                     ',
     'iperf         iperf2         FAILED     QUOTA_EXCEEDED  ',
     'cluster_boot  cluster_boot0  SKIPPED                    ',
-    '--------------------------------------------------------'))
+    '--------------------------------------------------------',
+))
 _STATUS_SUMMARY = os.linesep.join((
     'Benchmark run statuses:',
     '--------------------------------------------------------',
@@ -65,7 +69,8 @@ _STATUS_SUMMARY = os.linesep.join((
     'iperf         iperf2         FAILED     QUOTA_EXCEEDED  ',
     'cluster_boot  cluster_boot0  SKIPPED                    ',
     '--------------------------------------------------------',
-    'Success rate: 25.00% (1/4)'))
+    'Success rate: 25.00% (1/4)',
+))
 
 
 class CreateSummaryTableTestCase(unittest.TestCase):
@@ -91,20 +96,18 @@ class FailedSubstatusTestCase(pkb_common_test_case.PkbCommonTestCase):
           'expected_substatus': benchmark_status.FailedSubstatus.QUOTA,
       },
       {
-          'testcase_name':
-              'Capacity',
-          'exception_class':
-              errors.Benchmarks.InsufficientCapacityCloudFailure,
-          'expected_substatus':
-              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY,
+          'testcase_name': 'Capacity',
+          'exception_class': errors.Benchmarks.InsufficientCapacityCloudFailure,
+          'expected_substatus': (
+              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
+          ),
       },
       {
-          'testcase_name':
-              'KnownIntermittent',
-          'exception_class':
-              errors.Benchmarks.KnownIntermittentError,
-          'expected_substatus':
-              benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT,
+          'testcase_name': 'KnownIntermittent',
+          'exception_class': errors.Benchmarks.KnownIntermittentError,
+          'expected_substatus': (
+              benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT
+          ),
       },
       {
           'testcase_name': 'RestoreError',
@@ -122,11 +125,14 @@ class FailedSubstatusTestCase(pkb_common_test_case.PkbCommonTestCase):
           'expected_substatus': benchmark_status.FailedSubstatus.UNCATEGORIZED,
       },
   )
-  def testRunBenchmarkExceptionHasCorrectFailureStatus(self, exception_class,
-                                                       expected_substatus):
+  def testRunBenchmarkExceptionHasCorrectFailureStatus(
+      self, exception_class, expected_substatus
+  ):
     self.enter_context(
         mock.patch.object(
-            pkb, 'DoProvisionPhase', side_effect=[exception_class()]))
+            pkb, 'DoProvisionPhase', side_effect=[exception_class()]
+        )
+    )
     test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
     # Skip pickling the spec.
     self.enter_context(mock.patch.object(test_spec, 'Pickle'))

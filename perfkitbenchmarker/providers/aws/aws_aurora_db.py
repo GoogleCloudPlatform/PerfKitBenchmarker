@@ -38,11 +38,13 @@ _MAP_ENGINE_TO_DEFAULT_VERSION = {
 
 _AURORA_ENGINES = [
     sql_engine_utils.AURORA_MYSQL,
-    sql_engine_utils.AURORA_POSTGRES]
+    sql_engine_utils.AURORA_POSTGRES,
+]
 
 
 class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   """Implements the aurora database for AWS."""
+
   CLOUD = 'AWS'
   IS_MANAGED = True
   ENGINE = _AURORA_ENGINES
@@ -64,13 +66,16 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     """
     zones_needed_for_high_availability = len(self.zones) > 1
     if zones_needed_for_high_availability != self.spec.high_availability:
-      raise Exception('When db_high_availability is true, multiple '
-                      'zones must be specified.  When '
-                      'db_high_availability is false, one zone '
-                      'should be specified.   '
-                      'db_high_availability: {0}  '
-                      'zone count: {1} '.format(
-                          zones_needed_for_high_availability, len(self.zones)))
+      raise Exception(
+          'When db_high_availability is true, multiple '
+          'zones must be specified.  When '
+          'db_high_availability is false, one zone '
+          'should be specified.   '
+          'db_high_availability: {0}  '
+          'zone count: {1} '.format(
+              zones_needed_for_high_availability, len(self.zones)
+          )
+      )
 
     # Create the cluster.
     cmd = (
@@ -96,7 +101,6 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     vm_util.IssueCommand(cmd)
 
     for zone in self.zones:
-
       # The first instance is assumed to be writer -
       # and so use the instance_id  for that id.
       if zone == self.zones[0]:
@@ -106,17 +110,23 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
       self.all_instance_ids.append(instance_identifier)
 
-      cmd = util.AWS_PREFIX + [
-          'rds', 'create-db-instance',
-          '--db-instance-identifier=%s' % instance_identifier,
-          '--db-cluster-identifier=%s' % self.cluster_id,
-          '--engine=%s' % self.spec.engine,
-          '--engine-version=%s' % self.spec.engine_version,
-          '--no-auto-minor-version-upgrade',
-          '--db-instance-class=%s' % self.spec.db_spec.machine_type,
-          '--region=%s' % self.region,
-          '--availability-zone=%s' % zone, '--tags'
-      ] + util.MakeFormattedDefaultTags()
+      cmd = (
+          util.AWS_PREFIX
+          + [
+              'rds',
+              'create-db-instance',
+              '--db-instance-identifier=%s' % instance_identifier,
+              '--db-cluster-identifier=%s' % self.cluster_id,
+              '--engine=%s' % self.spec.engine,
+              '--engine-version=%s' % self.spec.engine_version,
+              '--no-auto-minor-version-upgrade',
+              '--db-instance-class=%s' % self.spec.db_spec.machine_type,
+              '--region=%s' % self.region,
+              '--availability-zone=%s' % zone,
+              '--tags',
+          ]
+          + util.MakeFormattedDefaultTags()
+      )
       vm_util.IssueCommand(cmd)
 
   def _PostCreate(self):
@@ -136,9 +146,9 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
   def _UpdateInstanceClass(self, instance_id: str, instance_class: str) -> None:
     """Updates DBInstanceClass for the writer instance."""
-    current_instance_class = self._DescribeInstance(instance_id)[
-        'DBInstances'
-    ][0]['DBInstanceClass']
+    current_instance_class = self._DescribeInstance(instance_id)['DBInstances'][
+        0
+    ]['DBInstanceClass']
     if current_instance_class != instance_class:
       logging.info(
           'Updating capacity from %s to %s',
@@ -167,9 +177,10 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
   def _DescribeCluster(self):
     cmd = util.AWS_PREFIX + [
-        'rds', 'describe-db-clusters',
+        'rds',
+        'describe-db-clusters',
         '--db-cluster-identifier=%s' % self.cluster_id,
-        '--region=%s' % self.region
+        '--region=%s' % self.region,
     ]
     stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
@@ -198,10 +209,11 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     """Fail over from master to replica."""
     new_primary_id = self.all_instance_ids[1]
     cmd = util.AWS_PREFIX + [
-        'rds', 'failover-db-cluster',
+        'rds',
+        'failover-db-cluster',
         '--db-cluster-identifier=%s' % self.cluster_id,
         '--target-db-instance-identifier=%s' % new_primary_id,
-        '--region=%s' % self.region
+        '--region=%s' % self.region,
     ]
     vm_util.IssueCommand(cmd)
 
@@ -223,10 +235,12 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         poll_interval=60,
         fuzz=0,
         timeout=3600,
-        retryable_exceptions=(errors.Resource.RetryableDeletionError,))
+        retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+    )
     def WaitUntilClusterDeleted():
       if self._ClusterExists():
         raise errors.Resource.RetryableDeletionError('Not yet deleted')
+
     WaitUntilClusterDeleted()
 
   @staticmethod
@@ -235,6 +249,7 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
     Args:
       engine (string): type of database (my_sql or postgres).
+
     Returns:
       (string): Default engine version.
     Raises:

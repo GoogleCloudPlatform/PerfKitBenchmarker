@@ -105,16 +105,20 @@ class LogUtilTestCase(pkb_common_test_case.PkbCommonTestCase):
     my_list.append(context.label)
 
   def testPkbLogFilter(self):
-    """Verify that PkbLogFilter sets the pkb_label of LogRecords it processes.
-    """
+    """Verify that PkbLogFilter sets the pkb_label of LogRecords it processes."""
     logger_name = 'log_util_test.LogUtilTestCase.testPkbLogFilter'
     context = log_util.ThreadLogContext()
     log_util.SetThreadLogContext(context)
     with context.ExtendLabel('LABEL-A'):
       log_record = logging.LogRecord(
-          name=logger_name, level=logging.INFO, pathname=__file__,
+          name=logger_name,
+          level=logging.INFO,
+          pathname=__file__,
           lineno=inspect.getframeinfo(inspect.currentframe()).lineno + 1,
-          msg="Log message.", args=None, exc_info=None)
+          msg='Log message.',
+          args=None,
+          exc_info=None,
+      )
       log_util.PkbLogFilter().filter(log_record)
       self.assertEqual(log_record.pkb_label, 'LABEL-A ')
 
@@ -125,11 +129,17 @@ class LogUtilTestCase(pkb_common_test_case.PkbCommonTestCase):
     def childLog():
       logger_name = 'log_util_test.LogUtilTestCase.testPkbLogFilterNoContext'
       self.log_record = logging.LogRecord(
-          name=logger_name, level=logging.INFO, pathname=__file__,
+          name=logger_name,
+          level=logging.INFO,
+          pathname=__file__,
           lineno=inspect.getframeinfo(inspect.currentframe()).lineno + 1,
-          msg="Log message.", args=None, exc_info=None)
+          msg='Log message.',
+          args=None,
+          exc_info=None,
+      )
       log_util.PkbLogFilter().filter(self.log_record)
       self.completed = True
+
     child = threading.Thread(target=childLog)
     child.start()
     child.join()

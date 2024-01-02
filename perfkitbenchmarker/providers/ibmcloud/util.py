@@ -35,29 +35,30 @@ DELIMITER = 'z-z'
 # for windows
 USER_DATA = (
     'Content-Type: text/x-shellscript; '
-    "charset=\"us-ascii\"\nContent-Transfer-Encoding: "
+    'charset="us-ascii"\nContent-Transfer-Encoding: '
     '7bit\nContent-Disposition: attachment; '
-    "filename=\"set-content.ps1\"\n#ps1_sysnative\nfunction "
+    'filename="set-content.ps1"\n#ps1_sysnative\nfunction '
     'Setup-Remote-Desktop () {\nSet-ItemProperty '
-    "\"HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\" -Name "
+    '"HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server" -Name '
     'fDenyTSConnections -Value 0\nSet-ItemProperty '
-    "\"HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal "
-    "Server\\WinStations\\RDP-Tcp\" -Name \"UserAuthentication\" -Value "
-    "1\nEnable-NetFireWallRule -DisplayGroup \"Remote Desktop\"\n}\nfunction "
-    "Setup-Ping () {\nSet-NetFirewallRule -DisplayName \"File and Printer "
-    "Sharing (Echo Request - ICMPv4-In)\" -enabled True\nSet-NetFirewallRule "
-    "-DisplayName \"File and Printer Sharing (Echo Request - ICMPv6-In)\" "
+    '"HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal '
+    'Server\\WinStations\\RDP-Tcp" -Name "UserAuthentication" -Value '
+    '1\nEnable-NetFireWallRule -DisplayGroup "Remote Desktop"\n}\nfunction '
+    'Setup-Ping () {\nSet-NetFirewallRule -DisplayName "File and Printer '
+    'Sharing (Echo Request - ICMPv4-In)" -enabled True\nSet-NetFirewallRule '
+    '-DisplayName "File and Printer Sharing (Echo Request - ICMPv6-In)" '
     '-enabled True\n}\nSetup-Remote-Desktop\nSetup-Ping\nNew-NetFirewallRule '
-    "-DisplayName \"Allow winrm https 5986\" -Direction Inbound -Action Allow "
+    '-DisplayName "Allow winrm https 5986" -Direction Inbound -Action Allow '
     '-Protocol TCP -LocalPort 5986\nwinrm set winrm/config/service/auth '
-    "'@{Basic=\"true\";Certificate=\"true\"}'\n$cert=New-SelfSignedCertificate"
+    '\'@{Basic="true";Certificate="true"}\'\n$cert=New-SelfSignedCertificate'
     ' -certstorelocation cert:\\localmachine\\my -dnsname '
     '*\n$thumb=($cert).Thumbprint\nNew-WSManInstance -ResourceURI '
-    "winrm/config/Listener -SelectorSet @{Address=\"*\";Transport=\"HTTPS\"} "
-    "-ValueSet @{CertificateThumbprint=\"$thumb\"}\npowercfg /SetActive "
-    "(powercfg /List | %{if ($_.Contains(\"High "
-    "performance\")){$_.Split()[3]}})\nSet-NetAdapterAdvancedProperty -Name "
-    'Ethernet -RegistryKeyword MTU -RegistryValue 9000\n')
+    'winrm/config/Listener -SelectorSet @{Address="*";Transport="HTTPS"} '
+    '-ValueSet @{CertificateThumbprint="$thumb"}\npowercfg /SetActive '
+    '(powercfg /List | %{if ($_.Contains("High '
+    'performance")){$_.Split()[3]}})\nSet-NetAdapterAdvancedProperty -Name '
+    'Ethernet -RegistryKeyword MTU -RegistryValue 9000\n'
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -115,7 +116,8 @@ def GetGen(account: Account):
       verbose=False,
       version='v1',
       silent=True,
-      force=True)
+      force=True,
+  )
   if not gen.Token():
     gen.SetToken()  # one more try
   return gen
@@ -153,8 +155,9 @@ def GetOsInfo(image: Dict[Any, Any]) -> Dict[str, Any]:
     data = image['operating_system']
     if 'href' in data:
       del data['href']  # delete this, does not seem necessary
-    if 'custom' in image[
-        'name']:  # this name is not the name in operating_system
+    if (
+        'custom' in image['name']
+    ):  # this name is not the name in operating_system
       custom = True
   else:
     # if lookup failed, try read from env if any is set

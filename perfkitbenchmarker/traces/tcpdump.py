@@ -25,18 +25,28 @@ from perfkitbenchmarker import stages
 from perfkitbenchmarker.traces import base_collector
 
 flags.DEFINE_boolean(
-    'tcpdump', False, 'Run tcpdump on each VM to collect network packets in '
-    'each benchmark run.')
-flags.DEFINE_list('tcpdump_ignore_ports', [22],
-                  'Ports to ignore when running tcpdump')
+    'tcpdump',
+    False,
+    'Run tcpdump on each VM to collect network packets in each benchmark run.',
+)
 flags.DEFINE_list(
-    'tcpdump_include_ports', [], 'Ports to include when running tcpdump.  By '
-    'default collects all ports except those in --tcpdump_ignore_ports')
-flags.DEFINE_integer('tcpdump_snaplen', 96,
-                     'Tcpdump snaplen, see man tcpdump "-s"')
+    'tcpdump_ignore_ports', [22], 'Ports to ignore when running tcpdump'
+)
+flags.DEFINE_list(
+    'tcpdump_include_ports',
+    [],
+    'Ports to include when running tcpdump.  By '
+    'default collects all ports except those in --tcpdump_ignore_ports',
+)
 flags.DEFINE_integer(
-    'tcpdump_packet_count', None, 'Number of packets to collect. Default '
-    'is to collect all packets in the run phase')
+    'tcpdump_snaplen', 96, 'Tcpdump snaplen, see man tcpdump "-s"'
+)
+flags.DEFINE_integer(
+    'tcpdump_packet_count',
+    None,
+    'Number of packets to collect. Default '
+    'is to collect all packets in the run phase',
+)
 
 FLAGS = flags.FLAGS
 
@@ -61,11 +71,13 @@ class _TcpdumpCollector(base_collector.BaseCollector):
   Installs tcpdump and runs it on the VMs.
   """
 
-  def __init__(self,
-               ignore_ports=None,
-               include_ports=None,
-               snaplen=None,
-               packet_count=None):
+  def __init__(
+      self,
+      ignore_ports=None,
+      include_ports=None,
+      snaplen=None,
+      packet_count=None,
+  ):
     super(_TcpdumpCollector, self).__init__(None, None)
     self.snaplen = snaplen
     self.packet_count = packet_count
@@ -120,7 +132,8 @@ def _CreateCollector(parsed_flags):
       ignore_ports=parsed_flags.tcpdump_ignore_ports,
       include_ports=parsed_flags.tcpdump_include_ports,
       snaplen=parsed_flags.tcpdump_snaplen,
-      packet_count=parsed_flags.tcpdump_packet_count)
+      packet_count=parsed_flags.tcpdump_packet_count,
+  )
 
 
 def Register(parsed_flags):

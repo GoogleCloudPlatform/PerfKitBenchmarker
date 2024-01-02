@@ -17,7 +17,6 @@
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
@@ -46,47 +45,65 @@ TEST_OUTPUT_SPECINT = """
  Est. SPECint(R)_base2006              22.7
 """
 
-GOOD_METADATA = {'runspec_config': 'linux64-x64-gcc47.cfg',
-                 'runspec_config_md5sum': 'abcd',
-                 'runspec_define': '',
-                 'runspec_iterations': '3',
-                 'runspec_enable_32bit': 'False',
-                 'runspec_metric': 'rate',
-                 'spec_runmode': 'base',
-                 'spec17_fdo': False,
-                 'spec17_copies': None,
-                 'spec17_threads': None,
-                 'spec17_subset': ['intspeed', 'fpspeed', 'intrate', 'fprate'],
-                 'gcc_version': '7',
-                 'CPU2017_version': ''}
+GOOD_METADATA = {
+    'runspec_config': 'linux64-x64-gcc47.cfg',
+    'runspec_config_md5sum': 'abcd',
+    'runspec_define': '',
+    'runspec_iterations': '3',
+    'runspec_enable_32bit': 'False',
+    'runspec_metric': 'rate',
+    'spec_runmode': 'base',
+    'spec17_fdo': False,
+    'spec17_copies': None,
+    'spec17_threads': None,
+    'spec17_subset': ['intspeed', 'fpspeed', 'intrate', 'fprate'],
+    'gcc_version': '7',
+    'CPU2017_version': '',
+}
 
 EXPECTED_RESULT_SPECINT = [
-    sample.Sample(metric='400.perlbench', value=23.4, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='401.bzip2', value=17.1, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='403.gcc', value=22.1, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='429.mcf', value=25.1, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='445.gobmk', value=21.0, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='456.hmmer', value=19.0, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='458.sjeng', value=20.6, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='462.libquantum', value=44.2, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='464.h264ref', value=31.6, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='471.omnetpp', value=17.9, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='473.astar', value=14.6, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='483.xalancbmk', value=27.8, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='SPECint(R)_base2006', value=22.7, unit='',
-                  metadata=GOOD_METADATA),
+    sample.Sample(
+        metric='400.perlbench', value=23.4, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='401.bzip2', value=17.1, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='403.gcc', value=22.1, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='429.mcf', value=25.1, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='445.gobmk', value=21.0, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='456.hmmer', value=19.0, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='458.sjeng', value=20.6, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='462.libquantum', value=44.2, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='464.h264ref', value=31.6, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='471.omnetpp', value=17.9, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='473.astar', value=14.6, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='483.xalancbmk', value=27.8, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='SPECint(R)_base2006',
+        value=22.7,
+        unit='',
+        metadata=GOOD_METADATA,
+    ),
 ]
 
 TEST_OUTPUT_SPECFP = """
@@ -112,43 +129,60 @@ TEST_OUTPUT_SPECFP = """
 """
 
 EXPECTED_RESULT_SPECFP = [
-
-    sample.Sample(metric='410.bwaves', value=19.0, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='416.gamess', value=21.2, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='433.milc', value=19.1, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='434.zeusmp', value=15.2, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='435.gromacs', value=11.8, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='436.cactusADM', value=9.27, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='437.leslie3d', value=10.9, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='444.namd', value=15.9, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='447.dealII', value=28.0, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='450.soplex', value=30.6, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='453.povray', value=23.0, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='454.calculix', value=8.31, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='459.GemsFDTD', value=13.7, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='465.tonto', value=17.4, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='470.lbm', value=37.7, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='481.wrf', value=14.2, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='482.sphinx3', value=29.2, unit='',
-                  metadata=GOOD_METADATA),
-    sample.Sample(metric='SPECfp(R)_base2006', value=17.5, unit='',
-                  metadata=GOOD_METADATA),
+    sample.Sample(
+        metric='410.bwaves', value=19.0, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='416.gamess', value=21.2, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='433.milc', value=19.1, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='434.zeusmp', value=15.2, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='435.gromacs', value=11.8, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='436.cactusADM', value=9.27, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='437.leslie3d', value=10.9, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='444.namd', value=15.9, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='447.dealII', value=28.0, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='450.soplex', value=30.6, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='453.povray', value=23.0, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='454.calculix', value=8.31, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='459.GemsFDTD', value=13.7, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='465.tonto', value=17.4, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='470.lbm', value=37.7, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='481.wrf', value=14.2, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='482.sphinx3', value=29.2, unit='', metadata=GOOD_METADATA
+    ),
+    sample.Sample(
+        metric='SPECfp(R)_base2006', value=17.5, unit='', metadata=GOOD_METADATA
+    ),
 ]
 
 # Invalid result, multiple NR failures and no aggregate score.
@@ -173,25 +207,44 @@ TEST_OUTPUT_BAD1 = """
 EXPECTED_BAD1_METADATA = GOOD_METADATA.copy()
 EXPECTED_BAD1_METADATA.update({
     'partial': 'true',
-    'missing_results': ('400.perlbench,401.bzip2,403.gcc,429.mcf,'
-                        '483.xalancbmk,SPECint(R)_rate_base2006')})
+    'missing_results': (
+        '400.perlbench,401.bzip2,403.gcc,429.mcf,'
+        '483.xalancbmk,SPECint(R)_rate_base2006'
+    ),
+})
 
 # Invalid result, multiple NR failures, but aggregate score present.
 EXPECTED_RESULT_BAD1 = [
-    sample.Sample(metric='445.gobmk', value=15.8, unit='',
-                  metadata=EXPECTED_BAD1_METADATA),
-    sample.Sample(metric='456.hmmer', value=14.8, unit='',
-                  metadata=EXPECTED_BAD1_METADATA),
-    sample.Sample(metric='458.sjeng', value=15.6, unit='',
-                  metadata=EXPECTED_BAD1_METADATA),
-    sample.Sample(metric='462.libquantum', value=37.5, unit='',
-                  metadata=EXPECTED_BAD1_METADATA),
-    sample.Sample(metric='464.h264ref', value=28.4, unit='',
-                  metadata=EXPECTED_BAD1_METADATA),
-    sample.Sample(metric='471.omnetpp', value=11.7, unit='',
-                  metadata=EXPECTED_BAD1_METADATA),
-    sample.Sample(metric='473.astar', value=10.7, unit='',
-                  metadata=EXPECTED_BAD1_METADATA),
+    sample.Sample(
+        metric='445.gobmk', value=15.8, unit='', metadata=EXPECTED_BAD1_METADATA
+    ),
+    sample.Sample(
+        metric='456.hmmer', value=14.8, unit='', metadata=EXPECTED_BAD1_METADATA
+    ),
+    sample.Sample(
+        metric='458.sjeng', value=15.6, unit='', metadata=EXPECTED_BAD1_METADATA
+    ),
+    sample.Sample(
+        metric='462.libquantum',
+        value=37.5,
+        unit='',
+        metadata=EXPECTED_BAD1_METADATA,
+    ),
+    sample.Sample(
+        metric='464.h264ref',
+        value=28.4,
+        unit='',
+        metadata=EXPECTED_BAD1_METADATA,
+    ),
+    sample.Sample(
+        metric='471.omnetpp',
+        value=11.7,
+        unit='',
+        metadata=EXPECTED_BAD1_METADATA,
+    ),
+    sample.Sample(
+        metric='473.astar', value=10.7, unit='', metadata=EXPECTED_BAD1_METADATA
+    ),
 ]
 
 TEST_OUTPUT_BAD2 = """
@@ -215,25 +268,46 @@ TEST_OUTPUT_BAD2 = """
 EXPECTED_BAD2_METADATA = GOOD_METADATA.copy()
 EXPECTED_BAD2_METADATA.update({
     'partial': 'true',
-    'missing_results': '400.perlbench,401.bzip2,403.gcc,429.mcf,483.xalancbmk'})
+    'missing_results': '400.perlbench,401.bzip2,403.gcc,429.mcf,483.xalancbmk',
+})
 
 EXPECTED_RESULT_BAD2 = [
-    sample.Sample(metric='445.gobmk', value=15.8, unit='',
-                  metadata=EXPECTED_BAD2_METADATA),
-    sample.Sample(metric='456.hmmer', value=14.8, unit='',
-                  metadata=EXPECTED_BAD2_METADATA),
-    sample.Sample(metric='458.sjeng', value=15.6, unit='',
-                  metadata=EXPECTED_BAD2_METADATA),
-    sample.Sample(metric='462.libquantum', value=37.5, unit='',
-                  metadata=EXPECTED_BAD2_METADATA),
-    sample.Sample(metric='464.h264ref', value=28.4, unit='',
-                  metadata=EXPECTED_BAD2_METADATA),
-    sample.Sample(metric='471.omnetpp', value=11.7, unit='',
-                  metadata=EXPECTED_BAD2_METADATA),
-    sample.Sample(metric='473.astar', value=10.7, unit='',
-                  metadata=EXPECTED_BAD2_METADATA),
-    sample.Sample(metric='SPECint(R)_rate_base2006', value=42.0, unit='',
-                  metadata=EXPECTED_BAD2_METADATA),
+    sample.Sample(
+        metric='445.gobmk', value=15.8, unit='', metadata=EXPECTED_BAD2_METADATA
+    ),
+    sample.Sample(
+        metric='456.hmmer', value=14.8, unit='', metadata=EXPECTED_BAD2_METADATA
+    ),
+    sample.Sample(
+        metric='458.sjeng', value=15.6, unit='', metadata=EXPECTED_BAD2_METADATA
+    ),
+    sample.Sample(
+        metric='462.libquantum',
+        value=37.5,
+        unit='',
+        metadata=EXPECTED_BAD2_METADATA,
+    ),
+    sample.Sample(
+        metric='464.h264ref',
+        value=28.4,
+        unit='',
+        metadata=EXPECTED_BAD2_METADATA,
+    ),
+    sample.Sample(
+        metric='471.omnetpp',
+        value=11.7,
+        unit='',
+        metadata=EXPECTED_BAD2_METADATA,
+    ),
+    sample.Sample(
+        metric='473.astar', value=10.7, unit='', metadata=EXPECTED_BAD2_METADATA
+    ),
+    sample.Sample(
+        metric='SPECint(R)_rate_base2006',
+        value=42.0,
+        unit='',
+        metadata=EXPECTED_BAD2_METADATA,
+    ),
 ]
 
 TEST_OUTPUT_EST = """
@@ -254,38 +328,68 @@ TEST_OUTPUT_EST = """
  """
 
 EXPECTED_EST_METADATA = GOOD_METADATA.copy()
-EXPECTED_EST_METADATA.update({
-    'partial': 'true',
-    'missing_results': 'SPECint(R)_rate_base2006'})
+EXPECTED_EST_METADATA.update(
+    {'partial': 'true', 'missing_results': 'SPECint(R)_rate_base2006'}
+)
 
 EXPECTED_RESULT_EST = [
-    sample.Sample(metric='400.perlbench', value=27.3, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='401.bzip2', value=16.2, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='403.gcc', value=21.9, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='429.mcf', value=24.4, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='445.gobmk', value=19.4, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='456.hmmer', value=22.0, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='458.sjeng', value=21.2, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='462.libquantum', value=40.1, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='464.h264ref', value=36.4, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='471.omnetpp', value=12.2, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='473.astar', value=14.3, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='483.xalancbmk', value=21.7, unit='',
-                  metadata=EXPECTED_EST_METADATA),
-    sample.Sample(metric='estimated_SPECint(R)_rate_base2006',
-                  value=21.846042257681507, unit='',
-                  metadata=EXPECTED_EST_METADATA),
+    sample.Sample(
+        metric='400.perlbench',
+        value=27.3,
+        unit='',
+        metadata=EXPECTED_EST_METADATA,
+    ),
+    sample.Sample(
+        metric='401.bzip2', value=16.2, unit='', metadata=EXPECTED_EST_METADATA
+    ),
+    sample.Sample(
+        metric='403.gcc', value=21.9, unit='', metadata=EXPECTED_EST_METADATA
+    ),
+    sample.Sample(
+        metric='429.mcf', value=24.4, unit='', metadata=EXPECTED_EST_METADATA
+    ),
+    sample.Sample(
+        metric='445.gobmk', value=19.4, unit='', metadata=EXPECTED_EST_METADATA
+    ),
+    sample.Sample(
+        metric='456.hmmer', value=22.0, unit='', metadata=EXPECTED_EST_METADATA
+    ),
+    sample.Sample(
+        metric='458.sjeng', value=21.2, unit='', metadata=EXPECTED_EST_METADATA
+    ),
+    sample.Sample(
+        metric='462.libquantum',
+        value=40.1,
+        unit='',
+        metadata=EXPECTED_EST_METADATA,
+    ),
+    sample.Sample(
+        metric='464.h264ref',
+        value=36.4,
+        unit='',
+        metadata=EXPECTED_EST_METADATA,
+    ),
+    sample.Sample(
+        metric='471.omnetpp',
+        value=12.2,
+        unit='',
+        metadata=EXPECTED_EST_METADATA,
+    ),
+    sample.Sample(
+        metric='473.astar', value=14.3, unit='', metadata=EXPECTED_EST_METADATA
+    ),
+    sample.Sample(
+        metric='483.xalancbmk',
+        value=21.7,
+        unit='',
+        metadata=EXPECTED_EST_METADATA,
+    ),
+    sample.Sample(
+        metric='estimated_SPECint(R)_rate_base2006',
+        value=21.846042257681507,
+        unit='',
+        metadata=EXPECTED_EST_METADATA,
+    ),
 ]
 
 
@@ -309,32 +413,57 @@ SPEED_OUTPUT_SPECINT = """
 SPEED_METADATA = GOOD_METADATA.copy()
 SPEED_METADATA['runspec_metric'] = 'speed'
 EXPECTED_SPEED_RESULT_SPECINT = [
-    sample.Sample(metric='400.perlbench:speed', value=29.5, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='401.bzip2:speed', value=17.3, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='403.gcc:speed', value=23.5, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='429.mcf:speed', value=19.0, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='445.gobmk:speed', value=20.3, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='456.hmmer:speed', value=23.8, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='458.sjeng:speed', value=22.5, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='462.libquantum:speed', value=39.5, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='464.h264ref:speed', value=38.6, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='471.omnetpp:speed', value=12.8, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='473.astar:speed', value=13.9, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='483.xalancbmk:speed', value=22.3, unit='',
-                  metadata=SPEED_METADATA),
-    sample.Sample(metric='SPECint(R)_base2006:speed', value=22.3, unit='',
-                  metadata=SPEED_METADATA),
+    sample.Sample(
+        metric='400.perlbench:speed',
+        value=29.5,
+        unit='',
+        metadata=SPEED_METADATA,
+    ),
+    sample.Sample(
+        metric='401.bzip2:speed', value=17.3, unit='', metadata=SPEED_METADATA
+    ),
+    sample.Sample(
+        metric='403.gcc:speed', value=23.5, unit='', metadata=SPEED_METADATA
+    ),
+    sample.Sample(
+        metric='429.mcf:speed', value=19.0, unit='', metadata=SPEED_METADATA
+    ),
+    sample.Sample(
+        metric='445.gobmk:speed', value=20.3, unit='', metadata=SPEED_METADATA
+    ),
+    sample.Sample(
+        metric='456.hmmer:speed', value=23.8, unit='', metadata=SPEED_METADATA
+    ),
+    sample.Sample(
+        metric='458.sjeng:speed', value=22.5, unit='', metadata=SPEED_METADATA
+    ),
+    sample.Sample(
+        metric='462.libquantum:speed',
+        value=39.5,
+        unit='',
+        metadata=SPEED_METADATA,
+    ),
+    sample.Sample(
+        metric='464.h264ref:speed', value=38.6, unit='', metadata=SPEED_METADATA
+    ),
+    sample.Sample(
+        metric='471.omnetpp:speed', value=12.8, unit='', metadata=SPEED_METADATA
+    ),
+    sample.Sample(
+        metric='473.astar:speed', value=13.9, unit='', metadata=SPEED_METADATA
+    ),
+    sample.Sample(
+        metric='483.xalancbmk:speed',
+        value=22.3,
+        unit='',
+        metadata=SPEED_METADATA,
+    ),
+    sample.Sample(
+        metric='SPECint(R)_base2006:speed',
+        value=22.3,
+        unit='',
+        metadata=SPEED_METADATA,
+    ),
 ]
 
 TEST_OUTPUT_ALL = """
@@ -349,22 +478,39 @@ ALL_METADATA = GOOD_METADATA.copy()
 ALL_METADATA['spec_runmode'] = 'all'
 ALL_METADATA['runspec_metric'] = None
 EXPECTED_ALL_RESULT_SPECINT = [
-    sample.Sample(metric='410.bwaves_r', value=19.0, unit='',
-                  metadata=ALL_METADATA),
-    sample.Sample(metric='410.bwaves_r:peak', value=19.1, unit='',
-                  metadata=ALL_METADATA),
-    sample.Sample(metric='507.cactuBSSN_r', value=21.2, unit='',
-                  metadata=ALL_METADATA),
-    sample.Sample(metric='507.cactuBSSN_r:peak', value=29.0, unit='',
-                  metadata=ALL_METADATA),
-    sample.Sample(metric='508.namd_r', value=19.1, unit='',
-                  metadata=ALL_METADATA),
-    sample.Sample(metric='508.namd_r:peak', value=39.0, unit='',
-                  metadata=ALL_METADATA),
-    sample.Sample(metric='SPECrate2017_fp_base', value=4.90, unit='',
-                  metadata=ALL_METADATA),
-    sample.Sample(metric='SPECrate2017_fp_peak', value=12.3, unit='',
-                  metadata=ALL_METADATA),
+    sample.Sample(
+        metric='410.bwaves_r', value=19.0, unit='', metadata=ALL_METADATA
+    ),
+    sample.Sample(
+        metric='410.bwaves_r:peak', value=19.1, unit='', metadata=ALL_METADATA
+    ),
+    sample.Sample(
+        metric='507.cactuBSSN_r', value=21.2, unit='', metadata=ALL_METADATA
+    ),
+    sample.Sample(
+        metric='507.cactuBSSN_r:peak',
+        value=29.0,
+        unit='',
+        metadata=ALL_METADATA,
+    ),
+    sample.Sample(
+        metric='508.namd_r', value=19.1, unit='', metadata=ALL_METADATA
+    ),
+    sample.Sample(
+        metric='508.namd_r:peak', value=39.0, unit='', metadata=ALL_METADATA
+    ),
+    sample.Sample(
+        metric='SPECrate2017_fp_base',
+        value=4.90,
+        unit='',
+        metadata=ALL_METADATA,
+    ),
+    sample.Sample(
+        metric='SPECrate2017_fp_peak',
+        value=12.3,
+        unit='',
+        metadata=ALL_METADATA,
+    ),
 ]
 
 
@@ -380,14 +526,24 @@ PEAK_METADATA = GOOD_METADATA.copy()
 PEAK_METADATA['spec_runmode'] = 'peak'
 PEAK_METADATA['runspec_metric'] = None
 EXPECTED_PEAK_RESULT_SPECINT = [
-    sample.Sample(metric='410.bwaves_r:peak', value=19.1, unit='',
-                  metadata=PEAK_METADATA),
-    sample.Sample(metric='507.cactuBSSN_r:peak', value=29.0, unit='',
-                  metadata=PEAK_METADATA),
-    sample.Sample(metric='508.namd_r:peak', value=39.0, unit='',
-                  metadata=PEAK_METADATA),
-    sample.Sample(metric='SPECrate2017_fp_peak', value=12.3, unit='',
-                  metadata=PEAK_METADATA),
+    sample.Sample(
+        metric='410.bwaves_r:peak', value=19.1, unit='', metadata=PEAK_METADATA
+    ),
+    sample.Sample(
+        metric='507.cactuBSSN_r:peak',
+        value=29.0,
+        unit='',
+        metadata=PEAK_METADATA,
+    ),
+    sample.Sample(
+        metric='508.namd_r:peak', value=39.0, unit='', metadata=PEAK_METADATA
+    ),
+    sample.Sample(
+        metric='SPECrate2017_fp_peak',
+        value=12.3,
+        unit='',
+        metadata=PEAK_METADATA,
+    ),
 ]
 
 
@@ -402,19 +558,28 @@ TEST_OUTPUT_PARTIAL_PEAK = """
 PARTIAL_PEAK_METADATA = GOOD_METADATA.copy()
 PARTIAL_PEAK_METADATA['spec_runmode'] = 'peak'
 PARTIAL_PEAK_METADATA['runspec_metric'] = None
-PARTIAL_PEAK_METADATA.update({
-    'partial': 'true',
-    'missing_results': ('410.bwaves_r,508.namd_r')})
+PARTIAL_PEAK_METADATA.update(
+    {'partial': 'true', 'missing_results': '410.bwaves_r,508.namd_r'}
+)
 EXPECTED_PARTIAL_PEAK_RESULT_SPECINT = [
-    sample.Sample(metric='507.cactuBSSN_r:peak', value=29.0, unit='',
-                  metadata=PARTIAL_PEAK_METADATA),
-    sample.Sample(metric='SPECrate2017_fp_peak', value=12.3, unit='',
-                  metadata=PARTIAL_PEAK_METADATA),
+    sample.Sample(
+        metric='507.cactuBSSN_r:peak',
+        value=29.0,
+        unit='',
+        metadata=PARTIAL_PEAK_METADATA,
+    ),
+    sample.Sample(
+        metric='SPECrate2017_fp_peak',
+        value=12.3,
+        unit='',
+        metadata=PARTIAL_PEAK_METADATA,
+    ),
 ]
 
 
-class Speccpu2006BenchmarkTestCase(unittest.TestCase,
-                                   test_util.SamplesTestMixin):
+class Speccpu2006BenchmarkTestCase(
+    unittest.TestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super(Speccpu2006BenchmarkTestCase, self).setUp()
@@ -431,36 +596,29 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     speccpu.FLAGS.spec_runmode = 'base'
     vm.speccpu_vm_state = spec_test_config
 
-    samples = speccpu._ExtractScore(TEST_OUTPUT_SPECINT, vm,
-                                    False, 'rate')
+    samples = speccpu._ExtractScore(TEST_OUTPUT_SPECINT, vm, False, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_SPECINT)
 
-    samples = speccpu._ExtractScore(TEST_OUTPUT_SPECFP, vm,
-                                    False, 'rate')
+    samples = speccpu._ExtractScore(TEST_OUTPUT_SPECFP, vm, False, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_SPECFP)
 
     # By default, incomplete results result in error.
     with self.assertRaises(errors.Benchmarks.RunError):
-      samples = speccpu._ExtractScore(TEST_OUTPUT_BAD1, vm,
-                                      False, 'rate')
+      samples = speccpu._ExtractScore(TEST_OUTPUT_BAD1, vm, False, 'rate')
 
     with self.assertRaises(errors.Benchmarks.RunError):
-      samples = speccpu._ExtractScore(TEST_OUTPUT_BAD2, vm,
-                                      False, 'rate')
+      samples = speccpu._ExtractScore(TEST_OUTPUT_BAD2, vm, False, 'rate')
 
     # Now use keep_partial_results
-    samples = speccpu._ExtractScore(TEST_OUTPUT_BAD1, vm,
-                                    True, 'rate')
+    samples = speccpu._ExtractScore(TEST_OUTPUT_BAD1, vm, True, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_BAD1)
 
-    samples = speccpu._ExtractScore(TEST_OUTPUT_BAD2, vm,
-                                    True, 'rate')
+    samples = speccpu._ExtractScore(TEST_OUTPUT_BAD2, vm, True, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_BAD2)
 
     # Estimate scores
     speccpu.FLAGS.runspec_estimate_spec = True
-    samples = speccpu._ExtractScore(TEST_OUTPUT_EST, vm,
-                                    True, 'rate')
+    samples = speccpu._ExtractScore(TEST_OUTPUT_EST, vm, True, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_EST)
 
   def testParseSpeedResults(self):
@@ -471,10 +629,10 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
-    samples = speccpu._ExtractScore(SPEED_OUTPUT_SPECINT, vm,
-                                    False, 'speed')
+    samples = speccpu._ExtractScore(SPEED_OUTPUT_SPECINT, vm, False, 'speed')
     self.assertSampleListsEqualUpToTimestamp(
-        samples, EXPECTED_SPEED_RESULT_SPECINT)
+        samples, EXPECTED_SPEED_RESULT_SPECINT
+    )
 
   def testParseAllResults(self):
     speccpu.FLAGS.spec_runmode = 'all'
@@ -484,10 +642,10 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
-    samples = speccpu._ExtractScore(TEST_OUTPUT_ALL, vm,
-                                    False, None)
+    samples = speccpu._ExtractScore(TEST_OUTPUT_ALL, vm, False, None)
     self.assertSampleListsEqualUpToTimestamp(
-        samples, EXPECTED_ALL_RESULT_SPECINT)
+        samples, EXPECTED_ALL_RESULT_SPECINT
+    )
 
   def testParsePeakResults(self):
     speccpu.FLAGS.spec_runmode = 'peak'
@@ -497,10 +655,10 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
-    samples = speccpu._ExtractScore(TEST_OUTPUT_PEAK, vm,
-                                    False, None)
+    samples = speccpu._ExtractScore(TEST_OUTPUT_PEAK, vm, False, None)
     self.assertSampleListsEqualUpToTimestamp(
-        samples, EXPECTED_PEAK_RESULT_SPECINT)
+        samples, EXPECTED_PEAK_RESULT_SPECINT
+    )
 
   def testParsePartialPeakResults(self):
     speccpu.FLAGS.spec_runmode = 'peak'
@@ -510,10 +668,10 @@ class Speccpu2006BenchmarkTestCase(unittest.TestCase,
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
-    samples = speccpu._ExtractScore(TEST_OUTPUT_PARTIAL_PEAK, vm,
-                                    True, None)
+    samples = speccpu._ExtractScore(TEST_OUTPUT_PARTIAL_PEAK, vm, True, None)
     self.assertSampleListsEqualUpToTimestamp(
-        samples, EXPECTED_PARTIAL_PEAK_RESULT_SPECINT)
+        samples, EXPECTED_PARTIAL_PEAK_RESULT_SPECINT
+    )
 
 
 if __name__ == '__main__':

@@ -104,7 +104,8 @@ cloud_bigtable_ycsb:
 
 def GetTestBigtableInstance(spec=_TEST_BENCHMARK_SPEC):
   test_benchmark_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-      yaml_string=spec, benchmark_name='cloud_bigtable_ycsb')
+      yaml_string=spec, benchmark_name='cloud_bigtable_ycsb'
+  )
   test_benchmark_spec.ConstructNonRelationalDb()
   return test_benchmark_spec.non_relational_db
 
@@ -116,14 +117,16 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.bigtable = GetTestBigtableInstance()
 
   def testNotFoundTable(self):
-    with mock.patch.object(util.GcloudCommand, 'Issue',
-                           return_value=('', '', 1)):
+    with mock.patch.object(
+        util.GcloudCommand, 'Issue', return_value=('', '', 1)
+    ):
       self.assertFalse(self.bigtable._Exists())
 
   def testFoundTable(self):
     stdout = VALID_JSON_BASE.format(project=PROJECT, name=NAME)
-    with mock.patch.object(util.GcloudCommand, 'Issue',
-                           return_value=(stdout, '', 0)):
+    with mock.patch.object(
+        util.GcloudCommand, 'Issue', return_value=(stdout, '', 0)
+    ):
       self.assertTrue(self.bigtable._Exists())
 
   def testQuotaError(self):
@@ -131,7 +134,9 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             util.GcloudCommand,
             'Issue',
-            return_value=[None, OUT_OF_QUOTA_STDERR, None]))
+            return_value=[None, OUT_OF_QUOTA_STDERR, None],
+        )
+    )
     with self.assertRaises(errors.Benchmarks.QuotaFailure):
       self.bigtable._Create()
 
@@ -181,7 +186,9 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             gcp_bigtable,
             'GetClustersDescription',
-            return_value=mock_get_cluster_output))
+            return_value=mock_get_cluster_output,
+        )
+    )
 
     # Act
     actual_metadata = instance.GetResourceMetadata()
@@ -208,7 +215,7 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
         'bigtable_replication_zone': 'parsed_rep_zone',
         'bigtable_storage_type': 'ssd',
         'bigtable_node_count': 3,
-        'bigtable_multicluster_routing': True
+        'bigtable_multicluster_routing': True,
     }
     self.assertEqual(actual_metadata, expected_metadata)
 
@@ -235,12 +242,18 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
     actual_flag_values = bigtable._BuildClusterConfigs()
 
     # Assert
-    expected_flag_values = [('id=test_name-0,zone=test_zone,'
-                             'autoscaling-min-nodes=1,autoscaling-max-nodes=5,'
-                             'autoscaling-cpu-target=50'),
-                            ('id=test_name-1,zone=test_replication_zone,'
-                             'autoscaling-min-nodes=1,autoscaling-max-nodes=5,'
-                             'autoscaling-cpu-target=50')]
+    expected_flag_values = [
+        (
+            'id=test_name-0,zone=test_zone,'
+            'autoscaling-min-nodes=1,autoscaling-max-nodes=5,'
+            'autoscaling-cpu-target=50'
+        ),
+        (
+            'id=test_name-1,zone=test_replication_zone,'
+            'autoscaling-min-nodes=1,autoscaling-max-nodes=5,'
+            'autoscaling-cpu-target=50'
+        ),
+    ]
     self.assertEqual(actual_flag_values, expected_flag_values)
 
   @flagsaver.flagsaver(run_uri='test_uri')
@@ -261,12 +274,17 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             util.GcloudCommand,
             'Issue',
-            return_value=(mock_json_response, '', 0)))
+            return_value=(mock_json_response, '', 0),
+        )
+    )
     self.enter_context(
-        mock.patch.object(util, 'GetAccessToken', return_value='test_token'))
+        mock.patch.object(util, 'GetAccessToken', return_value='test_token')
+    )
     mock_request = self.enter_context(
         mock.patch.object(
-            requests, 'patch', return_value=mock.Mock(status_code=200)))
+            requests, 'patch', return_value=mock.Mock(status_code=200)
+        )
+    )
 
     # Act
     new_labels = {
@@ -287,9 +305,10 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
             'labels': {
                 'benchmark': 'test_benchmark_2',
                 'timeout_minutes': '10',
-                'metadata': 'test_metadata'
+                'metadata': 'test_metadata',
             }
-        })
+        },
+    )
 
   def testBigtableGcloudCommand(self):
     bigtable = GetTestBigtableInstance()

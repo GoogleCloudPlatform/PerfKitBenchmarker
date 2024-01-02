@@ -33,31 +33,33 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_enum(
     'mutilate_protocol',
-    'binary', ['binary', 'ascii'],
-    'Protocol to use. Supported protocols are binary and ascii.')
+    'binary',
+    ['binary', 'ascii'],
+    'Protocol to use. Supported protocols are binary and ascii.',
+)
 flags.DEFINE_list(
-    'mutilate_qps', [],
-    'Target aggregate QPS. If not set, target for peak qps.')
-flags.DEFINE_integer(
-    'mutilate_time', 300,
-    'Maximum time to run (seconds).')
+    'mutilate_qps', [], 'Target aggregate QPS. If not set, target for peak qps.'
+)
+flags.DEFINE_integer('mutilate_time', 300, 'Maximum time to run (seconds).')
 flags.DEFINE_string(
-    'mutilate_keysize', '16',
-    'Length of memcached keys (distribution).')
+    'mutilate_keysize', '16', 'Length of memcached keys (distribution).'
+)
 flags.DEFINE_string(
-    'mutilate_valuesize', '128',
-    'Length of memcached values (distribution).')
+    'mutilate_valuesize', '128', 'Length of memcached values (distribution).'
+)
 flags.DEFINE_integer(
-    'mutilate_records', 10000,
-    'Number of memcached records to use.')
+    'mutilate_records', 10000, 'Number of memcached records to use.'
+)
 flags.DEFINE_float(
-    'mutilate_ratio', 0.0,
-    'Ratio of set:get. By default, read only.')
+    'mutilate_ratio', 0.0, 'Ratio of set:get. By default, read only.'
+)
 flags.DEFINE_list(
-    'mutilate_options', ['iadist=exponential:0.0'],
+    'mutilate_options',
+    ['iadist=exponential:0.0'],
     'Additional mutilate long-form options (--) in comma separated form. e.g.'
     '--mutilate_options=blocking,search=99:1000.'
-    'See https://github.com/leverich/mutilate for all available options.')
+    'See https://github.com/leverich/mutilate for all available options.',
+)
 
 # If more than one value provided for threads, connections, depths, we will
 # enumerate all test configurations. e.g.
@@ -65,30 +67,33 @@ flags.DEFINE_list(
 # We will test following threads:connections:depths:
 #   1,3,5; 1,3,6; 1,4,5; 1,4,6; 2,3,5; 2,3,6; 2,4,5; 2,4,6;
 flags.DEFINE_list(
-    'mutilate_threads', ['1'],
-    'Number of total client threads to spawn per client VM.')
+    'mutilate_threads',
+    ['1'],
+    'Number of total client threads to spawn per client VM.',
+)
 flags.DEFINE_list(
-    'mutilate_connections', ['1'],
-    'Number of connections to establish per client thread.')
+    'mutilate_connections',
+    ['1'],
+    'Number of connections to establish per client thread.',
+)
 flags.DEFINE_list(
-    'mutilate_depths', ['1'],
-    'Maximum depth to pipeline requests.')
+    'mutilate_depths', ['1'], 'Maximum depth to pipeline requests.'
+)
 
 # Agent mode options.
 flags.DEFINE_integer(
-    'mutilate_measure_connections', None,
-    'Master client connections.')
+    'mutilate_measure_connections', None, 'Master client connections.'
+)
 flags.DEFINE_integer(
-    'mutilate_measure_threads', None,
-    'Master client thread count.')
+    'mutilate_measure_threads', None, 'Master client thread count.'
+)
+flags.DEFINE_integer('mutilate_measure_qps', None, 'Master client QPS.')
 flags.DEFINE_integer(
-    'mutilate_measure_qps', None,
-    'Master client QPS.')
-flags.DEFINE_integer(
-    'mutilate_measure_depth', None,
-    'Master client connection depth.')
+    'mutilate_measure_depth', None, 'Master client connection depth.'
+)
 _INCREMENTAL_LOAD = flags.DEFINE_float(
-    'mutilate_incremental_load', None, 'Increments target qps until hits peak.')
+    'mutilate_incremental_load', None, 'Increments target qps until hits peak.'
+)
 # To use remote agent mode, we need at least 2 VMs.
 AGENT_MODE_MIN_CLIENT_VMS = 2
 
@@ -99,22 +104,27 @@ def CheckPrerequisites():
   Raises:
     errors.Setup.InvalidFlagConfigurationError: On invalid flag configurations.
   """
-  agent_mode_flags = [FLAGS['mutilate_measure_connections'].present,
-                      FLAGS['mutilate_measure_threads'].present,
-                      FLAGS['mutilate_measure_qps'].present,
-                      FLAGS['mutilate_measure_depth'].present]
+  agent_mode_flags = [
+      FLAGS['mutilate_measure_connections'].present,
+      FLAGS['mutilate_measure_threads'].present,
+      FLAGS['mutilate_measure_qps'].present,
+      FLAGS['mutilate_measure_depth'].present,
+  ]
 
   error_message = (
-      'To enable agent mode, set '
-      'memcached_mutilate_num_client_vms > 1.')
+      'To enable agent mode, set memcached_mutilate_num_client_vms > 1.'
+  )
   if any(agent_mode_flags) and (
-      FLAGS.memcached_mutilate_num_client_vms < AGENT_MODE_MIN_CLIENT_VMS):
+      FLAGS.memcached_mutilate_num_client_vms < AGENT_MODE_MIN_CLIENT_VMS
+  ):
     raise errors.Setup.InvalidFlagConfigurationError(error_message)
-  if _INCREMENTAL_LOAD.value and (len(FLAGS.mutilate_qps) != 1 or
-                                  int(FLAGS.mutilate_qps[0]) == 0):
+  if _INCREMENTAL_LOAD.value and (
+      len(FLAGS.mutilate_qps) != 1 or int(FLAGS.mutilate_qps[0]) == 0
+  ):
     raise errors.Setup.InvalidFlagConfigurationError(
         'To use dynamic load, set inital target qps with --mutilate_qps '
-        'and incremental with --mutilate_incremental_load.')
+        'and incremental with --mutilate_incremental_load.'
+    )
 
 
 def YumInstall(vm):
@@ -128,7 +138,8 @@ def AptInstall(vm):
   vm.InstallPackages(APT_PACKAGES)
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MUTILATE_DIR))
   vm.RemoteCommand(
-      f'sed -i "s|int total|long total|g" {MUTILATE_DIR}/mutilate.cc')
+      f'sed -i "s|int total|long total|g" {MUTILATE_DIR}/mutilate.cc'
+  )
   vm.RemoteCommand('cd {0} && sudo scons'.format(MUTILATE_DIR))
 
 
@@ -141,7 +152,7 @@ def GetMetadata():
       'keysize': FLAGS.mutilate_keysize,
       'valuesize': FLAGS.mutilate_valuesize,
       'records': FLAGS.mutilate_records,
-      'ratio': FLAGS.mutilate_ratio
+      'ratio': FLAGS.mutilate_ratio,
   }
   if FLAGS.mutilate_options:
     metadata['options'] = FLAGS.mutilate_options
@@ -154,13 +165,18 @@ def BuildCmd(server_ip, server_port, num_instances, options):
   server_ips = []
   for idx in range(num_instances):
     server_ips.append(f'--server={server_ip}:{server_port + idx}')
-  cmd = [
-      'ulimit -n 32768; ', MUTILATE_BIN,
-      '--keysize=%s' % FLAGS.mutilate_keysize,
-      '--valuesize=%s' % FLAGS.mutilate_valuesize,
-      '--records=%s' % FLAGS.mutilate_records,
-      '--roundrobin' if len(server_ips) > 1 else ''
-  ] + server_ips + options
+  cmd = (
+      [
+          'ulimit -n 32768; ',
+          MUTILATE_BIN,
+          '--keysize=%s' % FLAGS.mutilate_keysize,
+          '--valuesize=%s' % FLAGS.mutilate_valuesize,
+          '--records=%s' % FLAGS.mutilate_records,
+          '--roundrobin' if len(server_ips) > 1 else '',
+      ]
+      + server_ips
+      + options
+  )
   if FLAGS.mutilate_protocol == 'binary':
     cmd.append('--binary')
   return cmd
@@ -169,9 +185,7 @@ def BuildCmd(server_ip, server_port, num_instances, options):
 def Load(client_vm, server_ip, server_port):
   """Preload the server with data."""
   logging.info('Loading memcached server.')
-  cmd = BuildCmd(
-      server_ip, server_port, 1,
-      ['--loadonly'])
+  cmd = BuildCmd(server_ip, server_port, 1, ['--loadonly'])
   client_vm.RemoteCommand(' '.join(cmd))
 
 
@@ -180,11 +194,16 @@ def RestartAgent(vm, threads):
   # Kill existing mutilate agent threads
   vm.RemoteCommand('pkill -9 mutilate', ignore_failure=True)
   # Make sure have enough file descriptor for the agent process.
-  vm.RemoteCommand(' '.join([
-      'ulimit -n 32768; '
-      'nohup', MUTILATE_BIN,
-      '--threads=%s' % threads, '--agentmode', '&> log', '&'
-  ]))
+  vm.RemoteCommand(
+      ' '.join([
+          'ulimit -n 32768; nohup',
+          MUTILATE_BIN,
+          '--threads=%s' % threads,
+          '--agentmode',
+          '&> log',
+          '&',
+      ])
+  )
 
 
 def Run(vms, server_ip, server_port, num_instances):
@@ -199,17 +218,16 @@ def Run(vms, server_ip, server_port, num_instances):
   if FLAGS.mutilate_measure_connections:
     runtime_options['measure_connections'] = FLAGS.mutilate_measure_connections
     measure_flags.append(
-        '--measure_connections=%s' % FLAGS.mutilate_measure_connections)
+        '--measure_connections=%s' % FLAGS.mutilate_measure_connections
+    )
   if FLAGS.mutilate_measure_threads:
     runtime_options['measure_threads'] = FLAGS.mutilate_measure_threads
   if FLAGS.mutilate_measure_qps:
     runtime_options['measure_qps'] = FLAGS.mutilate_measure_qps
-    measure_flags.append(
-        '--measure_qps=%s' % FLAGS.mutilate_measure_qps)
+    measure_flags.append('--measure_qps=%s' % FLAGS.mutilate_measure_qps)
   if FLAGS.mutilate_measure_depth:
     runtime_options['measure_depth'] = FLAGS.mutilate_measure_depth
-    measure_flags.append(
-        '--measure_depth=%s' % FLAGS.mutilate_measure_depth)
+    measure_flags.append('--measure_depth=%s' % FLAGS.mutilate_measure_depth)
 
   for thread_count in FLAGS.mutilate_threads:
     runtime_options['threads'] = thread_count
@@ -225,20 +243,31 @@ def Run(vms, server_ip, server_port, num_instances):
           target_qps = int(target_qps_list[0])
           runtime_options['qps'] = target_qps or 'peak'
           remote_agents = ['--agent=%s' % vm.internal_ip for vm in vms[1:]]
-          cmd = BuildCmd(server_ip, server_port, num_instances, [
-              '--noload',
-              '--qps=%s' % target_qps,
-              '--time=%s' % FLAGS.mutilate_time,
-              '--update=%s' % FLAGS.mutilate_ratio,
-              '--threads=%s' % (FLAGS.mutilate_measure_threads or thread_count),
-              '--connections=%s' % connection_count,
-              '--depth=%s' % depth,
-          ] + remote_agents + measure_flags + additional_flags)
+          cmd = BuildCmd(
+              server_ip,
+              server_port,
+              num_instances,
+              [
+                  '--noload',
+                  '--qps=%s' % target_qps,
+                  '--time=%s' % FLAGS.mutilate_time,
+                  '--update=%s' % FLAGS.mutilate_ratio,
+                  '--threads=%s'
+                  % (FLAGS.mutilate_measure_threads or thread_count),
+                  '--connections=%s' % connection_count,
+                  '--depth=%s' % depth,
+              ]
+              + remote_agents
+              + measure_flags
+              + additional_flags,
+          )
 
           try:
             stdout, _, retcode = master.RemoteHostCommandWithReturnCode(
-                ' '.join(cmd), timeout=FLAGS.mutilate_time * 2,
-                ignore_failure=True)
+                ' '.join(cmd),
+                timeout=FLAGS.mutilate_time * 2,
+                ignore_failure=True,
+            )
           except errors.VmUtil.IssueCommandTimeoutError:
             break
           if retcode:
@@ -248,10 +277,12 @@ def Run(vms, server_ip, server_port, num_instances):
           run_samples, actual_qps = ParseResults(stdout, metadata)
           samples.extend(run_samples)
 
-          if _INCREMENTAL_LOAD.value and (actual_qps / target_qps >
-                                          (1 - _INCREMENTAL_LOAD.value * 2)):
+          if _INCREMENTAL_LOAD.value and (
+              actual_qps / target_qps > (1 - _INCREMENTAL_LOAD.value * 2)
+          ):
             target_qps_list.append(
-                int(target_qps) * (1 + _INCREMENTAL_LOAD.value))
+                int(target_qps) * (1 + _INCREMENTAL_LOAD.value)
+            )
           target_qps_list.pop(0)
           if not target_qps_list:
             break
@@ -302,18 +333,19 @@ def ParseResults(result, metadata):
     for idx, stat in enumerate(latency_stats):
       if idx == len(latency_values):
         logging.warning(
-            'Mutilate does not report %s latency for %s.', stat, metric)
+            'Mutilate does not report %s latency for %s.', stat, metric
+        )
         break
       samples.append(
-          sample.Sample(metric + '_' + stat,
-                        float(latency_values[idx]),
-                        'usec', metadata))
+          sample.Sample(
+              metric + '_' + stat, float(latency_values[idx]), 'usec', metadata
+          )
+      )
   # parse bandwidth
   for metric in ('TX', 'RX'):
     bw_regex = metric + BANDWIDTH_REGEX
     bw = regex_util.ExtractGroup(bw_regex, result)
-    samples.append(
-        sample.Sample(metric, float(bw), 'MB/s', metadata))
+    samples.append(sample.Sample(metric, float(bw), 'MB/s', metadata))
 
   qps = regex_util.ExtractFloat(QPS_REGEX, result)
   samples.append(sample.Sample('qps', qps, 'ops/s', metadata))

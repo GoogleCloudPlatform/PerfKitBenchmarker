@@ -31,5 +31,13 @@ def generate_provider_specific_cmd_list(script, driver, output, error):
   Returns:
     Command list to execute the supplied script.
   """
-  return [driver, FLAGS.host, FLAGS.database, FLAGS.user, FLAGS.password,
-          script, output, error]
+  return [
+      driver,
+      FLAGS.host,
+      FLAGS.database,
+      FLAGS.user,
+      FLAGS.password,
+      script,
+      output,
+      error,
+  ]

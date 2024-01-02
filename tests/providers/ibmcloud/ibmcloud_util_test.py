@@ -23,16 +23,13 @@ class IbmcloudUtilTest(unittest.TestCase):
 
   def testGetBaseOs(self):
     data = {'name': 'debian10'}
-    self.assertEqual('debian',
-                     util.GetBaseOs(data))
+    self.assertEqual('debian', util.GetBaseOs(data))
     data = {'name': 'myos'}
-    self.assertEqual('unknown',
-                     util.GetBaseOs(data))
+    self.assertEqual('unknown', util.GetBaseOs(data))
 
   def testGetOsInfo(self):
     data = {'name': 'Debian 10', 'operating_system': {'name': 'debian10'}}
-    self.assertEqual('debian',
-                     util.GetOsInfo(data)['base_os'])
+    self.assertEqual('debian', util.GetOsInfo(data)['base_os'])
 
 
 if __name__ == '__main__':

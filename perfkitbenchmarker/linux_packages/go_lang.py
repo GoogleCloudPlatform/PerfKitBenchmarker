@@ -31,10 +31,13 @@ GO_BIN = '/usr/local/go/bin/go'
 
 def Install(vm):
   """Install go lang package on the VM."""
-  vm.InstallPreprovisionedPackageData(PACKAGE_NAME, PREPROVISIONED_DATA.keys(),
-                                      linux_packages.INSTALL_DIR)
-  vm.RemoteCommand('cd %s && sudo tar -C /usr/local -xzf %s' %
-                   (linux_packages.INSTALL_DIR, GO_TAR))
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, PREPROVISIONED_DATA.keys(), linux_packages.INSTALL_DIR
+  )
+  vm.RemoteCommand(
+      'cd %s && sudo tar -C /usr/local -xzf %s'
+      % (linux_packages.INSTALL_DIR, GO_TAR)
+  )
 
 
 def Uninstall(_):

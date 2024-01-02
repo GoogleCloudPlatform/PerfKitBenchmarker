@@ -30,8 +30,9 @@ from perfkitbenchmarker.windows_packages import fio
 FLAGS = flags.FLAGS
 
 
-flags.DEFINE_integer('fio_file_size', 10,
-                     '"size" field of the fio config in GB.')
+flags.DEFINE_integer(
+    'fio_file_size', 10, '"size" field of the fio config in GB.'
+)
 
 BENCHMARK_NAME = 'fio'
 BENCHMARK_CONFIG = """
@@ -140,12 +141,12 @@ def Run(benchmark_spec):
 
   # Ignored when --fio_generate_scenarios is used.
   job_file_contents = DEFAULT_JOB.format(
-      filesize=FLAGS.fio_file_size,
-      runtime=FLAGS.fio_runtime
+      filesize=FLAGS.fio_file_size, runtime=FLAGS.fio_runtime
   )
 
-  return linux_fio.RunWithExec(vm, fio_exec, remote_job_file_path,
-                               job_file_contents)
+  return linux_fio.RunWithExec(
+      vm, fio_exec, remote_job_file_path, job_file_contents
+  )
 
 
 def Cleanup(unused_benchmark_spec):

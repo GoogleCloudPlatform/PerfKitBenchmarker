@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-""" Provider info for Digitial Ocean
-
-"""
+"""Provider info for Digitial Ocean"""
 
 
 from perfkitbenchmarker import provider_info
 
 
 class DigitalOceanProviderInfo(provider_info.BaseProviderInfo):
-
   UNSUPPORTED_BENCHMARKS = ['mysql_service']
   CLOUD = provider_info.DIGITALOCEAN

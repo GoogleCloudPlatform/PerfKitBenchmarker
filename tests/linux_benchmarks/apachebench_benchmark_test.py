@@ -44,9 +44,11 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.apachebench_output = self.populateTestString('apachebench_output.txt')
     self.apachebench_raw_request_times = self.populateTestString(
-        'apachebench_raw_request_times.tsv')
+        'apachebench_raw_request_times.tsv'
+    )
     self.apachebench_percentile_data = self.populateTestString(
-        'apachebench_percentile_data.csv')
+        'apachebench_percentile_data.csv'
+    )
 
     self.run_config = apachebench_benchmark.ApacheBenchRunConfig(
         num_requests=1,
@@ -56,22 +58,22 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         socket_timeout=30,
         timelimit=None,
         server_content_size=1,
-        client_vms=1
+        client_vms=1,
     )
     self.ip_config = apachebench_benchmark.ApacheBenchIpConfig(
         'internal-ip',
         'internal_ip',
         'internal_results.txt',
         'internal_ip_percentile_output.csv',
-        'internal_ip_raw_request_times.tsv')
+        'internal_ip_raw_request_times.tsv',
+    )
 
-    client = mock.MagicMock(
-        hostname='pkb-mock-0',
-        id='0123456789876543210')
+    client = mock.MagicMock(hostname='pkb-mock-0', id='0123456789876543210')
     server = mock.MagicMock(
         hostname='pkb-mock-1',
         id='9876543210123456789',
-        internal_ip='30.128.0.2')
+        internal_ip='30.128.0.2',
+    )
     self.vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     setattr(self.vm_spec, 'vm_groups', {'client': [client], 'server': [server]})
 
@@ -85,7 +87,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         0: [4.0, 5.0, 5.0],
         1: [4.0, 5.0],
         2: [5.0, 6.0],
-        3: [6.0, 7.0, 7.0]
+        3: [6.0, 7.0, 7.0],
     }
 
   def testApacheBenchRunConfigGetCommand(self):
@@ -103,7 +105,8 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn(f'1> {self.ip_config.output_path}', cmd)
 
   @mock.patch.multiple(
-      apache2_server, SetupServer=mock.DEFAULT, StartServer=mock.DEFAULT)
+      apache2_server, SetupServer=mock.DEFAULT, StartServer=mock.DEFAULT
+  )
   def testPrepare(self, SetupServer, StartServer):  # pylint: disable=invalid-name
     client = self.vm_spec.vm_groups['client'][0]
     server = self.vm_spec.vm_groups['server'][0]
@@ -119,11 +122,17 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
 
   @mock.patch.object(apache2_server, 'GetApacheCPUSeconds', autospec=True)
   @mock.patch.object(
-      apachebench_benchmark, '_ParseHistogramFromFile', autospec=True)
+      apachebench_benchmark, '_ParseHistogramFromFile', autospec=True
+  )
   @mock.patch.object(
-      apachebench_benchmark, '_ParseRawRequestData', autospec=True)
-  def testApacheBench_Run(self, _ParseRawRequestData, _ParseHistogramFromFile,  # pylint: disable=invalid-name
-                          GetApacheCPUSeconds):  # pylint: disable=invalid-name
+      apachebench_benchmark, '_ParseRawRequestData', autospec=True
+  )
+  def testApacheBench_Run(
+      self,
+      _ParseRawRequestData,
+      _ParseHistogramFromFile,  # pylint: disable=invalid-name
+      GetApacheCPUSeconds,
+  ):  # pylint: disable=invalid-name
     server = self.vm_spec.vm_groups['server'][0]
     clients = self.vm_spec.vm_groups['client']
     for client in clients:
@@ -133,8 +142,9 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     _ParseHistogramFromFile.return_value = self.expected_histogram
     _ParseRawRequestData.return_value = self.expected_raw_request_data
 
-    result = apachebench_benchmark._Run(clients, server, self.run_config,
-                                        self.ip_config)
+    result = apachebench_benchmark._Run(
+        clients, server, self.run_config, self.ip_config
+    )
 
     expected_attrs = {
         'complete_requests': 1,
@@ -155,7 +165,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         'html_transferred_unit': 'bytes',
         'histogram': self.expected_histogram,
         'raw_results': self.expected_raw_request_data,
-        'cpu_seconds': 1.0
+        'cpu_seconds': 1.0,
     }
 
     for metric, expected in expected_attrs.items():
@@ -166,7 +176,9 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     for client in clients:
       client.RemoteCommand.return_value = (self.apachebench_output, '')
 
-    FLAGS.apachebench_run_mode = apachebench_benchmark.ApacheBenchRunMode.MAX_THROUGHPUT
+    FLAGS.apachebench_run_mode = (
+        apachebench_benchmark.ApacheBenchRunMode.MAX_THROUGHPUT
+    )
 
     result = apachebench_benchmark.ApacheBenchResults(
         complete_requests=1,
@@ -187,9 +199,11 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         html_transferred_unit='bytes',
         histogram=self.expected_histogram,
         raw_results={0: [1.0]},
-        cpu_seconds=1.0)
-    metadata = apachebench_benchmark.GetMetadata(result, self.run_config,
-                                                 self.ip_config)
+        cpu_seconds=1.0,
+    )
+    metadata = apachebench_benchmark.GetMetadata(
+        result, self.run_config, self.ip_config
+    )
 
     expected_metadata = {
         'apachebench_requests': 1,
@@ -203,8 +217,9 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         'apachebench_client_vms': 1,
         'apachebench_complete_requests': 1,
         'apachebench_time_taken_for_tests': 1.0,
-        'apachebench_run_mode':
+        'apachebench_run_mode': (
             apachebench_benchmark.ApacheBenchRunMode.MAX_THROUGHPUT
+        ),
     }
 
     self.assertDictEqual(metadata, expected_metadata)

@@ -24,17 +24,25 @@ from perfkitbenchmarker import linux_packages
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('openmpi_version', '3.1.2',
-                    'OpenMPI version to install, such as 3.1.2 and 4.0.2.'
-                    'Set to empty to ignore the intallation of OpenMPI.')
-flags.DEFINE_bool('openmpi_enable_shared', False,
-                  'Whether openmpi should build shared libraries '
-                  'in addition to static ones.')
-flags.DEFINE_bool('openmpi_with_cuda_support', False,
-                  'Compile with CUDA support')
-flags.DEFINE_string('openmpi_configs', None,
-                    'command line options to be provided to ./configure for'
-                    'OpenMPI compilation')
+flags.DEFINE_string(
+    'openmpi_version',
+    '3.1.2',
+    'OpenMPI version to install, such as 3.1.2 and 4.0.2.'
+    'Set to empty to ignore the intallation of OpenMPI.',
+)
+flags.DEFINE_bool(
+    'openmpi_enable_shared',
+    False,
+    'Whether openmpi should build shared libraries in addition to static ones.',
+)
+flags.DEFINE_bool(
+    'openmpi_with_cuda_support', False, 'Compile with CUDA support'
+)
+flags.DEFINE_string(
+    'openmpi_configs',
+    None,
+    'command line options to be provided to ./configure forOpenMPI compilation',
+)
 
 MPI_URL_BASE = 'https://download.open-mpi.org/release/open-mpi'
 REMOVE_MPI_CMD = 'autoremove -y libopenmpi-dev openmpi-bin openmpi-common'
@@ -80,12 +88,14 @@ def _Install(vm):
   first_dot_pos = version_to_install.find('.')
   second_dot_pos = version_to_install.find('.', first_dot_pos + 1)
   major_version = version_to_install[0:second_dot_pos]
-  mpi_tar = ('openmpi-{version}.tar.gz'.format(version=version_to_install))
-  mpi_url = ('{mpi_url_base}/v{major_version}/{mpi_tar}'.format(
-      mpi_url_base=MPI_URL_BASE, major_version=major_version, mpi_tar=mpi_tar))
+  mpi_tar = 'openmpi-{version}.tar.gz'.format(version=version_to_install)
+  mpi_url = '{mpi_url_base}/v{major_version}/{mpi_tar}'.format(
+      mpi_url_base=MPI_URL_BASE, major_version=major_version, mpi_tar=mpi_tar
+  )
   install_dir = posixpath.join(
       linux_packages.INSTALL_DIR,
-      'openmpi-{version}'.format(version=version_to_install))
+      'openmpi-{version}'.format(version=version_to_install),
+  )
 
   vm.Install('build_tools')
   vm.Install('wget')
@@ -96,27 +106,36 @@ def _Install(vm):
   config_options = []
   config_options.append('--enable-static')
   config_options.append('--prefix=/usr')
-  config_options.append('--enable-shared' if FLAGS.openmpi_enable_shared
-                        else '--disable-shared')
+  config_options.append(
+      '--enable-shared' if FLAGS.openmpi_enable_shared else '--disable-shared'
+  )
   if FLAGS.openmpi_with_cuda_support:
-    config_options.append('--with-cuda=/usr/local/cuda-{version}/'
-                          .format(version=FLAGS.cuda_toolkit_version))
-    config_options.append('--with-cuda-libdir=/usr/local/cuda-{version}/lib64/'
-                          .format(version=FLAGS.cuda_toolkit_version))
+    config_options.append(
+        '--with-cuda=/usr/local/cuda-{version}/'.format(
+            version=FLAGS.cuda_toolkit_version
+        )
+    )
+    config_options.append(
+        '--with-cuda-libdir=/usr/local/cuda-{version}/lib64/'.format(
+            version=FLAGS.cuda_toolkit_version
+        )
+    )
   if FLAGS.openmpi_configs:
     config_options.append(FLAGS.openmpi_configs)
 
   config_cmd = './configure {}'.format(' '.join(config_options))
   vm.RobustRemoteCommand(
-      'cd %s/openmpi-%s && %s && make -j %s && sudo make install' %
-      (install_dir, version_to_install, config_cmd, make_jobs))
+      'cd %s/openmpi-%s && %s && make -j %s && sudo make install'
+      % (install_dir, version_to_install, config_cmd, make_jobs)
+  )
 
 
 def GetMpiDir():
   """Returns the installation directory of OpenMPI."""
   mpi_dir = posixpath.join(
       linux_packages.INSTALL_DIR,
-      'openmpi-{version}'.format(version=FLAGS.openmpi_version))
+      'openmpi-{version}'.format(version=FLAGS.openmpi_version),
+  )
   return mpi_dir
 
 
@@ -125,7 +144,8 @@ def YumInstall(vm):
   if not FLAGS.openmpi_version:
     return
   vm.RobustRemoteCommand(
-      'sudo yum {}'.format(REMOVE_MPI_CMD), ignore_failure=True)
+      'sudo yum {}'.format(REMOVE_MPI_CMD), ignore_failure=True
+  )
   _Install(vm)
 
 
@@ -134,7 +154,8 @@ def AptInstall(vm):
   if not FLAGS.openmpi_version:
     return
   vm.RobustRemoteCommand(
-      'sudo apt-get {}'.format(REMOVE_MPI_CMD), ignore_failure=True)
+      'sudo apt-get {}'.format(REMOVE_MPI_CMD), ignore_failure=True
+  )
   _Install(vm)
 
 

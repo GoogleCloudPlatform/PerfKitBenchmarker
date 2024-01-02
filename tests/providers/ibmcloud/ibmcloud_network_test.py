@@ -33,10 +33,14 @@ class IbmcloudNetworkTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(IbmcloudNetworkTest, self).setUp()
     # Patch the __init__ method for simplicity.
-    with mock.patch.object(ibmcloud_network.IbmCloudNetwork, '__init__',
-                           lambda self, prefix, zone: None):
-      self.network = ibmcloud_network.IbmCloudNetwork('fake_prefix',
-                                                      'fake_zone')
+    with mock.patch.object(
+        ibmcloud_network.IbmCloudNetwork,
+        '__init__',
+        lambda self, prefix, zone: None,
+    ):
+      self.network = ibmcloud_network.IbmCloudNetwork(
+          'fake_prefix', 'fake_zone'
+      )
 
   def get_vpc(self):
     return VPC_ID
@@ -50,8 +54,9 @@ class IbmcloudNetworkTest(pkb_common_test_case.PkbCommonTestCase):
   def testGetSubnetIndex(self):
     subnetx = '10.103.20.0/24'
     expected_subet_index = 2
-    self.assertEqual(expected_subet_index,
-                     ibmcloud_network.GetSubnetIndex(subnetx))
+    self.assertEqual(
+        expected_subet_index, ibmcloud_network.GetSubnetIndex(subnetx)
+    )
 
   def testCreateVpc(self):
     self.network = mock.Mock()

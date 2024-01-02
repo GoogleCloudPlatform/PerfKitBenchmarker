@@ -121,7 +121,8 @@ class GCPSQLServerIAASRelationalDb(
     # Moves the SQL Server temporary database to LocalSSD.
     for vm in vms:
       stdout, _ = vm.RemoteCommand(
-          'Get-PSDrive -PSProvider FileSystem | Select Name')
+          'Get-PSDrive -PSProvider FileSystem | Select Name'
+      )
 
       drive_list = [
           str(drive.strip().replace('\r', ''))

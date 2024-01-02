@@ -6,7 +6,6 @@ import uuid
 from absl import flags
 from absl.testing import parameterized
 import mock
-
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
@@ -28,7 +27,7 @@ EXISTS_ONE_RESPONSE = {
     'PlacementGroups': [{
         'GroupName': GROUP_NAME,
         'State': 'available',
-        'Strategy': STRATEGY
+        'Strategy': STRATEGY,
     }]
 }
 EXISTS_TWO_RESPONSE = {'PlacementGroups': ['seat', 'filler']}
@@ -42,7 +41,12 @@ FLAGS.run_uri = RUN_URI
 def AwsCommand(topic, *aws_args, **env):
   # used when validating an AWS command run via vm_util.IssueCommand
   aws_bash_cmd = [
-      'aws', '--output', 'json', 'ec2', topic, '--region={}'.format(REGION)
+      'aws',
+      '--output',
+      'json',
+      'ec2',
+      topic,
+      '--region={}'.format(REGION),
   ] + list(aws_args)
   return mock.call(aws_bash_cmd, **env)
 
@@ -52,15 +56,19 @@ EXISTS_CALL = AwsCommand(
     '--filter=Name=group-name,Values={}'.format(GROUP_NAME),
     env=None,
     raise_on_failure=False,
-    suppress_failure=None)
+    suppress_failure=None,
+)
 CREATE_CALL = AwsCommand(
-    'create-placement-group', '--group-name={}'.format(GROUP_NAME),
+    'create-placement-group',
+    '--group-name={}'.format(GROUP_NAME),
     '--strategy={}'.format(STRATEGY),
-    '--tag-specifications=foobar')
+    '--tag-specifications=foobar',
+)
 DELETE_CALL = AwsCommand(
     'delete-placement-group',
     '--group-name={}'.format(GROUP_NAME),
-    raise_on_failure=False)
+    raise_on_failure=False,
+)
 
 
 def AwsResponse(data):
@@ -69,9 +77,10 @@ def AwsResponse(data):
 
 def CreateAwsPlacementGroupSpec(group_style=STRATEGY):
   spec_class = spec.GetSpecClass(
-      placement_group.BasePlacementGroupSpec, CLOUD=CLOUD)
+      placement_group.BasePlacementGroupSpec, CLOUD=CLOUD
+  )
   FLAGS.placement_group_style = group_style
-  name = '{0}.placement_group_spec.{1}'.format(spec_class.SPEC_TYPE, CLOUD),
+  name = ('{0}.placement_group_spec.{1}'.format(spec_class.SPEC_TYPE, CLOUD),)
   return spec_class(name, zone=ZONE, flag_values=FLAGS)
 
 
@@ -85,7 +94,8 @@ class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super(AwsPlacementGroupTest, self).setUp()
     self.mock_cmd = self.enter_context(
-        mock.patch.object(vm_util, 'IssueCommand'))
+        mock.patch.object(vm_util, 'IssueCommand')
+    )
     uuid_call = self.enter_context(mock.patch.object(uuid, 'uuid4'))
     uuid_call.return_value = UUID
 
@@ -107,7 +117,8 @@ class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
   @parameterized.named_parameters(
       ('EXISTS_NONE_RESPONSE', EXISTS_NONE_RESPONSE, False),
       ('EXISTS_ONE_RESPONSE', EXISTS_ONE_RESPONSE, True),
-      ('EXISTS_TWO_RESPONSE', EXISTS_TWO_RESPONSE, None, True))
+      ('EXISTS_TWO_RESPONSE', EXISTS_TWO_RESPONSE, None, True),
+  )
   def testExists(self, response, exists_value, throws_exception=False):
     self.mock_cmd.side_effect = [AwsResponse(response)]
     pg = CreateAwsPlacementGroup()

@@ -1085,6 +1085,7 @@ class KubernetesCluster(BaseContainerCluster):
 @dataclasses.dataclass
 class KubernetesEventResource:
   """Holder for Kubernetes event involved objects."""
+
   kind: str
   name: str
 
@@ -1097,6 +1098,7 @@ class KubernetesEventResource:
 @dataclasses.dataclass
 class KubernetesEvent:
   """Holder for Kubernetes event data."""
+
   resource: KubernetesEventResource
   message: str
   # Reason is actually more of a machine readable message.

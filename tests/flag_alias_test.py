@@ -30,11 +30,13 @@ class TestFlagAlias(parameterized.TestCase):
       ('TestValueUnchanged1', ['-ab=a'], ['-ab=a']),
       ('TestValueUnchanged2', ['-a=-a'], ['-ab=-a']),
       ('TestNoPrefix1', ['-noa'], ['-noab']),
-      ('TestNoPrefix2', ['-noab'], ['-noab']))
+      ('TestNoPrefix2', ['-noab'], ['-noab']),
+  )
   def testAliasFlagsFromArgs(self, argv, expected_argv):
     flags = [{'a': 'ab'}]
     self.assertListEqual(
-        flag_alias.AliasFlagsFromArgs(argv, flags), expected_argv)
+        flag_alias.AliasFlagsFromArgs(argv, flags), expected_argv
+    )
 
   @parameterized.named_parameters(
       ('BaseCase1', {'a': 'cat'}, {'ab': 'cat'}),
@@ -45,7 +47,8 @@ class TestFlagAlias(parameterized.TestCase):
   def testAliasFlagsFromYaml(self, dic, expected_dic):
     flags = [{'a': 'ab'}, {'b': 'd'}]
     self.assertDictEqual(
-        flag_alias.AliasFlagsFromYaml(dic, flags), expected_dic)
+        flag_alias.AliasFlagsFromYaml(dic, flags), expected_dic
+    )
 
 
 class TestZonesFlagAlias(pkb_common_test_case.PkbCommonTestCase):

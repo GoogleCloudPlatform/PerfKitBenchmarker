@@ -33,7 +33,10 @@ P3RF_CLOUD_SQL_TEST_DIR = linux_hammerdb.P3RF_CLOUD_SQL_TEST_DIR
 HAMMERDB = 'HammerDB-{0}'
 HAMMERDB_DIR = HAMMERDB + '-Win'
 HAMMERDB_ZIP = HAMMERDB_DIR + '.zip'
-HAMMERDB_URL = 'https://github.com/TPC-Council/HammerDB/releases/download/v{0}/' + HAMMERDB_ZIP
+HAMMERDB_URL = (
+    'https://github.com/TPC-Council/HammerDB/releases/download/v{0}/'
+    + HAMMERDB_ZIP
+)
 
 # import linux flags
 HAMMERDB_SCRIPT = linux_hammerdb.HAMMERDB_SCRIPT
@@ -54,13 +57,15 @@ class WindowsHammerDbTclScript(linux_hammerdb.HammerDbTclScript):
     PushTestFile(vm, self.tcl_script_name, self.path)
 
     for parameter in self.needed_parameters:
-      tcl_script_parameters.SearchAndReplaceInScript(vm, self.tcl_script_name,
-                                                     parameter)
+      tcl_script_parameters.SearchAndReplaceInScript(
+          vm, self.tcl_script_name, parameter
+      )
 
-  def Run(self, vm, timeout: Optional[int] = 60*60*6) -> str:
+  def Run(self, vm, timeout: Optional[int] = 60 * 60 * 6) -> str:
     """Run hammerdbcli script."""
     hammerdb_exe_dir = ntpath.join(
-        vm.temp_dir, HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value))
+        vm.temp_dir, HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value)
+    )
     stdout, _ = vm.RobustRemoteCommand(
         f'cd {hammerdb_exe_dir} ; '
         f'.\\hammerdbcli.bat auto {self.tcl_script_name}',
@@ -75,9 +80,9 @@ class WindowsTclScriptParameters(linux_hammerdb.TclScriptParameters):
   """Handle of the parameters that may be needed by a TCL script."""
 
   def SearchAndReplaceInScript(self, vm, script_name: str, parameter: str):
-    SearchAndReplaceTclScript(vm, parameter,
-                              self.map_search_to_replace[parameter],
-                              script_name)
+    SearchAndReplaceTclScript(
+        vm, parameter, self.map_search_to_replace[parameter], script_name
+    )
 
 
 def _GetFileContent(vm, file_path: str) -> str:
@@ -104,12 +109,14 @@ def ParseTpcCResults(stdout: str, vm) -> List[sample.Sample]:
   tpcc_metrics = linux_hammerdb.ParseBasicTpcCResults(stdout)
   if linux_hammerdb.HAMMERDB_TPCC_TIME_PROFILE.value:
     tpcc_results = _GetFileContent(
-        vm, ntpath.join(vm.temp_dir, '..', 'hdbxtprofile.log'))
+        vm, ntpath.join(vm.temp_dir, '..', 'hdbxtprofile.log')
+    )
     tpcc_metrics += ParseTpcCTimeProfileResultsFromFile(tpcc_results)
 
   if linux_hammerdb.TPCC_LOG_TRANSACTIONS.value:
     tpcc_results = _GetFileContent(
-        vm, ntpath.join(vm.temp_dir, '..', 'hdbtcount.log'))
+        vm, ntpath.join(vm.temp_dir, '..', 'hdbtcount.log')
+    )
     tpcc_metrics += ParseTpcCTPMResultsFromFile(tpcc_results)
   return tpcc_metrics
 
@@ -121,11 +128,14 @@ def ParseTpcHResults(stdout: str) -> List[sample.Sample]:
 
 def SearchAndReplaceTclScript(vm, search: str, replace: str, script_name: str):
   hammerdb_exe_dir = ntpath.join(
-      vm.temp_dir, HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value))
-  vm.RemoteCommand(f'cd {hammerdb_exe_dir} ; '
-                   f'(Get-Content {script_name}) '
-                   f'-replace "{search}", "{replace}" | '
-                   f'Set-Content {script_name} -encoding ASCII ; ')
+      vm.temp_dir, HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value)
+  )
+  vm.RemoteCommand(
+      f'cd {hammerdb_exe_dir} ; '
+      f'(Get-Content {script_name}) '
+      f'-replace "{search}", "{replace}" | '
+      f'Set-Content {script_name} -encoding ASCII ; '
+  )
 
 
 def Install(vm):
@@ -133,37 +143,59 @@ def Install(vm):
   version = linux_hammerdb.HAMMERDB_VERSION.value
   if version not in [linux_hammerdb.HAMMERDB_4_5, linux_hammerdb.HAMMERDB_4_3]:
     raise errors.Setup.InvalidFlagConfigurationError(
-        f'Hammerdb version {version} is not supported on Windows. ')
+        f'Hammerdb version {version} is not supported on Windows. '
+    )
   vm.Install('mssql_tools')
   zip_path = ntpath.join(vm.temp_dir, HAMMERDB_ZIP.format(version))
   vm.DownloadFile(HAMMERDB_URL.format(version), zip_path)
   vm.UnzipFile(zip_path, vm.temp_dir)
 
 
-def SetupConfig(vm, db_engine: str, hammerdb_script: str, ip: str, port: int,
-                password: str, user: str, is_managed_azure: bool):
+def SetupConfig(
+    vm,
+    db_engine: str,
+    hammerdb_script: str,
+    ip: str,
+    port: int,
+    password: str,
+    user: str,
+    is_managed_azure: bool,
+):
   """Sets up the necessary scripts on the VM with the necessary parameters."""
   db_engine = sql_engine_utils.GetDbEngineType(db_engine)
 
   if db_engine not in linux_hammerdb.SCRIPT_MAPPING:
-    raise ValueError('{0} is currently not supported for running '
-                     'hammerdb benchmarks.'.format(db_engine))
+    raise ValueError(
+        '{0} is currently not supported for running '
+        'hammerdb benchmarks.'.format(db_engine)
+    )
 
   if hammerdb_script not in linux_hammerdb.SCRIPT_MAPPING[db_engine]:
-    raise ValueError('{0} is not a known hammerdb script.'.format(
-        hammerdb_script))
+    raise ValueError(
+        '{0} is not a known hammerdb script.'.format(hammerdb_script)
+    )
 
   linux_scripts = linux_hammerdb.SCRIPT_MAPPING[db_engine][hammerdb_script]
   windows_scripts = [
-      WindowsHammerDbTclScript(script.tcl_script_name, script.needed_parameters,
-                               script.path, script.script_type)
+      WindowsHammerDbTclScript(
+          script.tcl_script_name,
+          script.needed_parameters,
+          script.path,
+          script.script_type,
+      )
       for script in linux_scripts
   ]
 
   for script in windows_scripts:
     script_parameters = WindowsTclScriptParameters(
-        ip, port, password, user, is_managed_azure,
-        hammerdb_script, script.script_type)
+        ip,
+        port,
+        password,
+        user,
+        is_managed_azure,
+        hammerdb_script,
+        script.script_type,
+    )
     script.Install(vm, script_parameters)
 
   # Run all the build script or scripts before actual run phase
@@ -186,12 +218,12 @@ def Run(
   TPCH gathers the latency of the 22 TPCH queries.
 
   Args:
-     vm:  The virtual machine to run on that has
-          Install and SetupConfig already invoked on it.
+     vm:  The virtual machine to run on that has Install and SetupConfig already
+       invoked on it.
      db_engine:  The type of database that the script is running on
      hammerdb_script:  An enumeration from HAMMERDB_SCRIPT indicating which
-                       script to run.  Must have been prior setup with
-                       SetupConfig method on the vm to work.
+       script to run.  Must have been prior setup with SetupConfig method on the
+       vm to work.
     timeout: Timeout when running hammerdbcli
 
   Returns:
@@ -201,19 +233,25 @@ def Run(
 
   linux_scripts = linux_hammerdb.SCRIPT_MAPPING[db_engine][hammerdb_script]
   windows_scripts = [
-      WindowsHammerDbTclScript(script.tcl_script_name, script.needed_parameters,
-                               script.path, script.script_type)
+      WindowsHammerDbTclScript(
+          script.tcl_script_name,
+          script.needed_parameters,
+          script.path,
+          script.script_type,
+      )
       for script in linux_scripts
   ]
 
   # Run the run phase script.
   script = [
-      script for script in windows_scripts
+      script
+      for script in windows_scripts
       if script.script_type == linux_hammerdb.RUN_SCRIPT_TYPE
   ]
   if len(script) != 1:
     raise errors.Benchmarks.RunError(
-        f'1 run script expected but {len(script)} found. Exiting.')
+        f'1 run script expected but {len(script)} found. Exiting.'
+    )
   stdout = script[0].Run(vm, timeout=timeout)
 
   if hammerdb_script == linux_hammerdb.HAMMERDB_SCRIPT_TPC_H:
@@ -225,9 +263,12 @@ def Run(
 def PushTestFile(vm, data_file: str, path: str):
   vm.PushFile(
       data.ResourcePath(posixpath.join(path, data_file)),
-      ntpath.join(vm.temp_dir,
-                  HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value),
-                  data_file))
+      ntpath.join(
+          vm.temp_dir,
+          HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value),
+          data_file,
+      ),
+  )
 
 
 def GetMetadata(db_engine: str):

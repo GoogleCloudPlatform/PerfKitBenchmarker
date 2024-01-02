@@ -15,7 +15,6 @@
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_elasticache_redis
 from tests import pkb_common_test_case
@@ -42,36 +41,63 @@ class AwsElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testCreate(self):
     self.mock_command.return_value = (None, '', None)
     expected_output = [
-        'aws', 'elasticache', 'create-replication-group', '--engine', 'redis',
-        '--engine-version', '4.0.10', '--replication-group-id', 'pkb-run12345',
-        '--replication-group-description', 'pkb-run12345', '--region',
-        'us-east-1', '--cache-node-type', 'cache.m4.large',
-        '--cache-subnet-group-name', 'subnet-pkb-run12345',
-        '--preferred-cache-cluster-a-zs', 'us-east-1a', '--tags'
+        'aws',
+        'elasticache',
+        'create-replication-group',
+        '--engine',
+        'redis',
+        '--engine-version',
+        '4.0.10',
+        '--replication-group-id',
+        'pkb-run12345',
+        '--replication-group-description',
+        'pkb-run12345',
+        '--region',
+        'us-east-1',
+        '--cache-node-type',
+        'cache.m4.large',
+        '--cache-subnet-group-name',
+        'subnet-pkb-run12345',
+        '--preferred-cache-cluster-a-zs',
+        'us-east-1a',
+        '--tags',
     ]
     self.redis._Create()
     self.mock_command.assert_called_once_with(
-        expected_output, raise_on_failure=False)
+        expected_output, raise_on_failure=False
+    )
 
   def testDelete(self):
     self.mock_command.return_value = (None, '', None)
     expected_output = [
-        'aws', 'elasticache', 'delete-replication-group', '--region',
-        'us-east-1', '--replication-group-id', 'pkb-run12345'
+        'aws',
+        'elasticache',
+        'delete-replication-group',
+        '--region',
+        'us-east-1',
+        '--replication-group-id',
+        'pkb-run12345',
     ]
     self.redis._Delete()
     self.mock_command.assert_called_once_with(
-        expected_output, raise_on_failure=False)
+        expected_output, raise_on_failure=False
+    )
 
   def testExistTrue(self):
     self.mock_command.return_value = (None, '', None)
     expected_output = [
-        'aws', 'elasticache', 'describe-replication-groups', '--region',
-        'us-east-1', '--replication-group-id', 'pkb-run12345'
+        'aws',
+        'elasticache',
+        'describe-replication-groups',
+        '--region',
+        'us-east-1',
+        '--replication-group-id',
+        'pkb-run12345',
     ]
     self.redis._Exists()
     self.mock_command.assert_called_once_with(
-        expected_output, raise_on_failure=False)
+        expected_output, raise_on_failure=False
+    )
 
 
 if __name__ == '__main__':

@@ -28,10 +28,18 @@ IOR_DIR = '%s/ior' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/hpc/ior'
 GIT_TAG = '945fba2aa2d571e8babc4f5f01e78e9f5e6e193e'
 _METADATA_KEYS = [
-    'Operation', '#Tasks', 'segcnt', 'blksiz', 'xsize', 'aggsize', 'API', 'fPP',
+    'Operation',
+    '#Tasks',
+    'segcnt',
+    'blksiz',
+    'xsize',
+    'aggsize',
+    'API',
+    'fPP',
 ]
-_MDTEST_RESULT_REGEX = (r'\s*(.*?)\s*:\s*(\d+\.\d+)\s*(\d+\.\d+)'
-                        r'\s*(\d+\.\d+)\s*(\d+\.\d+)')
+_MDTEST_RESULT_REGEX = (
+    r'\s*(.*?)\s*:\s*(\d+\.\d+)\s*(\d+\.\d+)' r'\s*(\d+\.\d+)\s*(\d+\.\d+)'
+)
 _MDTEST_SUMMARY_REGEX = r'(\d+) tasks, (\d+) files[^\n]*\n\s*\n(.*?)\n\s*\n'
 
 
@@ -40,8 +48,10 @@ def Install(vm):
   vm.Install('openmpi')
   vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, IOR_DIR))
   vm.RemoteCommand('cd {0} && git checkout {1}'.format(IOR_DIR, GIT_TAG))
-  vm.RemoteCommand('cd {0} && ./bootstrap && ./configure && make && '
-                   'sudo make install'.format(IOR_DIR))
+  vm.RemoteCommand(
+      'cd {0} && ./bootstrap && ./configure && make && '
+      'sudo make install'.format(IOR_DIR)
+  )
 
 
 def Uninstall(vm):
@@ -63,11 +73,14 @@ def RunIOR(master_vm, num_tasks, script_path):
 
 
 def ParseIORResults(test_output):
-  """"Parses the test output and returns samples."""
-  random_offsets = (ordering == 'random offsets' for ordering in
-                    re.findall('ordering in a file = (.*)', test_output))
+  """ "Parses the test output and returns samples."""
+  random_offsets = (
+      ordering == 'random offsets'
+      for ordering in re.findall('ordering in a file = (.*)', test_output)
+  )
   match = re.search(
-      'Summary of all tests:\n(.*?)Finished', test_output, re.DOTALL)
+      'Summary of all tests:\n(.*?)Finished', test_output, re.DOTALL
+  )
   if not match:
     raise errors.Benchmarks.RunError('Error parsing: "{test_output}"')
   fp = io.StringIO(re.sub(' +', ' ', match.group(1)))
@@ -81,7 +94,7 @@ def ParseIORResults(test_output):
     iops = float(result_dict['Mean(OPs)'])
     results.extend([
         sample.Sample('Bandwidth', bandwidth, 'MiB/s', metadata),
-        sample.Sample('IOPS', iops, 'OPs/s', metadata)
+        sample.Sample('IOPS', iops, 'OPs/s', metadata),
     ])
   return results
 
@@ -111,24 +124,30 @@ def ParseMdtestResults(test_output):
   summaries = re.findall(_MDTEST_SUMMARY_REGEX, test_output, re.DOTALL)
   for num_tasks, num_files, summary in summaries:
     metadata = {
-        'command_line': command_line, 'num_tasks': num_tasks,
+        'command_line': command_line,
+        'num_tasks': num_tasks,
         'drop_caches': FLAGS.mdtest_drop_caches,
-        'num_files': num_files, 'dir_per_task': dir_per_task
+        'num_files': num_files,
+        'dir_per_task': dir_per_task,
     }
     result_lines = re.findall(_MDTEST_RESULT_REGEX, summary)
     for result_line in result_lines:
       op_type, max_ops, min_ops, mean_ops, std_dev = result_line
       if not float(mean_ops):
         continue
-      results.append(sample.Sample(
-          op_type + ' (Mean)', float(mean_ops), 'OPs/s', metadata))
+      results.append(
+          sample.Sample(op_type + ' (Mean)', float(mean_ops), 'OPs/s', metadata)
+      )
       if float(std_dev):
         results.extend([
             sample.Sample(
-                op_type + ' (Max)', float(max_ops), 'OPs/s', metadata),
+                op_type + ' (Max)', float(max_ops), 'OPs/s', metadata
+            ),
             sample.Sample(
-                op_type + ' (Min)', float(min_ops), 'OPs/s', metadata),
+                op_type + ' (Min)', float(min_ops), 'OPs/s', metadata
+            ),
             sample.Sample(
-                op_type + ' (Std Dev)', float(std_dev), 'OPs/s', metadata)
+                op_type + ' (Std Dev)', float(std_dev), 'OPs/s', metadata
+            ),
         ])
   return results

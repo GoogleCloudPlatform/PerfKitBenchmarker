@@ -38,8 +38,9 @@ class HbaseTest(pkb_common_test_case.PkbCommonTestCase):
 
 
 def MakeHbaseUrl(version):
-  return ('<a href="hbase-{version}-bin.tar.gz">'
-          'hbase-{version}-bin.tar.gz</a>').format(version=version)
+  return (
+      '<a href="hbase-{version}-bin.tar.gz">hbase-{version}-bin.tar.gz</a>'
+  ).format(version=version)
 
 
 if __name__ == '__main__':

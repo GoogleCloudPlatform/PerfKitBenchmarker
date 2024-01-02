@@ -34,30 +34,40 @@ MOFED_OS_MAPPING = {
 }
 
 # Mellanox OpenFabrics drivers
-MLNX_OFED_DOWNLOAD_URL = ('https://www.mellanox.com/downloads/ofed/MLNX_OFED-'
-                          '{version}/MLNX_OFED_LINUX-{version}-{os}-x86_64.tgz')
+MLNX_OFED_DOWNLOAD_URL = (
+    'https://www.mellanox.com/downloads/ofed/MLNX_OFED-'
+    '{version}/MLNX_OFED_LINUX-{version}-{os}-x86_64.tgz'
+)
 
 
 def _Install(vm):
   """Installs the Mellanox OpenFabrics driver on the VM."""
   if vm.OS_TYPE not in MOFED_OS_MAPPING:
-    raise ValueError('OS type {} not in {}'.format(vm.OS_TYPE,
-                                                   sorted(MOFED_OS_MAPPING)))
-  driver = MLNX_OFED_DOWNLOAD_URL.format(version=FLAGS.mofed_version,
-                                         os=MOFED_OS_MAPPING[vm.OS_TYPE])
+    raise ValueError(
+        'OS type {} not in {}'.format(vm.OS_TYPE, sorted(MOFED_OS_MAPPING))
+    )
+  driver = MLNX_OFED_DOWNLOAD_URL.format(
+      version=FLAGS.mofed_version, os=MOFED_OS_MAPPING[vm.OS_TYPE]
+  )
   vm.InstallPackages('libdapl2 libmlx4-1')
   vm.RemoteCommand(f'wget --retry-connrefused --tries=3 --waitretry=5 {driver}')
   vm.RemoteCommand('tar zxvf MLNX_OFED_LINUX-*-x86_64.tgz')
-  stdout, _ = vm.RemoteCommand('cd MLNX_OFED_LINUX-*-x86_64 && sudo '
-                               './mlnxofedinstall --force --skip-repo')
+  stdout, _ = vm.RemoteCommand(
+      'cd MLNX_OFED_LINUX-*-x86_64 && sudo '
+      './mlnxofedinstall --force --skip-repo'
+  )
   if 'Installation passed successfully' not in stdout:
     raise errors.Benchmarks.PrepareException(
-        'Mellanox OpenFabrics driver isn\'t installed successfully.')
+        "Mellanox OpenFabrics driver isn't installed successfully."
+    )
   vm.RemoteCommand('sudo /etc/init.d/openibd restart')
-  vm.RemoteCommand("sudo sed -i -e 's/# OS.EnableRDMA=y/"
-                   "OS.EnableRDMA=y/g' /etc/waagent.conf")
-  vm.RemoteCommand("sudo sed -i -e 's/# OS.UpdateRdmaDriver=y/"
-                   "OS.UpdateRdmaDriver=y/g' /etc/waagent.conf")
+  vm.RemoteCommand(
+      "sudo sed -i -e 's/# OS.EnableRDMA=y/OS.EnableRDMA=y/g' /etc/waagent.conf"
+  )
+  vm.RemoteCommand(
+      "sudo sed -i -e 's/# OS.UpdateRdmaDriver=y/"
+      "OS.UpdateRdmaDriver=y/g' /etc/waagent.conf"
+  )
   vm.Reboot()
   # Check IB status.
   stdout, _ = vm.RemoteCommand('sudo ibdev2netdev -v')

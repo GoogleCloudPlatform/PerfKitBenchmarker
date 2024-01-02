@@ -31,34 +31,41 @@ from tests import pkb_common_test_case
 FLAGS = flags.FLAGS
 
 
-class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
-                            test_util.SamplesTestMixin):
+class OpenfoamBenchmarkTest(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super(OpenfoamBenchmarkTest, self).setUp()
     self.mock_vm = mock.Mock()
     self.mock_benchmark_spec = mock.Mock(vms=[self.mock_vm])
     self.enter_context(
-        mock.patch.object(openmpi, 'GetMpiVersion', return_value='1.10.2'))
+        mock.patch.object(openmpi, 'GetMpiVersion', return_value='1.10.2')
+    )
     self.enter_context(
         mock.patch.object(
-            openfoam_benchmark, '_GetOpenfoamVersion', return_value='7'))
+            openfoam_benchmark, '_GetOpenfoamVersion', return_value='7'
+        )
+    )
 
-  @mock.patch.object(openfoam_benchmark, '_ParseRunCommands',
-                     return_value=['mpirun $(getApplication)'])
+  @mock.patch.object(
+      openfoam_benchmark,
+      '_ParseRunCommands',
+      return_value=['mpirun $(getApplication)'],
+  )
   @flagsaver.flagsaver(openfoam_dimensions=['80_32_32'])
-  def testRunCaseReturnsCorrectlyParsedSamples(self,
-                                               mock_parseruncommands):
+  def testRunCaseReturnsCorrectlyParsedSamples(self, mock_parseruncommands):
     # Run with mocked output data
     self.mock_vm.RemoteCommand.return_value = None, '\n'.join(
-        ['real 131.64', 'user 327.05', 'sys 137.04'])
+        ['real 131.64', 'user 327.05', 'sys 137.04']
+    )
     self.mock_vm.NumCpusForBenchmark.return_value = 8
     samples = openfoam_benchmark.Run(self.mock_benchmark_spec)
 
     # Verify command is what we expected to run
     run_cmd = [
         'cd $HOME/OpenFOAM/run/motorBike',
-        'time -p mpirun $(getApplication)'
+        'time -p mpirun $(getApplication)',
     ]
     self.mock_vm.RemoteCommand.assert_called_with(' && '.join(run_cmd))
 
@@ -78,16 +85,20 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
     }
     unit = 'seconds'
     self.assertSamplesEqualUpToTimestamp(
-        sample.Sample('time_real', 131, unit, expected_metadata), samples[0])
+        sample.Sample('time_real', 131, unit, expected_metadata), samples[0]
+    )
     self.assertSamplesEqualUpToTimestamp(
-        sample.Sample('time_user', 327, unit, expected_metadata), samples[1])
+        sample.Sample('time_user', 327, unit, expected_metadata), samples[1]
+    )
     self.assertSamplesEqualUpToTimestamp(
-        sample.Sample('time_sys', 137, unit, expected_metadata), samples[2])
+        sample.Sample('time_sys', 137, unit, expected_metadata), samples[2]
+    )
 
   def testYumInstallRaisesNotImplementedError(self):
     static_vm_spec = static_virtual_machine.StaticVmSpec('test_static_vm_spec')
     self.mock_vm = static_virtual_machine.Rhel7BasedStaticVirtualMachine(
-        static_vm_spec)
+        static_vm_spec
+    )
     self.mock_vm.install_packages = True
     with self.assertRaises(NotImplementedError):
       self.mock_vm.Install('openfoam')
@@ -97,7 +108,8 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
       openfoam_num_threads_per_vm=8,
       openfoam_mpi_mapping='hwthread',
       openfoam_decomp_method='simple',
-      openfoam_max_global_cells=1e9)
+      openfoam_max_global_cells=1e9,
+  )
   @mock.patch.object(openfoam_benchmark, '_UseMpi')
   @mock.patch.object(openfoam_benchmark, '_SetDictEntry')
   @mock.patch.object(openfoam_benchmark, '_RunCase')
@@ -114,8 +126,11 @@ class OpenfoamBenchmarkTest(pkb_common_test_case.PkbCommonTestCase,
         ('method', 'simple', 'system/decomposeParDict'),
         ('numberOfSubdomains', 8, 'system/decomposeParDict'),
         ('hierarchicalCoeffs.n', '(8 1 1)', 'system/decomposeParDict'),
-        ('castellatedMeshControls.maxGlobalCells', float(1e9),
-         'system/snappyHexMeshDict'),
+        (
+            'castellatedMeshControls.maxGlobalCells',
+            float(1e9),
+            'system/snappyHexMeshDict',
+        ),
     ]
     mock_setdict.assert_has_calls([
         mock.call(self.mock_vm, key, value, dict_file_name)

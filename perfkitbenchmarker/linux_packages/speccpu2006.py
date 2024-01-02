@@ -48,8 +48,9 @@ def GetSpecInstallConfig(scratch_dir):
   install_config.base_tar_file_path = _SPECCPU2006_TAR
   install_config.required_members = _TAR_REQUIRED_MEMBERS
   install_config.log_format = _LOG_FORMAT
-  install_config.runspec_config = (FLAGS.runspec_config or
-                                   _DEFAULT_RUNSPEC_CONFIG)
+  install_config.runspec_config = (
+      FLAGS.runspec_config or _DEFAULT_RUNSPEC_CONFIG
+  )
   install_config.UpdateConfig(scratch_dir)
   return install_config
 

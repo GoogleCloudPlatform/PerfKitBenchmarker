@@ -16,7 +16,6 @@
 
 import unittest
 import mock
-
 from perfkitbenchmarker.data.large_scale_boot import listener_server
 from tests import pkb_common_test_case
 
@@ -44,9 +43,11 @@ class ListenerServerTest(pkb_common_test_case.PkbCommonTestCase):
     fake_client_host = '1.2.3.4'
     fake_port = 22
     success = listener_server.ConfirmIPAccessible(
-        fake_client_host, fake_port, timeout=1)
+        fake_client_host, fake_port, timeout=1
+    )
     self.assertEqual(success.split(':')[0], 'Fail')
     self.assertEqual(success.split(':')[1], fake_client_host)
+
 
 if __name__ == '__main__':
   unittest.main()

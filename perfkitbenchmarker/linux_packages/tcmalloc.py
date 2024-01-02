@@ -25,12 +25,17 @@ needed for other platforms.
 from absl import flags
 from perfkitbenchmarker import errors
 
-flags.DEFINE_enum('tcmalloc_version', 'off',
-                  ['off', 'gperftools', 'experimental'],
-                  'the tcmalloc version to be preloaded')
+flags.DEFINE_enum(
+    'tcmalloc_version',
+    'off',
+    ['off', 'gperftools', 'experimental'],
+    'the tcmalloc version to be preloaded',
+)
 flags.DEFINE_string(
-    'tcmalloc_experimental_url', '',
-    'the GCS URL for downloading the tcmalloc experimental lib')
+    'tcmalloc_experimental_url',
+    '',
+    'the GCS URL for downloading the tcmalloc experimental lib',
+)
 flags.DEFINE_string(
     'tcmalloc_settings',
     '',
@@ -54,10 +59,12 @@ def AptInstall(vm):
   settings = FLAGS.tcmalloc_settings.split(',')
   for setting in settings:
     if setting:
-      vm.RemoteCommand('echo "export {setting}" | sudo tee -a {tmp}'.format(
-          setting=setting,  # e.g. 'TCMALLOC_RELEASE_RATE=0.5'
-          tmp=TEMP_BASHRC,
-      ))
+      vm.RemoteCommand(
+          'echo "export {setting}" | sudo tee -a {tmp}'.format(
+              setting=setting,  # e.g. 'TCMALLOC_RELEASE_RATE=0.5'
+              tmp=TEMP_BASHRC,
+          )
+      )
 
   if FLAGS.tcmalloc_version == 'gperftools':
     vm.InstallPackages('libgoogle-perftools-dev')
@@ -72,7 +79,8 @@ def AptInstall(vm):
             path1=libtcmalloc_paths[0],
             path2=libtcmalloc_paths[1],
             tmp=TEMP_BASHRC,
-        ))
+        )
+    )
 
   if FLAGS.tcmalloc_version == 'experimental':
     vm.Install('google_cloud_sdk')
@@ -82,17 +90,22 @@ def AptInstall(vm):
         '&& echo "export LD_PRELOAD={path}" | sudo tee -a {tmp}'.format(
             url=FLAGS.tcmalloc_experimental_url,
             path=local_path,
-            tmp=TEMP_BASHRC))
+            tmp=TEMP_BASHRC,
+        )
+    )
 
   # The environment variables must be exported before a potential termination
   # of bashrc when the shell is not interactive
-  vm.RemoteCommand('sudo cat {tmp} {bashrc} | sudo tee {bashrc}'.format(
-      tmp=TEMP_BASHRC,
-      bashrc=BASHRC,
-  ))
+  vm.RemoteCommand(
+      'sudo cat {tmp} {bashrc} | sudo tee {bashrc}'.format(
+          tmp=TEMP_BASHRC,
+          bashrc=BASHRC,
+      )
+  )
 
   # Verify that libtcmalloc is preloaded in new process
   stdout, unused_stderr = vm.RemoteCommand('echo $LD_PRELOAD')
   if 'libtcmalloc.so' not in stdout:
     raise errors.Setup.InvalidSetupError(
-        'Fail to install tcmalloc. LD_PRELOAD="{}"'.format(stdout))
+        'Fail to install tcmalloc. LD_PRELOAD="{}"'.format(stdout)
+    )

@@ -18,7 +18,6 @@ import functools
 import unittest
 from absl import flags
 import mock
-
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
@@ -53,7 +52,8 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
 
     config = configs.LoadConfig(ping_benchmark.BENCHMARK_CONFIG, {}, NAME)
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
-        NAME, flag_values=FLAGS, **config)
+        NAME, flag_values=FLAGS, **config
+    )
     spec = benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
     vm0 = mock.MagicMock()
     vm1 = mock.MagicMock()
@@ -68,7 +68,8 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
 
     with mock.patch(ping_benchmark.__name__ + '.Run'):
       vm0.StopBackgroundWorkload.side_effect = functools.partial(
-          self._CheckAndIncrement, expected_last_call=0)
+          self._CheckAndIncrement, expected_last_call=0
+      )
       pkb.DoCleanupPhase(spec, timer)
       for vm in spec.vms:
         self.assertEqual(vm.StartBackgroundWorkload.call_count, 1)

@@ -37,8 +37,9 @@ runior_sample = sample.Sample('runior', 0, '')
 runmdtest_sample = sample.Sample('runmdtest', 0, '')
 
 
-class IorBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
-                           test_util.SamplesTestMixin):
+class IorBenchmarkTestCase(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
 
   def setUp(self):
     super().setUp()
@@ -47,7 +48,8 @@ class IorBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
     self.spec = mock.Mock(vms=self.vms)
     self.mock_runior = self.enter_context(mock.patch.object(ior, 'RunIOR'))
     self.mock_runmdtest = self.enter_context(
-        mock.patch.object(ior, 'RunMdtest'))
+        mock.patch.object(ior, 'RunMdtest')
+    )
     self.mock_runior.return_value = [runior_sample]
     self.mock_runmdtest.return_value = [runmdtest_sample]
 
@@ -65,18 +67,23 @@ class IorBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
     self.headnode.PushDataFile.assert_called_with(
         'default_ior_script',
         '/ior/default_ior_script',
-        should_double_copy=False)
-    self.mock_runior.assert_called_with(self.headnode, 256,
-                                        '/ior/default_ior_script')
+        should_double_copy=False,
+    )
+    self.mock_runior.assert_called_with(
+        self.headnode, 256, '/ior/default_ior_script'
+    )
     # one RunIOR and 3 MdTest based on mdtest_args
     expected_samples = [
-        runior_sample, runmdtest_sample, runmdtest_sample, runmdtest_sample
+        runior_sample,
+        runmdtest_sample,
+        runmdtest_sample,
+        runmdtest_sample,
     ]
     self.assertSampleListsEqualUpToTimestamp(expected_samples, samples)
     self.mock_runmdtest.assert_has_calls([
         mock.call(self.headnode, 32, '-n 1000 -u -C'),
         mock.call(self.headnode, 32, '-n 1000 -u -T'),
-        mock.call(self.headnode, 32, '-n 1000 -u -r')
+        mock.call(self.headnode, 32, '-n 1000 -u -r'),
     ])
     for vm in self.vms:
       vm.DropCaches.assert_called()
@@ -106,12 +113,14 @@ class IorBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase,
       ior_num_procs=4,
       mdtest_num_procs=24,
       mdtest_args=['a', 'b'],
-      data_disk_type=disk.SMB)
+      data_disk_type=disk.SMB,
+  )
   def testNonDefaultFlags(self):
     samples = ior_benchmark.Run(self.spec)
 
     self.headnode.PushDataFile.assert_called_with(
-        'myior.sh', '/ior/myior.sh', should_double_copy=True)
+        'myior.sh', '/ior/myior.sh', should_double_copy=True
+    )
 
     expected_mdtest_args = ['a -C', 'a -T', 'a -r', 'b -C', 'b -T', 'b -r']
     expected_calls = [

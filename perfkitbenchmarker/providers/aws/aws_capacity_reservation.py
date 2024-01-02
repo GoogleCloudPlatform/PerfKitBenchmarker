@@ -67,13 +67,15 @@ class CreationError(Exception):
 
 class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
   """An object representing an AWS EC2 CapacityReservation."""
+
   CLOUD = provider_info.AWS
 
   def __init__(self, vm_group):
     if not vm_group:
       raise InvalidVmGroupSizeError(
           'AwsCapacityReservation must be initialized with at least one '
-          'VM in the vm_group.')
+          'VM in the vm_group.'
+      )
 
     super(AwsCapacityReservation, self).__init__(vm_group)
     self.zone_or_region = vm_group[0].zone
@@ -109,8 +111,8 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
       instance_platform = 'Windows'
     else:
       raise UnsupportedOsTypeError(
-          'Unsupported os_type for AWS CapacityReservation: %s.'
-          % self.os_type)
+          'Unsupported os_type for AWS CapacityReservation: %s.' % self.os_type
+      )
 
     # If the user did not specify an AZ, we need to try to create the
     # CapacityReservation in a specifc AZ until it succeeds.
@@ -121,9 +123,9 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
     else:
       zones_to_try = [self.zone_or_region]
 
-    end_date = (
-        datetime.datetime.utcnow() +
-        datetime.timedelta(minutes=FLAGS.timeout_minutes))
+    end_date = datetime.datetime.utcnow() + datetime.timedelta(
+        minutes=FLAGS.timeout_minutes
+    )
     for zone in zones_to_try:
       cmd = util.AWS_PREFIX + [
           'ec2',
@@ -137,23 +139,32 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
           '--end-date-type=limited',
           '--end-date=%s' % end_date.isoformat(),
       ]
-      stdout, stderr, retcode = vm_util.IssueCommand(cmd,
-                                                     raise_on_failure=False)
+      stdout, stderr, retcode = vm_util.IssueCommand(
+          cmd, raise_on_failure=False
+      )
       if retcode:
-        logging.info('Unable to create CapacityReservation in %s. '
-                     'This may be retried. Details: %s', zone, stderr)
+        logging.info(
+            'Unable to create CapacityReservation in %s. '
+            'This may be retried. Details: %s',
+            zone,
+            stderr,
+        )
         if _INSUFFICIENT_CAPACITY in stderr:
           logging.error(util.STOCKOUT_MESSAGE)
           raise errors.Benchmarks.InsufficientCapacityCloudFailure(
-              util.STOCKOUT_MESSAGE + ' CapacityReservation in ' + zone)
+              util.STOCKOUT_MESSAGE + ' CapacityReservation in ' + zone
+          )
         continue
       json_output = json.loads(stdout)
-      self.capacity_reservation_id = (
-          json_output['CapacityReservation']['CapacityReservationId'])
+      self.capacity_reservation_id = json_output['CapacityReservation'][
+          'CapacityReservationId'
+      ]
       self._UpdateVmsInGroup(self.capacity_reservation_id, zone)
       return
-    raise CreationError('Unable to create CapacityReservation in any of the '
-                        'following zones: %s.' % zones_to_try)
+    raise CreationError(
+        'Unable to create CapacityReservation in any of the '
+        'following zones: %s.' % zones_to_try
+    )
 
   def _Delete(self):
     """Deletes the capacity reservation."""
@@ -190,9 +201,9 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
 
     Args:
       capacity_reservation_id: ID of the reservation created by this instance.
-      zone: Zone chosen by this class, or if it was supplied, the zone
-      provided by the user. In the latter case, setting the zone is equivalent
-      to a no-op.
+      zone: Zone chosen by this class, or if it was supplied, the zone provided
+        by the user. In the latter case, setting the zone is equivalent to a
+        no-op.
     """
     for vm in self.vm_group:
       vm.capacity_reservation_id = capacity_reservation_id

@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing classes related to AliCloud disks.
-"""
+"""Module containing classes related to AliCloud disks."""
 
 import json
 import logging
@@ -56,7 +55,8 @@ class AliDisk(disk.BaseDisk):
         '--RegionId %s' % self.region,
         '--ZoneId %s' % self.zone,
         '--Size %s' % self.disk_size,
-        '--DiskCategory %s' % DISK_TYPE[self.disk_type]]
+        '--DiskCategory %s' % DISK_TYPE[self.disk_type],
+    ]
     create_cmd = util.GetEncodedCmd(create_cmd)
     stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
     response = json.loads(stdout)
@@ -71,9 +71,13 @@ class AliDisk(disk.BaseDisk):
     delete_cmd = util.ALI_PREFIX + [
         'ecs',
         'DeleteDisk',
-        '--DiskId %s' % self.id]
-    logging.info('Deleting AliCloud disk %s. This may fail if the disk is not '
-                 'yet detached, but will be retried.', self.id)
+        '--DiskId %s' % self.id,
+    ]
+    logging.info(
+        'Deleting AliCloud disk %s. This may fail if the disk is not '
+        'yet detached, but will be retried.',
+        self.id,
+    )
     delete_cmd = util.GetEncodedCmd(delete_cmd)
     vm_util.IssueRetryableCommand(delete_cmd)
 
@@ -87,7 +91,8 @@ class AliDisk(disk.BaseDisk):
       self.attached_vm_id = vm.id
       if self.attached_vm_id not in AliDisk.vm_devices:
         AliDisk.vm_devices[self.attached_vm_id] = set(
-            string.ascii_lowercase[1:])
+            string.ascii_lowercase[1:]
+        )
       self.device_letter = min(AliDisk.vm_devices[self.attached_vm_id])
       AliDisk.vm_devices[self.attached_vm_id].remove(self.device_letter)
 
@@ -96,7 +101,8 @@ class AliDisk(disk.BaseDisk):
         'AttachDisk',
         '--InstanceId %s' % self.attached_vm_id,
         '--DiskId %s' % self.id,
-        '--Device %s' % self.GetVirtualDevicePath()]
+        '--Device %s' % self.GetVirtualDevicePath(),
+    ]
     attach_cmd = util.GetEncodedCmd(attach_cmd)
     vm_util.IssueRetryableCommand(attach_cmd)
 
@@ -106,7 +112,8 @@ class AliDisk(disk.BaseDisk):
         'ecs',
         'DetachDisk',
         '--InstanceId %s' % self.attached_vm_id,
-        '--DiskId %s' % self.id]
+        '--DiskId %s' % self.id,
+    ]
     detach_cmd = util.GetEncodedCmd(detach_cmd)
     vm_util.IssueRetryableCommand(detach_cmd)
 
@@ -127,14 +134,16 @@ class AliDisk(disk.BaseDisk):
   @vm_util.Retry(poll_interval=5, max_retries=30, log_errors=False)
   def WaitForDiskStatus(self, status_list):
     """Waits until disk is attach to the instance."""
-    logging.info('Waits until the disk\'s status is one of statuses: %s',
-                 status_list)
+    logging.info(
+        "Waits until the disk's status is one of statuses: %s", status_list
+    )
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
         'DescribeDisks',
         '--RegionId %s' % self.region,
         '--ZoneId %s' % self.zone,
-        '--DiskIds \'["%s"]\'' % self.id]
+        '--DiskIds \'["%s"]\'' % self.id,
+    ]
     attach_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(attach_cmd)
     response = json.loads(stdout)

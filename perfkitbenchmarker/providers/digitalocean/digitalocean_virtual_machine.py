@@ -11,8 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Class to represent a DigitalOcean Virtual Machine object (Droplet).
-"""
+"""Class to represent a DigitalOcean Virtual Machine object (Droplet)."""
 
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
@@ -35,7 +34,7 @@ from six.moves import range
 #
 # To avoid this, just disable the root password (we don't need it),
 # and remove the forced expiration.
-CLOUD_CONFIG_TEMPLATE = '''#cloud-config
+CLOUD_CONFIG_TEMPLATE = """#cloud-config
 users:
   - name: {0}
     ssh-authorized-keys:
@@ -46,7 +45,7 @@ users:
 runcmd:
   - [ passwd, -l, root ]
   - [ chage, -d, -1, -I, -1, -E, -1, -M, 999999, root ]
-'''
+"""
 
 
 class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -73,26 +72,34 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     with open(self.ssh_public_key) as f:
       public_key = f.read().rstrip('\n')
 
-    response, retcode = util.DoctlAndParse(
-        ['compute', 'droplet', 'create',
-         self.name,
-         '--region', self.zone,
-         '--size', self.machine_type,
-         '--image', self.image,
-         '--user-data', CLOUD_CONFIG_TEMPLATE.format(
-             self.user_name, public_key),
-         '--enable-private-networking',
-         '--wait'])
+    response, retcode = util.DoctlAndParse([
+        'compute',
+        'droplet',
+        'create',
+        self.name,
+        '--region',
+        self.zone,
+        '--size',
+        self.machine_type,
+        '--image',
+        self.image,
+        '--user-data',
+        CLOUD_CONFIG_TEMPLATE.format(self.user_name, public_key),
+        '--enable-private-networking',
+        '--wait',
+    ])
     if retcode:
-      raise errors.Resource.RetryableCreationError('Creation failed: %s' %
-                                                   (response,))
+      raise errors.Resource.RetryableCreationError(
+          'Creation failed: %s' % (response,)
+      )
     self.droplet_id = response[0]['id']
 
   @vm_util.Retry()
   def _PostCreate(self):
     """Get the instance's data."""
     response, retcode = util.DoctlAndParse(
-        ['compute', 'droplet', 'get', self.droplet_id])
+        ['compute', 'droplet', 'get', self.droplet_id]
+    )
     for interface in response[0]['networks']['v4']:
       if interface['type'] == 'public':
         self.ip_address = interface['ip_address']
@@ -103,21 +110,24 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Delete a DigitalOcean VM instance."""
 
     response, retcode = util.DoctlAndParse(
-        ['compute', 'droplet', 'delete', self.droplet_id, '--force'])
+        ['compute', 'droplet', 'delete', self.droplet_id, '--force']
+    )
     # The command doesn't return the HTTP status code, and the error
     # format is very difficult to parse, so we string
     # search. TODO(user): parse the error message.
     if retcode and '404' in response['errors'][0]['detail']:
       return
     elif retcode:
-      raise errors.Resource.RetryableDeletionError('Deletion failed: %s' %
-                                                   (response,))
+      raise errors.Resource.RetryableDeletionError(
+          'Deletion failed: %s' % (response,)
+      )
 
   def _Exists(self):
     """Returns true if the VM exists."""
 
     response, retcode = util.DoctlAndParse(
-        ['compute', 'droplet', 'get', self.droplet_id])
+        ['compute', 'droplet', 'get', self.droplet_id]
+    )
 
     return retcode == 0
 
@@ -130,27 +140,36 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if disk_spec.disk_type == disk.LOCAL:
       if self.scratch_disks and self.scratch_disks[0].disk_type == disk.LOCAL:
-        raise errors.Error('DigitalOcean does not support multiple local '
-                           'disks.')
+        raise errors.Error(
+            'DigitalOcean does not support multiple local disks.'
+        )
 
       if disk_spec.num_striped_disks != 1:
-        raise ValueError('num_striped_disks=%s, but DigitalOcean VMs can only '
-                         'have one local disk.' % disk_spec.num_striped_disks)
+        raise ValueError(
+            'num_striped_disks=%s, but DigitalOcean VMs can only '
+            'have one local disk.'
+            % disk_spec.num_striped_disks
+        )
       # The single unique local disk on DigitalOcean is also the boot
       # disk, so we can't follow the normal procedure of formatting
       # and mounting. Instead, create a folder at the "mount point" so
       # the rest of PKB will work as expected and deliberately skip
       # self._CreateScratchDiskFromDisks.
-      self.RemoteCommand('sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'
-                         .format(disk_spec.mount_point))
+      self.RemoteCommand(
+          'sudo mkdir -p {0} && sudo chown -R $USER:$USER {0}'.format(
+              disk_spec.mount_point
+          )
+      )
       self.scratch_disks.append(
-          digitalocean_disk.DigitalOceanLocalDisk(disk_spec))
+          digitalocean_disk.DigitalOceanLocalDisk(disk_spec)
+      )
     else:
       disks = []
       for _ in range(disk_spec.num_striped_disks):
         # Disk 0 is the local disk.
         data_disk = digitalocean_disk.DigitalOceanBlockStorageDisk(
-            disk_spec, self.zone)
+            disk_spec, self.zone
+        )
         data_disk.disk_number = self.remote_disk_counter + 1
         self.remote_disk_counter += 1
         disks.append(data_disk)

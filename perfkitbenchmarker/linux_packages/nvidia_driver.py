@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing NVIDIA Driver installation.
-"""
+"""Module containing NVIDIA Driver installation."""
 
 import re
 from absl import flags
@@ -39,13 +38,15 @@ NVIDIA_TESLA_A10 = 'a10'
 
 EXTRACT_CLOCK_SPEEDS_REGEX = r'(\S*).*,\s*(\S*)'
 
-flag_util.DEFINE_integerlist('gpu_clock_speeds',
-                             None,
-                             'desired gpu clock speeds in the form '
-                             '[memory clock, graphics clock]')
+flag_util.DEFINE_integerlist(
+    'gpu_clock_speeds',
+    None,
+    'desired gpu clock speeds in the form [memory clock, graphics clock]',
+)
 
-flags.DEFINE_boolean('gpu_autoboost_enabled', None,
-                     'whether gpu autoboost is enabled')
+flags.DEFINE_boolean(
+    'gpu_autoboost_enabled', None, 'whether gpu autoboost is enabled'
+)
 
 flags.DEFINE_string(
     'nvidia_driver_version',
@@ -55,18 +56,29 @@ flags.DEFINE_string(
         'For example, "418.67" or "418.87.01."'
     ),
 )
-flags.DEFINE_boolean('nvidia_driver_force_install', False,
-                     'Whether to install NVIDIA driver, even if it is already '
-                     'installed.')
+flags.DEFINE_boolean(
+    'nvidia_driver_force_install',
+    False,
+    'Whether to install NVIDIA driver, even if it is already installed.',
+)
 
-flags.DEFINE_string('nvidia_driver_x_library_path', '/usr/lib',
-                    'X library path for nvidia driver installation')
+flags.DEFINE_string(
+    'nvidia_driver_x_library_path',
+    '/usr/lib',
+    'X library path for nvidia driver installation',
+)
 
-flags.DEFINE_string('nvidia_driver_x_module_path', '/usr/lib/xorg/modules',
-                    'X module path for nvidia driver installation')
+flags.DEFINE_string(
+    'nvidia_driver_x_module_path',
+    '/usr/lib/xorg/modules',
+    'X module path for nvidia driver installation',
+)
 
-flags.DEFINE_boolean('nvidia_driver_persistence_mode', None,
-                     'whether to enable persistence mode on the NVIDIA GPU')
+flags.DEFINE_boolean(
+    'nvidia_driver_persistence_mode',
+    None,
+    'whether to enable persistence mode on the NVIDIA GPU',
+)
 
 FLAGS = flags.FLAGS
 
@@ -138,8 +150,9 @@ def GetDriverVersion(vm):
   match = re.search(regex, stdout)
   if match:
     return str(match.group(1))
-  raise NvidiaSmiParseOutputError('Unable to parse driver version from {}'
-                                  .format(stdout))
+  raise NvidiaSmiParseOutputError(
+      'Unable to parse driver version from {}'.format(stdout)
+  )
 
 
 def GetGpuType(vm):
@@ -185,11 +198,11 @@ def GetGpuType(vm):
       else:
         gpu_types.append(splitted[2])
   except:
-    raise NvidiaSmiParseOutputError('Unable to parse gpu type from {}'
-                                    .format(stdout))
+    raise NvidiaSmiParseOutputError(
+        'Unable to parse gpu type from {}'.format(stdout)
+    )
   if any(gpu_type != gpu_types[0] for gpu_type in gpu_types):
-    raise HeterogeneousGpuTypesError(
-        'PKB only supports one type of gpu per VM')
+    raise HeterogeneousGpuTypesError('PKB only supports one type of gpu per VM')
 
   if 'K80' in gpu_types[0]:
     return NVIDIA_TESLA_K80
@@ -211,7 +224,8 @@ def GetGpuType(vm):
     return NVIDIA_H100
   else:
     raise UnsupportedClockSpeedError(
-        'Gpu type {0} is not supported by PKB'.format(gpu_types[0]))
+        'Gpu type {0} is not supported by PKB'.format(gpu_types[0])
+    )
 
 
 def GetGpuMem(vm: virtual_machine.BaseVirtualMachine) -> int:
@@ -224,7 +238,8 @@ def GetGpuMem(vm: virtual_machine.BaseVirtualMachine) -> int:
     Integer indicating the NVIDIA GPU memory on the vm.
   """
   stdout, _ = vm.RemoteCommand(
-      'sudo nvidia-smi --query-gpu=memory.total --id=0 --format=csv')
+      'sudo nvidia-smi --query-gpu=memory.total --id=0 --format=csv'
+  )
   return regex_util.ExtractInt(r'(\d+) MiB', stdout.split('\n')[1])
 
 
@@ -237,8 +252,9 @@ def QueryNumberOfGpus(vm):
   Returns:
     Integer indicating the number of NVIDIA GPUs present on the vm.
   """
-  stdout, _ = vm.RemoteCommand('sudo nvidia-smi --query-gpu=count --id=0 '
-                               '--format=csv')
+  stdout, _ = vm.RemoteCommand(
+      'sudo nvidia-smi --query-gpu=count --id=0 --format=csv'
+  )
   return int(stdout.split()[1])
 
 
@@ -271,10 +287,12 @@ def GetPeerToPeerTopology(vm):
 
   # Delimit each GPU result with semicolons,
   # and simplify the result character set to 'Y' and 'N'.
-  return (';'.join(results)
-          .replace('X', 'Y')    # replace X (self) with Y
-          .replace('OK', 'Y')   # replace OK with Y
-          .replace('NS', 'N'))  # replace NS (not supported) with N
+  return (
+      ';'.join(results)
+      .replace('X', 'Y')  # replace X (self) with Y
+      .replace('OK', 'Y')  # replace OK with Y
+      .replace('NS', 'N')
+  )  # replace NS (not supported) with N
 
 
 def SetAndConfirmGpuClocks(vm):
@@ -302,11 +320,15 @@ def SetAndConfirmGpuClocks(vm):
   SetAutoboostDefaultPolicy(vm, autoboost_enabled)
   num_gpus = QueryNumberOfGpus(vm)
   for i in range(num_gpus):
-    if QueryGpuClockSpeed(vm, i) != (desired_memory_clock,
-                                     desired_graphics_clock):
+    if QueryGpuClockSpeed(vm, i) != (
+        desired_memory_clock,
+        desired_graphics_clock,
+    ):
       raise UnsupportedClockSpeedError(
           'Unrecoverable error setting GPU #{} clock speed to {},{}'.format(
-              i, desired_memory_clock, desired_graphics_clock))
+              i, desired_memory_clock, desired_graphics_clock
+          )
+      )
 
 
 def SetGpuClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
@@ -321,11 +343,11 @@ def SetGpuClockSpeed(vm, memory_clock_speed, graphics_clock_speed):
   for device_id in range(num_gpus):
     current_clock_speeds = QueryGpuClockSpeed(vm, device_id)
     if current_clock_speeds != (memory_clock_speed, graphics_clock_speed):
-      vm.RemoteCommand('sudo nvidia-smi -ac {},{} --id={}'.format(
-          memory_clock_speed,
-          graphics_clock_speed,
-          device_id
-      ))
+      vm.RemoteCommand(
+          'sudo nvidia-smi -ac {},{} --id={}'.format(
+              memory_clock_speed, graphics_clock_speed, device_id
+          )
+      )
 
 
 def QueryGpuClockSpeed(vm, device_id):
@@ -340,13 +362,15 @@ def QueryGpuClockSpeed(vm, device_id):
   Returns:
     Tuple of clock speeds in MHz in the form (memory clock, graphics clock).
   """
-  query = ('sudo nvidia-smi --query-gpu=clocks.applications.memory,'
-           'clocks.applications.graphics --format=csv --id={0}'
-           .format(device_id))
+  query = (
+      'sudo nvidia-smi --query-gpu=clocks.applications.memory,'
+      'clocks.applications.graphics --format=csv --id={0}'.format(device_id)
+  )
   stdout, _ = vm.RemoteCommand(query)
   clock_speeds = stdout.splitlines()[1]
-  matches = regex_util.ExtractAllMatches(EXTRACT_CLOCK_SPEEDS_REGEX,
-                                         clock_speeds)[0]
+  matches = regex_util.ExtractAllMatches(
+      EXTRACT_CLOCK_SPEEDS_REGEX, clock_speeds
+  )[0]
   return (matches[0], matches[1])
 
 
@@ -375,8 +399,11 @@ def SetAutoboostDefaultPolicy(vm, autoboost_enabled):
   for device_id in range(num_gpus):
     current_state = QueryAutoboostPolicy(vm, device_id)
     if current_state['autoboost_default'] != autoboost_enabled:
-      vm.RemoteCommand('sudo nvidia-smi --auto-boost-default={0} --id={1}'
-                       .format(1 if autoboost_enabled else 0, device_id))
+      vm.RemoteCommand(
+          'sudo nvidia-smi --auto-boost-default={0} --id={1}'.format(
+              1 if autoboost_enabled else 0, device_id
+          )
+      )
 
 
 def QueryAutoboostPolicy(vm, device_id):
@@ -408,13 +435,14 @@ def QueryAutoboostPolicy(vm, device_id):
   }
 
   if (autoboost_match is None) or (autoboost_default_match is None):
-    raise NvidiaSmiParseOutputError('Unable to parse Auto Boost policy from {}'
-                                    .format(stdout))
+    raise NvidiaSmiParseOutputError(
+        'Unable to parse Auto Boost policy from {}'.format(stdout)
+    )
   return {
-      'autoboost': nvidia_smi_output_string_to_value[
-          autoboost_match.group(1)],
+      'autoboost': nvidia_smi_output_string_to_value[autoboost_match.group(1)],
       'autoboost_default': nvidia_smi_output_string_to_value[
-          autoboost_default_match.group(1)]
+          autoboost_default_match.group(1)
+      ],
   }
 
 

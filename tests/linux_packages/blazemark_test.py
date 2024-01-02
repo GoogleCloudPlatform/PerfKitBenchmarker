@@ -21,7 +21,6 @@ from perfkitbenchmarker.linux_packages import blazemark
 
 
 class BlazemarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
-
   maxDiff = None
 
   def setUp(self):

@@ -32,9 +32,7 @@ def RouteTable(cidr_block):
   return {
       'RouteTables': [{
           'RouteTableId': ROUTE_ID,
-          'Routes': [{
-              'DestinationCidrBlock': cidr_block
-          }]
+          'Routes': [{'DestinationCidrBlock': cidr_block}],
       }]
   }
 
@@ -47,26 +45,23 @@ QUERY_ROUTE_NO_DEFAULT = ('describe-route-tables', RouteTable('192.168.0.0/16'))
 QUERY_ROUTE_HAS_DEFAULT = ('describe-route-tables', RouteTable('0.0.0.0/0'))
 CREATE_ROUTE = ('create-route', {})
 GATEWAY_ID = 'igw-1234'
-DESCRIBE_SECURITY_GROUPS_ONLY_DEFAULT = ('describe-security-groups', {
-    'SecurityGroups': [{
-        'GroupId': SG_DEFAULT
-    }]
-})
+DESCRIBE_SECURITY_GROUPS_ONLY_DEFAULT = (
+    'describe-security-groups',
+    {'SecurityGroups': [{'GroupId': SG_DEFAULT}]},
+)
 VPC_QUERY_NONE = ('describe-vpcs', {'Vpcs': []})
 VPC_QUERY_ONE = ('describe-vpcs', {'Vpcs': [{'VpcId': VPC_ID}]})
 VPC_CREATE = ('create-vpc', {'Vpc': {'VpcId': VPC_ID}})
 MODIFY_VPC = ('modify-vpc-attribute', {})
-CREATE_GATEWAY = ('create-internet-gateway', {
-    'InternetGateway': {
-        'InternetGatewayId': GATEWAY_ID
-    }
-})
+CREATE_GATEWAY = (
+    'create-internet-gateway',
+    {'InternetGateway': {'InternetGatewayId': GATEWAY_ID}},
+)
 GATEWAY_QUERY_NONE = ('describe-internet-gateways', {'InternetGateways': []})
-GATEWAY_QUERY_ONE = ('describe-internet-gateways', {
-    'InternetGateways': [{
-        'InternetGatewayId': GATEWAY_ID
-    }]
-})
+GATEWAY_QUERY_ONE = (
+    'describe-internet-gateways',
+    {'InternetGateways': [{'InternetGatewayId': GATEWAY_ID}]},
+)
 ATTACH_GATEWAY = ('attach-internet-gateway', {})
 DETACH_GATEWAY = ('detach-internet-gateway', {})
 
@@ -93,15 +88,16 @@ def AwsFilter(name, value):
 
 
 class BaseAwsTest(pkb_common_test_case.PkbCommonTestCase):
-
   expected_commands: List[str]
 
   def setUp(self):
     super(BaseAwsTest, self).setUp()
     self.mock_aws = self.enter_context(
-        mock.patch.object(vm_util, 'IssueCommand'))
+        mock.patch.object(vm_util, 'IssueCommand')
+    )
     self.mock_tags = self.enter_context(
-        mock.patch.object(util, 'AddDefaultTags'))
+        mock.patch.object(util, 'AddDefaultTags')
+    )
 
   def SetExpectedCommands(self, *commands):
     self.mock_aws.reset_mock()
@@ -109,11 +105,13 @@ class BaseAwsTest(pkb_common_test_case.PkbCommonTestCase):
     self.expected_commands = [command for command, _ in commands]
 
   def assertCommandsCalled(self):
-    for expected_call, found_call in zip(self.expected_commands,
-                                         self.mock_aws.call_args_list):
+    for expected_call, found_call in zip(
+        self.expected_commands, self.mock_aws.call_args_list
+    ):
       self.assertEqual(expected_call, FindAwsCommand(found_call[0][0]))
     self.assertEqual(
-        len(self.expected_commands), len(self.mock_aws.call_args_list))
+        len(self.expected_commands), len(self.mock_aws.call_args_list)
+    )
 
   def assertLastCommandContains(self, want_phrase):
     self.assertIn(want_phrase, ' '.join(self.mock_aws.call_args[0][0]))
@@ -144,8 +142,12 @@ class AwsVpcTableTest(BaseAwsTest):
     self.assertCommandsCalled()
 
   def testCreate(self):
-    self.SetExpectedCommands(VPC_CREATE, MODIFY_VPC, VPC_QUERY_ONE,
-                             DESCRIBE_SECURITY_GROUPS_ONLY_DEFAULT)
+    self.SetExpectedCommands(
+        VPC_CREATE,
+        MODIFY_VPC,
+        VPC_QUERY_ONE,
+        DESCRIBE_SECURITY_GROUPS_ONLY_DEFAULT,
+    )
     vpc = aws_network.AwsVpc(REGION)
     vpc.Create()
     self.assertEqual(VPC_ID, vpc.id)
@@ -181,8 +183,9 @@ class AwsRouteTableTest(BaseAwsTest):
 
   def testCreateRouteNoDefault(self):
     # 'create-route' is executed
-    self.SetExpectedCommands(QUERY_ROUTE_NO_DEFAULT, QUERY_ROUTE_NO_DEFAULT,
-                             CREATE_ROUTE)
+    self.SetExpectedCommands(
+        QUERY_ROUTE_NO_DEFAULT, QUERY_ROUTE_NO_DEFAULT, CREATE_ROUTE
+    )
     self.route.Create()
     self.route.CreateRoute(GATEWAY_ID)
     self.assertCommandsCalled()

@@ -40,7 +40,8 @@ flags.DEFINE_integer(
     'Number of partition placement groups. Only used if'
     '--placement_group_style=partition.',
     lower_bound=2,
-    upper_bound=7)
+    upper_bound=7,
+)
 
 
 class AwsPlacementGroupSpec(placement_group.BasePlacementGroupSpec):
@@ -63,13 +64,16 @@ class AwsPlacementGroupSpec(placement_group.BasePlacementGroupSpec):
     """
     result = super(AwsPlacementGroupSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'placement_group_style': (option_decoders.EnumDecoder, {
-            'valid_values':
-                set([CLUSTER, SPREAD, PARTITION] +
-                    list(placement_group.PLACEMENT_GROUP_OPTIONS)),
-            'default':
-                CLUSTER,
-        })
+        'placement_group_style': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': set(
+                    [CLUSTER, SPREAD, PARTITION]
+                    + list(placement_group.PLACEMENT_GROUP_OPTIONS)
+                ),
+                'default': CLUSTER,
+            },
+        )
     })
     return result
 
@@ -83,12 +87,11 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
     """Init method for AwsPlacementGroup.
 
     Args:
-      aws_placement_group_spec: Object containing the
-        information needed to create an AwsPlacementGroup.
+      aws_placement_group_spec: Object containing the information needed to
+        create an AwsPlacementGroup.
     """
     super(AwsPlacementGroup, self).__init__(aws_placement_group_spec)
-    self.name = (
-        'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:]))
+    self.name = 'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:])
     self.region = util.GetRegionFromZone(self.zone)
     self.strategy = aws_placement_group_spec.placement_group_style
     # Already checked for compatibility in aws_network.py
@@ -100,8 +103,9 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
 
   def _Create(self):
     """Creates the Placement Group."""
-    formatted_tags = util.FormatTagSpecifications('placement-group',
-                                                  util.MakeDefaultTags())
+    formatted_tags = util.FormatTagSpecifications(
+        'placement-group', util.MakeDefaultTags()
+    )
 
     create_cmd = util.AWS_PREFIX + [
         'ec2',
@@ -109,7 +113,7 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
         '--region=%s' % self.region,
         '--group-name=%s' % self.name,
         '--strategy=%s' % self.strategy,
-        '--tag-specifications=%s' % formatted_tags
+        '--tag-specifications=%s' % formatted_tags,
     ]
 
     if self.partition_count:
@@ -123,7 +127,8 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
         'ec2',
         'delete-placement-group',
         '--region=%s' % self.region,
-        '--group-name=%s' % self.name]
+        '--group-name=%s' % self.name,
+    ]
     # Failed deletes are ignorable (probably already deleted).
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
@@ -133,7 +138,8 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
         'ec2',
         'describe-placement-groups',
         '--region=%s' % self.region,
-        '--filter=Name=group-name,Values=%s' % self.name]
+        '--filter=Name=group-name,Values=%s' % self.name,
+    ]
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     placement_groups = response['PlacementGroups']

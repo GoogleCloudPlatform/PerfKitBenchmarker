@@ -18,7 +18,6 @@ import os
 import unittest
 
 import mock
-
 from perfkitbenchmarker.linux_benchmarks import glibc_benchmark
 from perfkitbenchmarker.linux_packages import glibc
 
@@ -46,16 +45,14 @@ class GlibcTestCase(unittest.TestCase):
     """Read sample outputs of glibc_benchmark and call ParseOutput function.
 
     Args:
-      filename: The name of the sample output file
-      required to run the benchmark.
+      filename: The name of the sample output file required to run the
+        benchmark.
       upper_key: The first dimension key of the glibc_output dict.
-      results:
-        A list to which the ParseOutput function will append new samples based
-        on the glibc output.
+      results: A list to which the ParseOutput function will append new samples
+        based on the glibc output.
       metadata: Common metadata to attach to samples.
     """
-    path = os.path.join(os.path.dirname(__file__), '../data',
-                        filename)
+    path = os.path.join(os.path.dirname(__file__), '../data', filename)
     with open(path) as fp:
       self.contents = fp.read()
     glibc_benchmark.ParseOutput(self.contents, upper_key, results, metadata)
@@ -71,13 +68,14 @@ class GlibcTestCase(unittest.TestCase):
     results = []
     upper_key = 'functions'
 
-    self.CallParseOutput(
-        'glibc_bench_output.txt', upper_key, results, metadata)
+    self.CallParseOutput('glibc_bench_output.txt', upper_key, results, metadata)
     for sample in results:
       result_metadata = sample.metadata
       self.assertEqual(result_metadata['gcc'], _TEST_GCC_VERSION)
-      self.assertEqual(result_metadata['glibc_benchset'],
-                       glibc_benchmark.glibc_default_benchset)
+      self.assertEqual(
+          result_metadata['glibc_benchset'],
+          glibc_benchmark.glibc_default_benchset,
+      )
       self.assertEqual(result_metadata['glibc_version'], glibc.GLIBC_VERSION)
       self.assertEqual(result_metadata['num_machines'], _TEST_NUM_VMS)
 
@@ -85,15 +83,14 @@ class GlibcTestCase(unittest.TestCase):
     results = []
     upper_key = 'functions'
 
-    self.CallParseOutput(
-        'glibc_bench_output.txt', upper_key, results, {})
+    self.CallParseOutput('glibc_bench_output.txt', upper_key, results, {})
 
     result = {i.metric: i.metadata for i in results}
     metadata = result['pthread_once:']
 
     self.assertEqual(63, len(results))
-    self.assertAlmostEqual(1.72198e+10, metadata['duration'])
-    self.assertAlmostEqual(3.20756e+09, metadata['iterations'])
+    self.assertAlmostEqual(1.72198e10, metadata['duration'])
+    self.assertAlmostEqual(3.20756e09, metadata['iterations'])
     self.assertAlmostEqual(9626.89, metadata['max'])
     self.assertAlmostEqual(5.198, metadata['min'])
     self.assertAlmostEqual(5.3685, metadata['mean'])
@@ -102,14 +99,13 @@ class GlibcTestCase(unittest.TestCase):
     results = []
     upper_key = 'math-inlines'
 
-    self.CallParseOutput(
-        'glibc_benchset_output.txt', upper_key, results, {})
+    self.CallParseOutput('glibc_benchset_output.txt', upper_key, results, {})
 
     result = {i.metric: i.metadata for i in results}
     metadata = result['__isnan:inf/nan']
 
     self.assertEqual(42, len(results))
-    self.assertAlmostEqual(8.42329e+06, metadata['duration'])
+    self.assertAlmostEqual(8.42329e06, metadata['duration'])
     self.assertAlmostEqual(500, metadata['iterations'])
     self.assertAlmostEqual(16846, metadata['mean'])
 
@@ -117,16 +113,15 @@ class GlibcTestCase(unittest.TestCase):
     results = []
     upper_key = 'functions'
 
-    self.CallParseOutput(
-        'glibc_malloc_output.txt', upper_key, results, {})
+    self.CallParseOutput('glibc_malloc_output.txt', upper_key, results, {})
 
     metadata = results[0].metadata
     metric = results[0].metric
 
     self.assertEqual(1, len(results))
     self.assertEqual('malloc:', metric)
-    self.assertAlmostEqual(1.2e+11, metadata['duration'])
-    self.assertAlmostEqual(2.82979e+09, metadata['iterations'])
+    self.assertAlmostEqual(1.2e11, metadata['duration'])
+    self.assertAlmostEqual(2.82979e09, metadata['iterations'])
     self.assertAlmostEqual(42.406, metadata['time_per_iteration'])
     self.assertAlmostEqual(1800, metadata['max_rss'])
     self.assertAlmostEqual(1, metadata['threads'])

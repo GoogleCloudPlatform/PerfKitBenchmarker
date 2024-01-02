@@ -58,12 +58,16 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     self.cleanup_mock = self.PatchPkbFunction('DoCleanupPhase')
     self.teardown_mock = self.PatchPkbFunction('DoTeardownPhase')
     self.publish_failed_run_sample_mock = self.PatchPkbFunction(
-        'PublishFailedRunSample')
+        'PublishFailedRunSample'
+    )
 
     self.flags_mock.skip_pending_runs_file = None
     self.flags_mock.run_stage = [
-        stages.PROVISION, stages.PREPARE, stages.RUN, stages.CLEANUP,
-        stages.TEARDOWN
+        stages.PROVISION,
+        stages.PREPARE,
+        stages.RUN,
+        stages.CLEANUP,
+        stages.TEARDOWN,
     ]
 
     self.spec = mock.MagicMock()
@@ -76,7 +80,8 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
     self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.publish_failed_run_sample_mock.assert_called_once_with(
-        self.spec, error_msg, stages.PROVISION, self.collector)
+        self.spec, error_msg, stages.PROVISION, self.collector
+    )
 
   def testCreatePrepareFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
@@ -85,7 +90,8 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
     self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.publish_failed_run_sample_mock.assert_called_once_with(
-        self.spec, error_msg, stages.PREPARE, self.collector)
+        self.spec, error_msg, stages.PREPARE, self.collector
+    )
 
   def testCreateRunFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
@@ -94,7 +100,8 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
     self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.publish_failed_run_sample_mock.assert_called_once_with(
-        self.spec, error_msg, stages.RUN, self.collector)
+        self.spec, error_msg, stages.RUN, self.collector
+    )
 
   def testCreateCleanupFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
@@ -103,7 +110,8 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
     self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.publish_failed_run_sample_mock.assert_called_once_with(
-        self.spec, error_msg, stages.CLEANUP, self.collector)
+        self.spec, error_msg, stages.CLEANUP, self.collector
+    )
 
   def testCreateTeardownFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
@@ -112,7 +120,8 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
 
     self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
     self.publish_failed_run_sample_mock.assert_called_once_with(
-        self.spec, error_msg, stages.TEARDOWN, self.collector)
+        self.spec, error_msg, stages.TEARDOWN, self.collector
+    )
 
   def testDontCreateFailedRunSample(self):
     self.flags_mock.create_failed_run_samples = False
@@ -127,16 +136,21 @@ class TestPublishStageStartedSamples(unittest.TestCase):
   def setUp(self):
     super().setUp()
     self.addCleanup(mock.patch.stopall)
-    self.collector = mock.patch.object(
-        publisher, 'SampleCollector', autospec=True).start().return_value
+    self.collector = (
+        mock.patch.object(publisher, 'SampleCollector', autospec=True)
+        .start()
+        .return_value
+    )
     self.benchmark_spec = mock.create_autospec(
-        'perfkitbenchmarker.benchmark_spec.BenchmarkSpec', instance=True)
+        'perfkitbenchmarker.benchmark_spec.BenchmarkSpec', instance=True
+    )
     self.benchmark_spec.name = 'fake_benchmark'
 
   @mock.patch('time.time', return_value=123.45)
   def testProvisionStageDefault(self, _):
     pkb._PublishStageStartedSamples(
-        stages.PROVISION, benchmark_spec=self.benchmark_spec)
+        stages.PROVISION, benchmark_spec=self.benchmark_spec
+    )
     self.collector.PublishSamples.assert_not_called()
 
   @flagsaver.flagsaver(create_started_run_sample=True)
@@ -144,14 +158,19 @@ class TestPublishStageStartedSamples(unittest.TestCase):
   @mock.patch('time.time', return_value=123.45)
   def testProvisionStageFlags(self, _):
     pkb._PublishStageStartedSamples(
-        stages.PROVISION, benchmark_spec=self.benchmark_spec)
+        stages.PROVISION, benchmark_spec=self.benchmark_spec
+    )
     self.collector.AddSamples.assert_has_calls([
         mock.call(
             [sample.Sample('Run Started', 123.45, 'seconds', {'flags': '{}'})],
-            'fake_benchmark', self.benchmark_spec),
+            'fake_benchmark',
+            self.benchmark_spec,
+        ),
         mock.call(
             [sample.Sample('Provision Stage Started', 123.45, 'seconds', {})],
-            'fake_benchmark', self.benchmark_spec)
+            'fake_benchmark',
+            self.benchmark_spec,
+        ),
     ])
     self.collector.PublishSamples.assert_called()
 
@@ -166,13 +185,19 @@ class TestPublishFailedRunSample(unittest.TestCase):
     spec.vms = []
     spec.failed_substatus = None
     pkb.PublishFailedRunSample(
-        spec, error_msg, stages.PROVISION, collector=mock.Mock())
+        spec, error_msg, stages.PROVISION, collector=mock.Mock()
+    )
 
-    sample_mock.assert_called_once_with('Run Failed', 123.45, 'seconds', {
-        'error_message': error_msg,
-        'run_stage': stages.PROVISION,
-        'flags': '{}'
-    })
+    sample_mock.assert_called_once_with(
+        'Run Failed',
+        123.45,
+        'seconds',
+        {
+            'error_message': error_msg,
+            'run_stage': stages.PROVISION,
+            'flags': '{}',
+        },
+    )
 
   @mock.patch('time.time', return_value=123.45)
   @mock.patch('perfkitbenchmarker.sample.Sample')
@@ -184,19 +209,25 @@ class TestPublishFailedRunSample(unittest.TestCase):
     pkb.FLAGS.failed_run_samples_error_length = 7
 
     pkb.PublishFailedRunSample(
-        spec, error_msg, stages.PROVISION, collector=mock.Mock())
+        spec, error_msg, stages.PROVISION, collector=mock.Mock()
+    )
 
-    sample_mock.assert_called_once_with('Run Failed', 123.45, 'seconds', {
-        'error_message': 'This is',
-        'run_stage': stages.PROVISION,
-        'flags': '{}',
-        'failed_substatus': 'QuotaExceeded'
-    })
+    sample_mock.assert_called_once_with(
+        'Run Failed',
+        123.45,
+        'seconds',
+        {
+            'error_message': 'This is',
+            'run_stage': stages.PROVISION,
+            'flags': '{}',
+            'failed_substatus': 'QuotaExceeded',
+        },
+    )
 
 
-class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase,
-                        test_util.SamplesTestMixin):
-
+class TestMiscFunctions(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
   """Testing for various functions in pkb.py."""
 
   def _MockVm(
@@ -210,8 +241,8 @@ class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase,
     return vm
 
   def _MockVmWithVuln(
-      self, name: str,
-      cpu_vuln: linux_virtual_machine.CpuVulnerabilities) -> mock.Mock:
+      self, name: str, cpu_vuln: linux_virtual_machine.CpuVulnerabilities
+  ) -> mock.Mock:
     vm = mock.Mock(OS_TYPE='debian9')
     vm.name = name
     type(vm).cpu_vulnerabilities = mock.PropertyMock(return_value=cpu_vuln)
@@ -328,14 +359,14 @@ class TestMiscFunctions(pkb_common_test_case.PkbCommonTestCase,
     self.assertTrue(pkb._IsException(e, errors.Resource.CreationInternalError))
 
   def test_IsException_substring(self):
-
     def RaiseCreationInternalError(unused):
       raise errors.Resource.CreationInternalError('internal error')
 
     with self.assertRaises(errors.VmUtil.ThreadException) as cm:
       background_tasks.RunThreaded(RaiseCreationInternalError, [None])
     self.assertTrue(
-        pkb._IsException(cm.exception, errors.Resource.CreationInternalError))
+        pkb._IsException(cm.exception, errors.Resource.CreationInternalError)
+    )
 
   def test_IsException_false(self):
     e = errors.Resource.CreationInternalError('internal error')
@@ -350,7 +381,9 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
             providers,
             'LoadProviderUtils',
             autospec=True,
-            return_value=utils_module))
+            return_value=utils_module,
+        )
+    )
 
   def _MockGcpUtils(self, function_name, return_value=None, side_effect=None):
     return self.enter_context(
@@ -359,7 +392,9 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
             function_name,
             autospec=True,
             return_value=return_value,
-            side_effect=side_effect))
+            side_effect=side_effect,
+        )
+    )
 
   @flagsaver.flagsaver(retries=3)
   def testRunRetries(self):
@@ -369,7 +404,9 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             pkb,
             'DoProvisionPhase',
-            side_effect=errors.Benchmarks.QuotaFailure()))
+            side_effect=errors.Benchmarks.QuotaFailure(),
+        )
+    )
 
     benchmark_specs, _ = pkb.RunBenchmarkTask(spec=test_spec)
 
@@ -398,20 +435,20 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
           'expected_retry': False,
       },
       {
-          'testcase_name':
-              'FailedSubstatusIncluded',
-          'status':
-              benchmark_status.FAILED,
-          'failed_substatus':
-              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY,
-          'retry_substatuses':
-              [benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY],
-          'expected_retry':
-              True,
+          'testcase_name': 'FailedSubstatusIncluded',
+          'status': benchmark_status.FAILED,
+          'failed_substatus': (
+              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
+          ),
+          'retry_substatuses': [
+              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
+          ],
+          'expected_retry': True,
       },
   )
-  def testShouldRetry(self, status, failed_substatus, retry_substatuses,
-                      expected_retry):
+  def testShouldRetry(
+      self, status, failed_substatus, retry_substatuses, expected_retry
+  ):
     test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
     test_spec.status = status
     test_spec.failed_substatus = failed_substatus
@@ -432,7 +469,8 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
           'expected_run_count': 3,
           'expected_quota_retry_calls': 1,
           'expected_capacity_retry_calls': 1,
-      }, {
+      },
+      {
           'testcase_name': 'Default',
           'quota_flag_value': False,
           'capacity_flag_value': False,
@@ -445,12 +483,19 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
           'expected_run_count': 3,
           'expected_quota_retry_calls': 0,
           'expected_capacity_retry_calls': 0,
-      })
+      },
+  )
   @flagsaver.flagsaver
-  def testRunBenchmarkTask(self, quota_flag_value, capacity_flag_value,
-                           retry_count, run_results, expected_run_count,
-                           expected_quota_retry_calls,
-                           expected_capacity_retry_calls):
+  def testRunBenchmarkTask(
+      self,
+      quota_flag_value,
+      capacity_flag_value,
+      retry_count,
+      run_results,
+      expected_run_count,
+      expected_quota_retry_calls,
+      expected_capacity_retry_calls,
+  ):
     FLAGS.zones = ['test_zone']
     FLAGS.cloud = 'GCP'
     FLAGS.retries = retry_count
@@ -459,12 +504,15 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
     # Generate some exceptions for each run.
     self.enter_context(
-        mock.patch.object(pkb, 'DoProvisionPhase', side_effect=run_results))
+        mock.patch.object(pkb, 'DoProvisionPhase', side_effect=run_results)
+    )
     # Mock the retry options.
     mock_quota_retry = self.enter_context(
-        mock.patch.object(pkb.ZoneRetryManager, '_AssignZoneToNewRegion'))
+        mock.patch.object(pkb.ZoneRetryManager, '_AssignZoneToNewRegion')
+    )
     mock_capacity_retry = self.enter_context(
-        mock.patch.object(pkb.ZoneRetryManager, '_AssignZoneToSameRegion'))
+        mock.patch.object(pkb.ZoneRetryManager, '_AssignZoneToSameRegion')
+    )
     self._MockGcpUtils('GetZonesFromMachineType', return_value=set())
 
     benchmark_specs, _ = pkb.RunBenchmarkTask(spec=test_spec)
@@ -472,8 +520,9 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(len(benchmark_specs), expected_run_count)
     # Retry preparation functions should have the right calls.
     self.assertEqual(mock_quota_retry.call_count, expected_quota_retry_calls)
-    self.assertEqual(mock_capacity_retry.call_count,
-                     expected_capacity_retry_calls)
+    self.assertEqual(
+        mock_capacity_retry.call_count, expected_capacity_retry_calls
+    )
 
   @parameterized.named_parameters(
       ('1', False, False, ['test_zone_1'], ['test_zone_2'], 1, True),
@@ -484,9 +533,15 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
       ('6', True, False, ['test_zone_1', 'test_zone_2'], [], 1, False),
       ('7', True, True, ['test_zone_2'], [], 0, False),
   )
-  def testValidateSmartZoneRetryFlags(self, smart_quota_retry,
-                                      smart_capacity_retry, zone, zones,
-                                      retries, is_valid):
+  def testValidateSmartZoneRetryFlags(
+      self,
+      smart_quota_retry,
+      smart_capacity_retry,
+      zone,
+      zones,
+      retries,
+      is_valid,
+  ):
     flags_dict = {
         'retries': retries,
         'smart_quota_retry': smart_quota_retry,
@@ -518,7 +573,8 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
     self._MockGcpUtils('GetRegionsInGeo', return_value={'region_1', 'region_2'})
     # Expect that region_1 is skipped when getting zones.
     mock_get_zones = self._MockGcpUtils(
-        'GetZonesInRegion', return_value={'zone_2'})
+        'GetZonesInRegion', return_value={'zone_2'}
+    )
 
     test_retry_manager = pkb.ZoneRetryManager(test_machine_type)
     test_retry_manager.HandleSmartRetries(test_spec)
@@ -534,13 +590,15 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
   def testSmartCapacityRetry(self):
     test_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
     test_spec.failed_substatus = (
-        benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY)
+        benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
+    )
     self._MockLoadProviderUtils(gcp_utils)
     self._MockGcpUtils('GetRegionFromZone')
     # Expect that the correct possible zones are passed to the function below.
     self._MockGcpUtils('GetZonesInRegion', return_value={'zone_1', 'zone_2'})
     self._MockGcpUtils(
-        'GetZonesFromMachineType', return_value={'zone_1', 'zone_2'})
+        'GetZonesFromMachineType', return_value={'zone_1', 'zone_2'}
+    )
 
     test_retry_manager = pkb.ZoneRetryManager(test_machine_type)
     test_retry_manager.HandleSmartRetries(test_spec)
@@ -576,15 +634,16 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
   def testSpecPickledEvenWithException(self):
     # Make provision have an exception.
     self.enter_context(
-        mock.patch.object(pkb, 'DoProvisionPhase', side_effect=Exception()))
+        mock.patch.object(pkb, 'DoProvisionPhase', side_effect=Exception())
+    )
     # Make benchmark_spec avoid pickling for test.
-    test_benchmark_spec = (
-        pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-            pkb_common_test_case.SIMPLE_CONFIG, 'cluster_boot'))
-    self.enter_context(
-        mock.patch.object(test_benchmark_spec, 'Pickle'))
+    test_benchmark_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        pkb_common_test_case.SIMPLE_CONFIG, 'cluster_boot'
+    )
+    self.enter_context(mock.patch.object(test_benchmark_spec, 'Pickle'))
     mock_freeze = self.enter_context(
-        mock.patch.object(test_benchmark_spec, 'Freeze'))
+        mock.patch.object(test_benchmark_spec, 'Freeze')
+    )
     collector = publisher.SampleCollector()
 
     # Run the benchmark loop.
@@ -612,9 +671,11 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
             'status': benchmark_status.SUCCEEDED,
             'flags': {
                 'freeze': 'mock_freeze_path',
-                'restore': 'mock_restore_path'
-            }
-        }) + '\n')
+                'restore': 'mock_restore_path',
+            },
+        })
+        + '\n'
+    )
 
   def testRestoreRelationalDb(self):
     test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
@@ -634,6 +695,7 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
     test_bm_spec.Delete()
 
     test_bm_spec.relational_db.Delete.assert_called_with(freeze=True)
+
 
 if __name__ == '__main__':
   unittest.main()

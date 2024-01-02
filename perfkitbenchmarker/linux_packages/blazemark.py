@@ -31,42 +31,136 @@ CONFIG = 'config'
 
 THROUGHPUT_HEADER_REGEX = (
     r'(\w+[\w\- ]+\w+)\s*(\([0-9.]+% filled\))*\s*[\[\(]'
-    '([\w/]+)[\]\)]:([0-9\s.e\-+]+)')
+    '([\w/]+)[\]\)]:([0-9\s.e\-+]+)'
+)
 THROUGHPUT_RESULT_REGEX = r'([0-9]+)\s*([0-9.e\-+]+)'
 FILLED_REGEX = r'([0-9.]+)% filled'
 
 LIBS = frozenset([
-    'C-like', 'Classic', 'Blaze', 'Boost uBLAS', 'Blitz++',
-    'GMM++', 'Armadillo', 'MTL', 'Eigen'])
+    'C-like',
+    'Classic',
+    'Blaze',
+    'Boost uBLAS',
+    'Blitz++',
+    'GMM++',
+    'Armadillo',
+    'MTL',
+    'Eigen',
+])
 
 BLAZEMARK_BINARIES = frozenset([
-    'cg', 'daxpy', 'dmatsvecmult', 'dvecdvecsub', 'mat3mat3mult',
-    'smatdmatmult', 'smattsmatadd', 'svectdvecmult', 'tdmattdmatmult',
-    'tmat3mat3mult', 'tsmatdmatmult', 'tsvecdmatmult', 'tvec6tmat6mult',
-    'complex1', 'dmatdmatadd', 'dmattdmatadd', 'dvecnorm', 'mat3tmat3mult',
-    'smatdvecmult', 'smattsmatmult', 'svectsvecmult', 'tdmattsmatadd',
-    'tmat3tmat3add', 'tsmatdvecmult', 'tsvecdvecmult', 'vec3vec3add',
-    'complex2', 'dmatdmatmult', 'dmattdmatmult', 'dvecscalarmult',
-    'mat3vec3mult', 'smatscalarmult', 'svecdvecadd', 'tdmatdmatadd',
-    'tdmattsmatmult', 'tmat3tmat3mult', 'tsmatsmatadd', 'tsvecsmatmult',
-    'vec6vec6add', 'complex3', 'dmatdmatsub', 'dmattrans', 'dvecsvecadd',
-    'mat6mat6add', 'smatsmatadd', 'svecdveccross', 'tdmatdmatmult',
-    'tdvecdmatmult', 'tmat3vec3mult', 'tsmatsmatmult', 'tsvecsvecmult',
-    'complex4', 'dmatdvecmult', 'dmattsmatadd', 'dvecsveccross', 'mat6mat6mult',
-    'smatsmatmult', 'svecdvecmult', 'tdmatdvecmult', 'tdvecdvecmult',
-    'tmat6mat6mult', 'tsmatsvecmult', 'tsvectdmatmult', 'complex5', 'dmatinv',
-    'dmattsmatmult', 'dvecsvecmult', 'mat6tmat6mult', 'smatsvecmult',
-    'svecscalarmult', 'tdmatsmatadd', 'tdvecsmatmult', 'tmat6tmat6add',
-    'tsmattdmatadd', 'tsvectsmatmult', 'complex6', 'dmatscalarmult',
-    'dvecdvecadd', 'dvectdvecmult', 'mat6vec6mult', 'smattdmatadd',
-    'svecsvecadd', 'tdmatsmatmult', 'tdvecsvecmult', 'tmat6tmat6mult',
-    'tsmattdmatmult', 'tvec3mat3mult', 'complex7', 'dmatsmatadd',
-    'dvecdveccross', 'dvectsvecmult', 'memorysweep', 'smattdmatmult',
-    'svecsveccross', 'tdmatsvecmult', 'tdvectdmatmult', 'tmat6vec6mult',
-    'tsmattsmatadd', 'tvec3tmat3mult', 'complex8', 'dmatsmatmult',
-    'dvecdvecmult', 'mat3mat3add', 'smatdmatadd', 'smattrans',
-    'svecsvecmult', 'tdmattdmatadd', 'tdvectsmatmult', 'tsmatdmatadd',
-    'tsmattsmatmult', 'tvec6mat6mult'])
+    'cg',
+    'daxpy',
+    'dmatsvecmult',
+    'dvecdvecsub',
+    'mat3mat3mult',
+    'smatdmatmult',
+    'smattsmatadd',
+    'svectdvecmult',
+    'tdmattdmatmult',
+    'tmat3mat3mult',
+    'tsmatdmatmult',
+    'tsvecdmatmult',
+    'tvec6tmat6mult',
+    'complex1',
+    'dmatdmatadd',
+    'dmattdmatadd',
+    'dvecnorm',
+    'mat3tmat3mult',
+    'smatdvecmult',
+    'smattsmatmult',
+    'svectsvecmult',
+    'tdmattsmatadd',
+    'tmat3tmat3add',
+    'tsmatdvecmult',
+    'tsvecdvecmult',
+    'vec3vec3add',
+    'complex2',
+    'dmatdmatmult',
+    'dmattdmatmult',
+    'dvecscalarmult',
+    'mat3vec3mult',
+    'smatscalarmult',
+    'svecdvecadd',
+    'tdmatdmatadd',
+    'tdmattsmatmult',
+    'tmat3tmat3mult',
+    'tsmatsmatadd',
+    'tsvecsmatmult',
+    'vec6vec6add',
+    'complex3',
+    'dmatdmatsub',
+    'dmattrans',
+    'dvecsvecadd',
+    'mat6mat6add',
+    'smatsmatadd',
+    'svecdveccross',
+    'tdmatdmatmult',
+    'tdvecdmatmult',
+    'tmat3vec3mult',
+    'tsmatsmatmult',
+    'tsvecsvecmult',
+    'complex4',
+    'dmatdvecmult',
+    'dmattsmatadd',
+    'dvecsveccross',
+    'mat6mat6mult',
+    'smatsmatmult',
+    'svecdvecmult',
+    'tdmatdvecmult',
+    'tdvecdvecmult',
+    'tmat6mat6mult',
+    'tsmatsvecmult',
+    'tsvectdmatmult',
+    'complex5',
+    'dmatinv',
+    'dmattsmatmult',
+    'dvecsvecmult',
+    'mat6tmat6mult',
+    'smatsvecmult',
+    'svecscalarmult',
+    'tdmatsmatadd',
+    'tdvecsmatmult',
+    'tmat6tmat6add',
+    'tsmattdmatadd',
+    'tsvectsmatmult',
+    'complex6',
+    'dmatscalarmult',
+    'dvecdvecadd',
+    'dvectdvecmult',
+    'mat6vec6mult',
+    'smattdmatadd',
+    'svecsvecadd',
+    'tdmatsmatmult',
+    'tdvecsvecmult',
+    'tmat6tmat6mult',
+    'tsmattdmatmult',
+    'tvec3mat3mult',
+    'complex7',
+    'dmatsmatadd',
+    'dvecdveccross',
+    'dvectsvecmult',
+    'memorysweep',
+    'smattdmatmult',
+    'svecsveccross',
+    'tdmatsvecmult',
+    'tdvectdmatmult',
+    'tmat6vec6mult',
+    'tsmattsmatadd',
+    'tvec3tmat3mult',
+    'complex8',
+    'dmatsmatmult',
+    'dvecdvecmult',
+    'mat3mat3add',
+    'smatdmatadd',
+    'smattrans',
+    'svecsvecmult',
+    'tdmattdmatadd',
+    'tdvectsmatmult',
+    'tsmatdmatadd',
+    'tsmattsmatmult',
+    'tvec6mat6mult',
+])
 
 
 def GetBinaries():
@@ -162,11 +256,14 @@ def _ParseResult(out, test):
     unit = m[-2]
     for v in regex_util.ExtractAllMatches(THROUGHPUT_RESULT_REGEX, m[-1]):
       metadata['N'] = int(v[0])
-      results.append(sample.Sample(
-          '_'.join([test, lib, 'Throughput']),  # Metric name
-          float(v[1]),  # Value
-          unit,  # Unit
-          copy.deepcopy(metadata)))  # Metadata
+      results.append(
+          sample.Sample(
+              '_'.join([test, lib, 'Throughput']),  # Metric name
+              float(v[1]),  # Value
+              unit,  # Unit
+              copy.deepcopy(metadata),
+          )
+      )  # Metadata
   logging.info('Results for %s:\n %s', test, results)
   return results
 
@@ -183,8 +280,9 @@ def RunTest(vm, test):
     metadata).
   """
   out, _ = vm.RemoteCommand(
-      'cd %s; export BLAZE_NUM_THREADS=%s; ./%s -only-blaze' % (
-          os.path.join(BLAZEMARK_DIR, 'bin'), vm.NumCpusForBenchmark(), test))
+      'cd %s; export BLAZE_NUM_THREADS=%s; ./%s -only-blaze'
+      % (os.path.join(BLAZEMARK_DIR, 'bin'), vm.NumCpusForBenchmark(), test)
+  )
   ret = []
   try:
     ret = _ParseResult(out, test)
@@ -198,16 +296,22 @@ def _Configure(vm):
   vm.RenderTemplate(
       data.ResourcePath(CONFIG_TEMPLATE),
       os.path.join(BLAZEMARK_DIR, CONFIG),
-      {'compiler': '"g++-5"',
-       'compiler_flags': (
-           '"-Wall -Wextra -Werror -Wshadow -Woverloaded-virtual -ansi -O3 '
-           '-mavx -DNDEBUG -fpermissive -ansi -O3 -DNDEBUG '
-           '-DBLAZE_USE_BOOST_THREADS --std=c++14"'),
-       'lapack_path': '"/tmp/pkb/lapack-3.6.1/lib"',
-       'lapack_libs': '"-llapack -lblas -L%s -lgfortran"'
-       % os.path.dirname(fortran.GetLibPath(vm))})
-  vm.RemoteCommand('cd %s; ./configure %s; make -j %s' % (
-      BLAZEMARK_DIR, CONFIG, vm.num_cpus))
+      {
+          'compiler': '"g++-5"',
+          'compiler_flags': (
+              '"-Wall -Wextra -Werror -Wshadow -Woverloaded-virtual -ansi -O3 '
+              '-mavx -DNDEBUG -fpermissive -ansi -O3 -DNDEBUG '
+              '-DBLAZE_USE_BOOST_THREADS --std=c++14"'
+          ),
+          'lapack_path': '"/tmp/pkb/lapack-3.6.1/lib"',
+          'lapack_libs': '"-llapack -lblas -L%s -lgfortran"' % os.path.dirname(
+              fortran.GetLibPath(vm)
+          ),
+      },
+  )
+  vm.RemoteCommand(
+      'cd %s; ./configure %s; make -j %s' % (BLAZEMARK_DIR, CONFIG, vm.num_cpus)
+  )
 
 
 def _Install(vm):
