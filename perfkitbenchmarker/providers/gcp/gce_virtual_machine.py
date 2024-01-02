@@ -1114,9 +1114,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self, disk_spec, disk_count
     )
 
-    # This method will be depreciate soon.
-    if disk_spec.disk_type == disk.LOCAL and disk_count is None:
-      disk_count = self.max_local_disks
+    # This method will be deprecate soon.
     self.disk_specs = [copy.copy(disk_spec) for _ in range(disk_count)]
     # In the event that we need to create multiple disks from the same
     # DiskSpec, we need to ensure that they have different mount points.
