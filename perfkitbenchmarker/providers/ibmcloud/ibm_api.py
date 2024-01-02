@@ -80,15 +80,15 @@ class IbmAPICommand(object):
     boot_encryption_key: boot encryption key for account.
   """
 
-  gen = None
-  gen_instmgr = None
-  gen_imgmgr = None
-  gen_keymgr = None
-  gen_subnetmgr = None
-  gen_fipmgr = None
-  gen_volumemgr = None
-  gen_vpcmgr = None
-  gen_sgmgr = None
+  gen: ibmcloud_manager.IbmCloud = None
+  gen_instmgr: ibmcloud_manager.InstanceManager
+  gen_imgmgr: ibmcloud_manager.ImageManager
+  gen_keymgr: ibmcloud_manager.KeyManager
+  gen_subnetmgr: ibmcloud_manager.SubnetManager
+  gen_fipmgr: ibmcloud_manager.FipManager
+  gen_volumemgr: ibmcloud_manager.VolumeManager
+  gen_vpcmgr: ibmcloud_manager.VPCManager
+  gen_sgmgr: ibmcloud_manager.SGManager
   ibmcloud_account_id = None
   ibmcloud_apikey = None
   ibmcloud_auth_token = None
