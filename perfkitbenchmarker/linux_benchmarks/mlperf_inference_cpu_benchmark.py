@@ -133,7 +133,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   vm.RemoteCommand('python3 -m pip install cmind -U')
   cm = 'PATH=~/.local/bin:$PATH cm'
   bm_spec.cm = cm
-  vm.RemoteCommand(f'{cm} pull repo mlcommons@ck --checkout=master')
+  vm.RemoteCommand(f'{cm} pull repo mlcommons@ck --checkout=cm-v1.5.3')
   vm.RemoteCommand(f'{cm} run script "get sys-utils-cm" --quiet')
   vm.RemoteCommand(
       f'{cm} run script "install python-venv" --version=3.10.8 --name=mlperf'
