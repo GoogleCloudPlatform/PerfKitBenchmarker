@@ -465,13 +465,14 @@ def _GetGlobalSamples(
   )
 
   if FLAGS.dpb_export_job_stats:
-    run_cost = cluster.CalculateLastJobCost()
-    if run_cost is not None:
-      # Run cost of the job last DPB service job (valid for Serverless DPB
-      # services implementations only).
-      samples.append(
-          sample.Sample('sparksql_run_cost', run_cost, '$', metadata)
-      )
+    # Run cost of the job last DPB service job (non-empty for Serverless DPB
+    # services implementations only).
+    costs = cluster.CalculateLastJobCosts()
+    samples += costs.GetSamples(
+        prefix='sparksql_',
+        renames={'total_cost': 'run_cost'},
+        metadata=metadata,
+    )
   return samples
 
 

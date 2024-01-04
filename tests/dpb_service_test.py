@@ -1,14 +1,17 @@
 """Tests for perfkitbenchmarker.dpb_service module."""
 
+import datetime
 from typing import Any, Optional
 import unittest
 from unittest import mock
 
 from absl.testing import flagsaver
 from absl.testing import parameterized
+import freezegun
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import sample
 from tests import pkb_common_test_case
 
 CLUSTER_SPEC = mock.Mock(
@@ -22,6 +25,7 @@ CLUSTER_SPEC = mock.Mock(
     ),
 )
 TEST_RUN_URI = 'fakeru'
+FAKE_DATETIME_NOW = datetime.datetime(2010, 1, 1)
 
 
 class MockDpbService(dpb_service.BaseDpbService):
@@ -250,6 +254,157 @@ class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
     mock_dpb_service = NoDynallocSupportingMockDpbService(CLUSTER_SPEC)
     with flagsaver.flagsaver((dpb_service._DYNAMIC_ALLOCATION, dynalloc)):
       self.assertEqual(mock_dpb_service.GetClusterProperties(), expected)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='Empty',
+          job_costs=dpb_service.JobCosts(),
+          get_sample_kwargs={},
+          expected_samples=[],
+      ),
+      dict(
+          testcase_name='ComputeOnlyWithMetadata',
+          job_costs=dpb_service.JobCosts(
+              total_cost=42,
+              compute_units_used=21,
+              compute_unit_cost=2,
+              compute_unit_name='CU',
+          ),
+          get_sample_kwargs={'metadata': {'foo': 'bar'}},
+          expected_samples=[
+              sample.Sample(
+                  metric='total_cost',
+                  value=42.0,
+                  unit='$',
+                  metadata={'foo': 'bar'},
+                  timestamp=1262304000.0,
+              ),
+              sample.Sample(
+                  metric='compute_units_used',
+                  value=21.0,
+                  unit='CU',
+                  metadata={'foo': 'bar'},
+                  timestamp=1262304000.0,
+              ),
+              sample.Sample(
+                  metric='compute_unit_cost',
+                  value=2.0,
+                  unit='$/(CU)',
+                  metadata={'foo': 'bar'},
+                  timestamp=1262304000.0,
+              ),
+          ],
+      ),
+      dict(
+          testcase_name='ComputeOnlyPrefixAndRename',
+          job_costs=dpb_service.JobCosts(
+              total_cost=42,
+              compute_units_used=21,
+              compute_unit_cost=2,
+              compute_unit_name='CU',
+          ),
+          get_sample_kwargs={
+              'prefix': 'sparksql_',
+              'renames': {'total_cost': 'run_cost'},
+          },
+          expected_samples=[
+              sample.Sample(
+                  metric='sparksql_run_cost',
+                  value=42.0,
+                  unit='$',
+                  metadata={},
+                  timestamp=1262304000.0,
+              ),
+              sample.Sample(
+                  metric='sparksql_compute_units_used',
+                  value=21.0,
+                  unit='CU',
+                  metadata={},
+                  timestamp=1262304000.0,
+              ),
+              sample.Sample(
+                  metric='sparksql_compute_unit_cost',
+                  value=2.0,
+                  unit='$/(CU)',
+                  metadata={},
+                  timestamp=1262304000.0,
+              ),
+          ],
+      ),
+      dict(
+          testcase_name='AllMetrics',
+          job_costs=dpb_service.JobCosts(
+              total_cost=33,
+              compute_units_used=22,
+              compute_unit_cost=0.5,
+              compute_unit_name='CU',
+              memory_units_used=11,
+              memory_unit_cost=1,
+              memory_unit_name='MU',
+              storage_units_used=5.5,
+              storage_unit_cost=2,
+              storage_unit_name='SU',
+          ),
+          get_sample_kwargs={},
+          expected_samples=[
+              sample.Sample(
+                  metric='total_cost',
+                  value=33.0,
+                  unit='$',
+                  metadata={},
+                  timestamp=1262304000.0,
+              ),
+              sample.Sample(
+                  metric='compute_units_used',
+                  value=22.0,
+                  unit='CU',
+                  metadata={},
+                  timestamp=1262304000.0,
+              ),
+              sample.Sample(
+                  metric='memory_units_used',
+                  value=11.0,
+                  unit='MU',
+                  metadata={},
+                  timestamp=1262304000.0,
+              ),
+              sample.Sample(
+                  metric='storage_units_used',
+                  value=5.5,
+                  unit='SU',
+                  metadata={},
+                  timestamp=1262304000.0,
+              ),
+              sample.Sample(
+                  metric='compute_unit_cost',
+                  value=0.5,
+                  unit='$/(CU)',
+                  metadata={},
+                  timestamp=1262304000.0,
+              ),
+              sample.Sample(
+                  metric='memory_unit_cost',
+                  value=1.0,
+                  unit='$/(MU)',
+                  metadata={},
+                  timestamp=1262304000.0,
+              ),
+              sample.Sample(
+                  metric='storage_unit_cost',
+                  value=2.0,
+                  unit='$/(SU)',
+                  metadata={},
+                  timestamp=1262304000.0,
+              ),
+          ],
+      ),
+  )
+  @freezegun.freeze_time(FAKE_DATETIME_NOW)
+  def testJobCostsGetSamples(
+      self, job_costs, get_sample_kwargs, expected_samples
+  ):
+    actual_samples = job_costs.GetSamples(**get_sample_kwargs)
+    self.assertListEqual(actual_samples, expected_samples)
 
 
 if __name__ == '__main__':

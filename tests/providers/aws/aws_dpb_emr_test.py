@@ -23,6 +23,7 @@ from absl import flags
 from absl.testing import parameterized
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_constants
+from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_dpb_emr
@@ -156,7 +157,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
     self.assertEqual(cluster.GetResourceMetadata(), expected_metadata)
 
-  def testEmrServerlessCalculateLastJobCost(self):
+  def testEmrServerlessCalculateLastJobCosts(self):
     emr_serverless = aws_dpb_emr.AwsDpbEmrServerless(SERVERLESS_SPEC)
 
     create_application_response = {'applicationId': 'foobar'}
@@ -200,7 +201,23 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
           job_type=dpb_constants.PYSPARK_JOB_TYPE,
       )
 
-    self.assertEqual(emr_serverless.CalculateLastJobCost(), 4.711576935499999)
+    expected_costs = dpb_service.JobCosts(
+        total_cost=4.711576935499999,
+        compute_cost=3.1270233279999995,
+        memory_cost=1.3734858865,
+        storage_cost=0.21106772099999999,
+        compute_units_used=59.422,
+        memory_units_used=237.689,
+        storage_units_used=1901.511,
+        compute_unit_cost=0.052624,
+        memory_unit_cost=0.0057785,
+        storage_unit_cost=0.000111,
+        compute_unit_name='vCPU*hr',
+        memory_unit_name='GB*hr',
+        storage_unit_name='GB*hr',
+    )
+
+    self.assertEqual(emr_serverless.CalculateLastJobCosts(), expected_costs)
 
   def testEmrServerlessPricesSchema(self):
     # Checking schema of EMR_SERVERLESS_PRICES

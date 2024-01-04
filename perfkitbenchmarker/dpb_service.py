@@ -20,6 +20,7 @@ the corresponding provider directory as a subclass of BaseDpbService.
 """
 
 import abc
+from collections.abc import MutableMapping
 import dataclasses
 import datetime
 import logging
@@ -175,6 +176,106 @@ class JobResult:
   def wall_time(self) -> float:
     """The total time the service reported it took to execute."""
     return self.run_time + self.pending_time
+
+
+@dataclasses.dataclass
+class JobCosts:
+  """Contains cost stats for a job execution on a serverless DPB service.
+
+  Attributes:
+    total_cost: Total costs incurred by the job.
+    compute_cost: Compute costs incurred by the job. RAM may be billed as a
+      different item on some DPB service implementations.
+    memory_cost: RAM costs incurred by the job if available.
+    storage_cost: Shuffle storage costs incurred by the job.
+    compute_units_used: Compute units consumed by the job.
+    memory_units_used: RAM units consumed by this job.
+    storage_units_used: Shuffle storage units consumed by the job.
+    compute_unit_cost: Cost of 1 compute unit.
+    memory_unit_cost: Cost of 1 memory unit.
+    storage_unit_cost: Cost of 1 shuffle storage unit.
+    compute_unit_name: Name of the compute units used by the service.
+    memory_unit_name: Name of the memory units used by the service.
+    storage_unit_name: Name of the shuffle storage units used by the service.
+  """
+
+  total_cost: Optional[float] = None
+
+  compute_cost: Optional[float] = None
+  memory_cost: Optional[float] = None
+  storage_cost: Optional[float] = None
+
+  compute_units_used: Optional[float] = None
+  memory_units_used: Optional[float] = None
+  storage_units_used: Optional[float] = None
+
+  compute_unit_cost: Optional[float] = None
+  memory_unit_cost: Optional[float] = None
+  storage_unit_cost: Optional[float] = None
+
+  compute_unit_name: Optional[str] = None
+  memory_unit_name: Optional[str] = None
+  storage_unit_name: Optional[str] = None
+
+  def GetSamples(
+      self,
+      prefix: str = '',
+      renames: Optional[dict[str, str]] = None,
+      metadata: Optional[MutableMapping[str, str]] = None,
+  ) -> list[sample.Sample]:
+    """Gets PKB samples for these costs.
+
+    Args:
+      prefix: Add a prefix before the samples name if passed.
+      renames: Optional dict arg where each entry represents a metric rename,
+        being the key the original name and the value the new name. prefix is
+        added after the rename.
+      metadata: String mapping with the metadata for each benchmark.
+
+    Returns:
+      A list of samples to be published.
+    """
+
+    if renames is None:
+      renames = {}
+    if metadata is None:
+      metadata = {}
+
+    def GetName(original_name):
+      return f'{prefix}{renames.get(original_name) or original_name}'
+
+    metrics = [
+        ('total_cost', self.total_cost, '$'),
+        ('compute_cost', self.compute_cost, '$'),
+        ('memory_cost', self.memory_cost, '$'),
+        ('storage_cost', self.storage_cost, '$'),
+        ('compute_units_used', self.compute_units_used, self.compute_unit_name),
+        ('memory_units_used', self.memory_units_used, self.memory_unit_name),
+        ('storage_units_used', self.storage_units_used, self.storage_unit_name),
+        (
+            'compute_unit_cost',
+            self.compute_unit_cost,
+            f'$/({self.compute_unit_name})',
+        ),
+        (
+            'memory_unit_cost',
+            self.memory_unit_cost,
+            f'$/({self.memory_unit_name})',
+        ),
+        (
+            'storage_unit_cost',
+            self.storage_unit_cost,
+            f'$/({self.storage_unit_name})',
+        ),
+    ]
+
+    results = []
+    for metric_name, value, unit in metrics:
+      if value is not None and unit is not None:
+        results.append(
+            sample.Sample(GetName(metric_name), value, unit, metadata)
+        )
+    return results
 
 
 class BaseDpbService(resource.BaseResource):
@@ -517,13 +618,13 @@ class BaseDpbService(resource.BaseResource):
     """Gets service wrapper scripts to upload alongside benchmark scripts."""
     return []
 
-  def CalculateLastJobCost(self) -> Optional[float]:
+  def CalculateLastJobCosts(self) -> JobCosts:
     """Returns the cost of last job submitted.
 
     Returns:
-      A float representing the cost in dollars or None if not implemented.
+      A dpb_service.JobCosts object.
     """
-    return None
+    return JobCosts()
 
   def GetClusterDuration(self) -> Optional[float]:
     """Gets how much time the cluster has been running in seconds.

@@ -303,10 +303,12 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # and/or BillableStreamingDataProcessed when applicable
     return stats
 
-  def CalculateLastJobCost(self, pricing_type=DATAFLOW_TYPE_BATCH):
+  def CalculateLastJobCosts(
+      self, pricing_type=DATAFLOW_TYPE_BATCH
+  ) -> dpb_service.JobCosts:
     if pricing_type not in (DATAFLOW_TYPE_BATCH, DATAFLOW_TYPE_STREAMING):
       raise ValueError(
-          f'Invalid type provided to CalculateLastJobCost(): {pricing_type}'
+          f'Invalid type provided to CalculateLastJobCosts(): {pricing_type}'
       )
 
     # For some reason, pytype doesn't play well with functools.cached_property
@@ -316,18 +318,34 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     total_pd_usage = self.job_stats['total_pd_usage']
     # pytype: enable=unsupported-operands
 
-    cost = 0
     if pricing_type == DATAFLOW_TYPE_BATCH:
-      cost += total_vcpu_time * VCPU_PER_HR_BATCH
-      cost += total_mem_usage * MEM_PER_GB_HR_BATCH
+      vcpu_hr = total_vcpu_time * VCPU_PER_HR_BATCH
+      memory_hr = total_mem_usage * MEM_PER_GB_HR_BATCH
     else:
-      cost += total_vcpu_time * VCPU_PER_HR_STREAMING
-      cost += total_mem_usage * MEM_PER_GB_HR_STREAMING
+      vcpu_hr = total_vcpu_time * VCPU_PER_HR_STREAMING
+      memory_hr = total_mem_usage * MEM_PER_GB_HR_STREAMING
 
-    cost += total_pd_usage * PD_PER_GB_HR
+    vcpu_cost = total_vcpu_time * vcpu_hr
+    memory_cost = total_mem_usage * memory_hr
+
+    storage_cost = total_pd_usage * PD_PER_GB_HR
     # TODO(user): Add cost related to per-GB data processed by Dataflow
     #  Shuffle (for batch) or Streaming Engine (for streaming) when applicable
-    return cost
+    return dpb_service.JobCosts(
+        total_cost=vcpu_cost + memory_cost + storage_cost,
+        compute_cost=vcpu_cost,
+        memory_cost=memory_cost,
+        storage_cost=storage_cost,
+        compute_units_used=total_vcpu_time,
+        memory_units_used=total_mem_usage,
+        storage_units_used=total_pd_usage,
+        compute_unit_cost=vcpu_cost,
+        memory_unit_cost=memory_cost,
+        storage_unit_cost=storage_cost,
+        compute_unit_name='vCPU*hr',
+        memory_unit_name='GB*hr',
+        storage_unit_name='GB*hr',
+    )
 
   def _PullJobMetrics(self, force_refresh=False):
     """Retrieve and cache all job metrics from Dataflow API."""

@@ -59,7 +59,7 @@ class AwsDpbGlue(
     self._job_counter = 0
 
     # Last job run cost
-    self._run_cost = None
+    self._run_cost = dpb_service.JobCosts()
     self._FillMetadata()
 
   @property
@@ -223,7 +223,7 @@ class AwsDpbGlue(
     """Gets service wrapper scripts to upload alongside benchmark scripts."""
     return [self.SPARK_SQL_GLUE_WRAPPER_SCRIPT]
 
-  def CalculateLastJobCost(self) -> Optional[float]:
+  def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
     return self._run_cost
 
   def _ComputeJobRunCost(
@@ -231,7 +231,7 @@ class AwsDpbGlue(
       dpu_seconds: Optional[float],
       max_capacity: Optional[float],
       execution_time: Optional[float],
-  ) -> Optional[float]:
+  ) -> dpb_service.JobCosts:
     """Computes the job run cost.
 
     If dpu_seconds is not None, then the job run cost will be computed only with
@@ -252,11 +252,19 @@ class AwsDpbGlue(
     """
     dpu_hourly_price = aws_dpb_glue_prices.GLUE_PRICES.get(self.region)
     if dpu_hourly_price is None:
-      return None
+      return dpb_service.JobCosts()
     # dpu_seconds is only reported directly in auto-scaling jobs.
     if dpu_seconds is None:
       dpu_seconds = max_capacity * execution_time
-    return dpu_seconds / 3600 * dpu_hourly_price
+    hourly_dpu = dpu_seconds / 3600
+    cost = hourly_dpu * dpu_hourly_price
+    return dpb_service.JobCosts(
+        total_cost=cost,
+        compute_cost=cost,
+        compute_units_used=hourly_dpu,
+        compute_unit_name='DPU*hr',
+        compute_unit_cost=dpu_hourly_price,
+    )
 
   def GetHdfsType(self) -> Optional[str]:
     """Gets human friendly disk type for metric metadata."""

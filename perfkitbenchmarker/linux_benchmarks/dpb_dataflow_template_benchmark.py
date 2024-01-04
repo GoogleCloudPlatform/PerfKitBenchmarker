@@ -174,10 +174,10 @@ def Run(benchmark_spec):
   for name, value in stats.items():
     results.append(sample.Sample(name, value, 'number', metadata))
 
-  total_cost = dpb_service_instance.CalculateLastJobCost(
+  costs = dpb_service_instance.CalculateLastJobCosts(
       gcp_dpb_dataflow.DATAFLOW_TYPE_STREAMING
   )
-  results.append(sample.Sample('total_cost', total_cost, '$', metadata))
+  results += costs.GetSamples(metadata)
 
   return results
 

@@ -528,7 +528,7 @@ class AwsDpbEmrServerless(
     self.role = FLAGS.aws_emr_serverless_role
 
     # Last job run cost
-    self._run_cost = None
+    self._run_cost = dpb_service.JobCosts()
     self._FillMetadata()
 
   def SubmitJob(
@@ -625,7 +625,7 @@ class AwsDpbEmrServerless(
         (application_id, job_run_id), EMR_TIMEOUT, job_poll_interval
     )
 
-  def CalculateLastJobCost(self) -> Optional[float]:
+  def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
     return self._run_cost
 
   def GetJobProperties(self) -> Dict[str, str]:
@@ -664,7 +664,7 @@ class AwsDpbEmrServerless(
 
   def _ComputeJobRunCost(
       self, memory_gb_hour: float, storage_gb_hour: float, vcpu_hour: float
-  ) -> Optional[float]:
+  ) -> dpb_service.JobCosts:
     region_prices = aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES.get(
         self.region, {}
     )
@@ -676,11 +676,24 @@ class AwsDpbEmrServerless(
         or storage_gb_hour_price is None
         or vcpu_hour_price is None
     ):
-      return None
-    return (
-        memory_gb_hour * memory_gb_hour_price
-        + storage_gb_hour * storage_gb_hour_price
-        + vcpu_hour * vcpu_hour_price
+      return dpb_service.JobCosts()
+    vcpu_cost = vcpu_hour * vcpu_hour_price
+    memory_cost = memory_gb_hour * memory_gb_hour_price
+    storage_cost = storage_gb_hour * storage_gb_hour_price
+    return dpb_service.JobCosts(
+        total_cost=vcpu_cost + memory_cost + storage_cost,
+        compute_cost=vcpu_cost,
+        memory_cost=memory_cost,
+        storage_cost=storage_cost,
+        compute_units_used=vcpu_hour,
+        memory_units_used=memory_gb_hour,
+        storage_units_used=storage_gb_hour,
+        compute_unit_cost=vcpu_hour_price,
+        memory_unit_cost=memory_gb_hour_price,
+        storage_unit_cost=storage_gb_hour_price,
+        compute_unit_name='vCPU*hr',
+        memory_unit_name='GB*hr',
+        storage_unit_name='GB*hr',
     )
 
   def _GetCompletedJob(self, job_id):

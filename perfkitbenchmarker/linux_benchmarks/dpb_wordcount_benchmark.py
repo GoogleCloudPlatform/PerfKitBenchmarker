@@ -272,9 +272,8 @@ def Run(benchmark_spec):
       for name, value in stats.items():
         results.append(sample.Sample(name, value, 'number', metadata))
 
-    total_cost = dpb_service_instance.CalculateLastJobCost()
-    if total_cost is not None:
-      results.append(sample.Sample('total_cost', total_cost, '$', metadata))
+    costs = dpb_service_instance.CalculateLastJobCosts()
+    results += costs.GetSamples(metadata=metadata)
   else:
     logging.info(
         '--dpb_export_job_stats flag is False (which is the new default). Not '

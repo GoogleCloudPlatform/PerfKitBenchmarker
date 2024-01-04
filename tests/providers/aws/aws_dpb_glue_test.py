@@ -21,6 +21,7 @@ from unittest import mock
 
 from absl import flags
 from perfkitbenchmarker import dpb_constants
+from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_dpb_glue
 from perfkitbenchmarker.providers.aws import aws_dpb_glue_prices
@@ -87,7 +88,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(vm_util, 'IssueCommand', autospec=True)
     )
 
-  def testGlueCalculateLastJobCost(self):
+  def testGlueCalculateLastJobCosts(self):
     dpb_glue = aws_dpb_glue.AwsDpbGlue(GLUE_SPEC)
 
     create_job_response = {'Name': 'pkb-deadbeef-0'}
@@ -116,7 +117,15 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
           job_arguments=[],
       )
 
-    self.assertEqual(dpb_glue.CalculateLastJobCost(), 10.45048888888889)
+    expected_costs = dpb_service.JobCosts(
+        total_cost=10.45048888888889,
+        compute_cost=10.45048888888889,
+        compute_units_used=23.75111111111111,
+        compute_unit_cost=0.44,
+        compute_unit_name='DPU*hr',
+    )
+
+    self.assertEqual(dpb_glue.CalculateLastJobCosts(), expected_costs)
 
   def testGluePricesSchema(self):
     for region, price in aws_dpb_glue_prices.GLUE_PRICES.items():

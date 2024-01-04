@@ -720,7 +720,7 @@ class GcpDpbDataprocServerless(
         'dpb_job_properties': self.metadata['dpb_job_properties'],
     }
 
-  def CalculateLastJobCost(self):
+  def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
     fetch_batch_cmd = self.DataprocGcloudCommand(
         'batches', 'describe', self.batch_name
     )
@@ -754,7 +754,7 @@ class GcpDpbDataprocServerless(
         .get('usd_per_shuffle_storage_gb_sec')
     )
     if usd_per_milli_dcu_sec is None or usd_per_shuffle_storage_gb_sec is None:
-      return None
+      return dpb_service.JobCosts()
     results = FetchBatchResults()
     milli_dcu_seconds = int(
         results['runtimeInfo']['approximateUsage']['milliDcuSeconds']
@@ -762,11 +762,19 @@ class GcpDpbDataprocServerless(
     shuffle_storage_gb_seconds = int(
         results['runtimeInfo']['approximateUsage']['shuffleStorageGbSeconds']
     )
-    cost = (
-        usd_per_milli_dcu_sec * milli_dcu_seconds
-        + usd_per_shuffle_storage_gb_sec * shuffle_storage_gb_seconds
+    compute_cost = usd_per_milli_dcu_sec * milli_dcu_seconds
+    storage_cost = usd_per_shuffle_storage_gb_sec * shuffle_storage_gb_seconds
+    return dpb_service.JobCosts(
+        total_cost=compute_cost + storage_cost,
+        compute_cost=compute_cost,
+        storage_cost=storage_cost,
+        compute_units_used=milli_dcu_seconds / 1000 / 3600,
+        storage_units_used=shuffle_storage_gb_seconds / 3600,
+        compute_unit_cost=usd_per_milli_dcu_sec * 1000 * 3600,
+        storage_unit_cost=usd_per_shuffle_storage_gb_sec * 3600,
+        compute_unit_name='DCU*hr',
+        storage_unit_name='GB*hr',
     )
-    return cost
 
   def GetHdfsType(self) -> Optional[str]:
     """Gets human friendly disk type for metric metadata."""
