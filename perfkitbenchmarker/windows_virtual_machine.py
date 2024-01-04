@@ -640,9 +640,6 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
   def DiskDriveIsLocal(self, device, model):
     """Helper method to determine if a disk drive is a local ssd to stripe."""
 
-  def PrepareTempDbDisk(self):
-    """Helper method to format and setup disk for SQL Server TempDB."""
-
   def SetReadAhead(self, num_sectors, devices):
     """Set read-ahead value for block devices.
 

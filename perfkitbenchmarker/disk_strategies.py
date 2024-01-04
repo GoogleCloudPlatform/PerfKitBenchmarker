@@ -358,6 +358,3 @@ class PrepareScratchDiskStrategy:
     )
 
     vm.scratch_disks.append(scratch_disk)
-
-    if FLAGS.gce_num_local_ssds > 0 and FLAGS.db_disk_type != 'local':
-      vm.PrepareTempDbDisk()
