@@ -55,6 +55,8 @@ ATTACHED_DISK_LETTER = 'F'
 SMB_PORT = 445
 WINRM_PORT = 5986
 RDP_PORT = 3389
+
+START_COMMAND_RETRIES = 10
 # This startup script enables remote mangement of the instance. It does so
 # by creating a WinRM listener (using a self-signed cert) and opening
 # the WinRM port in the Windows firewall.
@@ -162,8 +164,15 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
           command,
           self,
       )
-    start_out, _ = self.RemoteCommand(f'Test-Path {command_path}.start')
-    if 'True' not in start_out:
+
+    found_start_file = False
+    for _ in range(START_COMMAND_RETRIES):
+      start_out, _ = self.RemoteCommand(f'Test-Path {command_path}.start')
+      found_start_file = 'True' in start_out
+      if found_start_file:
+        break
+
+    if not found_start_file:
       raise errors.VirtualMachine.RemoteCommandError(
           'RobustRemoteCommand did not start on VM.'
       )
