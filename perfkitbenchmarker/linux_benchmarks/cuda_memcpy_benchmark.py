@@ -131,6 +131,7 @@ def _CollectGpuSamples(
   """
   if not nvidia_driver.CheckNvidiaSmiExists(vm):
     return []
+  vm.InstallPackages('freeglut3-dev')
   global_metadata = _MetadataFromFlags()
   global_metadata.update(cuda_toolkit.GetMetadata(vm))
 
@@ -183,9 +184,6 @@ def _CollectGpuSamples(
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
-  background_tasks.RunThreaded(
-      lambda vm: vm.InstallPackages('freeglut3-dev'), bm_spec.vms
-  )
   sample_lists = background_tasks.RunThreaded(_CollectGpuSamples, bm_spec.vms)
   return (
       functools.reduce(lambda a, b: a + b, sample_lists) if sample_lists else []

@@ -1854,9 +1854,35 @@ class Ubuntu2004BasedAwsVirtualMachine(
 class Ubuntu2004EfaBasedAwsVirtualMachine(
     UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2004EfaMixin
 ):
+  """Ubuntu2004 Base DLAMI virtual machine."""
   IMAGE_OWNER = UBUNTU_EFA_IMAGE_PROJECT
   DEFAULT_ROOT_DISK_TYPE = 'gp3'
   IMAGE_NAME_FILTER_PATTERN = 'Deep Learning Base GPU AMI (Ubuntu 20.04) *'
+
+
+class AmazonLinux2EfaBasedAwsVirtualMachine(
+    AwsVirtualMachine, linux_virtual_machine.AmazonLinux2EfaMixin
+):
+  """AmazonLinux2 Base DLAMI virtual machine."""
+
+  IMAGE_OWNER = UBUNTU_EFA_IMAGE_PROJECT
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
+  IMAGE_NAME_FILTER_PATTERN = 'Deep Learning Base AMI (Amazon Linux 2) *'
+
+  def __init__(self, vm_spec):
+    """Initialize a AmazonLinux2 Base DLAMI virtual machine.
+
+    Args:
+      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+
+    Raises:
+      ValueError: If an incompatible vm_spec is passed.
+    """
+    super(AmazonLinux2EfaBasedAwsVirtualMachine, self).__init__(vm_spec)
+    # Add preinstalled packages for Deep Learning AMI
+    self._installed_packages.add('nccl')
+    self._installed_packages.add('cuda_toolkit')
+    self._installed_packages.add('openmpi')
 
 
 class Ubuntu2204BasedAwsVirtualMachine(

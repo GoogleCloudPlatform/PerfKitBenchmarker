@@ -189,7 +189,6 @@ def PrepareVm(vm):
   vm.AuthenticateVm()
   vm.Install('cuda_toolkit')
   vm.Install('nccl')
-  vm.InstallPackages('libnuma-dev')
   vm.Install('openmpi')
   vm.RemoteCommand('rm -rf nccl-tests')
   vm.RemoteCommand('git clone https://github.com/NVIDIA/nccl-tests.git')
