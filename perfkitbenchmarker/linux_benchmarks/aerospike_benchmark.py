@@ -152,13 +152,10 @@ aerospike:
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-
   if FLAGS.aerospike_storage_type == aerospike_server.DISK:
+    config['vm_groups']['workers']['disk_count'] = 1
     if FLAGS.data_disk_type == disk.LOCAL:
       # Didn't know max number of local disks, decide later.
-      config['vm_groups']['workers']['disk_count'] = (
-          config['vm_groups']['workers']['disk_count'] or None
-      )
       if FLAGS.cloud == 'GCP':
         config['vm_groups']['workers']['vm_spec']['GCP']['num_local_ssds'] = (
             FLAGS.gce_num_local_ssds or FLAGS.server_gce_num_local_ssds
@@ -172,10 +169,6 @@ def GetConfig(user_config):
           FLAGS['gce_ssd_interface'].present = False
           FLAGS.gce_ssd_interface = FLAGS.server_gce_ssd_interface
         config['vm_groups']['clients']['vm_spec']['GCP']['num_local_ssds'] = 0
-    else:
-      config['vm_groups']['workers']['disk_count'] = (
-          config['vm_groups']['workers']['disk_count'] or 1
-      )
 
   if FLAGS.aerospike_server_machine_type:
     vm_spec = config['vm_groups']['workers']['vm_spec']
