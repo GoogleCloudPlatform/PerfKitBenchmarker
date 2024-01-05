@@ -553,8 +553,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.machine_type and self.machine_type in _FIXED_GPU_MACHINE_TYPES:
       self.gpu_type = _FIXED_GPU_MACHINE_TYPES[self.machine_type][0]
       self.gpu_count = _FIXED_GPU_MACHINE_TYPES[self.machine_type][1]
-
-    if not self.SupportGVNIC():
+    if self.gce_nic_type == 'GVNIC' and not self.SupportGVNIC():
       logging.warning('Changing gce_nic_type to VIRTIO_NET')
       self.gce_nic_type = 'VIRTIO_NET'
     self.gce_egress_bandwidth_tier = gcp_flags.EGRESS_BANDWIDTH_TIER.value

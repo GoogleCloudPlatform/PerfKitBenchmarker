@@ -167,7 +167,10 @@ flags.DEFINE_enum(
 flags.DEFINE_enum(
     'gce_nic_type',
     'GVNIC',
-    ['VIRTIO_NET', 'GVNIC'],
+    [
+        'VIRTIO_NET',
+        'GVNIC',
+    ],
     'The virtual NIC type of GCE VMs. All machine types '
     'currently support GVNIC, but certain OS types will be '
     'excluded in gce_virtual_machine.',
