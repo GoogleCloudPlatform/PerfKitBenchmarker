@@ -211,6 +211,7 @@ class SetUpSMBDiskStrategy(SetUpDiskStrategy):
 
 class PrepareScratchDiskStrategy:
   """Strategies to prepare scratch disks."""
+  TEMPDB_DISK_LETTER = 'T'
 
   def PrepareScratchDisk(
       self,
@@ -264,7 +265,7 @@ class PrepareScratchDiskStrategy:
       scratch_disk: Union[disk.BaseDisk, disk.StripedDisk],
       disk_spec: disk.BaseDiskSpec,
   ) -> None:
-    """Helper method to format and mount scratch disk.
+    """Format and mount scratch disk.
 
     Args:
       vm: Windows Virtual Machine to create scratch disk on.
@@ -358,3 +359,85 @@ class PrepareScratchDiskStrategy:
     )
 
     vm.scratch_disks.append(scratch_disk)
+
+    if (
+        vm.OS_TYPE in os_types.WINDOWS_SQLSERVER_OS_TYPES
+        and disk_spec.disk_type != 'local'
+    ):
+      self.PrepareTempDbDisk(vm)
+
+  def GetLocalSSDNames(self) -> list[str]:
+    """Names of local ssd device when running Get-PhysicalDisk."""
+    return []
+
+  def GetLocalSSDDeviceIDs(self, vm) -> list[str]:
+    """Get all local ssd device ids."""
+    names = self.GetLocalSSDNames()
+
+    if not names:
+      # This function is not implemented in this cloud provider.
+      logging.info('Temp DB is not supported on this cloud')
+      return []
+
+    clause = ' -or '.join([f'($_.FriendlyName -eq "{name}")' for name in names])
+    clause = '{' + clause + '}'
+
+    # Select the DeviceID from the output
+    # It will be one integer per line.
+    # i.e
+    # 3
+    # 4
+    stdout, _ = vm.RemoteCommand(
+        f'Get-PhysicalDisk | where-object {clause} | Select -exp DeviceID'
+    )
+
+    # int casting will clean up the spacing and make sure we are getting
+    # correct device id.
+    return [
+        str(int(device_id)) for device_id in stdout.split('\n') if device_id
+    ]
+
+  def PrepareTempDbDisk(self, vm: 'virtual_machine.BaseVirtualMachine'):
+    """Format and mount temp db disk for sql server."""
+    # Create and then run a Diskpart script that will initialize the disks,
+    # create a volume, and then format and mount the volume.
+    # This would trigger when we detect local ssds on the VM
+    # and the disk type is not set to local ssd.
+    script = ''
+    local_ssd_disks = self.GetLocalSSDDeviceIDs(vm)
+    if not local_ssd_disks:
+      # No local ssd detected, will not move temp db.
+      return
+
+    for disk_number in local_ssd_disks:
+      # For local SSD disk, set the status to online (if it is not already),
+      # remove any formatting or partitioning on the disks, and convert
+      # it to a dynamic disk so it can be used to create a volume.
+      script += (
+          'select disk %s\n'
+          'online disk noerr\n'
+          'attributes disk clear readonly\n'
+          'clean\n'
+          'convert gpt\n'
+          'convert dynamic\n' % disk_number
+      )
+    if len(local_ssd_disks) > 1:
+      script += 'create volume stripe disk=%s\n' % ','.join(local_ssd_disks)
+    else:
+      script += 'create volume simple\n'
+
+    script += 'format fs=ntfs quick unit=64k\nassign letter={}\n'.format(
+        self.TEMPDB_DISK_LETTER.lower()
+    )
+    vm.RunDiskpartScript(script)
+
+    # Grant user permissions on the drive
+    vm.RemoteCommand(
+        'icacls {}: /grant Users:F /L'.format(self.TEMPDB_DISK_LETTER)
+    )
+    vm.RemoteCommand(
+        'icacls {}: --% /grant Users:(OI)(CI)F /L'.format(
+            self.TEMPDB_DISK_LETTER
+        )
+    )
+    vm.RemoteCommand('mkdir {}:\\TEMPDB'.format(self.TEMPDB_DISK_LETTER))

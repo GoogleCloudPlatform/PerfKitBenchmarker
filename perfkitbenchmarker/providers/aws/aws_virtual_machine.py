@@ -32,7 +32,6 @@ import uuid
 
 from absl import flags
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_virtual_machine
@@ -45,6 +44,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_disk_strategies
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
 from six.moves import range
@@ -1548,7 +1548,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       nvme_devices = self.GetNVMEDeviceInfo()
       self.PopulateNVMEDevicePath(scratch_disk, nvme_devices)
       self.UpdateDevicePath(scratch_disk)
-    disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
+    aws_disk_strategies.AWSPrepareScratchDiskStrategy().PrepareScratchDisk(
         self, scratch_disk, disk_spec
     )
 

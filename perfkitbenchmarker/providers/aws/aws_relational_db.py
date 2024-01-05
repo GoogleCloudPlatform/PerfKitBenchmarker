@@ -47,9 +47,6 @@ class AWSSQLServerIAASRelationalDb(
 
   CLOUD = provider_info.AWS
 
-  def MoveSQLServerTempDb(self):
-    """Moves the SQL Server temporary database to LocalSSD."""
-
 
 class AWSPostgresIAASRelationalDb(
     postgres_iaas_relational_db.PostgresIAASRelationalDb

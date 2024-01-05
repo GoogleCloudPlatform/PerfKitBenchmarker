@@ -16,7 +16,7 @@
 This module abstract out the disk algorithm for formatting and creating
 scratch disks.
 """
-from typing import Any, Union
+from typing import Any
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
@@ -281,69 +281,9 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
 class GCEPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
   """Strategies to prepare scratch disk on GCE."""
-  TEMPDB_DISK_LETTER = 'T'
 
-  def PrepareWindowsScratchDisk(
-      self,
-      vm: 'virtual_machine.BaseVirtualMachine',
-      scratch_disk: Union[disk.BaseDisk, disk.StripedDisk],
-      disk_spec: disk.BaseDiskSpec,
-  ) -> None:
-    super().PrepareWindowsScratchDisk(vm, scratch_disk, disk_spec)
-    if FLAGS.gce_num_local_ssds > 0 and FLAGS.db_disk_type != 'local':
-      self.PrepareTempDbDisk(vm)
-
-  def PrepareTempDbDisk(self, vm: 'virtual_machine.BaseVirtualMachine'):
-    """Formats and sets up disk for SQL Server TempDB."""
-    # Create and then run a Diskpart script that will initialize the disks,
-    # create a volume, and then format and mount the volume.
-    script = ''
-    stdout, _ = vm.RemoteCommand(
-        'Get-PhysicalDisk | where-object '
-        '{($_.FriendlyName -eq "Google EphemeralDisk") -or '
-        '($_.FriendlyName -eq "nvme_card")} | Select -exp DeviceID'
-    )
-    local_ssd_disks = [
-        int(device_id) for device_id in stdout.split('\n') if device_id
-    ]
-    local_ssd_disks_str = [str(d) for d in local_ssd_disks]
-
-    for disk_number in local_ssd_disks_str:
-      # For local SSD disk, set the status to online (if it is not already),
-      # remove any formatting or partitioning on the disks, and convert
-      # it to a dynamic disk so it can be used to create a volume.
-      script += (
-          'select disk %s\n'
-          'online disk noerr\n'
-          'attributes disk clear readonly\n'
-          'clean\n'
-          'convert gpt\n'
-          'convert dynamic\n' % disk_number
-      )
-
-    if local_ssd_disks:
-      if len(local_ssd_disks_str) > 1:
-        script += 'create volume stripe disk=%s\n' % ','.join(
-            local_ssd_disks_str
-        )
-      else:
-        script += 'create volume simple\n'
-      script += 'format fs=ntfs quick unit=64k\nassign letter={}\n'.format(
-          self.TEMPDB_DISK_LETTER.lower()
-      )
-    vm.RunDiskpartScript(script)
-
-    # Grant user permissions on the drive
-    if local_ssd_disks:
-      vm.RemoteCommand(
-          'icacls {}: /grant Users:F /L'.format(self.TEMPDB_DISK_LETTER)
-      )
-      vm.RemoteCommand(
-          'icacls {}: --% /grant Users:(OI)(CI)F /L'.format(
-              self.TEMPDB_DISK_LETTER
-          )
-      )
-      vm.RemoteCommand('mkdir {}:\\TEMPDB'.format(self.TEMPDB_DISK_LETTER))
+  def GetLocalSSDNames(self):
+    return ['Google EphemeralDisk', 'nvme_card']
 
 
 def _GenerateDiskNamePrefix(
