@@ -131,7 +131,6 @@ def _CollectGpuSamples(
   """
   if not nvidia_driver.CheckNvidiaSmiExists(vm):
     return []
-  vm.InstallPackages('freeglut3-dev')
   global_metadata = _MetadataFromFlags()
   global_metadata.update(cuda_toolkit.GetMetadata(vm))
 
