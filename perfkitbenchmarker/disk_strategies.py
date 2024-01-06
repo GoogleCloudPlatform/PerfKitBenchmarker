@@ -230,7 +230,7 @@ class PrepareScratchDiskStrategy:
       scratch_disk: Union[disk.BaseDisk, disk.StripedDisk],
       disk_spec: disk.BaseDiskSpec,
   ) -> None:
-    """Helper method to format and mount scratch disk.
+    """Format and mount scratch disk.
 
     Args:
       vm: Linux Virtual Machine to create scratch disk on.

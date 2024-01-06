@@ -24,7 +24,6 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-
 import abc
 import collections
 import itertools
@@ -39,7 +38,6 @@ from typing import Optional
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
@@ -52,6 +50,7 @@ from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
+from perfkitbenchmarker.providers.azure import azure_disk_strategies
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
 from six.moves import range
@@ -1056,7 +1055,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
       disks.append(data_disk)
 
     scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
-    disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
+    azure_disk_strategies.AzurePrepareScratchDiskStrategy().PrepareScratchDisk(
         self, scratch_disk, disk_spec
     )
 

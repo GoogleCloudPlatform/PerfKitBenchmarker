@@ -1,0 +1,43 @@
+# Copyright 2024 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Module containing strategies to prepare disks.
+
+This module abstract out the disk algorithm for formatting and creating
+scratch disks.
+"""
+
+from typing import Any
+from absl import flags
+from perfkitbenchmarker import disk_strategies
+from perfkitbenchmarker.providers.azure import azure_disk
+
+FLAGS = flags.FLAGS
+
+
+virtual_machine = Any  # pylint: disable=invalid-name
+
+
+class AzurePrepareScratchDiskStrategy(
+    disk_strategies.PrepareScratchDiskStrategy
+):
+  """Strategies to prepare scratch disk on AWS."""
+
+  def GetLocalSSDNames(self) -> list[str]:
+    # This is only for Ls-Series local ssd
+    # Temp disk is automatically setup on Azure and default to disk D.
+    return ['Microsoft NVMe Direct Disk']
+
+  def PrepareTempDbDisk(self, vm: 'virtual_machine.BaseVirtualMachine'):
+    if azure_disk.HasTempDrive(vm.machine_type):
+      vm.RemoteCommand('mkdir D:\\TEMPDB')

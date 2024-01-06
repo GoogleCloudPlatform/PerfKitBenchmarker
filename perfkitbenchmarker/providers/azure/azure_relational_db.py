@@ -62,9 +62,7 @@ class AzureSQLServerIAASRelationalDb(
   """A AWS IAAS database resource."""
 
   CLOUD = provider_info.AZURE
-
-  def MoveSQLServerTempDb(self):
-    """Moves the SQL Server temporary database to LocalSSD."""
+  TEMPDB_DISK_LETTER = 'D'
 
 
 class AzurePostgresIAASRelationalDb(

@@ -47,11 +47,10 @@ MSSQL_PID = "developer"  # Edition of SQL server on Linux
 
 DEFAULT_ENGINE_VERSION = sql_engine_utils.SQLSERVER_ENTERPRISE
 
-TEMPDB_DISK_LETTER = "T"
-
 
 class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
   """Object representing a IAAS relational database Service."""
+  TEMPDB_DISK_LETTER = "T"
 
   ENGINE = sql_engine_utils.SQLSERVER
 
@@ -123,7 +122,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
           if drive
       ]
 
-      if TEMPDB_DISK_LETTER in drive_list:
+      if self.TEMPDB_DISK_LETTER in drive_list:
         stdout, _ = vm.RemoteCommand(
             'sqlcmd -h -1 -Q "SET NOCOUNT '
             " ON; select f.name + CASE WHEN "
@@ -145,7 +144,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
               'sqlcmd -Q "ALTER DATABASE tempdb '
               "MODIFY FILE (NAME = [{}], "
               "FILENAME = '{}:\\TEMPDB\\{}');\"".format(
-                  tmp_db_name, TEMPDB_DISK_LETTER, tmp_db_file
+                  tmp_db_name, self.TEMPDB_DISK_LETTER, tmp_db_file
               )
           )
 
