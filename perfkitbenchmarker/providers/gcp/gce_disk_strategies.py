@@ -53,6 +53,28 @@ class GCPCreateDiskStrategy(disk_strategies.CreateDiskStrategy):
 class CreatePDDiskStrategy(GCPCreateDiskStrategy):
   """Contains logic to create persistence disk on GCE."""
 
+  def __init__(self, vm: Any, disk_spec: disk.BaseDiskSpec, disk_count: int):
+    super().__init__(vm, disk_spec, disk_count)
+    self.pd_disk_groups = []
+    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
+      disks = []
+      for i in range(disk_spec.num_striped_disks):
+        name = _GenerateDiskNamePrefix(vm, disk_spec_id, i)
+        data_disk = gce_disk.GceDisk(
+            disk_spec,
+            name,
+            vm.zone,
+            vm.project,
+            replica_zones=disk_spec.replica_zones,
+        )
+        if gce_disk.PdDriveIsNvme(vm):
+          data_disk.interface = gce_disk.NVME
+        else:
+          data_disk.interface = gce_disk.SCSI
+        vm.remote_disk_counter += 1
+        disks.append(data_disk)
+      self.pd_disk_groups.append(disks)
+
   def DiskCreatedOnVMCreation(self) -> bool:
     """Returns whether the disk is created on VM creation."""
     if self.disk_spec.replica_zones:
@@ -73,36 +95,14 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
         cmd.Issue()
 
   def GetCreationCommand(self) -> dict[str, Any]:
+    if not self.DiskCreatedOnVMCreation():
+      return {}
+
     create_disks = []
     dic = {}
-    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      if not self.DiskCreatedOnVMCreation():
-        continue
-      for i in range(disk_spec.num_striped_disks):
-        name = _GenerateDiskNamePrefix(self.vm, disk_spec_id, i)
-        pd_args = [
-            f'name={name}',
-            f'device-name={name}',
-            f'size={disk_spec.disk_size}',
-            f'type={disk_spec.disk_type}',
-            'auto-delete=yes',
-            'boot=no',
-            'mode=rw',
-        ]
-        if (
-            disk_spec.provisioned_iops
-            and disk_spec.disk_type in gce_disk.GCE_DYNAMIC_IOPS_DISK_TYPES
-        ):
-          pd_args += [f'provisioned-iops={disk_spec.provisioned_iops}']
-        if (
-            disk_spec.provisioned_throughput
-            and disk_spec.disk_type
-            in gce_disk.GCE_DYNAMIC_THROUGHPUT_DISK_TYPES
-        ):
-          pd_args += [
-              f'provisioned-throughput={disk_spec.provisioned_throughput}'
-          ]
-        create_disks.append(','.join(pd_args))
+    for disk_group in self.pd_disk_groups:
+      for pd_disk in disk_group:
+        create_disks.append(pd_disk.GetCreateFlags())
     if create_disks:
       dic['create-disk'] = create_disks
     return dic
@@ -130,22 +130,6 @@ class SetUpGCEResourceDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
   def __init__(self, disk_specs: list[disk.BaseDiskSpec]):
     self.disk_specs = disk_specs
-
-  def _CreateScratchDiskFromDisks(self, vm, disk_spec, disks):
-    """Helper method to create scratch data disks."""
-    # This will soon be moved to disk class. As the disk class should
-    # be able to handle how it's created and attached
-    if len(disks) > 1:
-      # If the disk_spec called for a striped disk, create one.
-      scratch_disk = disk.StripedDisk(disk_spec, disks)
-    else:
-      scratch_disk = disks[0]
-
-    if not vm.create_disk_strategy.DiskCreatedOnVMCreation():
-      scratch_disk.Create()
-      scratch_disk.Attach(vm)
-
-    return scratch_disk
 
   def FindRemoteNVMEDevices(self, nvme_devices):
     """Find the paths for all remote NVME devices inside the VM."""
@@ -220,28 +204,19 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
   def SetUpDisk(self, vm: Any, _: disk.BaseDiskSpec):
     # disk spec is not used here.
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      disks = []
+      disk_group = vm.create_disk_strategy.pd_disk_groups[disk_spec_id]
+      # Create the disk if it is not created on create
+      if not vm.create_disk_strategy.DiskCreatedOnVMCreation():
+        for pd_disk in disk_group:
+          pd_disk.Create()
+          pd_disk.Attach(vm)
 
-      for i in range(disk_spec.num_striped_disks):
-        name = _GenerateDiskNamePrefix(vm, disk_spec_id, i)
-        data_disk = gce_disk.GceDisk(
-            disk_spec,
-            name,
-            vm.zone,
-            vm.project,
-            replica_zones=disk_spec.replica_zones,
-        )
-        if gce_disk.PdDriveIsNvme(vm):
-          data_disk.interface = gce_disk.NVME
-        else:
-          data_disk.interface = gce_disk.SCSI
-        # Remote disk numbers start at 1+max_local_disks (0 is the system disk
-        # and local disks occupy 1-max_local_disks).
-        data_disk.disk_number = vm.remote_disk_counter + 1 + vm.max_local_disks
-        vm.remote_disk_counter += 1
-        disks.append(data_disk)
+      if len(disk_group) > 1:
+        # If the disk_spec called for a striped disk, create one.
+        scratch_disk = disk.StripedDisk(disk_spec, disk_group)
+      else:
+        scratch_disk = disk_group[0]
 
-      scratch_disk = self._CreateScratchDiskFromDisks(vm, disk_spec, disks)
       # Device path is needed to stripe disks on Linux, but not on Windows.
       # The path is not updated for Windows machines.
       if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:

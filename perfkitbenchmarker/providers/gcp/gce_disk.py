@@ -333,6 +333,7 @@ class GceDisk(disk.BaseDisk):
       replica_zones=None,
   ):
     super(GceDisk, self).__init__(disk_spec)
+    self.spec = disk_spec
     self.interface = disk_spec.interface
     self.attached_vm_name = None
     self.image = image
@@ -451,6 +452,23 @@ class GceDisk(disk.BaseDisk):
       raise errors.VmUtil.CalledProcessException(
           'Command returned a non-zero exit code:\n{}'.format(debug_text)
       )
+
+  def GetCreateFlags(self):
+    name = self.name
+    pd_args = [
+        f'name={name}',
+        f'device-name={name}',
+        f'size={self.spec.disk_size}',
+        f'type={self.spec.disk_type}',
+        'auto-delete=yes',
+        'boot=no',
+        'mode=rw',
+    ]
+    if self.provisioned_iops:
+      pd_args += [f'provisioned-iops={self.provisioned_iops}']
+    if self.provisioned_throughput:
+      pd_args += [f'provisioned-throughput={self.provisioned_throughput}']
+    return ','.join(pd_args)
 
   def Detach(self):
     """Detaches the disk from a VM."""

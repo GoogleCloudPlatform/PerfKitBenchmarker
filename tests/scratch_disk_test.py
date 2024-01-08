@@ -115,7 +115,6 @@ class ScratchDiskTestMixin(object):
     vm = self._CreateVm()
     disk_spec = self.GetDiskSpec(mount_point='/mountpoint')
     vm.SetDiskSpec(disk_spec, 2)
-
     vm.SetupAllScratchDisks()
     assert len(vm.scratch_disks) == 2, 'Disk not added to scratch disks.'
 
@@ -124,8 +123,8 @@ class ScratchDiskTestMixin(object):
     scratch_disk1.Create.assert_called_once_with()
     scratch_disk2.Create.assert_called_once_with()
     format_disk_callls = [
-        mock.call(scratch_disk1.GetDevicePath(), None),
-        mock.call(scratch_disk2.GetDevicePath(), None),
+        mock.call(scratch_disk1.GetDevicePath(), disk_spec.disk_type),
+        mock.call(scratch_disk2.GetDevicePath(), disk_spec.disk_type),
     ]
 
     vm.FormatDisk.assert_has_calls(format_disk_callls, None)
@@ -134,14 +133,14 @@ class ScratchDiskTestMixin(object):
         mock.call(
             scratch_disk1.GetDevicePath(),
             '/mountpoint0',
-            None,
+            disk_spec.disk_type,
             scratch_disk1.mount_options,
             scratch_disk1.fstab_options,
         ),
         mock.call(
             scratch_disk2.GetDevicePath(),
             '/mountpoint1',
-            None,
+            disk_spec.disk_type,
             scratch_disk2.mount_options,
             scratch_disk2.fstab_options,
         ),
@@ -210,7 +209,10 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def GetDiskSpec(self, mount_point):
     return gce_disk.GceDiskSpec(
-        _COMPONENT, mount_point=mount_point, create_with_vm=False
+        _COMPONENT,
+        mount_point=mount_point,
+        create_with_vm=False,
+        disk_type=gce_disk.PD_STANDARD,
     )
 
 
