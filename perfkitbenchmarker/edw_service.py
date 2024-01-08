@@ -114,10 +114,8 @@ flags.DEFINE_string(
     'The hosted snowflake database to use during the benchmark.',
 )
 flags.DEFINE_string(
-    'snowflake_schema',
-    None,
-    'The schema of the hosted snowflake database to use during the benchmark.',
-)
+    'snowflake_schema', None,
+    'The schema of the hosted snowflake database to use during the benchmark.')
 flags.DEFINE_enum(
     'snowflake_client_interface',
     'JDBC',
