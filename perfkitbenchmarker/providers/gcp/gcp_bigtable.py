@@ -495,7 +495,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
   def GetAverageCpuUsage(
       self, duration_minutes: int, end_time: datetime.datetime
   ) -> float:
-    """Gets the average CPU usage for the cluster.
+    """Gets the average CPU usage for the instance.
 
     Note that there is a delay for the API to get data, so this returns the
     average CPU usage in the period ending at `end_time` with missing data
@@ -507,7 +507,8 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
       end_time: The ending timestamp of the workload.
 
     Returns:
-      The average CPU usage during the time period.
+      The average CPU usage during the time period. In the case of multiple
+      clusters, this returns the average CPU of the hottest cluster.
     """
     if duration_minutes * 60 <= CPU_API_DELAY_SECONDS:
       raise ValueError(
@@ -530,7 +531,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     cpu_query = cpu_query.select_resources(instance=self.name)
     time_series = list(cpu_query)
 
-    instance_total_utilization = 0.0
+    instance_utilization_by_cluster = []
     for cluster_time_series in time_series:
       cluster_total_utilization = 0.0
       cluster_name = cluster_time_series.resource.labels['cluster']
@@ -550,10 +551,13 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
           cluster_name,
           cluster_average_utilization,
       )
-      instance_total_utilization += cluster_average_utilization
+      instance_utilization_by_cluster.append(cluster_average_utilization)
 
-    average_utilization = instance_total_utilization / len(time_series)
-    logging.info('Instance average CPU utilization: %s', average_utilization)
+    average_utilization = max(instance_utilization_by_cluster)
+    logging.info(
+        'Instance average CPU utilization (hottest cluster): %s',
+        average_utilization,
+    )
     return average_utilization
 
   def CalculateTheoreticalMaxThroughput(
