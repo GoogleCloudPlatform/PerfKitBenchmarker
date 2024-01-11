@@ -33,6 +33,7 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aws_credentials
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gcp_dpb_dataproc_serverless_prices
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
@@ -259,6 +260,10 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
 
     metadata = util.GetDefaultTags()
     metadata.update(flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata))
+    if gcp_flags.SPARK_BIGQUERY_CONNECTOR.value:
+      metadata['SPARK_BQ_CONNECTOR_URL'] = (
+          gcp_flags.SPARK_BIGQUERY_CONNECTOR.value
+      )
     cmd.flags['metadata'] = util.FormatTags(metadata)
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     timeout = 900  # 15 min

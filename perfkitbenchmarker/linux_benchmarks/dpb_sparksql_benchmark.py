@@ -93,11 +93,6 @@ dpb_sparksql_benchmark:
     worker_count: 2
 """
 
-flags.DEFINE_string(
-    'spark_bigquery_connector',
-    None,
-    'The Spark BigQuery Connector jar to pass to the Spark Job',
-)
 flags.DEFINE_list(
     'bigquery_tables',
     [],
@@ -135,12 +130,6 @@ def CheckPrerequisites(benchmark_config):
   if FLAGS.dpb_sparksql_database and FLAGS.dpb_sparksql_create_hive_tables:
     raise errors.Config.InvalidValue(
         'You cannot create hive tables in a custom database.'
-    )
-  if FLAGS.bigquery_tables and not FLAGS.spark_bigquery_connector:
-    # Remove if Dataproc ever bundles BigQuery connector
-    raise errors.Config.InvalidValue(
-        'You must provide the BigQuery connector using '
-        '--spark_bigquery_connector.'
     )
   if not (
       FLAGS.dpb_sparksql_data
@@ -326,8 +315,6 @@ def _RunQueries(benchmark_spec) -> tuple[str, dpb_service.JobResult]:
   if dpb_sparksql_benchmark_helper.DUMP_SPARK_CONF.value:
     args += ['--dump-spark-conf', os.path.join(cluster.base_dir, 'spark-conf')]
   jars = []
-  if FLAGS.spark_bigquery_connector:
-    jars.append(FLAGS.spark_bigquery_connector)
   job_result = cluster.SubmitJob(
       pyspark_file='/'.join([
           cluster.base_dir,

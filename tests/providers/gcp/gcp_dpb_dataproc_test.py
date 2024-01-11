@@ -140,6 +140,20 @@ class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('--zone us-central1-a', command_string)
 
   @mock.patch.object(
+      vm_util, 'IssueCommand', return_value=('fake_stdout', 'fake_stderr', 0)
+  )
+  def testCreateWithBQConnector(self, mock_issue):
+    FLAGS.spark_bigquery_connector = 'gs://custom-bq-libs/bqconnector.jar'
+    cluster = LocalGcpDpbDataproc(GetClusterSpec())
+    cluster._Create()
+    self.assertEqual(mock_issue.call_count, 1)
+    command_string = ' '.join(mock_issue.call_args[0][0])
+    self.assertIn(
+        '--metadata SPARK_BQ_CONNECTOR_URL=gs://custom-bq-libs/bqconnector.jar',
+        command_string,
+    )
+
+  @mock.patch.object(
       vm_util,
       'IssueCommand',
       return_value=(

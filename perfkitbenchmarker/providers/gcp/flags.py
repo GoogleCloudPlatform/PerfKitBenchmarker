@@ -413,6 +413,12 @@ flags.DEFINE_list(
     'multiple zones.',
 )
 
+SPARK_BIGQUERY_CONNECTOR = flags.DEFINE_string(
+    'spark_bigquery_connector',
+    None,
+    'The Spark BigQuery Connector jar to pass to the Spark Job',
+)
+
 
 def _ValidatePreemptFlags(flags_dict):
   if flags_dict['gce_preemptible_vms']:
