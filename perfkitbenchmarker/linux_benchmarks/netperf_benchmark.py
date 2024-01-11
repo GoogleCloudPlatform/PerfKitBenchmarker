@@ -35,6 +35,7 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
+from perfkitbenchmarker import histogram_util
 import six
 from six.moves import zip
 
@@ -209,50 +210,6 @@ def _SetupHostFirewall(benchmark_spec):
   for protocol in 'tcp', 'udp':
     for ip_addr in ip_addrs:
       server_vm.RemoteHostCommand(cmd % (protocol, ip_addr))
-
-
-def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
-  """Computes values at percentiles in a distribution as well as stddev.
-
-  Args:
-    histogram: A dict mapping values to the number of samples with that value.
-    percentiles: An array of percentiles to calculate.
-
-  Returns:
-    A dict mapping stat names to their values.
-  """
-  stats = {}
-
-  # Histogram data in list form sorted by key
-  by_value = sorted([(value, count) for value, count in histogram.items()],
-                    key=lambda x: x[0])
-  total_count = sum(histogram.values())
-
-  cur_value_index = 0  # Current index in by_value
-  cur_index = 0  # Number of values we've passed so far
-  for p in percentiles:
-    index = int(float(total_count) * float(p) / 100.0)
-    index = min(index, total_count - 1)  # Handle 100th percentile
-    for value, count in by_value[cur_value_index:]:
-      if cur_index + count > index:
-        stats['p%s' % str(p)] = by_value[cur_value_index][0]
-        break
-      else:
-        cur_index += count
-        cur_value_index += 1
-
-  # Compute stddev
-  value_sum = float(sum([value * count for value, count in histogram.items()]))
-  average = value_sum / float(total_count)
-  if total_count > 1:
-    total_of_squares = sum([
-        (value - average)**2 * count for value, count in histogram.items()
-    ])
-    stats['stddev'] = (total_of_squares / (total_count - 1))**0.5
-  else:
-    stats['stddev'] = 0
-  return stats
-
 
 def ParseNetperfOutput(stdout, metadata, benchmark_name,
                        enable_latency_histograms):
@@ -495,7 +452,7 @@ def RunNetperf(vm, benchmark_name, server_ip, num_streams):
           sample.Sample(f'{benchmark_name}_Latency_Histogram', 0, 'us',
                         hist_metadata))
       # Calculate stats on aggregate latency histogram
-      latency_stats = _HistogramStatsCalculator(latency_histogram, FLAGS.percentiles)
+      latency_stats = histogram_util._HistogramStatsCalculator(latency_histogram, FLAGS.percentiles)
       # Create samples for the latency stats
       for stat, value in latency_stats.items():
         samples.append(
