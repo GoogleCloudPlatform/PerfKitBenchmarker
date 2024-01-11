@@ -15,6 +15,7 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker import histogram_util
 
 from perfkitbenchmarker.linux_packages import mpi
 
@@ -45,6 +46,9 @@ _MPI_SUITE_TESTS = {
         'PingPingMT', 'PingPongMT', 'ReduceMT', 'SendRecvMT', 'UniBandMT'
     ]
 }
+
+flag_util.DEFINE_integerlist(
+    'percentiles', [50, 90, 99], 'Latency percentiles to calculate.')
 
 flags.DEFINE_list('mpi_suites', ['IMB-MPI1'],
                   'MPI benchmarks suites: {}.'.format(sorted(_MPI_SUITE_TESTS)))
@@ -341,6 +345,9 @@ def _MpiDataToSamples(row: mpi.MpiData) -> List[sample.Sample]:
         },
     }
     ret.append(sample.Sample('MPI_Latency_Histogram', 0, 'usec', metadata))
+    latency_stats = histogram_util._HistogramStatsCalculator(row.histogram, FLAGS.percentiles)
+    for stat, value in latency_stats.items():
+        ret.append(sample.Sample(f'MPI_Latency_{stat}', float(value), 'usec', metadata))
   for item in ret:
     item.metadata.update({
         'bytes': row.bytes,
