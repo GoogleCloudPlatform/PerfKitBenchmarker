@@ -65,7 +65,16 @@ def Install(vm, pip_cmd='pip', python_cmd='python'):
     # through 3.6. To be future proof check for the existence of a versioned
     # URL using requests.
     versioned_url = GET_PIP_VERSIONED_URL.format(python_version=python_version)
-    response = requests.get(versioned_url)
+
+    # Retry in case there are various temporary network issues.
+    @vm_util.Retry(
+        max_retries=5,
+        retryable_exceptions=(ConnectionError,)
+    )
+    def GetPipUrl():
+      return requests.get(versioned_url)
+
+    response = GetPipUrl()
     if response.ok:
       get_pip_url = versioned_url
     else:
@@ -74,7 +83,7 @@ def Install(vm, pip_cmd='pip', python_cmd='python'):
     # get_pip can suffer from various network issues.
     @vm_util.Retry(
         max_retries=5,
-        retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,),
+        retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,)
     )
     def GetPipWithRetries():
       vm.RemoteCommand(

@@ -91,6 +91,32 @@ class PipTest(pkb_common_test_case.PkbCommonTestCase):
     if not already_has_pip:
       requests_get.assert_called_once()
 
+  @mock.patch.object(
+      requests,
+      'get',
+      side_effect=[
+          ConnectionResetError('unable to connect'),
+          _TestResponse(200),
+      ],
+  )
+  def testNetworkRetries(
+      self,
+      requests_get: mock.Mock,
+  ):
+    self.enter_context(
+        mock.patch.object(python, 'GetPythonVersion', return_value='2.7')
+    )
+    vm = mock.Mock()
+    vm.TryRemoteCommand.return_value = False
+
+    pip.Install(vm)
+
+    vm.RemoteCommand.assert_has_calls(
+        [mock.call(cmd) for cmd in NEED_PIP_27]
+    )
+
+    requests_get.assert_called()
+
 
 if __name__ == '__main__':
   unittest.main()
