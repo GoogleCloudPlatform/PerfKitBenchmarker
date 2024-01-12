@@ -1128,26 +1128,24 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     # Prepare vm scratch disks:
     if any((spec.disk_type == disk.RAM for spec in self.disk_specs)):
-      disk_strategies.SetUpRamDiskStrategy().SetUpDisk(self, self.disk_specs[0])
+      disk_strategies.SetUpRamDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
       return
 
     if any((spec.disk_type == disk.OBJECT_STORAGE for spec in self.disk_specs)):
-      gce_disk_strategies.SetUpGcsFuseDiskStrategy().SetUpDisk(
+      gce_disk_strategies.SetUpGcsFuseDiskStrategy(
           self, self.disk_specs[0]
-      )
+      ).SetUpDisk()
       return
     if any((spec.disk_type == disk.NFS for spec in self.disk_specs)):
-      disk_strategies.SetUpNFSDiskStrategy().SetUpDisk(self, self.disk_specs[0])
+      disk_strategies.SetUpNFSDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
       return
     if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
-      gce_disk_strategies.SetUpGceLocalDiskStrategy(self.disk_specs).SetUpDisk(
+      gce_disk_strategies.SetUpGceLocalDiskStrategy(
           self, self.disk_specs[0]
-      )
+      ).SetUpDisk()
       return
 
-    gce_disk_strategies.SetUpPDDiskStrategy(self.disk_specs).SetUpDisk(
-        self, self.disk_specs[0]
-    )
+    gce_disk_strategies.SetUpPDDiskStrategy(self, self.disk_specs).SetUpDisk()
 
   def CreateIpReservation(
       self, ip_address_name: str

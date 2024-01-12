@@ -110,46 +110,46 @@ class EmptyCreateDiskStrategy(CreateDiskStrategy):
 class SetUpDiskStrategy:
   """Strategies to set up ram disks."""
 
-  def SetUpDisk(
+  def __init__(
       self,
-      vm,
+      vm: 'virtual_machine.BaseVirtualMachine',
       disk_spec: disk.BaseDiskSpec,
-  ) -> None:
-    if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
-      self.SetUpDiskOnLinux(vm, disk_spec)
-    else:
-      self.SetUpDiskOnWindows(vm, disk_spec)
+  ):
+    self.vm = vm
+    self.disk_spec = disk_spec
 
-  def SetUpDiskOnWindows(self, vm, disk_spec: disk.BaseDiskSpec):
+  def SetUpDisk(self) -> None:
+    if self.vm.OS_TYPE in os_types.LINUX_OS_TYPES:
+      self.SetUpDiskOnLinux()
+    else:
+      self.SetUpDiskOnWindows()
+
+  def SetUpDiskOnWindows(self):
     """Performs Windows specific setup of ram disk."""
     raise NotImplementedError(
-        f'{disk_spec.disk_type} is not supported on Windows.'
+        f'{self.disk_spec.disk_type} is not supported on Windows.'
     )
 
-  def SetUpDiskOnLinux(self, vm, disk_spec: disk.BaseDiskSpec):
+  def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of ram disk."""
     raise NotImplementedError(
-        f'{disk_spec.disk_type} is not supported on linux.'
+        f'{self.disk_spec.disk_type} is not supported on linux.'
     )
 
 
 class EmptyDiskStrategy(SetUpDiskStrategy):
   """Strategies to set up nothing. This is useful when there is no disk."""
 
-  def SetUpDisk(
-      self,
-      vm,
-      disk_spec: disk.BaseDiskSpec,
-  ) -> None:
-    del vm, disk_spec
+  def SetUpDisk(self) -> None:
+    pass
 
 
 class SetUpRamDiskStrategy(SetUpDiskStrategy):
   """Strategies to set up ram disks."""
 
-  def SetUpDiskOnLinux(self, vm, disk_spec: disk.BaseDiskSpec):
+  def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of ram disk."""
-    scratch_disk = disk.BaseDisk(disk_spec)
+    scratch_disk = disk.BaseDisk(self.disk_spec)
     logging.info(
         'Mounting and creating Ram Disk %s, %s',
         scratch_disk.mount_point,
@@ -159,16 +159,20 @@ class SetUpRamDiskStrategy(SetUpDiskStrategy):
         'sudo mkdir -p {0};sudo mount -t tmpfs -o size={1}g tmpfs {0};'
         'sudo chown -R $USER:$USER {0};'
     ).format(scratch_disk.mount_point, scratch_disk.disk_size)
-    vm.RemoteHostCommand(mnt_cmd)
-    vm.scratch_disks.append(disk.BaseDisk(disk_spec))
+    self.vm.RemoteHostCommand(mnt_cmd)
+    self.vm.scratch_disks.append(disk.BaseDisk(self.disk_spec))
 
 
 class SetUpNFSDiskStrategy(SetUpDiskStrategy):
   """Strategies to set up NFS disks."""
 
   def __init__(
-      self, unmanaged_nfs_service: Optional[nfs_service.BaseNfsService] = None
+      self,
+      vm,
+      disk_spec: disk.BaseDiskSpec,
+      unmanaged_nfs_service: Optional[nfs_service.BaseNfsService] = None,
   ):
+    super().__init__(vm, disk_spec)
     if unmanaged_nfs_service:
       self.nfs_service = unmanaged_nfs_service
     else:
@@ -176,37 +180,37 @@ class SetUpNFSDiskStrategy(SetUpDiskStrategy):
           pkb_context.GetThreadBenchmarkSpec(), 'nfs_service'
       )
 
-  def SetUpDiskOnLinux(self, vm, disk_spec: disk.BaseDiskSpec):
+  def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of ram disk."""
-    vm.Install('nfs_utils')
+    self.vm.Install('nfs_utils')
     nfs_disk = self.nfs_service.CreateNfsDisk()
-    vm.MountDisk(
+    self.vm.MountDisk(
         nfs_disk.GetDevicePath(),
-        disk_spec.mount_point,
-        disk_spec.disk_type,
+        self.disk_spec.mount_point,
+        self.disk_spec.disk_type,
         nfs_disk.mount_options,
         nfs_disk.fstab_options,
     )
 
-    vm.scratch_disks.append(nfs_disk)
+    self.vm.scratch_disks.append(nfs_disk)
 
 
 class SetUpSMBDiskStrategy(SetUpDiskStrategy):
   """Strategies to set up NFS disks."""
 
-  def SetUpDiskOnLinux(self, vm, disk_spec):
+  def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of ram disk."""
     smb_service = getattr(pkb_context.GetThreadBenchmarkSpec(), 'smb_service')
     smb_disk = smb_service.CreateSmbDisk()
-    vm.MountDisk(
+    self.vm.MountDisk(
         smb_disk.GetDevicePath(),
-        disk_spec.mount_point,
-        disk_spec.disk_type,
+        self.disk_spec.mount_point,
+        self.disk_spec.disk_type,
         smb_disk.mount_options,
         smb_disk.fstab_options,
     )
 
-    vm.scratch_disks.append(smb_disk)
+    self.vm.scratch_disks.append(smb_disk)
 
 
 class PrepareScratchDiskStrategy:

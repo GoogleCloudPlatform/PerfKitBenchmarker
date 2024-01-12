@@ -1315,14 +1315,14 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     # This method will be depreciate soon.
     # Prepare vm scratch disks:
     if any((spec.disk_type == disk.RAM for spec in self.disk_specs)):
-      disk_strategies.SetUpRamDiskStrategy().SetUpDisk(self, self.disk_specs[0])
+      disk_strategies.SetUpRamDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
       return
     if any((spec.disk_type == disk.NFS for spec in self.disk_specs)):
-      disk_strategies.SetUpNFSDiskStrategy().SetUpDisk(self, self.disk_specs[0])
+      disk_strategies.SetUpNFSDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
       return
 
     if any((spec.disk_type == disk.SMB for spec in self.disk_specs)):
-      disk_strategies.SetUpSMBDiskStrategy().SetUpDisk(self, self.disk_specs[0])
+      disk_strategies.SetUpSMBDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
       return
 
     if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):

@@ -128,9 +128,6 @@ class GCEEmptyCreateDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
 class SetUpGCEResourceDiskStrategy(disk_strategies.SetUpDiskStrategy):
   """Base Strategy class to set up local ssd and pd-ssd."""
 
-  def __init__(self, disk_specs: list[disk.BaseDiskSpec]):
-    self.disk_specs = disk_specs
-
   def FindRemoteNVMEDevices(self, nvme_devices):
     """Find the paths for all remote NVME devices inside the VM."""
     remote_nvme_devices = [
@@ -143,7 +140,6 @@ class SetUpGCEResourceDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
   def UpdateDevicePath(self, scratch_disk, remote_nvme_devices):
     """Updates the paths for all remote NVME devices inside the VM."""
-    disks = []
     if isinstance(scratch_disk, disk.StripedDisk):
       disks = scratch_disk.disks
     else:
@@ -161,55 +157,55 @@ class SetUpGCEResourceDiskStrategy(disk_strategies.SetUpDiskStrategy):
 class SetUpGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
   """Strategies to set up local disks."""
 
-  def SetUpDisk(self, vm: Any, disk_spec: disk.BaseDiskSpec):
+  def SetUpDisk(self):
     # disk spec is not used here.
-    vm.SetupLocalDisks()
+    self.vm.SetupLocalDisks()
     disks = []
-    for _ in range(disk_spec.num_striped_disks):
-      if vm.ssd_interface == gce_disk.SCSI:
-        name = 'local-ssd-%d' % vm.local_disk_counter
-      elif vm.ssd_interface == gce_disk.NVME:
-        name = f'local-nvme-ssd-{vm.local_disk_counter}'
+    for _ in range(self.disk_spec.num_striped_disks):
+      if self.vm.ssd_interface == gce_disk.SCSI:
+        name = 'local-ssd-%d' % self.vm.local_disk_counter
+      elif self.vm.ssd_interface == gce_disk.NVME:
+        name = f'local-nvme-ssd-{self.vm.local_disk_counter}'
       else:
         raise errors.Error('Unknown Local SSD Interface.')
 
-      data_disk = gce_disk.GceLocalDisk(disk_spec, name)
-      vm.local_disk_counter += 1
-      if vm.local_disk_counter > vm.max_local_disks:
+      data_disk = gce_disk.GceLocalDisk(self.disk_spec, name)
+      self.vm.local_disk_counter += 1
+      if self.vm.local_disk_counter > self.vm.max_local_disks:
         raise errors.Error('Not enough local disks.')
       disks.append(data_disk)
 
     if len(disks) == 1:
       scratch_disk = disks[0]
     else:
-      scratch_disk = disk.StripedDisk(disk_spec, disks)
+      scratch_disk = disk.StripedDisk(self.disk_spec, disks)
     # Device path is needed to stripe disks on Linux, but not on Windows.
     # The path is not updated for Windows machines.
-    if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
-      nvme_devices = vm.GetNVMEDeviceInfo()
+    if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+      nvme_devices = self.vm.GetNVMEDeviceInfo()
       remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
       self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
     GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
-        vm, scratch_disk, disk_spec
+        self.vm, scratch_disk, self.disk_spec
     )
 
 
 class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
   """Strategies to Persistance disk on GCE."""
 
-  def __init__(self, disk_specs: list[gce_disk.GceDiskSpec]):
-    super().__init__(disk_specs)
+  def __init__(self, vm, disk_specs: list[gce_disk.GceDiskSpec]):
+    super().__init__(vm, disk_specs[0])
     self.disk_specs = disk_specs
 
-  def SetUpDisk(self, vm: Any, _: disk.BaseDiskSpec):
+  def SetUpDisk(self):
     # disk spec is not used here.
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      disk_group = vm.create_disk_strategy.pd_disk_groups[disk_spec_id]
+      disk_group = self.vm.create_disk_strategy.pd_disk_groups[disk_spec_id]
       # Create the disk if it is not created on create
-      if not vm.create_disk_strategy.DiskCreatedOnVMCreation():
+      if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
         for pd_disk in disk_group:
           pd_disk.Create()
-          pd_disk.Attach(vm)
+          pd_disk.Attach(self.vm)
 
       if len(disk_group) > 1:
         # If the disk_spec called for a striped disk, create one.
@@ -219,12 +215,12 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
 
       # Device path is needed to stripe disks on Linux, but not on Windows.
       # The path is not updated for Windows machines.
-      if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
-        nvme_devices = vm.GetNVMEDeviceInfo()
+      if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+        nvme_devices = self.vm.GetNVMEDeviceInfo()
         remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
         self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
       GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
-          vm, scratch_disk, disk_spec
+          self.vm, scratch_disk, disk_spec
       )
 
 
@@ -238,20 +234,20 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
       'implicit_dirs',
   ]
 
-  def SetUpDiskOnLinux(self, vm, disk_spec):
+  def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of ram disk."""
-    scratch_disk = disk.BaseDisk(disk_spec)
-    vm.Install('gcsfuse')
-    vm.RemoteCommand(
-        f'sudo mkdir -p {disk_spec.mount_point} && sudo chmod a+w'
-        f' {disk_spec.mount_point}'
+    scratch_disk = disk.BaseDisk(self.disk_spec)
+    self.vm.Install('gcsfuse')
+    self.vm.RemoteCommand(
+        f'sudo mkdir -p {self.disk_spec.mount_point} && sudo chmod a+w'
+        f' {self.disk_spec.mount_point}'
     )
 
     opts = ','.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
     bucket = FLAGS.gcsfuse_bucket
-    target = disk_spec.mount_point
-    vm.RemoteCommand(f'sudo mount -t gcsfuse -o {opts} {bucket} {target}')
-    vm.scratch_disks.append(scratch_disk)
+    target = self.disk_spec.mount_point
+    self.vm.RemoteCommand(f'sudo mount -t gcsfuse -o {opts} {bucket} {target}')
+    self.vm.scratch_disks.append(scratch_disk)
 
 
 class GCEPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
