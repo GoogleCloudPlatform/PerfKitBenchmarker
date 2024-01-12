@@ -1103,10 +1103,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     elif not self.is_running_time:
       self.is_running_time = time.time()
 
-  def _GenerateDiskNamePrefix(self, disk_spec_id, index):
-    """Generates a deterministic disk name given disk_spec_id and index."""
-    return f'{self.name}-data-{disk_spec_id}-{index}'
-
   def SetDiskSpec(self, disk_spec, disk_count):
     """Sets Disk Specs of the current VM. Calls before the VM is created."""
     self.create_disk_strategy = gce_disk_strategies.GetCreateDiskStrategy(
