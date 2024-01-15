@@ -101,6 +101,10 @@ flags.register_validator(
     'netperf_benchmarks',
     lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_BENCHMARKS))
 
+flag_util.DEFINE_integerlist(
+    'netperf_latency_percentiles', [50, 90, 99], 'Latency percentiles to calculate/report'
+)
+
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'netperf'
@@ -575,7 +579,7 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams):
           sample.Sample(f'{benchmark_name}_Latency_Histogram', 0, 'us',
                         hist_metadata))
       # Calculate stats on aggregate latency histogram
-      latency_stats = _HistogramStatsCalculator(latency_histogram, [50, 90, 99])
+      latency_stats = _HistogramStatsCalculator(latency_histogram, FLAGS.netperf_latency_percentiles)
       # Create samples for the latency stats
       for stat, value in latency_stats.items():
         samples.append(
