@@ -49,15 +49,17 @@ GCE_REMOTE_DISK_TYPES = [
     HYPERDISK_EXTREME,
     HYPERDISK_BALANCED,
 ]
-GCE_DYNAMIC_IOPS_DISK_TYPES = [
-    PD_EXTREME,
-    HYPERDISK_EXTREME,
-    HYPERDISK_BALANCED,
-]
-GCE_DYNAMIC_THROUGHPUT_DISK_TYPES = [
-    HYPERDISK_BALANCED,
-    HYPERDISK_THROUGHPUT,
-]
+# Defaults picked to align with console.
+GCE_DYNAMIC_IOPS_DISK_TYPE_DEFAULTS = {
+    PD_EXTREME: 100000,
+    HYPERDISK_EXTREME: 100000,
+    HYPERDISK_BALANCED: 3600,
+}
+# Defaults picked to align with console.
+GCE_DYNAMIC_THROUGHPUT_DISK_TYPE_DEFAULTS = {
+    HYPERDISK_BALANCED: 290,
+    HYPERDISK_THROUGHPUT: 180,
+}
 
 REGIONAL_DISK_SCOPE = 'regional'
 
@@ -240,9 +242,9 @@ class GceBootDisk(boot_disk.BootDisk):
     self.boot_disk_type = boot_disk_spec.boot_disk_type
     self.boot_disk_iops = None
     self.boot_disk_throughput = None
-    if self.boot_disk_type in GCE_DYNAMIC_IOPS_DISK_TYPES:
+    if self.boot_disk_type in GCE_DYNAMIC_IOPS_DISK_TYPE_DEFAULTS.keys():
       self.boot_disk_iops = boot_disk_spec.boot_disk_iops
-    if self.boot_disk_type in GCE_DYNAMIC_THROUGHPUT_DISK_TYPES:
+    if self.boot_disk_type in GCE_DYNAMIC_THROUGHPUT_DISK_TYPE_DEFAULTS.keys():
       self.boot_disk_throughput = boot_disk_spec.boot_disk_throughput
 
   def GetCreationCommand(self):
@@ -345,11 +347,19 @@ class GceDisk(disk.BaseDisk):
     self.region = util.GetRegionFromZone(self.zone)
     self.provisioned_iops = None
     self.provisioned_throughput = None
-    if self.disk_type in GCE_DYNAMIC_IOPS_DISK_TYPES:
+    if self.disk_type in GCE_DYNAMIC_IOPS_DISK_TYPE_DEFAULTS.keys():
       self.provisioned_iops = disk_spec.provisioned_iops
+      if not self.provisioned_iops:
+        self.provisioned_iops = GCE_DYNAMIC_IOPS_DISK_TYPE_DEFAULTS[
+            self.disk_type
+        ]
       self.metadata['iops'] = self.provisioned_iops
-    if self.disk_type in GCE_DYNAMIC_THROUGHPUT_DISK_TYPES:
+    if self.disk_type in GCE_DYNAMIC_THROUGHPUT_DISK_TYPE_DEFAULTS.keys():
       self.provisioned_throughput = disk_spec.provisioned_throughput
+      if not self.provisioned_throughput:
+        self.provisioned_throughput = GCE_DYNAMIC_THROUGHPUT_DISK_TYPE_DEFAULTS[
+            self.disk_type
+        ]
       self.metadata['throughput'] = self.provisioned_throughput
 
     disk_metadata = DISK_METADATA[disk_spec.disk_type]
