@@ -44,12 +44,13 @@ BENCHMARK_CONFIG = """
 mongodb_ycsb:
   description: Run YCSB against a single MongoDB node.
   vm_groups:
-    workers:
+    servers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
       vm_count: 1
     clients:
       vm_spec: *default_single_core
+      vm_count: 1
 """
 
 
@@ -82,7 +83,7 @@ def _PrepareServer(vm):
   vm.RemoteCommand('sudo pkill mongod', ignore_failure=True)
 
   vm.RemoteCommand(
-      'nohup sudo /usr/bin/mongod --fork --config %s &'
+      'nohup sudo /usr/bin/mongod --fork --bind_ip_all --config %s &'
       % vm.GetPathToConfig('mongodb_server')
   )
 
@@ -90,6 +91,7 @@ def _PrepareServer(vm):
 def _PrepareClient(vm):
   """Install YCSB on the client VM."""
   vm.Install('ycsb')
+  vm.Install('mongosh')
   # Disable logging for MongoDB driver, which is otherwise quite verbose.
   log_config = """<configuration><root level="WARN"/></configuration>"""
 
@@ -107,7 +109,7 @@ def Prepare(benchmark_spec):
   """
   server_partials = [
       functools.partial(_PrepareServer, mongo_vm)
-      for mongo_vm in benchmark_spec.vm_groups['workers']
+      for mongo_vm in benchmark_spec.vm_groups['servers']
   ]
   client_partials = [
       functools.partial(_PrepareClient, client)
@@ -118,8 +120,8 @@ def Prepare(benchmark_spec):
       (lambda f: f()), server_partials + client_partials
   )
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
-  server = benchmark_spec.vm_groups['workers'][0]
-  benchmark_spec.mongodb_url = ('mongodb://%s:27017/' % server.internal_ip,)
+  server = benchmark_spec.vm_groups['servers'][0]
+  benchmark_spec.mongodb_url = f'mongodb://{server.internal_ip}:27017/'
 
 
 def Run(benchmark_spec):
