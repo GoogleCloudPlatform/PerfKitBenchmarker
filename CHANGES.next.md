@@ -405,3 +405,5 @@
 -   Updated tracer dstat to use pcp dstat.
 -   Removed Windows 2012 after loss of support on all clouds.
 -   Formatted entire directory with https://github.com/google/pyink.
+-   Added a new flag `--azure_attach_disk_with_create` (default=True) to
+    enable/disable attach of disks to VM as a part of Disk creation for Azure.

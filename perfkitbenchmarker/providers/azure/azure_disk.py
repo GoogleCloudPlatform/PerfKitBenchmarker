@@ -20,12 +20,10 @@ See http://msdn.microsoft.com/en-us/library/azure/dn790303.aspx for more
 information about azure disks.
 """
 
-
 import itertools
 import json
 import re
 import threading
-
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -154,6 +152,9 @@ class AzureDisk(disk.BaseDisk):
     self.vm = vm
     self.vm_name = vm.name
     self.name = self.vm_name + str(lun)
+    self.zone = vm.zone
+    self.availability_zone = vm.availability_zone
+    self.region = util.GetRegionFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup()
     self.storage_account = vm.storage_account
     # lun is Azure's abbreviation for "logical unit number"
@@ -194,7 +195,6 @@ class AzureDisk(disk.BaseDisk):
   def _Create(self):
     """Creates the disk."""
     assert not self.is_image
-
     if self.disk_type == ULTRA_STORAGE and not self.vm.availability_zone:
       raise Exception(
           f'Azure Ultradisk is being created in zone "{self.zone}"'
@@ -203,31 +203,45 @@ class AzureDisk(disk.BaseDisk):
           'eastus1-2 for availability zone 2 in zone eastus1'
       )
     with self._lock:
+      if FLAGS.azure_attach_disk_with_create:
+        cmd = [
+            azure.AZURE_PATH,
+            'vm',
+            'disk',
+            'attach',
+            '--new',
+            '--caching',
+            self.host_caching,
+            '--name',
+            self.name,
+            '--lun',
+            str(self.lun),
+            '--sku',
+            self.disk_type,
+            '--vm-name',
+            self.vm_name,
+            '--size-gb',
+            str(self.disk_size),
+        ] + self.resource_group.args
+      else:
+        cmd = [
+            azure.AZURE_PATH,
+            'disk',
+            'create',
+            '--name',
+            self.name,
+            '--size-gb',
+            str(self.disk_size),
+            '--sku',
+            self.disk_type,
+            '--location',
+            self.region,
+            '--zone',
+            self.availability_zone,
+        ] + self.resource_group.args
       _, _, retcode = vm_util.IssueCommand(
-          [
-              azure.AZURE_PATH,
-              'vm',
-              'disk',
-              'attach',
-              '--new',
-              '--caching',
-              self.host_caching,
-              '--name',
-              self.name,
-              '--lun',
-              str(self.lun),
-              '--sku',
-              self.disk_type,
-              '--vm-name',
-              self.vm_name,
-              '--size-gb',
-              str(self.disk_size),
-          ]
-          + self.resource_group.args,
-          raise_on_failure=False,
-          timeout=600,
+          cmd, raise_on_failure=False, timeout=600
       )
-
       if retcode:
         raise errors.Resource.RetryableCreationError(
             'Error creating Azure disk.'
@@ -312,8 +326,27 @@ class AzureDisk(disk.BaseDisk):
     Args:
       vm: The AzureVirtualMachine instance to which the disk will be attached.
     """
-    pass  # TODO(user): Implement Attach()
-    # (not critical because disks are attached to VMs when created)
+    if FLAGS.azure_attach_disk_with_create:
+      return
+    _, _, retcode = vm_util.IssueCommand(
+        [
+            azure.AZURE_PATH,
+            'vm',
+            'disk',
+            'attach',
+            '--vm-name',
+            self.vm.name,
+            '--name',
+            self.name,
+        ]
+        + self.resource_group.args,
+        raise_on_failure=False,
+        timeout=600,
+    )
+    if retcode:
+      raise errors.Resource.RetryableCreationError(
+          'Error attaching Azure disk to VM.'
+      )
 
   def Detach(self):
     """Detaches the disk from a VM."""

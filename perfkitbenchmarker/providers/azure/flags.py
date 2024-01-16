@@ -151,3 +151,8 @@ flags.DEFINE_enum(
     'The Runtime Interface used when interacting with Synapse.',
 )
 flags.DEFINE_string('query_timeout', '600', 'Query timeout in seconds.')
+flags.DEFINE_boolean(
+    'azure_attach_disk_with_create',
+    True,
+    'Whether to create PD disks at VM creation time. Defaults to True.',
+)
