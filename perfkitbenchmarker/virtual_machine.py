@@ -51,7 +51,7 @@ import six
 FLAGS = flags.FLAGS
 DEFAULT_USERNAME = 'perfkit'
 QUOTA_EXCEEDED_MESSAGE = 'Creation failed due to quota exceeded: '
-PREPROVISIONED_DATA_TIMEOUT = 300
+PREPROVISIONED_DATA_TIMEOUT = 600
 
 
 def ValidateVmMetadataFlag(options_list):
