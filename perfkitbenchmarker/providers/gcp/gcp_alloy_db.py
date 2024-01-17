@@ -252,6 +252,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
           self.instance_id,
           f'--database-flags=^:^{database_flags_str}',
           f'--cluster={self.cluster_id}',
+          '--no-async',
       ]
       cmd = self._GetAlloyDbCommand(cmd_string)
       cmd.Issue(timeout=CREATION_TIMEOUT)
