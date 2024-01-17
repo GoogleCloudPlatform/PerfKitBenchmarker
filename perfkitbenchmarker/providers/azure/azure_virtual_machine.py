@@ -520,6 +520,7 @@ def _GetSkuType(machine_type):
   # TODO(user): add support for FSv2 machine types when no longer in preview
   # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/dedicated-hosts
   sku = ''
+  assert isinstance(machine_type, str)
   if re.match('Standard_D[0-9]*s_v3', machine_type):
     sku = 'DSv3-Type1'
   elif re.match('Standard_E[0-9]*s_v3', machine_type):
@@ -657,6 +658,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Format for Azure availability zone support is "region-availability_zone"
     # Example: eastus2-1 is Azure region eastus2 with availability zone 1.
 
+    assert isinstance(self.zone, str)
+    assert isinstance(self.machine_type, str)
     self.region = util.GetRegionFromZone(self.zone)
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
     self.use_dedicated_host = vm_spec.use_dedicated_host
@@ -778,6 +781,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Create(self):
     """See base class."""
+    assert self.network is not None
     disk_size_args = []
     if self.os_disk.disk_size:
       disk_size_args = ['--os-disk-size-gb', str(self.os_disk.disk_size)]
@@ -1107,6 +1111,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     )
 
   def GetResourceMetadata(self):
+    assert self.network is not None
     result = super(AzureVirtualMachine, self).GetResourceMetadata()
     result['accelerated_networking'] = self.nic.accelerated_networking
     result['boot_disk_type'] = self.os_disk.disk_type

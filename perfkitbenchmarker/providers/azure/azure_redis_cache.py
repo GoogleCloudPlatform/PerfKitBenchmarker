@@ -41,6 +41,8 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
   # Azure redis could take up to an hour to create
   READY_TIMEOUT = 60 * 60  # 60 minutes
 
+  redis_version: str | None = None
+
   def __init__(self, spec):
     super(AzureRedisCache, self).__init__(spec)
     self.redis_region = FLAGS.cloud_redis_region
@@ -54,7 +56,6 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
       self.azure_tier = 'Premium'
     else:
       self.azure_tier = 'Basic'
-    self.redis_version = None
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cache.
