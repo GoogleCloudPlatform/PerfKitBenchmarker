@@ -96,6 +96,7 @@ cluster_boot:
       disk_count: 3
       disk_spec:
         GCP:
+          disk_type: pd-ssd
           disk_size: 75
       vm_count: 2
       vm_spec:
@@ -263,7 +264,9 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
 
     self.assertEqual(vm2.disk_specs[0].mount_point, '/scratch')
 
+  @flagsaver.flagsaver
   def testValidConfigWithDiskSpec(self):
+    FLAGS.zone = ['asia-east1-a']
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
         VALID_CONFIG_WITH_DISK_SPEC
     )
@@ -271,7 +274,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     vms = spec.vm_groups['default']
     self.assertEqual(len(vms), 2)
     for vm in vms:
-      self.assertEqual(len(vm.disk_specs), 3)
+      self.assertEqual(len(vm.create_disk_strategy.pd_disk_groups), 3)
       self.assertTrue(
           all(disk_spec.disk_size == 75 for disk_spec in vm.disk_specs)
       )

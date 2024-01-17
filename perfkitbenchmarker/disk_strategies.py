@@ -91,13 +91,19 @@ class CreateDiskStrategy:
     """Returns whether the disk is created on the VM."""
     raise NotImplementedError()
 
+  def GetSetupDiskStrategy(self) -> 'SetUpDiskStrategy':
+    """Returns the SetUpDiskStrategy for the disk."""
+    return EmptySetupDiskStrategy(self.vm, self.disk_spec)
+
 
 class EmptyCreateDiskStrategy(CreateDiskStrategy):
   """Strategies to create nothing. Useful when there is no resource disk."""
 
   # pylint: disable=super-init-not-called
   def __init__(self, vm: Any, disk_spec: disk.BaseDiskSpec, disk_count: int):
-    pass
+    self.disk_spec = disk_spec
+    self.disk_count = disk_count
+    self.vm = vm
 
   def _CreateAndAttachDisk(self) -> None:
     """Does nothing."""
@@ -137,7 +143,7 @@ class SetUpDiskStrategy:
     )
 
 
-class EmptyDiskStrategy(SetUpDiskStrategy):
+class EmptySetupDiskStrategy(SetUpDiskStrategy):
   """Strategies to set up nothing. This is useful when there is no disk."""
 
   def SetUpDisk(self) -> None:

@@ -36,12 +36,12 @@ def GetCreateDiskStrategy(
     disk_spec: gce_disk.GceDiskSpec,
     disk_count: int,
 ) -> disk_strategies.CreateDiskStrategy:
-  if disk_spec:
+  if disk_spec and disk_count > 0:
     if disk_spec.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES:
       return CreatePDDiskStrategy(vm, disk_spec, disk_count)
     elif disk_spec.disk_type == disk.LOCAL:
       return CreateLSSDDiskStrategy(vm, disk_spec, disk_count)
-  return GCEEmptyCreateDiskStrategy(vm, disk_spec, disk_count)
+  return GCECreateNonResourceDiskStrategy(vm, disk_spec, disk_count)
 
 
 class GCPCreateDiskStrategy(disk_strategies.CreateDiskStrategy):
@@ -107,6 +107,10 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
       dic['create-disk'] = create_disks
     return dic
 
+  def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
+    """Returns the SetUpDiskStrategy for the disk."""
+    return SetUpPDDiskStrategy(self.vm, self.disk_specs)
+
 
 class CreateLSSDDiskStrategy(GCPCreateDiskStrategy):
   """Contains logic to create LSSD disk on VM."""
@@ -115,14 +119,34 @@ class CreateLSSDDiskStrategy(GCPCreateDiskStrategy):
     """Returns whether the disk is created on VM creation."""
     return True
 
+  def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
+    """Returns the SetUpDiskStrategy for the disk."""
+    return SetUpGceLocalDiskStrategy(self.vm, self.disk_spec)
 
-class GCEEmptyCreateDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
-  """Empty CreateDiskStrategy for GCE when disks are not needed."""
+
+class GCECreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
+  """CreateDiskStrategy when there is no pd disks."""
 
   def DiskCreatedOnVMCreation(self) -> bool:
     # This have to be set to False due to _CreateScratchDiskFromDisks in
     # virtual_machine.py.
     return False
+
+  def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
+    """Returns the SetUpDiskStrategy for the disk."""
+    if not self.disk_spec:
+      return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
+
+    if self.disk_spec.disk_type == disk.RAM:
+      return disk_strategies.SetUpRamDiskStrategy(self.vm, self.disk_spec)
+
+    elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
+      return SetUpGcsFuseDiskStrategy(self.vm, self.disk_spec)
+
+    elif self.disk_spec.disk_type == disk.NFS:
+      return disk_strategies.SetUpNFSDiskStrategy(self.vm, self.disk_spec)
+
+    return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
 
 
 class SetUpGCEResourceDiskStrategy(disk_strategies.SetUpDiskStrategy):

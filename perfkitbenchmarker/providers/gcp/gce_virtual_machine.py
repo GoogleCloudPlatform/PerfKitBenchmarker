@@ -40,8 +40,6 @@ from typing import Dict, List, Optional, Tuple
 from absl import flags
 from perfkitbenchmarker import boot_disk
 from perfkitbenchmarker import custom_virtual_machine_spec
-from perfkitbenchmarker import disk
-from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
@@ -59,7 +57,6 @@ from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 import six
-from six.moves import range
 import yaml
 
 FLAGS = flags.FLAGS
@@ -1109,39 +1106,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self, disk_spec, disk_count
     )
 
-    # This method will be deprecate soon.
-    self.disk_specs = [copy.copy(disk_spec) for _ in range(disk_count)]
-    # In the event that we need to create multiple disks from the same
-    # DiskSpec, we need to ensure that they have different mount points.
-    if disk_count > 1 and disk_spec.mount_point:
-      for i, vm_disk_spec in enumerate(self.disk_specs):
-        vm_disk_spec.mount_point += str(i)
-
   def SetupAllScratchDisks(self):
     """Set up all scratch disks of the current VM."""
-    if not self.disk_specs:
-      return
-
     # Prepare vm scratch disks:
-    if any((spec.disk_type == disk.RAM for spec in self.disk_specs)):
-      disk_strategies.SetUpRamDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
-      return
-
-    if any((spec.disk_type == disk.OBJECT_STORAGE for spec in self.disk_specs)):
-      gce_disk_strategies.SetUpGcsFuseDiskStrategy(
-          self, self.disk_specs[0]
-      ).SetUpDisk()
-      return
-    if any((spec.disk_type == disk.NFS for spec in self.disk_specs)):
-      disk_strategies.SetUpNFSDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
-      return
-    if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
-      gce_disk_strategies.SetUpGceLocalDiskStrategy(
-          self, self.disk_specs[0]
-      ).SetUpDisk()
-      return
-
-    gce_disk_strategies.SetUpPDDiskStrategy(self, self.disk_specs).SetUpDisk()
+    self.create_disk_strategy.GetSetupDiskStrategy().SetUpDisk()
 
   def CreateIpReservation(
       self, ip_address_name: str
