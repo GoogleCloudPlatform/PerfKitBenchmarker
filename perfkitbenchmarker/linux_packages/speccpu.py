@@ -300,6 +300,10 @@ class SpecInstallConfigurations(object):
     Args:
       scratch_dir: The scratch directory on the VM that SPEC is installed on.
     """
+
+    if self.base_spec_dir is None:
+      raise ValueError('base_spec_dir must be set.')
+
     self.spec_dir = posixpath.join(scratch_dir, self.base_spec_dir)
     self.cfg_file_path = posixpath.join(
         self.spec_dir, 'config', os.path.basename(self.runspec_config)

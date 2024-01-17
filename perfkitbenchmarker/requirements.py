@@ -42,6 +42,7 @@ def _CheckRequirements(requirements_file_path):
           with open(file_path, 'r') as fp:
             lines = deque(fp.readlines())
         elif line:
+          assert pkg_resources.require is not None
           pkg_resources.require(line)
   except (
       pkg_resources.DistributionNotFound,

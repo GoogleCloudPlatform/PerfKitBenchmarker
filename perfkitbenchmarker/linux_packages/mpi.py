@@ -410,6 +410,8 @@ class MpiResultParser(Iterable[MpiResult]):
           # only tests that have been patched have the percentile metrics
           logging.info('No percentiles data for benchmark')
         else:
+          if on_deck.data is None:
+            raise ValueError('MpiData on_deck has None data')
           on_deck.data.update(percentiles)
         yield on_deck
         on_deck: MpiData = None

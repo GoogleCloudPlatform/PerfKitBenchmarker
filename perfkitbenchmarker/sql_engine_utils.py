@@ -192,6 +192,10 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
       suppress_stdout: bool = False,
   ):
     """Issue Sql Command."""
+
+    if self.ENGINE_TYPE is None:
+      raise ValueError('ENGINE_TYPE is None')
+
     command_string = None
     # Get the command to issue base on type
     if isinstance(command, dict):

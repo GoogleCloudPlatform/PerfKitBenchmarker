@@ -255,6 +255,8 @@ class PkbSparkService(BaseSparkService):
       cmd_list += job_arguments
     cmd_string = ' '.join(cmd_list)
     start_time = datetime.datetime.now()
+    if self.leader is None:
+      raise ValueError('leader is not set. Call _Create first.')
     stdout, _ = self.leader.RemoteCommand(cmd_string)
     end_time = datetime.datetime.now()
     if job_stdout_file:
