@@ -23,9 +23,13 @@ YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 
 import functools
 import posixpath
+from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import ycsb
 
 # See http://api.mongodb.org/java/2.13/com/mongodb/WriteConcern.html
@@ -53,19 +57,21 @@ mongodb_ycsb:
       vm_count: 1
 """
 
+_LinuxVM = linux_virtual_machine.BaseLinuxVirtualMachine
 
-def GetConfig(user_config):
+
+def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
   return config
 
 
-def _GetDataDir(vm):
+def _GetDataDir(vm: _LinuxVM) -> str:
   return posixpath.join(vm.GetScratchDir(), 'mongodb-data')
 
 
-def _PrepareServer(vm):
+def _PrepareServer(vm: _LinuxVM) -> None:
   """Installs MongoDB on the server."""
   vm.Install('mongodb_server')
   data_dir = _GetDataDir(vm)
@@ -88,7 +94,7 @@ def _PrepareServer(vm):
   )
 
 
-def _PrepareClient(vm):
+def _PrepareClient(vm: _LinuxVM) -> None:
   """Install YCSB on the client VM."""
   vm.Install('ycsb')
   vm.Install('mongosh')
@@ -100,7 +106,7 @@ def _PrepareClient(vm):
   )
 
 
-def Prepare(benchmark_spec):
+def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Install MongoDB on one VM and YCSB on another.
 
   Args:
@@ -124,7 +130,7 @@ def Prepare(benchmark_spec):
   benchmark_spec.mongodb_url = f'mongodb://{server.internal_ip}:27017/'
 
 
-def Run(benchmark_spec):
+def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Run YCSB with against MongoDB.
 
   Args:
@@ -151,7 +157,7 @@ def Run(benchmark_spec):
   return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Remove MongoDB and YCSB.
 
   Args:
@@ -159,7 +165,7 @@ def Cleanup(benchmark_spec):
       required to run the benchmark.
   """
 
-  def CleanupServer(server):
+  def CleanupServer(server: _LinuxVM) -> None:
     server.RemoteCommand(
         'sudo service %s stop' % server.GetServiceName('mongodb_server')
     )
