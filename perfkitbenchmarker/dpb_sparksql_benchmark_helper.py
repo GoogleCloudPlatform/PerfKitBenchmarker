@@ -225,7 +225,9 @@ def Prepare(benchmark_spec):
 
   benchmark_spec.table_subdirs = []
   if FLAGS.dpb_sparksql_data:
-    table_dir = FLAGS.dpb_sparksql_data.rstrip('/') + '/'
+    # Replace s3a scheme (used for S3 Express in Spark) with s3
+    table_dir = re.sub(r'^s3a://', 's3://', FLAGS.dpb_sparksql_data)
+    table_dir = table_dir.rstrip('/') + '/'
     stdout = storage_service.List(table_dir)
     for line in stdout.split('\n'):
       # GCS will sometimes list the directory itself.
