@@ -38,7 +38,7 @@ from tests import pkb_common_test_case
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
 
-test_machine_type = 'n1-standard-2'
+test_machine_type = ['n1-standard-2', 'n1-standard-4']
 
 
 class TestCreateFailedRunSampleFlag(unittest.TestCase):

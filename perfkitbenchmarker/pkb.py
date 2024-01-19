@@ -70,7 +70,7 @@ import sys
 import threading
 import time
 import types
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Type
+from typing import Any, Collection, Dict, List, Optional, Sequence, Set, Tuple, Type
 import uuid
 
 from absl import flags
@@ -1036,6 +1036,16 @@ def _ShouldRetry(spec: bm_spec.BenchmarkSpec) -> bool:
   )
 
 
+def _GetMachineTypes(spec: bm_spec.BenchmarkSpec) -> list[str]:
+  """Returns a deduped list of machine types to provision for the given spec."""
+  if FLAGS.machine_type:
+    return FLAGS.machine_type
+  results = set()
+  for vm_group_spec in spec.vms_to_boot.values():
+    results.add(vm_group_spec.vm_spec.machine_type)
+  return sorted(list(results))
+
+
 def RunBenchmarkTask(
     spec: bm_spec.BenchmarkSpec,
 ) -> Tuple[Sequence[bm_spec.BenchmarkSpec], List[sample.SampleDict]]:
@@ -1059,7 +1069,7 @@ def RunBenchmarkTask(
     # Unset run_uri so the config value takes precedence.
     FLAGS['run_uri'].present = 0
 
-  zone_retry_manager = ZoneRetryManager(FLAGS.machine_type)
+  zone_retry_manager = ZoneRetryManager(_GetMachineTypes(spec))
   # Set the run count.
   max_run_count = 1 + pkb_flags.MAX_RETRIES.value
 
@@ -1139,21 +1149,23 @@ class ZoneRetryManager:
     zones_tried: Zones that have already been tried in previous runs.
   """
 
-  def __init__(self, machine_type: str):
-    self._CheckFlag(machine_type)
+  def __init__(self, machine_types: Collection[str]):
+    self._CheckFlag(machine_types)
     if (
         not pkb_flags.SMART_CAPACITY_RETRY.value
         and not pkb_flags.SMART_QUOTA_RETRY.value
     ):
       return
-    self._machine_type = machine_type
+    self._machine_types = list(machine_types)
     self._zones_tried: Set[str] = set()
     self._regions_tried: Set[str] = set()
     self._utils: types.ModuleType = providers.LoadProviderUtils(FLAGS.cloud)
     self._SetOriginalZoneAndFlag()
 
-  def _CheckMachineTypeIsSupported(self, machine_type: str) -> None:
-    if not machine_type:
+  def _CheckMachineTypesAreSpecified(
+      self, machine_types: Collection[str]
+  ) -> None:
+    if not machine_types:
       raise errors.Config.MissingOption(
           'machine_type flag must be specified on the command line '
           'if zone=any feature is used.'
@@ -1162,12 +1174,12 @@ class ZoneRetryManager:
   def _GetCurrentZoneFlag(self):
     return FLAGS[self._zone_flag].value[0]
 
-  def _CheckFlag(self, machine_type: str) -> None:
+  def _CheckFlag(self, machine_types: Collection[str]) -> None:
     for zone_flag in ['zone', 'zones']:
       if FLAGS[zone_flag].value:
         self._zone_flag = zone_flag
         if self._GetCurrentZoneFlag() == _ANY_ZONE:
-          self._CheckMachineTypeIsSupported(machine_type)
+          self._CheckMachineTypesAreSpecified(machine_types)
           FLAGS['smart_capacity_retry'].parse(True)
           FLAGS['smart_quota_retry'].parse(True)
 
@@ -1175,8 +1187,12 @@ class ZoneRetryManager:
     """Records the flag name and zone value that the benchmark started with."""
     # This is guaranteed to set values due to flag validator.
     self._supported_zones = self._utils.GetZonesFromMachineType(
-        self._machine_type
+        self._machine_types[0]
     )
+    for machine_type in self._machine_types[1:]:
+      self._supported_zones.intersection_update(
+          self._utils.GetZonesFromMachineType(machine_type)
+      )
     if self._GetCurrentZoneFlag() == _ANY_ZONE:
       if pkb_flags.MAX_RETRIES.value < 1:
         FLAGS['retries'].parse(len(self._supported_zones))
