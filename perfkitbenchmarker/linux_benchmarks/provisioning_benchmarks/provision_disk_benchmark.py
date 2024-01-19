@@ -21,17 +21,13 @@ TODO(user) this benchmark currently only works for GCE, and needs some
 refactoring to become cloud-agnostic.
 """
 
-import time
 from typing import List
-
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.providers.gcp import gce_disk
-
 FLAGS = flags.FLAGS
 
 
@@ -47,6 +43,10 @@ provision_disk:
         GCP:
           machine_type: n2-standard-2
           zone: us-central1-c
+      disk_spec:
+        GCP:
+          disk_type: pd-ssd
+          disk_size: 10
 """
 
 
@@ -58,6 +58,14 @@ def Prepare(_):
   pass
 
 
+def CheckPrerequisites(benchmark_config):
+  """Perform flag checks."""
+  if not disk.IsRemoteDisk(
+      benchmark_config.vm_groups['default'].disk_spec.disk_type
+  ):
+    raise ValueError('Disk type must be a remote disk')
+
+
 def _WaitUntilAttached(vm, dsk) -> None:
   while vm.RemoteCommand(f'ls {dsk.GetDevicePath()}')[1]:
     continue
@@ -65,33 +73,38 @@ def _WaitUntilAttached(vm, dsk) -> None:
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs the benchmark."""
-  disk_spec_class = disk.GetDiskSpecClass(FLAGS.cloud, None)
-  disk_spec = disk_spec_class('provisioning', flag_values=FLAGS)
   vm: linux_virtual_machine.BaseLinuxVirtualMachine = bm_spec.vms[0]
 
   # TODO(user) in order for this to be cloud agnostic, we need to
-  # refactor the disk logic for each cloud into: 1) initializing the disk
-  # object, 2) creating it, 3) attaching it, and 4) formatting/mounting and
-  # other prep. We cannot directly call vm.CreateScratchDisk because it has
-  # extra steps.
-  managed_disk: disk.BaseDisk = gce_disk.GceDisk(
-      disk_spec, f'pkb-provisioning-{FLAGS.run_uri}', vm.zone, vm.project
-  )
-  start_time = time.time()
-  managed_disk.Create()
-  create_time = time.time() - start_time
-  managed_disk.Attach(vm)
-  _WaitUntilAttached(vm, managed_disk)
-  time_to_ls = time.time() - start_time
-
-  samples = managed_disk.GetSamples()
-  metadata = managed_disk.GetResourceMetadata()
-  samples.extend([
-      sample.Sample('Time to Create Disk', create_time, 'seconds', metadata),
-      sample.Sample(
-          'Time to Create and Attach Disk', time_to_ls, 'seconds', metadata
-      ),
-  ])
+  # refactor the virtual machine code for all the clouds to use disk strategies
+  # like GCE
+  if vm.create_disk_strategy is None:
+    raise ValueError('VM Create Disk Strategy is None')
+  if vm.create_disk_strategy.DiskCreatedOnVMCreation():
+    raise ValueError(
+        'Disk created on vm creation, cannot measure provisioning time.'
+        'Please set the flag --gcp_create_disks_with_vm=false to create disk'
+        'after VM creation.'
+    )
+  samples = []
+  disk_details = vm.create_disk_strategy.pd_disk_groups
+  for disk_group in disk_details:
+    for disk_details in disk_group:
+      total_time = 0
+      for sample_details in disk_details.GetSamples():
+        if sample_details.metric == 'Time to Create':
+          total_time += sample_details.value
+        elif sample_details.metric == 'Time to Attach':
+          total_time += sample_details.value
+      samples.extend(disk_details.GetSamples())
+      samples.extend([
+          sample.Sample(
+              'Time to Create and Attach Disk',
+              total_time,
+              'seconds',
+              vm.GetResourceMetadata(),
+          ),
+      ])
   return samples
 
 

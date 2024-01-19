@@ -427,7 +427,7 @@ class GceDisk(disk.BaseDisk):
     return bool(result)
 
   @vm_util.Retry()
-  def Attach(self, vm):
+  def _Attach(self, vm):
     """Attaches the disk to a VM.
 
     Args:

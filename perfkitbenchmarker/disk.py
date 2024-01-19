@@ -17,9 +17,12 @@ Disks can be created, deleted, attached to VMs, and detached from VMs.
 """
 
 import abc
+import time
+from typing import List
 
 from absl import flags
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 import six
@@ -117,6 +120,10 @@ def GetDiskSpecClass(cloud, disk_type):
   if spec_class is BaseDiskSpec:
     return spec.GetSpecClass(BaseDiskSpec, CLOUD=cloud)
   return spec_class
+
+
+def IsRemoteDisk(disk_type):
+  return disk_type not in [LOCAL, NFS, SMB, RAM]
 
 
 class BaseDiskSpec(spec.BaseSpec):
@@ -345,7 +352,11 @@ class BaseSMBDiskSpec(BaseDiskSpec):
 
 
 class BaseDisk(resource.BaseResource):
-  """Object representing a Base Disk."""
+  """Object representing a Base Disk.
+
+  attach_start_time: time when we start the disk attach to vm
+  attach_end_time: time when disk attach to vm is done
+  """
 
   is_striped = False
 
@@ -377,6 +388,8 @@ class BaseDisk(resource.BaseResource):
     # numbers are used in diskpart scripts in order to identify the disks
     # that we want to operate on.
     self.disk_number = disk_spec.disk_number
+    self.attach_start_time: float = None
+    self.attach_end_time: float = None
 
   @property
   def mount_options(self):
@@ -408,6 +421,16 @@ class BaseDisk(resource.BaseResource):
     return opts
 
   def Attach(self, vm):
+    """Attaches the disk to a VM and calculates the attach time.
+
+    Args:
+      vm: The BaseVirtualMachine instance to which the disk will be attached.
+    """
+    self.attach_start_time = time.time()
+    self._Attach(vm)
+    self.attach_end_time = time.time()
+
+  def _Attach(self, vm):
     """Attaches the disk to a VM.
 
     Args:
@@ -436,6 +459,20 @@ class BaseDisk(resource.BaseResource):
   def _Delete(self):
     # handled by disk
     pass
+
+  def GetSamples(self) -> List[sample.Sample]:
+    samples = super(BaseDisk, self).GetSamples()
+    metadata = self.GetResourceMetadata()
+    if self.attach_start_time and self.attach_end_time:
+      samples.append(
+          sample.Sample(
+              'Time to Attach',
+              self.attach_end_time - self.attach_start_time,
+              'seconds',
+              metadata,
+          )
+      )
+    return samples
 
 
 class StripedDisk(BaseDisk):

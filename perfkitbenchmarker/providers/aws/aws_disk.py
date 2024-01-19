@@ -578,7 +578,7 @@ class AwsDisk(disk.BaseDisk):
       cls.available_device_letters_by_vm[vm_name].remove(device_letter)
     return device_letter
 
-  def Attach(self, vm):
+  def _Attach(self, vm):
     """Attaches the disk to a VM.
 
     Args:

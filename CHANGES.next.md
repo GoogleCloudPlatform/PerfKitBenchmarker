@@ -407,3 +407,6 @@
 -   Formatted entire directory with https://github.com/google/pyink.
 -   Added a new flag `--azure_attach_disk_with_create` (default=True) to
     enable/disable attach of disks to VM as a part of Disk creation for Azure.
+-   Using the flag `--gcp_create_disks_with_vm=false` in provision_disk benchmark
+    to separate disk creation from VM creation in GCP and get the disk create
+    and attach time.

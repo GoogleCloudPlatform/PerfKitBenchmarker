@@ -320,7 +320,7 @@ class AzureDisk(disk.BaseDisk):
     except:
       return False
 
-  def Attach(self, vm):
+  def _Attach(self, vm):
     """Attaches the disk to a VM.
 
     Args:
