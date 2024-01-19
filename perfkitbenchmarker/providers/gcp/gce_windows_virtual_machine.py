@@ -147,8 +147,9 @@ class WindowsGceVirtualMachine(
     response = json.loads(stdout)
     return response['password']
 
-  def _PostCreate(self):
-    super(WindowsGceVirtualMachine, self)._PostCreate()
+  def Create(self, restore: bool = False) -> None:
+    """Get the windows password from the VM after VM is ready."""
+    super().Create(restore=restore)
     self.password = self._GetWindowsPassword()
 
   def _PreemptibleMetadataKeyValue(self) -> Tuple[str, str]:
