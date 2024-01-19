@@ -747,9 +747,14 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
         value, component_full_name, flag_values
     )
     if 'engine' in relational_db_config:
-      db_spec_class = relational_db_spec.GetRelationalDbSpecClass(
-          relational_db_config['engine']
-      )
+      if flag_values['db_engine'].present:
+        db_spec_class = relational_db_spec.GetRelationalDbSpecClass(
+            flag_values['db_engine'].value
+        )
+      else:
+        db_spec_class = relational_db_spec.GetRelationalDbSpecClass(
+            relational_db_config['engine']
+        )
     else:
       raise errors.Config.InvalidValue(
           'Required attribute `engine` missing from relational_db config.'

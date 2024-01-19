@@ -79,6 +79,10 @@ flags.DEFINE_list(
 flags.DEFINE_string(
     'client_vm_zone', None, 'zone or region to launch the client in. '
 )
+
+flags.DEFINE_integer(
+    'client_vm_count', None, 'Number of client vms to provision '
+)
 flags.DEFINE_string('db_machine_type', None, 'Machine type of the database.')
 flags.DEFINE_integer('db_cpus', None, 'Number of Cpus in the database.')
 flags.DEFINE_string(

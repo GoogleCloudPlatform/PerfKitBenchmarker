@@ -273,6 +273,12 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
         config_values['vm_groups']['servers']['vm_spec'][cloud]['zone'] = (
             flag_values.db_zone[0]
         )
+
+    if flag_values['client_vm_count'].present:
+      config_values['vm_groups']['clients'][
+          'vm_count'
+      ] = flag_values.client_vm_count
+
     if flag_values['client_vm_zone'].present:
       config_values['vm_groups']['clients']['vm_spec'][cloud][
           'zone'
