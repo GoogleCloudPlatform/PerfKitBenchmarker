@@ -411,3 +411,4 @@
     benchmark to separate disk creation from VM creation in GCP and get the disk
     create and attach time.
 -   Reduce duplicate code in MaintenanceEventTrigger.AppendSamples().
+-   Attach "run_number" label to "LM Total Time" sample.

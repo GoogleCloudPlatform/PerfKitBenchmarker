@@ -125,12 +125,21 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
           [float(d['Host_maintenance_end']) * 1000 for d in lm_event_dicts],
           default=0,
       )
+
+      # Populate the run_number "LM Total Time" by copying the metadata from
+      # (one of) the existing samples. Ideally pkb.DoRunPhase() would have sole
+      # responsibility for populating run_number for all samples, but making
+      # that change might be risky.
+      sample_metadata = (
+          copy.deepcopy(samples[0].metadata) if len(samples) > 0 else {}
+      )
+
       return [
           sample.Sample(
               'LM Total Time',
               d['LM_total_time'],
               'seconds',
-              d,
+              sample_metadata | d,
           )
           for d in lm_event_dicts
       ]
