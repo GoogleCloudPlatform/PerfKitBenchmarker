@@ -109,25 +109,33 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
       samples: List[sample.Sample],
   ):
     """Append samples related to Live Migration."""
-    if self.capture_live_migration_timestamps:
-      # Block test exit until LM ended.
-      lm_ends = 0
-      for vm in self.vms:
-        vm.WaitLMNotificationRelease()
-        lm_events_dict = vm.CollectLMNotificationsTime()
-        # Host maintenance is in s
-        lm_ends = max(
-            lm_ends, float(lm_events_dict['Host_maintenance_end']) * 1000
-        )
-        samples.append(
-            sample.Sample(
-                'LM Total Time',
-                lm_events_dict['LM_total_time'],
-                'seconds',
-                lm_events_dict,
-            )
-        )
-      self.lm_ends = lm_ends
+
+    def generate_lm_total_time_samples() -> List[sample.Sample]:
+      lm_event_dicts = []
+      if self.capture_live_migration_timestamps:
+        # Block test exit until LM ended.
+        for vm in self.vms:
+          vm.WaitLMNotificationRelease()
+          lm_event_dicts.append(vm.CollectLMNotificationsTime())
+      else:
+        return []
+
+      # Host maintenance is in s
+      self.lm_ends = max(
+          [float(d['Host_maintenance_end']) * 1000 for d in lm_event_dicts],
+          default=0,
+      )
+      return [
+          sample.Sample(
+              'LM Total Time',
+              d['LM_total_time'],
+              'seconds',
+              d,
+          )
+          for d in lm_event_dicts
+      ]
+
+    samples.extend(generate_lm_total_time_samples())
     self._AppendAggregatedMetrics(samples)
 
   def _AppendAggregatedMetrics(self, samples: List[sample.Sample]):
