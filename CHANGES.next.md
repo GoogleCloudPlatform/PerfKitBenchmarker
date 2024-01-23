@@ -273,6 +273,8 @@
 -   Support Azure ZRS disks and hyperdisk balanced.
 -   Add --create_container_cluster_time_resize option to time adding node to
     provisioned Kubernetes clusters.
+-   Added function under perfkitbenchmarker.publisher to de-serialize labels
+    from a string.
 
 ### Bug fixes and maintenance updates:
 

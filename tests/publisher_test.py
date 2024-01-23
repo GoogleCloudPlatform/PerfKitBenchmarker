@@ -792,5 +792,36 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
     mock_write_data.assert_called_once_with(expected_output)
 
 
+class LabelEncodingTestCase(unittest.TestCase):
+
+  def testEncodeDecode(
+      self,
+  ):
+    int_key = 'metric'
+    int_val: int = 32
+    labels = {'foo': 'bar', int_key: int_val, '$#$!()': 'baz:ugg'}
+    # The type of int_val won't survive, but otherwise the decoding should
+    # invert the encoding.
+    self.assertEqual(
+        labels | {int_key: str(int_val)},
+        publisher.LabelsToDict(publisher.GetLabelsFromDict(labels)),
+    )
+
+  def testDecodeEncode(
+      self,
+  ):
+    labels_str = '|example_key:some:val:including:colons|,|run_number:0|,|x:y|'
+    self.assertEqual(
+        publisher.GetLabelsFromDict(publisher.LabelsToDict(labels_str)),
+        labels_str,
+    )
+
+  def testEncodeSortsByKey(
+      self,
+  ):
+    labels = {'x': 'y', 'a': 'b'}
+    self.assertEqual('|a:b|,|x:y|', publisher.GetLabelsFromDict(labels))
+
+
 if __name__ == '__main__':
   unittest.main()

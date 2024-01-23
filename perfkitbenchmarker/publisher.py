@@ -31,6 +31,7 @@ import operator
 import pprint
 import sys
 import time
+from typing import Any
 import uuid
 
 from absl import flags
@@ -206,7 +207,13 @@ def PublishRunStageSamples(benchmark_spec, samples):
   collector.PublishSamples()
 
 
-def GetLabelsFromDict(metadata):
+# GetLabelsFromDict() and SampleLabelsToDict() currently encode/decode the label
+# dictionary in a way that does not support arbitrary strings as keys or values:
+# specifically, certain combinations of the :/,/| characters can cause issues.
+# The encoding might change in the future if more robustness is needed.
+
+
+def GetLabelsFromDict(metadata: dict[Any, Any]) -> str:
   """Converts a metadata dictionary to a string of labels sorted by key.
 
   Args:
@@ -219,6 +226,23 @@ def GetLabelsFromDict(metadata):
   for k, v in sorted(six.iteritems(metadata)):
     labels.append('|%s:%s|' % (k, v))
   return ','.join(labels)
+
+
+def LabelsToDict(labels_str: str) -> dict[str, str]:
+  """Deserializes labels from string.
+
+  Meant to invert GetLabelsFromDict().
+
+  Args:
+    labels_str: The string encoding the labels.
+
+  Returns:
+    A python dictionary mapping label names to contents.
+  """
+  # labels_str is of the form |k1:v1|,|k2:v2|.
+  entries = labels_str[1:-1].split('|,|')
+  split_entries = [s.split(':', 1) for s in entries]
+  return {k: v for k, v in split_entries}
 
 
 class MetadataProvider(six.with_metaclass(abc.ABCMeta, object)):
