@@ -21,15 +21,19 @@ MongoDB homepage: http://www.mongodb.org/
 YCSB homepage: https://github.com/brianfrankcooper/YCSB/wiki
 """
 
+from collections.abc import Sequence
 import functools
+import json
 import posixpath
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.linux_packages import mongosh
 from perfkitbenchmarker.linux_packages import ycsb
 
 # See http://api.mongodb.org/java/2.13/com/mongodb/WriteConcern.html
@@ -39,6 +43,8 @@ flags.DEFINE_string(
 flags.DEFINE_integer(
     'mongodb_readahead_kb', None, 'Configure block device readahead settings.'
 )
+
+_LinuxVM = linux_virtual_machine.BaseLinuxVirtualMachine
 
 
 FLAGS = flags.FLAGS
@@ -51,6 +57,10 @@ mongodb_ycsb:
     servers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
+      vm_count: 2
+    arbiter:
+      vm_spec: *default_single_core
+      disk_spec: *default_500_gb
       vm_count: 1
     clients:
       vm_spec: *default_single_core
@@ -61,9 +71,21 @@ _LinuxVM = linux_virtual_machine.BaseLinuxVirtualMachine
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
+  """Validates the user config dictionary."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+  server_count = config['vm_groups']['servers']['vm_count']
+  arbiter_count = config['vm_groups']['arbiter']['vm_count']
+  if server_count != 2:
+    raise errors.Config.InvalidValue(
+        'Servers VM count must be 2, one for primary and one for secondary.'
+        f' Got {server_count}.'
+    )
+  if arbiter_count != 1:
+    raise errors.Config.InvalidValue(
+        f'Arbiter VM count must be 1, got {arbiter_count}.'
+    )
   return config
 
 
@@ -74,7 +96,9 @@ def _GetDataDir(vm: _LinuxVM) -> str:
 def _PrepareServer(vm: _LinuxVM) -> None:
   """Installs MongoDB on the server."""
   vm.Install('mongodb_server')
+  vm.Install('mongosh')
   data_dir = _GetDataDir(vm)
+  vm.RemoteCommand(f'sudo rm -rf {_GetDataDir(vm)}')
   vm.RemoteCommand('mkdir {0} && chmod a+rwx {0}'.format(data_dir))
   vm.RemoteCommand(
       "sudo sed -i -e '/bind_ip/ s/^/#/; s,dbPath:.*,dbPath: %s,' %s"
@@ -89,9 +113,46 @@ def _PrepareServer(vm: _LinuxVM) -> None:
   vm.RemoteCommand('sudo pkill mongod', ignore_failure=True)
 
   vm.RemoteCommand(
-      'nohup sudo /usr/bin/mongod --fork --bind_ip_all --config %s &'
-      % vm.GetPathToConfig('mongodb_server')
+      'nohup sudo /usr/bin/mongod --replSet "rs0" --fork --bind_ip_all --config'
+      f' {vm.GetPathToConfig("mongodb_server")} &'
   )
+
+
+def _PrepareReplicaSet(
+    server_vms: Sequence[_LinuxVM], arbiter_vm: _LinuxVM
+) -> None:
+  """Prepares the replica set for the benchmark.
+
+  This benchmark currently uses a priamary-secondary-arbiter replica set
+  configuration. The secondary keeps a full replica of the data while the
+  arbiter does not. The arbiter is still able to vote. See
+  https://www.mongodb.com/docs/manual/core/replica-set-architecture-three-members
+  for more information.
+
+  Args:
+    server_vms: The primary (index 0) and secondary (index 1) server VMs to use.
+    arbiter_vm: The arbiter VM to use.
+  """
+  args = {
+      '_id': '"rs0"',
+      'members': [
+          {
+              '_id': 0,
+              'host': f'"{server_vms[0].internal_ip}:27017"',
+          },
+          {
+              '_id': 1,
+              'host': f'"{server_vms[1].internal_ip}:27017"',
+          },
+          {
+              '_id': 2,
+              'host': f'"{arbiter_vm.internal_ip}:27017"',
+              'arbiterOnly': True,
+          },
+      ],
+  }
+  mongosh.RunCommand(server_vms[0], f'rs.initiate({json.dumps(args)})')
+  mongosh.RunCommand(server_vms[0], 'rs.conf()')
 
 
 def _PrepareClient(vm: _LinuxVM) -> None:
@@ -113,18 +174,22 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
+  servers = benchmark_spec.vm_groups['servers']
+  arbiter = benchmark_spec.vm_groups['arbiter'][0]
+  clients = benchmark_spec.vm_groups['clients']
   server_partials = [
-      functools.partial(_PrepareServer, mongo_vm)
-      for mongo_vm in benchmark_spec.vm_groups['servers']
+      functools.partial(_PrepareServer, mongo_vm) for mongo_vm in servers
   ]
+  arbiter_partial = [functools.partial(_PrepareServer, arbiter)]
   client_partials = [
-      functools.partial(_PrepareClient, client)
-      for client in benchmark_spec.vm_groups['clients']
+      functools.partial(_PrepareClient, client) for client in clients
   ]
-
   background_tasks.RunThreaded(
-      (lambda f: f()), server_partials + client_partials
+      (lambda f: f()), server_partials + arbiter_partial + client_partials
   )
+
+  _PrepareReplicaSet(servers, arbiter)
+
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   server = benchmark_spec.vm_groups['servers'][0]
   benchmark_spec.mongodb_url = f'mongodb://{server.internal_ip}:27017/'

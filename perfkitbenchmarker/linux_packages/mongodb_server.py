@@ -70,6 +70,9 @@ def AptSetup(vm):
   """Performs common pre-install setup for mongodb .deb packages."""
   vm.InstallPackages('gnupg curl')
   vm.RemoteCommand(
+      f'sudo rm -rf /usr/share/keyrings/mongodb-server-{VERSION.value}.gpg'
+  )
+  vm.RemoteCommand(
       f'curl -fsSL https://pgp.mongodb.com/server-{VERSION.value}.asc | sudo'
       f' gpg -o /usr/share/keyrings/mongodb-server-{VERSION.value}.gpg'
       ' --dearmor'

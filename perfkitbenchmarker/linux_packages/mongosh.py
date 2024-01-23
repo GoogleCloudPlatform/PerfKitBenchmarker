@@ -32,3 +32,7 @@ def AptInstall(vm):
   mongodb_server.AptSetup(vm)
   vm.InstallPackages('mongodb-org')
 
+
+def RunCommand(vm, command: str) -> tuple[str, str]:
+  """Runs a mongosh command on the VM."""
+  return vm.RemoteCommand(f'mongosh --eval "{command}" --verbose')
