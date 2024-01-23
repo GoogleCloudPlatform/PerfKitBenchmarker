@@ -33,7 +33,12 @@ RATE_LIMITED_MESSAGE = 'Rate Limit Exceeded'
 # When too many read reqeusts are issued, receive a message like:
 # PERMISSION_DENIED: Quota exceeded for quota metric 'Read requests' and limit
 # 'Read requests per minute' of service 'compute.googleapis.com'
-READ_LIMITED_MESSAGE = "limit 'Read requests per minute'"
+# or
+# Quota exceeded for quota metric 'Heavy-weight read requests' and limit
+# 'Heavy-weight read requests per minute' of service 'compute.googleapis.com'
+READ_LIMITED_MESSAGE_REGEX = re.compile(
+    r'Quota exceeded .*[Rr]ead requests per minute'
+)
 
 
 # regex to check API limits when tagging resources
@@ -117,7 +122,7 @@ def GetZonesInRegion(region) -> Set[str]:
   """Gets a list of zones for the given region."""
   cmd = GcloudCommand(None, 'compute', 'zones', 'list')
   cmd.flags.update({
-      'filter': f"name~'{region}'",
+      'filter': f"region='{region}'",
       'format': 'value(name)',
   })
   stdout, _, _ = cmd.Issue()
@@ -128,7 +133,7 @@ def GetZonesFromMachineType(machine_type: str) -> Set[str]:
   """Gets a list of zones for the given machine type."""
   cmd = GcloudCommand(None, 'compute', 'machine-types', 'list')
   cmd.flags.update({
-      'filter': f"name~'{machine_type}'",
+      'filter': f"name='{machine_type}'",
       'format': 'value(zone)',
   })
   stdout, _, _ = cmd.Issue()
@@ -293,15 +298,12 @@ class GcloudCommand(object):
     return '{0}({1})'.format(type(self).__name__, ' '.join(self.GetCommand()))
 
   @staticmethod
-  def _IsIssueRateLimitMessage(text) -> bool:
-    if RATE_LIMITED_MESSAGE in text:
-      return True
-    if READ_LIMITED_MESSAGE in text:
-      return True
-    match = TAGGING_RATE_LIMITED_REGEX.search(text)
-    if match:
-      return True
-    return False
+  def _IsIssueRateLimitMessage(text: str) -> bool:
+    return bool(
+        RATE_LIMITED_MESSAGE in text
+        or READ_LIMITED_MESSAGE_REGEX.search(text)
+        or TAGGING_RATE_LIMITED_REGEX.search(text)
+    )
 
   @vm_util.Retry(
       poll_interval=RATE_LIMITED_MAX_POLLING_INTERVAL,

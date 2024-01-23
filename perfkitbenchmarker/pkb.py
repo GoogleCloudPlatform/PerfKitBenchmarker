@@ -1039,7 +1039,7 @@ def _ShouldRetry(spec: bm_spec.BenchmarkSpec) -> bool:
 def _GetMachineTypes(spec: bm_spec.BenchmarkSpec) -> list[str]:
   """Returns a deduped list of machine types to provision for the given spec."""
   if FLAGS.machine_type:
-    return FLAGS.machine_type
+    return [FLAGS.machine_type]
   results = set()
   for vm_group_spec in spec.vms_to_boot.values():
     results.add(vm_group_spec.vm_spec.machine_type)
