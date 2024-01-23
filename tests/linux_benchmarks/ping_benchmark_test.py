@@ -40,9 +40,9 @@ class TestGenerateJobFileString(unittest.TestCase):
     samples = ping_benchmark.Run(vm_spec)
     ping_benchmark.Cleanup(vm_spec)
 
-    self.assertEqual(vm_spec.vms[0].RemoteCommand.call_count, 2)
-    self.assertEqual(vm_spec.vms[1].RemoteCommand.call_count, 2)
-    self.assertEqual(len(samples), 16)
+    self.assertEqual(vm_spec.vms[0].RemoteCommand.call_count, 1)
+    self.assertEqual(vm_spec.vms[1].RemoteCommand.call_count, 1)
+    self.assertEqual(len(samples), 8)
 
 
 if __name__ == '__main__':

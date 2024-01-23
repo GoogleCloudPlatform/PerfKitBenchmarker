@@ -49,6 +49,7 @@
 -   Drop windows coremark benchmark.
 -   Remove cudnn linux package.
 -   Make Ubuntu 20 the default os_type.
+-   Default `--ip_addresses` to `INTERNAL`.
 
 ### New features:
 

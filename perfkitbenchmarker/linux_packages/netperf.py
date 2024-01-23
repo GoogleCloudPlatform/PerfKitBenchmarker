@@ -25,7 +25,7 @@ from perfkitbenchmarker import regex_util
 
 flags.DEFINE_integer(
     'netperf_histogram_buckets',
-    100,
+    1000,
     'The number of buckets per bucket array in a netperf histogram. Netperf '
     'keeps one array for latencies in the single usec range, one for the '
     '10-usec range, one for the 100-usec range, and so on until the 10-sec '

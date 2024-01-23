@@ -186,12 +186,13 @@ _VM_COMMAND_LOG_MODE = flags.DEFINE_enum_class(
 
 flags.DEFINE_enum(
     'ip_addresses',
-    IpAddressSubset.REACHABLE,
+    IpAddressSubset.INTERNAL,
     IpAddressSubset.ALL,
     'For networking tests: use both internal and external '
     'IP addresses (BOTH), internal and external only if '
     'the receiving VM is reachable by internal IP (REACHABLE), '
-    'external IP only (EXTERNAL) or internal IP only (INTERNAL)',
+    'external IP only (EXTERNAL) or internal IP only (INTERNAL). The default '
+    'is set to INTERNAL.',
 )
 
 flags.DEFINE_enum(
