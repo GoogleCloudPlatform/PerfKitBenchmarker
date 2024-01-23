@@ -259,11 +259,15 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     ip_name = "fci-ip-{}".format(FLAGS.run_uri)
 
     reserved_ip = server_vm.CreateIpReservation(ip_name)
-    disk_size = 2000
-    if server_vm.disk_specs:
-      disk_size = server_vm.disk_specs[0].disk_size
-    self.CreateAndAttachSharedDisk(server_vm, disk_size, "pd-ssd",
-                                   server_vm.name, replica_vms[0].name)
+
+    # Create multiwriter disk (only for FCIMW)
+    if self.spec.high_availability_type == "FCIMW":
+      disk_size = 2000
+      if server_vm.disk_specs:
+        disk_size = server_vm.disk_specs[0].disk_size
+      self.CreateAndAttachSharedDisk(server_vm, disk_size, "pd-ssd",
+                                     server_vm.name, replica_vms[0].name)
+
     # Install and configure AD components.
     self.PushAndRunPowershellScript(controller_vm,
                                     "setup_domain_controller.ps1",
