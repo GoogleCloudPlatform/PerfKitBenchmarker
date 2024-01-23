@@ -1,22 +1,46 @@
 2K performance run parameters for coremark.
 CoreMark Size    : 666
-Total ticks      : 67787
-Total time (secs): 67.787000
-Iterations/Sec   : 29504.182218
-Iterations       : 2000000
-Compiler version : GCC7.3.0
-Compiler flags   : -O2 -g -O2 -DMULTITHREAD=2 -DUSE_PTHREAD -DPERFORMANCE_RUN=1 -DPERFORMANCE_RUN=1  -lrt -lpthread
-Parallel PThreads : 2
+Total ticks      : 49793
+Total time (secs): 49.793000
+Iterations/Sec   : 160665.153736
+Iterations       : 8000000
+Compiler version : GCC11.4.0
+Compiler flags   : -O2 -DMULTITHREAD=8 -DUSE_SOCKET -DPERFORMANCE_RUN=1 -DPERFORMANCE_RUN=1  -lrt
+Parallel Sockets : 8
 Memory location  : Please put data memory location here
       (e.g. code in flash, data on heap etc)
 seedcrc          : 0xe9f5
 [0]crclist       : 0xe714
 [1]crclist       : 0xe714
+[2]crclist       : 0xe714
+[3]crclist       : 0xe714
+[4]crclist       : 0xe714
+[5]crclist       : 0xe714
+[6]crclist       : 0xe714
+[7]crclist       : 0xe714
 [0]crcmatrix     : 0x1fd7
 [1]crcmatrix     : 0x1fd7
+[2]crcmatrix     : 0x1fd7
+[3]crcmatrix     : 0x1fd7
+[4]crcmatrix     : 0x1fd7
+[5]crcmatrix     : 0x1fd7
+[6]crcmatrix     : 0x1fd7
+[7]crcmatrix     : 0x1fd7
 [0]crcstate      : 0x8e3a
 [1]crcstate      : 0x8e3a
+[2]crcstate      : 0x8e3a
+[3]crcstate      : 0x8e3a
+[4]crcstate      : 0x8e3a
+[5]crcstate      : 0x8e3a
+[6]crcstate      : 0x8e3a
+[7]crcstate      : 0x8e3a
 [0]crcfinal      : 0x988c
 [1]crcfinal      : 0x988c
+[2]crcfinal      : 0x988c
+[3]crcfinal      : 0x988c
+[4]crcfinal      : 0x988c
+[5]crcfinal      : 0x988c
+[6]crcfinal      : 0x988c
+[7]crcfinal      : 0x988c
 Correct operation validated. See readme.txt for run and reporting rules.
-CoreMark 1.0 : 29504.182218 / GCC7.3.0 -O2 -g -O2 -DMULTITHREAD=2 -DUSE_PTHREAD -DPERFORMANCE_RUN=1 -DPERFORMANCE_RUN=1  -lrt -lpthread / Heap / 2:PThreads
+CoreMark 1.0 : 160665.153736 / GCC11.4.0 -O2 -DMULTITHREAD=8 -DUSE_SOCKET -DPERFORMANCE_RUN=1 -DPERFORMANCE_RUN=1  -lrt / Heap / 8:Sockets

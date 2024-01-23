@@ -53,7 +53,7 @@ PARALLELISM_FORK = 'FORK'
 PARALLELISM_SOCKET = 'SOCKET'
 _COREMARK_PARALLELISM_METHOD = flags.DEFINE_enum(
     'coremark_parallelism_method',
-    PARALLELISM_PTHREAD,
+    PARALLELISM_SOCKET,
     [PARALLELISM_PTHREAD, PARALLELISM_FORK, PARALLELISM_SOCKET],
     'Method to use for parallelism in the Coremark benchmark.',
 )

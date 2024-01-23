@@ -34,25 +34,25 @@ class CoremarkBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     """Tests parsing valid output from running Coremark."""
     with open(_SAMPLE_OUTPUT_FILE) as f:
       output = f.read()
-    samples = coremark_benchmark._ParseOutputForSamples(output, 2)
+    samples = coremark_benchmark._ParseOutputForSamples(output, 8)
     self.assertEqual('Coremark Score', samples[0].metric)
-    self.assertAlmostEqual(29504.182218, samples[0].value)
+    self.assertAlmostEqual(160665.153736, samples[0].value)
     self.assertEqual(
-        'CoreMark 1.0 : 29504.182218 / GCC7.3.0 -O2 -g -O2 '
-        '-DMULTITHREAD=2 -DUSE_PTHREAD -DPERFORMANCE_RUN=1 '
-        '-DPERFORMANCE_RUN=1  -lrt -lpthread / Heap / 2:PThreads',
+        'CoreMark 1.0 : 160665.153736 / GCC11.4.0 -O2 '
+        '-DMULTITHREAD=8 -DUSE_SOCKET -DPERFORMANCE_RUN=1 '
+        '-DPERFORMANCE_RUN=1  -lrt / Heap / 8:Sockets',
         samples[0].metadata['summary'],
     )
     self.assertEqual(666, samples[0].metadata['size'])
-    self.assertEqual(67787, samples[0].metadata['total_ticks'])
-    self.assertAlmostEqual(67.787000, samples[0].metadata['total_time_sec'])
-    self.assertEqual(2000000, samples[0].metadata['iterations'])
+    self.assertEqual(49793, samples[0].metadata['total_ticks'])
+    self.assertAlmostEqual(49.793000, samples[0].metadata['total_time_sec'])
+    self.assertEqual(8000000, samples[0].metadata['iterations'])
     self.assertEqual(
         coremark_benchmark.ITERATIONS_PER_CPU,
         samples[0].metadata['iterations_per_cpu'],
     )
-    self.assertEqual('PTHREAD', samples[0].metadata['parallelism_method'])
-    self.assertEqual(2, samples[0].metadata['thread_count'])
+    self.assertEqual('SOCKET', samples[0].metadata['parallelism_method'])
+    self.assertEqual(8, samples[0].metadata['thread_count'])
 
   def testParseInvalidOutput(self):
     """Tests failing when Coremark does not report valid output."""
@@ -60,7 +60,7 @@ class CoremarkBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
       output = f.read()
     output = output.replace('Correct operation validated', 'Invalid run')
     with self.assertRaises(errors.Benchmarks.RunError):
-      coremark_benchmark._ParseOutputForSamples(output, 2)
+      coremark_benchmark._ParseOutputForSamples(output, 8)
 
 
 if __name__ == '__main__':
