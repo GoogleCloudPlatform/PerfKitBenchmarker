@@ -10,7 +10,6 @@ import os
 import unittest
 
 from absl.testing import parameterized
-import datetime_tz
 import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
@@ -74,7 +73,9 @@ class LinuxBootTest(
   def testUtcTimestampToDatetime(self):
     self.assertEqual(
         linux_boot.UtcTimestampToDatetime('1680741777.685234619'),
-        datetime_tz.datetime_tz(2023, 4, 6, 0, 42, 57, 685235, tzinfo='UTC'),
+        datetime.datetime(
+            2023, 4, 6, 0, 42, 57, 685235, tzinfo=datetime.timezone.utc
+        ),
     )
 
   def testCollectKernelSamples(self):

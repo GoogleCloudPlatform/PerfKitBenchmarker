@@ -30,7 +30,6 @@ google-cloud-datastore
 google-cloud-monitoring>=0.31.1
 beautifulsoup4
 requests
-python-datetime-tz
 seaborn
 
 # unlike setup.py requirements.txt cannot require a Python version AFAICT

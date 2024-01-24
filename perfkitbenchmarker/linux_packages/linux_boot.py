@@ -10,7 +10,6 @@ import time
 from typing import Callable, List, Optional, Tuple
 
 from absl import flags
-import datetime_tz
 import jinja2
 from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
@@ -100,7 +99,9 @@ def CollectBootSamples(
 
 
 def UtcTimestampToDatetime(timestamp_str: str) -> datetime.datetime:
-  return datetime_tz.datetime_tz.utcfromtimestamp(float(timestamp_str))
+  return datetime.datetime.fromtimestamp(
+      float(timestamp_str), datetime.timezone.utc
+  )
 
 
 _DMESG_TIME_PREFIX = r'\[\s*(\d*.\d*)\]\s*'
@@ -618,7 +619,10 @@ def CollectVmToVmSamples(
   runner_internal_ip, runner_external_ip = runner_ip
 
   def DeltaSec(t):
-    delta = datetime_tz.datetime_tz.fromtimestamp(float(t)) - create_time
+    delta = (
+        datetime.datetime.fromtimestamp(float(t), tz=datetime.timezone.utc)
+        - create_time
+    )
     return delta.total_seconds()
 
   for group in re.findall('Connection refused by (.+) at ([0-9.]+)', vm_output):
