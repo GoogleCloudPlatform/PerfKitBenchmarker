@@ -81,7 +81,7 @@ def AptSetup(vm):
       'echo "deb [ arch=amd64,arm64'
       f' signed-by=/usr/share/keyrings/mongodb-server-{VERSION.value}.gpg ]'
       ' https://repo.mongodb.org/apt/ubuntu'
-      f' focal/mongodb-org/{VERSION.value} multiverse" | sudo tee'
+      f' jammy/mongodb-org/{VERSION.value} multiverse" | sudo tee'
       f' /etc/apt/sources.list.d/mongodb-org-{VERSION.value}.list'
   )
   vm.AptUpdate()
