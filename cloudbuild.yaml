@@ -18,11 +18,15 @@ steps:
       - build
       - '-t'
       - 'us-west1-docker.pkg.dev/$PROJECT_ID/pkb-cloud-build/pkb:$COMMIT_SHA'
+      - '--build-arg'
+      - 'PYTHON_VERSION=${_PYTHON_VERSION}'
       - .
   - name: gcr.io/cloud-builders/docker
     args:
       - run
       - 'us-west1-docker.pkg.dev/$PROJECT_ID/pkb-cloud-build/pkb:$COMMIT_SHA'
+substitutions:
+    _PYTHON_VERSION: "3.9" # default value
 serviceAccount: 'projects/$PROJECT_ID/serviceAccounts/cloud-build@bionic-baton-343.iam.gserviceaccount.com'
 options:
   logging: CLOUD_LOGGING_ONLY
