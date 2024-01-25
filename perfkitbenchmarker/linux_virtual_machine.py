@@ -2861,6 +2861,12 @@ class Ubuntu2304Mixin(BaseUbuntuMixin):
   OS_TYPE = os_types.UBUNTU2304
 
 
+class Ubuntu2310Mixin(BaseUbuntuMixin):
+  """Class holding Ubuntu2310 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.UBUNTU2310
+
+
 class Ubuntu1604Cuda9Mixin(Ubuntu1604Mixin):
   """Class holding NVIDIA CUDA specific VM methods and attributes."""
 
