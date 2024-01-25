@@ -70,5 +70,55 @@ class BaseSpecFixedDecodeOrderTestCase(unittest.TestCase):
     callback.assert_called_once_with('0')
 
 
+class BaseSpecTestAbstractChild(spec.BaseSpec):
+  SPEC_TYPE = 'BaseSpecTestAbstractChild'
+  SPEC_ATTRS = ['CLOUD', 'TESTABILITY']
+  CLOUD = 'GCP'
+
+
+class BaseSpecTestGrandChildTwoValues(BaseSpecTestAbstractChild):
+  TESTABILITY = ['HARD', 'EASY']
+
+
+class BaseSpecTestGrandChildOneValue(BaseSpecTestAbstractChild):
+  TESTABILITY = 'MEDIUM'
+
+
+class BaseSpecTestAbstractGrandChild(BaseSpecTestAbstractChild):
+  CLOUD = 'Azure'
+  TESTABILITY = None
+
+
+class BaseSpecTestGreatGrandChild(BaseSpecTestAbstractGrandChild):
+  TESTABILITY = 'MEDIUM'
+
+
+class BaseSpecRegistryTest(unittest.TestCase):
+
+  def testSpecChildFetchesItself(self):
+    cls = spec.GetSpecClass(
+        BaseSpecTestAbstractChild, CLOUD='GCP', TESTABILITY='FAKE'
+    )
+    self.assertEqual(cls.__name__, BaseSpecTestAbstractChild.__name__)
+
+  def testSpecChildFetchesOneValue(self):
+    cls = spec.GetSpecClass(
+        BaseSpecTestAbstractChild, CLOUD='GCP', TESTABILITY='MEDIUM'
+    )
+    self.assertEqual(cls.__name__, BaseSpecTestGrandChildOneValue.__name__)
+
+  def testSpecGrandChildFetchedByMultipleAttribute(self):
+    cls = spec.GetSpecClass(
+        BaseSpecTestAbstractChild, CLOUD='GCP', TESTABILITY='HARD'
+    )
+    self.assertEqual(cls.__name__, BaseSpecTestGrandChildTwoValues.__name__)
+
+  def testSpecGreatGrandChildFetchesOneValue(self):
+    cls = spec.GetSpecClass(
+        BaseSpecTestAbstractChild, CLOUD='Azure', TESTABILITY='MEDIUM'
+    )
+    self.assertEqual(cls.__name__, BaseSpecTestGreatGrandChild.__name__)
+
+
 if __name__ == '__main__':
   unittest.main()

@@ -19,7 +19,6 @@ and checks for resource existence so that resources can be created and deleted
 reliably.
 """
 import abc
-import itertools
 import logging
 import time
 from typing import List, TypeVar
@@ -28,6 +27,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import auto_registry
 
 FLAGS = flags.FLAGS
 
@@ -48,30 +48,9 @@ def GetResourceClass(base_class: ResourceType, **kwargs) -> ResourceType:
   Raises:
     Exception: If no class could be found with matching attributes.
   """
-  key = [base_class.__name__]
-  key += sorted(kwargs.items())
-  if tuple(key) not in _RESOURCE_REGISTRY:
-    raise errors.Resource.SubclassNotFoundError(
-        'No %s subclass defined with the attributes: %s'
-        % (base_class.__name__, kwargs)
-    )
-  resource = _RESOURCE_REGISTRY.get(tuple(key))
-  if not resource:
-    raise errors.Resource.SubclassNotFoundError(
-        'Should not reach this code, but no %s subclass defined with the '
-        'attributes: %s' % (base_class.__name__, kwargs)
-    )
-  if not issubclass(resource, base_class):
-    raise errors.Resource.SubclassNotFoundError(
-        'Class %s was registered for type %s but they did not match each other.'
-        % (resource.__name__, base_class.__name__)
-    )
-
-  # Set the required attributes of the resource class
-  for key, value in kwargs.items():
-    setattr(resource, key, value)
-
-  return resource
+  return auto_registry.GetRegisteredClass(
+      _RESOURCE_REGISTRY, base_class, None, **kwargs
+  )
 
 
 class AutoRegisterResourceMeta(abc.ABCMeta):
@@ -82,39 +61,9 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
   REQUIRED_ATTRS: List[str]
 
   def __init__(cls, name, bases, dct):
-    if (
-        all(hasattr(cls, attr) for attr in cls.REQUIRED_ATTRS)
-        and cls.RESOURCE_TYPE
-    ):
-      unset_attrs = [
-          attr for attr in cls.REQUIRED_ATTRS if getattr(cls, attr) is None
-      ]
-      # Raise exception if subclass with unset attributes.
-      if unset_attrs and cls.RESOURCE_TYPE != cls.__name__:
-        raise Exception(
-            'Subclasses of %s must have the following attrs set: %s. For %s '
-            'the following attrs were not set: %s.'
-            % (cls.RESOURCE_TYPE, cls.REQUIRED_ATTRS, cls.__name__, unset_attrs)
-        )
-      # Flatten list type attributes with cartesian product.
-      # If a class have two list attributes i.e.
-      # class Example(AutoRegisterResourceMeta):
-      #   CLOUD = ['GCP', 'AWS']
-      #   ENGINE = ['mysql', 'postgres']
-      #   ....
-      # GetResourceClass(Example, CLOUD='GCP', ENGINE='mysql')
-      # would return Example.
-      attributes = [[cls.RESOURCE_TYPE]]
-      for attr in sorted(cls.REQUIRED_ATTRS):
-        value = getattr(cls, attr)
-        if not isinstance(value, list):
-          attributes.append([(attr, value)])
-        else:
-          attributes.append([(attr, i) for i in value])
-
-      # Cross product
-      for key in itertools.product(*attributes):
-        _RESOURCE_REGISTRY[tuple(key)] = cls
+    auto_registry.RegisterClass(
+        _RESOURCE_REGISTRY, cls, cls.REQUIRED_ATTRS, cls.RESOURCE_TYPE
+    )
     super(AutoRegisterResourceMeta, cls).__init__(name, bases, dct)
 
 

@@ -20,6 +20,7 @@ from typing import Any, Optional
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker.configs import auto_registry
 from perfkitbenchmarker.configs import option_decoders
 import six
 
@@ -36,11 +37,11 @@ def GetSpecClass(base_class, **kwargs) -> 'BaseSpecMetaClass':
       register the subclass.
 
   Raises:
-    Exception: If no class could be found with matching attributes.
+    Exception: If class found was not a subclass of base class.
   """
-  key = [base_class.__name__]
-  key += sorted(kwargs.items())
-  return _SPEC_REGISTRY.get(tuple(key), base_class)
+  return auto_registry.GetRegisteredClass(
+      _SPEC_REGISTRY, base_class, base_class, **kwargs
+  )
 
 
 class BaseSpecMetaClass(type):
@@ -57,15 +58,9 @@ class BaseSpecMetaClass(type):
     cls._init_decoders_lock = threading.Lock()
     cls._decoders = collections.OrderedDict()
     cls._required_options = set()
-    if all(hasattr(cls, attr) for attr in cls.SPEC_ATTRS) and cls.SPEC_TYPE:
-      key = [cls.SPEC_TYPE]
-      key += sorted([(attr, getattr(cls, attr)) for attr in cls.SPEC_ATTRS])
-      if tuple(key) in _SPEC_REGISTRY:
-        raise errors.Config.InvalidValue(
-            'Subclasses of %s must define unique values for the attrs: %s.'
-            % (cls.SPEC_TYPE, cls.SPEC_ATTRS)
-        )
-      _SPEC_REGISTRY[tuple(key)] = cls
+    auto_registry.RegisterClass(
+        _SPEC_REGISTRY, cls, cls.SPEC_ATTRS, cls.SPEC_TYPE
+    )
 
 
 class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
