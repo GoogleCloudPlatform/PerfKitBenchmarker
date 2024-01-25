@@ -65,6 +65,8 @@ mongodb_ycsb:
     clients:
       vm_spec: *default_single_core
       vm_count: 1
+  flags:
+    openjdk_version: 8
 """
 
 _LinuxVM = linux_virtual_machine.BaseLinuxVirtualMachine
@@ -86,6 +88,8 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
     raise errors.Config.InvalidValue(
         f'Arbiter VM count must be 1, got {arbiter_count}.'
     )
+  if FLAGS['ycsb_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
   return config
 
 
@@ -97,25 +101,23 @@ def _PrepareServer(vm: _LinuxVM) -> None:
   """Installs MongoDB on the server."""
   vm.Install('mongodb_server')
   vm.Install('mongosh')
+
   data_dir = _GetDataDir(vm)
-  vm.RemoteCommand(f'sudo rm -rf {_GetDataDir(vm)}')
-  vm.RemoteCommand('mkdir {0} && chmod a+rwx {0}'.format(data_dir))
+  vm.RemoteCommand(f'sudo rm -rf {data_dir}')
+  vm.RemoteCommand(f'mkdir {data_dir} && chmod a+rwx {data_dir}')
   vm.RemoteCommand(
-      "sudo sed -i -e '/bind_ip/ s/^/#/; s,dbPath:.*,dbPath: %s,' %s"
-      % (data_dir, vm.GetPathToConfig('mongodb_server'))
+      f'sudo sed -i "s|dbPath:.*|dbPath: {data_dir}|"'
+      f' {vm.GetPathToConfig("mongodb_server")}'
   )
+
   if FLAGS.mongodb_readahead_kb is not None:
     vm.SetReadAhead(
         FLAGS.mongodb_readahead_kb * 2,
         [d.GetDevicePath() for d in vm.scratch_disks],
     )
 
-  vm.RemoteCommand('sudo pkill mongod', ignore_failure=True)
-
-  vm.RemoteCommand(
-      'nohup sudo /usr/bin/mongod --replSet "rs0" --fork --bind_ip_all --config'
-      f' {vm.GetPathToConfig("mongodb_server")} &'
-  )
+  # Too many connections fails if we don't set file descriptor limit higher.
+  vm.RemoteCommand('ulimit -n 64000 && sudo systemctl start mongod')
 
 
 def _PrepareReplicaSet(
@@ -208,6 +210,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   kwargs = {
       'mongodb.url': benchmark_spec.mongodb_url,
       'mongodb.writeConcern': FLAGS.mongodb_writeconcern,
+      # Avoids some stale connection issues at the beginning of the load.
+      'core_workload_insertion_retry_limit': 10,
   }
   samples = list(
       benchmark_spec.executor.LoadAndRun(

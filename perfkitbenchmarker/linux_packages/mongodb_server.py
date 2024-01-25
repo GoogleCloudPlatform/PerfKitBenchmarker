@@ -36,8 +36,12 @@ def _GetConfigPath():
 
 def _Setup(vm):
   """Setup mongodb."""
+  config_path = _GetConfigPath()
   vm.RemoteCommand(
-      'sudo sed -i "s|bindIp|# bindIp|" {}'.format(_GetConfigPath())
+      f'sudo sed -i "s|bindIp: 127.0.0.1|bindIp: ::,0.0.0.0|" {config_path}'
+  )
+  vm.RemoteCommand(
+      f'echo "replication:\n  replSetName: rs0" | sudo tee -a {config_path}'
   )
 
 
