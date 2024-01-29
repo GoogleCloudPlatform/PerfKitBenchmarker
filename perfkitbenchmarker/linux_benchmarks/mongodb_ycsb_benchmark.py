@@ -60,7 +60,6 @@ mongodb_ycsb:
       vm_count: 2
     arbiter:
       vm_spec: *default_single_core
-      disk_spec: *default_500_gb
       vm_count: 1
     clients:
       vm_spec: *default_single_core
