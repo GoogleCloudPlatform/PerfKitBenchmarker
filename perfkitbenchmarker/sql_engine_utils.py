@@ -349,7 +349,9 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
   # The default database in postgres
   DEFAULT_DATABASE = POSTGRES
 
-  def Connect(self, sessions: Optional[int] = None) -> None:
+  def Connect(
+      self, sessions: Optional[int] = None, database_name: str = ''
+  ) -> None:
     """Connects to the DB using PGAdapter.
 
     See https://cloud.google.com/spanner/docs/sessions for a description
@@ -357,6 +359,7 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
 
     Args:
       sessions: The number of Spanner minSessions to set for the client.
+      database_name: Database to connect
     """
     self.vm.RemoteCommand('fuser -k 5432/tcp', ignore_failure=True)
     # Connections need some time to cleanup, or the run command fails.
@@ -369,12 +372,13 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
           f'numChannels={int(_PGADAPTER_MAX_SESSIONS/100)}"'
       )
     properties = self.connection_properties
+    database_name = database_name or properties.database_name
     self.vm.RemoteCommand(
         'java -jar pgadapter.jar '
         '-dir /tmp '
         f'-p {properties.project} '
         f'-i {properties.instance_name} '
-        f'-d {properties.database_name} '
+        f'-d {database_name} '
         f'{sessions_arg} '
         '&> /dev/null &'
     )
@@ -399,9 +403,7 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
     return sql_command
 
   def GetConnectionString(self, database_name: str = '', endpoint='') -> str:
-    if not endpoint:
-      endpoint = self.connection_properties.endpoint
-    return f'-h {endpoint}'
+    return '-h localhost'
 
   def GetSysbenchConnectionString(self) -> str:
     return '--pgsql-host=/tmp'

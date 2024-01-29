@@ -17,6 +17,7 @@ import socket
 import time
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import sql_engine_utils
 
 APT_PACKAGES = (
     'postgresql-client-common',
@@ -66,7 +67,10 @@ def MakeSamplesFromOutput(
     consists of a list of floats, sorted by time that were collected
     by running pgbench with the given client and job counts.
   """
-  lines = pgbench_stderr.splitlines()[2:]
+  lines = pgbench_stderr.splitlines()
+
+  # Only parse line that starts with progress:
+  lines = list(filter(lambda x: x.startswith('progress:'), lines))
   tps_numbers = [float(line.split(' ')[3]) for line in lines]
   latency_numbers = [float(line.split(' ')[6]) for line in lines]
 
@@ -113,17 +117,27 @@ def RunPgBench(
   # AWS DNS sometimes timeout when running the benchmark
   # https://stackoverflow.com/questions/58179080/occasional-temporary-failure-in-name-resolution-while-connecting-to-aws-aurora
   # Resolve the address to ip address first to avoid DNS failure
-  endpoint = socket.getaddrinfo(
-      relational_db.client_vm_query_tools.connection_properties.endpoint,
-      relational_db.client_vm_query_tools.connection_properties.port,
-  )[0][4][0]
 
-  connection_string = relational_db.client_vm_query_tools.GetConnectionString(
-      database_name=test_db_name, endpoint=endpoint
-  )
+  if relational_db.ENGINE != sql_engine_utils.SPANNER_POSTGRES:
+    endpoint = socket.getaddrinfo(
+        relational_db.client_vm_query_tools.connection_properties.endpoint,
+        relational_db.client_vm_query_tools.connection_properties.port,
+    )[0][4][0]
+
+    connection_string = relational_db.client_vm_query_tools.GetConnectionString(
+        database_name=test_db_name, endpoint=endpoint
+    )
+  else:
+    connection_string = relational_db.client_vm_query_tools.GetConnectionString(
+        database_name=relational_db.client_vm_query_tools.connection_properties.database_name,
+    )
 
   if file and path:
     metadata['pgbench_file'] = file
+
+  extended_protocol = ''
+  if relational_db.ENGINE == sql_engine_utils.SPANNER_POSTGRES:
+    extended_protocol = ' --protocol=extended'
 
   if job_counts and len(client_counts) != len(job_counts):
     raise ValueError('Length of clients and jobs must be the same.')
@@ -134,10 +148,11 @@ def RunPgBench(
       jobs = job_counts[i]
     else:
       jobs = min(client, 16)
+
     command = (
         f'ulimit -n 10000 && pgbench {connection_string} --client={client} '
         f'--jobs={jobs} --time={seconds_per_test} --progress=1 '
-        '-r'
+        '-r' + extended_protocol
     )
     if file and path:
       command = f'cd {path} && {command} --file={file}'
