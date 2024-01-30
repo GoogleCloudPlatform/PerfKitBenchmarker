@@ -119,12 +119,19 @@ def _PrepareServer(vm: _LinuxVM) -> None:
   vm.RemoteCommand('ulimit -n 64000 && sudo systemctl start mongod')
 
 
+def _PrepareArbiter(vm: _LinuxVM) -> None:
+  """Installs MongoDB on the arbiter."""
+  vm.Install('mongodb_server')
+  vm.Install('mongosh')
+  vm.RemoteCommand('ulimit -n 64000 && sudo systemctl start mongod')
+
+
 def _PrepareReplicaSet(
     server_vms: Sequence[_LinuxVM], arbiter_vm: _LinuxVM
 ) -> None:
   """Prepares the replica set for the benchmark.
 
-  This benchmark currently uses a priamary-secondary-arbiter replica set
+  This benchmark currently uses a primary-secondary-arbiter replica set
   configuration. The secondary keeps a full replica of the data while the
   arbiter does not. The arbiter is still able to vote. See
   https://www.mongodb.com/docs/manual/core/replica-set-architecture-three-members
@@ -181,7 +188,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   server_partials = [
       functools.partial(_PrepareServer, mongo_vm) for mongo_vm in servers
   ]
-  arbiter_partial = [functools.partial(_PrepareServer, arbiter)]
+  arbiter_partial = [functools.partial(_PrepareArbiter, arbiter)]
   client_partials = [
       functools.partial(_PrepareClient, client) for client in clients
   ]
