@@ -60,9 +60,11 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     self.should_run_internal.return_value = run_internal
 
   def testHistogramStatsCalculator(self):
+    FLAGS.netperf_histogram_percentiles = (
+        [0.0, 20.0, 30.0, 74.0, 80.0, 100.0])
     histogram = {1: 5, 2: 10, 5: 5}
     stats = netperf_benchmark._HistogramStatsCalculator(
-        histogram, [0, 20, 30, 74, 80, 100]
+        histogram
     )
     self.assertEqual(stats['p0'], 1)
     self.assertEqual(stats['p20'], 1)

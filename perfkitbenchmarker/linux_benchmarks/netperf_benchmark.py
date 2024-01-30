@@ -120,6 +120,12 @@ flags.register_validator(
     'netperf_benchmarks',
     lambda benchmarks: benchmarks and set(benchmarks).issubset(ALL_BENCHMARKS),
 )
+_HISTOGRAM_PERCENTILES = flags.DEFINE_multi_float(
+    'netperf_histogram_percentiles',
+    [10, 50, 90, 99, 99.9],
+    'Percentiles to calculate and report using the histogram. '
+    'Default histogram percentiles are p10, p50, p90, p99 and p99.9.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -156,8 +162,6 @@ PORT_START = 20000
 
 REMOTE_SCRIPTS_DIR = 'netperf_test_scripts'
 REMOTE_SCRIPT = 'netperf_test.py'
-
-PERCENTILES = [50, 90, 99]
 
 # By default, Container-Optimized OS (COS) host firewall allows only
 # outgoing connections and incoming SSH connections. To allow incoming
@@ -263,12 +267,11 @@ def _SetupHostFirewall(server_vm, client_vm_internal_ip, client_vm_ip_address):
       server_vm.RemoteHostCommand(cmd % (protocol, ip_addr))
 
 
-def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
+def _HistogramStatsCalculator(histogram):
   """Computes values at percentiles in a distribution as well as stddev.
 
   Args:
     histogram: A dict mapping values to the number of samples with that value.
-    percentiles: An array of percentiles to calculate.
 
   Returns:
     A dict mapping stat names to their values.
@@ -284,12 +287,16 @@ def _HistogramStatsCalculator(histogram, percentiles=PERCENTILES):
     return stats
   cur_value_index = 0  # Current index in by_value
   cur_index = 0  # Number of values we've passed so far
-  for p in percentiles:
-    index = int(float(total_count) * float(p) / 100.0)
+
+  latency_percentiles = _HISTOGRAM_PERCENTILES.value
+  for percent in latency_percentiles:
+    index = int(float(total_count) * float(percent) / 100.0)
     index = min(index, total_count - 1)  # Handle 100th percentile
     for value, count in by_value[cur_value_index:]:
       if cur_index + count > index:
-        stats['p%s' % str(p)] = by_value[cur_value_index][0]
+        # format '10.0' into '10' for backwards compatibility
+        stat_str = f'p{int(percent) if percent.is_integer() else percent}'
+        stats[stat_str] = by_value[cur_value_index][0]
         break
       else:
         cur_index += count
@@ -557,9 +564,12 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
     throughput_sample, latency_samples, histogram = parsed_output[0]
     latency_histogram = collections.Counter()
     latency_histogram.update(histogram)
-    # Netperf already outputs p50/p90/p99
-    latency_stats = _HistogramStatsCalculator(latency_histogram, [10, 99.9])
+    # Calculate all percentiles specified by flag.
+    latency_stats = _HistogramStatsCalculator(latency_histogram)
     for stat, value in latency_stats.items():
+      # Netperf already outputs p50/p90/p99 in ParseNetperfOutput
+      if stat in ['p50', 'p90', 'p99']:
+        continue
       latency_samples.append(
           sample.Sample(
               f'{benchmark_name}_Latency_{stat}',
@@ -633,7 +643,7 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
           )
       )
       # Calculate stats on aggregate latency histogram
-      latency_stats = _HistogramStatsCalculator(latency_histogram, [50, 90, 99])
+      latency_stats = _HistogramStatsCalculator(latency_histogram)
       # Create samples for the latency stats
       for stat, value in latency_stats.items():
         samples.append(
