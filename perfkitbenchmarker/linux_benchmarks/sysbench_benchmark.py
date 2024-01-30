@@ -786,6 +786,9 @@ def _RunScaleUpClientsBenchmark(
       current_transactions = _ParseSysbenchTransactions(stdout, new_metadata)
       total_tps += current_transactions[0].value
       total_qps += current_transactions[1].value
+    logging.info(
+        'num_clients: %d total_tps: %d total_qps: %d', i, total_tps, total_qps
+    )
     scale_up_samples += [
         sample.Sample('total_tps', total_tps, 'tps', new_metadata),
         sample.Sample('total_qps', total_qps, 'qps', new_metadata),
