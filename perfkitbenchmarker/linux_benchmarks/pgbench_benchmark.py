@@ -171,7 +171,7 @@ def UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec):
 
 def GetDbSize(relational_db, db_name):
   """Get the size of the database."""
-  if relational_db.ENGINE == sql_engine_utils.SPANNER_POSTGRES:
+  if relational_db.engine_type == sql_engine_utils.SPANNER_POSTGRES:
     return
   stdout, _ = relational_db.client_vm_query_tools.IssueSqlCommand(
       f"SELECT pg_size_pretty(pg_database_size('{db_name}'))",
@@ -205,7 +205,7 @@ def Prepare(benchmark_spec):
 
   connection_string = db.client_vm_query_tools.GetConnectionString(TEST_DB_NAME)
 
-  if db.ENGINE == sql_engine_utils.SPANNER_POSTGRES:
+  if db.engine_type == sql_engine_utils.SPANNER_POSTGRES:
     db.client_vm_query_tools.Connect(database_name=TEST_DB_NAME)
     db.client_vm_query_tools.IssueSqlCommand("""START BATCH DDL; \\
             CREATE TABLE IF NOT EXISTS pgbench_accounts ( \\

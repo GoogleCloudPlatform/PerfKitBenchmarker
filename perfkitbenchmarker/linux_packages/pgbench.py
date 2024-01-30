@@ -118,7 +118,7 @@ def RunPgBench(
   # https://stackoverflow.com/questions/58179080/occasional-temporary-failure-in-name-resolution-while-connecting-to-aws-aurora
   # Resolve the address to ip address first to avoid DNS failure
 
-  if relational_db.ENGINE != sql_engine_utils.SPANNER_POSTGRES:
+  if relational_db.engine_type != sql_engine_utils.SPANNER_POSTGRES:
     endpoint = socket.getaddrinfo(
         relational_db.client_vm_query_tools.connection_properties.endpoint,
         relational_db.client_vm_query_tools.connection_properties.port,
@@ -136,7 +136,7 @@ def RunPgBench(
     metadata['pgbench_file'] = file
 
   extended_protocol = ''
-  if relational_db.ENGINE == sql_engine_utils.SPANNER_POSTGRES:
+  if relational_db.engine_type == sql_engine_utils.SPANNER_POSTGRES:
     extended_protocol = ' --protocol=extended'
 
   if job_counts and len(client_counts) != len(job_counts):
