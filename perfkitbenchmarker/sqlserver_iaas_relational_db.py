@@ -54,6 +54,15 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
 
   ENGINE = sql_engine_utils.SQLSERVER
 
+  def __init__(self, relational_db_spec):
+    """Initialize the SQLServer IAAS relational database object.
+
+    Args:
+      relational_db_spec: spec of the managed database.
+    """
+    super().__init__(relational_db_spec)
+    self.ConfirmFlags()
+
   @property
   def replica_vms(self):
     """Server VM of replicas for hosting a managed database.
@@ -93,6 +102,12 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
   @controller_vm.setter
   def controller_vm(self, controller_vm):
     self._controller_vm = controller_vm
+
+  def ConfirmFlags(self):
+    """Confirm flags to make sure all the requirements are met."""
+    # If high availability mode, set high availability type if needed
+    if self.spec.high_availability and self.spec.high_availability_type is None:
+      self.spec.high_availability_type = "FCIS2D"
 
   def SetVms(self, vm_groups):
     super().SetVms(vm_groups)
