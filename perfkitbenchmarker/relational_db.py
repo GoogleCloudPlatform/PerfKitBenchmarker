@@ -528,3 +528,13 @@ class BaseRelationalDb(resource.BaseResource):
   def _FailoverHA(self):
     """Fail over from master to replica."""
     raise NotImplementedError('Failover is not implemented.')
+
+  def RestartDatabase(self):
+    """Restarts all the database services in the benchmark.
+
+    Args:
+      None
+
+    Returns: none
+    """
+    raise NotImplementedError('Restart database is not implemented.')

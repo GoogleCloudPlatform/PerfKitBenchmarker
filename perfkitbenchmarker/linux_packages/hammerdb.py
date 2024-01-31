@@ -224,6 +224,12 @@ HAMMERDB_TPCC_TIME_PROFILE = flags.DEFINE_bool(
     'the TPM/NOPM, gathered due to extra measurements.',
 )
 
+HAMMERDB_RESTART_BEFORE_RUN = flags.DEFINE_bool(
+    'hammerdbcli_restart_before_run',
+    False,
+    'Restart SQL Server before run phase',
+)
+
 
 def SetDefaultConfig():
   """Set the default configurations of unfilled flags."""
@@ -987,4 +993,6 @@ def GetMetadata(db_engine: str):
     if HAMMERDB_BUILD_TPCC_NUM_VU.value is None:
       FLAGS.hammerdbcli_build_tpcc_num_vu = HAMMERDB_NUM_VU.value
     metadata['hammerdbcli_build_tpcc_num_vu'] = HAMMERDB_BUILD_TPCC_NUM_VU.value
+    metadata['hammerdbcli_restart_before_run'] = (
+        HAMMERDB_RESTART_BEFORE_RUN.value)
   return metadata

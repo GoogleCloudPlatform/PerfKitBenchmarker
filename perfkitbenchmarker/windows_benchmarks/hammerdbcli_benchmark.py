@@ -188,6 +188,10 @@ def Prepare(benchmark_spec):
       is_azure,
   )
 
+  # SQL Server exhibits better performance when restarted after prepare step
+  if FLAGS.hammerdbcli_restart_before_run:
+    relational_db.RestartDatabase()
+
 
 def SetMinimumRecover(relational_db):
   """Change sql server settings to make TPM nubmers stable."""

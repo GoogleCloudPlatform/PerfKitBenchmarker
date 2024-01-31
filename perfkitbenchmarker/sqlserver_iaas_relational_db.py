@@ -230,10 +230,57 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         "filelocation.defaultlogdir "
         "/scratch/mssqllog"
     )
+    # Enabling FUA I/O subsystem capability per MSFT
+    # https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-performance-best-practices?view=sql-server-ver16
+    self.server_vm.RemoteCommand(
+        "sudo /opt/mssql/bin/mssql-conf set "
+        "control.alternatewritethrough 0"
+    )
+    self.server_vm.RemoteCommand(
+        "sudo /opt/mssql/bin/mssql-conf set "
+        "control.writethrough 1"
+    )
+    self.server_vm.RemoteCommand(
+        "sudo /opt/mssql/bin/mssql-conf set "
+        "traceflag.traceflag 3979"
+    )
+
+    if self.server_vm.OS_TYPE == os_types.DEFAULT:
+      self.server_vm.Install('mssql_tools')
+
+    self.MoveSQLServerTempDBLinux()
     self.server_vm.RemoteCommand("sudo systemctl restart mssql-server")
 
     if self.server_vm.OS_TYPE == os_types.RHEL8:
       _TuneForSQL(self.server_vm)
+
+  def MoveSQLServerTempDBLinux(self):
+    vm = self.server_vm
+    stdout, _ = vm.RemoteCommand(
+        "/opt/mssql-tools/bin/sqlcmd "
+        "-S localhost -U sa -P \'{}\' -h -1 -Q  \"SET NOCOUNT ON; "
+        "SELECT f.name + SUBSTRING(f.physical_name, "
+        "CHARINDEX('.', f.physical_name), LEN(f.physical_name) -1) "
+        "FROM sys.master_files f "
+        "WHERE f.database_id = DB_ID('tempdb');\""
+        .format(self.spec.database_password)
+        )
+
+    tmp_db_files_list = [
+        str(tmp_file.strip().replace("\r", ""))
+        for tmp_file in stdout.split("\n")
+        if tmp_file
+    ]
+
+    for tmp_db_file in tmp_db_files_list:
+      tmp_db_name = tmp_db_file.split(".")[0]
+      vm.RemoteCommand(
+          "/opt/mssql-tools/bin/sqlcmd "
+          "-S localhost -U sa -P \'{}\' -h -1 -Q "
+          "\"ALTER DATABASE tempdb "
+          "MODIFY FILE (NAME = [{}], "
+          "FILENAME = '/scratch/mssqltemp/{}');\""
+          .format(self.spec.database_password, tmp_db_name, tmp_db_file))
 
   @staticmethod
   def GetDefaultEngineVersion(engine):
@@ -641,6 +688,16 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     )
     cmd.Issue()
 
+  def RestartDatabase(self):
+    vms = [self.server_vm]
+    if self.spec.high_availability and self.replica_vms:
+      vms.append(self.replica_vms[0])
+    for vm in vms:
+      if vm.BASE_OS_TYPE == os_types.WINDOWS:
+        vm.RemoteCommand("Restart-Service MSSQLSERVER -Force")
+      else:
+        vm.RemoteCommand("sudo systemctl restart mssql-server")
+
 
 def ConfigureSQLServer(vm, username: str, password: str):
   """Update the username and password on a SQL Server."""
@@ -682,19 +739,27 @@ def _TuneForSQL(vm):
       "include=throughput-performance \n\n"
       "[cpu] \n"
       "force_latency=5\n\n"
+      "[vm] \n"
+      "# For multi-instance SQL deployments use 'madvise' instead of 'always'\n"
+      "transparent_hugepages=always \n\n"
       "[sysctl]\n"
       "vm.swappiness = 1\n"
       "vm.dirty_background_ratio = 3\n"
       "vm.dirty_ratio = 80\n"
       "vm.dirty_expire_centisecs = 500\n"
       "vm.dirty_writeback_centisecs = 100\n"
-      "vm.transparent_hugepages=always\n"
       "vm.max_map_count=1600000\n"
       "net.core.rmem_default = 262144\n"
       "net.core.rmem_max = 4194304\n"
       "net.core.wmem_default = 262144\n"
       "net.core.wmem_max = 1048576\n"
-      "kernel.numa_balancing=0"
+      "kernel.numa_balancing=0\n\n"
+      "[scheduler]\n"
+      "sched_latency_ns=60000000\n"
+      "sched_migration_cost_ns=500000\n"
+      "sched_min_granularity_ns=15000000\n"
+      "sched_wakeup_granularity_ns=2000000\n"
+      "\n"
   )
   vm.RemoteCommand("sudo mkdir -p /usr/lib/tuned/mssql")
   vm.RemoteCommand(
@@ -705,7 +770,8 @@ def _TuneForSQL(vm):
 
   vm.RemoteCommand("sudo chmod +x /usr/lib/tuned/mssql/tuned.conf")
   vm.RemoteCommand("sudo tuned-adm profile mssql")
-  vm.RemoteCommand("sudo tuned-adm list")
+  vm.RemoteCommand("sudo tuned-adm active")
+  vm.Reboot()
 
 
 def ConfigureSQLServerLinux(vm, username: str, password: str):
