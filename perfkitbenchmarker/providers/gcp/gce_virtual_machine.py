@@ -1111,26 +1111,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Prepare vm scratch disks:
     self.create_disk_strategy.GetSetupDiskStrategy().SetUpDisk()
 
-  def CreateIpReservation(
-      self, ip_address_name: str
-  ) -> gce_network.GceIPAddress:
-    """Creates an IP reservation.
-
-    Args:
-      ip_address_name: name of the IP reservation to be created.
-
-    Returns:
-      Reserved IP address.
-    """
-    reserved_ip_address = gce_network.GceIPAddress(
-        self.project,
-        util.GetRegionFromZone(self.zone),
-        ip_address_name,
-        self.network.primary_subnet_name,
-    )
-    reserved_ip_address.Create()
-    return reserved_ip_address
-
   def ReleaseIpReservation(self, ip_address_name: str) -> None:
     """Releases existing IP reservation.
 

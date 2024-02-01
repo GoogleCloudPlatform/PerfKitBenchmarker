@@ -36,6 +36,7 @@ from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import sqlserver_iaas_relational_db
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 from six.moves import range
 
@@ -110,6 +111,26 @@ class GCPSQLServerIAASRelationalDb(
   """A GCP IAAS database resource."""
 
   CLOUD = provider_info.GCP
+
+  def __init__(self, relational_db_spec):
+    super(GCPSQLServerIAASRelationalDb, self).__init__(relational_db_spec)
+    self._reserved_ip_address = None
+
+  def CreateIpReservation(self) -> str:
+    ip_address_name = 'fci-ip-{}'.format(FLAGS.run_uri)
+    self._reserved_ip_address = gce_network.GceIPAddress(
+        self.server_vm.project,
+        util.GetRegionFromZone(self.server_vm.zone),
+        ip_address_name,
+        self.server_vm.network.primary_subnet_name,
+    )
+    self._reserved_ip_address.Create()
+    return self._reserved_ip_address.ip_address
+
+  def _Delete(self):
+    super(GCPSQLServerIAASRelationalDb, self)._Delete()
+    if self._reserved_ip_address:
+      self._reserved_ip_address.Delete()
 
 
 class GCPPostgresIAASRelationalDb(

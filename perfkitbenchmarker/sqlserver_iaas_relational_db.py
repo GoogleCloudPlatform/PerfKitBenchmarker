@@ -317,10 +317,10 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     replica_vms = self.replica_vms
 
     win_password = vm_util.GenerateRandomWindowsPassword(
-        vm_util.PASSWORD_LENGTH, "*!@#%^+=")
-    ip_name = "fci-ip-{}".format(FLAGS.run_uri)
+        vm_util.PASSWORD_LENGTH, "*!@#%^+="
+    )
 
-    reserved_ip = server_vm.CreateIpReservation(ip_name)
+    ip_address = self.CreateIpReservation()
 
     # Create multiwriter disk (only for FCIMW)
     if self.spec.high_availability_type == "FCIMW":
@@ -392,12 +392,14 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
                                       [win_password])
 
     # install SQL server into newly created cluster
-    self.PushAndRunPowershellScript(server_vm,
-                                    "setup_sql_server_first_node.ps1",
-                                    [reserved_ip.ip_address, win_password])
-    self.PushAndRunPowershellScript(replica_vms[0],
-                                    "add_sql_server_second_node.ps1",
-                                    [reserved_ip.ip_address, win_password])
+    self.PushAndRunPowershellScript(
+        server_vm, "setup_sql_server_first_node.ps1", [ip_address, win_password]
+    )
+    self.PushAndRunPowershellScript(
+        replica_vms[0],
+        "add_sql_server_second_node.ps1",
+        [ip_address, win_password],
+    )
 
     # Install SQL server updates.
     # Installation media present on the system is very outdated and it
@@ -408,6 +410,10 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     # Update variables user for connection to SQL server.
     self.spec.database_password = win_password
     self.spec.endpoint = "fcidnn.perflab.local"
+
+  def CreateIpReservation(self):
+    """Create IP reservation for SQL server."""
+    raise NotImplementedError("CreateIpReservation not implemented.")
 
   def ConfigureSQLServerHaAoag(self):
     """Create SQL server HA deployment for performance testing."""
