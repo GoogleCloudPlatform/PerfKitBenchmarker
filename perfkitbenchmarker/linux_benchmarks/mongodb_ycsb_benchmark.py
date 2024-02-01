@@ -56,7 +56,19 @@ mongodb_ycsb:
   vm_groups:
     servers:
       vm_spec: *default_single_core
-      disk_spec: *default_500_gb
+      disk_spec:
+        GCP:
+          disk_size: 500
+          disk_type: pd-ssd
+          mount_point: /scratch
+        AWS:
+          disk_size: 500
+          disk_type: gp3
+          mount_point: /scratch
+        Azure:
+          disk_size: 500
+          disk_type: Premium_LRS
+          mount_point: /scratch
       vm_count: 2
     arbiter:
       vm_spec: *default_single_core
