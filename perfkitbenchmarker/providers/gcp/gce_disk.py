@@ -18,6 +18,7 @@ Use 'gcloud compute disk-types list' to determine valid disk types.
 """
 
 import json
+import re
 
 from absl import flags
 from perfkitbenchmarker import boot_disk
