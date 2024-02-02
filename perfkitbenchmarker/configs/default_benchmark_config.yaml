@@ -1,0 +1,53 @@
+# PKB benchmark configs that point to a benchmark module via 'name: <BENCHMARK_NAME>'.
+# This is meant to provide commonly used configs that can not be expressed through
+# flag defaults or default benchmark configs.
+# TODO(andytzhu) - GCP MTU, GCP TIER1, azure_accelerated_networking, aws network_card_count/eni_count
+netperf_tcp_rr:
+  name: netperf
+  flags:
+    netperf_benchmarks: TCP_RR
+
+netperf_tcp_stream:
+  name: netperf
+  flags:
+    netperf_benchmarks: TCP_STREAM
+    netperf_num_streams: 1,8,16,200
+
+hammerdbcli_mysql:
+  name: hammerdbcli
+  flags:
+    db_engine_version: 8.0
+    db_high_availability: False
+    hammerdbcli_optimized_server_configuration: restorable
+    hammerdbcli_tpcc_all_warehouse: True
+    hammerdbcli_tpcc_time_profile: True
+    use_managed_db: False
+  relational_db:
+    engine: mysql
+    db_disk_spec:
+      GCP:
+        disk_size: 500
+        disk_type: pd-ssd
+      AWS:
+        disk_size: 2000
+        disk_type: gp3
+      Azure:
+        disk_size: 2000
+        disk_type: PremiumV2_LRS
+    vm_groups:
+      clients:
+        disk_spec:
+          GCP:
+            disk_size: 200
+            disk_type: pd-ssd
+          AWS:
+            disk_size: 200
+            disk_type: gp2
+          Azure:
+            disk_size: 200
+            disk_type: Premium_LRS
+      servers:
+        vm_spec:
+          GCP:
+            boot_disk_size: 200
+            boot_disk_type: pd-ssd

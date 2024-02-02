@@ -309,7 +309,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testConfigNames(self):
     self.mock_flags.benchmarks = ['internal_iprf', 'netperf']
     with mock.patch(
-        'perfkitbenchmarker.configs.GetUserConfig',
+        'perfkitbenchmarker.configs.GetDefaultAndUserConfig',
         return_value=yaml.safe_load(USER_CONFIG),
     ):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -319,7 +319,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testMatrices(self):
     self.mock_flags.benchmarks = ['netperf']
     with mock.patch(
-        'perfkitbenchmarker.configs.GetUserConfig',
+        'perfkitbenchmarker.configs.GetDefaultAndUserConfig',
         return_value=yaml.safe_load(MATRIX_CONFIG),
     ):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -332,7 +332,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testZipWithDifferentAxesLengths(self):
     self.mock_flags.benchmarks = ['netperf']
     with mock.patch(
-        'perfkitbenchmarker.configs.GetUserConfig',
+        'perfkitbenchmarker.configs.GetDefaultAndUserConfig',
         return_value=yaml.safe_load(ZIP_CONFIG_DIFFERENT_AXES_LENGTH),
     ):
       self.assertRaises(ValueError, benchmark_sets.GetBenchmarksFromFlags)
@@ -340,7 +340,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testZip(self):
     self.mock_flags.benchmarks = ['netperf']
     with mock.patch(
-        'perfkitbenchmarker.configs.GetUserConfig',
+        'perfkitbenchmarker.configs.GetDefaultAndUserConfig',
         return_value=yaml.safe_load(ZIP_CONFIG),
     ):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -353,7 +353,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testZipSingleAxis(self):
     self.mock_flags.benchmarks = ['netperf']
     with mock.patch(
-        'perfkitbenchmarker.configs.GetUserConfig',
+        'perfkitbenchmarker.configs.GetDefaultAndUserConfig',
         return_value=yaml.safe_load(SINGLE_ZIP_CONFIG),
     ):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -366,7 +366,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testZipAndMatrix(self):
     self.mock_flags.benchmarks = ['netperf']
     with mock.patch(
-        'perfkitbenchmarker.configs.GetUserConfig',
+        'perfkitbenchmarker.configs.GetDefaultAndUserConfig',
         return_value=yaml.safe_load(ZIP_AND_MATRIX_CONFIG),
     ):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -379,7 +379,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testFilters(self):
     self.mock_flags.benchmarks = ['netperf']
     with mock.patch(
-        'perfkitbenchmarker.configs.GetUserConfig',
+        'perfkitbenchmarker.configs.GetDefaultAndUserConfig',
         return_value=yaml.safe_load(FILTER_CONFIG),
     ):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -392,7 +392,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
   def testFlagPrecedence(self):
     self.mock_flags.benchmarks = ['netperf']
     with mock.patch(
-        'perfkitbenchmarker.configs.GetUserConfig',
+        'perfkitbenchmarker.configs.GetDefaultAndUserConfig',
         return_value=yaml.safe_load(FLAG_PRECEDENCE_CONFIG),
     ):
       benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
@@ -410,7 +410,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.mock_flags.benchmarks = ['netperf']
     self.mock_flags.flag_matrix = 'bad_flag_matrix_name'
     with mock.patch(
-        'perfkitbenchmarker.configs.GetUserConfig',
+        'perfkitbenchmarker.configs.GetDefaultAndUserConfig',
         return_value=yaml.safe_load(USER_CONFIG),
     ):
       with self.assertRaises(benchmark_sets.FlagMatrixNotFoundException):
@@ -420,7 +420,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     self.mock_flags.benchmarks = ['netperf']
     self.mock_flags.flag_zip = 'bad_flag_zip_name'
     with mock.patch(
-        'perfkitbenchmarker.configs.GetUserConfig',
+        'perfkitbenchmarker.configs.GetDefaultAndUserConfig',
         return_value=yaml.safe_load(USER_CONFIG),
     ):
       with self.assertRaises(benchmark_sets.FlagZipNotFoundException):

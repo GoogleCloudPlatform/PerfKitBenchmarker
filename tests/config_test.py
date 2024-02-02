@@ -128,7 +128,7 @@ class ConfigsTestCase(unittest.TestCase):
     mock_flags.configure_mock(
         config_override=config_override, benchmark_config_file=None
     )
-    config = configs.GetUserConfig()
+    config = configs.GetDefaultAndUserConfig()
     self.assertEqual(config['a']['vm_groups']['default']['vm_count'], 5)
     self.assertEqual(config['a']['flags']['flag'], 'value')
 
@@ -137,7 +137,7 @@ class ConfigsTestCase(unittest.TestCase):
     self.addCleanup(p.stop)
     mock_flags = p.start()
     mock_flags.configure_mock(benchmark_config_file='test_import.yml')
-    config = configs.GetUserConfig()
+    config = configs.GetDefaultAndUserConfig()
     self.assertEqual(config['flags']['num_vms'], 3)
 
 

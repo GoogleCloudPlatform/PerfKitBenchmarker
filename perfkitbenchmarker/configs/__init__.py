@@ -78,6 +78,7 @@ import yaml
 
 FLAGS = flags.FLAGS
 CONFIG_CONSTANTS = 'default_config_constants.yaml'
+DEFAULT_BENCHMARK_CONFIG = 'default_benchmark_config.yaml'
 FLAGS_KEY = 'flags'
 IMPORT_REGEX = re.compile('^#import (.*)')
 
@@ -158,6 +159,12 @@ def _GetImportFiles(config_file, imported_set=None):
     return import_files
 
 
+def _LoadDefaultConfig():
+  """Loads the default config from the supplied path."""
+  with open(data.ResourcePath(DEFAULT_BENCHMARK_CONFIG, False)) as fp:
+    return yaml.safe_load(fp)
+
+
 def _LoadUserConfig(path):
   """Loads a user config from the supplied path."""
   config_files = _GetImportFiles(path)
@@ -197,25 +204,32 @@ def _GetConfigFromOverrides(overrides):
 @functools.lru_cache()
 def GetConfigFlags():
   """Returns the global flags from the user config."""
-  return GetUserConfig().get(FLAGS_KEY, {})
+  return GetDefaultAndUserConfig().get(FLAGS_KEY, {})
 
 
-def GetUserConfig():
-  """Returns the user config with any overrides applied.
+def GetDefaultAndUserConfig():
+  """Returns the user config merged with a default config, with any overrides applied.
 
-  This loads config from --benchmark_config_file and merges it with
-  any overrides specified via --config_override and returns the result.
+  This loads configs from --benchmark_config_file, merges it with
+  default_config, which is then merged with any overrides specified via
+  --config_override and returns the result. These configs are different from the
+  BENCHMARK_CONFIG in each benchmark file, which is merged in later (during
+  each benchmark's 'GetConfig' method.)
 
   Returns:
     dict. The result of merging the loaded config from the
     --benchmark_config_file flag with the config generated from the
     --config override flag.
   """
+  # Doing a single yaml parse of concatenated files might be faster but merging
+  # works as well.
+  default_config = _LoadDefaultConfig()
   try:
     if FLAGS.benchmark_config_file:
-      config = _LoadUserConfig(FLAGS.benchmark_config_file)
+      user_config = _LoadUserConfig(FLAGS.benchmark_config_file)
+      config = MergeConfigs(default_config, user_config)
     else:
-      config = {}
+      config = default_config
 
     if FLAGS.config_override:
       override_config = _GetConfigFromOverrides(FLAGS.config_override)

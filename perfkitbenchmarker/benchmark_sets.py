@@ -442,7 +442,7 @@ def GetBenchmarksFromFlags():
   Raises:
     ValueError: when benchmark_name is not valid for os_type supplied
   """
-  user_config = configs.GetUserConfig()
+  user_config = configs.GetDefaultAndUserConfig()
   benchmark_config_list = _GetBenchmarksFromUserConfig(user_config)
   if benchmark_config_list and not FLAGS['benchmarks'].present:
     return benchmark_config_list
