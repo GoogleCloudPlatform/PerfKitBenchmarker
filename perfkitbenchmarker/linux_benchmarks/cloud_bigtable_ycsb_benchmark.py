@@ -298,11 +298,10 @@ def _GetCpuUtilizationSample(
   # pylint: disable=g-import-not-at-top
   from google.cloud import monitoring_v3
   from google.cloud.monitoring_v3 import query
-  from google.cloud.monitoring_v3.gapic.transports import metric_service_grpc_transport
 
   client = monitoring_v3.MetricServiceClient(
-      transport=metric_service_grpc_transport.MetricServiceGrpcTransport(
-          address=_MONITORING_ADDRESS.value
+      transport=monitoring_v3.services.metric_service.transports.grpc.MetricServiceGrpcTransport(
+          host=_MONITORING_ADDRESS.value
       )
   )
 

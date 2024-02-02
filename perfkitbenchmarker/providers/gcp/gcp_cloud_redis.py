@@ -23,7 +23,6 @@ from typing import Any, Optional
 
 from absl import flags
 from google.cloud import monitoring_v3
-from google.cloud.monitoring_v3.types import TimeInterval
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import provider_info
@@ -240,7 +239,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     """Measure the average CPU utilization on GCP instance in percentage."""
     now = time.time()
     seconds = int(now)
-    interval = TimeInterval()
+    interval = monitoring_v3.TimeInterval()
     interval.end_time.seconds = seconds
     interval.start_time.seconds = seconds - interval_length
     client = monitoring_v3.MetricServiceClient()
@@ -260,7 +259,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
         name='projects/' + self.project,
         filter_=api_filter,
         interval=interval,
-        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
     )
 
     return self._ParseMonitoringTimeSeries(time_series)

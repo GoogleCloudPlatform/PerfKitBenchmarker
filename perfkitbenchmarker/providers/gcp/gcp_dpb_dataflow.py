@@ -431,10 +431,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # Shift TZ of datetime arguments since FromDatetime() assumes UTC
     # See
     # https://googleapis.dev/python/protobuf/latest/google/protobuf/timestamp_pb2.html#google.protobuf.timestamp_pb2.Timestamp.FromDatetime
-    interval.start_time.FromDatetime(
-        start_time.astimezone(datetime.timezone.utc)
-    )
-    interval.end_time.FromDatetime(end_time.astimezone(datetime.timezone.utc))
+    interval.start_time = start_time.astimezone(datetime.timezone.utc)
+    interval.end_time = end_time.astimezone(datetime.timezone.utc)
 
     api_filter = (
         'metric.type = "compute.googleapis.com/instance/cpu/utilization" '
@@ -449,13 +447,15 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
         group_by_fields=['resource.instance_id'],
     )
 
-    results = client.list_time_series(
+    req = types.ListTimeSeriesRequest(
         name=project_name,
-        filter_=api_filter,
+        filter=api_filter,
         interval=interval,
-        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
         aggregation=aggregation,
     )
+
+    results = client.list_time_series(req)
 
     if not results:
       logging.warning(
@@ -502,10 +502,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # Shift TZ of datetime arguments since FromDatetime() assumes UTC
     # See
     # https://googleapis.dev/python/protobuf/latest/google/protobuf/timestamp_pb2.html#google.protobuf.timestamp_pb2.Timestamp.FromDatetime
-    interval.start_time.FromDatetime(
-        start_time.astimezone(datetime.timezone.utc)
-    )
-    interval.end_time.FromDatetime(end_time.astimezone(datetime.timezone.utc))
+    interval.start_time = start_time.astimezone(datetime.timezone.utc)
+    interval.end_time = end_time.astimezone(datetime.timezone.utc)
 
     api_filter = (
         'metric.type = "dataflow.googleapis.com/job/elements_produced_count" '
@@ -519,13 +517,15 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
         per_series_aligner=types.Aggregation.Aligner.ALIGN_RATE,
     )
 
-    results = client.list_time_series(
+    req = types.ListTimeSeriesRequest(
         name=project_name,
-        filter_=api_filter,
+        filter=api_filter,
         interval=interval,
-        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
         aggregation=aggregation,
     )
+
+    results = client.list_time_series(req)
 
     if not results:
       logging.warning(
@@ -545,8 +545,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     delta = datetime.timedelta(minutes=interval_length)
 
     interval = types.TimeInterval()
-    interval.start_time.FromDatetime(now - delta)
-    interval.end_time.FromDatetime(now)
+    interval.start_time = now - delta
+    interval.end_time = now
 
     api_filter = (
         'metric.type = "pubsub.googleapis.com/subscription/'
@@ -556,9 +556,9 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     results = client.list_time_series(
         name=project_name,
-        filter_=api_filter,
+        filter=api_filter,
         interval=interval,
-        view=monitoring_v3.enums.ListTimeSeriesRequest.TimeSeriesView.FULL,
+        view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
     )
 
     return round(self._GetLastValueFromTimeSeries(results), 2)

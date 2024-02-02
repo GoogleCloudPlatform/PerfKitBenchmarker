@@ -27,7 +27,7 @@ six>=1.13.0
 pywinrm
 timeout-decorator
 google-cloud-datastore
-google-cloud-monitoring>=0.31.1
+google-cloud-monitoring>=2.0.0
 beautifulsoup4
 requests
 seaborn
