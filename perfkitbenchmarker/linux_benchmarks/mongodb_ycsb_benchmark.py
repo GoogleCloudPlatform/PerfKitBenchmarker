@@ -54,7 +54,7 @@ BENCHMARK_CONFIG = """
 mongodb_ycsb:
   description: Run YCSB against a single MongoDB node.
   vm_groups:
-    servers:
+    primary:
       vm_spec: *default_single_core
       disk_spec:
         GCP:
@@ -69,7 +69,23 @@ mongodb_ycsb:
           disk_size: 500
           disk_type: Premium_LRS
           mount_point: /scratch
-      vm_count: 2
+      vm_count: 1
+    secondary:
+      vm_spec: *default_single_core
+      disk_spec:
+        GCP:
+          disk_size: 500
+          disk_type: pd-ssd
+          mount_point: /scratch
+        AWS:
+          disk_size: 500
+          disk_type: gp3
+          mount_point: /scratch
+        Azure:
+          disk_size: 500
+          disk_type: Premium_LRS
+          mount_point: /scratch
+      vm_count: 1
     arbiter:
       vm_spec: *default_single_core
       vm_count: 1
@@ -88,16 +104,14 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
-  server_count = config['vm_groups']['servers']['vm_count']
+  primary_count = config['vm_groups']['primary']['vm_count']
+  secondary_count = config['vm_groups']['secondary']['vm_count']
   arbiter_count = config['vm_groups']['arbiter']['vm_count']
-  if server_count != 2:
+  if any(
+      [count != 1 for count in [primary_count, secondary_count, arbiter_count]]
+  ):
     raise errors.Config.InvalidValue(
-        'Servers VM count must be 2, one for primary and one for secondary.'
-        f' Got {server_count}.'
-    )
-  if arbiter_count != 1:
-    raise errors.Config.InvalidValue(
-        f'Arbiter VM count must be 1, got {arbiter_count}.'
+        'Must have exactly one primary, secondary, and arbiter VM.'
     )
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
@@ -194,11 +208,13 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  servers = benchmark_spec.vm_groups['servers']
+  primary = benchmark_spec.vm_groups['primary'][0]
+  secondary = benchmark_spec.vm_groups['secondary'][0]
   arbiter = benchmark_spec.vm_groups['arbiter'][0]
   clients = benchmark_spec.vm_groups['clients']
   server_partials = [
-      functools.partial(_PrepareServer, mongo_vm) for mongo_vm in servers
+      functools.partial(_PrepareServer, mongo_vm)
+      for mongo_vm in [primary, secondary]
   ]
   arbiter_partial = [functools.partial(_PrepareArbiter, arbiter)]
   client_partials = [
@@ -208,11 +224,10 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       (lambda f: f()), server_partials + arbiter_partial + client_partials
   )
 
-  _PrepareReplicaSet(servers, arbiter)
+  _PrepareReplicaSet([primary, secondary], arbiter)
 
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
-  server = benchmark_spec.vm_groups['servers'][0]
-  benchmark_spec.mongodb_url = f'mongodb://{server.internal_ip}:27017/'
+  benchmark_spec.mongodb_url = f'mongodb://{primary.internal_ip}:27017/'
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
