@@ -44,7 +44,7 @@ flags.DEFINE_string(
     None,
     'Use a particular version of the Google Cloud SDK, e.g.: 103.0.0',
 )
-flags.DEFINE_enum(
+GCS_CLIENT = flags.DEFINE_enum(
     'gcs_client',
     GCS_CLIENT_PYTHON,
     [GCS_CLIENT_PYTHON, GCS_CLIENT_BOTO],
@@ -225,6 +225,9 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     Args:
       vm: gce virtual machine object.
     """
+    if GCS_CLIENT.value == GCS_CLIENT_PYTHON:
+      return
+
     boto_src = object_storage_service.FindBotoFile()
     boto_des = object_storage_service.DEFAULT_BOTO_LOCATION_USER
     stdout, _ = vm.RemoteCommand(f'Test-Path {boto_des}')
@@ -253,6 +256,9 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     Args:
       vm: gce virtual machine object.
     """
+    if GCS_CLIENT.value == GCS_CLIENT_PYTHON:
+      return
+
     vm_pwd, _ = vm.RemoteCommand('pwd')
     home_dir = vm_pwd.strip()
     boto_src = object_storage_service.FindBotoFile()
@@ -330,7 +336,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
     vm.RemoteCommand('mkdir -p .config')
 
-    if FLAGS.gcs_client == GCS_CLIENT_BOTO:
+    if GCS_CLIENT.value == GCS_CLIENT_BOTO:
       if vm.BASE_OS_TYPE == os_types.WINDOWS:
         self.AcquireWritePermissionsWindows(vm)
       else:
@@ -368,7 +374,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   def CleanupVM(self, vm):
     vm.RemoveFile('google-cloud-sdk')
     vm.RemoveFile(GCLOUD_CONFIG_PATH)
-    if FLAGS.gcs_client == GCS_CLIENT_BOTO:
+    if GCS_CLIENT.value == GCS_CLIENT_BOTO:
       vm.RemoveFile(object_storage_service.DEFAULT_BOTO_LOCATION_USER)
       vm.Uninstall('gcs_boto_plugin')
 
@@ -385,9 +391,9 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   def Metadata(self, vm):
     metadata = {
         'pkb_installed_crcmod': vm.installed_crcmod,
-        'gcs_client': str(FLAGS.gcs_client),
+        'gcs_client': str(GCS_CLIENT.value),
     }
-    if FLAGS.gcs_client == GCS_CLIENT_BOTO:
+    if GCS_CLIENT.value == GCS_CLIENT_BOTO:
       metadata.update({
           object_storage_service.BOTO_LIB_VERSION: (
               linux_packages.GetPipPackageVersion(vm, 'boto')
@@ -396,7 +402,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     return metadata
 
   def APIScriptArgs(self):
-    return ['--gcs_client=' + str(FLAGS.gcs_client)]
+    return ['--gcs_client=' + str(GCS_CLIENT.value)]
 
   @classmethod
   def APIScriptFiles(cls):
