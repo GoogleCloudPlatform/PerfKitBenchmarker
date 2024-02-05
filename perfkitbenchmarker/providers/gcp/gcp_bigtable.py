@@ -539,7 +539,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
       for point in cluster_time_series.points:
         point_utilization = round(point.value.double_value, 3)
         point_time = datetime.datetime.fromtimestamp(
-            point.interval.start_time.seconds
+            point.interval.start_time.timestamp()
         )
         logging.info('%s: %s', point_time, point_utilization)
         cluster_total_utilization += point_utilization

@@ -629,7 +629,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     for user, system in zip(time_series[0].points, time_series[1].points):
       point_utilization = user.value.double_value + system.value.double_value
       point_time = datetime.datetime.fromtimestamp(
-          user.interval.start_time.seconds
+          user.interval.start_time.timestamp()
       )
       logging.info('%s: %s', point_time, point_utilization)
       cpu_aggregated.append(point_utilization)
