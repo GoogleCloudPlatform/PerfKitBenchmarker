@@ -13,17 +13,21 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.packages.fio."""
 
+import copy
 import json
 import os
 import unittest
 
+from absl import flags
 import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import fio
+from tests import pkb_common_test_case
 
 BASE_METADATA = {'foo': 'bar'}
+FLAGS = flags.FLAGS
 
 
 def _ReadFileToString(filename):
@@ -40,10 +44,14 @@ def _ExtractHistogramFromMetric(results, sample_name):
   return None
 
 
-class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
+class FioTestCase(
+    pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
+):
   maxDiff = None
 
   def setUp(self):
+    """Set up the test."""
+    super().setUp()
     self.data_dir = os.path.join(os.path.dirname(__file__), '..', 'data', 'fio')
     result_path = os.path.join(self.data_dir, 'fio-parser-sample-result.json')
     self.result_contents = json.loads(_ReadFileToString(result_path))
@@ -55,6 +63,7 @@ class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     )
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
+    FLAGS.fio_pinning = False
 
   def testParseFioJobFile(self):
     parameter_dict = fio.ParseJobFile(self.job_contents)
@@ -124,6 +133,53 @@ class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     }
     self.assertDictEqual(parameter_dict, expected_result)
 
+  def testParsePinnedFioJobFile(self):
+    FLAGS.fio_pinning = True
+    file_str = """
+[global]
+ioengine=libaio
+invalidate=1
+
+[rand_8k_write_100%-io-depth-256-num-jobs-16.0]
+stonewall
+rw=randwrite
+iodepth=2
+blocksize=8k
+numa_cpu_nodes=0
+filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-0
+
+[rand_8k_write_100%-io-depth-256-num-jobs-16.1]
+rw=randwrite
+iodepth=1
+blocksize=8k
+numa_cpu_nodes=1
+filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
+    """
+    parameter_dict = fio.ParseJobFile(file_str)
+
+    expected_result = {
+        'rand_8k_write_100%-io-depth-256-num-jobs-16': {
+            'ioengine': 'libaio',
+            'invalidate': '1',
+            'rw.0': 'randwrite',
+            'iodepth.0': '2',
+            'blocksize.0': '8k',
+            'numa_cpu_nodes.0': '0',
+            'filename.0': '/dev/disk/by-id/google-pkb-67d581a7-0-data-0-0',
+            'rw.1': 'randwrite',
+            'iodepth.1': '1',
+            'blocksize.1': '8k',
+            'numa_cpu_nodes.1': '1',
+            'filename.1': '/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1',
+        }
+    }
+    self.assertDictEqual(parameter_dict, expected_result)
+
+  def merge_two_dicts(self, x, y):
+    z = copy.deepcopy(x)
+    z.update(y)
+    return z
+
   def testParseFioResults(self):
     with mock.patch(
         fio.__name__ + '.ParseJobFile',
@@ -136,952 +192,921 @@ class FioTestCase(unittest.TestCase, test_util.SamplesTestMixin):
         },
     ):
       result = fio.ParseResults('', self.result_contents)
+      sequential_write_metadata = {
+          'fio_job': 'sequential_write',
+          'fio_version': 'fio-3.27',
+          'fio_pinning': False,
+      }
+      sequential_read_metadata = {
+          'fio_job': 'sequential_read',
+          'fio_version': 'fio-3.27',
+          'fio_pinning': False,
+      }
+      random_write_metadata = {
+          'fio_job': 'random_write_test',
+          'fio_version': 'fio-3.27',
+          'fio_pinning': False,
+      }
+      random_read_metadata = {
+          'fio_job': 'random_read_test',
+          'fio_version': 'fio-3.27',
+          'fio_pinning': False,
+      }
+      random_read_parallel_metadata = {
+          'fio_job': 'random_read_test_parallel',
+          'fio_version': 'fio-3.27',
+          'fio_pinning': False,
+      }
       expected_result = [
           [
               'sequential_write:write:bandwidth',
               68118,
               'KB/s',
-              {
-                  'bw_max': 74454,
-                  'bw_agg': 63936.8,
-                  'bw_min': 19225,
-                  'bw_dev': 20346.28,
-                  'bw_mean': 63936.8,
-                  'fio_job': 'sequential_write',
-                  'fio_version': 'fio-3.27',
-              },
+              self.merge_two_dicts(
+                  {
+                      'bw_max': 74454,
+                      'bw_agg': 63936.8,
+                      'bw_min': 19225,
+                      'bw_dev': 20346.28,
+                      'bw_mean': 63936.8,
+                  },
+                  sequential_write_metadata,
+              ),
           ],
           [
               'sequential_write:write:latency',
               477734.84,
               'usec',
-              {
-                  'max': 869891,
-                  'stddev': 92609.34,
-                  'min': 189263,
-                  'mean': 477734.84,
-                  'p60': 444416,
-                  'p1': 387072,
-                  'p99.9': 872448,
-                  'p70': 448512,
-                  'p5': 440320,
-                  'p90': 610304,
-                  'p99.95': 872448,
-                  'p80': 452608,
-                  'p95': 724992,
-                  'p10': 440320,
-                  'p99.5': 847872,
-                  'p99': 823296,
-                  'p20': 440320,
-                  'p99.99': 872448,
-                  'p30': 444416,
-                  'p50': 444416,
-                  'p40': 444416,
-                  'fio_job': 'sequential_write',
-                  'fio_version': 'fio-3.27',
-              },
+              self.merge_two_dicts(
+                  {
+                      'max': 869891,
+                      'stddev': 92609.34,
+                      'min': 189263,
+                      'mean': 477734.84,
+                      'p60': 444416,
+                      'p1': 387072,
+                      'p99.9': 872448,
+                      'p70': 448512,
+                      'p5': 440320,
+                      'p90': 610304,
+                      'p99.95': 872448,
+                      'p80': 452608,
+                      'p95': 724992,
+                      'p10': 440320,
+                      'p99.5': 847872,
+                      'p99': 823296,
+                      'p20': 440320,
+                      'p99.99': 872448,
+                      'p30': 444416,
+                      'p50': 444416,
+                      'p40': 444416,
+                  },
+                  sequential_write_metadata,
+              ),
           ],
           [
               'sequential_write:write:latency:min',
               189263,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:max',
               869891,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:mean',
               477734.84,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:stddev',
               92609.34,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p1',
               387072,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p5',
               440320,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p10',
               440320,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p20',
               440320,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p30',
               444416,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p40',
               444416,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p50',
               444416,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p60',
               444416,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p70',
               448512,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p80',
               452608,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p90',
               610304,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p95',
               724992,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p99',
               823296,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p99.5',
               847872,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p99.9',
               872448,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p99.95',
               872448,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:latency:p99.99',
               872448,
               'usec',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_write:write:iops',
               133,
               '',
-              {'fio_job': 'sequential_write', 'fio_version': 'fio-3.27'},
+              sequential_write_metadata,
           ],
           [
               'sequential_read:read:bandwidth',
               129836,
               'KB/s',
-              {
-                  'bw_max': 162491,
-                  'bw_agg': 130255.2,
-                  'bw_min': 115250,
-                  'bw_dev': 18551.37,
-                  'bw_mean': 130255.2,
-                  'fio_job': 'sequential_read',
-                  'fio_version': 'fio-3.27',
-              },
+              self.merge_two_dicts(
+                  {
+                      'bw_max': 162491,
+                      'bw_agg': 130255.2,
+                      'bw_min': 115250,
+                      'bw_dev': 18551.37,
+                      'bw_mean': 130255.2,
+                  },
+                  sequential_read_metadata,
+              ),
           ],
           [
               'sequential_read:read:latency',
               250667.06,
               'usec',
-              {
-                  'max': 528542,
-                  'stddev': 70403.40,
-                  'min': 24198,
-                  'mean': 250667.06,
-                  'p60': 268288,
-                  'p1': 59136,
-                  'p99.9': 528384,
-                  'p70': 272384,
-                  'p5': 116224,
-                  'p90': 292864,
-                  'p99.95': 528384,
-                  'p80': 280576,
-                  'p95': 366592,
-                  'p10': 164864,
-                  'p99.5': 489472,
-                  'p99': 473088,
-                  'p20': 199680,
-                  'p99.99': 528384,
-                  'p30': 246784,
-                  'p50': 264192,
-                  'p40': 257024,
-                  'fio_job': 'sequential_read',
-                  'fio_version': 'fio-3.27',
-              },
+              self.merge_two_dicts(
+                  {
+                      'max': 528542,
+                      'stddev': 70403.40,
+                      'min': 24198,
+                      'mean': 250667.06,
+                      'p60': 268288,
+                      'p1': 59136,
+                      'p99.9': 528384,
+                      'p70': 272384,
+                      'p5': 116224,
+                      'p90': 292864,
+                      'p99.95': 528384,
+                      'p80': 280576,
+                      'p95': 366592,
+                      'p10': 164864,
+                      'p99.5': 489472,
+                      'p99': 473088,
+                      'p20': 199680,
+                      'p99.99': 528384,
+                      'p30': 246784,
+                      'p50': 264192,
+                      'p40': 257024,
+                  },
+                  sequential_read_metadata,
+              ),
           ],
           [
               'sequential_read:read:latency:min',
               24198,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:max',
               528542,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:mean',
               250667.06,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:stddev',
               70403.40,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p1',
               59136,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p5',
               116224,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p10',
               164864,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p20',
               199680,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p30',
               246784,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p40',
               257024,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p50',
               264192,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p60',
               268288,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p70',
               272384,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p80',
               280576,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p90',
               292864,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p95',
               366592,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p99',
               473088,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p99.5',
               489472,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p99.9',
               528384,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p99.95',
               528384,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:latency:p99.99',
               528384,
               'usec',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'sequential_read:read:iops',
               253,
               '',
-              {'fio_job': 'sequential_read', 'fio_version': 'fio-3.27'},
+              sequential_read_metadata,
           ],
           [
               'random_write_test:write:bandwidth',
               6443,
               'KB/s',
-              {
-                  'bw_max': 7104,
-                  'bw_agg': 6446.55,
-                  'bw_min': 5896,
-                  'bw_dev': 336.21,
-                  'bw_mean': 6446.55,
-                  'fio_job': 'random_write_test',
-                  'fio_version': 'fio-3.27',
-              },
+              self.merge_two_dicts(
+                  {
+                      'bw_max': 7104,
+                      'bw_agg': 6446.55,
+                      'bw_min': 5896,
+                      'bw_dev': 336.21,
+                      'bw_mean': 6446.55,
+                  },
+                  random_write_metadata,
+              ),
           ],
           [
               'random_write_test:write:latency',
               587.02,
               'usec',
-              {
-                  'max': 81806,
-                  'stddev': 897.93,
-                  'min': 1,
-                  'mean': 587.02,
-                  'p60': 524,
-                  'p1': 446,
-                  'p99.9': 3216,
-                  'p70': 532,
-                  'p5': 462,
-                  'p90': 636,
-                  'p99.95': 4128,
-                  'p80': 564,
-                  'p95': 1064,
-                  'p10': 470,
-                  'p99.5': 1736,
-                  'p99': 1688,
-                  'p20': 482,
-                  'p99.99': 81408,
-                  'p30': 494,
-                  'p50': 510,
-                  'p40': 502,
-                  'fio_job': 'random_write_test',
-                  'fio_version': 'fio-3.27',
-              },
+              self.merge_two_dicts(
+                  {
+                      'max': 81806,
+                      'stddev': 897.93,
+                      'min': 1,
+                      'mean': 587.02,
+                      'p60': 524,
+                      'p1': 446,
+                      'p99.9': 3216,
+                      'p70': 532,
+                      'p5': 462,
+                      'p90': 636,
+                      'p99.95': 4128,
+                      'p80': 564,
+                      'p95': 1064,
+                      'p10': 470,
+                      'p99.5': 1736,
+                      'p99': 1688,
+                      'p20': 482,
+                      'p99.99': 81408,
+                      'p30': 494,
+                      'p50': 510,
+                      'p40': 502,
+                  },
+                  random_write_metadata,
+              ),
           ],
           [
               'random_write_test:write:latency:min',
               1,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:max',
               81806,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:mean',
               587.02,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:stddev',
               897.93,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p1',
               446,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p5',
               462,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p10',
               470,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p20',
               482,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p30',
               494,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p40',
               502,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p50',
               510,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p60',
               524,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p70',
               532,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p80',
               564,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p90',
               636,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p95',
               1064,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p99',
               1688,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p99.5',
               1736,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p99.9',
               3216,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p99.95',
               4128,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:latency:p99.99',
               81408,
               'usec',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_write_test:write:iops',
               1610,
               '',
-              {'fio_job': 'random_write_test', 'fio_version': 'fio-3.27'},
+              random_write_metadata,
           ],
           [
               'random_read_test:read:bandwidth',
               1269,
               'KB/s',
-              {
-                  'bw_max': 1745,
-                  'bw_agg': 1275.52,
-                  'bw_min': 330,
-                  'bw_dev': 201.59,
-                  'bw_mean': 1275.52,
-                  'fio_job': 'random_read_test',
-                  'fio_version': 'fio-3.27',
-              },
+              self.merge_two_dicts(
+                  {
+                      'bw_max': 1745,
+                      'bw_agg': 1275.52,
+                      'bw_min': 330,
+                      'bw_dev': 201.59,
+                      'bw_mean': 1275.52,
+                  },
+                  random_read_metadata,
+              ),
           ],
           [
               'random_read_test:read:latency',
               3117.62,
               'usec',
-              {
-                  'max': 352736,
-                  'stddev': 5114.37,
-                  'min': 0,
-                  'mean': 3117.62,
-                  'p60': 3312,
-                  'p1': 524,
-                  'p99.9': 6880,
-                  'p70': 3344,
-                  'p5': 588,
-                  'p90': 3408,
-                  'p99.95': 11840,
-                  'p80': 3376,
-                  'p95': 3440,
-                  'p10': 2544,
-                  'p99.5': 4128,
-                  'p99': 3728,
-                  'p20': 3152,
-                  'p99.99': 354304,
-                  'p30': 3216,
-                  'p50': 3280,
-                  'p40': 3248,
-                  'fio_job': 'random_read_test',
-                  'fio_version': 'fio-3.27',
-              },
+              self.merge_two_dicts(
+                  {
+                      'max': 352736,
+                      'stddev': 5114.37,
+                      'min': 0,
+                      'mean': 3117.62,
+                      'p60': 3312,
+                      'p1': 524,
+                      'p99.9': 6880,
+                      'p70': 3344,
+                      'p5': 588,
+                      'p90': 3408,
+                      'p99.95': 11840,
+                      'p80': 3376,
+                      'p95': 3440,
+                      'p10': 2544,
+                      'p99.5': 4128,
+                      'p99': 3728,
+                      'p20': 3152,
+                      'p99.99': 354304,
+                      'p30': 3216,
+                      'p50': 3280,
+                      'p40': 3248,
+                  },
+                  random_read_metadata,
+              ),
           ],
           [
               'random_read_test:read:latency:min',
               0,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:max',
               352736,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:mean',
               3117.62,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:stddev',
               5114.37,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p1',
               524,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p5',
               588,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p10',
               2544,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p20',
               3152,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p30',
               3216,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p40',
               3248,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p50',
               3280,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p60',
               3312,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p70',
               3344,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p80',
               3376,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p90',
               3408,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p95',
               3440,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p99',
               3728,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p99.5',
               4128,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p99.9',
               6880,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p99.95',
               11840,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:latency:p99.99',
               354304,
               'usec',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test:read:iops',
               317,
               '',
-              {'fio_job': 'random_read_test', 'fio_version': 'fio-3.27'},
+              random_read_metadata,
           ],
           [
               'random_read_test_parallel:read:bandwidth',
               1292,
               'KB/s',
-              {
-                  'bw_max': 1693,
-                  'bw_agg': 1284.71,
-                  'bw_min': 795,
-                  'bw_dev': 88.67,
-                  'bw_mean': 1284.71,
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              self.merge_two_dicts(
+                  {
+                      'bw_max': 1693,
+                      'bw_agg': 1284.71,
+                      'bw_min': 795,
+                      'bw_dev': 88.67,
+                      'bw_mean': 1284.71,
+                  },
+                  random_read_parallel_metadata,
+              ),
           ],
           [
               'random_read_test_parallel:read:latency',
               198030.44,
               'usec',
-              {
-                  'max': 400078,
-                  'stddev': 21709.40,
-                  'min': 0,
-                  'mean': 198030.44,
-                  'p60': 199680,
-                  'p1': 65280,
-                  'p99.9': 370688,
-                  'p70': 203776,
-                  'p5': 189440,
-                  'p90': 205824,
-                  'p99.95': 387072,
-                  'p80': 203776,
-                  'p95': 209920,
-                  'p10': 189440,
-                  'p99.5': 257024,
-                  'p99': 209920,
-                  'p20': 193536,
-                  'p99.99': 399360,
-                  'p30': 197632,
-                  'p50': 199680,
-                  'p40': 197632,
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              self.merge_two_dicts(
+                  {
+                      'max': 400078,
+                      'stddev': 21709.40,
+                      'min': 0,
+                      'mean': 198030.44,
+                      'p60': 199680,
+                      'p1': 65280,
+                      'p99.9': 370688,
+                      'p70': 203776,
+                      'p5': 189440,
+                      'p90': 205824,
+                      'p99.95': 387072,
+                      'p80': 203776,
+                      'p95': 209920,
+                      'p10': 189440,
+                      'p99.5': 257024,
+                      'p99': 209920,
+                      'p20': 193536,
+                      'p99.99': 399360,
+                      'p30': 197632,
+                      'p50': 199680,
+                      'p40': 197632,
+                  },
+                  random_read_parallel_metadata,
+              ),
           ],
           [
               'random_read_test_parallel:read:latency:min',
               0,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:max',
               400078,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:mean',
               198030.44,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:stddev',
               21709.40,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p1',
               65280,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p5',
               189440,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p10',
               189440,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p20',
               193536,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p30',
               197632,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p40',
               197632,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p50',
               199680,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p60',
               199680,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p70',
               203776,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p80',
               203776,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p90',
               205824,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p95',
               209920,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p99',
               209920,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p99.5',
               257024,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p99.9',
               370688,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p99.95',
               387072,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:latency:p99.99',
               399360,
               'usec',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
           [
               'random_read_test_parallel:read:iops',
               323,
               '',
-              {
-                  'fio_job': 'random_read_test_parallel',
-                  'fio_version': 'fio-3.27',
-              },
+              random_read_parallel_metadata,
           ],
       ]
       expected_result = [

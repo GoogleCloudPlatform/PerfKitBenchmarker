@@ -28,6 +28,8 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
+FLAGS = flags.FLAGS
+
 FIO_DIR = '%s/fio' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/axboe/fio.git'
 GIT_TAG = 'fio-3.27'
@@ -113,13 +115,22 @@ def ParseJobFile(job_file):
   if GLOBAL in config.sections():
     global_metadata = dict(config.items(GLOBAL))
   section_metadata = {}
+  require_merge = FLAGS.fio_pinning
   for section in config.sections():
-    if section != GLOBAL:
-      metadata = {}
-      metadata.update(global_metadata)
-      metadata.update(dict(config.items(section)))
-      if JOB_STONEWALL_PARAMETER in metadata:
-        del metadata[JOB_STONEWALL_PARAMETER]
+    if section == GLOBAL:
+      continue
+    metadata = dict(config.items(section))
+    if JOB_STONEWALL_PARAMETER in metadata:
+      del metadata[JOB_STONEWALL_PARAMETER]
+    if require_merge:
+      section, index = section.rsplit('.', 1)[0], section.rsplit('.', 1)[1]
+      updated_metadata = {
+          f'{key}.{index}': value for key, value in metadata.items()}
+      metadata = updated_metadata
+    metadata.update(global_metadata)
+    if section in section_metadata:
+      section_metadata[section].update(metadata)
+    else:
       section_metadata[section] = metadata
   return section_metadata
 
@@ -194,8 +205,9 @@ def ParseResults(
   clat_hist_idx = 0
 
   for job in fio_json_result['jobs']:
-    job_name = job['jobname']
-    parameters = {'fio_job': job_name}
+    job_name = job['jobname'].split('.')[0]
+    parameters = {'fio_job': job_name,
+                  'fio_pinning': FLAGS.fio_pinning}
     if parameter_metadata:
       parameters.update(parameter_metadata[job_name])
     if base_metadata:

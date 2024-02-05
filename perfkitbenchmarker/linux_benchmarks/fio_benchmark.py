@@ -18,6 +18,7 @@ Man: http://manpages.ubuntu.com/manpages/natty/man1/fio.1.html
 Quick howto: http://www.bluestop.org/fio/HOWTO.txt
 """
 
+import itertools
 import json
 import logging
 import posixpath
@@ -116,6 +117,12 @@ flags.DEFINE_list(
     '--fio_jobfile.   You can also specify a scenario in the '
     'format accesspattern_blocksize_operation_workingset '
     'for a custom workload.',
+)
+flags.DEFINE_bool(
+    'fio_pinning',
+    False,
+    'Use in conjunction with fio_generate_scenarios. Any scenario is split '
+    'across raw disk and numa nodes and raw disks are pinned to numa nodes.',
 )
 flags.DEFINE_bool(
     'fio_use_default_scenarios',
@@ -334,13 +341,18 @@ filename={{filename}}
 do_verify=0
 verify_fatal=0
 group_reporting=1
+
 {%- for parameter in parameters %}
 {{parameter}}
 {%- endfor %}
 {%- for scenario in scenarios %}
 
-[{{scenario['name']}}-io-depth-{{scenario['iodepth']}}-num-jobs-{{scenario['numjobs']}}]
+{%- for pair in disk_numa_pair %}
+
+[{{scenario['name']}}-io-depth-{{scenario['iodepth']}}-num-jobs-{{scenario['numjobs']}}{%- if scenario['disk_numa_pinning'] == True %}.{{pair['index']}}{%- endif%}]
+{%- if pair['index'] == 0 %}
 stonewall
+{%- endif%}
 rw={{scenario['rwkind']}}
 {%- if scenario['rwmixread'] is defined %}
 rwmixread={{scenario['rwmixread']}}
@@ -371,6 +383,13 @@ iodepth_batch_complete_max={{scenario['iodepth_batch_complete_max']}}
 {%- if scenario['numa_cpu_nodes'] is defined %}
 numa_cpu_nodes={{scenario['numa_cpu_nodes']}}
 {%- endif%}
+{%- if pair['numa_cpu_nodes'] is defined %}
+numa_cpu_nodes={{pair['numa_cpu_nodes']}}
+{%- endif%}
+{%- if pair['disk_filename'] is defined %}
+filename={{pair['disk_filename']}}
+{%- endif%}
+{%- endfor %}
 {%- endfor %}
 """
 
@@ -539,6 +558,7 @@ def GenerateJobFileString(
     direct: bool,
     parameters: list[str],
     numa_nodes: list[int],
+    raw_files: list[str],
 ) -> str:
   """Make a string with our fio job file.
 
@@ -555,6 +575,7 @@ def GenerateJobFileString(
     direct: boolean. Whether to use direct IO.
     parameters: list. Other fio parameters to be applied to all jobs.
     numa_nodes: list. List of NUMA nodes.
+    raw_files: A list of raw device paths.
 
   Returns:
     The contents of a fio job file, as a string.
@@ -620,16 +641,49 @@ def GenerateJobFileString(
   # https://cloud.google.com/compute/docs/disks/benchmark-hyperdisk-performance#prepare_for_testing.
   # The following ensures proper use of NUMA locality. HdX NVME-to-CPU not
   # used in the 1-NUMA case.
+
+  # any setup has at least 1 disk and 1 numa. So index 0 is always present.
+  # This (index) is also used to signal the jobfile to stonewall.
+  # We do not enumerate node and disk here because
+  # we only do it if we want to pin node and disks together.
+  disk_numa_pair = [{'index': 0}]
+
   for scenario in jinja_scenarios:
     if _FIO_RATE_BANDWIDTH_LIMIT.value:
       scenario['rate'] = _FIO_RATE_BANDWIDTH_LIMIT.value
     scenario['iodepth_batch_submit'] = scenario['iodepth']
     scenario['iodepth_batch_complete_max'] = scenario['iodepth']
+    scenario['disk_numa_pinning'] = FLAGS.fio_pinning
 
+    # There are two ways to really work a disk:
+    # 1. you can create many jobs, each of which is pinned to a different numa
+    #    and a different raw disk. These jobs are not stonewalled so they
+    #    all run simultaneously.
+    # 2. you can create 1 job, which is set to use all numa nodes and targets
+    #    all (striped or no) disks.
+    # The former is preferred for extremely high iops,
+    # and the latter is preferred for extremely high throughput.
+    # So offering both paths here via the fio_pinning flag.
     if numa_nodes != [0]:
-      scenario['numa_cpu_nodes'] = ','.join(
-          [str(numa_node) for numa_node in numa_nodes]
-      )
+      if FLAGS.fio_pinning:
+        # spread raw disks across numas
+        raw_disk_numa_pairs = (
+            zip(numa_nodes, raw_files)
+            if len(numa_nodes) >= len(raw_files)
+            else zip(itertools.cycle(numa_nodes), raw_files)
+        )
+        disk_numa_pair = [
+            {
+                'index': index,
+                'numa_cpu_nodes': str(pair[0]),
+                'disk_filename': pair[1],
+            }
+            for index, pair in enumerate(raw_disk_numa_pairs)
+        ]
+      else:
+        scenario['numa_cpu_nodes'] = ','.join(
+            [str(numa_node) for numa_node in numa_nodes]
+        )
 
   job_file_template = jinja2.Template(
       JOB_FILE_TEMPLATE, undefined=jinja2.StrictUndefined
@@ -644,6 +698,7 @@ def GenerateJobFileString(
           scenarios=jinja_scenarios,
           direct=int(direct),
           parameters=parameters,
+          disk_numa_pair=disk_numa_pair,
       )
   )
 
@@ -723,8 +778,11 @@ def GetOrGenerateJobFileString(
         user_job_file_string or job_file_contents, remove_filename
     )
   else:
+    raw_files = []
     if against_device:
       filename = disk.GetDevicePath()
+      if disk.is_striped:
+        raw_files = [d.GetDevicePath() for d in disk.disks]
     else:
       # Since we pass --directory to fio, we must use relative file
       # paths or get an error.
@@ -742,6 +800,7 @@ def GetOrGenerateJobFileString(
         direct,
         parameters,
         numa_nodes,
+        raw_files,
     )
 
 

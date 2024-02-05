@@ -83,6 +83,7 @@ iodepth_batch_complete_max=2"""
             True,
             ['randrepeat=0', 'offset_increment=1k'],
             [0],
+            ['/dev/sdb'],
         ),
         expected_jobfile,
     )
@@ -173,7 +174,18 @@ iodepth_batch_complete_max=1"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
-            self.filename, ['all'], [1], [1], None, None, 600, 10, True, [], [0]
+            self.filename,
+            ['all'],
+            [1],
+            [1],
+            None,
+            None,
+            600,
+            10,
+            True,
+            [],
+            [0],
+            ['/dev/sdb'],
         ),
         expected_jobfile,
     )
@@ -226,6 +238,7 @@ iodepth_batch_complete_max=1"""
             True,
             ['randrepeat=0'],
             [0],
+            ['/dev/sdb'],
         ),
         expected_jobfile,
     )
@@ -245,6 +258,7 @@ iodepth_batch_complete_max=1"""
         True,
         [],
         [0],
+        ['/dev/sdb'],
     )
 
     self.assertIn('blocksize=2000000B', job_file)
@@ -268,6 +282,7 @@ iodepth_batch_complete_max=1"""
         False,
         [],
         [0],
+        ['/dev/sdb'],
     )
     self.assertIn('direct=0', job_file)
 
@@ -383,6 +398,7 @@ iodepth_batch_complete_max=2"""
             True,
             ['randrepeat=0'],
             [0],
+            ['/dev/sdb'],
         ),
         expected_jobfile,
     )
@@ -439,6 +455,91 @@ iodepth_batch_complete_max=4"""
             True,
             ['randrepeat=0'],
             [0],
+            ['/dev/sdb'],
+        ),
+        expected_jobfile,
+    )
+
+  def testGenerateJobFileStringWithSplitAcrossRawDisksAndNuma(self):
+    FLAGS.fio_pinning = True
+    expected_jobfile = """
+[global]
+ioengine=libaio
+invalidate=1
+direct=1
+runtime=600
+ramp_time=10
+time_based
+filename=/test/filename
+do_verify=0
+verify_fatal=0
+group_reporting=1
+randrepeat=0
+
+[rand_8k_read_100%-io-depth-1-num-jobs-1.0]
+stonewall
+rw=randread
+blocksize=8k
+iodepth=1
+size=100%
+numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
+filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-0
+
+[rand_8k_read_100%-io-depth-1-num-jobs-1.1]
+rw=randread
+blocksize=8k
+iodepth=1
+size=100%
+numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=1
+filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1
+
+[rand_8k_write_100%-io-depth-1-num-jobs-1.0]
+stonewall
+rw=randwrite
+blocksize=8k
+iodepth=1
+size=100%
+numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=0
+filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-0
+
+[rand_8k_write_100%-io-depth-1-num-jobs-1.1]
+rw=randwrite
+blocksize=8k
+iodepth=1
+size=100%
+numjobs=1
+iodepth_batch_submit=1
+iodepth_batch_complete_max=1
+numa_cpu_nodes=1
+filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1"""
+
+    self.assertEqual(
+        fio_benchmark.GenerateJobFileString(
+            self.filename,
+            [
+                'rand_8k_read_100%',
+                'rand_8k_write_100%',
+            ],
+            [1],
+            [1],
+            None,
+            None,
+            600,
+            10,
+            True,
+            ['randrepeat=0'],
+            [0, 1, 2, 3],
+            ['/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-0',
+             '/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1'],
         ),
         expected_jobfile,
     )
