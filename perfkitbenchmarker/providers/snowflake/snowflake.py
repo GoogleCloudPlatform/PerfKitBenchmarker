@@ -178,7 +178,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
 class Snowflake(edw_service.EdwService):
   """Object representing a Snowflake Data Warehouse Instance."""
 
-  CLOUD = None
+  CLOUD: str = None
   SERVICE_TYPE = None
 
   def __init__(self, edw_service_spec):

@@ -402,6 +402,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
     cmd = util.GcloudCommand(
         self, 'compute', 'sole-tenancy', 'node-groups', 'create', self.name
     )
+    assert self.node_template is not None
     cmd.flags['node-template'] = self.node_template.name
     cmd.flags['target-size'] = 1
     _, stderr, retcode = cmd.Issue(raise_on_failure=False)

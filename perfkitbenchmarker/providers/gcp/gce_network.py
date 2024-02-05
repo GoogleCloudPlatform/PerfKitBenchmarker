@@ -209,6 +209,7 @@ class GceVpnGateway(network.BaseVpnGateway):
     region = tunnel_config.endpoints[self.name]['region']
     vpn_gateway_id = self.name
     target_ip = tunnel_config.endpoints[target_endpoint]['ip_address']
+    assert isinstance(target_ip, str)
     psk = tunnel_config.psk
     ike_version = tunnel_config.ike_version
     suffix = tunnel_config.suffix
@@ -867,7 +868,7 @@ class GceSubnetResource(resource.BaseResource):
     cmd.Issue(raise_on_failure=False)
 
 
-def IsPlacementGroupCompatible(machine_type):
+def IsPlacementGroupCompatible(machine_type: str):
   """Returns True if VMs of 'machine_type' can be put in a placement group."""
   prefix = machine_type.split('-')[0]
   return prefix in _PLACEMENT_GROUP_PREFIXES
