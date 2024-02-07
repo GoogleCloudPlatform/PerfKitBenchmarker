@@ -24,14 +24,26 @@ try {
       $cacheDiskModel = 'EphemeralDisk'
   }
   Write-Host $cacheDiskModel
-  if ([string]::IsNullOrEmpty($cacheDiskModel)) {
-      Enable-ClusterStorageSpacesDirect -PoolFriendlyName 's2dpool' -Confirm:0;
+
+  $maxRetryAttempts = 3
+  for (($i = 0); $i -lt $maxRetryAttempts; $i++) {
+    try {
+      if ([string]::IsNullOrEmpty($cacheDiskModel)) {
+          Enable-ClusterStorageSpacesDirect -PoolFriendlyName 's2dpool' -Confirm:0;
+      }
+      else {
+        Invoke-Command -ComputerName  $node1 -Credential $domainCredential -ArgumentList $cacheDiskModel -ScriptBlock {
+          Enable-ClusterStorageSpacesDirect -CacheDeviceModel $args[0]  -PoolFriendlyName 's2dpool' -Confirm:0;
+          }
+      }
+      break
+    }
+    catch {
+      Write-Host 'Exception occured while creating S2D cluster: '$_.Exception.Message
+      Start-Sleep -Seconds 10
+    }
   }
-  else {
-      Invoke-Command -ComputerName  $node1 -Credential $domainCredential -ArgumentList $cacheDiskModel -ScriptBlock {
-        Enable-ClusterStorageSpacesDirect -CacheDeviceModel $args[0]  -PoolFriendlyName 's2dpool' -Confirm:0;
-     }
-  }
+
   Start-Sleep -Seconds 40
   (Get-Cluster).BlockCacheSize = 2048
 

@@ -261,7 +261,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     )
 
     if self.server_vm.OS_TYPE == os_types.DEFAULT:
-      self.server_vm.Install('mssql_tools')
+      self.server_vm.Install("mssql_tools")
 
     self.MoveSQLServerTempDBLinux()
     self.server_vm.RemoteCommand("sudo systemctl restart mssql-server")
@@ -404,8 +404,27 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     # Install SQL server updates.
     # Installation media present on the system is very outdated and it
     # does not support DNN connection for SQL.
-    self.PushAndRunPowershellScript(server_vm, "update_sql_server.ps1")
-    self.PushAndRunPowershellScript(replica_vms[0], "update_sql_server.ps1")
+
+    # Fetch the SQL server update link from MS site.
+    sql_srv_vms = [server_vm, replica_vms[0]]
+    sql_srv_updates_windows = {
+        "2022": "KB5032679",
+        "2019": "KB5031908",
+        "2017": "KB5016884",
+        "2016": "KB5029186",
+        "2014": "KB5029185",
+    }
+
+    # for each database vm, fetch sql server update link and execute update
+
+    for sql_srv_vm in sql_srv_vms:
+      sql_server_version = self.GetSQLServerVersion(sql_srv_vm)
+      if (sql_srv_updates_windows.get(sql_server_version) is not None):
+        kb_number = sql_srv_updates_windows[sql_server_version]
+        if (kb_number is not None and kb_number):
+          self.PushAndRunPowershellScript(
+              sql_srv_vm, "update_sql_server.ps1", [kb_number]
+          )
 
     # Update variables user for connection to SQL server.
     self.spec.database_password = win_password
@@ -718,6 +737,36 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         vm.RemoteCommand("Restart-Service MSSQLSERVER -Force")
       else:
         vm.RemoteCommand("sudo systemctl restart mssql-server")
+
+  def GetSQLServerVersion(
+      self,
+      vm: virtual_machine.VirtualMachine
+  ) -> str:
+    """Fetch SQL Server Version of the vm.
+
+    Args:
+      vm: vm
+
+    Returns:
+      SQL Server Version
+    """
+
+    return_value: str = None
+    sql_srv_version_prefix = "sqlserver_"
+    sql_srv_supported_versions = [
+        "2022",
+        "2019",
+        "2017",
+        "2016",
+        "2014",
+        "2012"
+    ]
+
+    for version in sql_srv_supported_versions:
+      if vm.OS_TYPE.find(sql_srv_version_prefix+version) > 0:
+        return_value = version
+        break
+    return return_value
 
 
 def ConfigureSQLServer(vm, username: str, password: str):
