@@ -317,7 +317,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   samples = []
   for i in range(1, 1 + hammerdb.NUM_RUN.value):
     metadata['run_iteration'] = i
-    current_samples = hammerdb.Run(vm, db_engine, script, timeout=timeout)
+    stdout = hammerdb.Run(vm, db_engine, script, timeout=timeout)
+    current_samples = hammerdb.ParseResults(script=script, stdout=stdout, vm=vm)
     if (
         db_engine == sql_engine_utils.ALLOYDB
         and relational_db.enable_columnar_engine_recommendation
@@ -331,7 +332,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
       )
       relational_db.WaitColumnarEnginePopulates(database_name)
       # Another prewarm
-      current_samples = hammerdb.Run(vm, db_engine, script, timeout=timeout)
+      stdout = hammerdb.Run(vm, db_engine, script, timeout=timeout)
+      current_samples = hammerdb.ParseResults(script=script, stdout=stdout,
+                                              vm=vm)
 
     for s in current_samples:
       s.metadata.update(metadata)

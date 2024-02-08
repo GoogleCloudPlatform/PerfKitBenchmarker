@@ -780,6 +780,30 @@ def ParseTpcHResults(stdout: str) -> List[sample.Sample]:
   return results
 
 
+def ParseResults(
+    script: str, stdout: str, vm: virtual_machine.BaseVirtualMachine
+) -> List[sample.Sample]:
+  """Parse HammerDB results using the appropriate parser for the script type.
+
+  Args:
+    script:  An enumeration from HAMMERDB_SCRIPT indicating which
+      script to run.  Must have been prior setup with SetupConfig method on the
+      vm to work.
+    stdout:  Output from hammerdb.Run
+    vm:  The virtual machine to run on that has Install and SetupConfig already
+      invoked on it.
+  Returns:
+    A list of samples
+  Raises:
+    HammerdbBenchmarkError: Invalid script type
+  """
+  if script == HAMMERDB_SCRIPT_TPC_H:
+    return ParseTpcHResults(stdout)
+  elif script == HAMMERDB_SCRIPT_TPC_C:
+    return ParseTpcCResults(stdout, vm)
+  raise HammerdbBenchmarkError('Unknown script type: {}'.format(script))
+
+
 def LocalWorkingDirectory() -> str:
   """Get the directory local on the machine for storing data.
 
@@ -921,7 +945,7 @@ def Run(
     db_engine: str,
     hammerdb_script: str,
     timeout: Optional[int] = 60 * 60 * 8,
-) -> List[sample.Sample]:
+) -> str:
   """Run the HammerDBCli Benchmark.
 
   Runs Hammerdb TPCC or TPCH script.
@@ -942,7 +966,7 @@ def Run(
     timeout: Timeout when running hammerdbcli
 
   Returns:
-     _HammerDBCliResults object with TPM and NOPM values.
+    Standard output from the HammerDB command
   """
   db_engine = sql_engine_utils.GetDbEngineType(db_engine)
 
@@ -950,12 +974,7 @@ def Run(
 
   # Run the build scripts which contains build schema (inserts into dbs)
   # And the benchmark scripts. The last stdout is the result from the run script
-  stdout = scripts[-1].Run(vm, timeout=timeout)
-
-  if hammerdb_script == HAMMERDB_SCRIPT_TPC_H:
-    return ParseTpcHResults(stdout)
-  else:
-    return ParseTpcCResults(stdout, vm)
+  return scripts[-1].Run(vm, timeout=timeout)
 
 
 def GetMetadata(db_engine: str):

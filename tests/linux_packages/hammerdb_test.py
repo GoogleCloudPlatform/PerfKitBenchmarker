@@ -24,6 +24,8 @@ from unittest import mock
 from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker.linux_packages.hammerdb import HammerdbBenchmarkError
+from perfkitbenchmarker.linux_packages.hammerdb import ParseResults
 from perfkitbenchmarker.linux_packages.hammerdb import ParseTpcCResults
 from perfkitbenchmarker.linux_packages.hammerdb import ParseTpcCTimeProfileResultsFromFile
 from perfkitbenchmarker.linux_packages.hammerdb import ParseTpcCTPMResultsFromFile
@@ -834,6 +836,14 @@ class HammerdbcliTest(
     self.assertCountEqual(
         output, [sample.Sample(i[0], i[1], i[2]) for i in expected_result]
     )
+
+  def testParseResults(self):
+    """Tests the ParseResults convenience function."""
+    vm = mock.Mock()
+    self.assertLen(ParseResults('tpc_c', TPCC_LOG, vm), 2)
+    self.assertLen(ParseResults('tpc_h', TPCH_LOG, vm), 23)
+    with self.assertRaises(HammerdbBenchmarkError):
+      ParseResults('nonexistent', '', vm)
 
 
 if __name__ == '__main__':
