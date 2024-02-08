@@ -153,7 +153,16 @@ flags.DEFINE_integer(
     'innodb_buffer_pool_size',
     None,
     'Size of the innodb buffer pool size in GB. '
-    'Defaults to 25% of VM memory if unset',
+    'If unset, innodb_buffer_pool_ratio is used.',
+)
+
+flags.DEFINE_float(
+    'innodb_buffer_pool_ratio',
+    0.25,
+    'Ratio of the innodb buffer pool size to VM memory. '
+    'Ignored if innodb_buffer_pool_size is set.',
+    lower_bound=0,
+    upper_bound=1
 )
 
 flags.DEFINE_bool(
@@ -168,7 +177,16 @@ flags.DEFINE_integer(
     'postgres_shared_buffer_size',
     None,
     'Size of the shared buffer size in GB. '
-    'Defaults to 25% of VM memory if unset',
+    'If unset, postgres_shared_buffer_ratio is used.',
+)
+
+flags.DEFINE_float(
+    'postgres_shared_buffer_ratio',
+    0.25,
+    'Ratio of the shared buffer size to VM memory. '
+    'Ignored if postgres_shared_buffer_size is set.',
+    lower_bound=0,
+    upper_bound=1
 )
 
 OPTIMIZE_DB_SYSCTL_CONFIG = flags.DEFINE_bool(

@@ -68,7 +68,9 @@ class PostgresIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       kb_to_gb = 1.0 / 1000000
       if not self.postgres_shared_buffer_size:
         self.postgres_shared_buffer_size = int(
-            self.server_vm.total_memory_kb * kb_to_gb / 4
+            self.server_vm.total_memory_kb
+            * kb_to_gb
+            * FLAGS.postgres_shared_buffer_ratio
         )
 
   def GetResourceMetadata(self):

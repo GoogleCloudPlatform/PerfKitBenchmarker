@@ -218,6 +218,22 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
         ' dbname=postgresql\' -c "Select 1"',
     )
 
+  def testPostgresServerBufferRatio(self):
+    postgres_shared_buffer_ratio = 0.8
+    FLAGS['use_managed_db'].parse(False)
+    FLAGS['postgres_shared_buffer_ratio'].parse(postgres_shared_buffer_ratio)
+    db = FakePostgresRelationalDb(self.postgres_spec)
+    server_vm = mock.MagicMock()
+    server_vm.total_memory_kb = 100000000
+    db.SetVms(
+        {'default': [CreateTestLinuxVm()], 'servers': [server_vm]}
+    )
+    kb_to_gb = 1.0 / 1000000
+    self.assertEqual(
+        db.postgres_shared_buffer_size,
+        db.server_vm.total_memory_kb * kb_to_gb * postgres_shared_buffer_ratio,
+    )
+
   def testMakeMysqlCientCommand(self):
     FLAGS['use_managed_db'].parse(False)
     db = FakeMysqlRelationalDb(self.mysql_spec)
@@ -264,6 +280,22 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         db.server_vm_query_tools.MakeSqlCommand('Select 1'),
         'sqlcmd -S localhost -U root -P perfkitbenchmarker -Q "Select 1"',
+    )
+
+  def testMySQLServerBufferRatio(self):
+    innodb_buffer_pool_ratio = 0.8
+    FLAGS['use_managed_db'].parse(False)
+    FLAGS['innodb_buffer_pool_ratio'].parse(innodb_buffer_pool_ratio)
+    db = FakeMysqlRelationalDb(self.mysql_spec)
+    server_vm = mock.MagicMock()
+    server_vm.total_memory_kb = 100000000
+    db.SetVms(
+        {'default': [CreateTestLinuxVm()], 'servers': [server_vm]}
+    )
+    kb_to_gb = 1.0 / 1000000
+    self.assertEqual(
+        db.innodb_buffer_pool_size,
+        db.server_vm.total_memory_kb * kb_to_gb * innodb_buffer_pool_ratio,
     )
 
   def testInstallMYSQLServer(self):
