@@ -1745,13 +1745,6 @@ class Ubuntu2204BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
-class Ubuntu2304BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2304Mixin
-):
-  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2304-amd64'
-  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
-
-
 class Ubuntu2310BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2310Mixin
 ):

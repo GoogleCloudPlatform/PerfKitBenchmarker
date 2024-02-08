@@ -144,13 +144,13 @@
 -   Add --dpb_dynamic_allocation flag to disable dynamic allocation in Spark
     benchmarks.
 -   Add support for benchmarking VMs with Local SSD on Windows on GCE/AWS/Azure.
--   Add support for Ubuntu 23.04.
 -   Add support for Debian 12.
 -   Add netperf_hammerdbcli benchmark, which executes netperf and hammerdbcli
     benchmarks in parallel.
 -   Add default_benchmark_config.yaml and merge it with user_config. This is
     done before config overrides. Within default_benchmark_config.yaml, add
     configs for netperf_tcp_rr, netperf_tcp_stream, and hammerdbcli_mysql.
+-   Add support for Ubuntu 23.10.
 
 ### Enhancements:
 

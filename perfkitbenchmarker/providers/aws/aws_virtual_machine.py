@@ -1893,12 +1893,13 @@ class Ubuntu2204BasedAwsVirtualMachine(
   )
 
 
-class Ubuntu2304BasedAwsVirtualMachine(
-    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2304Mixin
+class Ubuntu2310BasedAwsVirtualMachine(
+    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2310Mixin
 ):
   IMAGE_NAME_FILTER_PATTERN = (
-      'ubuntu/images/*/ubuntu-lunar-23.04-{alternate_architecture}-server-20*'
+      'ubuntu/images/*/ubuntu-mantic-23.10-{alternate_architecture}-server-20*'
   )
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
 
 
 class JujuBasedAwsVirtualMachine(

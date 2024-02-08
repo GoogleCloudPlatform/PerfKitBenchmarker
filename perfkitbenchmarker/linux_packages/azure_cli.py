@@ -83,14 +83,24 @@ def _PipInstall(vm):
   vm.RemoteCommand('sudo pip3 install --upgrade azure-cli pyOpenSSL>=23.2.0')
 
 
+# https://packages.microsoft.com/repos/azure-cli/dists/
+SUPPORTED_APT_DISTROS = [
+    os_types.UBUNTU1804,
+    os_types.UBUNTU2004,
+    os_types.UBUNTU2204,
+    os_types.DEBIAN10,
+    os_types.DEBIAN11,
+    os_types.DEBIAN12,
+]
+
+
 def AptInstall(vm):
   """Installs the azure-cli package on the VM for Debian systems.
 
   Args:
     vm: Virtual Machine to install on.
   """
-  # https://packages.microsoft.com/repos/azure-cli/dists/ does not support lunar
-  if vm.is_aarch64 or vm.OS_TYPE == os_types.UBUNTU2304:
+  if vm.is_aarch64 or vm.OS_TYPE not in SUPPORTED_APT_DISTROS:
     _PipInstall(vm)
     return
   vm.InstallPackages('lsb-release curl apt-transport-https')

@@ -55,6 +55,7 @@ UBUNTU2004 = 'ubuntu2004'
 UBUNTU2004_EFA = 'ubuntu2004_efa'
 AMAZONLINUX2_EFA = 'amazonlinux2_efa'
 UBUNTU2204 = 'ubuntu2204'
+# TODO(user): Reemove EOL 23.04
 UBUNTU2304 = 'ubuntu2304'
 UBUNTU2310 = 'ubuntu2310'
 WINDOWS2016_CORE = 'windows2016_core'
