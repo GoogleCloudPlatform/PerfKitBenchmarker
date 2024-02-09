@@ -18,7 +18,9 @@ This contains the BaseProviderInfo class which is
 used for IsBenchmarkSupported
 """
 
+from absl import flags
 import six
+
 
 GCP = 'GCP'
 AZURE = 'Azure'
@@ -53,6 +55,19 @@ VALID_CLOUDS = (
 )
 
 _PROVIDER_INFO_REGISTRY = {}
+
+# With b/302543184, VM Platform replaces Cloud as that attribute is overused &
+# overloaded.
+# TODO(user): Add STATIC, DOCKER_ON_VM, DOCKER_INSTANCE, & BARE_METAL.
+DEFAULT_VM_PLATFORM = 'DEFAULT_VM'
+KUBERNETES_PLATFORM = KUBERNETES
+ALL_PLATFORMS = [
+    DEFAULT_VM_PLATFORM,
+    KUBERNETES_PLATFORM,
+]
+VM_PLATFORM = flags.DEFINE_enum(
+    'vm_platform', DEFAULT_VM_PLATFORM, ALL_PLATFORMS, 'VM platform to use.'
+)
 
 
 def GetProviderInfoClass(cloud):

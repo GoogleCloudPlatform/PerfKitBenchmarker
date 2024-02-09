@@ -34,7 +34,6 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import windows_virtual_machine
 
@@ -358,10 +357,9 @@ def GetStaticVmClass(os_type) -> type[virtual_machine.BaseVirtualMachine]:
   if not os_type:
     os_type = os_types.DEFAULT
     logging.warning('Could not find os type for VM. Defaulting to %s.', os_type)
-  return resource.GetResourceClass(
-      virtual_machine.BaseVirtualMachine,
-      CLOUD=StaticVirtualMachine.CLOUD,
-      OS_TYPE=os_type,
+  return virtual_machine.GetVmClass(
+      StaticVirtualMachine.CLOUD,
+      os_type,
   )
 
 

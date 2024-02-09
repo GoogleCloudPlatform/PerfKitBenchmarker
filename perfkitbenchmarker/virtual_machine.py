@@ -42,6 +42,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import package_lookup
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
@@ -212,15 +213,41 @@ flags.DEFINE_enum(
 )
 
 
-def GetVmSpecClass(cloud):
-  """Returns the VmSpec class corresponding to 'cloud'."""
-  return spec.GetSpecClass(BaseVmSpec, CLOUD=cloud)
+def GetVmSpecClass(cloud: str, platform: Optional[str] = None):
+  """Returns the VmSpec class with corresponding attributes.
+
+  Args:
+    cloud: The cloud being used.
+    platform: The vm platform being used (see enum above). If not provided,
+      defaults to flag value.
+
+  Returns:
+    A child of BaseVmSpec with the corresponding attributes.
+  """
+  if platform is None:
+    platform = provider_info.VM_PLATFORM.value
+  return spec.GetSpecClass(BaseVmSpec, CLOUD=cloud, PLATFORM=platform)
 
 
-def GetVmClass(cloud, os_type):
-  """Returns the VM class corresponding to 'cloud' and 'os_type'."""
+def GetVmClass(cloud: str, os_type: str, platform: Optional[str] = None):
+  """Returns the VM class with corresponding attributes.
+
+  Args:
+    cloud: The cloud being used.
+    os_type: The os type of the VM.
+    platform: The vm platform being used (see enum above). If not provided,
+      defaults to flag value.
+
+  Returns:
+    A child of BaseVirtualMachine with the corresponding attributes.
+  """
+  if platform is None:
+    platform = provider_info.VM_PLATFORM.value
   return resource.GetResourceClass(
-      BaseVirtualMachine, CLOUD=cloud, OS_TYPE=os_type
+      BaseVirtualMachine,
+      CLOUD=cloud,
+      OS_TYPE=os_type,
+      PLATFORM=platform,
   )
 
 
@@ -250,7 +277,9 @@ class BaseVmSpec(spec.BaseSpec):
   """
 
   SPEC_TYPE = 'BaseVmSpec'
+  SPEC_ATTRS = ['CLOUD', 'PLATFORM']
   CLOUD = None
+  PLATFORM = provider_info.DEFAULT_VM_PLATFORM
 
   def __init__(self, *args, **kwargs):
     self.zone = None
@@ -1190,7 +1219,9 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   is_static = False
 
   RESOURCE_TYPE = 'BaseVirtualMachine'
-  REQUIRED_ATTRS = ['CLOUD', 'OS_TYPE']
+  REQUIRED_ATTRS = ['CLOUD', 'OS_TYPE', 'PLATFORM']
+  # TODO(user): Define this value in all individual children.
+  PLATFORM = provider_info.DEFAULT_VM_PLATFORM
 
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
