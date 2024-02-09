@@ -339,7 +339,7 @@ flags.DEFINE_integer(
     'and hyperdisk-balanced volumes in GCP. Leave as None to '
     'use GCP defaults.',
 )
-flags.DEFINE_boolean(
+GCP_CREATE_DISKS_WITH_VM = flags.DEFINE_boolean(
     'gcp_create_disks_with_vm',
     True,
     'Whether to create PD disks at VM creation time. Defaults to True.',

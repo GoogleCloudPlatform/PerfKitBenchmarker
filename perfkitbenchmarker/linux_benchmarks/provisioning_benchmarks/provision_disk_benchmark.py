@@ -22,14 +22,16 @@ refactoring to become cloud-agnostic.
 """
 
 from typing import List
+
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
-FLAGS = flags.FLAGS
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 
+FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'provision_disk'
 
@@ -64,6 +66,10 @@ def CheckPrerequisites(benchmark_config):
       benchmark_config.vm_groups['default'].disk_spec.disk_type
   ):
     raise ValueError('Disk type must be a remote disk')
+  if FLAGS.cloud == 'GCP' and gcp_flags.GCP_CREATE_DISKS_WITH_VM.value:
+    raise ValueError(
+        'gcp_create_disks_with_vm must be set to false for GCP'
+    )
 
 
 def _WaitUntilAttached(vm, dsk) -> None:
