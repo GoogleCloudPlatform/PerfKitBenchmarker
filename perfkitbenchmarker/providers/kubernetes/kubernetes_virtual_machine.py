@@ -647,23 +647,22 @@ class DebianBasedKubernetesVirtualMachine(
       AttributeError: if the VirtualMachine class does not implement
         GenerateDownloadPreprovisionedDataCommand.
     """
-    cloud = FLAGS.container_cluster_cloud
-    if cloud == 'GCP':
+    if self.cloud == 'GCP':
       download_function = (
           gce_virtual_machine.GenerateDownloadPreprovisionedDataCommand
       )
-    elif cloud == 'AWS':
+    elif self.cloud == 'AWS':
       download_function = (
           aws_virtual_machine.GenerateDownloadPreprovisionedDataCommand
       )
-    elif cloud == 'Azure':
+    elif self.cloud == 'Azure':
       download_function = (
           azure_virtual_machine.GenerateDownloadPreprovisionedDataCommand
       )
     else:
       raise NotImplementedError(
           'Cloud {0} does not support downloading preprovisioned '
-          'data on Kubernetes VMs.'.format(cloud)
+          'data on Kubernetes VMs.'.format(self.cloud)
       )
 
     self.RemoteCommand(
@@ -672,8 +671,7 @@ class DebianBasedKubernetesVirtualMachine(
 
   def ShouldDownloadPreprovisionedData(self, module_name: str, filename: str):
     """Returns whether or not preprovisioned data is available."""
-    cloud = FLAGS.container_cluster_cloud
-    if cloud == 'GCP' and FLAGS.gcp_preprovisioned_data_bucket:
+    if self.cloud == 'GCP' and FLAGS.gcp_preprovisioned_data_bucket:
       stat_function = gce_virtual_machine.GenerateStatPreprovisionedDataCommand
       gce_virtual_machine.GceVirtualMachine.InstallCli(self)
       # We assume that gsutil is installed to /usr/bin/gsutil on GCE VMs
@@ -681,10 +679,10 @@ class DebianBasedKubernetesVirtualMachine(
       self.RemoteCommand(
           f'ln -sf {google_cloud_sdk.GSUTIL_PATH} /usr/bin/gsutil'
       )
-    elif cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
+    elif self.cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
       stat_function = aws_virtual_machine.GenerateStatPreprovisionedDataCommand
       aws_virtual_machine.AwsVirtualMachine.InstallCli(self)
-    elif cloud == 'Azure' and FLAGS.azure_preprovisioned_data_bucket:
+    elif self.cloud == 'Azure' and FLAGS.azure_preprovisioned_data_bucket:
       stat_function = (
           azure_virtual_machine.GenerateStatPreprovisionedDataCommand
       )
