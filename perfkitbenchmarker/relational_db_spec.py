@@ -340,15 +340,15 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
         config_values['vm_groups']['servers']['disk_spec'][cloud][
             'disk_type'
         ] = flag_values.db_disk_type
-    if flag_values['managed_db_disk_iops'].present:
+    if flag_values['db_disk_iops'].present:
       # This value will be used in aws_relation_db.py druing db creation
       config_values['db_disk_spec'][cloud][
-          'iops'
-      ] = flag_values.managed_db_disk_iops
+          'provisioned_iops'
+      ] = flag_values.db_disk_iops
       if has_unmanaged_dbs:
         config_values['vm_groups']['servers']['disk_spec'][cloud][
-            'iops'
-        ] = flag_values.managed_db_disk_iops
+            'provisioned_iops'
+        ] = flag_values.db_disk_iops
 
     if flag_values['client_vm_os_type'].present:
       config_values['vm_groups']['clients'][
@@ -388,6 +388,6 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       ] = flag_values.client_vm_disk_type
     if flag_values['client_vm_disk_iops'].present:
       config_values['vm_groups']['clients']['disk_spec'][cloud][
-          'disk_iops'
+          'provisioned_iops'
       ] = flag_values.client_vm_disk_iops
     logging.warning('Relational db config values: %s', config_values)

@@ -42,6 +42,7 @@ RELATIONAL_DB_FLAGS_TO_TRANSLATE = {
     'managed_db_memory': 'db_memory',
     'managed_db_disk_size': 'db_disk_size',
     'managed_db_disk_type': 'db_disk_type',
+    'managed_db_disk_iops': 'db_disk_iops',
 }
 
 LIST_TO_MULTISTRING_TRANSLATIONS = {'zones': 'zone', 'extra_zones': 'zone'}

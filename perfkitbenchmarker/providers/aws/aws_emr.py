@@ -158,7 +158,7 @@ class AwsEMR(spark_service.BaseSparkService):
         assert group_spec.disk_spec.device_path is None
         assert group_spec.disk_spec.disk_number is None
         assert group_spec.disk_spec.mount_point is None
-        assert group_spec.disk_spec.iops is None
+        assert group_spec.disk_spec.provisioned_iops is None
         ebs_configuration = {
             'EbsBlockDeviceConfigs': [{
                 'VolumeSpecification': {

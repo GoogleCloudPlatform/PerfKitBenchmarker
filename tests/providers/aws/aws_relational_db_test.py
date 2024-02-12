@@ -104,7 +104,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def CreateMockSpec(self, additional_spec_items=None):
     default_server_db_disk_spec = aws_disk.AwsDiskSpec(
-        _COMPONENT, disk_size=5, disk_type=aws_disk.IO1, iops=1000
+        _COMPONENT, disk_size=5, disk_type=aws_disk.IO1, provisioned_iops=1000
     )
 
     default_server_db_spec = virtual_machine.BaseVmSpec(

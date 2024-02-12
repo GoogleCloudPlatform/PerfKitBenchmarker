@@ -348,7 +348,8 @@ class AwsDiskSpec(disk.BaseDiskSpec):
   """Object holding the information needed to create an AwsDisk.
 
   Attributes:
-    iops: None or int. IOPS for Provisioned IOPS (SSD) volumes in AWS.
+    provisioned_iops: None or int. IOPS for Provisioned IOPS (SSD) volumes in
+      AWS.
     throughput: None or int. Throughput for (SSD) volumes in AWS.
   """
 
@@ -368,7 +369,7 @@ class AwsDiskSpec(disk.BaseDiskSpec):
     """
     super(AwsDiskSpec, cls)._ApplyFlags(config_values, flag_values)
     if flag_values['aws_provisioned_iops'].present:
-      config_values['iops'] = flag_values.aws_provisioned_iops
+      config_values['provisioned_iops'] = flag_values.aws_provisioned_iops
     if flag_values['aws_provisioned_throughput'].present:
       config_values['throughput'] = flag_values.aws_provisioned_throughput
 
@@ -383,7 +384,7 @@ class AwsDiskSpec(disk.BaseDiskSpec):
     """
     result = super(AwsDiskSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'iops': (
+        'provisioned_iops': (
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True},
         )
@@ -414,7 +415,7 @@ class AwsDisk(disk.BaseDisk):
 
   def __init__(self, disk_spec, zone, machine_type, disk_spec_id=None):
     super(AwsDisk, self).__init__(disk_spec)
-    self.iops = disk_spec.iops
+    self.iops = disk_spec.provisioned_iops
     self.throughput = disk_spec.throughput
     self.id = None
     self.zone = zone

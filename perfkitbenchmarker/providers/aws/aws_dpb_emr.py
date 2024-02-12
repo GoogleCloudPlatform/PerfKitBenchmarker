@@ -171,7 +171,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       # Make sure nothing we are ignoring is included in the disk spec
       assert self.spec.worker_group.disk_spec.device_path is None
       assert self.spec.worker_group.disk_spec.disk_number is None
-      assert self.spec.worker_group.disk_spec.iops is None
+      assert self.spec.worker_group.disk_spec.provisioned_iops is None
       if self.spec.worker_group.disk_spec.disk_type != disk.LOCAL:
         ebs_configuration = {
             'EbsBlockDeviceConfigs': [{

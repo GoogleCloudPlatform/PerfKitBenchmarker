@@ -104,8 +104,8 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         self.spec.db_disk_spec.disk_type == aws_disk.IO1
         or self.spec.db_disk_spec.disk_type == aws_disk.GP3
     ):
-      if self.spec.db_disk_spec.iops:
-        cmd.append('--iops=%s' % self.spec.db_disk_spec.iops)
+      if self.spec.db_disk_spec.provisioned_iops:
+        cmd.append('--iops=%s' % self.spec.db_disk_spec.provisioned_iops)
 
     vm_util.IssueCommand(cmd)
 
@@ -131,9 +131,9 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     """
     metadata = super(AwsRDSRelationalDb, self).GetResourceMetadata()
 
-    if hasattr(self.spec.db_disk_spec, 'iops'):
+    if hasattr(self.spec.db_disk_spec, 'provisioned_iops'):
       metadata.update({
-          'disk_iops': self.spec.db_disk_spec.iops,
+          'disk_iops': self.spec.db_disk_spec.provisioned_iops,
       })
 
     return metadata

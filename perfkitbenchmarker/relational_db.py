@@ -99,7 +99,10 @@ flags.DEFINE_integer(
 )
 flags.DEFINE_string('db_disk_type', None, 'Disk type of the database.')
 flags.DEFINE_integer(
-    'managed_db_disk_iops', None, 'Disk iops of the database on AWS io1 disks.'
+    'db_disk_iops',
+    None,
+    'Disk IOPs to provision for database disks, if provisioning is applicable'
+    ' or required. IOPs applies to each disk.',
 )
 
 flags.DEFINE_integer(
