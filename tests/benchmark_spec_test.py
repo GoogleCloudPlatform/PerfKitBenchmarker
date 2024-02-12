@@ -274,7 +274,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     vms = spec.vm_groups['default']
     self.assertEqual(len(vms), 2)
     for vm in vms:
-      self.assertEqual(len(vm.create_disk_strategy.pd_disk_groups), 3)
+      self.assertEqual(len(vm.create_disk_strategy.remote_disk_groups), 3)
       self.assertTrue(
           all(disk_spec.disk_size == 75 for disk_spec in vm.disk_specs)
       )

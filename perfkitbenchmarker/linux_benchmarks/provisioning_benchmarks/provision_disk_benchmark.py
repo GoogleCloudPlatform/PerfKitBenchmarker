@@ -27,14 +27,16 @@ from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
+
 
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'provision_disk'
-
 BENCHMARK_CONFIG = """
 provision_disk:
   description: >
@@ -45,9 +47,15 @@ provision_disk:
         GCP:
           machine_type: n2-standard-2
           zone: us-central1-c
+        Azure:
+          machine_type: Standard_D2s_v5
+          zone: eastus2-2
       disk_spec:
         GCP:
           disk_type: pd-ssd
+          disk_size: 10
+        Azure:
+          disk_type: PremiumV2_LRS
           disk_size: 10
 """
 
@@ -69,6 +77,10 @@ def CheckPrerequisites(benchmark_config):
   if FLAGS.cloud == 'GCP' and gcp_flags.GCP_CREATE_DISKS_WITH_VM.value:
     raise ValueError(
         'gcp_create_disks_with_vm must be set to false for GCP'
+    )
+  if FLAGS.cloud == 'Azure' and azure_flags.AZURE_ATTACH_DISK_WITH_CREATE.value:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'azure_attach_disk_with_create must be set to false for Azure'
     )
 
 
@@ -93,7 +105,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
         'after VM creation.'
     )
   samples = []
-  disk_details = vm.create_disk_strategy.pd_disk_groups
+  disk_details = vm.create_disk_strategy.remote_disk_groups
   for disk_group in disk_details:
     for disk_details in disk_group:
       total_time = 0

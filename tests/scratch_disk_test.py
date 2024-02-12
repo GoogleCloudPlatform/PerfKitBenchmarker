@@ -178,6 +178,12 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _GetDiskClass(self):
     return azure_disk.AzureDisk
 
+  def GetDiskSpec(self, mount_point):
+    test_disk = disk.BaseDiskSpec(_COMPONENT, mount_point=mount_point)
+    test_disk.disk_type = azure_disk.STANDARD_DISK
+    test_disk.disk_size = 10
+    return test_disk
+
 
 class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 

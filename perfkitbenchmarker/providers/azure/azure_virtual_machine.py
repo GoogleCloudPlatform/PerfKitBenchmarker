@@ -53,11 +53,10 @@ from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_disk_strategies
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
-from six.moves import range
 import yaml
 
 FLAGS = flags.FLAGS
-NUM_LOCAL_VOLUMES = {
+NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_L8s_v2': 1,
     'Standard_L16s_v2': 2,
     'Standard_L32s_v2': 4,
@@ -667,10 +666,12 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     if azure_disk.HasTempDrive(self.machine_type):
-      self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type, 1)
+      self.max_local_disks = NUM_LOCAL_VOLUMES.get(
+          self.machine_type, 1
+      )
     else:
       self.max_local_disks = 0
-    self._lun_counter = itertools.count()
+    self.lun_counter = itertools.count()
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
 
@@ -731,14 +732,13 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.low_priority_status_code = None
     self.spot_early_termination = False
     self.ultra_ssd_enabled = False
-
-    disk_spec = disk.BaseDiskSpec('azure_os_disk')
-    disk_spec.disk_type = (
-        vm_spec.boot_disk_type or self.storage_account.storage_type
+    self.boot_disk_size = vm_spec.boot_disk_size
+    self.boot_disk_type = vm_spec.boot_disk_type
+    self.create_os_disk_strategy = (
+        azure_disk_strategies.AzureCreateOSDiskStrategy(
+            self, disk.BaseDiskSpec('azure_os_disk'), 1
+        )
     )
-    if vm_spec.boot_disk_size:
-      disk_spec.disk_size = vm_spec.boot_disk_size
-    self.os_disk = azure_disk.AzureDisk(disk_spec, self, None, is_image=True)
 
   @property
   @classmethod
@@ -782,10 +782,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _Create(self):
     """See base class."""
     assert self.network is not None
-    disk_size_args = []
-    if self.os_disk.disk_size:
-      disk_size_args = ['--os-disk-size-gb', str(self.os_disk.disk_size)]
 
+    os_disk_args = self.create_os_disk_strategy.GetCreationCommand()[
+        'create-disk'
+    ]
     confidential_args = []
     if self.machine_type_is_confidential:
       confidential_args = [
@@ -819,12 +819,10 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
             self.machine_type,
             '--admin-username',
             self.user_name,
-            '--storage-sku',
-            f'os={self.os_disk.disk_type}',
             '--name',
             self.name,
         ]
-        + disk_size_args
+        + os_disk_args
         + confidential_args
         + self.resource_group.args
         + self.nic.args
@@ -1012,15 +1010,17 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         + self.resource_group.args
     )
     response = json.loads(stdout)
-    self.os_disk.name = response['storageProfile']['osDisk']['name']
-    self.os_disk.created = True
+    self.create_os_disk_strategy.disk.name = response['storageProfile'][
+        'osDisk'
+    ]['name']
+    self.create_os_disk_strategy.disk.created = True
     vm_util.IssueCommand(
         [
             azure.AZURE_PATH,
             'disk',
             'update',
             '--name',
-            self.os_disk.name,
+            self.create_os_disk_strategy.disk.name,
             '--set',
             util.GetTagsJson(self.resource_group.timeout_minutes),
         ]
@@ -1030,37 +1030,14 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.public_ip:
       self.ip_address = self.public_ip.GetIPAddress()
 
-  def CreateScratchDisk(self, _, disk_spec):
-    """Create a VM's scratch disk.
+  def SetupAllScratchDisks(self):
+    """Set up all scratch disks of the current VM."""
+    self.create_disk_strategy.GetSetupDiskStrategy().SetUpDisk()
 
-    Args:
-      disk_spec: virtual_machine.BaseDiskSpec object of the disk.
-
-    Raises:
-      CreationError: If an SMB disk is listed but the SMB service not created.
-    """
-    disks = []
-
-    for _ in range(disk_spec.num_striped_disks):
-      if disk_spec.disk_type == disk.LOCAL:
-        # Local disk numbers start at 1 (0 is the system disk).
-        disk_number = self.local_disk_counter + 1
-        self.local_disk_counter += 1
-        if self.local_disk_counter > self.max_local_disks:
-          raise errors.Error('Not enough local disks.')
-      else:
-        # Remote disk numbers start at 1 + max_local disks (0 is the system disk
-        # and local disks occupy [1, max_local_disks]).
-        disk_number = self.remote_disk_counter + 1 + self.max_local_disks
-        self.remote_disk_counter += 1
-      lun = next(self._lun_counter)
-      data_disk = azure_disk.AzureDisk(disk_spec, self, lun)
-      data_disk.disk_number = disk_number
-      disks.append(data_disk)
-
-    scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
-    azure_disk_strategies.AzurePrepareScratchDiskStrategy().PrepareScratchDisk(
-        self, scratch_disk, disk_spec
+  def SetDiskSpec(self, disk_spec, disk_count):
+    """Sets Disk Specs of the current VM. Calls before the VM is created."""
+    self.create_disk_strategy = azure_disk_strategies.GetCreateDiskStrategy(
+        self, disk_spec, disk_count
     )
 
   def InstallCli(self):
@@ -1114,8 +1091,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     assert self.network is not None
     result = super(AzureVirtualMachine, self).GetResourceMetadata()
     result['accelerated_networking'] = self.nic.accelerated_networking
-    result['boot_disk_type'] = self.os_disk.disk_type
-    result['boot_disk_size'] = self.os_disk.disk_size
+    result['boot_disk_type'] = self.create_os_disk_strategy.disk.disk_type
+    result['boot_disk_size'] = self.create_os_disk_strategy.disk.disk_size
     if self.network.placement_group:
       result['placement_group_strategy'] = self.network.placement_group.strategy
     else:

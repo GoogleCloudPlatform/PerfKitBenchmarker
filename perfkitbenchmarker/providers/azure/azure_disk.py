@@ -38,12 +38,25 @@ FLAGS = flags.FLAGS
 
 MAX_DRIVE_SUFFIX_LENGTH = 2  # Last allowable device is /dev/sdzz.
 
-PREMIUM_STORAGE = 'Premium_LRS'
 PREMIUM_STORAGE_V2 = 'PremiumV2_LRS'
+PREMIUM_STORAGE = 'Premium_LRS'
+PREMIUM_ZRS = 'Premium_ZRS'
+STANDARD_SSD_LRS = 'StandardSSD_LRS'
+STANDARD_SSD_ZRS = 'StandardSSD_ZRS'
 STANDARD_DISK = 'Standard_LRS'
 ULTRA_STORAGE = 'UltraSSD_LRS'
-PREMIUM_ZRS = 'Premium_ZRS'
 
+
+# https://learn.microsoft.com/en-us/rest/api/compute/disks/list?view=rest-compute-2023-10-02&tabs=HTTP#diskstorageaccounttypes
+AZURE_REMOTE_DISK_TYPES = [
+    PREMIUM_STORAGE,
+    PREMIUM_STORAGE_V2,
+    STANDARD_SSD_LRS,
+    STANDARD_SSD_ZRS,
+    STANDARD_DISK,
+    ULTRA_STORAGE,
+    PREMIUM_ZRS,
+]
 
 HOST_CACHING = 'host_caching'
 

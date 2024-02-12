@@ -418,3 +418,5 @@
     create and attach time.
 -   Reduce duplicate code in MaintenanceEventTrigger.AppendSamples().
 -   Attach "run_number" label to "LM Total Time" sample.
+-   Refactored `azure_virtual_machine.py` to use `azure_disk_strategies.py` and
+    Enabled disk provision benchmark for Azure.

@@ -148,8 +148,8 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
     azure_disk.AzureDisk.Create = mock.Mock()
     azure_disk.AzureDisk.Attach = mock.Mock()
     vm.StripeDisks = mock.Mock()
-    vm.CreateScratchDisk(0, disk_spec)
-
+    vm.SetDiskSpec(disk_spec, 1)
+    vm.SetupAllScratchDisks()
     expected = {
         disk.MEDIA: goal_media,
         disk.REPLICATION: goal_replication,

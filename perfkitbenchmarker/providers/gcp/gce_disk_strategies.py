@@ -55,7 +55,7 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
 
   def __init__(self, vm: Any, disk_spec: disk.BaseDiskSpec, disk_count: int):
     super().__init__(vm, disk_spec, disk_count)
-    self.pd_disk_groups = []
+    self.remote_disk_groups = []
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
       disks = []
       for i in range(disk_spec.num_striped_disks):
@@ -73,7 +73,7 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
           data_disk.interface = gce_disk.SCSI
         vm.remote_disk_counter += 1
         disks.append(data_disk)
-      self.pd_disk_groups.append(disks)
+      self.remote_disk_groups.append(disks)
 
   def DiskCreatedOnVMCreation(self) -> bool:
     """Returns whether the disk is created on VM creation."""
@@ -100,7 +100,7 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
 
     create_disks = []
     dic = {}
-    for disk_group in self.pd_disk_groups:
+    for disk_group in self.remote_disk_groups:
       for pd_disk in disk_group:
         create_disks.append(pd_disk.GetCreateFlags())
     if create_disks:
@@ -224,7 +224,7 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
   def SetUpDisk(self):
     # disk spec is not used here.
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      disk_group = self.vm.create_disk_strategy.pd_disk_groups[disk_spec_id]
+      disk_group = self.vm.create_disk_strategy.remote_disk_groups[disk_spec_id]
       # Create the disk if it is not created on create
       if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
         for pd_disk in disk_group:
