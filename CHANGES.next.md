@@ -420,3 +420,5 @@
 -   Attach "run_number" label to "LM Total Time" sample.
 -   Refactored `azure_virtual_machine.py` to use `azure_disk_strategies.py` and
     Enabled disk provision benchmark for Azure.
+-   Refactored `aws_virtual_machine.py` to use `aws_disk_strategies.py` and
+    Enabled disk provision benchmark for AWS by using `--aws_create_disks_with_vm`.

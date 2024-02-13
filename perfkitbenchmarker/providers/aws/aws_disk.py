@@ -27,7 +27,6 @@ import logging
 import string
 import threading
 from typing import Optional
-
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -353,6 +352,7 @@ class AwsDiskSpec(disk.BaseDiskSpec):
     throughput: None or int. Throughput for (SSD) volumes in AWS.
   """
 
+  create_with_vm: bool
   CLOUD = provider_info.AWS
 
   @classmethod
@@ -372,6 +372,8 @@ class AwsDiskSpec(disk.BaseDiskSpec):
       config_values['provisioned_iops'] = flag_values.aws_provisioned_iops
     if flag_values['aws_provisioned_throughput'].present:
       config_values['throughput'] = flag_values.aws_provisioned_throughput
+    if flag_values['aws_create_disks_with_vm'].present:
+      config_values['create_with_vm'] = flag_values.aws_create_disks_with_vm
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -393,6 +395,12 @@ class AwsDiskSpec(disk.BaseDiskSpec):
         'throughput': (
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True},
+        )
+    })
+    result.update({
+        'create_with_vm': (
+            option_decoders.BooleanDecoder,
+            {'default': True},
         )
     })
     return result
@@ -605,7 +613,7 @@ class AwsDisk(disk.BaseDisk):
     )
     util.IssueRetryableCommand(attach_cmd)
     volume_id, device_name = self._WaitForAttachedState()
-    vm.LogDeviceByName(device_name, volume_id)
+    vm.LogDeviceByName(device_name, volume_id, device_name)
     if self.disk_spec_id:
       vm.LogDeviceByDiskSpecId(self.disk_spec_id, device_name)
 

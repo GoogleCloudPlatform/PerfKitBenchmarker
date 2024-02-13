@@ -206,6 +206,11 @@ flags.DEFINE_integer(
     1,
     249,
 )
+AWS_CREATE_DISKS_WITH_VM = flags.DEFINE_boolean(
+    'aws_create_disks_with_vm',
+    True,
+    'Whether to create disks at VM creation time. Defaults to True.',
+)
 # TODO(user): Create a spec for aurora.
 AURORA_STORAGE_TYPE = flags.DEFINE_enum(
     'aws_aurora_storage_type',
