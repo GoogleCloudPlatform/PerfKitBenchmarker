@@ -173,10 +173,12 @@ def _PrepareReplicaSet(
           {
               '_id': 0,
               'host': f'"{server_vms[0].internal_ip}:27017"',
+              'priority': 1,
           },
           {
               '_id': 1,
               'host': f'"{server_vms[1].internal_ip}:27017"',
+              'priority': 0.5,
           },
           {
               '_id': 2,
@@ -199,6 +201,16 @@ def _PrepareClient(vm: _LinuxVM) -> None:
   vm.RemoteCommand(
       "echo '{0}' > {1}/logback.xml".format(log_config, ycsb.YCSB_DIR)
   )
+
+
+def _GetYcsbKwargs(benchmark_spec: bm_spec.BenchmarkSpec) -> dict[str, Any]:
+  """Returns args that are passed to YCSB via the command line."""
+  return {
+      'mongodb.url': benchmark_spec.mongodb_url,
+      'mongodb.writeConcern': FLAGS.mongodb_writeconcern,
+      # Avoids some stale connection issues at the beginning of the load.
+      'core_workload_insertion_retry_limit': 10,
+  }
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
@@ -228,6 +240,15 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   benchmark_spec.mongodb_url = f'mongodb://{primary.internal_ip}:27017/'
+  benchmark_spec.executor.Load(
+      benchmark_spec.vm_groups['clients'],
+      load_kwargs=_GetYcsbKwargs(benchmark_spec),
+  )
+
+  # Print some useful loading stats
+  mongosh.RunCommand(primary, 'db.stats()')
+  mongosh.RunCommand(primary, 'rs.conf()')
+  primary.RemoteCommand('df -h')
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
@@ -240,17 +261,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
-  kwargs = {
-      'mongodb.url': benchmark_spec.mongodb_url,
-      'mongodb.writeConcern': FLAGS.mongodb_writeconcern,
-      # Avoids some stale connection issues at the beginning of the load.
-      'core_workload_insertion_retry_limit': 10,
-  }
   samples = list(
-      benchmark_spec.executor.LoadAndRun(
+      benchmark_spec.executor.Run(
           benchmark_spec.vm_groups['clients'],
-          load_kwargs=kwargs,
-          run_kwargs=kwargs,
+          run_kwargs=_GetYcsbKwargs(benchmark_spec),
       )
   )
   if FLAGS.mongodb_readahead_kb is not None:
