@@ -130,7 +130,7 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
         _COMPONENT, machine_type='test_machine_type', zone='testing'
     )
     vm = TestAzureVirtualMachine(spec)
-
+    vm.SetDiskSpec(None, 0)
     self.mock_cmd.side_effect = [('', stderror, 1)]
     with self.assertRaises(expected_error):
       vm._Create()
@@ -143,7 +143,7 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
         low_priority=True,
     )
     vm = TestAzureVirtualMachine(spec)
-
+    vm.SetDiskSpec(None, 0)
     self.mock_cmd.side_effect = [('', 'OverconstrainedAllocationRequest', 1)]
     with self.assertRaises(errors.Benchmarks.InsufficientCapacityCloudFailure):
       vm._Create()

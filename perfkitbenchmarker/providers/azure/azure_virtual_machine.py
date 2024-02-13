@@ -739,6 +739,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
             self, disk.BaseDiskSpec('azure_os_disk'), 1
         )
     )
+    self.create_disk_strategy = azure_disk_strategies.GetCreateDiskStrategy(
+        self, None, 0
+    )
 
   @property
   @classmethod
@@ -774,9 +777,9 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
           self.host.fill_fraction += 1.0 / self.num_vms_per_host
 
   def _RequiresUltraDisk(self):
-    return any(
+    return hasattr(self.create_disk_strategy, 'disk_specs') and any(
         disk_spec.disk_type == azure_disk.ULTRA_STORAGE
-        for disk_spec in self.disk_specs
+        for disk_spec in self.create_disk_strategy.disk_specs
     )
 
   def _Create(self):
