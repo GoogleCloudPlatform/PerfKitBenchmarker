@@ -5,7 +5,7 @@ there should be tuning on each of the clouds
 """
 
 import logging
-from typing import Any, Dict, Iterator, List, Tuple
+from typing import Any, Dict, Iterator, List, Tuple, TypeVar
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
@@ -16,7 +16,10 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import mpi
 
-_BaseLinuxVirtualMachine = linux_virtual_machine.BaseLinuxVirtualMachine
+_BaseLinuxVirtualMachine = TypeVar(
+    '_BaseLinuxVirtualMachine',
+    bound=linux_virtual_machine.BaseLinuxVirtualMachine,
+)
 
 # documents the individual MPI tests in each suite
 _MPI_SUITE_TESTS = {

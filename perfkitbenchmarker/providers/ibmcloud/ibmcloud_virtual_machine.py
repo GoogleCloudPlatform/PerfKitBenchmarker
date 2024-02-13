@@ -78,7 +78,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.zone = 'us-south-1'  # default
     self.fip_address = None
     self.fip_id = None
-    self.network = None
+    self.network: ibmcloud_network.IbmCloudNetwork
     self.subnet = FLAGS.ibmcloud_subnet
     self.subnets = {}
     self.vpcid = FLAGS.ibmcloud_vpcid

@@ -1112,7 +1112,7 @@ def _RunMultiStreamProcesses(vms, command_builder, cmd_args, streams_per_vm):
     streams_per_vm: number of threads per vm.
   """
 
-  output = [None] * len(vms)
+  output = [''] * len(vms)
 
   def RunOneProcess(vm_idx):
     logging.info('Running on VM %s.', vm_idx)

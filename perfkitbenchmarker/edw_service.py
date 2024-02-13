@@ -290,6 +290,8 @@ class EdwClientInterface(object):
 
   def WarmUpQuery(self):
     """Executes a service-agnostic query that can detect cold start issues."""
+    if self.client_vm is None:
+      raise ValueError('SetProvisionedAttributes() not called')
     with open(SAMPLE_QUERY_PATH, 'w+') as f:
       f.write(SAMPLE_QUERY)
     self.client_vm.PushFile(SAMPLE_QUERY_PATH)
@@ -344,7 +346,7 @@ class EdwService(resource.BaseResource):
     self.spec = edw_service_spec
     # resource workflow management
     self.supports_wait_on_delete = True
-    self.client_interface = None
+    self.client_interface: EdwClientInterface
 
   def GetClientInterface(self) -> EdwClientInterface:
     """Gets the active Client Interface."""

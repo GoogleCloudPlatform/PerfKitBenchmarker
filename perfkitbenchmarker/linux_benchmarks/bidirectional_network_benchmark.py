@@ -335,7 +335,7 @@ def Run(benchmark_spec):
   vms = benchmark_spec.vms
   num_tests = len(FLAGS.bidirectional_network_tests)
   num_streams = FLAGS.bidirectional_stream_num_streams
-  test_results = [None] * num_tests
+  test_results = [([], 0., 0.)] * num_tests
 
   args = [
       (
