@@ -23,7 +23,6 @@ from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.aws import aws_disk_strategies
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_nfs_service
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -292,9 +291,8 @@ class AwsVirtualMachineTest(BaseTest):
     nfs.Create()
     self._SetBmSpec(nfs)
     aws_machine = self._CreateMockVm()
-    disk_spec = self._CreateDiskSpec(fs_type)
-    disk_spec.create_with_vm = False
-    aws_machine.SetDiskSpec(disk_spec, 1)
+    aws_machine.disk_specs = [self._CreateDiskSpec(fs_type)]
+    aws_machine.SetupAllScratchDisks()
     return aws_machine
 
   def testCreateNfsDisk(self):
@@ -313,7 +311,6 @@ class AwsVirtualMachineTest(BaseTest):
     install_nfs = 'sudo yum install -y nfs-utils'
 
     aws_machine = self._CallCreateScratchDisk(disk.NFS)
-    aws_machine.SetupAllScratchDisks()
     aws_machine.RemoteCommand.assert_called_with(install_nfs)
     self.assertEqual(
         [mock.call(mount_cmd), mock.call(fstab_cmd)],
@@ -337,17 +334,6 @@ class AwsVirtualMachineTest(BaseTest):
     )
 
     aws_machine = self._CallCreateScratchDisk('ext4')
-    setup_local_disk_strategy = aws_disk_strategies.SetUpLocalDiskStrategy(
-        aws_machine, [aws_machine.create_disk_strategy.disk_spec]
-    )
-    setup_local_disk_strategy.GetPathByDevice = mock.Mock()
-    setup_local_disk_strategy.GetPathByDevice.return_value = '/dev/xvdb'
-    aws_machine.create_disk_strategy.GetSetupDiskStrategy = mock.Mock()
-    aws_machine.create_disk_strategy.GetSetupDiskStrategy.return_value = (
-        setup_local_disk_strategy
-    )
-
-    aws_machine.SetupAllScratchDisks()
     self.assertEqual(
         [mock.call(format_cmd), mock.call(mount_cmd), mock.call(fstab_cmd)],
         aws_machine.RemoteHostCommand.call_args_list,

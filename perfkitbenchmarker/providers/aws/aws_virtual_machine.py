@@ -29,11 +29,13 @@ import re
 import threading
 import time
 import uuid
+
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
@@ -53,6 +55,7 @@ FLAGS = flags.FLAGS
 HVM = 'hvm'
 PV = 'paravirtual'
 NON_HVM_PREFIXES = ['m1', 'c1', 't1', 'm2']
+DRIVE_START_LETTER = 'b'
 
 # AWS EC2 Instance life cycle:
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html
@@ -252,11 +255,52 @@ def GetBlockDeviceMap(vm):
     else:
       root_block_device['Ebs']['Encrypted'] = True
     mappings.append(root_block_device)
-  mappings.extend(vm.create_disk_strategy.GetBlockDeviceMap())
+
+  for spec_index, disk_spec in enumerate(vm.disk_specs):
+    if not vm.DiskTypeCreatedOnVMCreation(disk_spec.disk_type):
+      continue
+
+    for i in range(disk_spec.num_striped_disks):
+      mapping = collections.OrderedDict()
+      device_letter = aws_disk.AwsDisk.GenerateDeviceLetter(vm.name)
+      device_name_prefix = aws_disk.AwsDisk.GenerateDeviceNamePrefix(
+          disk_spec.disk_type
+      )
+      device_name = device_name_prefix + device_letter
+      mapping['DeviceName'] = device_name
+      if disk_spec.disk_type == disk.LOCAL:
+        mapping['VirtualName'] = 'ephemeral%s' % i
+        if not aws_disk.LocalDriveIsNvme(vm.machine_type):
+          # non-nvme local disks just gets its name as device path,
+          # logging it now since it does not show up in block-device-mapping
+          # of DescribeInstances call.
+          vm.LogDeviceByName(device_name, None, device_name)
+      else:
+        ebs_block = collections.OrderedDict()
+        ebs_block['VolumeType'] = disk_spec.disk_type
+        ebs_block['VolumeSize'] = disk_spec.disk_size
+        ebs_block['DeleteOnTermination'] = True
+        if disk_spec.provisioned_iops and disk_spec.disk_type in [
+            aws_disk.IO1,
+            aws_disk.IO2,
+            aws_disk.GP3,
+        ]:
+          ebs_block['Iops'] = disk_spec.provisioned_iops
+        if disk_spec.throughput and disk_spec.disk_type in [aws_disk.GP3]:
+          ebs_block['Throughput'] = disk_spec.throughput
+        mapping['Ebs'] = ebs_block
+      mappings.append(mapping)
+      disk_spec_id = BuildDiskSpecId(spec_index, i)
+      vm.LogDeviceByDiskSpecId(disk_spec_id, device_name)
 
   if mappings:
     return json.dumps(mappings)
   return None
+
+
+def BuildDiskSpecId(spec_index, strip_index):
+  """Generates an unique string to represent a disk_spec position."""
+  return f'{spec_index}_{strip_index}'
 
 
 def GetArmArchitecture(machine_type: str):
@@ -626,9 +670,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # this is a mapping of known device name to AWS-side identifiers.
     # AWS-side identifiers are assigned by AWS at creation time.
     self.disk_identifiers_by_device = {}
-    self.create_disk_strategy = aws_disk_strategies.GetCreateDiskStrategy(
-        self, None, 0
-    )
 
   @property
   def host_list(self):
@@ -1441,24 +1482,169 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           f'Unknown status: {status}; retrying describe-instances command'
       )
 
-  def SetDiskSpec(self, disk_spec, disk_count):
-    """Sets Disk Specs of the current VM. Calls before the VM is created."""
-    self.create_disk_strategy = aws_disk_strategies.GetCreateDiskStrategy(
-        self, disk_spec, disk_count
+  def _GetNvmeBootIndex(self):
+    if aws_disk.LocalDriveIsNvme(self.machine_type) and aws_disk.EbsDriveIsNvme(
+        self.machine_type
+    ):
+      # identify boot drive
+      # If this command ever fails consider 'findmnt -nM / -o source'
+      cmd = (
+          'realpath /dev/disk/by-label/cloudimg-rootfs '
+          '| grep --only-matching "nvme[0-9]*"'
+      )
+      boot_drive = self.RemoteCommand(cmd, ignore_failure=True)[0].strip()
+      if boot_drive:
+        # get the boot drive index by dropping the nvme prefix
+        boot_idx = int(boot_drive[4:])
+        logging.info('found boot drive at nvme index %d', boot_idx)
+        return boot_idx
+      else:
+        logging.warning('Failed to identify NVME boot drive index. Assuming 0.')
+        return 0
+
+  def CreateScratchDisk(self, spec_index, disk_spec):
+    """Create a VM's scratch disk.
+
+    Args:
+      spec_index: Deterministic order of this disk_spec in the VM's list of
+        disk_specs.
+      disk_spec: virtual_machine.BaseDiskSpec object of the disk.
+
+    Raises:
+      CreationError: If an NFS disk is listed but the NFS service not created.
+    """
+    # Instantiate the disk(s) that we want to create.
+    disks = []
+    nvme_boot_drive_index = self._GetNvmeBootIndex()
+    for i in range(disk_spec.num_striped_disks):
+      disk_spec_id = BuildDiskSpecId(spec_index, i)
+      data_disk = aws_disk.AwsDisk(
+          disk_spec, self.zone, self.machine_type, disk_spec_id
+      )
+      if disk_spec.disk_type == disk.LOCAL:
+        device_letter = chr(ord(DRIVE_START_LETTER) + self.local_disk_counter)
+        data_disk.AssignDeviceLetter(device_letter, nvme_boot_drive_index)
+        # Local disk numbers start at 1 (0 is the system disk).
+        data_disk.disk_number = self.local_disk_counter + 1
+        self.local_disk_counter += 1
+        if self.local_disk_counter > self.max_local_disks:
+          raise errors.Error('Not enough local disks.')
+      else:
+        # Remote disk numbers start at 1 + max_local disks (0 is the system disk
+        # and local disks occupy [1, max_local_disks]).
+        data_disk.disk_number = (
+            self.remote_disk_counter + 1 + self.max_local_disks
+        )
+        self.remote_disk_counter += 1
+      disks.append(data_disk)
+
+    scratch_disk = self._CreateScratchDiskFromDisks(disk_spec, disks)
+    if self.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+      # here, all disks are created (either at vm creation or in line above).
+      # But we don't have all the raw device paths,
+      # which are necessary for striping the scratch disk on Linux,
+      # but not on Windows.
+      # The path is not updated for Windows machines.
+      nvme_devices = self.GetNVMEDeviceInfo()
+      self.PopulateNVMEDevicePath(scratch_disk, nvme_devices)
+      self.UpdateDevicePath(scratch_disk)
+    aws_disk_strategies.AWSPrepareScratchDiskStrategy().PrepareScratchDisk(
+        self, scratch_disk, disk_spec
     )
 
-  def SetupAllScratchDisks(self):
-    """Set up all scratch disks of the current VM."""
-    self.create_disk_strategy.GetSetupDiskStrategy().SetUpDisk()
+  def PopulateNVMEDevicePath(self, scratch_disk, nvme_devices):
+    local_devices = []
+    ebs_devices = {}
+    for device in nvme_devices:
+      device_path = device['DevicePath']
+      model_number = device['ModelNumber']
+      volume_id = device['SerialNumber'].replace('vol', 'vol-')
+      if model_number == 'Amazon Elastic Block Store':
+        ebs_devices[volume_id] = device_path
+      elif model_number == 'Amazon EC2 NVMe Instance Storage':
+        local_devices.append(device_path)
+      else:
+        raise errors.Benchmarks.UnsupportedConfigError(
+            f'{model_number} NVME devices is not supported.'
+        )
+
+    # because local devices are assigned in a round robin manner,
+    # some local devices might already have been assigned (previous spec_index).
+    # remove local devices that have been already been assigned.
+    for _, aws_id in self.disk_identifiers_by_device.items():
+      if aws_id.path in local_devices:
+        local_devices.remove(aws_id.path)
+
+    if not local_devices and not ebs_devices:
+      return
+
+    disks = scratch_disk.disks if scratch_disk.is_striped else [scratch_disk]
+    for d in disks:
+      if d.disk_type == disk.NFS:
+        continue
+      elif d.disk_type == disk.LOCAL:
+        if aws_disk.LocalDriveIsNvme(self.machine_type):
+          # assign in a round robin manner. Since NVME local disks
+          # are created ignoring all pkb naming conventions and assigned
+          # random names on the fly.
+          disk_name = self.GetDeviceByDiskSpecId(d.disk_spec_id)
+          self.LogDeviceByName(disk_name, None, local_devices.pop())
+      elif aws_disk.EbsDriveIsNvme(self.machine_type):
+        # EBS NVME volumes have disk_name assigned
+        # looks up disk_name by disk_spec_id
+        # populate the aws identifier information
+        disk_name = self.GetDeviceByDiskSpecId(d.disk_spec_id)
+        volume_id = self.GetVolumeIdByDevice(disk_name)
+        if volume_id in ebs_devices:
+          self.UpdateDeviceByName(disk_name, volume_id, ebs_devices[volume_id])
+
+  def UpdateDevicePath(self, scratch_disk):
+    """Updates the paths for all raw devices inside the VM."""
+    disks = scratch_disk.disks if scratch_disk.is_striped else [scratch_disk]
+    for d in disks:
+      if d.disk_type == disk.NFS:
+        continue
+      device_name = self.GetDeviceByDiskSpecId(d.disk_spec_id)
+      d.device_path = self.GetPathByDevice(device_name)
 
   def LogDeviceByDiskSpecId(self, disk_spec_id, device_name):
     """Records the deterministic disk_spec order to device name for lookup."""
     self.device_by_disk_spec_id[disk_spec_id] = device_name
 
+  def GetDeviceByDiskSpecId(self, disk_spec_id):
+    """Gets the logged device name by disk_spec_id."""
+    assert disk_spec_id is not None
+    return self.device_by_disk_spec_id.get(disk_spec_id, None)
+
   def LogDeviceByName(self, device_name, volume_id, path=None):
     """Records disk identifiers to device name for lookup."""
     aws_ids = aws_disk.AWSDiskIdentifiers(volume_id=volume_id, path=path)
     self.disk_identifiers_by_device[device_name] = aws_ids
+
+  def GetVolumeIdByDevice(self, disk_name):
+    """Gets the logged volume id by disk_name."""
+    assert disk_name is not None
+    aws_ids = self.disk_identifiers_by_device.get(disk_name, None)
+    assert aws_ids is not None
+    return aws_ids.volume_id
+
+  def GetPathByDevice(self, disk_name):
+    """Gets the logged device path."""
+    assert disk_name is not None
+    aws_ids = self.disk_identifiers_by_device.get(disk_name, None)
+    assert aws_ids is not None
+    return aws_ids.path
+
+  def UpdateDeviceByName(self, device_name, volume_id=None, path=None):
+    """Gets the volume id by disk_name."""
+    assert device_name is not None
+    aws_ids = self.disk_identifiers_by_device.get(device_name, None)
+    assert aws_ids is not None
+    if aws_ids.volume_id and volume_id:
+      assert aws_ids.volume_id == volume_id
+    # not asserting path similarity because we need to overwrite the path of
+    # ebs nvme devices (set to /dev/xvdb? on creation and re-named to nvme?n?)
+    self.LogDeviceByName(device_name, volume_id, path)
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""

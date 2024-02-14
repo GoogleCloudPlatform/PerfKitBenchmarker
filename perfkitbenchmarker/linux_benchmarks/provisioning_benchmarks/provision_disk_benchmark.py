@@ -30,9 +30,9 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
+
 
 FLAGS = flags.FLAGS
 
@@ -50,18 +50,12 @@ provision_disk:
         Azure:
           machine_type: Standard_D2s_v5
           zone: eastus2-2
-        AWS:
-          machine_type: m5.large
-          zone: us-east-1c
       disk_spec:
         GCP:
           disk_type: pd-ssd
           disk_size: 10
         Azure:
           disk_type: PremiumV2_LRS
-          disk_size: 10
-        AWS:
-          disk_type: gp2
           disk_size: 10
 """
 
@@ -81,16 +75,12 @@ def CheckPrerequisites(benchmark_config):
   ):
     raise ValueError('Disk type must be a remote disk')
   if FLAGS.cloud == 'GCP' and gcp_flags.GCP_CREATE_DISKS_WITH_VM.value:
-    raise errors.Setup.InvalidFlagConfigurationError(
+    raise ValueError(
         'gcp_create_disks_with_vm must be set to false for GCP'
     )
   if FLAGS.cloud == 'Azure' and azure_flags.AZURE_ATTACH_DISK_WITH_CREATE.value:
     raise errors.Setup.InvalidFlagConfigurationError(
         'azure_attach_disk_with_create must be set to false for Azure'
-    )
-  if FLAGS.cloud == 'AWS' and aws_flags.AWS_CREATE_DISKS_WITH_VM.value:
-    raise errors.Setup.InvalidFlagConfigurationError(
-        'aws_create_disks_with_vm must be set to false for AWS'
     )
 
 
@@ -111,7 +101,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   if vm.create_disk_strategy.DiskCreatedOnVMCreation():
     raise ValueError(
         'Disk created on vm creation, cannot measure provisioning time.'
-        'Please check the flags.'
+        'Please set the flag --gcp_create_disks_with_vm=false to create disk'
+        'after VM creation.'
     )
   samples = []
   disk_details = vm.create_disk_strategy.remote_disk_groups
