@@ -28,6 +28,7 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_disk_strategies
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util as aws_util
 from perfkitbenchmarker.providers.azure import azure_disk
@@ -232,19 +233,20 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     # _GetNvmeBootIndex() so we'll mock that instead.
     self.patches.append(
         mock.patch(
-            aws_virtual_machine.__name__
-            + '.AwsVirtualMachine._GetNvmeBootIndex'
+            aws_disk_strategies.__name__
+            + '.AWSCreateDiskStrategy._GetNvmeBootIndex'
         )
     )
     self.patches.append(
         mock.patch(
-            aws_virtual_machine.__name__
-            + '.AwsVirtualMachine.GetVolumeIdByDevice'
+            aws_disk_strategies.__name__
+            + '.AWSSetupDiskStrategy.GetVolumeIdByDevice'
         )
     )
     self.patches.append(
         mock.patch(
-            aws_virtual_machine.__name__ + '.AwsVirtualMachine.GetPathByDevice'
+            aws_disk_strategies.__name__
+            + '.AWSSetupDiskStrategy.GetPathByDevice'
         )
     )
 
@@ -266,6 +268,14 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _GetDiskClass(self):
     return aws_disk.AwsDisk
+
+  def GetDiskSpec(self, mount_point):
+    return aws_disk.AwsDiskSpec(
+        _COMPONENT,
+        mount_point=mount_point,
+        create_with_vm=False,
+        disk_type=aws_disk.STANDARD,
+    )
 
 
 class GceDeviceIdTest(unittest.TestCase):

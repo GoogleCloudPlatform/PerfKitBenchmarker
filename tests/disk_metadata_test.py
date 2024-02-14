@@ -103,11 +103,11 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
     }]
     vm.LogDeviceByDiskSpecId('0_0', 'foobar_1')
     vm.LogDeviceByName('foobar_1', 'vol67890', None)
-    vm.CreateScratchDisk(0, disk_spec)
-
+    vm.SetDiskSpec(disk_spec, 1)
+    # pytype: disable=attribute-error
     self.assertDictContainsSubset(
         {disk.MEDIA: goal_media, disk.REPLICATION: goal_replication},
-        vm.scratch_disks[0].metadata,
+        vm.create_disk_strategy.local_disk_groups[0][0].metadata,
     )
 
   def testLocalSSD(self):

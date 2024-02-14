@@ -23,11 +23,13 @@ from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_disk_strategies
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util
@@ -304,7 +306,17 @@ def OpenJSONData(filename):
 
 
 def CreateTestAwsVm():
-  return TestAwsVirtualMachine(vm_spec=TestVmSpec())
+  vm = TestAwsVirtualMachine(vm_spec=TestVmSpec())
+  disk_spec = disk.BaseDiskSpec(_COMPONENT, mount_point='/mountpoint')
+  disk_spec.disk_type = aws_disk.GP2
+  disk_spec.disk_size = 10
+  disk_spec.provisioned_iops = 1000
+  disk_spec.throughput = 256
+  disk_spec.create_with_vm = False
+  vm.create_disk_strategy = (
+      aws_disk_strategies.GetCreateDiskStrategy(vm, disk_spec, 1)
+  )
+  return vm
 
 
 class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -754,6 +766,17 @@ class AwsGetBlockDeviceMapTestCase(pkb_common_test_case.PkbCommonTestCase):
         mock.MagicMock(), config_spec, _BENCHMARK_UID
     )
     self.aws_vm = CreateTestAwsVm()
+    self.aws_vm.machine_type = 'c1.medium'
+    self.aws_vm.zone = 'us-east-1c'
+    disk_spec = disk.BaseDiskSpec(_COMPONENT, mount_point='/mountpoint')
+    disk_spec.disk_type = aws_disk.GP2
+    disk_spec.disk_size = 10
+    disk_spec.provisioned_iops = 1000
+    disk_spec.throughput = 256
+    disk_spec.create_with_vm = False
+    self.aws_vm.create_disk_strategy = (
+        aws_disk_strategies.GetCreateDiskStrategy(self.aws_vm, disk_spec, 1)
+    )
 
     path = os.path.join(
         os.path.dirname(__file__), 'data', 'describe_image_output.txt'
