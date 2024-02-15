@@ -50,6 +50,7 @@
 -   Remove cudnn linux package.
 -   Make Ubuntu 20 the default os_type.
 -   Default `--ip_addresses` to `INTERNAL`.
+-   Add multichase_benchmark flag defaults.
 
 ### New features:
 

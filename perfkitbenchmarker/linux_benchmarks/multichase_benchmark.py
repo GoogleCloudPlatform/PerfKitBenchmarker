@@ -72,6 +72,8 @@ multichase:
   vm_groups:
     default:
       vm_spec: *default_single_core
+  flags:
+    enable_transparent_hugepages: True
 """
 
 FLAGS = flags.FLAGS
@@ -116,8 +118,10 @@ class _MemorySizeParser(flag_util.UnitsParser):
 
 _MEMORY_SIZE_PARSER = _MemorySizeParser()
 _UNITS_SERIALIZER = flag_util.UnitsSerializer()
-_DEFAULT_MEMORY_SIZE = units.Quantity('256 MiB')
-_DEFAULT_STRIDE_SIZE = units.Quantity('256 bytes')
+_DEFAULT_MEMORY_SIZE_MIN = units.Quantity('1 KiB')
+# Multichase will OOM at high thread counts if using much more than 50%.
+_DEFAULT_MEMORY_SIZE_MAX = units.Quantity('50%')
+_DEFAULT_STRIDE_SIZE = units.Quantity('512 bytes')
 
 
 def _DefineMemorySizeFlag(name, default, help, flag_values=FLAGS, **kwargs):
@@ -156,7 +160,7 @@ flag_util.DEFINE_integerlist(
 )
 _DefineMemorySizeFlag(
     'multichase_memory_size_min',
-    _DEFAULT_MEMORY_SIZE,
+    _DEFAULT_MEMORY_SIZE_MIN,
     'Memory size to use when executing multichase. Passed to multichase via '
     'its -m flag. If it differs from multichase_memory_size_max, then '
     'multichase is executed multiple times, starting with a memory size equal '
@@ -165,7 +169,7 @@ _DefineMemorySizeFlag(
 )
 _DefineMemorySizeFlag(
     'multichase_memory_size_max',
-    _DEFAULT_MEMORY_SIZE,
+    _DEFAULT_MEMORY_SIZE_MAX,
     'Memory size to use when executing multichase. Passed to multichase via '
     'its -m flag. If it differs from multichase_memory_size_min, then '
     'multichase is executed multiple times, starting with a memory size equal '
@@ -194,13 +198,13 @@ _DefineMemorySizeFlag(
 )
 flags.DEFINE_string(
     'multichase_numactl_options',
-    None,
+    '--localalloc',
     'If provided, numactl is used to control memory placement and process '
     'CPU affinity. Examples: "--membind=0" or "--cpunodebind=0".',
 )
 flags.DEFINE_string(
     'multichase_additional_flags',
-    '',
+    '-T 8m',
     "Additional flags to use when executing multichase. Example: '-O 16 -y'.",
 )
 
