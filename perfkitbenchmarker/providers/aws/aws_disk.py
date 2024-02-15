@@ -321,6 +321,15 @@ NUM_LOCAL_VOLUMES = {
     'g4ad.4xlarge': 1,
     'g4ad.8xlarge': 1,
     'g4ad.16xlarge': 2,
+    'g5.xlarge': 1,
+    'g5.2xlarge': 1,
+    'g5.4xlarge': 1,
+    'g5.8xlarge': 1,
+    'g5.12xlarge': 1,
+    'g5.16xlarge': 1,
+    'g5.24xlarge': 1,
+    'g5.48xlarge': 2,
+    'p5.48xlarge': 8,
 }
 
 

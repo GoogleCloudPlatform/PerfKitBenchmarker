@@ -1674,8 +1674,42 @@ class Ubuntu2004EfaBasedAwsVirtualMachine(
   IMAGE_NAME_FILTER_PATTERN = 'Deep Learning Base GPU AMI (Ubuntu 20.04) *'
 
 
+class Ubuntu2004DeepLearningAMIBasedAWSVirtualMachine(
+    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2004DLMixin):
+  """Ubuntu2004 DLAMI VMs.
+
+  This uses same underlying image as Ubuntu2004 EFA based VMs. But skips package
+  installation whenever possible.
+  """
+  IMAGE_OWNER = UBUNTU_EFA_IMAGE_PROJECT
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
+  IMAGE_NAME_FILTER_PATTERN = 'Deep Learning Base GPU AMI (Ubuntu 20.04) *'
+
+  def __init__(self, vm_spec):
+    """Initialize a AmazonLinux2 Base DLAMI virtual machine.
+
+    Args:
+      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+
+    Raises:
+      ValueError: If an incompatible vm_spec is passed.
+    """
+    super(Ubuntu2004DeepLearningAMIBasedAWSVirtualMachine, self).__init__(
+        vm_spec)
+    # Add preinstalled packages for Deep Learning AMI
+    self._installed_packages.add('nccl')
+    self._installed_packages.add('cuda_toolkit')
+    self._installed_packages.add('openmpi')
+
+  def SetupAllScratchDisks(self):
+    # Ubuntu2004 DLAMI mount the disk by default, which might break PKB logic.
+    self.RemoteCommand('sudo umount /opt/dlami/nvme', ignore_failure=True)
+    self.RemoteCommand('sudo vgremove vg.01 -y', ignore_failure=True)
+    super().SetupAllScratchDisks()
+
+
 class AmazonLinux2EfaBasedAwsVirtualMachine(
-    AwsVirtualMachine, linux_virtual_machine.AmazonLinux2EfaMixin
+    AwsVirtualMachine, linux_virtual_machine.AmazonLinux2DLMixin
 ):
   """AmazonLinux2 Base DLAMI virtual machine."""
 

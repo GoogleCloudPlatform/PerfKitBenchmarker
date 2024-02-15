@@ -129,7 +129,7 @@ def CheckNvidiaSmiExists(vm):
   # PKB only supports NVIDIA driver on DEBIAN for now.
   if (
       vm.BASE_OS_TYPE != os_types.DEBIAN
-      and vm.OS_TYPE != os_types.AMAZONLINUX2_EFA
+      and vm.OS_TYPE != os_types.AMAZONLINUX2_DL
   ):
     return False
   resp, _ = vm.RemoteHostCommand('command -v nvidia-smi', ignore_failure=True)

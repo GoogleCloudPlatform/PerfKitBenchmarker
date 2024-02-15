@@ -2843,10 +2843,16 @@ class Ubuntu2004EfaMixin(Ubuntu2004Mixin):
   OS_TYPE = os_types.UBUNTU2004_EFA
 
 
-class AmazonLinux2EfaMixin(AmazonLinux2Mixin):
-  """Class holding EFA specific VM methods and attributes."""
+class Ubuntu2004DLMixin(Ubuntu2004Mixin):
+  """Class holding DeepLearning specific VM methods and attributes."""
 
-  OS_TYPE = os_types.AMAZONLINUX2_EFA
+  OS_TYPE = os_types.UBUNTU2004_DL
+
+
+class AmazonLinux2DLMixin(AmazonLinux2Mixin):
+  """Class holding DLAMI specific VM methods and attributes."""
+
+  OS_TYPE = os_types.AMAZONLINUX2_DL
 
 
 class Ubuntu2204Mixin(BaseUbuntuMixin):
