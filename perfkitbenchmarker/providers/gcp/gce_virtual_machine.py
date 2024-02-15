@@ -267,6 +267,11 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         config_values.pop('min_cpu_platform', None)
     if flag_values['disable_smt'].present:
       config_values['threads_per_core'] = 1
+    # Convert YAML to correct type even if only one element.
+    if 'gce_tags' in config_values and isinstance(
+        config_values['gce_tags'], str
+    ):
+      config_values['gce_tags'] = [config_values['gce_tags']]
     if flag_values['gce_tags'].present:
       config_values['gce_tags'] = flag_values.gce_tags
 

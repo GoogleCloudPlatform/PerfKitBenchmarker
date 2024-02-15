@@ -157,6 +157,7 @@ class GkeCluster(container_service.KubernetesCluster):
     nodepool_config.gpu_type = vm_config.gpu_type
     nodepool_config.gpu_count = vm_config.gpu_count
     nodepool_config.threads_per_core = vm_config.threads_per_core
+    nodepool_config.gce_tags = vm_config.gce_tags
     nodepool_config.min_cpu_platform = vm_config.min_cpu_platform
     nodepool_config.network = vm_config.network
     nodepool_config.cpus: int = vm_config.cpus
@@ -285,6 +286,12 @@ class GkeCluster(container_service.KubernetesCluster):
                 nodepool_config.gpu_type, nodepool_config.gpu_count
             )
         )
+
+    gce_tags = FLAGS.gce_tags
+    if nodepool_config.gce_tags:
+      gce_tags = nodepool_config.gce_tags
+    if gce_tags:
+      cmd.flags['tags'] = ','.join(gce_tags)
     if nodepool_config.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = nodepool_config.min_cpu_platform
 

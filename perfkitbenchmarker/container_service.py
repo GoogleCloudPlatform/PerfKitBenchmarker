@@ -407,6 +407,7 @@ class BaseNodePoolConfig:
     self.gpu_type: Optional[str]
     self.gpu_count: Optional[int]
     self.threads_per_core: int
+    self.gce_tags: list[str]
     self.min_cpu_platform: str
     self.cpus: int
     self.memory_mib: int
