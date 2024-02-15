@@ -13,12 +13,14 @@
 # limitations under the License.
 """Module to allow for auto registratation of classes by attributes."""
 import itertools
+import logging
 import typing
 from typing import Any, Optional
 from perfkitbenchmarker import errors
 
 
 T = typing.TypeVar('T')
+NO_SUBCLASS_DEFINED_ERROR = 'No %s subclass defined with the attributes: %s'
 
 
 def GetRegisteredClass(
@@ -47,9 +49,18 @@ def GetRegisteredClass(
   key += sorted(kwargs.items())
   resource = registry.get(tuple(key), default_class)
   if not resource:
+    possibilites = {
+        key: value
+        for (key, value) in registry.items()
+        if key[0] == base_class.__name__
+    }
+    logging.info(NO_SUBCLASS_DEFINED_ERROR, (base_class.__name__, kwargs))
+    logging.info(
+        'Did you mean one of these other classes that were registered for this '
+        'base class? Possibilities: %s', possibilites
+    )
     raise errors.Resource.SubclassNotFoundError(
-        'No %s subclass defined with the attributes: %s'
-        % (base_class.__name__, kwargs)
+        NO_SUBCLASS_DEFINED_ERROR % (base_class.__name__, kwargs)
     )
   if not issubclass(resource, base_class):
     raise errors.Resource.SubclassNotFoundError(
@@ -95,7 +106,6 @@ def RegisterClass(
         attributes.append([(attr, value)])
       else:
         attributes.append([(attr, i) for i in value])
-
     # Cross product
     for key in itertools.product(*attributes):
       registry[tuple(key)] = cls

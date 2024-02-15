@@ -105,7 +105,7 @@ class CustomMachineTypeSpecTestCase(unittest.TestCase):
       )
     self.assertEqual(
         str(cm.exception),
-        'Unrecognized options were found in test_component: extra1, extra2.',
+        'Unrecognized options were found in test_component: extra1, extra2.'
     )
 
   def testInvalidCpus(self):

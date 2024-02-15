@@ -14,6 +14,7 @@
 """Base class for objects decoded from a YAML config."""
 
 import collections
+import logging
 import threading
 from typing import Any, Optional
 
@@ -77,7 +78,7 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
       self,
       component_full_name: str,
       flag_values: Optional[flags.FlagValues] = None,
-      **kwargs: Any
+      **kwargs: Any,
   ):
     """Initializes a BaseSpec.
 
@@ -112,14 +113,32 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
       )
     unrecognized_options = frozenset(kwargs).difference(self._decoders)
     if unrecognized_options:
+      logging.info(
+          'Unrecognized options: %s for class {%s}. Could not find match in any'
+          ' decoders: %s',
+          unrecognized_options,
+          self.__class__.__name__,
+          self._DecodersToString(),
+      )
       raise errors.Config.UnrecognizedOption(
           'Unrecognized options were found in {0}: {1}.'.format(
-              component_full_name, ', '.join(sorted(unrecognized_options))
+              component_full_name,
+              ', '.join(sorted(unrecognized_options)),
           )
       )
     self._DecodeAndInit(
         component_full_name, kwargs, self._decoders, flag_values
     )
+
+  def _DecodersToString(self):
+    """Returns a string representation of the decoders."""
+    if not self._decoders:
+      return 'Decoders not initialized'
+    decoder_names = [
+        f'{arg}: {decoder.__class__.__name__}'
+        for arg, decoder in self._decoders.items()
+    ]
+    return '{' + ',\n'.join(decoder_names) + '}'
 
   @classmethod
   def _InitDecoders(cls):
@@ -251,5 +270,5 @@ class PerCloudConfigDecoder(option_decoders.TypeVerifier):
     return PerCloudConfigSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
-        **input_dict
+        **input_dict,
     )

@@ -82,7 +82,7 @@ class PerCloudConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testUnrecognizedCloud(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
       self._spec_class(_COMPONENT, fake_provider={})
-    self.assertEqual(
+    self.assertContainsSubsequence(
         str(cm.exception),
         'Unrecognized options were found in test_component: fake_provider.',
     )

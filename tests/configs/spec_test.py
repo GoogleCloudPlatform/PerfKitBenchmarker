@@ -57,6 +57,18 @@ class BaseSpecFixedDecodeOrderTestCase(unittest.TestCase):
     _TestFixedDecodeOrderSpec(_COMPONENT, **config)
     self.assertEqual(observed_decode_call_order, expected_decode_call_order)
 
+  def testDecodersPrint(self):
+    callback = mock.MagicMock()
+    config = {
+        config_option_name: callback
+        for config_option_name in self.config_option_names
+    }
+    test_spec = _TestFixedDecodeOrderSpec(_COMPONENT, **config)
+    self.assertIn(
+        '{0: _TestFixedDecodeOrderDecoder,\n1: _TestFixedDecodeOrderDecoder,',
+        test_spec._DecodersToString(),
+    )
+
   def testFailedDecode(self):
     callback = mock.MagicMock(side_effect=ValueError)
     config = {
