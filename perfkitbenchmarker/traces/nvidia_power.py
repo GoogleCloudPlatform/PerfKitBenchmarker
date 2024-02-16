@@ -47,7 +47,7 @@ _SELECTIONS = flags.DEFINE_string(
     'Choice(s) of data to collect; all or any '
     'combinations of power, pstate, utilization, '
     'temperature, clocks, and '
-    'clocks_throttle_reasons.',
+    'clocks_throttle_reasons (or clocks_event_reasons).',
 )
 FLAGS = flags.FLAGS
 
@@ -69,6 +69,12 @@ QUERY_TABLE = {
     'clocks_throttle_reasons.active': {
         'metric': 'clocks_throttle_reasons',
         'header': ' clocks_throttle_reasons.active',
+        'unit': '',
+        'type': 'string',
+    },
+    'clocks_event_reasons.active': {
+        'metric': 'clocks_event_reasons',
+        'header': ' clocks_event_reasons.active',
         'unit': '',
         'type': 'string',
     },
@@ -129,6 +135,7 @@ QUERY_GROUPS = {
     'temperature': ['temperature.gpu', 'temperature.memory'],
     'clocks': ['clocks.gr', 'clocks.sm', 'clocks.mem', 'clocks.video'],
     'clocks_throttle_reasons': ['clocks_throttle_reasons.active'],
+    'clocks_event_reasons': ['clocks_event_reasons.active'],
 }
 
 
@@ -158,6 +165,9 @@ def _NvidiaPowerResults(
       if query_item in ['index', 'timestamp']:
         continue
       table_row = QUERY_TABLE[query_item]
+      if not line.get(table_row['header']):
+        # metrics can change between nvidia driver versions
+        continue
       content = line.get(table_row['header']).split()[0]
       new_metadata = gpu_metadata.copy()
       value = 0.0
