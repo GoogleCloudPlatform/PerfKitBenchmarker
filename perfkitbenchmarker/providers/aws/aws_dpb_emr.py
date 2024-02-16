@@ -17,6 +17,7 @@ Clusters can be created and deleted.
 """
 
 import collections
+import dataclasses
 import json
 import logging
 from typing import Any, Dict, Optional
@@ -86,6 +87,74 @@ def _GetClusterConfiguration(cluster_properties: list[str]) -> str:
 
 class EMRRetryableException(Exception):
   pass
+
+
+@dataclasses.dataclass(frozen=True)
+class _AwsDpbEmrServerlessJobRun:
+  """Holds one EMR Serverless job run info, such as IDs and usage stats.
+
+  Attributes:
+    application_id: The application ID the job run belongs to.
+    job_run_id: The job run's ID.
+    region: Job run's region.
+    memory_gb_hour: RAM GB * hour used.
+    storage_gb_hour: Shuffle storage GB * hour used.
+    vcpu_hour: vCPUs * hour used.
+  """
+
+  application_id: Optional[str] = None
+  job_run_id: Optional[str] = None
+  region: Optional[str] = None
+  memory_gb_hour: Optional[float] = None
+  storage_gb_hour: Optional[float] = None
+  vcpu_hour: Optional[float] = None
+
+  def __bool__(self):
+    """Returns if this represents a job run or is just a dummy placeholder."""
+    return None not in (self.application_id, self.job_run_id, self.region)
+
+  def HasStats(self):
+    """Returns whether there are stats collected for the job run."""
+    return None not in (
+        self.memory_gb_hour,
+        self.storage_gb_hour,
+        self.vcpu_hour,
+    )
+
+  def ComputeJobRunCost(self) -> dpb_service.JobCosts:
+    """Computes the cost of a run for region given this usage."""
+    if not self.HasStats():
+      return dpb_service.JobCosts()
+    region_prices = aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES.get(
+        self.region, {}
+    )
+    memory_gb_hour_price = region_prices.get('memory_gb_hours')
+    storage_gb_hour_price = region_prices.get('storage_gb_hours')
+    vcpu_hour_price = region_prices.get('vcpu_hours')
+    if (
+        memory_gb_hour_price is None
+        or storage_gb_hour_price is None
+        or vcpu_hour_price is None
+    ):
+      return dpb_service.JobCosts()
+    vcpu_cost = self.vcpu_hour * vcpu_hour_price
+    memory_cost = self.memory_gb_hour * memory_gb_hour_price
+    storage_cost = self.storage_gb_hour * storage_gb_hour_price
+    return dpb_service.JobCosts(
+        total_cost=vcpu_cost + memory_cost + storage_cost,
+        compute_cost=vcpu_cost,
+        memory_cost=memory_cost,
+        storage_cost=storage_cost,
+        compute_units_used=self.vcpu_hour,
+        memory_units_used=self.memory_gb_hour,
+        storage_units_used=self.storage_gb_hour,
+        compute_unit_cost=vcpu_hour_price,
+        memory_unit_cost=memory_gb_hour_price,
+        storage_unit_cost=storage_gb_hour_price,
+        compute_unit_name='vCPU*hr',
+        memory_unit_name='GB*hr',
+        storage_unit_name='GB*hr',
+    )
 
 
 class AwsDpbEmr(dpb_service.BaseDpbService):
@@ -527,8 +596,8 @@ class AwsDpbEmrServerless(
       )
     self.role = FLAGS.aws_emr_serverless_role
 
-    # Last job run cost
-    self._run_cost = dpb_service.JobCosts()
+    # Last job usage info
+    self._job_run = _AwsDpbEmrServerlessJobRun()
     self._FillMetadata()
 
   def SubmitJob(
@@ -619,14 +688,35 @@ class AwsDpbEmrServerless(
         ]
     )
     result = json.loads(stdout)
-    application_id = result['applicationId']
-    job_run_id = result['jobRunId']
-    return self._WaitForJob(
-        (application_id, job_run_id), EMR_TIMEOUT, job_poll_interval
+    self._job_run = _AwsDpbEmrServerlessJobRun(
+        application_id=result['applicationId'],
+        job_run_id=result['jobRunId'],
+        region=self.region,
     )
+    return self._WaitForJob(self._job_run, EMR_TIMEOUT, job_poll_interval)
 
   def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
-    return self._run_cost
+    @vm_util.Retry(
+        fuzz=0,
+        retryable_exceptions=(EMRRetryableException,),
+    )
+    def WaitTilUsageMetricsAvailable():
+      self._CallGetJobRunApi(self._job_run)
+      if not self._job_run.HasStats():
+        raise EMRRetryableException(
+            'Usage metrics not ready yet for EMR Serverless '
+            f'application_id={self._job_run.application_id!r} '
+            f'job_run_id={self._job_run.job_run_id!r}'
+        )
+
+    if not self._job_run:
+      return _AwsDpbEmrServerlessJobRun().ComputeJobRunCost()
+    if not self._job_run.HasStats():
+      try:
+        WaitTilUsageMetricsAvailable()
+      except vm_util.TimeoutExceededRetryError:
+        logging.warning('Timeout exceeded for retrieving usage metrics.')
+    return self._job_run.ComputeJobRunCost()
 
   def GetJobProperties(self) -> Dict[str, str]:
     result = {'spark.dynamicAllocation.enabled': 'FALSE'}
@@ -696,16 +786,21 @@ class AwsDpbEmrServerless(
         storage_unit_name='GB*hr',
     )
 
-  def _GetCompletedJob(self, job_id):
+  def _GetCompletedJob(self, job_run):
     """See base class."""
-    application_id, job_run_id = job_id
+    return self._CallGetJobRunApi(job_run)
+
+  def _CallGetJobRunApi(
+      self, job_run: _AwsDpbEmrServerlessJobRun
+  ) -> Optional[dpb_service.JobResult]:
+    """Performs EMR Serverless GetJobRun API call."""
     cmd = self.cmd_prefix + [
         'emr-serverless',
         'get-job-run',
         '--application-id',
-        application_id,
+        job_run.application_id,
         '--job-run-id',
-        job_run_id,
+        job_run.job_run_id,
     ]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode:
@@ -724,16 +819,7 @@ class AwsDpbEmrServerless(
     if state == 'SUCCESS':
       start_time = result['jobRun']['createdAt']
       end_time = result['jobRun']['updatedAt']
-      resource_utilization = result.get('jobRun', {}).get(
-          'totalResourceUtilization', {}
-      )
-      memory_gb_hour = resource_utilization.get('memoryGBHour')
-      storage_gb_hour = resource_utilization.get('storageGBHour')
-      vcpu_hour = resource_utilization.get('vCPUHour')
-      if None not in (memory_gb_hour, storage_gb_hour, vcpu_hour):
-        self._run_cost = self._ComputeJobRunCost(
-            memory_gb_hour, storage_gb_hour, vcpu_hour
-        )
+      self._job_run = self._ParseCostMetrics(result)
       return dpb_service.JobResult(run_time=end_time - start_time)
 
   def _FillMetadata(self) -> None:
@@ -761,3 +847,17 @@ class AwsDpbEmrServerless(
   def GetHdfsType(self) -> Optional[str]:
     """Gets human friendly disk type for metric metadata."""
     return 'default-disk'
+
+  def _ParseCostMetrics(
+      self, get_job_run_result: dict[Any, Any]
+  ) -> _AwsDpbEmrServerlessJobRun:
+    """Parses usage metrics from an EMR s8s GetJobRun API response."""
+    resource_utilization = get_job_run_result.get('jobRun', {}).get(
+        'totalResourceUtilization', {}
+    )
+    return dataclasses.replace(
+        self._job_run,
+        memory_gb_hour=resource_utilization.get('memoryGBHour'),
+        storage_gb_hour=resource_utilization.get('storageGBHour'),
+        vcpu_hour=resource_utilization.get('vCPUHour'),
+    )
