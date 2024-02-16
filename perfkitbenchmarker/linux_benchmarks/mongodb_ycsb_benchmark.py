@@ -36,10 +36,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import mongosh
 from perfkitbenchmarker.linux_packages import ycsb
 
-# See http://api.mongodb.org/java/2.13/com/mongodb/WriteConcern.html
-flags.DEFINE_string(
-    'mongodb_writeconcern', 'acknowledged', 'MongoDB write concern.'
-)
 flags.DEFINE_integer(
     'mongodb_readahead_kb', None, 'Configure block device readahead settings.'
 )
@@ -203,14 +199,17 @@ def _PrepareClient(vm: _LinuxVM) -> None:
   )
 
 
-def _GetYcsbKwargs(benchmark_spec: bm_spec.BenchmarkSpec) -> dict[str, Any]:
-  """Returns args that are passed to YCSB via the command line."""
-  return {
-      'mongodb.url': benchmark_spec.mongodb_url,
-      'mongodb.writeConcern': FLAGS.mongodb_writeconcern,
-      # Avoids some stale connection issues at the beginning of the load.
-      'core_workload_insertion_retry_limit': 10,
-  }
+def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
+  """Returns the connection string used to connect to the instance."""
+  primary = benchmark_spec.vm_groups['primary'][0]
+  secondary = benchmark_spec.vm_groups['secondary'][0]
+  arbiter = benchmark_spec.vm_groups['arbiter'][0]
+  return (
+      f'"mongodb://{primary.internal_ip}:27017/,'
+      f'{secondary.internal_ip}:27017/,'
+      f'{arbiter.internal_ip}:27017/'
+      '?replicaSet=rs0&w=majority&compression=snappy"'
+  )
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
@@ -239,10 +238,14 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   _PrepareReplicaSet([primary, secondary], arbiter)
 
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
-  benchmark_spec.mongodb_url = f'mongodb://{primary.internal_ip}:27017/'
+  load_kwargs = {
+      'mongodb.url': _GetMongoDbURL(benchmark_spec),
+      'mongodb.batchsize': 10,
+      'core_workload_insertion_retry_limit': 10,
+  }
   benchmark_spec.executor.Load(
       benchmark_spec.vm_groups['clients'],
-      load_kwargs=_GetYcsbKwargs(benchmark_spec),
+      load_kwargs=load_kwargs,
   )
 
   # Print some useful loading stats
@@ -261,10 +264,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
+  run_kwargs = {'mongodb.url': _GetMongoDbURL(benchmark_spec)}
   samples = list(
       benchmark_spec.executor.Run(
           benchmark_spec.vm_groups['clients'],
-          run_kwargs=_GetYcsbKwargs(benchmark_spec),
+          run_kwargs=run_kwargs,
       )
   )
   if FLAGS.mongodb_readahead_kb is not None:
