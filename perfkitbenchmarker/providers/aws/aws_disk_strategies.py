@@ -19,7 +19,6 @@ scratch disks.
 import collections
 import logging
 from typing import Any
-
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
@@ -50,27 +49,6 @@ class AWSCreateDiskStrategy(disk_strategies.CreateDiskStrategy):
   """Same as CreateDiskStrategy, but with Base Disk spec."""
 
   disk_spec: aws_disk.AwsDiskSpec
-  LOCAL_DRIVE_START_LETTER = 'b'
-
-  def _GetNvmeBootIndex(self):
-    if aws_disk.LocalDriveIsNvme(
-        self.vm.machine_type
-    ) and aws_disk.EbsDriveIsNvme(self.vm.machine_type):
-      # identify boot drive
-      # If this command ever fails consider 'findmnt -nM / -o source'
-      cmd = (
-          'realpath /dev/disk/by-label/cloudimg-rootfs '
-          '| grep --only-matching "nvme[0-9]*"'
-      )
-      boot_drive = self.vm.RemoteCommand(cmd, ignore_failure=True)[0].strip()
-      if boot_drive:
-        # get the boot drive index by dropping the nvme prefix
-        boot_idx = int(boot_drive[4:])
-        logging.info('found boot drive at nvme index %d', boot_idx)
-        return boot_idx
-      else:
-        logging.warning('Failed to identify NVME boot drive index. Assuming 0.')
-        return 0
 
   def BuildDiskSpecId(self, spec_index, strip_index):
     """Generates an unique string to represent a disk_spec position."""
@@ -79,35 +57,6 @@ class AWSCreateDiskStrategy(disk_strategies.CreateDiskStrategy):
 
 class CreateLocalDiskStrategy(AWSCreateDiskStrategy):
   """Creates a local disk on AWS."""
-
-  def __init__(
-      self,
-      vm: 'virtual_machine.BaseVirtualMachine',
-      disk_spec: aws_disk.AwsDiskSpec,
-      disk_count: int,
-  ):
-    super().__init__(vm, disk_spec, disk_count)
-    self.local_disk_groups = []
-    nvme_boot_drive_index = self._GetNvmeBootIndex()
-    for spec_id, disk_spec in enumerate(self.disk_specs):
-      disks = []
-      for i in range(disk_spec.num_striped_disks):
-        disk_spec_id = self.BuildDiskSpecId(spec_id, i)
-        data_disk = aws_disk.AwsDisk(
-            disk_spec, self.vm.zone, self.vm.machine_type, disk_spec_id
-        )
-        device_letter = chr(
-            ord(self.LOCAL_DRIVE_START_LETTER) + self.vm.local_disk_counter
-        )
-        # Assign device letter to the disk.
-        data_disk.AssignDeviceLetter(device_letter, nvme_boot_drive_index)  # pytype: disable=wrong-arg-types
-        # Local disk numbers start at 1 (0 is the system disk).
-        data_disk.disk_number = self.vm.local_disk_counter + 1
-        self.vm.local_disk_counter += 1
-        if self.vm.local_disk_counter > self.vm.max_local_disks:
-          raise errors.Error('Not enough local disks.')
-        disks.append(data_disk)
-      self.local_disk_groups.append(disks)
 
   def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
     """Returns the SetUpDiskStrategy for the disk."""
@@ -269,7 +218,7 @@ class AWSSetupDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
     if not local_devices and not ebs_devices:
       return
-
+    # pytype: disable=attribute-error
     disks = scratch_disk.disks if scratch_disk.is_striped else [scratch_disk]
     for d in disks:
       if d.disk_type == disk.NFS:
@@ -279,14 +228,12 @@ class AWSSetupDiskStrategy(disk_strategies.SetUpDiskStrategy):
           # assign in a round robin manner. Since NVME local disks
           # are created ignoring all pkb naming conventions and assigned
           # random names on the fly.
-          # pytype: disable=attribute-error
           disk_name = self.GetDeviceByDiskSpecId(d.disk_spec_id)
           self.vm.LogDeviceByName(disk_name, None, local_devices.pop())
       elif aws_disk.EbsDriveIsNvme(self.vm.machine_type):
         # EBS NVME volumes have disk_name assigned
         # looks up disk_name by disk_spec_id
         # populate the aws identifier information
-        # pytype: disable=attribute-error
         disk_name = self.GetDeviceByDiskSpecId(d.disk_spec_id)
         volume_id = self.GetVolumeIdByDevice(disk_name)
         if volume_id in ebs_devices:
@@ -299,6 +246,7 @@ class AWSSetupDiskStrategy(disk_strategies.SetUpDiskStrategy):
       if d.disk_type == disk.NFS:
         continue
       device_name = self.GetDeviceByDiskSpecId(d.disk_spec_id)
+    # pytype: enable=attribute-error
       d.device_path = self.GetPathByDevice(device_name)
 
   def GetPathByDevice(self, disk_name):
@@ -335,6 +283,8 @@ class AWSSetupDiskStrategy(disk_strategies.SetUpDiskStrategy):
 class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
   """Strategies to setup remote disk."""
 
+  LOCAL_DRIVE_START_LETTER = 'b'
+
   def __init__(
       self,
       vm: 'virtual_machine.BaseVirtualMachine',
@@ -345,13 +295,31 @@ class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
     self.disk_specs = disk_specs
 
   def SetUpDisk(self):
-    for disk_spec_id, disk_spec in enumerate(self.disk_specs):
-      disk_group = self.vm.create_disk_strategy.local_disk_groups[disk_spec_id]
-      if len(disk_group) > 1:
+    self.local_disk_groups = []
+    nvme_boot_drive_index = self._GetNvmeBootIndex()
+    for spec_id, disk_spec in enumerate(self.disk_specs):
+      disks = []
+      for i in range(disk_spec.num_striped_disks):
+        disk_spec_id = self.vm.create_disk_strategy.BuildDiskSpecId(spec_id, i)
+        data_disk = aws_disk.AwsDisk(
+            disk_spec, self.vm.zone, self.vm.machine_type, disk_spec_id
+        )
+        device_letter = chr(
+            ord(self.LOCAL_DRIVE_START_LETTER) + self.vm.local_disk_counter
+        )
+        data_disk.AssignDeviceLetter(device_letter, nvme_boot_drive_index)  # pytype: disable=wrong-arg-types
+        # Local disk numbers start at 1 (0 is the system disk).
+        data_disk.disk_number = self.vm.local_disk_counter + 1
+        self.vm.local_disk_counter += 1
+        if self.vm.local_disk_counter > self.vm.max_local_disks:
+          raise errors.Error('Not enough local disks.')
+        disks.append(data_disk)
+      self.local_disk_groups.append(disks)
+      if len(disks) > 1:
         # If the disk_spec called for a striped disk, create one.
-        scratch_disk = disk.StripedDisk(disk_spec, disk_group)
+        scratch_disk = disk.StripedDisk(disk_spec, disks)
       else:
-        scratch_disk = disk_group[0]
+        scratch_disk = disks[0]
       if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
         # here, all disks are created (either at vm creation or in line above).
         # But we don't have all the raw device paths,
@@ -364,6 +332,26 @@ class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
       AWSPrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, scratch_disk, disk_spec
       )
+
+  def _GetNvmeBootIndex(self):
+    if aws_disk.LocalDriveIsNvme(
+        self.vm.machine_type
+    ) and aws_disk.EbsDriveIsNvme(self.vm.machine_type):
+      # identify boot drive
+      # If this command ever fails consider 'findmnt -nM / -o source'
+      cmd = (
+          'realpath /dev/disk/by-label/cloudimg-rootfs '
+          '| grep --only-matching "nvme[0-9]*"'
+      )
+      boot_drive = self.vm.RemoteCommand(cmd, ignore_failure=True)[0].strip()
+      if boot_drive:
+        # get the boot drive index by dropping the nvme prefix
+        boot_idx = int(boot_drive[4:])
+        logging.info('found boot drive at nvme index %d', boot_idx)
+        return boot_idx
+      else:
+        logging.warning('Failed to identify NVME boot drive index. Assuming 0.')
+        return 0
 
 
 class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):

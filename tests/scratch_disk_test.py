@@ -234,7 +234,7 @@ class AwsScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
     self.patches.append(
         mock.patch(
             aws_disk_strategies.__name__
-            + '.AWSCreateDiskStrategy._GetNvmeBootIndex'
+            + '.SetUpLocalDiskStrategy._GetNvmeBootIndex'
         )
     )
     self.patches.append(
