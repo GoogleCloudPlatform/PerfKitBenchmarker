@@ -387,12 +387,6 @@ class Ubuntu2204BasedStaticVirtualMachine(
   pass
 
 
-class Ubuntu2304BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Ubuntu2304Mixin
-):
-  pass
-
-
 class Ubuntu2310BasedStaticVirtualMachine(
     StaticVirtualMachine, linux_virtual_machine.Ubuntu2310Mixin
 ):
