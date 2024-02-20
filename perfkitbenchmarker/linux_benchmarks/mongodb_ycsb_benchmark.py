@@ -90,6 +90,9 @@ mongodb_ycsb:
       vm_count: 1
   flags:
     openjdk_version: 8
+    disk_fs_type: xfs
+    fstab_options: noatime
+    enable_transparent_hugepages: false
 """
 
 _LinuxVM = linux_virtual_machine.BaseLinuxVirtualMachine
@@ -136,6 +139,14 @@ def _PrepareServer(vm: _LinuxVM) -> None:
         FLAGS.mongodb_readahead_kb * 2,
         [d.GetDevicePath() for d in vm.scratch_disks],
     )
+
+  # Settings taken from MongoDB operations checklist
+  vm.ApplySysctlPersistent({
+      'fs.file-max': 98000,
+      'kernel.pid_max': 64000,
+      'kernel.threads-max': 64000,
+      'vm.max_map_count': 102400,
+  })
 
   # Too many connections fails if we don't set file descriptor limit higher.
   vm.RemoteCommand('ulimit -n 64000 && sudo systemctl start mongod')
