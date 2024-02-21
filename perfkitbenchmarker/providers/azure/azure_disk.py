@@ -25,6 +25,7 @@ import json
 import re
 import threading
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -386,3 +387,37 @@ class AzureDisk(disk.BaseDisk):
         return '/dev/sd%s' % REMOTE_DRIVE_PATH_SUFFIXES[start_index + self.lun]
       except IndexError:
         raise TooManyAzureDisksError()
+
+
+class AzureStripedDisk(disk.StripedDisk):
+  """Object representing multiple azure disks striped together."""
+
+  def _Create(self):
+    create_tasks = []
+    for disk_details in self.disks:
+      create_tasks.append((disk_details.Create, (), {}))
+    background_tasks.RunParallelThreads(create_tasks, max_concurrency=200)
+
+  def _Attach(self, vm):
+    if FLAGS.azure_attach_disk_with_create:
+      return
+    disk_names = [disk_details.name for disk_details in self.disks]
+    _, _, retcode = vm_util.IssueCommand(
+        [
+            azure.AZURE_PATH,
+            'vm',
+            'disk',
+            'attach',
+            '--vm-name',
+            vm.name,
+            '--disks'
+        ]
+        + disk_names
+        + vm.resource_group.args,
+        raise_on_failure=False,
+        timeout=600,
+    )
+    if retcode:
+      raise errors.Resource.RetryableCreationError(
+          'Error attaching Multiple Azure disks to VM.'
+      )
