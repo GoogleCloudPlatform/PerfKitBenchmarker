@@ -526,7 +526,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.ssd_interface = vm_spec.ssd_interface
     self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
-    self.max_local_disks = vm_spec.num_local_ssds
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
     self.spot_early_termination = False
@@ -551,6 +550,12 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_nic_type = FLAGS.gce_nic_type
+    self.max_local_disks = vm_spec.num_local_ssds
+    if (
+        self.machine_type
+        and self.machine_type in gce_disk.FIXED_SSD_MACHINE_TYPES
+    ):
+      self.max_local_disks = gce_disk.FIXED_SSD_MACHINE_TYPES[self.machine_type]
     # For certain machine families, we need to explicitly set the GPU type
     # and counts. See the _FIXED_GPU_MACHINE_TYPES dictionary for more details.
     if self.machine_type and self.machine_type in _FIXED_GPU_MACHINE_TYPES:
@@ -772,9 +777,14 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     cmd.flags['metadata'] = util.FormatTags(metadata)
 
-    cmd.flags['local-ssd'] = [
-        'interface={0}'.format(self.ssd_interface)
-    ] * self.max_local_disks
+    if (
+        self.machine_type is None
+        or self.machine_type not in gce_disk.FIXED_SSD_MACHINE_TYPES
+    ):
+      # Append the `--local-ssd` args only when it's a customized or old-gen VM.
+      cmd.flags['local-ssd'] = [
+          'interface={0}'.format(self.ssd_interface)
+      ] * self.max_local_disks
 
     cmd.flags.update(self.create_disk_strategy.GetCreationCommand())
 

@@ -27,7 +27,8 @@ flags.DEFINE_integer(
     0,
     'The number of ssds that should be added to the VM. Note '
     'that this is currently only supported in certain zones '
-    '(see https://cloud.google.com/compute/docs/local-ssd).',
+    '(see https://cloud.google.com/compute/docs/local-ssd), and '
+    'only applies for vms that can have a variable number of local SSDs.',
 )
 flags.DEFINE_string(
     'gcloud_scopes',
