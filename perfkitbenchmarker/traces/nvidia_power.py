@@ -173,6 +173,9 @@ def _NvidiaPowerResults(
       value = 0.0
       if table_row['type'] == 'string':
         new_metadata[table_row['metric']] = content
+      elif content == 'N/A':
+        # Not all stats are exposed.
+        continue
       else:
         value = float(content)
       samples.append(
