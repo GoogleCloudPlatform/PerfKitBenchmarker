@@ -168,9 +168,13 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  hammerdb.SetDefaultConfig()
   relational_db = benchmark_spec.relational_db
   vm = relational_db.client_vm
+  num_cpus = None
+  if hasattr(relational_db, 'server_vm'):
+    server_vm = relational_db.server_vm
+    num_cpus = server_vm.NumCpusForBenchmark()
+  hammerdb.SetDefaultConfig(num_cpus)
   vm.Install('hammerdb')
 
   is_azure = FLAGS.cloud == 'Azure' and FLAGS.use_managed_db

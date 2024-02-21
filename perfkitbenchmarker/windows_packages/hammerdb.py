@@ -100,8 +100,8 @@ def ParseTpcCTPMResultsFromFile(stdout: str) -> List[sample.Sample]:
   return linux_hammerdb.ParseTpcCTPMResultsFromFile(stdout)
 
 
-def SetDefaultConfig():
-  return linux_hammerdb.SetDefaultConfig()
+def SetDefaultConfig(num_cpus: Optional[int]):
+  return linux_hammerdb.SetDefaultConfig(num_cpus)
 
 
 def ParseTpcCResults(stdout: str, vm) -> List[sample.Sample]:

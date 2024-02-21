@@ -163,7 +163,8 @@ HAMMERDB_TPCC_DURATION = flags.DEFINE_integer(
 )
 
 HAMMERDB_TPCC_NUM_WAREHOUSE = flags.DEFINE_integer(
-    'hammerdbcli_tpcc_num_warehouse', 5, 'Number of warehouses set in TPCC'
+    'hammerdbcli_tpcc_num_warehouse', None, 'Number of warehouses set in TPCC. '
+    'If unset, it defaults to 5 for managed and num_cpus*25 for unmanaged.'
 )
 
 HAMMERDB_TPCC_ALL_WAREHOUSE = flags.DEFINE_bool(
@@ -231,15 +232,23 @@ HAMMERDB_RESTART_BEFORE_RUN = flags.DEFINE_bool(
 )
 
 
-def SetDefaultConfig():
+def SetDefaultConfig(num_cpus: Optional[int]):
   """Set the default configurations of unfilled flags."""
   if HAMMERDB_NUM_VU.value is None:
     if HAMMERDB_SCRIPT.value == HAMMERDB_SCRIPT_TPC_H:
       FLAGS.hammerdbcli_num_vu = 1
     elif HAMMERDB_SCRIPT.value == HAMMERDB_SCRIPT_TPC_C:
-      FLAGS.hammerdbcli_num_vu = 4
+      if FLAGS.use_managed_db or num_cpus is None:
+        FLAGS.hammerdbcli_num_vu = 4
+      else:
+        FLAGS.hammerdbcli_num_vu = num_cpus * 2
   if HAMMERDB_BUILD_TPCC_NUM_VU.value is None:
     FLAGS.hammerdbcli_build_tpcc_num_vu = HAMMERDB_NUM_VU.value
+  if HAMMERDB_TPCC_NUM_WAREHOUSE.value is None:
+    if FLAGS.use_managed_db or num_cpus is None:
+      FLAGS.hammerdbcli_tpcc_num_warehouse = 5
+    else:
+      FLAGS.hammerdbcli_tpcc_num_warehouse = num_cpus * 25
 
 
 def CheckPrerequisites(_):

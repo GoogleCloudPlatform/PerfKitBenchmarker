@@ -125,7 +125,11 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   vm = benchmark_spec.vms[0]
   relational_db = benchmark_spec.relational_db
   db_engine = relational_db.engine
-  hammerdb.SetDefaultConfig()
+  num_cpus = None
+  if hasattr(relational_db, 'server_vm'):
+    server_vm = relational_db.server_vm
+    num_cpus = server_vm.NumCpusForBenchmark()
+  hammerdb.SetDefaultConfig(num_cpus)
   db_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[hammerdb.HAMMERDB_SCRIPT.value]
 
   if FLAGS.cloud == 'Azure' and db_engine == 'mysql' and FLAGS.use_managed_db:
@@ -307,7 +311,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """
   vm = benchmark_spec.vms[0]
   relational_db = benchmark_spec.relational_db
-  hammerdb.SetDefaultConfig()
+  num_cpus = None
+  if hasattr(relational_db, 'server_vm'):
+    server_vm = relational_db.server_vm
+    num_cpus = server_vm.NumCpusForBenchmark()
+  hammerdb.SetDefaultConfig(num_cpus)
   db_engine = relational_db.engine
   metadata = hammerdb.GetMetadata(db_engine)
 

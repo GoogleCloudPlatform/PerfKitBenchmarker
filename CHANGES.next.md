@@ -51,6 +51,8 @@
 -   Make Ubuntu 20 the default os_type.
 -   Default `--ip_addresses` to `INTERNAL`.
 -   Add multichase_benchmark flag defaults.
+-   For hammerdbcli_benchmark, set default num_warehouses=25*num_cpus and
+    num_vu=2*num_cpus.
 
 ### New features:
 
