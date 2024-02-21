@@ -15,12 +15,14 @@
 
 import copy
 import json
+import time
 from typing import Any, Optional
 import unittest
 from unittest import mock
 
 from absl import flags
 from absl.testing import parameterized
+import freezegun
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
@@ -37,7 +39,7 @@ TEST_RUN_URI = 'fakeru'
 AWS_ZONE_US_EAST_1A = 'us-east-1a'
 FLAGS = flags.FLAGS
 
-_BASE_JOB_RUN_PAYLOAD = {
+_BASE_JOB_RUN_PAYLOAD: dict[str, Any] = {
     'jobRun': {
         'applicationId': 'foobar',
         'jobRunId': 'bazquux',
@@ -65,12 +67,23 @@ _BASE_JOB_RUN_PAYLOAD = {
             }
         },
         'tags': {},
-        'totalResourceUtilization': {
-            'vCPUHour': 59.422,
-            'memoryGBHour': 237.689,
-            'storageGBHour': 1901.511,
-        },
     }
+}
+
+_EMR_SERVERLESS_PRICES = {
+    'us-east-1': {
+        'vcpu_hours': 0.052624,
+        'memory_gb_hours': 0.0057785,
+        'storage_gb_hours': 0.000111,
+    },
+}
+
+_EMR_SERVERLESS_CREATE_APPLICATION_RESPONSE = {'applicationId': 'foobar'}
+_EMR_SERVERLESS_GET_APPLICATION_RESPONSE = {'application': {'state': 'STARTED'}}
+_EMR_SERVERLESS_START_JOB_RUN_RESPONSE = {
+    'applicationId': 'foobar',
+    'jobRunId': 'bazquux',
+    'arn': 'arn:aws:emr-serverless:us-east-1:1234567:/applications/foobar/jobruns/bazquux',
 }
 
 
@@ -87,17 +100,23 @@ def _GetEmrSpec():
 
 
 def _GetJobRunMockPayload(
-    vcpu_hour: Optional[float],
-    memory_gb_hour: Optional[float],
-    storage_gb_hour: Optional[float],
+    vcpu_hour: Optional[float] = None,
+    memory_gb_hour: Optional[float] = None,
+    storage_gb_hour: Optional[float] = None,
 ) -> dict[str, Any]:
   payload = copy.deepcopy(_BASE_JOB_RUN_PAYLOAD)
   if vcpu_hour is not None:
-    payload['jobRun']['vCPUHour'] = vcpu_hour
+    payload['jobRun'].setdefault('totalResourceUtilization', {})[
+        'vCPUHour'
+    ] = vcpu_hour
   if memory_gb_hour is not None:
-    payload['jobRun']['memoryGBHour'] = memory_gb_hour
+    payload['jobRun'].setdefault('totalResourceUtilization', {})[
+        'memoryGBHour'
+    ] = memory_gb_hour
   if storage_gb_hour is not None:
-    payload['jobRun']['storageGBHour'] = storage_gb_hour
+    payload['jobRun'].setdefault('totalResourceUtilization', {})[
+        'storageGBHour'
+    ] = storage_gb_hour
   return payload
 
 
@@ -157,20 +176,17 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
     self.assertEqual(cluster.GetResourceMetadata(), expected_metadata)
 
+  @mock.patch.object(
+      aws_dpb_emr_serverless_prices,
+      'EMR_SERVERLESS_PRICES',
+      new=_EMR_SERVERLESS_PRICES,
+  )
   def testEmrServerlessCalculateLastJobCosts(self):
     emr_serverless = aws_dpb_emr.AwsDpbEmrServerless(SERVERLESS_SPEC)
-
-    create_application_response = {'applicationId': 'foobar'}
-    get_application_response = {'application': {'state': 'STARTED'}}
-    start_job_run_response = {
-        'applicationId': 'foobar',
-        'jobRunId': 'bazquux',
-        'arn': 'arn:aws:emr-serverless:us-east-1:1234567:/applications/foobar/jobruns/bazquux',
-    }
     self.issue_cmd_mock.side_effect = [
-        (json.dumps(create_application_response), '', 0),
-        (json.dumps(get_application_response), '', 0),
-        (json.dumps(start_job_run_response), '', 0),
+        (json.dumps(_EMR_SERVERLESS_CREATE_APPLICATION_RESPONSE), '', 0),
+        (json.dumps(_EMR_SERVERLESS_GET_APPLICATION_RESPONSE), '', 0),
+        (json.dumps(_EMR_SERVERLESS_START_JOB_RUN_RESPONSE), '', 0),
         (
             json.dumps(
                 _GetJobRunMockPayload(
@@ -183,24 +199,10 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
             0,
         ),
     ]
-
-    with mock.patch.object(
-        aws_dpb_emr_serverless_prices, 'EMR_SERVERLESS_PRICES'
-    ):
-      # The actual prices are expected to change over time, but we don't want to
-      # update the test every time.
-      aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES = {
-          'us-east-1': {
-              'vcpu_hours': 0.052624,
-              'memory_gb_hours': 0.0057785,
-              'storage_gb_hours': 0.000111,
-          },
-      }
-      emr_serverless.SubmitJob(
-          pyspark_file='s3://test/hello.py',
-          job_type=dpb_constants.PYSPARK_JOB_TYPE,
-      )
-
+    emr_serverless.SubmitJob(
+        pyspark_file='s3://test/hello.py',
+        job_type=dpb_constants.PYSPARK_JOB_TYPE,
+    )
     expected_costs = dpb_service.JobCosts(
         total_cost=4.711576935499999,
         compute_cost=3.1270233279999995,
@@ -216,7 +218,6 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         memory_unit_name='GB*hr',
         storage_unit_name='GB*hr',
     )
-
     self.assertEqual(emr_serverless.CalculateLastJobCosts(), expected_costs)
 
   def testEmrServerlessPricesSchema(self):
@@ -227,6 +228,74 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIsInstance(price_dict['vcpu_hours'], float)
       self.assertIsInstance(price_dict['memory_gb_hours'], float)
       self.assertIsInstance(price_dict['storage_gb_hours'], float)
+
+  @freezegun.freeze_time('2024-02-16', auto_tick_seconds=60.0)
+  @mock.patch.object(time, 'sleep')
+  @mock.patch.object(
+      aws_dpb_emr_serverless_prices,
+      'EMR_SERVERLESS_PRICES',
+      new=_EMR_SERVERLESS_PRICES,
+  )
+  def testEmrServerlessUsageMetricsNotAvailableRightAway(self, *_):
+    emr_serverless = aws_dpb_emr.AwsDpbEmrServerless(SERVERLESS_SPEC)
+    self.issue_cmd_mock.side_effect = [
+        (json.dumps(_EMR_SERVERLESS_CREATE_APPLICATION_RESPONSE), '', 0),
+        (json.dumps(_EMR_SERVERLESS_GET_APPLICATION_RESPONSE), '', 0),
+        (json.dumps(_EMR_SERVERLESS_START_JOB_RUN_RESPONSE), '', 0),
+        (json.dumps(_GetJobRunMockPayload()), '', 0),
+        (
+            json.dumps(
+                _GetJobRunMockPayload(
+                    vcpu_hour=59.422,
+                    memory_gb_hour=237.689,
+                    storage_gb_hour=1901.511,
+                )
+            ),
+            '',
+            0,
+        ),
+    ]
+    emr_serverless.SubmitJob(
+        pyspark_file='s3://test/hello.py',
+        job_type=dpb_constants.PYSPARK_JOB_TYPE,
+    )
+    expected_costs = dpb_service.JobCosts(
+        total_cost=4.711576935499999,
+        compute_cost=3.1270233279999995,
+        memory_cost=1.3734858865,
+        storage_cost=0.21106772099999999,
+        compute_units_used=59.422,
+        memory_units_used=237.689,
+        storage_units_used=1901.511,
+        compute_unit_cost=0.052624,
+        memory_unit_cost=0.0057785,
+        storage_unit_cost=0.000111,
+        compute_unit_name='vCPU*hr',
+        memory_unit_name='GB*hr',
+        storage_unit_name='GB*hr',
+    )
+    self.assertEqual(emr_serverless.CalculateLastJobCosts(), expected_costs)
+
+  @freezegun.freeze_time('2024-02-16', auto_tick_seconds=60.0)
+  @mock.patch.object(time, 'sleep')
+  @mock.patch.object(
+      aws_dpb_emr_serverless_prices,
+      'EMR_SERVERLESS_PRICES',
+      new=_EMR_SERVERLESS_PRICES,
+  )
+  def testEmrServerlessUsageMetricsNeverAvailable(self, *_):
+    emr_serverless = aws_dpb_emr.AwsDpbEmrServerless(SERVERLESS_SPEC)
+    self.issue_cmd_mock.side_effect = [
+        (json.dumps(_EMR_SERVERLESS_CREATE_APPLICATION_RESPONSE), '', 0),
+        (json.dumps(_EMR_SERVERLESS_GET_APPLICATION_RESPONSE), '', 0),
+        (json.dumps(_EMR_SERVERLESS_START_JOB_RUN_RESPONSE), '', 0),
+    ] + [(json.dumps(_GetJobRunMockPayload()), '', 0)] * 100
+    emr_serverless.SubmitJob(
+        pyspark_file='s3://test/hello.py',
+        job_type=dpb_constants.PYSPARK_JOB_TYPE,
+    )
+    expected_costs = dpb_service.JobCosts()
+    self.assertEqual(emr_serverless.CalculateLastJobCosts(), expected_costs)
 
   def testEmrServerlessMetadata(self):
     emr_serverless = aws_dpb_emr.AwsDpbEmrServerless(SERVERLESS_SPEC)
