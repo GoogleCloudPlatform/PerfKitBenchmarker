@@ -1267,7 +1267,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
   def LogVmDebugInfo(self):
     """Logs the output of calling dmesg on the VM."""
     if FLAGS.log_dmesg:
-      self.RemoteCommand('hostname && dmesg')
+      self.RemoteCommand('hostname && sudo dmesg')
 
   def RemoteCopy(self, file_path, remote_path='', copy_to=True):
     self.RemoteHostCopy(file_path, remote_path, copy_to)
