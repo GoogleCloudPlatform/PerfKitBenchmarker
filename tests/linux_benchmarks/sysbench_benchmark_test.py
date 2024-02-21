@@ -256,21 +256,6 @@ class SpannerBenchmarkTestCase(
 
   class SysbenchBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
-    @parameterized.parameters(
-        ('spanner-tpcc', 16, 400, 1),
-        ('tpcc', 10, 10, 1),
-        ('oltp_read_only', 10, 400, 10),
-    )
-    def testGetLoadThreads(self, test_name, expected_threads, scale, tables):
-      with flagsaver.flagsaver(
-          sysbench_load_threads=16,
-          sysbench_testname=test_name,
-          sysbench_scale=scale,
-          sysbench_tables=tables,
-      ):
-        actual_threads = sysbench_benchmark._GetLoadThreads()
-      self.assertEqual(expected_threads, actual_threads)
-
     def testLoadPhaseIncreasedCapacityAurora(self):
       mock_spec = textwrap.dedent("""
       sysbench:

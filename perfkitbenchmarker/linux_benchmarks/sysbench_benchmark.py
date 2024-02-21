@@ -37,7 +37,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
 
-
 FLAGS = flags.FLAGS
 
 # The default values for flags and BENCHMARK_CONFIG are not a recommended
@@ -121,6 +120,10 @@ _SKIP_LOAD_STAGE = flags.DEFINE_boolean(
     'been loaded on a previous run.',
 )
 
+_AUTO_INCREMENT = flags.DEFINE_boolean(
+    'sysbench_auto_inc', True, 'Auto increment for sysbench'
+)
+
 # See https://github.com/Percona-Lab/sysbench-tpcc/releases for the most
 # up to date version.
 _SYSBENCH_TPCC_TAR = 'sysbench-tpcc.tar.gz'
@@ -155,10 +158,10 @@ SPANNER_TPCC = 'spanner-tpcc'
 _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
     'tpcc': set(['scale']),
     SPANNER_TPCC: set(['scale']),
-    'oltp_write_only': set(['table_size']),
-    'oltp_read_only': set(['table_size']),
-    'oltp_read_write': set(['table_size']),
-    'oltp_insert': set(['table_size']),
+    'oltp_write_only': set(['table_size', 'auto-inc']),
+    'oltp_read_only': set(['table_size', 'auto-inc']),
+    'oltp_read_write': set(['table_size', 'auto-inc']),
+    'oltp_insert': set(['table_size', 'auto-inc']),
 }
 
 
@@ -331,30 +334,26 @@ def _InstallLuaScriptsIfNecessary(vm):
     vm.PushDataFile('sysbench/spanner_pg_tpcc.lua', '~/tpcc.lua')
 
 
+def _PatchSpannerScripts(vm):
+  vm.PushDataFile(
+      'sysbench/spanner_oltp_git.diff', '~/sysbench/spanner_oltp_git.diff'
+  )
+  vm.RemoteCommand('cd ~/sysbench/ && git apply spanner_oltp_git.diff')
+
+
 def _IsValidFlag(flag):
   return (
       flag in _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS[FLAGS.sysbench_testname]
   )
 
 
-def _GetLoadThreads() -> int:
-  # Data loading is write only so need num_threads less than or equal to the
-  # amount of tables - capped at 64 threads for when number of tables
-  # gets very large. For TPCC, parallelize with threads as long as scale > 1.
-  if FLAGS.sysbench_testname == SPANNER_TPCC:
-    return _LOAD_THREADS.value
-  if _GetSysbenchTestParameter() == 'tpcc':
-    return min(FLAGS.sysbench_scale, 64)
-  return min(FLAGS.sysbench_tables, 64)
-
-
 def _GetSysbenchPrepareCommand(
     db: relational_db.BaseRelationalDb, num_vms: int, vm_index: int
 ) -> str:
   """Returns the sysbench command used to load the database."""
-  num_threads = _GetLoadThreads()
+  num_threads = _LOAD_THREADS.value
   data_load_cmd_tokens = [
-      'nice',  # run with a niceness of lower priority
+      'cd ~/sysbench/ && nice',  # run with a niceness of lower priority
       '-15',  # to encourage cpu time for ssh commands
       'sysbench',
       _GetSysbenchTestParameter(),
@@ -367,6 +366,12 @@ def _GetSysbenchPrepareCommand(
       ('--scale=%d' % FLAGS.sysbench_scale if _IsValidFlag('scale') else ''),
       '--threads=%d' % num_threads,
   ]
+
+  if _IsValidFlag('auto-inc'):
+    if _AUTO_INCREMENT.value:
+      data_load_cmd_tokens.append('--auto-inc=on')
+    else:
+      data_load_cmd_tokens.append('--auto-inc=off')
   if FLAGS.sysbench_testname == SPANNER_TPCC:
     # Supports loading through multiple VMs
     scale = FLAGS.sysbench_scale
@@ -379,6 +384,19 @@ def _GetSysbenchPrepareCommand(
         '--end_scale=%d' % end_scale,
         '--enable_pg_compat_mode=%d'
         % (1 if _SPANNER_PG_COMPAT_MODE.value else 0),
+    ])
+  if (
+      db.engine_type == sql_engine_utils.SPANNER_POSTGRES
+      and FLAGS.sysbench_testname != SPANNER_TPCC
+  ):
+    table_size = FLAGS.sysbench_table_size
+    fill_table_size = table_size / num_vms
+    start_index = fill_table_size * vm_index + 1
+
+    data_load_cmd_tokens.extend([
+        '--start_index=%d' % start_index,
+        '--fill_table_size=%d' % fill_table_size,
+        '--create_secondary=false',
     ])
   return ' '.join(
       data_load_cmd_tokens + _GetCommonSysbenchOptions(db) + ['prepare']
@@ -405,6 +423,17 @@ def _LoadDatabaseInParallel(
 
   db.UpdateCapacityForLoad()
 
+  if (
+      FLAGS.sysbench_testname != SPANNER_TPCC
+      and db.engine_type == sql_engine_utils.SPANNER_POSTGRES
+  ):
+    client_vms[0].RobustRemoteCommand(
+        'cd ~/sysbench/ && nice -15 sysbench oltp_read_only'
+        f' --tables={FLAGS.sysbench_tables} --table_size=0 '
+        f' --threads={_LOAD_THREADS.value} --auto-inc=off '
+        '--create_secondary=false --db-driver=pgsql'
+        ' --pgsql-host=/tmp prepare'
+    )
   _UpdateSessions(db, _LOAD_THREADS.value)
   # Provision the Sysbench test based on the input flags (load data into DB)
   # Could take a long time if the data to be loaded is large.
@@ -426,6 +455,18 @@ def _LoadDatabaseInParallel(
     if 'FATAL' in stderr:
       raise errors.Benchmarks.RunError('Error while running prepare phase')
 
+  if (
+      FLAGS.sysbench_testname != SPANNER_TPCC
+      and db.engine_type == sql_engine_utils.SPANNER_POSTGRES
+  ):
+    client_vms[0].RobustRemoteCommand(
+        'cd ~/sysbench/ && nice -15 sysbench oltp_read_only'
+        f' --tables={FLAGS.sysbench_tables} --table_size=0 '
+        f' --threads={_LOAD_THREADS.value} --auto-inc=off '
+        '--create_secondary=true --db-driver=pgsql'
+        ' --pgsql-host=/tmp prepare'
+    )
+
   db.UpdateCapacityForRun()
 
   return [
@@ -446,6 +487,15 @@ def _PrepareClients(
   # Setup common test tools required on the client VM
   background_tasks.RunThreaded(lambda vm: vm.Install('sysbench'), client_vms)
   background_tasks.RunThreaded(_InstallLuaScriptsIfNecessary, client_vms)
+  if (
+      db.engine_type == sql_engine_utils.SPANNER_POSTGRES
+      and FLAGS.sysbench_testname != SPANNER_TPCC
+  ):
+    background_tasks.RunThreaded(_PatchSpannerScripts, client_vms)
+    background_tasks.RunThreaded(
+        lambda client_query_tools: client_query_tools.InstallPackages(),
+        db.client_vms_query_tools,
+    )
 
   # Some databases install these query tools during _PostCreate, which is
   # skipped if the database is user managed / restored.
