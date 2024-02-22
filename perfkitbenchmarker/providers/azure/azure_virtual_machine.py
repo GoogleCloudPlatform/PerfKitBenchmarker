@@ -170,6 +170,15 @@ TRUSTED_LAUNCH_UNSUPPORTED_OS_TYPES = [
     os_types.ROCKY_LINUX9,
 ]
 
+NVME_MACHINE_FAMILIES = [
+    'Standard_Eibs_v5',
+    'Standard_Ebs_v5',
+    'Standard_Eibds_v5',
+    'Standard_Ebds_v5',
+    'Standard_Ms_v3',
+    'Standard_Mds_v3',
+]
+
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
@@ -714,6 +723,14 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.image = type(self).GEN2_IMAGE_URN
       else:
         raise errors.Benchmarks.UnsupportedConfigError('No Azure gen2 image.')
+    elif self._SupportsNVMe():
+      if hasattr(type(self), 'GEN2_IMAGE_URN'):
+        self.image = type(self).GEN2_IMAGE_URN
+      else:
+        raise errors.Benchmarks.UnsupportedConfigError(
+            f'{self.machine_type} is listed to use NVMe disk controller type, '
+            'which requires Azure gen2 image.'
+            'But no Azure gen2 image can be found. Pls check configuration.')
     elif arm_arch:
       if hasattr(type(self), 'ARM_IMAGE_URN'):
         self.image = type(self).ARM_IMAGE_URN
@@ -831,6 +848,8 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         + self.nic.args
         + tag_args
     )
+    if self._SupportsNVMe():
+      create_cmd.extend(['--disk-controller-type', 'NVMe'])
     if self.trusted_launch_unsupported_type:
       create_cmd.extend(['--security-type', 'Standard'])
     if self.boot_startup_script:
@@ -1140,6 +1159,14 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns: Early termination code.
     """
     return self.low_priority_status_code
+
+  def _SupportsNVMe(self):
+    """Returns whether this vm supports NVMe.
+
+    Returns:
+      True if this vm supports NVMe.
+    """
+    return util.GetMachineFamily(self.machine_type) in NVME_MACHINE_FAMILIES
 
 
 class Debian9BasedAzureVirtualMachine(

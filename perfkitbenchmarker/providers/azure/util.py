@@ -251,3 +251,21 @@ def GetAvailabilityZoneFromZone(zone_or_region):
   if _IsRegion(zone_or_region):
     return None
   raise ValueError('%s is not a valid Azure zone' % zone_or_region)
+
+
+def GetMachineFamily(machine_type):
+  """Returns the machine family of a machine type.
+
+  The family is the machine type with the number of vCPUs removed, hence all
+  machines from the same series shows up as having the same family.
+  See testGetMachineFamily in azure_util_test.py for examples.
+
+  Args:
+    machine_type: Azure machine type
+  """
+  if not machine_type:
+    return None
+  match = re.match(r'^(.*?)\d+(.*)$', machine_type)
+  if match:
+    return match.group(1) + match.group(2)
+  return None

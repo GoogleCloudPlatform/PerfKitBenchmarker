@@ -122,6 +122,31 @@ class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertEqual({'eastus', 'eastus2'}, found_regions)
 
+  def testGetMachineFamily(self):
+    self.assertEqual(
+        util.GetMachineFamily('Standard_E96bds_v5'), 'Standard_Ebds_v5'
+    )
+    self.assertEqual(
+        util.GetMachineFamily('Standard_E96bs_v5'), 'Standard_Ebs_v5'
+    )
+    self.assertEqual(
+        util.GetMachineFamily('Standard_E112ibds_v5'), 'Standard_Eibds_v5'
+    )
+    self.assertEqual(
+        util.GetMachineFamily('Standard_E112ibs_v5'), 'Standard_Eibs_v5'
+    )
+    self.assertEqual(
+        util.GetMachineFamily('Standard_E112ibs_v5'), 'Standard_Eibs_v5'
+    )
+    self.assertEqual(
+        util.GetMachineFamily('Standard_M12ds_v3'), 'Standard_Mds_v3'
+    )
+    self.assertEqual(
+        util.GetMachineFamily('Standard_A2'), 'Standard_A'
+    )
+    self.assertIsNone(
+        util.GetMachineFamily('foobar'),
+    )
 
 if __name__ == '__main__':
   unittest.main()
