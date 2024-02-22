@@ -429,9 +429,9 @@ def _LoadDatabaseInParallel(
       and db.engine_type == sql_engine_utils.SPANNER_POSTGRES
   ):
     client_vms[0].RobustRemoteCommand(
-        'cd ~/sysbench/ && nice -15 sysbench oltp_read_only'
+        f'cd ~/sysbench/ && nice -15 sysbench {FLAGS.sysbench_testname}'
         f' --tables={FLAGS.sysbench_tables} --table_size=0 '
-        f' --threads={_LOAD_THREADS.value} --auto-inc=off '
+        ' --threads=20 --auto-inc=off '
         '--create_secondary=false --db-driver=pgsql'
         ' --pgsql-host=/tmp prepare'
     )
