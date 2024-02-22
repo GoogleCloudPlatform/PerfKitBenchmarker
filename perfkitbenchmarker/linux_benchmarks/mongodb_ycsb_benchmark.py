@@ -216,9 +216,9 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
   secondary = benchmark_spec.vm_groups['secondary'][0]
   arbiter = benchmark_spec.vm_groups['arbiter'][0]
   return (
-      f'"mongodb://{primary.internal_ip}:27017/,'
-      f'{secondary.internal_ip}:27017/,'
-      f'{arbiter.internal_ip}:27017/'
+      f'"mongodb://{primary.internal_ip}:27017,'
+      f'{secondary.internal_ip}:27017,'
+      f'{arbiter.internal_ip}:27017/ycsb'
       '?replicaSet=rs0&w=majority&compression=snappy"'
   )
 
@@ -249,8 +249,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   _PrepareReplicaSet([primary, secondary], arbiter)
 
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
+  benchmark_spec.mongodb_url = _GetMongoDbURL(benchmark_spec)
   load_kwargs = {
-      'mongodb.url': _GetMongoDbURL(benchmark_spec),
+      'mongodb.url': benchmark_spec.mongodb_url,
       'mongodb.batchsize': 10,
       'core_workload_insertion_retry_limit': 10,
   }
@@ -275,7 +276,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
-  run_kwargs = {'mongodb.url': _GetMongoDbURL(benchmark_spec)}
+  run_kwargs = {'mongodb.url': benchmark_spec.mongodb_url}
   samples = list(
       benchmark_spec.executor.Run(
           benchmark_spec.vm_groups['clients'],
