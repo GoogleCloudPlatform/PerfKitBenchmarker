@@ -14,7 +14,7 @@ class SysbenchTest(pkb_common_test_case.PkbCommonTestCase):
   def testInstallIgnoresConcurrentMods(self):
     vm = mock.Mock()
     sysbench._Install(vm)
-    self.assertIn('P0001', vm.RemoteCommand.call_args_list[1][0][0])
+    self.assertIn('P0001', vm.RemoteCommand.call_args_list[2][0][0])
 
 
 if __name__ == '__main__':

@@ -36,6 +36,7 @@ from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker.linux_packages import sysbench
 
 FLAGS = flags.FLAGS
 
@@ -351,7 +352,6 @@ def _GetSysbenchPrepareCommand(
     db: relational_db.BaseRelationalDb, num_vms: int, vm_index: int
 ) -> str:
   """Returns the sysbench command used to load the database."""
-  num_threads = _LOAD_THREADS.value
   data_load_cmd_tokens = [
       'cd ~/sysbench/ && nice',  # run with a niceness of lower priority
       '-15',  # to encourage cpu time for ssh commands
@@ -364,7 +364,7 @@ def _GetSysbenchPrepareCommand(
           else ''
       ),
       ('--scale=%d' % FLAGS.sysbench_scale if _IsValidFlag('scale') else ''),
-      '--threads=%d' % num_threads,
+      '--threads=%d' % _LOAD_THREADS.value,
   ]
 
   if _IsValidFlag('auto-inc'):
@@ -397,6 +397,7 @@ def _GetSysbenchPrepareCommand(
         '--start_index=%d' % start_index,
         '--fill_table_size=%d' % fill_table_size,
         '--create_secondary=false',
+        '--create_tables=false',
     ])
   return ' '.join(
       data_load_cmd_tokens + _GetCommonSysbenchOptions(db) + ['prepare']
@@ -485,7 +486,8 @@ def _PrepareClients(
 ) -> None:
   """Installs the relevant packages on the clients."""
   # Setup common test tools required on the client VM
-  background_tasks.RunThreaded(lambda vm: vm.Install('sysbench'), client_vms)
+  # Run app install to force reinstalling sysbench.
+  background_tasks.RunThreaded(sysbench.AptInstall, client_vms)
   background_tasks.RunThreaded(_InstallLuaScriptsIfNecessary, client_vms)
   if (
       db.engine_type == sql_engine_utils.SPANNER_POSTGRES

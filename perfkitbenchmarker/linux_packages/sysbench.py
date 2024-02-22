@@ -41,6 +41,7 @@ CONCURRENT_MODS = (
 
 def _Install(vm):
   """Installs the sysbench package on the VM."""
+  vm.RemoteCommand(f'sudo rm -rf {SYSBENCH_DIR}')
   vm.RemoteCommand(
       f'git clone {GIT_REPO} {SYSBENCH_DIR} --branch {RELEASE_TAG}'
   )

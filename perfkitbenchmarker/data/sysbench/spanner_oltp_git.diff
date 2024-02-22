@@ -1,8 +1,8 @@
 diff --git a/src/lua/oltp_common.lua b/src/lua/oltp_common.lua
-index 90f93e2..e9c00ce 100644
+index 90f93e2..4094679 100644
 --- a/src/lua/oltp_common.lua
 +++ b/src/lua/oltp_common.lua
-@@ -33,6 +33,10 @@ end
+@@ -33,8 +33,14 @@ end
  sysbench.cmdline.options = {
     table_size =
        {"Number of rows per table", 10000},
@@ -12,16 +12,20 @@ index 90f93e2..e9c00ce 100644
 +      {"Starting index of the row", 1},
     range_size =
        {"Range size for range SELECT queries", 100},
++   create_tables =
++     {"Whether to create table", true},
     tables =
-@@ -81,6 +85,7 @@ sysbench.cmdline.options = {
+       {"Number of tables", 1},
+    point_selects =
+@@ -81,6 +87,7 @@ sysbench.cmdline.options = {
  function cmd_prepare()
     local drv = sysbench.sql.driver()
     local con = drv:connect()
-+   con:query("SET STATEMENT_TIMEOUT TO '1200s'")
++   con:query("SET STATEMENT_TIMEOUT TO '12000s'")
 
     for i = sysbench.tid % sysbench.opt.threads + 1, sysbench.opt.tables,
     sysbench.opt.threads do
-@@ -185,11 +190,11 @@ function create_table(drv, con, table_num)
+@@ -185,17 +192,17 @@ function create_table(drv, con, table_num)
     print(string.format("Creating table 'sbtest%d'...", table_num))
 
     query = string.format([[
@@ -37,8 +41,25 @@ index 90f93e2..e9c00ce 100644
    %s (id)
  ) %s %s]],
        table_num, id_def, id_index_def, engine_def, extra_table_options)
-@@ -211,8 +216,12 @@ CREATE TABLE sbtest%d(
+-
+-   con:query(query)
+-
++   if sysbench.opt.create_tables then
++    con:query(query)
++   end
+    if (sysbench.opt.table_size > 0) then
+       print(string.format("Inserting %d records into 'sbtest%d'",
+                           sysbench.opt.table_size, table_num))
+@@ -204,15 +211,18 @@ CREATE TABLE sbtest%d(
+    if sysbench.opt.auto_inc then
+       query = "INSERT INTO sbtest" .. table_num .. "(k, c, pad) VALUES"
+    else
++      con:query("PREPARE insert_sbtest" .. table_num .. " as INSERT INTO sbtest" .. table_num .." (id, k, c, pad) values($1,$2,$3,$4);")
+       query = "INSERT INTO sbtest" .. table_num .. "(id, k, c, pad) VALUES"
+    end
 
+-   con:bulk_insert_init(query)
+-
     local c_val
     local pad_val
 -
@@ -52,6 +73,24 @@ index 90f93e2..e9c00ce 100644
 
        c_val = get_c_value()
        pad_val = get_pad_value()
+@@ -222,15 +232,14 @@ CREATE TABLE sbtest%d(
+                                sb_rand(1, sysbench.opt.table_size), c_val,
+                                pad_val)
+       else
+-         query = string.format("(%d, %d, '%s', '%s')",
++         query = string.format("Execute insert_sbtest"..table_num.." (%d, %d, '%s', '%s')",
+                                i, sb_rand(1, sysbench.opt.table_size), c_val,
+                                pad_val)
+       end
+
+-      con:bulk_insert_next(query)
++      con:query(query)
+    end
+
+-   con:bulk_insert_done()
+
+    if sysbench.opt.create_secondary then
+       print(string.format("Creating a secondary index on 'sbtest%d'...",
 @@ -262,13 +271,13 @@ local stmt_defs = {
        t.INT},
     non_index_updates = {
