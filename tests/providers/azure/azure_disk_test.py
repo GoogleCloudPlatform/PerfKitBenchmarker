@@ -18,6 +18,9 @@ class AzureDiskGetDevicePathTest(pkb_common_test_case.PkbCommonTestCase):
       self.disk = azure_disk.AzureDisk()
       self.disk.disk_type = 'NOT_LOCAL'
       self.disk.machine_type = 'fake'
+      self.disk.vm = mock.Mock()
+      self.disk.vm.SupportsNVMe = mock.Mock()
+      self.disk.vm.SupportsNVMe.return_value = False
 
   def test_get_device_path_starts_at_c(self):
     self.disk.lun = 0

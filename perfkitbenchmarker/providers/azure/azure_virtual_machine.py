@@ -723,7 +723,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.image = type(self).GEN2_IMAGE_URN
       else:
         raise errors.Benchmarks.UnsupportedConfigError('No Azure gen2 image.')
-    elif self._SupportsNVMe():
+    elif self.SupportsNVMe():
       if hasattr(type(self), 'GEN2_IMAGE_URN'):
         self.image = type(self).GEN2_IMAGE_URN
       else:
@@ -848,7 +848,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         + self.nic.args
         + tag_args
     )
-    if self._SupportsNVMe():
+    if self.SupportsNVMe():
       create_cmd.extend(['--disk-controller-type', 'NVMe'])
     if self.trusted_launch_unsupported_type:
       create_cmd.extend(['--security-type', 'Standard'])
@@ -1160,7 +1160,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     return self.low_priority_status_code
 
-  def _SupportsNVMe(self):
+  def SupportsNVMe(self):
     """Returns whether this vm supports NVMe.
 
     Returns:

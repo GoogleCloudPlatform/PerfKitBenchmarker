@@ -378,6 +378,9 @@ class AzureDisk(disk.BaseDisk):
     else:
       try:
         start_index = 1  # the os drive is always at index 0; skip the OS drive.
+        if self.vm.SupportsNVMe():
+          # boot disk is nvme0n1. temp drive, if exists, uses scsi.
+          return '/dev/nvme0n%s' % str(1 + start_index + self.lun)
         if HasTempDrive(self.machine_type):
           start_index += 1
         return '/dev/sd%s' % REMOTE_DRIVE_PATH_SUFFIXES[start_index + self.lun]
