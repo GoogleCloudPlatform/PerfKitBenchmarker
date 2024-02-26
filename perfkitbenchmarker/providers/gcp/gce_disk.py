@@ -21,6 +21,7 @@ import json
 import re
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import boot_disk
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
@@ -433,6 +434,9 @@ class GceDisk(disk.BaseDisk):
     result = self._Describe()
     return bool(result)
 
+  def Exists(self):
+    return self._Exists()
+
   @vm_util.Retry()
   def _Attach(self, vm):
     """Attaches the disk to a VM.
@@ -505,3 +509,74 @@ class GceDisk(disk.BaseDisk):
       return self.name
     # by default, returns this name id.
     return f'/dev/disk/by-id/google-{self.name}'
+
+
+class GceStripedDisk(disk.StripedDisk):
+  """Object representing multiple azure disks striped together."""
+
+  def __init__(self, disk_spec, disks):
+    super(GceStripedDisk, self).__init__(disk_spec, disks)
+    if len(disks) <= 1:
+      raise ValueError(
+          f'{len(disks)} disks found for GceStripedDisk'
+      )
+    self.disks = disks
+    self.spec = disk_spec
+    self.interface = disk_spec.interface
+    data_disk = disks[0]
+    self.attached_vm_name = None
+    self.image = data_disk.image
+    self.image_project = data_disk.image_project
+    self.zone = data_disk.zone
+    self.project = data_disk.project
+    self.replica_zones = data_disk.replica_zones
+    self.region = util.GetRegionFromZone(self.zone)
+    self.provisioned_iops = data_disk.provisioned_iops
+    self.provisioned_throughput = data_disk.provisioned_throughput
+    self.metadata['iops'] = self.provisioned_iops
+    self.metadata['throughput'] = self.provisioned_throughput
+
+  def _Create(self):
+    """Creates the disk."""
+    cmd = util.GcloudCommand(
+        self, 'compute', 'disks', 'create', *self._GetDiskNames()
+    )
+    cmd.flags['size'] = self.disk_size
+    cmd.flags['type'] = self.disk_type
+    if self.provisioned_iops:
+      cmd.flags['provisioned-iops'] = self.provisioned_iops
+    if self.provisioned_throughput:
+      cmd.flags['provisioned-throughput'] = self.provisioned_throughput
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+    if self.image:
+      cmd.flags['image'] = self.image
+    if self.image_project:
+      cmd.flags['image-project'] = self.image_project
+
+    if self.replica_zones:
+      cmd.flags['region'] = self.region
+      cmd.flags['replica-zones'] = ','.join(self.replica_zones)
+      del cmd.flags['zone']
+
+    _, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    util.CheckGcloudResponseKnownFailures(stderr, retcode)
+
+  def _PostCreate(self):
+    """Called after _CreateResource() is called."""
+    for disk_details in self.disks:
+      disk_details.created = True
+
+  def _GetDiskNames(self):
+    return [d.name for d in self.disks]
+
+  def _Attach(self, vm):
+    attach_tasks = []
+    for disk_details in self.disks:
+      attach_tasks.append((disk_details.Attach, [vm], {}))
+    background_tasks.RunParallelThreads(attach_tasks, max_concurrency=200)
+
+  def _Exists(self):
+    for disk_details in self.disks:
+      if not disk_details.Exists():
+        return False
+    return True

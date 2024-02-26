@@ -425,3 +425,5 @@
     Enabled disk provision benchmark for Azure.
 -   Refactored `aws_virtual_machine.py` to use `aws_disk_strategies.py` and
     Enabled disk provision benchmark for AWS by using `--aws_create_disks_with_vm`.
+-   Enabled bulk create and parallel attach of GCE remote disks when the disks are
+    not created with the VM.

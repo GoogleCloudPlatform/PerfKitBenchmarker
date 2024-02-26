@@ -114,24 +114,44 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
         'Please check the flags.'
     )
   samples = []
-  disk_details = vm.create_disk_strategy.remote_disk_groups
-  for disk_group in disk_details:
-    for disk_details in disk_group:
-      total_time = 0
-      for sample_details in disk_details.GetSamples():
+  if FLAGS.cloud == 'GCP':
+    max_time_to_create = 0
+    max_time_to_attach = 0
+    for scratch_disk in vm.scratch_disks:
+      scratch_disk_samples = scratch_disk.GetSamples()
+      samples.extend(scratch_disk_samples)
+      for sample_details in scratch_disk_samples:
         if sample_details.metric == 'Time to Create':
-          total_time += sample_details.value
+          max_time_to_create = max(max_time_to_create, sample_details.value)
         elif sample_details.metric == 'Time to Attach':
-          total_time += sample_details.value
-      samples.extend(disk_details.GetSamples())
-      samples.extend([
-          sample.Sample(
-              'Time to Create and Attach Disk',
-              total_time,
-              'seconds',
-              vm.GetResourceMetadata(),
-          ),
-      ])
+          max_time_to_attach = max(max_time_to_attach, sample_details.value)
+    samples.extend([
+        sample.Sample(
+            'Time to Create and Attach Disk',
+            max_time_to_create + max_time_to_attach,
+            'seconds',
+            vm.GetResourceMetadata(),
+        ),
+    ])
+  else:
+    disk_details = vm.create_disk_strategy.remote_disk_groups
+    for disk_group in disk_details:
+      for disk_details in disk_group:
+        total_time = 0
+        for sample_details in disk_details.GetSamples():
+          if sample_details.metric == 'Time to Create':
+            total_time += sample_details.value
+          elif sample_details.metric == 'Time to Attach':
+            total_time += sample_details.value
+        samples.extend(disk_details.GetSamples())
+        samples.extend([
+            sample.Sample(
+                'Time to Create and Attach Disk',
+                total_time,
+                'seconds',
+                vm.GetResourceMetadata(),
+            ),
+        ])
   return samples
 
 

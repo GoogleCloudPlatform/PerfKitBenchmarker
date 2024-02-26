@@ -463,6 +463,7 @@ class BaseDisk(resource.BaseResource):
   def GetSamples(self) -> List[sample.Sample]:
     samples = super(BaseDisk, self).GetSamples()
     metadata = self.GetResourceMetadata()
+    metadata['resource_class'] = self.__class__.__name__
     if self.attach_start_time and self.attach_end_time:
       samples.append(
           sample.Sample(
@@ -506,7 +507,7 @@ class StripedDisk(BaseDisk):
     for disk in self.disks:
       disk.Delete()
 
-  def Attach(self, vm):
+  def _Attach(self, vm):
     for disk in self.disks:
       disk.Attach(vm)
 

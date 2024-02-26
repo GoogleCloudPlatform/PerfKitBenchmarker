@@ -18,6 +18,7 @@ scratch disks.
 """
 from typing import Any
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
@@ -223,20 +224,23 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
 
   def SetUpDisk(self):
     # disk spec is not used here.
+    create_tasks = []
+    attach_tasks = []
+    scratch_disks = []
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
       disk_group = self.vm.create_disk_strategy.remote_disk_groups[disk_spec_id]
-      # Create the disk if it is not created on create
-      if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
-        for pd_disk in disk_group:
-          pd_disk.Create()
-          pd_disk.Attach(self.vm)
-
       if len(disk_group) > 1:
         # If the disk_spec called for a striped disk, create one.
-        scratch_disk = disk.StripedDisk(disk_spec, disk_group)
+        scratch_disk = gce_disk.GceStripedDisk(disk_spec, disk_group)
       else:
         scratch_disk = disk_group[0]
-
+      scratch_disks.append((scratch_disk, disk_spec))
+      if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
+        create_tasks.append((scratch_disk.Create, (), {}))
+        attach_tasks.append((scratch_disk.Attach, [self.vm], {}))
+    background_tasks.RunParallelThreads(create_tasks, max_concurrency=200)
+    background_tasks.RunParallelThreads(attach_tasks, max_concurrency=200)
+    for scratch_disk, disk_spec in scratch_disks:
       # Device path is needed to stripe disks on Linux, but not on Windows.
       # The path is not updated for Windows machines.
       if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
