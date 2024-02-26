@@ -381,9 +381,10 @@ def _CreateBenchmarkSpecs():
         logging.exception('Prerequisite check failed for %s', name)
         raise
 
-    specs.append(
-        bm_spec.BenchmarkSpec.GetBenchmarkSpec(benchmark_module, config, uid)
-    )
+    with config.RedirectFlags(FLAGS):
+      specs.append(
+          bm_spec.BenchmarkSpec.GetBenchmarkSpec(benchmark_module, config, uid)
+      )
 
   return specs
 

@@ -13,25 +13,39 @@ netperf_tcp_stream:
     netperf_benchmarks: TCP_STREAM
     netperf_num_streams: 1,8,16,200
 
-hammerdbcli_mysql:
+mysql_tpcc:
   name: hammerdbcli
   flags:
-    db_engine_version: 8.0
-    db_high_availability: False
+    hammerdbcli_script: tpc_c
+    db_engine: mysql
+    db_engine_version: '8.0'
     hammerdbcli_optimized_server_configuration: restorable
     hammerdbcli_tpcc_all_warehouse: True
     hammerdbcli_tpcc_time_profile: True
     use_managed_db: False
+    db_high_availability: False
+    innodb_buffer_pool_ratio: 0.8
+    timeout_minutes: 360
+    azure_provisioned_iops: 40000
+    azure_provisioned_throughput: 1200
   relational_db:
     engine: mysql
     db_disk_spec:
       GCP:
-        disk_size: 500
-        disk_type: pd-ssd
-      AWS:
         disk_size: 2000
+        disk_type: pd-ssd
+      # These aim to match a 2 TB PD-SSD in performance and price. AWS can get better performance.
+      AWS:
+        disk_size: 500
         disk_type: gp3
-      Azure:
+        provisioned_iops: 10000
+        throughput: 300
+        num_striped_disks: 4
+      # copybara:strip_begin(internal)
+      # TODO(user) - Add Azure iops/throughput/striping.
+      # copybara:strip_end
+      # Azure provisioned IOPS/Throughput and striping must be configured via run-time flags.
+      Azure: # Premiumv2 disks matching 4TB pd-ssd
         disk_size: 2000
         disk_type: PremiumV2_LRS
     vm_groups:
@@ -48,6 +62,58 @@ hammerdbcli_mysql:
             disk_type: Premium_LRS
       servers:
         vm_spec:
+          # TODO(andytzhu) - Add AWS/Azure
+          GCP:
+            boot_disk_size: 200
+            boot_disk_type: pd-ssd
+
+postgres_tpcc:
+  name: hammerdbcli
+  flags:
+    hammerdbcli_script: tpc_c
+    db_engine: postgres
+    db_engine_version: '13'
+    hammerdbcli_version: '4.3'
+    hammerdbcli_tpcc_time_profile: True
+    hammerdbcli_tpcc_log_transactions: True
+    hammerdbcli_tpcc_duration: 30
+    hammerdbcli_build_timeout: 19000
+    use_managed_db: False
+    db_high_availability: False
+    postgres_shared_buffer_ratio: 0.25
+    metadata: shared_buffer_ratio:0.25
+    timeout_minutes: 360
+    azure_provisioned_iops: 64000
+    azure_provisioned_throughput: 1200
+  relational_db:
+    engine: postgres
+    db_disk_spec:
+      GCP:
+        disk_size: 4000
+        disk_type: pd-ssd
+      # These aim to match a 4 TB PD-SSD in performance and price. AWS can get better performance.
+      AWS:
+        disk_size: 1000
+        disk_type: gp3
+        provisioned_iops: 16000
+        throughput: 300
+        num_striped_disks: 4
+      # TODO(andytzhu) - Add Azure iops/throughput/striping.
+      Azure: # Premiumv2 disks matching 4TB pd-ssd
+        disk_size: 2000
+        disk_type: PremiumV2_LRS
+    vm_groups:
+      clients:
+        disk_spec:
+          GCP:
+            disk_size: 200
+          AWS:
+            disk_size: 200
+          Azure:
+            disk_size: 200
+      servers:
+        vm_spec:
+          # TODO(andytzhu) - Add AWS/Azure
           GCP:
             boot_disk_size: 200
             boot_disk_type: pd-ssd
