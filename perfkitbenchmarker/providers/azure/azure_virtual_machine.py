@@ -891,6 +891,11 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise errors.Benchmarks.QuotaFailure(
             virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr
         )
+      elif self.low_priority and (
+          re.search(r'requested VM size \S+ is not available', stderr)
+          or re.search(r'not available in location .+ for subscription', stderr)
+      ):
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
       elif re.search(
           r'requested VM size \S+ is not available', stderr
       ) or re.search(r'not available in location .+ for subscription', stderr):
