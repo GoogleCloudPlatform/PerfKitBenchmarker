@@ -1,7 +1,7 @@
-# Running PerfKit Benchmarker
+# Running PerfKit Benchmarker using Docker
 
 This tutorial outlines a few methods for running PerfKit Benchmarker (PKB) on
-Google Cloud, in increasing amounts of complexity.
+Google Cloud using Docker, in increasing amounts of complexity.
 
 ## Options
 
