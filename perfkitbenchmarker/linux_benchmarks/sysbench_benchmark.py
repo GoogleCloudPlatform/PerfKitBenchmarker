@@ -323,16 +323,32 @@ def _GetDatabaseName(db: relational_db.BaseRelationalDb) -> str:
 
 
 def _InstallLuaScriptsIfNecessary(vm):
+  """Installs the lua scripts if necessary."""
   if _GetSysbenchTestParameter() == 'tpcc':
     vm.InstallPreprovisionedBenchmarkData(
         BENCHMARK_NAME, [_SYSBENCH_TPCC_TAR], '~'
     )
-    vm.RemoteCommand(f'tar -zxvf {_SYSBENCH_TPCC_TAR} --strip-components 1')
-    vm.PushDataFile('sysbench/default_tpcc_common.lua', '~/tpcc_common.lua')
+    vm.RemoteCommand(
+        f'tar -zxvf {_SYSBENCH_TPCC_TAR} --strip-components 1'
+        f' -C {sysbench.SYSBENCH_DIR}'
+    )
+
+    vm.PushDataFile(
+        'sysbench/default_tpcc_common.lua',
+        f'{sysbench.SYSBENCH_DIR}/tpcc_common.lua',
+    )
   if FLAGS.sysbench_testname == SPANNER_TPCC:
-    vm.PushDataFile('sysbench/spanner_pg_tpcc_common.lua', '~/tpcc_common.lua')
-    vm.PushDataFile('sysbench/spanner_pg_tpcc_run.lua', '~/tpcc_run.lua')
-    vm.PushDataFile('sysbench/spanner_pg_tpcc.lua', '~/tpcc.lua')
+    vm.PushDataFile(
+        'sysbench/spanner_pg_tpcc_common.lua',
+        f'{sysbench.SYSBENCH_DIR}/tpcc_common.lua',
+    )
+    vm.PushDataFile(
+        'sysbench/spanner_pg_tpcc_run.lua',
+        f'{sysbench.SYSBENCH_DIR}/tpcc_run.lua',
+    )
+    vm.PushDataFile(
+        'sysbench/spanner_pg_tpcc.lua', f'{sysbench.SYSBENCH_DIR}/tpcc.lua'
+    )
 
 
 def _PatchSpannerScripts(vm):
@@ -723,6 +739,7 @@ def _GetSysbenchRunCommand(
   if _GetSysbenchTestParameter() == 'tpcc':
     run_cmd_tokens.append('--trx_level=%s' % _TXN_ISOLATION_LEVEL.value)
   run_cmd = ' '.join(run_cmd_tokens + _GetCommonSysbenchOptions(db) + ['run'])
+  run_cmd = 'cd ~/sysbench/ && ' + run_cmd
   return run_cmd
 
 
