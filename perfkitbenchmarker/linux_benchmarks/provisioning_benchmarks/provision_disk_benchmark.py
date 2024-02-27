@@ -114,7 +114,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
         'Please check the flags.'
     )
   samples = []
-  if FLAGS.cloud == 'GCP':
+  if FLAGS.cloud == 'GCP' or FLAGS.cloud == 'AWS':
     max_time_to_create = 0
     max_time_to_attach = 0
     for scratch_disk in vm.scratch_disks:

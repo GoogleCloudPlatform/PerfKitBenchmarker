@@ -27,6 +27,7 @@ import logging
 import string
 import threading
 from typing import Optional
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -644,3 +645,19 @@ class AwsDisk(disk.BaseDisk):
       )
       self.attached_vm_id = None
       self.device_letter = None
+
+
+class AwsStripedDisk(disk.StripedDisk):
+  """Object representing multiple azure disks striped together."""
+
+  def _Create(self):
+    create_tasks = []
+    for disk_details in self.disks:
+      create_tasks.append((disk_details.Create, (), {}))
+    background_tasks.RunParallelThreads(create_tasks, max_concurrency=200)
+
+  def _Attach(self, vm):
+    attach_tasks = []
+    for disk_details in self.disks:
+      attach_tasks.append((disk_details.Attach, [vm], {}))
+    background_tasks.RunParallelThreads(attach_tasks, max_concurrency=200)
