@@ -19,7 +19,6 @@ import ntpath
 import os
 import time
 from typing import Optional, Tuple, cast
-import uuid
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -28,7 +27,6 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
-import requests
 import six
 import timeout_decorator
 import winrm
@@ -114,20 +112,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
   ) -> Tuple[str, str]:
     """Runs a powershell command on the VM.
 
-    Should be more robust than its counterpart, RemoteCommand. In the event of
-    network failure, the process will continue on the VM, and we continually
-    reconnect to check if it has finished. The tradeoff is this is noticeably
-    slower than the normal RemoteCommand.
-
-    The algorithm works as follows:
-      1. Create a "command started" file
-      2. Run the command
-      3. Create a "command done" file
-
-    If we fail to run step 1, we raise a RemoteCommandError. If we have network
-    failure during step 2, the command will continue running on the VM and we
-    will spin inside this function waiting for the "command done" file to be
-    created.
+    We have attempted using Invoke-WmiMethod and other long running
+    command and failed. Revert to just use RemoteCommand on windows.
 
     Args:
       command: A valid powershell command.
@@ -138,69 +124,8 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
 
     Returns:
       A tuple of stdout and stderr from running the command.
-
-    Raises:
-      RemoteCommandError: If there was a problem issuing the command or the
-          command timed out.
     """
-
-    logging.info('Running robust command on %s: %s', self, command)
-    command_path = ntpath.join(self.temp_dir, str(uuid.uuid4()))
-    logged_command = (
-        'Invoke-WmiMethod -path win32_process -name create -argumentlist'
-        f' "powershell `"New-Item -Path {command_path}.start -ItemType File;'
-        f' {command} 2> {command_path}.err 1> {command_path}.out; New-Item'
-        f' -Path {command_path}.done -ItemType File`""'
-    )
-
-    start_command_time = time.time()
-    try:
-      self.RemoteCommand(
-          logged_command, ignore_failure=ignore_failure, timeout=timeout
-      )
-    except errors.VirtualMachine.RemoteCommandError:
-      logging.exception(
-          'Exception while running %s on %s, waiting for command to finish',
-          command,
-          self,
-      )
-
-    found_start_file = False
-    for _ in range(START_COMMAND_RETRIES):
-      start_out, _ = self.RemoteCommand(f'Test-Path {command_path}.start')
-      found_start_file = 'True' in start_out
-      if found_start_file:
-        break
-
-    if not found_start_file:
-      raise errors.VirtualMachine.RemoteCommandError(
-          'RobustRemoteCommand did not start on VM.'
-      )
-
-    def wait_for_done_file():
-      # It is better to sleep on the client rather than the VM
-      # as spinning on the VM have more chances of failure.
-      # i.e Full 60 seconds of connection have to be stable.
-      done_out = ''
-      while 'True' not in done_out:
-        if timeout is not None and time.time() - start_command_time > timeout:
-          raise WaitTimeoutError()
-        try:
-          done_out, _ = self.RemoteCommand(
-              'Test-Path %s.done' % (command_path,),
-              timeout=10,
-          )
-          time.sleep(60)
-        except requests.exceptions.ConnectionError as e:
-          logging.exception(e)
-        except WaitTimeoutError as e:
-          logging.exception(e)
-
-    wait_for_done_file()
-    stdout, _ = self.RemoteCommand('Get-Content %s.out' % (command_path,))
-    stderr, _ = self.RemoteCommand('Get-Content %s.err' % (command_path,))
-
-    return stdout, stderr
+    return self.RemoteCommand(command, ignore_failure, timeout)
 
   def RemoteCommand(
       self,
