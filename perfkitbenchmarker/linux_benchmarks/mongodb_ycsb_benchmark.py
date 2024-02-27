@@ -25,6 +25,7 @@ from collections.abc import Sequence
 import functools
 import json
 import posixpath
+import re
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -40,10 +41,9 @@ flags.DEFINE_integer(
     'mongodb_readahead_kb', None, 'Configure block device readahead settings.'
 )
 
-_LinuxVM = linux_virtual_machine.BaseLinuxVirtualMachine
-
-
 FLAGS = flags.FLAGS
+
+_VERSION_REGEX = r'\d+\.\d+\.\d+'
 
 BENCHMARK_NAME = 'mongodb_ycsb'
 BENCHMARK_CONFIG = """
@@ -283,9 +283,16 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           run_kwargs=run_kwargs,
       )
   )
+  mongodb_version = re.findall(
+      _VERSION_REGEX,
+      mongosh.RunCommand(
+          benchmark_spec.vm_groups['primary'][0], 'db.version()'
+      )[0],
+  )[-1]
   if FLAGS.mongodb_readahead_kb is not None:
     for s in samples:
       s.metadata['readahdead_kb'] = FLAGS.mongodb_readahead_kb
+      s.metadata['mongodb_version'] = mongodb_version
   return samples
 
 
