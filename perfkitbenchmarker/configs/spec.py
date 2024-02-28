@@ -130,6 +130,11 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
         component_full_name, kwargs, self._decoders, flag_values
     )
 
+  @classmethod
+  def GetAttributes(cls) -> list[tuple[Any, ...]]:
+    """Override to manually set the attributes for registering the class."""
+    return []
+
   def _DecodersToString(self):
     """Returns a string representation of the decoders."""
     if not self._decoders:

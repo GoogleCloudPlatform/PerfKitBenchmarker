@@ -55,9 +55,10 @@ def GetRegisteredClass(
         if key[0] == base_class.__name__
     }
     logging.info(NO_SUBCLASS_DEFINED_ERROR, (base_class.__name__, kwargs))
-    logging.info(
+    logging.warning(
         'Did you mean one of these other classes that were registered for this '
-        'base class? Possibilities: %s', possibilites
+        'base class? Possibilities: %s',
+        possibilites,
     )
     raise errors.Resource.SubclassNotFoundError(
         NO_SUBCLASS_DEFINED_ERROR % (base_class.__name__, kwargs)
@@ -90,22 +91,30 @@ def RegisterClass(
       be registered.
     cls_type: The class type to be registered (typically base class name).
   """
-  if all(hasattr(cls, attr) for attr in required_attrs) and cls_type:
-    # Flatten list type attributes with cartesian product.
-    # If a class have two list attributes i.e.
-    # class Example(AutoRegisterResourceMeta):
-    #   CLOUD = ['GCP', 'AWS']
-    #   ENGINE = ['mysql', 'postgres']
-    #   ....
-    # GetResourceClass(Example, CLOUD='GCP', ENGINE='mysql')
-    # would return Example.
-    attributes = [[cls_type]]
-    for attr in sorted(required_attrs):
-      value = getattr(cls, attr)
-      if not isinstance(value, list):
-        attributes.append([(attr, value)])
-      else:
-        attributes.append([(attr, i) for i in value])
-    # Cross product
-    for key in itertools.product(*attributes):
-      registry[tuple(key)] = cls
+  if not (all(hasattr(cls, attr) for attr in required_attrs) and cls_type):
+    return
+
+  # Use the manually overriden attributes if set.
+  if cls.GetAttributes():
+    for key in cls.GetAttributes():
+      registry[key] = cls
+    return
+
+  # Flatten list type attributes with cartesian product.
+  # If a class have two list attributes i.e.
+  # class Example(AutoRegisterResourceMeta):
+  #   CLOUD = ['GCP', 'AWS']
+  #   ENGINE = ['mysql', 'postgres']
+  #   ....
+  # GetResourceClass(Example, CLOUD='GCP', ENGINE='mysql')
+  # would return Example.
+  attributes = [[cls_type]]
+  for attr in sorted(required_attrs):
+    value = getattr(cls, attr)
+    if not isinstance(value, list):
+      attributes.append([(attr, value)])
+    else:
+      attributes.append([(attr, i) for i in value])
+  # Cross product
+  for key in itertools.product(*attributes):
+    registry[tuple(key)] = cls

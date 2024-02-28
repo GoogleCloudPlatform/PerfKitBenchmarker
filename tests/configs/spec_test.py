@@ -14,6 +14,7 @@
 """Tests for perfkitbenchmarker.configs.spec."""
 
 
+from typing import Any
 import unittest
 
 import mock
@@ -105,6 +106,18 @@ class BaseSpecTestGreatGrandChild(BaseSpecTestAbstractGrandChild):
   TESTABILITY = 'MEDIUM'
 
 
+class BaseSpecTestGrandChildDistinctValues(BaseSpecTestAbstractChild):
+  CLOUD = ['AWS', 'Azure']
+  TESTABILITY = ['HARD', 'MEDIUM']
+
+  @classmethod
+  def GetAttributes(cls) -> list[tuple[Any, ...]]:
+    return [
+        (cls.SPEC_TYPE, ('CLOUD', 'AWS'), ('TESTABILITY', 'MEDIUM')),
+        (cls.SPEC_TYPE, ('CLOUD', 'Azure'), ('TESTABILITY', 'HARD')),
+    ]
+
+
 class BaseSpecRegistryTest(unittest.TestCase):
 
   def testSpecChildFetchesItself(self):
@@ -124,6 +137,25 @@ class BaseSpecRegistryTest(unittest.TestCase):
         BaseSpecTestAbstractChild, CLOUD='GCP', TESTABILITY='HARD'
     )
     self.assertEqual(cls.__name__, BaseSpecTestGrandChildTwoValues.__name__)
+
+  def testSpecGrandChildFetchedByDistinctAttribute(self):
+    cls = spec.GetSpecClass(
+        BaseSpecTestAbstractChild, CLOUD='AWS', TESTABILITY='MEDIUM'
+    )
+    self.assertEqual(
+        cls.__name__, BaseSpecTestGrandChildDistinctValues.__name__
+    )
+    cls = spec.GetSpecClass(
+        BaseSpecTestAbstractChild, CLOUD='Azure', TESTABILITY='HARD'
+    )
+    self.assertEqual(
+        cls.__name__, BaseSpecTestGrandChildDistinctValues.__name__
+    )
+    # Revert to default abstract when nothing found.
+    cls = spec.GetSpecClass(
+        BaseSpecTestAbstractChild, CLOUD='AWS', TESTABILITY='HARD'
+    )
+    self.assertEqual(cls.__name__, BaseSpecTestAbstractChild.__name__)
 
   def testSpecGreatGrandChildFetchesOneValue(self):
     cls = spec.GetSpecClass(

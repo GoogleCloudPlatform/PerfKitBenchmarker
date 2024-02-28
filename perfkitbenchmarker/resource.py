@@ -21,7 +21,7 @@ reliably.
 import abc
 import logging
 import time
-from typing import List, TypeVar
+from typing import Any, List, TypeVar
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -65,6 +65,11 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
         _RESOURCE_REGISTRY, cls, cls.REQUIRED_ATTRS, cls.RESOURCE_TYPE
     )
     super(AutoRegisterResourceMeta, cls).__init__(name, bases, dct)
+
+  @classmethod
+  def GetAttributes(mcs) -> list[tuple[Any, ...]]:
+    """Override to manually set the attributes for registering the class."""
+    return []
 
 
 class BaseResource(metaclass=AutoRegisterResourceMeta):
