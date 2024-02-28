@@ -196,6 +196,19 @@ flags.DEFINE_integer(
     'which means no striping. ',
     lower_bound=1,
 )
+flags.DEFINE_integer(
+    'num_partitions',
+    None,
+    'The number of partitions to created from each disk. So far it is only '
+    'supported on Linux.',
+    lower_bound=1,
+)
+flags.DEFINE_string(
+    'partition_size',
+    None,
+    'The size of the partitions to create from each disk, e.g. 100M, 500G. '
+    'Note that this is only supported on Linux so far.',
+)
 flags.DEFINE_bool(
     'install_packages',
     None,

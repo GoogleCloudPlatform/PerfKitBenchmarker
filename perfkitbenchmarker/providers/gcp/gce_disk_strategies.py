@@ -122,7 +122,10 @@ class CreateLSSDDiskStrategy(GCPCreateDiskStrategy):
 
   def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
     """Returns the SetUpDiskStrategy for the disk."""
-    return SetUpGceLocalDiskStrategy(self.vm, self.disk_spec)
+    if self.disk_spec.num_partitions and self.disk_spec.partition_size:
+      return SetUpPartitionedGceLocalDiskStrategy(self.vm, self.disk_spec)
+    else:
+      return SetUpGceLocalDiskStrategy(self.vm, self.disk_spec)
 
 
 class GCECreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
@@ -213,6 +216,33 @@ class SetUpGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
     GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
         self.vm, scratch_disk, self.disk_spec
     )
+
+
+class SetUpPartitionedGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
+  """Strategies to set up local disks with custom partitions."""
+
+  def SetUpDisk(self):
+    self.vm.SetupLocalDisks()
+    while self.vm.local_disk_counter < self.vm.max_local_disks:
+      if self.vm.ssd_interface == gce_disk.SCSI:
+        name = 'local-ssd-%d' % self.vm.local_disk_counter
+      elif self.vm.ssd_interface == gce_disk.NVME:
+        name = f'local-nvme-ssd-{self.vm.local_disk_counter}'
+      else:
+        raise errors.Error('Unknown Local SSD Interface.')
+      raw_disk = gce_disk.GceLocalDisk(self.disk_spec, name)
+      self.vm.local_disk_counter += 1
+      partitions = self.vm.PartitionDisk(
+          name,
+          raw_disk.GetDevicePath(),
+          raw_disk.num_partitions,
+          raw_disk.partition_size
+      )
+      for partition_name in partitions:
+        scratch_disk = gce_disk.GceLocalDisk(self.disk_spec, partition_name)
+        GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
+            self.vm, scratch_disk, self.disk_spec
+        )
 
 
 class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):

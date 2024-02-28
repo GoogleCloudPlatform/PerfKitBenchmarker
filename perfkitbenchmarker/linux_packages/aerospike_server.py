@@ -95,6 +95,11 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'aerospike_vms', 1, 'Number of vms (nodes) for aerospike server.'
 )
+flags.DEFINE_integer(
+    'aerospike_proto_fd_max',
+    1024,
+    'Maximum number of allowed client connections by Aerospike server.'
+)
 
 MIN_FREE_KBYTES = 1160000
 
@@ -331,6 +336,7 @@ def ConfigureAndStart(server, seed_node_ips=None):
       '| sudo tee /proc/sys/vm/min_free_kbytes'
   )
   server.RemoteCommand('echo 0 | sudo tee /proc/sys/vm/swappiness')
+  server.RemoteCommand('ulimit -n %d' % FLAGS.aerospike_proto_fd_max)
   for idx in range(FLAGS.aerospike_instances):
     current_devices = []
     if devices:
@@ -350,6 +356,7 @@ def ConfigureAndStart(server, seed_node_ips=None):
             'seed_addresses': seed_node_ips,
             'service_threads': FLAGS.aerospike_service_threads,
             'replication_factor': FLAGS.aerospike_replication_factor,
+            'proto_fd_max': FLAGS.aerospike_proto_fd_max,
         },
     )
     if _AEROSPIKE_EDITION.value == AerospikeEdition.COMNUNITY:

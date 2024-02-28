@@ -150,6 +150,8 @@ class BaseDiskSpec(spec.BaseSpec):
     self.disk_type: str = None
     self.disk_size: int = None
     self.num_striped_disks: int = None
+    self.num_partitions = None
+    self.partition_size = None
     super(BaseDiskSpec, self).__init__(*args, **kwargs)
 
   @classmethod
@@ -177,6 +179,10 @@ class BaseDiskSpec(spec.BaseSpec):
       config_values['num_striped_disks'] = flag_values.num_striped_disks
     if flag_values['scratch_dir'].present:
       config_values['mount_point'] = flag_values.scratch_dir
+    if flag_values['num_partitions'].present:
+      config_values['num_partitions'] = flag_values.num_partitions
+    if flag_values['partition_size'].present:
+      config_values['partition_size'] = flag_values.partition_size
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -215,6 +221,14 @@ class BaseDiskSpec(spec.BaseSpec):
         'num_striped_disks': (
             option_decoders.IntDecoder,
             {'default': 1, 'min': 1},
+        ),
+        'num_partitions': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'partition_size': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
         ),
     })
     return result
@@ -366,6 +380,8 @@ class BaseDisk(resource.BaseResource):
     self.disk_type = disk_spec.disk_type
     self.mount_point = disk_spec.mount_point
     self.num_striped_disks = disk_spec.num_striped_disks
+    self.num_partitions = disk_spec.num_partitions
+    self.partition_size = disk_spec.partition_size
     self.metadata.update({
         'type': self.disk_type,
         'size': self.disk_size,

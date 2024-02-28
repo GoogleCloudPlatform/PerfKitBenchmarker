@@ -1827,6 +1827,42 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     )
     self.RemoteHostCommand(cmd)
 
+  def PartitionDisk(self, dev_name, dev_path, num_partitions, partition_size):
+    """Partitions the disk into smaller pieces.
+
+    Args:
+      dev_name: The name of the device.
+      dev_path: The device path that should be partitioned.
+      num_partitions: The number of new partitions to create.
+      partition_size: The size of each partition. The last partition will use
+                      the rest of the device space.
+    Returns:
+      A list of partition parths.
+    """
+    # Install sfdisk from util-linux and partprobe from parted to
+    # partition disks and refresh partition table.
+    self.InstallPackages('util-linux')
+    self.InstallPackages('parted')
+
+    # Set the disk label to gpt.
+    self.RemoteHostCommand(f'echo \'label: gpt\' | sudo sfdisk {dev_path}')
+
+    disks = []
+    # Create and append new partitions (except the last oen) to the disk
+    for part_id in range(num_partitions-1):
+      self.RemoteHostCommand(
+          'echo ",%s,L" | sudo sfdisk %s -f --append'
+          % (partition_size, dev_path)
+      )
+      new_partition_name = f'{dev_name}-part{part_id+1}'
+      disks.append(new_partition_name)
+    # Use the rest space to create the last partition and append.
+    self.RemoteHostCommand(f'echo ",,L" | sudo sfdisk {dev_path} -f --append')
+    # Refresh the partition table.
+    self.RemoteHostCommand(f'sudo partprobe {dev_path}')
+    disks.append(f'{dev_name}-part{num_partitions}')
+    return disks
+
   def BurnCpu(self, burn_cpu_threads=None, burn_cpu_seconds=None):
     """Burns vm cpu for some amount of time and dirty cache.
 

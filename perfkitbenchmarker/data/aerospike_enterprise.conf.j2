@@ -8,7 +8,7 @@ service {
   # The number of concurrent connections to the database is limited by
   # proto-fd-max, and by the system's maximum number of open file descriptors.
   # See "man limits.conf" for how to set the system's "nofile" limit.
-  proto-fd-max 1024
+  proto-fd-max {{ proto_fd_max }}
 
   work-directory opt/aerospike
   pidfile run/asd.pid
