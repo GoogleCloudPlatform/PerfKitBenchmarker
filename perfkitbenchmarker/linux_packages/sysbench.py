@@ -39,7 +39,7 @@ CONCURRENT_MODS = (
 )
 
 
-def _Install(vm):
+def _Install(vm, spanner_oltp=False):
   """Installs the sysbench package on the VM."""
   vm.RemoteCommand(f'sudo rm -rf {SYSBENCH_DIR}')
   vm.RemoteCommand(
@@ -48,6 +48,16 @@ def _Install(vm):
   if _IGNORE_CONCURRENT.value:
     driver_file = f'{SYSBENCH_DIR}/src/drivers/pgsql/drv_pgsql.c'
     vm.RemoteCommand(f"sed -i '{CONCURRENT_MODS}' {driver_file}")
+  if spanner_oltp:
+    vm.PushDataFile(
+        'sysbench/spanner_oltp_git.diff',
+        f'{SYSBENCH_DIR}/spanner_oltp_git.diff',
+    )
+    vm.RemoteCommand(
+        'cd ~/sysbench/ && git apply --reject --ignore-whitespace'
+        ' spanner_oltp_git.diff'
+    )
+
   vm.RemoteCommand(
       f'cd {SYSBENCH_DIR} && ./autogen.sh && ./configure --with-pgsql'
   )
@@ -68,10 +78,10 @@ def YumInstall(vm):
   _Install(vm)
 
 
-def AptInstall(vm):
+def AptInstall(vm, spanner_oltp=False):
   """Installs the sysbench package on the VM."""
   vm.InstallPackages(
       'make automake libtool pkg-config libaio-dev default-libmysqlclient-dev '
       'libssl-dev libpq-dev'
   )
-  _Install(vm)
+  _Install(vm, spanner_oltp=spanner_oltp)

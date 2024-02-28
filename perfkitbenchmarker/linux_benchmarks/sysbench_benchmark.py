@@ -70,7 +70,7 @@ flags.DEFINE_integer(
     'The duration of the warmup run in which results are '
     'discarded, in seconds.',
 )
-flags.DEFINE_integer(
+_RUN_DURATION = flags.DEFINE_integer(
     'sysbench_run_seconds',
     10,
     'The duration of the actual run in which results are '
@@ -351,13 +351,6 @@ def _InstallLuaScriptsIfNecessary(vm):
     )
 
 
-def _PatchSpannerScripts(vm):
-  vm.PushDataFile(
-      'sysbench/spanner_oltp_git.diff', '~/sysbench/spanner_oltp_git.diff'
-  )
-  vm.RemoteCommand('cd ~/sysbench/ && git apply spanner_oltp_git.diff')
-
-
 def _IsValidFlag(flag):
   return (
       flag in _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS[FLAGS.sysbench_testname]
@@ -476,10 +469,12 @@ def _LoadDatabaseInParallel(
       FLAGS.sysbench_testname != SPANNER_TPCC
       and db.engine_type == sql_engine_utils.SPANNER_POSTGRES
   ):
+    # This command update the secondary index
+    # Run all index update in parallel.
     client_vms[0].RobustRemoteCommand(
         'cd ~/sysbench/ && nice -15 sysbench oltp_read_only'
         f' --tables={FLAGS.sysbench_tables} --table_size=0 '
-        f' --threads={_LOAD_THREADS.value} --auto-inc=off '
+        f' --threads={FLAGS.sysbench_tables} --auto-inc=off '
         '--create_secondary=true --db-driver=pgsql'
         ' --pgsql-host=/tmp prepare'
     )
@@ -503,13 +498,28 @@ def _PrepareClients(
   """Installs the relevant packages on the clients."""
   # Setup common test tools required on the client VM
   # Run app install to force reinstalling sysbench.
-  background_tasks.RunThreaded(sysbench.AptInstall, client_vms)
+  spanner_oltp = (
+      db.engine_type == sql_engine_utils.SPANNER_POSTGRES
+      and FLAGS.sysbench_testname != SPANNER_TPCC
+  )
+  if spanner_oltp:
+    background_tasks.RunThreaded(
+        lambda vm: sysbench.AptInstall(
+            vm,
+            spanner_oltp=spanner_oltp,
+        ),
+        client_vms,
+    )
+  else:
+    background_tasks.RunThreaded(
+        lambda vm: vm.Install('sysbench'),
+        client_vms,
+    )
   background_tasks.RunThreaded(_InstallLuaScriptsIfNecessary, client_vms)
   if (
       db.engine_type == sql_engine_utils.SPANNER_POSTGRES
       and FLAGS.sysbench_testname != SPANNER_TPCC
   ):
-    background_tasks.RunThreaded(_PatchSpannerScripts, client_vms)
     background_tasks.RunThreaded(
         lambda client_query_tools: client_query_tools.InstallPackages(),
         db.client_vms_query_tools,
