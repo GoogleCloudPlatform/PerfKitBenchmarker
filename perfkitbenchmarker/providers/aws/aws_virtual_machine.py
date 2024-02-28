@@ -937,7 +937,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       ])
 
     # query fails on hpc6a.48xlarge which already disables smt.
-    if FLAGS.disable_smt and self.machine_type != 'hpc6a.48xlarge':
+    if FLAGS.disable_smt and self.machine_type not in (
+        'hpc6a.48xlarge', 'hpc6id.32xlarge', 'hpc7a.96xlarge'):
       query_cmd = util.AWS_PREFIX + [
           'ec2',
           'describe-instance-types',
