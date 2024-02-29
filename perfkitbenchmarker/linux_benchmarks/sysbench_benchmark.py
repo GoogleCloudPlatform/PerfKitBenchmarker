@@ -20,7 +20,7 @@ This is a set of benchmarks that measures performance of Sysbench Databases on
 As other cloud providers deliver a managed MySQL service, we will add it here.
 """
 
-
+import datetime
 import logging
 import re
 import time
@@ -859,6 +859,11 @@ def _RunScaleUpClientsBenchmark(
     ]
     args = [(command_vm_pair, {}) for command_vm_pair in command_vm_pairs]
     results = background_tasks.RunThreaded(_IssueSysbenchCommand, args)
+    if hasattr(benchmark_spec.relational_db, 'GetAverageCpuUsage'):
+      cpu_utilization = benchmark_spec.relational_db.GetAverageCpuUsage(
+          _RUN_DURATION.value // 60, datetime.datetime.now()
+      )
+      new_metadata['cpu_utilization'] = cpu_utilization
     total_tps = 0
     total_qps = 0
     for stdout, _ in results:
