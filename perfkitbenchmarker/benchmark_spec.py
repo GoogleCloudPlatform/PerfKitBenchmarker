@@ -22,7 +22,6 @@ import logging
 import os
 import pickle
 import threading
-import typing
 from typing import Any
 import uuid
 
@@ -52,7 +51,6 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import resource as resource_type
 from perfkitbenchmarker import smb_service
-from perfkitbenchmarker import spark_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
 from perfkitbenchmarker import virtual_machine
@@ -172,7 +170,6 @@ class BenchmarkSpec:
     self.deleted = False
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
     self.always_call_cleanup = False
-    self.spark_service: spark_service.BaseSparkService = None
     self.dpb_service: dpb_service.BaseDpbService = None
     self.container_cluster = None
     self.key = None
@@ -639,17 +636,6 @@ class BenchmarkSpec:
 
       self.vm_groups[group_name] = vms
       self.vms.extend(vms)
-    # If we have a spark service, it needs to access the master_group and
-    # the worker group.
-    if (
-        self.config.spark_service
-        and self.config.spark_service.service_type == spark_service.PKB_MANAGED
-    ):
-      self.spark_service = typing.cast(
-          spark_service.PkbSparkService, self.spark_service
-      )
-      for group_name in 'master_group', 'worker_group':
-        self.spark_service.vms[group_name] = self.vm_groups[group_name]
 
     # In the case of an un-managed yarn cluster, for hadoop software
     # installation, the dpb service instance needs access to constructed
@@ -671,36 +657,6 @@ class BenchmarkSpec:
       self.placement_groups[placement_group_name] = self._CreatePlacementGroup(
           placement_group_spec, placement_group_spec.CLOUD
       )
-
-  def ConstructSparkService(self):
-    """Create the spark_service object and create groups for its vms."""
-    if self.config.spark_service is None:
-      return
-
-    spark_spec = self.config.spark_service
-    # Worker group is required, master group is optional
-    cloud = spark_spec.worker_group.cloud
-    if spark_spec.master_group:
-      cloud = spark_spec.master_group.cloud
-    providers.LoadProvider(cloud)
-    service_type = spark_spec.service_type
-    spark_service_class = spark_service.GetSparkServiceClass(
-        cloud, service_type
-    )
-    self.spark_service = spark_service_class(spark_spec)  # pytype: disable=not-instantiable
-    # If this is Pkb managed, the benchmark spec needs to adopt vms.
-    if service_type == spark_service.PKB_MANAGED:
-      for name, group_spec in [
-          ('master_group', spark_spec.master_group),
-          ('worker_group', spark_spec.worker_group),
-      ]:
-        if name in self.vms_to_boot:
-          raise errors.Benchmarks.UnsupportedConfigError(
-              'Cannot have a vm group {0} with a {1} spark service'.format(
-                  name, spark_service.PKB_MANAGED
-              )
-          )
-        self.vms_to_boot[name] = group_spec
 
   def ConstructVPNService(self):
     """Create the VPNService object."""
@@ -829,8 +785,6 @@ class BenchmarkSpec:
             if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
         ]
       vm_util.GenerateSSHConfig(sshable_vms, sshable_vm_groups)
-    if self.spark_service:
-      self.spark_service.Create()
     if self.dpb_service:
       self.dpb_service.Create()
     if hasattr(self, 'relational_db') and self.relational_db:
@@ -874,8 +828,6 @@ class BenchmarkSpec:
 
     if self.container_registry:
       self.container_registry.Delete()
-    if self.spark_service:
-      self.spark_service.Delete()
     if self.dpb_service:
       self.dpb_service.Delete()
     if hasattr(self, 'relational_db') and self.relational_db:

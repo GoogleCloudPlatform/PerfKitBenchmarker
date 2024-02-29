@@ -53,6 +53,9 @@
 -   Add multichase_benchmark flag defaults.
 -   For hammerdbcli_benchmark, set default num_warehouses=25*num_cpus and
     num_vu=2*num_cpus.
+-   Remove old `spark_benchmark` and `hadoop_terasort_benchmark` and related
+    services. Prefer to use the newer `dpb_generic_benchmark` and
+    `dpb_terasort_benchmark`.
 
 ### New features:
 

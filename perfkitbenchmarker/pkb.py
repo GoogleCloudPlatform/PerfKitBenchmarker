@@ -452,8 +452,7 @@ def DoProvisionPhase(spec, timer):
   events.before_phase.send(stages.PROVISION, benchmark_spec=spec)
   spec.ConstructContainerCluster()
   spec.ConstructContainerRegistry()
-  # spark service needs to go first, because it adds some vms.
-  spec.ConstructSparkService()
+  # dpb service needs to go first, because it adds some vms.
   spec.ConstructDpbService()
   spec.ConstructVirtualMachines()
   spec.ConstructRelationalDb()
