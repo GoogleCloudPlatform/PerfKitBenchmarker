@@ -20,6 +20,7 @@ scratch disks.
 from typing import Any
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
@@ -214,16 +215,24 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
     self.disk_specs = disk_specs
 
   def SetUpDisk(self):
+    create_tasks = []
+    scratch_disks = []
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
       disk_group = self.vm.create_disk_strategy.remote_disk_groups[disk_spec_id]
       if len(disk_group) > 1:
         # If the disk_spec called for a striped disk, create one.
-        scratch_disk = disk.StripedDisk(disk_spec, disk_group)
+        scratch_disk = azure_disk.AzureStripedDisk(disk_spec, disk_group)
       else:
         scratch_disk = disk_group[0]
+      scratch_disks.append((scratch_disk, disk_spec))
       if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
-        scratch_disk.Create()
-        scratch_disk.Attach(self.vm)
+        create_tasks.append((scratch_disk.Create, (), {}))
+    background_tasks.RunParallelThreads(create_tasks, max_concurrency=200)
+
+    for scratch_disk, disk_spec in scratch_disks:
+      # Not doing parallel attach of azure disks because Azure
+      # throws conflict due to concurrent request
+      scratch_disk.Attach(self.vm)
       AzurePrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, scratch_disk, disk_spec
       )
