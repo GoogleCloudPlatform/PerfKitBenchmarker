@@ -253,6 +253,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   load_kwargs = {
       'mongodb.url': benchmark_spec.mongodb_url,
       'mongodb.batchsize': 10,
+      'mongodb.upsert': True,
       'core_workload_insertion_retry_limit': 10,
   }
   benchmark_spec.executor.Load(
