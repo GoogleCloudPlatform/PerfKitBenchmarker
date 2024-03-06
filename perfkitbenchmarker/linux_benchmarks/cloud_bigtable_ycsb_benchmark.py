@@ -331,7 +331,9 @@ def _GetCpuUtilizationSample(
           client,
           project=(FLAGS.project or _GetDefaultProject()),
           metric_type=f'bigtable.googleapis.com/cluster/{metric}',
-          end_time=datetime.datetime.utcfromtimestamp(end_timestamp),
+          end_time=datetime.datetime.fromtimestamp(
+              end_timestamp, datetime.timezone.utc
+          ),
           minutes=workload_duration_minutes,
       )
       cpu_query = cpu_query.select_resources(instance=instance_id)
