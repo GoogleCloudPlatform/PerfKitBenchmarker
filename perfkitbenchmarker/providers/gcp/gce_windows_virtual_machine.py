@@ -232,7 +232,8 @@ class WindowsGceVirtualMachine(
     """Return Remote python execution command for LM notify script."""
     vm_path = ntpath.join(self.temp_dir, self._LM_NOTICE_SCRIPT)
     return (
-        f'python {vm_path} {gcp_flags.LM_NOTIFICATION_METADATA_NAME.value} >'
+        f'python {vm_path} {gcp_flags.LM_NOTIFICATION_METADATA_NAME.value}'
+        f' {gcp_flags.LM_NOTIFICATION_TIMEOUT.value} >'
         f' {self.temp_dir}\\{self._LM_NOTICE_LOG} 2>&1'
     )
 

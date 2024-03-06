@@ -31,20 +31,31 @@ import requests
 
 METADATA_URL = 'http://metadata.google.internal/computeMetadata/v1/'
 METADATA_HEADERS = {'Metadata-Flavor': 'Google'}
+DEFAULT_TIMEOUT_MIN = 120
 
 
-def wait_for_maintenance(callback, metadata_field='instance/maintenance-event'):
+def wait_for_maintenance(
+    callback,
+    metadata_field='instance/maintenance-event',
+    timeout_min=DEFAULT_TIMEOUT_MIN,
+):
   """Pull events from GCE meta-data server."""
   url = METADATA_URL + metadata_field
   last_maintenance_event = None
   # [START hanging_get]
   last_etag = '0'
   should_break = False
-  while True:
+
+  end_time = datetime.datetime.now() + datetime.timedelta(minutes=timeout_min)
+  while datetime.datetime.now() < end_time:
     try:
       r = requests.get(
           url,
-          params={'last_etag': last_etag, 'wait_for_change': True},
+          params={
+              'last_etag': last_etag,
+              'wait_for_change': True,
+              'timeout_sec': timeout_min * 60,
+          },
           headers=METADATA_HEADERS,
       )
     except requests.exceptions.RequestException as err:
@@ -83,8 +94,14 @@ def maintenance_callback(event):
 
 
 def main():
-  if len(sys.argv) > 1:
+
+  if len(sys.argv) == 2:
     wait_for_maintenance(maintenance_callback, metadata_field=sys.argv[1])
+  elif len(sys.argv) > 2:
+    timeout = int(sys.argv[2])
+    wait_for_maintenance(
+        maintenance_callback, metadata_field=sys.argv[1], timeout_min=timeout
+    )
   else:
     wait_for_maintenance(maintenance_callback)
 

@@ -407,6 +407,11 @@ LM_NOTIFICATION_METADATA_NAME = flags.DEFINE_string(
     'instance/maintenance-event',
     'Lm notification metadata name to listen on.',
 )
+LM_NOTIFICATION_TIMEOUT = flags.DEFINE_integer(
+    'lm_notification_timeout',
+    120,
+    'Timeout for LM notification.'
+)
 flags.DEFINE_list(
     'data_disk_zones',
     [],

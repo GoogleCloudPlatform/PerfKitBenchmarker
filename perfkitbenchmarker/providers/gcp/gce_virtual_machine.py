@@ -84,6 +84,9 @@ OPERATION_DONE = 'DONE'
 # 2h timeout for LM notification
 LM_NOTIFICATION_TIMEOUT_SECONDS = 60 * 60 * 2
 
+# 10m wait time prior to checking log for LM status
+LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN = 10
+
 NVME = 'NVME'
 SCSI = 'SCSI'
 _INSUFFICIENT_HOST_CAPACITY = (
@@ -1231,11 +1234,33 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.name,
         '--async',
     )
+    logcmd = util.GcloudCommand(
+        None,
+        'logging',
+        'read',
+        '"protoPayload.methodName=v1.compute.instances.simulateMaintenanceEvent'
+        f' resource.labels.instance_id={self.id}"',
+    )
+    logcmd.flags['freshness'] = f'{LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN}M'
+
     stdout, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode or 'error' in stdout:
       raise errors.VirtualMachine.VirtualMachineError(
           'Unable to simulate maintenance event.'
       )
+
+    time.sleep(LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN * 60)
+    stdout, _, retcode = logcmd.Issue(raise_on_failure=False)
+    if retcode or 'error' in stdout:
+      raise errors.VirtualMachine.VirtualMachineError(
+          'Unable to get logs for simulate maintenance event.'
+      )
+    elif 'MIGRATION_TEMPORARILY_UNAVAILABLE' in stdout:
+      stdout, _, retcode = cmd.Issue(raise_on_failure=False)
+      if retcode or 'error' in stdout:
+        raise errors.VirtualMachine.VirtualMachineError(
+            'Unable to simulate maintenance event.'
+        )
 
   def SetupLMNotification(self):
     """Prepare environment for /scripts/gce_maintenance_notify.py script."""
@@ -1260,7 +1285,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Start meta-data server notification subscription."""
 
     def _Subscribe():
-      self.RobustRemoteCommand(
+      self.RemoteCommand(
           self._GetLMNotificationCommand(),
           timeout=LM_NOTIFICATION_TIMEOUT_SECONDS,
           ignore_failure=True,
@@ -1269,6 +1294,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       logging.info('[LM Notify] Release live migration lock.')
       self._LM_TIMES_SEMAPHORE.release()
 
+    logging.info('[LM Notify] Create live migration timestamp thread.')
     t = threading.Thread(target=_Subscribe)
     t.daemon = True
     t.start()
