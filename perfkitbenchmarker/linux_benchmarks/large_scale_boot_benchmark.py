@@ -360,7 +360,7 @@ def _BuildContext(launcher_vm, booter_template_vm):
   cloud = FLAGS.cloud
   if cloud == 'GCP':
     context.update({
-        'boot_disk_size': booter_template_vm.boot_disk_size,
+        'boot_disk_size': booter_template_vm.boot_disk.boot_disk_size,
         'boot_vm_name_prefix': _BOOT_VM_NAME_PREFIX.format(
             launcher_name=launcher_vm.name
         ),
