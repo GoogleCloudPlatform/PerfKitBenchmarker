@@ -135,6 +135,13 @@ def PdDriveIsNvme(vm):
   return False
 
 
+# Add labels fails sometimes with a timeout - consider moving to Create().
+@vm_util.Retry(
+    max_retries=3,
+    retryable_exceptions=(
+        errors.VmUtil.IssueCommandTimeoutError,
+    ),
+)
 def AddLabels(gcp_resource: resource.BaseResource, disk_name: str):
   """Add labels to a disk created by a service that fails to label a disk.
 
