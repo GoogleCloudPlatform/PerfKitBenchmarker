@@ -70,6 +70,16 @@ redis_memtier:
   description: >
       Run memtier_benchmark against Redis.
       Specify the number of client VMs with --redis_clients.
+  flags:
+    memtier_protocol: redis
+    create_and_boot_post_task_delay: 5
+    memtier_data_size: 1024
+    memtier_pipeline: 1
+    memtier_requests: -1
+    placement_group_style: none
+    redis_server_io_threads_cpu_affinity: False
+    redis_server_io_threads_do_reads: False
+    redis_simulate_aof: False
   vm_groups:
     servers:
       vm_spec: *default_dual_core
@@ -85,7 +95,7 @@ _BenchmarkSpec = benchmark_spec.BenchmarkSpec
 
 def CheckPrerequisites(_):
   """Verifies that benchmark setup is correct."""
-  if len(redis_server.GetRedisPorts()) > 1 and (
+  if len(redis_server.GetRedisPorts()) >= 0 and (
       len(FLAGS.memtier_pipeline) > 1
       or len(FLAGS.memtier_threads) > 1
       or len(FLAGS.memtier_clients) > 1
@@ -142,7 +152,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   # Run 4 at a time with only the first client VM to reduce memory
   # fragmentation and avoid overloading the server
   bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
-  ports = redis_server.GetRedisPorts()
+  ports = redis_server.GetRedisPorts(server_vm)
   ports_group_of_four = [ports[i : i + 4] for i in range(0, len(ports), 4)]
   for ports_group in ports_group_of_four:
     # pylint: disable=g-long-lambda
@@ -175,9 +185,11 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
     server_vm.RemoteCommand(f'bash {_TOP_SCRIPT}')
 
   raw_results = memtier.RunOverAllThreadsPipelinesAndClients(
-      client_vms, bm_spec.redis_endpoint_ip, redis_server.GetRedisPorts()
+      client_vms,
+      bm_spec.redis_endpoint_ip,
+      redis_server.GetRedisPorts(server_vm),
   )
-  redis_metadata = redis_server.GetMetadata()
+  redis_metadata = redis_server.GetMetadata(server_vm)
 
   top_results = []
   if measure_cpu_on_server_vm:

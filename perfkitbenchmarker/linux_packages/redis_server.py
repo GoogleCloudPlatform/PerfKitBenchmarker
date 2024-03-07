@@ -61,8 +61,8 @@ _NUM_PROCESSES = flags.DEFINE_integer(
     'redis_total_num_processes',
     1,
     'Total number of redis server processes. Useful when running with a redis '
-    'version lower than 6.',
-    lower_bound=1,
+    'version lower than 6. If set to 0, uses num_cpus.',
+    lower_bound=0,
 )
 _EVICTION_POLICY = flags.DEFINE_enum(
     'redis_eviction_policy',
@@ -98,6 +98,15 @@ def _GetRedisTarName() -> str:
 
 def GetRedisDir() -> str:
   return f'{linux_packages.INSTALL_DIR}/redis'
+
+
+def _GetNumProcesses(vm) -> int:
+  num_processes = _NUM_PROCESSES.value
+  if num_processes == 0 and vm is not None:
+    num_processes = vm.NumCpusForBenchmark()
+  assert num_processes >= 0, 'num_processes must be >=0.'
+
+  return num_processes
 
 
 def _Install(vm) -> None:
@@ -187,15 +196,17 @@ def _BuildStartCommand(vm, port: int) -> str:
 
   # Set maxmemory flag for each redis instance. Total memory for all of the
   # server instances combined should be 90% of server VM's total memory.
-  max_memory_per_instance = int(vm.total_memory_kb * 0.9 / _NUM_PROCESSES.value)
+  num_processes = _GetNumProcesses(vm)
+  max_memory_per_instance = int(vm.total_memory_kb * 0.9 / num_processes)
   cmd_args.append(f'--maxmemory {max_memory_per_instance}kb')
   return cmd.format(redis_dir=redis_dir, args=' '.join(cmd_args))
 
 
 def Start(vm) -> None:
   """Start redis server process."""
+  num_processes = _GetNumProcesses(vm)
   # 10 is an arbituary multiplier that ensures this value is high enough.
-  mux_sessions = 10 * _NUM_PROCESSES.value
+  mux_sessions = 10 * num_processes
   vm.RemoteCommand(
       f'echo "\nMaxSessions {mux_sessions}" | sudo tee -a /etc/ssh/sshd_config'
   )
@@ -214,21 +225,23 @@ def Start(vm) -> None:
   )
   if not (update_sysvtl and commit_sysvtl):
     logging.info('Fail to optimize overcommit_memory and socket connections.')
-  for port in GetRedisPorts():
+  for port in GetRedisPorts(vm):
     vm.RemoteCommand(_BuildStartCommand(vm, port))
 
 
-def GetMetadata() -> Dict[str, Any]:
+def GetMetadata(vm) -> Dict[str, Any]:
+  num_processes = _GetNumProcesses(vm)
   return {
       'redis_server_version': _VERSION.value,
       'redis_server_io_threads': _IO_THREADS.value,
       'redis_server_io_threads_do_reads': _IO_THREADS_DO_READS.value,
       'redis_server_io_threads_cpu_affinity': _IO_THREAD_AFFINITY.value,
       'redis_server_enable_snapshots': _ENABLE_SNAPSHOTS.value,
-      'redis_server_num_processes': _NUM_PROCESSES.value,
+      'redis_server_num_processes': num_processes,
   }
 
 
-def GetRedisPorts() -> List[int]:
+def GetRedisPorts(vm=None) -> List[int]:
   """Returns a list of redis port(s)."""
-  return [DEFAULT_PORT + i for i in range(_NUM_PROCESSES.value)]
+  num_processes = _GetNumProcesses(vm)
+  return [DEFAULT_PORT + i for i in range(num_processes)]
