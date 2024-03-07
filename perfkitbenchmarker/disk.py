@@ -73,6 +73,19 @@ flags.DEFINE_list(
 flags.DEFINE_list(
     'fstab_options', [], 'Additional arguments to supply to fstab.'
 )
+flags.DEFINE_integer(
+    'provisioned_iops',
+    None,
+    'Iops to provision, if applicable. Defaults to None. This flag only applies'
+    'to GCP.',
+)
+flags.DEFINE_integer(
+    'provisioned_throughput',
+    None,
+    'Throughput to provision, if applicable. Defaults to None. This flag only'
+    'applies to GCP.',
+)
+
 
 FLAGS = flags.FLAGS
 

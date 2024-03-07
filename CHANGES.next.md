@@ -56,6 +56,7 @@
 -   Remove old `spark_benchmark` and `hadoop_terasort_benchmark` and related
     services. Prefer to use the newer `dpb_generic_benchmark` and
     `dpb_terasort_benchmark`.
+-   gcp/aws/azure_provisioned_iops/throughput flags are unified to provisioned_iops/throughput flags.
 
 ### New features:
 

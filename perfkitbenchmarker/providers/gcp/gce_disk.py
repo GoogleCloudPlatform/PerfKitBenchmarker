@@ -186,11 +186,11 @@ class GceDiskSpec(disk.BaseDiskSpec):
       config_values['num_local_ssds'] = flag_values.gce_num_local_ssds
     if flag_values['gcp_create_disks_with_vm'].present:
       config_values['create_with_vm'] = flag_values.gcp_create_disks_with_vm
-    if flag_values['gcp_provisioned_iops'].present:
-      config_values['provisioned_iops'] = flag_values.gcp_provisioned_iops
-    if flag_values['gcp_provisioned_throughput'].present:
+    if flag_values['provisioned_iops'].present:
+      config_values['provisioned_iops'] = flag_values.provisioned_iops
+    if flag_values['provisioned_throughput'].present:
       config_values['provisioned_throughput'] = (
-          flag_values.gcp_provisioned_throughput
+          flag_values.provisioned_throughput
       )
     if flag_values['data_disk_zones'].present:
       config_values['replica_zones'] = flag_values.data_disk_zones
