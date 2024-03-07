@@ -70,8 +70,16 @@ class VmGroupSpec(spec.BaseSpec):
         else True
     )
     providers.LoadProvider(self.cloud, ignore_package_requirements)
+    provider = self.cloud
+    if (
+        flag_values
+        and flag_values['vm_platform'].present
+        and flag_values['vm_platform'].value
+        != provider_info.DEFAULT_VM_PLATFORM
+    ):
+      provider = flag_values['vm_platform'].value
     if self.disk_spec:
-      disk_config = getattr(self.disk_spec, self.cloud, None)
+      disk_config = getattr(self.disk_spec, provider, None)
       if disk_config is None:
         raise errors.Config.MissingOption(
             '{0}.cloud is "{1}", but {0}.disk_spec does not contain a '
@@ -93,13 +101,13 @@ class VmGroupSpec(spec.BaseSpec):
             flag_values=flag_values,
             **disk_config
         )
-    vm_config = getattr(self.vm_spec, self.cloud, None)
+    vm_config = getattr(self.vm_spec, provider, None)
     if vm_config is None:
       raise errors.Config.MissingOption(
           '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
           'configuration for "{1}".'.format(component_full_name, self.cloud)
       )
-    vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
+    vm_spec_class = virtual_machine.GetVmSpecClass(cloud=self.cloud)
     self.vm_spec = vm_spec_class(
         '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
         flag_values=flag_values,

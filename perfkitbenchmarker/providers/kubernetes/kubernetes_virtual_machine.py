@@ -18,7 +18,7 @@ import logging
 import os
 import posixpath
 import stat
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from absl import flags
 from perfkitbenchmarker import container_service
@@ -67,7 +67,15 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     k8s_sriov_network: Name of a network with sriov enabled.
   """
 
-  CLOUD = provider_info.KUBERNETES
+  CLOUD: Union[list[str], str] = [
+      provider_info.AWS,
+      provider_info.AZURE,
+      provider_info.GCP,
+  ]
+  PLATFORM: Union[list[str], str] = [
+      provider_info.DEFAULT_VM_PLATFORM,
+      provider_info.KUBERNETES,
+  ]
   DEFAULT_IMAGE = None
   HOME_DIR = '/root'
   IS_REBOOTABLE = False
@@ -88,8 +96,31 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.resource_requests: Optional[
         kubernetes_resources_spec.KubernetesResourcesSpec
     ] = vm_spec.resource_requests
-    self.cloud: str = FLAGS.container_cluster_cloud
+    self.cloud: str = (
+        self.CLOUD  # pytype: disable=annotation-type-mismatch
+        if self.PLATFORM == provider_info.KUBERNETES_PLATFORM
+        else FLAGS.container_cluster_cloud
+    )
     self.sriov_network: Optional[str] = FLAGS.k8s_sriov_network or None
+
+  @classmethod
+  def GetAttributes(cls):
+    """Returns the attributes cross product for registering the class."""
+    attributes = []
+    for cloud in cls.CLOUD:
+      attributes.append((
+          cls.RESOURCE_TYPE,
+          ('CLOUD', cloud),
+          ('OS_TYPE', cls.OS_TYPE),
+          ('PLATFORM', provider_info.KUBERNETES_PLATFORM),
+      ))
+    attributes.append((
+        cls.RESOURCE_TYPE,
+        ('CLOUD', provider_info.KUBERNETES),
+        ('OS_TYPE', cls.OS_TYPE),
+        ('PLATFORM', provider_info.DEFAULT_VM_PLATFORM),
+    ))
+    return attributes
 
   def GetResourceMetadata(self):
     metadata = super().GetResourceMetadata()
@@ -628,11 +659,8 @@ class DebianBasedKubernetesVirtualMachine(
     """Downloads a preprovisioned data file.
 
     This function works by looking up the VirtualMachine class which matches
-    the cloud we are running on (defined by FLAGS.container_cluster_cloud).
-
-    Then we look for a module-level function defined in the same module as
-    the VirtualMachine class which generates a string used to download
-    preprovisioned data for the given cloud.
+    the cloud we are running on. Each cloud's VM module has a function to
+    generate the preprovisioned data command, which we run from here.
 
     Note that this implementation is specific to Debian OS types.
 

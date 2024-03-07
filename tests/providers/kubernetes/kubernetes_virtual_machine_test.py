@@ -19,8 +19,10 @@ import builtins
 import json
 import unittest
 from absl import flags as flgs
+from absl.testing import flagsaver
 import contextlib2
 import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
@@ -326,6 +328,62 @@ class KubernetesVirtualMachineOsTypesTestCase(
       self.assertEqual(
           create_json['spec']['containers'][0]['image'], 'ubuntu:16.04'
       )
+
+
+class KubernetesVirtualMachineClassFoundTestCase(
+    BaseKubernetesVirtualMachineTestCase
+):
+
+  def testClassFoundByKubernetesCloud(self):
+    spec = kubernetes_pod_spec.KubernetesPodSpec(_COMPONENT)
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.KUBERNETES, os_types.UBUNTU1604
+    )
+    kub_vm = vm_class(spec)
+    self.assertIsInstance(
+        kub_vm,
+        kubernetes_virtual_machine.Ubuntu1604BasedKubernetesVirtualMachine,
+    )
+
+  def testClassNotKubernetesCloud(self):
+    with self.assertRaises(errors.Resource.SubclassNotFoundError):
+      virtual_machine.GetVmClass(
+          provider_info.GCP, os_types.UBUNTU1604
+      )
+
+  @flagsaver.flagsaver(
+      (provider_info.VM_PLATFORM, provider_info.KUBERNETES_PLATFORM)
+  )
+  def testClassFoundByKubernetesPlatform(self):
+    FLAGS.container_cluster_cloud = provider_info.AWS
+    spec = kubernetes_pod_spec.KubernetesPodSpec(_COMPONENT)
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.GCP, os_types.UBUNTU1604
+    )
+    kub_vm = vm_class(spec)
+    self.assertIsInstance(
+        kub_vm,
+        kubernetes_virtual_machine.Ubuntu1604BasedKubernetesVirtualMachine,
+    )
+    self.assertEqual(kub_vm.CLOUD, provider_info.GCP)
+    self.assertEqual(kub_vm.PLATFORM, provider_info.KUBERNETES_PLATFORM)
+    self.assertEqual(kub_vm.cloud, provider_info.GCP)
+
+  @flagsaver.flagsaver(
+      (provider_info.VM_PLATFORM, provider_info.KUBERNETES_PLATFORM)
+  )
+  def test2004AzureClassFoundByKubernetesPlatform(self):
+    FLAGS.container_cluster_cloud = None
+    spec = kubernetes_pod_spec.KubernetesPodSpec(_COMPONENT)
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.AZURE, os_types.UBUNTU2004
+    )
+    kub_vm = vm_class(spec)
+    self.assertIsInstance(
+        kub_vm,
+        kubernetes_virtual_machine.Ubuntu2004BasedKubernetesVirtualMachine,
+    )
+    self.assertEqual(kub_vm.cloud, provider_info.AZURE)
 
 
 class KubernetesVirtualMachineVmGroupAffinityTestCase(

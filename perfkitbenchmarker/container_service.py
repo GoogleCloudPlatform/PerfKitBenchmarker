@@ -41,6 +41,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
@@ -424,20 +425,20 @@ class BaseContainerCluster(resource.BaseResource):
   def __init__(self, cluster_spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(user_managed=bool(cluster_spec.static_cluster))
     self.name: str = cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
-    default_vm_config: virtual_machine.BaseVirtualMachine = (
-        virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
-            cluster_spec.vm_spec
-        )
+    # Go get a BaseVM, to use strictly for config values.
+    default_vm_class = virtual_machine.GetVmClass(
+        self.CLOUD, os_types.DEFAULT, provider_info.DEFAULT_VM_PLATFORM
+    )
+    default_vm_config: virtual_machine.BaseVirtualMachine = default_vm_class(
+        cluster_spec.vm_spec
     )
     self.default_nodepool = self._InitializeDefaultNodePool(
         cluster_spec, default_vm_config
     )
     self.nodepools: dict[str, BaseNodePoolConfig] = {}
     for name, nodepool_spec in cluster_spec.nodepools.copy().items():
-      vm_config: virtual_machine.BaseVirtualMachine = (
-          virtual_machine.GetVmClass(self.CLOUD, os_types.DEFAULT)(
-              nodepool_spec.vm_spec
-          )
+      vm_config: virtual_machine.BaseVirtualMachine = default_vm_class(
+          nodepool_spec.vm_spec
       )
       nodepool = self._InitializeNodePool(name, nodepool_spec, vm_config)
       self.nodepools[nodepool.name] = nodepool

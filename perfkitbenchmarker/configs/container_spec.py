@@ -408,6 +408,8 @@ class ContainerClusterSpec(spec.BaseSpec):
         if flag_values
         else True
     )
+    # TODO(user): Remove LoadProvider cloud once cloud != kubernetes.
+    providers.LoadProvider('kubernetes', ignore_package_requirements)
     providers.LoadProvider(self.cloud, ignore_package_requirements)
     vm_config = getattr(self.vm_spec, self.cloud, None)
     if vm_config is None:
@@ -415,7 +417,9 @@ class ContainerClusterSpec(spec.BaseSpec):
           '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
           'configuration for "{1}".'.format(component_full_name, self.cloud)
       )
-    vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
+    vm_spec_class = virtual_machine.GetVmSpecClass(
+        self.cloud, provider_info.DEFAULT_VM_PLATFORM
+    )
     self.vm_spec = vm_spec_class(
         '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
         flag_values=flag_values,
@@ -434,7 +438,6 @@ class ContainerClusterSpec(spec.BaseSpec):
             '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
             'configuration for "{1}".'.format(component_full_name, self.cloud)
         )
-      vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
       nodepool_spec.vm_spec = vm_spec_class(
           '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
           flag_values=flag_values,
