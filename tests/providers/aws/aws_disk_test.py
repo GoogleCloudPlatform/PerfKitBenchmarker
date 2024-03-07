@@ -69,8 +69,8 @@ class AwsDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
       aws_disk.AwsDiskSpec(_COMPONENT, provisioned_iops='ten')
 
   def testNonPresentFlagsDoNotOverrideConfigs(self):
-    FLAGS.aws_provisioned_iops = 2000
-    FLAGS.aws_provisioned_throughput = 200
+    FLAGS.provisioned_iops = 2000
+    FLAGS.provisioned_throughput = 200
     FLAGS.data_disk_size = 100
     spec = aws_disk.AwsDiskSpec(
         _COMPONENT, FLAGS, disk_size=75, provisioned_iops=1000, throughput=150
@@ -80,8 +80,8 @@ class AwsDiskSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(spec.throughput, 150)
 
   def testPresentFlagsOverrideConfigs(self):
-    FLAGS['aws_provisioned_iops'].parse(2000)
-    FLAGS['aws_provisioned_throughput'].parse(200)
+    FLAGS['provisioned_iops'].parse(2000)
+    FLAGS['provisioned_throughput'].parse(200)
     FLAGS['data_disk_size'].parse(100)
     spec = aws_disk.AwsDiskSpec(
         _COMPONENT, FLAGS, disk_size=75, provisioned_iops=1000, throughput=150

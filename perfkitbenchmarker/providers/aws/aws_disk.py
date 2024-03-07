@@ -378,10 +378,10 @@ class AwsDiskSpec(disk.BaseDiskSpec):
         provided config values.
     """
     super(AwsDiskSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['aws_provisioned_iops'].present:
-      config_values['provisioned_iops'] = flag_values.aws_provisioned_iops
-    if flag_values['aws_provisioned_throughput'].present:
-      config_values['throughput'] = flag_values.aws_provisioned_throughput
+    if flag_values['provisioned_iops'].present:
+      config_values['provisioned_iops'] = flag_values.provisioned_iops
+    if flag_values['provisioned_throughput'].present:
+      config_values['throughput'] = flag_values.provisioned_throughput
     if flag_values['aws_create_disks_with_vm'].present:
       config_values['create_with_vm'] = flag_values.aws_create_disks_with_vm
 

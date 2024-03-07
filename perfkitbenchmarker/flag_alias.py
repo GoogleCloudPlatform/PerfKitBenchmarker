@@ -20,8 +20,6 @@ from typing import Any, Dict, List, Optional
 # Added 7th Nov 2022
 DISK_FLAGS_TO_TRANSLATE = {
     'scratch_disk_type': 'data_disk_type',
-    'scratch_disk_iops': 'aws_provisioned_iops',
-    'scratch_disk_throughput': 'aws_provisioned_throughput',
     'scratch_disk_size': 'data_disk_size',
 }
 

@@ -77,13 +77,13 @@ flags.DEFINE_integer(
     'provisioned_iops',
     None,
     'Iops to provision, if applicable. Defaults to None. This flag only applies'
-    'to GCP.',
+    'to GCP and AWS.',
 )
 flags.DEFINE_integer(
     'provisioned_throughput',
     None,
     'Throughput to provision, if applicable. Defaults to None. This flag only'
-    'applies to GCP.',
+    'applies to GCP and AWS.',
 )
 
 
