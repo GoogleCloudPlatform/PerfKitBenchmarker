@@ -265,6 +265,12 @@ flags.DEFINE_integer(
     'Run duration in seconds for each throughput target '
     'if we have already reached sustained throughput.',
 )
+_DYNAMIC_LOAD_SLEEP_SEC = flags.DEFINE_integer(
+    'ycsb_dynamic_load_sleep_sec',
+    0,
+    'Sleep duration in seconds between run stages after reaching sustained '
+    'throughput.',
+)
 flags.DEFINE_integer(
     'ycsb_sleep_after_load_in_sec',
     0,
@@ -1147,6 +1153,12 @@ class YCSBExecutor:
           )
           if target_throughput is None:
             break
+          if _DYNAMIC_LOAD_SLEEP_SEC.value > 0:
+            logging.info(
+                'Sleeping %s seconds after dynamic load.',
+                _DYNAMIC_LOAD_SLEEP_SEC.value,
+            )
+            time.sleep(_DYNAMIC_LOAD_SLEEP_SEC.value)
 
     return all_results
 
