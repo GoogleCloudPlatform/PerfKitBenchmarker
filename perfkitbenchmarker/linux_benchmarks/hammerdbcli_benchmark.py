@@ -24,6 +24,7 @@ INNODB_BUFFER_POOL_SIZE = '{{INNODB_BUFFER_POOL_SIZE}}'
 SHARED_BUFFER_SIZE = '{{SHARED_BUFFER_SIZE}}'
 MAX_CONNECTIONS = '{{MAX_CONNECTIONS}}'
 PG_VERSION = '{{PG_VERSION}}'
+SCRATCH_DIR_PLACEHOLDER = '{{SCRATCH_DIR}}'
 BENCHMARK_NAME = 'hammerdbcli'
 BENCHMARK_CONFIG = """
 hammerdbcli:
@@ -283,6 +284,13 @@ def SetPostgresOptimizedServerConfiguration(
       server_vm, '~/', config, SHARED_BUFFER_SIZE, str(shared_buffer_size)
   )
   hammerdb.SearchAndReplaceGuestFile(server_vm, '~/', config, PG_VERSION, '13')
+  hammerdb.SearchAndReplaceGuestFile(
+      server_vm,
+      '~/',
+      config,
+      SCRATCH_DIR_PLACEHOLDER,
+      server_vm.GetScratchDir(),
+  )
   server_vm.RemoteCommand(
       f'sudo bash -c "cat {config} > /etc/postgresql/13/main/postgresql.conf"'
   )

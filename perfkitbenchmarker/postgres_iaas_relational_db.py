@@ -162,7 +162,7 @@ class PostgresIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         '{}'.format(self.postgres_shared_buffer_size, postgres_conf_file)
     )
     # Update data path to new location
-    vm.RemoteCommand('sudo rsync -av /var/lib/postgresql /scratch')
+    vm.RemoteCommand(f'sudo rsync -av /var/lib/postgresql {vm.GetScratchDir()}')
 
     # # Use cat to move files because mv will override file permissions
     self.server_vm.RemoteCommand(
