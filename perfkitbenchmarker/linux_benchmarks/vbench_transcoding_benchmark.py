@@ -89,8 +89,8 @@ vbench_transcoding:
         AWS:
           disk_size: 542
           disk_type: gp3
-          iops: 3000
-          throughput: 500
+          provisioned_iops: 3000
+          provisioned_throughput: 500
           mount_point: /scratch
         Azure:
           disk_size: 542

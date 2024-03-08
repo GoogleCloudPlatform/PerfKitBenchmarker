@@ -153,8 +153,10 @@ class CreateRemoteDiskStrategy(AWSCreateDiskStrategy):
             aws_disk.GP3,
         ]:
           ebs_block['Iops'] = disk_spec.provisioned_iops
-        if disk_spec.throughput and disk_spec.disk_type in [aws_disk.GP3]:
-          ebs_block['Throughput'] = disk_spec.throughput
+        if disk_spec.provisioned_throughput and disk_spec.disk_type in [
+            aws_disk.GP3
+        ]:
+          ebs_block['Throughput'] = disk_spec.provisioned_throughput
         mapping['Ebs'] = ebs_block
         mappings.append(mapping)
         disk_spec_id = self.BuildDiskSpecId(spec_index, i)

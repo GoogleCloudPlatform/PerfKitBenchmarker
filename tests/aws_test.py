@@ -311,7 +311,7 @@ def CreateTestAwsVm():
   disk_spec.disk_type = aws_disk.GP2
   disk_spec.disk_size = 10
   disk_spec.provisioned_iops = 1000
-  disk_spec.throughput = 256
+  disk_spec.provisioned_throughput = 256
   disk_spec.create_with_vm = False
   vm.create_disk_strategy = (
       aws_disk_strategies.GetCreateDiskStrategy(vm, disk_spec, 1)
@@ -772,7 +772,7 @@ class AwsGetBlockDeviceMapTestCase(pkb_common_test_case.PkbCommonTestCase):
     disk_spec.disk_type = aws_disk.GP2
     disk_spec.disk_size = 10
     disk_spec.provisioned_iops = 1000
-    disk_spec.throughput = 256
+    disk_spec.provisioned_throughput = 256
     disk_spec.create_with_vm = False
     self.aws_vm.create_disk_strategy = (
         aws_disk_strategies.GetCreateDiskStrategy(self.aws_vm, disk_spec, 1)

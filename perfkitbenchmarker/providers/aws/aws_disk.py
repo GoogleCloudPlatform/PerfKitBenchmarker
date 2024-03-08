@@ -381,7 +381,9 @@ class AwsDiskSpec(disk.BaseDiskSpec):
     if flag_values['provisioned_iops'].present:
       config_values['provisioned_iops'] = flag_values.provisioned_iops
     if flag_values['provisioned_throughput'].present:
-      config_values['throughput'] = flag_values.provisioned_throughput
+      config_values['provisioned_throughput'] = (
+          flag_values.provisioned_throughput
+      )
     if flag_values['aws_create_disks_with_vm'].present:
       config_values['create_with_vm'] = flag_values.aws_create_disks_with_vm
 
@@ -402,7 +404,7 @@ class AwsDiskSpec(disk.BaseDiskSpec):
         )
     })
     result.update({
-        'throughput': (
+        'provisioned_throughput': (
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True},
         )
@@ -434,7 +436,7 @@ class AwsDisk(disk.BaseDisk):
   def __init__(self, disk_spec, zone, machine_type, disk_spec_id=None):
     super(AwsDisk, self).__init__(disk_spec)
     self.iops = disk_spec.provisioned_iops
-    self.throughput = disk_spec.throughput
+    self.throughput = disk_spec.provisioned_throughput
     self.id = None
     self.zone = zone
     self.region = util.GetRegionFromZone(zone)
