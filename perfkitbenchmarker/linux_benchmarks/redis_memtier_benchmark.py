@@ -75,10 +75,7 @@ redis_memtier:
     create_and_boot_post_task_delay: 5
     memtier_data_size: 1024
     memtier_pipeline: 1
-    memtier_requests: -1
     placement_group_style: none
-    redis_server_io_threads_cpu_affinity: False
-    redis_server_io_threads_do_reads: False
     redis_simulate_aof: False
   vm_groups:
     servers:

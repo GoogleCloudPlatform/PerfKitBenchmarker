@@ -72,6 +72,7 @@ dpb_sparksql_benchmark:
       vm_spec:
         GCP:
           machine_type: n1-standard-4
+          num_local_ssds: 0
         AWS:
           machine_type: m5.xlarge
       disk_spec:

@@ -129,16 +129,16 @@ redis_memtier_full_house_loaded:
   name: redis_memtier
   flags:
     memtier_clients: 8
-    memtier_ratio: 1:9
+    memtier_requests: -1
     memtier_run_duration: 800
     memtier_threads: 4
     redis_eviction_policy: allkeys-lru
     redis_server_io_threads: 0
-    redis_server_version: 5.0.5
+    redis_server_version: '5.0.5'
     redis_total_num_processes: 0
-    metadata: load_key_ratio:0.9
-    metadata: max_key_ratio:1.1
-    metadata: scenario:full_house_loaded
+    metadata: 'load_key_ratio:0.9'
+    metadata: 'max_key_ratio:1.1'
+    metadata: 'scenario:full_house_loaded'
 
 # TODO: redis_server_io_threads
 redis_memtier_single_process:
@@ -147,14 +147,15 @@ redis_memtier_single_process:
     memtier_clients: 100
     memtier_key_maximum: 10000000
     memtier_load_key_maximum: 1
-    memtier_ratio: 1:10
+    memtier_ratio: '1:10'
+    memtier_requests: -1
     memtier_run_duration: 1800
     memtier_threads: 16
-    redis_server_version: 6.2.1
+    redis_server_version: '6.2.1'
     redis_total_num_processes: 1
-    metadata: load_key_ratio:0
-    metadata: max_key_ratio:N/A
-    metadata: scenario:single_process
+    metadata: 'load_key_ratio:0'
+    metadata: 'max_key_ratio:N/A'
+    metadata: 'scenario:single_process'
 
 sparksql_tpcds_1t:
   name: dpb_sparksql_benchmark
@@ -166,7 +167,7 @@ sparksql_tpcds_1t:
     dpb_sparksql_data_format: parquet
     dpb_sparksql_order: 1,2,3,4,5,6,7,8,9,10,11,12,13,14a,14b,15,16,17,18,19,20,21,22,23a,23b,24a,24b,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39a,39b,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99
     dpb_sparksql_query: tpcds_2_4
-    metadata: scale:1T,data_source:HDFS
+    metadata: 'scale:1T,data_source:HDFS'
     openjdk_version: 11
   dpb_service:
     service_type: unmanaged_spark_cluster
