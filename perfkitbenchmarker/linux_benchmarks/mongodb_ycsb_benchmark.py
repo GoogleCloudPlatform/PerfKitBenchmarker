@@ -66,25 +66,6 @@ mongodb_ycsb:
           disk_type: Premium_LRS
           mount_point: /scratch
       vm_count: 1
-    secondary:
-      vm_spec: *default_single_core
-      disk_spec:
-        GCP:
-          disk_size: 500
-          disk_type: pd-ssd
-          mount_point: /scratch
-        AWS:
-          disk_size: 500
-          disk_type: gp3
-          mount_point: /scratch
-        Azure:
-          disk_size: 500
-          disk_type: Premium_LRS
-          mount_point: /scratch
-      vm_count: 1
-    arbiter:
-      vm_spec: *default_single_core
-      vm_count: 1
     clients:
       vm_spec: *default_single_core
       vm_count: 1
@@ -103,17 +84,17 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
-  primary_count = config['vm_groups']['primary']['vm_count']
-  secondary_count = config['vm_groups']['secondary']['vm_count']
-  arbiter_count = config['vm_groups']['arbiter']['vm_count']
-  if any(
-      [count != 1 for count in [primary_count, secondary_count, arbiter_count]]
-  ):
-    raise errors.Config.InvalidValue(
-        'Must have exactly one primary, secondary, and arbiter VM.'
-    )
-  if FLAGS['ycsb_client_vms'].present:
-    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+  # primary_count = config['vm_groups']['primary']['vm_count']
+  # secondary_count = config['vm_groups']['secondary']['vm_count']
+  # arbiter_count = config['vm_groups']['arbiter']['vm_count']
+  # if any(
+  #     [count != 1 for count in [primary_count, secondary_count, arbiter_count]]
+  # ):
+  #   raise errors.Config.InvalidValue(
+  #       'Must have exactly one primary, secondary, and arbiter VM.'
+  #   )
+  # if FLAGS['ycsb_client_vms'].present:
+  #   config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
   return config
 
 
@@ -160,7 +141,7 @@ def _PrepareArbiter(vm: _LinuxVM) -> None:
 
 
 def _PrepareReplicaSet(
-    server_vms: Sequence[_LinuxVM], arbiter_vm: _LinuxVM
+    server_vms: Sequence[_LinuxVM]
 ) -> None:
   """Prepares the replica set for the benchmark.
 
@@ -181,16 +162,6 @@ def _PrepareReplicaSet(
               '_id': 0,
               'host': f'"{server_vms[0].internal_ip}:27017"',
               'priority': 1,
-          },
-          {
-              '_id': 1,
-              'host': f'"{server_vms[1].internal_ip}:27017"',
-              'priority': 0.5,
-          },
-          {
-              '_id': 2,
-              'host': f'"{arbiter_vm.internal_ip}:27017"',
-              'arbiterOnly': True,
           },
       ],
   }
@@ -213,12 +184,10 @@ def _PrepareClient(vm: _LinuxVM) -> None:
 def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
   """Returns the connection string used to connect to the instance."""
   primary = benchmark_spec.vm_groups['primary'][0]
-  secondary = benchmark_spec.vm_groups['secondary'][0]
-  arbiter = benchmark_spec.vm_groups['arbiter'][0]
+  # secondary = benchmark_spec.vm_groups['secondary'][0]
+  # arbiter = benchmark_spec.vm_groups['arbiter'][0]
   return (
-      f'"mongodb://{primary.internal_ip}:27017,'
-      f'{secondary.internal_ip}:27017,'
-      f'{arbiter.internal_ip}:27017/ycsb'
+      f'"mongodb://{primary.internal_ip}:27017/ycsb'
       '?replicaSet=rs0&w=majority&compression=snappy"'
   )
 
@@ -231,22 +200,19 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       required to run the benchmark.
   """
   primary = benchmark_spec.vm_groups['primary'][0]
-  secondary = benchmark_spec.vm_groups['secondary'][0]
-  arbiter = benchmark_spec.vm_groups['arbiter'][0]
   clients = benchmark_spec.vm_groups['clients']
   server_partials = [
       functools.partial(_PrepareServer, mongo_vm)
-      for mongo_vm in [primary, secondary]
+      for mongo_vm in [primary]
   ]
-  arbiter_partial = [functools.partial(_PrepareArbiter, arbiter)]
   client_partials = [
       functools.partial(_PrepareClient, client) for client in clients
   ]
   background_tasks.RunThreaded(
-      (lambda f: f()), server_partials + arbiter_partial + client_partials
+      (lambda f: f()), server_partials + client_partials
   )
 
-  _PrepareReplicaSet([primary, secondary], arbiter)
+  _PrepareReplicaSet([primary])
 
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   benchmark_spec.mongodb_url = _GetMongoDbURL(benchmark_spec)
