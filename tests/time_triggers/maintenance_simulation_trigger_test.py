@@ -187,6 +187,13 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
                 metadata={},
                 timestamp=0,
             ),
+            sample.Sample(
+                metric='total_missing_seconds',
+                value=0,
+                unit='seconds',
+                metadata={},
+                timestamp=0,
+            ),
         ],
     )
 
@@ -305,6 +312,13 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
                 metadata={},
                 timestamp=0,
             ),
+            sample.Sample(
+                metric='total_missing_seconds',
+                value=3,
+                unit='seconds',
+                metadata={},
+                timestamp=0,
+            ),
         ],
     )
 
@@ -419,6 +433,13 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
             sample.Sample(
                 metric='total_loss_seconds',
                 value=0.0,
+                unit='seconds',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_missing_seconds',
+                value=3,
                 unit='seconds',
                 metadata={},
                 timestamp=0,
@@ -544,6 +565,13 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
             Sample(
                 metric='total_loss_seconds',
                 value=3.4,
+                unit='seconds',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_missing_seconds',
+                value=0,
                 unit='seconds',
                 metadata={},
                 timestamp=0,
@@ -706,6 +734,13 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
                 metric='degradation_percent',
                 value=5.0,
                 unit='%',
+                metadata={},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_missing_seconds',
+                value=0,
+                unit='seconds',
                 metadata={},
                 timestamp=0,
             ),
@@ -872,6 +907,13 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
                 metadata={'random': 'random'},
                 timestamp=0,
             ),
+            sample.Sample(
+                metric='total_missing_seconds',
+                value=0,
+                unit='seconds',
+                metadata={},
+                timestamp=0,
+            ),
         ],
     )
 
@@ -899,7 +941,6 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     )
     trigger.vms = [vm]
     trigger.AppendSamples(None, vm_spec, samples)
-
     self.assertEqual(
         samples,
         [
@@ -919,7 +960,14 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
                 metric='LM Total Time',
                 value=100.0,
                 unit='seconds',
-                metadata={'LM_total_time': 100, 'Host_maintenance_end': 11},
+                metadata={
+                    'values': [1, 1, 1, 1, 1, 1, 1],
+                    'timestamps': [1000, 3000, 4000, 9000, 10000, 11000, 12000],
+                    'interval': 1,
+                    'random': 'random',
+                    'LM_total_time': 100,
+                    'Host_maintenance_end': 11,
+                },
                 timestamp=0,
             ),
             sample.Sample(
@@ -1010,6 +1058,13 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
                 metric='degradation_percent',
                 value=0.0,
                 unit='%',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_missing_seconds',
+                value=4.0,
+                unit='s',
                 metadata={'random': 'random'},
                 timestamp=0,
             ),

@@ -191,7 +191,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     base_line_values = []
     values_after_lm_starts = []
     values_after_lm_ends = []
-
+    total_missing_seconds = 0
     for i in range(len(values)):
       time = time_series[i]
       if time >= ramp_up_ends and time <= ramp_down_starts:
@@ -202,6 +202,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
           time_gap_in_seconds = (time - time_series[i - 1]) / 1000
           missing_entry_count = int((time_gap_in_seconds / interval) - 1)
           if missing_entry_count > 1:
+            total_missing_seconds += missing_entry_count * interval
             interval_values.extend(
                 [int(values[i] / float(missing_entry_count + 1))]
                 * (missing_entry_count + 1)
@@ -241,6 +242,16 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
       logging.info(
           'Number of samples after LM ends: %s', len(values_after_lm_ends)
       )
+
+    # Seconds that are missing i.e without throughput.
+    samples.append(
+        sample.Sample(
+            'total_missing_seconds',
+            total_missing_seconds,
+            's',
+            metadata=metadata,
+        )
+    )
     return samples
 
   def _ComputeLossPercentile(
