@@ -101,7 +101,10 @@ def _CopyTar(vm):
   """
 
   # Kubernetes VMs sometimes fail to copy the whole archive
-  if vm.CLOUD != provider_info.KUBERNETES:
+  if (
+      vm.CLOUD != provider_info.KUBERNETES
+      and vm.PLATFORM != provider_info.KUBERNETES
+  ):
     try:
       vm.PushDataFile(
           NETPERF_TAR, remote_path=(linux_packages.INSTALL_DIR + '/')
