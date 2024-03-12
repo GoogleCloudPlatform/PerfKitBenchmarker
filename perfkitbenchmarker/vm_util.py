@@ -393,7 +393,7 @@ def IssueCommand(
     raise_on_failure: bool = True,
     suppress_failure: Optional[Callable[[str, str, int], bool]] = None,
     raise_on_timeout: bool = True,
-    stack_level: int = 2,
+    stack_level: int = 1,
 ) -> Tuple[str, str, int]:
   """Tries running the provided command once.
 
@@ -419,7 +419,7 @@ def IssueCommand(
     raise_on_timeout: A boolean indicating if killing the process due to the
       timeout being hit should raise a IssueCommandTimeoutError
     stack_level: Number of stack frames to skip & get an "interesting" caller,
-      for logging. 2 skips this function, 3 skips this & its caller, etc..
+      for logging. 1 skips this function, 2 skips this & its caller, etc..
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
@@ -608,8 +608,9 @@ def IssueRetryableCommand(cmd, env=None):
   Returns:
     A tuple of stdout and stderr from running the provided command.
   """
+  # Additional retries will break stack_level, but works for the first one.
   stdout, stderr, retcode = IssueCommand(
-      cmd, env=env, raise_on_failure=False, stack_level=2
+      cmd, env=env, raise_on_failure=False, stack_level=3
   )
   if retcode:
     debug_text = 'Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' % (
