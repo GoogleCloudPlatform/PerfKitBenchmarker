@@ -1115,6 +1115,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # separate zone. Retrying fixes this error.
     if 'InvalidPlacementGroup.InUse' in stderr:
       raise errors.Resource.RetryableCreationError(stderr)
+    if self.use_spot_instance and re.search(
+        r'Your requested instance type .+ is not supported in your requested'
+        r' Availability Zone',
+        stderr,
+    ):
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
     if 'Unsupported' in stderr:
       raise errors.Benchmarks.UnsupportedConfigError(stderr)
     if retcode:
