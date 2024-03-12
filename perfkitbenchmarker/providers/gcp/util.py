@@ -18,10 +18,11 @@ import functools
 import json
 import logging
 import re
-from typing import Set
+from typing import Any, Optional, Set
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 import six
@@ -81,7 +82,7 @@ def GetDefaultUser():
   return result['core']['account']
 
 
-def GetRegionFromZone(zone):
+def GetRegionFromZone(zone) -> str:
   """Returns the region name from a fully-qualified zone name.
 
   Each fully-qualified GCP zone name is formatted as <region>-<zone> where, for
@@ -157,7 +158,7 @@ def GetRegionsInGeo(geo: str) -> Set[str]:
   return {region for region in GetAllRegions() if region.startswith(geo)}
 
 
-def GetMultiRegionFromRegion(region):
+def GetMultiRegionFromRegion(region: str):
   """Gets the closest multi-region location to the region."""
   if (
       region.startswith('us')
@@ -173,7 +174,7 @@ def GetMultiRegionFromRegion(region):
     raise Exception('Unknown region "%s".' % region)
 
 
-def IssueCommandFunction(cmd, **kwargs):
+def IssueCommandFunction(cmd: 'GcloudCommand', **kwargs):
   """Use vm_util to issue the given command.
 
   Args:
@@ -186,7 +187,7 @@ def IssueCommandFunction(cmd, **kwargs):
   return vm_util.IssueCommand(cmd.GetCommand(), **kwargs)
 
 
-def IssueRetryableCommandFunction(cmd, **kwargs):
+def IssueRetryableCommandFunction(cmd: 'GcloudCommand', **kwargs):
   """Use vm_util to issue the given retryable command.
 
   Args:
@@ -228,7 +229,7 @@ def SetIssueRetryableCommandFunction(func):
   _issue_retryable_command_function = func
 
 
-class GcloudCommand(object):
+class GcloudCommand:
   """A gcloud command.
 
   Attributes:
@@ -247,11 +248,11 @@ class GcloudCommand(object):
     use_beta_gcloud: boolean. Defaults to False.
   """
 
-  def __init__(self, resource, *args):
+  def __init__(self, common_resource: Optional[resource.BaseResource], *args):
     """Initializes a GcloudCommand with the provided args and common flags.
 
     Args:
-      resource: A GCE resource of type BaseResource.
+      common_resource: A GCE resource of type BaseResource.
       *args: sequence of strings. Non-flag args to pass to gcloud, typically
         specifying an operation to perform (e.g. ['compute', 'images', 'list']
         to list available images).
@@ -259,7 +260,7 @@ class GcloudCommand(object):
     self.args = list(args)
     self.flags = collections.OrderedDict()
     self.additional_flags = []
-    self._AddCommonFlags(resource)
+    self._AddCommonFlags(common_resource)
     self.rate_limited = False
     self.use_alpha_gcloud = False
     self.use_beta_gcloud = False
@@ -371,21 +372,24 @@ class GcloudCommand(object):
     """
     return _issue_retryable_command_function(self, **kwargs)
 
-  def _AddCommonFlags(self, resource):
+  def _AddCommonFlags(self, common_resource: Optional[resource.BaseResource]):
     """Adds common flags to the command.
 
     Adds common gcloud flags derived from the PKB flags and provided resource.
 
     Args:
-      resource: A GCE resource of type BaseResource.
+      common_resource: A GCE resource of type BaseResource.
     """
     self.flags['format'] = 'json'
     self.flags['quiet'] = True
-    if resource:
-      if resource.project is not None:
-        self.flags['project'] = resource.project
-      if hasattr(resource, 'zone') and resource.zone:
-        self.flags['zone'] = resource.zone
+    if common_resource:
+      if (
+          hasattr(common_resource, 'project')
+          and common_resource.project is not None
+      ):
+        self.flags['project'] = common_resource.project
+      if hasattr(common_resource, 'zone') and common_resource.zone:
+        self.flags['zone'] = common_resource.zone
     if FLAGS.project:
       # If resource did not set the flag use the global default.
       self.flags.setdefault('project', FLAGS.project)
@@ -411,7 +415,7 @@ _INVALID_MACHINE_TYPE_REGEX = re.compile(
 _INVALID_MACHINE_TYPE_MESSAGE = 'Creation failed due to invalid machine type: '
 
 
-def CheckGcloudResponseKnownFailures(stderr, retcode):
+def CheckGcloudResponseKnownFailures(stderr: str, retcode: int):
   """Checks gcloud responses for quota exceeded errors.
 
   Args:
@@ -433,7 +437,11 @@ def CheckGcloudResponseKnownFailures(stderr, retcode):
       raise errors.Benchmarks.UnsupportedConfigError(message)
 
 
-def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):
+def AuthenticateServiceAccount(
+    vm: virtual_machine.BaseVirtualMachine,
+    vm_gcloud_path: str = 'gcloud',
+    benchmark: Any = None,
+):
   """Authorize gcloud to access Google Cloud Platform with a service account.
 
   If you want gcloud (and other tools in the Cloud SDK) to use service account
@@ -476,7 +484,11 @@ def AuthenticateServiceAccount(vm, vm_gcloud_path='gcloud', benchmark=None):
   vm.RemoteCommand(activate_cmd)
 
 
-def InstallGcloudComponents(vm, vm_gcloud_path='gcloud', component='alpha'):
+def InstallGcloudComponents(
+    vm: virtual_machine.BaseVirtualMachine,
+    vm_gcloud_path: str = 'gcloud',
+    component: str = 'alpha',
+):
   """Install gcloud components on the target vm.
 
   Args:
@@ -490,7 +502,7 @@ def InstallGcloudComponents(vm, vm_gcloud_path='gcloud', component='alpha'):
   vm.RemoteCommand(install_cmd)
 
 
-def FormatTags(tags_dict):
+def FormatTags(tags_dict: dict[str, str]):
   """Format a dict of tags into arguments.
 
   Args:
@@ -504,7 +516,7 @@ def FormatTags(tags_dict):
   )
 
 
-def SplitTags(tags):
+def SplitTags(tags: str):
   """Formats a string of joined tags into a dictionary.
 
   Args:
@@ -518,7 +530,7 @@ def SplitTags(tags):
   )
 
 
-def GetDefaultTags(timeout_minutes=None):
+def GetDefaultTags(timeout_minutes: Optional[int] = None):
   """Get the default tags in a dictionary.
 
   Args:
@@ -533,7 +545,7 @@ def GetDefaultTags(timeout_minutes=None):
   return benchmark_spec.GetResourceTags(timeout_minutes)
 
 
-def MakeFormattedDefaultTags(timeout_minutes=None):
+def MakeFormattedDefaultTags(timeout_minutes: Optional[int] = None):
   """Get the default tags formatted.
 
   Args:
