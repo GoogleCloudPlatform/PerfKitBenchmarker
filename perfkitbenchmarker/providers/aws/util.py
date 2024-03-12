@@ -111,6 +111,22 @@ def GetZonesFromMachineType(machine_type: str) -> Set[str]:
   return zones
 
 
+def GetZoneId(zone_name: str) -> str:
+  """Returns the zone ID for a given zone name."""
+  region = GetRegionFromZone(zone_name)
+  stdout, _, _ = vm_util.IssueCommand(
+      AWS_PREFIX
+      + ['ec2', 'describe-availability-zones', f'--region={region}']
+      + AwsFilter({'zone-name': zone_name})
+  )
+  data = json.loads(stdout)
+  zones_data = data['AvailabilityZones']
+  # Givent the zone name filter this is guaranteed.
+  assert len(zones_data) == 1
+  assert zones_data[0]['ZoneName'] == zone_name
+  return zones_data[0]['ZoneId']
+
+
 def GetAllRegions() -> Set[str]:
   """Returns all enabled AWS regions."""
   get_regions_cmd = AWS_PREFIX + [

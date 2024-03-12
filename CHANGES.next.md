@@ -285,6 +285,7 @@
     provisioned Kubernetes clusters.
 -   Added function under perfkitbenchmarker.publisher to de-serialize labels
     from a string.
+-   Add support for S3 Express One Zone buckets with --object_storage_zone.
 
 ### Bug fixes and maintenance updates:
 

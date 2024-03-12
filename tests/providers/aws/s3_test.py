@@ -32,9 +32,9 @@ class S3Test(pkb_common_test_case.PkbCommonTestCase):
     self.mock_command.assert_called_once_with(
         [
             'aws',
-            's3',
-            'mb',
-            's3://test_bucket',
+            's3api',
+            'create-bucket',
+            '--bucket=test_bucket',
             '--region={}'.format(s3.DEFAULT_AWS_REGION),
         ],
         raise_on_failure=False,

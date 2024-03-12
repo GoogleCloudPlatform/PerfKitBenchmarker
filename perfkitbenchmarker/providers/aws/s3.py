@@ -15,9 +15,10 @@
 """Contains classes/functions related to S3."""
 
 import json
+import logging
 import os
 import posixpath
-from typing import List
+from typing import List, Optional
 
 from absl import flags
 from absl import logging
@@ -42,21 +43,67 @@ class S3Service(object_storage_service.ObjectStorageService):
   STORAGE_NAME = provider_info.AWS
 
   region: str
+  zone: Optional[str] = None
+  zone_id: Optional[str] = None
 
   def PrepareService(self, location):
-    self.region = location or DEFAULT_AWS_REGION
+    if not location:
+      self.region = DEFAULT_AWS_REGION
+    elif util.IsRegion(location):
+      self.region = location
+    else:
+      self.zone = location
+      self.zone_id = util.GetZoneId(self.zone)
+      self.region = util.GetRegionFromZone(location)
+
+  def S3ExpressZonalSuffix(self) -> str:
+    """Get the required suffix of S3Express buckets in this Zone."""
+    assert self.zone_id is not None
+    return f'--{self.zone_id}--x-s3'
 
   def MakeBucket(self, bucket_name, raise_on_failure=True, tag_bucket=True):
+    if self.zone and not bucket_name.endswith(self.S3ExpressZonalSuffix()):
+      raise errors.Benchmarks.BucketCreationError(
+          f'S3 Express Buckets in zone {self.zone_id} must end with '
+          f'{self.S3ExpressZonalSuffix()}')
+
+    bucket_configuration = None
+    if self.zone:
+      bucket_configuration = (
+          f'Location={{Type=AvailabilityZone,Name={self.zone_id}}},'
+          'Bucket={DataRedundancy=SingleAvailabilityZone,Type=Directory}'
+      )
+      # S3 express does not seem to support bucket tagging or TTL at the moment.
+      tag_bucket = False
+      assert not object_storage_service.OBJECT_TTL_DAYS.value
+    # For legacy reason us-east-1 cannot use a location constraint and all other
+    # regions need one.
+    elif self.region != DEFAULT_AWS_REGION:
+      bucket_configuration = (
+          f'LocationConstraint={self.region}'
+      )
+      # S3 express does not seem to support bucket tagging or TTL at the moment.
+      tag_bucket = False
+      assert not object_storage_service.OBJECT_TTL_DAYS.value
+
     command = [
         'aws',
-        's3',
-        'mb',
-        's3://%s' % bucket_name,
-        '--region=%s' % self.region,
+        's3api',
+        'create-bucket',
+        f'--bucket={bucket_name}',
+        f'--region={self.region}',
     ]
+    if bucket_configuration:
+      command.append(f'--create-bucket-configuration={bucket_configuration}')
+
     _, stderr, ret_code = vm_util.IssueCommand(command, raise_on_failure=False)
-    if ret_code and raise_on_failure:
-      raise errors.Benchmarks.BucketCreationError(stderr)
+    if ret_code:
+      if raise_on_failure:
+        raise errors.Benchmarks.BucketCreationError(stderr)
+      else:
+        logging.warning(
+            'Failed to create bucket %s. Not tagging.', bucket_name)
+        return
 
     if tag_bucket:
       # Tag the bucket with the persistent timeout flag so that buckets can

@@ -82,13 +82,20 @@ flags.DEFINE_enum(
     'storage provider (GCP/AZURE/AWS/OPENSTACK) to use.',
 )
 
-flags.DEFINE_string(
+OBJECT_STORAGE_REGION = flags.DEFINE_string(
     'object_storage_region',
     None,
     'Storage region for object storage benchmark.',
 )
 
-flags.DEFINE_string(
+OBJECT_STORAGE_ZONE = flags.DEFINE_string(
+    'object_storage_zone',
+    None,
+    'Storage zone for object storage benchmark. Currently only supported by '
+    'S3 Express.',
+)
+
+OBJECT_STORAGE_GCS_MULTIREGION = flags.DEFINE_string(
     'object_storage_gcs_multiregion',
     None,
     'Storage multiregion for GCS in object storage benchmark.',
@@ -374,10 +381,6 @@ RETRY_WAIT_INTERVAL_SECONDS = 30
 DEFAULT_GCS_MULTIREGION = 'us'
 
 # Keys for flag names and metadata values
-OBJECT_STORAGE_REGION = 'object_storage_region'
-REGIONAL_BUCKET_LOCATION = 'regional_bucket_location'
-OBJECT_STORAGE_GCS_MULTIREGION = 'object_storage_gcs_multiregion'
-GCS_MULTIREGION_LOCATION = 'gcs_multiregion_location'
 DEFAULT = 'default'
 
 # This accounts for the overhead of running RemoteCommand() on a VM.
@@ -1157,7 +1160,7 @@ def _ColdObjectsWrittenFilename():
     datetime_suffix = _DatetimeNow().strftime('%Y%m%d-%H%M')
     return '%s-%s-%s-%s' % (
         FLAGS.object_storage_objects_written_file_prefix,
-        FLAGS.object_storage_region,
+        OBJECT_STORAGE_REGION.value,
         uuid.uuid4(),  # Add a UUID to support parallel runs that upload data.
         datetime_suffix,
     )
@@ -1546,8 +1549,14 @@ def CheckPrerequisites(benchmark_config):
   """
   del benchmark_config
   data.ResourcePath(DATA_FILE)
+  if OBJECT_STORAGE_REGION.value and OBJECT_STORAGE_ZONE.value:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        '--object_storage_region and --object_storage_zone are mutually '
+        'exclusive.'
+    )
+
   if FLAGS.object_storage_apply_region_suffix_to_bucket_name:
-    if not FLAGS.object_storage_region:
+    if not OBJECT_STORAGE_REGION.value:
       raise errors.Setup.InvalidFlagConfigurationError(
           'Please specify --object_storage_region if using '
           '--object_storage_apply_region_suffix_to_bucket_name.'
@@ -1756,7 +1765,7 @@ def Prepare(benchmark_spec):
     # there is ever more than one.
     search_prefix = '%s-%s*' % (
         FLAGS.object_storage_read_objects_prefix,
-        FLAGS.object_storage_region,
+        OBJECT_STORAGE_REGION.value,
     )
     read_objects_filenames = glob.glob(search_prefix)
     logging.info(
@@ -1818,11 +1827,22 @@ def Prepare(benchmark_spec):
       # clouds cannot contain non-alphanumeric characters.
       bucket_name = '%s%s' % (
           bucket_name,
-          re.sub(r'[\W_]', '', FLAGS.object_storage_region),
+          re.sub(r'[\W_]', '', OBJECT_STORAGE_REGION.value),
       )
 
   service = object_storage_service.GetObjectStorageClass(FLAGS.storage)()
-  if (
+  if OBJECT_STORAGE_ZONE.value:
+    service.PrepareService(OBJECT_STORAGE_ZONE.value)
+    if FLAGS.storage == 'AWS':
+      if FLAGS.object_storage_bucket_name:
+        # If the user passed a flag, leave it alone and let S3 eror out if
+        # it's invalid rather than fixing it.
+        # TODO(pclay): consider fixing for user instead.
+        pass
+      else:
+        # Required for S3 zonal buckets.
+        bucket_name += service.S3ExpressZonalSuffix()
+  elif (
       FLAGS.storage == 'Azure'
       and FLAGS.object_storage_read_objects_prefix is not None
   ):
@@ -1831,7 +1851,7 @@ def Prepare(benchmark_spec):
     # account and resource group associated with the bucket containing our
     # objects
     service.PrepareService(
-        FLAGS.object_storage_region,
+        OBJECT_STORAGE_REGION.value,
         # On Azure, use an existing storage account if we
         # are reading existing objects
         (
@@ -1844,13 +1864,13 @@ def Prepare(benchmark_spec):
     # a storage account and resource group for this bucket based on the same
     # name (for consistency).
     service.PrepareService(
-        FLAGS.object_storage_region,
+        OBJECT_STORAGE_REGION.value,
         # The storage account must not exceed 24 characters.
         (bucket_name[:24], bucket_name + '-resource-group'),
         try_to_create_storage_account_and_resource_group=True,
     )
   else:
-    service.PrepareService(FLAGS.object_storage_region)
+    service.PrepareService(OBJECT_STORAGE_REGION.value)
 
   vms = benchmark_spec.vms
   background_tasks.RunThreaded(lambda vm: PrepareVM(vm, service), vms)
@@ -1862,11 +1882,11 @@ def Prepare(benchmark_spec):
     # the bucket, but won't fail if it was created. This supports running the
     # benchmark on the same bucket multiple times.
     raise_on_bucket_creation_failure = not FLAGS.object_storage_bucket_name
-    if FLAGS.storage == 'GCP' and FLAGS.object_storage_gcs_multiregion:
+    if FLAGS.storage == 'GCP' and OBJECT_STORAGE_GCS_MULTIREGION.value:
       # Use a GCS multiregional bucket
       multiregional_service = gcs.GoogleCloudStorageService()
       multiregional_service.PrepareService(
-          FLAGS.object_storage_gcs_multiregion or DEFAULT_GCS_MULTIREGION
+          OBJECT_STORAGE_GCS_MULTIREGION.value or DEFAULT_GCS_MULTIREGION
       )
       multiregional_service.MakeBucket(
           bucket_name, raise_on_failure=raise_on_bucket_creation_failure
@@ -1907,15 +1927,19 @@ def Run(benchmark_spec):
 
   vms = benchmark_spec.vms
 
-  if FLAGS[OBJECT_STORAGE_REGION].present:
-    metadata[REGIONAL_BUCKET_LOCATION] = FLAGS.object_storage_region
+  if zone := OBJECT_STORAGE_ZONE.value:
+    metadata['bucket_location'] = zone
+    metadata['bucket_locality'] = 'zonal'
+  elif region := OBJECT_STORAGE_REGION.value:
+    metadata['bucket_location'] = region
+    metadata['bucket_locality'] = 'regional'
+    metadata['regional_bucket_location'] = region
+  elif multiregion := OBJECT_STORAGE_GCS_MULTIREGION.value:
+    metadata['bucket_location'] = multiregion
+    metadata['bucket_locality'] = 'multiregional'
   else:
-    metadata[REGIONAL_BUCKET_LOCATION] = DEFAULT
-
-  if FLAGS[OBJECT_STORAGE_GCS_MULTIREGION].present:
-    metadata[GCS_MULTIREGION_LOCATION] = FLAGS.object_storage_gcs_multiregion
-  else:
-    metadata[GCS_MULTIREGION_LOCATION] = DEFAULT
+    metadata['bucket_location'] = DEFAULT
+    metadata['bucket_locality'] = 'regional'
 
   metadata.update(service.Metadata(vms[0]))
 
