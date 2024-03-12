@@ -37,9 +37,18 @@ _TRACE_VM_GROUPS = flags.DEFINE_list(
     'trace_vm_groups',
     None,
     (
-        'Run traces on all vms in the vm groups.By default traces runs on all'
+        'Run traces on all vms in the vm groups. By default traces runs on all'
         ' VMs, for client and server architecture, specify trace vm groups to'
         ' servers to only collect metrics on server vms.'
+    ),
+)
+
+_TRACE_PRIMARY_SERVER = flags.DEFINE_bool(
+    'trace_primary_server',
+    False,
+    (
+        'Run traces only on a single vm.  Use with trace_vm_groups'
+        ' to only collect metrics on a single primary server vm.'
     ),
 )
 
@@ -160,6 +169,10 @@ class BaseCollector(object):
     else:
       self.vm_groups = benchmark_spec.vm_groups
     vms = sum(self.vm_groups.values(), [])
+
+    if _TRACE_PRIMARY_SERVER.value:
+      vms = vms[:1]
+
     self.StartOnVms(sender, vms, suffix)
 
   def StartOnVms(self, sender, vms, id_suffix):

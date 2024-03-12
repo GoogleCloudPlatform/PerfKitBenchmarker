@@ -35,6 +35,16 @@ _TRIGGER_VM_GROUPS = flags.DEFINE_list(
     'specify trace vm groups to servers to only collect metrics on server vms.',
 )
 
+_TRIGGER_PRIMARY_SERVER = flags.DEFINE_bool(
+    'trigger_primary_server',
+    False,
+    (
+        'Run trigger only on a single vm.'
+        ' Use with trigger_vm_groups to only collect metrics on '
+        ' a single primary server vm.'
+    ),
+)
+
 
 class BaseTimeTrigger(metaclass=abc.ABCMeta):
   """Object representing a Base Time Trigger.
@@ -85,6 +95,8 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
     else:
       self.vms = benchmark_spec.vms
 
+    if _TRIGGER_PRIMARY_SERVER.value:
+      self.vms = self.vms[:1]
     self.SetUp()
 
   def RunTrigger(self, unused_sender):
