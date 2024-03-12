@@ -96,10 +96,9 @@ vbench_transcoding:
           disk_size: 542
           disk_type: PremiumV2_LRS
           mount_point: /scratch
+          provisioned_iops: 3000
+          provisioned_throughput: 500
       os_type: ubuntu2004
-  flags:
-    azure_provisioned_iops: 3000
-    azure_provisioned_throughput: 500
 """
 
 

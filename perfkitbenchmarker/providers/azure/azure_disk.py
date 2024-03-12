@@ -176,6 +176,8 @@ class AzureDisk(disk.BaseDisk):
     self.is_image = is_image
     self._deleted = False
     self.machine_type = vm.machine_type
+    self.provisioned_iops = disk_spec.provisioned_iops
+    self.provisioned_throughput = disk_spec.provisioned_throughput
     if (
         self.disk_type == PREMIUM_STORAGE
         or self.disk_type == PREMIUM_STORAGE_V2
@@ -281,7 +283,7 @@ class AzureDisk(disk.BaseDisk):
         )
 
       if self.disk_type in [ULTRA_STORAGE, PREMIUM_STORAGE_V2] and (
-          FLAGS.azure_provisioned_iops or FLAGS.azure_provisioned_throughput
+          self.provisioned_iops or self.provisioned_throughput
       ):
         args = [
             azure.AZURE_PATH,
@@ -291,15 +293,15 @@ class AzureDisk(disk.BaseDisk):
             self.name,
         ] + self.resource_group.args
 
-        if FLAGS.azure_provisioned_iops:
+        if self.provisioned_iops:
           args = args + [
               '--disk-iops-read-write',
-              str(FLAGS.azure_provisioned_iops),
+              str(self.provisioned_iops),
           ]
-        if FLAGS.azure_provisioned_throughput:
+        if self.provisioned_throughput:
           args = args + [
               '--disk-mbps-read-write',
-              str(FLAGS.azure_provisioned_throughput),
+              str(self.provisioned_throughput),
           ]
 
         _, _, _ = vm_util.IssueCommand(args, raise_on_failure=True)

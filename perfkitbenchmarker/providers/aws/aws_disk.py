@@ -354,13 +354,7 @@ AWS = 'AWS'
 
 
 class AwsDiskSpec(disk.BaseDiskSpec):
-  """Object holding the information needed to create an AwsDisk.
-
-  Attributes:
-    provisioned_iops: None or int. IOPS for Provisioned IOPS (SSD) volumes in
-      AWS.
-    throughput: None or int. Throughput for (SSD) volumes in AWS.
-  """
+  """Object holding the information needed to create an AwsDisk."""
 
   create_with_vm: bool
   CLOUD = provider_info.AWS
@@ -378,12 +372,6 @@ class AwsDiskSpec(disk.BaseDiskSpec):
         provided config values.
     """
     super(AwsDiskSpec, cls)._ApplyFlags(config_values, flag_values)
-    if flag_values['provisioned_iops'].present:
-      config_values['provisioned_iops'] = flag_values.provisioned_iops
-    if flag_values['provisioned_throughput'].present:
-      config_values['provisioned_throughput'] = (
-          flag_values.provisioned_throughput
-      )
     if flag_values['aws_create_disks_with_vm'].present:
       config_values['create_with_vm'] = flag_values.aws_create_disks_with_vm
 
@@ -397,18 +385,6 @@ class AwsDiskSpec(disk.BaseDiskSpec):
           arguments to construct in order to decode the named option.
     """
     result = super(AwsDiskSpec, cls)._GetOptionDecoderConstructions()
-    result.update({
-        'provisioned_iops': (
-            option_decoders.IntDecoder,
-            {'default': None, 'none_ok': True},
-        )
-    })
-    result.update({
-        'provisioned_throughput': (
-            option_decoders.IntDecoder,
-            {'default': None, 'none_ok': True},
-        )
-    })
     result.update({
         'create_with_vm': (
             option_decoders.BooleanDecoder,

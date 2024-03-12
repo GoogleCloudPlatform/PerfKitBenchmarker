@@ -24,8 +24,6 @@ mysql_tpcc:
     db_high_availability: False
     innodb_buffer_pool_ratio: 0.8
     timeout_minutes: 360
-    azure_provisioned_iops: 40000
-    azure_provisioned_throughput: 1200
   relational_db:
     engine: mysql
     vm_groups:
@@ -64,6 +62,8 @@ mysql_tpcc:
           Azure: # Premiumv2 disks matching 4TB pd-ssd
             disk_size: 2000
             disk_type: PremiumV2_LRS
+            provisioned_iops: 40000
+            provisioned_throughput: 1200
 
 postgres_tpcc:
   name: hammerdbcli
@@ -80,8 +80,6 @@ postgres_tpcc:
     postgres_shared_buffer_ratio: 0.25
     metadata: shared_buffer_ratio:0.25
     timeout_minutes: 360
-    azure_provisioned_iops: 64000
-    azure_provisioned_throughput: 1200
   relational_db:
     engine: postgres
     vm_groups:
@@ -114,6 +112,8 @@ postgres_tpcc:
           Azure: # Premiumv2 disks matching 4TB pd-ssd
             disk_size: 2000
             disk_type: PremiumV2_LRS
+            provisioned_iops: 64000
+            provisioned_throughput: 1200
 
 hpcc_stream:
   name: hpcc

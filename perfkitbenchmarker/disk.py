@@ -76,14 +76,12 @@ flags.DEFINE_list(
 flags.DEFINE_integer(
     'provisioned_iops',
     None,
-    'Iops to provision, if applicable. Defaults to None. This flag only applies'
-    'to GCP and AWS.',
+    'Iops to provision, if applicable. Defaults to None.',
 )
 flags.DEFINE_integer(
     'provisioned_throughput',
     None,
-    'Throughput to provision, if applicable. Defaults to None. This flag only'
-    'applies to GCP and AWS.',
+    'Throughput to provision, if applicable. Defaults to None.',
 )
 
 
@@ -165,6 +163,8 @@ class BaseDiskSpec(spec.BaseSpec):
     self.num_striped_disks: int = None
     self.num_partitions = None
     self.partition_size = None
+    self.provisioned_iops = None
+    self.provisioned_throughput = None
     super(BaseDiskSpec, self).__init__(*args, **kwargs)
 
   @classmethod
@@ -196,6 +196,12 @@ class BaseDiskSpec(spec.BaseSpec):
       config_values['num_partitions'] = flag_values.num_partitions
     if flag_values['partition_size'].present:
       config_values['partition_size'] = flag_values.partition_size
+    if flag_values['provisioned_iops'].present:
+      config_values['provisioned_iops'] = flag_values.provisioned_iops
+    if flag_values['provisioned_throughput'].present:
+      config_values['provisioned_throughput'] = (
+          flag_values.provisioned_throughput
+      )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -241,6 +247,14 @@ class BaseDiskSpec(spec.BaseSpec):
         ),
         'partition_size': (
             option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'provisioned_iops': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'provisioned_throughput': (
+            option_decoders.IntDecoder,
             {'default': None, 'none_ok': True},
         ),
     })
