@@ -597,20 +597,22 @@ def IssueBackgroundCommand(cmd, stdout_path, stderr_path, env=None):
 
 
 @Retry()
-def IssueRetryableCommand(cmd, env=None):
+def IssueRetryableCommand(cmd, env=None, **kwargs):
   """Tries running the provided command until it succeeds or times out.
 
   Args:
     cmd: A list of strings such as is given to the subprocess.Popen()
       constructor.
     env: An alternate environment to pass to the Popen command.
+    **kwargs: additional arguments for the command
 
   Returns:
     A tuple of stdout and stderr from running the provided command.
   """
   # Additional retries will break stack_level, but works for the first one.
+  kwargs['stack_level'] = kwargs.get('stack_level', 1) + 2
   stdout, stderr, retcode = IssueCommand(
-      cmd, env=env, raise_on_failure=False, stack_level=3
+      cmd, env=env, raise_on_failure=False, **kwargs
   )
   if retcode:
     debug_text = 'Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' % (

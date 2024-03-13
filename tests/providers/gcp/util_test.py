@@ -221,7 +221,7 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
           '--format',
           'json',
           '--quiet',
-      ])
+      ], stack_level=mock.ANY)
     self.assertEqual(return_value, mock_issue_return_value)
 
   def testIssueWarningSuppressed(self):
@@ -242,7 +242,7 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
           '--format',
           'json',
           '--quiet',
-      ])
+      ], stack_level=mock.ANY)
     self.assertEqual(return_value, mock_issue_return_value)
 
   def testIssueRetryable(self):
@@ -263,7 +263,7 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
           '--format',
           'json',
           '--quiet',
-      ])
+      ], stack_level=mock.ANY)
     self.assertEqual(return_value, mock_issue_return_value)
 
   def testGetRegionFromZone(self):

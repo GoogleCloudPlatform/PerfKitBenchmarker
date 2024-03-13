@@ -116,6 +116,7 @@ class GcePlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
             '2',
         ],
         raise_on_failure=False,
+        stack_level=mock.ANY,
     )
 
   def testPlacementGroupDelete(self):
@@ -139,6 +140,7 @@ class GcePlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
             'us-east1',
         ],
         raise_on_failure=False,
+        stack_level=mock.ANY,
     )
 
   def testPlacementGroupQuotaFailure(self):

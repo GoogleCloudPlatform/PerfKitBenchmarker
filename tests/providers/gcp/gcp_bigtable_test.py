@@ -341,8 +341,12 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertSequenceEqual(
         [
-            mock.call(matchers.HASALLOF('--num-nodes', '6')),
-            mock.call(matchers.HASALLOF('--num-nodes', '6')),
+            mock.call(
+                matchers.HASALLOF('--num-nodes', '6'), stack_level=mock.ANY
+            ),
+            mock.call(
+                matchers.HASALLOF('--num-nodes', '6'), stack_level=mock.ANY
+            ),
         ],
         cmd.mock_calls,
     )

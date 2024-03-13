@@ -390,6 +390,7 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
             ],
             raise_on_failure=False,
             timeout=None,
+            stack_level=mock.ANY,
         ),
         mock.call(
             [
@@ -406,6 +407,7 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
             ],
             raise_on_failure=False,
             timeout=None,
+            stack_level=mock.ANY,
         ),
     ])
 

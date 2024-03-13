@@ -184,6 +184,7 @@ def IssueCommandFunction(cmd: 'GcloudCommand', **kwargs):
   Returns:
     stdout, stderr, retcode tuple from running the command
   """
+  kwargs['stack_level'] = kwargs.get('stack_level', 1) + 1
   return vm_util.IssueCommand(cmd.GetCommand(), **kwargs)
 
 
@@ -197,6 +198,7 @@ def IssueRetryableCommandFunction(cmd: 'GcloudCommand', **kwargs):
   Returns:
     stdout, stderr, tuple from running the command
   """
+  kwargs['stack_level'] = kwargs.get('stack_level', 1) + 1
   return vm_util.IssueRetryableCommand(cmd.GetCommand(), **kwargs)
 
 
@@ -331,6 +333,8 @@ class GcloudCommand:
       IssueCommandError: if command fails without Rate Limit Exceeded.
     """
     try:
+      # Increase stack_level by 2 to compensate for Retry.
+      kwargs['stack_level'] = kwargs.get('stack_level', 1) + 2
       stdout, stderr, retcode = _issue_command_function(self, **kwargs)
     except errors.VmUtil.IssueCommandError as error:
       error_message = str(error)
@@ -370,6 +374,7 @@ class GcloudCommand:
     Returns:
       (stdout, stderr) pair of strings from running the gcloud command.
     """
+    kwargs['stack_level'] = kwargs.get('stack_level', 1) + 1
     return _issue_retryable_command_function(self, **kwargs)
 
   def _AddCommonFlags(self, common_resource: Optional[resource.BaseResource]):
