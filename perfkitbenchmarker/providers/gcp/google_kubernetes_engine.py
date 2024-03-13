@@ -284,6 +284,10 @@ class GkeCluster(container_service.KubernetesCluster):
     """Modifies cmd to include node specific command arguments."""
     # Apply labels to all nodepools.
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+    # Allow a long timeout due to the many minutes it can take to provision a
+    # large GPU-accelerated GKE cluster.
+    # Parameter is not documented well but is available in CLI.
+    cmd.flags['timeout'] = ONE_HOUR
 
     if nodepool_config.gpu_count:
       if 'a2-' not in nodepool_config.machine_type:
