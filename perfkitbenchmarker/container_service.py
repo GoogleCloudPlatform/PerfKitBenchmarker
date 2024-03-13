@@ -212,7 +212,7 @@ class BaseContainerService(resource.BaseResource):
     self.host_header: Optional[str] = None
 
 
-class _ContainerImage:
+class ContainerImage:
   """Simple class for tracking container image names and source locations."""
 
   def __init__(self, name: str):
@@ -279,11 +279,11 @@ class BaseContainerRegistry(resource.BaseResource):
     """
     raise NotImplementedError()
 
-  def PrePush(self, image: _ContainerImage):
+  def PrePush(self, image: ContainerImage):
     """Prepares registry to push a given image."""
     pass
 
-  def RemoteBuild(self, image: _ContainerImage):
+  def RemoteBuild(self, image: ContainerImage):
     """Build the image remotely.
 
     Args:
@@ -295,7 +295,7 @@ class BaseContainerRegistry(resource.BaseResource):
     """Log in to the registry (in order to push to it)."""
     raise NotImplementedError()
 
-  def LocalBuildAndPush(self, image: _ContainerImage):
+  def LocalBuildAndPush(self, image: ContainerImage):
     """Build the image locally and push to registry.
 
     Assumes we are already authenticated with the registry from self.Login.
@@ -345,7 +345,7 @@ class BaseContainerRegistry(resource.BaseResource):
     Args:
       image: The PKB name for the image (string).
     """
-    image = _ContainerImage(image)
+    image = ContainerImage(image)
     build_start = time.time()
     if not FLAGS.local_container_build:
       try:

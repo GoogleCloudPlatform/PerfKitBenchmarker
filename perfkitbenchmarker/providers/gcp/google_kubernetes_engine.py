@@ -18,6 +18,7 @@ import logging
 import math
 import os
 import re
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import container_service
@@ -26,6 +27,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
@@ -70,7 +72,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
     super(GoogleContainerRegistry, self).__init__(registry_spec)
     self.project = self.project or util.GetDefaultProject()
 
-  def GetFullRegistryTag(self, image):
+  def GetFullRegistryTag(self, image: str) -> str:
     """Gets the full tag of the image."""
     region = util.GetMultiRegionFromRegion(util.GetRegionFromZone(self.zone))
     hostname = '{region}.gcr.io'.format(region=region)
@@ -86,7 +88,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
     del cmd.flags['zone']
     cmd.Issue()
 
-  def RemoteBuild(self, image):
+  def RemoteBuild(self, image: container_service.ContainerImage):
     """Build the image remotely."""
     if not _CONTAINER_REMOTE_BUILD_CONFIG.value:
       full_tag = self.GetFullRegistryTag(image.name)
@@ -111,7 +113,7 @@ class GkeCluster(container_service.KubernetesCluster):
 
   CLOUD = provider_info.GCP
 
-  def __init__(self, spec):
+  def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(spec)
     self.project = spec.vm_spec.project
     self.cluster_version = FLAGS.container_cluster_version
@@ -163,7 +165,7 @@ class GkeCluster(container_service.KubernetesCluster):
     nodepool_config.cpus: int = vm_config.cpus
     nodepool_config.memory_mib: int = vm_config.memory_mib
 
-  def GetResourceMetadata(self):
+  def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the cluster.
 
     Returns:
@@ -187,7 +189,7 @@ class GkeCluster(container_service.KubernetesCluster):
       result['gpu_count'] = self.nodepools['nccl'].gpu_count
     return result
 
-  def _GcloudCommand(self, *args, **kwargs):
+  def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Fix zone and region."""
     cmd = util.GcloudCommand(self, *args, **kwargs)
     if len(self.zones) != 1:
@@ -264,7 +266,7 @@ class GkeCluster(container_service.KubernetesCluster):
       )
       self._IssueResourceCreationCommand(cmd)
 
-  def _IssueResourceCreationCommand(self, cmd):
+  def _IssueResourceCreationCommand(self, cmd: util.GcloudCommand):
     """Issues a command to gcloud to create resources."""
 
     # This command needs a long timeout due to the many minutes it
@@ -274,7 +276,11 @@ class GkeCluster(container_service.KubernetesCluster):
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
 
-  def _AddNodeParamsToCmd(self, nodepool_config, cmd):
+  def _AddNodeParamsToCmd(
+      self,
+      nodepool_config: container_service.BaseNodePoolConfig,
+      cmd: util.GcloudCommand,
+  ):
     """Modifies cmd to include node specific command arguments."""
     # Apply labels to all nodepools.
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
