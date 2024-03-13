@@ -153,6 +153,16 @@ def Prepare(benchmark_spec):
       (lambda f: f()), server_partials + client_partials
   )
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
+  load_kwargs = {
+      'mongodb.url': benchmark_spec.mongodb_url,
+      'mongodb.batchsize': 10,
+      'mongodb.upsert': True,
+      'core_workload_insertion_retry_limit': 10,
+  }
+  benchmark_spec.executor.Load(
+      benchmark_spec.vm_groups['clients'],
+      load_kwargs=load_kwargs,
+  )
 
 
 def Run(benchmark_spec):

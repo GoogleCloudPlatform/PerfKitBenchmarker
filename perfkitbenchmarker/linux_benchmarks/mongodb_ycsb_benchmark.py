@@ -250,6 +250,12 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   benchmark_spec.mongodb_url = _GetMongoDbURL(benchmark_spec)
+  benchmark_spec.mongodb_version = re.findall(
+      _VERSION_REGEX,
+      mongosh.RunCommand(
+          benchmark_spec.vm_groups['primary'][0], 'db.version()'
+      )[0],
+  )[-1]
   load_kwargs = {
       'mongodb.url': benchmark_spec.mongodb_url,
       'mongodb.batchsize': 10,
@@ -284,16 +290,12 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           run_kwargs=run_kwargs,
       )
   )
-  mongodb_version = re.findall(
-      _VERSION_REGEX,
-      mongosh.RunCommand(
-          benchmark_spec.vm_groups['primary'][0], 'db.version()'
-      )[0],
-  )[-1]
+
   if FLAGS.mongodb_readahead_kb is not None:
     for s in samples:
       s.metadata['readahdead_kb'] = FLAGS.mongodb_readahead_kb
-      s.metadata['mongodb_version'] = mongodb_version
+      if hasattr(benchmark_spec, 'mongodb_version'):
+        s.metadata['mongodb_version'] = benchmark_spec.mongodb_version
   return samples
 
 
