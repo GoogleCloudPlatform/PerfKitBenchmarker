@@ -1421,21 +1421,23 @@ def RunBenchmarks():
     )
 
   # Write completion status file(s)
+  if FLAGS.completion_status_file:
+    with open(FLAGS.completion_status_file, 'w') as status_file:
+      _WriteCompletionStatusFile(benchmark_specs, status_file)
   completion_status_file_name = vm_util.PrependTempDir(
       COMPLETION_STATUS_FILE_NAME
   )
   with open(completion_status_file_name, 'w') as status_file:
     _WriteCompletionStatusFile(benchmark_specs, status_file)
-  if FLAGS.completion_status_file:
-    with open(FLAGS.completion_status_file, 'w') as status_file:
-      _WriteCompletionStatusFile(benchmark_specs, status_file)
 
+  # Upload PKB logs to GCS after all benchmark runs are complete.
+  log_util.CollectPKBLogs()
   all_benchmarks_succeeded = all(
       spec.status == benchmark_status.SUCCEEDED for spec in benchmark_specs
   )
-  # Upload PKB logs to GCS after all benchmark runs are complete.
-  log_util.CollectPKBLogs()
-  return 0 if all_benchmarks_succeeded else 1
+  return_code = 0 if all_benchmarks_succeeded else 1
+  logging.info('PKB exiting with return_code %s', return_code)
+  return return_code
 
 
 def _GenerateBenchmarkDocumentation():
