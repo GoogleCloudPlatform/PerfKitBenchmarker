@@ -113,6 +113,7 @@ flags.DEFINE_integer(
     'Delay in seconds to delay in between boot tasks.',
 )
 # pyformat: disable
+# TODO(user): Delete this flag after fulling updating gcl.
 flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
                   [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
                   'Method used to check compatibility between the benchmark '

@@ -18,15 +18,4 @@ from perfkitbenchmarker import provider_info
 
 
 class DockerProviderInfo(provider_info.BaseProviderInfo):
-  SUPPORTED_BENCHMARKS = []
-
-  UNSUPPORTED_BENCHMARKS = ['sysbench']
-
   CLOUD = provider_info.DOCKER
-
-  @classmethod
-  def IsBenchmarkSupported(cls, benchmark):
-    if benchmark in cls.UNSUPPORTED_BENCHMARKS:
-      return False
-    else:
-      return True

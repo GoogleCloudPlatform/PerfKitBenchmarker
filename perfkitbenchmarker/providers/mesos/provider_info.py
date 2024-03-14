@@ -18,35 +18,4 @@ from perfkitbenchmarker import provider_info
 
 
 class MesosProviderInfo(provider_info.BaseProviderInfo):
-  SUPPORTED_BENCHMARKS = [
-      'block_storage_workload',
-      'cassandra_stress',
-      'cassandra_ycsb',
-      'cluster_boot',
-      'copy_throughput',
-      'fio',
-      'hbase_ycsb',
-      'hpcc',
-      'iperf',
-      'mongodb_ycsb',
-      'netperf',
-      'oldisim',
-      'ping',
-      'redis',
-      'redis_ycsb',
-      'scimark2',
-      'silo',
-      'sysbench_oltp',
-  ]
-  UNSUPPORTED_BENCHMARKS = ['bonnieplusplus', 'mysql_service']
-
   CLOUD = provider_info.MESOS
-
-  @classmethod
-  def IsBenchmarkSupported(cls, benchmark):
-    if benchmark in cls.SUPPORTED_BENCHMARKS:
-      return True
-    elif benchmark in cls.UNSUPPORTED_BENCHMARKS:
-      return False
-    else:
-      return None

@@ -18,27 +18,4 @@ from perfkitbenchmarker import provider_info
 
 
 class KubernetesProviderInfo(provider_info.BaseProviderInfo):
-  SUPPORTED_BENCHMARKS = [
-      'block_storage_workload',
-      'cassandra_ycsb',
-      'cassandra_stress',
-      'cluster_boot',
-      'fio',
-      'iperf',
-      'mesh_network',
-      'mongodb_ycsb',
-      'netperf',
-      'redis',
-  ]
-  UNSUPPORTED_BENCHMARKS = ['bonnieplusplus', 'sysbench']
-
   CLOUD = provider_info.KUBERNETES
-
-  @classmethod
-  def IsBenchmarkSupported(cls, benchmark):
-    if benchmark in cls.SUPPORTED_BENCHMARKS:
-      return True
-    elif benchmark in cls.UNSUPPORTED_BENCHMARKS:
-      return False
-    else:
-      return None

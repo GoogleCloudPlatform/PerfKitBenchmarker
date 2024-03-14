@@ -19,5 +19,4 @@ from perfkitbenchmarker import provider_info
 
 
 class ProfitBricksProviderInfo(provider_info.BaseProviderInfo):
-  UNSUPPORTED_BENCHMARKS = ['mysql_service']
   CLOUD = provider_info.PROFITBRICKS

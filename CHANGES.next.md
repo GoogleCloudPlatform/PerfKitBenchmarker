@@ -46,6 +46,7 @@
     dataflow_max_worker_count in spec to allow users to set this parameter on
     their own.
 -   Remove flag fio_write_against_multiple_clients from FIO.
+-   Remove flag benchmark_compatibility_checking.
 -   Drop windows coremark benchmark.
 -   Remove cudnn linux package.
 -   Make Ubuntu 20 the default os_type.

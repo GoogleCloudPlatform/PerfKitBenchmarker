@@ -18,5 +18,4 @@ from perfkitbenchmarker import provider_info
 
 
 class OpenStackProviderInfo(provider_info.BaseProviderInfo):
-  UNSUPPORTED_BENCHMARKS = ['mysql_service']
   CLOUD = provider_info.OPENSTACK
