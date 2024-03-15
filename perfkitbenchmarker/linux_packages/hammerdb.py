@@ -169,7 +169,7 @@ HAMMERDB_TPCC_NUM_WAREHOUSE = flags.DEFINE_integer(
 
 HAMMERDB_TPCC_ALL_WAREHOUSE = flags.DEFINE_bool(
     'hammerdbcli_tpcc_all_warehouse',
-    False,
+    True,
     'Uses all warehouse in TPCC benchmark',
 )
 

@@ -159,6 +159,7 @@
     done before config overrides. Within default_benchmark_config.yaml, add
     configs for netperf_tcp_rr, netperf_tcp_stream, and hammerdbcli_mysql.
 -   Add support for Ubuntu 23.10.
+-   HammerDB enables "Use All Warehouses" by default for increased I/O.
 
 ### Enhancements:
 
