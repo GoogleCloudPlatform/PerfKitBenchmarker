@@ -98,6 +98,7 @@ class AzureCreateRemoteDiskStrategy(AzureCreateDiskStrategy):
     super().__init__(vm, disk_spec, disk_count)
     self.remote_disk_groups = []
     self.vm = vm
+    self.setup_disk_strategy = None
     for _, disk_spec in enumerate(self.disk_specs):
       disks = []
       for _ in range(disk_spec.num_striped_disks):
@@ -121,12 +122,15 @@ class AzureCreateRemoteDiskStrategy(AzureCreateDiskStrategy):
 
   def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
     """Returns the SetUpDiskStrategy for the disk."""
-    return AzureSetUpRemoteDiskStrategy(self.vm, self.disk_specs)
+    if self.setup_disk_strategy is None:
+      self.setup_disk_strategy = AzureSetUpRemoteDiskStrategy(
+          self.vm, self.disk_specs
+      )
+    return self.setup_disk_strategy
 
 
 class AzureCreateLocalSSDDiskStrategy(AzureCreateDiskStrategy):
-  """Strategies to create local disks.
-  """
+  """Strategies to create local disks."""
 
   def DiskCreatedOnVMCreation(self) -> bool:
     """Returns whether the disk is created on VM creation."""
@@ -213,6 +217,7 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
     super().__init__(vm, disk_specs[0])
     self.vm = vm
     self.disk_specs = disk_specs
+    self.scratch_disks = []
 
   def SetUpDisk(self):
     create_tasks = []
@@ -228,14 +233,20 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
       if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
         create_tasks.append((scratch_disk.Create, (), {}))
     background_tasks.RunParallelThreads(create_tasks, max_concurrency=200)
-
+    self.scratch_disks = [
+        scratch_disk for scratch_disk, _ in scratch_disks
+    ]
+    self.AttachDisks()
     for scratch_disk, disk_spec in scratch_disks:
-      # Not doing parallel attach of azure disks because Azure
-      # throws conflict due to concurrent request
-      scratch_disk.Attach(self.vm)
       AzurePrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, scratch_disk, disk_spec
       )
+
+  def AttachDisks(self):
+    for scratch_disk in self.scratch_disks:
+      # Not doing parallel attach of azure disks because Azure
+      # throws conflict due to concurrent request
+      scratch_disk.Attach(self.vm)
 
 
 class AzurePrepareScratchDiskStrategy(

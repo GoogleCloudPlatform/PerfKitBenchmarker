@@ -364,11 +364,27 @@ class AzureDisk(disk.BaseDisk):
           'Error attaching Azure disk to VM.'
       )
 
-  def Detach(self):
+  def _Detach(self):
     """Detaches the disk from a VM."""
-    # Not needed since the resource group can be deleted
-    # without detaching disks.
-    pass
+    _, _, retcode = vm_util.IssueCommand(
+        [
+            azure.AZURE_PATH,
+            'vm',
+            'disk',
+            'detach',
+            '--vm-name',
+            self.vm.name,
+            '--name',
+            self.name,
+        ]
+        + self.resource_group.args,
+        raise_on_failure=False,
+        timeout=600,
+    )
+    if retcode:
+      raise errors.Resource.RetryableCreationError(
+          'Error detaching Azure disk from VM.'
+      )
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
@@ -423,3 +439,7 @@ class AzureStripedDisk(disk.StripedDisk):
       raise errors.Resource.RetryableCreationError(
           'Error attaching Multiple Azure disks to VM.'
       )
+
+  def _Detach(self):
+    for disk_details in self.disks:
+      disk_details.Detach()

@@ -57,6 +57,7 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
   def __init__(self, vm: Any, disk_spec: disk.BaseDiskSpec, disk_count: int):
     super().__init__(vm, disk_spec, disk_count)
     self.remote_disk_groups = []
+    self.setup_disk_strategy = None
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
       disks = []
       for i in range(disk_spec.num_striped_disks):
@@ -110,7 +111,11 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
 
   def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
     """Returns the SetUpDiskStrategy for the disk."""
-    return SetUpPDDiskStrategy(self.vm, self.disk_specs)
+    if self.setup_disk_strategy is None:
+      self.setup_disk_strategy = SetUpPDDiskStrategy(
+          self.vm, self.disk_specs
+      )
+    return self.setup_disk_strategy
 
 
 class CreateLSSDDiskStrategy(GCPCreateDiskStrategy):
@@ -251,11 +256,11 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
   def __init__(self, vm, disk_specs: list[gce_disk.GceDiskSpec]):
     super().__init__(vm, disk_specs[0])
     self.disk_specs = disk_specs
+    self.scratch_disks = []
 
   def SetUpDisk(self):
     # disk spec is not used here.
     create_tasks = []
-    attach_tasks = []
     scratch_disks = []
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
       disk_group = self.vm.create_disk_strategy.remote_disk_groups[disk_spec_id]
@@ -267,9 +272,11 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
       scratch_disks.append((scratch_disk, disk_spec))
       if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
         create_tasks.append((scratch_disk.Create, (), {}))
-        attach_tasks.append((scratch_disk.Attach, [self.vm], {}))
     background_tasks.RunParallelThreads(create_tasks, max_concurrency=200)
-    background_tasks.RunParallelThreads(attach_tasks, max_concurrency=200)
+    self.scratch_disks = [
+        scratch_disk for scratch_disk, _ in scratch_disks
+    ]
+    self.AttachDisks()
     for scratch_disk, disk_spec in scratch_disks:
       # Device path is needed to stripe disks on Linux, but not on Windows.
       # The path is not updated for Windows machines.
@@ -280,6 +287,13 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
       GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, scratch_disk, disk_spec
       )
+
+  def AttachDisks(self):
+    attach_tasks = []
+    for scratch_disk in self.scratch_disks:
+      if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
+        attach_tasks.append((scratch_disk.Attach, [self.vm], {}))
+    background_tasks.RunParallelThreads(attach_tasks, max_concurrency=200)
 
 
 class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):

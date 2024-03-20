@@ -21,9 +21,10 @@ TODO(user) this benchmark currently only works for GCE, and needs some
 refactoring to become cloud-agnostic.
 """
 
+import time
 from typing import List
-
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
@@ -114,25 +115,112 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
         'Please check the flags.'
     )
   samples = []
+  time_to_create = ParseCreateTimeFromScratchDisks(vm)
+  time_to_attach = ParseAttachTimeFromScratchDisks(vm)
+  disk_metadata = GetDiskMetadata(vm)
+  if disk_metadata is None:
+    raise ValueError('Disk metadata is None')
+  time_to_create_and_attach = time_to_create + time_to_attach
+  detach_time = DetachDisks(vm)
+  samples.append(
+      sample.Sample(
+          'Time to Create and Attach Disks',
+          time_to_create_and_attach,
+          'seconds',
+          disk_metadata,
+      ),
+  )
+  samples.append(
+      sample.Sample(
+          'Time to Create',
+          time_to_create,
+          'seconds',
+          disk_metadata,
+      ),
+  )
+  samples.append(
+      sample.Sample(
+          'Time to Attach Disk after create',
+          time_to_attach,
+          'seconds',
+          disk_metadata,
+      )
+  )
+  samples.append(
+      sample.Sample(
+          'Time to Detach Disks',
+          detach_time,
+          'seconds',
+          disk_metadata,
+      ),
+  )
+  time.sleep(60)
+  vm.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()
+  time_to_attach_after_detach = ParseAttachTimeFromScratchDisks(vm)
+  samples.append(
+      sample.Sample(
+          'Time to Attach Disk after detach',
+          time_to_attach_after_detach,
+          'seconds',
+          disk_metadata,
+      )
+  )
+  return samples
+
+
+def ParseCreateTimeFromScratchDisks(
+    vm: linux_virtual_machine.BaseLinuxVirtualMachine,
+):
   max_time_to_create = 0
-  max_time_to_attach = 0
   for scratch_disk in vm.scratch_disks:
     scratch_disk_samples = scratch_disk.GetSamples()
-    samples.extend(scratch_disk_samples)
     for sample_details in scratch_disk_samples:
       if sample_details.metric == 'Time to Create':
         max_time_to_create = max(max_time_to_create, sample_details.value)
-      elif sample_details.metric == 'Time to Attach':
+  return max_time_to_create
+
+
+def ParseAttachTimeFromScratchDisks(
+    vm: linux_virtual_machine.BaseLinuxVirtualMachine,
+):
+  max_time_to_attach = 0
+  for scratch_disk in vm.scratch_disks:
+    scratch_disk_samples = scratch_disk.GetSamples()
+    for sample_details in scratch_disk_samples:
+      if sample_details.metric == 'Time to Attach':
         max_time_to_attach = max(max_time_to_attach, sample_details.value)
-  samples.extend([
-      sample.Sample(
-          'Time to Create and Attach Disk',
-          max_time_to_create + max_time_to_attach,
-          'seconds',
-          vm.GetResourceMetadata(),
-      ),
-  ])
-  return samples
+  return max_time_to_attach
+
+
+def GetDiskMetadata(vm: linux_virtual_machine.BaseLinuxVirtualMachine):
+  for scratch_disk in vm.scratch_disks:
+    return scratch_disk.GetResourceMetadata()
+  return None
+
+
+def DetachDisks(vm: linux_virtual_machine.BaseLinuxVirtualMachine):
+  """Detaches all the disks from the virtual machine.
+
+  Args:
+    vm: Virtual Machine details
+
+  Returns:
+    time to detach all the disks from the virtual machine.
+
+  """
+  detach_tasks = []
+  for scratch_disk in vm.scratch_disks:
+    detach_tasks.append((scratch_disk.Detach, (), {}))
+  # Parallel Detach won't work for multiple Azure Scratch Disks that are not
+  # striped togeter
+  background_tasks.RunParallelThreads(detach_tasks, max_concurrency=200)
+  max_time_to_detach = 0
+  for scratch_disk in vm.scratch_disks:
+    max_time_to_detach = max(
+        max_time_to_detach,
+        scratch_disk.detach_end_time - scratch_disk.detach_start_time,
+    )
+  return max_time_to_detach
 
 
 def Cleanup(_):

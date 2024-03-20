@@ -418,6 +418,7 @@ class AwsDisk(disk.BaseDisk):
     self.region = util.GetRegionFromZone(zone)
     self.device_letter = None
     self.attached_vm_id = None
+    self.attached_vm_name = None
     self.machine_type = machine_type
     if self.disk_type != disk.LOCAL:
       self.metadata.update(DISK_METADATA.get(self.disk_type, {}))
@@ -552,25 +553,38 @@ class AwsDisk(disk.BaseDisk):
     return volume_id, device_name
 
   @classmethod
-  def GenerateDeviceNamePrefix(cls, disk_type):
-    """Generates the device name prefix depending on the device type."""
-    if disk_type == disk.LOCAL:
-      return '/dev/xvd'
-    else:
-      return '/dev/xvdb'
+  def GenerateDeviceNamePrefix(cls):
+    """Generates the device name prefix."""
+    return '/dev/xvd'
 
   @classmethod
   def GenerateDeviceLetter(cls, vm_name):
     """Generates the next available device letter for a given VM."""
     with cls._lock:
       if vm_name not in cls.available_device_letters_by_vm:
-        all_available_letters = set(string.ascii_lowercase)
+        # AWS allows the following device names:
+        # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html#available-ec2-device-names
+        ascii_characters = list(string.ascii_lowercase)
+        available_letters = []
+        first_ch = ['a', 'b', 'c', 'd']
+        for ch in first_ch:
+          available_letters.extend(
+              (ch + ascii_character) for ascii_character in ascii_characters
+          )
         # local ssds cannot use 'a' to allow for boot disk naming.
         # remove 'a' as an available device letter,
         # so that both local ssds and remote disks can share this naming
         # convention.
-        all_available_letters.remove('a')
-        cls.available_device_letters_by_vm[vm_name] = all_available_letters
+        ascii_characters.remove('a')
+        # According to the mentioned above, xvdb, xvdc, xvd are not allowed
+        ascii_characters.remove('b')
+        ascii_characters.remove('c')
+        ascii_characters.remove('d')
+        # Getting xvddy and xvddz are invalid names during runtime
+        available_letters.remove('dy')
+        available_letters.remove('dz')
+        available_letters.extend(ascii_characters)
+        cls.available_device_letters_by_vm[vm_name] = set(available_letters)
       device_letter = min(cls.available_device_letters_by_vm[vm_name])
       cls.available_device_letters_by_vm[vm_name].remove(device_letter)
     return device_letter
@@ -582,9 +596,11 @@ class AwsDisk(disk.BaseDisk):
       vm: The AwsVirtualMachine instance to which the disk will be attached.
     """
     self.device_letter = AwsDisk.GenerateDeviceLetter(vm.name)
+    self.attached_vm_id = vm.id
+    self.attached_vm_name = vm.name
 
     device_name = (
-        self.GenerateDeviceNamePrefix(self.disk_type) + self.device_letter
+        self.GenerateDeviceNamePrefix() + self.device_letter
     )
     attach_cmd = util.AWS_PREFIX + [
         'ec2',
@@ -599,13 +615,13 @@ class AwsDisk(disk.BaseDisk):
         'ready, but will be retried.',
         self.id,
     )
-    util.IssueRetryableCommand(attach_cmd)
+    vm_util.IssueCommand(attach_cmd, raise_on_failure=False)
     volume_id, device_name = self._WaitForAttachedState()
     vm.LogDeviceByName(device_name, volume_id, device_name)
     if self.disk_spec_id:
       vm.LogDeviceByDiskSpecId(self.disk_spec_id, device_name)
 
-  def Detach(self):
+  def _Detach(self):
     """Detaches the disk from a VM."""
     detach_cmd = util.AWS_PREFIX + [
         'ec2',
@@ -614,14 +630,15 @@ class AwsDisk(disk.BaseDisk):
         '--instance-id=%s' % self.attached_vm_id,
         '--volume-id=%s' % self.id,
     ]
-    util.IssueRetryableCommand(detach_cmd)
+    vm_util.IssueCommand(detach_cmd, raise_on_failure=False)
 
     with self._lock:
-      assert self.attached_vm_id in AwsDisk.available_device_letters_by_vm
-      AwsDisk.available_device_letters_by_vm[self.attached_vm_id].add(
+      assert self.attached_vm_name in AwsDisk.available_device_letters_by_vm
+      AwsDisk.available_device_letters_by_vm[self.attached_vm_name].add(
           self.device_letter
       )
       self.attached_vm_id = None
+      self.attached_vm_name = None
       self.device_letter = None
 
 
@@ -639,3 +656,9 @@ class AwsStripedDisk(disk.StripedDisk):
     for disk_details in self.disks:
       attach_tasks.append((disk_details.Attach, [vm], {}))
     background_tasks.RunParallelThreads(attach_tasks, max_concurrency=200)
+
+  def _Detach(self):
+    detach_tasks = []
+    for disk_details in self.disks:
+      detach_tasks.append((disk_details.Detach, (), {}))
+    background_tasks.RunParallelThreads(detach_tasks, max_concurrency=200)

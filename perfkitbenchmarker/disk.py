@@ -397,6 +397,8 @@ class BaseDisk(resource.BaseResource):
 
   attach_start_time: time when we start the disk attach to vm
   attach_end_time: time when disk attach to vm is done
+  detach_start_time: time when we start the disk detach from vm
+  detach_end_time: time when disk detach from vm is done
   """
 
   is_striped = False
@@ -433,6 +435,8 @@ class BaseDisk(resource.BaseResource):
     self.disk_number = disk_spec.disk_number
     self.attach_start_time: float = None
     self.attach_end_time: float = None
+    self.detach_start_time: float = None
+    self.detach_end_time: float = None
 
   @property
   def mount_options(self):
@@ -483,9 +487,13 @@ class BaseDisk(resource.BaseResource):
 
   def Detach(self):
     """Detaches the disk from a VM."""
-    # This is currently never called.
-    # TODO(pclay): Figure out if static VMs should call this.
-    raise NotImplementedError
+    self.detach_start_time = time.time()
+    self._Detach()
+    self.detach_end_time = time.time()
+
+  def _Detach(self):
+    """Detaches the disk from a VM."""
+    pass
 
   def GetDevicePath(self):
     """Returns the path to the device inside a Linux VM."""
@@ -512,6 +520,15 @@ class BaseDisk(resource.BaseResource):
           sample.Sample(
               'Time to Attach',
               self.attach_end_time - self.attach_start_time,
+              'seconds',
+              metadata,
+          )
+      )
+    if self.detach_start_time and self.detach_end_time:
+      samples.append(
+          sample.Sample(
+              'Time to Detach',
+              self.detach_end_time - self.detach_start_time,
               'seconds',
               metadata,
           )
@@ -554,7 +571,7 @@ class StripedDisk(BaseDisk):
     for disk in self.disks:
       disk.Attach(vm)
 
-  def Detach(self):
+  def _Detach(self):
     for disk in self.disks:
       disk.Detach()
 

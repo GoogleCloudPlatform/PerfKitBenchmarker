@@ -18,6 +18,7 @@ Use 'gcloud compute disk-types list' to determine valid disk types.
 """
 
 import json
+import logging
 import re
 
 from absl import flags
@@ -32,6 +33,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util
+
 
 FLAGS = flags.FLAGS
 
@@ -118,6 +120,10 @@ HYPERDISK_ONLY_MACHINE_FAMILIES = [
 # Default boot disk type in pkb.
 # Console defaults to pd-balanced & gcloud defaults to pd-standard as of 11/23
 PKB_DEFAULT_BOOT_DISK_TYPE = PD_BALANCED
+
+
+class GceServiceUnavailableError(Exception):
+  """Error for retrying _Attach when the describe output indicates that 'The service is currently unavailable'."""
 
 
 def PdDriveIsNvme(vm):
@@ -428,12 +434,19 @@ class GceDisk(disk.BaseDisk):
   def Exists(self):
     return self._Exists()
 
-  @vm_util.Retry()
+  @vm_util.Retry(
+      poll_interval=30,
+      max_retries=10,
+      retryable_exceptions=(GceServiceUnavailableError,),
+  )
   def _Attach(self, vm):
     """Attaches the disk to a VM.
 
     Args:
       vm: The GceVirtualMachine instance to which the disk will be attached.
+
+    Raises:
+      GceServiceUnavailableError: when the service is not available
     """
     self.attached_vm_name = vm.name
     cmd = util.GcloudCommand(
@@ -444,11 +457,16 @@ class GceDisk(disk.BaseDisk):
 
     if self.replica_zones:
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
-
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     # Gcloud attach-disk commands may still attach disks despite being rate
     # limited.
     if retcode:
+      if (
+          'The service is currently unavailable' in stderr
+          or 'Please try again in 30 seconds.' in stderr
+      ):
+        logging.info('disk attach command failed, retrying.')
+        raise GceServiceUnavailableError()
       if (
           cmd.rate_limited
           and 'is already being used' in stderr
@@ -482,7 +500,7 @@ class GceDisk(disk.BaseDisk):
       pd_args += [f'provisioned-throughput={self.provisioned_throughput}']
     return ','.join(pd_args)
 
-  def Detach(self):
+  def _Detach(self):
     """Detaches the disk from a VM."""
     cmd = util.GcloudCommand(
         self, 'compute', 'instances', 'detach-disk', self.attached_vm_name
@@ -571,3 +589,9 @@ class GceStripedDisk(disk.StripedDisk):
       if not disk_details.Exists():
         return False
     return True
+
+  def _Detach(self):
+    detach_tasks = []
+    for disk_details in self.disks:
+      detach_tasks.append((disk_details.Detach, (), {}))
+    background_tasks.RunParallelThreads(detach_tasks, max_concurrency=200)
