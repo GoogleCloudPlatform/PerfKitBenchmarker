@@ -109,7 +109,7 @@ class AzureCreateRemoteDiskStrategy(AzureCreateDiskStrategy):
         self.vm.remote_disk_counter += 1
         lun = next(self.vm.lun_counter)
         data_disk = azure_disk.AzureDisk(disk_spec, self.vm, lun)
-        # TODO(user) Clean code to avoid using
+        # TODO(arushigaur) Clean code to avoid using
         # disk_number as it is used for windows only
         data_disk.disk_number = disk_number
         disks.append(data_disk)
