@@ -53,7 +53,7 @@ _DEFAULT_JVM_CONT_TXI_ARGS = (
     '-Xms2g -Xmx2g -Xmn1536m -XX:+AlwaysPreTouch -XX:ParallelGCThreads=2'
 )
 _DEFAULT_COMPOSITE_MEMORY_RATIO = 0.8
-_DEFAULT_WORKERS_RATIO = 1
+_DEFAULT_WORKERS_RATIO = 0.5
 _DEFAULT_NUM_GROUPS = 4
 _RAM_MB_PER_CORE = 1500
 _SPEC_JBB_2015_ISO = specjbb.SPEC_JBB_2015_ISO
@@ -76,7 +76,7 @@ NEW_MAX_RATIO = 0.94  # Taken from customer script
 flags.DEFINE_float(
     'specjbb_workers_ratio',
     _DEFAULT_WORKERS_RATIO,
-    'A number indicating number of workers per vCPU.',
+    'A number indicating number of workers per vCPU per group.',
 )
 flags.DEFINE_enum(
     'specjbb_run_mode',
