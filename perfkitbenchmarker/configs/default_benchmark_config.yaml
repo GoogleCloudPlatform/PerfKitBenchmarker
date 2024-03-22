@@ -1,6 +1,53 @@
 # PKB benchmark configs that point to a benchmark module via 'name: <BENCHMARK_NAME>'.
 # This is meant to provide commonly used configs that can not be expressed through
 # flag defaults or default benchmark configs.
+default_disk_spec: &default_disk_spec
+  GCP:
+    disk_size: 200
+    disk_type: pd-ssd
+  AWS:
+    disk_size: 200
+    disk_type: gp2
+  Azure:
+    disk_size: 200
+    disk_type: Premium_LRS
+
+speccpu2017_int_rate_GCC11_O3_x86:
+  name: speccpu2017
+  flags:
+    build_fortran: True
+    enable_transparent_hugepages: True
+    metadata: 'compiler_config:GCC11-O3'
+    runspec_config: pkb-gcc-linux-x86.cfg
+    runspec_estimate_spec: True
+    runspec_iterations: 1
+    runspec_keep_partial_results: True
+    runspec_tar: cpu2017-1.1.8.tar.gz
+    spec17_gcc_flags: "'-O3 -march=native'"
+    spec17_subset: intrate
+    spec_runmode: base
+  vm_groups:
+    default:
+      disk_spec: *default_disk_spec
+
+speccpu2017_int_rate_GCC11_O3_arm:
+  name: speccpu2017
+  flags:
+    build_fortran: True
+    enable_transparent_hugepages: True
+    metadata: 'compiler_config:GCC11-O3'
+    runspec_config: pkb-gcc-linux-aarch64-1.1.0.cfg
+    runspec_estimate_spec: True
+    runspec_iterations: 1
+    runspec_keep_partial_results: True
+    runspec_tar: cpu2017-1.1.8.tar.gz
+    spec17_gcc_flags: "'-O3 -mcpu=native'"
+    spec17_subset: intrate
+    spec_runmode: base
+  vm_groups:
+    default:
+      disk_spec: *default_disk_spec
+
 netperf_tcp_rr:
   name: netperf
   flags:
@@ -28,16 +75,7 @@ mysql_tpcc:
     engine: mysql
     vm_groups:
       clients:
-        disk_spec:
-          GCP:
-            disk_size: 200
-            disk_type: pd-ssd
-          AWS:
-            disk_size: 200
-            disk_type: gp2
-          Azure:
-            disk_size: 200
-            disk_type: Premium_LRS
+        disk_spec: *default_disk_spec
       servers:
         vm_spec:
           # TODO(andytzhu) - Add AWS/Azure
@@ -84,13 +122,7 @@ postgres_tpcc:
     engine: postgres
     vm_groups:
       clients:
-        disk_spec:
-          GCP:
-            disk_size: 200
-          AWS:
-            disk_size: 200
-          Azure:
-            disk_size: 200
+        disk_spec: *default_disk_spec
       servers:
         vm_spec:
           # TODO(andytzhu) - Add AWS/Azure
