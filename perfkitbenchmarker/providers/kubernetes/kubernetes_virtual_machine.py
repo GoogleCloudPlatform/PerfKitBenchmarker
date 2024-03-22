@@ -72,10 +72,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       provider_info.AZURE,
       provider_info.GCP,
   ]
-  PLATFORM: Union[list[str], str] = [
-      provider_info.DEFAULT_VM_PLATFORM,
-      provider_info.KUBERNETES,
-  ]
+  PLATFORM: str = provider_info.KUBERNETES
   DEFAULT_IMAGE = None
   HOME_DIR = '/root'
   IS_REBOOTABLE = False
@@ -98,29 +95,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     ] = vm_spec.resource_requests
     self.cloud: str = (
         self.CLOUD  # pytype: disable=annotation-type-mismatch
-        if self.PLATFORM == provider_info.KUBERNETES_PLATFORM
-        else FLAGS.container_cluster_cloud
+        if isinstance(self.CLOUD, str) else FLAGS.cloud
     )
     self.sriov_network: Optional[str] = FLAGS.k8s_sriov_network or None
-
-  @classmethod
-  def GetAttributes(cls):
-    """Returns the attributes cross product for registering the class."""
-    attributes = []
-    for cloud in cls.CLOUD:
-      attributes.append((
-          cls.RESOURCE_TYPE,
-          ('CLOUD', cloud),
-          ('OS_TYPE', cls.OS_TYPE),
-          ('PLATFORM', provider_info.KUBERNETES_PLATFORM),
-      ))
-    attributes.append((
-        cls.RESOURCE_TYPE,
-        ('CLOUD', provider_info.KUBERNETES),
-        ('OS_TYPE', cls.OS_TYPE),
-        ('PLATFORM', provider_info.DEFAULT_VM_PLATFORM),
-    ))
-    return attributes
 
   def GetResourceMetadata(self):
     metadata = super().GetResourceMetadata()

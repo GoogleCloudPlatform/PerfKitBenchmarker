@@ -93,14 +93,6 @@ flags.DEFINE_boolean(
     'if they already exist in the registry.',
 )
 
-flags.DEFINE_string(
-    'container_cluster_cloud',
-    None,
-    'Sets the cloud to use for the container cluster. '
-    'This will override both the value set in the config and '
-    'the value set using the generic "cloud" flag.',
-)
-
 flags.DEFINE_integer(
     'container_cluster_num_vms',
     None,

@@ -133,8 +133,6 @@ class ContainerRegistrySpec(spec.BaseSpec):
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
-    if flag_values['container_cluster_cloud'].present:
-      config_values['cloud'] = flag_values.container_cluster_cloud
     updated_spec = {}
     if flag_values['project'].present:
       updated_spec['project'] = flag_values.project
@@ -497,8 +495,6 @@ class ContainerClusterSpec(spec.BaseSpec):
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
-    if flag_values['container_cluster_cloud'].present:
-      config_values['cloud'] = flag_values.container_cluster_cloud
     if flag_values['container_cluster_type'].present:
       config_values['type'] = flag_values.container_cluster_type
     if flag_values['container_cluster_num_vms'].present:

@@ -314,7 +314,9 @@ class KubernetesVirtualMachineOsTypesTestCase(
   @staticmethod
   def create_kubernetes_vm(os_type):
     spec = kubernetes_pod_spec.KubernetesPodSpec(_COMPONENT)
-    vm_class = virtual_machine.GetVmClass(provider_info.KUBERNETES, os_type)
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.GCP, os_type, provider_info.KUBERNETES
+    )
     kub_vm = vm_class(spec)
     kub_vm._WaitForPodBootCompletion = lambda: None
     kub_vm._Create()
@@ -334,28 +336,15 @@ class KubernetesVirtualMachineClassFoundTestCase(
     BaseKubernetesVirtualMachineTestCase
 ):
 
-  def testClassFoundByKubernetesCloud(self):
-    spec = kubernetes_pod_spec.KubernetesPodSpec(_COMPONENT)
-    vm_class = virtual_machine.GetVmClass(
-        provider_info.KUBERNETES, os_types.UBUNTU1604
-    )
-    kub_vm = vm_class(spec)
-    self.assertIsInstance(
-        kub_vm,
-        kubernetes_virtual_machine.Ubuntu1604BasedKubernetesVirtualMachine,
-    )
-
   def testClassNotKubernetesCloud(self):
     with self.assertRaises(errors.Resource.SubclassNotFoundError):
-      virtual_machine.GetVmClass(
-          provider_info.GCP, os_types.UBUNTU1604
-      )
+      virtual_machine.GetVmClass(provider_info.KUBERNETES, os_types.UBUNTU1604)
 
   @flagsaver.flagsaver(
       (provider_info.VM_PLATFORM, provider_info.KUBERNETES_PLATFORM)
   )
   def testClassFoundByKubernetesPlatform(self):
-    FLAGS.container_cluster_cloud = provider_info.AWS
+    FLAGS.cloud = provider_info.AWS
     spec = kubernetes_pod_spec.KubernetesPodSpec(_COMPONENT)
     vm_class = virtual_machine.GetVmClass(
         provider_info.GCP, os_types.UBUNTU1604
@@ -373,7 +362,7 @@ class KubernetesVirtualMachineClassFoundTestCase(
       (provider_info.VM_PLATFORM, provider_info.KUBERNETES_PLATFORM)
   )
   def test2004AzureClassFoundByKubernetesPlatform(self):
-    FLAGS.container_cluster_cloud = None
+    FLAGS.cloud = None
     spec = kubernetes_pod_spec.KubernetesPodSpec(_COMPONENT)
     vm_class = virtual_machine.GetVmClass(
         provider_info.AZURE, os_types.UBUNTU2004
@@ -462,13 +451,11 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
 
   def testDownloadPreprovisionedDataAws(self):
     spec = self.create_virtual_machine_spec()
-    FLAGS.container_cluster_cloud = 'AWS'
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.AWS, os_types.UBUNTU1604_CUDA9, provider_info.KUBERNETES
+    )
     with patch_critical_objects(flags=FLAGS) as (issue_command, _):
-      kub_vm = (
-          kubernetes_virtual_machine.Ubuntu1604BasedKubernetesVirtualMachine(
-              spec
-          )
-      )
+      kub_vm = vm_class(spec)
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
@@ -478,13 +465,11 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
   def testDownloadPreprovisionedDataAzure(self):
     azure_util.GetAzureStorageConnectionString = mock.Mock(return_value='')
     spec = self.create_virtual_machine_spec()
-    FLAGS.container_cluster_cloud = 'Azure'
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.AZURE, os_types.UBUNTU1604_CUDA9, provider_info.KUBERNETES
+    )
     with patch_critical_objects() as (issue_command, _):
-      kub_vm = (
-          kubernetes_virtual_machine.Ubuntu1604BasedKubernetesVirtualMachine(
-              spec
-          )
-      )
+      kub_vm = vm_class(spec)
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
@@ -493,14 +478,12 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
       self.assertIn('--connection-string', command_string)
 
   def testDownloadPreprovisionedDataGcp(self):
+    vm_class = virtual_machine.GetVmClass(
+        provider_info.GCP, os_types.UBUNTU1604_CUDA9, provider_info.KUBERNETES
+    )
     spec = self.create_virtual_machine_spec()
-    FLAGS.container_cluster_cloud = 'GCP'
     with patch_critical_objects() as (issue_command, _):
-      kub_vm = (
-          kubernetes_virtual_machine.Ubuntu1604BasedKubernetesVirtualMachine(
-              spec
-          )
-      )
+      kub_vm = vm_class(spec)
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
@@ -575,7 +558,7 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
   def testCreatePodBodyWrittenCorrectly(self):
     spec = self.create_virtual_machine_spec()
     vm_class = virtual_machine.GetVmClass(
-        provider_info.KUBERNETES, os_types.UBUNTU1604_CUDA9
+        provider_info.GCP, os_types.UBUNTU1604_CUDA9, provider_info.KUBERNETES
     )
     with patch_critical_objects() as (_, temp_file):
       kub_vm = vm_class(spec)

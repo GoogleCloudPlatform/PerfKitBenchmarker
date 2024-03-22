@@ -101,8 +101,6 @@ cluster_boot:
         GCP:
           machine_type: n1-standard-4
 """
-ALWAYS_SUPPORTED = 'iperf'
-NEVER_SUPPORTED = 'sysbench'
 
 _SIMPLE_EDW_CONFIG = """
 edw_benchmark:

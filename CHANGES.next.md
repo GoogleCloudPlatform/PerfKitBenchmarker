@@ -285,6 +285,9 @@
 -   Support Azure ZRS disks and hyperdisk balanced.
 -   Add --create_container_cluster_time_resize option to time adding node to
     provisioned Kubernetes clusters.
+-   Removed --container_cluster_cloud & --cloud=Kubernetes. Now to run VM
+    benchmarks on Kubernetes, just set --cloud=GCP (or whichever) and
+    --vm_platform=Kubernetes.
 -   Added function under perfkitbenchmarker.publisher to de-serialize labels
     from a string.
 -   Add support for S3 Express One Zone buckets with --object_storage_zone.

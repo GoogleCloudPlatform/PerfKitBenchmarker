@@ -34,10 +34,7 @@ class KubernetesPodSpec(virtual_machine.BaseVmSpec):
       provider_info.AZURE,
       provider_info.GCP,
   ]
-  PLATFORM: Union[list[str], str] = [
-      provider_info.DEFAULT_VM_PLATFORM,
-      provider_info.KUBERNETES,
-  ]
+  PLATFORM: str = provider_info.KUBERNETES
 
   def __init__(self, *args, **kwargs):
     self.resource_limits: Optional[
@@ -47,23 +44,6 @@ class KubernetesPodSpec(virtual_machine.BaseVmSpec):
         kubernetes_resources_spec.KubernetesResourcesSpec
     ] = None
     super().__init__(*args, **kwargs)
-
-  @classmethod
-  def GetAttributes(cls):
-    """Returns the attributes cross product for registering the class."""
-    attributes = []
-    for cloud in cls.CLOUD:
-      attributes.append((
-          cls.SPEC_TYPE,
-          ('CLOUD', cloud),
-          ('PLATFORM', provider_info.KUBERNETES_PLATFORM),
-      ))
-    attributes.append((
-        cls.SPEC_TYPE,
-        ('CLOUD', provider_info.KUBERNETES),
-        ('PLATFORM', provider_info.DEFAULT_VM_PLATFORM),
-    ))
-    return attributes
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
