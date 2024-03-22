@@ -285,3 +285,15 @@ index 90f93e2..4b9fb58 100644
  }
 
  function prepare_begin()
+diff --git a/src/lua/oltp_read_only.lua b/src/lua/oltp_read_only.lua
+index 86c0fc8..725c890 100755
+--- a/src/lua/oltp_read_only.lua
++++ b/src/lua/oltp_read_only.lua
+@@ -38,6 +38,7 @@ function prepare_statements()
+ end
+ 
+ function event()
++   con:query("SET SPANNER.READONLY = true")
+    if not sysbench.opt.skip_trx then
+       begin()
+    end

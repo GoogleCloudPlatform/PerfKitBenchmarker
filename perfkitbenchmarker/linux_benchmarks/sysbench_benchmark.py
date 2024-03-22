@@ -23,6 +23,7 @@ As other cloud providers deliver a managed MySQL service, we will add it here.
 import datetime
 import logging
 import re
+import statistics
 import time
 from typing import List
 
@@ -53,6 +54,7 @@ flags.DEFINE_string(
 flags.DEFINE_integer(
     'sysbench_tables', 4, 'The number of tables used in sysbench oltp.lua tests'
 )
+
 flags.DEFINE_integer(
     'sysbench_table_size',
     100000,
@@ -76,6 +78,12 @@ _RUN_DURATION = flags.DEFINE_integer(
     'The duration of the actual run in which results are '
     'collected, in seconds.',
 )
+_LOAD_CLIENTS = flags.DEFINE_integer(
+    'sysbench_load_client_vms',
+    None,
+    'The number of client vms used in the prepare phase',
+)
+
 _LOAD_THREADS = flags.DEFINE_integer(
     'sysbench_load_threads',
     64,
@@ -92,6 +100,7 @@ flags.DEFINE_integer(
     100,
     'The latency percentile we ask sysbench to compute.',
 )
+
 flags.DEFINE_integer(
     'sysbench_report_interval',
     2,
@@ -123,6 +132,12 @@ _SKIP_LOAD_STAGE = flags.DEFINE_boolean(
 
 _AUTO_INCREMENT = flags.DEFINE_boolean(
     'sysbench_auto_inc', True, 'Auto increment for sysbench'
+)
+
+_SCALE_UP_MAX_CPU_UTILIZATION = flags.DEFINE_float(
+    'sysbench_scale_up_max_cpu_utilization',
+    0.95,
+    'Stop the auto scale up experiment when we reach this cpu utilization',
 )
 
 # See https://github.com/Percona-Lab/sysbench-tpcc/releases for the most
@@ -430,7 +445,8 @@ def _LoadDatabaseInParallel(
     client_vms: list[virtual_machine.VirtualMachine],
 ) -> list[sample.Sample]:
   """Loads the database using the sysbench prepare command."""
-
+  if _LOAD_CLIENTS.value:
+    client_vms = client_vms[: _LOAD_CLIENTS.value]
   db.UpdateCapacityForLoad()
 
   if (
@@ -641,26 +657,50 @@ def _ParseSysbenchTransactions(
   ]
 
 
-def _ParseSysbenchLatency(sysbench_output, metadata) -> List[sample.Sample]:
+def _ParseSysbenchLatency(
+    sysbench_outputs: List[str], metadata
+) -> List[sample.Sample]:
   """Parse sysbench latency results."""
-  min_latency = regex_util.ExtractFloat(
-      'min: *([0-9]*[.]?[0-9]+)', sysbench_output
-  )
+  min_latency_array = []
+  average_latency_array = []
+  max_latency_array = []
+  for sysbench_output in sysbench_outputs:
+    min_latency_array.append(
+        regex_util.ExtractFloat('min: *([0-9]*[.]?[0-9]+)', sysbench_output)
+    )
 
-  average_latency = regex_util.ExtractFloat(
-      'avg: *([0-9]*[.]?[0-9]+)', sysbench_output
-  )
-  max_latency = regex_util.ExtractFloat(
-      'max: *([0-9]*[.]?[0-9]+)', sysbench_output
-  )
-  total_latency = regex_util.ExtractFloat(
-      'sum: *([0-9]*[.]?[0-9]+)', sysbench_output
-  )
+    average_latency_array.append(
+        regex_util.ExtractFloat('avg: *([0-9]*[.]?[0-9]+)', sysbench_output)
+    )
+    max_latency_array.append(
+        regex_util.ExtractFloat('max: *([0-9]*[.]?[0-9]+)', sysbench_output)
+    )
+  min_latency_meta = metadata.copy()
+  average_latency_meta = metadata.copy()
+  max_latency_meta = metadata.copy()
+  if len(sysbench_outputs) > 1:
+    min_latency_meta.update({'latency_array': min_latency_array})
+    average_latency_meta.update({'latency_array': average_latency_array})
+    max_latency_meta.update({'latency_array': max_latency_array})
   return [
-      sample.Sample('min_latency', min_latency, 'ms', metadata),
-      sample.Sample('average_latency', average_latency, 'ms', metadata),
-      sample.Sample('max_latency', max_latency, 'ms', metadata),
-      sample.Sample('total_latency', total_latency, 'ms', metadata),
+      sample.Sample(
+          'min_latency',
+          min(min_latency_array),
+          'ms',
+          min_latency_meta,
+      ),
+      sample.Sample(
+          'average_latency',
+          statistics.mean(average_latency_array),
+          'ms',
+          average_latency_meta,
+      ),
+      sample.Sample(
+          'max_latency',
+          max(max_latency_array),
+          'ms',
+          max_latency_meta,
+      ),
   ]
 
 
@@ -840,7 +880,7 @@ def _RunSysbench(vms, metadata, benchmark_spec, sysbench_thread_count):
 
   return (
       _ParseSysbenchTimeSeries(stdout, metadata)
-      + _ParseSysbenchLatency(stdout, metadata)
+      + _ParseSysbenchLatency([stdout], metadata)
       + _ParseSysbenchTransactions(stdout, metadata)
   )
 
@@ -859,24 +899,33 @@ def _RunScaleUpClientsBenchmark(
     ]
     args = [(command_vm_pair, {}) for command_vm_pair in command_vm_pairs]
     results = background_tasks.RunThreaded(_IssueSysbenchCommand, args)
+    stdouts = [i[0] for i in results]
+    cpu_utilization = 0
     if hasattr(benchmark_spec.relational_db, 'GetAverageCpuUsage'):
       cpu_utilization = benchmark_spec.relational_db.GetAverageCpuUsage(
           _RUN_DURATION.value // 60, datetime.datetime.now()
       )
       new_metadata['cpu_utilization'] = cpu_utilization
-    total_tps = 0
-    total_qps = 0
-    for stdout, _ in results:
+    total_tps = []
+    total_qps = []
+    for stdout in stdouts:
       current_transactions = _ParseSysbenchTransactions(stdout, new_metadata)
-      total_tps += current_transactions[0].value
-      total_qps += current_transactions[1].value
+      total_tps.append(current_transactions[0].value)
+      total_qps.append(current_transactions[1].value)
     logging.info(
         'num_clients: %d total_tps: %d total_qps: %d', i, total_tps, total_qps
     )
+    tps_metadata = new_metadata.copy()
+    tps_metadata.update({'tps': total_tps})
+    qps_metadata = new_metadata.copy()
+    qps_metadata.update({'qps': total_qps})
     scale_up_samples += [
-        sample.Sample('total_tps', total_tps, 'tps', new_metadata),
-        sample.Sample('total_qps', total_qps, 'qps', new_metadata),
-    ]
+        sample.Sample('total_tps', sum(total_tps), 'tps', tps_metadata),
+        sample.Sample('total_qps', sum(total_qps), 'qps', qps_metadata),
+    ] + _ParseSysbenchLatency(stdouts, new_metadata)
+    if cpu_utilization > _SCALE_UP_MAX_CPU_UTILIZATION.value:
+      logging.info('cpu_utilization is over the threadshold, stopping')
+      break
 
   return scale_up_samples
 

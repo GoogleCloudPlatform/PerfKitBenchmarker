@@ -47,15 +47,21 @@ class ScaleUpClientTestCase(
     FLAGS.sysbench_testname = sysbench_benchmark.SPANNER_TPCC
 
   @mock.patch('time.time', mock.MagicMock(return_value=0))
-  @flagsaver.flagsaver(sysbench_scaleup_clients_test_num_clients=2)
+  @flagsaver.flagsaver(
+      sysbench_scaleup_clients_test_num_clients=2,
+      sysbench_scale_up_max_cpu_utilization=0.5,
+  )
   def testScaleUpClient(self):
     benchmark_spec = mock.Mock()
     benchmark_spec.relational_db = mock.Mock()
+    benchmark_spec.relational_db.GetAverageCpuUsage = mock.Mock(
+        return_value=0.5
+    )
     clients = [mock.Mock(), mock.Mock()]
     for client in clients:
       client.RobustRemoteCommand = mock.Mock(return_value=[self.contents, ''])
     result = sysbench_benchmark._RunScaleUpClientsBenchmark(
-        clients, 100, mock.Mock(), 10, {}
+        clients, 100, benchmark_spec, 10, {}
     )
     self.assertEqual(clients[0].RobustRemoteCommand.call_count, 2)
     self.assertEqual(clients[1].RobustRemoteCommand.call_count, 1)
@@ -66,28 +72,107 @@ class ScaleUpClientTestCase(
                 metric='total_tps',
                 value=986.49,
                 unit='tps',
-                metadata={'sysbench_scale_up_client_count': 1},
+                metadata={
+                    'sysbench_scale_up_client_count': 1,
+                    'cpu_utilization': 0.5,
+                    'tps': [986.49],
+                },
                 timestamp=0,
             ),
             sample.Sample(
                 metric='total_qps',
                 value=19730.45,
                 unit='qps',
-                metadata={'sysbench_scale_up_client_count': 1},
+                metadata={
+                    'sysbench_scale_up_client_count': 1,
+                    'cpu_utilization': 0.5,
+                    'qps': [19730.45],
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='min_latency',
+                value=12.38,
+                unit='ms',
+                metadata={
+                    'sysbench_scale_up_client_count': 1,
+                    'cpu_utilization': 0.5,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='average_latency',
+                value=16.21,
+                unit='ms',
+                metadata={
+                    'sysbench_scale_up_client_count': 1,
+                    'cpu_utilization': 0.5,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='max_latency',
+                value=115.78,
+                unit='ms',
+                metadata={
+                    'sysbench_scale_up_client_count': 1,
+                    'cpu_utilization': 0.5,
+                },
                 timestamp=0,
             ),
             sample.Sample(
                 metric='total_tps',
                 value=1972.98,
                 unit='tps',
-                metadata={'sysbench_scale_up_client_count': 2},
+                metadata={
+                    'sysbench_scale_up_client_count': 2,
+                    'cpu_utilization': 0.5,
+                    'tps': [986.49, 986.49],
+                },
                 timestamp=0,
             ),
             sample.Sample(
                 metric='total_qps',
                 value=39460.9,
                 unit='qps',
-                metadata={'sysbench_scale_up_client_count': 2},
+                metadata={
+                    'sysbench_scale_up_client_count': 2,
+                    'cpu_utilization': 0.5,
+                    'qps': [19730.45, 19730.45],
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='min_latency',
+                value=12.38,
+                unit='ms',
+                metadata={
+                    'sysbench_scale_up_client_count': 2,
+                    'cpu_utilization': 0.5,
+                    'latency_array': [12.38, 12.38],
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='average_latency',
+                value=16.21,
+                unit='ms',
+                metadata={
+                    'sysbench_scale_up_client_count': 2,
+                    'cpu_utilization': 0.5,
+                    'latency_array': [16.21, 16.21],
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='max_latency',
+                value=115.78,
+                unit='ms',
+                metadata={
+                    'sysbench_scale_up_client_count': 2,
+                    'cpu_utilization': 0.5,
+                    'latency_array': [115.78, 115.78],
+                },
                 timestamp=0,
             ),
         ],
