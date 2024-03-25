@@ -291,6 +291,8 @@
 -   Added function under perfkitbenchmarker.publisher to de-serialize labels
     from a string.
 -   Add support for S3 Express One Zone buckets with --object_storage_zone.
+-   Add `--always_call_cleanup` flag for runs that need to run Cleanup, but may
+    fail in Provision.
 
 ### Bug fixes and maintenance updates:
 
@@ -436,3 +438,6 @@
 -   Refactored `aws_virtual_machine.py` to use `aws_disk_strategies.py` and
     Enabled disk provision benchmark for AWS by using `--aws_create_disks_with_vm`.
 -   Enabled parallel/bulk create and attach of GCE, AWS and Azure remote disks.
+-   Set `--always_call_cleanup=True` flag as the default for `cluster_boot`.
+    This prevents leaking `tcpdump` processes from runs that fail in the
+    Provision phase.

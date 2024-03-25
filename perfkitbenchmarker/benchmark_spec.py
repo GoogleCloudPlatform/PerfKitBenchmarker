@@ -40,6 +40,7 @@ from perfkitbenchmarker import edw_compute_resource
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import key as cloud_key
 from perfkitbenchmarker import messaging_service
 from perfkitbenchmarker import nfs_service
@@ -170,7 +171,7 @@ class BenchmarkSpec:
     self.container_registry = None
     self.deleted = False
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
-    self.always_call_cleanup = False
+    self.always_call_cleanup = pkb_flags.ALWAYS_CALL_CLEANUP.value
     self.dpb_service: dpb_service.BaseDpbService = None
     self.container_cluster = None
     self.key = None

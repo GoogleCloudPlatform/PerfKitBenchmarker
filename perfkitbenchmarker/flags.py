@@ -483,3 +483,8 @@ flags.DEFINE_bool(
     'When running with more than one benchmarks, '
     'randomize order of the benchmarks.',
 )
+ALWAYS_CALL_CLEANUP = flags.DEFINE_boolean(
+    'always_call_cleanup',
+    False,
+    'Indicates that this benchmark run should always run the Cleanup phase.'
+)

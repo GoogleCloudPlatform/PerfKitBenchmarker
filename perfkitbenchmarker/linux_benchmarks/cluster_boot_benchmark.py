@@ -114,6 +114,8 @@ cluster_boot:
     # retry VM creation failures.
     retry_on_rate_limited: False
     retry_gce_subnetwork_not_ready: False
+    # In case tcpdump is launched, always cleanup
+    always_call_cleanup: True
 """
 
 flags.DEFINE_boolean(
@@ -211,9 +213,8 @@ def GetConfig(user_config):
   return benchmark_config
 
 
-def Prepare(benchmark_spec):
-  # In case tcpdump is launched, always cleanup
-  benchmark_spec.always_call_cleanup = True
+def Prepare(unused_benchmark_spec):
+  pass
 
 
 def GetTimeToBoot(vms):
@@ -503,4 +504,7 @@ def Cleanup(benchmark_spec):
   if CollectNetworkSamples():
     pid = benchmark_spec.config.temporary['tcpdump_pid']
     logging.info('Terminating tcpdump process %s', pid)
-    os.kill(pid, signal.SIGTERM)
+    try:
+      os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+      logging.warning('tcpdump process %s ended prematurely.', pid)
