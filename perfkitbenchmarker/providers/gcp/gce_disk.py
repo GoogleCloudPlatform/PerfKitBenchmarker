@@ -437,7 +437,10 @@ class GceDisk(disk.BaseDisk):
   @vm_util.Retry(
       poll_interval=30,
       max_retries=10,
-      retryable_exceptions=(GceServiceUnavailableError,),
+      retryable_exceptions=(
+          GceServiceUnavailableError,
+          errors.VmUtil.IssueCommandTimeoutError,
+      ),
   )
   def _Attach(self, vm):
     """Attaches the disk to a VM.
