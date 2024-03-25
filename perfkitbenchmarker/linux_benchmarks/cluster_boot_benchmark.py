@@ -186,6 +186,7 @@ def PrepareStartupScript() -> Tuple[str, Optional[int]]:
         stderr=tcpdump_output,
     )
     pid = tcpdump_cmd.pid
+    logging.info('Starting tcpdump process %s', pid)
   else:
     pid = None
 
