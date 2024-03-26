@@ -143,6 +143,17 @@ flags.DEFINE_string(
         'on GCP, AWS, Azure for now.'
     ),
 )
+_REQUIRED_CPU_VERSION = flags.DEFINE_string(
+    'required_cpu_version',
+    None,
+    'The required CPU version. Benchmark will fail if CPU does not match.'
+    ' The version is defined as the fields in /proc/cpuinfo that define the cpu'
+    ' version joined by underscores. On x86, the fields are (Vendor ID,'
+    ' cpu family, Model, Stepping) (e.g. GenuineIntel_6_143_8). On ARM, the'
+    ' fields are (CPU implementer, CPU architecture, CPU variant, CPU part).'
+    ' This is only useful when a machine type comprises of multiple CPU'
+    ' versions.',
+)
 
 
 @enum.unique
@@ -1154,6 +1165,10 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """The basic CPU architecture of the VM."""
     return None
 
+  def GetCPUVersion(self) -> Optional[str]:
+    """Get the CPU version of the VM."""
+    return None
+
 
 class DeprecatedOsMixin(BaseOsMixin):
   """Class that adds a deprecation log message to OsBasedVms."""
@@ -1399,6 +1414,47 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
           % (disk_num, len(self.scratch_disks))
       )
     return self.scratch_disks[disk_num].mount_point
+
+  def CreateAndBootOnce(self):
+    """Creates a single VM and waits for boot to complete."""
+    self.Create()
+    logging.info('VM: %s (%s)', self.ip_address, self.internal_ip)
+    logging.info('Waiting for boot completion.')
+    self.AllowRemoteAccessPorts()
+    self.WaitForBootCompletion()
+
+  @vm_util.Retry(
+      max_retries=3,
+      retryable_exceptions=[errors.VirtualMachine.VmRetryableProvisioningError],
+  )
+  def CreateAndBoot(self):
+    """Runs CreateAndBootOnce repeatedly to get --required_cpu_version."""
+    self.CreateAndBootOnce()
+    guest_arch = self.GetCPUVersion()
+    if (
+        _REQUIRED_CPU_VERSION.value
+        and _REQUIRED_CPU_VERSION.value != guest_arch
+    ):
+      self.Delete()
+      raise errors.VirtualMachine.VmRetryableProvisioningError(
+          f'Guest arch {guest_arch} is not enforced guest arch'
+          f' {_REQUIRED_CPU_VERSION.value}. Deleting VM and scratch disk and'
+          ' recreating.',
+      )
+
+  def PrepareAfterBoot(self):
+    """Prepares a VM after it has booted.
+
+    This function will prepare a scratch disk if required.
+
+    Raises:
+        Exception: If --vm_metadata is malformed.
+    """
+    self.AddMetadata()
+    self.OnStartup()
+    self.SetupAllScratchDisks()
+    self.PrepareVMEnvironment()
+    self.RecordAdditionalMetadata()
 
   def AllowIcmp(self):
     """Opens ICMP protocol on the firewall corresponding to the VM if exists."""

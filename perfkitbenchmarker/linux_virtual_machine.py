@@ -941,6 +941,30 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     except errors.VirtualMachine.RemoteCommandError:
       return 'unknown'
 
+  def GetCPUVersion(self):
+    """Get the CPU version of the VM.
+
+    Refer to flag definition '--required_cpu_version' in virtual_machine.py for
+    more details.
+
+    Returns:
+      guest_arch: str.
+    """
+    proccpu_results = self.CheckProcCpu(check_cache=False).GetValues()
+    if 'vendor_id' in proccpu_results:
+      vendor = proccpu_results.get('vendor_id', 'UnknownVendor')
+      family = proccpu_results.get('cpu family', 'UnknownFamily')
+      model = proccpu_results.get('model', 'UnknownModel')
+      stepping = proccpu_results.get('stepping', 'UnknownStepping')
+      guest_arch = f'{vendor}_{family}_{model}_{stepping}'
+    else:
+      implementer = proccpu_results.get('CPU implementer', 'UnknownVendor')
+      arch = proccpu_results.get('CPU architecture', 'UnknownArchitecture')
+      variant = proccpu_results.get('CPU variant', 'UnknownVariant')
+      part = proccpu_results.get('CPU part', 'UnknownPart')
+      guest_arch = f'{implementer}_{arch}_{variant}_{part}'
+    return guest_arch
+
   def CheckLsCpu(self):
     """Returns a LsCpuResults from the host VM."""
     if not self._lscpu_cache:
@@ -948,9 +972,9 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       self._lscpu_cache = LsCpuResults(lscpu)
     return self._lscpu_cache
 
-  def CheckProcCpu(self):
+  def CheckProcCpu(self, check_cache=True):
     """Returns a ProcCpuResults from the host VM."""
-    if not self._proccpu_cache:
+    if not self._proccpu_cache or not check_cache:
       proccpu, _ = self.RemoteCommand('cat /proc/cpuinfo')
       self._proccpu_cache = ProcCpuResults(proccpu)
     return self._proccpu_cache

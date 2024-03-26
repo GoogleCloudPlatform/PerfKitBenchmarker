@@ -768,13 +768,13 @@ class BenchmarkSpec:
       # so that we don't slow down the creation of all the VMs by running
       # commands on the VMs that booted.
       background_tasks.RunThreaded(
-          self.CreateAndBootVm,
+          lambda vm: vm.CreateAndBoot(),
           self.vms,
           post_task_delay=FLAGS.create_and_boot_post_task_delay,
       )
       if self.nfs_service and self.nfs_service.CLOUD == nfs_service.UNMANAGED:
         self.nfs_service.Create()
-      background_tasks.RunThreaded(self.PrepareVmAfterBoot, self.vms)
+      background_tasks.RunThreaded(lambda vm: vm.PrepareAfterBoot(), self.vms)
 
       sshable_vms = [
           vm for vm in self.vms if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
@@ -1010,35 +1010,6 @@ class BenchmarkSpec:
       )
 
     return vm_class(vm_spec)
-
-  def CreateAndBootVm(self, vm):
-    """Creates a single VM and waits for boot to complete.
-
-    Args:
-        vm: The BaseVirtualMachine object representing the VM.
-    """
-    vm.Create()
-    logging.info('VM: %s (%s)', vm.ip_address, vm.internal_ip)
-    logging.info('Waiting for boot completion.')
-    vm.AllowRemoteAccessPorts()
-    vm.WaitForBootCompletion()
-
-  def PrepareVmAfterBoot(self, vm):
-    """Prepares a VM after it has booted.
-
-    This function will prepare a scratch disk if required.
-
-    Args:
-        vm: The BaseVirtualMachine object representing the VM.
-
-    Raises:
-        Exception: If --vm_metadata is malformed.
-    """
-    vm.AddMetadata()
-    vm.OnStartup()
-    vm.SetupAllScratchDisks()
-    vm.PrepareVMEnvironment()
-    vm.RecordAdditionalMetadata()
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.
