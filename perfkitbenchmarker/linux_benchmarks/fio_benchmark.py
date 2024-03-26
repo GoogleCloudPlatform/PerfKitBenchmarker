@@ -183,7 +183,7 @@ flag_util.DEFINE_units(
     'fio_blocksize',
     None,
     'The block size for fio operations. Default is given by '
-    'the scenario when using --generate_scenarios. This '
+    'the scenario when using --fio_generate_scenarios. This '
     'flag does not apply when using --fio_jobfile.',
     convertible_to=units.byte,
 )
