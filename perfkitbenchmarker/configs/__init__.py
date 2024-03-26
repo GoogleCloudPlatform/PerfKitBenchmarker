@@ -219,7 +219,7 @@ def GetDefaultAndUserConfig():
   Returns:
     dict. The result of merging the loaded config from the
     --benchmark_config_file flag with the config generated from the
-    --config override flag.
+    --config_override flag.
   """
   # Doing a single yaml parse of concatenated files might be faster but merging
   # works as well.
