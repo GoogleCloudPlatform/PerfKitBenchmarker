@@ -1425,7 +1425,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
 
   @vm_util.Retry(
       max_retries=3,
-      retryable_exceptions=[errors.VirtualMachine.VmRetryableProvisioningError],
+      retryable_exceptions=(errors.Resource.RetryableCreationError,),
   )
   def CreateAndBoot(self):
     """Runs CreateAndBootOnce repeatedly to get --required_cpu_version."""
@@ -1436,7 +1436,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
         and _REQUIRED_CPU_VERSION.value != guest_arch
     ):
       self.Delete()
-      raise errors.VirtualMachine.VmRetryableProvisioningError(
+      raise errors.Resource.RetryableCreationError(
           f'Guest arch {guest_arch} is not enforced guest arch'
           f' {_REQUIRED_CPU_VERSION.value}. Deleting VM and scratch disk and'
           ' recreating.',

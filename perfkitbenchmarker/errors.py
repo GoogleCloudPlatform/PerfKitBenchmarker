@@ -145,9 +145,6 @@ class VirtualMachine(object):
   class VmStateError(VirtualMachineError):
     pass
 
-  class VmRetryableProvisioningError(VirtualMachineError):
-    pass
-
 
 class VmUtil(object):
   """Errors raised by vm_util.py."""
