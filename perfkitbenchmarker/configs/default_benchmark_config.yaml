@@ -12,20 +12,34 @@ default_disk_spec: &default_disk_spec
     disk_size: 200
     disk_type: Premium_LRS
 
+speccpu2017_int_rate_flags_base: &speccpu2017_int_rate_flags_base
+  build_fortran: True
+  enable_transparent_hugepages: True
+  runspec_estimate_spec: True
+  runspec_iterations: 1
+  runspec_keep_partial_results: True
+  runspec_tar: cpu2017-1.1.8.tar.gz
+  spec17_subset: intrate
+  spec_runmode: base
+
 speccpu2017_int_rate_GCC11_O3_x86:
   name: speccpu2017
   flags:
-    build_fortran: True
-    enable_transparent_hugepages: True
+    <<: *speccpu2017_int_rate_flags_base
     metadata: 'compiler_config:GCC11-O3'
     runspec_config: pkb-gcc-linux-x86.cfg
-    runspec_estimate_spec: True
-    runspec_iterations: 1
-    runspec_keep_partial_results: True
-    runspec_tar: cpu2017-1.1.8.tar.gz
     spec17_gcc_flags: "'-O3 -march=native'"
-    spec17_subset: intrate
-    spec_runmode: base
+  vm_groups:
+    default:
+      disk_spec: *default_disk_spec
+
+speccpu2017_int_rate_GCC11_OFAST_x86:
+  name: speccpu2017
+  flags:
+    <<: *speccpu2017_int_rate_flags_base
+    metadata: 'compiler_config:GCC11-OFAST'
+    runspec_config: pkb-gcc-linux-x86.cfg
+    spec17_gcc_flags: "'-Ofast -funroll-loops -flto -ljemalloc -z muldefs -fallow-argument-mismatch -march=native'"
   vm_groups:
     default:
       disk_spec: *default_disk_spec
@@ -33,17 +47,21 @@ speccpu2017_int_rate_GCC11_O3_x86:
 speccpu2017_int_rate_GCC11_O3_arm:
   name: speccpu2017
   flags:
-    build_fortran: True
-    enable_transparent_hugepages: True
+    <<: *speccpu2017_int_rate_flags_base
     metadata: 'compiler_config:GCC11-O3'
     runspec_config: pkb-gcc-linux-aarch64-1.1.0.cfg
-    runspec_estimate_spec: True
-    runspec_iterations: 1
-    runspec_keep_partial_results: True
-    runspec_tar: cpu2017-1.1.8.tar.gz
     spec17_gcc_flags: "'-O3 -mcpu=native'"
-    spec17_subset: intrate
-    spec_runmode: base
+  vm_groups:
+    default:
+      disk_spec: *default_disk_spec
+
+speccpu2017_int_rate_GCC11_OFAST_arm:
+  name: speccpu2017
+  flags:
+    <<: *speccpu2017_int_rate_flags_base
+    metadata: 'compiler_config:GCC11-OFAST'
+    runspec_config: pkb-gcc-linux-aarch64-1.1.0.cfg
+    spec17_gcc_flags: "'-Ofast -funroll-loops -flto -ljemalloc -z muldefs -fallow-argument-mismatch -march=native'"
   vm_groups:
     default:
       disk_spec: *default_disk_spec
