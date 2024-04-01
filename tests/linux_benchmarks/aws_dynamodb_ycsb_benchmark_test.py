@@ -34,7 +34,7 @@ class LoadStageTest(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.enter_context(
         mock.patch.object(
-            aws_dynamodb_ycsb_benchmark, 'GetRemoteVMCredentialsFullPath'
+            aws_dynamodb_ycsb_benchmark, 'GetRemoteCredentialsFullPath'
         )
     )
     self.enter_context(mock.patch.object(background_tasks, 'RunThreaded'))

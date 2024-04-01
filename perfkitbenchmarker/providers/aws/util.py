@@ -19,7 +19,7 @@ import collections
 import json
 import re
 import string
-from typing import Dict, Set
+from typing import Dict, Optional, Set
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -332,3 +332,20 @@ def AwsFilter(filter_keys_and_values):
   for name, value in sorted(filter_keys_and_values.items()):
     filters.append('Name={},Values={}'.format(name, value))
   return filters
+
+
+def GetConfigValue(
+    key: str,
+    required=True,
+    profile: Optional[str] = None,
+    **kwargs,
+) -> Optional[str]:
+  """Gets the value of a given key from AWS CLI configuration."""
+  cmd = [AWS_PATH, 'configure', 'get', key]
+  if profile:
+    cmd.append(f'--profile={profile}')
+  stdout, _, retcode = vm_util.IssueCommand(
+      cmd, raise_on_failure=required, **kwargs
+  )
+  if not retcode:
+    return stdout.strip()

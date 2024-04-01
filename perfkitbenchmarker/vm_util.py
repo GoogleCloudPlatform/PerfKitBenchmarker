@@ -392,6 +392,7 @@ def IssueCommand(
     should_pre_log: bool = True,
     raise_on_failure: bool = True,
     suppress_failure: Optional[Callable[[str, str, int], bool]] = None,
+    suppress_logging: bool = False,
     raise_on_timeout: bool = True,
     stack_level: int = 1,
 ) -> Tuple[str, str, int]:
@@ -416,6 +417,8 @@ def IssueCommand(
     suppress_failure: A function passed (stdout, stderr, ret_code) for non-zero
       return codes to determine if the failure should be suppressed e.g. a
       delete command which fails because the item to be deleted does not exist.
+    suppress_logging: A boolean indicated whether STDOUT and STDERR should be
+      suppressed. Used for sensitive information.
     raise_on_timeout: A boolean indicating if killing the process due to the
       timeout being hit should raise a IssueCommandTimeoutError
     stack_level: Number of stack frames to skip & get an "interesting" caller,
@@ -528,12 +531,14 @@ def IssueCommand(
     if should_time:
       timing_output = tf_timing.read().rstrip('\n')
 
+  logged_stdout = '[REDACTED]' if suppress_logging else stdout
+  logged_stderr = '[REDACTED]' if suppress_logging else stderr
   debug_text = 'Ran: {%s}\nReturnCode:%s%s\nSTDOUT: %s\nSTDERR: %s' % (
       full_cmd,
       process.returncode,
       timing_output,
-      stdout,
-      stderr,
+      logged_stdout,
+      logged_stderr,
   )
   if _VM_COMMAND_LOG_MODE.value == VmCommandLogMode.ALWAYS_LOG or (
       _VM_COMMAND_LOG_MODE.value == VmCommandLogMode.LOG_ON_ERROR

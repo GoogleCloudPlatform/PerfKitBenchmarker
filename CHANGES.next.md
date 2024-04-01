@@ -58,6 +58,9 @@
     services. Prefer to use the newer `dpb_generic_benchmark` and
     `dpb_terasort_benchmark`.
 -   gcp/aws/azure_provisioned_iops/throughput flags are unified to provisioned_iops/throughput flags.
+-   aws_dynamodb_ycsb benchmark now requires an explicit
+    `--aws_dynamodb_ycsb_cli_profile` flag to select the credentials to talk to
+    YCSB.
 
 ### New features:
 

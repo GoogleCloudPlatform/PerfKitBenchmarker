@@ -21,16 +21,18 @@ TODO: add global table option.
 
 from collections.abc import Collection, Iterable, MutableMapping
 import logging
-import os
 from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
+from perfkitbenchmarker.providers.aws import util
 
 _INITIAL_WRITES = flags.DEFINE_integer(
     'aws_dynamodb_ycsb_provision_wcu',
@@ -64,6 +66,14 @@ _PROVISIONED_QPS = flags.DEFINE_boolean(
     False,
     'If true, runs YCSB with a target throughput equal to the provisioned qps '
     'of the instance and returns the result.',
+)
+_CLI_PROFILE = flags.DEFINE_string(
+    'aws_dynamodb_ycsb_cli_profile',
+    None,
+    'Local AWS CLI profile to use with YCSB. Must be long term crendentials. '
+    '"default" will work with basic CLI set up. '
+    'Using an IAM user that only has DynamoDB access limits the scope of '
+    'credentials copied into the VM.',
 )
 FLAGS = flags.FLAGS
 
@@ -105,6 +115,12 @@ def CheckPrerequisites(benchmark_config):
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
   del benchmark_config
+  if not _CLI_PROFILE.value:
+    raise errors.Config.MissingOption(
+        '--aws_dynamodb_ycsb_cli_profile must be explicitly passed. "default" '
+        'will use the default CLI profile and works with basic long lived '
+        'credentials. Using DynamoDB specific credentials limits what is '
+        'copied into the VM.')
   ycsb.CheckPrerequisites()
 
 
@@ -114,7 +130,7 @@ def _GetYcsbArgs(
 ) -> dict[str, Any]:
   """Returns args to pass to YCSB."""
   run_kwargs = {
-      'dynamodb.awsCredentialsFile': GetRemoteVMCredentialsFullPath(client),
+      'dynamodb.awsCredentialsFile': GetRemoteCredentialsFullPath(client),
       'dynamodb.primaryKey': instance.primary_key,
       'dynamodb.endpoint': instance.GetEndPoint(),
       'dynamodb.region': instance.region,
@@ -268,29 +284,35 @@ def Cleanup(benchmark_spec):
   del benchmark_spec
 
 
-def GetRemoteVMCredentialsFullPath(vm):
-  """Returns the full path for first AWS credentials file found."""
-  home_dir, _ = vm.RemoteCommand('echo ~')
-  search_path = os.path.join(
-      home_dir.rstrip('\n'), FLAGS.aws_credentials_remote_path
+AWS_CREDENTIALS_FILE = 'aws_credentials.properties'
+
+
+def GetRemoteCredentialsFullPath(vm):
+  """Returns the full path for the generated AWS credentials file."""
+  result, _ = vm.RemoteCommand(f'echo ~/{AWS_CREDENTIALS_FILE}')
+  return result.strip()
+
+
+def GenerateCredentials(vm) -> None:
+  """Generates AWS credentials properties file and pushes it to the VM."""
+  key_id = util.GetConfigValue('aws_access_key_id', profile=_CLI_PROFILE.value)
+  secret = util.GetConfigValue(
+      'aws_secret_access_key', profile=_CLI_PROFILE.value, suppress_logging=True
   )
-  result, _ = vm.RemoteCommand('grep -irl "key" {0}'.format(search_path))
-  return result.strip('\n').split('\n')[0]
+  # TODO(pclay): consider adding some validation here:
+  # 1. key and secret are in the correct account.
+  # 2. _CLI_PROFILE does not use a session token.
+
+  with vm_util.NamedTemporaryFile(prefix=AWS_CREDENTIALS_FILE, mode='w') as f:
+    f.write(f"""
+accessKey={key_id}
+secretKey={secret}
+""")
+    f.close()
+    vm.PushFile(f.name, GetRemoteCredentialsFullPath(vm))
 
 
 def _Install(vm):
   """Install YCSB on client 'vm'."""
   vm.Install('ycsb')
-  # copy AWS creds
-  vm.Install('aws_credentials')
-  # aws credentials file format to ycsb recognized format
-  vm.RemoteCommand(
-      'sed -i "s/aws_access_key_id/accessKey/g" {0}'.format(
-          GetRemoteVMCredentialsFullPath(vm)
-      )
-  )
-  vm.RemoteCommand(
-      'sed -i "s/aws_secret_access_key/secretKey/g" {0}'.format(
-          GetRemoteVMCredentialsFullPath(vm)
-      )
-  )
+  GenerateCredentials(vm)
