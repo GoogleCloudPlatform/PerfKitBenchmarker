@@ -36,6 +36,7 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
+from tests import matchers
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS

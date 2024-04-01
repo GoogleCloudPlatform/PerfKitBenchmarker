@@ -1325,6 +1325,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
             ssh_private_key, connect_timeout=FLAGS.scp_connect_timeout
         )
     )
+
     simplified_cmd = ['scp']
     if copy_to:
       simplified_cmd.extend([file_path, remote_location])
@@ -1436,6 +1437,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         self.ssh_private_key if self.is_static else vm_util.GetPrivateKeyPath()
     )
     ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
+
     if should_pre_log:
       logger.info(
           'Running on %s via ssh: %s',

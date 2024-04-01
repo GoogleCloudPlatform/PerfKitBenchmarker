@@ -1794,9 +1794,18 @@ class Ubuntu2310BasedGceVirtualMachine(
 
 
 def GenerateDownloadPreprovisionedDataCommand(
-    install_path, module_name, filename
-):
-  """Returns a string used to download preprovisioned data."""
+    install_path: str, module_name: str, filename: str
+) -> str:
+  """Returns a string used to download preprovisioned data.
+
+  Args:
+    install_path: Path to install the module.
+    module_name: Name of the module to download.
+    filename: Filename of the module. Usually a zip file.
+
+  Returns:
+    The gcloud command to run.
+  """
   return 'gsutil -q cp gs://%s/%s/%s %s' % (
       FLAGS.gcp_preprovisioned_data_bucket,
       module_name,
@@ -1805,8 +1814,18 @@ def GenerateDownloadPreprovisionedDataCommand(
   )
 
 
-def GenerateStatPreprovisionedDataCommand(module_name, filename):
-  """Returns a string used to download preprovisioned data."""
+def GenerateStatPreprovisionedDataCommand(
+    module_name: str, filename: str
+) -> str:
+  """Returns a string used to download preprovisioned data.
+
+  Args:
+    module_name: Name of the module to download.
+    filename: Filename of the module. Usually a zip file.
+
+  Returns:
+    The gcloud command to run.
+  """
   return 'gsutil stat gs://%s/%s/%s' % (
       FLAGS.gcp_preprovisioned_data_bucket,
       module_name,

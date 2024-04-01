@@ -191,6 +191,13 @@ class TestLinuxVirtualMachine(
     pass
 
 
+class TestGceLinuxVirtualMachine(  # pytype: disable=signature-mismatch  # overriding-return-type-checks
+    gce_virtual_machine.GceVirtualMachine, TestLinuxVirtualMachine
+):
+  """Test class that has VM methods for a GCE virtual machine."""
+  pass
+
+
 class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):  # pytype: disable=signature-mismatch  # overriding-return-type-checks
   pass
 
