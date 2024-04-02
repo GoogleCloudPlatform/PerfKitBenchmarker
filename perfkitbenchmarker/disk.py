@@ -273,6 +273,7 @@ class BaseNFSDiskSpec(BaseDiskSpec):
     self.device_path: str = None
     self.mount_point: str = None
     super(BaseNFSDiskSpec, self).__init__(*args, **kwargs)
+    self.disk_type = NFS
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):

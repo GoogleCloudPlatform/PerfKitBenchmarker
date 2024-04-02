@@ -189,7 +189,7 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
     disk_meta = {}
     for key, value in six.iteritems(self.MountOptions()):
       disk_meta['nfs_{}'.format(key)] = value
-    disk_meta.update({'num_stripes': 1, 'size': None, 'type': None})
+    disk_meta.update({'num_stripes': 1, 'size': None, 'type': 'nfs'})
     self.assertEqual(disk_meta, nfs_disk.metadata)
     self.assertTrue(nfs_disk._IsReady())
 
