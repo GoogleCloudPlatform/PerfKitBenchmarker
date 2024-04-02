@@ -277,6 +277,7 @@ def VmsToBoot(vm_groups):
       for name, spec in six.iteritems(vm_groups)
       if name == 'clients'
       or name == 'default'
+      or name == 'controller'
       or (not FLAGS.use_managed_db and name == 'servers')
   }
 

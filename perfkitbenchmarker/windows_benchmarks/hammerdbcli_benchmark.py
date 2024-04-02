@@ -63,6 +63,21 @@ hammerdbcli:
           num_striped_disks: 1
           mount_point: /scratch
     vm_groups:
+      controller:
+        os_type: windows2022_desktop
+        vm_spec:
+          GCP:
+            machine_type: n2-standard-4
+            zone: us-central1-c
+            boot_disk_size: 50
+            boot_disk_type: pd-ssd
+          AWS:
+            machine_type: m6i.xlarge
+            zone: us-east-1a
+          Azure:
+            machine_type: Standard_D4s_v5
+            zone: eastus
+            boot_disk_type: Premium_LRS
       servers:
         os_type: windows2022_desktop_sqlserver_2019_standard
         vm_spec:
@@ -138,11 +153,19 @@ def GetConfig(user_config):
     loaded benchmark configuration
   """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config['relational_db']['vm_groups']['controller']['vm_count'] = 0
   if FLAGS.db_high_availability:
     # We need two additional vms for sql ha deployment.
     # First vm to act as the second node in sql cluster
     # and additional vm to act as a domain controller.
-    config['relational_db']['vm_groups']['servers']['vm_count'] = 3
+
+    config['relational_db']['vm_groups']['servers']['vm_count'] = 2
+    config['relational_db']['vm_groups']['controller']['vm_count'] = 1
+    config['relational_db']['vm_groups']['controller']['vm_spec'][FLAGS.cloud][
+        'zone'
+    ] = config['relational_db']['vm_groups']['servers']['vm_spec'][FLAGS.cloud][
+        'zone'
+    ]
     if FLAGS.db_high_availability_type == 'FCIMW':
       config['relational_db']['vm_groups']['servers']['disk_count'] = 0
 
