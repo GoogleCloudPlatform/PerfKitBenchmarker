@@ -1,20 +1,49 @@
- try {
+param (
+    [string]$cluster_ip_address,
+    [string]$perf_password,
+    [string]$perf_domain
+ )
+
+ function Get-SqlInstallSourceDirectory {
+  # Depending on cloud provider SQL Server installation source directory changes
+  $sql_install_source_directory = ''
+  # AWS
+  if (Test-Path -Path 'C:\SQLServerSetup') {
+    $sql_install_source_directory = 'C:\SQLServerSetup\'
+  }
+  # Azure
+  if (Test-Path -Path 'C:\SQLServerFull') {
+      $sql_install_source_directory = 'C:\SQLServerFull\'
+  }
+  # GCP
+  if (Test-Path -Path 'C:\sql_server_install') {
+      $sql_install_source_directory = 'C:\sql_server_install\'
+  }
+  return $sql_install_source_directory
+}
+
+try {
   $scriptsFolder = 'c:\scripts'
-  $domainUser = 'perflab\administrator'
+  $domainUser = "$perf_domain\pkbadminuser"
+  $sql_service_account = "$perf_domain\sql_server"
+  $sql_server_install_folder = Get-SqlInstallSourceDirectory
+
+  Write-Host "Sql install folder: $sql_server_install_folder"
   $localServerName = [System.Net.Dns]::GetHostName()
-  $clearPassword = $args[1]
   $taskScriptPath = $scriptsFolder + '\fci-cluster-task.ps1'
-  $clusterIpAddress = $args[0]
 
   if (-not(Test-Path $scriptsFolder)) {
     New-Item -Path $scriptsFolder  -ItemType directory
   }
 
-  $sqlDestFolder = 'C:\ClusterStorage'
+  $sqlDestFolder = 'C:\ClusterStorage\Data'
   $clusterStorageName = 'Cluster Virtual Disk (Data)'
 
   if (Test-Path -Path 'D:\MSSQL\fcimw.txt' -PathType Leaf) {
-    $sqlDestFolder = 'D:\MSSQL'
+    $Disks = Get-CimInstance -Namespace Root\MSCluster -ClassName MSCluster_Resource -ComputerName $localServerName | ?{$_.Type -eq 'Physical Disk'}
+    $diskDetails = ($Disks | %{Get-CimAssociatedInstance -InputObject $_ -ResultClassName MSCluster_DiskPartition})
+
+    $sqlDestFolder = 'E:\MSSQL'
     $clusterStorage = Get-ClusterResource | Where-Object { $_.ResourceType -eq 'Physical Disk' }
     $clusterStorageName = $clusterStorage.Name
   }
@@ -23,7 +52,7 @@
   # SQL Server 2022 needs /PRODUCTCOVEREDBYSA=False
   $sql2022InstallParam = '/PRODUCTCOVEREDBYSA=False'
   $sql2022InstallParam = ''
-  $sqlInstallString = [string]::Format('c:\sql_server_install\Setup.exe /Action=InstallFailoverCluster /UpdateEnabled=True {2} /ENU=True /SQLSVCACCOUNT=''perflab\sql_server'' /SQLSVCPASSWORD=''{0}'' /SAPWD=''{0}'' /AGTSVCACCOUNT=''perflab\sql_server'' /AGTSVCPASSWORD=''{0}'' /FEATURES=SQLENGINE,REPLICATION,FULLTEXT,DQ /INSTANCEID=''MSSQLSERVER'' /INSTANCENAME=''MSSQLSERVER'' /INSTALLSHAREDDIR=''C:\Program Files\Microsoft SQL Server'' /INSTANCEDIR=''C:\Program Files\Microsoft SQL Server'' /FAILOVERCLUSTERDISKS=''{3}'' /FAILOVERCLUSTERNETWORKNAME=''sql'' /FAILOVERCLUSTERIPADDRESSES=''IPv4;{1};Cluster Network 1;255.255.240.0'' /FAILOVERCLUSTERGROUP=''SQL Server (MSSQLSERVER)'' /SQLSVCINSTANTFILEINIT=''True'' /SQLSYSADMINACCOUNTS=''perflab\domain admins'' /IACCEPTSQLSERVERLICENSETERMS=1 /INSTALLSQLDATADIR=''{4}\Data\'' /SQLUSERDBLOGDIR=''{4}\Data\MSSQL\Log'' /SQLTEMPDBDIR=''{4}\Data\MSSQL\Temp'' /FTSVCACCOUNT=''NT Service\MSSQLFDLauncher'' /INDICATEPROGRESS /SECURITYMODE=SQL /Q 2>&1 > c:\scripts\sqlsetuplog.log',$clearPassword, $clusterIpAddress,$sql2022InstallParam, $clusterStorageName, $sqlDestFolder)
+  $sqlInstallString = [string]::Format('{5}Setup.exe /Action=InstallFailoverCluster /UpdateEnabled=True {2} /ENU=True /SQLSVCACCOUNT=''{6}'' /SQLSVCPASSWORD=''{0}'' /SAPWD=''{0}'' /AGTSVCACCOUNT=''{6}'' /AGTSVCPASSWORD=''{0}'' /FEATURES=SQLENGINE,REPLICATION,FULLTEXT,DQ /INSTANCEID=''MSSQLSERVER'' /INSTANCENAME=''MSSQLSERVER'' /INSTALLSHAREDDIR=''C:\Program Files\Microsoft SQL Server'' /INSTANCEDIR=''C:\Program Files\Microsoft SQL Server'' /FAILOVERCLUSTERDISKS=''{3}'' /FAILOVERCLUSTERNETWORKNAME=''sql'' /FAILOVERCLUSTERIPADDRESSES=''IPv4;{1};Cluster Network 1;255.255.240.0'' /FAILOVERCLUSTERGROUP=''SQL Server (MSSQLSERVER)'' /SQLSVCINSTANTFILEINIT=''True'' /SQLSYSADMINACCOUNTS=''{7}\domain admins'' /IACCEPTSQLSERVERLICENSETERMS=1 /INSTALLSQLDATADIR=''{4}\MSSQL\Data'' /SQLUSERDBLOGDIR=''{4}\MSSQL\Log'' /SQLTEMPDBDIR=''{4}\MSSQL\Temp'' /FTSVCACCOUNT=''NT Service\MSSQLFDLauncher'' /INDICATEPROGRESS /SECURITYMODE=SQL /Q 2>&1 > c:\scripts\sqlsetuplog.log',$perf_password,$cluster_ip_address,$sql2022InstallParam,$clusterStorageName,$sqlDestFolder,$sql_server_install_folder,$sql_service_account,$perf_domain)
 
   Out-File -FilePath $taskScriptPath -InputObject $sqlInstallString
   Add-Content $taskScriptPath 'Add-ClusterResource -Name fci-dnn -ResourceType ''Distributed Network Name'' -Group ''SQL Server (MSSQLSERVER)'''
@@ -37,7 +66,7 @@
   $taskTrigger = New-ScheduledTaskTrigger -Once -At $currentDateTime.AddMinutes(120).ToString('HH:mm:sstt')
   $scheduledTask = New-ScheduledTask -Action $taskAction -Trigger $taskTrigger
 
-  Register-ScheduledTask -TaskName $taskName -InputObject $scheduledTask -User $domainUser -Password $clearPassword
+  Register-ScheduledTask -TaskName $taskName -InputObject $scheduledTask -User $domainUser -Password $perf_password
   Start-ScheduledTask -TaskName $taskName
 
 
@@ -53,6 +82,6 @@
 
 }
 catch {
- Write-Host $_.Exception.Message
- throw $_.Exception.Message
+  Write-Host $_.Exception.Message
+  throw $_.Exception.Message
 }

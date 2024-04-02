@@ -127,6 +127,11 @@ class GCPSQLServerIAASRelationalDb(
     self._reserved_ip_address.Create()
     return self._reserved_ip_address.ip_address
 
+  def ReleaseIpReservation(self) -> bool:
+    if self._reserved_ip_address:
+      self._reserved_ip_address.Delete()
+    return self._reserved_ip_address is None
+
   def _Delete(self):
     super(GCPSQLServerIAASRelationalDb, self)._Delete()
     if self._reserved_ip_address:

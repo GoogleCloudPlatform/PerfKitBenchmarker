@@ -64,6 +64,14 @@ class AzureSQLServerIAASRelationalDb(
   CLOUD = provider_info.AZURE
   TEMPDB_DISK_LETTER = 'D'
 
+  def CreateIpReservation(self) -> str:
+    cluster_ip_address = '.'.join(
+        self.server_vm.internal_ip.split('.')[:-1]+['128'])
+    return cluster_ip_address
+
+  def ReleaseIpReservation(self) -> bool:
+    return True
+
 
 class AzurePostgresIAASRelationalDb(
     postgres_iaas_relational_db.PostgresIAASRelationalDb

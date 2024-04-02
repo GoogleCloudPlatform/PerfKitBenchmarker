@@ -1,18 +1,21 @@
+param (
+    [string]$replica_vm_name,
+    [string]$perf_domain_password,
+    [string]$perf_domain
+ )
+
 try {
-    $domainUser = 'perflab\administrator'
+    $domainUser = "$perf_domain\pkbadminuser"
     $localServerName    = [System.Net.Dns]::GetHostName()
-
-    $passwordSecureString = (ConvertTo-SecureString -AsPlainText $args[2] -Force)
-    $node1 = $localServerName + '.perflab.local'
-    $node2 = $args[0] + '.perflab.local'
-    $fulldcname = $args[1] + '.perflab.local'
-
-    Write-Host $args[2]
-
+    $passwordSecureString = (ConvertTo-SecureString -AsPlainText $perf_domain_password -Force)
     $domainCredential   = New-Object System.Management.Automation.PSCredential ($domainUser, $passwordSecureString)
 
+    $ad_dc = Get-ADDomainController -Credential $domainCredential
+    $node1 = "$localServerName.$perf_domain.local"
+    $node2 = "$replica_vm_name.$perf_domain.local"
+
     Write-Host 'Create failover cluster'
-    Invoke-Command -ComputerName  $fulldcname -Credential $domainCredential -ArgumentList $node1,$node2 -ScriptBlock {
+    Invoke-Command -ComputerName $ad_dc.HostName -Credential $domainCredential -ArgumentList $node1,$node2 -ScriptBlock {
         New-Cluster -Name sql-fci -Node  $args[0],$args[1] -NoStorage -ManagementPointNetworkType Distributed
     }
 }

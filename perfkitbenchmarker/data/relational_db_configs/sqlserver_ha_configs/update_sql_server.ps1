@@ -1,5 +1,8 @@
+param (
+    [string]$kbNumber
+ )
+
 $scriptsFolder = 'c:\scripts'
-$kbNumber =  $args[0]
 $sqlsrvUpdateFileName = 'SQLServerUpdate.exe'
 
 function executeCodeBlock($codeBlock) {
@@ -20,10 +23,10 @@ function executeCodeBlock($codeBlock) {
           Install-Module kbupdate -Force -Confirm:$false
         }
         'Fetch_kb_url' {
-          $returnValue = Get-KbUpdate -Name "$kbNumber" | Select-Object Link | ForEach-Object {$_.Link}
+          $returnValue = Get-KbUpdate -Name $kbNumber | Select-Object Link | ForEach-Object {$_.Link}
         }
         'Get_kb_file_name' {
-          $components = ($url -split "/")
+          $components = ($url -split '/')
           $returnValue = $components[$components.length-1]
         }
         'Create_destination_folder' {

@@ -196,7 +196,8 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     """Set the DB endpoint for this instance during _PostCreate."""
     super()._SetEndpoint()
     if self.spec.high_availability:
-      self.endpoint = "fcidnn.perflab.local"
+      perf_domain = "perf" + FLAGS.run_uri[:6]
+      self.endpoint = "fcidnn.{}.local".format(perf_domain)
     else:
       self.endpoint = self.server_vm.internal_ip
 
@@ -321,6 +322,8 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     )
 
     ip_address = self.CreateIpReservation()
+    perf_domain = "perf" + FLAGS.run_uri[:6]
+    print(self.spec.cloud)
 
     # Create multiwriter disk (only for FCIMW)
     if self.spec.high_availability_type == "FCIMW":
@@ -331,74 +334,87 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
                                      server_vm.name, replica_vms[0].name)
 
     # Install and configure AD components.
-    self.PushAndRunPowershellScript(controller_vm,
-                                    "setup_domain_controller.ps1",
-                                    [win_password])
+    self.PushAndRunPowershellScript(
+        controller_vm, "setup_domain_controller.ps1",
+        [win_password, perf_domain, self.spec.cloud])
     controller_vm.Reboot()
-
+    self.PushAndRunPowershellScript(
+        controller_vm, "add_user_to_domain_groups.ps1",
+        [win_password, perf_domain])
     # Remove volumes and partitions created on the attached disks.
     # Disks will be initialized by S2D.
-    self.PushAndRunPowershellScript(server_vm, "clean_disks.ps1")
-
-    self.PushAndRunPowershellScript(server_vm, "set_dns_join_domain.ps1",
-                                    [controller_vm.internal_ip, win_password])
+    self.PushAndRunPowershellScript(
+        server_vm, "clean_disks.ps1")
+    server_vm.Reboot()
+    self.PushAndRunPowershellScript(
+        server_vm, "set_dns_join_domain.ps1",
+        [controller_vm.internal_ip, win_password, perf_domain])
     server_vm.Reboot()
 
-    self.PushAndRunPowershellScript(replica_vms[0], "clean_disks.ps1")
-    self.PushAndRunPowershellScript(replica_vms[0], "set_dns_join_domain.ps1",
-                                    [controller_vm.internal_ip, win_password])
+    self.PushAndRunPowershellScript(
+        replica_vms[0], "clean_disks.ps1")
     replica_vms[0].Reboot()
 
-    self.PushAndRunPowershellScript(client_vm, "set_dns.ps1",
-                                    [controller_vm.internal_ip])
+    self.PushAndRunPowershellScript(
+        replica_vms[0], "set_dns_join_domain.ps1",
+        [controller_vm.internal_ip, win_password, perf_domain])
+    replica_vms[0].Reboot()
+
+    self.PushAndRunPowershellScript(
+        client_vm, "set_dns.ps1", [controller_vm.internal_ip])
 
     # Install all components needed to create and configure failover cluster.
-    self.PushAndRunPowershellScript(controller_vm,
-                                    "install_cluster_components.ps1")
+    self.PushAndRunPowershellScript(
+        controller_vm, "install_cluster_components.ps1")
     controller_vm.Reboot()
-    self.PushAndRunPowershellScript(server_vm, "install_cluster_components.ps1")
+    self.PushAndRunPowershellScript(
+        server_vm, "install_cluster_components.ps1")
     server_vm.Reboot()
-    self.PushAndRunPowershellScript(replica_vms[0],
-                                    "install_cluster_components.ps1")
+    self.PushAndRunPowershellScript(
+        replica_vms[0], "install_cluster_components.ps1")
     replica_vms[0].Reboot()
 
     # Setup cluster witness.
-    self.PushAndRunPowershellScript(controller_vm, "setup_witness.ps1")
-    self.PushAndRunPowershellScript(server_vm, "setup_fci_cluster.ps1",
-                                    [replica_vms[0].name, controller_vm.name,
-                                     win_password])
+    self.PushAndRunPowershellScript(
+        controller_vm, "setup_witness.ps1")
+    self.PushAndRunPowershellScript(
+        server_vm, "setup_fci_cluster.ps1",
+        [replica_vms[0].hostname, win_password, perf_domain])
 
     # Ensure all nodes in the cluster have access to the witness share
-    self.PushAndRunPowershellScript(controller_vm, "grant_witness_access.ps1")
+    self.PushAndRunPowershellScript(
+        controller_vm, "grant_witness_access.ps1")
 
     # Uninstall existing SQL server.
     # FCI cluster requires different installation to what comes with the image.
-    server_vm.RemoteCommand("C:\\sql_server_install\\Setup.exe "
-                            "/Action=Uninstall /FEATURES=SQL,AS,IS,RS "
-                            "/INSTANCENAME=MSSQLSERVER /Q")
+    self.PushAndRunPowershellScript(
+        server_vm, "uninstall_sql_server.ps1")
     server_vm.Reboot()
-    replica_vms[0].RemoteCommand("C:\\sql_server_install\\Setup.exe "
-                                 "/Action=Uninstall /FEATURES=SQL,AS,IS,RS "
-                                 "/INSTANCENAME=MSSQLSERVER /Q")
+
+    self.PushAndRunPowershellScript(
+        replica_vms[0], "uninstall_sql_server.ps1")
     replica_vms[0].Reboot()
 
     if self.spec.high_availability_type == "FCIMW":
-      self.PushAndRunPowershellScript(server_vm, "setup_mw_volume.ps1",
-                                      [win_password])
+      # Configure MW cluster disks.
+      self.PushAndRunPowershellScript(
+          server_vm, "setup_mw_volume.ps1",
+          [win_password, replica_vms[0].hostname, perf_domain])
     else:
       # Configure S2D pool and volumes.
       # All available storage (both PD and local SSD) will be used
-      self.PushAndRunPowershellScript(server_vm, "setup_s2d_volumes.ps1",
-                                      [win_password])
+      self.PushAndRunPowershellScript(
+          server_vm, "setup_s2d_volumes.ps1",
+          [win_password, replica_vms[0].hostname, perf_domain])
 
     # install SQL server into newly created cluster
     self.PushAndRunPowershellScript(
-        server_vm, "setup_sql_server_first_node.ps1", [ip_address, win_password]
+        server_vm, "setup_sql_server_first_node.ps1",
+        [ip_address, win_password, perf_domain]
     )
     self.PushAndRunPowershellScript(
-        replica_vms[0],
-        "add_sql_server_second_node.ps1",
-        [ip_address, win_password],
+        replica_vms[0], "add_sql_server_second_node.ps1",
+        [ip_address, win_password, perf_domain],
     )
 
     # Install SQL server updates.
@@ -425,14 +441,20 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
           self.PushAndRunPowershellScript(
               sql_srv_vm, "update_sql_server.ps1", [kb_number]
           )
+          sql_srv_vm.Reboot()
 
     # Update variables user for connection to SQL server.
     self.spec.database_password = win_password
-    self.spec.endpoint = "fcidnn.perflab.local"
+    self.spec.endpoint = "fcidnn.{}.local".format(perf_domain)
+    self.ReleaseIpReservation()
 
   def CreateIpReservation(self):
     """Create IP reservation for SQL server."""
     raise NotImplementedError("CreateIpReservation not implemented.")
+
+  def ReleaseIpReservation(self):
+    """Release IP reservation for SQL server."""
+    raise NotImplementedError("ReleaseIpReservation not implemented.")
 
   def ConfigureSQLServerHaAoag(self):
     """Create SQL server HA deployment for performance testing."""
@@ -441,45 +463,52 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     controller_vm = self.controller_vm
     replica_vms = self.replica_vms
 
+    perf_domain = "perf" + FLAGS.run_uri[:6]
+    print(perf_domain)
     win_password = vm_util.GenerateRandomWindowsPassword(
         vm_util.PASSWORD_LENGTH, "*!@#%^+=")
 
     # Install and configure AD components.
-    self.PushAndRunPowershellScript(controller_vm,
-                                    "setup_domain_controller.ps1",
-                                    [win_password])
+    self.PushAndRunPowershellScript(
+        controller_vm, "setup_domain_controller.ps1",
+        [win_password, perf_domain])
     controller_vm.Reboot()
 
-    self.PushAndRunPowershellScript(server_vm, "set_dns_join_domain.ps1",
-                                    [controller_vm.internal_ip, win_password])
+    self.PushAndRunPowershellScript(
+        server_vm, "set_dns_join_domain.ps1",
+        [controller_vm.internal_ip, win_password, perf_domain])
     server_vm.Reboot()
 
-    self.PushAndRunPowershellScript(replica_vms[0], "set_dns_join_domain.ps1",
-                                    [controller_vm.internal_ip, win_password])
+    self.PushAndRunPowershellScript(
+        replica_vms[0], "set_dns_join_domain.ps1",
+        [controller_vm.internal_ip, win_password, perf_domain])
     replica_vms[0].Reboot()
 
-    self.PushAndRunPowershellScript(client_vm, "set_dns.ps1",
-                                    [controller_vm.internal_ip])
+    self.PushAndRunPowershellScript(
+        client_vm, "set_dns.ps1", [controller_vm.internal_ip])
 
     # Install all components needed to create and configure failover cluster.
-    self.PushAndRunPowershellScript(controller_vm,
-                                    "install_cluster_components.ps1")
+    self.PushAndRunPowershellScript(
+        controller_vm, "install_cluster_components.ps1")
     controller_vm.Reboot()
-    self.PushAndRunPowershellScript(server_vm, "install_cluster_components.ps1")
+    self.PushAndRunPowershellScript(
+        server_vm, "install_cluster_components.ps1")
     server_vm.Reboot()
-    self.PushAndRunPowershellScript(replica_vms[0],
-                                    "install_cluster_components.ps1")
+    self.PushAndRunPowershellScript(
+        replica_vms[0], "install_cluster_components.ps1")
     replica_vms[0].Reboot()
 
     # Setup cluster witness.
-    self.PushAndRunPowershellScript(controller_vm, "setup_witness.ps1")
+    self.PushAndRunPowershellScript(
+        controller_vm, "setup_witness.ps1")
 
-    self.PushAndRunPowershellScript(server_vm, "setup_fci_cluster.ps1",
-                                    [replica_vms[0].name, controller_vm.name,
-                                     win_password])
+    self.PushAndRunPowershellScript(
+        server_vm, "setup_fci_cluster.ps1",
+        [replica_vms[0].hostname, win_password, perf_domain])
 
     # Ensure all nodes in the cluster have access to the witness share
-    self.PushAndRunPowershellScript(controller_vm, "grant_witness_access.ps1")
+    self.PushAndRunPowershellScript(
+        controller_vm, "grant_witness_access.ps1")
 
     server_vm.RemoteCommand(
         f"Enable-SqlAlwaysOn -ServerInstance {server_vm.name} -Force")

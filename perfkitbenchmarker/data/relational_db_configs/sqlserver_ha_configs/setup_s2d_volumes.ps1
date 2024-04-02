@@ -1,18 +1,21 @@
+param (
+    [string]$perf_domain_password,
+    [string]$replica_vm_name,
+    [string]$perf_domain
+ )
+
 try {
-  $domainUser = 'perflab\administrator'
+  $domainUser = "$perf_domain\pkbadminuser"
   $localServerName    = [System.Net.Dns]::GetHostName()
 
-  $passwordSecureString = (ConvertTo-SecureString -AsPlainText $args[0] -Force)
-  $node1 = $localServerName + '.perflab.local'
-
-  $partVmName = $localServerName.Substring(0, $localServerName.Length - 1)
-
-  $node2 = $partVmName + '2.perflab.local'
-  $dc = $partVmName + '3.perflab.local'
-
+  $passwordSecureString = (ConvertTo-SecureString -AsPlainText $perf_domain_password -Force)
   $domainCredential = New-Object System.Management.Automation.PSCredential ($domainUser, $passwordSecureString)
 
-  $cacheDiskModel = 'EphemeralDisk'
+  $node1 = "$localServerName.$perf_domain.local"
+  $node2 = "$replica_vm_name.$perf_domain.local"
+  $ad_dc = Get-ADDomainController -Credential $domainCredential
+
+  $cacheDiskModel = ''
 
   $nvme_disks = Get-PhysicalDisk | Where-Object { $_.FriendlyName -like 'nvme_card' }
   $scsi_disks = Get-PhysicalDisk | Where-Object { $_.FriendlyName -like 'EphemeralDisk' }
@@ -29,12 +32,14 @@ try {
   for (($i = 0); $i -lt $maxRetryAttempts; $i++) {
     try {
       if ([string]::IsNullOrEmpty($cacheDiskModel)) {
+        Invoke-Command -ComputerName  $node1 -Credential $domainCredential -ArgumentList $cacheDiskModel -ScriptBlock {
           Enable-ClusterStorageSpacesDirect -PoolFriendlyName 's2dpool' -Confirm:0;
+        }
       }
       else {
         Invoke-Command -ComputerName  $node1 -Credential $domainCredential -ArgumentList $cacheDiskModel -ScriptBlock {
           Enable-ClusterStorageSpacesDirect -CacheDeviceModel $args[0]  -PoolFriendlyName 's2dpool' -Confirm:0;
-          }
+        }
       }
       break
     }
@@ -51,14 +56,14 @@ try {
     -AllocationUnitSize 65536 -ProvisioningType 'Fixed' `
     -UseMaximumSize
 
-  Write-Host 'Test Cluster'
-  Invoke-Command -ComputerName  $dc -Credential $domainCredential -ArgumentList $node1,$node2 -ScriptBlock {
+  Write-Host 'Verify Cluster'
+  Invoke-Command -ComputerName $ad_dc.HostName -Credential $domainCredential -ArgumentList $node1,$node2 -ScriptBlock {
         Test-Cluster -Node $args[0],$args[1] -Confirm:0;
-     }
+  }
   Write-Host 'Add SQL service account'
-  Invoke-Command -ComputerName  $dc -Credential $domainCredential -ArgumentList $passwordSecureString -ScriptBlock {
+  Invoke-Command -ComputerName $ad_dc.HostName -Credential $domainCredential -ArgumentList $passwordSecureString -ScriptBlock {
         New-ADUser -Name 'sql_server' -Description 'SQL Agent and SQL Admin account.' -AccountPassword $args[0] -Enabled $true -PasswordNeverExpires $true
-     }
+  }
 }
 catch {
   Write-Host $_.Exception.Message

@@ -47,6 +47,14 @@ class AWSSQLServerIAASRelationalDb(
 
   CLOUD = provider_info.AWS
 
+  def CreateIpReservation(self) -> str:
+    cluster_ip_address = '.'.join(
+        self.server_vm.internal_ip.split('.')[:-1]+['128'])
+    return cluster_ip_address
+
+  def ReleaseIpReservation(self) -> bool:
+    return True
+
 
 class AWSPostgresIAASRelationalDb(
     postgres_iaas_relational_db.PostgresIAASRelationalDb
