@@ -185,6 +185,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
             self.spec.database_username,
             self.spec.database_password)
         self.MoveSQLServerTempDb()
+        self.EnsurePrimaryReplica()
     else:
       ConfigureSQLServer(
           self.server_vm,
@@ -456,6 +457,25 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     """Release IP reservation for SQL server."""
     raise NotImplementedError("ReleaseIpReservation not implemented.")
 
+  def EnsurePrimaryReplica(self):
+    """Move server_vm as primary node in AOAG."""
+    # Set first server vm as primary if necessary
+    out, _ = self.server_vm.RemoteCommand(
+        """sqlcmd -Q \"
+        SELECT
+          role_desc
+        FROM
+          sys.dm_hadr_availability_replica_states ars
+          JOIN sys.availability_groups ag ON ars.group_id = ag.group_id
+        WHERE
+          ag.name = '{0}'
+          AND is_local = 1;\"
+        """.format(sql_engine_utils.SQLSERVER_AOAG_NAME))
+    if "PRIMARY" not in out:
+      self.server_vm.RemoteCommand(
+          'sqlcmd -Q "ALTER AVAILABILITY GROUP [{0}] FAILOVER"'.format(
+              sql_engine_utils.SQLSERVER_AOAG_NAME))
+
   def ConfigureSQLServerHaAoag(self):
     """Create SQL server HA deployment for performance testing."""
     server_vm = self.server_vm
@@ -515,7 +535,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     replica_vms[0].RemoteCommand(
         f"Enable-SqlAlwaysOn -ServerInstance {replica_vms[0].name} -Force")
 
-    # Create folder structure and tpcc database
+    # Create folder structure and dummy DB database for AOAG creation
     server_vm.RemoteCommand(r"mkdir F:\DATA; mkdir F:\Logs; mkdir F:\Backup")
     replica_vms[0].RemoteCommand(
         r"mkdir F:\DATA; mkdir F:\Logs; mkdir F:\Backup")
@@ -525,30 +545,30 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         GO
         ALTER LOGIN [sa] ENABLE
         GO
-        CREATE DATABASE [tpcc] ON PRIMARY (
-          NAME = [tpcc],
-          FILENAME='F:\\Data\\tpcc.mdf',
+        CREATE DATABASE [{0}] ON PRIMARY (
+          NAME = [{0}],
+          FILENAME='F:\\Data\\{0}.mdf',
           SIZE = 256MB,
           MAXSIZE = UNLIMITED,
           FILEGROWTH = 256MB)
         LOG ON (
-          NAME = 'tpcc_log',
-          FILENAME='F:\\Logs\\tpcc.ldf',
+          NAME = '{0}_log',
+          FILENAME='F:\\Logs\\{0}.ldf',
           SIZE = 256MB,
           MAXSIZE = UNLIMITED,
           FILEGROWTH = 256MB)
         GO
-        USE [tpcc]
+        USE [{0}]
         GO
         EXEC sp_changedbowner 'sa'
         GO
         USE [master]
         GO
-        ALTER DATABASE [tpcc] SET RECOVERY FULL
+        ALTER DATABASE [{0}] SET RECOVERY FULL
         GO
-        BACKUP DATABASE [tpcc] TO DISK = 'F:\\Backup\\tpcc.bak'
+        BACKUP DATABASE [{0}] TO DISK = 'F:\\Backup\\{0}.bak'
         GO\"
-        """)
+        """.format(sql_engine_utils.SQLSERVER_AOAG_DB_NAME))
 
     # Change log on for MSSQLSERVICE to perflab\adminuser
     # Default PowerShell version doesn't have Set-Service -Credential option
@@ -642,26 +662,29 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         USE [master]
         GO
 
-        CREATE AVAILABILITY GROUP [tpcc-aoag]
+        CREATE AVAILABILITY GROUP [{3}]
         WITH (AUTOMATED_BACKUP_PREFERENCE = SECONDARY,
         DB_FAILOVER = OFF,
         DTC_SUPPORT = NONE,
         REQUIRED_SYNCHRONIZED_SECONDARIES_TO_COMMIT = 0)
-        FOR DATABASE [tpcc]
+        FOR DATABASE [{2}]
 
         REPLICA ON N'{0}' WITH (ENDPOINT_URL = N'TCP://{0}.perflab.local:5022', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SEEDING_MODE = AUTOMATIC, SECONDARY_ROLE(ALLOW_CONNECTIONS = NO)),
             N'{1}' WITH (ENDPOINT_URL = N'TCP://{1}.perflab.local:5022', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SEEDING_MODE = AUTOMATIC, SECONDARY_ROLE(ALLOW_CONNECTIONS = NO));
         GO\"
-        """.format(self.server_vm.name, self.replica_vms[0].name))
+        """.format(self.server_vm.name,
+                   self.replica_vms[0].name,
+                   sql_engine_utils.SQLSERVER_AOAG_DB_NAME,
+                   sql_engine_utils.SQLSERVER_AOAG_NAME))
 
     replica_vms[0].RemoteCommand(
         """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
-        ALTER AVAILABILITY GROUP [tpcc-aoag] JOIN;
+        ALTER AVAILABILITY GROUP [{0}] JOIN;
         GO
 
-        ALTER AVAILABILITY GROUP [tpcc-aoag] GRANT CREATE ANY DATABASE;
+        ALTER AVAILABILITY GROUP [{0}] GRANT CREATE ANY DATABASE;
         GO\"
-        """)
+        """.format(sql_engine_utils.SQLSERVER_AOAG_NAME))
 
     # Restart SQL Service for AOAG replication to begin
     server_vm.RemoteCommand("Restart-Service MSSQLSERVER -Force")
@@ -671,7 +694,14 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     self.PushAndRunPowershellScript(
         server_vm,
         "add_dnn_listener.ps1",
-        ["tpcc-aoag", "fcidnn", "1533"])
+        [sql_engine_utils.SQLSERVER_AOAG_NAME, "fcidnn", "1533"])
+
+    server_vm.RemoteCommand(
+        """sqlcmd -Q \"
+        ALTER AVAILABILITY GROUP [{1}] REMOVE DATABASE [{0}];
+        DROP DATABASE [{0}];\"
+        """.format(sql_engine_utils.SQLSERVER_AOAG_DB_NAME,
+                   sql_engine_utils.SQLSERVER_AOAG_NAME))
 
     # Update variables user for connection to SQL server.
     self.spec.database_password = win_password

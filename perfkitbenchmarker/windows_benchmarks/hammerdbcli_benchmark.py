@@ -22,6 +22,7 @@ from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sql_engine_utils
+from perfkitbenchmarker.linux_packages import hammerdb as linux_hammerdb
 from perfkitbenchmarker.windows_packages import hammerdb
 
 
@@ -201,9 +202,23 @@ def Prepare(benchmark_spec):
   vm.Install('hammerdb')
 
   is_azure = FLAGS.cloud == 'Azure' and FLAGS.use_managed_db
-  if is_azure and hammerdb.HAMMERDB_SCRIPT.value == 'tpc_c':
+  if (
+      benchmark_spec.relational_db.spec.high_availability
+      and benchmark_spec.relational_db.spec.high_availability_type == 'AOAG'
+  ):
+    db_name = linux_hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[
+        linux_hammerdb.HAMMERDB_SCRIPT.value
+    ]
+    relational_db.client_vm_query_tools.IssueSqlCommand(
+        """CREATE DATABASE [{0}];
+        BACKUP DATABASE [{0}] TO DISK = 'F:\\Backup\\{0}.bak';
+        ALTER AVAILABILITY GROUP [{1}] ADD DATABASE [{0}];
+        """.format(db_name, sql_engine_utils.SQLSERVER_AOAG_NAME)
+    )
+  elif is_azure and hammerdb.HAMMERDB_SCRIPT.value == 'tpc_c':
     # Create the database first only Azure requires creating the database.
     relational_db.client_vm_query_tools.IssueSqlCommand('CREATE DATABASE tpcc;')
+
   hammerdb.SetupConfig(
       vm,
       sql_engine_utils.SQLSERVER,
