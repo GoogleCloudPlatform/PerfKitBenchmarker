@@ -168,7 +168,7 @@ def CollectNetworkSamples() -> bool:
   return bool(_CALLBACK_EXTERNAL.value or _CALLBACK_INTERNAL.value)
 
 
-def PrepareStartupScript() -> Tuple[str, Optional[int]]:
+def PrepareStartupScript() -> Tuple[str, Optional[int], str]:
   """Prepare startup script which will be ran as part of VM booting process."""
   port = _TCPDUMP_PORT.value
   if CollectNetworkSamples():
@@ -179,9 +179,8 @@ def PrepareStartupScript() -> Tuple[str, Optional[int]]:
       sock.bind(('', 0))
       port = sock.getsockname()[1]
       sock.close()
-    tcpdump_output = open(
-        vm_util.PrependTempDir(linux_boot.TCPDUMP_OUTPUT), 'w'
-    )
+    tcpdump_output_path = vm_util.PrependTempDir(linux_boot.TCPDUMP_OUTPUT)
+    tcpdump_output = open(tcpdump_output_path, 'w')
     tcpdump_cmd = subprocess.Popen(
         shlex.split(f'tcpdump -tt -n -l tcp dst port {port}'),
         stdout=tcpdump_output,
@@ -191,6 +190,7 @@ def PrepareStartupScript() -> Tuple[str, Optional[int]]:
     logging.info('Starting tcpdump process %s', pid)
   else:
     pid = None
+    tcpdump_output_path = linux_boot.TCPDUMP_OUTPUT
 
   startup_script = linux_boot.PrepareBootScriptVM(
       ' '.join(GetCallbackIPs()), port
@@ -199,7 +199,7 @@ def PrepareStartupScript() -> Tuple[str, Optional[int]]:
   with open(startup_script_path, 'w') as f:
     f.write(startup_script)
 
-  return startup_script_path, pid
+  return startup_script_path, pid, tcpdump_output_path
 
 
 def GetConfig(user_config):
@@ -207,9 +207,12 @@ def GetConfig(user_config):
       BENCHMARK_CONFIG, user_config, BENCHMARK_NAME
   )
   if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
-    startup_script_path, pid = PrepareStartupScript()
+    startup_script_path, pid, output_path = PrepareStartupScript()
     benchmark_config['flags']['boot_startup_script'] = startup_script_path
-    benchmark_config['temporary'] = {'tcpdump_pid': pid}
+    benchmark_config['temporary'] = {
+        'tcpdump_pid': pid,
+        'tcpdump_output_path': output_path,
+    }
   return benchmark_config
 
 
@@ -508,3 +511,9 @@ def Cleanup(benchmark_spec):
       os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
       logging.warning('tcpdump process %s ended prematurely.', pid)
+    try:
+      os.remove(benchmark_spec.config.temporary['tcpdump_output_path'])
+    except FileNotFoundError:
+      logging.exception(
+          'tcpdump output file %s does not exist', linux_boot.TCPDUMP_OUTPUT
+      )
