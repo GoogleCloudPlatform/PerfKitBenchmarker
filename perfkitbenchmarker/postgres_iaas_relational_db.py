@@ -16,7 +16,9 @@
 This class is responsible to provide helper methods for IAAS relational
 database.
 """
+import logging
 import posixpath
+import time
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -184,3 +186,28 @@ class PostgresIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       (string): Default version for the given database engine.
     """
     return DEFAULT_POSTGRES_VERSION
+
+  def PrintUnmanagedDbStats(self):
+    """Prints the unmanaged database stats."""
+    # Log the wal size
+    self.server_vm_query_tools.IssueSqlCommand(
+        'SELECT sum(size) from pg_ls_waldir();', superuser=True
+    )
+
+    # Log pg bgwriter stats
+    self.server_vm_query_tools.IssueSqlCommand(
+        'SELECT * FROM pg_stat_bgwriter;', superuser=True
+    )
+
+    start = time.time()
+    self.server_vm.RemoteCommand('sudo pg_ctlcluster 13  main stop -f -m fast')
+    self.server_vm.RemoteCommand('sudo pg_ctlcluster 13  main start')
+    end = time.time()
+    logging.info('Postgres restart took %.2f seconds', (end - start))
+
+    # Logging the main log of postgres, this log will contains checkpoint
+    # time frame and other useful information.
+    self.server_vm.RemoteCommand(
+        'sudo cat'
+        f' /var/log/postgresql/postgresql-{self.spec.engine_version}-main.log'
+    )
