@@ -28,7 +28,7 @@ from perfkitbenchmarker import provider_info
 FLAGS = flags.FLAGS
 
 JdbcClientDict = {
-    provider_info.AWS: 'snowflake-jdbc-client-2.9-enterprise.jar',
+    provider_info.AWS: 'snowflake-jdbc-client-2.10-enterprise.jar',
     provider_info.AZURE: 'snowflake-jdbc-client-azure-external-2.0.jar',
 }
 
