@@ -283,7 +283,10 @@ def SetPostgresOptimizedServerConfiguration(
   hammerdb.SearchAndReplaceGuestFile(
       server_vm, '~/', config, SHARED_BUFFER_SIZE, str(shared_buffer_size)
   )
-  hammerdb.SearchAndReplaceGuestFile(server_vm, '~/', config, PG_VERSION, '13')
+  db_version = relational_db.spec.engine_version
+  hammerdb.SearchAndReplaceGuestFile(
+      server_vm, '~/', config, PG_VERSION, db_version
+  )
   hammerdb.SearchAndReplaceGuestFile(
       server_vm,
       '~/',
@@ -292,7 +295,8 @@ def SetPostgresOptimizedServerConfiguration(
       server_vm.GetScratchDir(),
   )
   server_vm.RemoteCommand(
-      f'sudo bash -c "cat {config} > /etc/postgresql/13/main/postgresql.conf"'
+      f'sudo bash -c "cat {config} >'
+      f' /etc/postgresql/{db_version}/main/postgresql.conf"'
   )
   server_vm.RemoteCommand('sudo systemctl restart postgresql')
 
@@ -349,8 +353,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
       relational_db.WaitColumnarEnginePopulates(database_name)
       # Another prewarm
       stdout = hammerdb.Run(vm, db_engine, script, timeout=timeout)
-      current_samples = hammerdb.ParseResults(script=script, stdout=stdout,
-                                              vm=vm)
+      current_samples = hammerdb.ParseResults(
+          script=script, stdout=stdout, vm=vm
+      )
 
     for s in current_samples:
       s.metadata.update(metadata)

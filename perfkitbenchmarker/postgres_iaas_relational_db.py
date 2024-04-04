@@ -200,14 +200,16 @@ class PostgresIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     )
 
     start = time.time()
-    self.server_vm.RemoteCommand('sudo pg_ctlcluster 13  main stop -f -m fast')
-    self.server_vm.RemoteCommand('sudo pg_ctlcluster 13  main start')
+    db_version = self.spec.engine_version
+    self.server_vm.RemoteCommand(
+        f'sudo pg_ctlcluster {db_version} main stop -f -m fast'
+    )
+    self.server_vm.RemoteCommand(f'sudo pg_ctlcluster {db_version} main start')
     end = time.time()
     logging.info('Postgres restart took %.2f seconds', (end - start))
 
     # Logging the main log of postgres, this log will contains checkpoint
     # time frame and other useful information.
     self.server_vm.RemoteCommand(
-        'sudo cat'
-        f' /var/log/postgresql/postgresql-{self.spec.engine_version}-main.log'
+        f'sudo cat /var/log/postgresql/postgresql-{db_version}-main.log'
     )
