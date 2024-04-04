@@ -52,6 +52,13 @@ flags.DEFINE_string(
     'the instance is considered user managed and will not '
     'created/deleted by PKB.',
 )
+APP_PROFILE_ID = flags.DEFINE_string(
+    'google_bigtable_app_profile_id',
+    'default',
+    'Cloud Bigtable app profile to use. Should only be set if'
+    ' --google_bigtable_instance_name is specified. Only the "default" app'
+    ' profile will exist for instances created by PKB.',
+)
 flags.DEFINE_integer(
     'bigtable_node_count',
     None,
@@ -104,6 +111,22 @@ flags.DEFINE_boolean(
     None,
     'Whether to use multi-cluster routing.',
 )
+
+
+@flags.multi_flags_validator(
+    ['google_bigtable_instance_name', 'google_bigtable_app_profile_id'],
+    message=(
+        '--google_bigtable_instance_name must be set if'
+        ' --google_bigtable_app_profile_id is not set to "default".'
+    ),
+)
+def ValidateAppProfileIdFlag(flags_dict):
+  """Validates --google_bigtable_app_profile_id."""
+  return (
+      flags_dict['google_bigtable_instance_name'] is not None
+      or flags_dict['google_bigtable_app_profile_id'] == 'default'
+  )
+
 
 _DEFAULT_NODE_COUNT = 3
 _DEFAULT_STORAGE_TYPE = 'ssd'

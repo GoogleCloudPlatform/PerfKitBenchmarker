@@ -258,6 +258,7 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
         'google_bigtable_admin_endpoint': gcp_bigtable.ADMIN_ENDPOINT.value,
         'project': FLAGS.project or _GetDefaultProject(),
         'instance': bigtable.name,
+        'app_profile': gcp_bigtable.APP_PROFILE_ID.value,
         'hbase_major_version': FLAGS.hbase_version.split('.')[0],
         'channel_count': _CHANNEL_COUNT.value,
     }
@@ -468,6 +469,7 @@ def _CommonArgs(instance: _Bigtable) -> Dict[str, str]:
   kwargs = {'columnfamily': COLUMN_FAMILY}
   if _USE_JAVA_VENEER_CLIENT.value:
     kwargs['google.bigtable.instance.id'] = instance.name
+    kwargs['google.bigtable.app_profile.id'] = gcp_bigtable.APP_PROFILE_ID.value
     kwargs['google.bigtable.project.id'] = FLAGS.project or _GetDefaultProject()
     kwargs['google.bigtable.data.endpoint'] = (
         gcp_bigtable.ENDPOINT.value + ':443'

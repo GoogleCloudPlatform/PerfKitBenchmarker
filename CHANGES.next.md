@@ -296,6 +296,8 @@
 -   Add support for S3 Express One Zone buckets with --object_storage_zone.
 -   Add `--always_call_cleanup` flag for runs that need to run Cleanup, but may
     fail in Provision.
+-   Add support for setting an app profile to use on an existing instance via
+    `--google_bigtable_app_profile_id` for Cloud Bigtable YCSB benchmarks.
 
 ### Bug fixes and maintenance updates:
 
