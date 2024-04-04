@@ -15,6 +15,10 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.linux_packages import hammerdb
 from perfkitbenchmarker.providers.gcp import gcp_alloy_db  # pylint: disable=unused-import
 
+# Update this version when changing a config
+# TODO(chunla) Consider adding checks to make sure this version gets updated.
+CONFIG_VERSION = 'v1.0'
+
 # MYSQL Config file path
 MYSQL_CONFIG_PATH = '/etc/mysql/mysql.conf.d/mysqld.cnf'
 FLAGS = flags.FLAGS
@@ -330,7 +334,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   hammerdb.SetDefaultConfig(num_cpus)
   db_engine = relational_db.engine
   metadata = hammerdb.GetMetadata(db_engine)
-
+  # TODO(chunla) Consider if we should have separate versioning for each config.
+  metadata['hammerdbcli_config_version'] = CONFIG_VERSION
   script = hammerdb.HAMMERDB_SCRIPT.value
   timeout = hammerdb.HAMMERDB_RUN_TIMEOUT.value
   database_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[script]
