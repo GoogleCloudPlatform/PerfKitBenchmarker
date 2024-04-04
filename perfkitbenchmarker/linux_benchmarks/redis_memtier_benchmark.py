@@ -77,6 +77,7 @@ redis_memtier:
     memtier_pipeline: 1
     placement_group_style: none
     redis_simulate_aof: False
+    redis_server_io_threads: 0
   vm_groups:
     servers:
       vm_spec: *default_dual_core

@@ -149,6 +149,12 @@ def AptInstall(vm) -> None:
   _Install(vm)
 
 
+def _GetIOThreads(vm) -> int:
+  if _IO_THREADS.value:
+    return _IO_THREADS.value
+  return vm.NumCpusForBenchmark() // 2
+
+
 def _BuildStartCommand(vm, port: int) -> str:
   """Returns the run command used to start the redis server.
 
@@ -177,12 +183,11 @@ def _BuildStartCommand(vm, port: int) -> str:
   # Add check for the MADV_FREE/fork arm64 Linux kernel bug
   if _VERSION.value >= '6.2.1':
     cmd_args.append('--ignore-warnings ARM64-COW-BUG')
+    io_threads = _GetIOThreads(vm)
+    cmd_args.append(f'--io-threads {io_threads}')
   # Snapshotting
   if not _ENABLE_SNAPSHOTS.value:
     cmd_args.append('--save ""')
-  # IO threads
-  if _IO_THREADS.value:
-    cmd_args.append(f'--io-threads {_IO_THREADS.value}')
   # IO thread reads
   if _IO_THREADS_DO_READS.value:
     do_reads = 'yes' if _IO_THREADS_DO_READS.value else 'no'
@@ -233,7 +238,9 @@ def GetMetadata(vm) -> Dict[str, Any]:
   num_processes = _GetNumProcesses(vm)
   return {
       'redis_server_version': _VERSION.value,
-      'redis_server_io_threads': _IO_THREADS.value,
+      'redis_server_io_threads': (
+          _GetIOThreads(vm) if _VERSION.value >= '6.2.1' else 0
+      ),
       'redis_server_io_threads_do_reads': _IO_THREADS_DO_READS.value,
       'redis_server_io_threads_cpu_affinity': _IO_THREAD_AFFINITY.value,
       'redis_server_enable_snapshots': _ENABLE_SNAPSHOTS.value,

@@ -178,7 +178,6 @@ redis_memtier_full_house_loaded:
     memtier_run_duration: 800
     memtier_threads: 4
     redis_eviction_policy: allkeys-lru
-    redis_server_io_threads: 0
     redis_server_version: '5.0.5'
     redis_total_num_processes: 0
 
@@ -195,6 +194,9 @@ redis_memtier_single_process:
     memtier_threads: 16
     redis_server_version: '6.2.1'
     redis_total_num_processes: 1
+  vm_groups:
+    clients:
+      vm_count: 1
 
 sparksql_tpcds_1t:
   name: dpb_sparksql_benchmark
