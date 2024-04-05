@@ -27,7 +27,7 @@ speccpu2017_int_rate_GCC11_O3_x86:
   flags:
     <<: *speccpu2017_int_rate_flags_base
     runspec_config: pkb-gcc-linux-x86.cfg
-    spec17_gcc_flags: "'-O3 -march=native'"
+    spec17_gcc_flags: -O3 -march=native
   vm_groups:
     default:
       disk_spec: *default_disk_spec
@@ -37,7 +37,7 @@ speccpu2017_int_rate_GCC11_OFAST_x86:
   flags:
     <<: *speccpu2017_int_rate_flags_base
     runspec_config: pkb-gcc-linux-x86.cfg
-    spec17_gcc_flags: "'-Ofast -funroll-loops -flto -ljemalloc -z muldefs -fallow-argument-mismatch -march=native'"
+    spec17_gcc_flags: -Ofast -funroll-loops -flto -ljemalloc -z muldefs -fallow-argument-mismatch -march=native
   vm_groups:
     default:
       disk_spec: *default_disk_spec
@@ -47,7 +47,7 @@ speccpu2017_int_rate_GCC11_O3_arm:
   flags:
     <<: *speccpu2017_int_rate_flags_base
     runspec_config: pkb-gcc-linux-aarch64-1.1.0.cfg
-    spec17_gcc_flags: "'-O3 -mcpu=native'"
+    spec17_gcc_flags: -O3 -mcpu=native
   vm_groups:
     default:
       disk_spec: *default_disk_spec
@@ -57,7 +57,7 @@ speccpu2017_int_rate_GCC11_OFAST_arm:
   flags:
     <<: *speccpu2017_int_rate_flags_base
     runspec_config: pkb-gcc-linux-aarch64-1.1.0.cfg
-    spec17_gcc_flags: "'-Ofast -funroll-loops -flto -ljemalloc -z muldefs -fallow-argument-mismatch -march=native'"
+    spec17_gcc_flags: -Ofast -funroll-loops -flto -ljemalloc -z muldefs -fallow-argument-mismatch -march=native
   vm_groups:
     default:
       disk_spec: *default_disk_spec
