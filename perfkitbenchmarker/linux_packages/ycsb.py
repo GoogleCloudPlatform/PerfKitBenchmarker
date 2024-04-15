@@ -1055,6 +1055,9 @@ class YCSBExecutor:
         ):
           parameters['threads'] = client_count
           if target_qps_per_vm:
+            # Threads should be less than the target QPS since YCSB throttles
+            # weirdly when threads is much larger than target.
+            parameters['threads'] = min(client_count, target_qps_per_vm)
             parameters['target'] = int(target_qps_per_vm * len(vms))
           if is_sustained:
             parameters['maxexecutiontime'] = (
