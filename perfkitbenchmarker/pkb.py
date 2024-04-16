@@ -624,7 +624,7 @@ def DoRunPhase(spec, collector, timer):
     if FLAGS.record_lscpu:
       samples.extend(linux_virtual_machine.CreateLscpuSamples(spec.vms))
 
-    if FLAGS.record_proccpu:
+    if pkb_flags.RECORD_PROCCPU.value:
       samples.extend(linux_virtual_machine.CreateProcCpuSamples(spec.vms))
     if FLAGS.record_cpu_vuln and run_number == 0:
       samples.extend(_CreateCpuVulnerabilitySamples(spec.vms))

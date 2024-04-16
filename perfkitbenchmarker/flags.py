@@ -426,7 +426,7 @@ flags.DEFINE_bool(
 flags.DEFINE_boolean(
     'record_lscpu', True, 'Whether to record the lscpu output in a sample'
 )
-flags.DEFINE_boolean(
+RECORD_PROCCPU = flags.DEFINE_boolean(
     'record_proccpu',
     True,
     'Whether to record the /proc/cpuinfo output in a sample',
