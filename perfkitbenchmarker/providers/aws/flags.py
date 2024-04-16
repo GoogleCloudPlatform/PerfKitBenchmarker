@@ -219,3 +219,9 @@ AURORA_STORAGE_TYPE = flags.DEFINE_enum(
     'Aurora storage type to use, corresponds to different modes of billing. See'
     ' https://aws.amazon.com/rds/aurora/pricing/.',
 )
+AWS_EC2_INSTANCE_PROFILE = flags.DEFINE_string(
+    'aws_ec2_instance_profile',
+    None,
+    'The instance profile to use for EC2 instances. '
+    'Allows calling APIs on the instance.',
+)

@@ -44,6 +44,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_disk_strategies
 from perfkitbenchmarker.providers.aws import aws_network
+from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import util
 from six.moves import range
 
@@ -1024,6 +1025,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       instance_market_options['SpotOptions'] = spot_options
       create_cmd.append(
           '--instance-market-options=%s' % json.dumps(instance_market_options)
+      )
+    if aws_flags.AWS_EC2_INSTANCE_PROFILE.value:
+      create_cmd.append(
+          f'--iam-instance-profile=Name={aws_flags.AWS_EC2_INSTANCE_PROFILE.value}'
       )
     return create_cmd
 
