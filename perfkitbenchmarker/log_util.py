@@ -52,6 +52,18 @@ _PKB_LOG_BUCKET = flags.DEFINE_string(
     'and the caller must have write permissions on the bucket for a successful '
     'export.',
 )
+flags.DEFINE_enum(
+    'log_level',
+    INFO,
+    list(LOG_LEVELS.keys()),
+    'The log level to run at.',
+)
+flags.DEFINE_enum(
+    'file_log_level',
+    DEBUG,
+    list(LOG_LEVELS.keys()),
+    'Anything logged at this level or higher will be written to the log file.',
+)
 
 
 class ThreadLogContext(object):
