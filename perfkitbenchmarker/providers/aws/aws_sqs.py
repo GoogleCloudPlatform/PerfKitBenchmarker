@@ -11,6 +11,7 @@ from absl import flags
 from perfkitbenchmarker import messaging_service as msgsvc
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
@@ -30,6 +31,12 @@ class AwsSqs(msgsvc.BaseMessagingService):
   def __init__(self):
     super().__init__()
     self.queue_name = 'pkb-queue-{0}'.format(FLAGS.run_uri)
+
+  def CheckPrerequisites(self):
+    if not aws_flags.AWS_EC2_INSTANCE_PROFILE.value:
+      raise ValueError(
+          '--aws_ec2_instance_profile must be set to allow VM to authenticate '
+          'with SQS.')
 
   def _Create(self):
     """Handles AWS resources provision.
@@ -93,9 +100,6 @@ class AwsSqs(msgsvc.BaseMessagingService):
         MESSAGING_SERVICE_SCRIPTS_VM_AWS_DIR,
     )
     self.client_vm.PushDataFile(MESSAGING_SERVICE_SCRIPTS_AWS_BIN)
-
-    # copy AWS creds
-    self.client_vm.Install('aws_credentials')
 
   def Run(
       self,

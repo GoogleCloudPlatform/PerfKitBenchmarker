@@ -43,6 +43,7 @@ from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 from perfkitbenchmarker.linux_packages import spark
+from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util as aws_util
 from perfkitbenchmarker.providers.gcp import gcs
@@ -785,6 +786,12 @@ class UnmanagedDpbService(BaseDpbService):
 
     # set in _Create of derived classes
     self.leader = None
+
+  def CheckPrerequisites(self):
+    if self.cloud == 'AWS' and not aws_flags.AWS_EC2_INSTANCE_PROFILE:
+      raise ValueError(
+          'EC2 based Spark and Hadoop services require '
+          '--aws_ec2_instance_profile.')
 
   def GetClusterCreateTime(self) -> Optional[float]:
     """Returns the cluster creation time.

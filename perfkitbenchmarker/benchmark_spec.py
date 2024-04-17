@@ -1084,5 +1084,9 @@ class BenchmarkSpec:
 
   def CheckPrerequisites(self) -> None:
     """Checks preconditions for the benchmark_spec."""
+    for app_group in self.app_groups:
+      app_group.CheckPrerequisites()
     if self.dpb_service:
       self.dpb_service.CheckPrerequisites()
+    if self.messaging_service:
+      self.messaging_service.CheckPrerequisites()

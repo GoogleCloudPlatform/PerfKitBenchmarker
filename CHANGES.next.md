@@ -1,4 +1,5 @@
 ### Breaking changes:
+
 -   Added --accept_licenses flag. User have to turn this flag on to acknowledge
     that PKB may install software thereby accepting license agreements on the
     user's behalf.
@@ -57,10 +58,16 @@
 -   Remove old `spark_benchmark` and `hadoop_terasort_benchmark` and related
     services. Prefer to use the newer `dpb_generic_benchmark` and
     `dpb_terasort_benchmark`.
--   gcp/aws/azure_provisioned_iops/throughput flags are unified to provisioned_iops/throughput flags.
+-   gcp/aws/azure_provisioned_iops/throughput flags are unified to
+    provisioned_iops/throughput flags.
 -   aws_dynamodb_ycsb benchmark now requires an explicit
     `--aws_dynamodb_ycsb_cli_profile` flag to select the credentials to talk to
     YCSB.
+-   Benchmarks that require EC2 client VMs now require
+    `--aws_ec2_instance_profile` to configure VM permissions instead of
+    installing local AWS CLI credentials via aws_credentials.py. This must be
+    set up by the user beforehand. See
+    [AWS documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html)
 
 ### New features:
 
@@ -441,7 +448,8 @@
 -   Refactored `azure_virtual_machine.py` to use `azure_disk_strategies.py` and
     Enabled disk provision benchmark for Azure.
 -   Refactored `aws_virtual_machine.py` to use `aws_disk_strategies.py` and
-    Enabled disk provision benchmark for AWS by using `--aws_create_disks_with_vm`.
+    Enabled disk provision benchmark for AWS by using
+    `--aws_create_disks_with_vm`.
 -   Enabled parallel/bulk create and attach of GCE, AWS and Azure remote disks.
 -   Set `--always_call_cleanup=True` flag as the default for `cluster_boot`.
     This prevents leaking `tcpdump` processes from runs that fail in the

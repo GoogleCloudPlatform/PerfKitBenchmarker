@@ -31,7 +31,6 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
-from perfkitbenchmarker.linux_packages import aws_credentials
 import requests
 
 FLAGS = flags.FLAGS
@@ -221,8 +220,7 @@ def _RenderConfig(
   # This determines the number of reduce tasks in Terasort and is critical to
   # scale with the cluster.
   num_reduce_tasks = reduces_per_node * num_workers
-  if _BLOCKSIZE_OVERRIDE.value:
-    block_size = _BLOCKSIZE_OVERRIDE.value * 1024 * 1024
+  block_size = _BLOCKSIZE_OVERRIDE.value * 1024 * 1024
 
   if vm.scratch_disks:
     # TODO(pclay): support multiple scratch disks. A current suboptimal
@@ -231,11 +229,8 @@ def _RenderConfig(
   else:
     scratch_dir = posixpath.join('/tmp/pkb/local_scratch', 'hadoop')
 
-  aws_access_key = None
-  aws_secret_key = None
   optional_tools = None
   if configure_s3:
-    aws_access_key, aws_secret_key = aws_credentials.GetCredentials()
     optional_tools = 'hadoop-aws'
 
   context = {
@@ -252,8 +247,7 @@ def _RenderConfig(
       'reduce_memory_mb': reduce_memory_mb,
       'reduce_heap_mb': reduce_heap_mb,
       'num_reduce_tasks': num_reduce_tasks,
-      'aws_access_key': aws_access_key,
-      'aws_secret_key': aws_secret_key,
+      'configure_s3': configure_s3,
       'optional_tools': optional_tools,
       'block_size': block_size,
   }

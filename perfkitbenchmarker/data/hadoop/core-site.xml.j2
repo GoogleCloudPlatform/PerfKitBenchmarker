@@ -10,7 +10,7 @@
         <name>fs.defaultFS</name>
         <value>hdfs://{{ master_ip }}/</value>
     </property>
-    {% if aws_access_key %}
+    {% if configure_s3 %}
     <!-- Configure S3A Hadoop's S3 filesystem -->
     <!-- Use s3:// scheme to be consistent with EMR -->
     <property>
@@ -18,12 +18,8 @@
         <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>
     </property>
     <property>
-        <name>fs.s3a.access.key</name>
-        <value>{{ aws_access_key }}</value>
-    </property>
-    <property>
-        <name>fs.s3a.secret.key</name>
-        <value>{{ aws_secret_key }}</value>
+        <name>fs.s3a.aws.credentials.provider</name>
+        <value>org.apache.hadoop.fs.s3a.auth.IAMInstanceCredentialsProvider</value>
     </property>
     {% endif %}
 </configuration>

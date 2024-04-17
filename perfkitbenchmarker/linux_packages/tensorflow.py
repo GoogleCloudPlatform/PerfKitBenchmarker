@@ -120,12 +120,6 @@ def Install(vm):
   vm.RemoteCommand(
       'cd benchmarks && git checkout {}'.format(FLAGS.tf_cnn_benchmarks_branch)
   )
-  if (
-      FLAGS.cloud == 'AWS'
-      and FLAGS.tf_data_dir
-      and (not FLAGS.tf_use_local_data)
-  ):
-    vm.Install('aws_credentials')
 
 
 def Uninstall(vm):

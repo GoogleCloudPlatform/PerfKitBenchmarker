@@ -145,7 +145,6 @@ class AwsSqsTest(pkb_common_test_case.PkbCommonTestCase):
         ),
         mock.call.PushDataFile('messaging_service_scripts/aws_benchmark.py'),
     ])
-    self.client.Install.assert_called_with('aws_credentials')
 
   def testRun(self):
     return_value = ['{"mock1": 1}', None]

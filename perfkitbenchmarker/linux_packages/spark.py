@@ -31,7 +31,6 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
-from perfkitbenchmarker.linux_packages import aws_credentials
 from perfkitbenchmarker.linux_packages import hadoop
 import requests
 
@@ -150,12 +149,11 @@ def GetConfiguration(
   }
   if configure_s3:
     # Configure S3A Hadoop's S3 filesystem
-    aws_access_key, aws_secret_key = aws_credentials.GetCredentials()
     conf.update({
         # Use s3:// scheme to be consistent with EMR
         'spark.hadoop.fs.s3.impl': 'org.apache.hadoop.fs.s3a.S3AFileSystem',
-        'spark.hadoop.fs.s3a.access.key': aws_access_key,
-        'spark.hadoop.fs.s3a.secret.key': aws_secret_key,
+        'fs.s3a.aws.credentials.provider':
+            'org.apache.hadoop.fs.s3a.auth.IAMInstanceCredentialsProvider'
     })
   return conf
 
