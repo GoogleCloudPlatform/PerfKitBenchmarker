@@ -69,11 +69,13 @@ flags.DEFINE_boolean(
     'metadata.',
 )
 
-flags.DEFINE_string(
+DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
+JSON_PATH = flags.DEFINE_string(
     'json_path',
-    None,
-    'A path to write newline-delimited JSON results '
-    'Default: write to a run-specific temporary directory',
+    DEFAULT_JSON_OUTPUT_NAME,
+    'A path to write newline-delimited JSON results. '
+    'Default: write to a run-specific temporary directory. '
+    'Passing '' skips local publishing.',
 )
 flags.DEFINE_enum(
     'json_write_mode',
@@ -162,7 +164,6 @@ flags.DEFINE_boolean(
     'record_log_publisher', True, 'Whether to use the log publisher or not.'
 )
 
-DEFAULT_JSON_OUTPUT_NAME = 'perfkitbenchmarker_results.json'
 DEFAULT_CREDENTIALS_JSON = 'credentials.json'
 GCS_OBJECT_NAME_LENGTH = 20
 
@@ -1080,27 +1081,21 @@ class SampleCollector(object):
       publishers.append(LogPublisher())
     publishers.append(PrettyPrintStreamPublisher())
 
-    # Publish to the default JSON path even if we will also publish to a
-    # different path due to flags.
-    default_json_path = vm_util.PrependTempDir(DEFAULT_JSON_OUTPUT_NAME)
-    publishers.append(
-        NewlineDelimitedJSONPublisher(
-            default_json_path,
-            mode=FLAGS.json_write_mode,
-            collapse_labels=FLAGS.collapse_labels,
-        )
-    )
-
     return publishers
 
   @classmethod
   def _PublishersFromFlags(cls):
     publishers = []
 
-    if FLAGS.json_path:
+    if JSON_PATH.value:
+      # Default publishing path needs to be qualified with the run_uri temp dir.
+      if JSON_PATH.value == DEFAULT_JSON_OUTPUT_NAME:
+        publishing_json_path = vm_util.PrependTempDir(JSON_PATH.value)
+      else:
+        publishing_json_path = JSON_PATH.value
       publishers.append(
           NewlineDelimitedJSONPublisher(
-              FLAGS.json_path,
+              publishing_json_path,
               mode=FLAGS.json_write_mode,
               collapse_labels=FLAGS.collapse_labels,
           )
