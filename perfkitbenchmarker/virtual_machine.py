@@ -40,6 +40,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
+from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import provider_info
@@ -1295,6 +1296,7 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     self.vm_group = None
     self.id = None
     self.is_aarch64 = False
+    self.cpu_version = None
     self.create_operation_name = None
     self.create_return_time = None
     self.is_running_time = None
@@ -1430,14 +1432,14 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   def CreateAndBoot(self):
     """Runs CreateAndBootOnce repeatedly to get --required_cpu_version."""
     self.CreateAndBootOnce()
-    guest_arch = self.GetCPUVersion()
+    self.cpu_version = self.GetCPUVersion()
     if (
         _REQUIRED_CPU_VERSION.value
-        and _REQUIRED_CPU_VERSION.value != guest_arch
+        and _REQUIRED_CPU_VERSION.value != self.cpu_version
     ):
       self.Delete()
       raise errors.Resource.RetryableCreationError(
-          f'Guest arch {guest_arch} is not enforced guest arch'
+          f'Guest arch {self.cpu_version} is not enforced guest arch'
           f' {_REQUIRED_CPU_VERSION.value}. Deleting VM and scratch disk and'
           ' recreating.',
       )
@@ -1538,6 +1540,8 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       result['name'] = self.name
     if self.ip_address is not None:
       result['ip_address'] = self.ip_address
+    if pkb_flags.RECORD_PROCCPU.value and self.cpu_version:
+      result['cpu_version'] = self.cpu_version
     return result
 
   def SimulateMaintenanceEvent(self):
