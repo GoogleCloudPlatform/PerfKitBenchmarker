@@ -216,10 +216,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     """
     return self._cluster_ready_time - self._cluster_create_time
 
-  @staticmethod
-  def CheckPrerequisites(benchmark_config):
-    del benchmark_config  # Unused
-
   @property
   def security_group_id(self):
     """Returns the security group ID of this Cluster."""

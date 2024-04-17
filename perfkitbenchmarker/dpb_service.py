@@ -1389,9 +1389,7 @@ class KubernetesFlinkCluster(BaseDpbService):
 
     return JobResult(run_time=(end_time - start_time).total_seconds())
 
-  @staticmethod
-  def CheckPrerequisites(benchmark_config):
-    del benchmark_config  # Unused
+  def CheckPrerequisites(self):
     # Make sure dpb_job_jarfile is provided when using flink
     assert FLAGS.dpb_job_jarfile
     # dpb_cluster_properties is to be supported

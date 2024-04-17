@@ -503,3 +503,15 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
           )
       )
     return samples
+
+  def CheckPrerequisites(self) -> None:
+    """Checks preconditions for the resource.
+
+    Requires resource to be checked in benchmark_spec.CheckPrerequisites()
+    Allows for per-provider validation not available in
+    benchmark.CheckPrerequisites(config).
+
+    Raises:
+      ValueError: If there is a validation issue.
+    """
+    pass

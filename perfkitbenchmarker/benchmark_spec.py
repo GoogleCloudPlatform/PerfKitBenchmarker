@@ -1081,3 +1081,8 @@ class BenchmarkSpec:
     bm_spec.status = benchmark_status.SKIPPED
     context.SetThreadBenchmarkSpec(bm_spec)
     return bm_spec
+
+  def CheckPrerequisites(self) -> None:
+    """Checks preconditions for the benchmark_spec."""
+    if self.dpb_service:
+      self.dpb_service.CheckPrerequisites()

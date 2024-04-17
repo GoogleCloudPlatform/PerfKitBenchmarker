@@ -35,7 +35,6 @@ import os
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_constants
-from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import temp_dir
@@ -137,7 +136,7 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites(benchmark_config):
+def CheckPrerequisites(_):
   """Verifies that the required resources are present.
 
   Raises:
@@ -148,12 +147,6 @@ def CheckPrerequisites(benchmark_config):
       and FLAGS.dpb_wordcount_fs != dpb_constants.GCS_FS
   ):
     raise errors.Config.InvalidValue('Invalid default input directory.')
-  # Get handle to the dpb service
-  dpb_service_class = dpb_service.GetDpbServiceClass(
-      benchmark_config.dpb_service.worker_group.cloud,
-      benchmark_config.dpb_service.service_type,
-  )
-  dpb_service_class.CheckPrerequisites(benchmark_config)
 
 
 def Prepare(benchmark_spec):

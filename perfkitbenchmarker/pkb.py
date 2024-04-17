@@ -470,6 +470,10 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructNfsService()
   spec.ConstructSmbService()
   spec.ConstructDataDiscoveryService()
+
+  # Validate the construction resource spec before creating resources.
+  spec.CheckPrerequisites()
+
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()

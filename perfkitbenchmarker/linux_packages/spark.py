@@ -102,16 +102,6 @@ def SparkExamplesJarPath() -> str:
   )
 
 
-def CheckPrerequisites():
-  """Verifies that the required resources are present.
-
-  Raises:
-    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
-  """
-  for resource in DATA_FILES:
-    data.ResourcePath(resource)
-
-
 def Install(vm):
   """Install spark on a vm."""
   vm.Install('openjdk')

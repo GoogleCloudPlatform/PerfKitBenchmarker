@@ -156,9 +156,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       return f'gs://{self.bucket}/staging/'
     return FLAGS.dpb_dataflow_staging_location
 
-  @staticmethod
-  def CheckPrerequisites(benchmark_config):
-    del benchmark_config  # Unused
+  def CheckPrerequisites(self):
     if FLAGS.dpb_job_jarfile and FLAGS.dpb_job_jarfile.startswith('gs://'):
       return
     if not FLAGS.dpb_job_jarfile or not os.path.exists(FLAGS.dpb_job_jarfile):
