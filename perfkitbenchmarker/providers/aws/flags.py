@@ -13,6 +13,8 @@
 # limitations under the License.
 """Module containing flags applicable across benchmark run on AWS."""
 
+from typing import Any
+
 from absl import flags
 
 flags.DEFINE_string(
@@ -91,10 +93,11 @@ flags.DEFINE_string(
     'usage details in aws_virtual_machine.py around '
     'IMAGE_NAME_REGEX.',
 )
-flags.DEFINE_string(
+AWS_PREPROVISIONED_DATA_BUCKET = flags.DEFINE_string(
     'aws_preprovisioned_data_bucket',
     None,
-    'AWS bucket where pre-provisioned data has been copied.',
+    'AWS bucket where pre-provisioned data has been copied. '
+    'Requires --aws_ec2_instance_profile to be set.',
 )
 ELASTICACHE_NODE_TYPE = flags.DEFINE_string(
     'elasticache_node_type',
@@ -223,5 +226,18 @@ AWS_EC2_INSTANCE_PROFILE = flags.DEFINE_string(
     'aws_ec2_instance_profile',
     None,
     'The instance profile to use for EC2 instances. '
-    'Allows calling APIs on the instance.',
+    'Allows calling APIs on the instance. '
+    'Required if --aws_preprovisioned_data_bucket is set.',
 )
+
+
+@flags.multi_flags_validator(
+    [AWS_PREPROVISIONED_DATA_BUCKET.name, AWS_EC2_INSTANCE_PROFILE.name],
+    message='--aws_ec2_instance_profile must be set if '
+    '--aws_preprovisioned_data_bucket is set.',
+)
+def _ValidatePreprovisionedDataAccess(flag_values: dict[str, Any]) -> bool:
+  return bool(
+      not flag_values[AWS_PREPROVISIONED_DATA_BUCKET.name]
+      or flag_values[AWS_EC2_INSTANCE_PROFILE.name]
+  )

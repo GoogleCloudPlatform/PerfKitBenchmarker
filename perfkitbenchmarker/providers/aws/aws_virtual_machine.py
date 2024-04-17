@@ -630,6 +630,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.create_disk_strategy = aws_disk_strategies.GetCreateDiskStrategy(
         self, None, 0
     )
+    self.instance_profile = aws_flags.AWS_EC2_INSTANCE_PROFILE.value
 
   @property
   def host_list(self):
@@ -1026,9 +1027,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.append(
           '--instance-market-options=%s' % json.dumps(instance_market_options)
       )
-    if aws_flags.AWS_EC2_INSTANCE_PROFILE.value:
+    if self.instance_profile:
       create_cmd.append(
-          f'--iam-instance-profile=Name={aws_flags.AWS_EC2_INSTANCE_PROFILE.value}'
+          f'--iam-instance-profile=Name={self.instance_profile}'
       )
     return create_cmd
 
@@ -1481,7 +1482,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def InstallCli(self):
     """Installs the AWS cli and credentials on this AWS vm."""
     self.Install('awscli')
-    self.Install('aws_credentials')
 
   def DownloadPreprovisionedData(
       self,
@@ -1512,11 +1512,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""
-    self.Install('aws_credentials')
-    self.Install('awscli')
-    return FLAGS.aws_preprovisioned_data_bucket and self.TryRemoteCommand(
-        GenerateStatPreprovisionedDataCommand(module_name, filename)
-    )
+    if aws_flags.AWS_PREPROVISIONED_DATA_BUCKET.value:
+      # Guaranteed by flag validation
+      assert self.instance_profile
+      self.InstallCli()
+      return self.TryRemoteCommand(
+          GenerateStatPreprovisionedDataCommand(module_name, filename)
+      )
+    return False
 
   def IsInterruptible(self):
     """Returns whether this vm is an interruptible vm (spot vm).
