@@ -788,7 +788,7 @@ class UnmanagedDpbService(BaseDpbService):
     self.leader = None
 
   def CheckPrerequisites(self):
-    if self.cloud == 'AWS' and not aws_flags.AWS_EC2_INSTANCE_PROFILE:
+    if self.cloud == 'AWS' and not aws_flags.AWS_EC2_INSTANCE_PROFILE.value:
       raise ValueError(
           'EC2 based Spark and Hadoop services require '
           '--aws_ec2_instance_profile.')

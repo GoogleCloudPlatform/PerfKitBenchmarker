@@ -105,10 +105,6 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
     except ValueError:
       return datetime.datetime.strptime(state_time, '%Y-%m-%dT%H:%M:%SZ')
 
-  @staticmethod
-  def CheckPrerequisites(benchmark_config):
-    del benchmark_config  # Unused
-
   def DataprocGcloudCommand(self, *args):
     all_args = ('dataproc',) + tuple(args)
     cmd = util.GcloudCommand(self, *all_args)

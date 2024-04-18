@@ -44,8 +44,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     self.node_type = aws_flags.ELASTICACHE_NODE_TYPE.value
     self.version = FLAGS.managed_memory_store_version
 
-  @staticmethod
-  def CheckPrerequisites(benchmark_config):
+  def CheckPrerequisites(self):
     if (
         FLAGS.managed_memory_store_version
         and FLAGS.managed_memory_store_version not in MEMCACHED_VERSIONS

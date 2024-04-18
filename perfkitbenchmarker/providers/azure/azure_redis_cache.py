@@ -75,12 +75,8 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
     }
     return result
 
-  @staticmethod
-  def CheckPrerequisites(benchmark_config):
+  def CheckPrerequisites(self):
     """Check benchmark prerequisites on the input flag parameters.
-
-    Args:
-      benchmark_config: Unused.
 
     Raises:
       errors.Config.InvalidValue: Input flag parameters are invalid.

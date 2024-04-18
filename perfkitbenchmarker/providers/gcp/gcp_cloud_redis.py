@@ -80,8 +80,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
       return BASIC_TIER
     return STANDARD_TIER
 
-  @staticmethod
-  def CheckPrerequisites(_):
+  def CheckPrerequisites(self):
     if (
         FLAGS.redis_failover_style
         == managed_memory_store.Failover.FAILOVER_SAME_ZONE

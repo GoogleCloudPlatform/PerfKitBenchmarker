@@ -58,8 +58,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
 
     self.subnets = []
 
-  @staticmethod
-  def CheckPrerequisites(benchmark_config):
+  def CheckPrerequisites(self):
     if (
         FLAGS.managed_memory_store_version
         and FLAGS.managed_memory_store_version

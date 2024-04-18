@@ -47,9 +47,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
     self.input_sub_empty = False
     self.job_drained = False
 
-  @staticmethod
-  def CheckPrerequisites(benchmark_config):
-    del benchmark_config  # Unused
+  def CheckPrerequisites(self):
     if not FLAGS.dpb_dataflow_template_gcs_location:
       raise errors.Config.InvalidValue('Template GCS location missing.')
 
