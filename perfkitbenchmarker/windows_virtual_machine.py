@@ -485,6 +485,7 @@ class BaseWindowsMixin(virtual_machine.BaseOsMixin):
     stdout, _ = self.RemoteCommand('ps')
     return process in stdout
 
+  @vm_util.Retry(poll_interval=1, max_retries=5)
   def _GetNumCpus(self):
     """Returns the number of logical CPUs on the VM.
 

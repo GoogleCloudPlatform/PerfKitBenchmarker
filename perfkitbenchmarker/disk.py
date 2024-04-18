@@ -78,6 +78,7 @@ flags.DEFINE_integer(
     None,
     'Iops to provision, if applicable. Defaults to None.',
 )
+flags.DEFINE_bool('multi_writer_mode', False, 'Multi-writer mode.')
 flags.DEFINE_integer(
     'provisioned_throughput',
     None,
@@ -165,6 +166,7 @@ class BaseDiskSpec(spec.BaseSpec):
     self.partition_size = None
     self.provisioned_iops = None
     self.provisioned_throughput = None
+    self.multi_writer_mode: bool = False
     super(BaseDiskSpec, self).__init__(*args, **kwargs)
 
   @classmethod
@@ -202,6 +204,8 @@ class BaseDiskSpec(spec.BaseSpec):
       config_values['provisioned_throughput'] = (
           flag_values.provisioned_throughput
       )
+    if flag_values['multi_writer_mode'].present:
+      config_values['multi_writer_mode'] = flag_values.multi_writer_mode
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -256,6 +260,10 @@ class BaseDiskSpec(spec.BaseSpec):
         'provisioned_throughput': (
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True},
+        ),
+        'multi_writer_mode': (
+            option_decoders.BooleanDecoder,
+            {'default': False, 'none_ok': True},
         ),
     })
     return result
@@ -412,6 +420,7 @@ class BaseDisk(resource.BaseResource):
     self.num_striped_disks = disk_spec.num_striped_disks
     self.num_partitions = disk_spec.num_partitions
     self.partition_size = disk_spec.partition_size
+    self.multi_writer_disk: bool = disk_spec.multi_writer_mode
     self.metadata.update({
         'type': self.disk_type,
         'size': self.disk_size,

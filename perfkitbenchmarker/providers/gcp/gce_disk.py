@@ -393,6 +393,9 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['replica-zones'] = ','.join(self.replica_zones)
       del cmd.flags['zone']
 
+    if self.multi_writer_disk:
+      cmd.flags['access-mode'] = 'READ_WRITE_MANY'
+
     _, stderr, retcode = cmd.Issue(raise_on_failure=False)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
 

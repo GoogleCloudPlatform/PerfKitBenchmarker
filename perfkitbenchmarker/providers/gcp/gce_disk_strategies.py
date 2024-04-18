@@ -16,6 +16,7 @@
 This module abstract out the disk algorithm for formatting and creating
 scratch disks.
 """
+import threading
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -61,7 +62,9 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
       disks = []
       for i in range(disk_spec.num_striped_disks):
-        name = _GenerateDiskNamePrefix(vm, disk_spec_id, i)
+        name = _GenerateDiskNamePrefix(
+            vm, disk_spec_id, disk_spec.multi_writer_mode, i
+        )
         data_disk = gce_disk.GceDisk(
             disk_spec,
             name,
@@ -79,7 +82,7 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
 
   def DiskCreatedOnVMCreation(self) -> bool:
     """Returns whether the disk is created on VM creation."""
-    if self.disk_spec.replica_zones:
+    if self.disk_spec.replica_zones or self.disk_spec.multi_writer_mode:
       # GCE regional disks cannot use create-on-create.
       return False
     return self.disk_spec.create_with_vm
@@ -89,7 +92,9 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
       return
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
       for i in range(disk_spec.num_striped_disks):
-        name = _GenerateDiskNamePrefix(self.vm, disk_spec_id, i)
+        name = _GenerateDiskNamePrefix(
+            self.vm, disk_spec_id, disk_spec.multi_writer_mode, i
+        )
         cmd = util.GcloudCommand(
             self.vm, 'compute', 'disks', 'add-labels', name
         )
@@ -111,10 +116,12 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
 
   def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
     """Returns the SetUpDiskStrategy for the disk."""
-    if self.setup_disk_strategy is None:
-      self.setup_disk_strategy = SetUpPDDiskStrategy(
+    if self.disk_spec.multi_writer_mode:
+      self.setup_disk_strategy = SetUpMultiWriterPDDiskStrategy(
           self.vm, self.disk_specs
       )
+    elif self.setup_disk_strategy is None:
+      self.setup_disk_strategy = SetUpPDDiskStrategy(self.vm, self.disk_specs)
     return self.setup_disk_strategy
 
 
@@ -250,6 +257,42 @@ class SetUpPartitionedGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
         )
 
 
+class SetUpMultiWriterPDDiskStrategy(SetUpGCEResourceDiskStrategy):
+  """Strategies to Persistence disk on GCE."""
+
+  _MULTIWRITER_DISKS = {}
+  _GLOBAL_LOCK = threading.Lock()
+
+  def __init__(self, vm, disk_specs: list[gce_disk.GceDiskSpec]):
+    super().__init__(vm, disk_specs[0])
+    self.disk_specs = disk_specs
+    self.scratch_disks = []
+
+  def SetUpDisk(self):
+    self._GLOBAL_LOCK.acquire()
+    create_and_setup_disk = False
+    # Only supports one multiwriter disk now
+    self.scratch_disks = self.vm.create_disk_strategy.remote_disk_groups[0]
+    scratch_disk = self.scratch_disks[0]
+    if scratch_disk.name not in self._MULTIWRITER_DISKS:
+      create_and_setup_disk = True
+      scratch_disk.Create()
+      self._MULTIWRITER_DISKS[scratch_disk.name] = True
+
+    scratch_disk.Attach(self.vm)
+    # Device path is needed to stripe disks on Linux, but not on Windows.
+    # The path is not updated for Windows machines.
+    if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+      nvme_devices = self.vm.GetNVMEDeviceInfo()
+      remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
+      self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
+    if create_and_setup_disk:
+      GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
+          self.vm, scratch_disk, self.disk_specs[0]
+      )
+    self._GLOBAL_LOCK.release()
+
+
 class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
   """Strategies to Persistance disk on GCE."""
 
@@ -273,9 +316,7 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
       if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
         create_tasks.append((scratch_disk.Create, (), {}))
     background_tasks.RunParallelThreads(create_tasks, max_concurrency=200)
-    self.scratch_disks = [
-        scratch_disk for scratch_disk, _ in scratch_disks
-    ]
+    self.scratch_disks = [scratch_disk for scratch_disk, _ in scratch_disks]
     self.AttachDisks()
     for scratch_disk, disk_spec in scratch_disks:
       # Device path is needed to stripe disks on Linux, but not on Windows.
@@ -330,7 +371,12 @@ class GCEPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
 
 
 def _GenerateDiskNamePrefix(
-    vm: 'virtual_machine. BaseVirtualMachine', disk_spec_id: int, index: int
+    vm: 'virtual_machine. BaseVirtualMachine',
+    disk_spec_id: int,
+    is_multiwriter: bool,
+    index: int,
 ) -> str:
   """Generates a deterministic disk name given disk_spec_id and index."""
+  if is_multiwriter:
+    return f'pkb-{FLAGS.run_uri}-multiwriter-{vm.vm_group}-{index}'
   return f'{vm.name}-data-{disk_spec_id}-{index}'

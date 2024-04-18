@@ -167,8 +167,11 @@ def GetConfig(user_config):
     ] = config['relational_db']['vm_groups']['servers']['vm_spec'][FLAGS.cloud][
         'zone'
     ]
+
     if FLAGS.db_high_availability_type == 'FCIMW':
-      config['relational_db']['vm_groups']['servers']['disk_count'] = 0
+      config['relational_db']['vm_groups']['servers']['disk_spec'][FLAGS.cloud][
+          'multi_writer_mode'
+      ] = True
 
   return config
 

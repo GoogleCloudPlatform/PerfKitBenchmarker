@@ -30,7 +30,6 @@ from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 CONTROLLER_SCRIPT_PATH = (
     "relational_db_configs/sqlserver_ha_configs/controller.ps1"
@@ -325,14 +324,6 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     ip_address = self.CreateIpReservation()
     perf_domain = "perf" + FLAGS.run_uri[:6]
     print(self.spec.cloud)
-
-    # Create multiwriter disk (only for FCIMW)
-    if self.spec.high_availability_type == "FCIMW":
-      disk_size = 2000
-      if server_vm.disk_specs:
-        disk_size = server_vm.disk_specs[0].disk_size
-      self.CreateAndAttachSharedDisk(server_vm, disk_size, "pd-ssd",
-                                     server_vm.name, replica_vms[0].name)
 
     # Install and configure AD components.
     self.PushAndRunPowershellScript(
@@ -735,57 +726,6 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     return vm.RemoteCommand("powershell {} {}"
                             .format(script_path_on_vm,
                                     " ".join(cmd_parameters)))
-
-  def CreateAndAttachSharedDisk(self,
-                                server_vm: virtual_machine.VirtualMachine,
-                                disk_size: int,
-                                disk_type: str,
-                                server_vm_name: str,
-                                replica_vm_name: str) -> None:
-    """Releases existing IP reservation.
-
-    Args:
-      server_vm: server VM .
-      disk_size: size of the disk to be created.
-      disk_type: multi-writer disk type.
-      server_vm_name: name of the first SQL node where disk will be attached.
-      replica_vm_name: name of the second SQL node.
-    """
-
-    shared_disk_name = "pkb-{}-mw-disk-0".format(FLAGS.run_uri)
-    cmd = gcp_util.GcloudCommand(
-        server_vm,
-        "beta",
-        "compute",
-        "disks",
-        "create",
-        shared_disk_name,
-        f"--type={disk_type}",
-        "--multi-writer",
-        f"--zone={server_vm.zone}",
-        f"--size={disk_size}",
-    )
-    cmd.Issue()
-
-    cmd = gcp_util.GcloudCommand(
-        server_vm,
-        "compute",
-        "instances",
-        "attach-disk",
-        server_vm_name,
-        f"--disk={shared_disk_name}",
-    )
-    cmd.Issue()
-
-    cmd = gcp_util.GcloudCommand(
-        server_vm,
-        "compute",
-        "instances",
-        "attach-disk",
-        replica_vm_name,
-        f"--disk={shared_disk_name}",
-    )
-    cmd.Issue()
 
   def RestartDatabase(self):
     vms = [self.server_vm]
