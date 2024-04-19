@@ -127,13 +127,13 @@ class PackageResourceLoader(ResourceLoader):
     return '<{0} package="{1}">'.format(type(self).__name__, self.package)
 
   def ResourceExists(self, name):
-    return pkg_resources.resource_exists(self.package, name)
+    return pkg_resources.resource_exists(self.package, name)  # pytype: disable=not-callable
 
   def ResourcePath(self, name):
     if not self.ResourceExists(name):
       raise ResourceNotFound(name)
     try:
-      path = pkg_resources.resource_filename(self.package, name)
+      path = pkg_resources.resource_filename(self.package, name)  # pytype: disable=not-callable
     except NotImplementedError:
       # This can happen if PerfKit Benchmarker is executed from a zip file.
       # Extract the resource to the version-specific temporary directory.
@@ -147,7 +147,7 @@ class PackageResourceLoader(ResourceLoader):
             raise
         with open(path, 'wb') as extracted_file:
           shutil.copyfileobj(
-              pkg_resources.resource_stream(self.package, name), extracted_file
+              pkg_resources.resource_stream(self.package, name), extracted_file  # pytype: disable=not-callable
           )
     return path
 
