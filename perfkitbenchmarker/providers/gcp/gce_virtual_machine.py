@@ -1741,17 +1741,6 @@ class Cos101BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-101-lts'
 
 
-class Cos97BasedGceVirtualMachine(
-    BaseCosBasedGceVirtualMachine, virtual_machine.DeprecatedOsMixin
-):
-  OS_TYPE = os_types.COS97
-  DEFAULT_X86_IMAGE_FAMILY = 'cos-97-lts'
-  # https://cloud.google.com/container-optimized-os/docs/release-notes
-  # COS release page lists EOL as March 2024.
-  END_OF_LIFE = '2024-03-01'
-  ALTERNATIVE_OS = os_types.COS101
-
-
 class CoreOsBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CoreOsMixin
 ):

@@ -27,7 +27,6 @@ COS = 'cos'  # stable
 COS109 = 'cos109'
 COS105 = 'cos105'
 COS101 = 'cos101'
-COS97 = 'cos97'
 COS_DEV = 'cos_dev'
 CORE_OS = 'core_os'
 DEBIAN9 = 'debian9'
@@ -103,7 +102,6 @@ CONTAINER_OS_TYPES = [
     COS109,
     COS105,
     COS101,
-    COS97,
     COS_DEV,
 ]
 
