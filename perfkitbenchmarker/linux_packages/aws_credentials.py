@@ -14,23 +14,7 @@
 
 """Module for extracting AWS credentials from a the local configuration."""
 
-import logging
-import os
-from absl import flags
-from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.aws import util
-
-
-FLAGS = flags.FLAGS
-
-
-def _GetLocalPath():
-  """Gets the expanded local path of the credential files.
-
-  Returns:
-    string. Path to the credential files on the local machine.
-  """
-  return os.path.expanduser(FLAGS.aws_credentials_local_path)
 
 
 # TODO(pclay): Move to AWS provider since this is no longer an installable
@@ -57,36 +41,8 @@ def GetCredentials(profile: str):
 
 
 def Install(vm):
-  """Copies credential files to the specified VM.
-
-  Args:
-    vm: BaseVirtualMachine. VM that receives the credential files.
-
-  Raises:
-    errors.Error: If the file destination on the VM already exists, and the
-        overwrite behavior is not specified via --aws_credentials_overwrite.
-  """
-  local_path = _GetLocalPath()
-  remote_path = FLAGS.aws_credentials_remote_path
-  overwrite = FLAGS.aws_credentials_overwrite
-  try:
-    vm.RemoteCommand('[[ ! -e {0} ]]'.format(remote_path))
-  except errors.VirtualMachine.RemoteCommandError:
-    err_msg = 'File {0} already exists on VM {1}.'.format(remote_path, vm)
-    if overwrite:
-      logging.info('%s Overwriting.', err_msg)
-    else:
-      raise errors.Error(err_msg)
-  remote_dir = os.path.dirname(remote_path)
-  if remote_dir:
-    vm.RemoteCommand('mkdir -p {0}'.format(remote_dir))
-  vm.PushFile(local_path, remote_path)
-
-
-def Uninstall(vm):
-  """Deletes the credential files from the specified VM.
-
-  Args:
-    vm: BaseVirtualMachine. VM that has the credential files.
-  """
-  vm.RemoveFile(FLAGS.aws_credentials_remote_path)
+  """Deprecated means of copying local credentials into a VM."""
+  # This should never be called, but in case a fork calls
+  # Install('aws_credentsials into a VM.').
+  raise NotImplementedError('Do not install AWS local credentials. Use '
+                            '--aws_ec2_instance_profile instead.')
