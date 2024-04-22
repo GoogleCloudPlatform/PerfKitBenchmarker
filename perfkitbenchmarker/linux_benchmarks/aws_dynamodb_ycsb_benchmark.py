@@ -30,9 +30,9 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import aws_credentials
 from perfkitbenchmarker.linux_packages import ycsb
 from perfkitbenchmarker.providers.aws import aws_dynamodb
-from perfkitbenchmarker.providers.aws import util
 
 _INITIAL_WRITES = flags.DEFINE_integer(
     'aws_dynamodb_ycsb_provision_wcu',
@@ -295,13 +295,7 @@ def GetRemoteCredentialsFullPath(vm):
 
 def GenerateCredentials(vm) -> None:
   """Generates AWS credentials properties file and pushes it to the VM."""
-  key_id = util.GetConfigValue('aws_access_key_id', profile=_CLI_PROFILE.value)
-  secret = util.GetConfigValue(
-      'aws_secret_access_key', profile=_CLI_PROFILE.value, suppress_logging=True
-  )
-  # TODO(pclay): consider adding some validation here:
-  # 1. key and secret are in the correct account.
-  # 2. _CLI_PROFILE does not use a session token.
+  key_id, secret = aws_credentials.GetCredentials(profile=_CLI_PROFILE.value)
 
   with vm_util.NamedTemporaryFile(prefix=AWS_CREDENTIALS_FILE, mode='w') as f:
     f.write(f"""

@@ -44,6 +44,11 @@ flags.DEFINE_string(
     None,
     'The image version to use for the cluster.',
 )
+_S3A_CREDENTIALS = flags.DEFINE_string(
+    'dpb_dataproc_s3a_cross_cloud_credentials_cli_profile',
+    None,
+    'The local AWS CLI profile to use to copy data to S3.',
+)
 
 disk_to_hdfs_map = {
     'pd-standard': 'HDD',
@@ -130,16 +135,24 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
     """
     if dest_cloud == 'AWS':
       dest_prefix = 's3a://'
+      if not _S3A_CREDENTIALS.value:
+        raise ValueError(
+            '--dpb_dataproc_s3a_cross_cloud_credentials_cli_profile required '
+            'for writing to s3.'
+        )
+      s3_access_key, s3_secret_key = aws_credentials.GetCredentials(
+          _S3A_CREDENTIALS.value
+      )
+      properties = {
+          'fs.s3a.access.key': s3_access_key,
+          'fs.s3a.secret.key': s3_secret_key,
+      }
     else:
       raise ValueError('Unsupported destination cloud.')
-    s3_access_key, s3_secret_key = aws_credentials.GetCredentials()
     return self.DistributedCopy(
         'gs://' + source_location,
         dest_prefix + destination_location,
-        properties={
-            'fs.s3a.access.key': s3_access_key,
-            'fs.s3a.secret.key': s3_secret_key,
-        },
+        properties=properties,
     )
 
 

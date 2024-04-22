@@ -12,47 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Module containing AWS credential file installation and cleanup helpers.
+"""Module for extracting AWS credentials from a the local configuration."""
 
-AWS credentials consist of a secret access key and its ID, stored in a single
-file. Following PKB's AWS setup instructions (see
-https://github.com/GoogleCloudPlatform/PerfKitBenchmarker#install-aws-cli-and-setup-authentication),
-the default location of the file will be at ~/.aws/credentials
-
-This package copies the credentials file to the remote VM to make them available
-for calls from the VM to other AWS services, such as SQS or Kinesis.
-"""
-
-import configparser
 import logging
 import os
 from absl import flags
-from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker.providers.aws import util
 
 
 FLAGS = flags.FLAGS
-
-flags.DEFINE_string(
-    'aws_credentials_local_path',
-    os.path.join('~', '.aws'),
-    'Path where the AWS credential files can be found on the local machine.',
-)
-
-flags.DEFINE_string(
-    'aws_credentials_remote_path',
-    '.aws',
-    'Path where the AWS credential files will be written on remote machines.',
-)
-
-flags.DEFINE_boolean(
-    'aws_credentials_overwrite',
-    False,
-    'When set, if an AWS credential file already exists at the destination '
-    'specified by --aws_credentials_remote_path, it will be overwritten during '
-    'AWS credential file installation.',
-)
-flags.DEFINE_string('aws_s3_region', None, 'Region for the S3 bucket')
 
 
 def _GetLocalPath():
@@ -64,39 +33,27 @@ def _GetLocalPath():
   return os.path.expanduser(FLAGS.aws_credentials_local_path)
 
 
-def GetCredentials(credentials_file_name='credentials'):
-  """Gets the credentials from the local credential file.
+# TODO(pclay): Move to AWS provider since this is no longer an installable
+# package.
+def GetCredentials(profile: str):
+  """Gets the credentials from the AWS CLI config.
 
-  AWS credentials file is expected to be called 'credentials'.
-  AWS credentials file looks like this, and ends with a newline:
-  [default]
-  aws_access_key_id = {access_key}
-  aws_secret_access_key = {secret_access_key}
+  Prefer --aws_ec2_instance_profile when using EC2 VMs.
 
   Args:
-    credentials_file_name: String name of the file containing the credentials.
+    profile: name of the profile to get the credentials from.
 
   Returns:
     A string, string tuple of access_key and secret_access_key
   """
-  config = configparser.ConfigParser()
-  config.read(os.path.join(_GetLocalPath(), credentials_file_name))
-  key_id = config['default']['aws_access_key_id']
-  key = config['default']['aws_secret_access_key']
-  return key_id, key
-
-
-def CheckPrerequisites():
-  """Verifies that the required resources are present.
-
-  Raises:
-    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
-  """
-  local_path = _GetLocalPath()
-  if not os.path.exists(local_path):
-    raise data.ResourceNotFound(
-        'AWS credential files were not found at {0}'.format(local_path)
-    )
+  key_id = util.GetConfigValue('aws_access_key_id', profile=profile)
+  secret = util.GetConfigValue(
+      'aws_secret_access_key', profile=profile, suppress_logging=True
+  )
+  # TODO(pclay): consider adding some validation here:
+  # 1. key and secret are in the correct account.
+  # 2. profile does not use a session token.
+  return key_id, secret
 
 
 def Install(vm):
