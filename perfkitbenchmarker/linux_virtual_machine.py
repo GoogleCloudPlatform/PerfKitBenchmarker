@@ -2785,10 +2785,21 @@ class Debian9Mixin(BaseDebianMixin):
   PYTHON_2_PACKAGE = 'python'
 
 
-class Debian10Mixin(BaseDebianMixin):
+class Debian10Mixin(BaseDebianMixin, virtual_machine.DeprecatedOsMixin):
   """Class holding Debian 10 specific VM methods and attributes."""
 
   OS_TYPE = os_types.DEBIAN10
+  END_OF_LIFE = '2024-06-30'
+
+  def SetupPackageManager(self):
+    # buster-backports has moved to the archive domain
+    self.RemoteCommand(
+        'sudo find /etc/apt/sources.list* -type f -exec sed -Ei '
+        "'s@(https?://)\\S+(/debian buster-backports main)"
+        "@\\1archive.debian.org\\2@' "
+        '{} \\;'
+    )
+    super().SetupPackageManager()
 
 
 class Debian10BackportsMixin(Debian10Mixin):
