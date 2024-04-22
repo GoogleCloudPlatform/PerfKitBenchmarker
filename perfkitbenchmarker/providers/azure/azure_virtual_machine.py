@@ -81,6 +81,7 @@ _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES = (
     'Standard_ND96asr_v4',
     'Standard_ND96asr_A100_v4',
     'Standard_ND96amsr_A100_v4',
+    'Standard_ND96isr_H100_v5',
     'Standard_M208ms_v2',
     'Standard_M208s_v2',
     'Standard_M416ms_v2',
