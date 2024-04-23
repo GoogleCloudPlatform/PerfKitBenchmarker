@@ -34,7 +34,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
-
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'provision_disk'
@@ -132,7 +131,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   )
   samples.append(
       sample.Sample(
-          'Time to Create',
+          'Time to Create Disks',
           time_to_create,
           'seconds',
           disk_metadata,
@@ -173,10 +172,7 @@ def ParseCreateTimeFromScratchDisks(
 ):
   max_time_to_create = 0
   for scratch_disk in vm.scratch_disks:
-    scratch_disk_samples = scratch_disk.GetSamples()
-    for sample_details in scratch_disk_samples:
-      if sample_details.metric == 'Time to Create':
-        max_time_to_create = max(max_time_to_create, sample_details.value)
+    max_time_to_create = max(max_time_to_create, scratch_disk.GetCreateTime())
   return max_time_to_create
 
 
@@ -185,10 +181,7 @@ def ParseAttachTimeFromScratchDisks(
 ):
   max_time_to_attach = 0
   for scratch_disk in vm.scratch_disks:
-    scratch_disk_samples = scratch_disk.GetSamples()
-    for sample_details in scratch_disk_samples:
-      if sample_details.metric == 'Time to Attach':
-        max_time_to_attach = max(max_time_to_attach, sample_details.value)
+    max_time_to_attach = max(max_time_to_attach, scratch_disk.GetAttachTime())
   return max_time_to_attach
 
 
@@ -206,7 +199,6 @@ def DetachDisks(vm: linux_virtual_machine.BaseLinuxVirtualMachine):
 
   Returns:
     time to detach all the disks from the virtual machine.
-
   """
   detach_tasks = []
   for scratch_disk in vm.scratch_disks:
@@ -218,7 +210,7 @@ def DetachDisks(vm: linux_virtual_machine.BaseLinuxVirtualMachine):
   for scratch_disk in vm.scratch_disks:
     max_time_to_detach = max(
         max_time_to_detach,
-        scratch_disk.detach_end_time - scratch_disk.detach_start_time,
+        scratch_disk.GetDetachTime(),
     )
   return max_time_to_detach
 

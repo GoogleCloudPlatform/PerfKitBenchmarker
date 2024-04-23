@@ -408,6 +408,8 @@ class BaseDisk(resource.BaseResource):
   attach_end_time: time when disk attach to vm is done
   detach_start_time: time when we start the disk detach from vm
   detach_end_time: time when disk detach from vm is done
+  create_disk_start_time: time when start disk creation command
+  create_disk_end_time: time when we end disk creation command
   """
 
   is_striped = False
@@ -447,6 +449,11 @@ class BaseDisk(resource.BaseResource):
     self.attach_end_time: float = None
     self.detach_start_time: float = None
     self.detach_end_time: float = None
+    self.create_disk_start_time: float = None
+    self.create_disk_end_time: float = None
+    self.disk_create_time: float = None
+    self.disk_attach_time: float = None
+    self.disk_detach_time: float = None
 
   @property
   def mount_options(self):
@@ -483,9 +490,7 @@ class BaseDisk(resource.BaseResource):
     Args:
       vm: The BaseVirtualMachine instance to which the disk will be attached.
     """
-    self.attach_start_time = time.time()
     self._Attach(vm)
-    self.attach_end_time = time.time()
 
   def _Attach(self, vm):
     """Attaches the disk to a VM.
@@ -521,24 +526,45 @@ class BaseDisk(resource.BaseResource):
     # handled by disk
     pass
 
+  def GetAttachTime(self):
+    if self.attach_start_time and self.attach_end_time:
+      return self.attach_end_time - self.attach_start_time
+
+  def GetCreateTime(self):
+    if self.create_disk_start_time and self.create_disk_end_time:
+      return self.create_disk_end_time - self.create_disk_start_time
+
+  def GetDetachTime(self):
+    if self.detach_start_time and self.detach_end_time:
+      return self.detach_end_time - self.detach_start_time
+
   def GetSamples(self) -> List[sample.Sample]:
     samples = super(BaseDisk, self).GetSamples()
     metadata = self.GetResourceMetadata()
     metadata['resource_class'] = self.__class__.__name__
-    if self.attach_start_time and self.attach_end_time:
+    if self.GetAttachTime():
       samples.append(
           sample.Sample(
-              'Time to Attach',
-              self.attach_end_time - self.attach_start_time,
+              'Time to Attach Disk',
+              self.GetAttachTime(),
               'seconds',
               metadata,
           )
       )
-    if self.detach_start_time and self.detach_end_time:
+    if self.GetDetachTime():
       samples.append(
           sample.Sample(
-              'Time to Detach',
-              self.detach_end_time - self.detach_start_time,
+              'Time to Detach Disk',
+              self.GetDetachTime(),
+              'seconds',
+              metadata,
+          )
+      )
+    if self.GetCreateTime():
+      samples.append(
+          sample.Sample(
+              'Time to Create Disk',
+              self.GetCreateTime(),
               'seconds',
               metadata,
           )
@@ -584,6 +610,40 @@ class StripedDisk(BaseDisk):
   def _Detach(self):
     for disk in self.disks:
       disk.Detach()
+
+  def GetAttachTime(self):
+    if self.disk_attach_time:
+      return self.disk_attach_time
+    for disk_details in self.disks:
+      disk_details_attach_time = disk_details.GetAttachTime()
+      if not disk_details_attach_time:
+        raise ValueError(
+            'No attach time found for disk %s' % disk_details.GetDeviceId()
+        )
+      if not self.disk_attach_time:
+        self.disk_attach_time = disk_details_attach_time
+      else:
+        self.disk_attach_time = max(
+            self.disk_attach_time, disk_details_attach_time
+        )
+    return self.disk_attach_time
+
+  def GetCreateTime(self):
+    if self.disk_create_time:
+      return self.disk_create_time
+    for disk_details in self.disks:
+      disk_details_create_time = disk_details.GetCreateTime()
+      if not disk_details_create_time:
+        raise ValueError(
+            'No create time found for disk %s' % disk_details.GetDeviceId()
+        )
+      if not self.disk_create_time:
+        self.disk_create_time = disk_details_create_time
+      else:
+        self.disk_create_time = max(
+            self.disk_create_time, disk_details_create_time
+        )
+    return self.disk_create_time
 
 
 class NetworkDisk(BaseDisk):

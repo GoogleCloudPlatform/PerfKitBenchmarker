@@ -20,7 +20,7 @@ Use 'gcloud compute disk-types list' to determine valid disk types.
 import json
 import logging
 import re
-
+import time
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import boot_disk
@@ -395,9 +395,10 @@ class GceDisk(disk.BaseDisk):
 
     if self.multi_writer_disk:
       cmd.flags['access-mode'] = 'READ_WRITE_MANY'
-
+    self.create_disk_start_time = time.time()
     _, stderr, retcode = cmd.Issue(raise_on_failure=False)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
+    self.create_disk_end_time = time.time()
 
   def _Delete(self):
     """Deletes the disk."""
@@ -463,7 +464,9 @@ class GceDisk(disk.BaseDisk):
 
     if self.replica_zones:
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
+    self.attach_start_time = time.time()
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    self.attach_end_time = time.time()
     # Gcloud attach-disk commands may still attach disks despite being rate
     # limited.
     if retcode:
@@ -572,8 +575,9 @@ class GceStripedDisk(disk.StripedDisk):
       cmd.flags['region'] = self.region
       cmd.flags['replica-zones'] = ','.join(self.replica_zones)
       del cmd.flags['zone']
-
+    self.create_disk_start_time = time.time()
     _, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    self.create_disk_end_time = time.time()
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
   def _PostCreate(self):
@@ -601,3 +605,7 @@ class GceStripedDisk(disk.StripedDisk):
     for disk_details in self.disks:
       detach_tasks.append((disk_details.Detach, (), {}))
     background_tasks.RunParallelThreads(detach_tasks, max_concurrency=200)
+
+  def GetCreateTime(self):
+    if self.create_disk_start_time and self.create_disk_end_time:
+      return self.create_disk_end_time - self.create_disk_start_time

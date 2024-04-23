@@ -26,6 +26,7 @@ import json
 import logging
 import string
 import threading
+import time
 from typing import Optional
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
@@ -468,7 +469,9 @@ class AwsDisk(disk.BaseDisk):
       create_cmd.append('--throughput=%s' % self.throughput)
 
     try:
+      self.create_disk_start_time = time.time()
       stdout, _, _ = vm_util.IssueCommand(create_cmd)
+      self.create_disk_end_time = time.time()
     except errors.VmUtil.IssueCommandError as error:
       error_message = str(error)
       is_quota_error = 'MaxIOPSLimitExceeded' in error_message
@@ -615,7 +618,9 @@ class AwsDisk(disk.BaseDisk):
         'ready, but will be retried.',
         self.id,
     )
+    self.attach_start_time = time.time()
     vm_util.IssueCommand(attach_cmd, raise_on_failure=False)
+    self.attach_end_time = time.time()
     volume_id, device_name = self._WaitForAttachedState()
     vm.LogDeviceByName(device_name, volume_id, device_name)
     if self.disk_spec_id:

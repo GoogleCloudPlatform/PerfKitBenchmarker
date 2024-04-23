@@ -24,6 +24,7 @@ import itertools
 import json
 import re
 import threading
+import time
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
@@ -255,9 +256,11 @@ class AzureDisk(disk.BaseDisk):
             '--zone',
             self.availability_zone,
         ] + self.resource_group.args
+      self.create_disk_start_time = time.time()
       _, _, retcode = vm_util.IssueCommand(
           cmd, raise_on_failure=False, timeout=600
       )
+      self.create_disk_end_time = time.time()
       if retcode:
         raise errors.Resource.RetryableCreationError(
             'Error creating Azure disk.'
@@ -305,6 +308,7 @@ class AzureDisk(disk.BaseDisk):
           ]
 
         _, _, _ = vm_util.IssueCommand(args, raise_on_failure=True)
+        # create disk end time includes disk update command as well
 
   def _Delete(self):
     """Deletes the disk."""
@@ -344,6 +348,7 @@ class AzureDisk(disk.BaseDisk):
     """
     if FLAGS.azure_attach_disk_with_create:
       return
+    self.attach_start_time = time.time()
     _, _, retcode = vm_util.IssueCommand(
         [
             azure.AZURE_PATH,
@@ -359,6 +364,7 @@ class AzureDisk(disk.BaseDisk):
         raise_on_failure=False,
         timeout=600,
     )
+    self.attach_end_time = time.time()
     if retcode:
       raise errors.Resource.RetryableCreationError(
           'Error attaching Azure disk to VM.'
@@ -420,6 +426,7 @@ class AzureStripedDisk(disk.StripedDisk):
     if FLAGS.azure_attach_disk_with_create:
       return
     disk_names = [disk_details.name for disk_details in self.disks]
+    self.attach_start_time = time.time()
     _, _, retcode = vm_util.IssueCommand(
         [
             azure.AZURE_PATH,
@@ -428,7 +435,7 @@ class AzureStripedDisk(disk.StripedDisk):
             'attach',
             '--vm-name',
             vm.name,
-            '--disks'
+            '--disks',
         ]
         + disk_names
         + vm.resource_group.args,
@@ -439,7 +446,12 @@ class AzureStripedDisk(disk.StripedDisk):
       raise errors.Resource.RetryableCreationError(
           'Error attaching Multiple Azure disks to VM.'
       )
+    self.attach_end_time = time.time()
 
   def _Detach(self):
     for disk_details in self.disks:
       disk_details.Detach()
+
+  def GetAttachTime(self):
+    if self.attach_start_time and self.attach_end_time:
+      return self.attach_end_time - self.attach_start_time
