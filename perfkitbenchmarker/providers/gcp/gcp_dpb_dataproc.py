@@ -680,6 +680,18 @@ class GcpDpbDataprocServerless(
       result['spark.executor.memory'] = (
           f'{self.spec.dataproc_serverless_memory}m'
       )
+    if self.spec.dataproc_serverless_driver_memory:
+      result['spark.driver.memory'] = (
+          f'{self.spec.dataproc_serverless_driver_memory}m'
+      )
+    if self.spec.dataproc_serverless_executor_memory:
+      result['spark.executor.memory'] = (
+          f'{self.spec.dataproc_serverless_executor_memory}m'
+      )
+    if self.spec.dataproc_serverless_off_heap_memory:
+      result['spark.memory.offHeap.size'] = (
+          f'{self.spec.dataproc_serverless_off_heap_memory}m'
+      )
     if self.spec.dataproc_serverless_memory_overhead:
       result['spark.driver.memoryOverhead'] = (
           f'{self.spec.dataproc_serverless_memory_overhead}m'
@@ -709,6 +721,12 @@ class GcpDpbDataprocServerless(
     if initial_executors == min_executors == max_executors:
       cluster_size = initial_executors
 
+    memory_per_node = (
+        self.spec.dataproc_serverless_executor_memory
+        or self.spec.dataproc_serverless_memory
+        or 'default'
+    )
+
     self.metadata = {
         'dpb_service': self.metadata['dpb_service'],
         'dpb_version': self.metadata['dpb_version'],
@@ -722,11 +740,12 @@ class GcpDpbDataprocServerless(
         'dpb_cores_per_node': (
             self.spec.dataproc_serverless_core_count or 'default'
         ),
-        'dpb_memory_per_node': (
-            self.spec.dataproc_serverless_memory or 'default'
-        ),
+        'dpb_memory_per_node': memory_per_node,
         'dpb_memory_overhead_per_node': (
             self.spec.dataproc_serverless_memory_overhead or 'default'
+        ),
+        'dpb_off_heap_memory_per_node': (
+            self.spec.dataproc_serverless_off_heap_memory or 'default'
         ),
         'dpb_hdfs_type': self.metadata['dpb_hdfs_type'],
         'dpb_disk_size': self.metadata['dpb_disk_size'],

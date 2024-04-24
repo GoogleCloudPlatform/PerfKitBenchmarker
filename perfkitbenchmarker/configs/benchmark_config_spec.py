@@ -200,6 +200,18 @@ class _DpbServiceSpec(spec.BaseSpec):
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True},
         ),
+        'dataproc_serverless_driver_memory': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'dataproc_serverless_executor_memory': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'dataproc_serverless_off_heap_memory': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
         'dataproc_serverless_memory_overhead': (
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True},

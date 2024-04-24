@@ -82,6 +82,9 @@ def GetServerlessSpec():
       dataproc_serverless_max_executors=10,
       dataproc_serverless_memory=10000,
       dataproc_serverless_memory_overhead=4000,
+      dataproc_serverless_driver_memory=None,
+      dataproc_serverless_executor_memory=None,
+      dataproc_serverless_off_heap_memory=None,
       worker_group=mock.Mock(
           vm_spec=mock.Mock(
               machine_type='standard',
@@ -316,6 +319,7 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
         'dpb_disk_size': 42,
         'dpb_service_zone': 'us-central1-a',
         'dpb_job_properties': f'spark.executor.cores=4,spark.driver.cores=4,spark.executor.instances=4,spark.dynamicAllocation.minExecutors=2,spark.dynamicAllocation.maxExecutors=10,spark.dataproc.driver.disk.size=42g,spark.dataproc.executor.disk.size=42g,spark.dataproc.driver.disk.tier={tier},spark.dataproc.executor.disk.tier={tier},spark.dataproc.driver.compute.tier={tier},spark.dataproc.executor.compute.tier={tier},spark.driver.memory=10000m,spark.executor.memory=10000m,spark.driver.memoryOverhead=4000m,spark.executor.memoryOverhead=4000m',
+        'dpb_off_heap_memory_per_node': 'default',
     }
     self.assertEqual(service.GetResourceMetadata(), expected_metadata)
 
