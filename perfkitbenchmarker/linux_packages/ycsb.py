@@ -37,7 +37,6 @@ Each workload runs for at most 30 minutes.
 
 from collections.abc import Mapping, Sequence
 import copy
-import dataclasses
 import datetime
 import io
 import logging
@@ -1341,25 +1340,6 @@ class YCSBExecutor:
     Returns:
       A list of samples of benchmark results.
     """
-
-    @dataclasses.dataclass
-    class _ThroughputLatencyResult:
-      throughput: int = 0
-      read_latency: float = float('inf')
-      update_latency: float = float('inf')
-      samples: list[sample.Sample] = dataclasses.field(default_factory=list)
-
-    def _PrintDebugLog(result: _ThroughputLatencyResult) -> None:
-      logging.info(
-          'Run had throughput %s ops/s, read %s latency %s ms, update %s'
-          ' latency %s ms',
-          result.throughput,
-          _LOWEST_LATENCY_PERCENTILE,
-          result.read_latency,
-          _LOWEST_LATENCY_PERCENTILE,
-          result.update_latency,
-      )
-
     def _RunWorkload(target_qps: int) -> list[sample.Sample]:
       """Runs the workload at the target throughput."""
       run_params = _GetRunParameters()
@@ -1369,23 +1349,6 @@ class YCSBExecutor:
       )
       self._SetRunParameters(run_params)
       return self.RunStaircaseLoads([vms[0]], workloads, **run_kwargs)
-
-    def _ExtractStats(samples: list[sample.Sample]) -> _ThroughputLatencyResult:
-      """Returns the throughput and latency recorded in the samples."""
-      throughput, read_latency, update_latency = 0, 0, 0
-      for result in samples:
-        if result.metric == 'overall Throughput':
-          throughput = result.value
-        elif result.metric == f'read {_LOWEST_LATENCY_PERCENTILE} latency':
-          read_latency = result.value
-        elif result.metric == f'update {_LOWEST_LATENCY_PERCENTILE} latency':
-          update_latency = result.value
-      return _ThroughputLatencyResult(
-          throughput=int(throughput),
-          read_latency=read_latency,
-          update_latency=update_latency,
-          samples=samples,
-      )
 
     def _ProcessSamples(
         samples: list[sample.Sample], database: resource.BaseResource
@@ -1431,11 +1394,11 @@ class YCSBExecutor:
     target = _LOWEST_LATENCY_STARTING_QPS
     min_read_latency = float('inf')
     min_update_latency = float('inf')
-    prev_result = _ThroughputLatencyResult()
+    prev_result = ycsb_stats.ThroughputLatencyResult()
     while True:
       samples = _RunWorkload(target)
-      result = _ExtractStats(samples)
-      _PrintDebugLog(result)
+      result = ycsb_stats.ExtractStats(samples, _LOWEST_LATENCY_PERCENTILE)
+      logging.info('Run stats: %s', result)
       if (
           result.read_latency > min_read_latency + _LOWEST_LATENCY_BUFFER
           or result.update_latency > min_update_latency + _LOWEST_LATENCY_BUFFER
