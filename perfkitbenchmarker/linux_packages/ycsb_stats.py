@@ -1102,3 +1102,42 @@ def CreateSamples(
           '',
           {'latency_time_series': group.data},
       )
+
+
+@dataclasses.dataclass
+class ThroughputLatencyResult:
+  """Post-processing helper class for YCSB datapoints."""
+
+  throughput: int = 0
+  percentile: str = ''
+  read_latency: float = float('inf')
+  update_latency: float = float('inf')
+  samples: list[sample.Sample] = dataclasses.field(default_factory=list)
+
+  def __str__(self) -> str:
+    return (
+        f'({self.throughput} ops/s, '
+        f'{self.percentile} read latency: {self.read_latency}, '
+        f'{self.percentile} update latency: {self.update_latency})'
+    )
+
+
+def ExtractStats(
+    samples: list[sample.Sample], percentile: str
+) -> ThroughputLatencyResult:
+  """Returns the throughput and latency recorded in the samples."""
+  throughput, read_latency, update_latency = 0, 0, 0
+  for result in samples:
+    if result.metric == 'overall Throughput':
+      throughput = result.value
+    elif result.metric == f'read {percentile} latency':
+      read_latency = result.value
+    elif result.metric == f'update {percentile} latency':
+      update_latency = result.value
+  return ThroughputLatencyResult(
+      throughput=int(throughput),
+      percentile=percentile,
+      read_latency=read_latency,
+      update_latency=update_latency,
+      samples=samples,
+  )
