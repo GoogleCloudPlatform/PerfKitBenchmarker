@@ -22,3 +22,10 @@ $sql_install_file = (Get-SqlInstallSourceDirectory) + 'Setup.exe'
 Write-Host $sql_install_file
 
 & $sql_install_file $parameters
+
+# Uninstall OLE drivers
+Get-Package -Name 'Microsoft OLE*' | Uninstall-Package -Force
+
+# Uninstall ODBC drivers
+Get-Package -Name 'Microsoft ODBC*' | Uninstall-Package -Force
+
