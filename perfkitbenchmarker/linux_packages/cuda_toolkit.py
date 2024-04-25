@@ -383,9 +383,10 @@ def _InstallCuda11Generic(vm, toolkit_fmt, version_dash):
   vm.RemoteCommand(
       'wget -q'
       f' {CUDA_PIN.format(os=_CudaOs(vm.OS_TYPE), cpu_arch=GetCpuArchPath(vm))}'
+      f' -O /tmp/cuda-{_CudaOs(vm.OS_TYPE)}.pin'
   )
   vm.RemoteCommand(
-      f'sudo mv cuda-{_CudaOs(vm.OS_TYPE)}.pin '
+      f'sudo mv /tmp/cuda-{_CudaOs(vm.OS_TYPE)}.pin '
       '/etc/apt/preferences.d/cuda-repository-pin-600'
   )
   _DownloadCuda(vm, toolkit_fmt)
