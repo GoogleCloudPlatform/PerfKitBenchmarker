@@ -478,7 +478,7 @@ class BenchmarkSpec:
         cloud = group_spec.cloud
         providers.LoadProvider(cloud)
         nfs_class = nfs_service.GetNfsServiceClass(cloud)
-        self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)
+        self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)  # pytype: disable=not-instantiable
       else:
         self.nfs_service = nfs_service.UnmanagedNfsService(
             disk_spec, self.vms[0]
