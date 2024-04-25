@@ -2876,8 +2876,9 @@ class Ubuntu1804Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
 
     See https://bugs.launchpad.net/snappy/+bug/1659719.
     """
+    # Ensure ~/.bashrc exists.
     self.RemoteCommand(
-        r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" ~/.bashrc'
+        r'touch ~/.bashrc && sed -i "1 i\export PATH=$PATH:/snap/bin" ~/.bashrc'
     )
     self.RemoteCommand(
         r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" /etc/bash.bashrc'
@@ -2902,8 +2903,9 @@ class Ubuntu2004Mixin(BaseUbuntuMixin):
 
     See https://bugs.launchpad.net/snappy/+bug/1659719.
     """
+    # Ensure ~/.bashrc exists.
     self.RemoteCommand(
-        r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" ~/.bashrc'
+        r'touch ~/.bashrc && sed -i "1 i\export PATH=$PATH:/snap/bin" ~/.bashrc'
     )
     self.RemoteCommand(
         r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" /etc/bash.bashrc'
