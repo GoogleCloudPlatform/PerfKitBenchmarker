@@ -274,7 +274,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
-  """Run YCSB with against MongoDB.
+  """Run YCSB against MongoDB.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
