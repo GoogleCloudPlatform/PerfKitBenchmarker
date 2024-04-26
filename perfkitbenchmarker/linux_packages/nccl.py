@@ -76,6 +76,8 @@ def AptInstall(vm):
           build='./nccl/build/pkg/deb/', cuda=FLAGS.cuda_toolkit_version
       )
   )
+  # Cleanup temporary build files.
+  vm.RemoteCommand('rm -fr nccl')
 
   if FLAGS.nccl_net_plugin:
     vm.RemoteCommand(
