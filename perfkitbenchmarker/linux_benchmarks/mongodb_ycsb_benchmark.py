@@ -93,6 +93,7 @@ mongodb_ycsb:
     disk_fs_type: xfs
     fstab_options: noatime
     enable_transparent_hugepages: false
+    create_and_boot_post_task_delay: 5
 """
 
 _LinuxVM = linux_virtual_machine.BaseLinuxVirtualMachine
