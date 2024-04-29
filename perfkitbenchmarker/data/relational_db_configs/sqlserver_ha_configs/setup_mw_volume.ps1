@@ -5,8 +5,10 @@ param (
  )
 
 try {
+
   $domainUser = "$perf_domain\pkbadminuser"
   $localServerName    = [System.Net.Dns]::GetHostName()
+  $initializedDisks = New-Object Collections.Generic.List[String]
 
   $passwordSecureString = (ConvertTo-SecureString -AsPlainText $perf_domain_password -Force)
   $domainCredential = New-Object System.Management.Automation.PSCredential ($domainUser, $passwordSecureString)
@@ -26,15 +28,16 @@ try {
   }
   else {
     $diskCount = 0
-    $diskLetter = 'D','E','F'
+    $diskLetters = 'D','E','F'
 
     foreach($disk in $ClusterDisks) {
-      Write-Host "Disk letter: $diskLetter[$diskCount]"
-      Initialize-Disk -Number $disk.DeviceId
-      New-Partition -disknumber $disk.DeviceId -usemaximumsize -DriveLetter $diskLetter[$diskCount] | Format-Volume -FileSystem ReFS -newfilesystemlabel DataDisk -AllocationUnitSize 65536
-      New-Item -ItemType Directory -Path "$diskLetter[$diskCount]:\MSSQL"
-      Get-Date | Out-File -FilePath "$diskLetter[$diskCount]:\MSSQL\fcimw.txt"
+      $diskLetter = $diskLetters[$diskCount]
 
+      Initialize-Disk -Number $disk.DeviceId
+      New-Partition -DiskNumber $disk.DeviceId -UseMaximumSize  -DriveLetter $diskLetter | Format-Volume -FileSystem NTFS -newfilesystemlabel DataDisk -AllocationUnitSize 65536
+
+      Start-Sleep -Seconds 90
+      $initializedDisks.Add($diskLetter)
       $diskCount = $diskCount + 1
     }
 
@@ -49,6 +52,16 @@ try {
   Invoke-Command -ComputerName  $ad_dc.HostName -Credential $domainCredential -ArgumentList $passwordSecureString -ScriptBlock {
         New-ADUser -Name 'sql_server' -Description 'SQL Agent and SQL Admin account.' -AccountPassword $args[0] -Enabled $true -PasswordNeverExpires $true
   }
+
+  foreach($initDisk in $initializedDisks) {
+    if (Get-PSDrive -Name $initDisk) {
+      Write-Host "Disk $initDisk Created"
+      New-Item -ItemType Directory -Path "$($initDisk):\MSSQL"
+      Get-Date | Out-File -FilePath "$($initDisk):\MSSQL\fcimw.txt"
+      break
+    }
+  }
+
 }
 catch {
   Write-Host $_.Exception.Message

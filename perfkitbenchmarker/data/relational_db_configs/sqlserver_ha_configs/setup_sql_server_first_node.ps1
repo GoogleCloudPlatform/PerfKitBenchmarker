@@ -43,7 +43,7 @@ try {
     $Disks = Get-CimInstance -Namespace Root\MSCluster -ClassName MSCluster_Resource -ComputerName $localServerName | ?{$_.Type -eq 'Physical Disk'}
     $diskDetails = ($Disks | %{Get-CimAssociatedInstance -InputObject $_ -ResultClassName MSCluster_DiskPartition})
 
-    $sqlDestFolder = 'E:\MSSQL'
+    $sqlDestFolder = 'D:\MSSQL'
     $clusterStorage = Get-ClusterResource | Where-Object { $_.ResourceType -eq 'Physical Disk' }
     $clusterStorageName = $clusterStorage.Name
   }
