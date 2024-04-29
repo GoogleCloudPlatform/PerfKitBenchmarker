@@ -116,6 +116,7 @@ NVME_PD_MACHINE_FAMILIES = ['m3']
 # Some machine families cannot use pd-ssd
 HYPERDISK_ONLY_MACHINE_FAMILIES = [
     'c3a',
+    'n4',
 ]
 # Default boot disk type in pkb.
 # Console defaults to pd-balanced & gcloud defaults to pd-standard as of 11/23
