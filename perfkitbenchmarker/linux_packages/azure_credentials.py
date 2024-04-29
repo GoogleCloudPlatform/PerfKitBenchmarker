@@ -21,7 +21,6 @@ from packaging import version
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers import azure
 
 AZURE_CREDENTIAL_DIRECTORY = os.path.join('~', '.azure')
 # Necessary for user login with MSAL
@@ -41,7 +40,7 @@ def Install(vm):
   """Copies Azure credentials to the VM."""
   # Validate local azure-cli uses MSAL
   stdout, _, _ = vm_util.IssueCommand(
-      [azure.AZURE_PATH, 'version', '--query', '"azure-cli"']
+      ['az', 'version', '--query', '"azure-cli"']
   )
   az_version = version.Version(stdout.strip('"\n'))
   if az_version < version.Version(_REQUIRED_MSAL_CLI_VERSION):
