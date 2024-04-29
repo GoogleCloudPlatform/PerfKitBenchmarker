@@ -114,8 +114,10 @@ flags.DEFINE_string(
     'The hosted snowflake database to use during the benchmark.',
 )
 flags.DEFINE_string(
-    'snowflake_schema', None,
-    'The schema of the hosted snowflake database to use during the benchmark.')
+    'snowflake_schema',
+    None,
+    'The schema of the hosted snowflake database to use during the benchmark.',
+)
 flags.DEFINE_enum(
     'snowflake_client_interface',
     'JDBC',
@@ -454,6 +456,30 @@ class EdwService(resource.BaseResource):
       tables: List of table names to load.
       dataset: Optional name of the dataset. If none, will be determined by the
         service.
+    """
+    raise NotImplementedError
+
+  def OpenDataset(self, dataset: str):
+    """Switch from the currently active dataset to the one specified.
+
+    Switches the dataset that will be accessed by queries sent through the
+    client interface that this EDW service provides.
+
+    Args:
+      dataset: Name of the dataset to make the active dataset.
+    """
+    raise NotImplementedError
+
+  def CopyTable(self, copy_table_name: str, to_dataset: str) -> None:
+    """Copy a table from the active dataset to the specified dataset.
+
+    Copies a table between datasets, from the active (current) dataset to
+    another named dataset in the same project.
+
+    Args:
+      copy_table_name: Name of the table to copy from the loaded dataset to the
+        copy dataset.
+      to_dataset: Name of the dataset to copy the table into.
     """
     raise NotImplementedError
 

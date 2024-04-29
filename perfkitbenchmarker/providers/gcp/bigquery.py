@@ -32,7 +32,7 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
 
-BQ_CLIENT_FILE = 'bq-java-client-2.14.jar'
+BQ_CLIENT_FILE = 'bq-java-client-2.15.jar'
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
 BQ_JDBC_INTERFACES = [
@@ -606,6 +606,16 @@ class Bigquery(edw_service.EdwService):
         cmd.extend(['--set_label', f'{key}:{value}'])
       cmd.append(f'{project_dataset}.{table}')
       vm_util.IssueCommand(cmd)
+
+  def OpenDataset(self, dataset: str):
+    self.client_interface.dataset_id = dataset
+
+  def CopyTable(self, copy_table_name: str, to_dataset: str) -> None:
+    source = f'{self.FormatProjectAndDatasetForCommand()}.{copy_table_name}'
+    dest = f'{self.FormatProjectAndDatasetForCommand(to_dataset)}.{copy_table_name}'
+
+    cmd = ['bq', 'cp', source, dest]
+    vm_util.IssueCommand(cmd)
 
 
 class Endor(Bigquery):
