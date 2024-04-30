@@ -21,18 +21,14 @@ There are two types of diks strategies.
 2. SetUpDiskStrategy - This strategy controls how a disk are set up.
 """
 import copy
-import json
 import logging
-import time
 from typing import Any, Optional, Union
 
 from absl import flags
-from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context as pkb_context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
@@ -117,30 +113,6 @@ class EmptyCreateDiskStrategy(CreateDiskStrategy):
     return True
 
 
-class DisksAreNotVisibleError(Exception):
-  pass
-
-
-class DisksAreNotDetachedError(Exception):
-  pass
-
-
-def GetNonBootDiskCount(vm) -> int:
-  """Returns the number of non boot disks attached to the VM."""
-  stdout, stderr = vm.RemoteCommand('lsblk --json', ignore_failure=True)
-  if not stdout:
-    logging.error(stderr)
-  disks_json = json.loads(stdout)
-  block_devices = disks_json['blockdevices']
-  # This logic won't work for VMs that come with local ssd because
-  # the type is 'disk' for local ssd as well.
-  block_devices_disks = [d for d in block_devices if d['type'] == 'disk']
-  non_boot_disks_attached = (
-      len(block_devices_disks) - 1
-  )  # subtracting boot disk
-  return non_boot_disks_attached
-
-
 class SetUpDiskStrategy:
   """Strategies to set up ram disks."""
 
@@ -151,7 +123,6 @@ class SetUpDiskStrategy:
   ):
     self.vm = vm
     self.disk_spec = disk_spec
-    self.scratch_disks = []
 
   def SetUpDisk(self) -> None:
     if self.vm.OS_TYPE in os_types.LINUX_OS_TYPES:
@@ -170,47 +141,6 @@ class SetUpDiskStrategy:
     raise NotImplementedError(
         f'{self.disk_spec.disk_type} is not supported on linux.'
     )
-
-  def GetTotalDiskCount(self) -> int:
-    total_disks = 0
-    for scratch_disk in self.scratch_disks:
-      if isinstance(scratch_disk, disk.StripedDisk):
-        total_disks += len(scratch_disk.disks)
-      else:
-        total_disks += 1
-    return total_disks
-
-  def CheckDisksVisibility(self):
-    """Checks for all the disks to be visible from the VM.
-
-    Returns:
-      True : if all the disks are visible to the VM
-    """
-    non_boot_disks_attached = GetNonBootDiskCount(self.vm)
-    if non_boot_disks_attached == self.GetTotalDiskCount():
-      return True
-    else:
-      return False
-
-  @vm_util.Retry(
-      poll_interval=1,
-      timeout=200,
-      max_retries=200,
-      retryable_exceptions=(DisksAreNotVisibleError,),
-  )
-  def WaitForDisksToVisibleFromVm(self) -> float:
-    """Waits for the disks to be visible from the Guest.
-
-    Returns:
-      time taken for all the disks to be visible from the Guest.
-
-    Raises:
-      DisksAreNotVisibleError: if the disks are not visible.
-    """
-    self.CheckDisksVisibility()
-    if not self.CheckDisksVisibility():
-      raise DisksAreNotVisibleError('Disks not visible')
-    return time.time()
 
 
 class EmptySetupDiskStrategy(SetUpDiskStrategy):
@@ -291,7 +221,6 @@ class SetUpSMBDiskStrategy(SetUpDiskStrategy):
 
 class PrepareScratchDiskStrategy:
   """Strategies to prepare scratch disks."""
-
   TEMPDB_DISK_LETTER = 'T'
 
   def PrepareScratchDisk(
@@ -522,52 +451,3 @@ class PrepareScratchDiskStrategy:
         )
     )
     vm.RemoteCommand('mkdir {}:\\TEMPDB'.format(self.TEMPDB_DISK_LETTER))
-
-
-class DetachDiskStrategy:
-  """Strategies to detach disks from VM."""
-
-  def __init__(self, vm: Any):
-    self.vm = vm
-
-  def CheckDisksDetach(self):
-    """Checks for all the disks to be detached from the VM.
-
-    Returns:
-      True : if all the disks are detached from the VM
-    """
-    non_boot_disks_attached = GetNonBootDiskCount(self.vm)
-    if non_boot_disks_attached == 0:
-      return True
-    else:
-      return False
-
-  @vm_util.Retry(
-      poll_interval=1,
-      timeout=200,
-      max_retries=200,
-      retryable_exceptions=(DisksAreNotDetachedError,),
-  )
-  def WaitForDisksToDetachFromVm(self) -> float:
-    """Waits for the disks to detach from the Guest.
-
-    Returns:
-      time taken for all the disks to detach from the Guest.
-
-    Raises:
-      DisksAreNotDetachedError: if any disk is visible.
-    """
-    self.CheckDisksDetach()
-    if not self.CheckDisksDetach():
-      raise DisksAreNotDetachedError('Disks not visible')
-    return time.time()
-
-  def DetachDisks(self) -> float:
-    detach_tasks = []
-    for scratch_disk in self.vm.scratch_disks:
-      detach_tasks.append((scratch_disk.Detach, (), {}))
-    detach_tasks.append((self.WaitForDisksToDetachFromVm, (), {}))
-    time_returned = background_tasks.RunParallelThreads(
-        detach_tasks, max_concurrency=200
-    )
-    return time_returned[1]

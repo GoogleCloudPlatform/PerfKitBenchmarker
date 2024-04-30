@@ -17,8 +17,8 @@ This module abstract out the disk algorithm for formatting and creating
 scratch disks.
 """
 
-import time
 from typing import Any
+
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
@@ -51,7 +51,8 @@ class AzureCreateDiskStrategy(disk_strategies.CreateDiskStrategy):
 
 
 class AzureCreateOSDiskStrategy(AzureCreateDiskStrategy):
-  """Strategies to create OS disk."""
+  """Strategies to create OS disk.
+  """
 
   def __init__(
       self,
@@ -80,12 +81,13 @@ class AzureCreateOSDiskStrategy(AzureCreateDiskStrategy):
       disk_type_cmd = ['--storage-sku', f'os={self.disk.disk_type}']
     if self.disk and self.disk.disk_size:
       disk_size_cmd = ['--os-disk-size-gb', str(self.disk.disk_size)]
-    dic['create-disk'] = disk_type_cmd + disk_size_cmd
+    dic['create-disk'] = disk_type_cmd+disk_size_cmd
     return dic
 
 
 class AzureCreateRemoteDiskStrategy(AzureCreateDiskStrategy):
-  """Strategies to create remote disks."""
+  """Strategies to create remote disks.
+  """
 
   def __init__(
       self,
@@ -100,7 +102,11 @@ class AzureCreateRemoteDiskStrategy(AzureCreateDiskStrategy):
     for _, disk_spec in enumerate(self.disk_specs):
       disks = []
       for _ in range(disk_spec.num_striped_disks):
-        disk_number = self.vm.remote_disk_counter + 1 + self.vm.max_local_disks
+        disk_number = (
+            self.vm.remote_disk_counter
+            + 1
+            + self.vm.max_local_disks
+        )
         self.vm.remote_disk_counter += 1
         lun = next(self.vm.lun_counter)
         data_disk = azure_disk.AzureDisk(disk_spec, self.vm, lun)
@@ -160,7 +166,8 @@ class AzureCreateNonResourceDiskStrategy(
 
 
 class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
-  """Strategies to setup local disk."""
+  """Strategies to setup local disk.
+  """
 
   def __init__(
       self,
@@ -171,13 +178,18 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
     self.vm = vm
     self.disk_spec = disk_spec
 
-  def SetUpDisk(self):
+  def SetUpDisk(
+      self
+  ):
     disks = []
 
     for _ in range(self.disk_spec.num_striped_disks):
       disk_number = self.vm.local_disk_counter + 1
       self.vm.local_disk_counter += 1
-      if self.vm.local_disk_counter > self.vm.max_local_disks:
+      if (
+          self.vm.local_disk_counter
+          > self.vm.max_local_disks
+      ):
         raise errors.Error('Not enough local disks.')
       lun = next(self.vm.lun_counter)
       data_disk = azure_disk.AzureDisk(self.disk_spec, self.vm, lun)
@@ -194,7 +206,8 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
 
 class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
-  """Strategies to setup remote disk."""
+  """Strategies to setup remote disk.
+  """
 
   def __init__(
       self,
@@ -220,7 +233,9 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
       if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
         create_tasks.append((scratch_disk.Create, (), {}))
     background_tasks.RunParallelThreads(create_tasks, max_concurrency=200)
-    self.scratch_disks = [scratch_disk for scratch_disk, _ in scratch_disks]
+    self.scratch_disks = [
+        scratch_disk for scratch_disk, _ in scratch_disks
+    ]
     self.AttachDisks()
     for scratch_disk, disk_spec in scratch_disks:
       AzurePrepareScratchDiskStrategy().PrepareScratchDisk(
@@ -228,17 +243,6 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
       )
 
   def AttachDisks(self):
-    attach_tasks = []
-    start_time = time.time()
-    attach_tasks.append((self.AttachAzureDisks, (), {}))
-    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [], {}))
-    return_from_threads = background_tasks.RunParallelThreads(
-        attach_tasks, max_concurrency=200
-    )
-    self.time_to_visible = return_from_threads[1] - start_time
-    return self.time_to_visible
-
-  def AttachAzureDisks(self) -> None:
     for scratch_disk in self.scratch_disks:
       # Not doing parallel attach of azure disks because Azure
       # throws conflict due to concurrent request

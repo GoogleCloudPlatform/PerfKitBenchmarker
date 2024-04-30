@@ -454,7 +454,6 @@ class BaseDisk(resource.BaseResource):
     self.disk_create_time: float = None
     self.disk_attach_time: float = None
     self.disk_detach_time: float = None
-    self.time_to_visibility: float = None
 
   @property
   def mount_options(self):
