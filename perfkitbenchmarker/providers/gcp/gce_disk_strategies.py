@@ -17,6 +17,7 @@ This module abstract out the disk algorithm for formatting and creating
 scratch disks.
 """
 import threading
+import time
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -248,7 +249,7 @@ class SetUpPartitionedGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
           name,
           raw_disk.GetDevicePath(),
           raw_disk.num_partitions,
-          raw_disk.partition_size
+          raw_disk.partition_size,
       )
       for partition_name in partitions:
         scratch_disk = gce_disk.GceLocalDisk(self.disk_spec, partition_name)
@@ -300,6 +301,7 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
     super().__init__(vm, disk_specs[0])
     self.disk_specs = disk_specs
     self.scratch_disks = []
+    self.time_to_visible = None
 
   def SetUpDisk(self):
     # disk spec is not used here.
@@ -331,10 +333,16 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
 
   def AttachDisks(self):
     attach_tasks = []
+    start_time = time.time()
     for scratch_disk in self.scratch_disks:
       if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
         attach_tasks.append((scratch_disk.Attach, [self.vm], {}))
-    background_tasks.RunParallelThreads(attach_tasks, max_concurrency=200)
+    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [], {}))
+    return_from_threads = background_tasks.RunParallelThreads(
+        attach_tasks, max_concurrency=200
+    )
+    self.time_to_visible = return_from_threads[1] - start_time
+    return self.time_to_visible
 
 
 class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):

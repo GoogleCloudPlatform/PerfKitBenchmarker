@@ -24,16 +24,17 @@ refactoring to become cloud-agnostic.
 import time
 from typing import List
 from absl import flags
-from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
+
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'provision_disk'
@@ -116,11 +117,14 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   samples = []
   time_to_create = ParseCreateTimeFromScratchDisks(vm)
   time_to_attach = ParseAttachTimeFromScratchDisks(vm)
+  time_to_visible_after_create = (
+      vm.create_disk_strategy.GetSetupDiskStrategy().time_to_visible
+  )
   disk_metadata = GetDiskMetadata(vm)
   if disk_metadata is None:
     raise ValueError('Disk metadata is None')
   time_to_create_and_attach = time_to_create + time_to_attach
-  detach_time = DetachDisks(vm)
+  detach_time, time_to_detach_from_guest = DetachDisks(vm)
   samples.append(
       sample.Sample(
           'Time to Create and Attach Disks',
@@ -147,19 +151,45 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   )
   samples.append(
       sample.Sample(
+          'Time to Visible from Guest after Create',
+          time_to_visible_after_create,
+          'seconds',
+          disk_metadata,
+      )
+  )
+  samples.append(
+      sample.Sample(
           'Time to Detach Disks',
           detach_time,
           'seconds',
           disk_metadata,
       ),
   )
+  samples.append(
+      sample.Sample(
+          'Time to Detach from Guest',
+          time_to_detach_from_guest,
+          'seconds',
+          disk_metadata,
+      ),
+  )
   time.sleep(60)
-  vm.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()
+  time_to_visible_after_detach = (
+      vm.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()
+  )
   time_to_attach_after_detach = ParseAttachTimeFromScratchDisks(vm)
   samples.append(
       sample.Sample(
           'Time to Attach Disk after detach',
           time_to_attach_after_detach,
+          'seconds',
+          disk_metadata,
+      )
+  )
+  samples.append(
+      sample.Sample(
+          'Time to Visible from Guest after Re-attach',
+          time_to_visible_after_detach,
           'seconds',
           disk_metadata,
       )
@@ -200,19 +230,19 @@ def DetachDisks(vm: linux_virtual_machine.BaseLinuxVirtualMachine):
   Returns:
     time to detach all the disks from the virtual machine.
   """
-  detach_tasks = []
-  for scratch_disk in vm.scratch_disks:
-    detach_tasks.append((scratch_disk.Detach, (), {}))
+  vm_detach_disk_strategy = disk_strategies.DetachDiskStrategy(vm)
+  detach_start_time = time.time()
+  detach_end_time = vm_detach_disk_strategy.DetachDisks()
+  time_to_detach_from_vm = detach_end_time - detach_start_time
   # Parallel Detach won't work for multiple Azure Scratch Disks that are not
   # striped togeter
-  background_tasks.RunParallelThreads(detach_tasks, max_concurrency=200)
   max_time_to_detach = 0
   for scratch_disk in vm.scratch_disks:
     max_time_to_detach = max(
         max_time_to_detach,
         scratch_disk.GetDetachTime(),
     )
-  return max_time_to_detach
+  return max_time_to_detach, time_to_detach_from_vm
 
 
 def Cleanup(_):

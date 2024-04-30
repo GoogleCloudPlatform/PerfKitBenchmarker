@@ -116,6 +116,9 @@ class ScratchDiskTestMixin(object):
     vm = self._CreateVm()
     disk_spec = self.GetDiskSpec(mount_point='/mountpoint')
     vm.SetDiskSpec(disk_spec, 2)
+    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+        return_value=12
+    )
     vm.SetupAllScratchDisks()
     assert len(vm.scratch_disks) == 2, 'Disk not added to scratch disks.'
 

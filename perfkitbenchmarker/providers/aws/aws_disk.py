@@ -396,12 +396,14 @@ class AwsDiskSpec(disk.BaseDiskSpec):
           arguments to construct in order to decode the named option.
     """
     result = super(AwsDiskSpec, cls)._GetOptionDecoderConstructions()
-    result.update({
-        'create_with_vm': (
-            option_decoders.BooleanDecoder,
-            {'default': True},
-        )
-    })
+    result.update(
+        {
+            'create_with_vm': (
+                option_decoders.BooleanDecoder,
+                {'default': True},
+            )
+        }
+    )
     return result
 
 
@@ -612,9 +614,7 @@ class AwsDisk(disk.BaseDisk):
     self.attached_vm_id = vm.id
     self.attached_vm_name = vm.name
 
-    device_name = (
-        self.GenerateDeviceNamePrefix() + self.device_letter
-    )
+    device_name = self.GenerateDeviceNamePrefix() + self.device_letter
     attach_cmd = util.AWS_PREFIX + [
         'ec2',
         'attach-volume',

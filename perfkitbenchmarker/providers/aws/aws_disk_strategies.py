@@ -18,6 +18,7 @@ scratch disks.
 """
 import collections
 import logging
+import time
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -249,7 +250,7 @@ class AWSSetupDiskStrategy(disk_strategies.SetUpDiskStrategy):
       if d.disk_type == disk.NFS:
         continue
       device_name = self.GetDeviceByDiskSpecId(d.disk_spec_id)
-    # pytype: enable=attribute-error
+      # pytype: enable=attribute-error
       d.device_path = self.GetPathByDevice(device_name)
 
   def GetPathByDevice(self, disk_name):
@@ -369,6 +370,7 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
     self.vm = vm
     self.disk_specs = disk_specs
     self.scratch_disks = []
+    self.time_to_visible = None
 
   def SetUpDisk(self):
     create_tasks = []
@@ -384,9 +386,7 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
       scratch_disks.append((scratch_disk, disk_spec))
       if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
         create_tasks.append((scratch_disk.Create, (), {}))
-    self.scratch_disks = [
-        scratch_disk for scratch_disk, _ in scratch_disks
-    ]
+    self.scratch_disks = [scratch_disk for scratch_disk, _ in scratch_disks]
     background_tasks.RunParallelThreads(create_tasks, max_concurrency=200)
     self.AttachDisks()
     for scratch_disk, disk_spec in scratch_disks:
@@ -405,10 +405,16 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
 
   def AttachDisks(self):
     attach_tasks = []
+    start_time = time.time()
     for scratch_disk in self.scratch_disks:
       if not self.vm.create_disk_strategy.DiskCreatedOnVMCreation():
         attach_tasks.append((scratch_disk.Attach, [self.vm], {}))
-    background_tasks.RunParallelThreads(attach_tasks, max_concurrency=200)
+    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [], {}))
+    return_from_threads = background_tasks.RunParallelThreads(
+        attach_tasks, max_concurrency=200
+    )
+    self.time_to_visible = return_from_threads[1] - start_time
+    return self.time_to_visible
 
 
 class AWSPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
