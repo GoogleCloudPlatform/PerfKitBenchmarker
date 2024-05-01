@@ -362,7 +362,7 @@ def Run(benchmark_spec):
     return _RunMultiClient(
         clients,
         target,
-        rate=1000000,  # 1M aggregate requests/sec should max out requests.
+        rate=100000000,  # 100M aggregate requests/sec should max out requests.
         connections=clients[0].NumCpusForBenchmark() * 10,
         duration=60,
         threads=clients[0].NumCpusForBenchmark(),
