@@ -104,6 +104,9 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
     vm.LogDeviceByDiskSpecId('0_0', 'foobar_1')
     vm.LogDeviceByName('foobar_1', 'vol67890', None)
     vm.SetDiskSpec(disk_spec, 1)
+    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+        return_value=12
+    )
     vm.create_disk_strategy.GetSetupDiskStrategy().SetUpDisk()
     # pytype: disable=attribute-error
     self.assertDictContainsSubset(
@@ -150,6 +153,9 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
     azure_disk.AzureDisk.Attach = mock.Mock()
     vm.StripeDisks = mock.Mock()
     vm.SetDiskSpec(disk_spec, 1)
+    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+        return_value=12
+    )
     vm.SetupAllScratchDisks()
     expected = {
         disk.MEDIA: goal_media,

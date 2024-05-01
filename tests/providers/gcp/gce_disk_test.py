@@ -142,6 +142,9 @@ def PatchCriticalObjects(retvals=None):
 
 class GCEDiskTest(pkb_common_test_case.PkbCommonTestCase):
 
+  def GetDiskSpec(self, mount_point):
+    return disk.BaseDiskSpec(_COMPONENT, mount_point=mount_point)
+
   def _MockGcpUtils(self, function_name, return_value=None, side_effect=None):
     return self.enter_context(
         mock.patch.object(
@@ -154,6 +157,7 @@ class GCEDiskTest(pkb_common_test_case.PkbCommonTestCase):
     )
 
   def setUp(self):
+    """ """
     super(GCEDiskTest, self).setUp()
     p = mock.patch(
         gce_virtual_machine.__name__ + '.gce_network.GceNetwork.GetNetwork'
@@ -181,8 +185,12 @@ class GCEDiskTest(pkb_common_test_case.PkbCommonTestCase):
     self.linux_vm.name = 'test_vm'
     self.linux_vm.machine_type = 'n1-standard-4'
     self.linux_vm.GetConnectionIp = mock.MagicMock(return_value='1.1.1.1')
+    disk_spec = self.GetDiskSpec(mount_point='/mountpoint')
+    self.linux_vm.SetDiskSpec(disk_spec, 2)
+    self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+        return_value=12
+    )
     self.mock_cmd = mock.Mock()
-
     self.windows_vm = virtual_machine.GetVmClass(
         'GCP', os_types.WINDOWS2022_DESKTOP
     )(vm_spec)
@@ -238,6 +246,9 @@ class GCEPDDiskTest(GCEDiskTest):
     ]
     with PatchCriticalObjects(fake_rets) as issue_command:
       self.linux_vm.SetDiskSpec(spec, 1)
+      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().AttachDisks = (
+          mock.MagicMock()
+      )
       self.linux_vm.SetupAllScratchDisks()
       expected_commands = [
           ['sudo apt-get update'],
@@ -292,6 +303,9 @@ class GCEPDDiskTest(GCEDiskTest):
     ]
     with PatchCriticalObjects(fake_rets) as issue_command:
       self.linux_vm.SetDiskSpec(spec, 1)
+      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+          return_value=12
+      )
       self.linux_vm.SetupAllScratchDisks()
       expected_commands = [
           [
@@ -424,6 +438,9 @@ class GCEPDDiskTest(GCEDiskTest):
     ]
     with PatchCriticalObjects(fake_rets) as issue_command:
       self.linux_vm.SetDiskSpec(spec, 1)
+      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+          return_value=12
+      )
       self.linux_vm.SetupAllScratchDisks()
       expected_commands = [
           [
@@ -677,6 +694,9 @@ class GCENFSDiskTest(GCEDiskTest):
     ]
 
     with PatchCriticalObjects(fake_rets) as issue_command:
+      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+          return_value=12
+      )
       self.linux_vm.SetupAllScratchDisks()
       expected_commands = [
           ['sudo apt-get update'],
