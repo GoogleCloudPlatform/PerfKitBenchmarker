@@ -232,12 +232,12 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
     start_time = time.time()
     if not self.scratch_disks:
       return
-    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [], {}))
+    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [start_time], {}))
     attach_tasks.append((self.AttachAzureDisks, (), {}))
     return_from_threads = background_tasks.RunParallelThreads(
         attach_tasks, max_concurrency=200
     )
-    self.time_to_visible = return_from_threads[0] - start_time
+    self.time_to_visible = return_from_threads[0]
 
   def AttachAzureDisks(self) -> None:
     for scratch_disk in self.scratch_disks:

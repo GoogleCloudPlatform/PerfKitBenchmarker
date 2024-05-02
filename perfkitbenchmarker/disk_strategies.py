@@ -198,8 +198,11 @@ class SetUpDiskStrategy:
       max_retries=200,
       retryable_exceptions=(DisksAreNotVisibleError,),
   )
-  def WaitForDisksToVisibleFromVm(self) -> float:
+  def WaitForDisksToVisibleFromVm(self, start_time) -> float:
     """Waits for the disks to be visible from the Guest.
+
+    Args:
+      start_time: time when the attach operation started.
 
     Returns:
       time taken for all the disks to be visible from the Guest.
@@ -207,10 +210,13 @@ class SetUpDiskStrategy:
     Raises:
       DisksAreNotVisibleError: if the disks are not visible.
     """
+    # not implemented for Windows
+    if self.vm.OS_TYPE not in os_types.LINUX_OS_TYPES:
+      return -1
     self.CheckDisksVisibility()
     if not self.CheckDisksVisibility():
       raise DisksAreNotVisibleError('Disks not visible')
-    return time.time()
+    return time.time() - start_time
 
 
 class EmptySetupDiskStrategy(SetUpDiskStrategy):

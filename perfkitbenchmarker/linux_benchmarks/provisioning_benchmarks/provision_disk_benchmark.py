@@ -174,8 +174,9 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       ),
   )
   time.sleep(60)
+  vm.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()
   time_to_visible_after_detach = (
-      vm.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()
+      vm.create_disk_strategy.GetSetupDiskStrategy().time_to_visible
   )
   time_to_attach_after_detach = ParseAttachTimeFromScratchDisks(vm)
   samples.append(

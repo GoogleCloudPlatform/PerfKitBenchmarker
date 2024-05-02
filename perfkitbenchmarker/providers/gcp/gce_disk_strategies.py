@@ -339,13 +339,13 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
         or not self.scratch_disks
     ):
       return
-    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [], {}))
+    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [start_time], {}))
     for scratch_disk in self.scratch_disks:
       attach_tasks.append((scratch_disk.Attach, [self.vm], {}))
     return_from_threads = background_tasks.RunParallelThreads(
         attach_tasks, max_concurrency=200
     )
-    self.time_to_visible = return_from_threads[0] - start_time
+    self.time_to_visible = return_from_threads[0]
 
 
 class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
