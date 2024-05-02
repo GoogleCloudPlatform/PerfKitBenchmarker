@@ -75,6 +75,10 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.test_vm = mock.Mock()
     self.test_cmd = self.test_vm.RobustRemoteCommand
     self.test_cmd.return_value = ['', '']
+    # Second test VM with mocked command
+    self.test_vm_2 = mock.Mock()
+    self.test_cmd_2 = self.test_vm_2.RobustRemoteCommand
+    self.test_cmd_2.return_value = ['', '']
 
   @flagsaver.flagsaver
   def testRunCalledWithCorrectTarget(self):
@@ -93,6 +97,33 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('-target 250', self.test_cmd.call_args[0][0])
 
   @flagsaver.flagsaver
+  def testRunCalledWithCorrectTargetMultiVm(self):
+    self.enter_context(
+        mock.patch.object(
+            ycsb_stats, 'CombineResults', return_value=ycsb_stats.YcsbResult()
+        )
+    )
+
+    self.test_executor.Run(
+        [self.test_vm, self.test_vm_2], run_kwargs={'target': 1000}
+    )
+
+    self.assertIn('-target 500', self.test_cmd.call_args[0][0])
+    self.assertIn('-target 500', self.test_cmd_2.call_args[0][0])
+
+  @flagsaver.flagsaver(ycsb_run_parameters=['target=100'])
+  def testRunCalledWithCorrectTargetMultiVmRunParameters(self):
+    self.enter_context(
+        mock.patch.object(
+            ycsb_stats, 'CombineResults', return_value=ycsb_stats.YcsbResult()
+        )
+    )
+
+    self.test_executor.Run([self.test_vm, self.test_vm_2])
+
+    self.assertIn('-target 100', self.test_cmd.call_args[0][0])
+    self.assertIn('-target 100', self.test_cmd_2.call_args[0][0])
+
   def testBurstLoadUnlimitedMultiplier(self):
     # Arrange
     FLAGS.ycsb_burst_load = -1
@@ -252,7 +283,7 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
       ycsb_latency_threshold_mode=True,
       ycsb_latency_threshold_target=80,
       ycsb_latency_threshold_target_min=75,
-      ycsb_latency_threshold_sleep_mins=0
+      ycsb_latency_threshold_sleep_mins=0,
   )
   def testLatencyThresholdMode(self):
     self.enter_context(
