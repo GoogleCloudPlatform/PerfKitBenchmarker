@@ -80,6 +80,11 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.test_cmd_2 = self.test_vm_2.RobustRemoteCommand
     self.test_cmd_2.return_value = ['', '']
 
+  @flagsaver.flagsaver(ycsb_target_qps=500)
+  def testMultipleTargetsRaises(self):
+    with self.assertRaises(errors.Benchmarks.RunError):
+      self.test_executor.Run([self.test_vm], run_kwargs={'target': 1000})
+
   @flagsaver.flagsaver
   def testRunCalledWithCorrectTarget(self):
     # Act
@@ -123,6 +128,38 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertIn('-target 100', self.test_cmd.call_args[0][0])
     self.assertIn('-target 100', self.test_cmd_2.call_args[0][0])
+
+  @flagsaver.flagsaver(ycsb_threads_per_client=['30'])
+  def testThreadCountLessThanOrEqualToTargetThroughput(self):
+    self.test_executor.Run(
+        [self.test_vm], run_kwargs={'target': 10}
+    )
+
+    self.assertSequenceEqual(
+        [mock.call(matchers.HAS('-target 10'))], self.test_cmd.mock_calls
+    )
+    self.assertSequenceEqual(
+        [mock.call(matchers.HAS('-threads 10'))], self.test_cmd.mock_calls
+    )
+
+  def testThreadCountLessThanOrEqualToTargetThroughputMultiVm(self):
+    self.enter_context(
+        mock.patch.object(
+            ycsb_stats, 'CombineResults', return_value=ycsb_stats.YcsbResult()
+        )
+    )
+
+    self.test_executor.Run(
+        [self.test_vm, self.test_vm_2], run_kwargs={'target': 10, 'threads': 20}
+    )
+
+    for command in [self.test_cmd, self.test_cmd_2]:
+      self.assertSequenceEqual(
+          [mock.call(matchers.HAS('-target 5'))], command.mock_calls
+      )
+      self.assertSequenceEqual(
+          [mock.call(matchers.HAS('-threads 5'))], command.mock_calls
+      )
 
   def testBurstLoadUnlimitedMultiplier(self):
     # Arrange

@@ -1191,6 +1191,16 @@ class YCSBExecutor:
               overall_throughput += s.value
           return overall_throughput, run_samples
 
+        if target_qps_per_vm > 0 and parameters.get('target', 0) > 0:
+          raise errors.Benchmarks.RunError(
+              'Target QPS should only be passed in via one of'
+              ' --ycsb_threads_per_client, --ycsb_target_qps, or parameters.'
+          )
+        if 'target' in parameters:
+          target_qps_per_vm = parameters['target'] / len(vms)
+
+        # Consider refactoring so that target_qps_per_vm doesn't need to be
+        # passed in. Target should already be set in parameters.
         target_throughput, run_samples = _DoRunStairCaseLoad(
             client_count, target_qps_per_vm, workload_meta
         )
