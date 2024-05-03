@@ -19,7 +19,6 @@ import json
 import logging
 import os
 import re
-from typing import Dict, List, Text, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -91,7 +90,7 @@ class GenericClientInterface(edw_service.EdwClientInterface):
     self.project_id = project_id
     self.dataset_id = dataset_id
 
-  def GetMetadata(self) -> Dict[str, str]:
+  def GetMetadata(self) -> dict[str, str]:
     """Gets the Metadata attributes for the Client Interface."""
     return {'client': FLAGS.bq_client_interface}
 
@@ -152,7 +151,7 @@ class CliClientInterface(GenericClientInterface):
         )
     )
 
-  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(self, query_name: str) -> tuple[float, dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -183,7 +182,7 @@ class JdbcClientInterface(GenericClientInterface):
   """
 
   def SetProvisionedAttributes(self, benchmark_spec):
-    super(JdbcClientInterface, self).SetProvisionedAttributes(benchmark_spec)
+    super().SetProvisionedAttributes(benchmark_spec)
     self.project_id = re.split(
         r'\.', benchmark_spec.edw_service.cluster_identifier
     )[0]
@@ -222,7 +221,7 @@ class JdbcClientInterface(GenericClientInterface):
         '',
     )
 
-  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(self, query_name: str) -> tuple[float, dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -286,7 +285,7 @@ class JavaClientInterface(GenericClientInterface):
         package_name, [BQ_CLIENT_FILE], ''
     )
 
-  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(self, query_name: str) -> tuple[float, dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -321,7 +320,7 @@ class JavaClientInterface(GenericClientInterface):
     return json.loads(stdout)['query_wall_time_in_secs'], details
 
   def ExecuteSimultaneous(
-      self, submission_interval: int, queries: List[str]
+      self, submission_interval: int, queries: list[str]
   ) -> str:
     """Executes queries simultaneously on client and return performance details.
 
@@ -354,7 +353,7 @@ class JavaClientInterface(GenericClientInterface):
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
-  def ExecuteThroughput(self, concurrency_streams: List[List[str]]) -> str:
+  def ExecuteThroughput(self, concurrency_streams: list[list[str]]) -> str:
     """Executes a throughput test and returns performance details.
 
     Args:
@@ -393,7 +392,7 @@ class Bigquery(edw_service.EdwService):
   SERVICE_TYPE = 'bigquery'
 
   def __init__(self, edw_service_spec):
-    super(Bigquery, self).__init__(edw_service_spec)
+    super().__init__(edw_service_spec)
     project_id = re.split(r'\.', self.cluster_identifier)[0]
     dataset_id = re.split(r'\.', self.cluster_identifier)[1]
     self.client_interface = GetBigQueryClientInterface(project_id, dataset_id)
@@ -422,7 +421,7 @@ class Bigquery(edw_service.EdwService):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for the BigQuery cluster."""
-    basic_data = super(Bigquery, self).GetMetadata()
+    basic_data = super().GetMetadata()
     basic_data.update(self.client_interface.GetMetadata())
     return basic_data
 
@@ -623,19 +622,19 @@ class Endor(Bigquery):
 
   SERVICE_TYPE = 'endor'
 
-  def GetMetadata(self) -> Dict[str, str]:
+  def GetMetadata(self) -> dict[str, str]:
     """Return a dictionary of the metadata for the BigQuery Endor service.
 
     Returns:
       A dictionary set to Endor service details.
     """
-    basic_data = super(Endor, self).GetMetadata()
+    basic_data = super().GetMetadata()
     basic_data['edw_service_type'] = 'endor'
     basic_data.update(self.client_interface.GetMetadata())
     basic_data.update(self.GetDataDetails())
     return basic_data
 
-  def GetDataDetails(self) -> Dict[str, str]:
+  def GetDataDetails(self) -> dict[str, str]:
     """Returns a dictionary with underlying data details.
 
     cluster_identifier = <project_id>.<dataset_id>
@@ -662,13 +661,13 @@ class Endorazure(Endor):
 
   SERVICE_TYPE = 'endorazure'
 
-  def GetMetadata(self) -> Dict[str, str]:
+  def GetMetadata(self) -> dict[str, str]:
     """Return a dictionary of the metadata for the BigQuery Endor Azure service.
 
     Returns:
       A dictionary set to Endor Azure service details.
     """
-    basic_data = super(Endorazure, self).GetMetadata()
+    basic_data = super().GetMetadata()
     basic_data['edw_service_type'] = 'endorazure'
     return basic_data
 
@@ -678,19 +677,19 @@ class Bqfederated(Bigquery):
 
   SERVICE_TYPE = 'bqfederated'
 
-  def GetMetadata(self) -> Dict[str, str]:
+  def GetMetadata(self) -> dict[str, str]:
     """Return a dictionary of the metadata for the BigQuery Federated service.
 
     Returns:
       A dictionary set to Federated service details.
     """
-    basic_data = super(Bqfederated, self).GetMetadata()
+    basic_data = super().GetMetadata()
     basic_data['edw_service_type'] = Bqfederated.SERVICE_TYPE
     basic_data.update(self.client_interface.GetMetadata())
     basic_data.update(self.GetDataDetails())
     return basic_data
 
-  def GetDataDetails(self) -> Dict[str, str]:
+  def GetDataDetails(self) -> dict[str, str]:
     """Returns a dictionary with underlying data details.
 
     cluster_identifier = <project_id>.<dataset_id>
