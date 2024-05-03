@@ -946,6 +946,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       # '409: The resource X already exists'
       if '(gcloud.compute.instances.create) HTTPError 409' in stderr:
         raise errors.Benchmarks.KnownIntermittentError(stderr)
+      # Occurs when creating a large number >30 of VMs in parallel.
+      if 'gcloud crashed (SSLError)' in stderr:
+        raise errors.Resource.RetryableCreationError(stderr)
       raise errors.Resource.CreationError(
           f'Failed to create VM {self.name}:\n{stderr}\nreturn code: {retcode}'
       )

@@ -987,6 +987,18 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           ),
           'expected_error': errors.Benchmarks.KnownIntermittentError,
       },
+      {
+          'testcase_name': 'gcloud_ssl_error',
+          'fake_stderr': (
+              'ERROR: gcloud crashed (SSLError):'
+              " HTTPSConnectionPool(host='compute.googleapis.com', port=443):"
+              ' Max retries exceeded with url:'
+              ' /compute/v1/projects/test-project?alt=json (Caused by'
+              " SSLError(SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING]"
+              " EOF occurred in violation of protocol (_ssl.c:1006)')))"
+          ),
+          'expected_error': errors.Resource.RetryableCreationError,
+      },
   )
   def testCreateVMErrorCases(self, fake_stderr, expected_error):
     fake_rets = [('stdout', fake_stderr, 1)]
