@@ -1765,6 +1765,15 @@ class Ubuntu2310BasedAwsVirtualMachine(
   DEFAULT_ROOT_DISK_TYPE = 'gp3'
 
 
+class Ubuntu2404BasedAwsVirtualMachine(
+    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2404Mixin
+):
+  IMAGE_NAME_FILTER_PATTERN = (
+      'ubuntu/images/*/ubuntu-noble-24.04-{alternate_architecture}-server-20*'
+  )
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
+
+
 class JujuBasedAwsVirtualMachine(
     UbuntuBasedAwsVirtualMachine, linux_virtual_machine.JujuMixin
 ):

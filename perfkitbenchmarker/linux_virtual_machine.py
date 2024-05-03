@@ -2931,15 +2931,21 @@ class AmazonLinux2DLMixin(AmazonLinux2Mixin):
 
 
 class Ubuntu2204Mixin(BaseUbuntuMixin):
-  """Class holding Ubuntu2204 specific VM methods and attributes."""
+  """Class holding Ubuntu 22.04 specific VM methods and attributes."""
 
   OS_TYPE = os_types.UBUNTU2204
 
 
 class Ubuntu2310Mixin(BaseUbuntuMixin):
-  """Class holding Ubuntu2310 specific VM methods and attributes."""
+  """Class holding Ubuntu 23.10 specific VM methods and attributes."""
 
   OS_TYPE = os_types.UBUNTU2310
+
+
+class Ubuntu2404Mixin(BaseUbuntuMixin):
+  """Class holding Ubuntu 24.04 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.UBUNTU2404
 
 
 class Ubuntu1604Cuda9Mixin(Ubuntu1604Mixin):

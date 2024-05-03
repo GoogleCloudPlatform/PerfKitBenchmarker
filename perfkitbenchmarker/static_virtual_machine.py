@@ -393,6 +393,12 @@ class Ubuntu2310BasedStaticVirtualMachine(
   pass
 
 
+class Ubuntu2404BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Ubuntu2404Mixin
+):
+  pass
+
+
 class ClearBasedStaticVirtualMachine(
     StaticVirtualMachine, linux_virtual_machine.ClearMixin
 ):

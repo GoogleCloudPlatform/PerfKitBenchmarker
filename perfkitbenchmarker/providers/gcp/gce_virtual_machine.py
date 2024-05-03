@@ -1782,6 +1782,13 @@ class Ubuntu2310BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
+class Ubuntu2404BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2404Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2404-lts-amd64'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
+
 def GenerateDownloadPreprovisionedDataCommand(
     install_path: str, module_name: str, filename: str
 ) -> str:

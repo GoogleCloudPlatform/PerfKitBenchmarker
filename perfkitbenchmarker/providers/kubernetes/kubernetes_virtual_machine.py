@@ -738,9 +738,17 @@ class Ubuntu2204BasedKubernetesVirtualMachine(
     # RecordAdditionalMetadata.
     super()._InstallPrepareVmEnvironmentDependencies()
     # util-linux budled in the image no longer depends on fdisk.
-    # Ubuntu 22 VMs get fdisk from ubuntu-server (which maybe we should
+    # Ubuntu 22+ VMs get fdisk from ubuntu-server (which maybe we should
     # install here?).
     self.InstallPackages('fdisk')
+
+
+class Ubuntu2404BasedKubernetesVirtualMachine(
+    # Pick up fdisk fix.
+    Ubuntu2204BasedKubernetesVirtualMachine,
+    linux_virtual_machine.Ubuntu2404Mixin,
+):
+  DEFAULT_IMAGE = 'ubuntu:24.04'
 
 
 class Ubuntu2004BasedKubernetesVirtualMachine(
