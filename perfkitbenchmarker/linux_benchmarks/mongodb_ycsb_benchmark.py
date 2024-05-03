@@ -55,7 +55,7 @@ mongodb_ycsb:
       disk_spec:
         GCP:
           disk_size: 500
-          disk_type: pd-ssd
+          disk_type: pd-balanced
           mount_point: /scratch
         AWS:
           disk_size: 500
@@ -71,7 +71,7 @@ mongodb_ycsb:
       disk_spec:
         GCP:
           disk_size: 500
-          disk_type: pd-ssd
+          disk_type: pd-balanced
           mount_point: /scratch
         AWS:
           disk_size: 500
