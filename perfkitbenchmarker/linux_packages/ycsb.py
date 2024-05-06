@@ -1743,6 +1743,11 @@ class YCSBExecutor:
           )
           time.sleep(_LATENCY_THRESHOLD_SLEEP_MINS.value * 60)
 
+      raise RetriableLatencySearchBoundsError(
+          'Unable to find the requested latency - try modifying the min and'
+          ' target latency.'
+      )
+
     return _RunLatencyThresholdModeSingleWorkload()
 
   def LoadAndRun(self, vms, workloads=None, load_kwargs=None, run_kwargs=None):
