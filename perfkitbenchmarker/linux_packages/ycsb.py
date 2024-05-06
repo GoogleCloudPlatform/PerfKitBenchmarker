@@ -1197,7 +1197,7 @@ class YCSBExecutor:
               ' --ycsb_threads_per_client, --ycsb_target_qps, or parameters.'
           )
         if 'target' in parameters:
-          target_qps_per_vm = parameters['target'] / len(vms)
+          target_qps_per_vm = int(parameters['target'] / len(vms))
 
         # Consider refactoring so that target_qps_per_vm doesn't need to be
         # passed in. Target should already be set in parameters.
