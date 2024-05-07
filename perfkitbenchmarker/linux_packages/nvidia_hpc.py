@@ -3,6 +3,8 @@
 https://catalog.ngc.nvidia.com/orgs/nvidia/containers/hpc-benchmarks
 """
 
+from perfkitbenchmarker.linux_packages import docker
+
 
 def Install(vm):
   vm.Install('build_tools')
@@ -10,3 +12,4 @@ def Install(vm):
   vm.Install('nvidia_driver')
   vm.Install('slurm')
   vm.Install('cuda_toolkit')
+  docker.AddUser(vm)

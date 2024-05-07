@@ -1,6 +1,7 @@
 """Module containing slurm installation and cleanup function."""
 
 import os
+import re
 from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import vm_util
@@ -37,22 +38,25 @@ def AptInstall(vm):
       'v3.4.1/enroot+caps_3.4.1-1_${arch}.deb; '
       'sudo apt-get update ; sudo apt-get install --assume-yes ./*.deb')
   vm.RemoteCommand('sudo mkdir /run/enroot; sudo chmod 755 /run/enroot')
+  enroot_path = os.path.join(vm.GetScratchDir(), '${UID}/enroot/')
   vm.RemoteCommand(
-      'echo "ENROOT_RUNTIME_PATH    /mnt/localssd/${UID}/enroot/runtime" | '
-      'sudo tee -a /etc/enroot/enroot.conf')
+      f'echo "ENROOT_RUNTIME_PATH    {enroot_path}/runtime" | '
+      'sudo tee -a /etc/enroot/enroot.conf'
+  )
   vm.RemoteCommand(
-      'echo "ENROOT_CACHE_PATH    /mnt/localssd/${UID}/enroot/cache" | '
-      'sudo tee -a /etc/enroot/enroot.conf')
+      f'echo "ENROOT_CACHE_PATH    {enroot_path}/cache" | '
+      'sudo tee -a /etc/enroot/enroot.conf'
+  )
   vm.RemoteCommand(
-      'echo "ENROOT_DATA_PATH    /mnt/localssd/${UID}/enroot/data" | '
-      'sudo tee -a /etc/enroot/enroot.conf')
+      f'echo "ENROOT_DATA_PATH    {enroot_path}/data" | '
+      'sudo tee -a /etc/enroot/enroot.conf'
+  )
   # Install pyxis
   vm.RemoteCommand(
       f'cd {linux_packages.INSTALL_DIR};'
-      'git clone --depth 1 https://github.com/NVIDIA/pyxis.git; '
-      'cd pyxis && sudo make install && '
-      'echo "required /usr/local/lib/slurm/spank_pyxis.so" | '
-      'sudo tee -a /etc/slurm/plugstack.conf')
+      'git clone --depth 1 https://github.com/NVIDIA/pyxis.git && '
+      'cd pyxis && sudo make install'
+  )
 
 
 def ConfigureSlurm(vms):
@@ -64,15 +68,27 @@ def ConfigureSlurm(vms):
   slurm_cfg = os.path.join(SLURM_CONF_DIR, 'slurm.conf')
   for vm in workers:
     lscpu = vm.CheckLsCpu()
-    vm.RenderTemplate(cfg_path, tmp_slurm_cfg, {
-        'controller': controller.hostname,
-        'workers': ','.join(worker.hostname for worker in workers),
-        'cpus': vm.num_cpus,
-        'user': vm.user_name,
-        'sockets': lscpu.socket_count,
-        'cores_per_socket': lscpu.cores_per_socket,
-        'threads_per_core': lscpu.threads_per_core
-    })
+    vm.RemoteCommand(
+        'echo "required /usr/local/lib/slurm/spank_pyxis.so '
+        'container_scope=global" | '
+        'sudo tee /etc/slurm/plugstack.conf'
+    )
+    vm.RemoteCommand(
+        f'mkdir -p {linux_packages.INSTALL_DIR}/slurmd', ignore_failure=True
+    )
+    vm.RenderTemplate(
+        cfg_path,
+        tmp_slurm_cfg,
+        {
+            'controller': controller.hostname,
+            'workers': ','.join(worker.hostname for worker in vms[1:]),
+            'cpus': vm.num_cpus,
+            'user': vm.user_name,
+            'sockets': lscpu.socket_count,
+            'cores_per_socket': lscpu.cores_per_socket,
+            'threads_per_core': lscpu.threads_per_core,
+        },
+    )
     cgroup_path = data.ResourcePath('cgroup.conf')
     vm.PushFile(cgroup_path, linux_packages.INSTALL_DIR)
     tmp_cgroup_cfg = os.path.join(linux_packages.INSTALL_DIR, 'cgroup.conf')
@@ -106,3 +122,42 @@ def ConfigureSlurm(vms):
     vm.RemoteCommand('sudo pkill munged', ignore_failure=True)
     vm.RemoteCommand('sudo mkdir /run/munge', ignore_failure=True)
     vm.RemoteCommand('sudo munged --force')
+
+
+def Running(vm):
+  """Check if any slurm job is running."""
+  output, _ = vm.RemoteCommand('sinfo')
+  for line in output.splitlines():
+    if not line:
+      continue
+    status = line.split()[4]
+    if status in ('alloc', 'mix'):
+      return True
+  return False
+
+
+# TODO(yuyanting) Figure out how to set slurm node priority, so the output
+# always land on node0.
+def GetController(vms):
+  """Return the controller vm.
+
+  e.g.
+  ip-10-0-0-[28,175], return vm with hostname ip-10-0-0-28
+  pkb-46b6c6e7-[0-1], return vm with hostname pkb-46b6c6e7-0
+  Args:
+    vms: List of virtual machine objects.
+
+  Returns:
+    VirtualMachine object representing controller vm.
+
+  Raises:
+    RuntimeError: if cannot find the controller vm.
+  """
+  output, _ = vms[0].RemoteCommand('sinfo')
+  node_list = output.strip().split()[-1]
+  prefix = node_list.split('[')[0]
+  suffix = re.split(',|-', node_list.split('[')[1])[0]
+  for vm in vms:
+    if vm.hostname == prefix + suffix:
+      return vm
+  raise RuntimeError(f'Not able to find controller vm in {output}')

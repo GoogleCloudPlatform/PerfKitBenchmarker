@@ -2923,6 +2923,20 @@ class Ubuntu2004DLMixin(Ubuntu2004Mixin):
 
   OS_TYPE = os_types.UBUNTU2004_DL
 
+  def OnStartup(self):
+    super().OnStartup()
+    self.RemoteCommand('sudo chmod -R 755 /var/lib/nvidia')
+    self.RemoteCommand('sudo chown $USER:$USER /var/lib/nvidia')
+    self.RemoteCommand('mkdir -p /var/lib/nvidia/lib64')
+
+  def UpdateDockerfile(self, unused_dockerfile):
+    """Add provider specific instructions to a docker file.
+
+    Args:
+      unused_dockerfile: Path to dockerfile on remote VMs.
+    """
+    pass
+
 
 class AmazonLinux2DLMixin(AmazonLinux2Mixin):
   """Class holding DLAMI specific VM methods and attributes."""

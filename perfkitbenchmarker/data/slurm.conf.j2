@@ -46,5 +46,8 @@ SlurmdLogFile=/opt/pkb/slurmd.log
 #
 #
 # COMPUTE NODES
-NodeName={{ workers }} CPUs={{ cpus }} Sockets={{ sockets }} CoresPerSocket={{ cores_per_socket }} ThreadsPerCore={{ threads_per_core }} State=UNKNOWN
+NodeName={{ controller }} CPUs={{ cpus }} Sockets={{ sockets }} CoresPerSocket={{ cores_per_socket }} ThreadsPerCore={{ threads_per_core }} State=UNKNOWN Weight=1
+{% if workers | length > 0 %}
+NodeName={{ workers }} CPUs={{ cpus }} Sockets={{ sockets }} CoresPerSocket={{ cores_per_socket }} ThreadsPerCore={{ threads_per_core }} State=UNKNOWN Weight=10
+{% endif %}
 PartitionName=pkb Nodes=ALL Default=YES MaxTime=INFINITE State=UP

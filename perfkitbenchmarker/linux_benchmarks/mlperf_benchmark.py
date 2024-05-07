@@ -66,11 +66,12 @@ SSD = 'ssd'
 MINIGO = 'minigo'
 BERT = 'bert'
 DLRM = 'dlrm'
+GPT3 = 'gpt3'
 
 flags.DEFINE_enum(
     'mlperf_benchmark',
     RESNET,
-    [RESNET, TRANSFORMER, MASK, GNMT, SSD, MINIGO, BERT, DLRM],
+    [RESNET, TRANSFORMER, MASK, GNMT, SSD, MINIGO, BERT, DLRM, GPT3],
     'MLPerf benchmark test to run.',
 )
 
@@ -148,7 +149,7 @@ HYPERTHREADS = flags.DEFINE_bool(
 VERSION = flags.DEFINE_enum(
     'mlperf_training_version',
     'v2.0',
-    ['v1.0', 'v1.1', 'v2.0'],
+    ['v1.0', 'v1.1', 'v2.0', 'v3.1'],
     'MLPerf training version to run.',
 )
 
@@ -204,6 +205,9 @@ def _DownloadData(data_dir, data_path, vm):
           data_path=data_path,
       )
   )
+
+
+DownloadData = _DownloadData
 
 
 def PrepareBenchmark(benchmark_spec, vm=None):

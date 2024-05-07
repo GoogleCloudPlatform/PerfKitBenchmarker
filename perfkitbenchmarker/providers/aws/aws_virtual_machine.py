@@ -1698,7 +1698,9 @@ class Ubuntu2004DeepLearningAMIBasedAWSVirtualMachine(
   """
   IMAGE_OWNER = UBUNTU_EFA_IMAGE_PROJECT
   DEFAULT_ROOT_DISK_TYPE = 'gp3'
-  IMAGE_NAME_FILTER_PATTERN = 'Deep Learning Base GPU AMI (Ubuntu 20.04) *'
+  IMAGE_NAME_FILTER_PATTERN = (
+      'Deep Learning Base OSS Nvidia Driver GPU AMI (Ubuntu 20.04) *'
+  )
 
   def __init__(self, vm_spec):
     """Initialize a AmazonLinux2 Base DLAMI virtual machine.
@@ -1721,6 +1723,29 @@ class Ubuntu2004DeepLearningAMIBasedAWSVirtualMachine(
     self.RemoteCommand('sudo umount /opt/dlami/nvme', ignore_failure=True)
     self.RemoteCommand('sudo vgremove vg.01 -y', ignore_failure=True)
     super().SetupAllScratchDisks()
+
+  def UpdateDockerfile(self, dockerfile):
+    """Add provider specific instructions to a docker file."""
+    installation_script = r"""RUN curl -O https://efa-installer.amazonaws.com/aws-efa-installer-1.31.0.tar.gz
+RUN tar -xf aws-efa-installer-1.31.0.tar.gz && cd aws-efa-installer && ./efa_installer.sh --mpi=openmpi4 -y -g -d --skip-kmod --skip-limit-conf --no-verify
+RUN apt-get install libhwloc-dev -y
+RUN wget https://github.com/aws/aws-ofi-nccl/releases/download/v1.8.1-aws/aws-ofi-nccl-1.8.1-aws.tar.gz
+RUN export PATH=/opt/amazon/openmpi/bin/:\$PATH
+RUN tar -xf aws-ofi-nccl-1.8.1-aws.tar.gz && cd aws-ofi-nccl-1.8.1-aws && ./configure --prefix=/opt/aws-ofi-nccl --with-mpi=/opt/amazon/openmpi --with-libfabric=/opt/amazon/efa --with-cuda=/usr/local/cuda --enable-platform-aws && make && make install
+ENV LD_LIBRARY_PATH=/opt/aws-ofi-nccl/lib:/opt/amazon/efa:\$LD_LIBRARY_PATH
+"""
+    for line in installation_script.splitlines():
+      self.RemoteCommand(f'echo "{line}" >> {dockerfile}')
+
+  def OnStartup(self):
+    super().OnStartup()
+    self.InstallPackages('s3ql')
+    # This only works for x86
+    self.RemoteCommand(
+        'wget https://s3.amazonaws.com/mountpoint-s3-release/latest/'
+        'x86_64/mount-s3.deb'
+    )
+    self.RemoteCommand('sudo apt-get install ./mount-s3.deb')
 
 
 class AmazonLinux2EfaBasedAwsVirtualMachine(
