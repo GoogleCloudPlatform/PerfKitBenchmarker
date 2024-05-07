@@ -535,10 +535,10 @@ def _GetVersionFromUrl(url):
   return _GetVersion(match.group(0).strip('ycsb-'))
 
 
-def _GetThreadsQpsPerLoaderList(num_vms):
+def _GetThreadsQpsPerLoaderList(num_vms: int) -> list[list[int]]:
   """Returns the list of [client, qps] per VM to use in staircase load."""
 
-  def _FormatThreadQps(thread_qps):
+  def _FormatThreadQps(thread_qps: str) -> list[int]:
     thread_qps_pair = thread_qps.split(':')
     if len(thread_qps_pair) == 1:
       target = int(_TARGET_QPS.value / num_vms) if _TARGET_QPS.value else 0
@@ -1112,7 +1112,10 @@ class YCSBExecutor:
             max_retries=5,
         )
         def _DoRunStairCaseLoad(
-            client_count, target_qps_per_vm, workload_meta, is_sustained=False
+            client_count: int,
+            target_qps_per_vm: int,
+            workload_meta: Mapping[str, Any],
+            is_sustained: bool = False,
         ):
           parameters['threads'] = client_count
           if target_qps_per_vm:
