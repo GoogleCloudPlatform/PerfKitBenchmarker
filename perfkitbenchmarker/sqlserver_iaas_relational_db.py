@@ -323,7 +323,6 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
 
     ip_address = self.CreateIpReservation()
     perf_domain = "perf" + FLAGS.run_uri[:6]
-    print(self.spec.cloud)
 
     # Install and configure AD components.
     self.PushAndRunPowershellScript(
@@ -475,15 +474,17 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     replica_vms = self.replica_vms
 
     perf_domain = "perf" + FLAGS.run_uri[:6]
-    print(perf_domain)
     win_password = vm_util.GenerateRandomWindowsPassword(
         vm_util.PASSWORD_LENGTH, "*!@#%^+=")
 
     # Install and configure AD components.
     self.PushAndRunPowershellScript(
         controller_vm, "setup_domain_controller.ps1",
-        [win_password, perf_domain])
+        [win_password, perf_domain, self.spec.cloud])
     controller_vm.Reboot()
+    self.PushAndRunPowershellScript(
+        controller_vm, "add_user_to_domain_groups.ps1",
+        [win_password, perf_domain])
 
     self.PushAndRunPowershellScript(
         server_vm, "set_dns_join_domain.ps1",
@@ -564,12 +565,12 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     # Change log on for MSSQLSERVICE to perflab\adminuser
     # Default PowerShell version doesn't have Set-Service -Credential option
     server_vm.RemoteCommand(
-        'sc.exe config MSSQLSERVER obj= "perflab\\adminuser" password='
-        f' "{win_password}" type= own'
+        'sc.exe config MSSQLSERVER obj= "{0}\\pkbadminuser" password='
+        f' "{win_password}" type= own'.format(perf_domain)
     )
     replica_vms[0].RemoteCommand(
-        'sc.exe config MSSQLSERVER obj= "perflab\\adminuser" password='
-        f' "{win_password}" type= own'
+        'sc.exe config MSSQLSERVER obj= "{0}\\pkbadminuser" password='
+        f' "{win_password}" type= own'.format(perf_domain)
     )
 
     # create AOAG
@@ -591,12 +592,12 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         END
         GO
 
-        CREATE LOGIN [perflab\\adminuser] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        CREATE LOGIN [{0}\\pkbadminuser] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
         GO
-        ALTER SERVER ROLE [sysadmin] ADD MEMBER [perflab\\adminuser]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [{0}\\pkbadminuser]
         GO
 
-        GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [perflab\\adminuser]
+        GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [{0}\\pkbadminuser]
         GO
 
         IF EXISTS(SELECT * FROM sys.server_event_sessions WHERE name='AlwaysOn_health')
@@ -608,7 +609,8 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
             ALTER EVENT SESSION [AlwaysOn_health] ON SERVER STATE=START;
         END
         GO\"
-        """)
+        """.format(perf_domain)
+        )
 
     replica_vms[0].RemoteCommand(
         """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
@@ -629,12 +631,12 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         END
         GO
 
-        CREATE LOGIN [perflab\\adminuser] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
+        CREATE LOGIN [{0}\\pkbadminuser] FROM WINDOWS WITH DEFAULT_DATABASE=[master]
         GO
-        ALTER SERVER ROLE [sysadmin] ADD MEMBER [perflab\\adminuser]
+        ALTER SERVER ROLE [sysadmin] ADD MEMBER [{0}\\pkbadminuser]
         GO
 
-        GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [perflab\\adminuser]
+        GRANT CONNECT ON ENDPOINT::[Hadr_endpoint] TO [{0}\\pkbadminuser]
         GO
 
         IF EXISTS(SELECT * FROM sys.server_event_sessions WHERE name='AlwaysOn_health')
@@ -646,7 +648,8 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
             ALTER EVENT SESSION [AlwaysOn_health] ON SERVER STATE=START;
         END
         GO\"
-        """)
+        """.format(perf_domain)
+        )
 
     server_vm.RemoteCommand(
         """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
@@ -660,13 +663,14 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         REQUIRED_SYNCHRONIZED_SECONDARIES_TO_COMMIT = 0)
         FOR DATABASE [{2}]
 
-        REPLICA ON N'{0}' WITH (ENDPOINT_URL = N'TCP://{0}.perflab.local:5022', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SEEDING_MODE = AUTOMATIC, SECONDARY_ROLE(ALLOW_CONNECTIONS = NO)),
-            N'{1}' WITH (ENDPOINT_URL = N'TCP://{1}.perflab.local:5022', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SEEDING_MODE = AUTOMATIC, SECONDARY_ROLE(ALLOW_CONNECTIONS = NO));
+        REPLICA ON N'{0}' WITH (ENDPOINT_URL = N'TCP://{0}.{4}.local:5022', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SEEDING_MODE = AUTOMATIC, SECONDARY_ROLE(ALLOW_CONNECTIONS = NO)),
+            N'{1}' WITH (ENDPOINT_URL = N'TCP://{1}.{4}.local:5022', FAILOVER_MODE = AUTOMATIC, AVAILABILITY_MODE = SYNCHRONOUS_COMMIT, BACKUP_PRIORITY = 50, SEEDING_MODE = AUTOMATIC, SECONDARY_ROLE(ALLOW_CONNECTIONS = NO));
         GO\"
         """.format(self.server_vm.name,
                    self.replica_vms[0].name,
                    sql_engine_utils.SQLSERVER_AOAG_DB_NAME,
-                   sql_engine_utils.SQLSERVER_AOAG_NAME))
+                   sql_engine_utils.SQLSERVER_AOAG_NAME,
+                   perf_domain))
 
     replica_vms[0].RemoteCommand(
         """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
@@ -696,7 +700,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
 
     # Update variables user for connection to SQL server.
     self.spec.database_password = win_password
-    self.spec.endpoint = "fcidnn.perflab.local"
+    self.spec.endpoint = "fcidnn.{0}.local".format(perf_domain)
     self.port = 1533
 
   def PushAndRunPowershellScript(
