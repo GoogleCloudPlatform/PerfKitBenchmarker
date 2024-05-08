@@ -1215,7 +1215,7 @@ class YCSBExecutor:
         while FLAGS.ycsb_dynamic_load:
           actual_throughput, run_samples = _DoRunStairCaseLoad(
               client_count,
-              target_throughput // len(vms),
+              int(target_throughput // len(vms)),
               workload_meta,
               is_sustained,
           )
