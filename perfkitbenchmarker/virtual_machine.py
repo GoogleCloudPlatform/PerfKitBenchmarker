@@ -155,6 +155,11 @@ _REQUIRED_CPU_VERSION = flags.DEFINE_string(
     ' This is only useful when a machine type comprises of multiple CPU'
     ' versions.',
 )
+_REQUIRED_CPU_VERSION_RETRIES = flags.DEFINE_integer(
+    'required_cpu_version_retries',
+    5,
+    'The number of times to retry if the required CPU version does not match.',
+)
 
 
 @enum.unique
@@ -1417,32 +1422,40 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
       )
     return self.scratch_disks[disk_num].mount_point
 
-  def CreateAndBootOnce(self):
-    """Creates a single VM and waits for boot to complete."""
-    self.Create()
-    logging.info('VM: %s (%s)', self.ip_address, self.internal_ip)
-    logging.info('Waiting for boot completion.')
-    self.AllowRemoteAccessPorts()
-    self.WaitForBootCompletion()
-
-  @vm_util.Retry(
-      max_retries=3,
-      retryable_exceptions=(errors.Resource.RetryableCreationError,),
-  )
   def CreateAndBoot(self):
-    """Runs CreateAndBootOnce repeatedly to get --required_cpu_version."""
-    self.CreateAndBootOnce()
-    self.cpu_version = self.GetCPUVersion()
-    if (
-        _REQUIRED_CPU_VERSION.value
-        and _REQUIRED_CPU_VERSION.value != self.cpu_version
-    ):
-      self.Delete()
-      raise errors.Resource.RetryableCreationError(
-          f'Guest arch {self.cpu_version} is not enforced guest arch'
-          f' {_REQUIRED_CPU_VERSION.value}. Deleting VM and scratch disk and'
-          ' recreating.',
-      )
+    """Creates a single VM and waits for boot to complete.
+
+    This is done repeatedly to get --required_cpu_version if it is set.
+    """
+
+    def CreateAndBootOnce():
+      self.Create()
+      logging.info('VM: %s (%s)', self.ip_address, self.internal_ip)
+      logging.info('Waiting for boot completion.')
+      self.AllowRemoteAccessPorts()
+      self.WaitForBootCompletion()
+      self.cpu_version = self.GetCPUVersion()
+      if (
+          _REQUIRED_CPU_VERSION.value
+          and _REQUIRED_CPU_VERSION.value != self.cpu_version
+      ):
+        self.Delete()
+        raise errors.Resource.RetryableCreationError(
+            f'Guest arch {self.cpu_version} is not enforced guest arch'
+            f' {_REQUIRED_CPU_VERSION.value}. Deleting VM and scratch disk and'
+            ' recreating.',
+        )
+
+    try:
+      vm_util.Retry(
+          max_retries=_REQUIRED_CPU_VERSION_RETRIES.value,
+          retryable_exceptions=errors.Resource.RetryableCreationError,
+      )(CreateAndBootOnce)()
+    except vm_util.RetriesExceededRetryError as exc:
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+          f'{_REQUIRED_CPU_VERSION.value} was not obtained after'
+          f' {_REQUIRED_CPU_VERSION_RETRIES.value} retries.'
+      ) from exc
 
   def PrepareAfterBoot(self):
     """Prepares a VM after it has booted.
