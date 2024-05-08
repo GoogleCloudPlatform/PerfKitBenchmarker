@@ -128,6 +128,36 @@ class MysqlIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         if stderr:
           raise RuntimeError('Invalid MySQL flags: %s' % stderr)
 
+  def _InstallMySQL(self):
+    if (
+        self.spec.engine_version == '5.6'
+        or self.spec.engine_version.startswith('5.6.')
+    ):
+      self.mysql_name = 'mysql56'
+    elif (
+        self.spec.engine_version == '5.7'
+        or self.spec.engine_version.startswith('5.7.')
+    ):
+      self.mysql_name = 'mysql57'
+    elif (
+        self.spec.engine_version == '8.0'
+        or self.spec.engine_version.startswith('8.0.')
+    ):
+      self.mysql_name = 'mysql80'
+    else:
+      raise NotImplementedError(
+          'Invalid database engine version: %s. Only 5.6 and 5.7 '
+          'and 8.0 are supported.'
+          % self.spec.engine_version
+      )
+    self.server_vm.Install(self.mysql_name)
+    self.server_vm.RemoteCommand(
+        'chmod 755 %s' % self.server_vm.GetScratchDir()
+    )
+    self.server_vm.RemoteCommand(
+        'sudo service %s stop' % self.server_vm.GetServiceName(self.mysql_name)
+    )
+
   def _SetupLinuxUnmanagedDatabase(self):
     """Installs MySQL Server on the server vm.
 
@@ -139,35 +169,8 @@ class MysqlIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         shouldn't happen.
     """
     super()._SetupLinuxUnmanagedDatabase()
-    if (
-        self.spec.engine_version == '5.6'
-        or self.spec.engine_version.startswith('5.6.')
-    ):
-      mysql_name = 'mysql56'
-    elif (
-        self.spec.engine_version == '5.7'
-        or self.spec.engine_version.startswith('5.7.')
-    ):
-      mysql_name = 'mysql57'
-    elif (
-        self.spec.engine_version == '8.0'
-        or self.spec.engine_version.startswith('8.0.')
-    ):
-      mysql_name = 'mysql80'
-    else:
-      raise NotImplementedError(
-          'Invalid database engine version: %s. Only 5.6 and 5.7 '
-          'and 8.0 are supported.'
-          % self.spec.engine_version
-      )
-    self.server_vm.Install(mysql_name)
-    self.server_vm.RemoteCommand(
-        'chmod 755 %s' % self.server_vm.GetScratchDir()
-    )
-    self.server_vm.RemoteCommand(
-        'sudo service %s stop' % self.server_vm.GetServiceName(mysql_name)
-    )
-    self._PrepareDataDirectories(mysql_name)
+    self._InstallMySQL()
+    self._PrepareDataDirectories(self.mysql_name)
 
     # Minimal MySQL tuning; see AWS whitepaper in docstring.
     innodb_buffer_pool_gb = self.innodb_buffer_pool_size
@@ -179,14 +182,14 @@ class MysqlIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         'innodb_flush_neighbors = 0\n'
         f'innodb_log_file_size = {innodb_log_file_mb}M'
         '" | sudo tee -a %s'
-        % self.server_vm.GetPathToConfig(mysql_name)
+        % self.server_vm.GetPathToConfig(self.mysql_name)
     )
 
     if self.mysql_bin_log:
       bin_log_path = self.server_vm.GetScratchDir() + '/mysql/mysql-bin.log'
       self.server_vm.RemoteCommand(
           'echo "\nserver-id  = 1\nlog_bin = %s\n" | sudo tee -a %s'
-          % (bin_log_path, self.server_vm.GetPathToConfig(mysql_name))
+          % (bin_log_path, self.server_vm.GetPathToConfig(self.mysql_name))
       )
 
     # These (and max_connections after restarting) help avoid losing connection.
@@ -195,33 +198,35 @@ class MysqlIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         'connect_timeout        = 86400\n'
         'wait_timeout        = 86400\n'
         'interactive_timeout        = 86400" | sudo tee -a %s'
-        % self.server_vm.GetPathToConfig(mysql_name)
+        % self.server_vm.GetPathToConfig(self.mysql_name)
     )
     self.server_vm.RemoteCommand(
         'sudo sed -i "s/^bind-address/#bind-address/g" %s'
-        % self.server_vm.GetPathToConfig(mysql_name)
+        % self.server_vm.GetPathToConfig(self.mysql_name)
     )
     self.server_vm.RemoteCommand(
         'sudo sed -i "s/^mysqlx-bind-address/#mysqlx-bind-address/g" %s'
-        % self.server_vm.GetPathToConfig(mysql_name)
+        % self.server_vm.GetPathToConfig(self.mysql_name)
     )
     self.server_vm.RemoteCommand(
         'sudo sed -i '
         '"s/max_allowed_packet\t= 16M/max_allowed_packet\t= 1024M/g" %s'
-        % self.server_vm.GetPathToConfig(mysql_name)
+        % self.server_vm.GetPathToConfig(self.mysql_name)
     )
 
     # Configure logging (/var/log/mysql/error.log will print upon db deletion).
-    self.server_vm.RemoteCommand(
-        'echo "\nlog_error_verbosity        = 3" | sudo tee -a %s'
-        % self.server_vm.GetPathToConfig(mysql_name)
-    )
+    if self.mysql_name != 'mariadb':
+      self.server_vm.RemoteCommand(
+          'echo "\nlog_error_verbosity        = 3" | sudo tee -a %s'
+          % self.server_vm.GetPathToConfig(self.mysql_name)
+      )
     # Restart.
     self.server_vm.RemoteCommand(
-        'sudo service %s restart' % self.server_vm.GetServiceName(mysql_name)
+        'sudo service %s restart'
+        % self.server_vm.GetServiceName(self.mysql_name)
     )
     self.server_vm.RemoteCommand(
-        'sudo cat %s' % self.server_vm.GetPathToConfig(mysql_name)
+        'sudo cat %s' % self.server_vm.GetPathToConfig(self.mysql_name)
     )
 
     self.server_vm_query_tools.IssueSqlCommand(
@@ -348,6 +353,36 @@ def _TuneForSQL(vm):
   vm.RemoteCommand('sudo chmod +x /usr/lib/tuned/mssql/tuned.conf')
   vm.RemoteCommand('sudo tuned-adm profile mssql')
   vm.RemoteCommand('sudo tuned-adm list')
+
+
+class MariaDbIAASRelationalDB(MysqlIAASRelationalDb):
+  """Object representing MariaDB."""
+
+  ENGINE = sql_engine_utils.MARIADB
+
+  def _InstallMySQL(self):
+    """MariaDB is a variant of MySQL."""
+    self.server_vm.Install('mariadb')
+    self.mysql_name = 'mariadb'
+    self.innodb_buffer_pool_size = FLAGS.innodb_buffer_pool_size
+    self.mysql_bin_log = FLAGS.mysql_bin_log
+    self.innodb_log_file_size = FLAGS.innodb_log_file_size
+
+  def _SetupLinuxUnmanagedDatabase(self):
+    """Installs MariaDB on the server vm.
+
+    https://mariadb.com/kb/en/getting-installing-and-upgrading-mariadb/
+    Raises:
+      Exception: If the requested engine version is unsupported, or if this
+        method is called when the database is a managed one. The latter
+        shouldn't happen.
+    """
+
+    super()._SetupLinuxUnmanagedDatabase()
+    self.server_vm.Install('mariadb')
+    self.server_vm.RemoteCommand('sudo service mariadb stop')
+    self._PrepareDataDirectories('mariadb')
+    self.server_vm.RemoteCommand('sudo service mariadb start')
 
 
 def ConfigureSQLServerLinux(vm, username: str, password: str):

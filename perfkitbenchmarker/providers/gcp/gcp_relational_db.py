@@ -152,6 +152,14 @@ class GCPMysqlIAASRelationalDb(mysql_iaas_relational_db.MysqlIAASRelationalDb):
   CLOUD = provider_info.GCP
 
 
+class GCPMariaDbIAASRelationalDb(
+    mysql_iaas_relational_db.MariaDbIAASRelationalDB
+):
+  """A GCP IAAS database resource."""
+
+  CLOUD = provider_info.GCP
+
+
 class GCPRelationalDb(relational_db.BaseRelationalDb):
   """A GCP CloudSQL database resource.
 

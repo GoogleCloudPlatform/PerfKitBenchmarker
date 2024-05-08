@@ -31,6 +31,7 @@ FLEXIBLE_SERVER_MYSQL = 'flexible-server-mysql'
 FLEXIBLE_SERVER_POSTGRES = 'flexible-server-postgres'
 
 MYSQL = 'mysql'
+MARIADB = 'mariadb'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
 AURORA_MYSQL = 'aurora-mysql'
@@ -43,6 +44,7 @@ SPANNER_POSTGRES = 'spanner-postgres'
 ALLOYDB = 'alloydb-postgresql'
 
 ALL_ENGINES = [
+    MARIADB,
     MYSQL,
     POSTGRES,
     AURORA_POSTGRES,
@@ -567,6 +569,8 @@ def GetDbEngineType(db_engine: str) -> str:
     return SPANNER_POSTGRES
   elif db_engine == SPANNER_GOOGLESQL:
     return SPANNER_GOOGLESQL
+  elif db_engine == MARIADB:
+    return MYSQL
 
   if db_engine not in ENGINE_TYPES:
     raise TypeError('Unsupported engine type', db_engine)
@@ -577,6 +581,8 @@ def GetQueryToolsByEngine(vm, connection_properties):
   """Returns the query tools to use for the engine."""
   engine_type = GetDbEngineType(connection_properties.engine)
   if engine_type == MYSQL:
+    return MysqlCliQueryTools(vm, connection_properties)
+  elif engine_type == MARIADB:
     return MysqlCliQueryTools(vm, connection_properties)
   elif engine_type == POSTGRES:
     return PostgresCliQueryTools(vm, connection_properties)
