@@ -397,8 +397,11 @@ flags.register_multi_flags_validator(
 _LATENCY_THRESHOLD = flags.DEFINE_bool(
     'ycsb_latency_threshold_mode',
     False,
-    'Whether to run in latency threshold mode. The test will increase QPS until'
-    ' latency is above --ycsb_latency_threshold_target.',
+    'Whether to run in latency threshold mode. The test will report throughput'
+    ' found where latency measured is between'
+    ' --ycsb_latency_threshold_target_min and --ycsb_latency_threshold_target'
+    ' with the goal of being as close to the target as possible. The benchmark'
+    ' will raise if a target is not found.',
 )
 _LATENCY_THRESHOLD_TARGET_MIN = flags.DEFINE_float(
     'ycsb_latency_threshold_target_min',
@@ -411,7 +414,7 @@ _LATENCY_THRESHOLD_TARGET = flags.DEFINE_float(
     'ycsb_latency_threshold_target',
     20.0,
     'Latency threshold mode: maximum ms latency at which to stop the test. The'
-    ' test will continue to increment until the utilization level is reached,'
+    ' test will continue to search until the utilization level is reached,'
     ' and then return the maximum throughput for that usage level.',
 )
 _LATENCY_THRESHOLD_PERCENTILE = flags.DEFINE_string(
@@ -1650,7 +1653,7 @@ class YCSBExecutor:
       )
       return self.RunStaircaseLoads(vms, workloads=[workload], **run_kwargs)
 
-    def _AddMetadata(samples: list[sample.Sample]) -> None:
+    def _AddMetadata(samples: list[sample.Sample]) -> list[sample.Sample]:
       for s in samples:
         s.metadata.update({
             'ycsb_latency_threshold': True,
@@ -1668,14 +1671,10 @@ class YCSBExecutor:
             'ycsb_latency_threshold_sleep_mins': (
                 _LATENCY_THRESHOLD_SLEEP_MINS.value
             ),
+            'ycsb_latency_threshold_max_throughput_under_sla_sample': True,
         })
       return samples
 
-    @vm_util.Retry(
-        retryable_exceptions=RetriableLatencySearchBoundsError,
-        timeout=-1,
-        max_retries=3,
-    )
     def _RunLatencyThresholdModeSingleWorkload() -> list[sample.Sample]:
       """Runs the latency threshold test for a single workload."""
       max_throughput_samples = _ExecuteWorkload(target_qps=0)
@@ -1685,59 +1684,54 @@ class YCSBExecutor:
           max_throughput_samples,
           percentile=_LATENCY_THRESHOLD_PERCENTILE.value,
       ).throughput
-      logging.info('Max throughput samples: %s', max_throughput_samples)
-      logging.info(
-          'Max throughput: %s',
-          ycsb_stats.ExtractStats(
-              max_throughput_samples,
-              percentile=_LATENCY_THRESHOLD_PERCENTILE.value,
-          ),
-      )
       time.sleep(_LATENCY_THRESHOLD_SLEEP_MINS.value * 60)
 
       lower_bound = 0
       upper_bound = max_throughput
-      while lower_bound <= upper_bound:
-        if upper_bound - lower_bound <= max_throughput * 0.01:
-          raise RetriableLatencySearchBoundsError(
-              'Unable to find the requested latency. Retrying.'
-          )
+      current_max_stats = ycsb_stats.ThroughputLatencyResult()
+      result_samples = []
+      while (
+          lower_bound < (upper_bound - 1)
+          and upper_bound - lower_bound > max_throughput * 0.01
+      ):
         target_qps = int((upper_bound + lower_bound) / 2)
         run_samples = _ExecuteWorkload(target_qps)
         stats = ycsb_stats.ExtractStats(
             run_samples, percentile=_LATENCY_THRESHOLD_PERCENTILE.value
-        )
-        read_latency_normalized_qps = (
-            stats.throughput
-            / stats.read_latency
-            * _LATENCY_THRESHOLD_TARGET.value
-        )
-        run_samples.append(
-            sample.Sample(
-                'Read Latency Normalized Throughput',
-                read_latency_normalized_qps,
-                'ops/sec',
-                copy.copy(run_samples[0].metadata),
-            )
         )
         logging.info(
             'Run had throughput target %s and measured stats %s',
             target_qps,
             stats,
         )
-        if stats.read_latency < _LATENCY_THRESHOLD_TARGET_MIN.value:
-          lower_bound = stats.throughput
-        elif stats.read_latency > _LATENCY_THRESHOLD_TARGET.value:
-          upper_bound = stats.throughput
-        else:
-          logging.info(
-              'Found read latency between target %sms and %sms',
-              CPU_OPTIMIZATION_TARGET_MIN.value,
-              CPU_OPTIMIZATION_TARGET.value,
-          )
-          return _AddMetadata(run_samples) + max_throughput_samples
 
-        # Sleep between steps for some workloads.
+        if (
+            stats.throughput > current_max_stats.throughput
+            and stats.read_latency <= _LATENCY_THRESHOLD_TARGET.value
+        ):
+          # Compute a normalized QPS to attempt to make subtle differences in
+          # latency more even.
+          read_latency_normalized_qps = (
+              stats.throughput
+              / stats.read_latency
+              * _LATENCY_THRESHOLD_TARGET.value
+          )
+          run_samples.append(
+              sample.Sample(
+                  'Read Latency Normalized Throughput',
+                  read_latency_normalized_qps,
+                  'ops/sec',
+                  copy.copy(run_samples[0].metadata),
+              )
+          )
+          result_samples = run_samples
+          current_max_stats = stats
+
+        if stats.read_latency <= _LATENCY_THRESHOLD_TARGET.value:
+          lower_bound = target_qps
+        else:
+          upper_bound = target_qps
+
         if _LATENCY_THRESHOLD_SLEEP_MINS.value:
           logging.info(
               'Run phase finished, sleeping for %s minutes before starting the '
@@ -1746,10 +1740,16 @@ class YCSBExecutor:
           )
           time.sleep(_LATENCY_THRESHOLD_SLEEP_MINS.value * 60)
 
-      raise RetriableLatencySearchBoundsError(
-          'Unable to find the requested latency - try modifying the min and'
-          ' target latency.'
-      )
+      if (
+          not result_samples
+          or current_max_stats.read_latency
+          < _LATENCY_THRESHOLD_TARGET_MIN.value
+      ):
+        raise RetriableLatencySearchBoundsError(
+            'Unable to find the requested latency - try modifying the min and'
+            ' target latency.'
+        )
+      return _AddMetadata(result_samples) + max_throughput_samples
 
     return _RunLatencyThresholdModeSingleWorkload()
 

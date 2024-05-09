@@ -131,9 +131,7 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(ycsb_threads_per_client=['30'])
   def testThreadCountLessThanOrEqualToTargetThroughput(self):
-    self.test_executor.Run(
-        [self.test_vm], run_kwargs={'target': 10}
-    )
+    self.test_executor.Run([self.test_vm], run_kwargs={'target': 10})
 
     self.assertSequenceEqual(
         [mock.call(matchers.HAS('-target 10'))], self.test_cmd.mock_calls
@@ -328,18 +326,43 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
             self.test_executor,
             'RunStaircaseLoads',
             side_effect=[
-                _GetMockThroughputLatencySamples(200, 100, 30, 'p99'),
-                _GetMockThroughputLatencySamples(150, 50, 15, 'p99'),
-                _GetMockThroughputLatencySamples(175, 76, 25, 'p99'),
+                _GetMockThroughputLatencySamples(10, 100, 30, 'p99'),
+                _GetMockThroughputLatencySamples(5, 50, 15, 'p99'),
+                _GetMockThroughputLatencySamples(7, 76, 25, 'p99'),
+                _GetMockThroughputLatencySamples(9, 82, 20, 'p99'),
+                _GetMockThroughputLatencySamples(8, 81, 10, 'p99'),
             ],
         )
     )
 
     results = self.test_executor.Run([self.test_vm])
 
-    self.assertEqual(results[0].value, 175)
+    self.assertEqual(results[0].value, 7)
     self.assertEqual(results[1].value, 76)
     self.assertEqual(results[2].value, 25)
+
+  @flagsaver.flagsaver(
+      ycsb_latency_threshold_mode=True,
+      ycsb_latency_threshold_target=80,
+      ycsb_latency_threshold_target_min=75,
+      ycsb_latency_threshold_sleep_mins=0,
+  )
+  def testLatencyThresholdModeRaisesIfTargetNotFound(self):
+    self.enter_context(
+        mock.patch.object(
+            self.test_executor,
+            'RunStaircaseLoads',
+            side_effect=[
+                _GetMockThroughputLatencySamples(10, 100, 30, 'p99'),
+                _GetMockThroughputLatencySamples(5, 99, 15, 'p99'),
+                _GetMockThroughputLatencySamples(3, 98, 25, 'p99'),
+                _GetMockThroughputLatencySamples(2, 97, 20, 'p99'),
+                _GetMockThroughputLatencySamples(1, 96, 10, 'p99'),
+            ],
+        )
+    )
+    with self.assertRaises(ycsb.RetriableLatencySearchBoundsError):
+      self.test_executor.Run([self.test_vm])
 
 
 def _GetMockThroughputSamples(throughputs):
