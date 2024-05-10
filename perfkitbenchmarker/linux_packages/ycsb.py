@@ -428,6 +428,11 @@ _LATENCY_THRESHOLD_SLEEP_MINS = flags.DEFINE_integer(
     'Latency threshold mode: time in minutes to sleep between run steps when'
     ' changing target QPS.',
 )
+_LATENCY_THRESHOLD_WARMUP_MINS = flags.DEFINE_integer(
+    'ycsb_latency_threshold_warmup_mins',
+    15,
+    'Latency threshold mode: length of time to run YCSB for the warmup step.',
+)
 _LATENCY_THRESHOLD_INCREMENT_MINS = flags.DEFINE_integer(
     'ycsb_latency_threshold_workload_mins',
     15,
@@ -1642,15 +1647,15 @@ class YCSBExecutor:
       threshold.
     """
 
-    def _ExecuteWorkload(target_qps: int) -> list[sample.Sample]:
+    def _ExecuteWorkload(
+        target_qps: int, duration_mins: int
+    ) -> list[sample.Sample]:
       """Executes the workload after setting run-specific args."""
       if target_qps > 0:
         run_kwargs['target'] = target_qps
       else:
         run_kwargs.pop('target', None)
-      run_kwargs['maxexecutiontime'] = (
-          _LATENCY_THRESHOLD_INCREMENT_MINS.value * 60
-      )
+      run_kwargs['maxexecutiontime'] = duration_mins * 60
       return self.RunStaircaseLoads(vms, workloads=[workload], **run_kwargs)
 
     def _AddMetadata(samples: list[sample.Sample]) -> list[sample.Sample]:
@@ -1677,7 +1682,9 @@ class YCSBExecutor:
 
     def _RunLatencyThresholdModeSingleWorkload() -> list[sample.Sample]:
       """Runs the latency threshold test for a single workload."""
-      max_throughput_samples = _ExecuteWorkload(target_qps=0)
+      max_throughput_samples = _ExecuteWorkload(
+          target_qps=0, duration_mins=_LATENCY_THRESHOLD_WARMUP_MINS.value
+      )
       for s in max_throughput_samples:
         s.metadata['ycsb_latency_threshold_max_throughput_sample'] = True
       max_throughput = ycsb_stats.ExtractStats(
@@ -1695,7 +1702,9 @@ class YCSBExecutor:
           and upper_bound - lower_bound > max_throughput * 0.01
       ):
         target_qps = int((upper_bound + lower_bound) / 2)
-        run_samples = _ExecuteWorkload(target_qps)
+        run_samples = _ExecuteWorkload(
+            target_qps, _LATENCY_THRESHOLD_INCREMENT_MINS.value
+        )
         stats = ycsb_stats.ExtractStats(
             run_samples, percentile=_LATENCY_THRESHOLD_PERCENTILE.value
         )
