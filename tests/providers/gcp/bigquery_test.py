@@ -123,7 +123,7 @@ class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
       return None, None
 
     expected_command = (
-        'java -cp bq-java-client-2.15.jar '
+        'java -cp bq-java-client-2.16.jar '
         'com.google.cloud.performance.edw.Single --project {} '
         '--credentials_file {} --dataset {} --query_file '
         '{}'

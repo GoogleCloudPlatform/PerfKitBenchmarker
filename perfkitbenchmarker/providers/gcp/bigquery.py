@@ -31,7 +31,7 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
 
-BQ_CLIENT_FILE = 'bq-java-client-2.15.jar'
+BQ_CLIENT_FILE = 'bq-java-client-2.16.jar'
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
 BQ_JDBC_INTERFACES = [
