@@ -20,42 +20,18 @@ benchmarks.
 
 import copy
 import json
-from typing import Dict, List, Text, Tuple
+import logging
 from absl import flags
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
 JdbcClientDict = {
-    provider_info.AWS: 'snowflake-jdbc-client-2.10-enterprise.jar',
+    provider_info.AWS: 'snowflake-jdbc-client-2.13-enterprise.jar',
     provider_info.AZURE: 'snowflake-jdbc-client-azure-external-2.0.jar',
 }
-
-
-def GetSnowflakeClientInterface(
-    warehouse: str, database: str, schema: str, cloud: str
-) -> edw_service.EdwClientInterface:
-  """Builds and Returns the requested Snowflake client Interface.
-
-  Args:
-    warehouse: String name of the Snowflake virtual warehouse to use during the
-      benchmark
-    database: String name of the Snowflake database to use during the  benchmark
-    schema: String name of the Snowflake schema to use during the  benchmark
-    cloud: String ID of the cloud service the client interface is for
-
-  Returns:
-    A concrete Client Interface object (subclass of EdwClientInterface)
-
-  Raises:
-    RuntimeError: if an unsupported snowflake_client_interface is requested
-  """
-  if FLAGS.snowflake_client_interface == 'JDBC':
-    return JdbcClientInterface(
-        warehouse, database, schema, JdbcClientDict[cloud]
-    )
-  raise RuntimeError('Unknown Snowflake Client Interface requested.')
 
 
 class JdbcClientInterface(edw_service.EdwClientInterface):
@@ -95,7 +71,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         package_name, [self.jdbc_client], ''
     )
 
-  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(self, query_name: str) -> tuple[float, dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -114,15 +90,18 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--warehouse {self.warehouse} '
         f'--database {self.database} '
         f'--schema {self.schema} '
-        f'--query_file {query_name}'
+        f'--query_file {query_name} '
+        '--print_results true'
     )
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
-    return json.loads(stdout)['query_wall_time_in_secs'], details
+    result = (json.loads(stdout)['query_wall_time_in_secs'], details)
+    self._LogAndStripQueryResults(result)
+    return result
 
   def ExecuteSimultaneous(
-      self, submission_interval: int, queries: List[str]
+      self, submission_interval: int, queries: list[str]
   ) -> str:
     """Executes queries simultaneously on client and return performance details.
 
@@ -148,7 +127,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     return stdout
 
-  def ExecuteThroughput(self, concurrency_streams: List[List[str]]) -> str:
+  def ExecuteThroughput(self, concurrency_streams: list[list[str]]) -> str:
     """Executes a throughput test and returns performance details.
 
     Args:
@@ -170,9 +149,34 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     return stdout
 
-  def GetMetadata(self) -> Dict[str, str]:
+  def GetMetadata(self) -> dict[str, str]:
     """Gets the Metadata attributes for the Client Interface."""
     return {'client': FLAGS.snowflake_client_interface}
+
+
+def GetSnowflakeClientInterface(
+    warehouse: str, database: str, schema: str, cloud: str
+) -> JdbcClientInterface:
+  """Builds and Returns the requested Snowflake client Interface.
+
+  Args:
+    warehouse: String name of the Snowflake virtual warehouse to use during the
+      benchmark
+    database: String name of the Snowflake database to use during the  benchmark
+    schema: String name of the Snowflake schema to use during the  benchmark
+    cloud: String ID of the cloud service the client interface is for
+
+  Returns:
+    A concrete Client Interface object (subclass of EdwClientInterface)
+
+  Raises:
+    RuntimeError: if an unsupported snowflake_client_interface is requested
+  """
+  if FLAGS.snowflake_client_interface == 'JDBC':
+    return JdbcClientInterface(
+        warehouse, database, schema, JdbcClientDict[cloud]
+    )
+  raise RuntimeError('Unknown Snowflake Client Interface requested.')
 
 
 class Snowflake(edw_service.EdwService):
@@ -210,6 +214,147 @@ class Snowflake(edw_service.EdwService):
   def _Delete(self):
     """Delete a Snowflake cluster."""
     raise NotImplementedError
+
+  def RemoveDataset(self, dataset: str | None = None):
+    """Removes a dataset.
+
+    Args:
+      dataset: Optional name of the dataset. If none, will be determined by the
+        service.
+    """
+    if dataset is None:
+      dataset = f'pkb_{FLAGS.run_uri}_snowflake_autoname'
+    query = f'DROP SCHEMA {dataset}'
+    self._RunConfigurationStatement('drop_schema', query)
+
+  def CreateDataset(
+      self, dataset: str | None = None, description: str | None = None
+  ):
+    """Create a new dataset.
+
+    For Snowflake, we define a 'dataset' to be a 'schema', Snowflake's second
+    level division of data, below 'database'. This is analogous to the
+    GCP project/dataset hierarchy in BigQuery.
+
+    Args:
+      dataset: Optional name of the dataset. If none, will be determined by the
+        service.
+      description: Optional description of the dataset.
+    """
+    if dataset is None:
+      dataset = f'pkb_{FLAGS.run_uri}_snowflake_autoname'
+    query = f'CREATE SCHEMA {dataset}'
+    self._RunConfigurationStatement('create_schema', query)
+
+  def LoadDataset(self, source_bucket, tables, dataset=None):
+    """Load all tables in a dataset to a database from object storage.
+
+    Args:
+      source_bucket: Name of the bucket to load the data from. Should already
+        exist. Each table must have its own subfolder in the bucket named after
+        the table, containing one or more csv files that make up the table data.
+      tables: List of table names to load.
+      dataset: Optional name of the dataset. If none, will be determined by the
+        service.
+    """
+    raise NotImplementedError
+
+  def CopyTable(self, copy_table_name: str, to_dataset: str) -> None:
+    """Copy a table from the active dataset to the specified dataset.
+
+    Copies a table between datasets, from the active (current) dataset to
+    another named dataset in the same project.
+
+    Args:
+      copy_table_name: Name of the table to copy from the loaded dataset to the
+        copy dataset.
+      to_dataset: Name of the dataset to copy the table into.
+    """
+    database = self.client_interface.database
+    from_dataset = self.client_interface.schema
+    self._CreateLikeTable(copy_table_name, to_dataset)
+    self._CopyData(database, copy_table_name, to_dataset, from_dataset)
+
+  def _CreateLikeTable(self, table_name: str, dataset: str) -> None:
+    """Create a table in the specified dataset with the same name and schema.
+
+    Args:
+      table_name: Name of the table to create a schema-copy of in the target
+        dataset. Must be an extant table in the active dataset.
+      dataset: The dataset to create a table in.
+    """
+    database = self.client_interface.database
+    from_dataset = self.client_interface.schema
+    statement = (
+        'CREATE TABLE'
+        f' "{database}"."{dataset}".{table_name} LIKE'
+        f' "{database}"."{from_dataset}".{table_name}'
+    )
+
+    logging.info(
+        'Creating Snowflake table %s in target schema %s ...',
+        table_name,
+        dataset,
+    )
+
+    self._RunConfigurationStatement('create_table', statement)
+
+  def _CopyData(
+      self, database, copy_table_name: str, to_dataset: str, from_dataset: str
+  ) -> None:
+    """Copy data from a table in dataset to same name table in other dataset.
+
+    Args:
+      database: The database that contains the to and from datasets.
+      copy_table_name: Name of the table to copy from the loaded dataset to the
+        copy dataset.
+      to_dataset: Name of the dataset to copy the table into.
+      from_dataset: Name of the dataset to copy the table from.
+    """
+
+    copy_data_statement = (
+        'INSERT INTO'
+        f' "{database}"."{to_dataset}".{copy_table_name} '
+        'SELECT * FROM'
+        f' "{database}"."{from_dataset}".{copy_table_name}'
+    )
+
+    logging.info('Copying data from %s to %s ...', from_dataset, to_dataset)
+    self._RunConfigurationStatement('copy_data', copy_data_statement)
+
+  def _RunConfigurationStatement(self, stmt_name: str, query_text: str) -> None:
+    """Run the provided statement on the Snowflake instance, and return results.
+
+    Does not time the specified statement.
+
+    Args:
+      stmt_name: A name for the provided statement
+      query_text: The query text of the statement that should be run.
+
+    Returns:
+    Results returned in response to running the provided statement.
+    """
+    vm_util.CreateRemoteFile(
+        self.client_interface.client_vm, query_text, stmt_name
+    )
+    logging.info(
+        'Now running %s statement: %s', stmt_name, query_text, stacklevel=2
+    )
+    self.client_interface.ExecuteQuery(stmt_name)
+
+  def OpenDataset(self, dataset: str):
+    """Switch from the currently active dataset to the one specified.
+
+    Switches the dataset that will be accessed by queries sent through the
+    client interface that this EDW service provides.
+
+    For Snowflake, 'Dataset' is taken to mean what Snowflake calls 'Schemas',
+    which are a level of organization down from 'Databases'.
+
+    Args:
+      dataset: Name of the dataset to make the active dataset.
+    """
+    self.client_interface.schema = dataset
 
   def GetMetadata(self):
     """Return a metadata dictionary of the benchmarked Snowflake cluster."""
