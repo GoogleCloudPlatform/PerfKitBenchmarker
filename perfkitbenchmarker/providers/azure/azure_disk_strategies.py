@@ -230,7 +230,7 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
   def AttachDisks(self):
     attach_tasks = []
     start_time = time.time()
-    if not self.scratch_disks:
+    if not self.scratch_disks or FLAGS.azure_attach_disk_with_create:
       return
     attach_tasks.append((self.WaitForDisksToVisibleFromVm, [start_time], {}))
     attach_tasks.append((self.AttachAzureDisks, (), {}))
