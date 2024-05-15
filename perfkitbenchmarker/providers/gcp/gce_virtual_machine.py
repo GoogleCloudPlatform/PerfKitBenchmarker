@@ -527,6 +527,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.boot_startup_script:
       self.boot_metadata_from_file['startup-script'] = self.boot_startup_script
     self.ssd_interface = vm_spec.ssd_interface
+    if (
+        self.machine_type
+        and self.machine_type in gce_disk.FIXED_SSD_MACHINE_TYPES
+    ):
+      self.ssd_interface = 'NVME'
     self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
     self.memory_mib = vm_spec.memory

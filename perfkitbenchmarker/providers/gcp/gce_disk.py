@@ -105,11 +105,30 @@ DISK_METADATA = {
 SCSI = 'SCSI'
 NVME = 'NVME'
 
-# The Z3 machine families, unlike other GCE offerings, have a preset
+# Latest GCE families have a preset
 # number of SSDs, so we set those attributes directly from the machine type.
 FIXED_SSD_MACHINE_TYPES = {
     'z3-highmem-176': 12,
     'z3-highmem-88': 12,
+    'c3-standard-4-lssd': 1,
+    'c3-standard-8-lssd': 2,
+    'c3-standard-22-lssd': 4,
+    'c3-standard-44-lssd': 8,
+    'c3-standard-88-lssd': 16,
+    'c3d-standard-8-lssd': 1,
+    'c3d-standard-16-lssd': 1,
+    'c3d-standard-30-lssd': 2,
+    'c3d-standard-60-lssd': 4,
+    'c3d-standard-90-lssd': 8,
+    'c3d-standard-180-lssd': 16,
+    'c3d-standard-360-lssd': 32,
+    'c3d-highmem-8-lssd': 1,
+    'c3d-highmem-16-lssd': 1,
+    'c3d-highmem-30-lssd': 2,
+    'c3d-highmem-60-lssd': 4,
+    'c3d-highmem-90-lssd': 8,
+    'c3d-highmem-180-lssd': 16,
+    'c3d-highmem-360-lssd': 32,
 }
 
 NVME_PD_MACHINE_FAMILIES = ['m3']
