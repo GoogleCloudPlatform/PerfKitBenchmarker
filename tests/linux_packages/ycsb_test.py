@@ -343,6 +343,36 @@ class RunTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(
       ycsb_latency_threshold_mode=True,
+      ycsb_latency_threshold_target=100,
+      ycsb_latency_threshold_target_min=10,
+      ycsb_latency_threshold_sleep_mins=0,
+  )
+  def testLatencyThresholdModeEndsWithLowestLatency(self):
+    self.enter_context(
+        mock.patch.object(
+            self.test_executor,
+            'RunStaircaseLoads',
+            side_effect=[
+                _GetMockThroughputLatencySamples(4852, 15.871, 30, 'p99'),
+                _GetMockThroughputLatencySamples(2664, 11.871, 30, 'p99'),
+                _GetMockThroughputLatencySamples(3996, 10.871, 15, 'p99'),
+                _GetMockThroughputLatencySamples(4662, 10.719, 25, 'p99'),
+                _GetMockThroughputLatencySamples(4995, 10.487, 20, 'p99'),
+                _GetMockThroughputLatencySamples(5161, 8.623, 10, 'p99'),
+                _GetMockThroughputLatencySamples(5244, 9.823, 10, 'p99'),
+                _GetMockThroughputLatencySamples(5286, 8.319, 10, 'p99'),
+            ],
+        )
+    )
+
+    results = self.test_executor.Run([self.test_vm])
+
+    self.assertEqual(results[0].value, 4995)
+    self.assertEqual(results[1].value, 10.487)
+    self.assertEqual(results[2].value, 20)
+
+  @flagsaver.flagsaver(
+      ycsb_latency_threshold_mode=True,
       ycsb_latency_threshold_target=80,
       ycsb_latency_threshold_target_min=75,
       ycsb_latency_threshold_sleep_mins=0,

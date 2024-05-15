@@ -1717,6 +1717,7 @@ class YCSBExecutor:
         if (
             stats.throughput > current_max_stats.throughput
             and stats.read_latency <= _LATENCY_THRESHOLD_TARGET.value
+            and stats.read_latency >= _LATENCY_THRESHOLD_TARGET_MIN.value
         ):
           # Compute a normalized QPS to attempt to make subtle differences in
           # latency more even.
