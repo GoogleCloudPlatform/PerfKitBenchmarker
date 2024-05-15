@@ -18,7 +18,7 @@ directory as a subclass of BaseEdwService.
 """
 import logging
 import os
-from typing import Any, Dict, List, Text, Tuple
+from typing import Any, Dict, List, Text, Tuple, Union
 
 from absl import flags
 from perfkitbenchmarker import resource
@@ -306,7 +306,7 @@ class EdwClientInterface(object):
     raise NotImplementedError
 
   def _LogAndStripQueryResults(
-      self, query_results: tuple[float, dict[str, str | dict[Any, Any]]]
+      self, query_results: tuple[float, dict[str, Union[str, dict[Any, Any]]]]
   ) -> None:
     """Logs first 100 characters of query output, then removes from metadata.
 

@@ -21,6 +21,7 @@ benchmarks.
 import copy
 import json
 import logging
+from typing import Union
 from absl import flags
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import provider_info
@@ -215,7 +216,7 @@ class Snowflake(edw_service.EdwService):
     """Delete a Snowflake cluster."""
     raise NotImplementedError
 
-  def RemoveDataset(self, dataset: str | None = None):
+  def RemoveDataset(self, dataset: Union[str, None] = None):
     """Removes a dataset.
 
     Args:
@@ -228,7 +229,9 @@ class Snowflake(edw_service.EdwService):
     self._RunConfigurationStatement('drop_schema', query)
 
   def CreateDataset(
-      self, dataset: str | None = None, description: str | None = None
+      self,
+      dataset: Union[str, None] = None,
+      description: Union[str, None] = None,
   ):
     """Create a new dataset.
 
