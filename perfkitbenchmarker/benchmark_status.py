@@ -65,6 +65,12 @@ class FailedSubstatus(object):
   # Failure when freezing resource.
   FREEZE_FAILED = 'FREEZE_FAILED'
 
+  # Failure when a retryable command execution times out.
+  COMMAND_TIMEOUT = 'COMMAND_TIMEOUT'
+
+  # Failure when a retryable command execution exceeds the retry limit.
+  RETRIES_EXCEEDED = 'RETRIES_EXCEEDED'
+
   # List of valid substatuses for use with --retries.
   # UNCATEGORIZED failures are not retryable. To make a specific UNCATEGORIZED
   # failure retryable, please raise an errors.Benchmarks.KnownIntermittentError.
@@ -77,6 +83,8 @@ class FailedSubstatus(object):
       KNOWN_INTERMITTENT,
       INTERRUPTED,
       UNSUPPORTED,
+      COMMAND_TIMEOUT,
+      RETRIES_EXCEEDED,
   ]
 
 

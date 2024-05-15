@@ -306,6 +306,8 @@
     fail in Provision.
 -   Add support for setting an app profile to use on an existing instance via
     `--google_bigtable_app_profile_id` for Cloud Bigtable YCSB benchmarks.
+-   Add retryable failure sub-statuses for runs that fail on a `vm_util.Retry()`
+    command timing out or exceeding its retry limit.
 
 ### Bug fixes and maintenance updates:
 

@@ -928,6 +928,14 @@ def RunBenchmark(spec, collector):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.PROCESS_KILLED
           )
+        elif _IsException(e, vm_util.TimeoutExceededRetryError):
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.COMMAND_TIMEOUT
+          )
+        elif _IsException(e, vm_util.RetriesExceededRetryError):
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.RETRIES_EXCEEDED
+          )
         else:
           spec.failed_substatus = benchmark_status.FailedSubstatus.UNCATEGORIZED
         spec.status_detail = str(e)
