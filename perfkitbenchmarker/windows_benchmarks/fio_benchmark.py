@@ -136,7 +136,7 @@ def Run(benchmark_spec):
     List of samples produced by the test.
   """
   vm = benchmark_spec.vms[0]
-  fio_exec = fio.GetFioExec(vm)
+  fio_exec = fio.GetFioExec()
   remote_job_file_path = fio.GetRemoteJobFilePath(vm)
 
   # Ignored when --fio_generate_scenarios is used.

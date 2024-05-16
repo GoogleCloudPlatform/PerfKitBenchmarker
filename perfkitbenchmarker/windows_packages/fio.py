@@ -16,14 +16,14 @@
 
 import ntpath
 
-WINDOWS_FIO_DIR = 'fio-3.27-x86'
-FIO_ZIP = WINDOWS_FIO_DIR + '.zip'
-FIO_URL = 'https://bsdio.com/fio/releases/' + FIO_ZIP
+WINDOWS_FIO_DIR = 'C:\\"Program Files"\\fio'
+FIO_INSTALLER = 'fio_msi'
+FIO_URL = 'https://github.com/axboe/fio/releases/download/fio-3.37/fio-3.37-x64.msi'
 
 
-def GetFioExec(vm):
+def GetFioExec():
   return ntpath.join(
-      vm.temp_dir, '{fio_dir}\\fio.exe --thread'.format(fio_dir=WINDOWS_FIO_DIR)
+      '{fio_dir}\\fio.exe --thread'.format(fio_dir=WINDOWS_FIO_DIR)
   )
 
 
@@ -32,6 +32,6 @@ def GetRemoteJobFilePath(vm):
 
 
 def Install(vm):
-  zip_path = ntpath.join(vm.temp_dir, FIO_ZIP)
+  zip_path = ntpath.join(vm.temp_dir, FIO_INSTALLER)
   vm.DownloadFile(FIO_URL, zip_path)
-  vm.UnzipFile(zip_path, vm.temp_dir)
+  vm.RemoteCommand(f'msiexec /package  {zip_path} /quiet')
