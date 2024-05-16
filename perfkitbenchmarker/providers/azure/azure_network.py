@@ -308,7 +308,7 @@ class AzureVirtualNetwork(network.BaseNetwork):
 
   CLOUD = provider_info.AZURE
 
-  def __init__(self, spec, region, name, number_subnets):
+  def __init__(self, spec, region, name):
     super(AzureVirtualNetwork, self).__init__(spec)
     self.name = name
     self.resource_group = GetResourceGroup()
@@ -317,24 +317,16 @@ class AzureVirtualNetwork(network.BaseNetwork):
     self.address_index = 0
     self.regional_index = AzureVirtualNetwork._regional_network_count
     self.address_spaces = []
-    for zone_num in range(number_subnets):
-      self.address_spaces.append(
-          network.GetCidrBlock(self.regional_index, zone_num)
-      )
     self.is_created = False
 
   @classmethod
-  def GetForRegion(
-      cls, spec, region, name, number_subnets=1
-  ) -> Optional['AzureVirtualNetwork']:
+  def GetForRegion(cls, spec, region, name) -> Optional['AzureVirtualNetwork']:
     """Retrieves or creates an AzureVirtualNetwork.
 
     Args:
       spec: BaseNetworkSpec. Spec for Azure Network.
       region: string. Azure region name.
       name: string. Azure Network Name.
-      number_subnets: int. Optional. Number of subnets that network will
-        contain.
 
     Returns:
       AzureVirtualNetwork | None. If AZURE_SUBNET_ID is specified, an existing
@@ -357,21 +349,17 @@ class AzureVirtualNetwork(network.BaseNetwork):
     # Because this method is only called from the AzureNetwork constructor,
     # which is only called from AzureNetwork.GetNetwork, we already hold the
     # benchmark_spec.networks_lock.
-    number_subnets = max(number_subnets, len(FLAGS.zone))
     if key not in benchmark_spec.regional_networks:
-      benchmark_spec.regional_networks[key] = cls(
-          spec, region, name, number_subnets
-      )
+      benchmark_spec.regional_networks[key] = cls(spec, region, name)
       AzureVirtualNetwork._regional_network_count += 1
     return benchmark_spec.regional_networks[key]
 
-  def GetNextAddressSpace(self):
+  def GetNextAddressSpace(self) -> str:
     """Returns the next available address space for next subnet."""
     with self.vnet_lock:
-      assert self.address_index < len(
-          self.address_spaces
-      ), 'Only allocated {} addresses'.format(len(self.address_spaces))
-      next_address_space = self.address_spaces[self.address_index]
+      next_address_space = network.GetCidrBlock(
+          self.regional_index, self.address_index
+      )
       self.address_index += 1
       return next_address_space
 
@@ -449,13 +437,14 @@ class AzureSubnet(resource.BaseResource):
       self.vnet = vnet
       self.name = name
       self.args = ['--subnet', self.name]
-      self.address_space = None
+
+      self.address_space = ''
+      if self.vnet is not None:
+        self.address_space = self.vnet.GetNextAddressSpace()
+        # Append to vnet address_spaces so that it can be used in vnet _Create()
+        self.vnet.address_spaces.append(self.address_space)
 
   def _Create(self):
-    # Avoids getting additional address space when create retries.
-    if not self.address_space:
-      self.address_space = self.vnet.GetNextAddressSpace()
-
     vm_util.IssueCommand(
         [
             azure.AZURE_PATH,
