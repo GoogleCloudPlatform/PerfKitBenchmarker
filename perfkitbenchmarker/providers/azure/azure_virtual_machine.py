@@ -1084,7 +1084,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
   ):
     """Downloads a data file from Azure blob storage with pre-provisioned data.
 
-    Use --azure_preprovisioned_data_bucket to specify the name of the account.
+    Use --azure_preprovisioned_data_account to specify the name of the account.
 
     Note: Azure blob storage does not allow underscores in the container name,
     so this method replaces any underscores in module_name with dashes.
@@ -1113,7 +1113,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Do not install credentials. Data are fetched using locally generated
     # connection strings and do not use credentials on the VM.
     self.Install('azure_cli')
-    return FLAGS.azure_preprovisioned_data_bucket and self.TryRemoteCommand(
+    return FLAGS.azure_preprovisioned_data_account and self.TryRemoteCommand(
         GenerateStatPreprovisionedDataCommand(module_name, filename)
     )
 
@@ -1394,7 +1394,7 @@ class BaseWindowsAzureVirtualMachine(
   ):
     """Downloads a data file from Azure blob storage with pre-provisioned data.
 
-    Use --azure_preprovisioned_data_bucket to specify the name of the account.
+    Use --azure_preprovisioned_data_account to specify the name of the account.
 
     Note: Azure blob storage does not allow underscores in the container name,
     so this method replaces any underscores in module_name with dashes.
@@ -1427,7 +1427,7 @@ class BaseWindowsAzureVirtualMachine(
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""
     return (
-        FLAGS.azure_preprovisioned_data_bucket
+        FLAGS.azure_preprovisioned_data_account
         and vm_util.IssueCommand(
             GenerateStatPreprovisionedDataCommand(module_name, filename).split(
                 ' '
@@ -1532,8 +1532,10 @@ def GenerateDownloadPreprovisionedDataCommand(
     # is run on all clouds, and is os-agnostic (this is linux specific).
     mkdir_command = 'mkdir -p %s' % posixpath.dirname(destpath)
 
-  account_name = FLAGS.azure_preprovisioned_data_bucket
-  connection_string = util.GetAzureStorageConnectionString(account_name, [])
+  account_name = FLAGS.azure_preprovisioned_data_account
+  connection_string = util.GetAzureStorageConnectionString(
+      account_name, subscription=FLAGS.azure_preprovisioned_data_subscription
+  )
   download_command = (
       'az storage blob download '
       '--no-progress '
@@ -1557,8 +1559,10 @@ def GenerateDownloadPreprovisionedDataCommand(
 def GenerateStatPreprovisionedDataCommand(module_name, filename):
   """Returns a string used to download preprovisioned data."""
   module_name_with_underscores_removed = module_name.replace('_', '-')
-  account_name = FLAGS.azure_preprovisioned_data_bucket
-  connection_string = util.GetAzureStorageConnectionString(account_name, [])
+  account_name = FLAGS.azure_preprovisioned_data_account
+  connection_string = util.GetAzureStorageConnectionString(
+      account_name, subscription=FLAGS.azure_preprovisioned_data_subscription
+  )
   return (
       'az storage blob show '
       '--account-name {account_name} '

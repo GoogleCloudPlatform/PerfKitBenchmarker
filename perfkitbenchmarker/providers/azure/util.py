@@ -17,7 +17,7 @@
 
 import json
 import re
-from typing import Any, Dict, Set
+from typing import Any, Dict, Optional, Set
 
 from absl import flags
 from perfkitbenchmarker import context
@@ -26,36 +26,31 @@ from perfkitbenchmarker.providers import azure
 import six
 
 AZURE_PATH = azure.AZURE_PATH
-AZURE_SUFFIX = ['--output', 'json']
+OUTPUT_JSON = ['--output', 'json']
 FLAGS = flags.FLAGS
 
 
-def GetAzureStorageConnectionString(storage_account_name, resource_group_args):
+def GetAzureStorageConnectionString(
+    storage_account_name: str,
+    resource_group: Optional[str] = None,
+    subscription: Optional[str] = None):
   """Get connection string."""
-  stdout, _ = vm_util.IssueRetryableCommand(
-      [
-          AZURE_PATH,
-          'storage',
-          'account',
-          'show-connection-string',
-          '--name',
-          storage_account_name,
-      ]
-      + resource_group_args
-      + AZURE_SUFFIX
-  )
+  cmd = [
+      AZURE_PATH,
+      'storage',
+      'account',
+      'show-connection-string',
+      '--name',
+      storage_account_name,
+  ] + OUTPUT_JSON
+  if resource_group:
+    cmd.extend(['--resource-group', resource_group])
+  if subscription:
+    cmd.extend(['--subscription', subscription])
+  stdout, _ = vm_util.IssueRetryableCommand(cmd)
+
   response = json.loads(stdout)
   return response['connectionString']
-
-
-def GetAzureStorageConnectionArgs(storage_account_name, resource_group_args):
-  """Get connection CLI arguments."""
-  return [
-      '--connection-string',
-      GetAzureStorageConnectionString(
-          storage_account_name, resource_group_args
-      ),
-  ]
 
 
 def GetAzureStorageAccountKey(storage_account_name, resource_group_args):
@@ -71,7 +66,7 @@ def GetAzureStorageAccountKey(storage_account_name, resource_group_args):
           storage_account_name,
       ]
       + resource_group_args
-      + AZURE_SUFFIX
+      + OUTPUT_JSON
   )
 
   response = json.loads(stdout)

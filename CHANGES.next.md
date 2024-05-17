@@ -68,6 +68,10 @@
     installing local AWS CLI credentials via aws_credentials.py. This must be
     set up by the user beforehand. See
     [AWS documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html)
+-   Split `--azure_preprovisioned_data_bucket` into
+    `--azure_preprovisioned_data_account` and
+    `--azure_preprovisioned_data_subscription`, which allows cross-subscription
+    access.
 
 ### New features:
 

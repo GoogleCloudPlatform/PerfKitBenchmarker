@@ -37,7 +37,6 @@ Lifecycle:
 
 import json
 import logging
-from typing import List
 
 from absl import flags
 from perfkitbenchmarker import disk
@@ -79,7 +78,7 @@ class AzureSmbService(smb_service.BaseSmbService):
     self.resource_group = azure_network.GetResourceGroup(self.region)
 
     # set during _Create()
-    self.connection_args: List[str] = None
+    self.connection_string: str = None
     self.storage_account_key: str = None
     self.storage_account_name: str = None
 
@@ -137,8 +136,8 @@ class AzureSmbService(smb_service.BaseSmbService):
       )
       self.storage_account.Create()
 
-    self.connection_args = util.GetAzureStorageConnectionArgs(
-        self.storage_account_name, self.resource_group.args
+    self.connection_string = util.GetAzureStorageConnectionString(
+        self.storage_account_name, resource_group=self.resource_group.name
     )
     self.storage_account_key = util.GetAzureStorageAccountKey(
         self.storage_account_name, self.resource_group.args
@@ -168,7 +167,7 @@ class AzureSmbService(smb_service.BaseSmbService):
     cmd += ['--name', self.name]
     if verb == 'create':
       cmd += ['--quota', str(FLAGS.data_disk_size)]
-    cmd += self.connection_args
+    cmd += ['--connection-string', self.connection_string]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode:
       raise errors.Error('Error running command %s : %s' % (verb, stderr))

@@ -76,9 +76,19 @@ flags.DEFINE_enum(
     'to Hot and Cold storage tiers.',
 )
 flags.DEFINE_string(
-    'azure_preprovisioned_data_bucket',
+    'azure_preprovisioned_data_account',
     None,
-    'Azure blob storage account where pre-provisioned data has been copied.',
+    'Azure storage account containing Azure blob containers. Containing '
+    'preprovisioned data. This does not align with GCS or S3 where packages '
+    'are in the object path instead of the container/bucket name.',
+)
+flags.DEFINE_string(
+    'azure_preprovisioned_data_subscription',
+    None,
+    'Azure subscription id or name for the preprovisioned data account. If not '
+    'provided, Azure will look in the default subscription. Even though '
+    'storage accounts are globally unique, Azure requires specifying the '
+    'subscription to access.',
 )
 
 flags.DEFINE_boolean(

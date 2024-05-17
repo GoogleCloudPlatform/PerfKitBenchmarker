@@ -246,7 +246,7 @@ class AzureStorageAccount(resource.BaseResource):
   def _PostCreate(self):
     """Get our connection string and our keys."""
     self.connection_string = util.GetAzureStorageConnectionString(
-        self.name, self.resource_group.args
+        self.name, resource_group=self.resource_group.name
     )
     self.connection_args = ['--connection-string', self.connection_string]
     self.key = util.GetAzureStorageAccountKey(
