@@ -932,7 +932,8 @@ class BenchmarkSpec:
     # max length contraints on keys and values
     # https://cloud.google.com/resource-manager/docs/creating-managing-labels
     max_safe_length = 63
-    return result[:max_safe_length]
+    # GCP labels are not allowed to start or end with '_'
+    return result[:max_safe_length].strip('_')
 
   def _GetResourceDict(self, time_format, timeout_minutes=None):
     """Gets a list of tags to be used to tag resources."""
