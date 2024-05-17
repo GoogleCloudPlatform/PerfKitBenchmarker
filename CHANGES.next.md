@@ -72,6 +72,7 @@
     `--azure_preprovisioned_data_account` and
     `--azure_preprovisioned_data_subscription`, which allows cross-subscription
     access.
+-   Remove Rocky Linux on Azure.
 
 ### New features:
 
