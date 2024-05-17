@@ -23,7 +23,6 @@ from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -401,14 +400,6 @@ class ContainerClusterSpec(spec.BaseSpec):
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
-    ignore_package_requirements = (
-        getattr(flag_values, 'ignore_package_requirements', True)
-        if flag_values
-        else True
-    )
-    # TODO(user): Remove LoadProvider cloud once cloud != kubernetes.
-    providers.LoadProvider('kubernetes', ignore_package_requirements)
-    providers.LoadProvider(self.cloud, ignore_package_requirements)
     vm_config = getattr(self.vm_spec, self.cloud, None)
     if vm_config is None:
       raise errors.Config.MissingOption(

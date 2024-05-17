@@ -34,10 +34,10 @@ from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
-from perfkitbenchmarker.providers.kubernetes import flags as k8s_flags
-from perfkitbenchmarker.providers.kubernetes import kubernetes_disk
-from perfkitbenchmarker.providers.kubernetes import kubernetes_pod_spec
-from perfkitbenchmarker.providers.kubernetes import kubernetes_resources_spec
+from perfkitbenchmarker.resources.kubernetes import flags as k8s_flags
+from perfkitbenchmarker.resources.kubernetes import kubernetes_disk
+from perfkitbenchmarker.resources.kubernetes import kubernetes_pod_spec
+from perfkitbenchmarker.resources.kubernetes import kubernetes_resources_spec
 
 FLAGS = flags.FLAGS
 # Using root logger removes one function call logging.info adds.

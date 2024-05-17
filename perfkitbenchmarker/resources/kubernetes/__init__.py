@@ -11,3 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Init file for the kubernetes package.
+
+Loads all modules, neccesary for registering ResourceTypes and SpecClasses.
+"""
+
+
+from perfkitbenchmarker import import_util
+
+
+def LoadModules():
+  list(import_util.LoadModulesForPath(__path__, __name__))
+
+
+LoadModules()

@@ -28,8 +28,8 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import util as azure_util
-from perfkitbenchmarker.providers.kubernetes import kubernetes_pod_spec
-from perfkitbenchmarker.providers.kubernetes import kubernetes_virtual_machine
+from perfkitbenchmarker.resources.kubernetes import kubernetes_pod_spec
+from perfkitbenchmarker.resources.kubernetes import kubernetes_virtual_machine
 from tests import pkb_common_test_case
 
 FLAGS = flgs.FLAGS
@@ -267,6 +267,7 @@ class KubernetesResourcesTestCase(BaseKubernetesVirtualMachineTestCase):
 
   def testPodResourceLimits(self):
     spec = self.create_virtual_machine_spec()
+    assert spec.resource_limits is not None
     self.assertEqual(spec.resource_limits.cpus, 2)
     self.assertEqual(spec.resource_limits.memory, 5120)
 

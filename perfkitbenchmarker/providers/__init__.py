@@ -50,7 +50,7 @@ def LoadProviderFlags(providers):
 
 
 # Import flag definitions for all cloud providers.
-LoadProviderFlags(provider_info.VALID_CLOUDS)
+LoadProviderFlags(provider_info.PROVIDER_DIRECTORY_NAMES)
 
 
 def LoadProviderUtils(cloud: str) -> types.ModuleType:

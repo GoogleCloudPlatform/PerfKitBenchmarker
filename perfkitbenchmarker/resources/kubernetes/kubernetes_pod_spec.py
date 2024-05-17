@@ -18,7 +18,7 @@ from typing import Optional, Union
 
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker.providers.kubernetes import kubernetes_resources_spec
+from perfkitbenchmarker.resources.kubernetes import kubernetes_resources_spec
 
 
 class KubernetesPodSpec(virtual_machine.BaseVmSpec):

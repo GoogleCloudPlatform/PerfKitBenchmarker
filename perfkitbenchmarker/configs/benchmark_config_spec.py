@@ -37,6 +37,8 @@ from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
+# Included to import & load Kubernetes' __init__.py somewhere.
+from perfkitbenchmarker.resources import kubernetes  # pylint:disable=unused-import
 import six
 
 _NONE_OK = {'default': None, 'none_ok': True}

@@ -38,13 +38,12 @@ PROFITBRICKS = 'ProfitBricks'
 # for performing on premise to cloud benchmarks
 DOCKER = 'Docker'
 
-VALID_CLOUDS = (
+PROVIDER_DIRECTORY_NAMES = (
     GCP,
     AZURE,
     AWS,
     IBMCLOUD,
     DIGITALOCEAN,
-    KUBERNETES,
     OPENSTACK,
     RACKSPACE,
     CLOUDSTACK,
@@ -53,6 +52,8 @@ VALID_CLOUDS = (
     PROFITBRICKS,
     DOCKER,
 )
+# TODO(user): Remove Kubernetes from VALID_CLOUDS.
+VALID_CLOUDS = tuple(list(PROVIDER_DIRECTORY_NAMES) + [KUBERNETES])
 
 _PROVIDER_INFO_REGISTRY = {}
 
