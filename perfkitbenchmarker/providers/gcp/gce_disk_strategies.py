@@ -203,32 +203,37 @@ class SetUpGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
     self.vm.SetupLocalDisks()
     disks = []
     for _ in range(self.disk_spec.num_striped_disks):
-      if self.vm.ssd_interface == gce_disk.SCSI:
-        name = 'local-ssd-%d' % self.vm.local_disk_counter
-      elif self.vm.ssd_interface == gce_disk.NVME:
-        name = f'local-nvme-ssd-{self.vm.local_disk_counter}'
-      else:
-        raise errors.Error('Unknown Local SSD Interface.')
-
-      data_disk = gce_disk.GceLocalDisk(self.disk_spec, name)
-      self.vm.local_disk_counter += 1
-      if self.vm.local_disk_counter > self.vm.max_local_disks:
-        raise errors.Error('Not enough local disks.')
+      data_disk = self._CreateLocalDisk()
       disks.append(data_disk)
-
     if len(disks) == 1:
       scratch_disk = disks[0]
     else:
       scratch_disk = disk.StripedDisk(self.disk_spec, disks)
-    # Device path is needed to stripe disks on Linux, but not on Windows.
-    # The path is not updated for Windows machines.
-    if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
-      nvme_devices = self.vm.GetNVMEDeviceInfo()
-      remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
-      self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
     GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
         self.vm, scratch_disk, self.disk_spec
     )
+
+    # In the event local disks are not striped together and kept as raw disks
+    if self.disk_spec.num_striped_disks < self.vm.max_local_disks:
+      for _ in range(
+          self.vm.max_local_disks - self.disk_spec.num_striped_disks
+      ):
+        data_disk = self._CreateLocalDisk()
+        GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
+            self.vm, data_disk, self.disk_spec
+        )
+
+  def _CreateLocalDisk(self):
+    if self.vm.ssd_interface == gce_disk.SCSI:
+      name = 'local-ssd-%d' % self.vm.local_disk_counter
+    elif self.vm.ssd_interface == gce_disk.NVME:
+      name = f'local-nvme-ssd-{self.vm.local_disk_counter}'
+    else:
+      raise errors.Error('Unknown Local SSD Interface.')
+    self.vm.local_disk_counter += 1
+    if self.vm.local_disk_counter > self.vm.max_local_disks:
+      raise errors.Error('Not enough local disks.')
+    return gce_disk.GceLocalDisk(self.disk_spec, name)
 
 
 class SetUpPartitionedGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
