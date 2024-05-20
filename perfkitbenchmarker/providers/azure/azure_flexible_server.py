@@ -134,6 +134,8 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
     """Perform general post create operations on the cluster."""
     # Calling the grand parent class.
     super(azure_relational_db.AzureRelationalDb, self)._PostCreate()
+    # Get the client VM's ip address
+    ip = self.client_vm.ip_address
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
@@ -147,9 +149,9 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         '--rule-name',
         'allow-all-ips',
         '--start-ip-address',
-        '0.0.0.0',
+        ip,
         '--end-ip-address',
-        '255.255.255.255',
+        ip,
     ]
     vm_util.IssueCommand(cmd)
 
