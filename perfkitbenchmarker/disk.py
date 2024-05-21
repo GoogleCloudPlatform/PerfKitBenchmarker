@@ -452,7 +452,6 @@ class BaseDisk(resource.BaseResource):
     self.create_disk_start_time: float = None
     self.create_disk_end_time: float = None
     self.disk_create_time: float = None
-    self.disk_attach_time: float = None
     self.disk_detach_time: float = None
     self.time_to_visibility: float = None
 
@@ -613,21 +612,20 @@ class StripedDisk(BaseDisk):
       disk.Detach()
 
   def GetAttachTime(self):
-    if self.disk_attach_time:
-      return self.disk_attach_time
+    disk_attach_time = None
     for disk_details in self.disks:
       disk_details_attach_time = disk_details.GetAttachTime()
       if not disk_details_attach_time:
         raise ValueError(
             'No attach time found for disk %s' % disk_details.GetDeviceId()
         )
-      if not self.disk_attach_time:
-        self.disk_attach_time = disk_details_attach_time
+      if not disk_attach_time:
+        disk_attach_time = disk_details_attach_time
       else:
-        self.disk_attach_time = max(
-            self.disk_attach_time, disk_details_attach_time
+        disk_attach_time = max(
+            disk_attach_time, disk_details_attach_time
         )
-    return self.disk_attach_time
+    return disk_attach_time
 
   def GetCreateTime(self):
     if self.disk_create_time:
