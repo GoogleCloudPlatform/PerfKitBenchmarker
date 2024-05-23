@@ -115,10 +115,10 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
     )
 
   def testLocalSSD(self):
-    self.DoAwsDiskTest(disk.LOCAL, 'c3.2xlarge', disk.SSD, disk.NONE)
+    self.DoAwsDiskTest(disk.LOCAL, 'm3.large', disk.SSD, disk.NONE)
 
   def testLocalHDD(self):
-    self.DoAwsDiskTest(disk.LOCAL, 'd2.2xlarge', disk.HDD, disk.NONE)
+    self.DoAwsDiskTest(disk.LOCAL, 'c1.medium', disk.HDD, disk.NONE)
 
 
 class AzureDiskMetadataTest(_DiskMetadataTestCase):

@@ -70,7 +70,7 @@ class CreateLocalDiskStrategy(AWSCreateDiskStrategy):
     for spec_index, disk_spec in enumerate(self.disk_specs):
       if not self.vm.DiskTypeCreatedOnVMCreation(disk_spec.disk_type):
         continue
-      for i in range(disk_spec.num_striped_disks):
+      for i in range(self.vm.max_local_disks):
         mapping = collections.OrderedDict()
         device_letter = aws_disk.AwsDisk.GenerateDeviceLetter(self.vm.name)
         device_name_prefix = aws_disk.AwsDisk.GenerateDeviceNamePrefix()
@@ -299,26 +299,11 @@ class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
     self.disk_specs = disk_specs
 
   def SetUpDisk(self):
-    self.local_disk_groups = []
-    nvme_boot_drive_index = self._GetNvmeBootIndex()
     for spec_id, disk_spec in enumerate(self.disk_specs):
       disks = []
       for i in range(disk_spec.num_striped_disks):
-        disk_spec_id = self.vm.create_disk_strategy.BuildDiskSpecId(spec_id, i)
-        data_disk = aws_disk.AwsDisk(
-            disk_spec, self.vm.zone, self.vm.machine_type, disk_spec_id
-        )
-        device_letter = chr(
-            ord(self.LOCAL_DRIVE_START_LETTER) + self.vm.local_disk_counter
-        )
-        data_disk.AssignDeviceLetter(device_letter, nvme_boot_drive_index)  # pytype: disable=wrong-arg-types
-        # Local disk numbers start at 1 (0 is the system disk).
-        data_disk.disk_number = self.vm.local_disk_counter + 1
-        self.vm.local_disk_counter += 1
-        if self.vm.local_disk_counter > self.vm.max_local_disks:
-          raise errors.Error('Not enough local disks.')
+        data_disk = self._CreateLocalDisk(disk_spec, spec_id, i)
         disks.append(data_disk)
-      self.local_disk_groups.append(disks)
       if len(disks) > 1:
         # If the disk_spec called for a striped disk, create one.
         scratch_disk = disk.StripedDisk(disk_spec, disks)
@@ -336,6 +321,33 @@ class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
       AWSPrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, scratch_disk, disk_spec
       )
+
+      # in the event that local disks are not striped and kept as raw disks.
+      if self.vm.local_disk_counter < self.vm.max_local_disks:
+        for i in range(self.vm.local_disk_counter, self.vm.max_local_disks):
+          data_disk = self._CreateLocalDisk(disk_spec, spec_id, i)
+
+          if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+            nvme_devices = self.vm.GetNVMEDeviceInfo()
+            self.PopulateNVMEDevicePath(data_disk, nvme_devices)
+            self.UpdateDevicePath(data_disk)
+            AWSPrepareScratchDiskStrategy().PrepareScratchDisk(
+                self.vm, data_disk, disk_spec
+            )
+
+  def _CreateLocalDisk(self, disk_spec, spec_id, i):
+    disk_spec_id = self.vm.create_disk_strategy.BuildDiskSpecId(spec_id, i)
+    data_disk = aws_disk.AwsDisk(
+        disk_spec, self.vm.zone, self.vm.machine_type, disk_spec_id)
+    device_letter = chr(
+        ord(self.LOCAL_DRIVE_START_LETTER) + self.vm.local_disk_counter)
+    nvme_boot_drive_index = self._GetNvmeBootIndex()
+    data_disk.AssignDeviceLetter(device_letter, nvme_boot_drive_index)  # pytype: disable=wrong-arg-types
+    data_disk.disk_number = self.vm.local_disk_counter + 1
+    self.vm.local_disk_counter += 1
+    if self.vm.local_disk_counter > self.vm.max_local_disks:
+      raise errors.Error('Not enough local disks.')
+    return data_disk
 
   def _GetNvmeBootIndex(self):
     if aws_disk.LocalDriveIsNvme(
