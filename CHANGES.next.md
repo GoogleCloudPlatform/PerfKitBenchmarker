@@ -176,6 +176,7 @@
 -   Add support for Ubuntu 23.10.
 -   HammerDB enables "Use All Warehouses" by default for increased I/O.
 -   Add Ubuntu 24.04 support for GCP, AWS, and Azure Providers.
+-   Add keydb_memtier_benchmark (KeyDB is a fork of Redis).
 
 ### Enhancements:
 
