@@ -639,17 +639,30 @@ def CollectVmToVmSamples(
   # Sample TCPDUMP output:
   # 1680653297.391525 IP 34.83.176.250.33216 > 10.240.0.9.8080: Flags [S]...
   # Extracts datetime, src, dest ip:  (datetime) IP (src) > (dest)
+  internal_egress_sample = None
+  external_egress_sample = None
   for group in re.findall(
       r'([0-9.:]+) IP ([0-9.]+)\.\d+ > [0-9.]+\.\d+.*', tcpdump_output
   ):
     t, src = group
-    if src == vm_internal_ip:
-      samples.append(
-          sample.Sample('internal_egress', DeltaSec(t), 'second', {})
+    delta = DeltaSec(t)
+    # Guard against recycled IPs causing negative deltas (captured during the
+    # period between tcpdump starting and VM creation)
+    if delta < 0:
+      continue
+    # Capture only the first positive egress delta for each IP.
+    if src == vm_internal_ip and not internal_egress_sample:
+      internal_egress_sample = sample.Sample(
+          'internal_egress', delta, 'second', {}
       )
-    elif src == vm_external_ip:
-      samples.append(
-          sample.Sample('external_egress', DeltaSec(t), 'second', {})
+    elif src == vm_external_ip and not external_egress_sample:
+      external_egress_sample = sample.Sample(
+          'external_egress', delta, 'second', {}
       )
-
+    if internal_egress_sample and external_egress_sample:
+      break
+  if internal_egress_sample:
+    samples.append(internal_egress_sample)
+  if external_egress_sample:
+    samples.append(external_egress_sample)
   return samples
