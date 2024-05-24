@@ -95,7 +95,8 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     ] = vm_spec.resource_requests
     self.cloud: str = (
         self.CLOUD  # pytype: disable=annotation-type-mismatch
-        if isinstance(self.CLOUD, str) else FLAGS.cloud
+        if isinstance(self.CLOUD, str)
+        else FLAGS.cloud
     )
     self.sriov_network: Optional[str] = FLAGS.k8s_sriov_network or None
 
@@ -673,6 +674,13 @@ class DebianBasedKubernetesVirtualMachine(
     self.RemoteCommand(
         download_function(install_path, module_name, filename), timeout=timeout
     )
+
+  def _SetTransparentHugepages(self):
+    logging.info(
+        'Skipping transparent hugepages for Kubernetes VMs. PKB does not'
+        ' currently support this feature for Kubernetes VMs.'
+    )
+    return
 
   def ShouldDownloadPreprovisionedData(self, module_name: str, filename: str):
     """Returns whether or not preprovisioned data is available."""
