@@ -1732,9 +1732,6 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
     Free memory is calculated as sum of free, cached, and buffers
     as output from /proc/meminfo.
 
-    Args:
-      vm: vm to check
-
     Returns:
       free memory on the vm in KB
     """
@@ -1744,7 +1741,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         /MemFree:/ {total += $2}
         /Cached:/  {total += $2}
         /Buffers:/ {total += $2}
-        END        {print total}
+        END        {printf "%d",total}
         ' /proc/meminfo
         """)
     return int(stdout)
