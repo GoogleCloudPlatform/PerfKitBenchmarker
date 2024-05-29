@@ -1514,6 +1514,20 @@ class Windows2022DesktopSQLServer2019EnterpriseAzureVirtualMachine(
   IMAGE_URN = 'MicrosoftSQLServer:sql2019-ws2022:enterprise:latest'
 
 
+class Windows2022DesktopSQLServer2022StandardAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2022Standard,
+):
+  IMAGE_URN = 'MicrosoftSQLServer:sql2022-ws2022:standard-gen2:latest'
+
+
+class Windows2022DesktopSQLServer2022EnterpriseAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2022SQLServer2022Enterprise,
+):
+  IMAGE_URN = 'MicrosoftSQLServer:sql2022-ws2022:enterprise-gen2:latest'
+
+
 def GenerateDownloadPreprovisionedDataCommand(
     install_path, module_name, filename
 ):
