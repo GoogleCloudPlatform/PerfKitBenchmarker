@@ -314,7 +314,7 @@
     `--google_bigtable_app_profile_id` for Cloud Bigtable YCSB benchmarks.
 -   Add retryable failure sub-statuses for runs that fail on a `vm_util.Retry()`
     command timing out or exceeding its retry limit.
--   GCP and AWS local disks not included in striping are now available as scratch disks.
+-   Local disks not included in striping are now available as scratch disks.
 
 ### Bug fixes and maintenance updates:
 

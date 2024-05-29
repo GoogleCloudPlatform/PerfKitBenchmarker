@@ -175,13 +175,7 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
     disks = []
 
     for _ in range(self.disk_spec.num_striped_disks):
-      disk_number = self.vm.local_disk_counter + 1
-      self.vm.local_disk_counter += 1
-      if self.vm.local_disk_counter > self.vm.max_local_disks:
-        raise errors.Error('Not enough local disks.')
-      lun = next(self.vm.lun_counter)
-      data_disk = azure_disk.AzureDisk(self.disk_spec, self.vm, lun)
-      data_disk.disk_number = disk_number
+      data_disk = self._CreateLocalDisk()
       disks.append(data_disk)
     if len(disks) > 1:
       # If the disk_spec called for a striped disk, create one.
@@ -191,6 +185,23 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
     AzurePrepareScratchDiskStrategy().PrepareScratchDisk(
         self.vm, scratch_disk, self.disk_spec
     )
+
+    if self.disk_spec.num_striped_disks < self.vm.max_local_disks:
+      for _ in range(
+          self.vm.max_local_disks - self.disk_spec.num_striped_disks):
+        data_disk = self._CreateLocalDisk()
+        AzurePrepareScratchDiskStrategy().PrepareScratchDisk(
+            self.vm, data_disk, self.disk_spec)
+
+  def _CreateLocalDisk(self):
+    disk_number = self.vm.local_disk_counter + 1
+    self.vm.local_disk_counter += 1
+    if self.vm.local_disk_counter > self.vm.max_local_disks:
+      raise errors.Error('Not enough local disks.')
+    lun = next(self.vm.lun_counter)
+    data_disk = azure_disk.AzureDisk(self.disk_spec, self.vm, lun)
+    data_disk.disk_number = disk_number
+    return data_disk
 
 
 class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
