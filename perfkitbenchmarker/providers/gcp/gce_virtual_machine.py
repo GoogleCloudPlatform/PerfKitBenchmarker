@@ -268,7 +268,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       else:
         # Specifying gcp_min_cpu_platform explicitly removes any config.
         config_values.pop('min_cpu_platform', None)
-    if flag_values['disable_smt'].present:
+    if flag_values['disable_smt'].present and flag_values.disable_smt:
       config_values['threads_per_core'] = 1
     # Convert YAML to correct type even if only one element.
     if 'gce_tags' in config_values and isinstance(
