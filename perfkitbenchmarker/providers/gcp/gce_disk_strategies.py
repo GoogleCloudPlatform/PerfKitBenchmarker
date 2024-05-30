@@ -194,13 +194,17 @@ class SetUpGCEResourceDiskStrategy(disk_strategies.SetUpDiskStrategy):
       ):
         d.name = remote_nvme_devices.pop()
 
+  def SetupGCELocalDisks(self):
+    """Performs Linux specific setup of local disks."""
+    pass
+
 
 class SetUpGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
   """Strategies to set up local disks."""
 
   def SetUpDisk(self):
     # disk spec is not used here.
-    self.vm.SetupLocalDisks()
+    self.SetupGCELocalDisks()
     disks = []
     for _ in range(self.disk_spec.num_striped_disks):
       data_disk = self._CreateLocalDisk()
@@ -240,7 +244,7 @@ class SetUpPartitionedGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
   """Strategies to set up local disks with custom partitions."""
 
   def SetUpDisk(self):
-    self.vm.SetupLocalDisks()
+    self.SetupGCELocalDisks()
     while self.vm.local_disk_counter < self.vm.max_local_disks:
       if self.vm.ssd_interface == gce_disk.SCSI:
         name = 'local-ssd-%d' % self.vm.local_disk_counter
