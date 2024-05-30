@@ -35,7 +35,7 @@ from perfkitbenchmarker.linux_packages import netperf
 ALL_BENCHMARKS = ['STREAM', 'MAERTS', 'BIDIR', 'RRAGG']
 flags.DEFINE_list(
     'netperf_aggregate_benchmarks',
-    ALL_BENCHMARKS,
+    'RRAGG',
     'The netperf aggregate benchmark(s) to run. '
     'STREAM measures outbound throughput. '
     'MAERTS measures inbound throughput. '
