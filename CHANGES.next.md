@@ -73,7 +73,6 @@
     `--azure_preprovisioned_data_subscription`, which allows cross-subscription
     access.
 -   Remove Rocky Linux on Azure.
--   Changed supported Python version to 3.11.
 
 ### New features:
 
