@@ -447,6 +447,14 @@ class AwsDisk(disk.BaseDisk):
       self.metadata['throughput'] = self.throughput
     self.disk_spec_id = disk_spec_id
 
+  def IsNvme(self):
+    if self.disk_type == disk.LOCAL:
+      return LocalDriveIsNvme(self.machine_type)
+    elif self.disk_type in AWS_REMOTE_DISK_TYPES:
+      return EbsDriveIsNvme(self.machine_type)
+    else:
+      return False
+
   def AssignDeviceLetter(self, letter_suggestion, nvme_boot_drive_index):
     if LocalDriveIsNvme(self.machine_type) and EbsDriveIsNvme(
         self.machine_type

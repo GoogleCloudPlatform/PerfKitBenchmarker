@@ -326,6 +326,7 @@ class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
       if self.vm.local_disk_counter < self.vm.max_local_disks:
         for i in range(self.vm.local_disk_counter, self.vm.max_local_disks):
           data_disk = self._CreateLocalDisk(disk_spec, spec_id, i)
+          disks.append(data_disk)
 
           if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
             nvme_devices = self.vm.GetNVMEDeviceInfo()
@@ -334,6 +335,7 @@ class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
             AWSPrepareScratchDiskStrategy().PrepareScratchDisk(
                 self.vm, data_disk, disk_spec
             )
+      self.vm.SetupLocalDisks()
 
   def _CreateLocalDisk(self, disk_spec, spec_id, i):
     disk_spec_id = self.vm.create_disk_strategy.BuildDiskSpecId(spec_id, i)

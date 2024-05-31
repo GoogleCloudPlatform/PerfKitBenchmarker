@@ -265,6 +265,16 @@ _DISABLE_CSTATE_BY_NAME_AND_DEEPER = flags.DEFINE_string(
     ' will remain enabled.',
 )
 
+_ENABLE_NVME_INTERRUPT_COALEASING = flags.DEFINE_bool(
+    'enable_nvme_interrupt_coaleasing',
+    False,
+    'Attempt to enable interrupt coaleasing for all the NVMe disks on this VM. '
+    'Currently only implemented for local disks. '
+    'Depending on the Guest, this command may or may not actually '
+    'modify the interrupt coaleasing behavior.',
+)
+
+
 # RHEL package managers
 YUM = 'yum'
 DNF = 'dnf'
@@ -1816,7 +1826,25 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def SetupLocalDisks(self):
     """Performs Linux specific setup of local disks."""
-    pass
+    local_disks = []
+    for d in self.scratch_disks:
+      if d.disk_type == disk.LOCAL and d.IsNvme():
+        if isinstance(d, disk.StripedDisk):
+          local_disks += d.disks
+        else:
+          local_disks.append(d)
+    if _ENABLE_NVME_INTERRUPT_COALEASING.value:
+      self._EnableInterruptCoaleasing(local_disks)
+
+  def _EnableInterruptCoaleasing(self, local_disks):
+    if not _ENABLE_NVME_INTERRUPT_COALEASING.value:
+      return
+    self.os_metadata['interrupt_coaleasing'] = True
+    self.InstallPackages('nvme-cli')
+    for d in local_disks:
+      path = d.GetDevicePath()
+      self.RemoteCommand(
+          f'sudo nvme --set-feature --feature-id=8 --value=0x101 {path}')
 
   def StripeDisks(self, devices, striped_device):
     """Raids disks together using mdadm.

@@ -223,9 +223,11 @@ class SetUpGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
           self.vm.max_local_disks - self.disk_spec.num_striped_disks
       ):
         data_disk = self._CreateLocalDisk()
+        disks.append(data_disk)
         GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
             self.vm, data_disk, self.disk_spec
         )
+    self.vm.SetupLocalDisks()
 
   def _CreateLocalDisk(self):
     if self.vm.ssd_interface == gce_disk.SCSI:

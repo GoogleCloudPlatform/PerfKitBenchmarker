@@ -345,6 +345,9 @@ class GceLocalDisk(disk.BaseDisk):
   def GetDevicePath(self) -> str:
     return f'/dev/disk/by-id/google-{self.name}'
 
+  def IsNvme(self):
+    return self.interface == NVME
+
 
 class GceDisk(disk.BaseDisk):
   """Object representing a GCE Disk."""
@@ -547,6 +550,9 @@ class GceDisk(disk.BaseDisk):
       return self.name
     # by default, returns this name id.
     return f'/dev/disk/by-id/google-{self.name}'
+
+  def IsNvme(self):
+    return self.interface == NVME
 
 
 class GceStripedDisk(disk.StripedDisk):

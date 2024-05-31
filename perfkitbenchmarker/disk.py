@@ -571,6 +571,9 @@ class BaseDisk(resource.BaseResource):
       )
     return samples
 
+  def IsNvme(self):
+    raise NotImplementedError()
+
 
 class StripedDisk(BaseDisk):
   """Object representing several disks striped together."""
@@ -643,6 +646,12 @@ class StripedDisk(BaseDisk):
             self.disk_create_time, disk_details_create_time
         )
     return self.disk_create_time
+
+  def IsNvme(self):
+    for d in self.disks:
+      if not d.IsNvme():
+        return False
+    return True
 
 
 class NetworkDisk(BaseDisk):

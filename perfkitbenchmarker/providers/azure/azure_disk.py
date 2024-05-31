@@ -412,6 +412,14 @@ class AzureDisk(disk.BaseDisk):
       except IndexError:
         raise TooManyAzureDisksError()
 
+  def IsNvme(self):
+    if self.disk_type == disk.LOCAL:
+      return LocalDriveIsNvme(self.machine_type)
+    elif self.disk_type in AZURE_REMOTE_DISK_TYPES:
+      return self.vm.SupportsNVMe()
+    else:
+      return False
+
 
 class AzureStripedDisk(disk.StripedDisk):
   """Object representing multiple azure disks striped together."""

@@ -190,8 +190,10 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
       for _ in range(
           self.vm.max_local_disks - self.disk_spec.num_striped_disks):
         data_disk = self._CreateLocalDisk()
+        disks.append(data_disk)
         AzurePrepareScratchDiskStrategy().PrepareScratchDisk(
             self.vm, data_disk, self.disk_spec)
+    self.vm.SetupLocalDisks()
 
   def _CreateLocalDisk(self):
     disk_number = self.vm.local_disk_counter + 1
