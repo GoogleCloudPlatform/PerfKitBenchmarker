@@ -32,6 +32,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
@@ -174,6 +175,30 @@ class EksCluster(container_service.KubernetesCluster):
         f'--service-account-role-arn=arn:aws:iam::{self.account}:role/{ebs_csi_driver_role}',
     ]
     vm_util.IssueCommand(cmd)
+
+    if aws_flags.AWS_EKS_POD_IDENTITY_ROLE.value:
+      cmd = util.AWS_PREFIX + [
+          'eks',
+          'create-addon',
+          '--addon-name=eks-pod-identity-agent',
+          f'--region={self.region}',
+          f'--cluster-name={self.name}',
+      ]
+      vm_util.IssueCommand(cmd)
+      cmd = util.AWS_PREFIX + [
+          'eks',
+          'create-pod-identity-association',
+          '--role-arn',
+          (
+              f'arn:aws:iam::{self.account}:role/'
+              + aws_flags.AWS_EKS_POD_IDENTITY_ROLE.value
+          ),
+          '--namespace=default',
+          '--service-account=default',
+          f'--region={self.region}',
+          f'--cluster-name={self.name}',
+      ]
+      vm_util.IssueCommand(cmd)
 
   def _CreateNodeGroup(
       self, nodepool_config: container_service.BaseNodePoolConfig

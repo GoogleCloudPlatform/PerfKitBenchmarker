@@ -226,18 +226,30 @@ AWS_EC2_INSTANCE_PROFILE = flags.DEFINE_string(
     'aws_ec2_instance_profile',
     None,
     'The instance profile to use for EC2 instances. '
-    'Allows calling APIs on the instance. '
-    'Required if --aws_preprovisioned_data_bucket is set.',
+    'Allows calling APIs on the instance.',
+)
+AWS_EKS_POD_IDENTITY_ROLE = flags.DEFINE_string(
+    'aws_eks_pod_identity_role',
+    None,
+    'The IAM role to associate with the pod identity for EKS clusters.',
 )
 
 
 @flags.multi_flags_validator(
-    [AWS_PREPROVISIONED_DATA_BUCKET.name, AWS_EC2_INSTANCE_PROFILE.name],
-    message='--aws_ec2_instance_profile must be set if '
-    '--aws_preprovisioned_data_bucket is set.',
+    [
+        AWS_PREPROVISIONED_DATA_BUCKET.name,
+        AWS_EC2_INSTANCE_PROFILE.name,
+        AWS_EKS_POD_IDENTITY_ROLE.name,
+    ],
+    message=(
+        '--aws_ec2_instance_profile or --aws_eks_pod_identity_role must be '
+        'set if --aws_preprovisioned_data_bucket is set.'
+    ),
 )
 def _ValidatePreprovisionedDataAccess(flag_values: dict[str, Any]) -> bool:
+  """Validates that an auth flag is set if preprovisioned data is used."""
   return bool(
       not flag_values[AWS_PREPROVISIONED_DATA_BUCKET.name]
       or flag_values[AWS_EC2_INSTANCE_PROFILE.name]
+      or flag_values[AWS_EKS_POD_IDENTITY_ROLE.name]
   )
