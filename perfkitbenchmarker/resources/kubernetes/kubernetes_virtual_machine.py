@@ -695,7 +695,7 @@ class DebianBasedKubernetesVirtualMachine(
     elif self.cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
       stat_function = aws_virtual_machine.GenerateStatPreprovisionedDataCommand
       aws_virtual_machine.AwsVirtualMachine.InstallCli(self)
-    elif self.cloud == 'Azure' and FLAGS.azure_preprovisioned_data_bucket:
+    elif self.cloud == 'Azure' and FLAGS.azure_preprovisioned_data_account:
       stat_function = (
           azure_virtual_machine.GenerateStatPreprovisionedDataCommand
       )
