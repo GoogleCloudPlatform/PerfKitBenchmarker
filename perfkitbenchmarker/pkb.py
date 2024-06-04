@@ -1615,7 +1615,7 @@ def _CollectMeminfoHandler(
 
 def Main():
   """Entrypoint for PerfKitBenchmarker."""
-  assert sys.version_info >= (3, 9), 'PerfKitBenchmarker requires Python 3.9+'
+  assert sys.version_info >= (3, 11), 'PerfKitBenchmarker requires Python 3.11+'
   log_util.ConfigureBasicLogging()
   _InjectBenchmarkInfoIntoDocumentation()
   argv = flag_alias.AliasFlagsFromArgs(sys.argv)

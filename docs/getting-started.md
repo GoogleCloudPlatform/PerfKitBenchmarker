@@ -5,8 +5,8 @@ layout: page
 
 ## Python
 
-PerfKitBenchmarker requires [Python](https://www.python.org/downloads/) 3.9+
-and is tested on Python 3.9. We recommend using a
+PerfKitBenchmarker requires [Python](https://www.python.org/downloads/) 3.11+
+and is tested on Python 3.11. We recommend using a
 [virtual environment](https://docs.python.org/3/tutorial/venv.html) to manage
 different Python versions and their required `pip` dependencies.
 
