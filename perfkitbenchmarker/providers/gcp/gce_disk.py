@@ -234,7 +234,7 @@ class GceDiskSpec(disk.BaseDiskSpec):
     """
     result = super(GceDiskSpec, cls)._GetOptionDecoderConstructions()
     result.update({
-        'interface': (option_decoders.StringDecoder, {'default': 'SCSI'}),
+        'interface': (option_decoders.StringDecoder, {'default': 'NVME'}),
         'num_local_ssds': (
             option_decoders.IntDecoder,
             {'default': 0, 'min': 0},

@@ -295,7 +295,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         ),
         'ssd_interface': (
             option_decoders.StringDecoder,
-            {'default': 'SCSI'},
+            {'default': 'NVME'},
         ),
         'num_local_ssds': (
             option_decoders.IntDecoder,
