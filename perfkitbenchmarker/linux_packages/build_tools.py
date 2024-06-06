@@ -89,7 +89,7 @@ def BuildGccFromSource(vm, gcc_version):
     vm.InstallPackages('wget')
     try:
       vm.RemoteCommand(
-          f'cd {build_dir} && wget {GCC_URL.format(version=gcc_version)}'
+          f'cd {build_dir} && wget -nv {GCC_URL.format(version=gcc_version)}'
       )
     # Some older OS images have outdated certificates; use curl instead
     except errors.VirtualMachine.RemoteCommandError as e:
@@ -99,7 +99,7 @@ def BuildGccFromSource(vm, gcc_version):
           f'curl {GCC_URL.format(version=gcc_version)} '
           f'-L -o {gcc_tar}'
       )
-  vm.RemoteCommand(f'cd {build_dir} && tar xzvf {gcc_tar}')
+  vm.RemoteCommand(f'cd {build_dir} && tar xzf {gcc_tar}')
   vm.RemoteCommand(f'cd {build_dir} && mkdir -p obj.gcc-{gcc_version}')
   vm.RemoteCommand(
       f'cd {build_dir}/gcc-{gcc_version} && ./contrib/download_prerequisites'
