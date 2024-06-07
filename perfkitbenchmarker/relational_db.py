@@ -22,6 +22,7 @@ import re
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sql_engine_utils
 import six
@@ -509,6 +510,16 @@ class BaseRelationalDb(resource.BaseResource):
         lambda client_query_tools: client_query_tools.InstallPackages(),
         self.client_vms_query_tools,
     )
+
+    # Add a traceroute command to the client VM to ensure that the database is
+    # accessible. This also informs the baseline latency of the network.
+    if self.client_vm.OS_TYPE in os_types.LINUX_OS_TYPES and self.endpoint:
+      self.client_vm.RemoteCommand(
+          'sudo apt-get install -y tcptraceroute', ignore_failure=True
+      )
+      self.client_vm.RemoteCommand(
+          f'tcptraceroute {self.endpoint} {self.port}', ignore_failure=True
+      )
 
   def UpdateCapacityForLoad(self) -> None:
     """Updates infrastructure to the correct capacity for loading."""
