@@ -209,6 +209,7 @@ flags.DEFINE_enum(
         'broadwell',
         'skylake',
         'cascadelake',
+        'rome',
         'milan',
         'icelake',
     ],
