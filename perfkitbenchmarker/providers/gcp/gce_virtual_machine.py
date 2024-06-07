@@ -190,6 +190,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     self.node_type: str = None
     self.min_cpu_platform: str = None
     self.threads_per_core: int = None
+    self.visible_core_count: int = None
     self.gce_tags: List[str] = None
     self.min_node_cpus: int = None
     self.subnet_name: str = None
@@ -270,6 +271,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         config_values.pop('min_cpu_platform', None)
     if flag_values['disable_smt'].present and flag_values.disable_smt:
       config_values['threads_per_core'] = 1
+    if flag_values['visible_core_count'].present:
+      config_values['visible_core_count'] = flag_values.visible_core_count
     # Convert YAML to correct type even if only one element.
     if 'gce_tags' in config_values and isinstance(
         config_values['gce_tags'], str
@@ -324,6 +327,9 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
             {'default': None},
         ),
         'threads_per_core': (option_decoders.IntDecoder, {'default': None}),
+        'visible_core_count': (option_decoders.IntDecoder, {
+            'default': None
+        }),
         'gce_tags': (
             option_decoders.ListDecoder,
             {
@@ -553,6 +559,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.min_cpu_platform = vm_spec.min_cpu_platform
     self.threads_per_core = vm_spec.threads_per_core
+    self.visible_core_count = vm_spec.visible_core_count
     self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.gce_tags = vm_spec.gce_tags
@@ -704,6 +711,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.threads_per_core:
       cmd.flags['threads-per-core'] = self.threads_per_core
       self.metadata['threads_per_core'] = self.threads_per_core
+
+    if self.visible_core_count:
+      cmd.flags['visible-core-count'] = self.visible_core_count
 
     if self.gpu_count and (
         self.cpus
@@ -1207,6 +1217,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     result['gce_network_tier'] = self.gce_network_tier
     result['gce_nic_type'] = self.gce_nic_type
     result['gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
+    if self.visible_core_count:
+      result['visible_core_count'] = self.visible_core_count
     if self.network.mtu:
       result['mtu'] = self.network.mtu
     if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
