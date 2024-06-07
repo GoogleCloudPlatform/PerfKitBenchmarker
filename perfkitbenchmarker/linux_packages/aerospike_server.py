@@ -248,6 +248,8 @@ def _WaitForServerUp(server, idx=None):
     raise errors.Resource.RetryableCreationError(
         "Aerospike server not up yet. Expected 'ok' but got '%s'." % out
     )
+  finally:
+    server.RemoteCommand('sudo systemctl status aerospike')
 
 
 def WipeDisk(server, devices):
