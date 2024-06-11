@@ -54,6 +54,7 @@ def YumInstall(vm):
   # compilations so install it explicitly.
   if vm.HasPackage('libnsl'):
     vm.InstallPackages('libnsl')
+
   if FLAGS.gcc_version:
     Reinstall(vm, version=FLAGS.gcc_version)
 
@@ -63,6 +64,10 @@ def AptInstall(vm):
   vm.InstallPackages('build-essential git libtool autoconf automake')
   if FLAGS.gcc_version:
     Reinstall(vm, version=FLAGS.gcc_version)
+
+  # Install texinfo which provides makeinfo required by GCC 13
+  if vm.HasPackage('texinfo'):
+    vm.InstallPackages('texinfo')
 
 
 def BuildGccFromSource(vm, gcc_version):
