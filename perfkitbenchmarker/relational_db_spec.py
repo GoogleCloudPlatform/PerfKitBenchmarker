@@ -349,6 +349,14 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
         config_values['vm_groups']['servers']['disk_spec'][cloud][
             'provisioned_iops'
         ] = flag_values.db_disk_iops
+    if flag_values['db_disk_throughput'].present:
+      config_values['db_disk_spec'][cloud][
+          'provisioned_throughput'
+      ] = flag_values.db_disk_throughput
+      if has_unmanaged_dbs:
+        config_values['vm_groups']['servers']['disk_spec'][cloud][
+            'provisioned_throughput'
+        ] = flag_values.db_disk_throughput
 
     if flag_values['client_vm_os_type'].present:
       config_values['vm_groups']['clients'][

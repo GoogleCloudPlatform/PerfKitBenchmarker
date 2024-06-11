@@ -105,6 +105,12 @@ flags.DEFINE_integer(
     'Disk IOPs to provision for database disks, if provisioning is applicable'
     ' or required. IOPs applies to each disk.',
 )
+flags.DEFINE_integer(
+    'db_disk_throughput',
+    None,
+    'Disk throughput to provision for database disks, if provisioning is'
+    'applicable or required. Throughput applies to each disk.',
+)
 
 flags.DEFINE_integer(
     'managed_db_azure_compute_units', None, 'Number of Dtus in the database.'
