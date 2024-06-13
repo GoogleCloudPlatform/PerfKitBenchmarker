@@ -153,6 +153,15 @@ flags.DEFINE_string(
     '--fio_target_mode is against_device_with_fill or '
     'against_file_with_fill.',
 )
+flags.DEFINE_string(
+    'fio_fill_block_size',
+    '512k',
+    'The block size of the IO request to fill in prepare stage. '
+    'A filesystem will be unmounted before '
+    'filling and remounted afterwards. Only valid when '
+    '--fio_target_mode is against_device_with_fill or '
+    'against_file_with_fill.',
+)
 flag_util.DEFINE_integerlist(
     'fio_io_depths',
     flag_util.IntegerList([1]),
@@ -311,7 +320,7 @@ def FillDevice(vm, disk, fill_size, exec_path):
   command = (
       f'{exec_path} --filename={disk.GetDevicePath()} '
       f'--ioengine={FLAGS.fio_ioengine} --name=fill-device '
-      f'--blocksize=512k --iodepth=64 --rw=write --direct=1 --size={fill_size}'
+      f'--blocksize={FLAGS.fio_fill_block_size} --iodepth=64 --rw=write --direct=1 --size={fill_size}'
   )
 
   vm.RobustRemoteCommand(command)
@@ -1096,6 +1105,7 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
   for item in samples:
     item.metadata['fio_target_mode'] = FLAGS.fio_target_mode
     item.metadata['fio_fill_size'] = FLAGS.fio_fill_size
+    item.metadata['fio_fill_block_size'] = FLAGS.fio_fill_block_size
     item.metadata['fio_rng'] = FLAGS.fio_rng
 
   return samples
