@@ -29,21 +29,7 @@ _DEFAULT_ROLE = 'default_0'
 _OUTPUT_FILE = 'iostat_output.json'
 
 _EXPECTED_SAMPLES = [
-    sample.Sample(
-        metric='dm-0_r_await_time_series',
-        value=0.0,
-        unit='ms',
-        metadata={
-            'values': [0.95, 0.0],
-            'timestamps': [1710463994.0, 1710463995.0],
-            'interval': 1,
-            'event': 'iostat',
-            'role': _DEFAULT_ROLE,
-            'nodename': 'test-instance',
-            'disk': 'dm-0',
-        },
-        timestamp=mock.ANY,
-    ),
+    # no dm-0 since average util < 1
     sample.Sample(
         metric='dm-1_r_await_time_series',
         value=0.0,
@@ -110,9 +96,9 @@ class IostatCollectorTestCase(parameterized.TestCase):
   ):
     collector = iostat.IostatCollector(
         interval=1,
-        count=2,
         output_directory=self.output_directory,
-        metrics=['r_await'],
+        disk_metrics=['r_await'],
+        cpu_metrics=None,
         device_regex=device_regex,
     )
     collector._role_mapping = {_DEFAULT_ROLE: _OUTPUT_FILE}
@@ -131,8 +117,8 @@ class IostatCollectorTestCase(parameterized.TestCase):
           'linux_default_test',
           _CreateDummyVm(os_types.DEBIAN),
           (
-              'export S_TIME_FORMAT=ISO; iostat -xt 1 10 -o JSON >'
-              f' {_OUTPUT_FILE} 2>&1 &'
+              'export S_TIME_FORMAT=ISO; iostat -xt 1 -o JSON >'
+              f' {_OUTPUT_FILE} 2>&1 & echo $!'
           ),
       ),
   )

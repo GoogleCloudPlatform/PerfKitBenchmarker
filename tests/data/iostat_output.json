@@ -68,7 +68,7 @@
                 "wareq-sz": 4.0,
                 "dareq-sz": 0.0,
                 "aqu-sz": 0.0,
-                "util": 0.0
+                "util": 1.0
               },
               {
                 "disk_device": "sda",
@@ -93,7 +93,7 @@
                 "wareq-sz": 27.46,
                 "dareq-sz": 2645.84,
                 "aqu-sz": 0.03,
-                "util": 0.98
+                "util": 1.98
               }
             ]
           },
@@ -156,7 +156,7 @@
                 "wareq-sz": 0.0,
                 "dareq-sz": 0.0,
                 "aqu-sz": 0.0,
-                "util": 0.0
+                "util": 1.0
               },
               {
                 "disk_device": "sda",
@@ -181,7 +181,7 @@
                 "wareq-sz": 0.0,
                 "dareq-sz": 0.0,
                 "aqu-sz": 0.0,
-                "util": 0.4
+                "util": 1.4
               }
             ]
           }

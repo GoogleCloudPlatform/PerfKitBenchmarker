@@ -116,7 +116,7 @@ class BaseCollector(object):
     if vm.BASE_OS_TYPE == os_types.WINDOWS:
       return 'taskkill /PID {0} /F'.format(pid)
     else:
-      return 'kill {0}'.format(pid)
+      return 'kill -INT {0}'.format(pid)
 
   def _StartOnVm(self, vm, suffix=''):
     """Start collector, having it write to an output file."""
