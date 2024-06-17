@@ -190,6 +190,8 @@ def PrepareVm(vm):
   vm.Install('cuda_toolkit')
   vm.Install('nccl')
   vm.Install('openmpi')
+  vm.RemoteCommand('rm -rf nccl-tests')
+  vm.RemoteCommand('git clone https://github.com/NVIDIA/nccl-tests.git')
   vm.RemoteCommand(
       'cd nccl-tests && {env} make MPI=1 MPI_HOME={mpi} '
       'NCCL_HOME={nccl} CUDA_HOME={cuda}'.format(

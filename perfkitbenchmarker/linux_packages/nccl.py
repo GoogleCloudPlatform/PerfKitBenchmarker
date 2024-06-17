@@ -34,7 +34,6 @@ flags.DEFINE_string('nccl_home', '$HOME/nccl/build', 'NCCL home')
 FLAGS = flags.FLAGS
 
 GIT_REPO = 'https://github.com/NVIDIA/nccl.git'
-TESTS_REPO = 'https://github.com/NVIDIA/nccl-tests.git'
 
 
 def _Build(vm):
@@ -44,7 +43,6 @@ def _Build(vm):
           git_repo=GIT_REPO, version=FLAGS.nccl_version
       )
   )
-  vm.RemoteCommand(f'[ -d "nccl-tests" ] || git clone {TESTS_REPO}')
   cuda_home = cuda_toolkit.CUDA_HOME
   vm.InstallPackages('build-essential devscripts debhelper fakeroot')
 
