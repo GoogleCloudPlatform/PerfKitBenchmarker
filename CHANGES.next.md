@@ -320,6 +320,7 @@
 -   Add retryable failure sub-statuses for runs that fail on a `vm_util.Retry()`
     command timing out or exceeding its retry limit.
 -   Local disks not included in striping are now available as scratch disks.
+-   Add supportability of running Hadoop DFSIO on unmanaged Hadoop Yarn cluster.
 
 ### Bug fixes and maintenance updates:
 

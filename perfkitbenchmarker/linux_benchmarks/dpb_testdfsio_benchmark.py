@@ -46,9 +46,11 @@ dpb_testdfsio_benchmark:
         GCP:
           disk_size: 1500
           disk_type: pd-standard
+          mount_point: /scratch
         AWS:
           disk_size: 1500
           disk_type: gp2
+          mount_point: /scratch
     worker_count: 2
 """
 
@@ -74,7 +76,12 @@ flags.DEFINE_list(
 
 FLAGS = flags.FLAGS
 
-SUPPORTED_DPB_BACKENDS = [dpb_constants.DATAPROC, dpb_constants.EMR]
+SUPPORTED_DPB_BACKENDS = [
+    dpb_constants.DATAPROC,
+    dpb_constants.EMR,
+    # add unmanged hadoop yarn cluster support for dfsio
+    dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER,
+]
 
 # TestDSIO commands
 WRITE = 'write'
