@@ -178,29 +178,8 @@ def PrepareVm(vm):
   Args:
     vm: virtual machine on which to install NCCL
   """
-  env = ''
-  if FLAGS.aws_efa:
-    env = (
-        'export LD_LIBRARY_PATH=/opt/amazon/efa/lib:/opt/amazon/efa/lib64:'
-        '$LD_LIBRARY_PATH &&'
-    )
-  if FLAGS.azure_infiniband:
-    vm.Install('mofed')
   vm.AuthenticateVm()
-  vm.Install('cuda_toolkit')
-  vm.Install('nccl')
-  vm.Install('openmpi')
-  vm.RemoteCommand('rm -rf nccl-tests')
-  vm.RemoteCommand('git clone https://github.com/NVIDIA/nccl-tests.git')
-  vm.RemoteCommand(
-      'cd nccl-tests && {env} make MPI=1 MPI_HOME={mpi} '
-      'NCCL_HOME={nccl} CUDA_HOME={cuda}'.format(
-          env=env,
-          mpi=FLAGS.nccl_mpi_home,
-          nccl=FLAGS.nccl_home,
-          cuda='/usr/local/cuda-{}'.format(FLAGS.cuda_toolkit_version),
-      )
-  )
+  vm.Install('nccl_tests')
 
 
 def Prepare(benchmark_spec):
