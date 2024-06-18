@@ -15,10 +15,29 @@
 
 """Module containing mysql installation and cleanup functions."""
 
+import logging
 import re
+
+from perfkitbenchmarker import os_types
+
 
 MYSQL_PSWD = 'perfkitbenchmarker'
 PACKAGE_NAME = 'mysql'
+
+DISABLE_HUGE_PAGES = """
+[Unit]
+Description=Disable Transparent Huge Pages (THP)
+DefaultDependencies=no
+After=sysinit.target local-fs.target
+Before=mysqld.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'echo never | tee /sys/kernel/mm/transparent_hugepage/enabled > /dev/null'
+
+[Install]
+WantedBy=basic.target
+"""
 
 
 def YumInstall(vm):
@@ -103,3 +122,53 @@ def AptGetServiceName(vm):
   """Returns the name of the mysql service."""
   del vm
   return 'mysql'
+
+
+def ConfigureSystemSettings(vm):
+  """Percona system settings.
+
+  These system settings are what Percona (consulting firm) applies to
+  the mysql instances that they build for their customers.
+  Currently tested for centos_stream9 and Ubuntu only.
+
+  Args:
+    vm: The VM to configure.
+  """
+  if vm.OS_TYPE != os_types.LINUX_OS_TYPES:
+    logging.error(
+        'System settings not configured for unsupported OS: %s', vm.os_info)
+    return
+  sysctl_append = 'sudo tee -a /etc/sysctl.conf'
+  vm.RemoteCommand(f'echo "vm.swappiness=1" | {sysctl_append}')
+  vm.RemoteCommand(f'echo "vm.dirty_ratio=15" | {sysctl_append}')
+  vm.RemoteCommand(f'echo "vm.dirty_background_ratio=5" | {sysctl_append}')
+  vm.RemoteCommand(f'echo "net.core.somaxconn=65535" | {sysctl_append}')
+  vm.RemoteCommand(
+      f'echo "net.core.netdev_max_backlog=65535" | {sysctl_append}')
+  vm.RemoteCommand(
+      f'echo "net.ipv4.tcp_max_syn_backlog=65535" | {sysctl_append}')
+  vm.RemoteCommand(
+      f'echo "net.ipv4.ip_local_port_range=4000 65000" | {sysctl_append}')
+  vm.RemoteCommand(f'echo "net.ipv4.tcp_tw_reuse=1" | {sysctl_append}')
+  vm.RemoteCommand(f'echo "net.ipv4.tcp_fin_timeout=5" | {sysctl_append}')
+  vm.RemoteCommand('sudo sysctl -p')
+
+  limits_append = 'sudo tee -a /etc/security/limits.conf'
+  vm.RemoteCommand(f'echo "*     soft    nofile  64000" | {limits_append}')
+  vm.RemoteCommand(f'echo "*     hard    nofile  64000" | {limits_append}')
+
+  auth_append = 'sudo tee -a /etc/pam.d/login'
+  vm.RemoteCommand(f'echo "session required pam_limits.so" | {auth_append}')
+
+  thp_append = 'sudo tee -a /usr/lib/systemd/system/disable-thp.service'
+  vm.RemoteCommand('sudo touch /usr/lib/systemd/system/disable-thp.service')
+  vm.RemoteCommand(f'echo "{DISABLE_HUGE_PAGES}" | {thp_append}')
+  vm.RemoteCommand(
+      'sudo chown root:root /usr/lib/systemd/system/disable-thp.service')
+  vm.RemoteCommand(
+      'sudo chmod 0600 /usr/lib/systemd/system/disable-thp.service')
+  vm.RemoteCommand('sudo systemctl daemon-reload')
+  vm.RemoteCommand('sudo systemctl enable disable-thp.service')
+  vm.RemoteCommand('sudo systemctl start disable-thp.service')
+
+  vm.Reboot()
