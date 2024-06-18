@@ -1066,7 +1066,6 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
   #      so the program pauses here with no feedback to the user.
   #      This is a pretty lousy experience.
   logging.info('FIO Results:')
-
   start_time = time.time()
   stdout, _ = vm.RobustRemoteCommand(
       fio_command, timeout=FLAGS.fio_command_timeout_sec
