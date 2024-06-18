@@ -23,7 +23,16 @@ PACKAGE_NAME = 'mysql'
 
 def YumInstall(vm):
   """Installs the mysql package on the VM."""
-  raise NotImplementedError
+  vm.RemoteCommand(
+      'sudo yum -y install '
+      'https://dev.mysql.com/get/mysql80-community-release-el9-5.noarch.rpm'
+  )
+  vm.RemoteCommand('sudo dnf config-manager --enable mysql80-community')
+  vm.RemoteCommand('sudo dnf config-manager --enable mysql-tools-community')
+  vm.RemoteCommand(
+      'sudo yum install -y mysql-community-server mysql-community-client luajit'
+      ' libaio screen mysql-community-libs'
+  )
 
 
 def AptInstall(vm):
