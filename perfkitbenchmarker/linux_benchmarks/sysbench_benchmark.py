@@ -22,8 +22,6 @@ As other cloud providers deliver a managed MySQL service, we will add it here.
 
 import datetime
 import logging
-import re
-import statistics
 import time
 from typing import List
 
@@ -32,7 +30,6 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
@@ -641,123 +638,6 @@ def _GetDatabaseSize(db):
   return size_mb
 
 
-def _ParseSysbenchTransactions(
-    sysbench_output, metadata
-) -> List[sample.Sample]:
-  """Parse sysbench transaction results."""
-  transactions_per_second = regex_util.ExtractFloat(
-      r'transactions: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output
-  )
-  queries_per_second = regex_util.ExtractFloat(
-      r'queries: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output
-  )
-  return [
-      sample.Sample('tps', transactions_per_second, 'tps', metadata),
-      sample.Sample('qps', queries_per_second, 'qps', metadata),
-  ]
-
-
-def _ParseSysbenchLatency(
-    sysbench_outputs: List[str], metadata
-) -> List[sample.Sample]:
-  """Parse sysbench latency results."""
-  min_latency_array = []
-  average_latency_array = []
-  max_latency_array = []
-  for sysbench_output in sysbench_outputs:
-    min_latency_array.append(
-        regex_util.ExtractFloat('min: *([0-9]*[.]?[0-9]+)', sysbench_output)
-    )
-
-    average_latency_array.append(
-        regex_util.ExtractFloat('avg: *([0-9]*[.]?[0-9]+)', sysbench_output)
-    )
-    max_latency_array.append(
-        regex_util.ExtractFloat('max: *([0-9]*[.]?[0-9]+)', sysbench_output)
-    )
-  min_latency_meta = metadata.copy()
-  average_latency_meta = metadata.copy()
-  max_latency_meta = metadata.copy()
-  if len(sysbench_outputs) > 1:
-    min_latency_meta.update({'latency_array': min_latency_array})
-    average_latency_meta.update({'latency_array': average_latency_array})
-    max_latency_meta.update({'latency_array': max_latency_array})
-  return [
-      sample.Sample(
-          'min_latency',
-          min(min_latency_array),
-          'ms',
-          min_latency_meta,
-      ),
-      sample.Sample(
-          'average_latency',
-          statistics.mean(average_latency_array),
-          'ms',
-          average_latency_meta,
-      ),
-      sample.Sample(
-          'max_latency',
-          max(max_latency_array),
-          'ms',
-          max_latency_meta,
-      ),
-  ]
-
-
-def _ParseSysbenchTimeSeries(sysbench_output, metadata) -> List[sample.Sample]:
-  """Parses sysbench output.
-
-  Extract relevant TPS and latency numbers, and populate the final result
-  collection with these information.
-
-  Specifically, we are interested in tps and latency numbers reported by each
-  reporting interval.
-
-  Args:
-    sysbench_output: The output from sysbench.
-    metadata: Metadata of the benchmark
-
-  Returns:
-    Three arrays, the tps, latency and qps numbers and average latency.
-  """
-  tps_numbers = []
-  latency_numbers = []
-  qps_numbers = []
-  for line in sysbench_output.split('\n'):
-    # parse a line like (it's one line - broken up in the comment to fit):
-    # [ 6s ] thds: 16 tps: 650.51 qps: 12938.26 (r/w/o: 9046.18/2592.05/1300.03)
-    # lat (ms,99%): 40.37 err/s: 0.00 reconn/s: 0.00
-    if re.match(r'^\[', line):
-      match = re.search('tps: (.*?) ', line)
-      if not match:
-        raise ValueError(f'no tps in: {line}')
-      tps_numbers.append(float(match.group(1)))
-      match = re.search(r'lat \(.*?\): (.*?) ', line)
-      if not match:
-        raise ValueError(f'no lat in: {line}')
-      latency_numbers.append(float(match.group(1)))
-      match = re.search(r'qps: (.*?) \(.*?\) ', line)
-      if not match:
-        raise ValueError(f'no qps in: {line}')
-      qps_numbers.append(float(match.group(1)))
-      if line.startswith('SQL statistics:'):
-        break
-
-  tps_metadata = metadata.copy()
-  tps_metadata.update({'tps': tps_numbers})
-  tps_sample = sample.Sample('tps_array', -1, 'tps', tps_metadata)
-
-  latency_metadata = metadata.copy()
-  latency_metadata.update({'latency': latency_numbers})
-  latency_sample = sample.Sample('latency_array', -1, 'ms', latency_metadata)
-
-  qps_metadata = metadata.copy()
-  qps_metadata.update({'qps': qps_numbers})
-  qps_sample = sample.Sample('qps_array', -1, 'qps', qps_metadata)
-
-  return [tps_sample, latency_sample, qps_sample]
-
-
 def _GetSysbenchRunCommand(
     duration: int,
     db: relational_db.BaseRelationalDb,
@@ -879,9 +759,9 @@ def _RunSysbench(vms, metadata, benchmark_spec, sysbench_thread_count):
   logging.info('\n Parsing Sysbench Results...\n')
 
   return (
-      _ParseSysbenchTimeSeries(stdout, metadata)
-      + _ParseSysbenchLatency([stdout], metadata)
-      + _ParseSysbenchTransactions(stdout, metadata)
+      sysbench.ParseSysbenchTimeSeries(stdout, metadata)
+      + sysbench.ParseSysbenchLatency([stdout], metadata)
+      + sysbench.ParseSysbenchTransactions(stdout, metadata)
   )
 
 
@@ -909,7 +789,9 @@ def _RunScaleUpClientsBenchmark(
     total_tps = []
     total_qps = []
     for stdout in stdouts:
-      current_transactions = _ParseSysbenchTransactions(stdout, new_metadata)
+      current_transactions = sysbench.ParseSysbenchTransactions(
+          stdout, new_metadata
+      )
       total_tps.append(current_transactions[0].value)
       total_qps.append(current_transactions[1].value)
     logging.info(
@@ -922,7 +804,7 @@ def _RunScaleUpClientsBenchmark(
     scale_up_samples += [
         sample.Sample('total_tps', sum(total_tps), 'tps', tps_metadata),
         sample.Sample('total_qps', sum(total_qps), 'qps', qps_metadata),
-    ] + _ParseSysbenchLatency(stdouts, new_metadata)
+    ] + sysbench.ParseSysbenchLatency(stdouts, new_metadata)
     if cpu_utilization > _SCALE_UP_MAX_CPU_UTILIZATION.value:
       logging.info('cpu_utilization is over the threadshold, stopping')
       break
