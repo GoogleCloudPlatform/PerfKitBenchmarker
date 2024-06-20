@@ -1,3 +1,15 @@
+diff -u -r netperf-netperf-2.7.0/src/netlib.h netperf-netperf-2.7.0-patch/src/netlib.h
+--- netperf-netperf-2.7.0/src/netlib.h  2024-06-18 23:51:46.843104586 +0000
++++ netperf-netperf-2.7.0-patch/src/netlib.h    2024-06-18 23:53:06.098984482 +0000
+@@ -22,7 +22,7 @@
+                                         /* can tests send...            */
+ #define         MAXTIMES        4       /* how many times may we loop   */
+                                         /* to calibrate                 */
+-#define         MAXCPUS         256     /* how many CPU's can we track */
++#define         MAXCPUS        1024     /* how many CPU's can we track */
+ #define         MAXMESSAGESIZE  65536
+ #define         MAXALIGNMENT    16384
+ #define         MAXOFFSET        4096
 diff -u -r netperf-netperf-2.7.0/src/nettest_omni.c netperf-netperf-2.7.0-patch/src/nettest_omni.c
 --- netperf-netperf-2.7.0/src/nettest_omni.c    2022-12-03 05:09:26.736666047 +0000
 +++ netperf-netperf-2.7.0-patch/src/nettest_omni.c      2022-12-03 05:29:04.883140961 +0000
