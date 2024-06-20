@@ -124,11 +124,11 @@ class BaseCollector(object):
     suffix = '{0}-{1}'.format(suffix, self._CollectorName())
     if vm.BASE_OS_TYPE == os_types.WINDOWS:
       collector_file = os.path.join(
-          vm.temp_dir, '{0}{1}.stdout'.format(vm.name, suffix)
+          vm.temp_dir, '{0}{1}.log'.format(vm.name, suffix)
       )
     else:
       collector_file = posixpath.join(
-          vm_util.VM_TMP_DIR, '{0}{1}.stdout'.format(vm.name, suffix)
+          vm_util.VM_TMP_DIR, '{0}{1}.log'.format(vm.name, suffix)
       )
 
     cmd = self._CollectorRunCommand(vm, collector_file)
