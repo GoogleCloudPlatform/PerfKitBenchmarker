@@ -417,20 +417,23 @@ class PrepareScratchDiskStrategy:
       script += 'create volume simple\n'
 
     # If a mount point has been specified, create the directory where it will be
-    # mounted, format the volume, and assign the mount point to the volume.
+    # mounted and assign the mount point to the volume.
+    mount_command = ''
     if disk_spec.mount_point:
       vm.RemoteCommand('mkdir %s' % disk_spec.mount_point)
+      mount_command = 'assign mount=%s\n' % disk_spec.mount_point
+    # Format the volume, based on OS type.
+    if vm.OS_TYPE in os_types.WINDOWS_SQLSERVER_OS_TYPES:
+      format_command = 'format fs=ntfs quick unit=64k'
+    else:
       format_command = 'format quick'
 
-      if vm.OS_TYPE in os_types.WINDOWS_SQLSERVER_OS_TYPES:
-        format_command = 'format fs=ntfs quick unit=64k'
-
-      script += '%s\nassign letter=%s\nassign mount=%s\n' % (
-          format_command,
-          vm.assigned_disk_letter.lower(),
-          disk_spec.mount_point,
-      )
-
+    # Add format type, drive letter and mount point for the diskpart script.
+    script += '%s\nassign letter=%s\n%s' % (
+        format_command,
+        vm.assigned_disk_letter.lower(),
+        mount_command,
+    )
     # No-op, useful for understanding the state of the disks
     vm.RunDiskpartScript('list disk')
     vm.RunDiskpartScript(script)
