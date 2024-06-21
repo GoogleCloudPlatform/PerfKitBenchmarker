@@ -1754,10 +1754,10 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
         /MemFree:/ {total += $2}
         /Cached:/  {total += $2}
         /Buffers:/ {total += $2}
-        END        {printf "%d",total}
+        END        {printf "%d",total/1024}
         ' /proc/meminfo
         """)
-    return int(stdout)
+    return int(stdout) * 1024
 
   def _GetTotalMemoryKbFromCgroup(self):
     """Extracts the memory space in kibibyte (KiB) for containers.
