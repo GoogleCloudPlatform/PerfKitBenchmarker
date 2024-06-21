@@ -37,6 +37,7 @@ specjbb2015:
       disk_spec: *default_50_gb
   flags:
     openjdk_version: 11
+    enable_transparent_hugepages: True
 """
 
 FLAGS = flags.FLAGS
