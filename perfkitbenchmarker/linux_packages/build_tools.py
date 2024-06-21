@@ -57,12 +57,22 @@ def YumInstall(vm):
   if FLAGS.gcc_version:
     Reinstall(vm, version=FLAGS.gcc_version)
 
+  # Install texinfo which provides makeinfo required by GCC 13
+  if FLAGS.gcc_version >= '13':
+    if vm.HasPackage('texinfo'):
+      vm.InstallPackages('texinfo')
+
 
 def AptInstall(vm):
   """Installs build tools on the VM."""
   vm.InstallPackages('build-essential git libtool autoconf automake')
   if FLAGS.gcc_version:
     Reinstall(vm, version=FLAGS.gcc_version)
+
+  # Install texinfo which provides makeinfo required by GCC 13
+  if FLAGS.gcc_version >= '13':
+    if vm.HasPackage('texinfo'):
+      vm.InstallPackages('texinfo')
 
 
 def BuildGccFromSource(vm, gcc_version):
