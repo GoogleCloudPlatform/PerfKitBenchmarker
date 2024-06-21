@@ -246,6 +246,9 @@ flags.DEFINE_boolean(
     'to extract the total available memory capacity in the container.',
 )
 
+flags.DEFINE_integer('visible_core_count', None,
+                     'To customize the number of visible CPU cores.')
+
 _DISABLE_YUM_CRON = flags.DEFINE_boolean(
     'disable_yum_cron', True, 'Whether to disable the cron-run yum service.'
 )
