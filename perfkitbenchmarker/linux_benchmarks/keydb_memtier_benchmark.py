@@ -42,6 +42,7 @@ keydb_memtier:
     memtier_protocol: redis
     memtier_key_pattern: P:P
     memtier_run_duration: 1200
+    memtier_expiry_range: 600-600
     create_and_boot_post_task_delay: 5
     memtier_data_size: 1024
     memtier_key_maximum: 20000000

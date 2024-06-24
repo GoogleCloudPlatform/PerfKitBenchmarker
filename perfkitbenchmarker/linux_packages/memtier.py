@@ -122,6 +122,15 @@ MEMTIER_REQUESTS = flags.DEFINE_integer(
         ' per client. Defaults to 10000.'
     ),
 )
+MEMTIER_EXPIRY_RANGE = flags.DEFINE_string(
+    'memtier_expiry_range',
+    None,
+    (
+        'Use random expiry values from the specified range. '
+        'Must be expressed as [0-n]-[1-n]. Applies for keys created when '
+        'loading the db and when running the memtier benchmark. '
+    ),
+)
 flag_util.DEFINE_integerlist(
     'memtier_clients',
     [50],
@@ -360,6 +369,7 @@ def BuildMemtierCommand(
     cluster_mode: Optional[bool] = None,
     shard_addresses: Optional[str] = None,
     tls: Optional[bool] = None,
+    expiry_range: Optional[str] = None,
     json_out_file: Optional[pathlib.PosixPath] = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
@@ -388,6 +398,8 @@ def BuildMemtierCommand(
     args['data-size-list'] = data_size_list
   else:
     args['data-size'] = data_size
+  if expiry_range:
+    args['expiry-range'] = expiry_range
   # Arguments passed without a parameter
   no_param_args = {
       'random-data': random_data,
@@ -440,6 +452,7 @@ def _LoadSingleVM(
       cluster_mode=MEMTIER_CLUSTER_MODE.value,
       password=request.server_password,
       tls=MEMTIER_TLS.value,
+      expiry_range=MEMTIER_EXPIRY_RANGE.value,
   )
   load_vm.RemoteCommand(cmd)
 
@@ -1206,6 +1219,7 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
       'memtier_protocol': MEMTIER_PROTOCOL.value,
       'memtier_run_count': MEMTIER_RUN_COUNT.value,
       'memtier_requests': MEMTIER_REQUESTS.value,
+      'memtier_expiry_range': MEMTIER_EXPIRY_RANGE.value,
       'memtier_threads': threads,
       'memtier_clients': clients,
       'memtier_ratio': MEMTIER_RATIO.value,

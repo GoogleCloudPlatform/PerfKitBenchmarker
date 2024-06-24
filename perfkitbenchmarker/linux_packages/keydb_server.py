@@ -26,7 +26,7 @@ from perfkitbenchmarker import linux_packages
 SERVER_VCPU_RATIO = 0.75
 
 _KEYDB_RELEASE = flags.DEFINE_string(
-    'keydb_release', 'RELEASE_6', 'Git Release of KeyDB to use.'
+    'keydb_release', 'RELEASE_6_3_4', 'Git Release of KeyDB to use.'
 )
 _KEYDB_SERVER_THREADS = flags.DEFINE_integer(
     'keydb_server_threads',
@@ -39,8 +39,7 @@ _KEYDB_SERVER_THREADS = flags.DEFINE_integer(
 # Default port for KeyDB
 DEFAULT_PORT = 6379
 FLAGS = flags.FLAGS
-# TODO(user): Move to Snapchat repro
-KEYDB_GIT = 'https://github.com/EQ-Alpha/KeyDB.git'
+KEYDB_GIT = 'https://github.com/Snapchat/KeyDB.git'
 
 
 def GetKeydbDir() -> str:
@@ -50,7 +49,7 @@ def GetKeydbDir() -> str:
 def _GetNumServerThreads(vm) -> int:
   num_server_threads = _KEYDB_SERVER_THREADS.value
   if num_server_threads == 0 and vm is not None:
-    num_server_threads = vm.NumCpusForBenchmark() * SERVER_VCPU_RATIO
+    num_server_threads = int(vm.NumCpusForBenchmark() * SERVER_VCPU_RATIO)
   assert num_server_threads >= 0, 'num_server_threads must be >=0.'
   return num_server_threads
 

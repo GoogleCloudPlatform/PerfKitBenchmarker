@@ -1795,6 +1795,7 @@ class MemtierTestCase(
             'memtier_protocol': 'memcache_binary',
             'memtier_ratio': '1:9',
             'memtier_requests': 10000,
+            'memtier_expiry_range': None,
             'memtier_run_count': 1,
             'memtier_run_mode': 'NORMAL_RUN',
             'memtier_threads': 4,
