@@ -109,8 +109,26 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   server_vm.Install('keydb_server')
   keydb_server.Start(server_vm)
 
+  # Transfer SSL cert files to client(s)
+  if FLAGS.memtier_tls:
+    for client_vm in client_vms:
+      for filename in ['keydb.crt', 'keydb.key', 'ca.crt']:
+        server_vm.MoveHostFile(
+            client_vm,
+            f'{keydb_server.GetKeydbDir()}/tests/tls/{filename}',
+            remote_path='',
+        )
+
   # Load the KeyDB server with preexisting data.
   bm_spec.keydb_endpoint_ip = str(bm_spec.vm_groups['servers'][0].internal_ip)
+  # Hack in SSL args into the endpoint IP
+  if FLAGS.memtier_tls:
+    bm_spec.keydb_endpoint_ip = (
+        f'{bm_spec.keydb_endpoint_ip} '
+        '--cert=keydb.crt '
+        '--key=keydb.key '
+        '--cacert=ca.crt'
+    )
   memtier.Load(
       [client_vms[0]], bm_spec.keydb_endpoint_ip, keydb_server.DEFAULT_PORT
   )

@@ -66,12 +66,12 @@ def _Install(vm) -> None:
       f'git checkout {_KEYDB_RELEASE.value} && '
       'git pull'
   )
-  vm.RemoteCommand(
-      f'cd {GetKeydbDir()} && '
-      # 'make BUILD_TLS=yes && '
-      'make && '
-      'sudo make install'
-  )
+  # See https://docs.keydb.dev/docs/build/#build-flags
+  # and https://docs.keydb.dev/blog/2020/09/29/blog-post/#find-out-more
+  if FLAGS.memtier_tls:
+    vm.RemoteCommand(f'cd {GetKeydbDir()} && ./utils/gen-test-certs.sh')
+  make_cmd = 'make BUILD_TLS=yes' if FLAGS.memtier_tls else 'make'
+  vm.RemoteCommand(f'cd {GetKeydbDir()} && {make_cmd} && sudo make install')
 
 
 def YumInstall(_) -> None:
@@ -110,13 +110,21 @@ def _BuildStartCommand(vm) -> str:
       f'--server-threads {_GetNumServerThreads(vm)}',
       '--save',
   ]
-  # TODO(spencerkim): Add TLS support
+  tls_args = []
+  if FLAGS.memtier_tls:
+    tls_args = [
+        f'--tls-port {DEFAULT_PORT}',
+        '--port 0',
+        f'--tls-cert-file {keydb_dir}/tests/tls/keydb.crt',
+        f'--tls-key-file {keydb_dir}/tests/tls/keydb.key',
+        f'--tls-ca-cert-file {keydb_dir}/tests/tls/ca.crt',
+    ]
   # TODO(spencerkim): Add --server-thread-affinity argument.
   # TODO(spencerkim): Add --maxmemory and eviction arguments.
   # TODO(user): Consider adding persistence support
   # https://docs.keydb.dev/docs/persistence/
 
-  return cmd.format(keydb_dir=keydb_dir, args=' '.join(cmd_args))
+  return cmd.format(keydb_dir=keydb_dir, args=' '.join(cmd_args + tls_args))
 
 
 def Start(vm) -> None:

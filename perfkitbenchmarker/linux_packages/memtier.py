@@ -393,7 +393,9 @@ def BuildMemtierCommand(
       'random-data': random_data,
       'cluster-mode': cluster_mode,
       'tls': tls,
-      'tls-skip-verify': tls,
+      # Don't skip certificate verification by default. keydb_memtier_benchmark
+      # does this by hacking in ca args into the server ip.
+      'tls-skip-verify': tls and FLAGS.cloud_redis_tls,
   }
   # Build the command
   cmd = []
@@ -1213,6 +1215,7 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
       'memtier_version': GIT_TAG,
       'memtier_run_mode': MEMTIER_RUN_MODE.value,
       'memtier_cluster_mode': MEMTIER_CLUSTER_MODE.value,
+      'memtier_tls': MEMTIER_TLS.value,
   }
   if MEMTIER_DATA_SIZE_LIST.value:
     meta['memtier_data_size_list'] = MEMTIER_DATA_SIZE_LIST.value
