@@ -83,9 +83,6 @@ class S3Service(object_storage_service.ObjectStorageService):
       bucket_configuration = (
           f'LocationConstraint={self.region}'
       )
-      # S3 express does not seem to support bucket tagging or TTL at the moment.
-      tag_bucket = False
-      assert not object_storage_service.OBJECT_TTL_DAYS.value
 
     command = [
         'aws',
