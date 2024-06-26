@@ -1,0 +1,76 @@
+
+[client]
+port            = 3306
+socket          = {{ scratch_dir }}/mysql.sock
+
+[mysqld]
+datadir                 = {{ scratch_dir }}
+tmpdir                  = /tmp
+pid-file                = {{ scratch_dir }}/mysqld.pid
+socket                  = {{ scratch_dir }}/mysql.sock
+port                    = 3306
+max_connections         = 4100
+back_log                = 1500
+table_open_cache        = 200000
+table_open_cache_instances = 32
+max_prepared_stmt_count = 512000
+skip-name-resolve
+skip-character-set-client-handshake
+performance_schema      = 1
+binlog_row_image= MINIMAL
+
+#####################
+#InnoDB settings
+#####################
+innodb_buffer_pool_size          = {{ buffer_pool_size }}
+innodb_buffer_pool_instances     = 16
+innodb_redo_log_capacity         = 16G
+innodb_io_capacity               = 80000
+innodb_io_capacity_max           = 1600000
+innodb_page_cleaners             = 16
+innodb_purge_threads             = 4
+innodb_lru_scan_depth            = 1024
+#innodb_max_purge_lag = 0
+innodb_adaptive_flushing_lwm     = 10
+innodb_flushing_avg_loops        = 30
+innodb_flush_method              = O_DIRECT_NO_FSYNC
+innodb_numa_interleave           = 1
+innodb_adaptive_hash_index       = 0
+innodb_change_buffering          = none
+
+# Durability settings
+innodb_doublewrite               = 1
+innodb_doublewrite_pages         = 64
+innodb_doublewrite_files         = 2
+innodb_flush_log_at_trx_commit   = 1
+innodb_buffer_pool_load_at_startup = 0
+innodb_buffer_pool_dump_at_shutdown = 0
+
+#####################
+#Replication + binlog settings
+#####################
+server-id                                   = {{ server_id }}
+binlog_format                               = ROW
+log-bin                                     = {{ scratch_dir }}/mysql-bin
+log-slave-updates                           = 1
+#read_only                                  = 1
+#super_read_only                            = 1
+sync_binlog                                 = 1
+binlog_expire_logs_seconds                  = 3600
+
+gtid_mode                                   = ON
+enforce-gtid-consistency
+
+#####################
+#Logging
+#####################
+# Error Logging
+log-error                                    = /var/log/mysqld.log
+
+# Slow Logging
+#slow_query_log_file                         = /var/log/mysql/mysql-slow.log
+slow-query-log                               = 1
+long_query_time                              = 10
+
+[mysql]
+prompt=(\\u@\\h) [\\d]>\\

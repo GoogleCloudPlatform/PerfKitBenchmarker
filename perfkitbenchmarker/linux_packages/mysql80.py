@@ -18,7 +18,9 @@
 import logging
 import re
 
+from perfkitbenchmarker import data
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import virtual_machine
 
 
 MYSQL_PSWD = 'perfkitbenchmarker'
@@ -42,6 +44,8 @@ WantedBy=basic.target
 
 def YumInstall(vm):
   """Installs the mysql package on the VM."""
+  vm.RemoteCommand('sudo dnf config-manager --set-enabled crb')
+  vm.RemoteCommand('sudo dnf install -y epel-release epel-next-release')
   vm.RemoteCommand(
       'sudo yum -y install '
       'https://dev.mysql.com/get/mysql80-community-release-el9-5.noarch.rpm'
@@ -124,7 +128,7 @@ def AptGetServiceName(vm):
   return 'mysql'
 
 
-def ConfigureSystemSettings(vm):
+def ConfigureSystemSettings(vm: virtual_machine.VirtualMachine):
   """Percona system settings.
 
   These system settings are what Percona (consulting firm) applies to
@@ -134,7 +138,7 @@ def ConfigureSystemSettings(vm):
   Args:
     vm: The VM to configure.
   """
-  if vm.OS_TYPE != os_types.LINUX_OS_TYPES:
+  if vm.OS_TYPE not in os_types.LINUX_OS_TYPES:
     logging.error(
         'System settings not configured for unsupported OS: %s', vm.os_info)
     return
@@ -172,3 +176,37 @@ def ConfigureSystemSettings(vm):
   vm.RemoteCommand('sudo systemctl start disable-thp.service')
 
   vm.Reboot()
+
+
+def ConfigureAndRestart(
+    vm: virtual_machine.VirtualMachine, buffer_pool_size: str, server_id: int
+):
+  """Configure and restart mysql."""
+  # TODO(ruwa): add metadata for the name of config file used.
+  config_template = 'mysql/ha.cnf.j2'
+  remote_temp_config = '/tmp/my.cnf'
+  remote_final_config = '/etc/my.cnf'
+  config_d_service = 'mysql/mysqld.service'
+  remote_temp_d_service = '/tmp/mysqld'
+  remote_final_d_service = '/lib/systemd/system/mysqld.service'
+  logrotation = 'mysql/logrotation'
+  remote_temp_logrotation = '/tmp/logrotation'
+  remote_final_logrotation = '/etc/logrotate.d/mysqld'
+  context = {
+      'scratch_dir': vm.GetScratchDir(),
+      'server_id': str(server_id),
+      'buffer_pool_size': buffer_pool_size,
+  }
+  vm.RenderTemplate(
+      data.ResourcePath(config_template), remote_temp_config, context
+  )
+  vm.RemoteCommand(f'sudo cp {remote_temp_config} {remote_final_config}')
+  vm.PushDataFile(config_d_service, remote_temp_d_service)
+  vm.RemoteCommand(f'sudo cp {remote_temp_d_service} {remote_final_d_service}')
+  vm.PushDataFile(logrotation, remote_temp_logrotation)
+  vm.RemoteCommand(
+      f'sudo cp {remote_temp_logrotation} {remote_final_logrotation}'
+  )
+  vm.RemoteCommand(f'sudo chmod 0644 {remote_final_logrotation}')
+  vm.RemoteCommand('sudo systemctl daemon-reload')
+  vm.RemoteCommand('sudo systemctl start mysqld')

@@ -16,6 +16,7 @@
 
 This is a set of benchmarks that measures performance of Sysbench Databases on
   managed MySQL or Postgres.
+For unmanaged databases, consider using unmanaged_mysql_sysbench_benchmark.py.
 
 As other cloud providers deliver a managed MySQL service, we will add it here.
 """

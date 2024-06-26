@@ -225,3 +225,6 @@ sparksql_tpcds_1t:
           disk_type: gp3
           provisioned_iops: 5000
           provisioned_throughput: 480
+
+mysql_sysbench:
+  name: unmanaged_mysql_sysbench
