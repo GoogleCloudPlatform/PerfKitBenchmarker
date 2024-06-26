@@ -78,6 +78,12 @@ def BuildGccFromSource(vm, gcc_version):
     gcc_version = '9.2.0'
   logging.info('Compiling GCC %s', gcc_version)
 
+  # Install texinfo which provides makeinfo required by GCC 13 and above.
+  gcc_components = gcc_version.split('.')
+  major = int(gcc_components[0])
+  if major >= 13:
+    vm.InstallPackages('texinfo')
+
   # build GCC on scratch disks for speed if possible
   build_dir = vm.GetScratchDir() if vm.scratch_disks else '~/'
   gcc_tar = GCC_TAR.format(version=gcc_version)
