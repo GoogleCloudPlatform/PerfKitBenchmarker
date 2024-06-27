@@ -702,7 +702,8 @@ class Bqfederated(Bigquery):
       A dictionary set to underlying data's details (format, etc.)
     """
     data_details = {}
-    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    project_id, dataset_id = re.split(r'\.', self.cluster_identifier)
+    data_details['metadata_caching'] = str('metadata-caching' in project_id)
     parsed_id = re.split(r'_', dataset_id)
     data_details['format'] = parsed_id[1]
     data_details['compression'] = parsed_id[2]
