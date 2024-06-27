@@ -1306,13 +1306,6 @@ class CentOs7BasedAzureVirtualMachine(
   IMAGE_URN = 'OpenLogic:CentOS-LVM:7-lvm:latest'
 
 
-class CentOs8BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.CentOs8Mixin
-):
-  GEN2_IMAGE_URN = 'OpenLogic:CentOS-LVM:8-lvm-gen2:latest'
-  IMAGE_URN = 'OpenLogic:CentOS-LVM:8-lvm:latest'
-
-
 # Rocky Linux is now distributed via a community gallery:
 # https://rockylinux.org/news/rocky-on-azure-community-gallery
 # TODO(user): Support Select images from community galleries and

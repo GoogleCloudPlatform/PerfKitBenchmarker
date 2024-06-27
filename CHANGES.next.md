@@ -78,6 +78,8 @@
     access.
 -   Remove Rocky Linux on Azure.
 -   Changed supported Python version to 3.11.
+-   Deprecate CentOS Linux 7 as it is EOL on 2024-06-30.
+-   Remove EOL CentOS 8 and CentOS Stream 8.
 
 ### New features:
 

@@ -441,12 +441,6 @@ class CentOs7BasedStaticVirtualMachine(
   pass
 
 
-class CentOs8BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.CentOs8Mixin
-):
-  pass
-
-
 class Debian9BasedStaticVirtualMachine(
     StaticVirtualMachine, linux_virtual_machine.Debian9Mixin
 ):

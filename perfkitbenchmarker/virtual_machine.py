@@ -1195,8 +1195,8 @@ class DeprecatedOsMixin(BaseOsMixin):
   # Optional alternative to use instead.
   ALTERNATIVE_OS = None
 
-  def __init__(self):
-    super(DeprecatedOsMixin, self).__init__()
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
     assert self.OS_TYPE
     assert self.END_OF_LIFE
     warning = "os_type '%s' is deprecated and will be removed after %s." % (
