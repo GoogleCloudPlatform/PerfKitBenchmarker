@@ -36,14 +36,11 @@ try {
       Initialize-Disk -Number $disk.DeviceId
       New-Partition -DiskNumber $disk.DeviceId -UseMaximumSize  -DriveLetter $diskLetter | Format-Volume -FileSystem NTFS -newfilesystemlabel DataDisk -AllocationUnitSize 65536
 
-      Start-Sleep -Seconds 90
+      Start-Sleep -Seconds 10
       $initializedDisks.Add($diskLetter)
       $diskCount = $diskCount + 1
     }
-
-    Get-ClusterAvailableDisk | Add-ClusterDisk
   }
-
   Write-Host 'Test Cluster'
   Invoke-Command -ComputerName  $ad_dc.HostName -Credential $domainCredential -ArgumentList $node1,$node2 -ScriptBlock {
         Test-Cluster -Node $args[0],$args[1] -Include 'Inventory', 'Network', 'System Configuration' -Confirm:0;
@@ -53,13 +50,30 @@ try {
         New-ADUser -Name 'sql_server' -Description 'SQL Agent and SQL Admin account.' -AccountPassword $args[0] -Enabled $true -PasswordNeverExpires $true
   }
 
-  foreach($initDisk in $initializedDisks) {
-    if (Get-PSDrive -Name $initDisk) {
-      Write-Host "Disk $initDisk Created"
-      New-Item -ItemType Directory -Path "$($initDisk):\MSSQL"
-      Get-Date | Out-File -FilePath "$($initDisk):\MSSQL\fcimw.txt"
-      break
+  $clDiskList = Get-ClusterAvailableDisk
+  if ($clDiskList.count -gt 0) {
+    $clDiskCount = 1
+    foreach($disk in $ClusterDisks) {
+        Get-Disk -Number $disk.DeviceId | Add-ClusterDisk
+        Start-Sleep -Seconds 30
+        $selectedClusterDisk = Get-ClusterResource -Name "Cluster Disk $clDiskCount"
+        if ($selectedClusterDisk.OwnerNode -ne $localServerName) {
+          Write-Host 'Moving Disk Ownership'
+          Move-ClusterGroup -Name $selectedClusterDisk.OwnerGroup -Node $localServerName
+        }
+        $clDiskCount++
     }
+
+    foreach($initDisk in $initializedDisks) {
+      if (Get-PSDrive -Name $initDisk) {
+        Write-Host "Disk $initDisk Created"
+        New-Item -ItemType Directory -Path "$($initDisk):\MSSQL"
+        Get-Date | Out-File -FilePath "$($initDisk):\MSSQL\fcimw.txt"
+      }
+    }
+  }
+  else {
+    Write-Host 'No cluster disks available'
   }
 
 }
