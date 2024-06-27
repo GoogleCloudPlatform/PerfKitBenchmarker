@@ -39,7 +39,7 @@ class Failover(object):
   FAILOVER_SAME_REGION = 'failover_same_region'
 
 
-flags.DEFINE_enum(
+_FAILOVER_STYLE = flags.DEFINE_enum(
     'redis_failover_style',
     Failover.FAILOVER_NONE,
     [
@@ -48,8 +48,10 @@ flags.DEFINE_enum(
         Failover.FAILOVER_SAME_REGION,
     ],
     (
-        'Failover behavior of cloud redis cluster. Acceptable values are:'
-        'failover_none, failover_same_zone, and failover_same_region'
+        'Failover behavior of cloud redis instance when using a standalone'
+        ' instance. By default, provider implementations use a single replica'
+        ' for failover. Acceptable values are: failover_none,'
+        ' failover_same_zone, and failover_same_region'
     ),
 )
 
@@ -76,13 +78,15 @@ _MANAGED_MEMORY_STORE_CLUSTER = flags.DEFINE_bool(
     False,
     'If True, provisions a cluster instead of a standalone instance.',
 )
-_NODE_COUNT = flags.DEFINE_integer(
-    'managed_memory_store_node_count',
+_SHARD_COUNT = flags.DEFINE_integer(
+    'managed_memory_store_shard_count',
     1,
-    (
-        'Number of cache nodes (shards) to use. Only used if '
-        'managed_memory_store_cluster is True.'
-    ),
+    'Number of shards to use. Only used for clustered instances.',
+)
+_REPLICAS_PER_SHARD = flags.DEFINE_integer(
+    'managed_memory_store_replicas_per_shard',
+    0,
+    'Number of replicas per shard. Only used for clustered instances.',
 )
 _ZONES = flags.DEFINE_list(
     'cloud_redis_zones',
@@ -155,7 +159,7 @@ class RedisShard:
     slots: formatted like 2731-5461
     ip: address of the redis shard
     port: port of the redis shard
-    zone: location where the shard is located
+    zone: location of the primary node of the shard
   """
 
   slots: str
@@ -182,14 +186,32 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self._ip: str = None
     self._port: int = None
     self._password: str = None
+
+    self.failover_style = _FAILOVER_STYLE.value
     self._clustered: bool = _MANAGED_MEMORY_STORE_CLUSTER.value
-    self.node_count = _NODE_COUNT.value if self._clustered else 1
+    # Shards contain a primary node and its replicas.
+    self.shard_count = _SHARD_COUNT.value if self._clustered else 1
+    self.replicas_per_shard = _REPLICAS_PER_SHARD.value
+    self.node_count = self._GetNodeCount()
+
     self.zones = _ZONES.value if self._clustered else []
     self.enable_tls = _TLS.value
 
-    self.metadata['clustered'] = self._clustered
-    self.metadata['node_count'] = self.node_count
-    self.metadata['enable_tls'] = self.enable_tls
+    self.metadata.update({
+        'clustered': self._clustered,
+        'shard_count': self.shard_count,
+        'replicas_per_shard': self.replicas_per_shard,
+        'node_count': self.node_count,
+        'enable_tls': self.enable_tls,
+    })
+
+  def _GetNodeCount(self) -> int:
+    """Returns the number of nodes in the cluster."""
+    if self._clustered:
+      return self.shard_count * (1 + self.replicas_per_shard)
+    if self.failover_style == Failover.FAILOVER_NONE:
+      return 1
+    return 2
 
   def GetMemoryStoreIp(self) -> str:
     """Returns the Ip address of the managed memory store."""

@@ -150,7 +150,7 @@ def _MeasureMemtierDistribution(
       redis_instance.GetMemoryStoreIp(),
       redis_instance.GetMemoryStorePort(),
       vms,
-      redis_instance.node_count,
+      redis_instance.shard_count,
       redis_instance.GetMemoryStorePassword(),
   )
 
@@ -164,7 +164,7 @@ def _Run(vms: list[_LinuxVm], redis_instance: _ManagedRedis):
       return _MeasureMemtierDistribution(redis_instance, vms)
     return memtier.MeasureLatencyCappedThroughput(
         vms[0],
-        redis_instance.node_count,
+        redis_instance.shard_count,
         redis_instance.GetMemoryStoreIp(),
         redis_instance.GetMemoryStorePort(),
         redis_instance.GetMemoryStorePassword(),

@@ -54,7 +54,6 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
       self.size = self.node_count * _SHARD_SIZE_GB
     self.redis_region = FLAGS.cloud_redis_region
     self.redis_version = spec.config.cloud_redis.redis_version
-    self.failover_style = FLAGS.redis_failover_style
     self.tier = self._GetTier()
     self.network = (
         'default'

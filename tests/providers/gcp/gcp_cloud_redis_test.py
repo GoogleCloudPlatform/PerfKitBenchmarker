@@ -14,6 +14,7 @@
 """Tests for perfkitbenchmarker.providers.gcp.gcp_cloud_redis."""
 import unittest
 from absl import flags
+from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker.providers.gcp import gcp_cloud_redis
 from perfkitbenchmarker.providers.gcp import util
@@ -112,6 +113,25 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
         self.TimeSeries([77, 34, 29, 83, 11, 8, 38, 68]),
     ])
     self.assertEqual(avg_cpu, 3.25)
+
+  def testShardAndNodeCount(self):
+    self.assertEqual(self.redis.shard_count, 1)
+    self.assertEqual(self.redis.replicas_per_shard, 0)
+    self.assertEqual(self.redis.node_count, 1)
+
+
+class GcpCloudRedisClusterTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  @flagsaver.flagsaver(
+      managed_memory_store_cluster=True,
+      managed_memory_store_shard_count=2,
+      managed_memory_store_replicas_per_shard=2,
+  )
+  def testShardAndNodeCount(self):
+    test_instance = gcp_cloud_redis.CloudRedis(mock.Mock())
+    self.assertEqual(test_instance.shard_count, 2)
+    self.assertEqual(test_instance.replicas_per_shard, 2)
+    self.assertEqual(test_instance.node_count, 6)
 
 
 if __name__ == '__main__':
