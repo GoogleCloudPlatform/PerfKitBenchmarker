@@ -974,6 +974,16 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
     """
     raise NotImplementedError()
 
+  def _SetNumCpus(self):
+    """Sets the number of CPUs on the VM.
+
+    Returns:
+      The number of CPUs on the VM.
+    """
+    if self.num_cpus is None:
+      self.num_cpus = self._GetNumCpus()
+    return self.num_cpus
+
   def NumCpusForBenchmark(self, report_only_physical_cpus=False):
     """Gets the number of CPUs for benchmark configuration purposes.
 

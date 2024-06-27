@@ -692,6 +692,7 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
 
   def PrepareVMEnvironment(self):
     super(BaseLinuxMixin, self).PrepareVMEnvironment()
+    self._SetNumCpus()
     self.SetupProxy()
     self._CreateVmTmpDir()
     self._SetTransparentHugepages()
