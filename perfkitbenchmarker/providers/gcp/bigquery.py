@@ -31,7 +31,7 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
 
-BQ_CLIENT_FILE = 'bq-jdbc-simba-client-1.0.jar'
+BQ_CLIENT_FILE = 'bq-jdbc-simba-client-1.1.jar'
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
 BQ_JDBC_INTERFACES = [
@@ -303,7 +303,7 @@ class JavaClientInterface(GenericClientInterface):
       key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
 
     query_command = (
-        'java -cp {} '
+        'java -Xmx6g -cp {} '
         'com.google.cloud.performance.edw.Single --project {} '
         '--credentials_file {} --dataset {} '
         '--query_file {}'
@@ -338,7 +338,7 @@ class JavaClientInterface(GenericClientInterface):
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
     cmd = (
-        'java -cp {} '
+        'java -Xmx6g -cp {} '
         'com.google.cloud.performance.edw.Simultaneous --project {} '
         '--credentials_file {} --dataset {} --submission_interval {} '
         '--query_files {}'.format(
@@ -367,7 +367,7 @@ class JavaClientInterface(GenericClientInterface):
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
     cmd = (
-        'java -cp {} '
+        'java -Xmx6g -cp {} '
         'com.google.cloud.performance.edw.Throughput --project {} '
         '--credentials_file {} --dataset {} --query_streams {}'.format(
             BQ_CLIENT_FILE,
