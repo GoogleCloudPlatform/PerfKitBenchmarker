@@ -115,7 +115,6 @@ hammerdbcli:
             machine_type: n2-standard-16
             zone: us-central1-c
             boot_disk_size: 50
-            boot_disk_type: pd-ssd
           AWS:
             machine_type: m6i.4xlarge
             zone: us-east-1a
