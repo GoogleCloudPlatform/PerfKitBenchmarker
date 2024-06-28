@@ -617,15 +617,14 @@ class DebianBasedKubernetesVirtualMachine(
     # Ubuntu docker images are based on Minimal Ubuntu
     # https://wiki.ubuntu.com/Minimal
     # The VM images PKB uses are based on a full Ubuntu Server flavor and have a
-    # bunch of useful utilities
-    # Utilities packages install here so that we
-    # have similar base packages. This is essentially the same as running
-    # unminimize.
-    # ubuntu-minimal contains iputils-ping
-    # ubuntu-server contains curl, net-tools, software-properties-common
-    # ubuntu-standard contains wget
+    # bunch of useful utilities.
+    # There are ubuntu meta-packages that provide the same functionality, but
+    # they install additional packages that do not run well in a container
+    # (namely systemd). So we install the packages we need directly.
     # TODO(pclay): Revisit if Debian or RHEL images are added.
-    self.InstallPackages('ubuntu-minimal ubuntu-server ubuntu-standard')
+    self.InstallPackages(
+        'ubuntu-minimal curl net-tools software-properties-common wget'
+    )
 
   def DownloadPreprovisionedData(
       self,
