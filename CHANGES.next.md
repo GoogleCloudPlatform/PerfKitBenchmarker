@@ -184,6 +184,8 @@
 -   HammerDB enables "Use All Warehouses" by default for increased I/O.
 -   Add Ubuntu 24.04 support for GCP, AWS, and Azure Providers.
 -   Add keydb_memtier_benchmark (KeyDB is a fork of Redis).
+-   Add `--skip_teardown_conditions` flag, offering the option to keep resources
+    alive if any metrics satisfy the criteria passed into the flag.
 
 ### Enhancements:
 

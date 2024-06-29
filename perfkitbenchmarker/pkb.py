@@ -70,7 +70,7 @@ import sys
 import threading
 import time
 import types
-from typing import Any, Collection, Dict, List, Optional, Sequence, Set, Tuple, Type
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Type
 import uuid
 
 from absl import flags
@@ -174,6 +174,84 @@ def ValidateRetriesAndRunStages(flags_dict):
   if flags_dict['retries'] > 0 and flags_dict['run_stage'] != stages.STAGES:
     return False
   return True
+
+
+def ParseSkipTeardownConditions(
+    skip_teardown_conditions: Collection[str],
+) -> Mapping[str, Mapping[str, Optional[float]]]:
+  """Parses the skip_teardown_conditions flag.
+
+  Used by the validator below and flag_util.ShouldTeardown to separate
+  conditions passed by the --skip_teardown_conditions flag into three tokens:
+      metric, lower bound, upper_bound
+
+  Initial regex parsing captures a metric (any string before a > or <),
+  direction (the > or <), and a threshold (any number after the direction).
+
+  Args:
+    skip_teardown_conditions: list of conditions to parse
+  Returns:
+    list of tuples of (metric, lower_bound, upper_bound)
+  Raises:
+    ValueError: if any condition is invalid
+  """
+  parsed_conditions = {}
+  pattern = re.compile(
+      r'''
+      ([\w -]+)   # Matches all characters that could appear in a metric name
+      ([<>])      # Matches < or >
+      ([\d+\.]+)  # Matches any floating point number
+      ''',
+      re.VERBOSE
+  )
+  for condition in skip_teardown_conditions:
+    match = pattern.match(condition)
+    if not match or len(match.groups()) != 3:
+      raise ValueError(
+          'Invalid skip_teardown_conditions flag. Conditions must be in the '
+          'format of:\n'
+          '<metric><direction><threshold>;...;...\n'
+          'where metric is any string, direction is either > or <, and '
+          'threshold is any number.'
+      )
+    metric, direction, threshold = match.groups()
+    # Raises ValueError if threshold is not a valid number.
+    threshold = float(threshold)
+    lower_bound = threshold if direction == '>' else None
+    upper_bound = threshold if direction == '<' else None
+    if metric not in parsed_conditions:
+      parsed_conditions[metric] = {
+          'lower_bound': lower_bound,
+          'upper_bound': upper_bound,
+      }
+      continue
+    # Update the existing metric's bound(s) if necessary.
+    current_lower_bound = parsed_conditions[metric]['lower_bound']
+    if lower_bound is not None and (
+        current_lower_bound is None or lower_bound < current_lower_bound
+    ):
+      parsed_conditions[metric]['lower_bound'] = lower_bound
+    current_upper_bound = parsed_conditions[metric]['upper_bound']
+    if upper_bound is not None and (
+        current_upper_bound is None or upper_bound > current_upper_bound
+    ):
+      parsed_conditions[metric]['upper_bound'] = upper_bound
+  return parsed_conditions
+
+
+@flags.validator(
+    'skip_teardown_conditions',
+    message='Invalid skip_teardown_conditions flag.',
+)
+def ValidateSkipTeardownConditions(flags_dict: Mapping[str, Any]) -> bool:
+  """Validates skip_teardown_conditions flag."""
+  if 'skip_teardown_conditions' not in flags_dict:
+    return True
+  try:
+    ParseSkipTeardownConditions(flags_dict['skip_teardown_conditions'])
+    return True
+  except ValueError:
+    return False
 
 
 def _InjectBenchmarkInfoIntoDocumentation():
@@ -837,6 +915,11 @@ def RunBenchmark(spec, collector):
 
   spec.status = benchmark_status.FAILED
   current_run_stage = stages.PROVISION
+
+  # If the skip_teardown_conditions flag is set, we will check the samples
+  # collected before the teardown phase to determine if we should skip teardown.
+  should_teardown = True
+
   # Modify the logger prompt for messages logged within this function.
   label_extension = '{}({}/{})'.format(
       spec.name, spec.sequence_number, spec.total_benchmarks
@@ -878,8 +961,16 @@ def RunBenchmark(spec, collector):
             interrupt_checker = None
 
           if stages.TEARDOWN in FLAGS.run_stage:
-            current_run_stage = stages.TEARDOWN
-            DoTeardownPhase(spec, collector, detailed_timer)
+            skip_teardown_conditions = ParseSkipTeardownConditions(
+                pkb_flags.SKIP_TEARDOWN_CONDITIONS.value
+            )
+            should_teardown = flag_util.ShouldTeardown(
+                skip_teardown_conditions,
+                collector.published_samples + collector.samples,
+            )
+            if should_teardown:
+              current_run_stage = stages.TEARDOWN
+              DoTeardownPhase(spec, collector, detailed_timer)
 
         # Add timing samples.
         if (
@@ -965,7 +1056,7 @@ def RunBenchmark(spec, collector):
           interrupt_checker.EndCheckInterruptThread()
         # Deleting resources should happen first so any errors with publishing
         # don't prevent teardown.
-        if stages.TEARDOWN in FLAGS.run_stage:
+        if stages.TEARDOWN in FLAGS.run_stage and should_teardown:
           spec.Delete()
         if FLAGS.publish_after_run:
           collector.PublishSamples()

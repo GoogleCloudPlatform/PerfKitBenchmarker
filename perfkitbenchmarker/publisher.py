@@ -1037,7 +1037,9 @@ class SampleCollector(object):
   results via any number of SamplePublishers.
 
   Attributes:
-    samples: A list of Sample objects as dicts.
+    samples: A list of Sample objects as dicts that have yet to be published.
+    published_samples: A list of Sample objects as dicts that have been
+      published.
     metadata_providers: A list of MetadataProvider objects. Metadata providers
       to use.  Defaults to DEFAULT_METADATA_PROVIDERS.
     publishers: A list of SamplePublisher objects to publish to.
@@ -1056,7 +1058,10 @@ class SampleCollector(object):
       publishers_from_flags=True,
       add_default_publishers=True,
   ):
+    # List of samples yet to be published.
     self.samples: list[pkb_sample.SampleDict] = []
+    # List of samples that have already been published.
+    self.published_samples: list[pkb_sample.SampleDict] = []
 
     if metadata_providers is not None:
       self.metadata_providers = metadata_providers
@@ -1188,6 +1193,7 @@ class SampleCollector(object):
           if publisher.PUBLISH_CONSOLE_LOG_DATA
           else samples_for_console
       )
+    self.published_samples += self.samples
     self.samples = []
 
 

@@ -71,7 +71,7 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     ]
 
     self.spec = mock.MagicMock()
-    self.collector = mock.Mock()
+    self.collector = mock.MagicMock()
 
   def testCreateProvisionFailedSample(self):
     self.flags_mock.create_failed_run_samples = True
@@ -560,6 +560,75 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
   def testValidateRetriesAndBenchmarkStages(self, retries, run_stage, is_valid):
     flags_dict = {'retries': retries, 'run_stage': run_stage}
     self.assertEqual(pkb.ValidateRetriesAndRunStages(flags_dict), is_valid)
+
+  @parameterized.named_parameters(
+      ('InvalidCondition', ['invalid_condition']),
+      ('InvalidDirection', ['metric1=1.5']),
+      ('InvalidThreshold', ['metric1>invalid_threshold']),
+  )
+  def testParseSkipTeardownConditionsInvalid(self, conditions):
+    self.assertRaises(
+        ValueError,
+        pkb.ParseSkipTeardownConditions,
+        conditions,
+    )
+
+  @parameterized.named_parameters(
+      (
+          'ValidCondition',
+          ['metric1>1.5'],
+          {
+              'metric1': {'lower_bound': 1.5, 'upper_bound': None}
+          },
+      ),
+      (
+          'ValidConditions',
+          ['metric1>1.5', 'metric2<2.5'],
+          {
+              'metric1': {'lower_bound': 1.5, 'upper_bound': None},
+              'metric2': {'lower_bound': None, 'upper_bound': 2.5},
+          },
+      ),
+      (
+          'UpperAndLowerBounds',
+          ['metric1>1.5', 'metric1<2.5'],
+          {
+              'metric1': {'lower_bound': 1.5, 'upper_bound': 2.5},
+          },
+      ),
+      (
+          'LowerBoundReplaced',
+          ['metric1>2.5', 'metric1>1.5'],
+          {
+              'metric1': {'lower_bound': 1.5, 'upper_bound': None},
+          },
+      ),
+      (
+          'UpperBoundReplaced',
+          ['metric1<1.5', 'metric1<2.5'],
+          {
+              'metric1': {'lower_bound': None, 'upper_bound': 2.5},
+          },
+      ),
+  )
+  def testParseSkipTeardownConditionsValid(self, conditions, parsed):
+    self.assertEqual(pkb.ParseSkipTeardownConditions(conditions), parsed)
+
+  @parameterized.named_parameters(
+      ('NoConditions', {'skip_teardown_conditions': []}, True),
+      (
+          'InvalidThreshold',
+          {'skip_teardown_conditions': ['metric1>invalid_threshold']},
+          False,
+      ),
+      (
+          'ValidConditions',
+          {'skip_teardown_conditions': ['metric1>1.5', 'metric2<2.5']},
+          True,
+      ),
+  )
+  def testValidateSkipTeardownConditions(self, flags_dict, is_valid):
+    self.assertEqual(pkb.ValidateSkipTeardownConditions(flags_dict), is_valid)
 
   @flagsaver.flagsaver(zone=['zone_1'], smart_quota_retry=True, retries=1)
   def testSmartQuotaRetry(self):

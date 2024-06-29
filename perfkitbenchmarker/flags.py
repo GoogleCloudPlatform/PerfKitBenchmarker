@@ -403,7 +403,9 @@ flags.DEFINE_integer(
     240,
     'An upper bound on the time in minutes that the benchmark is expected to '
     'run. This time is annotated or tagged on the resources of cloud '
-    'providers. Note that for retries, this applies to each individual retry.',
+    'providers. Note that for retries, this applies to each individual retry. '
+    'This is also used to annotate the "keep up time" for resources that are '
+    'kept alive through the --skip_teardown_conditions flag.'
 )
 flags.DEFINE_integer(
     'persistent_timeout_minutes',
@@ -474,4 +476,20 @@ ALWAYS_CALL_CLEANUP = flags.DEFINE_boolean(
     'always_call_cleanup',
     False,
     'Indicates that this benchmark run should always run the Cleanup phase.'
+)
+SKIP_TEARDOWN_CONDITIONS = flags.DEFINE_list(
+    'skip_teardown_conditions',
+    [],
+    'A list of conditions that warrant skipping teardown. This is useful for '
+    'investigating resources with interesting performance characteristics.\n'
+    'Each item contains three tokens: '
+    '\tmetric: the metric to check\n'
+    '\tdirection: the direction to check against ("<" or ">")\n'
+    '\tthreshold: the threshold to check against (in seconds)\n'
+    'For example: "kernel_start>50"\n'
+    'Additional conditions should be separated by commas. '
+    'Adjust the --timeout_minutes flag to annotate the affected resources with '
+    'your desired keep up time. The PKB run will complete, so users of this '
+    'flag must have a spearate teardown procedure in place for resources with '
+    'extended uptimes.',
 )
