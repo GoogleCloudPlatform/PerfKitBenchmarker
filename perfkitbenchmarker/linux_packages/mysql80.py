@@ -248,3 +248,15 @@ def CreateDatabase(
       {'database_name': db_name, 'password': password},
   )
   vm.RemoteCommand(f'mysql -uroot -p"{password}"< {tmp_path}')
+
+
+def SetupReplica(
+    vm: virtual_machine.VirtualMachine, password: str, master_ip: str):
+  """Setup replica mysql server."""
+  tmp_path = '/tmp/setup_repl.sql'
+  vm.RenderTemplate(
+      data.ResourcePath('mysql/setup_repl.sql.j2'),
+      tmp_path,
+      {'password': password, 'private_ip': master_ip},
+  )
+  vm.RemoteCommand(f'mysql -uroot -p"{password}"< {tmp_path}')

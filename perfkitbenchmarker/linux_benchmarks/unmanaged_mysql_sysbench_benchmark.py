@@ -17,6 +17,7 @@
 This benchmark measures performance of Sysbench Databases on unmanaged MySQL.
 """
 
+import copy
 import logging
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -79,12 +80,26 @@ _OLTP = 'oltp_read_write'
 
 
 def GetConfig(user_config):
+  """Get the benchmark config, applying user overrides.
+
+  Args:
+    user_config:
+
+  Returns:
+    Benchmark config.
+  """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   # Instead of changing the default data dir of database in (multiple) configs,
   # Force the scratch disk as database default dir (simpler code).
   disk_spec = config['vm_groups']['server']['disk_spec']
   for cloud in disk_spec:
     disk_spec[cloud]['mount_point'] = '/var/lib/mysql'
+  if FLAGS.db_high_availability:
+    for index, zone in enumerate(FLAGS.db_replica_zones):
+      replica = copy.deepcopy(config['vm_groups']['server'])
+      for cloud in replica['vm_spec']:
+        replica['vm_spec'][cloud]['zone'] = zone
+      config['vm_groups'][f'replica_{index}'] = replica
   return config
 
 
@@ -104,14 +119,23 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   if FLAGS.innodb_buffer_pool_size:
     buffer_pool_size = f'{FLAGS.innodb_buffer_pool_size}G'
 
-  servers = benchmark_spec.vm_groups['server']
-  primary_server = servers[0]
+  primary_server = benchmark_spec.vm_groups['server'][0]
+  replica_servers = []
+  for vm in benchmark_spec.vm_groups:
+    if vm.startswith('replica'):
+      replica_servers += benchmark_spec.vm_groups[vm]
+
+  servers = [primary_server] + replica_servers
   new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
   for index, server in enumerate(servers):
     # mysql server ids needs to be positive integers.
-    mysql80.ConfigureAndRestart(server, buffer_pool_size, index+1)
+    mysql80.ConfigureAndRestart(server, buffer_pool_size, index + 1)
     mysql80.UpdatePassword(server, new_password)
     mysql80.CreateDatabase(server, new_password, _DATABASE_NAME)
+
+  assert primary_server.internal_ip
+  for replica in replica_servers:
+    mysql80.SetupReplica(replica, new_password, primary_server.internal_ip)
 
   clients = benchmark_spec.vm_groups['client']
   for client in clients:

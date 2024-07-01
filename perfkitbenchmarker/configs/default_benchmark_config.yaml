@@ -246,3 +246,4 @@ mysql_sysbench_tpcc:
     sysbench_use_fk: False
     sysbench_txn_isolation_level: RC
     sysbench_ssl_mode: required
+    db_high_availability: true

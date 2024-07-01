@@ -77,6 +77,11 @@ flags.DEFINE_list(
     'zone or region to launch the database in. '
     "Defaults to the client vm's zone.",
 )
+flags.DEFINE_list(
+    'db_replica_zones',
+    [],
+    'zones to launch the database replicas in. ',
+)
 flags.DEFINE_string(
     'client_vm_zone', None, 'zone or region to launch the client in. '
 )
