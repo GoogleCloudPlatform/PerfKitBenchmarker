@@ -123,7 +123,7 @@ class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
       return None, None
 
     expected_command = (
-        'java -Xmx6g -cp bq-jdbc-simba-client-1.1.jar '
+        'java -Xmx6g -cp bq-jdbc-simba-client-1.2.jar '
         'com.google.cloud.performance.edw.Single --project {} '
         '--credentials_file {} --dataset {} --query_file '
         '{}'

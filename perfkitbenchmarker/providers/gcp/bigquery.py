@@ -31,7 +31,7 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
 
-BQ_CLIENT_FILE = 'bq-jdbc-simba-client-1.1.jar'
+BQ_CLIENT_FILE = 'bq-jdbc-simba-client-1.2.jar'
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
 BQ_JDBC_INTERFACES = [
