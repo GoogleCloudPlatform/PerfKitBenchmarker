@@ -210,3 +210,41 @@ def ConfigureAndRestart(
   vm.RemoteCommand(f'sudo chmod 0644 {remote_final_logrotation}')
   vm.RemoteCommand('sudo systemctl daemon-reload')
   vm.RemoteCommand('sudo systemctl start mysqld')
+
+
+def UpdatePassword(vm: virtual_machine.VirtualMachine, new_password: str):
+  """Update the password of the root user."""
+  password = vm.RemoteCommand(
+      'sudo grep "A temporary password" /var/log/mysqld.log | '
+      'sed "s/.*generated for root@localhost: //"'
+  )[0].strip()
+  vm.RemoteCommand(
+      f"""mysql --connect-timeout=10 -uroot --password='{password}' """
+      """--connect-expired-password -e "alter user 'root'@'localhost' """
+      f'''identified by '{new_password}';"'''
+  )
+  vm.RemoteCommand('sudo touch /root/.my.cnf')
+  vm.RemoteCommand(
+      f"""echo "[client]\nuser=root\npassword='{new_password}'" | """
+      """sudo tee -a /root/.my.cnf"""
+  )
+  tmp_path = '/tmp/update_passwords.sql'
+  vm.RenderTemplate(
+      data.ResourcePath('mysql/update_passwords.sql.j2'),
+      tmp_path,
+      {'password': new_password},
+  )
+  vm.RemoteCommand(f'mysql -uroot -p"{new_password}"< {tmp_path}')
+
+
+def CreateDatabase(
+    vm: virtual_machine.VirtualMachine, password: str, db_name: str
+):
+  """Create test db."""
+  tmp_path = '/tmp/create_db.sql'
+  vm.RenderTemplate(
+      data.ResourcePath('mysql/create_db.sql.j2'),
+      tmp_path,
+      {'database_name': db_name, 'password': password},
+  )
+  vm.RemoteCommand(f'mysql -uroot -p"{password}"< {tmp_path}')

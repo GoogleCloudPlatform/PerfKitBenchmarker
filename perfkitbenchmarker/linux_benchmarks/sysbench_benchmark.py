@@ -374,6 +374,7 @@ def _GetSysbenchPrepareCommand(
     db: relational_db.BaseRelationalDb, num_vms: int, vm_index: int
 ) -> str:
   """Returns the sysbench command used to load the database."""
+  # TODO(ruwa): Migrate to use sysbench.BuildLoadCommand()
   data_load_cmd_tokens = [
       'cd ~/sysbench/ && nice',  # run with a niceness of lower priority
       '-15',  # to encourage cpu time for ssh commands

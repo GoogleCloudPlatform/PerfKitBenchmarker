@@ -17,7 +17,7 @@
 
 import re
 import statistics
-from typing import List
+from typing import Optional, List
 
 from absl import flags
 from perfkitbenchmarker import regex_util
@@ -32,26 +32,48 @@ _IGNORE_CONCURRENT = flags.DEFINE_bool(
     'If true, ignores concurrent modification P0001 exceptions thrown by '
     'some databases.',
 )
+# release 1.0.20; committed Apr 24, 2020. When updating this, also update the
+# correct line for CONCURRENT_MODS, as it may have changed in between releases.
+DEFAULT_RELEASE_TAG = '1.0.20'
+RELEASE_TAGS = [DEFAULT_RELEASE_TAG]
+SYSBENCH_VERSION = flags.DEFINE_string(
+    'sysbench_version',
+    DEFAULT_RELEASE_TAG,
+    'Sysbench version to use. Can be a release tag or a git tag.',
+)
+SYSBENCH_SSL_MODE = flags.DEFINE_string(
+    'sysbench_ssl_mode',
+    None,
+    'Sets the ssl mode to connect to the database. '
+)
 
 
 GIT_REPO = 'https://github.com/akopytov/sysbench'
-# release 1.0.20; committed Apr 24, 2020. When updating this, also update the
-# correct line for CONCURRENT_MODS, as it may have changed in between releases.
-RELEASE_TAG = '1.0.20'
 SYSBENCH_DIR = '~/sysbench'
+# default lua path
+LUA_SCRIPT_PATH = f'{SYSBENCH_DIR}/src/lua/'
 
 # Inserts this error code on line 534.
 CONCURRENT_MODS = (
     '534 i !strcmp(con->sql_state, "P0001")/* concurrent modification */ ||'
 )
 
+# Sysbench TPCC-addon script
+SYSBENCH_TPCC_REPRO = 'https://github.com/Percona-Lab/sysbench-tpcc.git'
+
 
 def _Install(vm, spanner_oltp=False):
   """Installs the sysbench package on the VM."""
   vm.RemoteCommand(f'sudo rm -rf {SYSBENCH_DIR}')
-  vm.RemoteCommand(
-      f'git clone {GIT_REPO} {SYSBENCH_DIR} --branch {RELEASE_TAG}'
-  )
+  if SYSBENCH_VERSION.value in RELEASE_TAGS:
+    vm.RemoteCommand(
+        f'git clone {GIT_REPO} {SYSBENCH_DIR} --branch {SYSBENCH_VERSION.value}'
+    )
+  else:
+    vm.RemoteCommand(
+        f'git clone {GIT_REPO} {SYSBENCH_DIR} && cd {SYSBENCH_DIR} && '
+        f'git checkout {SYSBENCH_VERSION.value}')
+
   if _IGNORE_CONCURRENT.value:
     driver_file = f'{SYSBENCH_DIR}/src/drivers/pgsql/drv_pgsql.c'
     vm.RemoteCommand(f"sed -i '{CONCURRENT_MODS}' {driver_file}")
@@ -207,3 +229,80 @@ def ParseSysbenchTransactions(sysbench_output, metadata) -> List[sample.Sample]:
       sample.Sample('tps', transactions_per_second, 'tps', metadata),
       sample.Sample('qps', queries_per_second, 'qps', metadata),
   ]
+
+
+# TODO(ruwa): wrap in a dataclass.
+def BuildLoadCommand(
+    custom_lua_packages_path: Optional[str] = None,
+    built_in_test: Optional[bool] = True,  # if this test comes with sysbench
+    test: Optional[str] = None,  # sysbench test path
+    db_driver: Optional[str] = None,  # sysbench default mysql
+    db_ps_mode: Optional[str] = None,  # sysbench default auto
+    skip_trx: Optional[bool] = False,  # sysbench default off
+    trx_level: Optional[str] = None,  # transaction isolation level, default RR
+    tables: Optional[int] = None,  # number of tables to create, default 1
+    table_size: Optional[int] = None,  # number of rows to insert, default 10000
+    scale: Optional[int] = None,  # scale factor, default 100
+    report_interval: Optional[int] = None,  # default 0 (disabled)
+    threads: Optional[int] = None,  # number of threads, default 1
+    events: Optional[int] = None,   # limit on events to run, default 0
+    rate: Optional[int] = None,  # rate limit, default 0 (unlimited)
+    use_fk: Optional[int] = None,  # use foreign keys, default 1 (on)
+    db_user: Optional[str] = None,
+    db_password: Optional[str] = None,
+    db_name: Optional[str] = None,
+    host_ip: Optional[str] = None,
+    ssl_setting: Optional[str] = None,
+) -> str:
+  """Builds a sysbench load command."""
+  cmd = []
+  if custom_lua_packages_path:
+    cmd += [f'LUA_PATH={custom_lua_packages_path}']
+  if built_in_test:
+    cmd += ['sysbench']
+  if test:
+    cmd += [test]
+  args = {
+      'db-driver': db_driver,
+      'db-ps-mode': db_ps_mode,
+      'tables': tables,
+      'table_size': table_size,
+      'scale': scale,
+      'report-interval': report_interval,
+      'threads': threads,
+      'events': events,
+      'rate': rate,
+      'use_fk': use_fk,
+      'trx_level': trx_level,
+  }
+  for arg, value in args.items():
+    if value is not None:
+      cmd.extend([f'--{arg}={value}'])
+  if skip_trx:
+    cmd += ['--skip_trx=on']
+  cmd += GetSysbenchDatabaseFlags(
+      db_driver, db_user, db_password, db_name, host_ip, ssl_setting)
+  cmd += ['prepare']
+  return  f'cd {SYSBENCH_DIR} && ' + ' '.join(cmd)
+
+
+def GetSysbenchDatabaseFlags(
+    db_driver: str,
+    db_user: str,
+    db_password: str,
+    db_name: str,
+    host_ip: str,
+    ssl_setting: Optional[str] = None,  # only available in sysbench ver 1.1+
+) -> List[str]:
+  """Returns the database flags for sysbench."""
+  if db_driver == 'mysql':
+    ssl_flag = []
+    if ssl_setting:
+      ssl_flag += [f'--mysql-ssl={ssl_setting}']
+    return ssl_flag + [
+        f'--mysql-user={db_user}',
+        f'--mysql-password={db_password}',
+        f'--mysql-db={db_name}',
+        f'--mysql-host={host_ip}',
+    ]
+  return []

@@ -17,12 +17,15 @@
 This benchmark measures performance of Sysbench Databases on unmanaged MySQL.
 """
 
+import logging
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import mysql80
+from perfkitbenchmarker.linux_packages import sysbench
 
 FLAGS = flags.FLAGS
 
@@ -66,18 +69,22 @@ unmanaged_mysql_sysbench:
 # increasing buffer pool and dataset to larger sizes
 DEFAULT_BUFFER_POOL_SIZE = 8
 
+# The database name is used to create a database on the server.
+_DATABASE_TYPE = 'mysql'
+_DATABASE_NAME = 'sysbench'
+
+# test names
+_TPCC = 'percona_tpcc'
+_OLTP = 'oltp_read_write'
+
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   # Instead of changing the default data dir of database in (multiple) configs,
   # Force the scratch disk as database default dir (simpler code).
-  if (
-      FLAGS.db_engine == 'mysql'
-      or config['flags'].get('db_engine', None) == 'mysql'
-  ):
-    disk_spec = config['vm_groups']['server']['disk_spec']
-    for cloud in disk_spec:
-      disk_spec[cloud]['mount_point'] = '/var/lib/mysql'
+  disk_spec = config['vm_groups']['server']['disk_spec']
+  for cloud in disk_spec:
+    disk_spec[cloud]['mount_point'] = '/var/lib/mysql'
   return config
 
 
@@ -98,9 +105,64 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
     buffer_pool_size = f'{FLAGS.innodb_buffer_pool_size}G'
 
   servers = benchmark_spec.vm_groups['server']
+  primary_server = servers[0]
+  new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
   for index, server in enumerate(servers):
     # mysql server ids needs to be positive integers.
     mysql80.ConfigureAndRestart(server, buffer_pool_size, index+1)
+    mysql80.UpdatePassword(server, new_password)
+    mysql80.CreateDatabase(server, new_password, _DATABASE_NAME)
+
+  clients = benchmark_spec.vm_groups['client']
+  for client in clients:
+    client.InstallPackages('git')
+    client.Install('sysbench')
+    if FLAGS.sysbench_testname == _TPCC:
+      client.RemoteCommand(
+          'cd /opt && sudo rm -fr sysbench-tpcc && '
+          f'sudo git clone {sysbench.SYSBENCH_TPCC_REPRO}')
+
+  loader_vm = benchmark_spec.vm_groups['client'][0]
+  if FLAGS.sysbench_testname == _OLTP:
+    cmd = sysbench.BuildLoadCommand(
+        built_in_test=True,
+        test=f'{sysbench.LUA_SCRIPT_PATH}{_OLTP}.lua',
+        db_driver=_DATABASE_TYPE,
+        db_ps_mode='disable',  # prepared statements usage mode.
+        tables=FLAGS.sysbench_tables,
+        table_size=FLAGS.sysbench_table_size,
+        report_interval=FLAGS.sysbench_report_interval,
+        threads=FLAGS.sysbench_load_threads,
+        db_user=_DATABASE_NAME,
+        db_password=new_password,
+        db_name=_DATABASE_NAME,
+        host_ip=primary_server.internal_ip,
+        ssl_setting=sysbench.SYSBENCH_SSL_MODE.value)
+    logging.info('OLTP load command: %s', cmd)
+    loader_vm.RemoteCommand(cmd)
+  elif FLAGS.sysbench_testname == _TPCC:
+    cmd = sysbench.BuildLoadCommand(
+        custom_lua_packages_path='/opt/sysbench-tpcc/?.lua',
+        built_in_test=False,
+        test='/opt/sysbench-tpcc/tpcc.lua',
+        db_driver=_DATABASE_TYPE,
+        tables=FLAGS.sysbench_tables,
+        scale=FLAGS.sysbench_scale,
+        report_interval=FLAGS.sysbench_report_interval,
+        threads=FLAGS.sysbench_load_threads,
+        use_fk=FLAGS.sysbench_use_fk,
+        trx_level=FLAGS.sysbench_txn_isolation_level,
+        db_user=_DATABASE_NAME,
+        db_password=new_password,
+        db_name=_DATABASE_NAME,
+        host_ip=primary_server.internal_ip,
+        ssl_setting=sysbench.SYSBENCH_SSL_MODE.value)
+    logging.info('TPCC load command: %s', cmd)
+    loader_vm.RemoteCommand(cmd)
+  else:
+    raise errors.Setup.InvalidConfigurationError(
+        f'Test --sysbench_testname={FLAGS.sysbench_testname} is not supported.'
+    )
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
