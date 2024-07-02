@@ -186,6 +186,7 @@
 -   Add keydb_memtier_benchmark (KeyDB is a fork of Redis).
 -   Add `--skip_teardown_conditions` flag, offering the option to keep resources
     alive if any metrics satisfy the criteria passed into the flag.
+-   Add unmanaged_mysql_sysbench benchmark.
 
 ### Enhancements:
 

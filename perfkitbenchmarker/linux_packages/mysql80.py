@@ -182,7 +182,6 @@ def ConfigureAndRestart(
     vm: virtual_machine.VirtualMachine, buffer_pool_size: str, server_id: int
 ):
   """Configure and restart mysql."""
-  # TODO(ruwa): add metadata for the name of config file used.
   config_template = 'mysql/ha.cnf.j2'
   remote_temp_config = '/tmp/my.cnf'
   remote_final_config = '/etc/my.cnf'

@@ -19,6 +19,8 @@ This benchmark measures performance of Sysbench Databases on unmanaged MySQL.
 
 import copy
 import logging
+from typing import Optional
+
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -27,6 +29,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import mysql80
 from perfkitbenchmarker.linux_packages import sysbench
+
 
 FLAGS = flags.FLAGS
 
@@ -41,20 +44,20 @@ unmanaged_mysql_sysbench:
       vm_spec:
         GCP:
           machine_type: c3-standard-22
-          zone: us-central1-b
+          zone: us-east1-b
     server:
       os_type: centos_stream9
       vm_spec:
         GCP:
           machine_type: c3-highmem-22
-          zone: us-central1-b
+          zone: us-east1-b
       disk_spec:
         GCP:
           disk_size: 500
           disk_type: hyperdisk-balanced
-          provisioned_iops: 80000
+          provisioned_iops: 160000
           provisioned_throughput: 2400
-          num_striped_disks: 2
+          num_striped_disks: 1
   flags:
     disk_fs_type: xfs
     # for now we only have mysql supported
@@ -94,6 +97,16 @@ def GetConfig(user_config):
   disk_spec = config['vm_groups']['server']['disk_spec']
   for cloud in disk_spec:
     disk_spec[cloud]['mount_point'] = '/var/lib/mysql'
+  # Update machine type for server/client.
+  if FLAGS.db_machine_type:
+    vm_spec = config['vm_groups']['server']['vm_spec']
+    for cloud in vm_spec:
+      vm_spec[cloud]['machine_type'] = FLAGS.db_machine_type
+  if FLAGS.client_vm_machine_type:
+    vm_spec = config['vm_groups']['client']['vm_spec']
+    for cloud in vm_spec:
+      vm_spec[cloud]['machine_type'] = FLAGS.client_vm_machine_type
+  # Add replica servers if configured.
   if FLAGS.db_high_availability:
     for index, zone in enumerate(FLAGS.db_replica_zones):
       replica = copy.deepcopy(config['vm_groups']['server'])
@@ -103,6 +116,54 @@ def GetConfig(user_config):
   return config
 
 
+def _GetPassword():
+  """Generate a password for this session."""
+  return FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
+
+
+def _GetSysbenchParameters(primary_server_ip: Optional[str], password: str):
+  """Get sysbench parameters from flags."""
+  sysbench_parameters = sysbench.SysbenchInputParameters(
+      db_driver=_DATABASE_TYPE,
+      tables=FLAGS.sysbench_tables,
+      threads=FLAGS.sysbench_load_threads,
+      report_interval=FLAGS.sysbench_report_interval,
+      db_user=_DATABASE_NAME,
+      db_password=password,
+      db_name=_DATABASE_NAME,
+      host_ip=primary_server_ip,
+      ssl_setting=sysbench.SYSBENCH_SSL_MODE.value,
+  )
+  if FLAGS.sysbench_testname == _OLTP:
+    sysbench_parameters.built_in_test = True
+    sysbench_parameters.test = f'{sysbench.LUA_SCRIPT_PATH}{_OLTP}.lua'
+    sysbench_parameters.db_ps_mode = 'disable'
+    sysbench_parameters.skip_trx = True
+    sysbench_parameters.table_size = FLAGS.sysbench_table_size
+
+  elif FLAGS.sysbench_testname == _TPCC:
+    sysbench_parameters.custom_lua_packages_path = '/opt/sysbench-tpcc/?.lua'
+    sysbench_parameters.built_in_test = False
+    sysbench_parameters.test = '/opt/sysbench-tpcc/tpcc.lua'
+    sysbench_parameters.scale = FLAGS.sysbench_scale
+    sysbench_parameters.use_fk = FLAGS.sysbench_use_fk
+    sysbench_parameters.trx_level = FLAGS.sysbench_txn_isolation_level
+
+  else:
+    raise errors.Setup.InvalidConfigurationError(
+        f'Test --sysbench_testname={FLAGS.sysbench_testname} is not supported.'
+    )
+
+  return sysbench_parameters
+
+
+def GetBufferPoolSize():
+  """Get buffer pool size from flags."""
+  if FLAGS.innodb_buffer_pool_size:
+    return f'{FLAGS.innodb_buffer_pool_size}G'
+  return f'{DEFAULT_BUFFER_POOL_SIZE}G'
+
+
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   """Prepare the servers and clients for the benchmark run.
 
@@ -110,14 +171,10 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
     benchmark_spec:
   """
   vms = benchmark_spec.vms
-  # TODO(ruwa): add metadata for system settings.
   background_tasks.RunThreaded(mysql80.ConfigureSystemSettings, vms)
   background_tasks.RunThreaded(lambda vm: vm.Install('mysql80'), vms)
 
-   # TODO(ruwa): add metadata for buffer pool size.
-  buffer_pool_size = f'{DEFAULT_BUFFER_POOL_SIZE}G'
-  if FLAGS.innodb_buffer_pool_size:
-    buffer_pool_size = f'{FLAGS.innodb_buffer_pool_size}G'
+  buffer_pool_size = GetBufferPoolSize()
 
   primary_server = benchmark_spec.vm_groups['server'][0]
   replica_servers = []
@@ -144,55 +201,49 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
     if FLAGS.sysbench_testname == _TPCC:
       client.RemoteCommand(
           'cd /opt && sudo rm -fr sysbench-tpcc && '
-          f'sudo git clone {sysbench.SYSBENCH_TPCC_REPRO}')
+          f'sudo git clone {sysbench.SYSBENCH_TPCC_REPRO}'
+      )
 
   loader_vm = benchmark_spec.vm_groups['client'][0]
-  if FLAGS.sysbench_testname == _OLTP:
-    cmd = sysbench.BuildLoadCommand(
-        built_in_test=True,
-        test=f'{sysbench.LUA_SCRIPT_PATH}{_OLTP}.lua',
-        db_driver=_DATABASE_TYPE,
-        db_ps_mode='disable',  # prepared statements usage mode.
-        tables=FLAGS.sysbench_tables,
-        table_size=FLAGS.sysbench_table_size,
-        report_interval=FLAGS.sysbench_report_interval,
-        threads=FLAGS.sysbench_load_threads,
-        db_user=_DATABASE_NAME,
-        db_password=new_password,
-        db_name=_DATABASE_NAME,
-        host_ip=primary_server.internal_ip,
-        ssl_setting=sysbench.SYSBENCH_SSL_MODE.value)
-    logging.info('OLTP load command: %s', cmd)
-    loader_vm.RemoteCommand(cmd)
-  elif FLAGS.sysbench_testname == _TPCC:
-    cmd = sysbench.BuildLoadCommand(
-        custom_lua_packages_path='/opt/sysbench-tpcc/?.lua',
-        built_in_test=False,
-        test='/opt/sysbench-tpcc/tpcc.lua',
-        db_driver=_DATABASE_TYPE,
-        tables=FLAGS.sysbench_tables,
-        scale=FLAGS.sysbench_scale,
-        report_interval=FLAGS.sysbench_report_interval,
-        threads=FLAGS.sysbench_load_threads,
-        use_fk=FLAGS.sysbench_use_fk,
-        trx_level=FLAGS.sysbench_txn_isolation_level,
-        db_user=_DATABASE_NAME,
-        db_password=new_password,
-        db_name=_DATABASE_NAME,
-        host_ip=primary_server.internal_ip,
-        ssl_setting=sysbench.SYSBENCH_SSL_MODE.value)
-    logging.info('TPCC load command: %s', cmd)
-    loader_vm.RemoteCommand(cmd)
-  else:
-    raise errors.Setup.InvalidConfigurationError(
-        f'Test --sysbench_testname={FLAGS.sysbench_testname} is not supported.'
-    )
+  sysbench_parameters = _GetSysbenchParameters(
+      primary_server.internal_ip, new_password)
+  cmd = sysbench.BuildLoadCommand(sysbench_parameters)
+  logging.info('%s load command: %s', FLAGS.sysbench_testname, cmd)
+  loader_vm.RemoteCommand(cmd)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
-  del benchmark_spec
-  # this is a work in progress.
+  """Run the sysbench benchmark and publish results.
+
+  Args:
+    benchmark_spec: The benchmark specification. Contains all data that is
+      required to run the benchmark.
+
+  Returns:
+    Results.
+  """
+  primary_server = benchmark_spec.vm_groups['server'][0]
+  client = benchmark_spec.vm_groups['client'][0]
+  sysbench_parameters = _GetSysbenchParameters(
+      primary_server.internal_ip, _GetPassword())
   results = []
+  for thread_count in FLAGS.sysbench_run_threads:
+    sysbench_parameters.threads = thread_count
+    cmd = sysbench.BuildRunCommand(sysbench_parameters)
+    logging.info('%s run command: %s', FLAGS.sysbench_testname, cmd)
+    try:
+      stdout, _ = client.RemoteCommand(
+          cmd, timeout=2*FLAGS.sysbench_run_seconds,)
+    except errors.VirtualMachine.RemoteCommandError as e:
+      logging.exception('Failed to run sysbench command: %s', e)
+      continue
+    metadata = sysbench.GetMetadata(sysbench_parameters)
+    metadata.update({
+        'buffer_pool_size': GetBufferPoolSize(),
+    })
+    results += sysbench.ParseSysbenchTimeSeries(stdout, metadata)
+    results += sysbench.ParseSysbenchLatency([stdout], metadata)
+    results += sysbench.ParseSysbenchTransactions(stdout, metadata)
   return results
 
 

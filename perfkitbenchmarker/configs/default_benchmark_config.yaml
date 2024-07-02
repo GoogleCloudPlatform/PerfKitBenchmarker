@@ -235,6 +235,9 @@ mysql_sysbench_oltp:
     sysbench_tables: 8
     sysbench_report_interval: 1
     sysbench_ssl_mode: required
+    db_high_availability: True
+    sysbench_run_threads: 64,128,256,512,1024,2048
+    sysbench_run_seconds: 300
 
 mysql_sysbench_tpcc:
   name: unmanaged_mysql_sysbench
@@ -246,4 +249,6 @@ mysql_sysbench_tpcc:
     sysbench_use_fk: False
     sysbench_txn_isolation_level: RC
     sysbench_ssl_mode: required
-    db_high_availability: true
+    db_high_availability: True
+    sysbench_run_threads: 64,128,256,512,1024,2048
+    sysbench_run_seconds: 300

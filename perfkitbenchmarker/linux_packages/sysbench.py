@@ -15,9 +15,10 @@
 
 """Module containing sysbench installation and cleanup functions."""
 
+import dataclasses
 import re
 import statistics
-from typing import Optional, List
+from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import regex_util
@@ -116,7 +117,7 @@ def AptInstall(vm, spanner_oltp=False):
   _Install(vm, spanner_oltp=spanner_oltp)
 
 
-def ParseSysbenchTimeSeries(sysbench_output, metadata) -> List[sample.Sample]:
+def ParseSysbenchTimeSeries(sysbench_output, metadata) -> list[sample.Sample]:
   """Parses sysbench output.
 
   Extract relevant TPS and latency numbers, and populate the final result
@@ -171,8 +172,8 @@ def ParseSysbenchTimeSeries(sysbench_output, metadata) -> List[sample.Sample]:
 
 
 def ParseSysbenchLatency(
-    sysbench_outputs: List[str], metadata
-) -> List[sample.Sample]:
+    sysbench_outputs: list[str], metadata
+) -> list[sample.Sample]:
   """Parse sysbench latency results."""
   min_latency_array = []
   average_latency_array = []
@@ -217,7 +218,7 @@ def ParseSysbenchLatency(
   ]
 
 
-def ParseSysbenchTransactions(sysbench_output, metadata) -> List[sample.Sample]:
+def ParseSysbenchTransactions(sysbench_output, metadata) -> list[sample.Sample]:
   """Parse sysbench transaction results."""
   transactions_per_second = regex_util.ExtractFloat(
       r'transactions: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output
@@ -231,58 +232,79 @@ def ParseSysbenchTransactions(sysbench_output, metadata) -> List[sample.Sample]:
   ]
 
 
-# TODO(ruwa): wrap in a dataclass.
-def BuildLoadCommand(
-    custom_lua_packages_path: Optional[str] = None,
-    built_in_test: Optional[bool] = True,  # if this test comes with sysbench
-    test: Optional[str] = None,  # sysbench test path
-    db_driver: Optional[str] = None,  # sysbench default mysql
-    db_ps_mode: Optional[str] = None,  # sysbench default auto
-    skip_trx: Optional[bool] = False,  # sysbench default off
-    trx_level: Optional[str] = None,  # transaction isolation level, default RR
-    tables: Optional[int] = None,  # number of tables to create, default 1
-    table_size: Optional[int] = None,  # number of rows to insert, default 10000
-    scale: Optional[int] = None,  # scale factor, default 100
-    report_interval: Optional[int] = None,  # default 0 (disabled)
-    threads: Optional[int] = None,  # number of threads, default 1
-    events: Optional[int] = None,   # limit on events to run, default 0
-    rate: Optional[int] = None,  # rate limit, default 0 (unlimited)
-    use_fk: Optional[int] = None,  # use foreign keys, default 1 (on)
-    db_user: Optional[str] = None,
-    db_password: Optional[str] = None,
-    db_name: Optional[str] = None,
-    host_ip: Optional[str] = None,
-    ssl_setting: Optional[str] = None,
-) -> str:
-  """Builds a sysbench load command."""
+@dataclasses.dataclass
+class SysbenchInputParameters:
+  """A dataclass for sysbench input flags."""
+  custom_lua_packages_path: Optional[str] = None
+  built_in_test: Optional[bool] = True  # if this test comes with sysbench
+  test: Optional[str] = None  # sysbench test path
+  db_driver: Optional[str] = None  # sysbench default mysql
+  db_ps_mode: Optional[str] = None  # sysbench default auto
+  skip_trx: Optional[bool] = False  # sysbench default off
+  trx_level: Optional[str] = None  # transaction isolation level, default RR
+  tables: Optional[int] = None  # number of tables to create, default 1
+  table_size: Optional[int] = None  # number of rows to insert, default 10000
+  scale: Optional[int] = None  # scale factor, default 100
+  report_interval: Optional[int] = None  # default 0 (disabled)
+  threads: Optional[int] = None  # number of threads, default 1
+  events: Optional[int] = None   # limit on events to run, default 0
+  rate: Optional[int] = None  # rate limit, default 0 (unlimited)
+  use_fk: Optional[int] = None  # use foreign keys, default 1 (on)
+  db_user: Optional[str] = None
+  db_password: Optional[str] = None
+  db_name: Optional[str] = None
+  host_ip: Optional[str] = None
+  ssl_setting: Optional[str] = None
+
+
+def _BuildGenericCommand(
+    sysbench_parameters: SysbenchInputParameters,
+) -> list[str]:
+  """Builds a generic sysbench command."""
   cmd = []
-  if custom_lua_packages_path:
-    cmd += [f'LUA_PATH={custom_lua_packages_path}']
-  if built_in_test:
+  if sysbench_parameters.custom_lua_packages_path:
+    cmd += [f'LUA_PATH={sysbench_parameters.custom_lua_packages_path}']
+  if sysbench_parameters.built_in_test:
     cmd += ['sysbench']
-  if test:
-    cmd += [test]
+  if sysbench_parameters.test:
+    cmd += [sysbench_parameters.test]
   args = {
-      'db-driver': db_driver,
-      'db-ps-mode': db_ps_mode,
-      'tables': tables,
-      'table_size': table_size,
-      'scale': scale,
-      'report-interval': report_interval,
-      'threads': threads,
-      'events': events,
-      'rate': rate,
-      'use_fk': use_fk,
-      'trx_level': trx_level,
+      'db-driver': sysbench_parameters.db_driver,
+      'db-ps-mode': sysbench_parameters.db_ps_mode,
+      'tables': sysbench_parameters.tables,
+      'table_size': sysbench_parameters.table_size,
+      'scale': sysbench_parameters.scale,
+      'report-interval': sysbench_parameters.report_interval,
+      'threads': sysbench_parameters.threads,
+      'events': sysbench_parameters.events,
+      'rate': sysbench_parameters.rate,
+      'use_fk': sysbench_parameters.use_fk,
+      'trx_level': sysbench_parameters.trx_level,
   }
   for arg, value in args.items():
     if value is not None:
       cmd.extend([f'--{arg}={value}'])
-  if skip_trx:
+  if sysbench_parameters.skip_trx:
     cmd += ['--skip_trx=on']
   cmd += GetSysbenchDatabaseFlags(
-      db_driver, db_user, db_password, db_name, host_ip, ssl_setting)
+      sysbench_parameters.db_driver, sysbench_parameters.db_user,
+      sysbench_parameters.db_password, sysbench_parameters.db_name,
+      sysbench_parameters.host_ip, sysbench_parameters.ssl_setting)
+  return cmd
+
+
+def BuildLoadCommand(sysbench_parameters: SysbenchInputParameters) -> str:
+  """Builds a sysbench load command."""
+  cmd = _BuildGenericCommand(sysbench_parameters)
   cmd += ['prepare']
+  return  f'cd {SYSBENCH_DIR} && ' + ' '.join(cmd)
+
+
+def BuildRunCommand(sysbench_parameters: SysbenchInputParameters) -> str:
+  """Builds a sysbench run command."""
+  cmd = _BuildGenericCommand(sysbench_parameters)
+  cmd += [f'--time={FLAGS.sysbench_run_seconds}']
+  cmd += ['run']
   return  f'cd {SYSBENCH_DIR} && ' + ' '.join(cmd)
 
 
@@ -293,7 +315,7 @@ def GetSysbenchDatabaseFlags(
     db_name: str,
     host_ip: str,
     ssl_setting: Optional[str] = None,  # only available in sysbench ver 1.1+
-) -> List[str]:
+) -> list[str]:
   """Returns the database flags for sysbench."""
   if db_driver == 'mysql':
     ssl_flag = []
@@ -306,3 +328,28 @@ def GetSysbenchDatabaseFlags(
         f'--mysql-host={host_ip}',
     ]
   return []
+
+
+def GetMetadata(parameters: SysbenchInputParameters) -> dict[str, str]:
+  """Returns the metadata for sysbench."""
+  args = {
+      'sysbench_testname': parameters.test,
+      'sysbench_driver': parameters.db_driver,
+      'sysbench_ps_mode': parameters.db_ps_mode,
+      'sysbench_skip_trx': parameters.skip_trx,
+      'sysbench_trx_level': parameters.trx_level,
+      'sysbench_tables': parameters.tables,
+      'sysbench_table_size': parameters.table_size,
+      'sysbench_scale': parameters.scale,
+      'sysbench_report_interval': parameters.report_interval,
+      'sysbench_threads': parameters.threads,
+      'sysbench_events': parameters.events,
+      'sysbench_rate': parameters.rate,
+      'sysbench_use_fk': parameters.use_fk,
+      'sysbench_ssl_setting': parameters.ssl_setting,
+  }
+  metadata = {}
+  for arg, value in args.items():
+    if value is not None:
+      metadata[arg] = str(value)
+  return metadata
