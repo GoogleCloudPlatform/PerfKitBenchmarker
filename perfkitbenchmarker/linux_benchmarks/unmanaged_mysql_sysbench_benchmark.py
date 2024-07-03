@@ -59,9 +59,15 @@ unmanaged_mysql_sysbench:
           provisioned_throughput: 2400
           num_striped_disks: 1
   flags:
+    sysbench_version: df89d34c410a2277e19f77e47e535d0890b2029b
     disk_fs_type: xfs
     # for now we only have mysql supported
     db_engine: mysql
+    sysbench_report_interval: 1
+    sysbench_ssl_mode: required
+    db_high_availability: True
+    sysbench_run_threads: 64,128,256,512,1024,2048
+    sysbench_run_seconds: 300
 """
 
 # There are 2 main customer scenarios:
@@ -79,7 +85,10 @@ _DATABASE_NAME = 'sysbench'
 
 # test names
 _TPCC = 'percona_tpcc'
-_OLTP = 'oltp_read_write'
+_OLTP_READ_WRITE = 'oltp_read_write'
+_OLTP_READ_ONLY = 'oltp_read_only'
+_OLTP_WRITE_ONLY = 'oltp_write_only'
+_OLTP = [_OLTP_READ_WRITE, _OLTP_READ_ONLY, _OLTP_WRITE_ONLY]
 
 
 def GetConfig(user_config):
@@ -134,14 +143,15 @@ def _GetSysbenchParameters(primary_server_ip: Optional[str], password: str):
       host_ip=primary_server_ip,
       ssl_setting=sysbench.SYSBENCH_SSL_MODE.value,
   )
-  if FLAGS.sysbench_testname == _OLTP:
+  test = FLAGS.sysbench_testname
+  if test in _OLTP:
     sysbench_parameters.built_in_test = True
-    sysbench_parameters.test = f'{sysbench.LUA_SCRIPT_PATH}{_OLTP}.lua'
+    sysbench_parameters.test = f'{sysbench.LUA_SCRIPT_PATH}{test}.lua'
     sysbench_parameters.db_ps_mode = 'disable'
     sysbench_parameters.skip_trx = True
     sysbench_parameters.table_size = FLAGS.sysbench_table_size
 
-  elif FLAGS.sysbench_testname == _TPCC:
+  elif test == _TPCC:
     sysbench_parameters.custom_lua_packages_path = '/opt/sysbench-tpcc/?.lua'
     sysbench_parameters.built_in_test = False
     sysbench_parameters.test = '/opt/sysbench-tpcc/tpcc.lua'

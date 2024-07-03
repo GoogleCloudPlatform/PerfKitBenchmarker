@@ -226,29 +226,32 @@ sparksql_tpcds_1t:
           provisioned_iops: 5000
           provisioned_throughput: 480
 
-mysql_sysbench_oltp:
+mysql_sysbench_oltp_base: &mysql_sysbench_oltp_base
+  sysbench_table_size: 50000000
+  sysbench_tables: 8
+
+mysql_sysbench_oltp_read_write:
   name: unmanaged_mysql_sysbench
   flags:
-    sysbench_version: df89d34c410a2277e19f77e47e535d0890b2029b
     sysbench_testname: oltp_read_write
-    sysbench_table_size: 50000000
-    sysbench_tables: 8
-    sysbench_report_interval: 1
-    sysbench_ssl_mode: required
-    db_high_availability: True
-    sysbench_run_threads: 64,128,256,512,1024,2048
-    sysbench_run_seconds: 300
+    <<: *mysql_sysbench_oltp_base
+
+mysql_sysbench_oltp_read_only:
+  name: unmanaged_mysql_sysbench
+  flags:
+    sysbench_testname: oltp_read_only
+    <<: *mysql_sysbench_oltp_base
+
+mysql_sysbench_oltp_write_only:
+  name: unmanaged_mysql_sysbench
+  flags:
+    sysbench_testname: oltp_write_only
+    <<: *mysql_sysbench_oltp_base
 
 mysql_sysbench_tpcc:
   name: unmanaged_mysql_sysbench
   flags:
-    sysbench_version: df89d34c410a2277e19f77e47e535d0890b2029b
     sysbench_testname: percona_tpcc
     sysbench_tables: 10
-    sysbench_report_interval: 1
     sysbench_use_fk: False
     sysbench_txn_isolation_level: RC
-    sysbench_ssl_mode: required
-    db_high_availability: True
-    sysbench_run_threads: 64,128,256,512,1024,2048
-    sysbench_run_seconds: 300
