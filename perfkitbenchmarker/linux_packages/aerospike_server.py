@@ -23,6 +23,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
@@ -30,6 +31,11 @@ FLAGS = flags.FLAGS
 GIT_REPO = 'https://github.com/aerospike/aerospike-server.git'
 GIT_TAG = '6.0.0.2'
 AEROSPIKE_DIR = '%s/aerospike-server' % linux_packages.INSTALL_DIR
+
+AEROSPIKE_VERSION_NAME_FOR_OS = {
+    os_types.UBUNTU2004: 'ubuntu20_amd64',
+    os_types.RHEL8: 'el8_amd64',
+}
 
 
 @enum.unique
@@ -44,7 +50,6 @@ MEMORY = 'memory'
 DISK = 'disk'
 
 DEFAULT_VERSION = '6.2.0'
-DEFAULT_PACKAGE = 'ubuntu20_amd64'
 DEFAULT_INSTALL_URL = (
     'https://enterprise.aerospike.com/enterprise/download/server/{}/artifact/{}'
 )
@@ -55,9 +60,6 @@ DEFAULT_INSTALL_URL = (
 
 _AEROSPIKE_ENTERPRISE_VERSION = flags.DEFINE_string(
     'aerospike_enterprise_version', DEFAULT_VERSION, 'Aerospike version to use'
-)
-_AEROSPIKE_ENTERPRISE_PACKAGE = flags.DEFINE_string(
-    'aerospike_enterprise_package', DEFAULT_PACKAGE, 'Aerospike package to use'
 )
 
 _AEROSPIKE_EDITION = flags.DEFINE_enum_class(
@@ -97,8 +99,8 @@ flags.DEFINE_integer(
 )
 flags.DEFINE_integer(
     'aerospike_proto_fd_max',
-    1024,
-    'Maximum number of allowed client connections by Aerospike server.'
+    80000,
+    'Maximum number of allowed file descriptors to be opened in the VM.'
 )
 
 MIN_FREE_KBYTES = 1160000
@@ -150,16 +152,23 @@ def _InstallFromPackage(vm):
     raise NotImplementedError(
         'Only support one instance of aerospike on enterprise'
     )
+  if FLAGS.os_type not in AEROSPIKE_VERSION_NAME_FOR_OS:
+    raise ValueError(
+        f'Unsupported OS type: {FLAGS.os_type}. Supported OS types are: '
+        + ', '.join(AEROSPIKE_VERSION_NAME_FOR_OS.keys())
+    )
   # https://docs.aerospike.com/server/operations/install/linux/ubuntu
   vm.RemoteCommand(
       'wget -O aerospike.tgz '
       + DEFAULT_INSTALL_URL.format(
           _AEROSPIKE_ENTERPRISE_VERSION.value,
-          _AEROSPIKE_ENTERPRISE_PACKAGE.value,
+          AEROSPIKE_VERSION_NAME_FOR_OS[FLAGS.os_type],
       )
   )
   # Create log directory
-  vm.InstallPackages('python')
+  vm.InstallPackages('python3')
+  vm.InstallPackages('dpkg')
+  vm.InstallPackages('netcat')
   vm.RemoteCommand('sudo mkdir -p /var/log/aerospike')
 
   vm.RemoteCommand('mkdir -p aerospike')
@@ -177,6 +186,7 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('lua5_1')
   vm.Install('openssl')
+  vm.Install('wget')
   if _AEROSPIKE_EDITION.value == AerospikeEdition.COMNUNITY:
     _InstallFromGit(vm)
   else:
@@ -220,22 +230,11 @@ def _WaitForServerUp(server, idx=None):
       is an error connecting to the telnet port or otherwise running the remote
       check command.
   """
-  address = server.internal_ip
   port = f'{idx + 3}003'
-
-  logging.info('Trying to connect to Aerospike at %s:%s', server, port)
+  logging.info('Trying to connect to Aerospike at port %s', port)
   try:
-
-    def _NetcatPrefix():
-      _, stderr = server.RemoteCommand('nc -h', ignore_failure=True)
-      if '-q' in stderr:
-        return 'nc -q 1'
-      else:
-        return 'nc -i 1'
-
     out, _ = server.RemoteCommand(
-        '(echo -e "status\n" ; sleep 1)| %s %s %s'
-        % (_NetcatPrefix(), address, port)
+        f'sudo asinfo -v "status -p {port}"', ignore_failure=True
     )
     if out.startswith('ok'):
       logging.info('Aerospike server status is OK. Server up and running.')
@@ -304,6 +303,14 @@ def BuildAndStartCommunityAerospike(server, idx):
   server.PullFile(vm_util.GetTempDir(), log_file)
   _WaitForServerUp(server, idx)
   logging.info('Aerospike server configured and started.')
+  server.RemoteCommand(
+      'sudo asadm -e "show best-practices"'
+  )
+  # In certain cases where file descriptor is not enough, the server will
+  # hanging when processing disk IOs. Logging to expose more debugging info.
+  server.RemoteCommand(
+      'sudo cat /var/log/aerospike/aerospike.log | grep "descriptor"'
+  )
 
 
 def RestartEnterpriseAerospike(server):
@@ -359,6 +366,11 @@ def ConfigureAndStart(server, seed_node_ips=None):
             'service_threads': FLAGS.aerospike_service_threads,
             'replication_factor': FLAGS.aerospike_replication_factor,
             'proto_fd_max': FLAGS.aerospike_proto_fd_max,
+            'node_id': GetNodeId(server),
+            'rack_id': GetNodeId(server),
+            'enable_strong_consistency': (
+                FLAGS.aerospike_enable_strong_consistency
+            ),
         },
     )
     if _AEROSPIKE_EDITION.value == AerospikeEdition.COMNUNITY:
@@ -369,3 +381,34 @@ def ConfigureAndStart(server, seed_node_ips=None):
 
 def Uninstall(vm):
   del vm
+
+
+def GetNodeId(vm):
+  # Assuming the instance name always follows the patten `pkb-xxxx-x`.
+  return vm.name.split('-')[2]
+
+
+def EnableStrongConsistency(vm, namespaces):
+  """Enable the strong consistency feature for the given namespaces.
+
+  Args:
+    vm: the vm instance where the Aerospike server is running.
+    namespaces: the Aerospike namespace to enable strong consistency.
+  """
+  # Grant necessary permissions
+  vm.RemoteCommand(
+      'sudo asadm -e "manage acl grant user admin roles sys-admin data-admin'
+      ' read-write" --enable'
+  )
+  vm.RemoteCommand('sudo systemctl status aerospike')
+  # Enable Strong Consistency
+  for namespace in namespaces:
+    out, _ = vm.RemoteCommand(
+        f'sudo asinfo -v "roster:namespace={namespace}" | grep -oE'
+        r' "observed_nodes=([@a-zA-Z0-9,]+)[\:;]?"'
+    )
+    nodes = out.split('=')[1]
+    vm.RemoteCommand(
+        f'sudo asinfo -v "roster-set:namespace={namespace};nodes={nodes}"'
+    )
+  vm.RemoteCommand('sudo asinfo -v "recluster:"')

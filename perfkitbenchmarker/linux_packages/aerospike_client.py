@@ -23,16 +23,34 @@ import re
 from typing import Any, List
 
 from absl import flags
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
-PATH = 'aerospike-tools-7.0.5-ubuntu20.04'
-TAR_FILE = f'{PATH}.tgz'
-DOWNLOAD_URL = (
-    f'https://download.aerospike.com/artifacts/aerospike-tools/7.0.5/{TAR_FILE}'
+
+# https://download.aerospike.com/artifacts/aerospike-tools/7.0.5/
+AEROSPIKE_TOOL_VERSION_NAME_FOR_OS = {
+    os_types.UBUNTU2004: 'ubuntu20.04',
+    os_types.RHEL8: 'el8',
+}
+
+DEFAULT_PKG_VERSION = '10.2.1'
+
+_AEROSPIKE_TOOLS_VERSION = flags.DEFINE_string(
+    'aerospike_tools_version',
+    DEFAULT_PKG_VERSION,
+    'Aerospike tools version to use'
 )
+
+PATH_FORMATTER = 'aerospike-tools_%s_%s_x86_64'
+TAR_FILE_FORMATTER = '%s.tgz'
+
+DOWNLOAD_URL_PREFIX = (
+    'https://download.aerospike.com/artifacts/aerospike-tools/%s'
+)
+
 STDOUT_START = 'Stage 1: default config'
 SUM = lambda x, y: x + y
 METADATA_AGGREGATOR = {
@@ -61,9 +79,23 @@ class HistogramLine:
 
 def _Install(vm):
   """Installs the aerospike client on the VM."""
-  vm.RemoteCommand(f'wget {DOWNLOAD_URL}')
-  vm.RemoteCommand('tar xvzf ' + TAR_FILE)
-  vm.RemoteCommand(f'cd {PATH}; sudo ./asinstall')
+  if FLAGS.os_type not in AEROSPIKE_TOOL_VERSION_NAME_FOR_OS:
+    raise ValueError(
+        f'Unsupported OS type: {FLAGS.os_type}. Supported OS types are: '
+        + ', '.join(AEROSPIKE_TOOL_VERSION_NAME_FOR_OS.keys())
+    )
+  path = PATH_FORMATTER % (
+      FLAGS.aerospike_tools_version,
+      AEROSPIKE_TOOL_VERSION_NAME_FOR_OS[FLAGS.os_type],
+  )
+  tar_file = TAR_FILE_FORMATTER % path
+  url = '/'.join(
+      [DOWNLOAD_URL_PREFIX % FLAGS.aerospike_tools_version, tar_file]
+  )
+  vm.Install('wget')
+  vm.RemoteCommand(f'wget {url}')
+  vm.RemoteCommand('tar xvzf ' + tar_file)
+  vm.RemoteCommand(f'cd {path}; sudo ./asinstall')
 
 
 def AptInstall(vm):

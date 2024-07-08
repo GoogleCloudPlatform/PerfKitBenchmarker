@@ -18,7 +18,7 @@
 
 def YumInstall(vm):
   """Installs lua on the VM."""
-  vm.InstallPackages('lua lua-devel lua-static')
+  vm.InstallPackages('lua lua-devel')
 
 
 def AptInstall(vm):

@@ -18,7 +18,7 @@
 
 def YumInstall(vm):
   """Installs OpenSSL on the VM."""
-  vm.InstallPackages('openssl openssl-devel openssl-static')
+  vm.InstallPackages('openssl openssl-devel')
 
 
 def AptInstall(vm):
