@@ -308,7 +308,17 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   def AddKey(vm):
     vm.RemoteCommand('echo "{0}" >> ~/.ssh/authorized_keys'.format(public_key))
 
+  # Add unmanaged Hadoop bin path to the environment PATH so that
+  # hadoop/yarn/hdfs commands can be ran without specifying the full path.
+  def ExportHadoopBinPath(vm):
+    vm.RemoteCommand(
+        'echo "export PATH=$PATH:{0}" >> ~/.bashrc && source ~/.bashrc'.format(
+            HADOOP_BIN
+        )
+    )
+
   background_tasks.RunThreaded(AddKey, vms)
+  background_tasks.RunThreaded(ExportHadoopBinPath, vms)
 
   context = {
       'hadoop_dir': HADOOP_DIR,

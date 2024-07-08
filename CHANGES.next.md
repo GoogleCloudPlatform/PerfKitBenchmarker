@@ -330,6 +330,8 @@
 -   Add supportability of running Hadoop DFSIO on unmanaged Hadoop Yarn cluster.
 -   Enable log aggregation in Hadoop YARN job history server to enable finished
     application info and log retrieval.
+-   Add unmanaged Hadoop bin path to the environment PATH so that
+    hadoop/yarn/hdfs commands can be ran without specifying the full path.
 
 ### Bug fixes and maintenance updates:
 
