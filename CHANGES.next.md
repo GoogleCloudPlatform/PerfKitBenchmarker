@@ -68,10 +68,10 @@
     installing local AWS CLI credentials via aws_credentials.py. This must be
     set up by the user beforehand. See
     [AWS documentation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_switch-role-ec2_instance-profiles.html)
-    - Alternatively for EKS benchmarking, clusters require
-    --aws_eks_pod_identity_role for Kubernetes VMs inside the cluster calling
-    APIs. The role must be set up by the user beforehand. See
-    [AWS documentation](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-association.html)
+    -   Alternatively for EKS benchmarking, clusters require
+        --aws_eks_pod_identity_role for Kubernetes VMs inside the cluster
+        calling APIs. The role must be set up by the user beforehand. See
+        [AWS documentation](https://docs.aws.amazon.com/eks/latest/userguide/pod-id-association.html)
 -   Split `--azure_preprovisioned_data_bucket` into
     `--azure_preprovisioned_data_account` and
     `--azure_preprovisioned_data_subscription`, which allows cross-subscription
@@ -190,8 +190,8 @@
 
 ### Enhancements:
 
--   Updated `sar` switch to efficiently collect all sar metrics
-    during the run, and download the file for hands-on analysis (no parsing).
+-   Updated `sar` switch to efficiently collect all sar metrics during the run,
+    and download the file for hands-on analysis (no parsing).
 -   Added delay_time support for delete operations in object storage service.
 -   Added horovod_synthetic option for synthetic input data in ResNet/ReXtNet
     models.
@@ -328,6 +328,8 @@
     command timing out or exceeding its retry limit.
 -   Local disks not included in striping are now available as scratch disks.
 -   Add supportability of running Hadoop DFSIO on unmanaged Hadoop Yarn cluster.
+-   Enable log aggregation in Hadoop YARN job history server to enable finished
+    application info and log retrieval.
 
 ### Bug fixes and maintenance updates:
 
