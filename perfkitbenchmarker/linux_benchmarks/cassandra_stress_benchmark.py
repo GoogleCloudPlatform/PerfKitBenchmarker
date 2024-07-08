@@ -26,6 +26,7 @@ import logging
 import math
 import posixpath
 import time
+from typing import Optional, Union
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
@@ -202,11 +203,29 @@ cassandra_stress:
   description: Benchmark Cassandra using cassandra-stress
   vm_groups:
     workers:
-      vm_spec: *default_single_core
+      vm_spec:
+        GCP:
+          machine_type: c3-standard-4
+          zone: us-central1-a
+        Azure:
+          machine_type: Standard_D4_v5
+          zone: eastus2
+        AWS:
+          machine_type: m6i.xlarge
+          zone: us-east-1
       disk_spec: *default_500_gb
       vm_count: 3
     client:
-      vm_spec: *default_single_core
+      vm_spec:
+        GCP:
+          machine_type: c3-standard-4
+          zone: us-central1-a
+        Azure:
+          machine_type: Standard_D4_v5
+          zone: eastus2
+        AWS:
+          machine_type: m6i.xlarge
+          zone: us-east-1
 """
 
 CASSANDRA_GROUP = 'workers'
@@ -233,9 +252,9 @@ RESULTS_METRICS = (
     'latency 99.9th percentile',  # 99.9% of the time the latency was less than
     # the number displayed in the column.
     'latency max',  # Maximum latency in milliseconds.
-    'Total partitions',  # Number of partitions.
-    'Total errors',  # Number of errors.
-    'Total operation time',
+    'total partitions',  # Number of partitions.
+    'total errors',  # Number of errors.
+    'total operation time',
 )  # Total operation time.
 
 # Metrics are aggregated between client vms.
@@ -393,7 +412,6 @@ def Prepare(benchmark_spec):
   seed_vm = cassandra_vms[0]
   configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
   background_tasks.RunThreaded(configure, cassandra_vms)
-
   cassandra.StartCluster(seed_vm, cassandra_vms[1:])
 
   if FLAGS.cassandra_stress_command == USER_COMMAND:
@@ -449,7 +467,6 @@ def RunTestOnLoader(
     schema_option = '-schema replication\(factor={replication_factor}\)'.format(
         replication_factor=FLAGS.cassandra_stress_replication_factor
     )
-
   population_range = '%s..%s' % (
       loader_index * population_per_vm + 1,
       (loader_index + 1) * population_per_vm,
@@ -466,11 +483,10 @@ def RunTestOnLoader(
   else:
     population_dist = '-pop seq=%s' % population_params
   vm.RobustRemoteCommand(
-      '{cassandra} {command} cl={consistency_level} n={num_keys} '
+      'sudo cassandra-stress {command} cl={consistency_level} n={num_keys} '
       '-node {nodes} {schema} {population_dist} '
       '-log file={result_file} -rate threads={threads} '
       '-errors retries={retries}'.format(
-          cassandra=cassandra.GetCassandraStressPath(vm),
           command=command,
           consistency_level=FLAGS.cassandra_stress_consistency_level,
           num_keys=operations_per_vm,
@@ -511,7 +527,7 @@ def RunCassandraStressTest(
   data_node_ips = [vm.internal_ip for vm in cassandra_vms]
   population_size = population_size or num_operations
   operations_per_vm = int(math.ceil(float(num_operations) / num_loaders))
-  population_per_vm = population_size / num_loaders
+  population_per_vm = int(population_size / num_loaders)
   if num_operations % num_loaders:
     logging.warn(
         'Total number of operations rounded to %s '
@@ -540,6 +556,57 @@ def RunCassandraStressTest(
   background_tasks.RunThreaded(RunTestOnLoader, args)
 
 
+def ParseResp(resp) -> dict[str, Union[float, int]]:
+  """Parses response from Cassandra stress test.
+
+  Args:
+    resp: metric data to parse
+
+  Returns:
+    dict of all the metrics and their values
+  """
+  all_rows = resp.split('\n')
+  metric_values = {}
+  for row in all_rows:
+    if row.strip() == 'Results:' or not row.strip():
+      continue
+    metric_details = _ParseResultRow(row)
+    if metric_details:
+      metric_name, metric_value = metric_details
+      metric_values[metric_name] = metric_value
+  return metric_values
+
+
+def _ParseResultRow(row: str) -> Optional[tuple[str, float]]:
+  """Parses a single row of the result file."""
+  try:
+    metric_name = regex_util.ExtractGroup('(.*) :', row, 1).lower().strip()
+  except regex_util.NoMatchError:
+    logging.error('Metric name not found in row: %s', row)
+    return None
+  if metric_name not in RESULTS_METRICS:
+    return None
+  try:
+    metric_data = regex_util.ExtractGroup(
+        r'(.*) :\s*(\d{1,3}(,\d{3})*(\.\d+)*)', row, 2
+    ).strip()
+  except regex_util.NoMatchError:
+    logging.error('Invalid value for %s: %s', metric_name, row)
+    return None
+  if metric_name == 'total operation time':
+    operation_time_values = regex_util.ExtractGroup(
+        r'(.*) :\s*(\d{2}:\d{2}:\d{2})', row, 2
+    ).split(':')
+    metric_value = (
+        int(operation_time_values[0].strip()) * 3600
+        + int(operation_time_values[1].strip()) * 60
+        + int(operation_time_values[2].strip())
+    )
+  else:
+    metric_value = float(metric_data.strip().replace(',', ''))
+  return (metric_name, metric_value)
+
+
 def CollectResultFile(vm, results):
   """Collect result file on vm.
 
@@ -551,15 +618,13 @@ def CollectResultFile(vm, results):
   result_path = _ResultFilePath(vm)
   vm.PullFile(vm_util.GetTempDir(), result_path)
   resp, _ = vm.RemoteCommand('tail -n 20 ' + result_path)
+  metrics = ParseResp(resp)
+  logging.info('Metrics: %s', metrics)
   for metric in RESULTS_METRICS:
-    value = regex_util.ExtractGroup(r'%s[\t ]+: ([\d\.:]+)' % metric, resp)
-    if metric == RESULTS_METRICS[-1]:  # Total operation time
-      value = value.split(':')
-      results[metric].append(
-          int(value[0]) * 3600 + int(value[1]) * 60 + int(value[2])
-      )
-    else:
-      results[metric].append(float(value))
+    if metric not in metrics:
+      raise ValueError(f'Metric {metric} not found in result file.')
+    value = metrics[metric]
+    results[metric].append(value)
 
 
 def CollectResults(benchmark_spec, metadata):
@@ -587,6 +652,7 @@ def CollectResults(benchmark_spec, metadata):
       value = math.fsum(raw_results[metric])
       if metric not in AGGREGATED_METRICS:
         value = value / len(loader_vms)
+    unit = ''
     if metric.startswith('latency'):
       unit = 'ms'
     elif metric.endswith('rate'):
@@ -594,7 +660,6 @@ def CollectResults(benchmark_spec, metadata):
     elif metric == 'Total operation time':
       unit = 'seconds'
     results.append(sample.Sample(metric, value, unit, metadata))
-  logging.info('Cassandra results:\n%s', results)
   return results
 
 
@@ -609,7 +674,9 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   metadata = GenerateMetadataFromFlags(benchmark_spec)
-
+  metadata['cassandra_version'] = cassandra.GetCassandraVersion(
+      benchmark_spec.vm_groups[CASSANDRA_GROUP][0]
+  )
   RunCassandraStressTest(
       benchmark_spec.vm_groups[CASSANDRA_GROUP],
       benchmark_spec.vm_groups[CLIENT_GROUP],
