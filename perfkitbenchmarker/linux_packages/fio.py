@@ -99,11 +99,12 @@ def AptInstall(vm):
   _Install(vm)
 
 
-def ParseJobFile(job_file):
+def ParseJobFile(job_file, merge=False):
   """Parse fio job file as dictionaries of sample metadata.
 
   Args:
     job_file: The contents of fio job file.
+    merge: whether the job files need to be merged later.
 
   Returns:
     A dictionary of dictionaries of sample metadata, using test name as keys,
@@ -115,7 +116,7 @@ def ParseJobFile(job_file):
   if GLOBAL in config.sections():
     global_metadata = dict(config.items(GLOBAL))
   section_metadata = {}
-  require_merge = FLAGS.fio_pinning
+  require_merge = merge
   for section in config.sections():
     if section == GLOBAL:
       continue
@@ -176,6 +177,7 @@ def ParseResults(
     log_file_base='',
     bin_vals=None,
     skip_latency_individual_stats=False,
+    require_merge=False,
 ):
   """Parse fio json output into samples.
 
@@ -189,6 +191,8 @@ def ParseResults(
       fio/tools/hist/fiologparser_hist.py
     skip_latency_individual_stats: Bool. If true, skips pulling latency stats
       that are not aggregate.
+    require_merge: whether the result samples require merging from multiple fio
+      jobs. (in event jobs are pinned to CPUs or raw disks.)
 
   Returns:
     A list of sample.Sample objects.
@@ -197,7 +201,9 @@ def ParseResults(
   # The samples should all have the same timestamp because they
   # come from the same fio run.
   timestamp = time.time()
-  parameter_metadata = ParseJobFile(job_file) if job_file else dict()
+  parameter_metadata = (
+      ParseJobFile(job_file, require_merge) if job_file else dict()
+  )
   io_modes = list(DATA_DIRECTION.values())
 
   # clat_hist files are indexed sequentially by inner job.  If you have a job

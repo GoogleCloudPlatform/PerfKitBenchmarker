@@ -155,7 +155,7 @@ blocksize=8k
 numa_cpu_nodes=1
 filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
     """
-    parameter_dict = fio.ParseJobFile(file_str)
+    parameter_dict = fio.ParseJobFile(file_str, True)
 
     expected_result = {
         'rand_8k_write_100%-io-depth-256-num-jobs-16': {
