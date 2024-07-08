@@ -44,13 +44,17 @@ provision_container_cluster:
   description: >
       Time spinning up and deleting a Kubernetes Cluster
   container_specs:
-    hello_world:
+    main_nodepool:
       image: hello-world
   container_cluster:
     type: Kubernetes
     vm_count: 1
     vm_spec: *default_dual_core
 """
+
+# kubectl pods don't allow _'s.
+SPEC_NAME = 'main_nodepool'
+CONTAINER_NAME = 'main-nodepool'
 
 
 def GetConfig(user_config):
@@ -70,7 +74,9 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   """Provision container, because it's not handled by provision stage."""
   cluster = bm_spec.container_cluster
   assert cluster
-  cluster.DeployContainer('hello-world', bm_spec.container_specs['hello_world'])
+  container = bm_spec.container_specs[SPEC_NAME]
+  logging.info('Deploying container with image %s', container.image)
+  cluster.DeployContainer(CONTAINER_NAME, container)
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -78,7 +84,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   cluster = bm_spec.container_cluster
   assert cluster
   assert isinstance(cluster, container_service.KubernetesCluster)
-  container = cluster.containers['hello-world'][0]
+  container = cluster.containers[CONTAINER_NAME][0]
   samples = container.GetSamples()
   if not cluster.user_managed:
     samples.append(
@@ -132,7 +138,6 @@ def _BenchmarkClusterResize(
   def PollForData(
       poll: Callable[[], str], poll_message: str, failure_message: str
   ) -> str:
-    result = None
     for _ in range(20):
       result = poll()
       if result:
@@ -230,4 +235,4 @@ def _GetKeyScalingEventTimes(
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   assert bm_spec.container_cluster
-  bm_spec.container_cluster.containers['hello-world'][0].Delete()
+  bm_spec.container_cluster.containers[SPEC_NAME][0].Delete()
