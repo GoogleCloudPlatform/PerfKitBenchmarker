@@ -329,6 +329,8 @@
     application info and log retrieval.
 -   Add unmanaged Hadoop bin path to the environment PATH so that
     hadoop/yarn/hdfs commands can be ran without specifying the full path.
+-   Set dfs.datanode.data.dir and mapreduce.cluster.local.dir dynamically to use
+    all attached scratch disks on each HDFS data node.
 
 ### Bug fixes and maintenance updates:
 

@@ -39,6 +39,12 @@
         <name>mapreduce.job.reduce.slowstart.completedmaps</name>
         <value>0.95</value>
     </property>
+    {% if mapreduce_cluster_local_paths is defined %}
+    <property>
+      <name>mapreduce.cluster.local.dir</name>
+      <value>{{ mapreduce_cluster_local_paths }}</value>
+    </property>
+    {% endif %}
   <!-- TODO(pclay): consider setting
     * mapreduce.task.io.sort.*
     * mapreduce.reduce.merge.*
