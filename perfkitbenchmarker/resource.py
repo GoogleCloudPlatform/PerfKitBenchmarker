@@ -35,6 +35,13 @@ _RESOURCE_REGISTRY = {}
 RegisteredType = TypeVar('RegisteredType')
 ResourceType = type[RegisteredType]
 
+# Constants used for annotating resources with timeout metadata:
+# GCP labels only allow hyphens (-), underscores (_), lowercase characters, and
+# numbers and International characters.
+# metadata allow all characters and numbers.
+METADATA_TIME_FORMAT = '%Y%m%dt%H%M%Sz'
+TIMEOUT_METADATA_KEY = 'timeout_utc'
+
 
 def GetResourceClass(base_class: ResourceType, **kwargs) -> ResourceType:
   """Returns the subclass with the corresponding attributes.

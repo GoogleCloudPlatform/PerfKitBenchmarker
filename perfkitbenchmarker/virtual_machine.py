@@ -1883,5 +1883,8 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
     """See base class."""
     self.LogVmDebugInfo()
 
+  def UpdateTimeoutMetadata(self):
+    """Updates the timeout tag for the VM."""
+
 
 VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)

@@ -83,10 +83,6 @@ six.moves.copyreg.pickle(six.moves._thread.LockType, PickleLock)
 SUPPORTED = 'strict'
 NOT_EXCLUDED = 'permissive'
 SKIP_CHECK = 'none'
-# GCP labels only allow hyphens (-), underscores (_), lowercase characters, and
-# numbers and International characters.
-# metadata allow all characters and numbers.
-METADATA_TIME_FORMAT = '%Y%m%dt%H%M%Sz'
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum(
@@ -946,7 +942,7 @@ class BenchmarkSpec:
     timeout_utc = now_utc + datetime.timedelta(minutes=timeout_minutes)
 
     tags = {
-        'timeout_utc': timeout_utc.strftime(time_format),
+        resource_type.TIMEOUT_METADATA_KEY: timeout_utc.strftime(time_format),
         'create_time_utc': now_utc.strftime(time_format),
         'benchmark': self.name,
         'perfkit_uuid': self.uuid,
@@ -967,7 +963,8 @@ class BenchmarkSpec:
 
   def GetResourceTags(self, timeout_minutes=None):
     """Gets a list of tags to be used to tag resources."""
-    return self._GetResourceDict(METADATA_TIME_FORMAT, timeout_minutes)
+    return self._GetResourceDict(resource_type.METADATA_TIME_FORMAT,
+                                 timeout_minutes)
 
   def _CreatePlacementGroup(self, placement_group_spec, cloud):
     """Create a placement group in zone.

@@ -24,7 +24,6 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-
 import collections
 import copy
 import datetime
@@ -42,6 +41,7 @@ from perfkitbenchmarker import boot_disk
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
@@ -58,6 +58,7 @@ from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 import six
 import yaml
+
 
 FLAGS = flags.FLAGS
 
@@ -1495,6 +1496,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def GetDefaultImageProject(self) -> Optional[str]:
     return None
+
+  def UpdateTimeoutMetadata(self):
+    """Updates the timeout metadata for the VM."""
+    new_timeout = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
+        minutes=pkb_flags.SKIP_TEARDOWN_KEEP_UP_MINUTES.value
+    )
+    new_timeout = new_timeout.strftime(resource.METADATA_TIME_FORMAT)
+    args = ['compute', 'instances', 'add-metadata', self.name]
+    cmd = util.GcloudCommand(self, *args)
+    cmd.flags['metadata'] = (
+        f'{resource.TIMEOUT_METADATA_KEY}={new_timeout},kept_alive=true'
+    )
+    cmd.Issue()
 
 
 class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):

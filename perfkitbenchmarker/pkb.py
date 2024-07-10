@@ -971,6 +971,9 @@ def RunBenchmark(spec, collector):
             if should_teardown:
               current_run_stage = stages.TEARDOWN
               DoTeardownPhase(spec, collector, detailed_timer)
+            else:
+              for vm in spec.vms:
+                vm.UpdateTimeoutMetadata()
 
         # Add timing samples.
         if (

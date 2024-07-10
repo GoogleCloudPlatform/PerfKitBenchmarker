@@ -403,9 +403,7 @@ flags.DEFINE_integer(
     240,
     'An upper bound on the time in minutes that the benchmark is expected to '
     'run. This time is annotated or tagged on the resources of cloud '
-    'providers. Note that for retries, this applies to each individual retry. '
-    'This is also used to annotate the "keep up time" for resources that are '
-    'kept alive through the --skip_teardown_conditions flag.'
+    'providers. Note that for retries, this applies to each individual retry.',
 )
 flags.DEFINE_integer(
     'persistent_timeout_minutes',
@@ -492,4 +490,12 @@ SKIP_TEARDOWN_CONDITIONS = flags.DEFINE_list(
     'your desired keep up time. The PKB run will complete, so users of this '
     'flag must have a spearate teardown procedure in place for resources with '
     'extended uptimes.',
+)
+SKIP_TEARDOWN_KEEP_UP_MINUTES = flags.DEFINE_integer(
+    'skip_teardown_keep_up_minutes',
+    1440,  # 24 hours
+    'The time in minutes that VMs left behind by the benchmark should live. '
+    'This is used to annotate the "timeout_utc" tag for resources that are '
+    'kept alive through the --skip_teardown_conditions flag.\n'
+    'Only implemented for GCE VMs.',
 )
