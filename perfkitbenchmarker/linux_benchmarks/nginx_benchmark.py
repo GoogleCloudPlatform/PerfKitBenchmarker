@@ -150,6 +150,7 @@ nginx:
       vm_spec: *default_single_core
     upstream_servers:
       vm_spec: *default_dual_core
+      vm_count: 6
 """
 
 _CONTENT_FILENAME = 'random_content'
@@ -192,7 +193,7 @@ def _ConfigureNginxServer(server, upstream_servers):
   )
   for idx, upstream_server in enumerate(upstream_servers):
     server.RemoteCommand(
-        r"sudo sed -i 's|<fileserver_%s_ip_or_dns>|%s|g'"
+        r"sudo sed -i 's|# server <fileserver_%s_ip_or_dns>|server %s|g'"
         ' /etc/nginx/conf.d/loadbalance.conf'
         % (idx + 1, upstream_server.internal_ip)
     )
