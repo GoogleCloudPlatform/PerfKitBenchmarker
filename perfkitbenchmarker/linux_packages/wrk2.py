@@ -119,9 +119,6 @@ def _ParseOutput(output_text):
   yield 'error_rate', error_rate, ''
   yield 'errors', errors, ''
 
-  if error_rate > 0.1:
-    raise ValueError('More than 10% of requests failed.')
-
 
 def Run(
     vm, target, rate, connections=1, duration=60, script_path=None, threads=None

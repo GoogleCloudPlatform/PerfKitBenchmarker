@@ -1,4 +1,4 @@
-# Copyright 2019 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2024 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs HTTP load generators against an Nginx server."""
+"""Runs HTTPS load generators against a Reverse Proxy or API Gateway which connects to an Nginx file server .
+
+References:
+https://docs.nginx.com/nginx/admin-guide/web-server/serving-static-content/
+https://learn.arm.com/learning-paths/servers-and-cloud-computing/nginx/
+"""
 
 import ipaddress
 
@@ -34,10 +39,23 @@ _FLAG_FORMAT_DESCRIPTION = (
 )
 
 flags.DEFINE_string(
-    'nginx_conf',
-    None,
-    'The path to an Nginx config file that should be applied '
-    'to the server instead of the default one.',
+    'nginx_global_conf',
+    'nginx/file_server_global.conf',
+    'The filename (relative to perfkitbenchmarker/data) of an Nginx global'
+    ' config file that should be applied to the server instead of the default'
+    ' one.',
+)
+flags.DEFINE_string(
+    'nginx_file_server_conf',
+    'nginx/file_server.conf',
+    'The filename (relative to perfkitbenchmarker/data) of an Nginx server'
+    ' config file referenced by the global config.',
+)
+flags.DEFINE_string(
+    'nginx_server_conf',
+    'nginx/rp_apigw.conf',
+    'The filename (relative to perfkitbenchmarker/data) of an Nginx proxy'
+    ' config file referenced by the global config.',
 )
 flags.DEFINE_integer(
     'nginx_content_size',
@@ -67,17 +85,30 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     'nginx_server_machine_type',
     None,
+    'Machine type to use for the wrk2 proxy if different '
+    'from nginx upstream server machine type.',
+)
+flags.DEFINE_string(
+    'nginx_upstream_server_machine_type',
+    None,
     'Machine type to use for the nginx server if different '
     'from wrk2 client machine type.',
 )
 flags.DEFINE_boolean(
-    'nginx_use_ssl', False, 'Use HTTPs when connecting to nginx.'
+    'nginx_use_ssl', True, 'Use HTTPs when connecting to nginx.'
 )
 flags.DEFINE_integer(
     'nginx_worker_connections',
     1024,
     'The maximum number of simultaneous connections that can '
     'be opened by a worker process.',
+)
+flags.DEFINE_enum(
+    'nginx_scenario',
+    'reverse_proxy',
+    ['reverse_proxy', 'api_gateway'],
+    'Benchmark scenario. Can be "reverse_proxy" or "api_gateway". Set to'
+    ' "reverse_proxy" by default.',
 )
 _NGINX_SERVER_PORT = flags.DEFINE_integer(
     'nginx_server_port',
@@ -116,8 +147,13 @@ nginx:
       vm_spec: *default_single_core
       vm_count: null
     server:
+      vm_spec: *default_single_core
+    upstream_servers:
       vm_spec: *default_dual_core
 """
+
+_CONTENT_FILENAME = 'random_content'
+_API_GATEWAY_PATH = 'api_old'  # refer to data/nginx/rp_apigw.conf
 
 
 def GetConfig(user_config):
@@ -136,7 +172,63 @@ def GetConfig(user_config):
   if FLAGS.nginx_server_machine_type:
     vm_spec = config['vm_groups']['server']['vm_spec']
     vm_spec[FLAGS.cloud]['machine_type'] = FLAGS.nginx_server_machine_type
+  if FLAGS.nginx_upstream_server_machine_type:
+    vm_spec = config['vm_groups']['upstream_servers']['vm_spec']
+    vm_spec[FLAGS.cloud][
+        'machine_type'
+    ] = FLAGS.nginx_upstream_server_machine_type
   return config
+
+
+def _ConfigureNginxServer(server, upstream_servers):
+  """Configures nginx proxy server."""
+  server.PushDataFile(FLAGS.nginx_global_conf)
+  global_conf_file = FLAGS.nginx_global_conf.split('/')[-1]
+  server.RemoteCommand('sudo cp %s /etc/nginx/nginx.conf' % global_conf_file)
+  server.PushDataFile(FLAGS.nginx_server_conf)
+  server_conf_file = FLAGS.nginx_server_conf.split('/')[-1]
+  server.RemoteCommand(
+      'sudo cp %s /etc/nginx/conf.d/loadbalance.conf' % server_conf_file
+  )
+  for idx, upstream_server in enumerate(upstream_servers):
+    server.RemoteCommand(
+        r"sudo sed -i 's|<fileserver_%s_ip_or_dns>|%s|g'"
+        ' /etc/nginx/conf.d/loadbalance.conf'
+        % (idx + 1, upstream_server.internal_ip)
+    )
+  if FLAGS.nginx_use_ssl:
+    _ConfigureNginxForSsl(server)
+  else:
+    _ConfigureNginxListeners(server)
+
+  server.RemoteCommand('sudo service nginx restart')
+
+
+def _ConfigureNginxUpstreamServer(upstream_server):
+  """Configures nginx upstream server."""
+  root_dir = '/usr/share/nginx/html'
+  content_path = root_dir + '/' + _CONTENT_FILENAME
+  upstream_server.RemoteCommand(f'sudo mkdir -p {root_dir}')
+  upstream_server.RemoteCommand(
+      'sudo dd  bs=1 count=%s if=/dev/urandom of=%s'
+      % (FLAGS.nginx_content_size, content_path)
+  )
+  upstream_server.PushDataFile(FLAGS.nginx_global_conf)
+  global_conf_file = FLAGS.nginx_global_conf.split('/')[-1]
+  upstream_server.RemoteCommand(
+      'sudo cp %s /etc/nginx/nginx.conf' % global_conf_file
+  )
+  upstream_server.PushDataFile(FLAGS.nginx_file_server_conf)
+  upstream_server_conf_file = FLAGS.nginx_file_server_conf.split('/')[-1]
+  upstream_server.RemoteCommand(
+      'sudo cp %s /etc/nginx/conf.d/fileserver.conf' % upstream_server_conf_file
+  )
+  if FLAGS.nginx_use_ssl:
+    _ConfigureNginxForSsl(upstream_server)
+  else:
+    _ConfigureNginxListeners(upstream_server)
+
+  upstream_server.RemoteCommand('sudo service nginx restart')
 
 
 def _ConfigureNginxForSsl(server):
@@ -191,71 +283,27 @@ def _ConfigureNginxForSsl(server):
     )
 
 
-def _ConfigureNginx(server):
-  """Configures nginx server."""
-  content_path = '/var/www/html/random_content'
-  server.RemoteCommand('sudo mkdir -p /var/www/html')  # create folder if needed
-  server.RemoteCommand(
-      'sudo dd  bs=1 count=%s if=/dev/urandom of=%s'
-      % (FLAGS.nginx_content_size, content_path)
+def _ConfigureNginxListeners(vm):
+  """Configures the ports from which nginx listens."""
+  isipv6 = isinstance(
+      ipaddress.ip_address(vm.internal_ip), ipaddress.IPv6Address
   )
-  if FLAGS.nginx_conf:
-    server.PushDataFile(FLAGS.nginx_conf)
-    server.RemoteCommand('sudo cp %s /etc/nginx/nginx.conf' % FLAGS.nginx_conf)
+  if not isipv6:
+    vm.RemoteCommand(
+        r"sudo sed -i 's|\(listen \[::\]:80 .*;\)|#\1|g' "
+        r'/etc/nginx/sites-enabled/default'
+    )
   else:
-    # disable logging, nginx logs every request by default.
-    server.RemoteCommand(
-        r"sudo sed -i 's|access_log .*|access_log /dev/null;|g' "
-        r'/etc/nginx/nginx.conf'
+    vm.RemoteCommand(
+        r"sudo sed -i 's|\(listen 80 .*\)|#\1|g' "
+        r'/etc/nginx/sites-enabled/default'
     )
-    # Add some optimizations to the Nginx stack to improve throughput.
-    # This is based off https://www.nginx.com/blog/tuning-nginx/
-    # Increase worker_connections from to 1024 (default 768)
-    server.RemoteCommand(
-        r"sudo sed -i 's|worker_connections .*|worker_connections %s;|g' "
-        r'/etc/nginx/nginx.conf' % FLAGS.nginx_worker_connections
+  if FLAGS.nginx_server_port:
+    server_port = FLAGS.nginx_server_port
+    replace_str = rf's|\(listen .*\)80 |\1{server_port} |g'
+    vm.RemoteCommand(
+        f"sudo sed -i '{replace_str}' /etc/nginx/sites-enabled/default"
     )
-    # Increase keepalive_requests to a large value (default 1000)
-    server.RemoteCommand(
-        r"sudo sed -i 's|\(\s*\)keepalive_timeout .*|"
-        r"\1keepalive_timeout 75;\n\1keepalive_requests 1000000000;|g' "
-        r'/etc/nginx/nginx.conf'
-    )
-    # Enable caching
-    server.RemoteCommand(
-        "sudo sed -i 's|# server_tokens off;|"
-        'open_file_cache max=200000 inactive=20s;'
-        'open_file_cache_valid 30s;'
-        'open_file_cache_min_uses 2;'
-        'open_file_cache_errors on;'
-        "# server_tokens off;|g' "
-        '/etc/nginx/nginx.conf'
-    )
-
-  if FLAGS.nginx_use_ssl:
-    _ConfigureNginxForSsl(server)
-  else:
-    isipv6 = isinstance(
-        ipaddress.ip_address(server.internal_ip), ipaddress.IPv6Address
-    )
-    if not isipv6:
-      server.RemoteCommand(
-          r"sudo sed -i 's|\(listen \[::\]:80 .*;\)|#\1|g' "
-          r'/etc/nginx/sites-enabled/default'
-      )
-    else:
-      server.RemoteCommand(
-          r"sudo sed -i 's|\(listen 80 .*\)|#\1|g' "
-          r'/etc/nginx/sites-enabled/default'
-      )
-    if FLAGS.nginx_server_port:
-      server_port = FLAGS.nginx_server_port
-      replace_str = rf's|\(listen .*\)80 |\1{server_port} |g'
-      server.RemoteCommand(
-          f"sudo sed -i '{replace_str}' /etc/nginx/sites-enabled/default"
-      )
-
-  server.RemoteCommand('sudo service nginx restart')
 
 
 def Prepare(benchmark_spec):
@@ -267,13 +315,15 @@ def Prepare(benchmark_spec):
   """
   clients = benchmark_spec.vm_groups['clients']
   server = benchmark_spec.vm_groups['server'][0]
-  server.Install('nginx')
-  _ConfigureNginx(server)
+  upstream_servers = benchmark_spec.vm_groups['upstream_servers']
+  background_tasks.RunThreaded(
+      lambda vm: vm.Install('nginx'), [server] + upstream_servers
+  )
+  _ConfigureNginxServer(server, upstream_servers)
+  background_tasks.RunThreaded(_ConfigureNginxUpstreamServer, upstream_servers)
   background_tasks.RunThreaded(lambda vm: vm.Install('wrk2'), clients)
 
-  benchmark_spec.nginx_endpoint_ip = benchmark_spec.vm_groups['server'][
-      0
-  ].internal_ip
+  benchmark_spec.nginx_endpoint_ip = server.internal_ip
 
 
 def _RunMultiClient(clients, target, rate, connections, duration, threads):
@@ -324,7 +374,7 @@ def _RunMultiClient(clients, target, rate, connections, duration, threads):
       'nginx_worker_connections': FLAGS.nginx_worker_connections,
       'nginx_use_ssl': FLAGS.nginx_use_ssl,
   }
-  if not FLAGS.nginx_conf:
+  if not FLAGS.nginx_file_server_conf:
     metadata['caching'] = True
   results += [
       sample.Sample('achieved_rate', requests / duration, '', metadata),
@@ -356,7 +406,14 @@ def Run(benchmark_spec):
       else f'{hostip}'
   )
   portstr = f':{FLAGS.nginx_server_port}' if FLAGS.nginx_server_port else ''
-  target = f'{scheme}://{hoststr}{portstr}/random_content'
+  if FLAGS.nginx_scenario == 'reverse_proxy':
+    # e.g. "https://10.128.0.36/random_content"
+    target = f'{scheme}://{hoststr}{portstr}/{_CONTENT_FILENAME}'
+  elif FLAGS.nginx_scenario == 'api_gateway':
+    # e.g. "https://10.128.0.36/api_old/random_content"
+    target = (
+        f'{scheme}://{hoststr}{portstr}/{_API_GATEWAY_PATH}/{_CONTENT_FILENAME}'
+    )
 
   if FLAGS.nginx_throttle:
     return _RunMultiClient(

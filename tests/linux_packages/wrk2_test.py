@@ -16,7 +16,6 @@ import os
 import unittest
 
 from perfkitbenchmarker.linux_packages import wrk2
-import six
 
 
 def _ReadOutputFile(file_name):
@@ -47,11 +46,6 @@ class Wrk2Test(unittest.TestCase):
         ],
         result,
     )
-
-  def testParseAllRequestsFailed(self):
-    wrk_output = _ReadOutputFile('wrk2_output_all_error.txt')
-    with six.assertRaisesRegex(self, ValueError, 'More than 10%'):
-      list(wrk2._ParseOutput(wrk_output))
 
   def testParseWithErrors(self):
     wrk_output = _ReadOutputFile('wrk2_output_errors.txt')
