@@ -33,7 +33,7 @@ REDIS_VERSION_MAPPING = {
     'redis_4_0': '4.0.10',
     'redis_5_0': '5.0.6',
     'redis_6_x': '6.x',
-    'redis_7_x': '7.0',
+    'redis_7_x': '7.1',
 }
 
 
