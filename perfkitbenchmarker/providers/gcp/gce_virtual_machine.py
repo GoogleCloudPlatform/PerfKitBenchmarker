@@ -143,6 +143,8 @@ _FIXED_GPU_MACHINE_TYPES = {
     'g2-standard-96': (virtual_machine.GPU_L4, 8),
 }
 
+PKB_SKIPPED_TEARDOWN_METADATA_KEY = 'pkb_skipped_teardown'
+
 
 class GceRetryDescribeOperationsError(Exception):
   """Exception for retrying Exists().
@@ -1497,6 +1499,29 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def GetDefaultImageProject(self) -> Optional[str]:
     return None
 
+  def GetNumTeardownSkippedVms(self) -> int:
+    """Returns the number of lingering VMs in this VM's project and zone."""
+    # compute instances list doesn't accept a --zone flag, so we need to drop
+    # the zone from the VM object and pass in --zones instead.
+    vm_without_zone = copy.copy(self)
+    vm_without_zone.zone = None
+    args = ['compute', 'instances', 'list']
+    cmd = util.GcloudCommand(vm_without_zone, *args)
+    cmd.flags['format'] = 'json'
+    cmd.flags['zones'] = self.zone
+    stdout, _, _ = cmd.Issue()
+    all_vms = json.loads(stdout)
+    num_teardown_skipped_vms = 0
+    for vm_json in all_vms:
+      for item in vm_json['metadata']['items']:
+        if (
+            item['key'] == PKB_SKIPPED_TEARDOWN_METADATA_KEY
+            and item['value'] == 'true'
+        ):
+          num_teardown_skipped_vms += 1
+          continue
+    return num_teardown_skipped_vms
+
   def UpdateTimeoutMetadata(self):
     """Updates the timeout metadata for the VM."""
     new_timeout = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
@@ -1506,7 +1531,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     args = ['compute', 'instances', 'add-metadata', self.name]
     cmd = util.GcloudCommand(self, *args)
     cmd.flags['metadata'] = (
-        f'{resource.TIMEOUT_METADATA_KEY}={new_timeout},kept_alive=true'
+        f'{resource.TIMEOUT_METADATA_KEY}={new_timeout},'
+        f'{PKB_SKIPPED_TEARDOWN_METADATA_KEY}=true'
     )
     cmd.Issue()
 

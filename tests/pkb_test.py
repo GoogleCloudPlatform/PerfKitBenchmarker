@@ -874,6 +874,44 @@ class TestConditionalSkipTeardown(parameterized.TestCase):
         )
     )
 
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'teardown_anyway',
+          'num_vms': 1,
+          'zonal_vm_limit': 1,
+          'expected_result': True,
+      },
+      {
+          'testcase_name': 'skip_teardown',
+          'num_vms': 1,
+          'zonal_vm_limit': 2,
+          'expected_result': False,
+      },
+      {
+          'testcase_name': 'teardown_anyway_multiple_vms',
+          'num_vms': 2,
+          'zonal_vm_limit': 2,
+          'expected_result': True,
+      },
+  )
+  def testShouldTeardownZonalVmLimit(
+      self, num_vms, zonal_vm_limit, expected_result
+  ):
+    test_vm = mock.MagicMock()
+    test_vm.GetNumTeardownSkippedVms.return_value = 1
+    test_conditions = {
+        'metric1': {'lower_bound': None, 'upper_bound': 1.5},
+    }
+    self.assertEqual(
+        expected_result,
+        pkb.ShouldTeardown(
+            skip_teardown_conditions=test_conditions,
+            samples=self.SAMPLES,
+            vms=[test_vm] * num_vms,
+            skip_teardown_zonal_vm_limit=zonal_vm_limit,
+        )
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -1903,5 +1903,8 @@ class BaseVirtualMachine(BaseOsMixin, resource.BaseResource):
   def UpdateTimeoutMetadata(self):
     """Updates the timeout tag for the VM."""
 
+  def GetNumTeardownSkippedVms(self) -> int | None:
+    """Returns the number of lingering VMs in this VM's zone."""
+
 
 VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)

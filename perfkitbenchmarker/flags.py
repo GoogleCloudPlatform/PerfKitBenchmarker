@@ -491,6 +491,14 @@ SKIP_TEARDOWN_CONDITIONS = flags.DEFINE_list(
     'flag must have a spearate teardown procedure in place for resources with '
     'extended uptimes.',
 )
+SKIP_TEARDOWN_ZONAL_VM_LIMIT = flags.DEFINE_integer(
+    'skip_teardown_zonal_vm_limit',
+    None,
+    'The maximum number of VMs in the zone (within a project) that can be left '
+    'behind via the --skip_teardown_conditions flag. If skipping teardown will '
+    'cause the number of VMs in the project to exceed this limit, teardown '
+    'will be performed regardless of the --skip_teardown_conditions flag.',
+)
 SKIP_TEARDOWN_KEEP_UP_MINUTES = flags.DEFINE_integer(
     'skip_teardown_keep_up_minutes',
     1440,  # 24 hours

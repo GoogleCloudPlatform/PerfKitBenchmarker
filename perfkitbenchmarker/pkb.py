@@ -103,6 +103,7 @@ from perfkitbenchmarker import time_triggers
 from perfkitbenchmarker import timing_util
 from perfkitbenchmarker import traces
 from perfkitbenchmarker import version
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -322,6 +323,8 @@ def MetricMeetsConditions(
 def ShouldTeardown(
     skip_teardown_conditions: Mapping[str, Mapping[str, Optional[float]]],
     samples: MutableSequence[Mapping[str, Any]],
+    vms: Optional[Sequence[virtual_machine.BaseVirtualMachine]] = None,
+    skip_teardown_zonal_vm_limit: int | None = None,
 ) -> bool:
   """Checks all samples against all skip teardown conditions.
 
@@ -329,6 +332,9 @@ def ShouldTeardown(
     skip_teardown_conditions: list of tuples of: (metric, lower_bound,
       upper_bound)
     samples: list of samples to check against the conditions
+    vms: list of VMs brought up by the benchmark
+    skip_teardown_zonal_vm_limit: the maximum number of VMs in the zone that can
+      be left behind.
 
   Returns:
     True if the benchmark should teardown as usual, False if it should skip due
@@ -336,6 +342,18 @@ def ShouldTeardown(
   """
   if not skip_teardown_conditions:
     return True
+  if skip_teardown_zonal_vm_limit:
+    for vm in vms:
+      num_lingering_vms = vm.GetNumTeardownSkippedVms()
+      if (
+          num_lingering_vms is not None
+          and num_lingering_vms + len(vms) > skip_teardown_zonal_vm_limit
+      ):
+        logging.warning(
+            'Too many lingering VMs: tearing down resources regardless of skip'
+            ' teardown conditions.'
+        )
+        return True
   for metric_sample in samples:
     if MetricMeetsConditions(metric_sample, skip_teardown_conditions):
       logging.warning('Skipping TEARDOWN phase.')
@@ -1057,6 +1075,8 @@ def RunBenchmark(spec, collector):
             should_teardown = ShouldTeardown(
                 skip_teardown_conditions,
                 collector.published_samples + collector.samples,
+                spec.vms,
+                pkb_flags.SKIP_TEARDOWN_ZONAL_VM_LIMIT.value,
             )
             if should_teardown:
               current_run_stage = stages.TEARDOWN
