@@ -57,6 +57,7 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
 
 
 import collections
+from collections.abc import Mapping, MutableSequence
 import copy
 import itertools
 import json
@@ -70,7 +71,7 @@ import sys
 import threading
 import time
 import types
-from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Type
+from typing import Any, Collection, Dict, List, Optional, Sequence, Set, Tuple, Type
 import uuid
 
 from absl import flags
@@ -252,6 +253,94 @@ def ValidateSkipTeardownConditions(flags_dict: Mapping[str, Any]) -> bool:
     return True
   except ValueError:
     return False
+
+
+def MetricMeetsConditions(
+    metric_sample: Mapping[str, Any],
+    conditions: Mapping[str, Mapping[str, Optional[float]]],
+) -> bool:
+  """Checks if a metric sample meets any conditions.
+
+  If a metric falls within the bounds of a condition, log the metric and the
+  condition.
+
+  Args:
+    metric_sample: The metric sample to check
+    conditions: The conditions to check against
+  Returns:
+    True if the metric sample meets any of the conditions, False otherwise.
+  """
+  if metric_sample['metric'] not in conditions:
+    return False
+
+  target_condition = conditions[metric_sample['metric']]
+  lower_bound = target_condition['lower_bound']
+  upper_bound = target_condition['upper_bound']
+  lower_bound_satisfied = (
+      lower_bound is not None and metric_sample['value'] > lower_bound
+  )
+  upper_bound_satisfied = (
+      upper_bound is not None and metric_sample['value'] < upper_bound
+  )
+  if lower_bound_satisfied and upper_bound_satisfied:
+    logging.info(
+        'Skip teardown condition met: %s is greater than %s %s and less'
+        ' than %s %s',
+        metric_sample['metric'],
+        lower_bound,
+        metric_sample['unit'],
+        upper_bound,
+        metric_sample['unit'],
+    )
+    return True
+  # Requires that a metric meet both thresholds if lower_bound < upper_bound.
+  elif (
+      lower_bound is not None
+      and upper_bound is not None
+      and lower_bound < upper_bound
+  ):
+    return False
+  elif lower_bound_satisfied:
+    logging.info(
+        'Skip teardown condition met: %s is greater than %s %s',
+        metric_sample['metric'],
+        lower_bound,
+        metric_sample['unit'],
+    )
+    return True
+  elif upper_bound_satisfied:
+    logging.info(
+        'Skip teardown condition met: %s is less than %s %s',
+        metric_sample['metric'],
+        upper_bound,
+        metric_sample['unit'],
+    )
+    return True
+  return False
+
+
+def ShouldTeardown(
+    skip_teardown_conditions: Mapping[str, Mapping[str, Optional[float]]],
+    samples: MutableSequence[Mapping[str, Any]],
+) -> bool:
+  """Checks all samples against all skip teardown conditions.
+
+  Args:
+    skip_teardown_conditions: list of tuples of: (metric, lower_bound,
+      upper_bound)
+    samples: list of samples to check against the conditions
+
+  Returns:
+    True if the benchmark should teardown as usual, False if it should skip due
+    to a condition being met.
+  """
+  if not skip_teardown_conditions:
+    return True
+  for metric_sample in samples:
+    if MetricMeetsConditions(metric_sample, skip_teardown_conditions):
+      logging.warning('Skipping TEARDOWN phase.')
+      return False
+  return True
 
 
 def _InjectBenchmarkInfoIntoDocumentation():
@@ -965,7 +1054,7 @@ def RunBenchmark(spec, collector):
             skip_teardown_conditions = ParseSkipTeardownConditions(
                 pkb_flags.SKIP_TEARDOWN_CONDITIONS.value
             )
-            should_teardown = flag_util.ShouldTeardown(
+            should_teardown = ShouldTeardown(
                 skip_teardown_conditions,
                 collector.published_samples + collector.samples,
             )

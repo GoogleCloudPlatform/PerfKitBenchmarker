@@ -766,5 +766,114 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
     test_bm_spec.relational_db.Delete.assert_called_with(freeze=True)
 
 
+class TestConditionalSkipTeardown(parameterized.TestCase):
+  SAMPLES = [
+      sample.Sample(
+          metric='metric1',
+          value=1.0,
+          unit='seconds',
+          timestamp=1678147200.0,
+      ).asdict(),
+      sample.Sample(
+          metric='metric2',
+          value=2.0,
+          unit='seconds',
+          timestamp=1678147200.0,
+      ).asdict(),
+      sample.Sample(
+          metric='metricminus10',
+          value=-10.0,
+          unit='seconds',
+          timestamp=1678147200.0,
+      ).asdict(),
+  ]
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'no_conditions_met',
+          'conditions': {
+              'metric1': {'lower_bound': 1.5, 'upper_bound': None},
+              'metric2': {'lower_bound': None, 'upper_bound': 1.5},
+          },
+      },
+      {
+          'testcase_name': 'upper_greater_than_lower',
+          'conditions': {
+              'metric1': {'lower_bound': 1.5, 'upper_bound': 2.5},
+          },
+      },
+      {
+          'testcase_name': 'upper_less_than_lower',
+          'conditions': {
+              'metric1': {'lower_bound': 1.5, 'upper_bound': 0.5},
+          },
+      },
+      {
+          'testcase_name': 'neither_bound',
+          'conditions': {
+              'metric1': {'lower_bound': None, 'upper_bound': None},
+          },
+      },
+      {
+          'testcase_name': 'no_flag_passed',
+          'conditions': None,
+      },
+  )
+  def testTeardownAsUsual(self, conditions):
+    self.assertTrue(
+        pkb.ShouldTeardown(
+            skip_teardown_conditions=conditions,
+            samples=self.SAMPLES,
+        )
+    )
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'less_test',
+          'conditions': {
+              'metric1': {'lower_bound': None, 'upper_bound': 1.5},
+          },
+      },
+      {
+          'testcase_name': 'greater_test',
+          'conditions': {
+              'metric2': {'lower_bound': 1.5, 'upper_bound': None},
+          },
+      },
+      {
+          'testcase_name': 'multiple_conditions',
+          'conditions': {
+              'metric1': {'lower_bound': None, 'upper_bound': 1.5},
+              'metric2': {'lower_bound': 1.5, 'upper_bound': None},
+          },
+      },
+      {
+          'testcase_name': 'upper_greater_than_lower',
+          'conditions': {
+              'metric1': {'lower_bound': 0.5, 'upper_bound': 1.5},
+          },
+      },
+      {
+          'testcase_name': 'upper_less_than_lower',
+          'conditions': {
+              'metric1': {'lower_bound': 2.5, 'upper_bound': 1.5},
+          },
+      },
+      {
+          'testcase_name': 'zero_bound',
+          'conditions': {
+              'metricminus10': {'lower_bound': None, 'upper_bound': 0.0},
+          },
+      },
+  )
+  def testSkipTeardown(self, conditions):
+    self.assertFalse(
+        pkb.ShouldTeardown(
+            skip_teardown_conditions=conditions,
+            samples=self.SAMPLES,
+        )
+    )
+
+
 if __name__ == '__main__':
   unittest.main()
