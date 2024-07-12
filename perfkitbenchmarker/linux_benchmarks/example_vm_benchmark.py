@@ -11,13 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Sample benchmark.
-
-This benchmark demonstrates the use of preprovisioned data.
-
-TODO(deitz): Expand this benchmark so that it describes how to add new
-benchmarks to PerfKitBenchmarker and demonstrates more features.
-"""
+"""Sample benchmark which uses a VM & preprovisioned data."""
 
 import posixpath
 from typing import Any
@@ -27,9 +21,9 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
-BENCHMARK_NAME = 'sample'
+BENCHMARK_NAME = 'example_vm'
 BENCHMARK_CONFIG = """
-sample:
+example_vm:
   description: Runs a sample benchmark.
   vm_groups:
     default:
