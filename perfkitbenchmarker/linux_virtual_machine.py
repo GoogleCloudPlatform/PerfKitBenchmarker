@@ -856,6 +856,32 @@ class BaseLinuxMixin(virtual_machine.BaseOsMixin):
       sysctl_params[key] = value
     self._ApplySysctlPersistent(sysctl_params)
 
+  def TuneNetworkStack(self):
+    """Tune the network stack to improve throughput.
+
+    These settings are based on the recommendations in
+    https://learn.arm.com/learning-paths/servers-and-cloud-computing/nginx_tune.
+    """
+    max_port_num = 65535
+    small_4k = 4096
+    large_8m = 8388607
+    self.RemoteCommand(
+        f'sudo sysctl -w net.ipv4.ip_local_port_range="1024 {max_port_num}"'
+    )
+    self.RemoteCommand(
+        f'sudo sysctl -w net.ipv4.tcp_max_syn_backlog={max_port_num}'
+    )
+    self.RemoteCommand(f'sudo sysctl -w net.core.rmem_max={large_8m}')
+    self.RemoteCommand(f'sudo sysctl -w net.core.wmem_max={large_8m}')
+    self.RemoteCommand(
+        f'sudo sysctl -w net.ipv4.tcp_rmem="{small_4k} {large_8m} {large_8m}"'
+    )
+    self.RemoteCommand(
+        f'sudo sysctl -w net.ipv4.tcp_wmem="{small_4k} {large_8m} {large_8m}"'
+    )
+    self.RemoteCommand(f'sudo sysctl -w net.core.somaxconn={max_port_num}')
+    self.RemoteCommand('sudo sysctl net.ipv4.tcp_autocorking=0')
+
   def DoConfigureNetworkForBBR(self):
     """Apply --network_enable_BBR to the VM."""
     if not FLAGS.network_enable_BBR:

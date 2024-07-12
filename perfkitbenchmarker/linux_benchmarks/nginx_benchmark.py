@@ -17,6 +17,7 @@
 References:
 https://docs.nginx.com/nginx/admin-guide/web-server/serving-static-content/
 https://learn.arm.com/learning-paths/servers-and-cloud-computing/nginx/
+https://armkeil.blob.core.windows.net/developer/Files/pdf/white-paper/guidelines-for-deploying-nginx-plus-on-aws.pdf
 """
 
 import ipaddress
@@ -40,7 +41,7 @@ _FLAG_FORMAT_DESCRIPTION = (
 
 flags.DEFINE_string(
     'nginx_global_conf',
-    'nginx/file_server_global.conf',
+    'nginx/global.conf',
     'The filename (relative to perfkitbenchmarker/data) of an Nginx global'
     ' config file that should be applied to the server instead of the default'
     ' one.',
@@ -72,7 +73,7 @@ flags.DEFINE_list(
 )
 flags.DEFINE_boolean(
     'nginx_throttle',
-    False,
+    True,
     'If True, skip running the nginx_load_configs and run '
     'wrk2 once aiming to throttle the nginx server.',
 )
@@ -323,6 +324,9 @@ def Prepare(benchmark_spec):
   _ConfigureNginxServer(server, upstream_servers)
   background_tasks.RunThreaded(_ConfigureNginxUpstreamServer, upstream_servers)
   background_tasks.RunThreaded(lambda vm: vm.Install('wrk2'), clients)
+  background_tasks.RunThreaded(
+      lambda vm: vm.TuneNetworkStack(), clients + [server] + upstream_servers
+  )
 
   benchmark_spec.nginx_endpoint_ip = server.internal_ip
 
