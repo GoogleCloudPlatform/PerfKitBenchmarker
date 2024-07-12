@@ -308,6 +308,37 @@ def _ConfigureNginxListeners(vm):
     )
 
 
+# TODO(user): Move to linux_virtual_machine.py if used more broadly.
+def _TuneNetworkStack(vm):
+  """Tune the network stack to improve throughput.
+
+  These settings are based on the recommendations in
+  https://learn.arm.com/learning-paths/servers-and-cloud-computing/nginx_tune.
+
+  Args:
+    vm: The VM to tune.
+  """
+  max_port_num = 65535
+  small_4k = 4096
+  large_8m = 8388607
+  vm.RemoteCommand(
+      f'sudo sysctl -w net.ipv4.ip_local_port_range="1024 {max_port_num}"'
+  )
+  vm.RemoteCommand(
+      f'sudo sysctl -w net.ipv4.tcp_max_syn_backlog={max_port_num}'
+  )
+  vm.RemoteCommand(f'sudo sysctl -w net.core.rmem_max={large_8m}')
+  vm.RemoteCommand(f'sudo sysctl -w net.core.wmem_max={large_8m}')
+  vm.RemoteCommand(
+      f'sudo sysctl -w net.ipv4.tcp_rmem="{small_4k} {large_8m} {large_8m}"'
+  )
+  vm.RemoteCommand(
+      f'sudo sysctl -w net.ipv4.tcp_wmem="{small_4k} {large_8m} {large_8m}"'
+  )
+  vm.RemoteCommand(f'sudo sysctl -w net.core.somaxconn={max_port_num}')
+  vm.RemoteCommand('sudo sysctl net.ipv4.tcp_autocorking=0')
+
+
 def Prepare(benchmark_spec):
   """Install Nginx on the server and a load generator on the clients.
 
@@ -325,7 +356,7 @@ def Prepare(benchmark_spec):
   background_tasks.RunThreaded(_ConfigureNginxUpstreamServer, upstream_servers)
   background_tasks.RunThreaded(lambda vm: vm.Install('wrk2'), clients)
   background_tasks.RunThreaded(
-      lambda vm: vm.TuneNetworkStack(), clients + [server] + upstream_servers
+      _TuneNetworkStack, clients + [server] + upstream_servers
   )
 
   benchmark_spec.nginx_endpoint_ip = server.internal_ip
