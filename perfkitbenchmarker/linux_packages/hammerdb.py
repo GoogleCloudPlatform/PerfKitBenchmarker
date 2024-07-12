@@ -124,7 +124,7 @@ HAMMERDB_SCRIPT = flags.DEFINE_enum(
     'The script to run for hammerdb.',
 )
 
-_HAMMERDB_BUILD_TIMEOUT = flags.DEFINE_integer(
+HAMMERDB_BUILD_TIMEOUT = flags.DEFINE_integer(
     'hammerdbcli_build_timeout',
     15000,
     'Timeout hammerdb build phase when exceed build timeout.',
@@ -428,7 +428,7 @@ class TclScriptParameters(object):
         SCRIPT_PARAMETER_PASSWORD: password,
         SCRIPT_PARAMETER_USER: user,
         SCRIPT_PARAMETER_AZURE: 'true' if is_managed_azure else 'false',
-        SCRIPT_PARAMETER_BUILD_TIMEOUT: _HAMMERDB_BUILD_TIMEOUT.value,
+        SCRIPT_PARAMETER_BUILD_TIMEOUT: HAMMERDB_BUILD_TIMEOUT.value,
     }
 
     if hammerdb_script == HAMMERDB_SCRIPT_TPC_H:

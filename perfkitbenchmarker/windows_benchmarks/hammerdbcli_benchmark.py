@@ -296,7 +296,7 @@ def Run(benchmark_spec):
       client_vms[0],
       sql_engine_utils.SQLSERVER,
       hammerdb.HAMMERDB_SCRIPT.value,
-      timeout=None,
+      timeout=linux_hammerdb.HAMMERDB_RUN_TIMEOUT.value,
   )
 
   metadata = GetMetadata()
