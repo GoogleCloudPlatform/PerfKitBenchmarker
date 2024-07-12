@@ -37,6 +37,7 @@ from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
+from perfkitbenchmarker.resources import example_resource_spec
 # Included to import & load Kubernetes' __init__.py somewhere.
 from perfkitbenchmarker.resources import kubernetes  # pylint:disable=unused-import
 import six
@@ -256,6 +257,45 @@ class _DpbServiceSpec(spec.BaseSpec):
       if group in config_values:
         for cloud in config_values[group]['vm_spec']:
           config_values[group]['vm_spec'][cloud]['zone'] = flag_values.zone[0]
+
+
+class _ExampleResourceDecoder(option_decoders.TypeVerifier):
+  """Validate the example_resource dictionary of a benchmark config object."""
+
+  def __init__(self, **kwargs):
+    super().__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify example_resource dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      ExampleResourceSpec built from the config passed in value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    example_config = super().Decode(value, component_full_name, flag_values)
+    if 'example_type' in example_config:
+      spec_class = example_resource_spec.GetExampleResourceSpecClass(
+          example_config['example_type']
+      )
+    else:
+      raise errors.Config.InvalidValue(
+          'Required attribute `example_type` missing from example_resource '
+          'config.'
+      )
+    return spec_class(
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **example_config,
+    )
 
 
 class _TpuGroupSpec(spec.BaseSpec):
@@ -1337,6 +1377,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'tpu_groups': (_TpuGroupsDecoder, {'default': {}}),
         'edw_compute_resource': (_EdwComputeResourceDecoder, {'default': None}),
         'edw_service': (_EdwServiceDecoder, {'default': None}),
+        'example_resource': (_ExampleResourceDecoder, {'default': None}),
         'cloud_redis': (_CloudRedisDecoder, {'default': None}),
         'vpn_service': (_VPNServiceDecoder, {'default': None}),
         'app_groups': (_AppGroupsDecoder, {'default': {}}),

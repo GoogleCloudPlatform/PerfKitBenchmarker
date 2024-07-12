@@ -12,3 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Init file for the resources package for ResourceType & SpecClasses."""
+from perfkitbenchmarker import import_util
+
+
+def LoadModules():
+  list(import_util.LoadModulesForPath(__path__, __name__))
+
+
+LoadModules()

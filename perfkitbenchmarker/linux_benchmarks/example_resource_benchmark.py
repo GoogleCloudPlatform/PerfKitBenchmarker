@@ -29,9 +29,9 @@ BENCHMARK_CONFIG = """
 example_resource:
   description: >
     Example benchmark demonstrating how to write a benchmark.
-  # TODO: Add example_resource_spec in next cl.
-  # example_spec:
-  #   to_log: 'Hello from Benchmark'
+  example_resource:
+    example_type: 'ImplementedExampleResource'
+    log_text: 'Hello from Benchmark'
 """
 
 
@@ -62,16 +62,17 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   Returns:
     A list of sample.Sample instances.
   """
-  del benchmark_spec
   logging.info('Running Run phase of the example benchmark')
-  metadata = {'logged_message': 'hello'}
-  samples = []
+  ex_resource = benchmark_spec.example_resource
+  # Every resource supplies create times by default.
+  samples = ex_resource.GetSamples()
+  metadata = ex_resource.GetResourceMetadata()
   samples.append(sample.Sample('Example Sample Latency', 0.5, 'ms', metadata))
   return samples
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec):
-  """Cleanup the VM to its original state.
+  """Cleanup resources to tjeor original state.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is

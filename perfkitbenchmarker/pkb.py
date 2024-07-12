@@ -544,6 +544,7 @@ def DoProvisionPhase(spec, timer):
   spec.ConstructTpu()
   spec.ConstructEdwService()
   spec.ConstructEdwComputeResource()
+  spec.ConstructExampleResource()
   spec.ConstructVPNService()
   spec.ConstructNfsService()
   spec.ConstructSmbService()
