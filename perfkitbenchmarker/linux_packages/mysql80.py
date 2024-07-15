@@ -61,8 +61,9 @@ OS_DEPENDENT_DEFAULTS = {
 
 def YumInstall(vm):
   """Installs the mysql package on the VM."""
-  vm.RemoteCommand('sudo dnf config-manager --set-enabled crb')
-  vm.RemoteCommand('sudo dnf install -y epel-release epel-next-release')
+  if vm.OS_TYPE not in os_types.AMAZONLINUX_TYPES:
+    vm.RemoteCommand('sudo dnf config-manager --set-enabled crb')
+    vm.RemoteCommand('sudo dnf install -y epel-release epel-next-release')
   vm.RemoteCommand(
       'sudo yum -y install '
       'https://dev.mysql.com/get/mysql80-community-release-el9-5.noarch.rpm'
@@ -197,7 +198,7 @@ def ConfigureSystemSettings(vm: virtual_machine.VirtualMachine):
 
 def GetOSDependentDefaults(os_type: str) -> dict[str, str]:
   """Returns the OS family."""
-  if os_type in os_types.CENTOS_TYPES:
+  if os_type in os_types.CENTOS_TYPES or os_type in os_types.AMAZONLINUX_TYPES:
     return OS_DEPENDENT_DEFAULTS['centos']
   else:
     return OS_DEPENDENT_DEFAULTS['debian']

@@ -21,6 +21,7 @@ import statistics
 from typing import Optional
 
 from absl import flags
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 
@@ -101,8 +102,12 @@ def Uninstall(vm):
 
 def YumInstall(vm):
   """Installs the sysbench package on the VM."""
+  mariadb_pkg_name = 'mariadb-devel'
+  if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
+    # Use mysql-devel according to sysbench documentation.
+    mariadb_pkg_name = 'mysql-devel'
   vm.InstallPackages(
-      'make automake libtool pkgconfig libaio-devel mariadb-devel '
+      f'make automake libtool pkgconfig libaio-devel {mariadb_pkg_name} '
       'openssl-devel postgresql-devel'
   )
   _Install(vm)
@@ -255,6 +260,7 @@ class SysbenchInputParameters:
   db_name: Optional[str] = None
   host_ip: Optional[str] = None
   ssl_setting: Optional[str] = None
+  mysql_ignore_errors: Optional[str] = None
 
 
 def _BuildGenericCommand(
@@ -280,6 +286,7 @@ def _BuildGenericCommand(
       'rate': sysbench_parameters.rate,
       'use_fk': sysbench_parameters.use_fk,
       'trx_level': sysbench_parameters.trx_level,
+      'mysql_ignore_errors': sysbench_parameters.mysql_ignore_errors,
   }
   for arg, value in args.items():
     if value is not None:
@@ -347,6 +354,7 @@ def GetMetadata(parameters: SysbenchInputParameters) -> dict[str, str]:
       'sysbench_rate': parameters.rate,
       'sysbench_use_fk': parameters.use_fk,
       'sysbench_ssl_setting': parameters.ssl_setting,
+      'sysbench_mysql_ignore_errors': parameters.mysql_ignore_errors,
   }
   metadata = {}
   for arg, value in args.items():

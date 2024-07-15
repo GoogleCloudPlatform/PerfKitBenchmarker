@@ -45,12 +45,18 @@ unmanaged_mysql_sysbench:
         GCP:
           machine_type: c3-standard-22
           zone: us-east1-b
+        AWS:
+          machine_type: m7i.4xlarge
+          zone: us-east-1a
     server:
       os_type: centos_stream9
       vm_spec:
         GCP:
           machine_type: c3-highmem-22
           zone: us-east1-b
+        AWS:
+          machine_type: r7i.4xlarge
+          zone: us-east-1a
       disk_spec:
         GCP:
           disk_size: 500
@@ -58,6 +64,12 @@ unmanaged_mysql_sysbench:
           provisioned_iops: 160000
           provisioned_throughput: 2400
           num_striped_disks: 1
+        AWS:
+          disk_size: 500
+          disk_type: gp3
+          provisioned_iops: 16000
+          provisioned_throughput: 1000
+          num_striped_disks: 5
   flags:
     sysbench_version: df89d34c410a2277e19f77e47e535d0890b2029b
     disk_fs_type: xfs
@@ -150,6 +162,9 @@ def _GetSysbenchParameters(primary_server_ip: Optional[str], password: str):
     sysbench_parameters.db_ps_mode = 'disable'
     sysbench_parameters.skip_trx = True
     sysbench_parameters.table_size = FLAGS.sysbench_table_size
+    # oltp tests on mysql require ignoring errors.
+    # https://github.com/akopytov/sysbench/issues/253
+    sysbench_parameters.mysql_ignore_errors = 'all'
 
   elif test == _TPCC:
     sysbench_parameters.custom_lua_packages_path = '/opt/sysbench-tpcc/?.lua'
