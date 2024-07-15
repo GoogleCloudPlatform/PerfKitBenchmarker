@@ -245,7 +245,7 @@ def Prepare(benchmark_spec):
       )
       for vm in servers
   ]
-  if FLAGS.enable_aerospike_strong_consistency:
+  if FLAGS.aerospike_enable_strong_consistency:
     for server in servers:
       aerospike_server.EnableStrongConsistency(
           server, FLAGS.aerospike_namespaces
