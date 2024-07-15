@@ -153,6 +153,11 @@ class RetriableContainerException(
 
 def RunKubectlCommand(command: list[str], **kwargs):
   """Run a kubectl command."""
+  if 'stack_level' in kwargs:
+    kwargs['stack_level'] += 1
+  else:
+    # IssueCommand defaults stack_level to 1, so 2 skips this function.
+    kwargs['stack_level'] = 2
   cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig] + command
   return vm_util.IssueCommand(cmd, **kwargs)
 
