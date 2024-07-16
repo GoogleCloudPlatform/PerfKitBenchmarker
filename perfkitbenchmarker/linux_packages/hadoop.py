@@ -235,6 +235,8 @@ def _RenderConfig(
         posixpath.join(vm.GetScratchDir(i), 'hadoop', 'mapred', 'local')
         for i in range(len(vm.scratch_disks))
     ])
+    # according to mapred-default.xml, the paths for mapreduce.cluster.local.dir
+    # need to be existing, otherwise they will be ignored.
     _MakeFolders(
         mapreduce_cluster_local_paths,
         vm,

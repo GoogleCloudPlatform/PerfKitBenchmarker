@@ -178,9 +178,14 @@ flags.DEFINE_integer('data_disk_size', None, 'Size, in gb, for all data disks.')
 flags.DEFINE_integer(
     'num_striped_disks',
     None,
-    'The number of data disks to stripe together to form one '
-    '"logical" data disk. This defaults to 1, '
-    'which means no striping. ',
+    'The number of data disks for PKB to create and stripe together into a '
+    'single RAID 0 device. This defaults to 1, which means no striping. If '
+    'data disks are local this is simply the number of existing disks you '
+    'would like to combine. If data disks are provisioned remote disks, PKB '
+    'will create this many disks and stripe them together. You do not need to '
+    'set vm_group.disk_count. If you do set both vm_group.disk_count=m and '
+    'num_striped_disks=n, you will end up with m logical disks striped out of '
+    'm x n remote disks, which is probably not what you want.',
     lower_bound=1,
 )
 flags.DEFINE_integer(
