@@ -22,11 +22,13 @@ parameter values. Each file is accessed in a separate map task.
 """
 
 import copy
+from typing import List
 
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 
 BENCHMARK_NAME = 'dpb_testdfsio_benchmark'
@@ -115,6 +117,12 @@ def Prepare(benchmark_spec):
   del benchmark_spec  # unused
 
 
+def ParseResults(command: str, stdout: str) -> List[sample.Sample]:
+  regex = r'Throughput mb/sec: (\d+.\d+)'
+  throughput = regex_util.ExtractFloat(regex, stdout)
+  return [sample.Sample(f'{command}_throughput', throughput, 'MB/s')]
+
+
 def Run(benchmark_spec):
   """Runs testdfsio benchmark and reports the results.
 
@@ -164,6 +172,8 @@ def Run(benchmark_spec):
                 command + '_run_time', result.run_time, 'seconds', metadata
             )
         )
+        if command in (WRITE, READ):
+          results += ParseResults(command, result.stderr)
   return results
 
 

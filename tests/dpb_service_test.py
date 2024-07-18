@@ -26,6 +26,9 @@ CLUSTER_SPEC = mock.Mock(
 )
 TEST_RUN_URI = 'fakeru'
 FAKE_DATETIME_NOW = datetime.datetime(2010, 1, 1)
+JOB_RUN_TIME = 1
+JOB_STDOUT = 'stdout'
+JOB_STDERR = 'stderr'
 
 
 class MockDpbService(dpb_service.BaseDpbService):
@@ -45,7 +48,9 @@ class MockDpbService(dpb_service.BaseDpbService):
     return self._cluster_create_time
 
   def SubmitJob(self, *args, **kwargs) -> dpb_service.JobResult:
-    return dpb_service.JobResult(run_time=1)
+    return dpb_service.JobResult(
+        run_time=JOB_RUN_TIME, stdout=JOB_STDOUT, stderr=JOB_STDERR
+    )
 
 
 class NoDynallocSupportingMockDpbService(MockDpbService):
@@ -405,6 +410,14 @@ class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
   ):
     actual_samples = job_costs.GetSamples(**get_sample_kwargs)
     self.assertListEqual(actual_samples, expected_samples)
+
+  def testSubmitJob(self):
+    mock_dpb_service = MockDpbService(CLUSTER_SPEC)
+    mock_job = mock.Mock()
+    job_result = mock_dpb_service.SubmitJob(mock_job)
+    self.assertEqual(job_result.run_time, JOB_RUN_TIME)
+    self.assertEqual(job_result.stdout, JOB_STDOUT)
+    self.assertEqual(job_result.stderr, JOB_STDERR)
 
 
 if __name__ == '__main__':

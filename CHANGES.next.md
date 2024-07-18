@@ -336,6 +336,7 @@
 -   Set dfs.datanode.data.dir and mapreduce.cluster.local.dir dynamically to use
     all attached scratch disks on each HDFS data node.
 -   Add a flag to allow users to specify a suffix for the GCP VM instance name.
+-   Add support for parsing testdfsio results.
 
 ### Bug fixes and maintenance updates:
 

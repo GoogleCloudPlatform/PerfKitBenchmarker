@@ -172,6 +172,10 @@ class JobResult:
   run_time: float
   # Service reported pending time (0 if service does not report).
   pending_time: float = 0
+  # Stdout of the job.
+  stdout: str = ''
+  # Stderr of the job.
+  stderr: str = ''
 
   @property
   def wall_time(self) -> float:
@@ -904,7 +908,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
 
     start_time = datetime.datetime.now()
     try:
-      stdout, _ = self.leader.RobustRemoteCommand(cmd_string)
+      stdout, stderr = self.leader.RobustRemoteCommand(cmd_string)
     except errors.VirtualMachine.RemoteCommandError as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
@@ -912,7 +916,11 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
         f.write(stdout)
-    return JobResult(run_time=(end_time - start_time).total_seconds())
+    return JobResult(
+        run_time=(end_time - start_time).total_seconds(),
+        stdout=stdout,
+        stderr=stderr,
+    )
 
   def _Delete(self):
     pass
