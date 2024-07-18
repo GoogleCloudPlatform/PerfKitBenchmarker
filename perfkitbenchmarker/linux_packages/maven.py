@@ -20,7 +20,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
 from six.moves.urllib.parse import urlparse
 
-flags.DEFINE_string('maven_version', '3.6.3', 'The version of maven')
+flags.DEFINE_string('maven_version', '3.9.8', 'The version of maven')
 flags.DEFINE_string(
     'maven_mirror_url',
     None,
@@ -46,10 +46,14 @@ PREPROVISIONED_DATA = {
     'apache-maven-{0}-bin.tar.gz'.format(
         '3.6.3'
     ): '26ad91d751b3a9a53087aefa743f4e16a17741d3915b219cf74112bf87a438c5',
+    'apache-maven-{0}-bin.tar.gz'.format(
+        '3.9.8'
+    ): '067672629075b740e3d0a928e21021dd615a53287af36d4ccca44e87e081d102',
 }
 PACKAGE_DATA_URL = {
     'apache-maven-{0}-bin.tar.gz'.format('3.6.1'): MVN_URL.format('3', '3.6.1'),
     'apache-maven-{0}-bin.tar.gz'.format('3.6.3'): MVN_URL.format('3', '3.6.3'),
+    'apache-maven-{0}-bin.tar.gz'.format('3.9.8'): MVN_URL.format('3', '3.9.8'),
 }
 
 
