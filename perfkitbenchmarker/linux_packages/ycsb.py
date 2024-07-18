@@ -60,10 +60,8 @@ from perfkitbenchmarker.linux_packages import ycsb_stats
 
 FLAGS = flags.FLAGS
 
-YCSB_URL_TEMPLATE = (
-    'https://github.com/brianfrankcooper/YCSB/releases/'
-    'download/{0}/ycsb-{0}.tar.gz'
-)
+GITHUB_URL = 'https://github.com/brianfrankcooper/YCSB'
+YCSB_URL_TEMPLATE = f'{GITHUB_URL}/releases/download/{{0}}/ycsb-{{0}}.tar.gz'
 YCSB_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'ycsb')
 YCSB_EXE = posixpath.join(YCSB_DIR, 'bin', 'ycsb')
 HDRHISTOGRAM_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'hdrhistogram')
@@ -72,13 +70,30 @@ HDRHISTOGRAM_TAR_URL = (
     'HdrHistogram-2.1.10.tar.gz'
 )
 
-flags.DEFINE_string(
-    'ycsb_version', '0.17.0', 'YCSB version to use. Defaults to version 0.17.0.'
+_YCSB_VERSION = flags.DEFINE_string(
+    'ycsb_version',
+    '0.17.0',
+    'YCSB version to use. Defaults to version 0.17.0. If --ycsb_tar_url is not'
+    ' specified, this will pull YCSB from GitHub. If pulling from a commit,'
+    ' still provide this flag so that samples are labeled with the correct'
+    ' version metadata.',
 )
-flags.DEFINE_string(
+_YCSB_TAR_URL = flags.DEFINE_string(
     'ycsb_tar_url',
     None,
-    'URL to a YCSB tarball to use instead of the releases located on github.',
+    'URL to a YCSB tarball to use instead of the releases located on GitHub.'
+    ' Must match the version specified by --ycsb_version.',
+)
+_YCSB_COMMIT = flags.DEFINE_string(
+    'ycsb_commit',
+    None,
+    'If supplied, pulls YCSB from GitHub using the specified commit SHA.'
+)
+_YCSB_BINDING = flags.DEFINE_string(
+    'ycsb_binding',
+    None,
+    'Must be used with --ycsb_commit. If supplied, builds YCSB only with the'
+    ' specified binding in order to speed up the build.',
 )
 flags.DEFINE_enum(
     'ycsb_measurement_type',
@@ -512,7 +527,7 @@ def SetYcsbTarUrl(url):
   _ycsb_tar_url = url
 
 
-def _GetVersion(version_str):
+def _GetVersion(version_str: str) -> int:
   """Returns the version from ycsb version string.
 
   Args:
@@ -524,7 +539,7 @@ def _GetVersion(version_str):
   return int(version_str.split('.')[1])
 
 
-def _GetVersionFromUrl(url):
+def _GetVersionFromUrl(url: str) -> int:
   """Returns the version from ycsb url string.
 
   Args:
@@ -590,12 +605,17 @@ def CheckPrerequisites():
     if not os.path.exists(workload_file):
       raise IOError('Missing workload file: {0}'.format(workload_file))
 
+  if _YCSB_COMMIT.value and _YCSB_TAR_URL.value:
+    raise errors.Config.InvalidValue(
+        'Only one of --ycsb_commit or --ycsb_tar_url should be set.'
+    )
+
   if _ycsb_tar_url:
     ycsb_version = _GetVersionFromUrl(_ycsb_tar_url)
-  elif FLAGS.ycsb_tar_url:
-    ycsb_version = _GetVersionFromUrl(FLAGS.ycsb_tar_url)
+  elif _YCSB_TAR_URL.value:
+    ycsb_version = _GetVersionFromUrl(_YCSB_TAR_URL.value)
   else:
-    ycsb_version = _GetVersion(FLAGS.ycsb_version)
+    ycsb_version = _GetVersion(_YCSB_VERSION.value)
 
   if ycsb_version < 17:
     raise errors.Config.InvalidValue('must use YCSB version 0.17.0 or higher.')
@@ -673,11 +693,7 @@ def Install(vm):
   # https://github.com/brianfrankcooper/YCSB/issues/1459
   vm.Install('python')
   vm.InstallPackages('curl')
-  ycsb_url = (
-      _ycsb_tar_url
-      or FLAGS.ycsb_tar_url
-      or YCSB_URL_TEMPLATE.format(FLAGS.ycsb_version)
-  )
+  vm.Install('maven')
   install_cmd = (
       'mkdir -p {0} && curl -L {1} | '
       'tar -C {0} --strip-components=1 -xzf - '
@@ -690,20 +706,36 @@ def Install(vm):
       # TODO(user): Update minimum YCSB version and remove.
       "--exclude='**/log4j-core-2*.jar' "
   )
-  vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
-  if _GetVersion(FLAGS.ycsb_version) >= 11:
-    vm.Install('maven')
-    vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
-    # _JAVA_OPTIONS needed to work around this issue:
-    # https://stackoverflow.com/questions/53010200/maven-surefire-could-not-find-forkedbooter-class
-    # https://stackoverflow.com/questions/34170811/maven-connection-reset-error
+  if _YCSB_COMMIT.value:
     vm.RemoteCommand(
-        'cd {hist_dir} && _JAVA_OPTIONS=-Djdk.net.URLClassPath.'
-        'disableClassPathURLCheck=true,https.protocols=TLSv1.2 '
-        '{mvn_cmd}'.format(
-            hist_dir=HDRHISTOGRAM_DIR, mvn_cmd=maven.GetRunCommand('install')
-        )
+        f'git clone {GITHUB_URL} {YCSB_DIR}; cd {YCSB_DIR} && git checkout'
+        f' {_YCSB_COMMIT.value};'
     )
+    build_cmd = f'{linux_packages.INSTALL_DIR}/maven/bin/mvn clean package'
+    if _YCSB_BINDING.value:
+      build_cmd = (
+          f'{linux_packages.INSTALL_DIR}/maven/bin/mvn -pl'
+          f' site.ycsb:{_YCSB_BINDING.value}-binding -am clean package'
+      )
+    vm.RemoteCommand(f'cd {YCSB_DIR} && {build_cmd}')
+  else:
+    ycsb_url = (
+        _ycsb_tar_url
+        or FLAGS.ycsb_tar_url
+        or YCSB_URL_TEMPLATE.format(_YCSB_VERSION.value)
+    )
+    vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
+  vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
+  # _JAVA_OPTIONS needed to work around this issue:
+  # https://stackoverflow.com/questions/53010200/maven-surefire-could-not-find-forkedbooter-class
+  # https://stackoverflow.com/questions/34170811/maven-connection-reset-error
+  vm.RemoteCommand(
+      'cd {hist_dir} && _JAVA_OPTIONS=-Djdk.net.URLClassPath.'
+      'disableClassPathURLCheck=true,https.protocols=TLSv1.2 '
+      '{mvn_cmd}'.format(
+          hist_dir=HDRHISTOGRAM_DIR, mvn_cmd=maven.GetRunCommand('install')
+      )
+  )
 
 
 def ParseWorkload(contents):
@@ -820,7 +852,9 @@ class YCSBExecutor:
     for parameter, value in parameters.items():
       command.extend(('-p', '{0}={1}'.format(parameter, value)))
 
-    return 'cd %s && %s' % (YCSB_DIR, ' '.join(command))
+    path = f'export PATH=$PATH:{maven.MVN_DIR}/bin'
+    command = ' '.join(command)
+    return f'{path} && cd {YCSB_DIR} && {command}'
 
   @property
   def _default_preload_threads(self):
@@ -924,7 +958,8 @@ class YCSBExecutor:
         samples.extend(
             ycsb_stats.CreateSamples(
                 ycsb_result=result,
-                ycsb_version=FLAGS.ycsb_version,
+                ycsb_version=_YCSB_VERSION.value,
+                ycsb_commit=_YCSB_COMMIT.value,
                 include_command_line=_SHOULD_RECORD_COMMAND_LINE.value,
                 result_type='individual',
                 result_index=i,
@@ -937,7 +972,8 @@ class YCSBExecutor:
     samples.extend(
         ycsb_stats.CreateSamples(
             ycsb_result=combined,
-            ycsb_version=FLAGS.ycsb_version,
+            ycsb_version=_YCSB_VERSION.value,
+            ycsb_commit=_YCSB_COMMIT.value,
             include_histogram=FLAGS.ycsb_histogram,
             include_command_line=_SHOULD_RECORD_COMMAND_LINE.value,
             result_type='combined',
@@ -1164,7 +1200,8 @@ class YCSBExecutor:
               all_results.extend(
                   ycsb_stats.CreateSamples(
                       ycsb_result=result,
-                      ycsb_version=FLAGS.ycsb_version,
+                      ycsb_version=_YCSB_VERSION.value,
+                      ycsb_commit=_YCSB_COMMIT.value,
                       include_histogram=FLAGS.ycsb_histogram,
                       include_command_line=_SHOULD_RECORD_COMMAND_LINE.value,
                       result_type='individual',
@@ -1188,7 +1225,8 @@ class YCSBExecutor:
           run_samples = list(
               ycsb_stats.CreateSamples(
                   ycsb_result=combined,
-                  ycsb_version=FLAGS.ycsb_version,
+                  ycsb_version=_YCSB_VERSION.value,
+                  ycsb_commit=_YCSB_COMMIT.value,
                   include_command_line=_SHOULD_RECORD_COMMAND_LINE.value,
                   include_histogram=FLAGS.ycsb_histogram,
                   result_type='combined',

@@ -992,6 +992,7 @@ def CombineHdrHistogramLogFiles(
 def CreateSamples(
     ycsb_result: YcsbResult,
     ycsb_version: str,
+    ycsb_commit: str = '',
     include_histogram: bool = False,
     include_command_line=True,
     **kwargs,
@@ -1001,6 +1002,7 @@ def CreateSamples(
   Args:
     ycsb_result: Result of ParseResults.
     ycsb_version: The version of YCSB used to run the tests.
+    ycsb_commit: The commit SHA of YCSB used to run the tests.
     include_histogram: If True, include records for each histogram bin. Note
       that this will increase the output volume significantly.
     include_command_line: If True, include command line in metadata. Note that
@@ -1019,6 +1021,8 @@ def CreateSamples(
   }
   if include_command_line:
     base_metadata['command_line'] = command_line
+  if ycsb_commit:
+    base_metadata['ycsb_commit'] = ycsb_commit
   base_metadata.update(kwargs)
 
   if ycsb_result.status_time_series:
