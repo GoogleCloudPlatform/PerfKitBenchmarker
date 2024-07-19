@@ -48,6 +48,9 @@ unmanaged_mysql_sysbench:
         AWS:
           machine_type: m7i.4xlarge
           zone: us-east-1a
+        Azure:
+          machine_type: Standard_D16s_v5
+          zone: eastus
     server:
       os_type: centos_stream9
       vm_spec:
@@ -57,6 +60,9 @@ unmanaged_mysql_sysbench:
         AWS:
           machine_type: r7i.4xlarge
           zone: us-east-1a
+        Azure:
+          machine_type: Standard_E20s_v5
+          zone: eastus
       disk_spec:
         GCP:
           disk_size: 500
@@ -70,6 +76,12 @@ unmanaged_mysql_sysbench:
           provisioned_iops: 16000
           provisioned_throughput: 1000
           num_striped_disks: 5
+        Azure:
+          disk_size: 200
+          disk_type: Premium_LRS_V2
+          provisioned_iops: 40000
+          provisioned_throughput: 800
+          num_striped_disks: 2
   flags:
     sysbench_version: df89d34c410a2277e19f77e47e535d0890b2029b
     disk_fs_type: xfs
