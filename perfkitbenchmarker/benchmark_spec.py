@@ -276,6 +276,30 @@ class BenchmarkSpec:
     setattr(self, attribute_name, frozen_resource)
     return True
 
+  def ConstructResources(self):
+    """Constructs the resources for the benchmark."""
+    self.ConstructContainerCluster()
+    self.ConstructContainerRegistry()
+    # dpb service needs to go first, because it adds some vms.
+    self.ConstructDpbService()
+    self.ConstructVirtualMachines()
+    self.ConstructRelationalDb()
+    self.ConstructNonRelationalDb()
+    self.ConstructKey()
+    self.ConstructMessagingService()
+    # CapacityReservations need to be constructed after VirtualMachines because
+    # it needs information about the VMs (machine type, count, zone, etc). The
+    # CapacityReservations will be provisioned before VMs.
+    self.ConstructCapacityReservations()
+    self.ConstructTpu()
+    self.ConstructEdwService()
+    self.ConstructEdwComputeResource()
+    self.ConstructExampleResource()
+    self.ConstructVPNService()
+    self.ConstructNfsService()
+    self.ConstructSmbService()
+    self.ConstructDataDiscoveryService()
+
   def ConstructContainerCluster(self):
     """Create the container cluster."""
     if self.config.container_cluster is None:
