@@ -18,13 +18,21 @@ try {
   $ad_dc = Get-ADDomainController -Credential $domainCredential
 
   $ClusterDisks = Get-PhysicalDisk -CanPool $True |
-      Where-Object { ($_ |
+      Where-Object { ($_.FriendlyName -ne 'nvme_card' -and $_.FriendlyName -ne 'EphemeralDisk') -and ($_ |
           Get-PhysicalDiskStorageNodeView |
           Select-Object -Property StorageNodeObjectId) -like ('*' + $localServerName + '*') }
 
-  if ($ClusterDisks.count > 3) {
+  if ($ClusterDisks.count -gt 2) {
     $Pool = New-StoragePool -StorageSubsystemFriendlyName 'Clustered*' -FriendlyName FciPool -PhysicalDisks $ClusterDisks -ResiliencySettingNameDefault Simple -Verbose
-    $Pool | New-Volume -FriendlyName 'Data' -FileSystem CSVFS_ReFS -AllocationUnitSize 65536 -ProvisioningType 'Fixed' -UseMaximumSize
+    $Pool | New-Volume -FriendlyName 'Data' -FileSystem ReFS -AllocationUnitSize 65536 -ProvisioningType 'Fixed' -UseMaximumSize -DriveLetter D
+    Start-Sleep -Seconds 20
+    Write-Host 'Moving Cluster Groups'
+    Move-ClusterGroup -Name 'Available Storage' -Node $localServerName
+    $ClusterPool = Get-ClusterResource -name 'Cluster Pool 1'
+    Move-ClusterGroup -Name $ClusterPool.OwnerGroup -Node $localServerName
+
+    New-Item -ItemType Directory -Path 'D:\MSSQL'
+    Get-Date | Out-File -FilePath 'D:\MSSQL\fcimw.txt'
   }
   else {
     $diskCount = 0
@@ -36,7 +44,7 @@ try {
       Initialize-Disk -Number $disk.DeviceId
       New-Partition -DiskNumber $disk.DeviceId -UseMaximumSize  -DriveLetter $diskLetter | Format-Volume -FileSystem NTFS -newfilesystemlabel DataDisk -AllocationUnitSize 65536
 
-      Start-Sleep -Seconds 10
+      Start-Sleep -Seconds 30
       $initializedDisks.Add($diskLetter)
       $diskCount = $diskCount + 1
     }
@@ -51,22 +59,22 @@ try {
   }
 
   $clDiskList = Get-ClusterAvailableDisk
+  Write-Host 'Add Cluster Disks'
   if ($clDiskList.count -gt 0) {
-    $clDiskCount = 1
-    foreach($disk in $ClusterDisks) {
-        Get-Disk -Number $disk.DeviceId | Add-ClusterDisk
-        Start-Sleep -Seconds 30
-        $selectedClusterDisk = Get-ClusterResource -Name "Cluster Disk $clDiskCount"
-        if ($selectedClusterDisk.OwnerNode -ne $localServerName) {
-          Write-Host 'Moving Disk Ownership'
-          Move-ClusterGroup -Name $selectedClusterDisk.OwnerGroup -Node $localServerName
-        }
-        $clDiskCount++
-    }
+    Get-ClusterAvailableDisk | Add-ClusterDisk
+    Start-Sleep -Seconds 30
 
+    $AddedClusterDisks = Get-ClusterResource -Name 'Cluster Disk *'
+    foreach($addedDisk in $AddedClusterDisks) {
+      if ($addedDisk.OwnerNode -ne $localServerName) {
+        Write-Host "Moving Disk Ownership for $addedDisk.Name"
+        Move-ClusterGroup -Name $addedDisk.OwnerGroup -Node $localServerName
+        Start-Sleep -Seconds 15
+      }
+    }
+    Start-Sleep -Seconds 30
     foreach($initDisk in $initializedDisks) {
       if (Get-PSDrive -Name $initDisk) {
-        Write-Host "Disk $initDisk Created"
         New-Item -ItemType Directory -Path "$($initDisk):\MSSQL"
         Get-Date | Out-File -FilePath "$($initDisk):\MSSQL\fcimw.txt"
       }

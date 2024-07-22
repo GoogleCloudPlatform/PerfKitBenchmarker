@@ -40,12 +40,13 @@ try {
   $clusterStorageName = 'Cluster Virtual Disk (Data)'
 
   if (Test-Path -Path 'D:\MSSQL\fcimw.txt' -PathType Leaf) {
-    $Disks = Get-CimInstance -Namespace Root\MSCluster -ClassName MSCluster_Resource -ComputerName $localServerName | ?{$_.Type -eq 'Physical Disk'}
-    $diskDetails = ($Disks | %{Get-CimAssociatedInstance -InputObject $_ -ResultClassName MSCluster_DiskPartition})
-
+    $PhysicalDisks = Get-CimInstance -Namespace Root\MSCluster -ClassName MSCluster_Resource -ComputerName $localServerName | ?{$_.Type -eq 'Physical Disk'}
+    foreach ($disk in $PhysicalDisks) {
+      $diskDetails = Get-CimAssociatedInstance -InputObject $disk -ResultClassName MSCluster_DiskPartition
+      if ($diskDetails.MountPoints -eq 'D:') {
+        $clusterStorageName = $disk.Name      }
+    }
     $sqlDestFolder = 'D:\MSSQL'
-    $clusterStorage = Get-ClusterResource | Where-Object { $_.ResourceType -eq 'Physical Disk' }
-    $clusterStorageName = $clusterStorage.Name
   }
 
   Write-Host 'Install SQL Server'

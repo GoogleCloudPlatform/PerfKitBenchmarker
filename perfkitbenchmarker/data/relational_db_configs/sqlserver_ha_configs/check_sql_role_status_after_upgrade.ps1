@@ -8,7 +8,9 @@ $sql_cluster_group = Get-ClusterGroup -Name $cluster_group_name
 
 if ($sql_cluster_group.State -eq 'Online') {
   $cluster_shared_volumes = Get-ClusterSharedVolume
-  Move-ClusterSharedVolume -Name $cluster_shared_volumes.Name
+  foreach ($cluster_shared_volume in $cluster_shared_volumes) {
+      Move-ClusterSharedVolume -Name $cluster_shared_volume.Name
+  }
   Move-ClusterGroup -Name $sql_cluster_group.Name
 }
 
