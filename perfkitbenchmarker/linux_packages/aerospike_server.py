@@ -234,7 +234,7 @@ def _WaitForServerUp(server, idx=None):
   logging.info('Trying to connect to Aerospike at port %s', port)
   try:
     out, _ = server.RemoteCommand(
-        f'sudo asinfo -v "status -p {port}"', ignore_failure=True
+        f'sudo asinfo -v "status" -p {port}', ignore_failure=True
     )
     if out.startswith('ok'):
       logging.info('Aerospike server status is OK. Server up and running.')
