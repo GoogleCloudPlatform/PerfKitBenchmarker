@@ -40,6 +40,7 @@ from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.resources import example_resource_spec
 # Included to import & load Kubernetes' __init__.py somewhere.
 from perfkitbenchmarker.resources import kubernetes  # pylint:disable=unused-import
+from perfkitbenchmarker.resources import managed_ai_model_spec
 import six
 
 _NONE_OK = {'default': None, 'none_ok': True}
@@ -289,6 +290,33 @@ class _ExampleResourceDecoder(option_decoders.TypeVerifier):
         self._GetOptionFullName(component_full_name),
         flag_values,
         **example_config,
+    )
+
+
+class _ManagedAiModelSpecDecoder(option_decoders.TypeVerifier):
+  """Validate the managed_model dictionary of a benchmark config object."""
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify managed_model dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      ManagedAiModelSpec built from the config passed in value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    model_config = super().Decode(value, component_full_name, flag_values)
+    return managed_ai_model_spec.BaseManagedAiModelSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **model_config,
     )
 
 
@@ -1362,6 +1390,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
                 'default': None,
             },
         ),
+        'ai_model': (_ManagedAiModelSpecDecoder, {'default': None}),
         'data_discovery_service': (
             _DataDiscoveryServiceDecoder,
             {

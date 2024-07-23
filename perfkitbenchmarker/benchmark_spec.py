@@ -61,6 +61,7 @@ from perfkitbenchmarker import vpn_service
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.resources import example_resource
+from perfkitbenchmarker.resources import managed_ai_model
 import six
 from six.moves import range
 import six.moves._thread
@@ -183,6 +184,7 @@ class BenchmarkSpec:
     self.nfs_service = None
     self.smb_service = None
     self.messaging_service = None
+    self.ai_model = None
     self.data_discovery_service = None
     self.app_groups = {}
     self._zone_index = 0
@@ -287,6 +289,7 @@ class BenchmarkSpec:
     self.ConstructNonRelationalDb()
     self.ConstructKey()
     self.ConstructMessagingService()
+    self.ConstructManagedAiModel()
     # CapacityReservations need to be constructed after VirtualMachines because
     # it needs information about the VMs (machine type, count, zone, etc). The
     # CapacityReservations will be provisioned before VMs.
@@ -495,6 +498,22 @@ class BenchmarkSpec:
         self.config.example_resource
     )  # pytype: disable=not-instantiable
     self.resources.append(self.example_resource)
+
+  def ConstructManagedAiModel(self):
+    """Create an example_resource object. Also call this from pkb.py."""
+    if self.config.ai_model is None:
+      return
+    cloud = self.config.ai_model.cloud
+    providers.LoadProvider(cloud)
+    model_class = (
+        managed_ai_model.GetManagedAiModelClass(
+            cloud
+        )
+    )
+    self.ai_model = model_class(
+        self.config.ai_model
+    )  # pytype: disable=not-instantiable
+    self.resources.append(self.ai_model)
 
   def ConstructNfsService(self):
     """Construct the NFS service object.
@@ -893,6 +912,8 @@ class BenchmarkSpec:
       self.smb_service.Delete()
     if hasattr(self, 'messaging_service') and self.messaging_service:
       self.messaging_service.Delete()
+    if self.ai_model:
+      self.ai_model.Delete()
     if hasattr(self, 'data_discovery_service') and self.data_discovery_service:
       self.data_discovery_service.Delete()
 
