@@ -61,9 +61,6 @@ class _DpbApplicationListDecoder(option_decoders.ListDecoder):
 class _DpbServiceDecoder(option_decoders.TypeVerifier):
   """Validates the dpb service dictionary of a benchmark config object."""
 
-  def __init__(self, **kwargs):
-    super(_DpbServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Verifies dpb service dictionary of a benchmark config object.
 
@@ -262,9 +259,6 @@ class _DpbServiceSpec(spec.BaseSpec):
 class _ExampleResourceDecoder(option_decoders.TypeVerifier):
   """Validate the example_resource dictionary of a benchmark config object."""
 
-  def __init__(self, **kwargs):
-    super().__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Verify example_resource dict of a benchmark config object.
 
@@ -392,9 +386,6 @@ class _TpuGroupSpec(spec.BaseSpec):
 
 class _EdwServiceDecoder(option_decoders.TypeVerifier):
   """Validates the edw service dictionary of a benchmark config object."""
-
-  def __init__(self, **kwargs):
-    super(_EdwServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies edw service dictionary of a benchmark config object.
@@ -670,9 +661,6 @@ class _PlacementGroupSpecsDecoder(option_decoders.TypeVerifier):
 class _RelationalDbDecoder(option_decoders.TypeVerifier):
   """Validate the relational_db dictionary of a benchmark config object."""
 
-  def __init__(self, **kwargs):
-    super(_RelationalDbDecoder, self).__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Verify relational_db dict of a benchmark config object.
 
@@ -715,9 +703,6 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
 class _NonRelationalDbDecoder(option_decoders.TypeVerifier):
   """Validate the non_relational_db dictionary of a benchmark config object."""
 
-  def __init__(self, **kwargs):
-    super(_NonRelationalDbDecoder, self).__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Verify non_relational_db dict of a benchmark config object.
 
@@ -755,9 +740,6 @@ class _NonRelationalDbDecoder(option_decoders.TypeVerifier):
 
 class _TpuGroupsDecoder(option_decoders.TypeVerifier):
   """Validate the tpu dictionary of a benchmark config object."""
-
-  def __init__(self, **kwargs):
-    super(_TpuGroupsDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verify tpu dict of a benchmark config object.
@@ -847,9 +829,6 @@ class _CloudRedisSpec(spec.BaseSpec):
 
 class _CloudRedisDecoder(option_decoders.TypeVerifier):
   """Validate the cloud_redis dictionary of a benchmark config object."""
-
-  def __init__(self, **kwargs):
-    super(_CloudRedisDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verify cloud_redis dict of a benchmark config object.
@@ -960,9 +939,6 @@ class _VPNServiceSpec(spec.BaseSpec):
 class _VPNServiceDecoder(option_decoders.TypeVerifier):
   """Validate the vpn_service dictionary of a benchmark config object."""
 
-  def __init__(self, **kwargs):
-    super(_VPNServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Verify vpn_service dict of a benchmark config object.
 
@@ -1044,9 +1020,6 @@ class AppGroupSpec(spec.BaseSpec):
 class _AppGroupsDecoder(option_decoders.TypeVerifier):
   """Verify app_groups dictionary of a benchmark config object."""
 
-  def __init__(self, **kwargs):
-    super(_AppGroupsDecoder, self).__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Verifys app_groups dictionary of a benchmark config object.
 
@@ -1080,9 +1053,6 @@ class _AppGroupsDecoder(option_decoders.TypeVerifier):
 
 class _AppServiceDecoder(option_decoders.TypeVerifier):
   """Verify app_service dict of a benchmark config object."""
-
-  def __init__(self, **kwargs):
-    super(_AppServiceDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verify app_service dict of a benchmark config object.
@@ -1157,9 +1127,6 @@ class _MessagingServiceSpec(spec.BaseSpec):
 
 class _MessagingServiceDecoder(option_decoders.TypeVerifier):
   """Validate the messaging_service dictionary of a benchmark config object."""
-
-  def __init__(self, **kwargs):
-    super().__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verify messaging_service dict of a benchmark config object.
@@ -1236,9 +1203,6 @@ class _DataDiscoveryServiceSpec(spec.BaseSpec):
 class _DataDiscoveryServiceDecoder(option_decoders.TypeVerifier):
   """Validate the data_discovery_service dict of a benchmark config object."""
 
-  def __init__(self, **kwargs):
-    super().__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Verify data_discovery_service dict of a benchmark config object.
 
@@ -1270,9 +1234,6 @@ class _DataDiscoveryServiceDecoder(option_decoders.TypeVerifier):
 
 class _KeyDecoder(option_decoders.TypeVerifier):
   """Validates the key dict of a benchmark config object."""
-
-  def __init__(self, **kwargs):
-    super().__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies the key dict of a benchmark config object."""

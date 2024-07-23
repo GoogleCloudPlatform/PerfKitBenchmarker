@@ -183,9 +183,6 @@ class VmGroupSpec(spec.BaseSpec):
 class VmGroupsDecoder(option_decoders.TypeVerifier):
   """Validates the vm_groups dictionary of a benchmark config object."""
 
-  def __init__(self, **kwargs):
-    super(VmGroupsDecoder, self).__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Verifies vm_groups dictionary of a benchmark config object.
 
@@ -220,9 +217,6 @@ class VmGroupsDecoder(option_decoders.TypeVerifier):
 
 class VmGroupSpecDecoder(option_decoders.TypeVerifier):
   """Validates a single VmGroupSpec dictionary."""
-
-  def __init__(self, **kwargs):
-    super(VmGroupSpecDecoder, self).__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies vm_groups dictionary of a benchmark config object.

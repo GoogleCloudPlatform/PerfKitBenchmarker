@@ -165,9 +165,6 @@ class ContainerRegistrySpec(spec.BaseSpec):
 class ContainerRegistryDecoder(option_decoders.TypeVerifier):
   """Validates the container_registry dictionary of a benchmark config."""
 
-  def __init__(self, **kwargs):
-    super().__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Verifies container_registry dictionary of a benchmark config object.
 
@@ -195,9 +192,6 @@ class ContainerRegistryDecoder(option_decoders.TypeVerifier):
 
 class ContainerSpecsDecoder(option_decoders.TypeVerifier):
   """Validates the container_specs dictionary of a benchmark config object."""
-
-  def __init__(self, **kwargs):
-    super().__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies container_specs dictionary of a benchmark config object.
@@ -295,9 +289,6 @@ class NodepoolSpec(spec.BaseSpec):
 class _NodepoolsDecoder(option_decoders.TypeVerifier):
   """Validate the nodepool dictionary of a nodepools config object."""
 
-  def __init__(self, **kwargs):
-    super().__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Verify Nodepool dict of a benchmark config object.
 
@@ -363,9 +354,6 @@ class SandboxSpec(spec.BaseSpec):
 
 class _SandboxDecoder(option_decoders.TypeVerifier):
   """Decodes the sandbox configuration option of a nodepool."""
-
-  def __init__(self, **kwargs):
-    super(_SandboxDecoder, self).__init__((dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Decodes the sandbox configuration option of a nodepool.
@@ -501,9 +489,6 @@ class ContainerClusterSpec(spec.BaseSpec):
 
 class ContainerClusterSpecDecoder(option_decoders.TypeVerifier):
   """Validates a ContainerClusterSpec dictionary."""
-
-  def __init__(self, **kwargs):
-    super().__init__(valid_types=(dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Verifies container_cluster dictionary of a benchmark config object."""

@@ -148,7 +148,7 @@ class TypeVerifier(ConfigOptionDecoder):
   Passes value through unmodified.
   """
 
-  def __init__(self, valid_types, none_ok=False, **kwargs):
+  def __init__(self, valid_types=(dict,), none_ok=False, **kwargs):
     """Initializes a TypeVerifier.
 
     Args:

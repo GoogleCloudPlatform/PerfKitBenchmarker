@@ -20,9 +20,6 @@ from perfkitbenchmarker.configs import option_decoders
 class StaticVmDecoder(option_decoders.TypeVerifier):
   """Decodes an item of the static_vms list of a VM group config object."""
 
-  def __init__(self, **kwargs):
-    super().__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Decodes an item of the static_vms list of a VM group config object.
 

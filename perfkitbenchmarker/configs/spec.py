@@ -253,9 +253,6 @@ class PerCloudConfigSpec(BaseSpec):
 class PerCloudConfigDecoder(option_decoders.TypeVerifier):
   """Decodes the disk_spec or vm_spec option of a VM group config object."""
 
-  def __init__(self, **kwargs):
-    super().__init__(valid_types=(dict,), **kwargs)
-
   def Decode(self, value, component_full_name, flag_values):
     """Decodes the disk_spec or vm_spec option of a VM group config object.
 
