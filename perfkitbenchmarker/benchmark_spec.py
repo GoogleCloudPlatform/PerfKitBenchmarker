@@ -856,6 +856,8 @@ class BenchmarkSpec:
       self.key.Create()
     if self.tpus:
       background_tasks.RunThreaded(lambda tpu: tpu.Create(), self.tpus)
+    if self.ai_model:
+      self.ai_model.Create()
     if self.edw_service:
       if (
           not self.edw_service.user_managed
