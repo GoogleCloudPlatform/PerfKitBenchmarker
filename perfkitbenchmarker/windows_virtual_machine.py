@@ -23,8 +23,8 @@ from typing import Optional, Tuple, cast
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker import os_types
-from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
 import six
@@ -86,7 +86,7 @@ class WaitTimeoutError(Exception):
   """Exception thrown if a wait operation takes too long."""
 
 
-class BaseWindowsMixin(virtual_machine.BaseOsMixin):
+class BaseWindowsMixin(os_mixin.BaseOsMixin):
   """Class that holds Windows related VM methods and attributes."""
 
   OS_TYPE = os_types.WINDOWS

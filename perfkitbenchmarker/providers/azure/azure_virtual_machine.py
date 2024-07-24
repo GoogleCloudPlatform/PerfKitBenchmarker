@@ -53,6 +53,7 @@ from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_disk_strategies
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
+import six
 import yaml
 
 FLAGS = flags.FLAGS
@@ -645,7 +646,9 @@ def _MachineTypeIsArm(machine_type):
   )
 
 
-class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
+class AzureVirtualMachine(
+    six.with_metaclass(abc.ABCMeta, virtual_machine.BaseVirtualMachine)
+):
   """Object representing an Azure Virtual Machine."""
 
   CLOUD = provider_info.AZURE
@@ -676,9 +679,7 @@ class AzureVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.network = azure_network.AzureNetwork.GetNetwork(self)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     if azure_disk.HasTempDrive(self.machine_type):
-      self.max_local_disks = NUM_LOCAL_VOLUMES.get(
-          self.machine_type, 1
-      )
+      self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type, 1)
     else:
       self.max_local_disks = 0
     self.lun_counter = itertools.count()

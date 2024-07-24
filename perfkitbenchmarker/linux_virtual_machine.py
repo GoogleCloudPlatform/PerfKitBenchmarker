@@ -46,6 +46,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -408,7 +409,7 @@ class KernelRelease(object):
     return self.name
 
 
-class BaseLinuxMixin(virtual_machine.BaseOsMixin):
+class BaseLinuxMixin(os_mixin.BaseOsMixin):
   """Class that holds Linux related VM methods and attributes."""
 
   # If multiple ssh calls are made in parallel using -t it will mess
@@ -2520,7 +2521,7 @@ class Fedora37Mixin(BaseRhelMixin):
     """Fedora does not need epel."""
 
 
-class CentOs7Mixin(BaseRhelMixin, virtual_machine.DeprecatedOsMixin):
+class CentOs7Mixin(BaseRhelMixin, os_mixin.DeprecatedOsMixin):
   """Class holding CentOS 7 specific VM methods and attributes."""
 
   OS_TYPE = os_types.CENTOS7
@@ -2787,7 +2788,7 @@ class Debian9Mixin(BaseDebianMixin):
   PYTHON_2_PACKAGE = 'python'
 
 
-class Debian10Mixin(BaseDebianMixin, virtual_machine.DeprecatedOsMixin):
+class Debian10Mixin(BaseDebianMixin, os_mixin.DeprecatedOsMixin):
   """Class holding Debian 10 specific VM methods and attributes."""
 
   OS_TYPE = os_types.DEBIAN10
@@ -2855,7 +2856,7 @@ class BaseUbuntuMixin(BaseDebianMixin):
       self.Reboot()
 
 
-class Ubuntu1604Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
+class Ubuntu1604Mixin(BaseUbuntuMixin, os_mixin.DeprecatedOsMixin):
   """Class holding Ubuntu1604 specific VM methods and attributes."""
 
   OS_TYPE = os_types.UBUNTU1604
@@ -2864,7 +2865,7 @@ class Ubuntu1604Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
   ALTERNATIVE_OS = os_types.UBUNTU1804
 
 
-class Ubuntu1804Mixin(BaseUbuntuMixin, virtual_machine.DeprecatedOsMixin):
+class Ubuntu1804Mixin(BaseUbuntuMixin, os_mixin.DeprecatedOsMixin):
   """Class holding Ubuntu1804 specific VM methods and attributes."""
 
   OS_TYPE = os_types.UBUNTU1804

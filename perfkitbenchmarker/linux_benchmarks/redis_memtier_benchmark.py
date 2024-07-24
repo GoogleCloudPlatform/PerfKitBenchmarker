@@ -152,6 +152,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
   ports = redis_server.GetRedisPorts(server_vm)
   ports_group_of_four = [ports[i : i + 4] for i in range(0, len(ports), 4)]
+  assert bm_spec.redis_endpoint_ip
   for ports_group in ports_group_of_four:
     # pylint: disable=g-long-lambda
     background_tasks.RunThreaded(
@@ -182,6 +183,7 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
     server_vm.RemoteCommand(f'echo "{top_cmd}" > {_TOP_SCRIPT}')
     server_vm.RemoteCommand(f'bash {_TOP_SCRIPT}')
 
+  assert bm_spec.redis_endpoint_ip
   raw_results = memtier.RunOverAllThreadsPipelinesAndClients(
       client_vms,
       bm_spec.redis_endpoint_ip,

@@ -27,6 +27,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker import pkb  # pylint:disable=unused-import
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
@@ -76,7 +77,7 @@ def CreateTestVmSpec() -> TestVmSpec:
   return TestVmSpec('test_component_name')
 
 
-class TestOsMixin(virtual_machine.BaseOsMixin):
+class TestOsMixin(os_mixin.BaseOsMixin):
   """Test class that provides dummy implementations of abstract functions."""
 
   OS_TYPE = 'test_os_type'
@@ -147,6 +148,9 @@ class TestOsMixin(virtual_machine.BaseOsMixin):
   def _IsSmtEnabled(self):
     return True
 
+  def GetConnectionIp(self):
+    pass
+
 
 class TestResource(resource.BaseResource):
 
@@ -178,6 +182,9 @@ class TestVirtualMachine(
     pass
 
   def _Resume(self):
+    pass
+
+  def GetConnectionIp(self):
     pass
 
 
