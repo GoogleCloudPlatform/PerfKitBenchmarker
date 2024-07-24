@@ -154,7 +154,16 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
     SetOptimizedServerConfiguration(
         optimized_server_config, server_vm, relational_db, db_engine
     )
-
+  elif db_engine == 'postgres':
+    custom_server_config = hammerdb.HAMMERDB_SERVER_CONFIGURATION.value
+    if custom_server_config:
+      server_vm = relational_db.server_vm
+      SetPostgresOptimizedServerConfiguration(
+          optimized_server_config,
+          server_vm,
+          relational_db,
+          custom_server_config,
+      )
   hammerdb.SetupConfig(
       vm=vm,
       db_engine=db_engine,
@@ -243,6 +252,7 @@ def SetPostgresOptimizedServerConfiguration(
     optimized_server_config: str,
     server_vm: virtual_machine.BaseVirtualMachine,
     relational_db: r_db.BaseRelationalDb,
+    custom_server_config: str = '',
 ):
   """Set the optimized configuration for hammerdb for postgres.
 
@@ -251,6 +261,7 @@ def SetPostgresOptimizedServerConfiguration(
       support MINIMUM_RECOVERY and RESTORABLE
     server_vm: Server VM to host the database.
     relational_db: Relational database class.
+    custom_server_config: str = '' The custom server configuration file name
   """
 
   shared_buffer_size = relational_db.postgres_shared_buffer_size
@@ -272,7 +283,12 @@ def SetPostgresOptimizedServerConfiguration(
   )
   server_vm.RemoteCommand('sudo sysctl -p')
 
-  config = f'hammerdb_optimized_{optimized_server_config}_' + 'postgresql.conf'
+  if optimized_server_config == hammerdb.NON_OPTIMIZED and custom_server_config:
+    config = custom_server_config
+  else:
+    config = (
+        f'hammerdb_optimized_{optimized_server_config}_' + 'postgresql.conf'
+    )
   server_vm.PushFile(
       data.ResourcePath(posixpath.join('relational_db_configs', config)),
       '',

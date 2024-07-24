@@ -231,6 +231,12 @@ HAMMERDB_RESTART_BEFORE_RUN = flags.DEFINE_bool(
     'Restart SQL Server before run phase',
 )
 
+HAMMERDB_SERVER_CONFIGURATION = flags.DEFINE_string(
+    'hammerdbcli_server_configuration',
+    '',
+    'Server configuration to use when benchmarking IAAS DB using HammerDB tool',
+)
+
 
 def SetDefaultConfig(num_cpus: Optional[int]):
   """Set the default configurations of unfilled flags."""
