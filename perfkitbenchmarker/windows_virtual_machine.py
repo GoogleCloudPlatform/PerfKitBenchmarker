@@ -380,15 +380,15 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
     # Log driver information so that the user has a record of which drivers
     # were used.
     # TODO(user): put the driver information in the metadata.
-    stdout, _ = self.RemoteCommand('dism /online /get-drivers')
+    stdout, _ = self.RemoteCommand('dism /online /get-drivers', timeout=10)
     logging.info(stdout)
-    stdout, _ = self.RemoteCommand('echo $env:TEMP')
+    stdout, _ = self.RemoteCommand('echo $env:TEMP', timeout=10)
     self.temp_dir = ntpath.join(stdout.strip(), 'pkb')
-    stdout, _ = self.RemoteCommand('echo $env:USERPROFILE')
+    stdout, _ = self.RemoteCommand('echo $env:USERPROFILE', timeout=10)
     self.home_dir = stdout.strip()
-    stdout, _ = self.RemoteCommand('echo $env:SystemDrive')
+    stdout, _ = self.RemoteCommand('echo $env:SystemDrive', timeout=10)
     self.system_drive = stdout.strip()
-    self.RemoteCommand('mkdir %s -Force' % self.temp_dir)
+    self.RemoteCommand('mkdir %s -Force' % self.temp_dir, timeout=10)
     self.DisableGuestFirewall()
 
   def _Reboot(self):
@@ -553,7 +553,7 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
   def DisableGuestFirewall(self):
     """Disables the guest firewall."""
     command = 'netsh advfirewall set allprofiles state off'
-    self.RemoteCommand(command)
+    self.RemoteCommand(command, timeout=10)
 
   def EnableGuestFirewall(self):
     """Enables the guest firewall."""

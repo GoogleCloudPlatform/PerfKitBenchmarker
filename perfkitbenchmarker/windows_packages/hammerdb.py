@@ -87,8 +87,9 @@ class WindowsTclScriptParameters(linux_hammerdb.TclScriptParameters):
     )
 
 
+@vm_util.Retry(poll_interval=10, max_retries=3)
 def _GetFileContent(vm, file_path: str) -> str:
-  stdout, _ = vm.RemoteCommand(f' type {file_path}')
+  stdout, _ = vm.RemoteCommand(f' type {file_path}', timeout=10)
   return stdout
 
 
