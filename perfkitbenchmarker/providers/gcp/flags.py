@@ -165,21 +165,20 @@ flags.DEFINE_enum(
     ['SCSI', 'NVME'],
     'The ssd interface for GCE local SSD.',
 )
-flags.DEFINE_enum(
-    'gce_nic_type',
-    'GVNIC',
-    [
-        'VIRTIO_NET',
-        'GVNIC',
-    ],
-    'The virtual NIC type of GCE VMs. All machine types '
-    'currently support GVNIC, but certain OS types will be '
-    'excluded in gce_virtual_machine.',
+flags.DEFINE_list(
+    'gce_nic_types',
+    ['GVNIC'],
+    'The virtual NIC type of GCE VMs. Each nic_type should map to each subnet'
+    ' in gce_subnet_name based on order. All machine types currently support'
+    ' GVNIC.',
 )
 GCE_NIC_RECORD_VERSION = flags.DEFINE_boolean(
     'gce_nic_record_version',
     False,
     'If True, records the NIC version for supported NICs (currently GVNIC).',
+)
+GCE_NIC_QUEUE_COUNTS = flags.DEFINE_list(
+    'gce_nic_queue_counts', ['default'], 'The queue count of each NIC.'
 )
 EGRESS_BANDWIDTH_TIER = flags.DEFINE_enum(
     'gce_egress_bandwidth_tier',
@@ -395,9 +394,7 @@ LM_NOTIFICATION_METADATA_NAME = flags.DEFINE_string(
     'Lm notification metadata name to listen on.',
 )
 LM_NOTIFICATION_TIMEOUT = flags.DEFINE_integer(
-    'lm_notification_timeout',
-    120,
-    'Timeout for LM notification.'
+    'lm_notification_timeout', 120, 'Timeout for LM notification.'
 )
 flags.DEFINE_list(
     'data_disk_zones',
@@ -424,4 +421,28 @@ flags.register_multi_flags_validator(
     _ValidatePreemptFlags,
     'When gce_preemptible_vms is specified, '
     'gcp_preemptible_status_bucket must be specified.',
+)
+
+
+def _ValidateNetworkFlags(flags_dict):
+  return len(flags_dict['gce_nic_types']) == len(
+      flags_dict['gce_nic_queue_counts']
+  ) and all(
+      nic_type
+      in [
+          'GVNIC',
+          'VIRTIO_NET',
+          'IDPF',
+      ]
+      for nic_type in flags_dict['gce_nic_types']
+  )
+
+
+flags.register_multi_flags_validator(
+    [
+        'gce_nic_types',
+        'gce_nic_queue_counts',
+    ],
+    _ValidateNetworkFlags,
+    'gce_nic_types and gce_nic_queue_counts must be the same length.',
 )

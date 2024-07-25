@@ -46,6 +46,8 @@ dpdk:
   flags:
     placement_group_style: closest_supported
     gce_subnet_name: default,dpdk0
+    gce_nic_types: GVNIC,GVNIC
+    gce_nic_queue_counts: default,default
     gce_network_type: custom
     ip_addresses: INTERNAL
 """

@@ -566,7 +566,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
-    self.gce_nic_type = FLAGS.gce_nic_type
+    self.gce_nic_types = FLAGS.gce_nic_types
     self.max_local_disks = vm_spec.num_local_ssds
     if (
         self.machine_type
@@ -578,9 +578,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.machine_type and self.machine_type in _FIXED_GPU_MACHINE_TYPES:
       self.gpu_type = _FIXED_GPU_MACHINE_TYPES[self.machine_type][0]
       self.gpu_count = _FIXED_GPU_MACHINE_TYPES[self.machine_type][1]
-    if self.gce_nic_type == 'GVNIC' and not self.SupportGVNIC():
-      logging.warning('Changing gce_nic_type to VIRTIO_NET')
-      self.gce_nic_type = 'VIRTIO_NET'
+    for idx, gce_nic_type in enumerate(self.gce_nic_types):
+      if gce_nic_type == 'GVNIC' and not self.SupportGVNIC():
+        logging.warning('Changing gce_nic_type to VIRTIO_NET')
+        self.gce_nic_types[idx] = 'VIRTIO_NET'
     self.gce_egress_bandwidth_tier = gcp_flags.EGRESS_BANDWIDTH_TIER.value
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
     # Default to GCE default (Live Migration)
@@ -652,7 +653,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.metadata['gce_egress_bandwidth_tier'] = (
           self.gce_egress_bandwidth_tier
       )
-
     if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
       # TODO(pclay): remove when on-host-maintenance gets promoted to GA
       cmd.use_alpha_gcloud = True
@@ -667,28 +667,38 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         maintenance_flag = 'on-host-maintenance'
       cmd.flags[maintenance_flag] = self.on_host_maintenance
 
+    if self.network.subnet_resources:
+      net_resources = self.network.subnet_resources
+      ni_arg_name = 'subnet'
+    else:
+      net_resources = self.network.network_resources
+      ni_arg_name = 'network'
+
     # Bundle network-related arguments with --network-interface
     # This flag is mutually exclusive with any of these flags:
     # --address, --network, --network-tier, --subnet, --private-network-ip.
     # gcloud compute instances create ... --network-interface=
-    common_ni_args = [
-        f'network-tier={self.gce_network_tier.upper()}',
-        f'nic-type={self.gce_nic_type.upper()}',
-    ]
-    if not self.assign_external_ip:
-      common_ni_args.append('no-address')
-    if self.network.subnet_resources:
-      for subnet_resource in self.network.subnet_resources:
-        cmd.additional_flags += [
-            '--network-interface',
-            ','.join([f'subnet={subnet_resource.name}'] + common_ni_args),
+    for idx, net_resource in enumerate(net_resources):
+      gce_nic_type = self.gce_nic_types[idx].upper()
+      gce_nic_queue_count_arg = []
+      if gcp_flags.GCE_NIC_QUEUE_COUNTS.value[idx] != 'default':
+        gce_nic_queue_count_arg = [
+            f'queue-count={gcp_flags.GCE_NIC_QUEUE_COUNTS.value[idx]}'
         ]
-    else:
-      for network_resource in self.network.network_resources:
-        cmd.additional_flags += [
-            '--network-interface',
-            ','.join([f'network={network_resource.name}'] + common_ni_args),
-        ]
+      no_address_arg = []
+      if not self.assign_external_ip or idx > 0:
+        no_address_arg = ['no-address']
+      cmd.additional_flags += [
+          '--network-interface',
+          ','.join(
+              [
+                  f'{ni_arg_name}={net_resource.name}',
+                  f'nic-type={gce_nic_type}',
+                  f'network-tier={self.gce_network_tier.upper()}',
+              ]
+              + gce_nic_queue_count_arg + no_address_arg
+          ),
+      ]
 
     if self.image:
       cmd.flags['image'] = self.image
@@ -1218,7 +1228,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         for subnet_resource in self.network.subnet_resources
     )
     result['gce_network_tier'] = self.gce_network_tier
-    result['gce_nic_type'] = self.gce_nic_type
+    result['gce_nic_type'] = self.gce_nic_types
     result['gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
     if self.visible_core_count:
       result['visible_core_count'] = self.visible_core_count
