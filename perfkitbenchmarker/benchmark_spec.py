@@ -489,14 +489,10 @@ class BenchmarkSpec:
     if self.config.example_resource is None:
       return
     example_resource_type = self.config.example_resource.example_type
-    example_resource_class = (
-        example_resource.GetExampleResourceClass(
-            example_resource_type
-        )
+    example_resource_class = example_resource.GetExampleResourceClass(
+        example_resource_type
     )
-    self.example_resource = example_resource_class(
-        self.config.example_resource
-    )  # pytype: disable=not-instantiable
+    self.example_resource = example_resource_class(self.config.example_resource)  # pytype: disable=not-instantiable
     self.resources.append(self.example_resource)
 
   def ConstructManagedAiModel(self):
@@ -505,14 +501,8 @@ class BenchmarkSpec:
       return
     cloud = self.config.ai_model.cloud
     providers.LoadProvider(cloud)
-    model_class = (
-        managed_ai_model.GetManagedAiModelClass(
-            cloud
-        )
-    )
-    self.ai_model = model_class(
-        self.config.ai_model
-    )  # pytype: disable=not-instantiable
+    model_class = managed_ai_model.GetManagedAiModelClass(cloud)
+    self.ai_model = model_class(self.config.ai_model)  # pytype: disable=not-instantiable
     self.resources.append(self.ai_model)
 
   def ConstructNfsService(self):
@@ -914,7 +904,7 @@ class BenchmarkSpec:
       self.smb_service.Delete()
     if hasattr(self, 'messaging_service') and self.messaging_service:
       self.messaging_service.Delete()
-    if self.ai_model:
+    if hasattr(self, 'ai_model') and self.ai_model:
       self.ai_model.Delete()
     if hasattr(self, 'data_discovery_service') and self.data_discovery_service:
       self.data_discovery_service.Delete()
@@ -1032,8 +1022,9 @@ class BenchmarkSpec:
 
   def GetResourceTags(self, timeout_minutes=None):
     """Gets a list of tags to be used to tag resources."""
-    return self._GetResourceDict(resource_type.METADATA_TIME_FORMAT,
-                                 timeout_minutes)
+    return self._GetResourceDict(
+        resource_type.METADATA_TIME_FORMAT, timeout_minutes
+    )
 
   def _CreatePlacementGroup(self, placement_group_spec, cloud):
     """Create a placement group in zone.
