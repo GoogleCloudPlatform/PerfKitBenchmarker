@@ -485,6 +485,9 @@ class GceDisk(disk.BaseDisk):
     )
     cmd.flags['device-name'] = self.name
     cmd.flags['disk'] = self.name
+    if FLAGS.debug_gce_disk_attach:
+      cmd.flags['verbosity'] = 'debug'
+      cmd.flags['log-http'] = True
 
     if self.replica_zones:
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE

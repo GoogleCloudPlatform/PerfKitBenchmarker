@@ -37,6 +37,13 @@ from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_bool(
+    'debug_gce_disk_attach',
+    False,
+    'Whether to enable debug logging for disk attach.',
+)
+
+
 BENCHMARK_NAME = 'provision_disk'
 BENCHMARK_CONFIG = """
 provision_disk:
