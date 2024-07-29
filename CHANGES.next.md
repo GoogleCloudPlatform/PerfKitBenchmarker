@@ -490,3 +490,5 @@
 -   Added `example_benchmark` & `example_resource` which showcase the simplest
     possible spec, resource, & benchmark that can be written.
 -   Fix cluster_boot to work on AliCloud by default.
+-   Let hdfs-site.xml use dfs.blocksize
+    (https://issues.apache.org/jira/browse/HDFS-631).
