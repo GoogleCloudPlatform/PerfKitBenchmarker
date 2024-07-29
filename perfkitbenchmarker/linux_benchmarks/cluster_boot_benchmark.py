@@ -89,6 +89,9 @@ cluster_boot:
   vm_groups:
     default:
       vm_spec:
+        AliCloud:
+          machine_type: ecs.g5.large
+          zone: us-east-1a
         AWS:
           machine_type: m5.large
           zone: us-east-1

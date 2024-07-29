@@ -506,6 +506,24 @@ class Ubuntu1804BasedAliVirtualMachine(
   IMAGE_NAME_FILTER = 'ubuntu_18_04_x64*alibase*.vhd'
 
 
+class Ubuntu2004BasedAliVirtualMachine(
+    AliVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
+):
+  IMAGE_NAME_FILTER = 'ubuntu_20_04_x64*alibase*.vhd'
+
+
+class Ubuntu2204BasedAliVirtualMachine(
+    AliVirtualMachine, linux_virtual_machine.Ubuntu2204Mixin
+):
+  IMAGE_NAME_FILTER = 'ubuntu_22_04_x64*alibase*.vhd'
+
+
+class Ubuntu2404BasedAliVirtualMachine(
+    AliVirtualMachine, linux_virtual_machine.Ubuntu2404Mixin
+):
+  IMAGE_NAME_FILTER = 'ubuntu_24_04_x64*alibase*.vhd'
+
+
 class CentOs7BasedAliVirtualMachine(
     AliVirtualMachine, linux_virtual_machine.CentOs7Mixin
 ):
