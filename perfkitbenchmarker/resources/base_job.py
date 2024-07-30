@@ -64,10 +64,6 @@ class BaseJob(resource.BaseResource):
     """Executes the job."""
     pass
 
-  def Create(self, restore=False):
-    """Creates the job."""
-    pass
-
 
 JobChild = TypeVar('JobChild', bound='BaseJob')
 
