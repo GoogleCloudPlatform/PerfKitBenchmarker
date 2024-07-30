@@ -13,7 +13,6 @@
 # limitations under the License.
 """Container for all data required for a benchmark to run."""
 
-
 import contextlib
 import copy
 import datetime
@@ -60,6 +59,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import vpn_service
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import freeze_restore_spec
+from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import example_resource
 from perfkitbenchmarker.resources import managed_ai_model
 import six
@@ -178,6 +178,7 @@ class BenchmarkSpec:
     self.non_relational_db = None
     self.tpus = []
     self.tpu_groups = {}
+    self.base_job = None
     self.edw_service = None
     self.edw_compute_resource = None
     self.example_resource = None
@@ -302,6 +303,7 @@ class BenchmarkSpec:
     self.ConstructNfsService()
     self.ConstructSmbService()
     self.ConstructDataDiscoveryService()
+    self.ConstructBaseJob()
 
   def ConstructContainerCluster(self):
     """Create the container cluster."""
@@ -494,6 +496,18 @@ class BenchmarkSpec:
     )
     self.example_resource = example_resource_class(self.config.example_resource)  # pytype: disable=not-instantiable
     self.resources.append(self.example_resource)
+
+  def ConstructBaseJob(self):
+    """Create an instance of the base job.It is also called from pkb.py."""
+    if self.config.base_job is None:
+      return
+    job_type = self.config.base_job.job_type
+    cloud = self.config.base_job.CLOUD
+    providers.LoadProvider(cloud)
+    job_class = base_job.GetJobClass(job_type)
+
+    self.base_job = job_class(self.config.base_job)  # pytype: disable=not-instantiable
+    self.resources.append(self.base_job)
 
   def ConstructManagedAiModel(self):
     """Create an example_resource object. Also call this from pkb.py."""
@@ -863,6 +877,9 @@ class BenchmarkSpec:
       self.edw_compute_resource.Create()
     if self.example_resource:
       self.example_resource.Create()
+
+    if self.base_job:
+      self.base_job.Create()
     if self.vpn_service:
       self.vpn_service.Create()
     if hasattr(self, 'messaging_service') and self.messaging_service:
@@ -898,6 +915,8 @@ class BenchmarkSpec:
       self.edw_compute_resource.Delete()
     if self.example_resource:
       self.example_resource.Delete()
+    if self.base_job:
+      self.base_job.Delete()
     if self.nfs_service:
       self.nfs_service.Delete()
     if self.smb_service:

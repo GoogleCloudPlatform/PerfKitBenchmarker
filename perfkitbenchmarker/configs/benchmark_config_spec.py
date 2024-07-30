@@ -38,6 +38,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.resources import example_resource_spec
+from perfkitbenchmarker.resources import jobs_setter
 # Included to import & load Kubernetes' __init__.py somewhere.
 from perfkitbenchmarker.resources import kubernetes  # pylint:disable=unused-import
 from perfkitbenchmarker.resources import managed_ai_model_spec
@@ -290,6 +291,38 @@ class _ExampleResourceDecoder(option_decoders.TypeVerifier):
         self._GetOptionFullName(component_full_name),
         flag_values,
         **example_config,
+    )
+
+
+class _BaseJobDecoder(option_decoders.TypeVerifier):
+  """Validates the base_job dictionary of a benchmark config object."""
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies base_job dictionary of a benchmark config object.
+
+    Args :
+      value: dict base_job config dictionary
+      component_full_name: string.  Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues.  Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+        BaseJobSpec built from the config passed in value.
+    Raises:
+        errors.Config.InvalidValue upon invalid input value.
+    """
+    base_job_config = super().Decode(value, component_full_name, flag_values)
+    if 'job_type' in base_job_config:
+      spec_class = jobs_setter.GetJobSpecClass(base_job_config['job_type'])
+    else:
+      raise errors.Config.InvalidValue(
+          'job_type is required for base_job config'
+      )
+    return spec_class(
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **base_job_config,
     )
 
 
@@ -1367,6 +1400,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'edw_compute_resource': (_EdwComputeResourceDecoder, {'default': None}),
         'edw_service': (_EdwServiceDecoder, {'default': None}),
         'example_resource': (_ExampleResourceDecoder, {'default': None}),
+        'base_job': (_BaseJobDecoder, {'default': None}),
         'cloud_redis': (_CloudRedisDecoder, {'default': None}),
         'vpn_service': (_VPNServiceDecoder, {'default': None}),
         'app_groups': (_AppGroupsDecoder, {'default': {}}),

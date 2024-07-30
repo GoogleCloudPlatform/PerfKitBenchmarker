@@ -192,6 +192,7 @@ def ParseSkipTeardownConditions(
 
   Args:
     skip_teardown_conditions: list of conditions to parse
+
   Returns:
     list of tuples of (metric, lower_bound, upper_bound)
   Raises:
@@ -199,12 +200,12 @@ def ParseSkipTeardownConditions(
   """
   parsed_conditions = {}
   pattern = re.compile(
-      r'''
+      r"""
       ([\w -]+)   # Matches all characters that could appear in a metric name
       ([<>])      # Matches < or >
       ([\d+\.]+)  # Matches any floating point number
-      ''',
-      re.VERBOSE
+      """,
+      re.VERBOSE,
   )
   for condition in skip_teardown_conditions:
     match = pattern.match(condition)
@@ -268,6 +269,7 @@ def MetricMeetsConditions(
   Args:
     metric_sample: The metric sample to check
     conditions: The conditions to check against
+
   Returns:
     True if the metric sample meets any of the conditions, False otherwise.
   """
@@ -635,7 +637,28 @@ def DoProvisionPhase(spec, timer):
   """
   logging.info('Provisioning resources for benchmark %s', spec.name)
   events.before_phase.send(stages.PROVISION, benchmark_spec=spec)
-  spec.ConstructResources()
+  spec.ConstructContainerCluster()
+  spec.ConstructContainerRegistry()
+  # dpb service needs to go first, because it adds some vms.
+  spec.ConstructDpbService()
+  spec.ConstructVirtualMachines()
+  spec.ConstructRelationalDb()
+  spec.ConstructNonRelationalDb()
+  spec.ConstructKey()
+  spec.ConstructMessagingService()
+  # CapacityReservations need to be constructed after VirtualMachines because
+  # it needs information about the VMs (machine type, count, zone, etc). The
+  # CapacityReservations will be provisioned before VMs.
+  spec.ConstructCapacityReservations()
+  spec.ConstructTpu()
+  spec.ConstructEdwService()
+  spec.ConstructEdwComputeResource()
+  spec.ConstructExampleResource()
+  spec.ConstructBaseJob()
+  spec.ConstructVPNService()
+  spec.ConstructNfsService()
+  spec.ConstructSmbService()
+  spec.ConstructDataDiscoveryService()
 
   # Validate the construction resource spec before creating resources.
   spec.CheckPrerequisites()
