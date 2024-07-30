@@ -1,5 +1,6 @@
 """Example benchmark that creates a job, measures the time to create it, and deletes it."""
 
+import time
 from typing import Any
 from absl import logging
 from perfkitbenchmarker import benchmark_spec as benchmark_spec_lib
@@ -29,26 +30,39 @@ def Run(
     benchmark_spec: benchmark_spec_lib.BenchmarkSpec,
 ) -> list[sample.Sample]:
   """Runs the benchmark."""
-  assert benchmark_spec.container_registry is not None
-  container_image = benchmark_spec.container_registry.GetOrBuild(
-      'serverless/echo_job'
-  )
+
   resource = google_cloud_run_jobs.GoogleCloudRunJob(
-      'us-central1', container_image
+      'us-central1', 'us-docker.pkg.dev/cloudrun/container/hello-job'
   )
-  resource.Create()
   logging.info('Running Run phase of the job_create benchmark')
   metadata = {'logged_message': 'hello from kenean!'}
-  samples = []
+  resource.Create()
+  resource.Execute()
+  samples = resource.GetSamples()
+
+  execute_start_time = time.time()
+  resource.Execute()
+  execute_end_time = time.time()
   samples.append(
       sample.Sample(
-          'resource_create_time',
-          resource.create_end_time - resource.create_start_time,
-          's',
+          'resource_end_to_end_execution_time',
+          execute_end_time - execute_start_time,
+          'seconds',
           metadata,
       )
   )
+
+  samples.append(
+      sample.Sample(
+          'execute_cli_time',
+          execute_end_time - resource.create_start_time,
+          'seconds',
+          metadata,
+      )
+  )
+
   resource.Delete()
+  del benchmark_spec  # to avoid unused variable warning
 
   return samples
 

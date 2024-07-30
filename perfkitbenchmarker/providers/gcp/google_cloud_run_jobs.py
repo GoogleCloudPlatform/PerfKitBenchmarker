@@ -5,10 +5,13 @@ and managing lifecycle of Google Cloud Run Jobs. More details at
 https://cloud.google.com/run/docs/quickstarts/jobs/create-execute
 """
 
+import logging
 import threading
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
+
 
 FLAGS = flags.FLAGS
 CLOUD_RUN_PRODUCT = 'GoogleCloudRunJobs'
@@ -32,9 +35,6 @@ class GoogleCloudRunJob(resource.BaseResource):
     self.image = image
     self.region = self._default_region or region
     self.user_managed = False
-    # Cloud Run jobs only use the second generation execution environment.
-    # For details, see
-    # https://cloud.google.com/run/docs/configuring/execution-environments
 
   def _GenerateName(self) -> str:
     """Generates a unique name for the job.
@@ -68,7 +68,6 @@ class GoogleCloudRunJob(resource.BaseResource):
     ]
 
     vm_util.IssueCommand(cmd)
-    # future work: use vm.RemoteCommand instead by setting up a vm via spec.
 
   def _Delete(self):
     """Deletes the underlying resource."""
@@ -85,4 +84,41 @@ class GoogleCloudRunJob(resource.BaseResource):
     ]
 
     vm_util.IssueCommand(cmd)
-    # future work: use vm.RemoteCommand instead by setting up a vm via spec.
+
+  def _Exists(self):
+    cmd = [
+        'gcloud',
+        'run',
+        'jobs',
+        'describe',
+        self.name,
+        '--region=%s' % self.region,
+        '--project=p3rf-serverless-gcf2',
+    ]
+    try:
+      out = vm_util.IssueCommand(cmd)
+      logging.info(out)
+    except (KeyError, ValueError, errors.VmUtil.IssueCommandError):
+      logging.error(
+          'Cloud Run Job: %s, in region: %s could not be found.',
+          self.name,
+          self.region,
+      )
+      return False
+    return True
+
+  def Execute(self):
+    """Executes the job."""
+    # https://cloud.google.com/sdk/gcloud/reference/run/jobs/execute
+
+    cmd = [
+        'gcloud',
+        'run',
+        'jobs',
+        'execute',
+        self.name,
+        '--wait',  # wait for the execution to complete.
+        '--region=%s' % self.region,
+        '--project=p3rf-serverless-gcf2',
+    ]
+    vm_util.IssueCommand(cmd)
