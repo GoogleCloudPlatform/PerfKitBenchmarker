@@ -33,13 +33,14 @@ def Install(vm):
   # Download Visual C++ 2017 Redistributable (needed on Azure)
   download_path = ntpath.join(vm.temp_dir, VC_REDIST_INSTALLER)
   vm.DownloadFile(VC_REDIST_DOWNLOAD_LINK, download_path)
-  vm.RemoteCommand(f'{download_path} /q /norestart')
+  vm.RemoteCommand(f'{download_path} /q /norestart', timeout=5 * 60)
 
   # Downloading and installing odbc driver 17.
   download_path = ntpath.join(vm.temp_dir, ODBC_17_INSTALLER)
   vm.DownloadFile(ODBC_17_DOWNLOAD_LINK, download_path)
   vm.RemoteCommand(
-      f'msiexec /i {download_path} IACCEPTMSODBCSQLLICENSETERMS=YES /passive'
+      f'msiexec /i {download_path} IACCEPTMSODBCSQLLICENSETERMS=YES /passive',
+      timeout=5 * 60,
   )
 
   # Downloading and installing MSSQL.
@@ -47,5 +48,5 @@ def Install(vm):
   vm.DownloadFile(SQLCMD_DOWNLOAD_LINK, download_path)
   vm.RemoteCommand(
       f'msiexec /i {download_path} IACCEPTMSSQLCMDLNUTILSLICENSETERMS=YES'
-      ' /passive'
+      ' /passive', timeout=5 * 60
   )
