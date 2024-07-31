@@ -22,7 +22,7 @@ added as a PKB resource because they cannot be deleted.
 import dataclasses
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -88,7 +88,7 @@ class GcpKeySpec(key.BaseKeySpec):
   def __init__(
       self,
       component_full_name: str,
-      flag_values: Optional[flags.FlagValues] = None,
+      flag_values: flags.FlagValues | None = None,
       **kwargs,
   ):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)

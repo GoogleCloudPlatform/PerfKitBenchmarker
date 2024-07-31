@@ -16,7 +16,6 @@
 import dataclasses
 import inspect
 import os
-from typing import Optional
 import unittest
 from absl import flags
 from absl.testing import parameterized
@@ -263,7 +262,7 @@ class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
       num_vms: int,
       num_vcpus: int,
       memory_size_gb: int,
-      flag_memory_size_mb: Optional[int],
+      flag_memory_size_mb: int | None,
       problem_size: int,
       num_rows: int,
       num_columns: int,

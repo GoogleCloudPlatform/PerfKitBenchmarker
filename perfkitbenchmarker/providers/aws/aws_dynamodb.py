@@ -18,7 +18,7 @@ Tables can be created and deleted.
 
 import json
 import logging
-from typing import Any, Collection, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Collection, Dict, List, Sequence, Tuple
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -234,17 +234,17 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
 
   def __init__(
       self,
-      table_name: Optional[str] = None,
-      billing_mode: Optional[str] = None,
-      zone: Optional[str] = None,
-      rcu: Optional[int] = None,
-      wcu: Optional[int] = None,
-      primary_key: Optional[str] = None,
-      sort_key: Optional[str] = None,
-      attribute_type: Optional[str] = None,
-      lsi_count: Optional[int] = None,
-      gsi_count: Optional[int] = None,
-      use_sort: Optional[bool] = None,
+      table_name: str | None = None,
+      billing_mode: str | None = None,
+      zone: str | None = None,
+      rcu: int | None = None,
+      wcu: int | None = None,
+      primary_key: str | None = None,
+      sort_key: str | None = None,
+      attribute_type: str | None = None,
+      lsi_count: int | None = None,
+      gsi_count: int | None = None,
+      use_sort: bool | None = None,
       **kwargs,
   ):
     super(AwsDynamoDBInstance, self).__init__(**kwargs)
@@ -619,7 +619,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     return metadata
 
   def SetThroughput(
-      self, rcu: Optional[int] = None, wcu: Optional[int] = None
+      self, rcu: int | None = None, wcu: int | None = None
   ) -> None:
     """Updates the table's rcu and wcu."""
     if not rcu:

@@ -1,6 +1,6 @@
 """Module containing class for BaseJob and BaseJobSpec."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 
@@ -49,7 +49,7 @@ class BaseJobSpec(spec.BaseSpec):
     return result
 
 
-def GetJobSpecClass(service: str) -> Optional[spec.BaseSpecMetaClass]:
+def GetJobSpecClass(service: str) -> spec.BaseSpecMetaClass | None:
   """Returns the job spec class corresponding to the given service.
 
   Args:

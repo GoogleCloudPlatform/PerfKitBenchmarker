@@ -17,7 +17,7 @@ See perfkitbenchmarker/configs/__init__.py for more information about
 configuration files.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
@@ -40,7 +40,7 @@ class ContainerSpec(spec.BaseSpec):
   def __init__(
       self,
       component_full_name: str,
-      flag_values: Optional[flags.FlagValues] = None,
+      flag_values: flags.FlagValues | None = None,
       **kwargs: Any,
   ):
     super().__init__(component_full_name, flag_values, **kwargs)
@@ -107,16 +107,16 @@ class ContainerRegistrySpec(spec.BaseSpec):
   def __init__(
       self,
       component_full_name: str,
-      flag_values: Optional[flags.FlagValues] = None,
+      flag_values: flags.FlagValues | None = None,
       **kwargs: Any,
   ):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
-    self.spec: Optional[dict[str, Any]]
+    self.spec: dict[str, Any] | None
     self.cloud: str
     registry_spec = getattr(self.spec, self.cloud, {})
-    self.project: Optional[str] = registry_spec.get('project')
-    self.zone: Optional[str] = registry_spec.get('zone')
-    self.name: Optional[str] = registry_spec.get('name')
+    self.project: str | None = registry_spec.get('project')
+    self.zone: str | None = registry_spec.get('zone')
+    self.name: str | None = registry_spec.get('name')
     self.cpus: float
     self.memory: int
     self.command: list[str]
@@ -240,7 +240,7 @@ class NodepoolSpec(spec.BaseSpec):
     )
     self.vm_count: int
     self.vm_spec: spec.PerCloudConfigSpec
-    self.sandbox_config: Optional[SandboxSpec]
+    self.sandbox_config: SandboxSpec | None
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):

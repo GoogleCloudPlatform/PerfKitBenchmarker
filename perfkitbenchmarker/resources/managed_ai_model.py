@@ -20,7 +20,6 @@ than simply for calls like with an API. This also gives the customer more
 control & ownership.
 """
 
-from typing import Optional
 from perfkitbenchmarker import resource
 
 
@@ -33,7 +32,7 @@ class BaseManagedAiModel(resource.BaseResource):
 
 def GetManagedAiModelClass(
     cloud: str,
-) -> Optional[resource.AutoRegisterResourceMeta]:
+) -> resource.AutoRegisterResourceMeta | None:
   """Gets the managed AI model class for the given cloud."""
   return resource.GetResourceClass(
       BaseManagedAiModel, CLOUD=cloud

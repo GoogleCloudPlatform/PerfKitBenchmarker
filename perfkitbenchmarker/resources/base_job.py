@@ -1,7 +1,7 @@
 """Base class for representing a job / instance."""
 
 import threading
-from typing import List, Optional, Type, TypeVar
+from typing import List, Type, TypeVar
 from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
@@ -68,7 +68,7 @@ class BaseJob(resource.BaseResource):
 JobChild = TypeVar('JobChild', bound='BaseJob')
 
 
-def GetJobClass(service: str) -> Optional[Type[JobChild]]:
+def GetJobClass(service: str) -> Type[JobChild] | None:
   """Returns class of the given Job type.
 
   Args:

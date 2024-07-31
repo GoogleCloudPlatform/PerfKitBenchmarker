@@ -1,7 +1,6 @@
 """Base classes for cryptographic keys."""
 
 import dataclasses
-from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import resource
@@ -22,7 +21,7 @@ class BaseKeySpec(spec.BaseSpec):
   def __init__(
       self,
       component_full_name: str,
-      flag_values: Optional[flags.FlagValues] = None,
+      flag_values: flags.FlagValues | None = None,
       **kwargs
   ):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -52,11 +51,11 @@ class BaseKey(resource.BaseResource):
   CLOUD = None
 
 
-def GetKeySpecClass(cloud: str) -> Optional[spec.BaseSpecMetaClass]:
+def GetKeySpecClass(cloud: str) -> spec.BaseSpecMetaClass | None:
   """Gets the key spec class corresponding to 'cloud'."""
   return spec.GetSpecClass(BaseKeySpec, CLOUD=cloud)
 
 
-def GetKeyClass(cloud: str) -> Optional[resource.AutoRegisterResourceMeta]:
+def GetKeyClass(cloud: str) -> resource.AutoRegisterResourceMeta | None:
   """Gets the key class corresponding to 'cloud'."""
   return resource.GetResourceClass(BaseKey, CLOUD=cloud)

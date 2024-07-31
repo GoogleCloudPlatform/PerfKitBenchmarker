@@ -26,7 +26,7 @@ import logging
 import math
 import posixpath
 import time
-from typing import Optional, Union
+from typing import Union
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
@@ -577,7 +577,7 @@ def ParseResp(resp) -> dict[str, Union[float, int]]:
   return metric_values
 
 
-def _ParseResultRow(row: str) -> Optional[tuple[str, float]]:
+def _ParseResultRow(row: str) -> tuple[str, float] | None:
   """Parses a single row of the result file."""
   try:
     metric_name = regex_util.ExtractGroup('(.*) :', row, 1).lower().strip()

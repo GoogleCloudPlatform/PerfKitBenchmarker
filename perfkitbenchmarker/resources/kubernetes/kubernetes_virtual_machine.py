@@ -98,7 +98,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         if isinstance(self.CLOUD, str)
         else FLAGS.cloud
     )
-    self.sriov_network: Optional[str] = FLAGS.k8s_sriov_network or None
+    self.sriov_network: str | None = FLAGS.k8s_sriov_network or None
 
   def GetResourceMetadata(self):
     metadata = super().GetResourceMetadata()
@@ -431,11 +431,11 @@ class DebianBasedKubernetesVirtualMachine(
   def RemoteHostCommandWithReturnCode(
       self,
       command: str,
-      retries: Optional[int] = None,
+      retries: int | None = None,
       ignore_failure: bool = False,
       login_shell: bool = False,
-      timeout: Optional[float] = None,
-      ip_address: Optional[str] = None,
+      timeout: float | None = None,
+      ip_address: str | None = None,
       should_pre_log: bool = True,
       stack_level: int = 1,
   ):
@@ -529,7 +529,7 @@ class DebianBasedKubernetesVirtualMachine(
       file_path: str,
       remote_path: str = '',
       copy_to: bool = True,
-      retries: Optional[int] = None,
+      retries: int | None = None,
   ):
     """Copies a file to or from the VM.
 

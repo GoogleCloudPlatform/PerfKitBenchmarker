@@ -16,7 +16,6 @@
 import abc
 import dataclasses
 import re
-from typing import Optional
 from absl import flags
 from absl import logging
 from perfkitbenchmarker import resource
@@ -165,7 +164,7 @@ class RedisShard:
   slots: str
   ip: str
   port: int
-  zone: Optional[str] = None
+  zone: str | None = None
 
 
 class BaseManagedMemoryStore(resource.BaseResource):
@@ -258,7 +257,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
     """Returns the access password of the managed memory store, if any."""
     return self._password
 
-  def MeasureCpuUtilization(self) -> Optional[float]:
+  def MeasureCpuUtilization(self) -> float | None:
     """Measures the CPU utilization of an instance using the cloud's API."""
     raise NotImplementedError()
 

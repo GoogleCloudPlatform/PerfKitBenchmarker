@@ -18,7 +18,7 @@ import logging
 import ntpath
 import os
 import time
-from typing import Optional, Tuple, cast
+from typing import Tuple, cast
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -108,7 +108,7 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
       self,
       command: str,
       ignore_failure: bool = False,
-      timeout: Optional[float] = None,
+      timeout: float | None = None,
   ) -> Tuple[str, str]:
     """Runs a powershell command on the VM.
 
@@ -131,7 +131,7 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
       self,
       command: str,
       ignore_failure: bool = False,
-      timeout: Optional[float] = None,
+      timeout: float | None = None,
   ) -> Tuple[str, str]:
     """Runs a powershell command on the VM.
 

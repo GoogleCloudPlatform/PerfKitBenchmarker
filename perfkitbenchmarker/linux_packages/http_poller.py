@@ -13,7 +13,7 @@ script can be used as a standalone utility.
 import ast
 import dataclasses
 import logging
-from typing import Optional, Sequence
+from typing import Sequence
 from perfkitbenchmarker import data
 
 DRIVER_SCRIPT = 'http/poll_http_endpoint.py'
@@ -64,8 +64,8 @@ class HttpPoller:
       retries: int,
       retry_interval: float,
       timeout: int,
-      expected_response_code: Optional[str],
-      expected_response: Optional[str],
+      expected_response_code: str | None,
+      expected_response: str | None,
   ):
     """Builds command for polling script."""
     cmd = (
@@ -89,8 +89,8 @@ class HttpPoller:
       retries: int = 0,
       retry_interval: float = 0.5,
       timeout: int = 600,
-      expected_response_code: Optional[int] = None,
-      expected_response: Optional[str] = None,
+      expected_response_code: int | None = None,
+      expected_response: str | None = None,
   ):
     """Polls HTTP endpoint.
 

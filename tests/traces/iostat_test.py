@@ -14,7 +14,6 @@
 """Tests for iostat utility."""
 
 import os
-from typing import Optional
 import unittest
 
 from absl.testing import parameterized
@@ -92,7 +91,7 @@ class IostatCollectorTestCase(parameterized.TestCase):
   def testIostatCollectorAnalyze(
       self,
       expected_samples: list[sample.Sample],
-      device_regex: Optional[str] = None,
+      device_regex: str | None = None,
   ):
     collector = iostat.IostatCollector(
         interval=1,

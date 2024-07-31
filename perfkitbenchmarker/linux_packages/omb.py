@@ -5,7 +5,7 @@ import itertools
 import logging
 import re
 import time
-from typing import Any, Dict, Iterator, List, Optional, Pattern, Sequence, Tuple, Union
+from typing import Any, Dict, Iterator, List, Pattern, Sequence, Tuple, Union
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -289,9 +289,7 @@ class RunResult:
 class RunRequest:
   test_name: str
   vms: List[Any]  # virtual machine
-  message_size: Optional[Union[str, int]] = (
-      None  # default: run all message sizes
-  )
+  message_size: Union[str, int] | None = None  # default: run all message sizes
 
 
 FLAGS = flags.FLAGS
@@ -421,7 +419,7 @@ def RunBenchmark(request: RunRequest) -> Iterator[RunResult]:
     )
 
 
-def _GetMpiVersion(vm) -> Optional[str]:
+def _GetMpiVersion(vm) -> str | None:
   """Returns the MPI version to use for the given OS type."""
   if FLAGS.mpi_vendor == 'intel':
     return intelmpi.MpirunMpiVersion(vm)

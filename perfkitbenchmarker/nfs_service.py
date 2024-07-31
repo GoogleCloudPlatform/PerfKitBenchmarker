@@ -39,7 +39,6 @@ specsfs:
 import abc
 import logging
 import re
-from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -176,7 +175,7 @@ class UnmanagedNfsService(BaseNfsService):
 
   def __init__(
       self,
-      disk_spec: Optional[disk.BaseNFSDiskSpec],
+      disk_spec: disk.BaseNFSDiskSpec | None,
       server_vm,
       check_export_not_same_mount=True,
       server_directory=None,

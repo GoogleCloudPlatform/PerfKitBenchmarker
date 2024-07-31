@@ -17,7 +17,7 @@ import json
 import os
 import re
 import typing
-from typing import Any, Optional
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -198,7 +198,7 @@ def StageMetadata(
   storage_service.Copy(local_file, staged_file)
 
 
-def GetQueryId(filename: str) -> Optional[str]:
+def GetQueryId(filename: str) -> str | None:
   """Extract query id from file name."""
   match = re.match(r'(.*/)?q?([0-9]+[ab]?)(\.sql)?$', filename)
   if match:
@@ -259,7 +259,7 @@ def LoadAndStageQueries(
 
   if _QUERIES_URL.value:
     _GetQueryFilesFromUrl(storage_service, _QUERIES_URL.value)
-    # casting it, so it doesn't complain about being Optional[str]
+    # casting it, so it doesn't complain about being str | None
     return typing.cast(str, _QUERIES_URL.value)
   _StageQueriesFromRepo(storage_service, base_dir)
   return base_dir

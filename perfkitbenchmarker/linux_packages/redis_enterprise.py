@@ -23,7 +23,7 @@ import itertools
 import json
 import logging
 import posixpath
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -168,7 +168,7 @@ PREPROVISIONED_DATA = {
 _THREAD_OPTIMIZATION_RATIO = 0.75
 
 
-def _GetTarName() -> Optional[str]:
+def _GetTarName() -> str | None:
   """Returns the Redis Enterprise package to use depending on the os.
 
   For information about available packages, see
@@ -267,7 +267,7 @@ def OfflineCores(vms: List[_VM]) -> None:
   background_tasks.RunThreaded(_Offline, vms)
 
 
-def TuneProxy(vm: _VM, proxy_threads: Optional[int] = None) -> None:
+def TuneProxy(vm: _VM, proxy_threads: int | None = None) -> None:
   """Tunes the number of Redis proxies on the cluster."""
   proxy_threads = proxy_threads or _PROXY_THREADS.value
   vm.RemoteCommand(
@@ -279,7 +279,7 @@ def TuneProxy(vm: _VM, proxy_threads: Optional[int] = None) -> None:
   vm.RemoteCommand('sudo /opt/redislabs/bin/dmc_ctl restart')
 
 
-def PinWorkers(vms: List[_VM], proxy_threads: Optional[int] = None) -> None:
+def PinWorkers(vms: List[_VM], proxy_threads: int | None = None) -> None:
   """Splits the Redis worker threads across the NUMA nodes evenly.
 
   This function is no-op if --enterprise_redis_pin_workers is not set.
@@ -374,7 +374,7 @@ def LoadDatabases(
     redis_vms: List[_VM],
     load_vms: List[_VM],
     endpoints: List[Tuple[str, int]],
-    shards: Optional[int] = None,
+    shards: int | None = None,
 ) -> None:
   """Loads the databases before performing tests."""
   vms = load_vms + redis_vms
@@ -420,7 +420,7 @@ class HttpClient:
     command += f'{request.url}'
     logging.info('Making API call equivalent to this curl command: %s', command)
 
-  def GetDatabases(self) -> Optional[_UidToJsonDict]:
+  def GetDatabases(self) -> _UidToJsonDict | None:
     """Gets the database object(s) running in the cluster.
 
     Returns:
@@ -447,7 +447,7 @@ class HttpClient:
     logging.info('Database endpoints: %s', endpoints)
     return endpoints
 
-  def GetDatabase(self, uid: int) -> Optional[_Json]:
+  def GetDatabase(self, uid: int) -> _Json | None:
     """Returns the database JSON object corresponding to uid."""
     logging.info('Getting Redis Enterprise database (uid: %s).', uid)
     all_databases = self.GetDatabases()
@@ -467,7 +467,7 @@ class HttpClient:
     if db['status'] != 'active':
       raise errors.Resource.RetryableCreationError()
 
-  def CreateDatabase(self, shards: Optional[int] = None) -> _Json:
+  def CreateDatabase(self, shards: int | None = None) -> _Json:
     """Creates a new Redis Enterprise database.
 
     See https://docs.redis.com/latest/rs/references/rest-api/objects/bdb/.
@@ -519,7 +519,7 @@ class HttpClient:
     logging.info('Finished creating Redis Enterprise database %s.', r.json())
     return r.json()
 
-  def CreateDatabases(self, shards: Optional[int] = None) -> None:
+  def CreateDatabases(self, shards: int | None = None) -> None:
     """Creates all databases with the specified number of shards."""
     for _ in range(_NUM_DATABASES.value):
       self.CreateDatabase(shards)
@@ -544,7 +544,7 @@ class HttpClient:
 
 
 def _BuildRunCommand(
-    host: str, threads: int, port: int, shards: Optional[int] = None
+    host: str, threads: int, port: int, shards: int | None = None
 ) -> str:
   """Spawns a memtier_benchmark on the load_vm against the redis_vm:port.
 
@@ -608,9 +608,9 @@ def ParseResults(output: str) -> List[Result]:
 def Run(
     redis_vms: List[_VM],
     load_vms: List[_VM],
-    shards: Optional[int] = None,
-    proxy_threads: Optional[int] = None,
-    memtier_threads: Optional[int] = None,
+    shards: int | None = None,
+    proxy_threads: int | None = None,
+    memtier_threads: int | None = None,
 ) -> _ThroughputSampleTuple:
   """Run memtier against enterprise redis and measure latency and throughput.
 

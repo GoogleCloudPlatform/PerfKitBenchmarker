@@ -2,7 +2,7 @@ r"""Installs MPI library (Intel or OpenMPI) and compiles Intel MPI benchmarks (I
 
 import logging
 import posixpath
-from typing import List, Optional
+from typing import List
 
 from absl import flags
 from perfkitbenchmarker.linux_packages import intel_repo
@@ -226,7 +226,7 @@ def MpiRunCommand(
     environment: List[str],
     global_environment: List[str],
     tune: bool,
-) -> Optional[str]:
+) -> str | None:
   """String command to call mpirun."""
   if FLAGS.mpi_vendor == 'intel':
     return _MpiRunCommandForIntelMpiLibrary(

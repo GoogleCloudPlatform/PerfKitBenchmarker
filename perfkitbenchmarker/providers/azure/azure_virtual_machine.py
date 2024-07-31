@@ -33,7 +33,6 @@ import ntpath
 import posixpath
 import re
 import threading
-from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
@@ -352,7 +351,7 @@ class AzureNIC(resource.BaseResource):
       self,
       network: azure_network.AzureNetwork,
       name: str,
-      public_ip: Optional[str],
+      public_ip: str | None,
       accelerated_networking: bool,
       private_ip=None,
   ):

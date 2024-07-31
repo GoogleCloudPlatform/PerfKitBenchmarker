@@ -13,8 +13,6 @@
 # limitations under the License.
 """Module containing base class for non-relational databases."""
 
-from typing import Optional
-
 from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import freeze_restore_spec
@@ -39,7 +37,7 @@ class BaseNonRelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   def __init__(
       self,
       component_full_name: str,
-      flag_values: Optional[flags.FlagValues] = None,
+      flag_values: flags.FlagValues | None = None,
       **kwargs
   ):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)

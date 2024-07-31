@@ -18,7 +18,7 @@ import datetime
 import json
 import os
 import re
-from typing import Any, List, Optional
+from typing import Any, List
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -111,7 +111,7 @@ def _IostatResults(
     disk_metrics: list[str],
     cpu_metrics: list[str],
     interval: int,
-    device_regex: Optional[str],
+    device_regex: str | None,
 ) -> None:
   """Parses iostat json data and adds samples."""
   stats = json_output['sysstat']['hosts']
@@ -190,9 +190,9 @@ class IostatCollector(base_collector.BaseCollector):
       self,
       interval: int = 1,
       output_directory: str = '',
-      disk_metrics: Optional[list[str]] = None,
-      cpu_metrics: Optional[list[str]] = None,
-      device_regex: Optional[str] = None,
+      disk_metrics: list[str] | None = None,
+      cpu_metrics: list[str] | None = None,
+      device_regex: str | None = None,
   ) -> None:
     super().__init__(interval, output_directory=output_directory)
     self.interval = interval

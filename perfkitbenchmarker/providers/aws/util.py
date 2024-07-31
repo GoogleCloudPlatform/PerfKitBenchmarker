@@ -19,7 +19,7 @@ import collections
 import json
 import re
 import string
-from typing import Dict, Optional, Set
+from typing import Dict, Set
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -337,9 +337,9 @@ def AwsFilter(filter_keys_and_values):
 def GetConfigValue(
     key: str,
     required=True,
-    profile: Optional[str] = None,
+    profile: str | None = None,
     **kwargs,
-) -> Optional[str]:
+) -> str | None:
   """Gets the value of a given key from AWS CLI configuration."""
   cmd = [AWS_PATH, 'configure', 'get', key]
   if profile:

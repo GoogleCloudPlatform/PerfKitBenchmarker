@@ -15,7 +15,7 @@
 import itertools
 import logging
 import typing
-from typing import Any, Optional
+from typing import Any
 from perfkitbenchmarker import errors
 
 
@@ -26,7 +26,7 @@ NO_SUBCLASS_DEFINED_ERROR = 'No %s subclass defined with the attributes: %s'
 def GetRegisteredClass(
     registry: dict[tuple[Any], type[T]],
     base_class: type[T],
-    default_class: Optional[type[T]] = None,
+    default_class: type[T] | None = None,
     **kwargs
 ) -> type[T]:
   """Returns the subclass with the corresponding attributes.
@@ -79,8 +79,8 @@ def GetRegisteredClass(
 def RegisterClass(
     registry: dict[tuple[Any], type[T]],
     cls: type[T],
-    required_attrs: Optional[list[str]],
-    cls_type: Optional[str],
+    required_attrs: list[str] | None,
+    cls_type: str | None,
 ):
   """Adds the class with its attributes to the registry.
 

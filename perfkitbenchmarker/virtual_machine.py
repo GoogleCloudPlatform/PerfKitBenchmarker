@@ -26,7 +26,7 @@ import logging
 import os.path
 import threading
 import typing
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import benchmark_lookup
@@ -234,7 +234,7 @@ flags.DEFINE_enum(
 )
 
 
-def GetVmSpecClass(cloud: str, platform: Optional[str] = None):
+def GetVmSpecClass(cloud: str, platform: str | None = None):
   """Returns the VmSpec class with corresponding attributes.
 
   Args:
@@ -250,7 +250,7 @@ def GetVmSpecClass(cloud: str, platform: Optional[str] = None):
   return spec.GetSpecClass(BaseVmSpec, CLOUD=cloud, PLATFORM=platform)
 
 
-def GetVmClass(cloud: str, os_type: str, platform: Optional[str] = None):
+def GetVmClass(cloud: str, os_type: str, platform: str | None = None):
   """Returns the VM class with corresponding attributes.
 
   Args:

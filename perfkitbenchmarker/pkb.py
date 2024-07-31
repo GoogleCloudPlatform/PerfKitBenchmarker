@@ -71,7 +71,7 @@ import sys
 import threading
 import time
 import types
-from typing import Any, Collection, Dict, List, Optional, Sequence, Set, Tuple, Type
+from typing import Any, Collection, Dict, List, Sequence, Set, Tuple, Type
 import uuid
 
 from absl import flags
@@ -180,7 +180,7 @@ def ValidateRetriesAndRunStages(flags_dict):
 
 def ParseSkipTeardownConditions(
     skip_teardown_conditions: Collection[str],
-) -> Mapping[str, Mapping[str, Optional[float]]]:
+) -> Mapping[str, Mapping[str, float | None]]:
   """Parses the skip_teardown_conditions flag.
 
   Used by the validator below and flag_util.ShouldTeardown to separate
@@ -259,7 +259,7 @@ def ValidateSkipTeardownConditions(flags_dict: Mapping[str, Any]) -> bool:
 
 def MetricMeetsConditions(
     metric_sample: Mapping[str, Any],
-    conditions: Mapping[str, Mapping[str, Optional[float]]],
+    conditions: Mapping[str, Mapping[str, float | None]],
 ) -> bool:
   """Checks if a metric sample meets any conditions.
 
@@ -323,9 +323,9 @@ def MetricMeetsConditions(
 
 
 def ShouldTeardown(
-    skip_teardown_conditions: Mapping[str, Mapping[str, Optional[float]]],
+    skip_teardown_conditions: Mapping[str, Mapping[str, float | None]],
     samples: MutableSequence[Mapping[str, Any]],
-    vms: Optional[Sequence[virtual_machine.BaseVirtualMachine]] = None,
+    vms: Sequence[virtual_machine.BaseVirtualMachine] | None = None,
     skip_teardown_zonal_vm_limit: int | None = None,
 ) -> bool:
   """Checks all samples against all skip teardown conditions.
@@ -965,8 +965,8 @@ def _PublishRunStartedSample(spec):
 def _PublishEventSample(
     spec: bm_spec.BenchmarkSpec,
     event: str,
-    metadata: Optional[Dict[str, Any]] = None,
-    collector: Optional[publisher.SampleCollector] = None,
+    metadata: Dict[str, Any] | None = None,
+    collector: publisher.SampleCollector | None = None,
 ):
   """Publishes a sample indicating the progress of the benchmark.
 
@@ -1705,7 +1705,7 @@ def _GenerateBenchmarkDocumentation():
 def _CreateCpuVulnerabilitySamples(vms) -> List[sample.Sample]:
   """Returns samples of the VMs' CPU vulernabilites."""
 
-  def CreateSample(vm) -> Optional[sample.Sample]:
+  def CreateSample(vm) -> sample.Sample | None:
     metadata = {'vm_name': vm.name}
     metadata.update(vm.cpu_vulnerabilities.asdict)
     return sample.Sample('cpu_vuln', 0, '', metadata)

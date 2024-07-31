@@ -23,7 +23,6 @@ When adding a new spec, also add substantial references from
 benchmark_config_spec.py.
 """
 
-from typing import Optional
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 
@@ -79,6 +78,6 @@ class ImplementedExampleResourceSpec(BaseExampleResourceSpec):
 
 def GetExampleResourceSpecClass(
     example_type: str,
-) -> Optional[spec.BaseSpecMetaClass]:
+) -> spec.BaseSpecMetaClass | None:
   """Gets the example spec class corresponding to 'example_type'."""
   return spec.GetSpecClass(BaseExampleResourceSpec, EXAMPLE_TYPE=example_type)

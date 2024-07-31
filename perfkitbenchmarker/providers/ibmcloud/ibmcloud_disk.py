@@ -17,7 +17,7 @@ import json
 import logging
 import re
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import disk
@@ -47,7 +47,7 @@ class IbmCloudDisk(disk.BaseDisk):
       disk_spec: disk.BaseDiskSpec,
       name: str,
       zone: str,
-      encryption_key: Optional[str] = None,
+      encryption_key: str | None = None,
   ):
     super(IbmCloudDisk, self).__init__(disk_spec)
     self.name = name

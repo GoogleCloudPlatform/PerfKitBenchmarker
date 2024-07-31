@@ -16,7 +16,7 @@
 
 import ntpath
 import posixpath
-from typing import Any, List, Optional
+from typing import Any, List
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -63,7 +63,7 @@ class WindowsHammerDbTclScript(linux_hammerdb.HammerDbTclScript):
       )
 
   @vm_util.Retry(poll_interval=10, max_retries=3, timeout=TIMEOUT)
-  def Run(self, vm, timeout: Optional[int] = 60 * 60 * 6) -> str:
+  def Run(self, vm, timeout: int | None = 60 * 60 * 6) -> str:
     """Run hammerdbcli script."""
     hammerdb_exe_dir = ntpath.join(
         vm.temp_dir, HAMMERDB.format(linux_hammerdb.HAMMERDB_VERSION.value)
@@ -103,7 +103,7 @@ def ParseTpcCTPMResultsFromFile(stdout: str) -> List[sample.Sample]:
   return linux_hammerdb.ParseTpcCTPMResultsFromFile(stdout)
 
 
-def SetDefaultConfig(num_cpus: Optional[int]):
+def SetDefaultConfig(num_cpus: int | None):
   return linux_hammerdb.SetDefaultConfig(num_cpus)
 
 
@@ -210,7 +210,7 @@ def SetupConfig(
 
 
 def Run(
-    vm, db_engine: str, hammerdb_script: str, timeout: Optional[int] = TIMEOUT
+    vm, db_engine: str, hammerdb_script: str, timeout: int | None = TIMEOUT
 ) -> List[sample.Sample]:
   """Run the HammerDB Benchmark.
 

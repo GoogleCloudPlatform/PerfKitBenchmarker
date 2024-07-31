@@ -20,7 +20,7 @@ supported by Memtier, see
 https://github.com/RedisLabs/memtier_benchmark/blob/master/memtier_benchmark.cpp
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -138,7 +138,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
 def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   """Run memtier_benchmark against KeyDB."""
   client_vms = bm_spec.vm_groups['clients']
-  server_vm: Optional[virtual_machine.BaseVirtualMachine] = None
+  server_vm: virtual_machine.BaseVirtualMachine | None = None
   if 'servers' in bm_spec.vm_groups:
     server_vm = bm_spec.vm_groups['servers'][0]
 

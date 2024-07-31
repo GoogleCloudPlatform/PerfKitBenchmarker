@@ -20,7 +20,7 @@ import collections
 import dataclasses
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import disk
@@ -102,12 +102,12 @@ class _AwsDpbEmrServerlessJobRun:
     vcpu_hour: vCPUs * hour used.
   """
 
-  application_id: Optional[str] = None
-  job_run_id: Optional[str] = None
-  region: Optional[str] = None
-  memory_gb_hour: Optional[float] = None
-  storage_gb_hour: Optional[float] = None
-  vcpu_hour: Optional[float] = None
+  application_id: str | None = None
+  job_run_id: str | None = None
+  region: str | None = None
+  memory_gb_hour: float | None = None
+  storage_gb_hour: float | None = None
+  vcpu_hour: float | None = None
 
   def __bool__(self):
     """Returns if this represents a job run or is just a dummy placeholder."""
@@ -193,18 +193,18 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.storage_service.PrepareService(self.region)
     self.persistent_fs_prefix = 's3://'
     self.bucket_to_delete = None
-    self._cluster_create_time: Optional[float] = None
-    self._cluster_ready_time: Optional[float] = None
-    self._cluster_delete_time: Optional[float] = None
+    self._cluster_create_time: float | None = None
+    self._cluster_ready_time: float | None = None
+    self._cluster_delete_time: float | None = None
     if not self.GetDpbVersion():
       raise errors.Setup.InvalidSetupError(
           'dpb_service.version must be provided.'
       )
 
-  def GetDpbVersion(self) -> Optional[str]:
+  def GetDpbVersion(self) -> str | None:
     return FLAGS.dpb_emr_release_label or super().GetDpbVersion()
 
-  def GetClusterCreateTime(self) -> Optional[float]:
+  def GetClusterCreateTime(self) -> float | None:
     """Returns the cluster creation time.
 
     On this implementation, the time returned is based on the timestamps
@@ -390,7 +390,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   @classmethod
   def _ParseClusterCreateTime(
       cls, data: dict[str, Any]
-  ) -> tuple[Optional[float], Optional[float]]:
+  ) -> tuple[float | None, float | None]:
     """Parses the cluster create & ready time from an API response dict."""
     try:
       creation_ts = data['Cluster']['Status']['Timeline']['CreationDateTime']
@@ -541,7 +541,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         job_type=dpb_constants.HADOOP_JOB_TYPE,
     )
 
-  def GetHdfsType(self) -> Optional[str]:
+  def GetHdfsType(self) -> str | None:
     """Gets human friendly disk type for metric metadata."""
     try:
       return disk_to_hdfs_map[self.spec.worker_group.disk_spec.disk_type]
@@ -788,7 +788,7 @@ class AwsDpbEmrServerless(
 
   def _CallGetJobRunApi(
       self, job_run: _AwsDpbEmrServerlessJobRun
-  ) -> Optional[dpb_service.JobResult]:
+  ) -> dpb_service.JobResult | None:
     """Performs EMR Serverless GetJobRun API call."""
     cmd = self.cmd_prefix + [
         'emr-serverless',
@@ -840,7 +840,7 @@ class AwsDpbEmrServerless(
         'dpb_job_properties': basic_data['dpb_job_properties'],
     }
 
-  def GetHdfsType(self) -> Optional[str]:
+  def GetHdfsType(self) -> str | None:
     """Gets human friendly disk type for metric metadata."""
     return 'default-disk'
 

@@ -27,7 +27,7 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Type
 
 from absl import flags
 import jinja2
@@ -204,29 +204,29 @@ class JobCosts:
     storage_unit_name: Name of the shuffle storage units used by the service.
   """
 
-  total_cost: Optional[float] = None
+  total_cost: float | None = None
 
-  compute_cost: Optional[float] = None
-  memory_cost: Optional[float] = None
-  storage_cost: Optional[float] = None
+  compute_cost: float | None = None
+  memory_cost: float | None = None
+  storage_cost: float | None = None
 
-  compute_units_used: Optional[float] = None
-  memory_units_used: Optional[float] = None
-  storage_units_used: Optional[float] = None
+  compute_units_used: float | None = None
+  memory_units_used: float | None = None
+  storage_units_used: float | None = None
 
-  compute_unit_cost: Optional[float] = None
-  memory_unit_cost: Optional[float] = None
-  storage_unit_cost: Optional[float] = None
+  compute_unit_cost: float | None = None
+  memory_unit_cost: float | None = None
+  storage_unit_cost: float | None = None
 
-  compute_unit_name: Optional[str] = None
-  memory_unit_name: Optional[str] = None
-  storage_unit_name: Optional[str] = None
+  compute_unit_name: str | None = None
+  memory_unit_name: str | None = None
+  storage_unit_name: str | None = None
 
   def GetSamples(
       self,
       prefix: str = '',
-      renames: Optional[dict[str, str]] = None,
-      metadata: Optional[MutableMapping[str, str]] = None,
+      renames: dict[str, str] | None = None,
+      metadata: MutableMapping[str, str] | None = None,
   ) -> list[sample.Sample]:
     """Gets PKB samples for these costs.
 
@@ -337,10 +337,10 @@ class BaseDpbService(resource.BaseResource):
     self.cluster_duration = None
     self._InitializeMetadata()
 
-  def GetDpbVersion(self) -> Optional[str]:
+  def GetDpbVersion(self) -> str | None:
     return self.spec.version
 
-  def GetHdfsType(self) -> Optional[str]:
+  def GetHdfsType(self) -> str | None:
     """Gets human friendly disk type for metric metadata."""
     return None
 
@@ -351,18 +351,18 @@ class BaseDpbService(resource.BaseResource):
   @abc.abstractmethod
   def SubmitJob(
       self,
-      jarfile: Optional[str] = None,
-      classname: Optional[str] = None,
-      pyspark_file: Optional[str] = None,
-      query_file: Optional[str] = None,
-      job_poll_interval: Optional[float] = None,
-      job_stdout_file: Optional[str] = None,
-      job_arguments: Optional[List[str]] = None,
-      job_files: Optional[List[str]] = None,
-      job_jars: Optional[List[str]] = None,
-      job_py_files: Optional[List[str]] = None,
-      job_type: Optional[str] = None,
-      properties: Optional[Dict[str, str]] = None,
+      jarfile: str | None = None,
+      classname: str | None = None,
+      pyspark_file: str | None = None,
+      query_file: str | None = None,
+      job_poll_interval: float | None = None,
+      job_stdout_file: str | None = None,
+      job_arguments: List[str] | None = None,
+      job_files: List[str] | None = None,
+      job_jars: List[str] | None = None,
+      job_py_files: List[str] | None = None,
+      job_type: str | None = None,
+      properties: Dict[str, str] | None = None,
   ) -> JobResult:
     """Submit a data processing job to the backend.
 
@@ -413,7 +413,7 @@ class BaseDpbService(resource.BaseResource):
 
     return Poll()
 
-  def _GetCompletedJob(self, job_id: str) -> Optional[JobResult]:
+  def _GetCompletedJob(self, job_id: str) -> JobResult | None:
     """Get the job result if it has finished.
 
     Args:
@@ -432,16 +432,16 @@ class BaseDpbService(resource.BaseResource):
 
   def GetSparkSubmitCommand(
       self,
-      jarfile: Optional[str] = None,
-      classname: Optional[str] = None,
-      pyspark_file: Optional[str] = None,
-      query_file: Optional[str] = None,
-      job_arguments: Optional[List[str]] = None,
-      job_files: Optional[List[str]] = None,
-      job_jars: Optional[List[str]] = None,
-      job_type: Optional[str] = None,
-      job_py_files: Optional[List[str]] = None,
-      properties: Optional[Dict[str, str]] = None,
+      jarfile: str | None = None,
+      classname: str | None = None,
+      pyspark_file: str | None = None,
+      query_file: str | None = None,
+      job_arguments: List[str] | None = None,
+      job_files: List[str] | None = None,
+      job_jars: List[str] | None = None,
+      job_type: str | None = None,
+      job_py_files: List[str] | None = None,
+      properties: Dict[str, str] | None = None,
       spark_submit_cmd: str = spark.SPARK_SUBMIT,
   ) -> List[str]:
     """Builds the command to run spark-submit on cluster."""
@@ -478,7 +478,7 @@ class BaseDpbService(resource.BaseResource):
       self,
       source: str,
       destination: str,
-      properties: Optional[Dict[str, str]] = None,
+      properties: Dict[str, str] | None = None,
   ) -> JobResult:
     """Method to copy data using a distributed job on the cluster.
 
@@ -606,7 +606,7 @@ class BaseDpbService(resource.BaseResource):
         f'No jar found for category {job_category} and type {job_type}.'
     )
 
-  def GetClusterCreateTime(self) -> Optional[float]:
+  def GetClusterCreateTime(self) -> float | None:
     """Returns the cluster creation time.
 
     This default implementation computes it by substracting the
@@ -631,7 +631,7 @@ class BaseDpbService(resource.BaseResource):
     """
     return JobCosts()
 
-  def GetClusterDuration(self) -> Optional[float]:
+  def GetClusterDuration(self) -> float | None:
     """Gets how much time the cluster has been running in seconds.
 
     This default implementation just returns None. Override in subclasses if
@@ -643,7 +643,7 @@ class BaseDpbService(resource.BaseResource):
     """
     return self.cluster_duration
 
-  def GetClusterCost(self) -> Optional[float]:
+  def GetClusterCost(self) -> float | None:
     """Gets the cost of running the cluster if applicable.
 
     Default implementation returns the sum of cluster hardware cost and service
@@ -660,7 +660,7 @@ class BaseDpbService(resource.BaseResource):
       return None
     return hardware_cost + premium_cost
 
-  def GetClusterHardwareCost(self) -> Optional[float]:
+  def GetClusterHardwareCost(self) -> float | None:
     """Computes the hardware cost with --dpb_hardware_hourly_cost value.
 
     Default implementation multiplies --dpb_hardware_hourly_cost with the value
@@ -675,7 +675,7 @@ class BaseDpbService(resource.BaseResource):
       return None
     return cluster_duration / 3600 * _HARDWARE_HOURLY_COST.value
 
-  def GetClusterPremiumCost(self) -> Optional[float]:
+  def GetClusterPremiumCost(self) -> float | None:
     """Computes the premium cost with --dpb_service_premium_hourly_cost value.
 
     Default implementation multiplies --dpb_service_premium_hourly_cost with the
@@ -693,7 +693,7 @@ class BaseDpbService(resource.BaseResource):
   def GetSamples(self) -> list[sample.Sample]:
     """Gets samples with service statistics."""
     samples = []
-    metrics: dict[str, tuple[Optional[float], str]] = {
+    metrics: dict[str, tuple[float | None, str]] = {
         # Cluster creation time as reported by the DPB service
         # (non-Serverless DPB services only).
         'dpb_cluster_create_time': (self.GetClusterCreateTime(), 'seconds'),
@@ -738,19 +738,19 @@ class DpbServiceServerlessMixin:
   def _Delete(self) -> None:
     pass
 
-  def GetClusterCreateTime(self) -> Optional[float]:
+  def GetClusterCreateTime(self) -> float | None:
     return None
 
-  def GetClusterDuration(self) -> Optional[float]:
+  def GetClusterDuration(self) -> float | None:
     return None
 
-  def GetClusterCost(self) -> Optional[float]:
+  def GetClusterCost(self) -> float | None:
     return None
 
-  def GetClusterHardwareCost(self) -> Optional[float]:
+  def GetClusterHardwareCost(self) -> float | None:
     return None
 
-  def GetClusterPremiumCost(self) -> Optional[float]:
+  def GetClusterPremiumCost(self) -> float | None:
     return None
 
 
@@ -797,7 +797,7 @@ class UnmanagedDpbService(BaseDpbService):
           'EC2 based Spark and Hadoop services require '
           '--aws_ec2_instance_profile.')
 
-  def GetClusterCreateTime(self) -> Optional[float]:
+  def GetClusterCreateTime(self) -> float | None:
     """Returns the cluster creation time.
 
     UnmanagedDpbService Create phase doesn't consider actual VM creation, just
@@ -848,7 +848,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
     super(UnmanagedDpbServiceYarnCluster, self).__init__(dpb_service_spec)
     self.cloud = dpb_service_spec.worker_group.cloud
 
-  def GetDpbVersion(self) -> Optional[str]:
+  def GetDpbVersion(self) -> str | None:
     return str(hadoop.HadoopVersion())
 
   def _Create(self):
@@ -925,7 +925,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
   def _Delete(self):
     pass
 
-  def _GetCompletedJob(self, job_id: str) -> Optional[JobResult]:
+  def _GetCompletedJob(self, job_id: str) -> JobResult | None:
     """Submitting Job via SSH is blocking so this is not meaningful."""
     raise NotImplementedError('Submitting Job via SSH is a blocking command.')
 
@@ -948,7 +948,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
     self.vms = {}
     self.cloud = dpb_service_spec.worker_group.cloud
 
-  def GetDpbVersion(self) -> Optional[str]:
+  def GetDpbVersion(self) -> str | None:
     return f'spark_{spark.SparkVersion()}'
 
   def _Create(self):
@@ -1016,7 +1016,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
   def _Delete(self):
     pass
 
-  def _GetCompletedJob(self, job_id: str) -> Optional[JobResult]:
+  def _GetCompletedJob(self, job_id: str) -> JobResult | None:
     """Submitting Job via SSH is blocking so this is not meaningful."""
     raise NotImplementedError('Submitting Job via SSH is a blocking command.')
 
@@ -1082,7 +1082,7 @@ class KubernetesSparkCluster(BaseDpbService):
           f' least 2 nodes.Found {self.k8s_cluster.num_nodes}.'
       )
 
-  def GetDpbVersion(self) -> Optional[str]:
+  def GetDpbVersion(self) -> str | None:
     return 'spark_' + FLAGS.spark_version
 
   def _Create(self):
@@ -1218,7 +1218,7 @@ class KubernetesSparkCluster(BaseDpbService):
   def _Delete(self):
     pass
 
-  def _GetCompletedJob(self, job_id: str) -> Optional[JobResult]:
+  def _GetCompletedJob(self, job_id: str) -> JobResult | None:
     """container.WaitForExit is blocking so this is not meaningful."""
     raise NotImplementedError('container.WaitForExit is a blocking command.')
 
@@ -1263,7 +1263,7 @@ class KubernetesFlinkCluster(BaseDpbService):
           f' least 2 nodes.Found {self.k8s_cluster.num_nodes}.'
       )
 
-  def GetDpbVersion(self) -> Optional[str]:
+  def GetDpbVersion(self) -> str | None:
     return self.spec.version or self.DEFAULT_FLINK_IMAGE
 
   def _CreateConfigMapDir(self):
@@ -1410,7 +1410,7 @@ class KubernetesFlinkCluster(BaseDpbService):
     # dpb_cluster_properties is to be supported
     assert not FLAGS.dpb_cluster_properties
 
-  def _GetCompletedJob(self, job_id: str) -> Optional[JobResult]:
+  def _GetCompletedJob(self, job_id: str) -> JobResult | None:
     """container.WaitForExit is blocking so this is not meaningful."""
     raise NotImplementedError('container.WaitForExit is a blocking command.')
 
@@ -1420,7 +1420,7 @@ class KubernetesFlinkCluster(BaseDpbService):
 
 def GetDpbServiceClass(
     cloud: str, dpb_service_type: str
-) -> Optional[Type[BaseDpbService]]:
+) -> Type[BaseDpbService] | None:
   """Gets the Data Processing Backend class corresponding to 'service_type'.
 
   Args:

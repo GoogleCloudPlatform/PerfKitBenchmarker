@@ -5,7 +5,7 @@ performance with postgres.
 """
 
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from absl import flags
 from perfkitbenchmarker import regex_util
@@ -219,10 +219,10 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
 
   def UpdateAlloyDBFlags(
       self,
-      columnar_engine_size: Optional[int],
+      columnar_engine_size: int | None,
       enable_columnar_recommendation: bool,
       enable_auto_columnarization: str,
-      relation: Optional[str] = None,
+      relation: str | None = None,
   ):
     database_flags = []
     if FLAGS.db_flags:
@@ -272,7 +272,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     )
 
   def _GetAlloyDbCommand(
-      self, cmd_string: List[str], timeout: Optional[int] = None
+      self, cmd_string: List[str], timeout: int | None = None
   ) -> util.GcloudCommand:
     """Used to issue alloydb command."""
     cmd_string = [self, 'alpha', 'alloydb'] + cmd_string

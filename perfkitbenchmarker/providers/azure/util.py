@@ -17,7 +17,7 @@
 
 import json
 import re
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Set
 
 from absl import flags
 from perfkitbenchmarker import context
@@ -32,8 +32,9 @@ FLAGS = flags.FLAGS
 
 def GetAzureStorageConnectionString(
     storage_account_name: str,
-    resource_group: Optional[str] = None,
-    subscription: Optional[str] = None):
+    resource_group: str | None = None,
+    subscription: str | None = None,
+):
   """Get connection string."""
   cmd = [
       AZURE_PATH,

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing a VM group spec and related decoders."""
-from typing import Optional
+
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
@@ -56,7 +56,7 @@ class VmGroupSpec(spec.BaseSpec):
   vm_count: int
   vm_spec: virtual_machine.BaseVmSpec
   vm_as_nfs: bool
-  vm_as_nfs_disk_spec: Optional[disk.BaseNFSDiskSpec]
+  vm_as_nfs_disk_spec: disk.BaseNFSDiskSpec | None
   placement_group_name: str
   cidr: str
 

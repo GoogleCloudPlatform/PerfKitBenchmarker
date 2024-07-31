@@ -19,7 +19,6 @@ import abc
 import logging
 import os
 import pathlib
-from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -323,7 +322,7 @@ class ObjectStorageService(
     return self.GetDownloadUrl(bucket, object_name, use_https)
 
   # Different services require uploads to be POST or PUT.
-  UPLOAD_HTTP_METHOD: Optional[str] = None
+  UPLOAD_HTTP_METHOD: str | None = None
 
   def MakeBucketPubliclyReadable(self, bucket: str, also_make_writable=False):
     """Make a bucket readable and optionally writable by everyone."""

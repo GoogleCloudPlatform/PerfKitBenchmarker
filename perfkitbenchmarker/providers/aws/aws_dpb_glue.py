@@ -9,7 +9,7 @@ Docs:
 
 import json
 import os
-from typing import List, Optional
+from typing import List
 
 from absl import flags
 from perfkitbenchmarker import dpb_constants
@@ -228,9 +228,9 @@ class AwsDpbGlue(
 
   def _ComputeJobRunCost(
       self,
-      dpu_seconds: Optional[float],
-      max_capacity: Optional[float],
-      execution_time: Optional[float],
+      dpu_seconds: float | None,
+      max_capacity: float | None,
+      execution_time: float | None,
   ) -> dpb_service.JobCosts:
     """Computes the job run cost.
 
@@ -266,6 +266,6 @@ class AwsDpbGlue(
         compute_unit_cost=dpu_hourly_price,
     )
 
-  def GetHdfsType(self) -> Optional[str]:
+  def GetHdfsType(self) -> str | None:
     """Gets human friendly disk type for metric metadata."""
     return 'default-disk'

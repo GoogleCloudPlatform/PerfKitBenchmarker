@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -88,11 +88,11 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
     self.persistent_fs_prefix = 'gs://'
-    self._cluster_create_time: Optional[float] = None
-    self._cluster_ready_time: Optional[float] = None
-    self._cluster_delete_time: Optional[float] = None
+    self._cluster_create_time: float | None = None
+    self._cluster_ready_time: float | None = None
+    self._cluster_delete_time: float | None = None
 
-  def GetDpbVersion(self) -> Optional[str]:
+  def GetDpbVersion(self) -> str | None:
     return FLAGS.dpb_dataproc_image_version or super().GetDpbVersion()
 
   @staticmethod
@@ -172,7 +172,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     if self.user_managed and not FLAGS.dpb_service_bucket:
       self.bucket = self._GetCluster()['config']['tempBucket']
 
-  def GetClusterCreateTime(self) -> Optional[float]:
+  def GetClusterCreateTime(self) -> float | None:
     """Returns the cluster creation time.
 
     On this implementation, the time returned is based on the timestamps
@@ -287,7 +287,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
   @classmethod
   def _ParseClusterCreateTime(
       cls, stdout: str
-  ) -> Tuple[Optional[float], Optional[float]]:
+  ) -> Tuple[float | None, float | None]:
     """Parses the cluster create & ready time from a raw API response."""
     try:
       creation_data = json.loads(stdout)
@@ -332,7 +332,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
           .timestamp()
       )
 
-  def _GetCluster(self) -> Optional[Dict[str, Any]]:
+  def _GetCluster(self) -> Dict[str, Any] | None:
     """Gets the cluster resource in a dict."""
     cmd = self.DataprocGcloudCommand('clusters', 'describe', self.cluster_id)
     stdout, _, retcode = cmd.Issue(raise_on_failure=False)
@@ -435,7 +435,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     flag_name = cmd_property
     cmd.flags[flag_name] = cmd_value
 
-  def GetHdfsType(self) -> Optional[str]:
+  def GetHdfsType(self) -> str | None:
     """Gets human friendly disk type for metric metadata."""
     hdfs_type = None
 
@@ -511,7 +511,7 @@ class GcpDpbDpgke(GcpDpbDataproc):
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
 
-  def GetHdfsType(self) -> Optional[str]:
+  def GetHdfsType(self) -> str | None:
     """Gets human friendly disk type for metric metadata."""
     return None
 
@@ -809,7 +809,7 @@ class GcpDpbDataprocServerless(
         storage_unit_name='GB*hr',
     )
 
-  def GetHdfsType(self) -> Optional[str]:
+  def GetHdfsType(self) -> str | None:
     """Gets human friendly disk type for metric metadata."""
     try:
       return serverless_disk_to_hdfs_map[self._dpb_s8s_disk_type]

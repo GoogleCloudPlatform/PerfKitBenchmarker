@@ -16,7 +16,7 @@
 import collections
 import logging
 import threading
-from typing import Any, Optional
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -77,7 +77,7 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
   def __init__(
       self,
       component_full_name: str,
-      flag_values: Optional[flags.FlagValues] = None,
+      flag_values: flags.FlagValues | None = None,
       **kwargs: Any,
   ):
     """Initializes a BaseSpec.
@@ -200,7 +200,7 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
       decoders: collections.OrderedDict[
           str, option_decoders.ConfigOptionDecoder
       ],
-      flag_values: Optional[flags.FlagValues],
+      flag_values: flags.FlagValues | None,
   ):
     """Initializes spec attributes from provided config option values.
 

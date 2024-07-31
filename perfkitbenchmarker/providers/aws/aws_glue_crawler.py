@@ -1,7 +1,7 @@
 """Module containing class for AWS's Glue Crawler."""
 
 import json
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data_discovery_service
@@ -182,7 +182,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
           f'Crawler {self.crawler_name} still running.'
       )
 
-  def _DbExists(self) -> Optional[bool]:
+  def _DbExists(self) -> bool | None:
     """Whether the database exists or not.
 
     It might return None if the API call failed with an unknown error.
@@ -203,7 +203,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
       return True
     return False if 'EntityNotFoundException' in stderr else None
 
-  def _CrawlerExists(self) -> Optional[bool]:
+  def _CrawlerExists(self) -> bool | None:
     """Whether the crawler exists or not.
 
     It might return None if the API call failed with an unknown error.

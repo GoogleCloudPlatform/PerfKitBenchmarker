@@ -27,7 +27,6 @@ import logging
 import string
 import threading
 import time
-from typing import Optional
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -420,8 +419,8 @@ class AwsDiskSpec(disk.BaseDiskSpec):
 class AWSDiskIdentifiers:
   """Identifiers of an AWS disk assigned by AWS at creation time."""
 
-  volume_id: Optional[str]
-  path: Optional[str]
+  volume_id: str | None
+  path: str | None
 
 
 class AwsDisk(disk.BaseDisk):

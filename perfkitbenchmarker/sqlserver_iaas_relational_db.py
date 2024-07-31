@@ -19,7 +19,6 @@ database.
 
 import ntpath
 import os
-from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -728,9 +727,9 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       self,
       vm: virtual_machine.VirtualMachine,
       script_name: str,
-      cmd_parameters: Optional[list[str]] = None,
-      source_path: str = "relational_db_configs/sqlserver_ha_configs/"
-      ) -> tuple[str, str]:
+      cmd_parameters: list[str] | None = None,
+      source_path: str = "relational_db_configs/sqlserver_ha_configs/",
+  ) -> tuple[str, str]:
     """Pushes a powershell script to VM and run it.
 
     Args:

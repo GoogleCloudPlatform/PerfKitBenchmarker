@@ -34,7 +34,7 @@ import posixpath
 import re
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from absl import flags
 from perfkitbenchmarker import boot_disk
@@ -549,7 +549,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.preemptible_status_code = None
     self.project = vm_spec.project or util.GetDefaultProject()
     self.image_project = vm_spec.image_project or self.GetDefaultImageProject()
-    self.mtu: Optional[int] = FLAGS.mtu
+    self.mtu: int | None = FLAGS.mtu
     self.subnet_name = vm_spec.subnet_name
     self.network = self._GetNetwork()
     self.firewall = gce_network.GceFirewall.GetFirewall()
@@ -1493,10 +1493,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   def SupportGVNIC(self) -> bool:
     return True
 
-  def GetDefaultImageFamily(self, is_arm: bool) -> Optional[str]:
+  def GetDefaultImageFamily(self, is_arm: bool) -> str | None:
     return None
 
-  def GetDefaultImageProject(self) -> Optional[str]:
+  def GetDefaultImageProject(self) -> str | None:
     return None
 
   def GetNumTeardownSkippedVms(self) -> int:
@@ -1575,7 +1575,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
     super(BaseLinuxGceVirtualMachine, self).OnStartup()
     self._gvnic_version = self.GetGvnicVersion()
 
-  def GetGvnicVersion(self) -> Optional[str]:
+  def GetGvnicVersion(self) -> str | None:
     """Returns the gvnic network driver version."""
     if not gcp_flags.GCE_NIC_RECORD_VERSION.value:
       return

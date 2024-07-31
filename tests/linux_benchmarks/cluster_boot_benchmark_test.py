@@ -1,6 +1,5 @@
 """Tests for cluster_boot_delete."""
 
-from typing import Optional
 import unittest
 
 import freezegun
@@ -33,8 +32,8 @@ def vm_mock(index: int, timestamp: float) -> mock.Mock:
 
 def vm_mock_given_delete_times(
     index: int,
-    delete_start_time: Optional[float] = None,
-    delete_end_time: Optional[float] = None,
+    delete_start_time: float | None = None,
+    delete_end_time: float | None = None,
 ) -> mock.Mock:
   """Creates a mock vm with a provided delete_start_time and delete_end_time.
 

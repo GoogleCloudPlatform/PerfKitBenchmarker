@@ -16,7 +16,6 @@
 
 import json
 import time
-from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -42,7 +41,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
   # Azure redis could take up to an hour to create
   READY_TIMEOUT = 60 * 60  # 60 minutes
 
-  redis_version: Optional[str] = None
+  redis_version: str | None = None
 
   def __init__(self, spec):
     super(AzureRedisCache, self).__init__(spec)

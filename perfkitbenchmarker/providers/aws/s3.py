@@ -18,7 +18,7 @@ import json
 import logging
 import os
 import posixpath
-from typing import List, Optional
+from typing import List
 
 from absl import flags
 from absl import logging
@@ -44,8 +44,8 @@ class S3Service(object_storage_service.ObjectStorageService):
   STORAGE_NAME = provider_info.AWS
 
   region: str
-  zone: Optional[str] = None
-  zone_id: Optional[str] = None
+  zone: str | None = None
+  zone_id: str | None = None
 
   def PrepareService(self, location):
     if not location:

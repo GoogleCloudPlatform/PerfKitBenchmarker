@@ -16,7 +16,7 @@
 import copy
 import json
 import time
-from typing import Any, Optional
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -100,9 +100,9 @@ def _GetEmrSpec():
 
 
 def _GetJobRunMockPayload(
-    vcpu_hour: Optional[float] = None,
-    memory_gb_hour: Optional[float] = None,
-    storage_gb_hour: Optional[float] = None,
+    vcpu_hour: float | None = None,
+    memory_gb_hour: float | None = None,
+    storage_gb_hour: float | None = None,
 ) -> dict[str, Any]:
   payload = copy.deepcopy(_BASE_JOB_RUN_PAYLOAD)
   if vcpu_hour is not None:

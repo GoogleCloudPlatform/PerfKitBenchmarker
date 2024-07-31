@@ -3,7 +3,7 @@
 import logging
 import threading
 import time
-from typing import Any, Dict, List, Optional, Type, TypeVar
+from typing import Any, Dict, List, Type, TypeVar
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -108,7 +108,7 @@ class BaseAppServiceSpec(spec.BaseSpec):
 AppServiceChild = TypeVar('AppServiceChild', bound='BaseAppService')
 
 
-def GetAppServiceClass(service: str) -> Optional[Type[AppServiceChild]]:
+def GetAppServiceClass(service: str) -> Type[AppServiceChild] | None:
   """Returns class of the given AppService.
 
   Args:
@@ -150,7 +150,7 @@ class BaseAppService(resource.BaseResource):
     self.region: str = base_app_service_spec.appservice_region
     self.backend: str = base_app_service_spec.appservice_backend
     self.builder: Any = None
-    self.endpoint: Optional[str] = None
+    self.endpoint: str | None = None
     self.poller: http_poller.HttpPoller = http_poller.HttpPoller()
     self.vm: virtual_machine.BaseVirtualMachine
     # update metadata

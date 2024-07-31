@@ -21,7 +21,7 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -169,7 +169,7 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   client_vms = bm_spec.vm_groups['clients']
   # IMPORTANT: Don't reference vm_groups['servers'] directly, because this is
   # reused by kubernetes_redis_memtier_benchmark, which doesn't define it.
-  server_vm: Optional[virtual_machine.BaseVirtualMachine] = None
+  server_vm: virtual_machine.BaseVirtualMachine | None = None
   if 'servers' in bm_spec.vm_groups:
     server_vm = bm_spec.vm_groups['servers'][0]
   measure_cpu_on_server_vm = server_vm and REDIS_MEMTIER_MEASURE_CPU.value

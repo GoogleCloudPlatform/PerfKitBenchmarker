@@ -27,7 +27,7 @@ import logging
 import os.path
 import socket
 import time
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 from absl import flags
 import jinja2
@@ -133,7 +133,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
       self,
       command: str,
       ignore_failure: bool = False,
-      timeout: Optional[float] = None,
+      timeout: float | None = None,
       **kwargs,
   ) -> Tuple[str, str]:
     """Runs a command on the VM.
@@ -159,7 +159,7 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
   def RobustRemoteCommand(
       self,
       command: str,
-      timeout: Optional[float] = None,
+      timeout: float | None = None,
       ignore_failure: bool = False,
   ) -> Tuple[str, str]:
     """Runs a command on the VM in a more robust way than RemoteCommand.
@@ -750,11 +750,11 @@ class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
 
   # TODO(pclay): Implement on Windows, make abstract and non Optional
   @property
-  def cpu_arch(self) -> Optional[str]:
+  def cpu_arch(self) -> str | None:
     """The basic CPU architecture of the VM."""
     return None
 
-  def GetCPUVersion(self) -> Optional[str]:
+  def GetCPUVersion(self) -> str | None:
     """Get the CPU version of the VM."""
     return None
 

@@ -18,7 +18,6 @@
 import dataclasses
 import re
 import statistics
-from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import os_types
@@ -240,27 +239,27 @@ def ParseSysbenchTransactions(sysbench_output, metadata) -> list[sample.Sample]:
 @dataclasses.dataclass
 class SysbenchInputParameters:
   """A dataclass for sysbench input flags."""
-  custom_lua_packages_path: Optional[str] = None
-  built_in_test: Optional[bool] = True  # if this test comes with sysbench
-  test: Optional[str] = None  # sysbench test path
-  db_driver: Optional[str] = None  # sysbench default mysql
-  db_ps_mode: Optional[str] = None  # sysbench default auto
-  skip_trx: Optional[bool] = False  # sysbench default off
-  trx_level: Optional[str] = None  # transaction isolation level, default RR
-  tables: Optional[int] = None  # number of tables to create, default 1
-  table_size: Optional[int] = None  # number of rows to insert, default 10000
-  scale: Optional[int] = None  # scale factor, default 100
-  report_interval: Optional[int] = None  # default 0 (disabled)
-  threads: Optional[int] = None  # number of threads, default 1
-  events: Optional[int] = None   # limit on events to run, default 0
-  rate: Optional[int] = None  # rate limit, default 0 (unlimited)
-  use_fk: Optional[int] = None  # use foreign keys, default 1 (on)
-  db_user: Optional[str] = None
-  db_password: Optional[str] = None
-  db_name: Optional[str] = None
-  host_ip: Optional[str] = None
-  ssl_setting: Optional[str] = None
-  mysql_ignore_errors: Optional[str] = None
+  custom_lua_packages_path: str | None = None
+  built_in_test: bool | None = True  # if this test comes with sysbench
+  test: str | None = None  # sysbench test path
+  db_driver: str | None = None  # sysbench default mysql
+  db_ps_mode: str | None = None  # sysbench default auto
+  skip_trx: bool | None = False  # sysbench default off
+  trx_level: str | None = None  # transaction isolation level, default RR
+  tables: int | None = None  # number of tables to create, default 1
+  table_size: int | None = None  # number of rows to insert, default 10000
+  scale: int | None = None  # scale factor, default 100
+  report_interval: int | None = None  # default 0 (disabled)
+  threads: int | None = None  # number of threads, default 1
+  events: int | None = None  # limit on events to run, default 0
+  rate: int | None = None  # rate limit, default 0 (unlimited)
+  use_fk: int | None = None  # use foreign keys, default 1 (on)
+  db_user: str | None = None
+  db_password: str | None = None
+  db_name: str | None = None
+  host_ip: str | None = None
+  ssl_setting: str | None = None
+  mysql_ignore_errors: str | None = None
 
 
 def _BuildGenericCommand(
@@ -321,7 +320,7 @@ def GetSysbenchDatabaseFlags(
     db_password: str,
     db_name: str,
     host_ip: str,
-    ssl_setting: Optional[str] = None,  # only available in sysbench ver 1.1+
+    ssl_setting: str | None = None,  # only available in sysbench ver 1.1+
 ) -> list[str]:
   """Returns the database flags for sysbench."""
   if db_driver == 'mysql':

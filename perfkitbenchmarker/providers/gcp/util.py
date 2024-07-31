@@ -18,7 +18,7 @@ import functools
 import json
 import logging
 import re
-from typing import Any, Optional, Set
+from typing import Any, Set
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
@@ -250,7 +250,7 @@ class GcloudCommand:
     use_beta_gcloud: boolean. Defaults to False.
   """
 
-  def __init__(self, common_resource: Optional[resource.BaseResource], *args):
+  def __init__(self, common_resource: resource.BaseResource | None, *args):
     """Initializes a GcloudCommand with the provided args and common flags.
 
     Args:
@@ -377,7 +377,7 @@ class GcloudCommand:
     kwargs['stack_level'] = kwargs.get('stack_level', 1) + 1
     return _issue_retryable_command_function(self, **kwargs)
 
-  def _AddCommonFlags(self, common_resource: Optional[resource.BaseResource]):
+  def _AddCommonFlags(self, common_resource: resource.BaseResource | None):
     """Adds common flags to the command.
 
     Adds common gcloud flags derived from the PKB flags and provided resource.
@@ -535,7 +535,7 @@ def SplitTags(tags: str):
   )
 
 
-def GetDefaultTags(timeout_minutes: Optional[int] = None):
+def GetDefaultTags(timeout_minutes: int | None = None):
   """Get the default tags in a dictionary.
 
   Args:
@@ -550,7 +550,7 @@ def GetDefaultTags(timeout_minutes: Optional[int] = None):
   return benchmark_spec.GetResourceTags(timeout_minutes)
 
 
-def MakeFormattedDefaultTags(timeout_minutes: Optional[int] = None):
+def MakeFormattedDefaultTags(timeout_minutes: int | None = None):
   """Get the default tags formatted.
 
   Args:

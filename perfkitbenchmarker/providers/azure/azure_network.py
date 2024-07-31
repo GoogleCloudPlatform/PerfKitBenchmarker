@@ -23,7 +23,6 @@ for more information about Azure Virtual Networks.
 import json
 import logging
 import threading
-from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import context
@@ -74,7 +73,7 @@ class AzureResourceGroup(resource.BaseResource):
   """A Resource Group, the basic unit of Azure provisioning."""
 
   _az_lock = threading.Condition()
-  _az_version: Optional[str] = None
+  _az_version: str | None = None
 
   def __init__(
       self,
@@ -320,7 +319,7 @@ class AzureVirtualNetwork(network.BaseNetwork):
     self.is_created = False
 
   @classmethod
-  def GetForRegion(cls, spec, region, name) -> Optional['AzureVirtualNetwork']:
+  def GetForRegion(cls, spec, region, name) -> 'AzureVirtualNetwork | None':
     """Retrieves or creates an AzureVirtualNetwork.
 
     Args:

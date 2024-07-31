@@ -4,7 +4,7 @@ https://github.com/cloudharmony
 """
 
 import io
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from absl import flags
 import pandas as pd
@@ -130,7 +130,7 @@ def ParseCsvResultsFromString(
   return results
 
 
-def GetCommonMetadata(custom_metadata: Optional[Dict[str, Any]] = None) -> str:
+def GetCommonMetadata(custom_metadata: Dict[str, Any] | None = None) -> str:
   """Returns pkb metadata associated with this run as cloudharmony metadata.
 
   Cloudharmony benchmarks take in benchmark setup configurations as inputs and

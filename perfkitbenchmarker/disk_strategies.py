@@ -24,7 +24,7 @@ import copy
 import json
 import logging
 import time
-from typing import Any, Optional, Union
+from typing import Any, Union
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -252,7 +252,7 @@ class SetUpNFSDiskStrategy(SetUpDiskStrategy):
       self,
       vm,
       disk_spec: disk.BaseDiskSpec,
-      unmanaged_nfs_service: Optional[nfs_service.BaseNfsService] = None,
+      unmanaged_nfs_service: nfs_service.BaseNfsService | None = None,
   ):
     super().__init__(vm, disk_spec)
     if unmanaged_nfs_service:

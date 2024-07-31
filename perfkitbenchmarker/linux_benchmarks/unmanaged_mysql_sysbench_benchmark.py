@@ -19,7 +19,6 @@ This benchmark measures performance of Sysbench Databases on unmanaged MySQL.
 
 import copy
 import logging
-from typing import Optional
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -154,7 +153,7 @@ def _GetPassword():
   return FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
 
 
-def _GetSysbenchParameters(primary_server_ip: Optional[str], password: str):
+def _GetSysbenchParameters(primary_server_ip: str | None, password: str):
   """Get sysbench parameters from flags."""
   sysbench_parameters = sysbench.SysbenchInputParameters(
       db_driver=_DATABASE_TYPE,

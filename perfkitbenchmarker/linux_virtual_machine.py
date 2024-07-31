@@ -37,7 +37,7 @@ import posixpath
 import re
 import threading
 import time
-from typing import Any, Dict, Optional, Set, Tuple, Union
+from typing import Any, Dict, Set, Tuple, Union
 import uuid
 
 from absl import flags
@@ -451,10 +451,10 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     self._proccpu_cache = None
     self._smp_affinity_script = None
     self.name: str
-    self._os_info: Optional[str] = None
-    self._kernel_release: Optional[KernelRelease] = None
-    self._cpu_arch: Optional[str] = None
-    self._kernel_command_line: Optional[str] = None
+    self._os_info: str | None = None
+    self._kernel_release: KernelRelease | None = None
+    self._cpu_arch: str | None = None
+    self._kernel_command_line: str | None = None
     self._network_device_mtus = None
 
   def _Suspend(self):
@@ -510,7 +510,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       disabled_cstates.append(cstates[index])
     self.os_metadata['disabled_cstates'] = ','.join(disabled_cstates)
 
-  def _GetOrderedCstates(self) -> Optional[list[str]]:
+  def _GetOrderedCstates(self) -> list[str] | None:
     """Returns the ordered cstates by querying the sysfs cpuidle path.
 
     The ordering is obtained by the alphabetical wildcard expansion.
@@ -543,7 +543,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
   def RobustRemoteCommand(
       self,
       command: str,
-      timeout: Optional[float] = None,
+      timeout: float | None = None,
       ignore_failure: bool = False,
   ) -> Tuple[str, str]:
     """Runs a command on the VM in a more robust way than RemoteCommand.
@@ -1403,11 +1403,11 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
   def RemoteHostCommandWithReturnCode(
       self,
       command: str,
-      retries: Optional[int] = None,
+      retries: int | None = None,
       ignore_failure: bool = False,
       login_shell: bool = False,
-      timeout: Optional[float] = None,
-      ip_address: Optional[str] = None,
+      timeout: float | None = None,
+      ip_address: str | None = None,
       should_pre_log: bool = True,
       stack_level: int = 1,
   ) -> Tuple[str, str, int]:

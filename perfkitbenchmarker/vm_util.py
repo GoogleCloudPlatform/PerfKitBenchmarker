@@ -28,7 +28,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import Callable, Dict, Iterable, Optional, Tuple
+from typing import Callable, Dict, Iterable, Tuple
 
 from absl import flags
 import jinja2
@@ -386,12 +386,12 @@ def _ReadIssueCommandOutput(tf_out, tf_err):
 
 def IssueCommand(
     cmd: Iterable[str],
-    env: Optional[Dict[str, str]] = None,
-    timeout: Optional[int] = DEFAULT_TIMEOUT,
-    cwd: Optional[str] = None,
+    env: Dict[str, str] | None = None,
+    timeout: int | None = DEFAULT_TIMEOUT,
+    cwd: str | None = None,
     should_pre_log: bool = True,
     raise_on_failure: bool = True,
-    suppress_failure: Optional[Callable[[str, str, int], bool]] = None,
+    suppress_failure: Callable[[str, str, int], bool] | None = None,
     suppress_logging: bool = False,
     raise_on_timeout: bool = True,
     stack_level: int = 1,

@@ -20,7 +20,7 @@ import datetime
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from absl import flags
 from google.cloud import monitoring_v3
@@ -263,18 +263,18 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
 
   def __init__(
       self,
-      name: Optional[str],
-      project: Optional[str],
-      zone: Optional[str],
-      node_count: Optional[int],
-      load_node_count: Optional[int],
-      storage_type: Optional[str],
-      replication_cluster: Optional[bool],
-      replication_cluster_zone: Optional[str],
-      multicluster_routing: Optional[bool],
-      autoscaling_min_nodes: Optional[int],
-      autoscaling_max_nodes: Optional[int],
-      autoscaling_cpu_target: Optional[int],
+      name: str | None,
+      project: str | None,
+      zone: str | None,
+      node_count: int | None,
+      load_node_count: int | None,
+      storage_type: str | None,
+      replication_cluster: bool | None,
+      replication_cluster_zone: str | None,
+      multicluster_routing: bool | None,
+      autoscaling_min_nodes: int | None,
+      autoscaling_max_nodes: int | None,
+      autoscaling_cpu_target: int | None,
       **kwargs,
   ):
     super(GcpBigtableInstance, self).__init__(**kwargs)
@@ -287,15 +287,15 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
     self._load_node_count = load_node_count or self.node_count
     self.storage_type: str = storage_type or _DEFAULT_STORAGE_TYPE
     self.replication_cluster: bool = replication_cluster or False
-    self.replication_cluster_zone: Optional[str] = (
+    self.replication_cluster_zone: str | None = (
         (replication_cluster_zone or _DEFAULT_REPLICATION_ZONE)
         if self.replication_cluster
         else None
     )
     self.multicluster_routing: bool = multicluster_routing or False
-    self.autoscaling_min_nodes: Optional[int] = autoscaling_min_nodes or None
-    self.autoscaling_max_nodes: Optional[int] = autoscaling_max_nodes or None
-    self.autoscaling_cpu_target: Optional[int] = autoscaling_cpu_target or None
+    self.autoscaling_min_nodes: int | None = autoscaling_min_nodes or None
+    self.autoscaling_max_nodes: int | None = autoscaling_max_nodes or None
+    self.autoscaling_cpu_target: int | None = autoscaling_cpu_target or None
 
   @classmethod
   def FromSpec(cls, spec: BigtableSpec) -> 'GcpBigtableInstance':

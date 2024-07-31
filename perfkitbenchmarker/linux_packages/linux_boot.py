@@ -7,7 +7,7 @@ import logging
 import os
 import re
 import time
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Tuple
 
 from absl import flags
 import jinja2
@@ -107,7 +107,7 @@ def UtcTimestampToDatetime(timestamp_str: str) -> datetime.datetime:
 _DMESG_TIME_PREFIX = r'\[\s*(\d*.\d*)\]\s*'
 
 
-def ParseDMesgOutput(dmesg_output: str, suffix: str) -> Optional[float]:
+def ParseDMesgOutput(dmesg_output: str, suffix: str) -> float | None:
   """Takes a string from dmesg formatted output, searches for the suffix.
 
   Returns the timestamp from square brackets associated with it.
@@ -277,7 +277,7 @@ def CollectKernelSamples(
   return samples
 
 
-def GetServerTimeDrift(vm: virtual_machine.VirtualMachine) -> Optional[float]:
+def GetServerTimeDrift(vm: virtual_machine.VirtualMachine) -> float | None:
   start_time = time.process_time()
   out, _ = vm.RemoteCommand('date +%s.%N')
   end_time = time.process_time()
@@ -394,7 +394,7 @@ PATTERN_SYSTEMD_LINE1 = re.compile(r'\+(.*?)s')
 PATTERN_SYSTEMD_LINE2 = re.compile(r'@(.*?)s')
 
 
-def ParseSystemDCriticalChainOutput(systemd_output: str) -> Optional[float]:
+def ParseSystemDCriticalChainOutput(systemd_output: str) -> float | None:
   """Returns critical chain output seconds.
 
   Given the output from systemd-analyze critical-chain <target> will
@@ -457,7 +457,7 @@ def ParseSystemDCriticalChainOutput(systemd_output: str) -> Optional[float]:
     return None
 
 
-def ParseSystemDCriticalChainServiceTime(systemd_out: str) -> Optional[float]:
+def ParseSystemDCriticalChainServiceTime(systemd_out: str) -> float | None:
   """Returns critical chain total service time.
 
   Given the output from systemd-analyze critical-chain <target> will
@@ -517,14 +517,14 @@ def WaitForReady(
   raise RuntimeError('Timed out waiting for boot.')
 
 
-def GetSshServiceReady(vm: virtual_machine.VirtualMachine) -> Optional[float]:
+def GetSshServiceReady(vm: virtual_machine.VirtualMachine) -> float | None:
   """Get ssh service ready time (the service name is OS dependent)."""
   return GetSystemDCriticalChainMetric(
       vm, 'ssh.service'
   ) or GetSystemDCriticalChainMetric(vm, 'sshd.service')
 
 
-def GetGuestScriptsStart(vm: virtual_machine.VirtualMachine) -> Optional[float]:
+def GetGuestScriptsStart(vm: virtual_machine.VirtualMachine) -> float | None:
   stdout, _ = vm.RemoteCommand(
       'sudo systemd-analyze critical-chain google-startup-scripts.service'
   )
@@ -538,7 +538,7 @@ def GetGuestScriptsStart(vm: virtual_machine.VirtualMachine) -> Optional[float]:
 
 def GetSystemDCriticalChainMetric(
     vm: virtual_machine.VirtualMachine, metric: str
-) -> Optional[float]:
+) -> float | None:
   stdout, _ = vm.RemoteCommand(f'sudo systemd-analyze critical-chain {metric}')
   return ParseSystemDCriticalChainOutput(stdout)
 

@@ -18,7 +18,7 @@ import dataclasses
 import logging
 import time
 import timeit
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
@@ -92,9 +92,9 @@ class DbConnectionProperties:
   port: int
   database_username: str
   database_password: str
-  instance_name: Optional[str] = None
-  database_name: Optional[str] = None
-  project: Optional[str] = None
+  instance_name: str | None = None
+  database_name: str | None = None
+  project: str | None = None
 
 
 class ISQLQueryTools(metaclass=abc.ABCMeta):
@@ -192,7 +192,7 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
       database_name: str = '',
       superuser: bool = False,
       session_variables: str = '',
-      timeout: Optional[int] = None,
+      timeout: int | None = None,
       ignore_failure: bool = False,
       suppress_stdout: bool = False,
   ):
@@ -355,7 +355,7 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
   DEFAULT_DATABASE = POSTGRES
 
   def Connect(
-      self, sessions: Optional[int] = None, database_name: str = ''
+      self, sessions: int | None = None, database_name: str = ''
   ) -> None:
     """Connects to the DB using PGAdapter.
 

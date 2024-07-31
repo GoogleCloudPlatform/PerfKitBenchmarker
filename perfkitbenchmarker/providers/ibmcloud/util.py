@@ -15,7 +15,7 @@
 
 import dataclasses
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
@@ -63,9 +63,9 @@ USER_DATA = (
 
 @dataclasses.dataclass(frozen=True)
 class Account:
-  name: Optional[str]
-  apikey: Optional[str]
-  enckey: Optional[str]
+  name: str | None
+  apikey: str | None
+  enckey: str | None
 
 
 def ReadConfig(config: str) -> Dict[Any, Any]:

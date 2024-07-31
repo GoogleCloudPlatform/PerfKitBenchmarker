@@ -13,8 +13,6 @@
 # limitations under the License.
 """Classes relating to decoding a Kubernetes resource limits or requests."""
 
-from typing import Optional
-
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -30,8 +28,8 @@ class KubernetesResourcesSpec(spec.BaseSpec):
   """
 
   def __init__(self, *args, **kwargs):
-    self.cpus: Optional[float] = None
-    self.memory: Optional[str] = None
+    self.cpus: float | None = None
+    self.memory: str | None = None
     super().__init__(*args, **kwargs)
 
   @classmethod

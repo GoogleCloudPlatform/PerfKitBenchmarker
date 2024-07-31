@@ -19,7 +19,7 @@ import functools
 import posixpath
 import re
 import statistics
-from typing import Any, FrozenSet, List, Optional
+from typing import Any, FrozenSet, List
 
 from absl import flags
 from dateutil import parser
@@ -238,7 +238,7 @@ HAMMERDB_SERVER_CONFIGURATION = flags.DEFINE_string(
 )
 
 
-def SetDefaultConfig(num_cpus: Optional[int]):
+def SetDefaultConfig(num_cpus: int | None):
   """Set the default configurations of unfilled flags."""
   if HAMMERDB_NUM_VU.value is None:
     if HAMMERDB_SCRIPT.value == HAMMERDB_SCRIPT_TPC_H:
@@ -333,7 +333,7 @@ class HammerDbTclScript(object):
   def Run(
       self,
       vm: virtual_machine.BaseVirtualMachine,
-      timeout: Optional[int] = 60 * 60 * 6,
+      timeout: int | None = 60 * 60 * 6,
   ) -> str:
     """Run hammerdbcli script."""
     script_location = '{0}/{1}'.format(
@@ -959,7 +959,7 @@ def Run(
     vm: virtual_machine.BaseVirtualMachine,
     db_engine: str,
     hammerdb_script: str,
-    timeout: Optional[int] = 60 * 60 * 8,
+    timeout: int | None = 60 * 60 * 8,
 ) -> str:
   """Run the HammerDBCli Benchmark.
 

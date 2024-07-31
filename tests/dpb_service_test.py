@@ -1,7 +1,7 @@
 """Tests for perfkitbenchmarker.dpb_service module."""
 
 import datetime
-from typing import Any, Optional
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -36,15 +36,15 @@ class MockDpbService(dpb_service.BaseDpbService):
   def __init__(
       self,
       dpb_service_spec: Any,
-      cluster_create_time: Optional[float] = None,
-      cluster_duration: Optional[float] = None,
+      cluster_create_time: float | None = None,
+      cluster_duration: float | None = None,
   ):
     super().__init__(dpb_service_spec)
     self._cluster_create_time = cluster_create_time
     self.cluster_duration = cluster_duration
     self.metadata = {'foo': 42}
 
-  def GetClusterCreateTime(self) -> Optional[float]:
+  def GetClusterCreateTime(self) -> float | None:
     return self._cluster_create_time
 
   def SubmitJob(self, *args, **kwargs) -> dpb_service.JobResult:

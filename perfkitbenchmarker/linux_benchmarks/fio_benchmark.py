@@ -24,7 +24,7 @@ import logging
 import posixpath
 import re
 import time
-from typing import Any, Optional
+from typing import Any
 
 from absl import flags
 import jinja2
@@ -558,9 +558,9 @@ def GetScenarioFromScenarioString(scenario_string):
 def GenerateJobFileString(
     filename: str,
     scenario_strings: list[str],
-    io_depths: Optional[list[int]],
-    num_jobs: Optional[list[int]],
-    working_set_size: Optional[int],
+    io_depths: list[int] | None,
+    num_jobs: list[int] | None,
+    working_set_size: int | None,
     block_size: Any,
     runtime: int,
     ramptime: int,

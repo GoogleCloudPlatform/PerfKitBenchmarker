@@ -19,7 +19,7 @@ import json
 import logging
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 
 from absl import flags
 from google.cloud import monitoring_v3
@@ -70,7 +70,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
         gcp_flags.CLOUD_REDIS_API_OVERRIDE.value
     )
 
-  def _GetTier(self) -> Optional[str]:
+  def _GetTier(self) -> str | None:
     """Returns the tier of the instance."""
     # See https://cloud.google.com/memorystore/docs/redis/redis-tiers."""
     if self._clustered:

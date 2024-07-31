@@ -23,7 +23,7 @@ import collections
 import dataclasses
 import io
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from absl import flags
 import pandas as pd
@@ -57,7 +57,7 @@ class ApacheBenchRunConfig:
   keep_alive: bool
   http_method: str
   socket_timeout: int
-  timelimit: Optional[int]
+  timelimit: int | None
   server_content_size: int
   client_vms: int
 
@@ -118,7 +118,7 @@ class ApacheBenchResults:
   html_transferred_unit: str
   histogram: sample._Histogram
   raw_results: Dict[int, List[float]]
-  cpu_seconds: Optional[float] = None
+  cpu_seconds: float | None = None
 
   def GetSamples(self, metadata: Dict[str, Any]) -> List[sample.Sample]:
     """Generate a list of samples based on the data stored in this object."""

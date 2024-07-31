@@ -48,7 +48,7 @@ import datetime
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -168,7 +168,7 @@ def _GetCPUAverageMetrics(
     host_stats: List[Dict[str, Any]],
     number_of_cpus: int,
     metadata: Dict[str, Any],
-    timestamp: Optional[float] = None,
+    timestamp: float | None = None,
 ):
   """Get average metrics for all CPUs.
 
@@ -242,7 +242,7 @@ def _GetCPUAverageInterruptions(
     host_stats: List[Dict[str, Any]],
     number_of_cpus: int,
     metadata: Dict[str, Any],
-    timestamp: Optional[float] = None,
+    timestamp: float | None = None,
 ):
   """Get average interruption for all CPUs.
 

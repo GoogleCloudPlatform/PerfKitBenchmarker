@@ -24,7 +24,7 @@ more information about GCE VM networking.
 import json
 import logging
 import threading
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Set, Tuple, Union
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -166,11 +166,9 @@ class GceVpnGateway(network.BaseVpnGateway):
 
     # configure routing
     # requires: next_hop_tunnel_id, target_cidr,
-    # TODO(dlott) Should be Optional[str], but that requires making endpoints a
+    # TODO(dlott) Should be str | None, but that requires making endpoints a
     # proper class rather than a dictionary of string and bool. See TunnelConfig
-    dest_cidr: Optional[Any] = tunnel_config.endpoints[target_endpoint].get(
-        'cidr'
-    )
+    dest_cidr: Any = tunnel_config.endpoints[target_endpoint].get('cidr')
     if not dest_cidr or not dest_cidr.strip():
       logging.debug(
           'tunnel_config: destination CIDR needed... '
@@ -346,7 +344,7 @@ class GceIPAddress(resource.BaseResource):
   """Object representing a GCE IP address."""
 
   def __init__(
-      self, project: str, region: str, name: str, subnet: Optional[str] = None
+      self, project: str, region: str, name: str, subnet: str | None = None
   ):
     super(GceIPAddress, self).__init__()
     self.project = project
@@ -509,7 +507,7 @@ class GceForwardingRule(resource.BaseResource):
       name: str,
       protocol: str,
       src_vpn_gateway: GceVpnGateway,
-      port: Optional[int] = None,
+      port: int | None = None,
   ):
     super(GceForwardingRule, self).__init__()
     self.name = name
@@ -571,7 +569,7 @@ class GceFirewallRule(resource.BaseResource):
       project: str,
       allow: str,
       network_name: str,
-      source_range: Optional[str] = None,
+      source_range: str | None = None,
   ):
     super(GceFirewallRule, self).__init__()
     self.name = name
@@ -645,8 +643,8 @@ class GceFirewall(network.BaseFirewall):
       self,
       vm,  # gce_virtual_machine.GceVirtualMachine
       start_port: int,
-      end_port: Optional[int] = None,
-      source_range: Optional[List[str]] = None,
+      end_port: int | None = None,
+      source_range: List[str] | None = None,
   ):
     """Opens a port on the firewall.
 
@@ -740,10 +738,10 @@ class GceNetworkSpec(network.BaseNetworkSpec):
 
   def __init__(
       self,
-      project: Optional[str] = None,
-      mtu: Optional[int] = None,
-      machine_type: Optional[str] = None,
-      subnet_name: Optional[str] = None,
+      project: str | None = None,
+      mtu: int | None = None,
+      machine_type: str | None = None,
+      subnet_name: str | None = None,
       **kwargs,
   ):
     """Initializes the GceNetworkSpec.
@@ -766,7 +764,7 @@ class GceNetworkResource(resource.BaseResource):
   """Object representing a GCE Network resource."""
 
   def __init__(
-      self, name: str, mode: str, project: str, mtu: Optional[int] = None
+      self, name: str, mode: str, project: str, mtu: int | None = None
   ):
     super(GceNetworkResource, self).__init__()
     self.name = name
@@ -881,7 +879,7 @@ class GceNetwork(network.BaseNetwork):
 
   def __init__(self, network_spec: GceNetworkSpec):
     super(GceNetwork, self).__init__(network_spec)
-    self.project: Optional[str] = network_spec.project
+    self.project: str | None = network_spec.project
     self.vpn_gateway: Dict[str, GceVpnGateway] = {}
 
     #  Figuring out the type of network here.
@@ -1063,9 +1061,9 @@ class GceNetwork(network.BaseNetwork):
 
   def _MakeGceNetworkName(
       self,
-      net_type: Optional[str] = None,
-      cidr: Optional[str] = None,
-      uri: Optional[str] = None,
+      net_type: str | None = None,
+      cidr: str | None = None,
+      uri: str | None = None,
   ) -> str:
     """Build the current network's name string.
 
@@ -1097,12 +1095,12 @@ class GceNetwork(network.BaseNetwork):
 
   def _MakeGceFWRuleName(
       self,
-      net_type: Optional[str] = None,
-      src_cidr: Optional[str] = None,
-      dst_cidr: Optional[str] = None,
-      port_range_lo: Optional[str] = None,
-      port_range_hi: Optional[str] = None,
-      uri: Optional[str] = None,
+      net_type: str | None = None,
+      src_cidr: str | None = None,
+      dst_cidr: str | None = None,
+      port_range_lo: str | None = None,
+      port_range_hi: str | None = None,
+      uri: str | None = None,
   ) -> str:
     """Build a firewall name string.
 

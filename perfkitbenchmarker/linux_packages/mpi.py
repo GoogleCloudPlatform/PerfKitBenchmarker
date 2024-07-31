@@ -14,7 +14,7 @@ import logging
 import os
 import posixpath
 import re
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, Iterable, Iterator, List, Sequence, Tuple, Union
 import uuid
 
 from absl import flags
@@ -42,11 +42,11 @@ class MpiData:
   }
   """
 
-  bytes: Optional[int] = None
-  repetitions: Optional[int] = None
-  data: Optional[Dict[str, Union[int, float]]] = None
+  bytes: int | None = None
+  repetitions: int | None = None
+  data: Dict[str, Union[int, float]] | None = None
   is_error: bool = False
-  histogram: Optional[Dict[float, int]] = None
+  histogram: Dict[float, int] | None = None
 
 
 @dataclasses.dataclass
@@ -58,10 +58,10 @@ class MpiResult:
 
   benchmark: str
   data: List[MpiData]
-  groups: Optional[int] = None
-  processes_per_group: Optional[int] = None
-  mode: Optional[str] = None
-  group_layout: Optional[Dict[int, List[int]]] = None
+  groups: int | None = None
+  processes_per_group: int | None = None
+  mode: str | None = None
+  group_layout: Dict[int, List[int]] | None = None
 
 
 @dataclasses.dataclass
@@ -95,14 +95,14 @@ class MpiRequest:
   msglog_max: int
   timeout: int
   off_cache_size: int
-  off_cache_line_size: Optional[int]
+  off_cache_line_size: int | None
   iterations: int
   include_zero_byte: bool
   compile_from_source: bool
   environment: List[str] = dataclasses.field(default_factory=list)
   global_environment: List[str] = dataclasses.field(default_factory=list)
   record_latencies: bool = False
-  npmin: Optional[int] = None
+  npmin: int | None = None
   tune: bool = False
   multi: bool = False
 
@@ -165,7 +165,7 @@ def VerifyInstall(vms) -> None:
   RunMpiStats(vms[0], request)
 
 
-def GetMpiVersion(vm) -> Optional[str]:
+def GetMpiVersion(vm) -> str | None:
   """Returns the MPI version to use for the given OS type."""
   if FLAGS.mpi_vendor == 'intel':
     return intelmpi.MPI_VERSION.value
@@ -284,7 +284,7 @@ class MpiResultParser(Iterable[MpiResult]):
       else:
         break
 
-  def _NextValue(self) -> Optional[MpiResult]:
+  def _NextValue(self) -> MpiResult | None:
     """Returns the next MpiResult or None if no more entries."""
     name = self._BenchmarkName()
     if not name:
@@ -302,13 +302,13 @@ class MpiResultParser(Iterable[MpiResult]):
       last_row_is_error = row.is_error
     return MpiResult(name, data, groups, processes, mode, group_layout)
 
-  def _BenchmarkName(self) -> Optional[str]:
+  def _BenchmarkName(self) -> str | None:
     for line in self._lines:
       m = self._NAME.match(line)
       if m:
         return m.group(1)
 
-  def _NumberGroups(self) -> Tuple[Optional[int], int]:
+  def _NumberGroups(self) -> Tuple[int | None, int]:
     """Return a tuple of the number of MPI groups and processes for the test."""
     for line in self._lines:
       m = self._GROUP1.match(line)
@@ -321,7 +321,7 @@ class MpiResultParser(Iterable[MpiResult]):
         return None, int(m.group('processes'))
     raise errors.Benchmarks.RunError('Did not find number of processes')
 
-  def _GroupLayout(self) -> Optional[Dict[int, List[int]]]:
+  def _GroupLayout(self) -> Dict[int, List[int]] | None:
     """Returns the MPI group CPU layout.
 
     Parses this input:
@@ -355,7 +355,7 @@ class MpiResultParser(Iterable[MpiResult]):
         break
     return layout
 
-  def _Headers(self) -> Tuple[Optional[str], Sequence[str]]:
+  def _Headers(self) -> Tuple[str | None, Sequence[str]]:
     """Returns a tuple of (benchmark mode, List of headers for data)."""
     mode = None
     for line in self._lines:
@@ -452,7 +452,7 @@ class MpiResultParser(Iterable[MpiResult]):
 
 
 def BuildMpiBenchmarkArgs(
-    request: MpiRequest, latency_file: Optional[str], ppn_set: bool
+    request: MpiRequest, latency_file: str | None, ppn_set: bool
 ) -> List[str]:
   """Creates the common arguments to pass to mpirun.
 

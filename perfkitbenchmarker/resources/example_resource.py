@@ -20,7 +20,6 @@ from a BENCHMARK_CONFIG, see example_benchmark.py.
 """
 
 import logging
-from typing import Optional
 from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.resources import example_resource_spec
@@ -66,7 +65,7 @@ class ImplementedExampleResource(BaseExampleResource):
 
 def GetExampleResourceClass(
     example_type: str,
-) -> Optional[resource.AutoRegisterResourceMeta]:
+) -> resource.AutoRegisterResourceMeta | None:
   """Gets the example resource class corresponding to 'example_type'."""
   return resource.GetResourceClass(
       BaseExampleResource, EXAMPLE_TYPE=example_type

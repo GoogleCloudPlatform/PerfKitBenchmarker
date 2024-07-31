@@ -25,7 +25,6 @@ http://manpages.ubuntu.com/manpages/xenial/man1/stress-ng.1.html
 """
 
 import logging
-from typing import Optional
 
 from absl import flags
 import numpy
@@ -420,7 +419,7 @@ def Prepare(benchmark_spec):
 
 def _ParseStressngResult(
     metadata, output, cpu_method=None
-) -> Optional[sample.Sample]:
+) -> sample.Sample | None:
   """Returns stress-ng data as a sample.
 
   Sample output eg:
