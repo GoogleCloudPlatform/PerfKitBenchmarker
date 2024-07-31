@@ -388,15 +388,21 @@ def _InjectBenchmarkInfoIntoDocumentation():
   )
 
 
-def _ParseFlags(argv):
-  """Parses the command-line flags."""
-  try:
-    argv = FLAGS(argv)
-  except flags.Error as e:
-    logging.error(e)
-    logging.info('For usage instructions, use --helpmatch={module_name}')
-    logging.info('For example, ./pkb.py --helpmatch=benchmarks.fio')
-    sys.exit(1)
+def _ParseFlags(argv: Sequence[str]):
+  """Parses the command-line flags. Validates there are no positional args.
+
+  Args:
+    argv: The arguments to parse. Should come from sys.argv.
+
+  Raises:
+    flags.Error: If there are unknown flags or any positional arguments.
+  """
+  argv = FLAGS(argv)
+  positional_args = argv[1:]
+  if positional_args:
+    # Raise flags.Error to get usage in except
+    raise flags.Error(
+        f'pkb.py does not take postional args. Passed {positional_args}.')
 
 
 def _PrintHelp(matches=None):
@@ -1826,7 +1832,16 @@ def Main():
   log_util.ConfigureBasicLogging()
   _InjectBenchmarkInfoIntoDocumentation()
   argv = flag_alias.AliasFlagsFromArgs(sys.argv)
-  _ParseFlags(argv)
+  try:
+    _ParseFlags(argv)
+  except flags.Error as e:
+
+    logging.error(e)
+    logging.info('For usage instructions, use --helpmatch={module_name}')
+    logging.info('For example, ./pkb.py --helpmatch=benchmarks.fio')
+    sys.exit(1)
+  # TODO(pclay): Migrate to https://abseil.io/docs/python/guides/app to avoid
+  # doing this by hand?
   if FLAGS.helpmatch:
     _PrintHelp(FLAGS.helpmatch)
     return 0
