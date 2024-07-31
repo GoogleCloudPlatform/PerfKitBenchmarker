@@ -6,7 +6,13 @@ Uses gcloud python libraries to manage those resources.
 import logging
 import os
 from absl import flags
-from google.cloud.aiplatform import aiplatform
+# pylint: disable=g-import-not-at-top, g-statement-before-imports
+# External needs from google.cloud.
+# pytype: disable=module-attr
+try:
+  from google.cloud.aiplatform import aiplatform
+except ImportError:
+  from google.cloud import aiplatform
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources import managed_ai_model_spec
