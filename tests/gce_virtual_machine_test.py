@@ -653,6 +653,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
           FLAGS,
           image='image',
           machine_type='test_machine_type',
+          zone='us-central1-a',
       )
       vm = pkb_common_test_case.TestGceVirtualMachine(vm_spec)
       vm._CreateDependencies()
@@ -1144,7 +1145,7 @@ class GceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
   def testGetNetwork(self):
     project = 'myproject'
     zone = 'us-east1-a'
-    vm = mock.Mock(zone=zone, project=project, cidr=None)
+    vm = mock.Mock(zone=zone, project=project, cidr=None, subnet_names=None)
     net = gce_network.GceNetwork.GetNetwork(vm)
     self.assertEqual(project, net.project)
     self.assertEqual(zone, net.zone)

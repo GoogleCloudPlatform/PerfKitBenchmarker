@@ -180,7 +180,9 @@ class ClusterBootBenchmarkTest(
         pkb_common_test_case.CreateBenchmarkSpecFromYaml()
     )
 
-    vm_spec = gce_virtual_machine.GceVmSpec('cluster_boot_benchmark_test')
+    vm_spec = gce_virtual_machine.GceVmSpec(
+        'cluster_boot_benchmark_test', zone='us-central1-a'
+    )
     vm = gce_virtual_machine.Ubuntu2204BasedGceVirtualMachine(vm_spec)
     vm.create_start_time = 1
     vm.create_return_time = 2
