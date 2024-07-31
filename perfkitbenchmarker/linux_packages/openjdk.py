@@ -15,62 +15,77 @@
 
 """Module containing OpenJDK installation and cleanup functions."""
 
-from typing import Callable
-
 from absl import flags
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import vm_util
 
 JAVA_HOME = '/usr'
 
 OPENJDK_VERSION = flags.DEFINE_integer(
     'openjdk_version',
     None,
-    'Version of openjdk to use. By default, the oldest non-end-of-life LTS '
-    'version of openjdk is automatically detected.',
+    'Version of openjdk to use. By default, the Default Java version is used '
+    'on Debian based systems and the latest available version is used on '
+    'Red Hat based systems.',
 )
-
-
-# Earlier elements of list are preferred.
-# These are the 3 LTS versions of Java.
-# The default 11 is a compromise between the older most popular, but maintenance
-# mode Java 8 and the newest Java 17.
-KNOWN_JAVA_VERSIONS = [11, 17, 8]
-
-
-def _Install(vm, get_package_name_for_version: Callable[[int], str]):
-  """Installs the OpenJDK package on the VM."""
-
-  def DetectJava():
-    for version in KNOWN_JAVA_VERSIONS:
-      if vm.HasPackage(get_package_name_for_version(version)):
-        return version
-
-  version = OPENJDK_VERSION.value or DetectJava()
-  if not version:
-    raise errors.VirtualMachine.VirtualMachineError(
-        f'No OpenJDK candidate found for {vm.name}.'
-    )
-  vm.InstallPackages(get_package_name_for_version(version))
 
 
 def YumInstall(vm):
   """Installs the OpenJDK package on the VM."""
 
-  def OpenJdkPackage(version: int) -> str:
-    numeric_version = version > 8 and version or f'1.{version}.0'
-    if vm.OS_TYPE == os_types.AMAZONLINUX2023:
+  def OpenJdkPackage(version: str) -> str:
+    # TODO(pclay): Remove support for Java 8
+    if version == '8':
+      version = '1.8.0'
+    if (
+        vm.OS_TYPE == os_types.AMAZONLINUX2023
+        or vm.OS_TYPE == os_types.AMAZONLINUX2
+    ):
       # Corretto is Amazon's build of the OpenJDK source.
       # https://aws.amazon.com/corretto/
       build_name = 'amazon-corretto'
     else:
       build_name = 'openjdk'
+    return f'java-{version}-{build_name}-devel'
 
-    return f'java-{numeric_version}-{build_name}-devel'
+  @vm_util.Retry(max_retries=5)
+  def DetectLatestJavaPackage() -> str:
+    # Amazon Linux 2 is handled elsewhere.
+    assert vm.PACKAGE_MANAGER == 'dnf'
 
-  _Install(vm, OpenJdkPackage)
+    # Check for latest
+    if vm.HasPackage(OpenJdkPackage('latest')):
+      return OpenJdkPackage('latest')
+
+    stdout, _ = vm.RemoteCommand(
+        # dnf has a habit of crashing and we need to catch it before processing
+        # the text (or process the text in python).
+        'set -o pipefail && '
+        f"sudo dnf list '{OpenJdkPackage('*')}' "
+        "| cut -d'-' -f2 "
+        '| sort -rn '
+        '| head -1'
+    )
+    version = stdout.strip()
+    assert int(version), f'Invalid Java version detected: {version}. Retrying.'
+    return OpenJdkPackage(version)
+
+  if OPENJDK_VERSION.value:
+    package = OpenJdkPackage(str(OPENJDK_VERSION.value))
+  elif vm.OS_TYPE == os_types.AMAZONLINUX2:
+    # yum is worse than dnf at finding the latest version. Just hard code it.
+    package = OpenJdkPackage('17')
+  else:
+    # TODO(pclay): Record Java version in metadata.
+    package = DetectLatestJavaPackage()
+  vm.InstallPackages(package)
 
 
 def AptInstall(vm):
   """Installs the OpenJDK package on the VM."""
-  _Install(vm, lambda version: f'openjdk-{version}-jdk')
+  if OPENJDK_VERSION.value:
+    package = f'openjdk-{OPENJDK_VERSION.value}-jdk'
+  else:
+    # TODO(pclay): Record default-jdk version in metadata.
+    package = 'default-jdk'
+  vm.InstallPackages(package)

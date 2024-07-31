@@ -494,3 +494,5 @@
 -   Fix cluster_boot to work on AliCloud by default.
 -   Let hdfs-site.xml use dfs.blocksize
     (https://issues.apache.org/jira/browse/HDFS-631).
+-   Update OpenJDK version to default on Debian based OSes and latest on Red Hat
+    based OSes.
