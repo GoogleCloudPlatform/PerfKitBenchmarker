@@ -1,4 +1,4 @@
-# Copyright 2021 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2024 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import numactl
 from perfkitbenchmarker.linux_packages import openjdk
 from perfkitbenchmarker.linux_packages import openjdk_neoverse
@@ -36,27 +37,20 @@ specjbb2015:
       vm_spec: *default_single_core
       disk_spec: *default_50_gb
   flags:
-    openjdk_version: 11
+    openjdk_version: 21
     enable_transparent_hugepages: True
 """
 
 FLAGS = flags.FLAGS
 _FOUR_HOURS = 60 * 60 * 4
-# Customer's JVM args.
-_DEFAULT_JVM_ARGS = (
-    '-XX:+AlwaysPreTouch -XX:-UseAdaptiveSizePolicy '
-    '-XX:MaxTenuringThreshold=15 -XX:-UseBiasedLocking '
-    '-XX:SurvivorRatio=10 '
-    '-XX:TargetSurvivorRatio=90 -XX:TargetSurvivorRatio=90 '
-    '-XX:+UseParallelOldGC -XX:+PrintGCDetails '
-)
+_DEFAULT_JVM_ARGS = ''
 _DEFAULT_JVM_CONT_TXI_ARGS = (
     '-Xms2g -Xmx2g -Xmn1536m -XX:+AlwaysPreTouch -XX:ParallelGCThreads=2'
 )
 _DEFAULT_COMPOSITE_MEMORY_RATIO = 0.8
-_DEFAULT_WORKERS_RATIO = 0.5
-_DEFAULT_NUM_GROUPS = 4
-_RAM_MB_PER_CORE = 1500
+_DEFAULT_WORKERS_RATIO = 1.0
+_DEFAULT_NUM_GROUPS = 1
+_DEFAULT_MEMORY_RATIO = 0.75
 _SPEC_JBB_2015_ISO = specjbb.SPEC_JBB_2015_ISO
 _SPEC_DIR = specjbb.SPEC_DIR
 _LOG_FILE = '~/specjbb2015.log'
@@ -85,10 +79,35 @@ flags.DEFINE_enum(
     [MULTIJVM_MODE, COMPOSITE_MODE],
     'String representing run mode. COMPOSITE or MultiJVM.',
 )
+flags.DEFINE_boolean(
+    'specjbb_auto_groups',
+    True,
+    'Used in MultiJVM. If true, sets groups equal to NUMA nodes and overrides '
+    'specjbb_num_groups.',
+)
 flags.DEFINE_integer(
     'specjbb_num_groups',
     _DEFAULT_NUM_GROUPS,
     'Used in MultiJVM, number of groups.',
+)
+flags.DEFINE_float(
+    'specjbb_memory_ratio',
+    _DEFAULT_MEMORY_RATIO,
+    'Used in MultiJVM, is overridden by specjbb_ram_mb_per_core. '
+    'This value determines the total memory usage of the JVM backends by '
+    "multplying with the VM's memory. For example, a memory ratio of 0.75 "
+    'and a machine with 64 GB memory and 2 backend groups means that each '
+    'backend will have 24 GB memory allotted.',
+)
+flags.DEFINE_integer(
+    'specjbb_ram_mb_per_core',
+    None,
+    'Used in MultiJVM. Setting this to 1500 means that the total memory usage '
+    'of the JVM backends will be num_cpus * 1.5 GB. This is useful for '
+    'obtaining a comparable performance number between machines with '
+    'different memory ratios, e.g. 1 vCPU : 2 GB and 1 vCPU : 8 GB, or '
+    'AWS EC2 C/M/R and GCE highcpu/standard/highmem. '
+    'Overrides specjbb_memory_ratio if set',
 )
 flags.DEFINE_bool(
     'specjbb_numa_aware',
@@ -170,12 +189,28 @@ def Prepare(benchmark_spec):
   vm.RemoteCommand(cmd)
 
 
+def _GetNumGroups(vm):
+  """Returns integer number of backend groups to use for MultiJVM."""
+  if FLAGS.specjbb_auto_groups:
+    return int(vm.CheckLsCpu().numa_node_count)
+  return FLAGS.specjbb_num_groups
+
+
 def _MaxHeapMB(vm, mode):
   """Returns max heap size in MB as an int."""
   if mode == BACKEND_MODE:
-    return (
-        int(vm.NumCpusForBenchmark() // _DEFAULT_NUM_GROUPS) * _RAM_MB_PER_CORE
-    )
+    if FLAGS.specjbb_ram_mb_per_core:  # overrides --specjbb_memory_ratio if set
+      return (
+          int(vm.NumCpusForBenchmark() // _GetNumGroups(vm))
+          * FLAGS.specjbb_ram_mb_per_core
+      )
+    else:
+      return int(
+          vm.total_memory_kb
+          * FLAGS.specjbb_memory_ratio
+          // _GetNumGroups(vm)
+          // 1024
+      )
   elif mode == COMPOSITE_MODE:
     return int(vm.total_memory_kb * _DEFAULT_COMPOSITE_MEMORY_RATIO / 1024)
 
@@ -185,7 +220,7 @@ def _JVMArgs(vm, mode):
   if mode in (TXINJECTOR_MODE, MULTICONTROLLER_MODE):
     return _DEFAULT_JVM_CONT_TXI_ARGS
 
-  gc_size = int(vm.NumCpusForBenchmark() / _DEFAULT_NUM_GROUPS)
+  gc_size = int(vm.NumCpusForBenchmark() / _GetNumGroups(vm))
   jvm_backend_gc_arg = f'-XX:ParallelGCThreads={gc_size}'
 
   # Determine max/new heap arguments. max per group = 3/8 * vCPU GB.
@@ -211,11 +246,13 @@ def _JVMArgs(vm, mode):
 def _SpecArgs(vm, mode):
   """Determines Spec args and returns them as a string."""
 
-  num_workers = vm.NumCpusForBenchmark() * FLAGS.specjbb_workers_ratio
+  num_workers = (
+      vm.NumCpusForBenchmark() * FLAGS.specjbb_workers_ratio / _GetNumGroups(vm)
+  )
   spec_num_workers_arg = f' -Dspecjbb.forkjoin.workers={int(num_workers)}'
-  spec_num_groups_arg = f' -Dspecjbb.group.count={FLAGS.specjbb_num_groups}'
+  spec_num_groups_arg = f' -Dspecjbb.group.count={_GetNumGroups(vm)}'
   spec_rt_curve_arg = '-Dspecjbb.controller.rtcurve.warmup.step=0.5'
-  spec_mr_arg = f'-Dspecjbb.mapreducer.pool.size={_DEFAULT_NUM_GROUPS * 2}'
+  spec_mr_arg = f'-Dspecjbb.mapreducer.pool.size={_GetNumGroups(vm) * 2}'
   spec_connect_pool_size_arg = f'-Dspecjbb.comm.connect.client.pool.size={FLAGS.specjbb_connection_pool_size}'
 
   if mode == TXINJECTOR_MODE:
@@ -333,7 +370,7 @@ def Run(benchmark_spec):
     # Run backends and txinjectors as background commands
     # java -jar specjbb2015.jar -m txinjector -G GRP1 -J JVM1 > grp1jvm1.log
     # java -jar specjbb2015.jar -m backend -G GRP1 -J JVM1 > grp1jvm2.log
-    for group in range(1, FLAGS.specjbb_num_groups + 1):
+    for group in range(1, _GetNumGroups(vm) + 1):
       node_id = node_ids[(group - 1) % len(node_ids)]
 
       txinjector_cmd = [
@@ -411,14 +448,21 @@ def Run(benchmark_spec):
   metadata = {
       'OpenJDK_version': jdk_metadata,
       'iso_hash': BENCHMARK_DATA[_SPEC_JBB_2015_ISO],
-      'num_workers': vm.NumCpusForBenchmark() * FLAGS.specjbb_workers_ratio,
-      'num_groups': FLAGS.specjbb_num_groups,
+      'num_workers': int(
+          vm.NumCpusForBenchmark()
+          * FLAGS.specjbb_workers_ratio
+          / _GetNumGroups(vm)
+      ),
+      'num_groups': _GetNumGroups(vm),
       'worker_ratio': FLAGS.specjbb_workers_ratio,
+      'memory_ratio': FLAGS.specjbb_memory_ratio,
+      'ram_mb_per_core': FLAGS.specjbb_ram_mb_per_core,
       'max_heap_size': f'{max_heap_size_gb}g',
       'specjbb_mode': FLAGS.specjbb_run_mode,
       'sla_metrics': _CollectSLAMetrics(vm),
       'specjbb_numa_aware': FLAGS.specjbb_numa_aware,
   }
+  vm.PullFile(vm_util.GetTempDir(), _LOG_FILE)
   return ParseJbbOutput(stdout, metadata)
 
 

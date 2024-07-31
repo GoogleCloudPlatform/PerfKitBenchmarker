@@ -339,6 +339,7 @@
     all attached scratch disks on each HDFS data node.
 -   Add a flag to allow users to specify a suffix for the GCP VM instance name.
 -   Add support for parsing testdfsio results.
+-   Mostly reconfigured Specjbb2015 to follow the user guide with 1 JVM group.
 
 ### Bug fixes and maintenance updates:
 
