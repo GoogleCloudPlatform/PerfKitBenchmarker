@@ -299,6 +299,7 @@ class BenchmarkSpec:
     self.ConstructEdwService()
     self.ConstructEdwComputeResource()
     self.ConstructExampleResource()
+    self.ConstructBaseJob()
     self.ConstructVPNService()
     self.ConstructNfsService()
     self.ConstructSmbService()

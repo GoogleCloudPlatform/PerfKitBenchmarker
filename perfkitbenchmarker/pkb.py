@@ -637,30 +637,8 @@ def DoProvisionPhase(spec, timer):
   """
   logging.info('Provisioning resources for benchmark %s', spec.name)
   events.before_phase.send(stages.PROVISION, benchmark_spec=spec)
-  spec.ConstructContainerCluster()
-  spec.ConstructContainerRegistry()
-  # dpb service needs to go first, because it adds some vms.
-  spec.ConstructDpbService()
-  spec.ConstructVirtualMachines()
-  spec.ConstructRelationalDb()
-  spec.ConstructNonRelationalDb()
-  spec.ConstructKey()
-  spec.ConstructMessagingService()
-  # CapacityReservations need to be constructed after VirtualMachines because
-  # it needs information about the VMs (machine type, count, zone, etc). The
-  # CapacityReservations will be provisioned before VMs.
-  spec.ConstructCapacityReservations()
-  spec.ConstructTpu()
-  spec.ConstructEdwService()
-  spec.ConstructEdwComputeResource()
-  spec.ConstructExampleResource()
-  spec.ConstructBaseJob()
-  spec.ConstructVPNService()
-  spec.ConstructNfsService()
-  spec.ConstructSmbService()
-  spec.ConstructDataDiscoveryService()
+  spec.ConstructResources()
 
-  # Validate the construction resource spec before creating resources.
   spec.CheckPrerequisites()
 
   # Pickle the spec before we try to create anything so we can clean
