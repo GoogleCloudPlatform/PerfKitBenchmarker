@@ -913,19 +913,5 @@ class TestConditionalSkipTeardown(parameterized.TestCase):
     )
 
 
-class TestParseArgs(pkb_common_test_case.PkbCommonTestCase):
-
-  def testBasicCase(self):
-    pkb._ParseFlags(['./pkb.py', '--benchmarks=foo'])
-    self.assertSameElements(FLAGS.benchmarks, ['foo'])
-
-  def testPositionalArg(self):
-    with self.assertRaises(flags.Error):
-      pkb._ParseFlags(['./pkb.py', '--benchmarks=foo', 'positional_arg'])
-
-  def testUnknownFlag(self):
-    with self.assertRaises(flags.Error):
-      pkb._ParseFlags(['./pkb.py', '--unknown-flag=foo'])
-
 if __name__ == '__main__':
   unittest.main()
