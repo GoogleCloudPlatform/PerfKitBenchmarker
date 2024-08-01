@@ -13,6 +13,7 @@ try:
   from google.cloud.aiplatform import aiplatform
 except ImportError:
   from google.cloud import aiplatform
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources import managed_ai_model_spec
@@ -36,58 +37,78 @@ VLLM_ARGS = [
     '--max-model-len=2048',
     '--max-num-batched-tokens=4096',
 ]
-# The pre-built serving docker images.
-VLLM_DOCKER_URI = 'us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20240222_0916_RC00'
 
 
 class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
-  """Represents a Vertex AI model in the model registry."""
+  """Represents a Vertex AI model in the model registry.
+
+  Attributes:
+    model_name: The official name of the model in Model Garden, e.g. Llama2.
+    model_bucket_path: Where the model bucket is located.
+    name: The name of the created model in private model registry.
+    region: The region.
+    project: The project.
+    endpoint: The PKB resource endpoint the model is deployed to.
+    gcloud_model: Representation of the model in gcloud python library.
+  """
 
   CLOUD = 'GCP'
+
+  endpoint: 'VertexAiEndpoint'
+  model_spec: 'VertexAiModelSpec'
+  model_name: str
+  model_bucket_path: str
+  name: str
+  region: str
+  project: str
+  gcloud_model: aiplatform.Model | None
 
   def __init__(
       self, model_spec: managed_ai_model_spec.BaseManagedAiModelSpec, **kwargs
   ):
     super().__init__(**kwargs)
+    if not isinstance(model_spec, VertexAiModelSpec):
+      raise errors.Config.InvalidValue(
+          f'Invalid model spec class: "{model_spec.__class__.__name__}". '
+          'Must be a VertexAiModelSpec. It had config values of '
+          f'{model_spec.model_name} & {model_spec.cloud}'
+      )
+    self.model_spec = model_spec
     self.model_name = model_spec.model_name
-    self.model_id = os.path.join(MODEL_BUCKET, self.model_name)
+    self.model_bucket_path = os.path.join(
+        BUCKET_URI, self.model_spec.model_bucket_suffix
+    )
     self.name = 'pkb' + FLAGS.run_uri
-    self.metadata.update({
-        'name': self.name,
-        'model_name': self.model_name,
-    })
     self.endpoint = VertexAiEndpoint(name=self.name)
     self.region = 'us-east4'
     self.project = 'test-howellz'
     self.gcloud_model = None
+    self.metadata.update({
+        'name': self.name,
+        'model_name': self.model_name,
+    })
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
-    # TODO(user): Unhardcode some of these values.
     logging.info('Creating the resource: %s for ai model.', self.model_name)
-    env_vars = {
-        'MODEL_ID': self.model_id,
-        'DEPLOY_SOURCE': 'notebook',
-    }
+    env_vars = self.model_spec.GetEnvironmentVariables(
+        model_bucket_path=self.model_bucket_path
+    )
     self.gcloud_model = aiplatform.Model.upload(
         display_name=self.name,
-        serving_container_image_uri=VLLM_DOCKER_URI,
-        serving_container_command=[
-            'python',
-            '-m',
-            'vllm.entrypoints.api_server',
-        ],
-        serving_container_args=VLLM_ARGS,
-        serving_container_ports=[7080],
-        serving_container_predict_route='/generate',
-        serving_container_health_route='/ping',
+        serving_container_image_uri=self.model_spec.container_image_uri,
+        serving_container_command=self.model_spec.serving_container_command,
+        serving_container_args=self.model_spec.serving_container_args,
+        serving_container_ports=self.model_spec.serving_container_ports,
+        serving_container_predict_route=self.model_spec.serving_container_predict_route,
+        serving_container_health_route=self.model_spec.serving_container_health_route,
         serving_container_environment_variables=env_vars,
-        artifact_uri=self.model_id,
+        artifact_uri=self.model_bucket_path,
     )
     self.gcloud_model.deploy(
         endpoint=self.endpoint.ai_endpoint,
-        machine_type='g2-standard-8',
-        accelerator_type='NVIDIA_L4',
+        machine_type=self.model_spec.machine_type,
+        accelerator_type=self.model_spec.accelerator_type,
         accelerator_count=1,
         deploy_request_timeout=1800,
         service_account=SERVICE_ACCOUNT,
@@ -138,3 +159,68 @@ class VertexAiEndpoint(resource.BaseResource):
     logging.info('Deleting the endpoint: %s.', self.name)
     assert self.ai_endpoint
     self.ai_endpoint.delete(force=True)
+
+
+class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
+  """Spec for a Vertex AI model.
+
+  Attributes:
+    env_vars: Environment variables set on the node.
+    serving_container_command: Command run on container to start the model.
+    serving_container_args: The arguments passed to container create.
+    serving_container_ports: The ports to expose for the model.
+    serving_container_predict_route: The route to use for prediction requests.
+    serving_container_health_route: The route to use for health checks.
+    machine_type: The machine type for model's cluster.
+    accelerator_type: The type of the GPU/TPU.
+  """
+
+  CLOUD = 'GCP'
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    # The pre-built serving docker images.
+    self.container_image_uri: str
+    self.model_bucket_suffix: str
+    self.serving_container_command: list[str]
+    self.serving_container_args: list[str]
+    self.serving_container_ports: list[int]
+    self.serving_container_predict_route: str
+    self.serving_container_health_route: str
+    self.machine_type: str
+    self.accelerator_type: str
+
+  def GetEnvironmentVariables(self, **kwargs) -> dict[str, str]:
+    """Returns container's environment variables, with whatever args needed."""
+    del kwargs
+    return {}
+
+
+class VertexAiLlama27bSpec(VertexAiModelSpec):
+  """Spec for running the Llama2 7b model."""
+
+  MODEL_NAME = 'llama2_7b'
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    # The pre-built serving docker images.
+    self.container_image_uri = 'us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20240222_0916_RC00'
+    self.serving_container_command = [
+        'python',
+        '-m',
+        'vllm.entrypoints.api_server',
+    ]
+    self.model_bucket_suffix = os.path.join('llama2', 'llama2-7b-hf')
+    self.serving_container_args = VLLM_ARGS
+    self.serving_container_ports = [7080]
+    self.serving_container_predict_route = '/generate'
+    self.serving_container_health_route = '/ping'
+    self.machine_type = 'g2-standard-8'
+    self.accelerator_type = 'NVIDIA_L4'
+
+  def GetEnvironmentVariables(self, **kwargs) -> dict[str, str]:
+    """Returns container's environment variables needed by Llama2."""
+    return {
+        'MODEL_ID': kwargs['model_bucket_path'],
+        'DEPLOY_SOURCE': 'notebook',
+    }

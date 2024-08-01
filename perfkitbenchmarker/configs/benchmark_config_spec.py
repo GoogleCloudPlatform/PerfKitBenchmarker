@@ -345,11 +345,21 @@ class _ManagedAiModelSpecDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    model_config = super().Decode(value, component_full_name, flag_values)
-    return managed_ai_model_spec.BaseManagedAiModelSpec(
+    config = super().Decode(value, component_full_name, flag_values)
+    if 'cloud' in config and 'model_name' in config:
+      providers.LoadProvider(config['cloud'])
+      spec_class = managed_ai_model_spec.GetManagedAiModelSpecClass(
+          config['cloud'], config['model_name']
+      )
+    else:
+      raise errors.Config.InvalidValue(
+          'Required attribute missing from model spec '
+          f'config {config}.'
+      )
+    return spec_class(
         self._GetOptionFullName(component_full_name),
         flag_values,
-        **model_config,
+        **config,
     )
 
 

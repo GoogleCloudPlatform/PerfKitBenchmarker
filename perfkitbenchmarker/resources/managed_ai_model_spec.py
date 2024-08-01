@@ -26,13 +26,27 @@ class BaseManagedAiModelSpec(spec.BaseSpec):
     model_name: The name of the model to use.
   """
 
-  SPEC_TYPE = 'BaseManagedModelSpec'
-  SPEC_ATTRS = []
+  SPEC_TYPE = 'BaseManagedAiModelSpec'
+  SPEC_ATTRS = ['CLOUD', 'MODEL_NAME']
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     self.cloud: str
     self.model_name: str
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values.
+
+    Args:
+      config_values: dict mapping config option names to provided values. May be
+        modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+        provided config values.
+    """
+    super()._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -61,3 +75,12 @@ class BaseManagedAiModelSpec(spec.BaseSpec):
         ),
     })
     return result
+
+
+def GetManagedAiModelSpecClass(
+    cloud: str, model_name: str
+) -> spec.BaseSpecMetaClass | None:
+  """Gets the example spec class corresponding to the given attributes."""
+  return spec.GetSpecClass(
+      BaseManagedAiModelSpec, CLOUD=cloud, MODEL_NAME=model_name
+  )
