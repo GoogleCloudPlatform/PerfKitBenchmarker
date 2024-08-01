@@ -82,6 +82,24 @@ def GetDefaultUser():
   return result['core']['account']
 
 
+def GetProjectNumber(project_id: str | None = None) -> str:
+  """Get the number of the default project."""
+  # All GCP projects have both a project number & a project id. The project id
+  # is the human-readable name of the project.
+  if not project_id:
+    project_id = GetDefaultProject()
+  cmd = [
+      FLAGS.gcloud_path,
+      'projects',
+      'list',
+      f'--filter=name:{project_id}',
+      '--format=json',
+  ]
+  stdout, _, _ = vm_util.IssueCommand(cmd)
+  result = json.loads(stdout)
+  return result[0]['projectNumber']
+
+
 def GetRegionFromZone(zone) -> str:
   """Returns the region name from a fully-qualified zone name.
 
