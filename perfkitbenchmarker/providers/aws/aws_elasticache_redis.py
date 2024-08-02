@@ -41,6 +41,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
   """Object representing a AWS Elasticache redis instance."""
 
   CLOUD = provider_info.AWS
+  SERVICE_TYPE = 'elasticache'
   MEMORY_STORE = managed_memory_store.REDIS
 
   # AWS Clusters can take up to 2 hours to create

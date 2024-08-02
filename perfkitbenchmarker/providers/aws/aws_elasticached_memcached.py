@@ -34,6 +34,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
   """Object representing a AWS Elasticache memcached instance."""
 
   CLOUD = provider_info.AWS
+  SERVICE_TYPE = 'elasticache'
   MEMORY_STORE = managed_memory_store.MEMCACHED
 
   def __init__(self, spec):
@@ -57,11 +58,11 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     Returns:
       dict mapping string property key to value.
     """
-    result = {
+    self.metadata.update({
         'cloud_memcached_version': self.version,
         'cloud_memcached_node_type': self.node_type,
-    }
-    return result
+    })
+    return self.metadata
 
   def _CreateDependencies(self):
     """Create the subnet dependencies."""

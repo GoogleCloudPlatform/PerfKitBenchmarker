@@ -69,8 +69,12 @@ def _GetManagedMemoryStoreClass() -> (
     type[managed_memory_store.BaseManagedMemoryStore]
 ):
   """Gets the cloud-specific redis memory store class."""
+  # This should eventually use a spec and create the resource in the provision
+  # phase.
   return managed_memory_store.GetManagedMemoryStoreClass(
-      FLAGS.cloud, managed_memory_store.REDIS
+      FLAGS.cloud,
+      FLAGS.managed_memory_store_service_type,
+      managed_memory_store.REDIS,
   )
 
 

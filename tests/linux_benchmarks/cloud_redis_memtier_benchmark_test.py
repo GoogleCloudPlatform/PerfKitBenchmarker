@@ -50,6 +50,8 @@ def _GetTestRedisInstance():
   test_spec = _GetTestRedisSpec()
   mock_bm_spec = mock.Mock()
   mock_bm_spec.config.cloud_redis = test_spec
+  FLAGS.cloud = 'AWS'
+  FLAGS.managed_memory_store_service_type = 'elasticache'
   redis_class = cloud_redis_memtier_benchmark._GetManagedMemoryStoreClass()
   instance = redis_class(mock_bm_spec)  # pytype: disable=not-instantiable
   instance._ip = '0.0.0.0'

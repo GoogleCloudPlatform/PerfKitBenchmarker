@@ -63,6 +63,14 @@ REDIS_7_X = 'redis_7_x'
 REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X, REDIS_7_X]
 
 flags.DEFINE_string(
+    'managed_memory_store_service_type',
+    'memorystore',
+    (
+        'The service type of the managed memory store, e.g. memorystore,'
+        ' elasticache, etc.'
+    ),
+)
+flags.DEFINE_string(
     'managed_memory_store_version',
     None,
     (
@@ -108,12 +116,14 @@ MEMCACHED_NODE_COUNT = 1
 
 
 def GetManagedMemoryStoreClass(
-    cloud, memory_store
+    cloud: str, service_type: str, memory_store: str
 ) -> type['BaseManagedMemoryStore']:
   """Gets the cloud managed memory store class corresponding to 'cloud'.
 
   Args:
     cloud: String. Name of cloud to get the class for.
+    service_type: String. Service type of the managed memory store. e.g.
+      elasticache.
     memory_store: String. Type of memory store to get the class for.
 
   Returns:
@@ -123,7 +133,10 @@ def GetManagedMemoryStoreClass(
     Exception: An invalid cloud was provided
   """
   return resource.GetResourceClass(
-      BaseManagedMemoryStore, CLOUD=cloud, MEMORY_STORE=memory_store
+      BaseManagedMemoryStore,
+      CLOUD=cloud,
+      SERVICE_TYPE=service_type,
+      MEMORY_STORE=memory_store,
   )
 
 
@@ -170,8 +183,11 @@ class RedisShard:
 class BaseManagedMemoryStore(resource.BaseResource):
   """Object representing a cloud managed memory store."""
 
-  REQUIRED_ATTRS = ['CLOUD', 'MEMORY_STORE']
+  REQUIRED_ATTRS = ['CLOUD', 'SERVICE_TYPE', 'MEMORY_STORE']
   RESOURCE_TYPE = 'BaseManagedMemoryStore'
+  CLOUD: str
+  SERVICE_TYPE: str
+  MEMORY_STORE: str
 
   def __init__(self, spec):
     """Initialize the cloud managed memory store object.
@@ -197,12 +213,19 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self.enable_tls = _TLS.value
 
     self.metadata.update({
-        'clustered': self._clustered,
-        'shard_count': self.shard_count,
-        'replicas_per_shard': self.replicas_per_shard,
-        'node_count': self.node_count,
-        'enable_tls': self.enable_tls,
+        'managed_memory_store_cloud': self.CLOUD,
+        'managed_memory_store_type': self.MEMORY_STORE,
+        'managed_memory_store_service_type': self.SERVICE_TYPE,
     })
+    # Consider separating redis and memcached classes.
+    if self.MEMORY_STORE == REDIS:
+      self.metadata.update({
+          'clustered': self._clustered,
+          'shard_count': self.shard_count,
+          'replicas_per_shard': self.replicas_per_shard,
+          'node_count': self.node_count,
+          'enable_tls': self.enable_tls,
+      })
 
   def _GetNodeCount(self) -> int:
     """Returns the number of nodes in the cluster."""

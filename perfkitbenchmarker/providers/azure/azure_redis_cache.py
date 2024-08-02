@@ -36,6 +36,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
   """Object representing an Azure Redis Cache."""
 
   CLOUD = provider_info.AZURE
+  SERVICE_TYPE = 'cache'
   MEMORY_STORE = managed_memory_store.REDIS
 
   # Azure redis could take up to an hour to create
@@ -62,7 +63,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
     Returns:
       dict mapping string property key to value.
     """
-    result = {
+    self.metadata.update({
         'cloud_redis_failover_style': self.failover_style,
         'cloud_redis_region': self.redis_region,
         'cloud_redis_azure_tier': self.azure_tier,
@@ -70,8 +71,8 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         'cloud_redis_version': managed_memory_store.ParseReadableVersion(
             self.redis_version
         ),
-    }
-    return result
+    })
+    return self.metadata
 
   def CheckPrerequisites(self):
     """Check benchmark prerequisites on the input flag parameters.

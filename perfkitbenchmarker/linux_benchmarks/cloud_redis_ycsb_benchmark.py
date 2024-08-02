@@ -65,7 +65,9 @@ def CheckPrerequisites(benchmark_config):
   # child resources can override CheckPrerequisites and benefit from it.
   # The attribute-error below can be removed when this is fixed.
   cloud_redis_class = managed_memory_store.GetManagedMemoryStoreClass(
-      FLAGS.cloud, managed_memory_store.REDIS
+      FLAGS.cloud,
+      FLAGS.managed_memory_store_service_type,
+      managed_memory_store.REDIS
   )
   cloud_redis_class.CheckPrerequisites(benchmark_config)  # pytype: disable=attribute-error
 
@@ -83,7 +85,9 @@ def Prepare(benchmark_spec):
   background_tasks.RunThreaded(_Install, ycsb_vms)
 
   cloud_redis_class = managed_memory_store.GetManagedMemoryStoreClass(
-      FLAGS.cloud, managed_memory_store.REDIS
+      FLAGS.cloud,
+      FLAGS.managed_memory_store_service_type,
+      managed_memory_store.REDIS
   )
   benchmark_spec.cloud_redis_instance = cloud_redis_class(benchmark_spec)  # pytype: disable=not-instantiable
   benchmark_spec.cloud_redis_instance.Create()

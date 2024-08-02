@@ -44,6 +44,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
   """Object representing a GCP cloud redis instance."""
 
   CLOUD = provider_info.GCP
+  SERVICE_TYPE = 'memorystore'
   MEMORY_STORE = managed_memory_store.REDIS
 
   def __init__(self, spec):
