@@ -12,12 +12,14 @@ f. Raw geo mean performance for each iteration
 g. Aggregated geo mean performance using the aggregated query performances
 """
 
+import abc
 import copy
 import enum
 import functools
 import json
 import logging
-from typing import Any, Dict, Iterable, List, Text
+
+from typing import Any, Iterable
 
 from absl import flags
 import numpy as np
@@ -38,11 +40,11 @@ class EdwPerformanceAggregationError(Exception):
   """Error encountered during aggregation of performance results."""
 
 
-def geometric_mean(iterable: List[float]) -> float:
+def geometric_mean(iterable: list[float]) -> float:
   """Function to compute the geo mean for a list of numeric values.
 
   Args:
-    iterable: A List of Float performance values
+    iterable: A list of Float performance values
 
   Returns:
     A float value equal to the geometric mean of the input performance values.
@@ -82,7 +84,7 @@ class EdwQueryPerformance(object):
   """
 
   def __init__(
-      self, query_name: Text, performance: float, metadata: Dict[str, str]
+      self, query_name: str, performance: float, metadata: dict[str, Any]
   ):
     # TODO(user): add query start and query end as attributes.
     self.name = query_name
@@ -122,7 +124,7 @@ class EdwQueryPerformance(object):
         metadata=metadata,
     )
 
-  def get_performance_sample(self, metadata: Dict[str, str]) -> sample.Sample:
+  def get_performance_sample(self, metadata: dict[str, Any]) -> sample.Sample:
     """Method to generate a sample for the query performance.
 
     Args:
@@ -148,7 +150,7 @@ class EdwQueryPerformance(object):
     """
     return self.performance
 
-  def get_performance_metadata(self) -> Dict[str, str]:
+  def get_performance_metadata(self) -> dict[str, Any]:
     """Method to get the query's execution attributes (job_id, etc.).
 
     Returns:
@@ -161,8 +163,61 @@ class EdwQueryPerformance(object):
     return self.execution_status == EdwQueryExecutionStatus.SUCCESSFUL
 
 
-class EdwBaseIterationPerformance(object):
+class EdwBaseIterationPerformance(abc.ABC):
   """Class that represents the performance of an iteration of edw queries."""
+  id: str
+
+  @abc.abstractmethod
+  def add_query_performance(
+      self, query_name: str, performance: float, metadata: dict[str, Any]
+  ):
+    """Creates and populates a query performance from the input results."""
+
+  @abc.abstractmethod
+  def has_query_performance(self, query_name: str) -> bool:
+    """Returns whether the query was run at least once in the iteration."""
+
+  @abc.abstractmethod
+  def is_successful(self, expected_queries: list[str]) -> bool:
+    """Check if all the expected queries ran and all succeeded."""
+
+  @abc.abstractmethod
+  def is_query_successful(self, query_name: str) -> bool:
+    """Returns whether the query was successful in the iteration."""
+
+  @abc.abstractmethod
+  def get_query_performance(self, query_name: str) -> float:
+    """Gets a query's execution performance generated during iteration execution."""
+
+  @abc.abstractmethod
+  def get_query_metadata(self, query_name: str) -> dict[str, Any]:
+    """Gets the metadata of a query as executed in the current iteration."""
+
+  @abc.abstractmethod
+  def get_all_query_performance_samples(
+      self, metadata: dict[str, Any]
+  ) -> list[sample.Sample]:
+    """Gets a list of samples for all queries in the iteration."""
+
+  @abc.abstractmethod
+  def get_queries_geomean_performance_sample(
+      self, expected_queries: list[str], metadata: dict[str, Any]
+  ) -> sample.Sample:
+    """Gets a sample for geomean of all queries in the iteration."""
+
+  @abc.abstractmethod
+  def get_queries_geomean(self) -> float:
+    """Gets the geometric mean of all queries in the iteration."""
+
+  @abc.abstractmethod
+  def get_wall_time(self) -> float:
+    """Gets the total wall time, in seconds, for the iteration."""
+
+  @abc.abstractmethod
+  def get_wall_time_performance_sample(
+      self, metadata: dict[str, Any]
+  ) -> sample.Sample:
+    """Gets a sample for wall time performance of the iteration."""
 
 
 class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
@@ -181,17 +236,17 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
       iteration.
   """
 
-  def __init__(self, iteration_id: Text, total_queries: int):
+  def __init__(self, iteration_id: str, total_queries: int):
     self.id = iteration_id
-    self.performance = {}
+    self.performance: dict[str, EdwQueryPerformance] = {}
     self.total_count = total_queries
-    self.successful_count = 0
+    self.successful_count: int = 0
     self.start_time = 0
     self.end_time = -1
     self.wall_time: float = 0.0
 
   def add_query_performance(
-      self, query_name: Text, performance: float, metadata: Dict[str, str]
+      self, query_name: str, performance: float, metadata: dict[str, Any]
   ):
     """Creates and populates a query performance from the input results.
 
@@ -226,7 +281,7 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
       self.successful_count += 1
     self.wall_time = self.wall_time + performance
 
-  def has_query_performance(self, query_name: Text) -> bool:
+  def has_query_performance(self, query_name: str) -> bool:
     """Returns whether the query was run at least once in the iteration.
 
     Args:
@@ -237,7 +292,7 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
     """
     return query_name in self.performance
 
-  def is_query_successful(self, query_name: Text) -> bool:
+  def is_query_successful(self, query_name: str) -> bool:
     """Returns whether the query was successful in the iteration.
 
     Args:
@@ -246,9 +301,9 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
     Returns:
       A boolean value indicating if the query was successful in the iteration.
     """
-    return self.performance.get(query_name).is_successful()
+    return self.performance[query_name].is_successful()
 
-  def get_query_performance(self, query_name: Text) -> float:
+  def get_query_performance(self, query_name: str) -> float:
     """Gets a query's execution performance generated during iteration execution.
 
     Args:
@@ -259,7 +314,7 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
     """
     return self.performance[query_name].get_performance_value()
 
-  def get_query_metadata(self, query_name: Text) -> Dict[str, Any]:
+  def get_query_metadata(self, query_name: str) -> dict[str, Any]:
     """Gets the metadata of a query as executed in the current iteration.
 
     Args:
@@ -275,9 +330,9 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
       raise EdwPerformanceAggregationError(
           'Cannot aggregate invalid / failed query' + query_name
       )
-    return self.performance.get(query_name).metadata
+    return self.performance[query_name].metadata
 
-  def get_all_queries_in_iteration(self) -> List[Text]:
+  def get_all_queries_in_iteration(self) -> Iterable[str]:
     """Gets a list of names of all queries in the iteration.
 
     Returns:
@@ -286,8 +341,8 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
     return self.performance.keys()
 
   def get_all_query_performance_samples(
-      self, metadata: Dict[str, str]
-  ) -> List[sample.Sample]:
+      self, metadata: dict[str, Any]
+  ) -> list[sample.Sample]:
     """Gets a list of samples for all queries in the iteration.
 
     Args:
@@ -331,7 +386,7 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
     return self.wall_time
 
   def get_wall_time_performance_sample(
-      self, metadata: Dict[str, str]
+      self, metadata: dict[str, Any]
   ) -> sample.Sample:
     """Gets a sample for wall time performance of the iteration.
 
@@ -349,7 +404,7 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
         'edw_iteration_wall_time', self.wall_time, 'seconds', wall_time_metadata
     )
 
-  def is_successful(self, expected_queries: List[Text]) -> bool:
+  def is_successful(self, expected_queries: list[str]) -> bool:
     """Check if all the expected queries ran and all succeeded."""
     all_queries_ran = set(self.get_all_queries_in_iteration()) == set(
         expected_queries
@@ -373,7 +428,7 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
     ])
 
   def get_queries_geomean_performance_sample(
-      self, expected_queries: List[Text], metadata: Dict[str, str]
+      self, expected_queries: list[str], metadata: dict[str, Any]
   ) -> sample.Sample:
     """Gets a sample for geomean of all queries in the iteration.
 
@@ -414,11 +469,11 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
 
   def __init__(
       self,
-      iteration_id: Text,
+      iteration_id: str,
       iteration_start_time: int,
       iteration_end_time: int,
       iteration_wall_time: float,
-      iteration_performance: Dict[str, EdwQueryPerformance],
+      iteration_performance: dict[str, EdwQueryPerformance],
       all_queries_succeeded: bool,
   ):
     self.id = iteration_id
@@ -484,7 +539,7 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
     return self.wall_time
 
   def get_wall_time_performance_sample(
-      self, metadata: Dict[str, str]
+      self, metadata: dict[str, Any]
   ) -> sample.Sample:
     """Gets a sample for wall time performance of the iteration.
 
@@ -504,8 +559,8 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
     )
 
   def get_all_query_performance_samples(
-      self, metadata: Dict[str, str]
-  ) -> List[sample.Sample]:
+      self, metadata: dict[str, Any]
+  ) -> list[sample.Sample]:
     """Gets a list of samples for all queries in the iteration.
 
     Args:
@@ -520,12 +575,12 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
         for query_performance in self.performance.values()
     ]
 
-  def is_successful(self, expected_queries: List[Text]) -> bool:
+  def is_successful(self, expected_queries: list[str]) -> bool:
     """Check if all the expected queries ran and all succeeded."""
     all_queries_ran = self.performance.keys() == set(expected_queries)
     return all_queries_ran and self.all_queries_succeeded
 
-  def has_query_performance(self, query_name: Text) -> bool:
+  def has_query_performance(self, query_name: str) -> bool:
     """Returns whether the query was run at least once in the iteration.
 
     Args:
@@ -536,7 +591,7 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
     """
     return query_name in self.performance
 
-  def is_query_successful(self, query_name: Text) -> bool:
+  def is_query_successful(self, query_name: str) -> bool:
     """Returns whether the query was successful in the iteration.
 
     Args:
@@ -546,10 +601,10 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
       A boolean value indicating if the query was successful in the iteration.
     """
     if self.has_query_performance(query_name):
-      return self.performance.get(query_name).is_successful()
+      return self.performance[query_name].is_successful()
     return False
 
-  def get_query_performance(self, query_name: Text) -> float:
+  def get_query_performance(self, query_name: str) -> float:
     """Gets a query's execution performance in the current iteration.
 
     Args:
@@ -560,7 +615,7 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
     """
     return self.performance[query_name].get_performance_value()
 
-  def get_query_metadata(self, query_name: Text) -> Dict[str, Any]:
+  def get_query_metadata(self, query_name: str) -> dict[str, Any]:
     """Gets the metadata of a query in the current iteration.
 
     Args:
@@ -577,7 +632,7 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
       raise EdwPerformanceAggregationError(
           'Cannot aggregate invalid / failed query' + query_name
       )
-    return self.performance.get(query_name).metadata
+    return self.performance[query_name].metadata
 
   def get_queries_geomean(self) -> float:
     """Gets the geometric mean of all queries in the iteration.
@@ -595,7 +650,7 @@ class EdwSimultaneousIterationPerformance(EdwBaseIterationPerformance):
     ])
 
   def get_queries_geomean_performance_sample(
-      self, expected_queries: List[Text], metadata: Dict[str, str]
+      self, expected_queries: list[str], metadata: dict[str, Any]
   ) -> sample.Sample:
     """Gets a sample for geomean of all queries in the iteration.
 
@@ -636,11 +691,11 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
 
   def __init__(
       self,
-      iteration_id: Text,
+      iteration_id: str,
       iteration_start_time: int,
       iteration_end_time: int,
       iteration_wall_time: float,
-      iteration_performance: Dict[str, Dict[str, EdwQueryPerformance]],
+      iteration_performance: dict[str, dict[str, EdwQueryPerformance]],
   ):
     self.id = iteration_id
     self.start_time = iteration_start_time
@@ -714,7 +769,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
         iteration_performance=stream_performances,
     )
 
-  def has_query_performance(self, query_name: Text) -> bool:
+  def has_query_performance(self, query_name: str) -> bool:
     """Returns whether the query was run at least once in the iteration.
 
     Args:
@@ -728,7 +783,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
         return True
     return False
 
-  def is_query_successful(self, query_name: Text) -> bool:
+  def is_query_successful(self, query_name: str) -> bool:
     """Returns whether the query was successful in the iteration.
 
     Args:
@@ -743,7 +798,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
           return False
     return True
 
-  def get_query_performance(self, query_name: Text) -> float:
+  def get_query_performance(self, query_name: str) -> float:
     """Gets a query's execution performance aggregated across all streams in the current iteration.
 
     Args:
@@ -760,7 +815,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
       return -1.0
     return sum(all_performances) / len(all_performances)
 
-  def get_query_metadata(self, query_name: Text) -> Dict[str, Any]:
+  def get_query_metadata(self, query_name: str) -> dict[str, Any]:
     """Gets the metadata of a query aggregated across all streams in the current iteration.
 
     Args:
@@ -785,8 +840,8 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
     return result
 
   def get_all_query_performance_samples(
-      self, metadata: Dict[str, str]
-  ) -> List[sample.Sample]:
+      self, metadata: dict[str, Any]
+  ) -> list[sample.Sample]:
     """Gets a list of samples for all queries in all streams of the iteration.
 
     Args:
@@ -807,7 +862,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
     return all_query_performances
 
   def all_streams_ran_all_expected_queries(
-      self, expected_queries: List[Text]
+      self, expected_queries: list[str]
   ) -> bool:
     """Checks that the same set of expected queries ran in all streams."""
     for stream in self.performance.values():
@@ -830,7 +885,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
           return False
     return True
 
-  def is_successful(self, expected_queries: List[Text]) -> bool:
+  def is_successful(self, expected_queries: list[str]) -> bool:
     """Check if the throughput run was successful.
 
     A successful run meets the following conditions:
@@ -877,7 +932,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
     return geometric_mean(query_performances)
 
   def get_queries_geomean_performance_sample(
-      self, expected_queries: List[Text], metadata: Dict[str, str]
+      self, expected_queries: list[str], metadata: dict[str, Any]
   ) -> sample.Sample:
     """Gets a sample for geomean of all queries in all streams of the iteration.
 
@@ -914,7 +969,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
     return self.wall_time
 
   def get_wall_time_performance_sample(
-      self, metadata: Dict[str, str]
+      self, metadata: dict[str, Any]
   ) -> sample.Sample:
     """Gets a sample for total wall time performance of the iteration.
 
@@ -944,10 +999,10 @@ class EdwBenchmarkPerformance(object):
       execution performance (an instance of EdwBaseIterationPerformance)
   """
 
-  def __init__(self, total_iterations: int, expected_queries: Iterable[Text]):
+  def __init__(self, total_iterations: int, expected_queries: Iterable[str]):
     self.total_iterations = total_iterations
     self.expected_queries = list(expected_queries)
-    self.iteration_performances = {}
+    self.iteration_performances: dict[str, EdwBaseIterationPerformance] = {}
 
   def add_iteration_performance(self, performance: EdwBaseIterationPerformance):
     """Add an iteration's performance to the benchmark results.
@@ -976,7 +1031,7 @@ class EdwBenchmarkPerformance(object):
         ],
     )
 
-  def aggregated_query_status(self, query_name: Text) -> bool:
+  def aggregated_query_status(self, query_name: str) -> bool:
     """Gets the status of query aggregated across all iterations.
 
     A query is considered successful only if
@@ -996,7 +1051,7 @@ class EdwBenchmarkPerformance(object):
         return False
     return True
 
-  def aggregated_query_execution_time(self, query_name: Text) -> float:
+  def aggregated_query_execution_time(self, query_name: str) -> float:
     """Gets the execution time of query aggregated across all iterations.
 
     Args:
@@ -1019,7 +1074,7 @@ class EdwBenchmarkPerformance(object):
     ]
     return sum(query_performances) / self.total_iterations
 
-  def aggregated_query_metadata(self, query_name: Text) -> Dict[str, Any]:
+  def aggregated_query_metadata(self, query_name: str) -> dict[str, Any]:
     """Gets the metadata of a query aggregated across all iterations.
 
     Args:
@@ -1051,7 +1106,7 @@ class EdwBenchmarkPerformance(object):
     return result
 
   def get_aggregated_query_performance_sample(
-      self, query_name: Text, metadata: Dict[str, str]
+      self, query_name: str, metadata: dict[str, Any]
   ) -> sample.Sample:
     """Gets the performance of query aggregated across all iterations.
 
@@ -1078,8 +1133,8 @@ class EdwBenchmarkPerformance(object):
     )
 
   def get_all_query_performance_samples(
-      self, metadata: Dict[str, str]
-  ) -> List[sample.Sample]:
+      self, metadata: dict[str, Any]
+  ) -> list[sample.Sample]:
     """Generates samples for all query performances.
 
     Benchmark relies on iteration runs to generate the raw query performance
@@ -1111,7 +1166,7 @@ class EdwBenchmarkPerformance(object):
     return results
 
   def get_aggregated_wall_time_performance_sample(
-      self, metadata: Dict[str, str]
+      self, metadata: dict[str, Any]
   ) -> sample.Sample:
     """Gets the wall time performance aggregated across all iterations.
 
@@ -1136,7 +1191,7 @@ class EdwBenchmarkPerformance(object):
         wall_time_metadata,
     )
 
-  def get_wall_time_performance_samples(self, metadata: Dict[str, str]):
+  def get_wall_time_performance_samples(self, metadata: dict[str, Any]):
     """Generates samples for all wall time performances.
 
     Benchmark relies on iterations to generate the raw wall time performance
@@ -1164,7 +1219,7 @@ class EdwBenchmarkPerformance(object):
     return results
 
   def get_aggregated_geomean_performance_sample(
-      self, metadata: Dict[str, str]
+      self, metadata: dict[str, Any]
   ) -> sample.Sample:
     """Gets the geomean performance aggregated across all iterations.
 
@@ -1197,8 +1252,8 @@ class EdwBenchmarkPerformance(object):
     )
 
   def get_queries_geomean_performance_samples(
-      self, metadata: Dict[str, str]
-  ) -> List[sample.Sample]:
+      self, metadata: dict[str, Any]
+  ) -> list[sample.Sample]:
     """Generates samples for all geomean performances.
 
     Benchmark relies on iteration runs to generate the raw geomean performance
