@@ -485,9 +485,6 @@ class GceDisk(disk.BaseDisk):
     )
     cmd.flags['device-name'] = self.name
     cmd.flags['disk'] = self.name
-    if FLAGS.debug_gce_disk_attach:
-      cmd.flags['verbosity'] = 'debug'
-      cmd.flags['log-http'] = True
 
     if self.replica_zones:
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
@@ -560,7 +557,7 @@ class GceDisk(disk.BaseDisk):
 
 
 class GceStripedDisk(disk.StripedDisk):
-  """Object representing multiple azure disks striped together."""
+  """Object representing multiple GCP disks striped together."""
 
   def __init__(self, disk_spec, disks):
     super(GceStripedDisk, self).__init__(disk_spec, disks)
@@ -586,29 +583,10 @@ class GceStripedDisk(disk.StripedDisk):
 
   def _Create(self):
     """Creates the disk."""
-    cmd = util.GcloudCommand(
-        self, 'compute', 'disks', 'create', *self._GetDiskNames()
-    )
-    cmd.flags['size'] = self.disk_size
-    cmd.flags['type'] = self.disk_type
-    if self.provisioned_iops:
-      cmd.flags['provisioned-iops'] = self.provisioned_iops
-    if self.provisioned_throughput:
-      cmd.flags['provisioned-throughput'] = self.provisioned_throughput
-    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
-    if self.image:
-      cmd.flags['image'] = self.image
-    if self.image_project:
-      cmd.flags['image-project'] = self.image_project
-
-    if self.replica_zones:
-      cmd.flags['region'] = self.region
-      cmd.flags['replica-zones'] = ','.join(self.replica_zones)
-      del cmd.flags['zone']
-    self.create_disk_start_time = time.time()
-    _, stderr, retcode = cmd.Issue(raise_on_failure=False)
-    self.create_disk_end_time = time.time()
-    util.CheckGcloudResponseKnownFailures(stderr, retcode)
+    create_tasks = []
+    for disk_details in self.disks:
+      create_tasks.append((disk_details.Create, (), {}))
+    background_tasks.RunParallelThreads(create_tasks, max_concurrency=200)
 
   def _PostCreate(self):
     """Called after _CreateResource() is called."""
@@ -635,7 +613,3 @@ class GceStripedDisk(disk.StripedDisk):
     for disk_details in self.disks:
       detach_tasks.append((disk_details.Detach, (), {}))
     background_tasks.RunParallelThreads(detach_tasks, max_concurrency=200)
-
-  def GetCreateTime(self):
-    if self.create_disk_start_time and self.create_disk_end_time:
-      return self.create_disk_end_time - self.create_disk_start_time
