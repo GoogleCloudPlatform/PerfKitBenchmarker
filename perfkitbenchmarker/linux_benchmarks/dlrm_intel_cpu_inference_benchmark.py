@@ -81,6 +81,10 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       'dlrm-v2-99.9/pytorch-cpu-int8/docker && '
       'sed -i "s|docker build|docker build --network=host|g" '
       'build_dlrm-v2-99_int8_container.sh && '
+      'sed -i "s|conda install -y -c intel|conda install -y -c '
+      r'https\:\/\/software.repos.intel.com\/python\/conda\/|g" Dockerfile && '
+      'sed -i "s|conda config --add channels intel|conda config --add channels '
+      r'https\:\/\/software.repos.intel.com\/python\/conda\/|g" Dockerfile && '
       'bash build_dlrm-v2-99_int8_container.sh'
   )
   num_cpus = vm.NumCpusForBenchmark()
