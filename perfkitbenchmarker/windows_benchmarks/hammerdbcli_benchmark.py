@@ -201,38 +201,53 @@ def Prepare(benchmark_spec):
   hammerdb.SetDefaultConfig(num_cpus)
   vm.Install('hammerdb')
 
-  is_azure = FLAGS.cloud == 'Azure' and FLAGS.use_managed_db
-  if (
-      benchmark_spec.relational_db.spec.high_availability
-      and benchmark_spec.relational_db.spec.high_availability_type == 'AOAG'
-  ):
-    db_name = linux_hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[
-        linux_hammerdb.HAMMERDB_SCRIPT.value
-    ]
-    relational_db.client_vm_query_tools.IssueSqlCommand(
-        """CREATE DATABASE [{0}];
-        BACKUP DATABASE [{0}] TO DISK = 'F:\\Backup\\{0}.bak';
-        ALTER AVAILABILITY GROUP [{1}] ADD DATABASE [{0}];
-        """.format(db_name, sql_engine_utils.SQLSERVER_AOAG_NAME)
-    )
-  elif is_azure and hammerdb.HAMMERDB_SCRIPT.value == 'tpc_c':
-    # Create the database first only Azure requires creating the database.
-    relational_db.client_vm_query_tools.IssueSqlCommand('CREATE DATABASE tpcc;')
+  retryable_exceptions = Exception
+  max_retries = 3
+  for tries in range(max_retries):
+    try:
+      # Drop tpcc database if it exists for retry
+      relational_db.client_vm_query_tools.IssueSqlCommand(
+          'DROP DATABASE IF EXISTS tpcc;', timeout=60 * 5
+      )
 
-  hammerdb.SetupConfig(
-      vm,
-      sql_engine_utils.SQLSERVER,
-      hammerdb.HAMMERDB_SCRIPT.value,
-      relational_db.endpoint,
-      relational_db.port,
-      relational_db.spec.database_password,
-      relational_db.spec.database_username,
-      is_azure,
-  )
+      is_azure = FLAGS.cloud == 'Azure' and FLAGS.use_managed_db
+      if (
+          benchmark_spec.relational_db.spec.high_availability
+          and benchmark_spec.relational_db.spec.high_availability_type == 'AOAG'
+      ):
+        db_name = linux_hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[
+            linux_hammerdb.HAMMERDB_SCRIPT.value
+        ]
+        relational_db.client_vm_query_tools.IssueSqlCommand(
+            """CREATE DATABASE [{0}];
+            BACKUP DATABASE [{0}] TO DISK = 'F:\\Backup\\{0}.bak';
+            ALTER AVAILABILITY GROUP [{1}] ADD DATABASE [{0}];
+            """.format(db_name, sql_engine_utils.SQLSERVER_AOAG_NAME)
+        )
+      elif is_azure and hammerdb.HAMMERDB_SCRIPT.value == 'tpc_c':
+        # Create the database first only Azure requires creating the database.
+        relational_db.client_vm_query_tools.IssueSqlCommand(
+            'CREATE DATABASE tpcc;'
+        )
 
-  # SQL Server exhibits better performance when restarted after prepare step
-  if FLAGS.hammerdbcli_restart_before_run:
-    relational_db.RestartDatabase()
+      hammerdb.SetupConfig(
+          vm,
+          sql_engine_utils.SQLSERVER,
+          hammerdb.HAMMERDB_SCRIPT.value,
+          relational_db.endpoint,
+          relational_db.port,
+          relational_db.spec.database_password,
+          relational_db.spec.database_username,
+          is_azure,
+      )
+
+      # SQL Server exhibits better performance when restarted after prepare step
+      if FLAGS.hammerdbcli_restart_before_run:
+        relational_db.RestartDatabase()
+      return
+    except retryable_exceptions as e:
+      if tries >= max_retries - 1:
+        raise e
 
 
 def SetMinimumRecover(relational_db):

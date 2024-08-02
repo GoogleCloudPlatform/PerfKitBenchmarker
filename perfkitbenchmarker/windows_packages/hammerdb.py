@@ -62,7 +62,6 @@ class WindowsHammerDbTclScript(linux_hammerdb.HammerDbTclScript):
           vm, self.tcl_script_name, parameter
       )
 
-  @vm_util.Retry(poll_interval=10, max_retries=3, timeout=TIMEOUT)
   def Run(self, vm, timeout: int | None = 60 * 60 * 6) -> str:
     """Run hammerdbcli script."""
     hammerdb_exe_dir = ntpath.join(
@@ -209,6 +208,7 @@ def SetupConfig(
       script.Run(vm, timeout=linux_hammerdb.HAMMERDB_BUILD_TIMEOUT.value + 600)
 
 
+@vm_util.Retry(poll_interval=10, max_retries=3)
 def Run(
     vm, db_engine: str, hammerdb_script: str, timeout: int | None = TIMEOUT
 ) -> List[sample.Sample]:
