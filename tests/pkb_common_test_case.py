@@ -35,6 +35,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
+from tests import mock_command
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
@@ -202,6 +203,7 @@ class TestGceLinuxVirtualMachine(  # pytype: disable=signature-mismatch  # overr
     gce_virtual_machine.GceVirtualMachine, TestLinuxVirtualMachine
 ):
   """Test class that has VM methods for a GCE virtual machine."""
+
   pass
 
 
@@ -294,3 +296,27 @@ class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
 
     p.start().return_value.returncode = retcode
     cmd_output.start().side_effect = [(stdout, stderr)]
+
+  def MockRemoteCommand(
+      self,
+      call_to_response: dict[str, list[tuple[str, str]]],
+      vm: virtual_machine.BaseVirtualMachine | None = None,
+  ) -> virtual_machine.BaseVirtualMachine:
+    """Mocks vm.RemoteCommand, returning response for the given call.
+
+    Args:
+      call_to_response: A dictionary of commands to a list of responses.
+        Commands just need to be a substring of the actual command. Each
+        response is given in order, like with mock's normal iterating
+        side_effect.
+      vm: A mocked vm. If None, a mock is created.
+
+    Returns:
+      The vm, now with a mocked RemoteCommand.
+    """
+    if vm is None:
+      vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
+    vm.RemoteCommand.mock_command = mock_command.MockRemoteCommand(
+        call_to_response, vm
+    )
+    return vm
