@@ -331,13 +331,7 @@ class DebianBasedDockerContainer(
     logging.warn('Docker Containers cannot be rebooted to apply flags')
 
 
-class Ubuntu1604BasedDockerContainer(
-    DebianBasedDockerContainer, linux_virtual_machine.Ubuntu1604Mixin
-):
-  DEFAULT_IMAGE = UBUNTU16_IMAGE
-
-
-# Note: to add support for ubuntu 14 and ubuntu 18, we simply need to
+# Note: to add support for ubuntu 20+, we simply need to
 #       create/test Dockerfiles for those distros. This should be
 #       fairly simple, but may require a few changes from the
 #       ubuntu16 Dockerfile.

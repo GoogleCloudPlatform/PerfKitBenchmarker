@@ -682,7 +682,7 @@ class BenchmarkSpec:
     for group_name, group_spec in sorted(six.iteritems(vm_group_specs)):
       vms = self.ConstructVirtualMachineGroup(group_name, group_spec)
 
-      if group_spec.os_type == os_types.JUJU:
+      if group_spec.os_type.startswith('juju'):
         # The Juju VM needs to be created first, so that subsequent units can
         # be properly added under its control.
         if group_spec.cloud in clouds:

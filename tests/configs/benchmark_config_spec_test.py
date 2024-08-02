@@ -582,23 +582,22 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
             os_types.WINDOWS2019_CORE,
         )
     }
-    expected_os_types = os_types.JUJU, os_types.WINDOWS2019_CORE
+    valid_os_types = os_types.DEBIAN12, os_types.WINDOWS2019_CORE
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._spec_class(
           _COMPONENT,
-          expected_os_types=expected_os_types,
+          expected_os_types=valid_os_types,
           flag_values=FLAGS,
           **self._kwargs
       )
     self.assertEqual(
         str(cm.exception),
         (
-            'VM groups in test_component may only have the following OS types: '
-            "'juju', 'windows2019_core'. The following VM group options are "
-            'invalid:{sep}'
-            "test_component.vm_groups['rhel8_group'].os_type: 'rhel8'{sep}"
-            "test_component.vm_groups['ubuntu2004_group'].os_type: 'ubuntu2004'"
-            .format(sep=os.linesep)
+            'VM groups in test_component may only have the following OS types:'
+            " 'debian12', 'windows2019_core'. The following VM group options"
+            " are invalid:{sep}test_component.vm_groups['rhel8_group'].os_type:"
+            " 'rhel8'{sep}test_component.vm_groups['ubuntu2004_group'].os_type:"
+            " 'ubuntu2004'".format(sep=os.linesep)
         ),
     )
 

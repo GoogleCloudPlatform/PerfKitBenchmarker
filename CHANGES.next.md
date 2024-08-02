@@ -82,6 +82,10 @@
 -   Remove EOL CentOS 8 and CentOS Stream 8.
 -   Add a python dependency on google-cloud-aiplatform & google-cloud-core,
     needed for benchmarking Vertex AI.
+-   Remove EOL CentOS 7 and RHEL 7.
+-   Remove EOL Debian 9 and 10.
+-   Remove EOL Ubuntu 16, 18, and 23.10.
+-   Remove Broken Juju and Ubuntu Container OS types.
 
 ### New features:
 

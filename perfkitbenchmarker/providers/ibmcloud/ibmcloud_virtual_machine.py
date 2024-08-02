@@ -403,44 +403,10 @@ class DebianBasedIbmCloudVirtualMachine(
     super(DebianBasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
 
 
-class Debian9BasedIbmCloudVirtualMachine(
-    DebianBasedIbmCloudVirtualMachine, linux_virtual_machine.Debian9Mixin
-):
-  IMAGE_NAME_PREFIX = 'ibm-debian-9-'
-
-
-class Debian10BasedIbmCloudVirtualMachine(
-    DebianBasedIbmCloudVirtualMachine, linux_virtual_machine.Debian10Mixin
-):
-  IMAGE_NAME_PREFIX = 'ibm-debian-10-'
-
-
 class Debian11BasedIbmCloudVirtualMachine(
     DebianBasedIbmCloudVirtualMachine, linux_virtual_machine.Debian11Mixin
 ):
   IMAGE_NAME_PREFIX = 'ibm-debian-11-'
-
-
-class Ubuntu1604BasedIbmCloudVirtualMachine(
-    IbmCloudVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin
-):
-  IMAGE_NAME_PREFIX = 'ibm-ubuntu-16-04-'
-
-  def PrepareVMEnvironment(self):
-    self.RemoteCommand('DEBIAN_FRONTEND=noninteractive apt-get -y update')
-    super(Ubuntu1604BasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
-
-
-class Ubuntu1804BasedIbmCloudVirtualMachine(
-    IbmCloudVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin
-):
-  IMAGE_NAME_PREFIX = 'ibm-ubuntu-18-04-'
-
-  def PrepareVMEnvironment(self):
-    logging.info('Pausing for 10 min before update and installs')
-    time.sleep(_WAIT_TIME_UBUNTU)
-    self.RemoteCommand('DEBIAN_FRONTEND=noninteractive apt-get -y update')
-    super(Ubuntu1804BasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
 
 
 class Ubuntu2004BasedIbmCloudVirtualMachine(
@@ -456,12 +422,6 @@ class RhelBasedIbmCloudVirtualMachine(
   def PrepareVMEnvironment(self):
     time.sleep(_WAIT_TIME_RHEL)
     super(RhelBasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
-
-
-class Rhel7BasedIbmCloudVirtualMachine(
-    RhelBasedIbmCloudVirtualMachine, linux_virtual_machine.Rhel7Mixin
-):
-  IMAGE_NAME_PREFIX = 'ibm-redhat-7-6-minimal-amd64'
 
 
 class Rhel8BasedIbmCloudVirtualMachine(

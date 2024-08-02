@@ -60,7 +60,7 @@ hammerdbcli:
         disk_size: 128
     vm_groups:
       clients:
-        os_type: debian9
+        os_type: debian11
         vm_spec:
           GCP:
             machine_type: n1-standard-8

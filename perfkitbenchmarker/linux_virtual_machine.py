@@ -247,8 +247,9 @@ flags.DEFINE_boolean(
     'to extract the total available memory capacity in the container.',
 )
 
-flags.DEFINE_integer('visible_core_count', None,
-                     'To customize the number of visible CPU cores.')
+flags.DEFINE_integer(
+    'visible_core_count', None, 'To customize the number of visible CPU cores.'
+)
 
 _DISABLE_YUM_CRON = flags.DEFINE_boolean(
     'disable_yum_cron', True, 'Whether to disable the cron-run yum service.'
@@ -1849,7 +1850,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     for d in local_disks:
       path = d.GetDevicePath()
       self.RemoteCommand(
-          f'sudo nvme --set-feature --feature-id=8 --value=0x101 {path}')
+          f'sudo nvme --set-feature --feature-id=8 --value=0x101 {path}'
+      )
 
   def StripeDisks(self, devices, striped_device):
     """Raids disks together using mdadm.
@@ -1891,7 +1893,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       dev_path: The device path that should be partitioned.
       num_partitions: The number of new partitions to create.
       partition_size: The size of each partition. The last partition will use
-                      the rest of the device space.
+        the rest of the device space.
+
     Returns:
       A list of partition parths.
     """
@@ -1901,11 +1904,11 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     self.InstallPackages('parted')
 
     # Set the disk label to gpt.
-    self.RemoteHostCommand(f'echo \'label: gpt\' | sudo sfdisk {dev_path}')
+    self.RemoteHostCommand(f"echo 'label: gpt' | sudo sfdisk {dev_path}")
 
     disks = []
     # Create and append new partitions (except the last oen) to the disk
-    for part_id in range(num_partitions-1):
+    for part_id in range(num_partitions - 1):
       self.RemoteHostCommand(
           'echo ",%s,L" | sudo sfdisk %s -f --append'
           % (partition_size, dev_path)
@@ -2287,7 +2290,7 @@ class BaseRhelMixin(BaseLinuxMixin):
   # dnf is backwards compatible with yum, but has some additional capabilities
   # For CentOS and RHEL 7 we override this to yum and do not pass dnf-only flags
   # The commands are similar enough that forking whole methods seemed necessary.
-  # This can be removed when CentOS and RHEL 7 are no longer supported by PKB.
+  # This can be removed when Amazon Linux 2 is no longer supported by PKB.
   PACKAGE_MANAGER = DNF
 
   # OS_TYPE = os_types.RHEL
@@ -2463,21 +2466,6 @@ class AmazonLinux2023Mixin(BaseRhelMixin):
   # https://docs.aws.amazon.com/linux/al2023/ug/compare-with-al2.html#epel
 
 
-class Rhel7Mixin(BaseRhelMixin):
-  """Class holding RHEL 7 specific VM methods and attributes."""
-
-  OS_TYPE = os_types.RHEL7
-  PACKAGE_MANAGER = YUM
-
-  def SetupPackageManager(self):
-    """Install EPEL."""
-    # https://docs.fedoraproject.org/en-US/epel/#_rhel_7
-    # yum exits 1 if the program is installed so check first
-    self.RemoteCommand(
-        f'rpm -q epel-release || sudo yum install -y {_EPEL_URL.format(7)}'
-    )
-
-
 class Rhel8Mixin(BaseRhelMixin):
   """Class holding RHEL 8 specific VM methods and attributes."""
 
@@ -2519,24 +2507,6 @@ class Fedora37Mixin(BaseRhelMixin):
 
   def SetupPackageManager(self):
     """Fedora does not need epel."""
-
-
-class CentOs7Mixin(BaseRhelMixin, os_mixin.DeprecatedOsMixin):
-  """Class holding CentOS 7 specific VM methods and attributes."""
-
-  OS_TYPE = os_types.CENTOS7
-  PACKAGE_MANAGER = YUM
-
-  END_OF_LIFE = '2024-06-30'
-  ALTERNATIVE_OS = os_types.ROCKY_LINUX8
-
-  def SetupPackageManager(self):
-    """Install EPEL."""
-    # https://docs.fedoraproject.org/en-US/epel/#_centos_7
-    # yum exits 1 if the program is installed so check first
-    self.RemoteCommand(
-        'rpm -q epel-release || sudo yum install -y epel-release'
-    )
 
 
 class CentOsStream9Mixin(BaseRhelMixin):
@@ -2780,37 +2750,6 @@ class BaseDebianMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class Debian9Mixin(BaseDebianMixin):
-  """Class holding Debian9 specific VM methods and attributes."""
-
-  OS_TYPE = os_types.DEBIAN9
-  # https://packages.debian.org/stretch/python
-  PYTHON_2_PACKAGE = 'python'
-
-
-class Debian10Mixin(BaseDebianMixin, os_mixin.DeprecatedOsMixin):
-  """Class holding Debian 10 specific VM methods and attributes."""
-
-  OS_TYPE = os_types.DEBIAN10
-  END_OF_LIFE = '2024-06-30'
-
-  def SetupPackageManager(self):
-    # buster-backports has moved to the archive domain
-    self.RemoteCommand(
-        'sudo find /etc/apt/sources.list* -type f -exec sed -Ei '
-        "'s@(https?://)\\S+(/debian buster-backports main)"
-        "@\\1archive.debian.org\\2@' "
-        '{} \\;'
-    )
-    super().SetupPackageManager()
-
-
-class Debian10BackportsMixin(Debian10Mixin):
-  """Debian 10 with backported kernel."""
-
-  OS_TYPE = os_types.DEBIAN10_BACKPORTS
-
-
 class Debian11Mixin(BaseDebianMixin):
   """Class holding Debian 11 specific VM methods and attributes."""
 
@@ -2854,44 +2793,6 @@ class BaseUbuntuMixin(BaseDebianMixin):
     self.RemoteCommand('sudo update-grub')
     if reboot:
       self.Reboot()
-
-
-class Ubuntu1604Mixin(BaseUbuntuMixin, os_mixin.DeprecatedOsMixin):
-  """Class holding Ubuntu1604 specific VM methods and attributes."""
-
-  OS_TYPE = os_types.UBUNTU1604
-  PYTHON_2_PACKAGE = 'python'
-  END_OF_LIFE = '2021-05-01'
-  ALTERNATIVE_OS = os_types.UBUNTU1804
-
-
-class Ubuntu1804Mixin(BaseUbuntuMixin, os_mixin.DeprecatedOsMixin):
-  """Class holding Ubuntu1804 specific VM methods and attributes."""
-
-  OS_TYPE = os_types.UBUNTU1804
-  # https://packages.ubuntu.com/bionic/python
-  PYTHON_2_PACKAGE = 'python'
-  END_OF_LIFE = '2023-05-31'
-  ALTERNATIVE_OS = os_types.UBUNTU2004
-
-  def UpdateEnvironmentPath(self):
-    """Add /snap/bin to default search path for Ubuntu1804.
-
-    See https://bugs.launchpad.net/snappy/+bug/1659719.
-    """
-    # Ensure ~/.bashrc exists.
-    self.RemoteCommand(
-        r'touch ~/.bashrc && sed -i "1 i\export PATH=$PATH:/snap/bin" ~/.bashrc'
-    )
-    self.RemoteCommand(
-        r'sudo sed -i "1 i\export PATH=$PATH:/snap/bin" /etc/bash.bashrc'
-    )
-
-
-class Ubuntu1804EfaMixin(Ubuntu1804Mixin):
-  """Class holding EFA specific VM methods and attributes."""
-
-  OS_TYPE = os_types.UBUNTU1804_EFA
 
 
 class Ubuntu2004Mixin(BaseUbuntuMixin):
@@ -2953,26 +2854,16 @@ class Ubuntu2204Mixin(BaseUbuntuMixin):
   OS_TYPE = os_types.UBUNTU2204
 
 
-class Ubuntu2310Mixin(BaseUbuntuMixin):
-  """Class holding Ubuntu 23.10 specific VM methods and attributes."""
-
-  OS_TYPE = os_types.UBUNTU2310
-
-
 class Ubuntu2404Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu 24.04 specific VM methods and attributes."""
 
   OS_TYPE = os_types.UBUNTU2404
 
 
-class Ubuntu1604Cuda9Mixin(Ubuntu1604Mixin):
-  """Class holding NVIDIA CUDA specific VM methods and attributes."""
-
-  OS_TYPE = os_types.UBUNTU1604_CUDA9
-
-
 class ContainerizedDebianMixin(BaseDebianMixin):
-  """Class representing a Containerized Virtual Machine.
+  """DEPRECATED mixin with no current implementations.
+
+  Class representing a Containerized Virtual Machine.
 
   A Containerized Virtual Machine is a VM that runs remote commands
   within a Docker Container.
@@ -2980,7 +2871,6 @@ class ContainerizedDebianMixin(BaseDebianMixin):
   whereas any call to RemoteHostCommand() will be run in the VM itself.
   """
 
-  OS_TYPE = os_types.UBUNTU_CONTAINER
   BASE_DOCKER_IMAGE = 'ubuntu:xenial'
 
   def __init__(self, *args, **kwargs):
@@ -3324,7 +3214,9 @@ class ProcCpuResults(object):
 
 
 class JujuMixin(BaseDebianMixin):
-  """Class to allow running Juju-deployed workloads.
+  """DEPRECATED mixin with no current implementations.
+
+  Class to allow running Juju-deployed workloads.
 
   Bootstraps a Juju environment using the manual provider:
   https://jujucharms.com/docs/stable/config-manual
@@ -3332,8 +3224,6 @@ class JujuMixin(BaseDebianMixin):
 
   # TODO: Add functionality to tear down and uninstall Juju
   # (for pre-provisioned) machines + JujuUninstall for packages using charms.
-
-  OS_TYPE = os_types.JUJU
 
   is_controller = False
 

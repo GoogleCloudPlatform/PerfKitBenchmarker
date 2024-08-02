@@ -494,18 +494,6 @@ class Debian113BasedAliVirtualMachine(
   IMAGE_NAME_FILTER = 'debian_11_3_x64_20G*alibase*.vhd'
 
 
-class Ubuntu1604BasedAliVirtualMachine(
-    AliVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin
-):
-  IMAGE_NAME_FILTER = 'ubuntu_16_04_x64*alibase*.vhd'
-
-
-class Ubuntu1804BasedAliVirtualMachine(
-    AliVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin
-):
-  IMAGE_NAME_FILTER = 'ubuntu_18_04_x64*alibase*.vhd'
-
-
 class Ubuntu2004BasedAliVirtualMachine(
     AliVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
 ):
@@ -522,9 +510,3 @@ class Ubuntu2404BasedAliVirtualMachine(
     AliVirtualMachine, linux_virtual_machine.Ubuntu2404Mixin
 ):
   IMAGE_NAME_FILTER = 'ubuntu_24_04_x64*alibase*.vhd'
-
-
-class CentOs7BasedAliVirtualMachine(
-    AliVirtualMachine, linux_virtual_machine.CentOs7Mixin
-):
-  IMAGE_NAME_FILTER = 'centos_7_05_x64*alibase*.vhd'

@@ -661,16 +661,16 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     # when aws_efa_version is blanked out do not install EFA
     FLAGS.aws_efa = True
     FLAGS.aws_efa_version = ''
-    vm = InitCentosVm()
+    vm = InitVm()
     vm._InstallEfa = mock.Mock()
     vm._ConfigureEfa = mock.Mock()
     vm._PostCreate()
     vm._InstallEfa.assert_not_called()
 
-  def testInstallEfaCentos(self):
+  def testInstallEfa(self):
     # Confirms vm._PostCreate() calls for EFA creation
     FLAGS.aws_efa = True
-    vm = InitCentosVm()
+    vm = InitVm()
     vm._ConfigureElasticIp = mock.Mock()
     vm._PostCreate()
     aws_cmd = '; '.join(
@@ -680,13 +680,10 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         aws_cmd,
         '.*'.join([
             'curl -O https://s3-us-west-2',
-            'yum upgrade -y kernel',
-            'yum install -y kernel-devel',
             'efa_installer.sh -y',
             './efa_test.sh',
         ]),
     )
-    vm.Reboot.assert_called_once()
 
 
 def CreateVm():
@@ -704,7 +701,7 @@ def CreateVm():
   return ' '.join(vm_util.IssueCommand.call_args[0][0])
 
 
-def InitCentosVm():
+def InitVm():
   aws_response = {
       'Reservations': [{
           'Instances': [{
@@ -715,7 +712,7 @@ def InitCentosVm():
       }]
   }
   util.IssueRetryableCommand.return_value = json.dumps(aws_response), ''
-  vm = aws_virtual_machine.CentOs7BasedAwsVirtualMachine(TestVmSpec())
+  vm = aws_virtual_machine.Ubuntu2404BasedAwsVirtualMachine(TestVmSpec())
   # This assumes that STDOUT is never parsed, which is incredibly brittle.
   # If this test starts infinitely looping it's probably retrying an error
   # based on this mock.

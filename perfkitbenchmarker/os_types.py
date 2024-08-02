@@ -18,7 +18,6 @@ from absl import flags
 AMAZONLINUX2 = 'amazonlinux2'
 AMAZONLINUX2023 = 'amazonlinux2023'
 AMAZON_NEURON = 'amazon_neuron'
-CENTOS7 = 'centos7'  # deprecated
 CENTOS_STREAM9 = 'centos_stream9'
 CLEAR = 'clear'
 COS = 'cos'  # stable
@@ -27,33 +26,22 @@ COS105 = 'cos105'
 COS101 = 'cos101'
 COS_DEV = 'cos_dev'
 CORE_OS = 'core_os'
-DEBIAN9 = 'debian9'
-DEBIAN10 = 'debian10'
-DEBIAN10_BACKPORTS = 'debian10_backports'
 DEBIAN11 = 'debian11'
 DEBIAN11_BACKPORTS = 'debian11_backports'
 DEBIAN12 = 'debian12'
 FEDORA36 = 'fedora36'
 FEDORA37 = 'fedora37'
-JUJU = 'juju'
-RHEL7 = 'rhel7'
 RHEL8 = 'rhel8'
 RHEL9 = 'rhel9'
 ROCKY_LINUX8 = 'rocky_linux8'
 ROCKY_LINUX8_OPTIMIZED = 'rocky_linux8_optimized'
 ROCKY_LINUX9 = 'rocky_linux9'
 ROCKY_LINUX9_OPTIMIZED = 'rocky_linux9_optimized'
-UBUNTU_CONTAINER = 'ubuntu_container'
-UBUNTU1604 = 'ubuntu1604'  # deprecated
-UBUNTU1604_CUDA9 = 'ubuntu1604_cuda9'
-UBUNTU1804 = 'ubuntu1804'  # deprecated
-UBUNTU1804_EFA = 'ubuntu1804_efa'
 UBUNTU2004 = 'ubuntu2004'
 UBUNTU2004_EFA = 'ubuntu2004_efa'
 UBUNTU2004_DL = 'ubuntu2004_dl'
 AMAZONLINUX2_DL = 'amazonlinux2_dl'
 UBUNTU2204 = 'ubuntu2204'
-UBUNTU2310 = 'ubuntu2310'
 UBUNTU2404 = 'ubuntu2404'
 WINDOWS2016_CORE = 'windows2016_core'
 WINDOWS2019_CORE = 'windows2019_core'
@@ -109,35 +97,23 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     AMAZONLINUX2_DL,
     AMAZONLINUX2023,
     AMAZON_NEURON,
-    CENTOS7,
     CENTOS_STREAM9,
     CLEAR,
-    DEBIAN9,
-    DEBIAN10,
-    DEBIAN10_BACKPORTS,
     DEBIAN11,
     DEBIAN11_BACKPORTS,
     DEBIAN12,
     FEDORA36,
     FEDORA37,
-    JUJU,
-    RHEL7,
     RHEL8,
     RHEL9,
     ROCKY_LINUX8,
     ROCKY_LINUX8_OPTIMIZED,
     ROCKY_LINUX9,
     ROCKY_LINUX9_OPTIMIZED,
-    UBUNTU_CONTAINER,
-    UBUNTU1604,  # deprecated
-    UBUNTU1604_CUDA9,
-    UBUNTU1804,  # deprecated
-    UBUNTU1804_EFA,
     UBUNTU2004,
     UBUNTU2004_EFA,
     UBUNTU2004_DL,
     UBUNTU2204,
-    UBUNTU2310,
     UBUNTU2404,
 ]
 
@@ -164,7 +140,7 @@ WINDOWS_SQLSERVER_OS_TYPES = [
     WINDOWS2022_SQLSERVER_2022_ENTERPRISE,
 ]
 
-CENTOS_TYPES = [CENTOS7, CENTOS_STREAM9]
+CENTOS_TYPES = [CENTOS_STREAM9]
 WINDOWS_OS_TYPES = (
     WINDOWS_CORE_OS_TYPES + WINDOWS_DESKOP_OS_TYPES + WINDOWS_SQLSERVER_OS_TYPES
 )

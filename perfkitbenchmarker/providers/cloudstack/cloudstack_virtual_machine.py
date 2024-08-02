@@ -23,7 +23,6 @@ import logging
 
 from absl import flags
 from perfkitbenchmarker import disk_strategies
-from perfkitbenchmarker import linux_virtual_machine as linux_vm
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -196,9 +195,3 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     disk_strategies.PrepareScratchDiskStrategy().PrepareScratchDisk(
         self, scratch_disk, disk_spec
     )
-
-
-class CentOs7BasedCloudStackVirtualMachine(
-    CloudStackVirtualMachine, linux_vm.CentOs7Mixin
-):
-  DEFAULT_IMAGE = 'CentOS 7 HVM base (64bit)'

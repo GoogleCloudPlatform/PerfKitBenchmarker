@@ -31,10 +31,9 @@ _DEB_REPO_FILE = 'https://packages.microsoft.com/config/ubuntu/{os}/prod.list'
 _DEB_FILE_LOCATION = '/etc/apt/sources.list.d/msprod.list'
 
 OS_TYPE_MAPPING = {
-    os_types.UBUNTU1604: '16.04',
-    os_types.UBUNTU1804: '18.04',
     os_types.UBUNTU2004: '20.04',
     os_types.UBUNTU2204: '22.04',
+    os_types.UBUNTU2404: '24.04',
 }
 
 

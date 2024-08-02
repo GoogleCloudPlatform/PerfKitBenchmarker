@@ -19,7 +19,6 @@ import posixpath
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
-from perfkitbenchmarker import os_types
 
 FLAGS = flags.FLAGS
 
@@ -30,14 +29,12 @@ flags.DEFINE_integer('gluster_stripes', 1, 'The number of Gluster stripes.')
 def YumInstall(vm):
   """Installs the gluster package on the VM."""
   # TODO(user): Install gluster for RHEL.
-  if FLAGS.os_type != os_types.CENTOS7:
-    raise NotImplementedError(
-        'PKB currently only supports installation of gluster on centos7 or '
-        'Debian-based VMs.'
-    )
-  vm.InstallPackages('centos-release-gluster')
-  vm.InstallPackages('glusterfs-server')
-  vm.RemoteCommand('sudo glusterd')
+  raise NotImplementedError(
+      'PKB currently only supports installation of gluster on Debian-based VMs.'
+  )
+  # vm.InstallPackages('centos-release-gluster')
+  # vm.InstallPackages('glusterfs-server')
+  # vm.RemoteCommand('sudo glusterd')
 
 
 def AptInstall(vm):

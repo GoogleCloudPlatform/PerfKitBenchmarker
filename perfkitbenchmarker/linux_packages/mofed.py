@@ -25,10 +25,6 @@ flags.DEFINE_string('mofed_version', '5.0-2.1.8.0', 'Mellanox OFED version')
 
 # TODO(tohaowu) Add DEBIAN9, CENTOS7, RHEL
 MOFED_OS_MAPPING = {
-    os_types.UBUNTU1604: 'ubuntu16.04',
-    os_types.UBUNTU1604_CUDA9: 'ubuntu16.04',
-    os_types.UBUNTU1804: 'ubuntu18.04',
-    os_types.UBUNTU1804_EFA: 'ubuntu18.04',
     os_types.UBUNTU2004: 'ubuntu20.04',
     os_types.UBUNTU2004_EFA: 'ubuntu20.04',
 }

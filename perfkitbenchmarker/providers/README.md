@@ -310,7 +310,7 @@ and set these parameters.
 Use os_type to change OS image.
 
 ```bash
---os_type=debian10
+--os_type=debian12
 ```
 
 For cross zones network test, set zones to a comma separated string like

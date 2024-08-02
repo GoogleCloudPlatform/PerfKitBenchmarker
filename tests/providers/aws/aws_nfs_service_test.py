@@ -270,7 +270,7 @@ class AwsVirtualMachineTest(BaseTest):
     vm_spec = aws_virtual_machine.AwsVmSpec(
         _COMPONENT, zone=_AWS_ZONE, machine_type='m2.2xlarge'
     )
-    aws_machine = aws_virtual_machine.Rhel7BasedAwsVirtualMachine(vm_spec)
+    aws_machine = aws_virtual_machine.Rhel9BasedAwsVirtualMachine(vm_spec)
     aws_machine.RemoteCommand = mock.Mock()
     aws_machine.RemoteHostCommand = mock.Mock()
     aws_machine.GetNVMEDeviceInfo = mock.Mock()
@@ -310,7 +310,7 @@ class AwsVirtualMachineTest(BaseTest):
     fstab_cmd = (
         'echo "{host}:/ /scratch nfs {mount_opt}" | sudo tee -a /etc/fstab'
     ).format(mount_opt=mount_opt, host=host)
-    install_nfs = 'sudo yum install -y nfs-utils'
+    install_nfs = 'sudo dnf install -y nfs-utils --allowerasing'
 
     aws_machine = self._CallCreateScratchDisk(disk.NFS)
     aws_machine.SetupAllScratchDisks()

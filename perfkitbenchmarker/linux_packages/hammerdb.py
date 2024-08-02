@@ -24,8 +24,6 @@ from typing import Any, FrozenSet, List
 from absl import flags
 from dateutil import parser
 from perfkitbenchmarker import data
-from perfkitbenchmarker import errors
-from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
@@ -259,16 +257,7 @@ def SetDefaultConfig(num_cpus: int | None):
 
 def CheckPrerequisites(_):
   """Verifies that benchmark setup is correct."""
-  # hammerdb 4.5 and later versions required glibc 2.29 or later,
-  # which is not available on ubuntu1804 and earlier.
-  if HAMMERDB_VERSION.value == HAMMERDB_4_5 and FLAGS.os_type in [
-      os_types.UBUNTU1604,
-      os_types.UBUNTU1804,
-  ]:
-    raise errors.Setup.InvalidFlagConfigurationError(
-        'Hammerdb version 4.5 is not supported on os type {}.'
-        'Use a later version of the os or an earlier version of hammerdb.'
-    )
+  pass
 
 
 # define Hammerdb exception

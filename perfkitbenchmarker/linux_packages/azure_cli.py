@@ -80,10 +80,9 @@ def _PipInstall(vm):
 
 # https://packages.microsoft.com/repos/azure-cli/dists/
 SUPPORTED_APT_DISTROS = [
-    os_types.UBUNTU1804,
     os_types.UBUNTU2004,
     os_types.UBUNTU2204,
-    os_types.DEBIAN10,
+    os_types.UBUNTU2404,
     os_types.DEBIAN11,
     os_types.DEBIAN12,
 ]

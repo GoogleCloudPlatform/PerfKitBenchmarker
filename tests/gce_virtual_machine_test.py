@@ -560,8 +560,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       )
       self.assertNotIn('image_family', vm_metadata)
 
-  def testCreateRhel7CustomImage(self):
-    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.RHEL7)
+  def testCreateRhel9CustomImage(self):
+    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.RHEL9)
     fake_image = 'fake-custom-rhel-image'
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT, machine_type='fake-machine-type', image=fake_image
@@ -584,33 +584,6 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm_metadata = vm.GetResourceMetadata()
       self.assertDictContainsSubset(
           {'image': fake_image, 'image_project': 'rhel-cloud'}, vm_metadata
-      )
-      self.assertNotIn('image_family', vm_metadata)
-
-  def testCreateCentOs7CustomImage(self):
-    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.CENTOS7)
-    fake_image = 'fake-custom-centos7-image'
-    spec = gce_virtual_machine.GceVmSpec(
-        _COMPONENT, machine_type='fake-machine-type', image=fake_image
-    )
-    with PatchCriticalObjects(
-        self._CreateFakeReturnValues(fake_image)
-    ) as issue_command:
-      vm = vm_class(spec)
-      vm._CreateDependencies()
-      vm._Create()
-      vm.created = True
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud compute instances create', command_string)
-      self.assertIn('--image ' + fake_image, command_string)
-      self.assertIn('--image-project centos-cloud', command_string)
-      vm._PostCreate()
-      self.assertEqual(issue_command.call_count, 3)
-      vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset(
-          {'image': fake_image, 'image_project': 'centos-cloud'}, vm_metadata
       )
       self.assertNotIn('image_family', vm_metadata)
 

@@ -37,7 +37,6 @@ import tempfile
 from absl import flags
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -573,16 +572,3 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
         and 'config' not in blk_device['label']
         and blk_device['name'] not in self.allocated_disks
     )
-
-
-class Rhel7BasedRackspaceVirtualMachine(
-    RackspaceVirtualMachine, linux_virtual_machine.Rhel7Mixin
-):
-  DEFAULT_IMAGE = '92f8a8b8-6019-4c27-949b-cf9910b84ffb'
-
-
-class VersionlessRhelBasedRackspaceVirtualMachine(
-    linux_virtual_machine.VersionlessRhelMixin,
-    Rhel7BasedRackspaceVirtualMachine,
-):
-  pass

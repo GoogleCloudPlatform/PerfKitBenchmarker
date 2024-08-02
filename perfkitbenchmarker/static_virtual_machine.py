@@ -246,7 +246,6 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         os_types.DEBIAN: linux_required_keys,
         os_types.RHEL: linux_required_keys,
         os_types.CLEAR: linux_required_keys,
-        os_types.UBUNTU_CONTAINER: linux_required_keys,
     }
 
     # assume linux_required_keys for unknown os_type
@@ -363,18 +362,6 @@ def GetStaticVmClass(os_type) -> type[virtual_machine.BaseVirtualMachine]:
   )
 
 
-class Ubuntu1604BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin
-):
-  pass
-
-
-class Ubuntu1804BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin
-):
-  pass
-
-
 class Ubuntu2004BasedStaticVirtualMachine(
     StaticVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
 ):
@@ -387,12 +374,6 @@ class Ubuntu2204BasedStaticVirtualMachine(
   pass
 
 
-class Ubuntu2310BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Ubuntu2310Mixin
-):
-  pass
-
-
 class Ubuntu2404BasedStaticVirtualMachine(
     StaticVirtualMachine, linux_virtual_machine.Ubuntu2404Mixin
 ):
@@ -401,12 +382,6 @@ class Ubuntu2404BasedStaticVirtualMachine(
 
 class ClearBasedStaticVirtualMachine(
     StaticVirtualMachine, linux_virtual_machine.ClearMixin
-):
-  pass
-
-
-class Rhel7BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Rhel7Mixin
 ):
   pass
 
@@ -431,24 +406,6 @@ class Fedora36BasedStaticVirtualMachine(
 
 class Fedora37BasedStaticVirtualMachine(
     StaticVirtualMachine, linux_virtual_machine.Fedora37Mixin
-):
-  pass
-
-
-class CentOs7BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.CentOs7Mixin
-):
-  pass
-
-
-class Debian9BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Debian9Mixin
-):
-  pass
-
-
-class Debian10BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Debian10Mixin
 ):
   pass
 

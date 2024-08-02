@@ -43,7 +43,6 @@ messaging_service:
   description: messaging_service benchmark
   vm_groups:
     default:
-      os_type: debian10
       vm_spec:
         AWS:
           machine_type: m5.2xlarge

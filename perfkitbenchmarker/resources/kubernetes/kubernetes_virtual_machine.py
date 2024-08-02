@@ -733,6 +733,12 @@ class DebianBasedKubernetesVirtualMachine(
 # sudo in the container startup script.
 
 
+class Ubuntu2004BasedKubernetesVirtualMachine(
+    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
+):
+  DEFAULT_IMAGE = 'ubuntu:20.04'
+
+
 class Ubuntu2204BasedKubernetesVirtualMachine(
     DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu2204Mixin
 ):
@@ -751,34 +757,8 @@ class Ubuntu2204BasedKubernetesVirtualMachine(
 
 
 class Ubuntu2404BasedKubernetesVirtualMachine(
+    linux_virtual_machine.Ubuntu2404Mixin,
     # Pick up fdisk fix.
     Ubuntu2204BasedKubernetesVirtualMachine,
-    linux_virtual_machine.Ubuntu2404Mixin,
 ):
   DEFAULT_IMAGE = 'ubuntu:24.04'
-
-
-class Ubuntu2004BasedKubernetesVirtualMachine(
-    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
-):
-  DEFAULT_IMAGE = 'ubuntu:20.04'
-
-
-class Ubuntu1804BasedKubernetesVirtualMachine(
-    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin
-):
-  DEFAULT_IMAGE = 'ubuntu:18.04'
-
-
-class Ubuntu1604BasedKubernetesVirtualMachine(
-    DebianBasedKubernetesVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin
-):
-  DEFAULT_IMAGE = 'ubuntu:16.04'
-
-
-class Ubuntu1604Cuda9BasedKubernetesVirtualMachine(
-    DebianBasedKubernetesVirtualMachine,
-    linux_virtual_machine.Ubuntu1604Cuda9Mixin,
-):
-  # Image is from https://hub.docker.com/r/nvidia/cuda/
-  DEFAULT_IMAGE = 'nvidia/cuda:9.0-devel-ubuntu16.04'

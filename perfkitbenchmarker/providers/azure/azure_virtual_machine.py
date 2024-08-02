@@ -956,7 +956,6 @@ class AzureVirtualMachine(
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       else:
         raise errors.Resource.CreationError(
-            'Failed to create VM: %s return code: %s' % (stderr, retcode)
         )
 
   def _Exists(self):
@@ -1177,21 +1176,6 @@ class AzureVirtualMachine(
     return util.GetMachineFamily(self.machine_type) in NVME_MACHINE_FAMILIES
 
 
-class Debian9BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Debian9Mixin
-):
-  # From https://wiki.debian.org/Cloud/MicrosoftAzure
-  IMAGE_URN = 'credativ:Debian:9:latest'
-
-
-class Debian10BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Debian10Mixin
-):
-  # From https://wiki.debian.org/Cloud/MicrosoftAzure
-  GEN2_IMAGE_URN = 'Debian:debian-10:10-gen2:latest'
-  IMAGE_URN = 'Debian:debian-10:10:latest'
-
-
 class Debian11BasedAzureVirtualMachine(
     AzureVirtualMachine, linux_virtual_machine.Debian11Mixin
 ):
@@ -1208,24 +1192,6 @@ class Debian12BasedAzureVirtualMachine(
   GEN2_IMAGE_URN = 'Debian:debian-12:12-gen2:latest'
   IMAGE_URN = 'Debian:debian-12:12:latest'
   ARM_IMAGE_URN = 'Debian:debian-12:12-arm64:latest'
-
-
-class Ubuntu1604BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Ubuntu1604Mixin
-):
-  GEN2_IMAGE_URN = 'Canonical:UbuntuServer:16_04-lts-gen2:latest'
-  IMAGE_URN = 'Canonical:UbuntuServer:16.04-LTS:latest'
-  # No ARM image when running
-  # az vm image list --architecture Arm64 --all --publisher canonical
-  # | grep 16_04
-
-
-class Ubuntu1804BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Ubuntu1804Mixin
-):
-  GEN2_IMAGE_URN = 'Canonical:UbuntuServer:18_04-lts-gen2:latest'
-  IMAGE_URN = 'Canonical:UbuntuServer:18.04-LTS:latest'
-  ARM_IMAGE_URN = 'Canonical:UbuntuServer:18_04-lts-arm64:latest'
 
 
 class Ubuntu2004BasedAzureVirtualMachine(
@@ -1258,17 +1224,6 @@ class Ubuntu2204BasedAzureVirtualMachine(
   )
 
 
-class Ubuntu2310BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Ubuntu2310Mixin
-):
-  GEN2_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-mantic:23_10-gen2:latest'
-  IMAGE_URN = 'Canonical:0001-com-ubuntu-server-mantic:23_10:latest'
-  CONFIDENTIAL_IMAGE_URN = (
-      'Canonical:0001-com-ubuntu-confidential-vm-mantic:23_10-cvm:latest'
-  )
-  ARM_IMAGE_URN = 'Canonical:0001-com-ubuntu-server-mantic:23_10-arm64:latest'
-
-
 class Ubuntu2404BasedAzureVirtualMachine(
     AzureVirtualMachine, linux_virtual_machine.Ubuntu2404Mixin
 ):
@@ -1276,13 +1231,6 @@ class Ubuntu2404BasedAzureVirtualMachine(
   IMAGE_URN = 'Canonical:ubuntu-24_04-lts:server-gen1:latest'
   CONFIDENTIAL_IMAGE_URN = 'Canonical:ubuntu-24_04-lts:cvm:latest'
   ARM_IMAGE_URN = 'Canonical:ubuntu-24_04-lts:server-arm64:latest'
-
-
-class Rhel7BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Rhel7Mixin
-):
-  GEN2_IMAGE_URN = 'RedHat:RHEL:7lvm-gen2:latest'
-  IMAGE_URN = 'RedHat:RHEL:7-LVM:latest'
 
 
 class Rhel8BasedAzureVirtualMachine(
@@ -1297,20 +1245,6 @@ class Rhel9BasedAzureVirtualMachine(
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:9-lvm-gen2:latest'
   IMAGE_URN = 'RedHat:RHEL:9-lvm:latest'
-
-
-class CentOs7BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.CentOs7Mixin
-):
-  GEN2_IMAGE_URN = 'OpenLogic:CentOS-LVM:7-lvm-gen2:latest'
-  IMAGE_URN = 'OpenLogic:CentOS-LVM:7-lvm:latest'
-
-
-class AlmaLinuxBasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.RockyLinux8Mixin
-):
-  GEN2_IMAGE_URN = 'almalinux:almalinux-hpc:8_7-hpc-gen2:latest'
-  IMAGE_URN = 'almalinux:almalinux-hpc:8_7-hpc:latest'
 
 
 # Rocky Linux is now distributed via a community gallery:

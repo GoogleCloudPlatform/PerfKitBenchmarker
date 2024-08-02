@@ -1650,26 +1650,6 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
     return self.DEFAULT_IMAGE_PROJECT
 
 
-class Debian9BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Debian9Mixin
-):
-  DEFAULT_X86_IMAGE_FAMILY = 'debian-9'
-  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
-  SUPPORTS_GVNIC = False
-
-  def _BeforeSuspend(self):
-    self.InstallPackages('dbus')
-    self.RemoteCommand('sudo systemctl restart systemd-logind.service')
-
-
-class Debian10BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Debian10Mixin
-):
-  DEFAULT_X86_IMAGE_FAMILY = 'debian-10'
-  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
-  SUPPORTS_GVNIC = False
-
-
 class Debian11BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian11Mixin
 ):
@@ -1684,13 +1664,6 @@ class Debian12BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
-class Rhel7BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Rhel7Mixin
-):
-  DEFAULT_X86_IMAGE_FAMILY = 'rhel-7'
-  DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
-
-
 class Rhel8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel8Mixin
 ):
@@ -1703,13 +1676,6 @@ class Rhel9BasedGceVirtualMachine(
 ):
   DEFAULT_X86_IMAGE_FAMILY = 'rhel-9'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
-
-
-class CentOs7BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.CentOs7Mixin
-):
-  DEFAULT_X86_IMAGE_FAMILY = 'centos-7'
-  DEFAULT_IMAGE_PROJECT = 'centos-cloud'
 
 
 class RockyLinux8BasedGceVirtualMachine(
@@ -1808,13 +1774,6 @@ class CoreOsBasedGceVirtualMachine(
     self.user_name = 'core'
 
 
-class Ubuntu1804BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu1804Mixin
-):
-  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-1804-lts'
-  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
-
-
 class Ubuntu2004BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2004Mixin
 ):
@@ -1826,13 +1785,6 @@ class Ubuntu2204BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2204Mixin
 ):
   DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2204-lts'
-  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
-
-
-class Ubuntu2310BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2310Mixin
-):
-  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2310-amd64'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 

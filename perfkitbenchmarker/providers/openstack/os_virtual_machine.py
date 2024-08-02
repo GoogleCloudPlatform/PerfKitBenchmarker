@@ -442,18 +442,6 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     return result
 
 
-class Rhel7BasedOpenStackVirtualMachine(
-    OpenStackVirtualMachine, linux_virtual_machine.Rhel7Mixin
-):
-  DEFAULT_IMAGE = 'rhel-7.2'
-
-
-class CentOs7BasedOpenStackVirtualMachine(
-    OpenStackVirtualMachine, linux_virtual_machine.CentOs7Mixin
-):
-  DEFAULT_IMAGE = 'centos7'
-
-
 class ClearBasedOpenStackVirtualMachine(
     OpenStackVirtualMachine, linux_virtual_machine.ClearMixin
 ):

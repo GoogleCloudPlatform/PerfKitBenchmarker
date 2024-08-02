@@ -26,9 +26,9 @@ _CMAKE_KITWARE = flags.DEFINE_bool(
 
 # Needed to configure the kitware debian repo
 _UBUNTU_VERSION_NAMES = {
-    os_types.UBUNTU1604: 'xenial',
-    os_types.UBUNTU1804: 'bionic',
     os_types.UBUNTU2004: 'focal',
+    os_types.UBUNTU2204: 'jammy',
+    os_types.UBUNTU2404: 'noble',
 }
 _KITWARE_KEY_URL = 'https://apt.kitware.com/keys/kitware-archive-latest.asc'
 _KITWARE_DEB_CONFIG = 'deb https://apt.kitware.com/ubuntu/ {version} main'

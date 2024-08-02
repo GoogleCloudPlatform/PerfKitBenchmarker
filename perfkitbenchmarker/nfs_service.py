@@ -222,7 +222,7 @@ class UnmanagedNfsService(BaseNfsService):
     assert self.server_vm, 'NFS server VM not created.'
     self.server_vm.Install('nfs_server')
     self._ExportNfsDir(self.server_directory)
-    # Restart NFS service upon reboot if required (Centos7)
+    # Restart NFS service upon reboot if required
     self.server_vm.RemoteCommand(
         'sudo systemctl enable nfs', ignore_failure=True
     )

@@ -115,7 +115,7 @@ _EXPECTED_CALL_BODY_WITH_2_GPUS = """
 }
 """
 
-_EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE = """
+_EXPECTED_CALL_BODY_UBUNTU_2404 = """
 {
     "spec": {
         "dnsPolicy":
@@ -125,7 +125,7 @@ _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE = """
             "name": "fake_name",
             "volumeMounts": [],
             "workingDir": "/root",
-            "image": "nvidia/cuda:9.0-devel-ubuntu16.04",
+            "image": "ubuntu:24.04",
             "securityContext": {
                 "privileged": true
             },
@@ -322,14 +322,14 @@ class KubernetesVirtualMachineOsTypesTestCase(
     kub_vm._WaitForPodBootCompletion = lambda: None
     kub_vm._Create()
 
-  def testCreateUbuntu1604(self):
+  def testCreateUbuntu2404(self):
     with patch_critical_objects() as (_, temp_file):
-      self.create_kubernetes_vm(os_types.UBUNTU1604)
+      self.create_kubernetes_vm(os_types.UBUNTU2404)
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
       create_json = json.loads(write_mock.call_args[0][0])
       self.assertEqual(
-          create_json['spec']['containers'][0]['image'], 'ubuntu:16.04'
+          create_json['spec']['containers'][0]['image'], 'ubuntu:24.04'
       )
 
 
@@ -339,7 +339,7 @@ class KubernetesVirtualMachineClassFoundTestCase(
 
   def testClassNotKubernetesCloud(self):
     with self.assertRaises(errors.Resource.SubclassNotFoundError):
-      virtual_machine.GetVmClass(provider_info.KUBERNETES, os_types.UBUNTU1604)
+      virtual_machine.GetVmClass(provider_info.KUBERNETES, os_types.UBUNTU2404)
 
   @flagsaver.flagsaver(
       (provider_info.VM_PLATFORM, provider_info.KUBERNETES_PLATFORM)
@@ -348,12 +348,12 @@ class KubernetesVirtualMachineClassFoundTestCase(
     FLAGS.cloud = provider_info.AWS
     spec = kubernetes_pod_spec.KubernetesPodSpec(_COMPONENT)
     vm_class = virtual_machine.GetVmClass(
-        provider_info.GCP, os_types.UBUNTU1604
+        provider_info.GCP, os_types.UBUNTU2404
     )
     kub_vm = vm_class(spec)
     self.assertIsInstance(
         kub_vm,
-        kubernetes_virtual_machine.Ubuntu1604BasedKubernetesVirtualMachine,
+        kubernetes_virtual_machine.Ubuntu2404BasedKubernetesVirtualMachine,
     )
     self.assertEqual(kub_vm.CLOUD, provider_info.GCP)
     self.assertEqual(kub_vm.PLATFORM, provider_info.KUBERNETES_PLATFORM)
@@ -453,7 +453,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
   def testDownloadPreprovisionedDataAws(self):
     spec = self.create_virtual_machine_spec()
     vm_class = virtual_machine.GetVmClass(
-        provider_info.AWS, os_types.UBUNTU1604_CUDA9, provider_info.KUBERNETES
+        provider_info.AWS, os_types.UBUNTU2404, provider_info.KUBERNETES
     )
     with patch_critical_objects(flags=FLAGS) as (issue_command, _):
       kub_vm = vm_class(spec)
@@ -467,7 +467,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
     azure_util.GetAzureStorageConnectionString = mock.Mock(return_value='')
     spec = self.create_virtual_machine_spec()
     vm_class = virtual_machine.GetVmClass(
-        provider_info.AZURE, os_types.UBUNTU1604_CUDA9, provider_info.KUBERNETES
+        provider_info.AZURE, os_types.UBUNTU2404, provider_info.KUBERNETES
     )
     with patch_critical_objects() as (issue_command, _):
       kub_vm = vm_class(spec)
@@ -480,7 +480,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
 
   def testDownloadPreprovisionedDataGcp(self):
     vm_class = virtual_machine.GetVmClass(
-        provider_info.GCP, os_types.UBUNTU1604_CUDA9, provider_info.KUBERNETES
+        provider_info.GCP, os_types.UBUNTU2404, provider_info.KUBERNETES
     )
     spec = self.create_virtual_machine_spec()
     with patch_critical_objects() as (issue_command, _):
@@ -542,9 +542,7 @@ class KubernetesVirtualMachineWithGpusTestCase(
       )
 
 
-class KubernetesVirtualMachineWithNvidiaCudaImage(
-    BaseKubernetesVirtualMachineTestCase
-):
+class KubernetesVirtualMachine(BaseKubernetesVirtualMachineTestCase):
 
   @staticmethod
   def create_virtual_machine_spec():
@@ -559,7 +557,7 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
   def testCreatePodBodyWrittenCorrectly(self):
     spec = self.create_virtual_machine_spec()
     vm_class = virtual_machine.GetVmClass(
-        provider_info.GCP, os_types.UBUNTU1604_CUDA9, provider_info.KUBERNETES
+        provider_info.GCP, os_types.UBUNTU2404, provider_info.KUBERNETES
     )
     with patch_critical_objects() as (_, temp_file):
       kub_vm = vm_class(spec)
@@ -573,7 +571,7 @@ class KubernetesVirtualMachineWithNvidiaCudaImage(
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
       self.assertJsonEqual(
-          write_mock.call_args[0][0], _EXPECTED_CALL_BODY_WITH_NVIDIA_CUDA_IMAGE
+          write_mock.call_args[0][0], _EXPECTED_CALL_BODY_UBUNTU_2404
       )
 
 

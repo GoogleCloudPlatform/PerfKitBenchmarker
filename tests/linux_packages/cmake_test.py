@@ -37,17 +37,5 @@ class CmakeTests(pkb_common_test_case.PkbCommonTestCase):
     ]
     vm.RemoteCommand.assert_has_calls([mock.call(cmd) for cmd in expected_cmds])
 
-  @flagsaver.flagsaver(cmake_kitware=True)
-  def testYumInstallViaKitware(self):
-    vm = MockVm('centos7')
-    with self.assertRaises(ValueError):
-      cmake.YumInstall(vm)
-
-  def testYumNonKitware(self):
-    vm = MockVm('centos7')
-    # no exceptions thrown
-    cmake.YumInstall(vm)
-
-
 if __name__ == '__main__':
   unittest.main()

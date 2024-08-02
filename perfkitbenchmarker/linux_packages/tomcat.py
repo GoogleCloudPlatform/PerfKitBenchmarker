@@ -98,7 +98,6 @@ def AptInstall(vm):
 
 def Start(vm):
   """Starts Tomcat on "vm"."""
-  # CentOS7 uses systemd as an init system
   vm.RemoteCommand('bash ' + _TOMCAT_START)
 
 

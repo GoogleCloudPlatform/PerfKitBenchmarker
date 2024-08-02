@@ -230,12 +230,14 @@ class TestMiscFunctions(
 ):
   """Testing for various functions in pkb.py."""
 
+  OS_TYPE = 'debian12'
+
   def _MockVm(
       self, name: str, remote_command_text: str
   ) -> linux_virtual_machine.BaseLinuxVirtualMachine:
     vm_spec = pkb_common_test_case.CreateTestVmSpec()
     vm = pkb_common_test_case.TestLinuxVirtualMachine(vm_spec=vm_spec)
-    vm.OS_TYPE = 'debian9'
+    vm.OS_TYPE = self.OS_TYPE
     vm.name = name
     vm.RemoteCommand = mock.Mock(return_value=(remote_command_text, ''))
     return vm
@@ -243,7 +245,7 @@ class TestMiscFunctions(
   def _MockVmWithVuln(
       self, name: str, cpu_vuln: linux_virtual_machine.CpuVulnerabilities
   ) -> mock.Mock:
-    vm = mock.Mock(OS_TYPE='debian9')
+    vm = mock.Mock(OS_TYPE=self.OS_TYPE)
     vm.name = name
     type(vm).cpu_vulnerabilities = mock.PropertyMock(return_value=cpu_vuln)
     return vm
