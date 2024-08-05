@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""A fancier mock for BaseVirtualMachine.RemoteCommand.
+"""A fancier mock for RemoteCommand & IssueCommand.
 
 Allows for specifying different responses for different commands.
 Usage:
@@ -34,8 +34,15 @@ Usage:
 """
 
 import collections
+from typing import Any
 from unittest import mock
+from absl.testing import absltest
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
+
+
+# stdout, stderr, returncode
+ReturnValues = tuple[str, str] | tuple[str, str, int]
 
 
 class MockCommand:
@@ -51,38 +58,35 @@ class MockCommand:
 
   def __init__(
       self,
-      call_to_response: dict[str, list[tuple[str, str]]],
+      call_to_response: dict[str, list[ReturnValues]],
       mock_command_function: mock.MagicMock,
   ):
     self.progress_through_calls = collections.defaultdict(int)
     self.call_to_response = call_to_response
 
-    def mock_remote_command(
-        cmd: str, **kwargs
-    ) -> tuple[str, str]:
-      del kwargs  # Unused but matches type signature.
-      for call in self.call_to_response:
-        if call in cmd:
-          call_num = self.progress_through_calls[call]
-          if len(call_to_response[call]) <= call_num:
-            call_num = len(call_to_response[call]) - 1
-          response = call_to_response[call][call_num]
-          self.progress_through_calls[call] += 1
-          return response
-      return '', ''
-    mock_command_function.side_effect = mock_remote_command
+    mock_command_function.side_effect = self.mock_remote_command
+
+  def mock_remote_command(
+      self, cmd: str | list[str], **kwargs
+  ) -> ReturnValues:
+    """Mocks a command, returning the next response for the command."""
+    del kwargs  # Unused but matches type signature.
+    for call in self.call_to_response:
+      if call in cmd:
+        call_num = self.progress_through_calls[call]
+        if len(self.call_to_response[call]) <= call_num:
+          call_num = len(self.call_to_response[call]) - 1
+        response = self.call_to_response[call][call_num]
+        if not response and isinstance(self.call_to_response[call], tuple):
+          # Tester passed in one tuple rather than a list of tuples.
+          response = self.call_to_response[call]
+        self.progress_through_calls[call] += 1
+        return response
+    return '', ''
 
 
 class MockRemoteCommand(MockCommand):
-  """A mock for BaseVirtualMachine.RemoteCommand.
-
-  Attributes:
-    progress_through_calls: A dictionary of how many times each call has been
-      made.
-    call_to_response: A dictionary of commands to a list of responses. Commands
-      just need to be a substring of the actual command. Each response is given
-      in order, like with mock's normal iterating side_effect.
-  """
+  """A mock for BaseVirtualMachine.RemoteCommand."""
 
   def __init__(
       self,
@@ -90,3 +94,26 @@ class MockRemoteCommand(MockCommand):
       vm: virtual_machine.BaseVirtualMachine,
   ):
     super().__init__(call_to_response, vm.RemoteCommand)
+
+
+class MockIssueCommand(MockCommand):
+  """A mock for vm_util.IssueCommand."""
+
+  def __init__(
+      self,
+      call_to_response: dict[str, list[tuple[str, str, int]]],
+      test_case: absltest.TestCase,
+  ):
+    self.func_to_mock = test_case.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueCommand',
+        )
+    )
+    super().__init__(call_to_response, self.func_to_mock)
+
+  def mock_remote_command(
+      self, cmd: str | list[str], **kwargs: Any
+  ) -> ReturnValues:
+    str_cmd = ' '.join(cmd)
+    return super().mock_remote_command(str_cmd, **kwargs)

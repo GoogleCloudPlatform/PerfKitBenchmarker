@@ -121,7 +121,11 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
         'An error occurred (VpcLimitExceeded) when calling the CreateVpc '
         'operation: The maximum number of VPCs has been reached.'
     )
-    self.MockIssueCommand(None, stderr, 255)
+    self.MockIssueCommand(
+        {
+            '': ('', stderr, 255),
+        },
+    )
     with self.assertRaises(errors.Benchmarks.QuotaFailure) as e:
       self.vpc.Create()
     self.assertEqual(str(e.exception), stderr)
@@ -130,7 +134,11 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
     stderr = 'An unknown error occurred when calling the CreateVpc opeartion.'
     retcode = 1
     error_msg = 'Failed to create Vpc: %s return code: %s' % (retcode, stderr)
-    self.MockIssueCommand(None, stderr, retcode)
+    self.MockIssueCommand(
+        {
+            '': ('', stderr, retcode),
+        },
+    )
     with self.assertRaises(errors.Resource.CreationError) as e:
       self.vpc.Create()
     self.assertEqual(str(e.exception), error_msg)

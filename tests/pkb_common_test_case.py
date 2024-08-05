@@ -14,7 +14,6 @@
 """Common base class for PKB unittests."""
 
 import pathlib
-import subprocess
 from typing import Any, Dict
 
 from absl import flags
@@ -31,7 +30,6 @@ from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker import pkb  # pylint:disable=unused-import
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
@@ -273,29 +271,22 @@ class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
     )
     self.enter_context(p)
 
-  # TODO(user): Extend MockIssueCommand to support multiple calls to
-  # vm_util.IssueCommand
-  def MockIssueCommand(self, stdout: str, stderr: str, retcode: int) -> None:
-    """Mocks function calls inside vm_util.IssueCommand.
-
-    Mocks subproccess.Popen and _ReadIssueCommandOutput in IssueCommand.
-    This allows the logic of IssueCommand to run and returns the given
-    stdout, stderr when IssueCommand is called.
+  def MockIssueCommand(
+      self,
+      call_to_response: dict[str, list[tuple[str, str, int]]],
+  ) -> mock_command.MockIssueCommand:
+    """Mocks IssueCommand, returning response for the given call.
 
     Args:
-      stdout: String. Output from standard output
-      stderr: String. Output from standard error
-      retcode: Int. Return code from running the command.
+      call_to_response: A dictionary of commands to a list of responses.
+        Commands just need to be a substring of the actual command. Each
+        response is given in order, like with mock's normal iterating
+        side_effect.
+
+    Returns:
+      The mocked function object with call dict.
     """
-
-    p = mock.patch('subprocess.Popen', spec=subprocess.Popen)
-    cmd_output = mock.patch.object(vm_util, '_ReadIssueCommandOutput')
-
-    self.addCleanup(p.stop)
-    self.addCleanup(cmd_output.stop)
-
-    p.start().return_value.returncode = retcode
-    cmd_output.start().side_effect = [(stdout, stderr)]
+    return mock_command.MockIssueCommand(call_to_response, self)
 
   def MockRemoteCommand(
       self,
