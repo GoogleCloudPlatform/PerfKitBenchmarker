@@ -2,12 +2,16 @@
 
 import threading
 from typing import List, Type, TypeVar
+
 from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.resources import jobs_setter
 
+
 FLAGS = flags.FLAGS
+# TODO: b/357673905 - Add Presubmit reminders to force image rebuild
+# if container is modified.
 
 
 class BaseJob(resource.BaseResource):
@@ -22,6 +26,7 @@ class BaseJob(resource.BaseResource):
     region: Region the job should be in.
     backend: Amount of memory allocated.
     samples: Samples with lifecycle metrics (e.g. create time) recorded.
+    container_image: Image to use for the job.
   """
 
   RESOURCE_TYPE: str = 'BaseJob'
@@ -31,11 +36,16 @@ class BaseJob(resource.BaseResource):
   _job_counter: int = 0
   _job_counter_lock: threading.Lock = threading.Lock()
 
-  def __init__(self, base_job_spec: jobs_setter.BaseJobSpec):
+  def __init__(
+      self, base_job_spec: jobs_setter.BaseJobSpec, container_registry
+  ):
     super().__init__()
     self.name: str = self._GenerateName()
     self.region: str = base_job_spec.job_region
     self.backend: str = base_job_spec.job_backend
+    self.container_registry = container_registry
+    self.job_spec = base_job_spec
+
     # update metadata
     self.metadata.update({
         'backend': self.backend,
@@ -63,6 +73,13 @@ class BaseJob(resource.BaseResource):
   def Execute(self):
     """Executes the job."""
     pass
+
+  def _CreateDependencies(self):
+    assert self.container_registry is not None
+    self.container_image = (
+        self.container_registry.GetOrBuild(self.job_spec.image_directory)
+        + ':latest'
+    )
 
 
 JobChild = TypeVar('JobChild', bound='BaseJob')

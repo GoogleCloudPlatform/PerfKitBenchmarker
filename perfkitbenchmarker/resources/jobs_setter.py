@@ -16,12 +16,14 @@ class BaseJobSpec(spec.BaseSpec):
     SPEC_ATTRS: Required field(s) for subclasses.
     job_region: The region to run in.
     job_backend: Amount of memory to use.
+    image_directory: The directory to use for the image.
   """
 
   SPEC_TYPE: str = 'BaseJobSpec'
   SPEC_ATTRS: List[str] = ['SERVICE', 'CLOUD']
   job_region: str
   job_backend: str
+  image_directory: str
   CLOUD: str = 'GCP'
 
   @classmethod
@@ -43,6 +45,10 @@ class BaseJobSpec(spec.BaseSpec):
         'job_count': (
             option_decoders.IntDecoder,
             {'default': 1, 'none_ok': True},
+        ),
+        'image_directory': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
         ),
     })
 

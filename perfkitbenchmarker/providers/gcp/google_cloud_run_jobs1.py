@@ -35,8 +35,8 @@ class GoogleCloudRunJob(base_job.BaseJob):
   SERVICE = CLOUD_RUN_PRODUCT
   _default_region = 'us-central1'
 
-  def __init__(self, job_spec: _JOB_SPEC):
-    super().__init__(job_spec)
+  def __init__(self, job_spec: _JOB_SPEC, container_registry):
+    super().__init__(job_spec, container_registry)
     self.region = self.region or self._default_region
     self.user_managed = False
     self.metadata.update({
@@ -54,17 +54,14 @@ class GoogleCloudRunJob(base_job.BaseJob):
         'jobs',
         'create',
         self.name,
-        # TODO(user): build the image at runtime instead of hardcoding.
-        # Now using prebuilt image as logs didn't show up when built @ runtime.
-        # The image below is from an echo workload.
-        (
-            '--image='
-            'us-central1-docker.pkg.dev/p3rf-serverless-gcf2/cloud-run-source-deploy/cjob@sha256:a3ea8ff5143620165fccc702b78d7796b0bb4fcb4bfced57cb4fb0b53eadb99e'
-        ),
+        '--image=%s' % self.container_image,
         '--region=%s' % self.region,
         '--memory=%s' % self.backend,
         '--project=p3rf-serverless-gcf2',
     ]
+    self.metadata.update({
+        'container_image': self.container_image,
+    })
     logging.info(
         'Created Cloud Run Job. View internal stats at:\n%s',
         self.GetMonitoringLink(),

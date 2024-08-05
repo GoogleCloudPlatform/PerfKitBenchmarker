@@ -507,7 +507,7 @@ class BenchmarkSpec:
     providers.LoadProvider(cloud)
     job_class = base_job.GetJobClass(job_type)
 
-    self.base_job = job_class(self.config.base_job)  # pytype: disable=not-instantiable
+    self.base_job = job_class(self.config.base_job, self.container_registry)  # pytype: disable=not-instantiable
     self.resources.append(self.base_job)
 
   def ConstructManagedAiModel(self):
