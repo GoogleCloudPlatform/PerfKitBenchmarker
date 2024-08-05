@@ -10,7 +10,7 @@ from tests import pkb_common_test_case
 class S3Test(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(S3Test, self).setUp()
+    super().setUp()
     flag_values = {'timeout_minutes': 0, 'persistent_timeout_minutes': 0}
     p = mock.patch.object(s3, 'FLAGS')
     flags_mock = p.start()
@@ -23,7 +23,7 @@ class S3Test(pkb_common_test_case.PkbCommonTestCase):
     self.s3_service.PrepareService(None)  # will use s3.DEFAULT_AWS_REGION
 
   def tearDown(self):
-    super(S3Test, self).tearDown()
+    super().tearDown()
     mock.patch.stopall()
 
   def test_make_bucket(self):

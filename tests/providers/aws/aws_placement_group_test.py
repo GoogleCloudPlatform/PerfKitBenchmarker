@@ -80,7 +80,7 @@ def CreateAwsPlacementGroupSpec(group_style=STRATEGY):
       placement_group.BasePlacementGroupSpec, CLOUD=CLOUD
   )
   FLAGS.placement_group_style = group_style
-  name = ('{0}.placement_group_spec.{1}'.format(spec_class.SPEC_TYPE, CLOUD),)
+  name = ('{}.placement_group_spec.{}'.format(spec_class.SPEC_TYPE, CLOUD),)
   return spec_class(name, zone=ZONE, flag_values=FLAGS)
 
 
@@ -92,7 +92,7 @@ def CreateAwsPlacementGroup(group_style=STRATEGY):
 class AwsPlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AwsPlacementGroupTest, self).setUp()
+    super().setUp()
     self.mock_cmd = self.enter_context(
         mock.patch.object(vm_util, 'IssueCommand')
     )

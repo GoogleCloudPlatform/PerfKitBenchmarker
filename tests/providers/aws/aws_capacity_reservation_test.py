@@ -36,7 +36,7 @@ CREATE_STDOUT_SUCCESSFUL = """
 """
 
 
-class FakeAwsVirtualMachine(object):
+class FakeAwsVirtualMachine:
 
   def __init__(self):
     self.zone = 'us-west-1'
@@ -56,7 +56,7 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
     return mock_to_return
 
   def setUp(self):
-    super(AwsCapacityReservationTest, self).setUp()
+    super().setUp()
     FLAGS.timeout_minutes = 30
 
     self._create_patch(

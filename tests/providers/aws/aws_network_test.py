@@ -91,7 +91,7 @@ class BaseAwsTest(pkb_common_test_case.PkbCommonTestCase):
   expected_commands: List[str]
 
   def setUp(self):
-    super(BaseAwsTest, self).setUp()
+    super().setUp()
     self.mock_aws = self.enter_context(
         mock.patch.object(vm_util, 'IssueCommand')
     )
@@ -158,7 +158,7 @@ class AwsVpcTableTest(BaseAwsTest):
 class AwsRouteTableTest(BaseAwsTest):
 
   def setUp(self):
-    super(AwsRouteTableTest, self).setUp()
+    super().setUp()
     self.route = aws_network.AwsRouteTable(REGION, VPC_ID)
 
   def testExistsNoRoutes(self):

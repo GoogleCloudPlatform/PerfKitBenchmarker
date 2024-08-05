@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.aws.aws_relational_db."""
 
+import builtins
 import contextlib
 import json
 import os
@@ -33,7 +34,7 @@ from perfkitbenchmarker.sql_engine_utils import AURORA_POSTGRES
 from perfkitbenchmarker.sql_engine_utils import MYSQL
 from tests import matchers
 from tests import pkb_common_test_case
-from six.moves import builtins
+
 
 FLAGS = flags.FLAGS
 
@@ -65,7 +66,7 @@ class AwsRelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AwsRelationalDbTestCase, self).setUp()
+    super().setUp()
     FLAGS['run_uri'].value = '123'
     FLAGS['use_managed_db'].parse(True)
 

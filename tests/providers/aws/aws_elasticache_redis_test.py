@@ -25,7 +25,7 @@ FLAGS = flags.FLAGS
 class AwsElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AwsElasticacheRedisTestCase, self).setUp()
+    super().setUp()
     FLAGS.project = 'project'
     FLAGS.zones = ['us-east-1a']
     FLAGS.cloud_redis_region = 'us-east-1'

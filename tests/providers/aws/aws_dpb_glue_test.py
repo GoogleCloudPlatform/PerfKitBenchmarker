@@ -80,7 +80,7 @@ GLUE_SPEC = mock.Mock(
 class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AwsDpbEmrTestCase, self).setUp()
+    super().setUp()
     FLAGS.run_uri = TEST_RUN_URI
     FLAGS.dpb_service_zone = AWS_ZONE_US_EAST_1A
     FLAGS.zones = [AWS_ZONE_US_EAST_1A]

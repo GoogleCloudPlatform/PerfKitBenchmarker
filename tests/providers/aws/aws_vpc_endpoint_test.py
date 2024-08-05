@@ -66,7 +66,7 @@ DELETE_ENDPOINT_CMD = [
 class AwsVpcS3EndpointTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AwsVpcS3EndpointTest, self).setUp()
+    super().setUp()
     self.mock_vpc = mock.Mock()
     self.mock_vpc.region = REGION
     self.mock_run_cmd = self.enter_context(

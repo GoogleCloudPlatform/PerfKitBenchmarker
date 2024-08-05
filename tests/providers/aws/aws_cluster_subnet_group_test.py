@@ -33,7 +33,7 @@ class RedshiftClusterSubnetGroupTestCase(
 ):
 
   def setUp(self):
-    super(RedshiftClusterSubnetGroupTestCase, self).setUp()
+    super().setUp()
     FLAGS.zones = [AWS_ZONE_US_EAST_1A]
     FLAGS.run_uri = TEST_RUN_URI
 

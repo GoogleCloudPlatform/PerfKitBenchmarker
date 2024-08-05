@@ -46,13 +46,13 @@ BASE_REDSHIFT_SPEC = {
 FLAGS = flags.FLAGS
 
 
-class FakeRedshiftClusterSubnetGroup(object):
+class FakeRedshiftClusterSubnetGroup:
 
   def __init__(self):
     self.name = CLUSTER_SUBNET_GROUP
 
 
-class FakeRedshiftClusterParameterGroup(object):
+class FakeRedshiftClusterParameterGroup:
 
   def __init__(self):
     self.name = CLUSTER_PARAMETER_GROUP
@@ -61,7 +61,7 @@ class FakeRedshiftClusterParameterGroup(object):
 class RedshiftTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(RedshiftTestCase, self).setUp()
+    super().setUp()
     FLAGS.run_uri = TEST_RUN_URI
     FLAGS.zone = [AWS_ZONE_US_EAST_1A]
 
