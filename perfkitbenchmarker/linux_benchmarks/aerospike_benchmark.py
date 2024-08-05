@@ -123,10 +123,11 @@ flags.DEFINE_boolean(
     False,
     'Whether or not to enable strong consistency for the Aerospike namespaces.',
 )
-flags.DEFINE_list(
+flags.DEFINE_string(
     'aerospike_test_workload_types',
-    ['RU, 75'],
-    'The test workload type to generate.',
+    'RU, 75',
+    'The test workload types to generate. If there are multuple types, they'
+    ' should be separated by semicolon.',
 )
 flags.DEFINE_list(
     'aerospike_test_workload_extra_args',
@@ -318,7 +319,7 @@ def Run(benchmark_spec):
       run_command = (
           f'asbench '
           f'--threads {threads} --namespace {namespace} '  # pylint: disable=cell-var-from-loop
-          f'--workload {op} '
+          f'--workload "{op}" '
           f'{extra_arg_str} '
           f'--object-spec {FLAGS.aerospike_test_workload_object_spec} '
           f'--keys {FLAGS.aerospike_num_keys} '
@@ -331,17 +332,18 @@ def Run(benchmark_spec):
       )
       stdout, _ = clients[client_idx].RobustRemoteCommand(run_command)
       stdout_samples.extend(aerospike_client.ParseAsbenchStdout(stdout))  # pylint: disable=cell-var-from-loop
+    workload_types = FLAGS.aerospike_test_workload_types.split(';')
     extra_args = (
         FLAGS.aerospike_test_workload_extra_args
         if FLAGS.aerospike_test_workload_extra_args
-        else [None] * len(FLAGS.aerospike_test_workload_type)
+        else [None] * len(workload_types)
     )
-    if len(extra_args) != len(FLAGS.aerospike_test_workload_type):
+    if len(extra_args) != len(workload_types):
       raise ValueError(
           'aerospike_test_workload_extra_args must be the same length as '
-          'aerospike_test_workload_type'
+          'aerospike_test_workload_types'
       )
-    for op, extra_arg in zip(FLAGS.aerospike_test_workload_types, extra_args):
+    for op, extra_arg in zip(workload_types, extra_args):
       for namespace in FLAGS.aerospike_namespaces:
         run_params = []
         for client_idx in range(len(clients)):
@@ -352,12 +354,6 @@ def Run(benchmark_spec):
         background_tasks.RunThreaded(_Run, run_params)
         for server in servers:
           server.RemoteCommand('sudo asadm -e summary')
-    run_params = []
-    for child_idx in range(len(clients)):
-      for process_idx in range(FLAGS.aerospike_instances):
-        run_params.append(((child_idx, process_idx), {}))
-
-    background_tasks.RunThreaded(_Run, run_params)
 
     if num_client_vms * FLAGS.aerospike_instances == 1:
       detailed_samples = stdout_samples
@@ -396,10 +392,8 @@ def Run(benchmark_spec):
         'aerospike_enable_strong_consistency': (
             FLAGS.aerospike_enable_strong_consistency
         ),
-        'aerospike_test_workload_types': ';'.join(
-            FLAGS.aerospike_test_workload_types
-        ),
-        'aerospike_test_workload_extra_args': ';'.join(
+        'aerospike_test_workload_types': FLAGS.aerospike_test_workload_types,
+        'aerospike_test_workload_extra_args': (
             FLAGS.aerospike_test_workload_extra_args
         ),
         'aerospike_skip_db_prepopulation': (
@@ -412,7 +406,6 @@ def Run(benchmark_spec):
     if FLAGS.aerospike_edition == aerospike_server.AerospikeEdition.ENTERPRISE:
       metadata.update({
           'aerospike_version': FLAGS.aerospike_enterprise_version,
-          'aerospike_package': FLAGS.aerospike_enterprise_package,
       })
     for s in temp_samples:
       s.metadata.update(metadata)

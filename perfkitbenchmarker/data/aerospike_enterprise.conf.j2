@@ -83,7 +83,7 @@ namespace test {
 }
 
 namespace bar {
-  replication-factor 2
+  replication-factor {{ replication_factor }}
   memory-size 4G
   rack-id {{ rack_id }}
 
