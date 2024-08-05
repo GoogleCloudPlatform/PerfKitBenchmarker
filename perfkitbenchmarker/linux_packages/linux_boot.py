@@ -576,7 +576,7 @@ SYSTEMD_CRITICAL_CHAIN_METRICS = [
     ('systemd_remount_fs_service', 'systemd-remount-fs.service'),
     ('systemd_initctl_service', 'systemd-initctl.service'),
     ('systemd_networkd_service', 'systemd-networkd.service'),
-    ('google_instance_setup_service', 'google-instance-setup.service'),
+    ('google_guest_agent_service', 'google-guest-agent.service'),
     ('cloud_init_local_service', 'cloud-init-local.service'),
     ('cloud_init_service', 'cloud-init.service'),
     ('cloud_final_service', 'cloud-final.service'),
