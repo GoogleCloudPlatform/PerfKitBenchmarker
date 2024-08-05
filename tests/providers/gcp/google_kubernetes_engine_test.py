@@ -15,6 +15,7 @@
 
 # pylint: disable=not-context-manager
 
+import builtins
 import os
 import unittest
 from unittest import mock
@@ -30,7 +31,6 @@ from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
-from six.moves import builtins
 
 FLAGS = flgs.FLAGS
 
@@ -220,7 +220,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
-          'gcloud container clusters get-credentials pkb-{0}'.format(_RUN_URI),
+          'gcloud container clusters get-credentials pkb-{}'.format(_RUN_URI),
           command_string,
       )
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
@@ -236,7 +236,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
       self.assertEqual(issue_command.call_count, 3)
       self.assertIn(
-          'gcloud container clusters delete pkb-{0}'.format(_RUN_URI),
+          'gcloud container clusters delete pkb-{}'.format(_RUN_URI),
           command_string,
       )
       self.assertIn('--zone us-central1-a', command_string)
@@ -250,7 +250,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
-          'gcloud container clusters describe pkb-{0}'.format(_RUN_URI),
+          'gcloud container clusters describe pkb-{}'.format(_RUN_URI),
           command_string,
       )
 
@@ -512,7 +512,7 @@ class GoogleKubernetesEngineWithGpusTestCase(
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
-          'gcloud container clusters get-credentials pkb-{0}'.format(_RUN_URI),
+          'gcloud container clusters get-credentials pkb-{}'.format(_RUN_URI),
           command_string,
       )
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
@@ -549,10 +549,10 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
       self.assertIn('gcloud container node-pools list', command_string)
       self.assertIn('--cluster', command_string)
 
-      expected = set([
+      expected = {
           'gke-pkb-0c47e6fa-default-pool-167d73ee-grp',
           'gke-pkb-0c47e6fa-test-efea7796-grp',
-      ])
+      }
       self.assertEqual(expected, set(instance_groups))  # order doesn't matter
 
 

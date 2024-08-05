@@ -34,14 +34,14 @@ _BASE_BIGQUERY_SPEC = {
 FLAGS = flags.FLAGS
 
 
-class FakeRemoteVM(object):
+class FakeRemoteVM:
 
   def Install(self, package_name):
     if package_name != 'google_cloud_sdk':
       raise RuntimeError
 
 
-class FakeRemoteVMForCliClientInterfacePrepare(object):
+class FakeRemoteVMForCliClientInterfacePrepare:
   """Class to setup a Fake VM that prepares a Client VM (CLI Client)."""
 
   def __init__(self):
@@ -74,7 +74,7 @@ class FakeRemoteVMForCliClientInterfacePrepare(object):
     pass
 
 
-class FakeRemoteVMForCliClientInterfaceExecuteQuery(object):
+class FakeRemoteVMForCliClientInterfaceExecuteQuery:
   """Class to setup a Fake VM that executes script on Client VM (CLI Client)."""
 
   def RemoteCommand(self, command):
@@ -92,7 +92,7 @@ class FakeRemoteVMForCliClientInterfaceExecuteQuery(object):
     return response, None
 
 
-class FakeRemoteVMForJavaClientInterfacePrepare(object):
+class FakeRemoteVMForJavaClientInterfacePrepare:
   """Class to setup a Fake VM that prepares a Client VM (JAVA Client)."""
 
   def __init__(self):
@@ -115,7 +115,7 @@ class FakeRemoteVMForJavaClientInterfacePrepare(object):
       raise RuntimeError
 
 
-class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
+class FakeRemoteVMForJavaClientInterfaceExecuteQuery:
   """Class to setup a Fake VM that executes script on Client VM (JAVA Client)."""
 
   def RemoteCommand(self, command):
@@ -138,7 +138,7 @@ class FakeRemoteVMForJavaClientInterfaceExecuteQuery(object):
     return response, None
 
 
-class FakeBenchmarkSpec(object):
+class FakeBenchmarkSpec:
   """Fake BenchmarkSpec to use for setting client interface attributes."""
 
   def __init__(self, client_vm):
@@ -149,7 +149,7 @@ class FakeBenchmarkSpec(object):
 class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(BigqueryTestCase, self).setUp()
+    super().setUp()
     FLAGS.cloud = 'GCP'
     FLAGS.run_uri = _TEST_RUN_URI
     FLAGS.zones = [_GCP_ZONE_US_CENTRAL_1_C]

@@ -85,7 +85,7 @@ def _CreateGcePlacementGroup(group_style=_STRATEGY):
 class GcePlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GcePlacementGroupTest, self).setUp()
+    super().setUp()
     self.mock_cmd = self.enter_context(
         mock.patch.object(vm_util, 'IssueCommand')
     )

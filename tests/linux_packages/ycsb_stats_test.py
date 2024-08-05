@@ -48,7 +48,7 @@ def _parse_and_return_time_series(filename):
 class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(SimpleResultParserTestCase, self).setUp()
+    super().setUp()
     self.contents = open_data_file('ycsb-test-run.dat')
     self.results = ycsb_stats.ParseResults(self.contents, 'histogram')
 
@@ -114,7 +114,7 @@ class SimpleResultParserTestCase(pkb_common_test_case.PkbCommonTestCase):
 class DetailedResultParserTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(DetailedResultParserTestCase, self).setUp()
+    super().setUp()
     self.contents = open_data_file('ycsb-test-run-2.dat')
     self.results = ycsb_stats.ParseResults(self.contents, 'histogram')
 

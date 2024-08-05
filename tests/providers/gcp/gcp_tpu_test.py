@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.gcp.gcp_tpu."""
 
+import builtins
 import contextlib
 import unittest
 from absl import flags
@@ -23,7 +24,6 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gcp_tpu
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
-from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
@@ -47,7 +47,7 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
 
   def setUp(self):
-    super(GcpTpuTestCase, self).setUp()
+    super().setUp()
     FLAGS.run_uri = '123'
     FLAGS.project = ''
     FLAGS.tpu_cores_per_donut = 8

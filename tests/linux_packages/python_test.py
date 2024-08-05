@@ -40,7 +40,7 @@ SYMLINK_SET = _RESPONSE_GOOD
 class PythonTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(PythonTest, self).setUp()
+    super().setUp()
     FLAGS['default_timeout'].parse(0)  # due to @retry
 
   def RunSetDefault(self, responses, expected_last_call=None):

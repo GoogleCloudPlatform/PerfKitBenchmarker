@@ -29,7 +29,7 @@ FLAGS = flags.FLAGS
 class AerospikeServerTest(unittest.TestCase):
 
   def setUp(self):
-    super(AerospikeServerTest, self).setUp()
+    super().setUp()
     self.vm = mock.Mock()
     self.vm.RemoteCommand.return_value = ('', '')
     self.vm.DownloadPreprovisionedData.return_value = ('', '')

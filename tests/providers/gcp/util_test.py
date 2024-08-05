@@ -24,7 +24,6 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
-import six
 
 
 _GCLOUD_PATH = 'path/gcloud'
@@ -42,7 +41,7 @@ def _MockIssueCommand(test_response):
 class GceResource(resource.BaseResource):
 
   def __init__(self, **kwargs):
-    for k, v in six.iteritems(kwargs):
+    for k, v in kwargs.items():
       setattr(self, k, v)
 
   def _Create(self):
@@ -55,7 +54,7 @@ class GceResource(resource.BaseResource):
 class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GcloudCommandTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(util.__name__ + '.FLAGS')
     self.mock_flags = p.start()
     self.addCleanup(p.stop)

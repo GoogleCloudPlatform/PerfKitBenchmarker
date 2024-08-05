@@ -27,7 +27,7 @@ FLAGS = flags.FLAGS
 class MavenTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(MavenTest, self).setUp()
+    super().setUp()
     self.vm = mock.Mock()
     self.vm.RemoteCommand.return_value = ('/home/jre/java', '')
 

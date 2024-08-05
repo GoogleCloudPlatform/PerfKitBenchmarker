@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.gcp.gce_network."""
 
+import builtins
 import contextlib
 import unittest
 
@@ -27,7 +28,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.gcp import gce_network
 from tests import pkb_common_test_case
-from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
@@ -145,11 +145,11 @@ class BaseGceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         benchmark_name, flag_values=FLAGS, **config_dict
     )
-    benchmark_module = next((
+    benchmark_module = next(
         b
         for b in linux_benchmarks.BENCHMARKS
         if b.BENCHMARK_NAME == benchmark_name
-    ))
+    )
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, _URI)
 
 
@@ -286,7 +286,7 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
 class TestGceNetworkNames(BaseGceNetworkTest):
 
   def setUp(self):
-    super(TestGceNetworkNames, self).setUp()
+    super().setUp()
     # need a benchmarkspec in the context to run
     FLAGS.run_uri = _URI
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
@@ -319,7 +319,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     self.assertEqual(
         expected_netname, net_name
     )  # pkb-network-uri45678 (default)
-    self.assertRegexpMatches(net_name, _REGEX_GCE_NET_NAMES)
+    self.assertRegex(net_name, _REGEX_GCE_NET_NAMES)
 
   def testGetSingleNetworkName(self):
     FLAGS.gce_subnet_region = 'us-south1-c'
@@ -345,7 +345,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     self.assertEqual(
         expected_netname, net_name
     )  # pkb-network-single-2-2-3-4-33-uri45678 (single)
-    self.assertRegexpMatches(net_name, _REGEX_GCE_NET_NAMES)
+    self.assertRegex(net_name, _REGEX_GCE_NET_NAMES)
 
   def testGetMultiNetworkName(self):
     project = _PROJECT
@@ -368,7 +368,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     self.assertEqual(
         expected_netname, net_name
     )  # pkb-network-multi-1-2-3-4-56-uri45678 (multi)
-    self.assertRegexpMatches(net_name, _REGEX_GCE_NET_NAMES)
+    self.assertRegex(net_name, _REGEX_GCE_NET_NAMES)
 
   @flagsaver.flagsaver(gce_network_name=['my-network'])
   def testSpecifyNetworkName(self):
@@ -456,7 +456,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     )
 
     self.assertEqual(expected_name, fw_name)
-    self.assertRegexpMatches(fw_name, _REGEX_GCE_FW_NAMES)
+    self.assertRegex(fw_name, _REGEX_GCE_FW_NAMES)
 
   def testGetSingleFWName(self):
     FLAGS.gce_subnet_region = 'us-south1-c'
@@ -500,7 +500,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     self.assertEqual(
         expected_name, fw_name
     )  # single-internal-2-2-3-4-33-uri45678
-    self.assertRegexpMatches(fw_name, _REGEX_GCE_FW_NAMES)
+    self.assertRegex(fw_name, _REGEX_GCE_FW_NAMES)
 
   def testGetMultiFWNameWithPorts(self):
     project = _PROJECT
@@ -546,7 +546,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     self.assertEqual(
         expected_name, fw_name
     )  # multi-internal-1-2-3-4-56-49152-65535-uri45678
-    self.assertRegexpMatches(fw_name, _REGEX_GCE_FW_NAMES)
+    self.assertRegex(fw_name, _REGEX_GCE_FW_NAMES)
 
   def testGetMultiFWNameWithPortsDst(self):
     project = _PROJECT
@@ -590,7 +590,7 @@ class TestGceNetworkNames(BaseGceNetworkTest):
 
     # perfkit-firewall-multi-1-2-3-4-56-123-567-901-13-49152-65535-uri45678
     self.assertEqual(expected_name, fw_name)
-    self.assertRegexpMatches(fw_name, _REGEX_GCE_FW_NAMES)
+    self.assertRegex(fw_name, _REGEX_GCE_FW_NAMES)
 
 
 #  found in tests/gce_virtual_machine_test.py
@@ -614,7 +614,7 @@ def PatchCriticalObjects(retvals=None):
 class TestGceNetwork(BaseGceNetworkTest):
 
   def setUp(self):
-    super(TestGceNetwork, self).setUp()
+    super().setUp()
     # need a benchmarkspec in the context to run
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         'cluster_boot', flag_values=FLAGS

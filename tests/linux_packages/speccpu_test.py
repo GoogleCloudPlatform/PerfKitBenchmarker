@@ -582,7 +582,7 @@ class Speccpu2006BenchmarkTestCase(
 ):
 
   def setUp(self):
-    super(Speccpu2006BenchmarkTestCase, self).setUp()
+    super().setUp()
     mock.patch.object(build_tools, 'GetVersion').start().return_value = '7'
     mock.patch.object(speccpu, '_GenerateMd5sum').start().return_value = 'abcd'
     self.addCleanup(mock.patch.stopall)

@@ -24,7 +24,7 @@ class LinuxBootTest(
 ):
 
   def setUp(self):
-    super(LinuxBootTest, self).setUp()
+    super().setUp()
     self.data_dir = os.path.join(
         os.path.dirname(__file__), '..', 'data', 'linux_boot'
     )

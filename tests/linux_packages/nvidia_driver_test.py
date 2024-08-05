@@ -27,7 +27,7 @@ AUTOBOOST_DISABLED_DICT = {'autoboost': False, 'autoboost_default': False}
 class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
-    super(NvidiaDriverTestCase, self).setUp()
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__), '../data', 'nvidia_smi_output.txt'
     )
@@ -142,7 +142,7 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
       nvidia_smi_output = fp.read()
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock(return_value=(nvidia_smi_output, ''))
-    self.assertRaisesRegexp(
+    self.assertRaisesRegex(
         nvidia_driver.HeterogeneousGpuTypesError,  # pytype: disable=wrong-arg-count
         'PKB only supports one type of gpu per VM',
         nvidia_driver.GetGpuType,

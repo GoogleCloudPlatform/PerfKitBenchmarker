@@ -26,7 +26,7 @@ FLAGS = flags.FLAGS
 class HbaseTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(HbaseTest, self).setUp()
+    super().setUp()
     FLAGS['hbase_version'].parse('1.3.2.1')
     p = mock.patch.object(urllib.request, 'urlopen')
     self.mock_url_open = p.start()
@@ -34,7 +34,7 @@ class HbaseTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testGetUrlVersion(self):
     url = hbase._GetHBaseURL()
-    self.assertRegexpMatches(url, 'hbase-1.3.2.1-bin.tar.gz$')
+    self.assertRegex(url, 'hbase-1.3.2.1-bin.tar.gz$')
 
 
 def MakeHbaseUrl(version):

@@ -105,7 +105,7 @@ class MemtierTestCase(
 ):
 
   def setUp(self):
-    super(MemtierTestCase, self).setUp()
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__), '..', 'data', 'redis_memtier.json'
     )

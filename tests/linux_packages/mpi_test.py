@@ -95,7 +95,7 @@ class MpiTestCase(pkb_common_test_case.PkbCommonTestCase):
   }
 
   def setUp(self):
-    super(MpiTestCase, self).setUp()
+    super().setUp()
     FLAGS.intelmpi_version = self.MPI_VERSION
     self.enter_context(
         mock.patch.object(intelmpi, 'MpiVars', return_value=MPI_VARS)

@@ -111,7 +111,7 @@ class LocalGcpDpbDataproc(gcp_dpb_dataproc.GcpDpbDataproc):
 class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GcpDpbDataprocTestCase, self).setUp()
+    super().setUp()
     FLAGS.run_uri = TEST_RUN_URI
     FLAGS.dpb_service_zone = GCP_ZONE_US_CENTRAL1_A
     FLAGS.zones = [GCP_ZONE_US_CENTRAL1_A]
@@ -234,7 +234,7 @@ class LocalGcpDpbDPGKE(gcp_dpb_dataproc.GcpDpbDpgke):
 class GcpDpbDPGKETestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GcpDpbDPGKETestCase, self).setUp()
+    super().setUp()
     FLAGS.run_uri = TEST_RUN_URI
     FLAGS.dpb_service_zone = GCP_ZONE_US_CENTRAL1_A
     FLAGS.dpb_service_bucket = STAGING_BUCKET

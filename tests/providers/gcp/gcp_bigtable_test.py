@@ -113,7 +113,7 @@ def GetTestBigtableInstance(spec=_TEST_BENCHMARK_SPEC):
 class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GcpBigtableTestCase, self).setUp()
+    super().setUp()
     self.bigtable = GetTestBigtableInstance()
 
   def testNotFoundTable(self):

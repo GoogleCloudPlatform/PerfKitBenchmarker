@@ -158,7 +158,7 @@ class GCEDiskTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     """ """
-    super(GCEDiskTest, self).setUp()
+    super().setUp()
     p = mock.patch(
         gce_virtual_machine.__name__ + '.gce_network.GceNetwork.GetNetwork'
     )

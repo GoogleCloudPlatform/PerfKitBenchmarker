@@ -26,7 +26,7 @@ FLAGS = flags.FLAGS
 class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GcpCloudRedisTestCase, self).setUp()
+    super().setUp()
     with mock.patch.object(
         util.GcloudCommand, 'Issue', return_value=('{}', '', 0)
     ):

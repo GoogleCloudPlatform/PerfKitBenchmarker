@@ -88,7 +88,7 @@ class HpccTest(unittest.TestCase):
 
   def testLimitBenchmarksToRunToFirstBenchmark(self):
     """Tests limiting the benchmarks to run to the first benchmark."""
-    self._RunLimitBenchmarksToRun(set(['MPI RandomAccess']))
+    self._RunLimitBenchmarksToRun({'MPI RandomAccess'})
     self._ValidateRunLimitBenchmarksToRun([
         '  MPI_Init( &argc, &argv );',
         '  if (redacted)',
@@ -104,7 +104,7 @@ class HpccTest(unittest.TestCase):
 
   def testLimitBenchmarksToRunToLastBenchmark(self):
     """Tests limiting the benchmarks to run to the first benchmark."""
-    self._RunLimitBenchmarksToRun(set(['SingleRandomAccess']))
+    self._RunLimitBenchmarksToRun({'SingleRandomAccess'})
     self._ValidateRunLimitBenchmarksToRun([
         '  MPI_Init( &argc, &argv );',
         '  if (redacted)',
@@ -121,7 +121,7 @@ class HpccTest(unittest.TestCase):
   def testLimitBenchmarksToRunToMultipleBenchmarks(self):
     """Tests limiting the benchmarks to run to the first benchmark."""
     self._RunLimitBenchmarksToRun(
-        set(['StarRandomAccess', 'SingleRandomAccess'])
+        {'StarRandomAccess', 'SingleRandomAccess'}
     )
     self._ValidateRunLimitBenchmarksToRun([
         '  MPI_Init( &argc, &argv );',

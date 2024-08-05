@@ -14,6 +14,7 @@
 
 """Tests for perfkitbenchmarker.providers.gcp.gcp_relational_db."""
 
+import builtins
 import contextlib
 import json
 import os
@@ -31,7 +32,6 @@ from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.sql_engine_utils import MYSQL
 from perfkitbenchmarker.sql_engine_utils import POSTGRES
 from tests import pkb_common_test_case
-from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
@@ -136,7 +136,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     }
 
   def setUp(self):
-    super(GcpMysqlRelationalDbTestCase, self).setUp()
+    super().setUp()
     FLAGS['run_uri'].parse('123')
     FLAGS['gcloud_path'].parse('gcloud')
     FLAGS['use_managed_db'].parse(True)
@@ -284,7 +284,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 class GcpPostgresRelationlDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GcpPostgresRelationlDbTestCase, self).setUp()
+    super().setUp()
     FLAGS.project = ''
     FLAGS.run_uri = ''
     FLAGS.gcloud_path = ''

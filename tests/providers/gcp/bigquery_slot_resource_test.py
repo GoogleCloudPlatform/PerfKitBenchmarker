@@ -26,7 +26,7 @@ class BigquerySlotsTestCase(pkb_common_test_case.PkbCommonTestCase):
   TEST_REGION = 'aws-fake-region'
 
   def setUp(self):
-    super(BigquerySlotsTestCase, self).setUp()
+    super().setUp()
     FLAGS.cloud = 'GCP'
     FLAGS.run_uri = _TEST_RUN_URI
     FLAGS.zones = [_GCP_ZONE_US_CENTRAL_1_C]
