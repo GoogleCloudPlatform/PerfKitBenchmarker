@@ -49,7 +49,7 @@ class KubernetesDiskSpec(disk.BaseDiskSpec):
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
-    result = super(KubernetesDiskSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'provisioner': (
             option_decoders.StringDecoder,
@@ -78,7 +78,7 @@ class KubernetesDiskSpec(disk.BaseDiskSpec):
       dict mapping config option names to values derived from the config
       values or flag values.
     """
-    super(KubernetesDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['k8s_volume_provisioner'].present:
       config_values['provisioner'] = flag_values.k8s_volume_provisioner
     if flag_values['k8s_volume_parameters'].present:
@@ -99,7 +99,7 @@ class KubernetesDisk(disk.BaseDisk):
   REQUIRED_ATTRS = ['K8S_VOLUME_TYPE']
 
   def __init__(self, disk_num, disk_spec, name):
-    super(KubernetesDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.name = '%s-%s' % (name, disk_num)
 
   def _Create(self):
@@ -145,7 +145,7 @@ class CephDisk(KubernetesDisk):
   K8S_VOLUME_TYPE = 'rbd'
 
   def __init__(self, disk_num, disk_spec, name):
-    super(CephDisk, self).__init__(disk_num, disk_spec, name)
+    super().__init__(disk_num, disk_spec, name)
     self.ceph_secret = FLAGS.ceph_secret
 
   def _Create(self):
@@ -254,7 +254,7 @@ class PersistentVolumeClaim(resource.BaseResource):
     )
 
   def __init__(self, name, storage_class, size):
-    super(PersistentVolumeClaim, self).__init__()
+    super().__init__()
     self.name = name
     self.storage_class = storage_class
     self.size = size
@@ -289,7 +289,7 @@ class StorageClass(resource.BaseResource):
   """Object representing a K8s StorageClass (with dynamic provisioning)."""
 
   def __init__(self, name, provisioner, parameters):
-    super(StorageClass, self).__init__()
+    super().__init__()
     self.name = name
     self.provisioner = provisioner
     self.parameters = parameters
@@ -349,7 +349,7 @@ class PvcVolume(KubernetesDisk):
   PROVISIONER = None
 
   def __init__(self, disk_num, spec, name):
-    super(PvcVolume, self).__init__(disk_num, spec, name)
+    super().__init__(disk_num, spec, name)
     self.storage_class = StorageClass(
         name, self.PROVISIONER or spec.provisioner, spec.parameters
     )

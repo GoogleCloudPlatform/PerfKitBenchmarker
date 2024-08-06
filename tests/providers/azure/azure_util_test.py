@@ -19,7 +19,7 @@ def _MockIssueCommand(file_name_text_response):
 class AzureUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AzureUtilTest, self).setUp()
+    super().setUp()
     self.expected_region = 'eastus2'
     self.expected_availability_zone = '1'
 

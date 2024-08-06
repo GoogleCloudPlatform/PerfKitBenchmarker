@@ -59,7 +59,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
-    super(IbmCloudVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.user_name = FLAGS.ibmcloud_image_username
     self.boot_volume_size = FLAGS.ibmcloud_boot_volume_size
     self.boot_volume_iops = FLAGS.ibmcloud_boot_volume_iops
@@ -91,7 +91,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _CreateRiasKey(self):
     """Creates a ibmcloud key from the generated ssh key."""
     logging.info('Creating rias key')
-    with open(vm_util.GetPublicKeyPath(), 'r') as keyfile:
+    with open(vm_util.GetPublicKeyPath()) as keyfile:
       pubkey = keyfile.read()
     logging.info(
         'ssh private key file: %s, public key file: %s',
@@ -400,7 +400,7 @@ class DebianBasedIbmCloudVirtualMachine(
     time.sleep(_WAIT_TIME_DEBIAN)
     self.RemoteCommand('DEBIAN_FRONTEND=noninteractive apt-get -y update')
     self.RemoteCommand('DEBIAN_FRONTEND=noninteractive apt-get -y install sudo')
-    super(DebianBasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
+    super().PrepareVMEnvironment()
 
 
 class Debian11BasedIbmCloudVirtualMachine(
@@ -421,7 +421,7 @@ class RhelBasedIbmCloudVirtualMachine(
 
   def PrepareVMEnvironment(self):
     time.sleep(_WAIT_TIME_RHEL)
-    super(RhelBasedIbmCloudVirtualMachine, self).PrepareVMEnvironment()
+    super().PrepareVMEnvironment()
 
 
 class Rhel8BasedIbmCloudVirtualMachine(
@@ -436,7 +436,7 @@ class WindowsIbmCloudVirtualMachine(
   """Support for Windows machines on IBMCloud."""
 
   def __init__(self, vm_spec):
-    super(WindowsIbmCloudVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.user_name = 'Administrator'
     self.user_data = util.USER_DATA
 
@@ -456,7 +456,7 @@ class WindowsIbmCloudVirtualMachine(
 
   def _PostCreate(self):
     """Retrieve generic VM info and then retrieve the VM's password."""
-    super(WindowsIbmCloudVirtualMachine, self)._PostCreate()
+    super()._PostCreate()
 
     # Get the decoded password data.
     decoded_password_data = self._GetDecodedPasswordData()

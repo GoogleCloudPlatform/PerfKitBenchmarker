@@ -49,7 +49,7 @@ class IbmCloudDisk(disk.BaseDisk):
       zone: str,
       encryption_key: str | None = None,
   ):
-    super(IbmCloudDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.name = name
     self.zone = zone
     self.encryption_key = encryption_key

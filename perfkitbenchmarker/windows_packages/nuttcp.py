@@ -22,7 +22,6 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from six.moves import range
 
 FLAGS = flags.FLAGS
 

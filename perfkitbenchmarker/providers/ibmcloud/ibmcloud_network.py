@@ -187,7 +187,7 @@ class IbmCloudNetwork(resource.BaseResource):
   _lock_vpc = threading.Lock()
 
   def __init__(self, prefix, zone, vpcid=None):
-    super(IbmCloudNetwork, self).__init__()
+    super().__init__()
     self.prefix = prefix
     self.vpcid = vpcid
     self.subnet = None

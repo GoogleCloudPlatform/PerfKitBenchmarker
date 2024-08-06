@@ -54,7 +54,7 @@ class KubernetesPodSpec(virtual_machine.BaseVmSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(KubernetesPodSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'resource_limits': (
             kubernetes_resources_spec.KubernetesResourcesDecoder,

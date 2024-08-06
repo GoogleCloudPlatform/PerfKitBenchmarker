@@ -28,7 +28,7 @@ _BASE_SNOWFLAKE_SPEC = {'type': 'snowflake_azure'}
 FLAGS = flags.FLAGS
 
 
-class FakeRemoteVMCreateLambdaRole(object):
+class FakeRemoteVMCreateLambdaRole:
 
   def Install(self, package_name):
     if package_name != 'snowsql':
@@ -43,7 +43,7 @@ class FakeRemoteVMCreateLambdaRole(object):
 class SnowflakeTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(SnowflakeTestCase, self).setUp()
+    super().setUp()
     FLAGS.cloud = 'AZURE'
     FLAGS.run_uri = _TEST_RUN_URI
     FLAGS.zones = [_AZURE_ZONE_EAST_US_2]

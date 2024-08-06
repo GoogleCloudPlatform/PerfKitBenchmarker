@@ -29,7 +29,6 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-import six
 
 FLAGS = flags.FLAGS
 
@@ -389,8 +388,8 @@ def RunDiskSpd(running_vm):
   """Run Diskspd and return the samples collected from the run."""
 
   metadata = {}
-  for k, v in six.iteritems(running_vm.GetResourceMetadata()):
-    metadata['{0}'.format(k)] = v
+  for k, v in running_vm.GetResourceMetadata().items():
+    metadata['{}'.format(k)] = v
 
   # add the flag information to the metadata
   # some of the flags information has been included in the xml file

@@ -12,7 +12,7 @@ FLAGS = flags.FLAGS
 class AzureDiskGetDevicePathTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AzureDiskGetDevicePathTest, self).setUp()
+    super().setUp()
     # Patch the __init__ method for simplicity.
     with mock.patch.object(azure_disk.AzureDisk, '__init__', lambda self: None):
       self.disk = azure_disk.AzureDisk()

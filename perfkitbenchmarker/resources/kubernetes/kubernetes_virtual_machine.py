@@ -405,13 +405,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.resource_requests:
       resources['requests'].update({
           'cpu': str(self.resource_requests.cpus),
-          'memory': '{0}Mi'.format(self.resource_requests.memory),
+          'memory': '{}Mi'.format(self.resource_requests.memory),
       })
 
     if self.resource_limits:
       resources['limits'].update({
           'cpu': str(self.resource_limits.cpus),
-          'memory': '{0}Mi'.format(self.resource_limits.memory),
+          'memory': '{}Mi'.format(self.resource_limits.memory),
       })
 
     if self.gpu_count:
@@ -601,7 +601,7 @@ class DebianBasedKubernetesVirtualMachine(
   def PrepareVMEnvironment(self):
     # Install sudo as most PrepareVMEnvironment assume it exists.
     self._InstallPrepareVmEnvironmentDependencies()
-    super(DebianBasedKubernetesVirtualMachine, self).PrepareVMEnvironment()
+    super().PrepareVMEnvironment()
     if k8s_flags.SETUP_SSH.value:
       # Don't rely on SSH being installed in Kubernetes containers,
       # so install it and restart the service so that it is ready to go.
@@ -666,7 +666,7 @@ class DebianBasedKubernetesVirtualMachine(
       )
     else:
       raise NotImplementedError(
-          'Cloud {0} does not support downloading preprovisioned '
+          'Cloud {} does not support downloading preprovisioned '
           'data on Kubernetes VMs.'.format(self.cloud)
       )
 

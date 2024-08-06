@@ -17,10 +17,9 @@
 import abc
 
 from perfkitbenchmarker import errors
-import six
 
 
-class ConfigOptionDecoder(six.with_metaclass(abc.ABCMeta, object)):
+class ConfigOptionDecoder(metaclass=abc.ABCMeta):
   """Verifies and decodes a config option value.
 
   Attributes:
@@ -47,7 +46,7 @@ class ConfigOptionDecoder(six.with_metaclass(abc.ABCMeta, object)):
       self._default = kwargs.pop('default')
     assert (
         not kwargs
-    ), '__init__() received unexpected keyword arguments: {0}'.format(kwargs)
+    ), '__init__() received unexpected keyword arguments: {}'.format(kwargs)
 
   def _GetOptionFullName(self, component_full_name):
     """Returns the fully qualified name of a config option.
@@ -59,7 +58,7 @@ class ConfigOptionDecoder(six.with_metaclass(abc.ABCMeta, object)):
     return (
         component_full_name
         if self.option is None
-        else '{0}.{1}'.format(component_full_name, self.option)
+        else '{}.{}'.format(component_full_name, self.option)
     )
 
   @property
@@ -71,7 +70,7 @@ class ConfigOptionDecoder(six.with_metaclass(abc.ABCMeta, object)):
     """
     assert not self.required, (
         'Attempted to get the default value of required config option '
-        '"{0}".'.format(self.option)
+        '"{}".'.format(self.option)
     )
     if hasattr(self._default, '__call__'):
       return self._default()
@@ -133,8 +132,8 @@ class EnumDecoder(ConfigOptionDecoder):
       return value
     else:
       raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}". Value must be one of the following: '
-          '{2}.'.format(
+          'Invalid {} value: "{}". Value must be one of the following: '
+          '{}.'.format(
               self._GetOptionFullName(component_full_name),
               value,
               ', '.join(str(t) for t in self.valid_values),
@@ -180,8 +179,8 @@ class TypeVerifier(ConfigOptionDecoder):
     """
     if not isinstance(value, self._valid_types):
       raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}" (of type "{2}"). Value must be one of the '
-          'following types: {3}.'.format(
+          'Invalid {} value: "{}" (of type "{}"). Value must be one of the '
+          'following types: {}.'.format(
               self._GetOptionFullName(component_full_name),
               value,
               value.__class__.__name__,
@@ -231,13 +230,13 @@ class IntDecoder(TypeVerifier):
     if value is not None:
       if self.max is not None and value > self.max:
         raise errors.Config.InvalidValue(
-            'Invalid {0} value: "{1}". Value must be at most {2}.'.format(
+            'Invalid {} value: "{}". Value must be at most {}.'.format(
                 self._GetOptionFullName(component_full_name), value, self.max
             )
         )
       if self.min is not None and value < self.min:
         raise errors.Config.InvalidValue(
-            'Invalid {0} value: "{1}". Value must be at least {2}.'.format(
+            'Invalid {} value: "{}". Value must be at least {}.'.format(
                 self._GetOptionFullName(component_full_name), value, self.min
             )
         )
@@ -277,13 +276,13 @@ class FloatDecoder(TypeVerifier):
     if value is not None:
       if self.max is not None and value > self.max:
         raise errors.Config.InvalidValue(
-            'Invalid {0} value: "{1}". Value must be at most {2}.'.format(
+            'Invalid {} value: "{}". Value must be at most {}.'.format(
                 self._GetOptionFullName(component_full_name), value, self.max
             )
         )
       if self.min is not None and value < self.min:
         raise errors.Config.InvalidValue(
-            'Invalid {0} value: "{1}". Value must be at least {2}.'.format(
+            'Invalid {} value: "{}". Value must be at least {}.'.format(
                 self._GetOptionFullName(component_full_name), value, self.min
             )
         )
@@ -294,7 +293,7 @@ class StringDecoder(TypeVerifier):
   """Verifies and decodes a config option value when a string is expected."""
 
   def __init__(self, **kwargs):
-    super().__init__(six.string_types, **kwargs)
+    super().__init__((str,), **kwargs)
 
 
 class ListDecoder(TypeVerifier):
@@ -334,7 +333,7 @@ class ListDecoder(TypeVerifier):
     list_full_name = self._GetOptionFullName(component_full_name)
     result = []
     for index, input_item in enumerate(input_list):
-      item_full_name = '{0}[{1}]'.format(list_full_name, index)
+      item_full_name = '{}[{}]'.format(list_full_name, index)
       result.append(
           self._item_decoder.Decode(input_item, item_full_name, flag_values)
       )

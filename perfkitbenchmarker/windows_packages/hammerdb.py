@@ -170,13 +170,13 @@ def SetupConfig(
 
   if db_engine not in linux_hammerdb.SCRIPT_MAPPING:
     raise ValueError(
-        '{0} is currently not supported for running '
+        '{} is currently not supported for running '
         'hammerdb benchmarks.'.format(db_engine)
     )
 
   if hammerdb_script not in linux_hammerdb.SCRIPT_MAPPING[db_engine]:
     raise ValueError(
-        '{0} is not a known hammerdb script.'.format(hammerdb_script)
+        '{} is not a known hammerdb script.'.format(hammerdb_script)
     )
 
   linux_scripts = linux_hammerdb.SCRIPT_MAPPING[db_engine][hammerdb_script]

@@ -26,7 +26,7 @@ FLAGS = flags.FLAGS
 class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AzureRedisCacheTestCase, self).setUp()
+    super().setUp()
     FLAGS.project = 'project'
     FLAGS.zones = ['eastus']
     mock_spec = mock.Mock()

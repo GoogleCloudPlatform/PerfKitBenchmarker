@@ -21,7 +21,7 @@ class TestAzureVirtualMachine(
 class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AzureVirtualMachineTest, self).setUp()
+    super().setUp()
     self.enter_context(
         mock.patch(
             azure_virtual_machine.__name__
@@ -152,7 +152,7 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
 class AzurePublicIPAddressTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AzurePublicIPAddressTest, self).setUp()
+    super().setUp()
     self.enter_context(
         mock.patch(
             azure_virtual_machine.__name__ + '.azure_network.GetResourceGroup'

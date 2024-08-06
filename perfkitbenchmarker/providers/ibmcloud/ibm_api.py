@@ -40,7 +40,7 @@ class States(Enum):
   ATTACHED = 'attached'
 
 
-class IbmAPICommand(object):
+class IbmAPICommand:
   """A IBM Cloud rest api command.
 
   Attributes:

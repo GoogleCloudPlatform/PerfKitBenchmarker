@@ -23,7 +23,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import auto_registry
 from perfkitbenchmarker.configs import option_decoders
-import six
 
 
 _SPEC_REGISTRY = {}
@@ -64,7 +63,7 @@ class BaseSpecMetaClass(type):
     )
 
 
-class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
+class BaseSpec(metaclass=BaseSpecMetaClass):
   """Object decoded from a YAML config."""
 
   # Each derived class has its own copy of the following three variables. They
@@ -107,7 +106,7 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
     missing_options = self._required_options.difference(kwargs)
     if missing_options:
       raise errors.Config.MissingOption(
-          'Required options were missing from {0}: {1}.'.format(
+          'Required options were missing from {}: {}.'.format(
               component_full_name, ', '.join(sorted(missing_options))
           )
       )
@@ -121,7 +120,7 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
           self._DecodersToString(),
       )
       raise errors.Config.UnrecognizedOption(
-          'Unrecognized options were found in {0}: {1}.'.format(
+          'Unrecognized options were found in {}: {}.'.format(
               component_full_name,
               ', '.join(sorted(unrecognized_options)),
           )
@@ -155,7 +154,7 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
       if not cls._decoders:
         constructions = cls._GetOptionDecoderConstructions()
         for option, decoder_construction in sorted(
-            six.iteritems(constructions)
+            constructions.items()
         ):
           decoder_class, init_args = decoder_construction
           decoder = decoder_class(option=option, **init_args)
@@ -218,7 +217,7 @@ class BaseSpec(six.with_metaclass(BaseSpecMetaClass, object)):
         'decoders must be an OrderedDict. The order in which options are '
         'decoded must be guaranteed.'
     )
-    for option, decoder in six.iteritems(decoders):
+    for option, decoder in decoders.items():
       if option in config:
         value = decoder.Decode(config[option], component_full_name, flag_values)
       else:

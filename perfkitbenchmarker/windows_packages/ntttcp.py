@@ -30,7 +30,6 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-import six
 
 FLAGS = flags.FLAGS
 
@@ -302,8 +301,8 @@ def RunNtttcp(
 
   metadata = {'ip_type': ip_type}
   for vm_specifier, vm in ('receiving', receiving_vm), ('sending', sending_vm):
-    for k, v in six.iteritems(vm.GetResourceMetadata()):
-      metadata['{0}_{1}'.format(vm_specifier, k)] = v
+    for k, v in vm.GetResourceMetadata().items():
+      metadata['{}_{}'.format(vm_specifier, k)] = v
 
   return ParseNtttcpResults(sender_xml, receiver_xml, metadata)
 

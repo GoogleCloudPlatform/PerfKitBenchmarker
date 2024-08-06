@@ -61,7 +61,7 @@ class VmGroupSpec(spec.BaseSpec):
   cidr: str
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super(VmGroupSpec, self).__init__(
+    super().__init__(
         component_full_name, flag_values=flag_values, **kwargs
     )
     ignore_package_requirements = (
@@ -90,14 +90,14 @@ class VmGroupSpec(spec.BaseSpec):
         disk_type = flag_values['data_disk_type'].value
       disk_spec_class = disk.GetDiskSpecClass(self.cloud, disk_type)
       self.disk_spec = disk_spec_class(
-          '{0}.disk_spec.{1}'.format(component_full_name, self.cloud),
+          '{}.disk_spec.{}'.format(component_full_name, self.cloud),
           flag_values=flag_values,
           **disk_config
       )
 
       if self.vm_as_nfs:
         self.vm_as_nfs_disk_spec = disk.BaseNFSDiskSpec(
-            '{0}.disk_spec.{1}'.format(component_full_name, self.cloud),
+            '{}.disk_spec.{}'.format(component_full_name, self.cloud),
             flag_values=flag_values,
             **disk_config
         )
@@ -109,7 +109,7 @@ class VmGroupSpec(spec.BaseSpec):
       )
     vm_spec_class = virtual_machine.GetVmSpecClass(cloud=self.cloud)
     self.vm_spec = vm_spec_class(
-        '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
+        '{}.vm_spec.{}'.format(component_full_name, self.cloud),
         flag_values=flag_values,
         **vm_config
     )
@@ -123,7 +123,7 @@ class VmGroupSpec(spec.BaseSpec):
       The pair specifies a decoder class and its __init__() keyword arguments
       to construct in order to decode the named option.
     """
-    result = super(VmGroupSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'cloud': (
             option_decoders.EnumDecoder,
@@ -171,7 +171,7 @@ class VmGroupSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
         provided config values.
     """
-    super(VmGroupSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
     if flag_values['os_type'].present or 'os_type' not in config_values:
@@ -200,13 +200,13 @@ class VmGroupsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_configs = super(VmGroupsDecoder, self).Decode(
+    vm_group_configs = super().Decode(
         value, component_full_name, flag_values
     )
     result = {}
     for vm_group_name, vm_group_config in vm_group_configs.items():
       result[vm_group_name] = VmGroupSpec(
-          '{0}.{1}'.format(
+          '{}.{}'.format(
               self._GetOptionFullName(component_full_name), vm_group_name
           ),
           flag_values=flag_values,
@@ -234,7 +234,7 @@ class VmGroupSpecDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_config = super(VmGroupSpecDecoder, self).Decode(
+    vm_group_config = super().Decode(
         value, component_full_name, flag_values
     )
     return VmGroupSpec(

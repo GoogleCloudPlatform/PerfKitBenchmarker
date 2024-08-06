@@ -72,7 +72,6 @@ from absl import flags
 import contextlib2
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-import six
 import yaml
 
 
@@ -102,7 +101,7 @@ flags.DEFINE_multi_string(
 )
 
 
-class _ConcatenatedFiles(object):
+class _ConcatenatedFiles:
   """Class that presents several files as a single object.
 
   The class exposes a single method (read) which is all that yaml
@@ -271,7 +270,7 @@ def MergeConfigs(default_config, override_config, warn_new_key=False):
   def _Merge(d1, d2):
     """Merge two nested dicts."""
     merged_dict = copy.deepcopy(d1)
-    for k, v in six.iteritems(d2):
+    for k, v in d2.items():
       if k not in d1:
         merged_dict[k] = copy.deepcopy(v)
         if warn_new_key:

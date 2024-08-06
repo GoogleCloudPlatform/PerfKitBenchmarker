@@ -41,9 +41,7 @@ class KubernetesResourcesSpec(spec.BaseSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(
-        KubernetesResourcesSpec, cls
-    )._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'cpus': (option_decoders.FloatDecoder, {'min': 0.1}),
         'memory': (custom_virtual_machine_spec.MemoryDecoder, {}),
@@ -55,7 +53,7 @@ class KubernetesResourcesDecoder(option_decoders.TypeVerifier):
   """Decodes a kubernetes resources spec."""
 
   def __init__(self, **kwargs):
-    super(KubernetesResourcesDecoder, self).__init__((dict), **kwargs)
+    super().__init__((dict), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Decodes the kubernetes resources spec.
@@ -70,7 +68,7 @@ class KubernetesResourcesDecoder(option_decoders.TypeVerifier):
     Returns:
       The decoded KubernetesResourcesSpec.
     """
-    super(KubernetesResourcesDecoder, self).Decode(
+    super().Decode(
         value, component_full_name, flag_values
     )
     return KubernetesResourcesSpec(

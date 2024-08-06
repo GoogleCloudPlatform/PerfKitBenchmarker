@@ -26,7 +26,6 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
-import six
 
 
 _DEFAULT_VM_COUNT = 1
@@ -214,9 +213,9 @@ class ContainerSpecsDecoder(option_decoders.TypeVerifier):
         value, component_full_name, flag_values
     )
     result = {}
-    for spec_name, spec_config in six.iteritems(container_spec_configs):
+    for spec_name, spec_config in container_spec_configs.items():
       result[spec_name] = ContainerSpec(
-          '{0}.{1}'.format(
+          '{}.{}'.format(
               self._GetOptionFullName(component_full_name), spec_name
           ),
           flag_values=flag_values,
@@ -234,7 +233,7 @@ class NodepoolSpec(spec.BaseSpec):
       self, component_full_name, group_name, flag_values=None, **kwargs
   ):
     super().__init__(
-        '{0}.{1}'.format(component_full_name, group_name),
+        '{}.{}'.format(component_full_name, group_name),
         flag_values=flag_values,
         **kwargs,
     )
@@ -305,11 +304,11 @@ class _NodepoolsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    nodepools_configs = super(_NodepoolsDecoder, self).Decode(
+    nodepools_configs = super().Decode(
         value, component_full_name, flag_values
     )
     result = {}
-    for nodepool_name, nodepool_config in six.iteritems(nodepools_configs):
+    for nodepool_name, nodepool_config in nodepools_configs.items():
       result[nodepool_name] = NodepoolSpec(
           self._GetOptionFullName(component_full_name),
           nodepool_name,
@@ -398,15 +397,15 @@ class ContainerClusterSpec(spec.BaseSpec):
         self.cloud, provider_info.DEFAULT_VM_PLATFORM
     )
     self.vm_spec = vm_spec_class(
-        '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
+        '{}.vm_spec.{}'.format(component_full_name, self.cloud),
         flag_values=flag_values,
         **vm_config,
     )
     nodepools = {}
-    for nodepool_name, nodepool_spec in sorted(six.iteritems(self.nodepools)):
+    for nodepool_name, nodepool_spec in sorted(self.nodepools.items()):
       if nodepool_name == DEFAULT_NODEPOOL:
         raise errors.Config.InvalidValue(
-            'Nodepool name {0} is reserved for use during cluster creation. '
+            'Nodepool name {} is reserved for use during cluster creation. '
             'Please rename nodepool'.format(nodepool_name)
         )
       nodepool_config = getattr(nodepool_spec.vm_spec, self.cloud, None)
@@ -416,7 +415,7 @@ class ContainerClusterSpec(spec.BaseSpec):
             'configuration for "{1}".'.format(component_full_name, self.cloud)
         )
       nodepool_spec.vm_spec = vm_spec_class(
-          '{0}.vm_spec.{1}'.format(component_full_name, self.cloud),
+          '{}.vm_spec.{}'.format(component_full_name, self.cloud),
           flag_values=flag_values,
           **nodepool_config,
       )

@@ -78,7 +78,7 @@ def ReadConfig(config: str) -> Dict[Any, Any]:
     The json representation of the config file.
   """
   try:
-    with open(config, 'r') as stream:
+    with open(config) as stream:
       return yaml.safe_load(stream)
   except Exception as ex:
     raise errors.Error(('Failed to load configuration file %s, %s', config, ex))
