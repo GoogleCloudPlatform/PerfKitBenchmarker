@@ -168,12 +168,6 @@ class EdwBaseIterationPerformance(abc.ABC):
   id: str
 
   @abc.abstractmethod
-  def add_query_performance(
-      self, query_name: str, performance: float, metadata: dict[str, Any]
-  ):
-    """Creates and populates a query performance from the input results."""
-
-  @abc.abstractmethod
   def has_query_performance(self, query_name: str) -> bool:
     """Returns whether the query was run at least once in the iteration."""
 

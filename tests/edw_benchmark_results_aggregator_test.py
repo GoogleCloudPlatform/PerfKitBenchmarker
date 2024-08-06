@@ -636,5 +636,25 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
       agg.geometric_mean(performance_iterable)
 
 
+class EdwAggregatorTypeValidation(pkb_common_test_case.PkbCommonTestCase):
+  def test_EdwPowerIterationPerformance_not_abstract(self):
+    try:
+      agg.EdwPowerIterationPerformance('1', 1)
+    except TypeError:
+      self.fail('EdwPowerIterationPerformance failed to instantiate')
+
+  def test_EdwThroughputIterationPerformance_not_abstract(self):
+    try:
+      agg.EdwThroughputIterationPerformance('1', 1, 1, 1.0, {})
+    except TypeError:
+      self.fail('EdwThroughputIterationPerformance failed to instantiate')
+
+  def test_EdwSimultaneousIterationPerformance_not_abstract(self):
+    try:
+      agg.EdwSimultaneousIterationPerformance('1', 1, 1, 1.0, {}, True)
+    except TypeError:
+      self.fail('EdwSimultaneousIterationPerformance failed to instantiate')
+
+
 if __name__ == '__main__':
   unittest.main()
