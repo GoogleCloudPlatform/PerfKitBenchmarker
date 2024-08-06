@@ -30,6 +30,7 @@ SECOND = 'seconds'
 FLEXIBLE_SERVER_MYSQL = 'flexible-server-mysql'
 FLEXIBLE_SERVER_POSTGRES = 'flexible-server-postgres'
 
+OMNI = 'omni'
 MYSQL = 'mysql'
 MARIADB = 'mariadb'
 POSTGRES = 'postgres'
@@ -44,6 +45,7 @@ SPANNER_POSTGRES = 'spanner-postgres'
 ALLOYDB = 'alloydb-postgresql'
 
 ALL_ENGINES = [
+    OMNI,
     MARIADB,
     MYSQL,
     POSTGRES,
@@ -563,7 +565,7 @@ def GetDbEngineType(db_engine: str) -> str:
       db_engine == AWS_AURORA_MYSQL_ENGINE or db_engine == FLEXIBLE_SERVER_MYSQL
   ):
     return MYSQL
-  elif db_engine == ALLOYDB:
+  elif db_engine == ALLOYDB or db_engine == OMNI:
     return POSTGRES
   elif db_engine == SPANNER_POSTGRES:
     return SPANNER_POSTGRES

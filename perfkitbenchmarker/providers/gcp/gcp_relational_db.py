@@ -30,6 +30,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import mysql_iaas_relational_db
+from perfkitbenchmarker import omni_postgres_iaas_relational_db
 from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
@@ -157,6 +158,13 @@ class GCPMariaDbIAASRelationalDb(
 ):
   """A GCP IAAS database resource."""
 
+  CLOUD = provider_info.GCP
+
+
+class GCPOmniPostgresIAASRelationalDb(
+    omni_postgres_iaas_relational_db.OmniPostgresIAASRelationalDb
+):
+  """A GCP Omni Postgres IAAS database resource."""
   CLOUD = provider_info.GCP
 
 
