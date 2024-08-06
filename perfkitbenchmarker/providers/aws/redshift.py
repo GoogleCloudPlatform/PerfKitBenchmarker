@@ -20,7 +20,7 @@ and deleted.
 import copy
 import json
 import os
-from typing import Dict, List, Text, Tuple
+from typing import Dict, List, Tuple
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
@@ -120,7 +120,7 @@ class CliClientInterface(edw_service.EdwClientInterface):
 
   def SetProvisionedAttributes(self, bm_spec: benchmark_spec.BenchmarkSpec):
     """Sets any attributes that were unknown during initialization."""
-    super(CliClientInterface, self).SetProvisionedAttributes(bm_spec)
+    super().SetProvisionedAttributes(bm_spec)
     self.host = bm_spec.edw_service.endpoint
 
   def Prepare(self, package_name: str) -> None:
@@ -156,7 +156,7 @@ class CliClientInterface(edw_service.EdwClientInterface):
         )
     )
 
-  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -208,7 +208,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
 
   def SetProvisionedAttributes(self, bm_spec: benchmark_spec.BenchmarkSpec):
     """Sets any attributes that were unknown during initialization."""
-    super(JdbcClientInterface, self).SetProvisionedAttributes(bm_spec)
+    super().SetProvisionedAttributes(bm_spec)
     endpoint = bm_spec.edw_service.endpoint
     self.host = f'jdbc:redshift://{endpoint}:{self.port}/{self.database}'
 
@@ -228,7 +228,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         package_name, [REDSHIFT_JDBC_JAR], ''
     )
 
-  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -318,7 +318,7 @@ class Redshift(edw_service.EdwService):
   READY_TIMEOUT = 7200
 
   def __init__(self, edw_service_spec):
-    super(Redshift, self).__init__(edw_service_spec)
+    super().__init__(edw_service_spec)
     # pkb setup attribute
     self.project = None
     self.cmd_prefix = list(util.AWS_PREFIX)
@@ -613,7 +613,7 @@ class Redshift(edw_service.EdwService):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
-    basic_data = super(Redshift, self).GetMetadata()
+    basic_data = super().GetMetadata()
     basic_data['region'] = self.region
     if self.snapshot is not None:
       basic_data['snapshot'] = self.snapshot

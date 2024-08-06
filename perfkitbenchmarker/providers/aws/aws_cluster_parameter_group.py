@@ -28,7 +28,7 @@ class RedshiftClusterParameterGroup(resource.BaseResource):
   """
 
   def __init__(self, cmd_prefix):
-    super(RedshiftClusterParameterGroup, self).__init__(user_managed=False)
+    super().__init__(user_managed=False)
     self.cmd_prefix = cmd_prefix
     self.name = 'pkb-' + FLAGS.run_uri
 

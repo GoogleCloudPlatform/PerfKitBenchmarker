@@ -84,7 +84,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
   """
 
   def __init__(self, relational_db_spec):
-    super(BaseAwsRelationalDb, self).__init__(relational_db_spec)
+    super().__init__(relational_db_spec)
     self.all_instance_ids = []
     self.primary_zone = None
     self.secondary_zone = None
@@ -166,7 +166,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
         self.security_group_id,
         '--protocol',
         'tcp',
-        '--port={0}'.format(self.port),
+        '--port={}'.format(self.port),
         '--region',
         self.region,
     ]
@@ -214,7 +214,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
       subnets: a list of strings. The db subnet group will consit of all subnets
         in this list.
     """
-    db_subnet_group_name = 'pkb-db-subnet-group-{0}'.format(FLAGS.run_uri)
+    db_subnet_group_name = 'pkb-db-subnet-group-{}'.format(FLAGS.run_uri)
 
     create_db_subnet_group_cmd = util.AWS_PREFIX + (
         [
@@ -451,7 +451,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       metadata: dict of AWS Managed DB metadata.
     """
-    metadata = super(BaseAwsRelationalDb, self).GetResourceMetadata()
+    metadata = super().GetResourceMetadata()
     metadata.update({
         'zone': self.primary_zone,
     })

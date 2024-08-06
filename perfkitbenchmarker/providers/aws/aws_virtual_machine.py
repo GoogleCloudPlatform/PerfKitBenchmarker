@@ -46,7 +46,6 @@ from perfkitbenchmarker.providers.aws import aws_disk_strategies
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import util
-from six.moves import range
 
 
 FLAGS = flags.FLAGS
@@ -213,7 +212,7 @@ def GetRootBlockDeviceSpecForImage(image_id, region):
   root_device_name = image_spec['RootDeviceName']
   block_device_mappings = image_spec['BlockDeviceMappings']
   root_block_device_dict = next(
-      (x for x in block_device_mappings if x['DeviceName'] == root_device_name)
+      x for x in block_device_mappings if x['DeviceName'] == root_device_name
   )
   return root_block_device_dict
 
@@ -293,7 +292,7 @@ class AwsDedicatedHost(resource.BaseResource):
   """
 
   def __init__(self, machine_type: str, zone: str):
-    super(AwsDedicatedHost, self).__init__()
+    super().__init__()
     self.machine_type = machine_type
     self.zone = zone
     self.region = util.GetRegionFromZone(self.zone)
@@ -366,7 +365,7 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
         provided config values.
     """
-    super(AwsVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['aws_boot_disk_size'].present:
       config_values['boot_disk_size'] = flag_values.aws_boot_disk_size
     if flag_values['aws_spot_instances'].present:
@@ -387,7 +386,7 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(AwsVmSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'use_spot_instance': (
             option_decoders.BooleanDecoder,
@@ -415,7 +414,7 @@ def _GetKeyfileSetKey(region):
   return (region, FLAGS.run_uri)
 
 
-class AwsKeyFileManager(object):
+class AwsKeyFileManager:
   """Object for managing AWS Keyfiles."""
 
   _lock = threading.Lock()
@@ -475,7 +474,7 @@ class AwsKeyFileManager(object):
 
   @classmethod
   def GetKeyNameForRun(cls):
-    return 'perfkit-key-{0}'.format(FLAGS.run_uri)
+    return 'perfkit-key-{}'.format(FLAGS.run_uri)
 
 
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -539,7 +538,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Raises:
       ValueError: If an incompatible vm_spec is passed.
     """
-    super(AwsVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     assert isinstance(self.zone, str)
     self.region = util.GetRegionFromZone(self.zone)
     self.user_name = FLAGS.aws_user_name or self.DEFAULT_USER_NAME
@@ -1547,7 +1546,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       dict mapping string property key to value.
     """
-    result = super(AwsVirtualMachine, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     result['boot_disk_type'] = self.DEFAULT_ROOT_DISK_TYPE
     result['boot_disk_size'] = self.boot_disk_size
     if self.use_dedicated_host:
@@ -1658,7 +1657,7 @@ class Ubuntu2004DeepLearningAMIBasedAWSVirtualMachine(
     Raises:
       ValueError: If an incompatible vm_spec is passed.
     """
-    super(Ubuntu2004DeepLearningAMIBasedAWSVirtualMachine, self).__init__(
+    super().__init__(
         vm_spec
     )
     # Add preinstalled packages for Deep Learning AMI
@@ -1714,7 +1713,7 @@ class AmazonLinux2EfaBasedAwsVirtualMachine(
     Raises:
       ValueError: If an incompatible vm_spec is passed.
     """
-    super(AmazonLinux2EfaBasedAwsVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     # Add preinstalled packages for Deep Learning AMI
     self._installed_packages.add('nccl')
     self._installed_packages.add('cuda_toolkit')
@@ -1825,7 +1824,7 @@ class BaseWindowsAwsVirtualMachine(
   DEFAULT_USER_NAME = 'Administrator'
 
   def __init__(self, vm_spec):
-    super(BaseWindowsAwsVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.user_data = (
         '<powershell>%s</powershell>' % windows_virtual_machine.STARTUP_SCRIPT
     )
@@ -1897,7 +1896,7 @@ class BaseWindowsAwsVirtualMachine(
 
   def _PostCreate(self):
     """Retrieve generic VM info and then retrieve the VM's password."""
-    super(BaseWindowsAwsVirtualMachine, self)._PostCreate()
+    super()._PostCreate()
 
     # Get the decoded password data.
     decoded_password_data = self._GetDecodedPasswordData()
@@ -1925,7 +1924,7 @@ class BaseWindowsAwsVirtualMachine(
     Returns:
       dict mapping metadata key to value.
     """
-    result = super(BaseWindowsAwsVirtualMachine, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     result['disable_interrupt_moderation'] = self.disable_interrupt_moderation
     return result
 
@@ -1953,7 +1952,7 @@ class BaseWindowsAwsVirtualMachine(
     self.RemoteCommand(command)
     try:
       self.RemoteCommand('Restart-NetAdapter -Name "Ethernet 2"')
-    except IOError:
+    except OSError:
       # Restarting the network adapter will always fail because
       # the winrm connection used to issue the command will be
       # broken.

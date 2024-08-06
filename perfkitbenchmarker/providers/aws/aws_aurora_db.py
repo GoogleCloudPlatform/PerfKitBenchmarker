@@ -51,7 +51,7 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
 
   def __init__(self, relational_db_spec):
-    super(AwsAuroraRelationalDb, self).__init__(relational_db_spec)
+    super().__init__(relational_db_spec)
     self.cluster_id = 'pkb-db-cluster-' + FLAGS.run_uri
     self.storage_type = aws_flags.AURORA_STORAGE_TYPE.value
     self._load_machine_type = self.spec.db_spec.machine_type
@@ -71,8 +71,8 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
           'zones must be specified.  When '
           'db_high_availability is false, one zone '
           'should be specified.   '
-          'db_high_availability: {0}  '
-          'zone count: {1} '.format(
+          'db_high_availability: {}  '
+          'zone count: {} '.format(
               zones_needed_for_high_availability, len(self.zones)
           )
       )
@@ -256,7 +256,8 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
       Exception: If unrecognized engine is specified.
     """
     if engine not in _MAP_ENGINE_TO_DEFAULT_VERSION:
-      raise Exception('Unspecified default version for {0}'.format(engine))
+      # pylint: disable-next=broad-exception-raised
+      raise Exception('Unspecified default version for {}'.format(engine))
     return _MAP_ENGINE_TO_DEFAULT_VERSION[engine]
 
   def GetResourceMetadata(self) -> dict[str, Any]:

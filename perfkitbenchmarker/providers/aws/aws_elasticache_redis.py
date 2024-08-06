@@ -48,7 +48,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
   READY_TIMEOUT = 120 * 60
 
   def __init__(self, spec):
-    super(ElastiCacheRedis, self).__init__(spec)
+    super().__init__(spec)
     self.subnet_group_name = 'subnet-%s' % self.name
     self.version = REDIS_VERSION_MAPPING[spec.config.cloud_redis.redis_version]
     self.node_type = FLAGS.elasticache_node_type

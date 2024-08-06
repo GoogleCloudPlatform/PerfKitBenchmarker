@@ -77,7 +77,7 @@ class AwsIamRole(resource.BaseResource):
       resource_arn,
       policy_version=None,
   ):
-    super(AwsIamRole, self).__init__()
+    super().__init__()
     self.account = account
     self.role_name = role_name
     self.policy_name = policy_name

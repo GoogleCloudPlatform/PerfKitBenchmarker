@@ -43,7 +43,7 @@ class AwsDax(resource.BaseResource):
   """Class representing an AWS Dax cluster."""
 
   def __init__(self, benchmark_uid, zone, network):
-    super(AwsDax, self).__init__()
+    super().__init__()
     self.benchmark_uid = benchmark_uid
     self.zone = zone
     self.region = util.GetRegionFromZone(self.zone)

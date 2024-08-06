@@ -65,7 +65,7 @@ DATAPROC_TO_EMR_CONF_FILES = {
 
 def _GetClusterConfiguration(cluster_properties: list[str]) -> str:
   """Return a JSON string containing dpb_cluster_properties."""
-  properties = collections.defaultdict(lambda: {})
+  properties = collections.defaultdict(dict)
   for entry in cluster_properties:
     file, kv = entry.split(':')
     key, value = kv.split('=')
@@ -176,7 +176,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   SUPPORTS_NO_DYNALLOC = True
 
   def __init__(self, dpb_service_spec):
-    super(AwsDpbEmr, self).__init__(dpb_service_spec)
+    super().__init__(dpb_service_spec)
     self.project = None
     self.cmd_prefix = list(util.AWS_PREFIX)
     if self.dpb_service_zone:
@@ -223,7 +223,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
 
   def _CreateDependencies(self):
     """Set up the ssh key."""
-    super(AwsDpbEmr, self)._CreateDependencies()
+    super()._CreateDependencies()
     aws_virtual_machine.AwsKeyFileManager.ImportKeyfile(self.region)
 
   def _Create(self):
@@ -338,7 +338,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   def _DeleteDependencies(self):
-    super(AwsDpbEmr, self)._DeleteDependencies()
+    super()._DeleteDependencies()
     aws_virtual_machine.AwsKeyFileManager.DeleteKeyfile(self.region)
 
   def _Exists(self):

@@ -24,7 +24,7 @@ class LogGroup(resource.BaseResource):
   """Class representing a CloudWatch log group."""
 
   def __init__(self, region, name, retention_in_days=7):
-    super(LogGroup, self).__init__()
+    super().__init__()
     self.region = region
     self.name = name
     self.retention_in_days = retention_in_days

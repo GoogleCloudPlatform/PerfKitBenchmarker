@@ -66,7 +66,7 @@ class AwsNfsService(nfs_service.BaseNfsService):
   DEFAULT_TIER = 'generalPurpose'
 
   def __init__(self, disk_spec, zone):
-    super(AwsNfsService, self).__init__(disk_spec, zone)
+    super().__init__(disk_spec, zone)
     self.region = util.GetRegionFromZone(self.zone)
     self.aws_commands = AwsEfsCommands(self.region)
     self.disk_spec.disk_size = 0
@@ -188,14 +188,15 @@ class AwsNfsService(nfs_service.BaseNfsService):
     self.filer_id = None
 
 
-class AwsEfsCommands(object):
-  """Commands for interacting with AWS EFS.
-
-  Args:
-    region: AWS region for the NFS service.
-  """
+class AwsEfsCommands:
+  """Commands for interacting with AWS EFS."""
 
   def __init__(self, region):
+    """AwsEfsCommands constructor.
+
+    Args:
+      region: AWS region for the NFS service.
+    """
     self.efs_prefix = util.AWS_PREFIX + ['--region', region, 'efs']
 
   def GetFiler(self, token):

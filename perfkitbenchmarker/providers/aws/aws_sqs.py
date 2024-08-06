@@ -30,7 +30,7 @@ class AwsSqs(msgsvc.BaseMessagingService):
 
   def __init__(self):
     super().__init__()
-    self.queue_name = 'pkb-queue-{0}'.format(FLAGS.run_uri)
+    self.queue_name = 'pkb-queue-{}'.format(FLAGS.run_uri)
 
   def CheckPrerequisites(self):
     if not aws_flags.AWS_EC2_INSTANCE_PROFILE.value:

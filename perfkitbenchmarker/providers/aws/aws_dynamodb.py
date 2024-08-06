@@ -247,7 +247,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
       use_sort: bool | None = None,
       **kwargs,
   ):
-    super(AwsDynamoDBInstance, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self.table_name = table_name or f'pkb-{FLAGS.run_uri}'
     self._resource_id = f'table/{self.table_name}'
     self.billing_mode = billing_mode or _PROVISIONED

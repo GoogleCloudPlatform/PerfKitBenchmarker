@@ -129,7 +129,7 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     Returns:
       metadata: dict of AWS Managed DB metadata.
     """
-    metadata = super(AwsRDSRelationalDb, self).GetResourceMetadata()
+    metadata = super().GetResourceMetadata()
 
     if hasattr(self.spec.db_disk_spec, 'provisioned_iops'):
       metadata.update({
@@ -170,5 +170,6 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
       Exception: If unrecognized engine is specified.
     """
     if engine not in _MAP_ENGINE_TO_DEFAULT_VERSION:
-      raise Exception('Unspecified default version for {0}'.format(engine))
+      # pylint: disable-next=broad-exception-raised
+      raise Exception('Unspecified default version for {}'.format(engine))
     return _MAP_ENGINE_TO_DEFAULT_VERSION[engine]

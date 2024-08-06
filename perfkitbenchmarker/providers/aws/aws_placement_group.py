@@ -62,7 +62,7 @@ class AwsPlacementGroupSpec(placement_group.BasePlacementGroupSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(AwsPlacementGroupSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'placement_group_style': (
             option_decoders.EnumDecoder,
@@ -90,7 +90,7 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
       aws_placement_group_spec: Object containing the information needed to
         create an AwsPlacementGroup.
     """
-    super(AwsPlacementGroup, self).__init__(aws_placement_group_spec)
+    super().__init__(aws_placement_group_spec)
     self.name = 'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:])
     self.region = util.GetRegionFromZone(self.zone)
     self.strategy = aws_placement_group_spec.placement_group_style

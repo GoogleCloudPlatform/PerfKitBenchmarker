@@ -67,7 +67,7 @@ class AwsVpcEndpoint(resource.BaseResource):
   AWS_SERVICE: str  # must be set by derived classes
 
   def __init__(self, vpc):
-    super(AwsVpcEndpoint, self).__init__()
+    super().__init__()
     assert vpc, 'Must have a VPC object (does not require an id).'
     self._vpc = vpc
     self.region = self._vpc.region

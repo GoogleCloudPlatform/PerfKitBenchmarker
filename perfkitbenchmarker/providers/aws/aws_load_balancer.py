@@ -33,7 +33,7 @@ class TargetGroup(resource.BaseResource):
       vpc: AwsVpc object which contains the targets for load balancing.
       port: The internal port that the load balancer connects to.
     """
-    super(TargetGroup, self).__init__()
+    super().__init__()
     self.arn = None
     self.region = vpc.region
     self.name = 'pkb-%s' % FLAGS.run_uri
@@ -87,7 +87,7 @@ class LoadBalancer(resource.BaseResource):
     Args:
       subnets: List of AwsSubnet objects.
     """
-    super(LoadBalancer, self).__init__()
+    super().__init__()
     self.region = subnets[0].region
     self.name = 'pkb-%s' % FLAGS.run_uri
     self.subnet_ids = [subnet.id for subnet in subnets]
@@ -140,7 +140,7 @@ class Listener(resource.BaseResource):
   """Class representing an AWS listener."""
 
   def __init__(self, load_balancer, target_group, port):
-    super(Listener, self).__init__()
+    super().__init__()
     self.load_balancer_arn = load_balancer.arn
     self.target_group_arn = target_group.arn
     self.port = port

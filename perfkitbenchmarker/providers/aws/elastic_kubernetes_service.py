@@ -93,7 +93,7 @@ class EksCluster(container_service.KubernetesCluster):
     Returns:
       dict mapping string property key to value.
     """
-    result = super(EksCluster, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     result['boot_disk_type'] = self.default_nodepool.disk_type
     result['boot_disk_size'] = self.default_nodepool.disk_size
     return result

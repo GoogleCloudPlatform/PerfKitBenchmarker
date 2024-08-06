@@ -30,7 +30,6 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 import requests
-import six
 import yaml
 
 FLAGS = flags.FLAGS
@@ -41,7 +40,7 @@ class EcrRepository(resource.BaseResource):
   """Class representing an Elastic Container Registry image repository."""
 
   def __init__(self, name, region):
-    super(EcrRepository, self).__init__()
+    super().__init__()
     self.name = name
     self.region = region
 
@@ -107,7 +106,7 @@ class ElasticContainerRegistry(container_service.BaseContainerRegistry):
   CLOUD = provider_info.AWS
 
   def __init__(self, registry_spec):
-    super(ElasticContainerRegistry, self).__init__(registry_spec)
+    super().__init__(registry_spec)
     self.account = self.project or util.GetAccount()
     self.region = util.GetRegionFromZone(self.zone.split(',')[0])
     self.repositories = []
@@ -164,7 +163,7 @@ class TaskDefinition(resource.BaseResource):
   """Class representing an AWS task definition."""
 
   def __init__(self, name, container_spec, cluster):
-    super(TaskDefinition, self).__init__()
+    super().__init__()
     self.name = name
     self.cpus = container_spec.cpus
     self.memory = container_spec.memory
@@ -244,7 +243,7 @@ class EcsTask(container_service.BaseContainer):
   """Class representing an ECS/Fargate task."""
 
   def __init__(self, name, container_spec, cluster):
-    super(EcsTask, self).__init__(container_spec)
+    super().__init__(container_spec)
     self.name = name
     self.task_def = cluster.task_defs[name]
     self.arn = None
@@ -372,7 +371,7 @@ class EcsTask(container_service.BaseContainer):
     assert self.arn is not None
     task_id = self.arn.split('/')[-1]
     log_stream = 'pkb/{name}/{task_id}'.format(name=self.name, task_id=task_id)
-    return six.text_type(
+    return str(
         aws_logs.GetLogStreamAsString(self.region, log_stream, 'pkb')
     )
 
@@ -381,7 +380,7 @@ class EcsService(container_service.BaseContainerService):
   """Class representing an ECS/Fargate service."""
 
   def __init__(self, name, container_spec, cluster):
-    super(EcsService, self).__init__(container_spec)
+    super().__init__(container_spec)
     self.client_token = str(uuid.uuid4())[:32]
     self.name = name
     self.task_def = cluster.task_defs[name]
@@ -508,7 +507,7 @@ class FargateCluster(container_service.BaseContainerCluster):
   CLUSTER_TYPE = 'Fargate'
 
   def __init__(self, cluster_spec):
-    super(FargateCluster, self).__init__(cluster_spec)
+    super().__init__(cluster_spec)
     self.region = util.GetRegionFromZone(self.zone)
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.firewall = aws_network.AwsFirewall.GetFirewall()
@@ -592,7 +591,7 @@ class AwsKopsCluster(container_service.KubernetesCluster):
   CLUSTER_TYPE = 'kops'
 
   def __init__(self, spec):
-    super(AwsKopsCluster, self).__init__(spec)
+    super().__init__(spec)
     self.name += '.k8s.local'
     self.config_bucket = 'kops-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4()))
     self.region = util.GetRegionFromZone(self.zone)

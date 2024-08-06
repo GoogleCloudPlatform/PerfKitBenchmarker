@@ -390,7 +390,7 @@ class AwsDiskSpec(disk.BaseDiskSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
         provided config values.
     """
-    super(AwsDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['aws_create_disks_with_vm'].present:
       config_values['create_with_vm'] = flag_values.aws_create_disks_with_vm
 
@@ -403,7 +403,7 @@ class AwsDiskSpec(disk.BaseDiskSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(AwsDiskSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update(
         {
             'create_with_vm': (
@@ -431,7 +431,7 @@ class AwsDisk(disk.BaseDisk):
   available_device_letters_by_vm = {}
 
   def __init__(self, disk_spec, zone, machine_type, disk_spec_id=None):
-    super(AwsDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.iops = disk_spec.provisioned_iops
     self.throughput = disk_spec.provisioned_throughput
     self.id = None
@@ -444,11 +444,11 @@ class AwsDisk(disk.BaseDisk):
     if self.disk_type != disk.LOCAL:
       self.metadata.update(DISK_METADATA.get(self.disk_type, {}))
     else:
-      self.metadata.update((
+      self.metadata.update(
           LOCAL_HDD_METADATA
           if LocalDiskIsHDD(machine_type)
           else LOCAL_SSD_METADATA
-      ))
+      )
     if self.iops:
       self.metadata['iops'] = self.iops
     if self.throughput:

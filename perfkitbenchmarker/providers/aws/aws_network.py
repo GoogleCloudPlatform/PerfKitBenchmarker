@@ -220,7 +220,7 @@ class AwsVpc(resource.BaseResource):
   """An object representing an Aws VPC."""
 
   def __init__(self, region, vpc_id=None, regional_network_index=0):
-    super(AwsVpc, self).__init__(vpc_id is not None)
+    super().__init__(vpc_id is not None)
     self.region = region
     self.regional_network_index = regional_network_index
     self.cidr = network.GetCidrBlock(self.regional_network_index, 0, 16)
@@ -363,7 +363,7 @@ class AwsVpc(resource.BaseResource):
     with self._subnet_index_lock:
       if self._subnet_index >= (1 << 8) - 1:
         raise ValueError(
-            'Exceeded subnet limit ({0}).'.format(self._subnet_index)
+            'Exceeded subnet limit ({}).'.format(self._subnet_index)
         )
       cidr = network.GetCidrBlock(
           self.regional_network_index, self._subnet_index
@@ -417,7 +417,7 @@ class AwsSubnet(resource.BaseResource):
   """An object representing an Aws subnet."""
 
   def __init__(self, zone, vpc_id, cidr_block='10.0.0.0/24', subnet_id=None):
-    super(AwsSubnet, self).__init__(subnet_id is not None)
+    super().__init__(subnet_id is not None)
     self.zone = zone
     self.region = util.GetRegionFromZone(zone)
     self.vpc_id = vpc_id
@@ -489,7 +489,7 @@ class AwsInternetGateway(resource.BaseResource):
   """An object representing an Aws Internet Gateway."""
 
   def __init__(self, region, vpc_id=None):
-    super(AwsInternetGateway, self).__init__(vpc_id is not None)
+    super().__init__(vpc_id is not None)
     self.region = region
     self.vpc_id = None
     self.id = None
@@ -604,7 +604,7 @@ class AwsRouteTable(resource.BaseResource):
   """An object representing a route table."""
 
   def __init__(self, region, vpc_id):
-    super(AwsRouteTable, self).__init__()
+    super().__init__()
     self.region = region
     self.vpc_id = vpc_id
     self.id: str = None  # set by _PostCreate
@@ -794,7 +794,7 @@ class AwsNetworkSpec(network.BaseNetworkSpec):
   """Configuration for creating an AWS network."""
 
   def __init__(self, zone, vpc_id=None, subnet_id=None, machine_type=None):
-    super(AwsNetworkSpec, self).__init__(zone)
+    super().__init__(zone)
     self.machine_type = machine_type
     if vpc_id or subnet_id:
       logging.info(
@@ -929,7 +929,7 @@ class AwsNetwork(network.BaseNetwork):
     Args:
       spec: An AwsNetworkSpec object.
     """
-    super(AwsNetwork, self).__init__(spec)
+    super().__init__(spec)
     self.region = util.GetRegionFromZone(spec.zone)
     self.regional_network = _AwsRegionalNetwork.GetForRegion(
         self.region, spec.vpc_id

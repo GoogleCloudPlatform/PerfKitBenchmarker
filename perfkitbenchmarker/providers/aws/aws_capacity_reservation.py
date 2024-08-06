@@ -77,7 +77,7 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
           'VM in the vm_group.'
       )
 
-    super(AwsCapacityReservation, self).__init__(vm_group)
+    super().__init__(vm_group)
     self.zone_or_region = vm_group[0].zone
     self.region = util.GetRegionFromZone(self.zone_or_region)
     self.machine_type = vm_group[0].machine_type

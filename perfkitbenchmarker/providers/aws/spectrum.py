@@ -52,7 +52,7 @@ def AddTags(resource_arn, region):
   vm_util.IssueCommand(tag_cmd)
 
 
-class AddingIAMRole(object):
+class AddingIAMRole:
   """IAM Role to associate with the cluster.
 
   IAM Role can be associated with the cluster to access to other services such
@@ -89,7 +89,7 @@ class Spectrum(redshift.Redshift):
   SERVICE_TYPE = 'spectrum'
 
   def __init__(self, edw_service_spec):
-    super(Spectrum, self).__init__(edw_service_spec)
+    super().__init__(edw_service_spec)
     # Cluster setup attributes
     self.iam_role = edw_service_spec.iam_role
 

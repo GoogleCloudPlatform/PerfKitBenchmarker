@@ -24,7 +24,6 @@ from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-import six
 
 AWS_PATH = 'aws'
 AWS_PREFIX = [AWS_PATH, '--output', 'json']
@@ -79,7 +78,7 @@ def GetZonesInRegion(region: str) -> Set[str]:
   get_zones_cmd = AWS_PREFIX + [
       'ec2',
       'describe-availability-zones',
-      '--region={0}'.format(region),
+      '--region={}'.format(region),
   ]
   stdout, _, _ = vm_util.IssueCommand(get_zones_cmd)
   response = json.loads(stdout)
@@ -179,7 +178,7 @@ def FormatTags(tags_dict):
     A list of tags formatted as arguments for 'tag' parameter.
   """
   return [
-      'Key=%s,Value=%s' % (k, v) for k, v in sorted(six.iteritems(tags_dict))
+      'Key=%s,Value=%s' % (k, v) for k, v in sorted(tags_dict.items())
   ]
 
 
@@ -194,7 +193,7 @@ def FormatTagSpecifications(resource_type, tags_dict):
     A list of tags formatted as arguments for 'tag-specifications' parameter.
   """
   tags = ','.join(
-      '{Key=%s,Value=%s}' % (k, v) for k, v in six.iteritems(tags_dict)
+      '{Key=%s,Value=%s}' % (k, v) for k, v in tags_dict.items()
   )
   return 'ResourceType=%s,Tags=[%s]' % (resource_type, tags)
 

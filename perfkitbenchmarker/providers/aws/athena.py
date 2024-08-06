@@ -18,7 +18,7 @@ import datetime
 import json
 import logging
 import re
-from typing import Dict, Text, Tuple
+from typing import Dict, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -114,7 +114,7 @@ class GenericClientInterface(edw_service.EdwClientInterface):
   """
 
   def __init__(self, database: str, output_bucket: str, region: str):
-    super(GenericClientInterface, self).__init__()
+    super().__init__()
     self.database = database
     self.output_bucket = 's3://%s' % output_bucket
     self.region = region
@@ -150,7 +150,7 @@ class JavaClientInterface(GenericClientInterface):
         package_name, [LATEST_CLIENT_JAR], ''
     )
 
-  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -255,7 +255,7 @@ class Athena(edw_service.EdwService):
   SERVICE_TYPE = 'athena'
 
   def __init__(self, edw_service_spec):
-    super(Athena, self).__init__(edw_service_spec)
+    super().__init__(edw_service_spec)
     self.region = util.GetRegionFromZone(FLAGS.zone[0])
     self.output_bucket = '-'.join(
         [FLAGS.athena_output_location_prefix, self.region, FLAGS.run_uri]
@@ -426,7 +426,7 @@ class Athena(edw_service.EdwService):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for the Athena data warehouse."""
-    basic_data = super(Athena, self).GetMetadata()
+    basic_data = super().GetMetadata()
     basic_data.update({'database': self.cluster_identifier})
     basic_data.update(self.GetDataDetails())
     basic_data.update(self.client_interface.GetMetadata())
