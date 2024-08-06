@@ -89,7 +89,7 @@ ENV_METADATA = (
 class HPCCTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(HPCCTestCase, self).setUp()
+    super().setUp()
     FLAGS.hpcc_math_library = 'openblas'
     path = os.path.join(os.path.dirname(__file__), '../data', 'hpcc-sample.txt')
     with open(path) as fp:

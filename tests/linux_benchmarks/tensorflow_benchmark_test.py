@@ -25,7 +25,7 @@ class TensorflowBenchmarkBatchSizesTestCase(
 ):
 
   def setUp(self):
-    super(TensorflowBenchmarkBatchSizesTestCase, self).setUp()
+    super().setUp()
     FLAGS.tf_batch_sizes = [99]
 
   def testFlagOverridesDefaultBatchSize(self):

@@ -14,6 +14,7 @@
 
 """Tests for fio_benchmark."""
 
+import builtins
 import unittest
 from absl import flags
 import mock
@@ -23,7 +24,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import fio_benchmark
 from perfkitbenchmarker.linux_packages import numactl
 from tests import pkb_common_test_case
-from six.moves import builtins
 
 FLAGS = flags.FLAGS
 
@@ -31,7 +31,7 @@ FLAGS = flags.FLAGS
 class TestGenerateJobFileString(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(TestGenerateJobFileString, self).setUp()
+    super().setUp()
     self.filename = '/test/filename'
 
   def testBasicGeneration(self):

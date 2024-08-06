@@ -26,7 +26,7 @@ class SysBenchMemoryBenchmarkTestCase(
 ):
 
   def setUp(self):
-    super(SysBenchMemoryBenchmarkTestCase, self).setUp()
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__),
         '..',

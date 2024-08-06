@@ -32,7 +32,7 @@ class TestGenerateJobFileString(unittest.TestCase):
     vm1 = mock.MagicMock()
     vm_spec.vms = [vm0, vm1]
     path = os.path.join(os.path.dirname(__file__), '..', 'data', 'ping.out')
-    outfile = open(path, 'r')
+    outfile = open(path)
     pingstdout = outfile.read()
     for vm in vm_spec.vms:
       vm.RemoteCommand.side_effect = [(pingstdout, ' '), (pingstdout, ' ')]

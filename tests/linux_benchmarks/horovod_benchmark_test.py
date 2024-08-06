@@ -24,7 +24,7 @@ FLAGS = flags.FLAGS
 class HorovodBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(HorovodBenchmarkTestCase, self).setUp()
+    super().setUp()
     filenames = [
         'horovod_output_resnet.txt',
         'horovod_output_bert.txt',

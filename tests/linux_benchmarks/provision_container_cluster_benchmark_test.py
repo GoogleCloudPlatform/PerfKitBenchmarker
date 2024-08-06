@@ -31,7 +31,7 @@ class ProvisionKubernetesClusterTest(pkb_common_test_case.PkbCommonTestCase):
     test_path = os.path.join(
         os.path.dirname(__file__), '../data/kubectl_get_events.yaml'
     )
-    with open(test_path, 'r') as f:
+    with open(test_path) as f:
       events_yaml = f.read()
     mock_run_kubectl.return_value = (events_yaml, None, None)
 

@@ -26,7 +26,7 @@ class MlperfBenchmarkTestCase(
 ):
 
   def setUp(self):
-    super(MlperfBenchmarkTestCase, self).setUp()
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__), '..', 'data', 'mlperf_output.txt'
     )

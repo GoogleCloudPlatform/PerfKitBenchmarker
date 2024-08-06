@@ -28,7 +28,7 @@ FLAGS = flags.FLAGS
 class TestBuildCommands(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(TestBuildCommands, self).setUp()
+    super().setUp()
     FLAGS.object_storage_multistream_objects_per_stream = 100
     FLAGS.object_storage_object_sizes = {'1KB': '100%'}
     FLAGS.object_storage_streams_per_vm = 1

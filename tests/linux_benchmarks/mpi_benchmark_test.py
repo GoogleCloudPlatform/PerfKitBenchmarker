@@ -44,7 +44,7 @@ class Vm(pkb_common_test_case.TestLinuxVirtualMachine):
   def __init__(
       self, smt_enabled=True, ip='10.0.0.2', robust_remote_command_text=None
   ) -> None:
-    super(Vm, self).__init__(vm_spec=pkb_common_test_case.CreateTestVmSpec())
+    super().__init__(vm_spec=pkb_common_test_case.CreateTestVmSpec())
     self.internal_ip = ip
     self.num_cpus = 32
     # pylint: disable=invalid-name
@@ -79,7 +79,7 @@ class MpiBenchmarkTestCase(
   _MOCK_UUIDS = [mock.PropertyMock(hex=f'uuid_{i}') for i in range(12)]
 
   def setUp(self) -> None:
-    super(MpiBenchmarkTestCase, self).setUp()
+    super().setUp()
     FLAGS.mpi_benchmarks = ['PingPong']
     FLAGS.intelmpi_version = '2019.2-057'
     self.mock_histo = self.enter_context(

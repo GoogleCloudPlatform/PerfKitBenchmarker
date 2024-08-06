@@ -53,7 +53,7 @@ def _load_data(filename):
 class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
 
   def setUp(self):
-    super(DpdkBenchmarkTestCase, self).setUp()
+    super().setUp()
     # Load data
     self.expected_client_cmd = _load_data(DATA_FILENAMES[0])
     self.expected_server_cmd = _load_data(DATA_FILENAMES[1])

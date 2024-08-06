@@ -35,7 +35,7 @@ class SuspendResumeBenchmarkTest(
 ):
 
   def setUp(self):
-    super(SuspendResumeBenchmarkTest, self).setUp()
+    super().setUp()
     time.time()
     self.enter_context(
         mock.patch.object(time, 'time', side_effect=itertools.cycle([0, 52]))

@@ -30,7 +30,7 @@ _TEST_NUM_VMS = 5
 class GlibcTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(GlibcTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(glibc_benchmark.__name__ + '.FLAGS')
     p.start()
     self.addCleanup(p.stop)

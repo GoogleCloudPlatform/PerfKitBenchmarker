@@ -25,7 +25,7 @@ class MxnetBenchmarkTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     path = os.path.join(
         os.path.dirname(__file__), '..', 'data', 'mxnet_output.txt'
     )
-    with open(path, 'r') as fp:
+    with open(path) as fp:
       self.contents = fp.read()
 
   def testParseSysbenchResult(self):

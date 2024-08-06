@@ -36,7 +36,7 @@ class BidirectionalNetworkBenchmarkTestCase(
 ):
 
   def setUp(self):
-    super(BidirectionalNetworkBenchmarkTestCase, self).setUp()
+    super().setUp()
     # Load netperf stdout data
     path = os.path.join(
         os.path.dirname(__file__),

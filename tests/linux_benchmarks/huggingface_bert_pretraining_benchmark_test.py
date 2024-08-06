@@ -25,7 +25,7 @@ class HuggingfaceBertPretrainingTestCase(
 ):
 
   def setUp(self):
-    super(HuggingfaceBertPretrainingTestCase, self).setUp()
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__),
         '..',

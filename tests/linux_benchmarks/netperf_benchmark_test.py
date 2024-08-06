@@ -34,7 +34,7 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
   maxDiff = None
 
   def setUp(self):
-    super(NetperfBenchmarkTestCase, self).setUp()
+    super().setUp()
     # Load data
     path = os.path.join(
         os.path.dirname(__file__), '..', 'data', 'netperf_results.json'

@@ -36,7 +36,7 @@ class OpenfoamBenchmarkTest(
 ):
 
   def setUp(self):
-    super(OpenfoamBenchmarkTest, self).setUp()
+    super().setUp()
     self.mock_vm = mock.Mock()
     self.mock_benchmark_spec = mock.Mock(vms=[self.mock_vm])
     self.enter_context(

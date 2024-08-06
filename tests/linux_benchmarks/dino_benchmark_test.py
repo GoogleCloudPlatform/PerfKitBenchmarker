@@ -13,7 +13,7 @@ class DinoTestCase(
 ):
 
   def setUp(self):
-    super(DinoTestCase, self).setUp()
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__), '..', 'data', 'dino_output.txt'
     )

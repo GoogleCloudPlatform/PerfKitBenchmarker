@@ -26,7 +26,7 @@ FLAGS.mark_as_parsed()
 class IperfBenchmarkTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(IperfBenchmarkTestCase, self).setUp()
+    super().setUp()
 
     self.vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     vm0 = mock.MagicMock(

@@ -25,7 +25,7 @@ class RobertaMmlmBenchmarkTestCase(
 ):
 
   def setUp(self):
-    super(RobertaMmlmBenchmarkTestCase, self).setUp()
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__), '..', 'data', 'roberta_mmlm_output.txt'
     )

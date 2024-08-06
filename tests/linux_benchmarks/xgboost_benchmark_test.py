@@ -32,7 +32,7 @@ class XgboostBenchmarkTest(
 ):
 
   def setUp(self) -> None:
-    super(XgboostBenchmarkTest, self).setUp()
+    super().setUp()
     self.enter_context(
         mock.patch.object(nvidia_driver, 'QueryNumberOfGpus', return_value=1)
     )

@@ -19,11 +19,11 @@ class CloudharmonyIperfBenchmarkTestCase(
 ):
 
   def setUp(self):
-    super(CloudharmonyIperfBenchmarkTestCase, self).setUp()
+    super().setUp()
     self.path = os.path.join(
         os.path.dirname(__file__), '../data/cloudharmony_iperf.csv'
     )
-    with open(self.path, 'r') as fp:
+    with open(self.path) as fp:
       self.iperf_csv_text = fp.read()
       self.cloud_harmony_metadata = (
           cloud_harmony_util.ParseCsvResultsFromString(self.iperf_csv_text)

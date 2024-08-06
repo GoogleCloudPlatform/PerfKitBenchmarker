@@ -22,7 +22,7 @@ from perfkitbenchmarker.linux_benchmarks import stress_ng_benchmark
 class StressngTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(StressngTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(stress_ng_benchmark.__name__)
     p.start()
     self.addCleanup(p.stop)

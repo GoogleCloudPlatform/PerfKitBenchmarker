@@ -80,10 +80,10 @@ class Stencil2DBenchmarkTestCase(unittest.TestCase):
   @mock.patch(
       'perfkitbenchmarker.linux_packages.nvidia_driver.QueryAutoboostPolicy'
   )
-  @mock.patch((
+  @mock.patch(
       'perfkitbenchmarker.linux_benchmarks.'
       'stencil2d_benchmark._RunSingleIteration'
-  ))
+  )
   def testRun(
       self,
       run_single_iteration_mock,

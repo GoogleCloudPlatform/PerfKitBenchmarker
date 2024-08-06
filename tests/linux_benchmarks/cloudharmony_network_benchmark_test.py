@@ -20,11 +20,11 @@ class CloudharmonyNetworkBenchmarkTestCase(
 ):
 
   def setUp(self):
-    super(CloudharmonyNetworkBenchmarkTestCase, self).setUp()
+    super().setUp()
     self.path = os.path.join(
         os.path.dirname(__file__), '../data/cloudharmony_network.csv'
     )
-    with open(self.path, 'r') as fp:
+    with open(self.path) as fp:
       self.network_csv_text = fp.read()
       self.cloud_harmony_metadata = (
           cloud_harmony_util.ParseCsvResultsFromString(self.network_csv_text)

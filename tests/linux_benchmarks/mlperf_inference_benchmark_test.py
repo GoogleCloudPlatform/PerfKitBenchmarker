@@ -26,7 +26,7 @@ class MlperfInferenceBenchmarkTestCase(
 ):
 
   def setUp(self):
-    super(MlperfInferenceBenchmarkTestCase, self).setUp()
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__),
         "..",

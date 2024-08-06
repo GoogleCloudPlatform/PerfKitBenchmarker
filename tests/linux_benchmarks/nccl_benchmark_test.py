@@ -24,7 +24,7 @@ from perfkitbenchmarker.sample import Sample
 class NcclBenchmarkTest(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
-    super(NcclBenchmarkTest, self).setUp()
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__), '..', 'data', 'nccl_output.txt'
     )

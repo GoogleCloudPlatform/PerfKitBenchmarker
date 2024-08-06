@@ -32,7 +32,7 @@ class StopStartBenchmarkTest(
 ):
 
   def setUp(self):
-    super(StopStartBenchmarkTest, self).setUp()
+    super().setUp()
     self.enter_context(
         mock.patch.object(
             time,
